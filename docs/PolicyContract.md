@@ -14,8 +14,9 @@ This smart contract will be deployed with every purchase of an insurance policy 
 sets all the state variables
 
 ## view functions
-* getExpirationDate()
-* getClaimStatus()
+* viewPolicyHolder()
+* viewExpirationDate()
+* viewClaimStatus()
 
 ## mutative functions
 
