@@ -7,7 +7,8 @@ This smart contract will be deployed with every purchase of an insurance policy 
 * premium amount (% of insured funds over 365 days)
 * policy start time
 * policy end time
-* insured amount in Ether
+* coverageLimit
+* deductible
 * claim status
 
 ## constructor
