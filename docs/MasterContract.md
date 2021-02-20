@@ -1,5 +1,6 @@
 # Master smart contract
-This smart contract will own and operate the platform at launch, eventually transferring the ownership to decentralized governance. It will be capable of minting/burning SOLACE tokens, launching and upgrading to new contracts, switching to new routers, etc. 
+This smart contract will own and operate the platform at launch, eventually transferring the ownership to decentralized governance.
+It's main purpose is minting/burning SOLACE tokens and distributing SOLACE tokens to LPs on DEXes and staking SOLACE holders (reward depositors of SOLACE and LP tokens). 
 
 ## state variables
 

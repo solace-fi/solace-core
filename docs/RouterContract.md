@@ -1,5 +1,5 @@
 # Router smart contract
-This smart contract will route the calls from the front-end app to the functional contracts, allowing for efficient updates.
+This smart contract will route the calls from the front-end app to the functional contracts, allowing for efficient upgrades.
 
 ## state variables
 
