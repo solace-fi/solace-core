@@ -5,7 +5,7 @@ https://solace.fi
 
 ## Contracts
 detailed technical documentation is located in docs folder.
-* MultiSig: Solace deployer controlled by the core team
+* MultiSig: Solace deployer controlled by the core team (use Gnosis Safe?)
 * SolaceToken: solace.fi protocol ERC20 token
 * Master: owner of solace.fi (ownership will be transferred to decentralized governance in the future) and SOLACE distributor
 * Vault: contract that holds the reserve and allocates capital to investment (denominated in ETH)
@@ -17,8 +17,9 @@ detailed technical documentation is located in docs folder.
 * Policy: purchased insurance policy
 * Router: routes the function calls to the core contracts
 
-## Arch Questions
-* how to structure reserve and investment pools?
+## Operational notes
+* Use OpenZeppelin Defender for smart contract administration
+* Proxy scheme to deploy insurance policies (one implementation per product, one proxy per user)
 *
 ## License
 MIT
