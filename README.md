@@ -1,6 +1,8 @@
 # solace.fi
 https://solace.fi
 
+![architecture](tech-arch.jpg)
+
 ## Contracts
 detailed technical documentation is located in docs folder.
 * SolaceToken: solace.fi protocol ERC20 token
@@ -13,6 +15,6 @@ detailed technical documentation is located in docs folder.
 
 ## Arch Questions
 * how to structure reserve and investment pools?
-* 
+*
 ## License
 MIT
