@@ -1,6 +1,6 @@
 # Master smart contract
-This smart contract will own and operate the platform at launch, eventually transferring the ownership to decentralized governance.
-It's main purpose is minting/burning SOLACE tokens and distributing SOLACE tokens to LPs on DEXes and staking SOLACE holders (reward depositors of SOLACE and LP tokens). 
+This smart contract will distribute SOLACE token to liquidity (LPs) and capital providers (CPs).
+Reward liquidity providers for ETH-SOLACE pair on DEX(es) who stake their LP tokens, capital providers for our Vault who stake their CP tokens, and stakers of SOLACE.
 
 ## state variables
 

@@ -15,7 +15,8 @@ detailed technical documentation is located in docs folder.
 * Treasury: holds and manages the protocol's own capital and buys up SOLACE on the open market (denominated in SOLACE)
 * Factory: deploys new insurance products created by the MultiSig
 * Product: deploys new insurance policies purchased by the buyers
-* Policy: purchased insurance policy
+* Policy: insurance policy implementation
+* Proxy Policy: user front contract storing data and forwarding the calls to the implementation contract
 
 ## Operational notes
 * Use OpenZeppelin Defender for smart contract administration

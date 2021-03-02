@@ -1,5 +1,5 @@
 # Factory smart contract
-This smart contract will launch new insurance products' smart contracts and manage the existing ones. Master will call this contract to launch new products 
+This smart contract will launch new insurance products' smart contracts and manage the existing ones. MultiSig will call this contract to launch new products.
 
 ## state variables
 * mapping(uint => address) public getProduct

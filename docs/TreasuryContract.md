@@ -1,5 +1,5 @@
-# Router smart contract
-This smart contract will route the calls from the front-end app to the functional contracts, allowing for efficient upgrades.
+# Treasury smart contract
+This smart contract will manage the protocol's treasury held in SOLACE tokens and market-buy SOLACE with the premiums flowing in.
 
 ## state variables
 

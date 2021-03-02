@@ -1,19 +1,11 @@
 # Policy smart contract
-This smart contract will be deployed with every purchase of an insurance policy and contain all the necessary variables and functions for user to interact with the protocol (e.g. extend/cancel the policy, file a claim, etc.) and the protocol to interact with the user (e.g. process refunds, pay out claims, etc.)
+This smart contract will hold the implementation of Policy contract functions that will handle user interactions with the protocol (e.g. extend/cancel the policy, file a claim, etc.). Each time a user purchases a policy a new Proxy contract will be deployed with the user-specific state variable and act as the entrance point which will delegate calls to this Implementation contract.
+
 
 ## state variables
-* policy holder address
-* product contract address
-* premium amount (% of insured funds over 365 days)
-* policy start time
-* policy end time
-* coverageLimit
-* deductible
-* claim status
+
 
 ## constructor
-sets all the state variables
-
 ## view functions
 * viewPolicyHolder()
 * viewExpirationDate()

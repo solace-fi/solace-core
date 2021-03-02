@@ -10,9 +10,7 @@ import "./SolaceToken.sol";
 
 /// @title Master: owner of solace.fi
 /// @author Nikita S. Buzov
-/// @notice This contract can mint SOLACE tokens and control the SOLACE Protocol.
-///         The ownership will be transferred to a governance smart contract once
-///         SOLACE is sufficiently distributed and the community can govern itself.
+/// @notice This contract is the SOLACE token distributor.
 
 contract Master is Ownable, ReentrancyGuard {
     using SafeMath for uint256;
@@ -21,7 +19,7 @@ contract Master is Ownable, ReentrancyGuard {
     /* ========== STATE VARIABLES ========== */
 
     SolaceToken public _solace; // native SOLACE token
-    adress public devaddress; // developer's address
+    adress public devaddress; // developer's address (our MultiSig)
 
 
     /* ========== CONSTRUCTOR ========== */
