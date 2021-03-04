@@ -23,4 +23,4 @@ detailed technical documentation is located in docs folder.
 * Proxy scheme to deploy insurance policies (one implementation per product, one proxy per user)
 
 ## License
-MIT
+GNU Affero General Public License v3.0
