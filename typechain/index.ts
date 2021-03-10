@@ -5,3 +5,5 @@ export { Erc20Factory } from "./Erc20Factory";
 export type { Erc20 } from "./Erc20";
 export { SolaceFactory } from "./SolaceFactory";
 export type { Solace } from "./Solace";
+export { VaultFactory } from "./VaultFactory";
+export type { Vault } from "./Vault";
