@@ -22,5 +22,19 @@ detailed technical documentation is located in docs folder.
 * Use OpenZeppelin Defender for smart contract administration
 * Proxy scheme to deploy insurance policies (one implementation per product, one proxy per user)
 
+## Pragma Version
+* Solidity 0.8.0: https://docs.soliditylang.org/en/v0.8.0/
+
+## Development Stack
+* Ethereum Dev Environment: https://hardhat.org/
+* Smart Contract Testing: https://getwaffle.io/
+* Blockchain interactions: https://docs.ethers.io/v5/
+* TypeChain (TypeScript bindings for Ethereum smartcontracts): https://github.com/ethereum-ts/TypeChain
+* TypeScript: https://www.typescriptlang.org/
+
+## Style Guide
+* Solidity: https://docs.soliditylang.org/en/v0.5.3/style-guide.html
+* TypeScript: https://google.github.io/styleguide/tsguide.html
+
 ## License
 GNU Affero General Public License v3.0
