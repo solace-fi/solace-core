@@ -3,15 +3,17 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 
 /**
- * @title Solace Token
+ * @title Solace Token (SOLACE)
  * @author solace.fi
- * @notice Solace Tokens can be earned by depositing Capital Provider or Liquidity Provider tokens to the Master contract.
- * Solace Tokens can locked in the Locker contract to earn veSolace Tokens.
+ * @notice Solace tokens can be earned by depositing Capital Provider or Liquidity Provider tokens to the Master contract.
+ *         SOLACE can also be locked for a preset time in the Locker contract to recieve veSOLACE tokens.
  */
 contract SOLACE is ERC20 {
     using SafeERC20 for IERC20;
+    using Address for address;
 
     /// @notice governor
     address public governance;
@@ -27,7 +29,7 @@ contract SOLACE is ERC20 {
 
     /**
      * @notice Creates `amount` new tokens for `to`.
-     * The caller must have the `MINTER_ROLE`.
+     * The caller must be a minter.
      * @param account receiver of new tokens
      * @param amount number of new tokens
      */
