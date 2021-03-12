@@ -32,6 +32,7 @@ interface VaultInterface extends ethers.utils.Interface {
     "governance()": FunctionFragment;
     "increaseAllowance(address,uint256)": FunctionFragment;
     "name()": FunctionFragment;
+    "setGovernance(address)": FunctionFragment;
     "symbol()": FunctionFragment;
     "totalSupply()": FunctionFragment;
     "transfer(address,uint256)": FunctionFragment;
@@ -62,6 +63,10 @@ interface VaultInterface extends ethers.utils.Interface {
     values: [string, BigNumberish]
   ): string;
   encodeFunctionData(functionFragment: "name", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "setGovernance",
+    values: [string]
+  ): string;
   encodeFunctionData(functionFragment: "symbol", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "totalSupply",
@@ -91,6 +96,10 @@ interface VaultInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "name", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "setGovernance",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "symbol", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "totalSupply",
@@ -231,6 +240,16 @@ export class Vault extends Contract {
       0: string;
     }>;
 
+    setGovernance(
+      _governance: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "setGovernance(address)"(
+      _governance: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
     symbol(
       overrides?: CallOverrides
     ): Promise<{
@@ -353,6 +372,16 @@ export class Vault extends Contract {
 
   "name()"(overrides?: CallOverrides): Promise<string>;
 
+  setGovernance(
+    _governance: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "setGovernance(address)"(
+    _governance: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
   symbol(overrides?: CallOverrides): Promise<string>;
 
   "symbol()"(overrides?: CallOverrides): Promise<string>;
@@ -458,6 +487,16 @@ export class Vault extends Contract {
     name(overrides?: CallOverrides): Promise<string>;
 
     "name()"(overrides?: CallOverrides): Promise<string>;
+
+    setGovernance(
+      _governance: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "setGovernance(address)"(
+      _governance: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
 
     symbol(overrides?: CallOverrides): Promise<string>;
 
@@ -576,6 +615,16 @@ export class Vault extends Contract {
 
     "name()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+    setGovernance(
+      _governance: string,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "setGovernance(address)"(
+      _governance: string,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
     symbol(overrides?: CallOverrides): Promise<BigNumber>;
 
     "symbol()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -685,6 +734,16 @@ export class Vault extends Contract {
     name(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "name()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    setGovernance(
+      _governance: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "setGovernance(address)"(
+      _governance: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
 
     symbol(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
