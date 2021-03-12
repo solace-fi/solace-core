@@ -1,8 +1,7 @@
-
 import chai from "chai";
 import { waffle } from "hardhat";
 import SolaceArtifact from '../artifacts/contracts/SOLACE.sol/SOLACE.json'
-import { Solace, SolaceFactory } from "../typechain";
+import { Solace } from "../typechain";
 
 const { expect } = chai;
 const { deployContract, solidity } = waffle;
@@ -12,7 +11,6 @@ chai.use(solidity);
 
 describe('SolaceToken', () => {
   let solace: Solace;
-
   const [owner, governor, minter, receiver1, receiver2] = provider.getWallets();
   const name = 'solace.fi';
   const symbol = 'SOLACE';
@@ -20,12 +18,10 @@ describe('SolaceToken', () => {
   const amount = 10
 
   beforeEach(async () => {
-
     solace = (await deployContract(
       owner,
       SolaceArtifact
     )) as Solace;
-    
   })
 
   it('has a correct name', async function () {
