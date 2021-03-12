@@ -5,6 +5,8 @@ export { Erc20Factory } from "./Erc20Factory";
 export type { Erc20 } from "./Erc20";
 export { MasterFactory } from "./MasterFactory";
 export type { Master } from "./Master";
+export { MockStrategyFactory } from "./MockStrategyFactory";
+export type { MockStrategy } from "./MockStrategy";
 export { MockTokenFactory } from "./MockTokenFactory";
 export type { MockToken } from "./MockToken";
 export { MockWethFactory } from "./MockWethFactory";
