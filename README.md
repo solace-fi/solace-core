@@ -35,6 +35,7 @@ detailed technical documentation is located in docs folder.
 ## Style Guide
 * Solidity: https://docs.soliditylang.org/en/v0.5.3/style-guide.html
 * TypeScript: https://google.github.io/styleguide/tsguide.html
+* Git: https://github.com/kseniya292/standards
 
 ## License
-GNU Affero General Public License v3.0
+GNU General Public License v3.0
