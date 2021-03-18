@@ -154,7 +154,7 @@ contract Vault is ERC20 {
      * Mints CP tokens to caller if caller is not Vault or WETH
      */
     receive() external payable {
-        if (msg.sender != strategy && msg.sender != address(token)) {
+        if (msg.sender != address(token)) {
             deposit();
         }
     }
