@@ -38,6 +38,8 @@ contract Vault is ERC20 {
     mapping (address => StrategyParams) public strategies;
 
     event StrategyAdded(address indexed strategy, uint256 debtRatio, uint256 minDebtPerHarvest, uint256 maxDebtPerHarvest, uint256 performanceFee);
+    event DepositMade(address indexed depositor, uint256 indexed amount);
+    event InvestmentMade(address indexed strategy, uint256 indexed amount);
 
     constructor (address _token) ERC20("Solace CP Token", "SCP") {
         governance = msg.sender;
@@ -60,12 +62,14 @@ contract Vault is ERC20 {
      * @param _strategy address of strategy contract
      * @param _amount of token to move to Investment contract
      */
-    function invest(address _strategy, uint256 _amount) public {
+    function invest(address _strategy, uint256 _amount) external {
         require(msg.sender == governance, "!governance");
         require(strategies[_strategy].activation > 0, "must be an approved strategy");
-        // send ETH to Investment
+        // send ETH to Strategy contract to execute on investment strategy
         token.safeTransfer(_strategy, _amount);
         IStrategy(_strategy).deposit();
+
+        emit InvestmentMade(_strategy, _amount);
     }
 
     /**
@@ -124,6 +128,8 @@ contract Vault is ERC20 {
             shares = (amount * totalSupply()) / beforeBalance;
         }
         _mint(msg.sender, shares);
+
+        emit DepositMade(msg.sender, amount);
     }
 
     /**

@@ -113,7 +113,11 @@ describe("Vault", function () {
 
         it('should emit Transfer event as CP tokens are minted', async function () {
             expect(await vault.connect(depositor1).deposit({ value: testDepositAmount})).to.emit(vault, 'Transfer').withArgs(ZERO_ADDRESS, depositor1.address, testDepositAmount);
-        })
+        });
+
+        it('should emit DepositMade event after function logic is successful', async function () {
+            expect(await vault.connect(depositor1).deposit({ value: testDepositAmount})).to.emit(vault, 'DepositMade').withArgs(depositor1.address, testDepositAmount);
+        });
 
     });
 
@@ -135,6 +139,10 @@ describe("Vault", function () {
         it("should revert if not called by governance", async function () {
             await expect(vault.connect(depositor1).invest(strategy.address, testInvestmentAmount)).to.be.revertedWith("!governance");
         });
+
+        it('should emit InvestmentMade event after function logic is successful', async function () {
+            expect(await vault.connect(owner).invest(strategy.address, testInvestmentAmount)).to.emit(vault, 'InvestmentMade').withArgs(strategy.address, testInvestmentAmount);
+        })
     });
 
     describe("withdraw", function () {

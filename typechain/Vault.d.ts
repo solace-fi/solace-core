@@ -143,11 +143,15 @@ interface VaultInterface extends ethers.utils.Interface {
 
   events: {
     "Approval(address,address,uint256)": EventFragment;
+    "DepositMade(address,uint256)": EventFragment;
+    "InvestmentMade(address,uint256)": EventFragment;
     "StrategyAdded(address,uint256,uint256,uint256,uint256)": EventFragment;
     "Transfer(address,address,uint256)": EventFragment;
   };
 
   getEvent(nameOrSignatureOrTopic: "Approval"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "DepositMade"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "InvestmentMade"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "StrategyAdded"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "Transfer"): EventFragment;
 }
@@ -871,6 +875,16 @@ export class Vault extends Contract {
       owner: string | null,
       spender: string | null,
       value: null
+    ): EventFilter;
+
+    DepositMade(
+      depositor: string | null,
+      amount: BigNumberish | null
+    ): EventFilter;
+
+    InvestmentMade(
+      strategy: string | null,
+      amount: BigNumberish | null
     ): EventFilter;
 
     StrategyAdded(
