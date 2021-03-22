@@ -23,7 +23,7 @@ contract Master {
         //   pending reward = (user.amount * farm.accSolacePerShare) - user.rewardDebt
         //
         // Whenever a user deposits or withdraws LP tokens to a farm. Here's what happens:
-        //   1. The farm's `accSolacePerShare` (and `lastRewardBlock`) gets updated.
+        //   1. The farm's `accSolacePerShare` and `lastRewardBlock` gets updated.
         //   2. User receives the pending reward sent to his/her address.
         //   3. User's `amount` gets updated.
         //   4. User's `rewardDebt` gets updated.
@@ -32,10 +32,10 @@ contract Master {
     // Info of each farm.
     struct FarmInfo {
         IERC20 token;              // address of CP or LP token contract
-        uint256 allocPoints;       // How many allocation points assigned to this farm
+        uint256 allocPoints;       // how many allocation points assigned to this farm
         uint256 startBlock;        // when the farm will start
         uint256 endBlock;          // when the farm will end
-        uint256 lastRewardBlock;   // last time rewards were distributed / farm was updated
+        uint256 lastRewardBlock;   // last time rewards were distributed or farm was updated
         uint256 accSolacePerShare; // accumulated rewards per share, times 1e12
         uint256 tokensStaked;      // number of tokens staked by all farmers
     }
@@ -77,56 +77,6 @@ contract Master {
     }
 
     /**
-     * @notice The number of farms.
-     * @return The number of farms.
-     */
-    function farmLength() external view returns (uint256) {
-        return farmInfo.length;
-    }
-
-    /**
-     * @notice Calculates the reward multiplier over the given _from until _to block.
-     * @param _farmId The farm to measure rewards for.
-     * @param _from The start of the period to measure rewards for.
-     * @param _to The end of the period to measure rewards for.
-     * @return The weighted multiplier for the given period.
-     */
-    function getMultiplier(uint256 _farmId, uint256 _from, uint256 _to) public view returns (uint256) {
-        // no rewards for non existant farm
-        if (_farmId >= farmInfo.length) return 0;
-        // get farm information
-        FarmInfo storage farm = farmInfo[_farmId];
-        // validate window
-        uint256 from = Math.max(_from, farm.startBlock);
-        uint256 to = Math.min(_to, farm.endBlock);
-        // no reward for negative window
-        if (from > to) return 0;
-        return to - from;
-    }
-
-    /**
-     * @notice Calculates the accumulated balance of reward token for specified user.
-     * @param _farmId The farm to measure rewards for.
-     * @param _user The user for whom unclaimed tokens will be shown.
-     * @return Total amount of withdrawable reward tokens.
-     */
-    function pendingReward(uint256 _farmId, address _user) public view returns (uint256) {
-        // no rewards for a non existant farm
-        if (_farmId >= farmInfo.length) return 0;
-        // get farm and farmer information
-        FarmInfo storage farm = farmInfo[_farmId];
-        UserInfo storage user = userInfo[_farmId][_user];
-        // math
-        uint256 accSolacePerShare = farm.accSolacePerShare;
-        if (block.number > farm.lastRewardBlock && farm.tokensStaked != 0) {
-            uint256 multiplier = getMultiplier(_farmId, farm.lastRewardBlock, block.number);
-            uint256 tokenReward = multiplier * solacePerBlock * farm.allocPoints / totalAllocPoints;
-            accSolacePerShare += tokenReward * 1e12 / farm.tokensStaked;
-        }
-        return user.amount * accSolacePerShare / 1e12 - user.rewardDebt;
-    }
-
-    /**
      * @notice Constructs a new farm.
      * @param _token The token to deposit.
      * @param _allocPoints Relative amount of solace rewards to distribute per block.
@@ -139,7 +89,9 @@ contract Master {
         uint256 _allocPoints,
         uint256 _startBlock,
         uint256 _endBlock
-    ) public returns (uint256) {
+    )
+        external returns (uint256)
+    {
         // leaving input validation to governor
         // require(_token != address(0x0), "cannot farm the null token");
         // require(_startBlock < _endBlock, "duration must be positive");
@@ -172,62 +124,57 @@ contract Master {
      * Can only be called by the current governor.
      * @param _governance The new governor.
      */
-    function setGovernance(address _governance) public {
+    function setGovernance(address _governance) external {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
         governance = _governance;
     }
 
     /**
-     * @notice Updates farm information to be up to date to the current block.
-     * @param _farmId The farm to update.
-     */
-    function updateFarm(uint256 _farmId) public {
-        // dont update a non existant farm
-        if (_farmId >= farmInfo.length) return;
-        // get farm information
-        FarmInfo storage farm = farmInfo[_farmId];
-        // dont update needlessly
-        if (block.number <= farm.lastRewardBlock) return;
-        if (farm.tokensStaked == 0) {
-            farm.lastRewardBlock = Math.min(block.number, farm.endBlock);
-            return;
-        }
-        // update math
-        uint256 multiplier = getMultiplier(_farmId, farm.lastRewardBlock, block.number);
-        uint256 tokenReward = multiplier * solacePerBlock * farm.allocPoints / totalAllocPoints;
-        farm.accSolacePerShare += tokenReward * 1e12 / farm.tokensStaked;
-        farm.lastRewardBlock = Math.min(block.number, farm.endBlock);
-    }
-
-    /**
-     * @notice Updates all farms to be up to date to the current block.
-     */
-    function massUpdateFarms() public {
-        uint256 length = farmInfo.length;
-        for (uint256 farmId = 0; farmId < length; ++farmId) {
-            updateFarm(farmId);
-        }
-    }
-
-    /**
-     * @notice Set a farm's allocation.
+     * @notice Sets the Solace reward distribution across all farms.
      * Optionally updates all farms.
-     * @dev Need to set allocation of multiple farms?
-     * Save gas by only using _withUpdate on the last farm.
-     * @param _farmId The farm to set allocation for.
-     * @param _allocPoints The farm's new allocation points.
+     * @param _solacePerBlock Amount of solace to distribute per block.
      * @param _withUpdate If true, updates all farms.
      */
-    function setAllocation(uint256 _farmId, uint256 _allocPoints, bool _withUpdate) public {
+    function setSolacePerBlock(uint256 _solacePerBlock, bool _withUpdate) external {
+        // can only be called by governor
+        require(msg.sender == governance, "!governance");
+        // optional update
+        if (_withUpdate) massUpdateFarms();
+        // accounting
+        solacePerBlock = _solacePerBlock;
+    }
+
+    /**
+     * @notice Set a farm's allocation and end block.
+     * Optionally updates all farms.
+     * @dev This should be two methods, setAllocation() and setEndBlock().
+     * It is more gas efficient to use a single method.
+     * Need to set allocation of multiple farms?
+     * Save even more gas by only using _withUpdate on the last farm.
+     * @param _farmId The farm to set allocation for.
+     * @param _allocPoints The farm's new allocation points.
+     * @param _endBlock The farm's new end block.
+     * @param _withUpdate If true, updates all farms.
+     */
+    function setFarmParams(
+        uint256 _farmId,
+        uint256 _allocPoints,
+        uint256 _endBlock,
+        bool _withUpdate
+    )
+        external
+    {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
         // cannot set allocation for a non existant farm
         require(_farmId < farmInfo.length, "farm does not exist");
+        // optional update
         if (_withUpdate) massUpdateFarms();
         // accounting
         totalAllocPoints = totalAllocPoints + _allocPoints - farmInfo[_farmId].allocPoints;
         farmInfo[_farmId].allocPoints = _allocPoints;
+        farmInfo[_farmId].endBlock = _endBlock;
     }
 
     /**
@@ -235,12 +182,13 @@ contract Master {
      * @param _farmId The farm to deposit to.
      * @param _amount The deposit amount.
      */
-    function deposit(uint256 _farmId, uint256 _amount) public {
+    function deposit(uint256 _farmId, uint256 _amount) external {
         // cannot deposit onto a non existant farm
         require(_farmId < farmInfo.length, "farm does not exist");
         // get farm and farmer information
         FarmInfo storage farm = farmInfo[_farmId];
         UserInfo storage user = userInfo[_farmId][msg.sender];
+        // update farm
         updateFarm(_farmId);
         // transfer users pending rewards if nonzero
         if (user.amount > 0) {
@@ -263,7 +211,7 @@ contract Master {
      * Note: _amount will be deducted from amount deposited.
      * User will receive _amount of CP/LP tokens and accumulated Solace rewards.
      */
-    function withdraw(uint256 _farmId, uint256 _amount) public {
+    function withdraw(uint256 _farmId, uint256 _amount) external {
         // cannot withdraw from a non existant farm
         require(_farmId < farmInfo.length, "farm does not exist");
         // get farm and farmer information
@@ -271,6 +219,7 @@ contract Master {
         UserInfo storage user = userInfo[_farmId][msg.sender];
         // cannot withdraw more than deposited
         require(user.amount >= _amount, "insufficient");
+        // update farm
         updateFarm(_farmId);
         // transfer users pending rewards
         uint256 pendingSolace = user.amount * farm.accSolacePerShare / 1e12 - user.rewardDebt;
@@ -282,6 +231,88 @@ contract Master {
         // return CP/LP tokens
         safeTransfer(farm.token, msg.sender, _amount);
         emit Withdraw(msg.sender, _farmId, _amount);
+    }
+
+    /**
+     * @notice Calculates the accumulated balance of reward token for specified user.
+     * @param _farmId The farm to measure rewards for.
+     * @param _user The user for whom unclaimed tokens will be shown.
+     * @return Total amount of withdrawable reward tokens.
+     */
+    function pendingReward(uint256 _farmId, address _user) external view returns (uint256) {
+        // no rewards for a non existant farm
+        if (_farmId >= farmInfo.length) return 0;
+        // get farm and farmer information
+        FarmInfo storage farm = farmInfo[_farmId];
+        UserInfo storage user = userInfo[_farmId][_user];
+        // math
+        uint256 accSolacePerShare = farm.accSolacePerShare;
+        if (block.number > farm.lastRewardBlock && farm.tokensStaked != 0 && totalAllocPoints != 0) {
+            uint256 multiplier = getMultiplier(_farmId, farm.lastRewardBlock, block.number);
+            uint256 tokenReward = multiplier * solacePerBlock * farm.allocPoints / totalAllocPoints;
+            accSolacePerShare += tokenReward * 1e12 / farm.tokensStaked;
+        }
+        return user.amount * accSolacePerShare / 1e12 - user.rewardDebt;
+    }
+
+    /**
+     * @notice The number of farms.
+     * @return The number of farms.
+     */
+    function farmLength() external view returns (uint256) {
+        return farmInfo.length;
+    }
+
+    /**
+     * @notice Updates farm information to be up to date to the current block.
+     * @param _farmId The farm to update.
+     */
+    function updateFarm(uint256 _farmId) public {
+        // dont update a non existant farm
+        if (_farmId >= farmInfo.length) return;
+        // get farm information
+        FarmInfo storage farm = farmInfo[_farmId];
+        // dont update needlessly
+        if (block.number <= farm.lastRewardBlock) return;
+        if (farm.tokensStaked == 0 || totalAllocPoints == 0) {
+            farm.lastRewardBlock = Math.min(block.number, farm.endBlock);
+            return;
+        }
+        // update math
+        uint256 multiplier = getMultiplier(_farmId, farm.lastRewardBlock, block.number);
+        uint256 tokenReward = multiplier * solacePerBlock * farm.allocPoints / totalAllocPoints;
+        farm.accSolacePerShare += tokenReward * 1e12 / farm.tokensStaked;
+        farm.lastRewardBlock = Math.min(block.number, farm.endBlock);
+    }
+
+    /**
+     * @notice Updates all farms to be up to date to the current block.
+     */
+    function massUpdateFarms() public {
+        uint256 length = farmInfo.length;
+        for (uint256 farmId = 0; farmId < length; ++farmId) {
+            updateFarm(farmId);
+        }
+    }
+
+    /**
+     * @notice Calculates the reward multiplier over the given _from until _to block.
+     * @param _farmId The farm to measure rewards for.
+     * @param _from The start of the period to measure rewards for.
+     * @param _to The end of the period to measure rewards for.
+     * @return The weighted multiplier for the given period.
+     */
+    function getMultiplier(uint256 _farmId, uint256 _from, uint256 _to) public view returns (uint256) {
+        // no rewards for non existant farm
+        if (_farmId >= farmInfo.length) return 0;
+        // get farm information
+        FarmInfo storage farm = farmInfo[_farmId];
+        // validate window
+        uint256 from = Math.max(_from, farm.startBlock);
+        uint256 to = Math.min(_to, farm.endBlock);
+        // no reward for negative window
+        if (from > to) return 0;
+        return to - from;
     }
 
     /**

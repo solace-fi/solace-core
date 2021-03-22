@@ -30,8 +30,9 @@ interface MasterInterface extends ethers.utils.Interface {
     "governance()": FunctionFragment;
     "massUpdateFarms()": FunctionFragment;
     "pendingReward(uint256,address)": FunctionFragment;
-    "setAllocation(uint256,uint256,bool)": FunctionFragment;
+    "setFarmParams(uint256,uint256,uint256,bool)": FunctionFragment;
     "setGovernance(address)": FunctionFragment;
+    "setSolacePerBlock(uint256,bool)": FunctionFragment;
     "solace()": FunctionFragment;
     "solacePerBlock()": FunctionFragment;
     "totalAllocPoints()": FunctionFragment;
@@ -73,12 +74,16 @@ interface MasterInterface extends ethers.utils.Interface {
     values: [BigNumberish, string]
   ): string;
   encodeFunctionData(
-    functionFragment: "setAllocation",
-    values: [BigNumberish, BigNumberish, boolean]
+    functionFragment: "setFarmParams",
+    values: [BigNumberish, BigNumberish, BigNumberish, boolean]
   ): string;
   encodeFunctionData(
     functionFragment: "setGovernance",
     values: [string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "setSolacePerBlock",
+    values: [BigNumberish, boolean]
   ): string;
   encodeFunctionData(functionFragment: "solace", values?: undefined): string;
   encodeFunctionData(
@@ -120,11 +125,15 @@ interface MasterInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "setAllocation",
+    functionFragment: "setFarmParams",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
     functionFragment: "setGovernance",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "setSolacePerBlock",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "solace", data: BytesLike): Result;
@@ -295,16 +304,18 @@ export class Master extends Contract {
       0: BigNumber;
     }>;
 
-    setAllocation(
+    setFarmParams(
       _farmId: BigNumberish,
       _allocPoints: BigNumberish,
+      _endBlock: BigNumberish,
       _withUpdate: boolean,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    "setAllocation(uint256,uint256,bool)"(
+    "setFarmParams(uint256,uint256,uint256,bool)"(
       _farmId: BigNumberish,
       _allocPoints: BigNumberish,
+      _endBlock: BigNumberish,
       _withUpdate: boolean,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
@@ -316,6 +327,18 @@ export class Master extends Contract {
 
     "setGovernance(address)"(
       _governance: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    setSolacePerBlock(
+      _solacePerBlock: BigNumberish,
+      _withUpdate: boolean,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "setSolacePerBlock(uint256,bool)"(
+      _solacePerBlock: BigNumberish,
+      _withUpdate: boolean,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
@@ -506,16 +529,18 @@ export class Master extends Contract {
     overrides?: CallOverrides
   ): Promise<BigNumber>;
 
-  setAllocation(
+  setFarmParams(
     _farmId: BigNumberish,
     _allocPoints: BigNumberish,
+    _endBlock: BigNumberish,
     _withUpdate: boolean,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  "setAllocation(uint256,uint256,bool)"(
+  "setFarmParams(uint256,uint256,uint256,bool)"(
     _farmId: BigNumberish,
     _allocPoints: BigNumberish,
+    _endBlock: BigNumberish,
     _withUpdate: boolean,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
@@ -527,6 +552,18 @@ export class Master extends Contract {
 
   "setGovernance(address)"(
     _governance: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  setSolacePerBlock(
+    _solacePerBlock: BigNumberish,
+    _withUpdate: boolean,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "setSolacePerBlock(uint256,bool)"(
+    _solacePerBlock: BigNumberish,
+    _withUpdate: boolean,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
@@ -693,16 +730,18 @@ export class Master extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    setAllocation(
+    setFarmParams(
       _farmId: BigNumberish,
       _allocPoints: BigNumberish,
+      _endBlock: BigNumberish,
       _withUpdate: boolean,
       overrides?: CallOverrides
     ): Promise<void>;
 
-    "setAllocation(uint256,uint256,bool)"(
+    "setFarmParams(uint256,uint256,uint256,bool)"(
       _farmId: BigNumberish,
       _allocPoints: BigNumberish,
+      _endBlock: BigNumberish,
       _withUpdate: boolean,
       overrides?: CallOverrides
     ): Promise<void>;
@@ -714,6 +753,18 @@ export class Master extends Contract {
 
     "setGovernance(address)"(
       _governance: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    setSolacePerBlock(
+      _solacePerBlock: BigNumberish,
+      _withUpdate: boolean,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "setSolacePerBlock(uint256,bool)"(
+      _solacePerBlock: BigNumberish,
+      _withUpdate: boolean,
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -861,16 +912,18 @@ export class Master extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    setAllocation(
+    setFarmParams(
       _farmId: BigNumberish,
       _allocPoints: BigNumberish,
+      _endBlock: BigNumberish,
       _withUpdate: boolean,
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    "setAllocation(uint256,uint256,bool)"(
+    "setFarmParams(uint256,uint256,uint256,bool)"(
       _farmId: BigNumberish,
       _allocPoints: BigNumberish,
+      _endBlock: BigNumberish,
       _withUpdate: boolean,
       overrides?: Overrides
     ): Promise<BigNumber>;
@@ -882,6 +935,18 @@ export class Master extends Contract {
 
     "setGovernance(address)"(
       _governance: string,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    setSolacePerBlock(
+      _solacePerBlock: BigNumberish,
+      _withUpdate: boolean,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "setSolacePerBlock(uint256,bool)"(
+      _solacePerBlock: BigNumberish,
+      _withUpdate: boolean,
       overrides?: Overrides
     ): Promise<BigNumber>;
 
@@ -1009,16 +1074,18 @@ export class Master extends Contract {
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
-    setAllocation(
+    setFarmParams(
       _farmId: BigNumberish,
       _allocPoints: BigNumberish,
+      _endBlock: BigNumberish,
       _withUpdate: boolean,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    "setAllocation(uint256,uint256,bool)"(
+    "setFarmParams(uint256,uint256,uint256,bool)"(
       _farmId: BigNumberish,
       _allocPoints: BigNumberish,
+      _endBlock: BigNumberish,
       _withUpdate: boolean,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
@@ -1030,6 +1097,18 @@ export class Master extends Contract {
 
     "setGovernance(address)"(
       _governance: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    setSolacePerBlock(
+      _solacePerBlock: BigNumberish,
+      _withUpdate: boolean,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "setSolacePerBlock(uint256,bool)"(
+      _solacePerBlock: BigNumberish,
+      _withUpdate: boolean,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
