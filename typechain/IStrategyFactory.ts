@@ -33,7 +33,13 @@ const _abi = [
       },
     ],
     name: "withdraw",
-    outputs: [],
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "_loss",
+        type: "uint256",
+      },
+    ],
     stateMutability: "nonpayable",
     type: "function",
   },

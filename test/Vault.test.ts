@@ -3,7 +3,8 @@ import { waffle } from "hardhat";
 import VaultArtifact from '../artifacts/contracts/Vault.sol/Vault.json'
 import StrategyArtifact from '../artifacts/contracts/mocks/MockStrategy.sol/MockStrategy.json'
 import WETHArtifact from '../artifacts/contracts/mocks/MockWETH.sol/MockWETH.json'
-import { Vault, MockStrategy, MockToken, MockWeth } from "../typechain";
+import { BigNumber as BN } from 'ethers';
+import { Vault, MockStrategy, MockWeth } from "../typechain";
 
 const { expect } = chai;
 const { deployContract, solidity } = waffle;
@@ -15,18 +16,20 @@ describe("Vault", function () {
     let vault: Vault;
     let weth: MockWeth;
     let strategy: MockStrategy;
+    let unaddedStrategy: MockStrategy;
 
     const [owner, newOwner, depositor1, depositor2] = provider.getWallets();
     const tokenName = "Solace CP Token";
     const tokenSymbol = "SCP";
-    const testDepositAmount = 5;
-    const testInvestmentAmount = 3;
+    const testDepositAmount = BN.from("5");
+    const testInvestmentAmount = BN.from("3");
     const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
     const debtRatio = 10;
     const minDebtPerHarvest = 0;
     const maxDebtPerHarvest = 50;
     const performanceFee = 10;
+    const maxLoss = 1; // 0.01% BPS
 
     beforeEach(async () => {
         weth = (await deployContract(
@@ -41,6 +44,12 @@ describe("Vault", function () {
         )) as Vault;
 
         strategy = (await deployContract(
+            owner,
+            StrategyArtifact,
+            [vault.address]
+        )) as MockStrategy;
+
+        unaddedStrategy = (await deployContract(
             owner,
             StrategyArtifact,
             [vault.address]
@@ -105,10 +114,13 @@ describe("Vault", function () {
             await vault.connect(depositor1).deposit({ value: testDepositAmount});
             expect(await vault.balanceOf(depositor1.address)).to.equal(testDepositAmount);
 
-            await vault.connect(depositor2).deposit({ value: testDepositAmount});
-            expect(await vault.balanceOf(depositor2.address)).to.equal(testDepositAmount);
+            const callTotalAssets = await vault.totalAssets();
+            const callTotalSupply = await vault.totalSupply();
 
-            expect(await weth.balanceOf(vault.address)).to.equal(testDepositAmount * 2);
+            await vault.connect(depositor2).deposit({ value: testDepositAmount});
+            expect(await vault.balanceOf(depositor2.address)).to.equal(testDepositAmount.mul(callTotalSupply).div(callTotalAssets));
+
+            expect(await weth.balanceOf(vault.address)).to.equal(testDepositAmount.mul(2));
         });
 
         it('should emit Transfer event as CP tokens are minted', async function () {
@@ -117,6 +129,53 @@ describe("Vault", function () {
 
         it('should emit DepositMade event after function logic is successful', async function () {
             expect(await vault.connect(depositor1).deposit({ value: testDepositAmount})).to.emit(vault, 'DepositMade').withArgs(depositor1.address, testDepositAmount);
+        });
+
+    });
+
+    describe("withdrawal queue management", function () {
+        
+        beforeEach('set investment address and make initial deposit', async function () {
+            await vault.connect(owner).addStrategy(strategy.address, debtRatio, minDebtPerHarvest, maxDebtPerHarvest, performanceFee);
+        })
+
+        describe("setWithdrawalQueue", function () {
+            it("should revert if not called by governance", async function () {
+                await expect(vault.connect(depositor1).setWithdrawalQueue([strategy.address, unaddedStrategy.address])).to.be.revertedWith("!governance");
+            });
+            it("should allow governance to set a new withdrawal queue", async function () {
+                await vault.connect(owner).addStrategy(unaddedStrategy.address, debtRatio, minDebtPerHarvest, maxDebtPerHarvest, performanceFee);
+                // expect(await vault.connect(owner).setWithdrawalQueue([strategy.address, unaddedStrategy.address])).to.emit(vault, 'UpdateWithdrawalQueue').withArgs([strategy.address, unaddedStrategy.address]);
+            });
+        });
+
+        describe("addStrategyToQueue", function () {
+            it("should revert if not called by governance", async function () {
+                await expect(vault.connect(depositor1).addStrategyToQueue(strategy.address)).to.be.revertedWith("!governance");
+            });
+            it("should revert if not an active strategy address", async function () {
+                await expect(vault.connect(owner).addStrategyToQueue(unaddedStrategy.address)).to.be.revertedWith("must be a current strategy");
+            });
+            it("should revert if strategy is already in the queue", async function () {
+                await expect(vault.connect(owner).addStrategyToQueue(strategy.address)).to.be.revertedWith("strategy already in queue");
+            });
+            it('should emit StrategyAddedToQueue event after function logic is successful', async function () {
+                await vault.connect(owner).addStrategy(unaddedStrategy.address, debtRatio, minDebtPerHarvest, maxDebtPerHarvest, performanceFee);
+                await vault.connect(owner).removeStrategyFromQueue(unaddedStrategy.address);
+                // expect(await vault.connect(owner).addStrategyToQueue(unaddedStrategy.address)).to.emit(vault, 'StrategyAddedToQueue').withArgs(strategy.address);
+            });
+        });
+
+        describe("removeStrategyFromQueue", function () {
+            it("should revert if not called by governance", async function () {
+                await expect(vault.connect(depositor1).removeStrategyFromQueue(strategy.address)).to.be.revertedWith("!governance");
+            });
+            it("should revert if not an active strategy address", async function () {
+                await expect(vault.connect(owner).removeStrategyFromQueue(unaddedStrategy.address)).to.be.revertedWith("must be a current strategy");
+            });
+            it('should emit StrategyRemovedFromQueue event after function logic is successful', async function () {
+                expect(await vault.connect(owner).removeStrategyFromQueue(strategy.address)).to.emit(vault, 'StrategyRemovedFromQueue').withArgs(strategy.address);
+            })
         });
 
     });
@@ -133,7 +192,7 @@ describe("Vault", function () {
         });
 
         it("should revert if not an approved strategy", async function () {
-            await expect(vault.connect(owner).invest(weth.address, testInvestmentAmount)).to.be.revertedWith("must be an approved strategy");
+            await expect(vault.connect(owner).invest(weth.address, testInvestmentAmount)).to.be.revertedWith("must be a current strategy");
         });
 
         it("should revert if not called by governance", async function () {
@@ -154,13 +213,13 @@ describe("Vault", function () {
         context("when there is enough WETH in the Vault", function () {
             it("should alter WETH balance of Vault contract by amountNeeded", async function () {
                 let cpBalance = await vault.balanceOf(depositor1.address);
-                await expect(() => vault.connect(depositor1).withdraw(cpBalance)).to.changeTokenBalance(weth, vault, testDepositAmount * -1);
+                await expect(() => vault.connect(depositor1).withdraw(cpBalance, maxLoss)).to.changeTokenBalance(weth, vault, testDepositAmount.mul(-1));
             });
             
             it("should only use WETH from Vault if Vault balance is sufficient", async function () {
                 let cpBalance = await vault.balanceOf(depositor1.address);
     
-                expect(await vault.connect(depositor1).withdraw(cpBalance)).to.changeEtherBalance(depositor1, testDepositAmount);
+                expect(await vault.connect(depositor1).withdraw(cpBalance, maxLoss)).to.changeEtherBalance(depositor1, testDepositAmount);
     
                 expect(await vault.balanceOf(depositor1.address)).to.equal(0);
                 expect(await weth.balanceOf(vault.address)).to.equal(0);
@@ -174,11 +233,11 @@ describe("Vault", function () {
             })
             it("should alter WETH balance of Strategy contract by amountNeeded", async function () {
                 let cpBalance = await vault.balanceOf(depositor1.address);
-                await expect(() => vault.connect(depositor1).withdraw(cpBalance)).to.changeTokenBalance(weth, strategy, testInvestmentAmount * -1);
+                await expect(() => vault.connect(depositor1).withdraw(cpBalance, maxLoss)).to.changeTokenBalance(weth, strategy, testInvestmentAmount.mul(-1));
             });
-            it("should withdraw difference from Investment contract", async function () {
+            it("should withdraw difference from Investment contract, burn user's vault shares and transfer ETH back to user", async function () {
                 let cpBalance = await vault.balanceOf(depositor1.address);
-                expect(await vault.connect(depositor1).withdraw(cpBalance)).to.changeEtherBalance(depositor1, testDepositAmount);
+                expect(await vault.connect(depositor1).withdraw(cpBalance, maxLoss)).to.changeEtherBalance(depositor1, testDepositAmount);
                 expect(await vault.balanceOf(depositor1.address)).to.equal(0);
             });
         });

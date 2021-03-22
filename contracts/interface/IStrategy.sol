@@ -8,6 +8,6 @@ pragma solidity ^0.8.0;
  * @notice Interface for investment Strategy contract
  */
 interface IStrategy {
-    function withdraw(uint256 _amount) external;
+    function withdraw(uint256 _amount) external returns (uint256 _loss);
     function deposit() external payable;
 }

@@ -151,6 +151,32 @@ const _abi = [
       {
         indexed: true,
         internalType: "address",
+        name: "strategy",
+        type: "address",
+      },
+    ],
+    name: "StrategyAddedToQueue",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address",
+        name: "strategy",
+        type: "address",
+      },
+    ],
+    name: "StrategyRemovedFromQueue",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address",
         name: "from",
         type: "address",
       },
@@ -169,6 +195,51 @@ const _abi = [
     ],
     name: "Transfer",
     type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address[2]",
+        name: "queue",
+        type: "address[2]",
+      },
+    ],
+    name: "UpdateWithdrawalQueue",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address",
+        name: "withdrawer",
+        type: "address",
+      },
+      {
+        indexed: true,
+        internalType: "uint256",
+        name: "value",
+        type: "uint256",
+      },
+    ],
+    name: "WithdrawalMade",
+    type: "event",
+  },
+  {
+    inputs: [],
+    name: "activation",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
   },
   {
     inputs: [
@@ -199,6 +270,19 @@ const _abi = [
       },
     ],
     name: "addStrategy",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "_strategy",
+        type: "address",
+      },
+    ],
+    name: "addStrategyToQueue",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -260,6 +344,19 @@ const _abi = [
       },
     ],
     name: "balanceOf",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "debtRatio",
     outputs: [
       {
         internalType: "uint256",
@@ -371,6 +468,45 @@ const _abi = [
   },
   {
     inputs: [],
+    name: "lastReport",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "lockedProfit",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "lockedProfitDegration",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
     name: "name",
     outputs: [
       {
@@ -386,11 +522,37 @@ const _abi = [
     inputs: [
       {
         internalType: "address",
+        name: "_strategy",
+        type: "address",
+      },
+    ],
+    name: "removeStrategyFromQueue",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
         name: "_governance",
         type: "address",
       },
     ],
     name: "setGovernance",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address[2]",
+        name: "_queue",
+        type: "address[2]",
+      },
+    ],
+    name: "setWithdrawalQueue",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -456,19 +618,6 @@ const _abi = [
   },
   {
     inputs: [],
-    name: "strategy",
-    outputs: [
-      {
-        internalType: "address",
-        name: "",
-        type: "address",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
     name: "symbol",
     outputs: [
       {
@@ -488,6 +637,32 @@ const _abi = [
         internalType: "contract IERC20",
         name: "",
         type: "address",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "totalAssets",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "totalDebt",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
       },
     ],
     stateMutability: "view",
@@ -563,13 +738,43 @@ const _abi = [
     inputs: [
       {
         internalType: "uint256",
-        name: "_amount",
+        name: "shares",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "maxLoss",
         type: "uint256",
       },
     ],
     name: "withdraw",
-    outputs: [],
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
     stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    name: "withdrawalQueue",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "view",
     type: "function",
   },
   {
