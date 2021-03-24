@@ -29,7 +29,6 @@ contract Vault is ERC20 {
         uint256 totalLoss; // Total losses that Strategy has realized for Vault
     }
 
-    uint256 constant MAXIMUM_STRATEGIES = 2;
     uint256 constant DEGREDATION_COEFFICIENT = 10 ** 18;
     uint256 constant MAX_BPS = 10000; // 10k basis points (100%)
 
@@ -38,6 +37,7 @@ contract Vault is ERC20 {
     uint256 public totalDebt; // Amount of tokens that all strategies have borrowed
     uint256 public lastReport; // block.timestamp of last report
     uint256 public lockedProfit; // how much profit is locked and cant be withdrawn
+    uint256 public performanceFee;
     uint256 public lockedProfitDegration; // rate per block of degration. DEGREDATION_COEFFICIENT is 100% per block
 
     // WETH
@@ -46,8 +46,8 @@ contract Vault is ERC20 {
     // address with rights to call governance functions
     address public governance;
     
-    /// @notice Determines the order of strategies to pull funds from. Managed by governance
-    address[MAXIMUM_STRATEGIES] public withdrawalQueue;
+    // @notice Determines the order of strategies to pull funds from. Managed by governance
+    address[] public withdrawalQueue;
 
     mapping (address => StrategyParams) public strategies;
 
@@ -59,12 +59,12 @@ contract Vault is ERC20 {
         uint256 performanceFee
     );
 
-    event DepositMade(address indexed depositor, uint256 indexed amount);
+    event DepositMade(address indexed depositor, uint256 indexed amount, uint256 indexed shares);
     event WithdrawalMade(address indexed withdrawer, uint256 indexed value);
     event InvestmentMade(address indexed strategy, uint256 indexed amount);
     event StrategyAddedToQueue(address indexed strategy);
     event StrategyRemovedFromQueue(address indexed strategy);
-    event UpdateWithdrawalQueue(address[MAXIMUM_STRATEGIES] indexed queue);
+    event UpdateWithdrawalQueue(address[] indexed queue);
 
     constructor (address _token) ERC20("Solace CP Token", "SCP") {
         governance = msg.sender;
@@ -87,13 +87,13 @@ contract Vault is ERC20 {
     }
 
     /**
-     * @notice Returns the total quantity of all assets under control of this
-        Vault, including those loaned out to a Strategy as well as those currently
-        held in the Vault.
-     * @return The total assets under control of this vault.
-    */
-    function totalAssets() external view returns (uint256) {
-        return _totalAssets();
+     * @notice Changes the locked profit degration. 
+     * Can only be called by the current governor.
+     * @param degration rate of degration in percent per second scaled to 1e18.
+     */
+    function setLockedProfitDegration(uint256 degration) external {
+        require(msg.sender == governance, "!governance");
+        lockedProfitDegration = degration;
     }
 
     /**
@@ -105,9 +105,17 @@ contract Vault is ERC20 {
     function invest(address _strategy, uint256 _amount) external {
         require(msg.sender == governance, "!governance");
         require(strategies[_strategy].activation > 0, "must be a current strategy");
+        
         // send ETH to Strategy contract to execute on investment strategy
         token.safeTransfer(_strategy, _amount);
         IStrategy(_strategy).deposit();
+
+        // uint256 credit = _creditAvailable(_strategy);
+
+        // if (credit > 0) {
+        strategies[_strategy].totalDebt += _amount;
+        totalDebt += _amount;
+        // }
 
         emit InvestmentMade(_strategy, _amount);
     }
@@ -130,6 +138,8 @@ contract Vault is ERC20 {
     ) external {
         require(msg.sender == governance, "!governance");
         require(_strategy != address(0), "strategy cannot be set to zero address");
+        require(debtRatio + _debtRatio <= MAX_BPS, "debtRatio exceeds MAX BPS");
+        require(_performanceFee <= MAX_BPS - performanceFee, "invalid performance fee");
         require(_minDebtPerHarvest <= _maxDebtPerHarvest, "minDebtPerHarvest exceeds maxDebtPerHarvest");
         
         // Add strategy to approved strategies
@@ -147,8 +157,9 @@ contract Vault is ERC20 {
 
         
         // Append strategy to withdrawal queue
-        withdrawalQueue[MAXIMUM_STRATEGIES - 1] = _strategy;
-        _organizeWithdrawalQueue();
+        withdrawalQueue.push(_strategy);
+
+        debtRatio += _debtRatio;
 
         emit StrategyAdded(_strategy, _debtRatio, _minDebtPerHarvest, _maxDebtPerHarvest, _performanceFee);
     }
@@ -161,23 +172,66 @@ contract Vault is ERC20 {
      * having funds removed) first, with the next least impactful second, etc.
      * @param _queue array of addresses of strategy contracts
      */
-    function setWithdrawalQueue(address[MAXIMUM_STRATEGIES] memory _queue) external {
+    function setWithdrawalQueue(address[] memory _queue) external {
         
         require(msg.sender == governance, "!governance");
         
-        for (uint256 i = 0; i < MAXIMUM_STRATEGIES; i++) {
-            if (_queue[i] == address(0) && withdrawalQueue[i] == address(0)) {
-                break;
-            }
+        // check that each entry in input array is an active strategy
+        for (uint256 i = 0; i < _queue.length; i++) {
             require(strategies[_queue[i]].activation > 0, "must be a current strategy");
-            withdrawalQueue[i] = _queue[i];
         }
+
+        // set input to be the new queue
+        withdrawalQueue = _queue;
+
         emit UpdateWithdrawalQueue(_queue);
+    }
+
+    /**
+     * @notice Amount of tokens in Vault a Strategy has access to as a credit line.
+     * Check the Strategy's debt limit, as well as the tokens available in the Vault,
+     * and determine the maximum amount of tokens (if any) the Strategy may draw on.
+     * In the rare case the Vault is in emergency shutdown this will return 0.
+     * @param strategy The Strategy to check. Defaults to caller.
+     * @return The quantity of tokens available for the Strategy to draw on.
+     */
+    function creditAvailable(address strategy) external view returns (uint256) {
+        return _creditAvailable(strategy);
+    }
+
+    function _creditAvailable(address _strategy) internal view returns (uint256) {
+        uint256 vaultTotalAssets = _totalAssets();
+        uint256 vaultDebtLimit = (debtRatio * vaultTotalAssets) / MAX_BPS;
+        uint256 vaultTotalDebt = totalDebt;
+        uint256 strategyDebtLimit = (strategies[_strategy].debtRatio * vaultTotalAssets) / MAX_BPS;
+        uint256 strategyTotalDebt = strategies[_strategy].totalDebt;
+        uint256 strategyMinDebtPerHarvest = strategies[_strategy].minDebtPerHarvest;
+        uint256 strategyMaxDebtPerHarvest = strategies[_strategy].maxDebtPerHarvest;
+
+        // no credit available if credit line has been exhasted
+        if (vaultDebtLimit <= vaultTotalDebt || strategyDebtLimit <= strategyTotalDebt) return 0;
+
+        uint256 available = strategyDebtLimit - strategyTotalDebt;
+
+        // Adjust by the global debt limit left
+        if (vaultDebtLimit - vaultTotalDebt < available) available = vaultDebtLimit - vaultTotalDebt;
+
+        // Can only borrow up to what the contract has in reserve
+        if (token.balanceOf(address(this)) < available) available = token.balanceOf(address(this));
+
+        if (available < strategyMinDebtPerHarvest) return 0;
+
+        if (strategyMaxDebtPerHarvest < available) return strategyMaxDebtPerHarvest;
+    
+        return available;
+
     }
 
     /**
      * @notice Remove `_strategy` from `withdrawalQueue`
      * Can only be called by the current governor.
+     * Can only be called on an active strategy (added using addStrategy)
+     * `_strategy` cannot already be in the queue
      * @param _strategy address of the strategy to remove
      */
     function addStrategyToQueue(address _strategy) external {
@@ -185,23 +239,13 @@ contract Vault is ERC20 {
         require(msg.sender == governance, "!governance");
         require(strategies[_strategy].activation > 0, "must be a current strategy");
         
-        uint256 last_index;
-        
-        for (uint256 i = 0; i < MAXIMUM_STRATEGIES; i++) {
-            
-            if (withdrawalQueue[i] == address(0)) {
-                break;
-            }
-
+        // check that strategy is not already in the queue
+        for (uint256 i = 0; i < withdrawalQueue.length; i++) {
             require(withdrawalQueue[i] != _strategy, "strategy already in queue");
-            last_index = i;
         }
-        
-        require(last_index < MAXIMUM_STRATEGIES, "queue is full");
 
-        withdrawalQueue[MAXIMUM_STRATEGIES - 1] = _strategy;
+        withdrawalQueue.push(_strategy);
 
-        _organizeWithdrawalQueue();
         emit StrategyAddedToQueue(_strategy);
     }
 
@@ -214,16 +258,21 @@ contract Vault is ERC20 {
         
         require(msg.sender == governance, "!governance");
         require(strategies[_strategy].activation > 0, "must be a current strategy");
+
+        address[] storage newQueue;
         
-        for (uint256 i = 0; i < MAXIMUM_STRATEGIES; i++) {
-            if (withdrawalQueue[i] == _strategy) {
-                withdrawalQueue[i] = address(0);
-                _organizeWithdrawalQueue();
-                emit StrategyRemovedFromQueue(_strategy);
-                return;
+        for (uint256 i = 0; i < withdrawalQueue.length; i++) {
+            if (withdrawalQueue[i] != _strategy) {
+                newQueue.push(withdrawalQueue[i]);
             }
         }
-        revert("strategy not in queue");
+
+        // we added all the elements back in the queue
+        if (withdrawalQueue.length == newQueue.length) revert("strategy not in queue");
+
+        // set withdrawalQueue to be the new one without the removed strategy
+        withdrawalQueue = newQueue;
+        emit StrategyRemovedFromQueue(_strategy);
     }
 
     /**
@@ -245,7 +294,7 @@ contract Vault is ERC20 {
         // Wrap the depositor's ETH to add WETH to the vault
         IWETH10(address(token)).deposit{value: amount}();
 
-        emit DepositMade(msg.sender, amount);
+        emit DepositMade(msg.sender, amount, shares);
     }
 
     /**
@@ -255,6 +304,8 @@ contract Vault is ERC20 {
      * @return value in ETH that the shares where redeemed for
      */
     function withdraw(uint256 shares, uint256 maxLoss) external returns (uint256) {
+
+        require(shares <= balanceOf(msg.sender), "cannot redeem more shares than you own");
         
         uint256 value = _shareValue(shares);
         uint256 totalLoss;
@@ -262,16 +313,11 @@ contract Vault is ERC20 {
         // If redeemable amount exceeds vaultBalance, withdraw funds from strategies in the withdrawal queue
         uint256 vaultBalance = token.balanceOf(address(this));
         
-        if (vaultBalance < value) {
+        if (value > vaultBalance) {
 
             for (uint256 i = 0; i < withdrawalQueue.length; i++) {
-                
-                // Break if we have run out of strategies in the queue
-                if (withdrawalQueue[i] == address(0)) {
-                    break;
-                }
-                
-                // Break if we are done withdrawing from strategies
+
+                // Break if we are done withdrawing from Strategies
                 vaultBalance = token.balanceOf(address(this));
                 if (value <= vaultBalance) {
                     break;
@@ -298,17 +344,20 @@ contract Vault is ERC20 {
                 }
 
                 // Reduce the Strategy's debt by the amount withdrawn ("realized returns")
-                // NOTE: This doesn't add to returns as it's not earned by "normal means"
+                // This doesn't add to returns as it's not earned by "normal means"
                 strategies[withdrawalQueue[i]].totalDebt -= withdrawn + loss;
                 totalDebt -= withdrawn + loss;
             }
         }
 
         vaultBalance = token.balanceOf(address(this));
+
         if (vaultBalance < value) {
             value = vaultBalance;
             shares = _sharesForAmount(value + totalLoss);
         }
+
+        // revert if losses from withdrawing are more than what is considered acceptable.
         assert(totalLoss <= maxLoss * (value + totalLoss) / MAX_BPS);
 
         // burn shares and transfer ETH to withdrawer
@@ -316,30 +365,24 @@ contract Vault is ERC20 {
         IWETH10(address(token)).withdraw(value);
         payable(msg.sender).transfer(value);
 
+        emit WithdrawalMade(msg.sender, value);
+
         return value;
     }
 
     /**
-     * @notice Reorganize `withdrawalQueue` based on premise that if there is an
-     * empty value between two actual values, then the empty value should be
-     * replaced by the later value. Relative ordering of non-zero values is maintained.
-     */
-    function _organizeWithdrawalQueue() internal {
-        uint256 offset;
-        for (uint256 i = 0; i < MAXIMUM_STRATEGIES; i++) {
-            address strategy = withdrawalQueue[i];
-            if (strategy == address(0)) {
-                offset += 1;
-            } else if (offset > 0) {
-                withdrawalQueue[i - offset] = strategy;
-                withdrawalQueue[i] = address(0);
-            }
-        }
+     * @notice Returns the total quantity of all assets under control of this
+        Vault, including those loaned out to a Strategy as well as those currently
+        held in the Vault.
+     * @return The total assets under control of this vault.
+    */
+    function totalAssets() external view returns (uint256) {
+        return _totalAssets();
     }
 
     /**
      * @notice Determines the current value of `shares`
-     * replaced by the later value. Relative ordering of non-zero values is maintained.
+     * @param shares amount of shares to calculate value for.
      */
     function _shareValue(uint256 shares) internal view returns (uint256) {
 
@@ -353,7 +396,6 @@ contract Vault is ERC20 {
 
         // using 1e3 for extra precision here when decimals is low
         return ((10 ** 3 * (shares * freeFunds)) / totalSupply()) / 10 ** 3;
-        
     }
 
     /**

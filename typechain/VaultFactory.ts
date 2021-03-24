@@ -85,6 +85,12 @@ const _abi = [
         name: "amount",
         type: "uint256",
       },
+      {
+        indexed: true,
+        internalType: "uint256",
+        name: "shares",
+        type: "uint256",
+      },
     ],
     name: "DepositMade",
     type: "event",
@@ -201,9 +207,9 @@ const _abi = [
     inputs: [
       {
         indexed: true,
-        internalType: "address[2]",
+        internalType: "address[]",
         name: "queue",
-        type: "address[2]",
+        type: "address[]",
       },
     ],
     name: "UpdateWithdrawalQueue",
@@ -344,6 +350,25 @@ const _abi = [
       },
     ],
     name: "balanceOf",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "strategy",
+        type: "address",
+      },
+    ],
+    name: "creditAvailable",
     outputs: [
       {
         internalType: "uint256",
@@ -519,6 +544,19 @@ const _abi = [
     type: "function",
   },
   {
+    inputs: [],
+    name: "performanceFee",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
     inputs: [
       {
         internalType: "address",
@@ -547,9 +585,22 @@ const _abi = [
   {
     inputs: [
       {
-        internalType: "address[2]",
+        internalType: "uint256",
+        name: "degration",
+        type: "uint256",
+      },
+    ],
+    name: "setLockedProfitDegration",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address[]",
         name: "_queue",
-        type: "address[2]",
+        type: "address[]",
       },
     ],
     name: "setWithdrawalQueue",
