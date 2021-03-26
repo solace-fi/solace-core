@@ -6,11 +6,11 @@ https://solace.fi
 ## Contracts
 detailed technical documentation is located in docs folder.
 * MultiSig: Solace deployer controlled by the core team (Gnosis Safe + OpenZeppelin Defender)
-:white_check_mark: SolaceToken: solace.fi protocol ERC20 token
-:white_check_mark: Registry: registry contract keeping track of contract addresses and the products mapping deployed by the MultiSig Deployer
-:white_check_mark: Master: SOLACE token distributor (yield farming staking contract)
+* :white_check_mark: SolaceToken: solace.fi protocol ERC20 token
+* :white_check_mark: Registry: registry contract keeping track of contract addresses and the products mapping deployed by the MultiSig Deployer
+* :white_check_mark: Master: SOLACE token distributor (yield farming staking contract)
 * Vault: contract that holds the reserve and allocates capital to strategies (denominated in ETH)
-:white_check_mark: BaseStrategy: abstract contract that be inherited by strategy contracts executing an investment (will deploy multiple strategies, one at launch will be liquid ETH2.0 staking strategy)
+* :white_check_mark: BaseStrategy: abstract contract that be inherited by strategy contracts executing an investment (will deploy multiple strategies, one at launch will be liquid ETH2.0 staking strategy)
 * Locker: vote lockup contract to boost rewards for capital providers and gain governance rights
 * Treasury: holds and manages the protocol's own capital and buys up SOLACE on the open market (denominated in SOLACE)
 * BaseProduct: abstract contract that's inherited by the products, which will deploy new insurance policies purchased by the buyers
