@@ -37,14 +37,12 @@ interface RegistryInterface extends ethers.utils.Interface {
     "numPolicies()": FunctionFragment;
     "numProducts()": FunctionFragment;
     "numStrategies()": FunctionFragment;
-    "productFactory()": FunctionFragment;
     "removePolicy(address)": FunctionFragment;
     "removeProduct(address)": FunctionFragment;
     "removeStrategy(address)": FunctionFragment;
     "setGovernance(address)": FunctionFragment;
     "setLocker(address)": FunctionFragment;
     "setMaster(address)": FunctionFragment;
-    "setProductFactory(address)": FunctionFragment;
     "setSolace(address)": FunctionFragment;
     "setTreasury(address)": FunctionFragment;
     "setVault(address)": FunctionFragment;
@@ -90,10 +88,6 @@ interface RegistryInterface extends ethers.utils.Interface {
     values?: undefined
   ): string;
   encodeFunctionData(
-    functionFragment: "productFactory",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
     functionFragment: "removePolicy",
     values: [string]
   ): string;
@@ -111,10 +105,6 @@ interface RegistryInterface extends ethers.utils.Interface {
   ): string;
   encodeFunctionData(functionFragment: "setLocker", values: [string]): string;
   encodeFunctionData(functionFragment: "setMaster", values: [string]): string;
-  encodeFunctionData(
-    functionFragment: "setProductFactory",
-    values: [string]
-  ): string;
   encodeFunctionData(functionFragment: "setSolace", values: [string]): string;
   encodeFunctionData(functionFragment: "setTreasury", values: [string]): string;
   encodeFunctionData(functionFragment: "setVault", values: [string]): string;
@@ -153,10 +143,6 @@ interface RegistryInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "productFactory",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
     functionFragment: "removePolicy",
     data: BytesLike
   ): Result;
@@ -174,10 +160,6 @@ interface RegistryInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(functionFragment: "setLocker", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "setMaster", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "setProductFactory",
-    data: BytesLike
-  ): Result;
   decodeFunctionResult(functionFragment: "setSolace", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "setTreasury",
@@ -391,18 +373,6 @@ export class Registry extends Contract {
       0: BigNumber;
     }>;
 
-    productFactory(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
-    "productFactory()"(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
     removePolicy(
       _policy: string,
       overrides?: Overrides
@@ -460,16 +430,6 @@ export class Registry extends Contract {
 
     "setMaster(address)"(
       _master: string,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
-    setProductFactory(
-      _productFactory: string,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
-    "setProductFactory(address)"(
-      _productFactory: string,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
@@ -645,10 +605,6 @@ export class Registry extends Contract {
 
   "numStrategies()"(overrides?: CallOverrides): Promise<BigNumber>;
 
-  productFactory(overrides?: CallOverrides): Promise<string>;
-
-  "productFactory()"(overrides?: CallOverrides): Promise<string>;
-
   removePolicy(
     _policy: string,
     overrides?: Overrides
@@ -706,16 +662,6 @@ export class Registry extends Contract {
 
   "setMaster(address)"(
     _master: string,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
-  setProductFactory(
-    _productFactory: string,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
-  "setProductFactory(address)"(
-    _productFactory: string,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
@@ -855,10 +801,6 @@ export class Registry extends Contract {
 
     "numStrategies()"(overrides?: CallOverrides): Promise<BigNumber>;
 
-    productFactory(overrides?: CallOverrides): Promise<string>;
-
-    "productFactory()"(overrides?: CallOverrides): Promise<string>;
-
     removePolicy(_policy: string, overrides?: CallOverrides): Promise<void>;
 
     "removePolicy(address)"(
@@ -901,16 +843,6 @@ export class Registry extends Contract {
 
     "setMaster(address)"(
       _master: string,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    setProductFactory(
-      _productFactory: string,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    "setProductFactory(address)"(
-      _productFactory: string,
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -1050,10 +982,6 @@ export class Registry extends Contract {
 
     "numStrategies()"(overrides?: CallOverrides): Promise<BigNumber>;
 
-    productFactory(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "productFactory()"(overrides?: CallOverrides): Promise<BigNumber>;
-
     removePolicy(_policy: string, overrides?: Overrides): Promise<BigNumber>;
 
     "removePolicy(address)"(
@@ -1099,16 +1027,6 @@ export class Registry extends Contract {
 
     "setMaster(address)"(
       _master: string,
-      overrides?: Overrides
-    ): Promise<BigNumber>;
-
-    setProductFactory(
-      _productFactory: string,
-      overrides?: Overrides
-    ): Promise<BigNumber>;
-
-    "setProductFactory(address)"(
-      _productFactory: string,
       overrides?: Overrides
     ): Promise<BigNumber>;
 
@@ -1261,12 +1179,6 @@ export class Registry extends Contract {
 
     "numStrategies()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
-    productFactory(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    "productFactory()"(
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
     removePolicy(
       _policy: string,
       overrides?: Overrides
@@ -1324,16 +1236,6 @@ export class Registry extends Contract {
 
     "setMaster(address)"(
       _master: string,
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    setProductFactory(
-      _productFactory: string,
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    "setProductFactory(address)"(
-      _productFactory: string,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 

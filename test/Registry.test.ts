@@ -9,11 +9,9 @@ import RegistryArtifact from "../artifacts/contracts/Registry.sol/Registry.json"
 import SolaceArtifact from "../artifacts/contracts/SOLACE.sol/SOLACE.json";
 import MasterArtifact from "../artifacts/contracts/Master.sol/Master.json";
 // TODO: switch from mocks and SignerWithAddress to actual contracts after implementation
-import MockProductFactoryArtifact from "../artifacts/contracts/mocks/MockProductFactory.sol/MockProductFactory.json";
 import MockProductArtifact from "../artifacts/contracts/mocks/MockProduct.sol/MockProduct.json";
 import MockVaultArtifact from "../artifacts/contracts/mocks/MockVault.sol/MockVault.json";
 import { Registry, Solace, Master, Vault, MockProduct, MockVault } from "../typechain";
-import { MockProductFactory } from "../typechain/MockProductFactory.d";
 
 chai.use(solidity);
 
@@ -31,7 +29,6 @@ describe("Registry", function () {
   let solaceToken: Solace;
   let master: Master;
   // mock contracts
-  let productFactory: MockProductFactory;
   let product: MockProduct;
   let vault: MockVault;
   // @ts-ignore
@@ -85,15 +82,6 @@ describe("Registry", function () {
           registry.address
         ]
     )) as MockVault;
-
-    // deploy mock product factory
-    productFactory = (await deployContract(
-      governor1,
-      MockProductFactoryArtifact,
-      [
-        registry.address
-      ]
-    )) as MockProductFactory;
 
     // deploy a mock product
     product = (await deployContract(
@@ -221,21 +209,6 @@ describe("Registry", function () {
     })
   })
 
-  describe("product factory", function () {
-    it("starts as the zero address", async function () {
-      expect(await registry.productFactory()).to.equal(ZERO_ADDRESS);
-    })
-
-    it("can be set", async function () {
-      await registry.connect(governor2).setProductFactory(productFactory.address);
-      expect(await registry.productFactory()).to.equal(productFactory.address);
-    })
-
-    it("cannot be set by non governor", async function () {
-      await expect(registry.connect(user).setProductFactory(productFactory.address)).to.be.revertedWith("!governance");
-    })
-  })
-
   describe("locker", function () {
     it("starts as the zero address", async function () {
       expect(await registry.locker()).to.equal(ZERO_ADDRESS);
@@ -285,35 +258,24 @@ describe("Registry", function () {
     })
 
     it("can add products", async function () {
-      await registry.connect(governor2).addProduct(mockContract1.address);
-      let tx = await productFactory.createProduct();
-      let events = (await tx.wait()).events;
-      expect(events).to.exist;
-      //expect(events.length).to.not.equal(0); // TODO: get typescript to stop flagging unnecessarily
-      if(events && events.length > 0 && events[0].args && events[0].args.product){
-        productAddress = events[0].args.product;
-      }else{
-        expect(true).to.equal(false);
-      }
+      let tx = await registry.connect(governor2).addProduct(mockContract1.address);
+      expect(await registry.numProducts()).to.equal(1);
     })
 
     it("returns products", async function () {
-      expect(await registry.numProducts()).to.equal(2);
+      expect(await registry.numProducts()).to.equal(1);
       expect(await registry.getProduct(0)).to.equal(mockContract1.address);
-      expect(await registry.getProduct(1)).to.equal(productAddress);
       expect(await registry.isProduct(mockContract1.address)).to.equal(true);
-      expect(await registry.isProduct(productAddress)).to.equal(true);
       expect(await registry.isProduct(mockContract3.address)).to.equal(false);
     })
 
     it("rejects adds and removes by non manager", async function () {
-      await expect(registry.connect(user).addProduct(mockContract3.address)).to.be.revertedWith("!manager");
-      await expect(registry.connect(user).removeProduct(mockContract1.address)).to.be.revertedWith("!manager");
+      await expect(registry.connect(user).addProduct(mockContract3.address)).to.be.revertedWith("!governance");
+      await expect(registry.connect(user).removeProduct(mockContract1.address)).to.be.revertedWith("!governance");
     })
 
     it("can remove products", async function () {
       await registry.connect(governor2).removeProduct(mockContract1.address);
-      await productFactory.deleteProduct(productAddress);
       expect(await registry.numStrategies()).to.equal(0);
       expect(await registry.isProduct(mockContract1.address)).to.equal(false);
     })

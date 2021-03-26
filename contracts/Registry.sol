@@ -22,8 +22,6 @@ contract Registry {
     address public vault;
     /// @notice Treasury contract.
     address public treasury;
-    /// @notice Product Factory contract.
-    address public productFactory;
     /// @notice Locker contract.
     address public locker;
     // Set of strategies.
@@ -96,17 +94,6 @@ contract Registry {
     }
 
     /**
-     * @notice Sets the product factory contract.
-     * Can only be called by the current governor.
-     * @param _productFactory The prodyct factory address.
-     */
-    function setProductFactory(address _productFactory) external {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
-        productFactory = _productFactory;
-    }
-
-    /**
      * @notice Sets the locker contract.
      * Can only be called by the current governor.
      * @param _locker The locker address.
@@ -141,23 +128,23 @@ contract Registry {
 
     /**
      * @notice Adds a new product.
-     * Can only be called by the current governor or the factory.
+     * Can only be called by the current governor.
      * @param _product The product to add.
      */
     function addProduct(address _product) external {
-        // can only be called by governor or the factory
-        require(msg.sender == governance || msg.sender == productFactory, "!manager");
+        // can only be called by governor
+        require(msg.sender == governance, "!governance");
         products.add(_product);
     }
 
     /**
      * @notice Removes a product.
-     * Can only be called by the current governor or the factory.
+     * Can only be called by the current governor.
      * @param _product The product to remove.
      */
     function removeProduct(address _product) external {
-        // can only be called by governor or the factory
-        require(msg.sender == governance || msg.sender == productFactory, "!manager");
+        // can only be called by governor
+        require(msg.sender == governance, "!governance");
         products.remove(_product);
     }
 
