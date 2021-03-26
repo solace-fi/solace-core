@@ -20,24 +20,18 @@ import { BytesLike } from "@ethersproject/bytes";
 import { Listener, Provider } from "@ethersproject/providers";
 import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
-interface SolaceInterface extends ethers.utils.Interface {
+interface Erc20PermitInterface extends ethers.utils.Interface {
   functions: {
     "DOMAIN_SEPARATOR()": FunctionFragment;
-    "addMinter(address)": FunctionFragment;
     "allowance(address,address)": FunctionFragment;
     "approve(address,uint256)": FunctionFragment;
     "balanceOf(address)": FunctionFragment;
     "decimals()": FunctionFragment;
     "decreaseAllowance(address,uint256)": FunctionFragment;
-    "governance()": FunctionFragment;
     "increaseAllowance(address,uint256)": FunctionFragment;
-    "mint(address,uint256)": FunctionFragment;
-    "minters(address)": FunctionFragment;
     "name()": FunctionFragment;
     "nonces(address)": FunctionFragment;
     "permit(address,address,uint256,uint256,uint8,bytes32,bytes32)": FunctionFragment;
-    "removeMinter(address)": FunctionFragment;
-    "setGovernance(address)": FunctionFragment;
     "symbol()": FunctionFragment;
     "totalSupply()": FunctionFragment;
     "transfer(address,uint256)": FunctionFragment;
@@ -48,7 +42,6 @@ interface SolaceInterface extends ethers.utils.Interface {
     functionFragment: "DOMAIN_SEPARATOR",
     values?: undefined
   ): string;
-  encodeFunctionData(functionFragment: "addMinter", values: [string]): string;
   encodeFunctionData(
     functionFragment: "allowance",
     values: [string, string]
@@ -64,18 +57,9 @@ interface SolaceInterface extends ethers.utils.Interface {
     values: [string, BigNumberish]
   ): string;
   encodeFunctionData(
-    functionFragment: "governance",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
     functionFragment: "increaseAllowance",
     values: [string, BigNumberish]
   ): string;
-  encodeFunctionData(
-    functionFragment: "mint",
-    values: [string, BigNumberish]
-  ): string;
-  encodeFunctionData(functionFragment: "minters", values: [string]): string;
   encodeFunctionData(functionFragment: "name", values?: undefined): string;
   encodeFunctionData(functionFragment: "nonces", values: [string]): string;
   encodeFunctionData(
@@ -89,14 +73,6 @@ interface SolaceInterface extends ethers.utils.Interface {
       BytesLike,
       BytesLike
     ]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "removeMinter",
-    values: [string]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "setGovernance",
-    values: [string]
   ): string;
   encodeFunctionData(functionFragment: "symbol", values?: undefined): string;
   encodeFunctionData(
@@ -116,7 +92,6 @@ interface SolaceInterface extends ethers.utils.Interface {
     functionFragment: "DOMAIN_SEPARATOR",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(functionFragment: "addMinter", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "allowance", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "approve", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "balanceOf", data: BytesLike): Result;
@@ -125,24 +100,13 @@ interface SolaceInterface extends ethers.utils.Interface {
     functionFragment: "decreaseAllowance",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(functionFragment: "governance", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "increaseAllowance",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(functionFragment: "mint", data: BytesLike): Result;
-  decodeFunctionResult(functionFragment: "minters", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "name", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "nonces", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "permit", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "removeMinter",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "setGovernance",
-    data: BytesLike
-  ): Result;
   decodeFunctionResult(functionFragment: "symbol", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "totalSupply",
@@ -163,7 +127,7 @@ interface SolaceInterface extends ethers.utils.Interface {
   getEvent(nameOrSignatureOrTopic: "Transfer"): EventFragment;
 }
 
-export class Solace extends Contract {
+export class Erc20Permit extends Contract {
   connect(signerOrProvider: Signer | Provider | string): this;
   attach(addressOrName: string): this;
   deployed(): Promise<this>;
@@ -174,7 +138,7 @@ export class Solace extends Contract {
   removeAllListeners(eventName: EventFilter | string): this;
   removeListener(eventName: any, listener: Listener): this;
 
-  interface: SolaceInterface;
+  interface: Erc20PermitInterface;
 
   functions: {
     DOMAIN_SEPARATOR(
@@ -188,16 +152,6 @@ export class Solace extends Contract {
     ): Promise<{
       0: string;
     }>;
-
-    addMinter(
-      _minter: string,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
-    "addMinter(address)"(
-      _minter: string,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
 
     allowance(
       owner: string,
@@ -265,18 +219,6 @@ export class Solace extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    governance(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
-    "governance()"(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
     increaseAllowance(
       spender: string,
       addedValue: BigNumberish,
@@ -288,32 +230,6 @@ export class Solace extends Contract {
       addedValue: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
-
-    mint(
-      account: string,
-      amount: BigNumberish,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
-    "mint(address,uint256)"(
-      account: string,
-      amount: BigNumberish,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
-    minters(
-      arg0: string,
-      overrides?: CallOverrides
-    ): Promise<{
-      0: boolean;
-    }>;
-
-    "minters(address)"(
-      arg0: string,
-      overrides?: CallOverrides
-    ): Promise<{
-      0: boolean;
-    }>;
 
     name(
       overrides?: CallOverrides
@@ -360,26 +276,6 @@ export class Solace extends Contract {
       v: BigNumberish,
       r: BytesLike,
       s: BytesLike,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
-    removeMinter(
-      _minter: string,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
-    "removeMinter(address)"(
-      _minter: string,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
-    setGovernance(
-      _governance: string,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
-    "setGovernance(address)"(
-      _governance: string,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
@@ -438,16 +334,6 @@ export class Solace extends Contract {
 
   "DOMAIN_SEPARATOR()"(overrides?: CallOverrides): Promise<string>;
 
-  addMinter(
-    _minter: string,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
-  "addMinter(address)"(
-    _minter: string,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
   allowance(
     owner: string,
     spender: string,
@@ -495,10 +381,6 @@ export class Solace extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  governance(overrides?: CallOverrides): Promise<string>;
-
-  "governance()"(overrides?: CallOverrides): Promise<string>;
-
   increaseAllowance(
     spender: string,
     addedValue: BigNumberish,
@@ -510,22 +392,6 @@ export class Solace extends Contract {
     addedValue: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
-
-  mint(
-    account: string,
-    amount: BigNumberish,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
-  "mint(address,uint256)"(
-    account: string,
-    amount: BigNumberish,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
-  minters(arg0: string, overrides?: CallOverrides): Promise<boolean>;
-
-  "minters(address)"(arg0: string, overrides?: CallOverrides): Promise<boolean>;
 
   name(overrides?: CallOverrides): Promise<string>;
 
@@ -557,26 +423,6 @@ export class Solace extends Contract {
     v: BigNumberish,
     r: BytesLike,
     s: BytesLike,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
-  removeMinter(
-    _minter: string,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
-  "removeMinter(address)"(
-    _minter: string,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
-  setGovernance(
-    _governance: string,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
-  "setGovernance(address)"(
-    _governance: string,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
@@ -618,13 +464,6 @@ export class Solace extends Contract {
     DOMAIN_SEPARATOR(overrides?: CallOverrides): Promise<string>;
 
     "DOMAIN_SEPARATOR()"(overrides?: CallOverrides): Promise<string>;
-
-    addMinter(_minter: string, overrides?: CallOverrides): Promise<void>;
-
-    "addMinter(address)"(
-      _minter: string,
-      overrides?: CallOverrides
-    ): Promise<void>;
 
     allowance(
       owner: string,
@@ -673,10 +512,6 @@ export class Solace extends Contract {
       overrides?: CallOverrides
     ): Promise<boolean>;
 
-    governance(overrides?: CallOverrides): Promise<string>;
-
-    "governance()"(overrides?: CallOverrides): Promise<string>;
-
     increaseAllowance(
       spender: string,
       addedValue: BigNumberish,
@@ -686,25 +521,6 @@ export class Solace extends Contract {
     "increaseAllowance(address,uint256)"(
       spender: string,
       addedValue: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<boolean>;
-
-    mint(
-      account: string,
-      amount: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    "mint(address,uint256)"(
-      account: string,
-      amount: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    minters(arg0: string, overrides?: CallOverrides): Promise<boolean>;
-
-    "minters(address)"(
-      arg0: string,
       overrides?: CallOverrides
     ): Promise<boolean>;
 
@@ -738,23 +554,6 @@ export class Solace extends Contract {
       v: BigNumberish,
       r: BytesLike,
       s: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    removeMinter(_minter: string, overrides?: CallOverrides): Promise<void>;
-
-    "removeMinter(address)"(
-      _minter: string,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    setGovernance(
-      _governance: string,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    "setGovernance(address)"(
-      _governance: string,
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -808,13 +607,6 @@ export class Solace extends Contract {
 
     "DOMAIN_SEPARATOR()"(overrides?: CallOverrides): Promise<BigNumber>;
 
-    addMinter(_minter: string, overrides?: Overrides): Promise<BigNumber>;
-
-    "addMinter(address)"(
-      _minter: string,
-      overrides?: Overrides
-    ): Promise<BigNumber>;
-
     allowance(
       owner: string,
       spender: string,
@@ -862,10 +654,6 @@ export class Solace extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    governance(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "governance()"(overrides?: CallOverrides): Promise<BigNumber>;
-
     increaseAllowance(
       spender: string,
       addedValue: BigNumberish,
@@ -876,25 +664,6 @@ export class Solace extends Contract {
       spender: string,
       addedValue: BigNumberish,
       overrides?: Overrides
-    ): Promise<BigNumber>;
-
-    mint(
-      account: string,
-      amount: BigNumberish,
-      overrides?: Overrides
-    ): Promise<BigNumber>;
-
-    "mint(address,uint256)"(
-      account: string,
-      amount: BigNumberish,
-      overrides?: Overrides
-    ): Promise<BigNumber>;
-
-    minters(arg0: string, overrides?: CallOverrides): Promise<BigNumber>;
-
-    "minters(address)"(
-      arg0: string,
-      overrides?: CallOverrides
     ): Promise<BigNumber>;
 
     name(overrides?: CallOverrides): Promise<BigNumber>;
@@ -927,23 +696,6 @@ export class Solace extends Contract {
       v: BigNumberish,
       r: BytesLike,
       s: BytesLike,
-      overrides?: Overrides
-    ): Promise<BigNumber>;
-
-    removeMinter(_minter: string, overrides?: Overrides): Promise<BigNumber>;
-
-    "removeMinter(address)"(
-      _minter: string,
-      overrides?: Overrides
-    ): Promise<BigNumber>;
-
-    setGovernance(
-      _governance: string,
-      overrides?: Overrides
-    ): Promise<BigNumber>;
-
-    "setGovernance(address)"(
-      _governance: string,
       overrides?: Overrides
     ): Promise<BigNumber>;
 
@@ -987,16 +739,6 @@ export class Solace extends Contract {
 
     "DOMAIN_SEPARATOR()"(
       overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    addMinter(
-      _minter: string,
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    "addMinter(address)"(
-      _minter: string,
-      overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
     allowance(
@@ -1049,10 +791,6 @@ export class Solace extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    governance(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    "governance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
     increaseAllowance(
       spender: string,
       addedValue: BigNumberish,
@@ -1063,28 +801,6 @@ export class Solace extends Contract {
       spender: string,
       addedValue: BigNumberish,
       overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    mint(
-      account: string,
-      amount: BigNumberish,
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    "mint(address,uint256)"(
-      account: string,
-      amount: BigNumberish,
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    minters(
-      arg0: string,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    "minters(address)"(
-      arg0: string,
-      overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
     name(overrides?: CallOverrides): Promise<PopulatedTransaction>;
@@ -1120,26 +836,6 @@ export class Solace extends Contract {
       v: BigNumberish,
       r: BytesLike,
       s: BytesLike,
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    removeMinter(
-      _minter: string,
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    "removeMinter(address)"(
-      _minter: string,
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    setGovernance(
-      _governance: string,
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    "setGovernance(address)"(
-      _governance: string,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
