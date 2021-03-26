@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Unlicense
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 
 /**
  * @title Solace Token (SOLACE)
@@ -11,7 +11,7 @@ import "@openzeppelin/contracts/utils/Address.sol";
  * @notice Solace tokens can be earned by depositing Capital Provider or Liquidity Provider tokens to the Master contract.
  *         SOLACE can also be locked for a preset time in the Locker contract to recieve veSOLACE tokens.
  */
-contract SOLACE is ERC20 {
+contract SOLACE is ERC20Permit {
     using SafeERC20 for IERC20;
     using Address for address;
 
@@ -23,7 +23,7 @@ contract SOLACE is ERC20 {
     /**
      * @notice Constructs the Solace Token contract.
      */
-    constructor() ERC20("solace.fi", "SOLACE") {
+    constructor() ERC20("solace.fi", "SOLACE") ERC20Permit("solace.fi"){
         governance = msg.sender;
     }
 
