@@ -35,6 +35,67 @@ const _abi = [
         type: "address",
       },
     ],
+    name: "debtOutstanding",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "gain",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "loss",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "_debtPayment",
+        type: "uint256",
+      },
+    ],
+    name: "report",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    name: "revokeStrategy",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
     name: "strategies",
     outputs: [
       {

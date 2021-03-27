@@ -23,17 +23,41 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
 interface IStrategyInterface extends ethers.utils.Interface {
   functions: {
+    "delegatedAssets()": FunctionFragment;
     "deposit()": FunctionFragment;
+    "estimatedTotalAssets()": FunctionFragment;
+    "harvest()": FunctionFragment;
+    "isActive()": FunctionFragment;
     "withdraw(uint256)": FunctionFragment;
   };
 
+  encodeFunctionData(
+    functionFragment: "delegatedAssets",
+    values?: undefined
+  ): string;
   encodeFunctionData(functionFragment: "deposit", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "estimatedTotalAssets",
+    values?: undefined
+  ): string;
+  encodeFunctionData(functionFragment: "harvest", values?: undefined): string;
+  encodeFunctionData(functionFragment: "isActive", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "withdraw",
     values: [BigNumberish]
   ): string;
 
+  decodeFunctionResult(
+    functionFragment: "delegatedAssets",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "deposit", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "estimatedTotalAssets",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "harvest", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "isActive", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "withdraw", data: BytesLike): Result;
 
   events: {};
@@ -53,9 +77,49 @@ export class IStrategy extends Contract {
   interface: IStrategyInterface;
 
   functions: {
+    delegatedAssets(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    "delegatedAssets()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
     deposit(overrides?: PayableOverrides): Promise<ContractTransaction>;
 
     "deposit()"(overrides?: PayableOverrides): Promise<ContractTransaction>;
+
+    estimatedTotalAssets(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    "estimatedTotalAssets()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    harvest(overrides?: Overrides): Promise<ContractTransaction>;
+
+    "harvest()"(overrides?: Overrides): Promise<ContractTransaction>;
+
+    isActive(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: boolean;
+    }>;
+
+    "isActive()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: boolean;
+    }>;
 
     withdraw(
       _amount: BigNumberish,
@@ -68,9 +132,25 @@ export class IStrategy extends Contract {
     ): Promise<ContractTransaction>;
   };
 
+  delegatedAssets(overrides?: CallOverrides): Promise<BigNumber>;
+
+  "delegatedAssets()"(overrides?: CallOverrides): Promise<BigNumber>;
+
   deposit(overrides?: PayableOverrides): Promise<ContractTransaction>;
 
   "deposit()"(overrides?: PayableOverrides): Promise<ContractTransaction>;
+
+  estimatedTotalAssets(overrides?: CallOverrides): Promise<BigNumber>;
+
+  "estimatedTotalAssets()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+  harvest(overrides?: Overrides): Promise<ContractTransaction>;
+
+  "harvest()"(overrides?: Overrides): Promise<ContractTransaction>;
+
+  isActive(overrides?: CallOverrides): Promise<boolean>;
+
+  "isActive()"(overrides?: CallOverrides): Promise<boolean>;
 
   withdraw(
     _amount: BigNumberish,
@@ -83,9 +163,25 @@ export class IStrategy extends Contract {
   ): Promise<ContractTransaction>;
 
   callStatic: {
+    delegatedAssets(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "delegatedAssets()"(overrides?: CallOverrides): Promise<BigNumber>;
+
     deposit(overrides?: CallOverrides): Promise<void>;
 
     "deposit()"(overrides?: CallOverrides): Promise<void>;
+
+    estimatedTotalAssets(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "estimatedTotalAssets()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    harvest(overrides?: CallOverrides): Promise<void>;
+
+    "harvest()"(overrides?: CallOverrides): Promise<void>;
+
+    isActive(overrides?: CallOverrides): Promise<boolean>;
+
+    "isActive()"(overrides?: CallOverrides): Promise<boolean>;
 
     withdraw(
       _amount: BigNumberish,
@@ -101,9 +197,25 @@ export class IStrategy extends Contract {
   filters: {};
 
   estimateGas: {
+    delegatedAssets(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "delegatedAssets()"(overrides?: CallOverrides): Promise<BigNumber>;
+
     deposit(overrides?: PayableOverrides): Promise<BigNumber>;
 
     "deposit()"(overrides?: PayableOverrides): Promise<BigNumber>;
+
+    estimatedTotalAssets(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "estimatedTotalAssets()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    harvest(overrides?: Overrides): Promise<BigNumber>;
+
+    "harvest()"(overrides?: Overrides): Promise<BigNumber>;
+
+    isActive(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "isActive()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     withdraw(_amount: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
 
@@ -114,9 +226,31 @@ export class IStrategy extends Contract {
   };
 
   populateTransaction: {
+    delegatedAssets(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "delegatedAssets()"(
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
     deposit(overrides?: PayableOverrides): Promise<PopulatedTransaction>;
 
     "deposit()"(overrides?: PayableOverrides): Promise<PopulatedTransaction>;
+
+    estimatedTotalAssets(
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "estimatedTotalAssets()"(
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    harvest(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    "harvest()"(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    isActive(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "isActive()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     withdraw(
       _amount: BigNumberish,

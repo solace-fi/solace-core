@@ -25,5 +25,12 @@ interface IVault {
     function withdraw(uint256 _amount) external;
     function balanceOf() external returns (uint256);
     function token() external view returns (address);
+    function debtOutstanding(address) external view returns (uint256);
+    function revokeStrategy(address) external;
     function strategies(address) external view returns (StrategyParams memory);
+    function report(
+        uint256 gain,
+        uint256 loss,
+        uint256 _debtPayment
+    ) external returns (uint256);
 }

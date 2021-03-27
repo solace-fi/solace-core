@@ -1,5 +1,6 @@
 import { HardhatUserConfig } from "hardhat/types";
 import { task } from "hardhat/config";
+import "hardhat-contract-sizer";
 import "@nomiclabs/hardhat-waffle";
 import "hardhat-typechain";
 import "hardhat-abi-exporter";

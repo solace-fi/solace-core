@@ -29,27 +29,56 @@ contract Vault is ERC20 {
         uint256 totalLoss; // Total losses that Strategy has realized for Vault
     }
 
+    /*************
+    GLOBAL CONSTANTS
+    *************/
+
     uint256 constant DEGREDATION_COEFFICIENT = 10 ** 18;
     uint256 constant MAX_BPS = 10000; // 10k basis points (100%)
 
-    uint256 public activation;
+    /*************
+    GLOBAL VARIABLES
+    *************/
+
+    // uint256 public activation;
+    // uint256 public delegatedAssets;
     uint256 public debtRatio; // Debt ratio for the Vault across all strategies (in BPS, <= 10k)
     uint256 public totalDebt; // Amount of tokens that all strategies have borrowed
-    uint256 public lastReport; // block.timestamp of last report
-    uint256 public lockedProfit; // how much profit is locked and cant be withdrawn
-    uint256 public performanceFee;
+    // uint256 public lastReport; // block.timestamp of last report
+    // uint256 public lockedProfit; // how much profit is locked and cant be withdrawn
+    // uint256 public performanceFee;
     uint256 public lockedProfitDegration; // rate per block of degration. DEGREDATION_COEFFICIENT is 100% per block
 
-    // WETH
+    uint256 activation;
+    uint256 delegatedAssets;
+    // uint256 debtRatio; // Debt ratio for the Vault across all strategies (in BPS, <= 10k)
+    // uint256 totalDebt; // Amount of tokens that all strategies have borrowed
+    uint256 lastReport; // block.timestamp of last report
+    uint256 lockedProfit; // how much profit is locked and cant be withdrawn
+    uint256 performanceFee;
+    // uint256 lockedProfitDegration; // rate per block of degration. DEGREDATION_COEFFICIENT is 100% per block
+
+    bool public emergencyShutdown;
+
+    /// WETH
     IERC20 public token;
 
-    // address with rights to call governance functions
+    /// address with rights to call governance functions
     address public governance;
     
-    // @notice Determines the order of strategies to pull funds from. Managed by governance
+    /// @notice Determines the order of strategies to pull funds from. Managed by governance
     address[] public withdrawalQueue;
 
+    /*************
+    MAPPINGS
+    *************/
+
     mapping (address => StrategyParams) public strategies;
+    mapping (address => uint256) internal _strategyDelegatedAssets;
+
+    /*************
+    EVENTS
+    *************/
 
     event StrategyAdded(
         address indexed strategy,
@@ -59,12 +88,25 @@ contract Vault is ERC20 {
         uint256 performanceFee
     );
 
+    event StrategyReported(
+        address indexed strategy,
+        uint256 gain,
+        uint256 loss,
+        uint256 debtPaid,
+        uint256 totalGain,
+        uint256 totalLoss,
+        uint256 totalDebt,
+        uint256 debtAdded,
+        uint256 debtRatio
+    );
+
     event DepositMade(address indexed depositor, uint256 indexed amount, uint256 indexed shares);
     event WithdrawalMade(address indexed withdrawer, uint256 indexed value);
-    event InvestmentMade(address indexed strategy, uint256 indexed amount);
     event StrategyAddedToQueue(address indexed strategy);
     event StrategyRemovedFromQueue(address indexed strategy);
     event UpdateWithdrawalQueue(address[] indexed queue);
+    event StrategyRevoked(address strategy);
+    event EmergencyShutdown(bool active);
 
     constructor (address _token) ERC20("Solace CP Token", "SCP") {
         governance = msg.sender;
@@ -97,27 +139,39 @@ contract Vault is ERC20 {
     }
 
     /**
-     * @notice Allows governance to move ETH to Investment contract to execute a strategy
+     * @notice Activates or deactivates Vault mode where all Strategies go into full withdrawal.
      * Can only be called by the current governor.
-     * @param _strategy address of strategy contract
-     * @param _amount of token to move to Investment contract
-     */
-    function invest(address _strategy, uint256 _amount) external {
+     * During Emergency Shutdown:
+     * 1. No Users may deposit into the Vault (but may withdraw as usual.)
+     * 2. Governance may not add new Strategies.
+     * 3. Each Strategy must pay back their debt as quickly as reasonable to minimally affect their position.
+     * 4. Only Governance may undo Emergency Shutdown.
+     * @param active If true, the Vault goes into Emergency Shutdown.
+     * If false, the Vault goes back into Normal Operation.
+    */
+    function setEmergencyShutdown(bool active) external {
         require(msg.sender == governance, "!governance");
-        require(strategies[_strategy].activation > 0, "must be a current strategy");
-        
-        // send ETH to Strategy contract to execute on investment strategy
-        token.safeTransfer(_strategy, _amount);
-        IStrategy(_strategy).deposit();
+        emergencyShutdown = active;
+        // emit EmergencyShutdown(active);
+    }
 
-        // uint256 credit = _creditAvailable(_strategy);
+    /**
+     * @notice Sets `withdrawalQueue` to be in the order specified by input array
+     * @dev Specify addresses in the order in which funds should be withdrawn.
+     * The ordering should be least impactful (the Strategy whose core positions will be least impacted by
+     * having funds removed) first, with the next least impactful second, etc.
+     * @param _queue array of addresses of strategy contracts
+     */
+    function setWithdrawalQueue(address[] memory _queue) external {
+        require(msg.sender == governance, "!governance");
+        // check that each entry in input array is an active strategy
+        for (uint256 i = 0; i < _queue.length; i++) {
+            require(strategies[_queue[i]].activation > 0, "must be a current strategy");
+        }
+        // set input to be the new queue
+        withdrawalQueue = _queue;
 
-        // if (credit > 0) {
-        strategies[_strategy].totalDebt += _amount;
-        totalDebt += _amount;
-        // }
-
-        emit InvestmentMade(_strategy, _amount);
+        emit UpdateWithdrawalQueue(_queue);
     }
 
     /**
@@ -137,7 +191,8 @@ contract Vault is ERC20 {
         uint256 _performanceFee
     ) external {
         require(msg.sender == governance, "!governance");
-        require(_strategy != address(0), "strategy cannot be set to zero address");
+        require(!emergencyShutdown, "vault is in emergency shutdown");
+        // require(_strategy != address(0), "strategy cannot be set to zero address");
         require(debtRatio + _debtRatio <= MAX_BPS, "debtRatio exceeds MAX BPS");
         require(_performanceFee <= MAX_BPS - performanceFee, "invalid performance fee");
         require(_minDebtPerHarvest <= _maxDebtPerHarvest, "minDebtPerHarvest exceeds maxDebtPerHarvest");
@@ -155,7 +210,6 @@ contract Vault is ERC20 {
             totalLoss: 0
         });
 
-        
         // Append strategy to withdrawal queue
         withdrawalQueue.push(_strategy);
 
@@ -165,74 +219,9 @@ contract Vault is ERC20 {
     }
 
     /**
-     * @notice Sets `withdrawalQueue` to be in the order specified by input array
+     * @notice Adds `_strategy` to `withdrawalQueue`
      * Can only be called by the current governor.
-     * @dev Specify addresses in the order in which funds should be withdrawn.
-     * The ordering should be least impactful (the Strategy whose core positions will be least impacted by
-     * having funds removed) first, with the next least impactful second, etc.
-     * @param _queue array of addresses of strategy contracts
-     */
-    function setWithdrawalQueue(address[] memory _queue) external {
-        
-        require(msg.sender == governance, "!governance");
-        
-        // check that each entry in input array is an active strategy
-        for (uint256 i = 0; i < _queue.length; i++) {
-            require(strategies[_queue[i]].activation > 0, "must be a current strategy");
-        }
-
-        // set input to be the new queue
-        withdrawalQueue = _queue;
-
-        emit UpdateWithdrawalQueue(_queue);
-    }
-
-    /**
-     * @notice Amount of tokens in Vault a Strategy has access to as a credit line.
-     * Check the Strategy's debt limit, as well as the tokens available in the Vault,
-     * and determine the maximum amount of tokens (if any) the Strategy may draw on.
-     * In the rare case the Vault is in emergency shutdown this will return 0.
-     * @param strategy The Strategy to check. Defaults to caller.
-     * @return The quantity of tokens available for the Strategy to draw on.
-     */
-    function creditAvailable(address strategy) external view returns (uint256) {
-        return _creditAvailable(strategy);
-    }
-
-    function _creditAvailable(address _strategy) internal view returns (uint256) {
-        uint256 vaultTotalAssets = _totalAssets();
-        uint256 vaultDebtLimit = (debtRatio * vaultTotalAssets) / MAX_BPS;
-        uint256 vaultTotalDebt = totalDebt;
-        uint256 strategyDebtLimit = (strategies[_strategy].debtRatio * vaultTotalAssets) / MAX_BPS;
-        uint256 strategyTotalDebt = strategies[_strategy].totalDebt;
-        uint256 strategyMinDebtPerHarvest = strategies[_strategy].minDebtPerHarvest;
-        uint256 strategyMaxDebtPerHarvest = strategies[_strategy].maxDebtPerHarvest;
-
-        // no credit available if credit line has been exhasted
-        if (vaultDebtLimit <= vaultTotalDebt || strategyDebtLimit <= strategyTotalDebt) return 0;
-
-        uint256 available = strategyDebtLimit - strategyTotalDebt;
-
-        // Adjust by the global debt limit left
-        if (vaultDebtLimit - vaultTotalDebt < available) available = vaultDebtLimit - vaultTotalDebt;
-
-        // Can only borrow up to what the contract has in reserve
-        if (token.balanceOf(address(this)) < available) available = token.balanceOf(address(this));
-
-        if (available < strategyMinDebtPerHarvest) return 0;
-
-        if (strategyMaxDebtPerHarvest < available) return strategyMaxDebtPerHarvest;
-    
-        return available;
-
-    }
-
-    /**
-     * @notice Remove `_strategy` from `withdrawalQueue`
-     * Can only be called by the current governor.
-     * Can only be called on an active strategy (added using addStrategy)
-     * `_strategy` cannot already be in the queue
-     * @param _strategy address of the strategy to remove
+     * @param _strategy address of the strategy to add
      */
     function addStrategyToQueue(address _strategy) external {
         
@@ -250,9 +239,11 @@ contract Vault is ERC20 {
     }
 
     /**
-     * @notice Adds `_strategy` to `withdrawalQueue`
+     * @notice Remove `_strategy` from `withdrawalQueue`
      * Can only be called by the current governor.
-     * @param _strategy address of the strategy to add
+     * Can only be called on an active strategy (added using addStrategy)
+     * `_strategy` cannot already be in the queue
+     * @param _strategy address of the strategy to remove
      */
     function removeStrategyFromQueue(address _strategy) external {
         
@@ -276,10 +267,35 @@ contract Vault is ERC20 {
     }
 
     /**
+     * @notice Revoke a Strategy, setting its debt limit to 0 and preventing any future deposits.
+     * Should only be used in the scenario where the Strategy is being retired
+     * but no migration of the positions are possible, or in the
+     * extreme scenario that the Strategy needs to be put into "Emergency Exit"
+     * mode in order for it to exit as quickly as possible. The latter scenario
+     * could be for any reason that is considered "critical" that the Strategy
+     * exits its position as fast as possible, such as a sudden change in market
+     * conditions leading to losses, or an imminent failure in an external
+     * dependency.
+     * This may only be called by governance or the Strategy itself.
+     * A Strategy will only revoke itself during emergency shutdown.
+     * @param strategy The Strategy to revoke.
+    */
+    function revokeStrategy(address strategy) external {
+        require(msg.sender == governance ||
+            strategies[msg.sender].activation > 0, "must be called by governance or strategy to be revoked"
+        );
+        _revokeStrategy(strategy);
+    }
+
+    /**
      * @notice Allows a user to deposit ETH into the Vault (becoming a Capital Provider)
      * Shares of the Vault (CP tokens) are minteed to caller
+     * Called when Vault receives ETH
+     * Deposits `_amount` `token`, issuing shares to `recipient`.
+     * Reverts if Vault is in Emergency Shutdown
      */
     function deposit() public payable {
+        require(!emergencyShutdown, "cannot deposit when vault is in emergency shutdown");
         uint256 amount = msg.value;
         uint256 shares;
         if (totalSupply() == 0) {
@@ -371,6 +387,145 @@ contract Vault is ERC20 {
     }
 
     /**
+     * @notice Reports the amount of assets the calling Strategy has free (usually in terms of ROI).
+     * The performance fee is determined here, off of the strategy's profits (if any), and sent to governance.
+     * The strategist's fee is also determined here (off of profits), to be handled according 
+     * to the strategist on the next harvest.
+     * This may only be called by a Strategy managed by this Vault.
+     * @dev For approved strategies, this is the most efficient behavior.
+     * The Strategy reports back what it has free, then Vault "decides"
+     * whether to take some back or give it more. Note that the most it can
+     * take is `gain + _debtPayment`, and the most it can give is all of the
+     * remaining reserves. Anything outside of those bounds is abnormal behavior.
+     * All approved strategies must have increased diligence around
+     * calling this function, as abnormal behavior could become catastrophic.
+     * @param gain Amount Strategy has realized as a gain on it's investment since its
+     * last report, and is free to be given back to Vault as earnings
+     * @param loss Amount Strategy has realized as a loss on it's investment since its
+     * last report, and should be accounted for on the Vault's balance sheet
+     * @param _debtPayment Amount Strategy has made available to cover outstanding debt
+     * @return Amount of debt outstanding (if totalDebt > debtLimit or emergency shutdown).
+    */
+    function report(uint256 gain, uint256 loss, uint256 _debtPayment) external returns (uint256) {
+        require(strategies[msg.sender].activation > 0, "must be called by an active strategy");
+        require(token.balanceOf(msg.sender) >= gain + _debtPayment, "need to have available tokens to withdraw");
+
+        // Report loss before rest of calculations if possible
+        if (loss > 0) _reportLoss(msg.sender, loss);
+
+        // Assess both management fee and performance fee, and issue both as shares of the vault
+        // _assessFees(msg.sender, gain);
+
+        // Returns are always "realized gains"
+        strategies[msg.sender].totalGain += gain;
+
+        // Outstanding debt the Strategy wants to take back from the Vault (if any)
+        // NOTE: debtOutstanding <= StrategyParams.totalDebt
+        uint256 debt = _debtOutstanding(msg.sender);
+        uint256 debtPayment;
+        if (debt < _debtPayment) {
+            debtPayment = debt;
+        } else {
+            debtPayment = _debtPayment;
+        }
+
+        if (debtPayment > 0) {
+            strategies[msg.sender].totalDebt -= debtPayment;
+            totalDebt -= debtPayment;
+            debt -= debtPayment; // `debt` is being tracked for later
+        }
+
+        // Compute the line of credit the Vault is able to offer the Strategy (if any)
+        uint256 credit = _creditAvailable(msg.sender);
+
+        // Update the actual debt based on the full credit we are extending to the Strategy
+        // or the returns if we are taking funds back
+        // NOTE: credit + strategies[msg.sender].totalDebt is always < debtLimit
+        // NOTE: At least one of `credit` or `debt` is always 0 (both can be 0)
+        if (credit > 0) {
+            strategies[msg.sender].totalDebt += credit;
+            totalDebt += credit;
+        }
+
+        // Give/take balance to Strategy, based on the difference between the reported gains
+        // (if any), the debt payment (if any), the credit increase we are offering (if any),
+        // and the debt needed to be paid off (if any)
+        // NOTE: This is just used to adjust the balance of tokens between the Strategy and
+        // the Vault based on the Strategy's debt limit (as well as the Vault's). 
+        uint256 totalAvail = gain + debtPayment;
+        if (totalAvail < credit){  // credit surplus, give to Strategy
+            SafeERC20.safeTransfer(token, msg.sender, credit - totalAvail);
+        } else if (totalAvail > credit) {  // credit deficit, take from Strategy
+            SafeERC20.safeTransferFrom(token, msg.sender, address(this), totalAvail - credit);
+        }
+        // else, don't do anything because it is balanced
+
+        // Update cached value of delegated assets (used to properly account for mgmt fee in `_assessFees`)
+        delegatedAssets -= _strategyDelegatedAssets[msg.sender];
+        
+        // NOTE: Take the min of totalDebt and delegatedAssets) to guard against improper computation
+        uint256 strategyDelegatedAssets;
+        if (strategies[msg.sender].totalDebt < IStrategy(msg.sender).delegatedAssets()) {
+            strategyDelegatedAssets = strategies[msg.sender].totalDebt;
+        } else {
+            strategyDelegatedAssets = IStrategy(msg.sender).delegatedAssets();
+        }
+        delegatedAssets += strategyDelegatedAssets;
+        _strategyDelegatedAssets[msg.sender] = delegatedAssets;
+
+        // Update reporting time
+        strategies[msg.sender].lastReport = block.timestamp;
+        lastReport = block.timestamp;
+        // profit is locked and gradually released per block
+        lockedProfit = gain;
+
+        // emit StrategyReported(
+        //     msg.sender,
+        //     gain,
+        //     loss,
+        //     debtPayment,
+        //     strategies[msg.sender].totalGain,
+        //     strategies[msg.sender].totalLoss,
+        //     strategies[msg.sender].totalDebt,
+        //     credit,
+        //     strategies[msg.sender].debtRatio
+        // );
+
+        if (strategies[msg.sender].debtRatio == 0 || emergencyShutdown) {
+            // Take every last penny the Strategy has (Emergency Exit/revokeStrategy)
+            // NOTE: This is different than `debt` in order to extract *all* of the returns
+            return IStrategy(msg.sender).estimatedTotalAssets();
+        } else {
+            // Otherwise, just return what we have as debt outstanding
+            return debt;
+        }
+    }
+
+    /**
+     * @notice Amount of tokens in Vault a Strategy has access to as a credit line.
+     * Check the Strategy's debt limit, as well as the tokens available in the Vault,
+     * and determine the maximum amount of tokens (if any) the Strategy may draw on.
+     * In the rare case the Vault is in emergency shutdown this will return 0.
+     * @param strategy The Strategy to check. Defaults to caller.
+     * @return The quantity of tokens available for the Strategy to draw on.
+     */
+    function creditAvailable(address strategy) external view returns (uint256) {
+        return _creditAvailable(strategy);
+    }
+
+    /**
+    * @notice Provide an accurate expected value for the return this `strategy`
+    * would provide to the Vault the next time `report()` is called
+    * (since the last time it was called).
+    * @param strategy The Strategy to determine the expected return for. Defaults to caller.
+    * @return The anticipated amount `strategy` should make on its investment
+    * since its last report.
+    */
+    function expectedReturn(address strategy) external view returns (uint256) {
+        _expectedReturn(strategy);
+    }
+
+    /**
      * @notice Returns the total quantity of all assets under control of this
         Vault, including those loaned out to a Strategy as well as those currently
         held in the Vault.
@@ -378,6 +533,91 @@ contract Vault is ERC20 {
     */
     function totalAssets() external view returns (uint256) {
         return _totalAssets();
+    }
+
+    /**
+     * @notice Determines if `strategy` is past its debt limit and if any tokens
+     * should be withdrawn to the Vault.
+     * @param strategy The Strategy to check. Defaults to the caller.
+     * @return The quantity of tokens to withdraw.
+    */
+    function debtOutstanding(address strategy) external view returns (uint256) {
+        return _debtOutstanding(strategy);
+    }
+
+    function _revokeStrategy(address strategy) internal {
+        debtRatio -= strategies[strategy].debtRatio;
+        strategies[strategy].debtRatio = 0;
+        emit StrategyRevoked(strategy);
+    }
+
+    function _reportLoss(address strategy, uint256 loss) internal {
+        uint256 strategyTotalDebt = strategies[strategy].totalDebt;
+        require(strategyTotalDebt >= loss, "loss can only be up the amount of debt issued to strategy");
+        strategies[strategy].totalLoss += loss;
+        strategies[strategy].totalDebt = strategyTotalDebt - loss;
+        totalDebt -= loss;
+        
+        // Also, make sure we reduce our trust with the strategy by the same amount
+        uint256 strategyDebtRatio = strategies[strategy].debtRatio;
+
+        uint256 ratioChange;
+
+        if (loss * MAX_BPS / _totalAssets() < strategyDebtRatio) {
+            ratioChange = loss * MAX_BPS / _totalAssets();
+        } else {
+            ratioChange = strategyDebtRatio;
+        }
+        strategies[strategy].debtRatio -= ratioChange;
+        debtRatio -= ratioChange;
+    }
+
+    /**
+     * @notice Quantity of all assets under control of this Vault, including those loaned out to Strategies
+     */
+    function _totalAssets() internal view returns (uint256) {
+        return token.balanceOf(address(this)) + totalDebt;
+    }
+
+    function _creditAvailable(address _strategy) internal view returns (uint256) {
+        if (emergencyShutdown) return 0;
+
+        uint256 vaultTotalAssets = _totalAssets();
+        uint256 vaultDebtLimit = (debtRatio * vaultTotalAssets) / MAX_BPS;
+        uint256 strategyDebtLimit = (strategies[_strategy].debtRatio * vaultTotalAssets) / MAX_BPS;
+
+        // No credit available to issue if credit line has been exhasted
+        if (vaultDebtLimit <= totalDebt || strategyDebtLimit <= strategies[_strategy].totalDebt) return 0;
+        
+        uint256 available = strategyDebtLimit - strategies[_strategy].totalDebt;
+
+        // Adjust by the global debt limit left
+        if (vaultDebtLimit - totalDebt < available) available = vaultDebtLimit - totalDebt;
+
+        // Can only borrow up to what the contract has in reserve
+        if (token.balanceOf(address(this)) < available) available = token.balanceOf(address(this));
+
+        if (available < strategies[_strategy].minDebtPerHarvest) return 0;
+
+        if (strategies[_strategy].maxDebtPerHarvest < available) return strategies[_strategy].maxDebtPerHarvest;
+    
+        return available;
+    }
+
+    function _expectedReturn(address strategy) internal view returns (uint256) {
+        uint256 strategyLastReport = strategies[strategy].lastReport;
+        uint256 timeSinceLastHarvest = block.timestamp - strategyLastReport;
+        uint256 totalHarvestTime = strategyLastReport - strategies[strategy].activation;
+
+        // NOTE: If either `timeSinceLastHarvest` or `totalHarvestTime` is 0, we can short-circuit to `0`
+        if (timeSinceLastHarvest > 0 && totalHarvestTime > 0 && IStrategy(strategy).isActive()) {
+            // NOTE: Unlikely to throw unless strategy accumalates >1e68 returns
+            // NOTE: Calculate average over period of time where harvests have occured in the past
+            return (strategies[strategy].totalGain * timeSinceLastHarvest) / totalHarvestTime;
+        } else {
+            // Covers the scenario when block.timestamp == activation
+            return 0;
+        }
     }
 
     /**
@@ -411,11 +651,17 @@ contract Vault is ERC20 {
         }
     }
 
-    /**
-     * @notice Quantity of all assets under control of this Vault, including those loaned out to Strategies
-     */
-    function _totalAssets() internal view returns (uint256) {
-        return token.balanceOf(address(this)) + totalDebt;
+    function _debtOutstanding(address strategy) internal view returns (uint256) {
+        uint256 strategyDebtLimit = strategies[strategy].debtRatio * _totalAssets() / MAX_BPS;
+        uint256 strategyTotalDebt = strategies[strategy].totalDebt;
+
+        if (emergencyShutdown) {
+            return strategyTotalDebt;
+        } else if (strategyTotalDebt <= strategyDebtLimit) {
+            return 0;
+        } else {
+            return strategyTotalDebt - strategyDebtLimit;
+        }
     }
 
     /**

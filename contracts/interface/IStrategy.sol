@@ -10,4 +10,8 @@ pragma solidity ^0.8.0;
 interface IStrategy {
     function withdraw(uint256 _amount) external returns (uint256 _loss);
     function deposit() external payable;
+    function estimatedTotalAssets() external view returns (uint256);
+    function delegatedAssets() external view returns (uint256);
+    function harvest() external;
+    function isActive() external view returns (bool);
 }

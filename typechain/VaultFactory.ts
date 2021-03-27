@@ -99,19 +99,13 @@ const _abi = [
     anonymous: false,
     inputs: [
       {
-        indexed: true,
-        internalType: "address",
-        name: "strategy",
-        type: "address",
-      },
-      {
-        indexed: true,
-        internalType: "uint256",
-        name: "amount",
-        type: "uint256",
+        indexed: false,
+        internalType: "bool",
+        name: "active",
+        type: "bool",
       },
     ],
-    name: "InvestmentMade",
+    name: "EmergencyShutdown",
     type: "event",
   },
   {
@@ -183,6 +177,80 @@ const _abi = [
       {
         indexed: true,
         internalType: "address",
+        name: "strategy",
+        type: "address",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "gain",
+        type: "uint256",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "loss",
+        type: "uint256",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "debtPaid",
+        type: "uint256",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "totalGain",
+        type: "uint256",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "totalLoss",
+        type: "uint256",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "totalDebt",
+        type: "uint256",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "debtAdded",
+        type: "uint256",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "debtRatio",
+        type: "uint256",
+      },
+    ],
+    name: "StrategyReported",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: false,
+        internalType: "address",
+        name: "strategy",
+        type: "address",
+      },
+    ],
+    name: "StrategyRevoked",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address",
         name: "from",
         type: "address",
       },
@@ -233,19 +301,6 @@ const _abi = [
     ],
     name: "WithdrawalMade",
     type: "event",
-  },
-  {
-    inputs: [],
-    name: "activation",
-    outputs: [
-      {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
   },
   {
     inputs: [
@@ -380,6 +435,25 @@ const _abi = [
     type: "function",
   },
   {
+    inputs: [
+      {
+        internalType: "address",
+        name: "strategy",
+        type: "address",
+      },
+    ],
+    name: "debtOutstanding",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
     inputs: [],
     name: "debtRatio",
     outputs: [
@@ -438,6 +512,38 @@ const _abi = [
   },
   {
     inputs: [],
+    name: "emergencyShutdown",
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "strategy",
+        type: "address",
+      },
+    ],
+    name: "expectedReturn",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
     name: "governance",
     outputs: [
       {
@@ -474,50 +580,6 @@ const _abi = [
     type: "function",
   },
   {
-    inputs: [
-      {
-        internalType: "address",
-        name: "_strategy",
-        type: "address",
-      },
-      {
-        internalType: "uint256",
-        name: "_amount",
-        type: "uint256",
-      },
-    ],
-    name: "invest",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "lastReport",
-    outputs: [
-      {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "lockedProfit",
-    outputs: [
-      {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
     inputs: [],
     name: "lockedProfitDegration",
     outputs: [
@@ -544,19 +606,6 @@ const _abi = [
     type: "function",
   },
   {
-    inputs: [],
-    name: "performanceFee",
-    outputs: [
-      {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
     inputs: [
       {
         internalType: "address",
@@ -565,6 +614,61 @@ const _abi = [
       },
     ],
     name: "removeStrategyFromQueue",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "gain",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "loss",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "_debtPayment",
+        type: "uint256",
+      },
+    ],
+    name: "report",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "strategy",
+        type: "address",
+      },
+    ],
+    name: "revokeStrategy",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "bool",
+        name: "active",
+        type: "bool",
+      },
+    ],
+    name: "setEmergencyShutdown",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",

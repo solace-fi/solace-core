@@ -22,10 +22,14 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
 interface MockStrategyInterface extends ethers.utils.Interface {
   functions: {
-    "deposit()": FunctionFragment;
+    "delegatedAssets()": FunctionFragment;
+    "emergencyExit()": FunctionFragment;
     "estimatedTotalAssets()": FunctionFragment;
     "governance()": FunctionFragment;
+    "harvest()": FunctionFragment;
+    "isActive()": FunctionFragment;
     "protectedToken()": FunctionFragment;
+    "setEmergencyExit()": FunctionFragment;
     "setGovernance(address)": FunctionFragment;
     "setVault(address)": FunctionFragment;
     "vault()": FunctionFragment;
@@ -33,7 +37,14 @@ interface MockStrategyInterface extends ethers.utils.Interface {
     "withdraw(uint256)": FunctionFragment;
   };
 
-  encodeFunctionData(functionFragment: "deposit", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "delegatedAssets",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "emergencyExit",
+    values?: undefined
+  ): string;
   encodeFunctionData(
     functionFragment: "estimatedTotalAssets",
     values?: undefined
@@ -42,8 +53,14 @@ interface MockStrategyInterface extends ethers.utils.Interface {
     functionFragment: "governance",
     values?: undefined
   ): string;
+  encodeFunctionData(functionFragment: "harvest", values?: undefined): string;
+  encodeFunctionData(functionFragment: "isActive", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "protectedToken",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "setEmergencyExit",
     values?: undefined
   ): string;
   encodeFunctionData(
@@ -58,14 +75,27 @@ interface MockStrategyInterface extends ethers.utils.Interface {
     values: [BigNumberish]
   ): string;
 
-  decodeFunctionResult(functionFragment: "deposit", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "delegatedAssets",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "emergencyExit",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "estimatedTotalAssets",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "governance", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "harvest", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "isActive", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "protectedToken",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "setEmergencyExit",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -77,7 +107,13 @@ interface MockStrategyInterface extends ethers.utils.Interface {
   decodeFunctionResult(functionFragment: "want", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "withdraw", data: BytesLike): Result;
 
-  events: {};
+  events: {
+    "EmergencyExitEnabled()": EventFragment;
+    "Harvested(uint256,uint256,uint256,uint256)": EventFragment;
+  };
+
+  getEvent(nameOrSignatureOrTopic: "EmergencyExitEnabled"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "Harvested"): EventFragment;
 }
 
 export class MockStrategy extends Contract {
@@ -94,9 +130,29 @@ export class MockStrategy extends Contract {
   interface: MockStrategyInterface;
 
   functions: {
-    deposit(overrides?: Overrides): Promise<ContractTransaction>;
+    delegatedAssets(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
 
-    "deposit()"(overrides?: Overrides): Promise<ContractTransaction>;
+    "delegatedAssets()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    emergencyExit(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: boolean;
+    }>;
+
+    "emergencyExit()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: boolean;
+    }>;
 
     estimatedTotalAssets(
       overrides?: CallOverrides
@@ -122,6 +178,22 @@ export class MockStrategy extends Contract {
       0: string;
     }>;
 
+    harvest(overrides?: Overrides): Promise<ContractTransaction>;
+
+    "harvest()"(overrides?: Overrides): Promise<ContractTransaction>;
+
+    isActive(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: boolean;
+    }>;
+
+    "isActive()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: boolean;
+    }>;
+
     protectedToken(
       overrides?: CallOverrides
     ): Promise<{
@@ -133,6 +205,10 @@ export class MockStrategy extends Contract {
     ): Promise<{
       0: string;
     }>;
+
+    setEmergencyExit(overrides?: Overrides): Promise<ContractTransaction>;
+
+    "setEmergencyExit()"(overrides?: Overrides): Promise<ContractTransaction>;
 
     setGovernance(
       _governance: string,
@@ -189,9 +265,13 @@ export class MockStrategy extends Contract {
     ): Promise<ContractTransaction>;
   };
 
-  deposit(overrides?: Overrides): Promise<ContractTransaction>;
+  delegatedAssets(overrides?: CallOverrides): Promise<BigNumber>;
 
-  "deposit()"(overrides?: Overrides): Promise<ContractTransaction>;
+  "delegatedAssets()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+  emergencyExit(overrides?: CallOverrides): Promise<boolean>;
+
+  "emergencyExit()"(overrides?: CallOverrides): Promise<boolean>;
 
   estimatedTotalAssets(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -201,9 +281,21 @@ export class MockStrategy extends Contract {
 
   "governance()"(overrides?: CallOverrides): Promise<string>;
 
+  harvest(overrides?: Overrides): Promise<ContractTransaction>;
+
+  "harvest()"(overrides?: Overrides): Promise<ContractTransaction>;
+
+  isActive(overrides?: CallOverrides): Promise<boolean>;
+
+  "isActive()"(overrides?: CallOverrides): Promise<boolean>;
+
   protectedToken(overrides?: CallOverrides): Promise<string>;
 
   "protectedToken()"(overrides?: CallOverrides): Promise<string>;
+
+  setEmergencyExit(overrides?: Overrides): Promise<ContractTransaction>;
+
+  "setEmergencyExit()"(overrides?: Overrides): Promise<ContractTransaction>;
 
   setGovernance(
     _governance: string,
@@ -241,9 +333,13 @@ export class MockStrategy extends Contract {
   ): Promise<ContractTransaction>;
 
   callStatic: {
-    deposit(overrides?: CallOverrides): Promise<void>;
+    delegatedAssets(overrides?: CallOverrides): Promise<BigNumber>;
 
-    "deposit()"(overrides?: CallOverrides): Promise<void>;
+    "delegatedAssets()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    emergencyExit(overrides?: CallOverrides): Promise<boolean>;
+
+    "emergencyExit()"(overrides?: CallOverrides): Promise<boolean>;
 
     estimatedTotalAssets(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -253,9 +349,21 @@ export class MockStrategy extends Contract {
 
     "governance()"(overrides?: CallOverrides): Promise<string>;
 
+    harvest(overrides?: CallOverrides): Promise<void>;
+
+    "harvest()"(overrides?: CallOverrides): Promise<void>;
+
+    isActive(overrides?: CallOverrides): Promise<boolean>;
+
+    "isActive()"(overrides?: CallOverrides): Promise<boolean>;
+
     protectedToken(overrides?: CallOverrides): Promise<string>;
 
     "protectedToken()"(overrides?: CallOverrides): Promise<string>;
+
+    setEmergencyExit(overrides?: CallOverrides): Promise<void>;
+
+    "setEmergencyExit()"(overrides?: CallOverrides): Promise<void>;
 
     setGovernance(
       _governance: string,
@@ -293,12 +401,25 @@ export class MockStrategy extends Contract {
     ): Promise<BigNumber>;
   };
 
-  filters: {};
+  filters: {
+    EmergencyExitEnabled(): EventFilter;
+
+    Harvested(
+      profit: null,
+      loss: null,
+      debtPayment: null,
+      debtOutstanding: null
+    ): EventFilter;
+  };
 
   estimateGas: {
-    deposit(overrides?: Overrides): Promise<BigNumber>;
+    delegatedAssets(overrides?: CallOverrides): Promise<BigNumber>;
 
-    "deposit()"(overrides?: Overrides): Promise<BigNumber>;
+    "delegatedAssets()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    emergencyExit(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "emergencyExit()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     estimatedTotalAssets(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -308,9 +429,21 @@ export class MockStrategy extends Contract {
 
     "governance()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+    harvest(overrides?: Overrides): Promise<BigNumber>;
+
+    "harvest()"(overrides?: Overrides): Promise<BigNumber>;
+
+    isActive(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "isActive()"(overrides?: CallOverrides): Promise<BigNumber>;
+
     protectedToken(overrides?: CallOverrides): Promise<BigNumber>;
 
     "protectedToken()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    setEmergencyExit(overrides?: Overrides): Promise<BigNumber>;
+
+    "setEmergencyExit()"(overrides?: Overrides): Promise<BigNumber>;
 
     setGovernance(
       _governance: string,
@@ -349,9 +482,15 @@ export class MockStrategy extends Contract {
   };
 
   populateTransaction: {
-    deposit(overrides?: Overrides): Promise<PopulatedTransaction>;
+    delegatedAssets(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
-    "deposit()"(overrides?: Overrides): Promise<PopulatedTransaction>;
+    "delegatedAssets()"(
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    emergencyExit(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "emergencyExit()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     estimatedTotalAssets(
       overrides?: CallOverrides
@@ -365,11 +504,23 @@ export class MockStrategy extends Contract {
 
     "governance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
+    harvest(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    "harvest()"(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    isActive(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "isActive()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
     protectedToken(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "protectedToken()"(
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
+
+    setEmergencyExit(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    "setEmergencyExit()"(overrides?: Overrides): Promise<PopulatedTransaction>;
 
     setGovernance(
       _governance: string,

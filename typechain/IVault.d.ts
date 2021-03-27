@@ -23,12 +23,27 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 interface IVaultInterface extends ethers.utils.Interface {
   functions: {
     "balanceOf()": FunctionFragment;
+    "debtOutstanding(address)": FunctionFragment;
+    "report(uint256,uint256,uint256)": FunctionFragment;
+    "revokeStrategy(address)": FunctionFragment;
     "strategies(address)": FunctionFragment;
     "token()": FunctionFragment;
     "withdraw(uint256)": FunctionFragment;
   };
 
   encodeFunctionData(functionFragment: "balanceOf", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "debtOutstanding",
+    values: [string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "report",
+    values: [BigNumberish, BigNumberish, BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "revokeStrategy",
+    values: [string]
+  ): string;
   encodeFunctionData(functionFragment: "strategies", values: [string]): string;
   encodeFunctionData(functionFragment: "token", values?: undefined): string;
   encodeFunctionData(
@@ -37,6 +52,15 @@ interface IVaultInterface extends ethers.utils.Interface {
   ): string;
 
   decodeFunctionResult(functionFragment: "balanceOf", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "debtOutstanding",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "report", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "revokeStrategy",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "strategies", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "token", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "withdraw", data: BytesLike): Result;
@@ -61,6 +85,44 @@ export class IVault extends Contract {
     balanceOf(overrides?: Overrides): Promise<ContractTransaction>;
 
     "balanceOf()"(overrides?: Overrides): Promise<ContractTransaction>;
+
+    debtOutstanding(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    "debtOutstanding(address)"(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    report(
+      gain: BigNumberish,
+      loss: BigNumberish,
+      _debtPayment: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "report(uint256,uint256,uint256)"(
+      gain: BigNumberish,
+      loss: BigNumberish,
+      _debtPayment: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    revokeStrategy(
+      arg0: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "revokeStrategy(address)"(
+      arg0: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
 
     strategies(
       arg0: string,
@@ -141,6 +203,37 @@ export class IVault extends Contract {
 
   "balanceOf()"(overrides?: Overrides): Promise<ContractTransaction>;
 
+  debtOutstanding(arg0: string, overrides?: CallOverrides): Promise<BigNumber>;
+
+  "debtOutstanding(address)"(
+    arg0: string,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
+
+  report(
+    gain: BigNumberish,
+    loss: BigNumberish,
+    _debtPayment: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "report(uint256,uint256,uint256)"(
+    gain: BigNumberish,
+    loss: BigNumberish,
+    _debtPayment: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  revokeStrategy(
+    arg0: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "revokeStrategy(address)"(
+    arg0: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
   strategies(
     arg0: string,
     overrides?: CallOverrides
@@ -207,6 +300,37 @@ export class IVault extends Contract {
     balanceOf(overrides?: CallOverrides): Promise<BigNumber>;
 
     "balanceOf()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    debtOutstanding(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "debtOutstanding(address)"(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    report(
+      gain: BigNumberish,
+      loss: BigNumberish,
+      _debtPayment: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "report(uint256,uint256,uint256)"(
+      gain: BigNumberish,
+      loss: BigNumberish,
+      _debtPayment: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    revokeStrategy(arg0: string, overrides?: CallOverrides): Promise<void>;
+
+    "revokeStrategy(address)"(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
 
     strategies(
       arg0: string,
@@ -275,6 +399,37 @@ export class IVault extends Contract {
 
     "balanceOf()"(overrides?: Overrides): Promise<BigNumber>;
 
+    debtOutstanding(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "debtOutstanding(address)"(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    report(
+      gain: BigNumberish,
+      loss: BigNumberish,
+      _debtPayment: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "report(uint256,uint256,uint256)"(
+      gain: BigNumberish,
+      loss: BigNumberish,
+      _debtPayment: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    revokeStrategy(arg0: string, overrides?: Overrides): Promise<BigNumber>;
+
+    "revokeStrategy(address)"(
+      arg0: string,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
     strategies(arg0: string, overrides?: CallOverrides): Promise<BigNumber>;
 
     "strategies(address)"(
@@ -298,6 +453,40 @@ export class IVault extends Contract {
     balanceOf(overrides?: Overrides): Promise<PopulatedTransaction>;
 
     "balanceOf()"(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    debtOutstanding(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "debtOutstanding(address)"(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    report(
+      gain: BigNumberish,
+      loss: BigNumberish,
+      _debtPayment: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "report(uint256,uint256,uint256)"(
+      gain: BigNumberish,
+      loss: BigNumberish,
+      _debtPayment: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    revokeStrategy(
+      arg0: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "revokeStrategy(address)"(
+      arg0: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
 
     strategies(
       arg0: string,

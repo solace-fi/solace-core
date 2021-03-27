@@ -23,26 +23,27 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
 interface VaultInterface extends ethers.utils.Interface {
   functions: {
-    "activation()": FunctionFragment;
     "addStrategy(address,uint256,uint256,uint256,uint256)": FunctionFragment;
     "addStrategyToQueue(address)": FunctionFragment;
     "allowance(address,address)": FunctionFragment;
     "approve(address,uint256)": FunctionFragment;
     "balanceOf(address)": FunctionFragment;
     "creditAvailable(address)": FunctionFragment;
+    "debtOutstanding(address)": FunctionFragment;
     "debtRatio()": FunctionFragment;
     "decimals()": FunctionFragment;
     "decreaseAllowance(address,uint256)": FunctionFragment;
     "deposit()": FunctionFragment;
+    "emergencyShutdown()": FunctionFragment;
+    "expectedReturn(address)": FunctionFragment;
     "governance()": FunctionFragment;
     "increaseAllowance(address,uint256)": FunctionFragment;
-    "invest(address,uint256)": FunctionFragment;
-    "lastReport()": FunctionFragment;
-    "lockedProfit()": FunctionFragment;
     "lockedProfitDegration()": FunctionFragment;
     "name()": FunctionFragment;
-    "performanceFee()": FunctionFragment;
     "removeStrategyFromQueue(address)": FunctionFragment;
+    "report(uint256,uint256,uint256)": FunctionFragment;
+    "revokeStrategy(address)": FunctionFragment;
+    "setEmergencyShutdown(bool)": FunctionFragment;
     "setGovernance(address)": FunctionFragment;
     "setLockedProfitDegration(uint256)": FunctionFragment;
     "setWithdrawalQueue(address[])": FunctionFragment;
@@ -58,10 +59,6 @@ interface VaultInterface extends ethers.utils.Interface {
     "withdrawalQueue(uint256)": FunctionFragment;
   };
 
-  encodeFunctionData(
-    functionFragment: "activation",
-    values?: undefined
-  ): string;
   encodeFunctionData(
     functionFragment: "addStrategy",
     values: [string, BigNumberish, BigNumberish, BigNumberish, BigNumberish]
@@ -83,6 +80,10 @@ interface VaultInterface extends ethers.utils.Interface {
     functionFragment: "creditAvailable",
     values: [string]
   ): string;
+  encodeFunctionData(
+    functionFragment: "debtOutstanding",
+    values: [string]
+  ): string;
   encodeFunctionData(functionFragment: "debtRatio", values?: undefined): string;
   encodeFunctionData(functionFragment: "decimals", values?: undefined): string;
   encodeFunctionData(
@@ -90,6 +91,14 @@ interface VaultInterface extends ethers.utils.Interface {
     values: [string, BigNumberish]
   ): string;
   encodeFunctionData(functionFragment: "deposit", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "emergencyShutdown",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "expectedReturn",
+    values: [string]
+  ): string;
   encodeFunctionData(
     functionFragment: "governance",
     values?: undefined
@@ -99,29 +108,25 @@ interface VaultInterface extends ethers.utils.Interface {
     values: [string, BigNumberish]
   ): string;
   encodeFunctionData(
-    functionFragment: "invest",
-    values: [string, BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "lastReport",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
-    functionFragment: "lockedProfit",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
     functionFragment: "lockedProfitDegration",
     values?: undefined
   ): string;
   encodeFunctionData(functionFragment: "name", values?: undefined): string;
   encodeFunctionData(
-    functionFragment: "performanceFee",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
     functionFragment: "removeStrategyFromQueue",
     values: [string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "report",
+    values: [BigNumberish, BigNumberish, BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "revokeStrategy",
+    values: [string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "setEmergencyShutdown",
+    values: [boolean]
   ): string;
   encodeFunctionData(
     functionFragment: "setGovernance",
@@ -164,7 +169,6 @@ interface VaultInterface extends ethers.utils.Interface {
     values: [BigNumberish]
   ): string;
 
-  decodeFunctionResult(functionFragment: "activation", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "addStrategy",
     data: BytesLike
@@ -180,6 +184,10 @@ interface VaultInterface extends ethers.utils.Interface {
     functionFragment: "creditAvailable",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(
+    functionFragment: "debtOutstanding",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "debtRatio", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "decimals", data: BytesLike): Result;
   decodeFunctionResult(
@@ -187,15 +195,17 @@ interface VaultInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "deposit", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "emergencyShutdown",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "expectedReturn",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "governance", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "increaseAllowance",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(functionFragment: "invest", data: BytesLike): Result;
-  decodeFunctionResult(functionFragment: "lastReport", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "lockedProfit",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -204,11 +214,16 @@ interface VaultInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(functionFragment: "name", data: BytesLike): Result;
   decodeFunctionResult(
-    functionFragment: "performanceFee",
+    functionFragment: "removeStrategyFromQueue",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "report", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "revokeStrategy",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "removeStrategyFromQueue",
+    functionFragment: "setEmergencyShutdown",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -249,10 +264,12 @@ interface VaultInterface extends ethers.utils.Interface {
   events: {
     "Approval(address,address,uint256)": EventFragment;
     "DepositMade(address,uint256,uint256)": EventFragment;
-    "InvestmentMade(address,uint256)": EventFragment;
+    "EmergencyShutdown(bool)": EventFragment;
     "StrategyAdded(address,uint256,uint256,uint256,uint256)": EventFragment;
     "StrategyAddedToQueue(address)": EventFragment;
     "StrategyRemovedFromQueue(address)": EventFragment;
+    "StrategyReported(address,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)": EventFragment;
+    "StrategyRevoked(address)": EventFragment;
     "Transfer(address,address,uint256)": EventFragment;
     "UpdateWithdrawalQueue(address[])": EventFragment;
     "WithdrawalMade(address,uint256)": EventFragment;
@@ -260,10 +277,12 @@ interface VaultInterface extends ethers.utils.Interface {
 
   getEvent(nameOrSignatureOrTopic: "Approval"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "DepositMade"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "InvestmentMade"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "EmergencyShutdown"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "StrategyAdded"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "StrategyAddedToQueue"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "StrategyRemovedFromQueue"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "StrategyReported"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "StrategyRevoked"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "Transfer"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "UpdateWithdrawalQueue"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "WithdrawalMade"): EventFragment;
@@ -283,18 +302,6 @@ export class Vault extends Contract {
   interface: VaultInterface;
 
   functions: {
-    activation(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: BigNumber;
-    }>;
-
-    "activation()"(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: BigNumber;
-    }>;
-
     addStrategy(
       _strategy: string,
       _debtRatio: BigNumberish,
@@ -379,6 +386,20 @@ export class Vault extends Contract {
       0: BigNumber;
     }>;
 
+    debtOutstanding(
+      strategy: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    "debtOutstanding(address)"(
+      strategy: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
     debtRatio(
       overrides?: CallOverrides
     ): Promise<{
@@ -419,6 +440,32 @@ export class Vault extends Contract {
 
     "deposit()"(overrides?: PayableOverrides): Promise<ContractTransaction>;
 
+    emergencyShutdown(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: boolean;
+    }>;
+
+    "emergencyShutdown()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: boolean;
+    }>;
+
+    expectedReturn(
+      strategy: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    "expectedReturn(address)"(
+      strategy: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
     governance(
       overrides?: CallOverrides
     ): Promise<{
@@ -442,42 +489,6 @@ export class Vault extends Contract {
       addedValue: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
-
-    invest(
-      _strategy: string,
-      _amount: BigNumberish,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
-    "invest(address,uint256)"(
-      _strategy: string,
-      _amount: BigNumberish,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
-    lastReport(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: BigNumber;
-    }>;
-
-    "lastReport()"(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: BigNumber;
-    }>;
-
-    lockedProfit(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: BigNumber;
-    }>;
-
-    "lockedProfit()"(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: BigNumber;
-    }>;
 
     lockedProfitDegration(
       overrides?: CallOverrides
@@ -503,18 +514,6 @@ export class Vault extends Contract {
       0: string;
     }>;
 
-    performanceFee(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: BigNumber;
-    }>;
-
-    "performanceFee()"(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: BigNumber;
-    }>;
-
     removeStrategyFromQueue(
       _strategy: string,
       overrides?: Overrides
@@ -522,6 +521,40 @@ export class Vault extends Contract {
 
     "removeStrategyFromQueue(address)"(
       _strategy: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    report(
+      gain: BigNumberish,
+      loss: BigNumberish,
+      _debtPayment: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "report(uint256,uint256,uint256)"(
+      gain: BigNumberish,
+      loss: BigNumberish,
+      _debtPayment: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    revokeStrategy(
+      strategy: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "revokeStrategy(address)"(
+      strategy: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    setEmergencyShutdown(
+      active: boolean,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "setEmergencyShutdown(bool)"(
+      active: boolean,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
@@ -716,10 +749,6 @@ export class Vault extends Contract {
     }>;
   };
 
-  activation(overrides?: CallOverrides): Promise<BigNumber>;
-
-  "activation()"(overrides?: CallOverrides): Promise<BigNumber>;
-
   addStrategy(
     _strategy: string,
     _debtRatio: BigNumberish,
@@ -789,6 +818,16 @@ export class Vault extends Contract {
     overrides?: CallOverrides
   ): Promise<BigNumber>;
 
+  debtOutstanding(
+    strategy: string,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
+
+  "debtOutstanding(address)"(
+    strategy: string,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
+
   debtRatio(overrides?: CallOverrides): Promise<BigNumber>;
 
   "debtRatio()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -813,6 +852,20 @@ export class Vault extends Contract {
 
   "deposit()"(overrides?: PayableOverrides): Promise<ContractTransaction>;
 
+  emergencyShutdown(overrides?: CallOverrides): Promise<boolean>;
+
+  "emergencyShutdown()"(overrides?: CallOverrides): Promise<boolean>;
+
+  expectedReturn(
+    strategy: string,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
+
+  "expectedReturn(address)"(
+    strategy: string,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
+
   governance(overrides?: CallOverrides): Promise<string>;
 
   "governance()"(overrides?: CallOverrides): Promise<string>;
@@ -829,26 +882,6 @@ export class Vault extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  invest(
-    _strategy: string,
-    _amount: BigNumberish,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
-  "invest(address,uint256)"(
-    _strategy: string,
-    _amount: BigNumberish,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
-  lastReport(overrides?: CallOverrides): Promise<BigNumber>;
-
-  "lastReport()"(overrides?: CallOverrides): Promise<BigNumber>;
-
-  lockedProfit(overrides?: CallOverrides): Promise<BigNumber>;
-
-  "lockedProfit()"(overrides?: CallOverrides): Promise<BigNumber>;
-
   lockedProfitDegration(overrides?: CallOverrides): Promise<BigNumber>;
 
   "lockedProfitDegration()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -857,10 +890,6 @@ export class Vault extends Contract {
 
   "name()"(overrides?: CallOverrides): Promise<string>;
 
-  performanceFee(overrides?: CallOverrides): Promise<BigNumber>;
-
-  "performanceFee()"(overrides?: CallOverrides): Promise<BigNumber>;
-
   removeStrategyFromQueue(
     _strategy: string,
     overrides?: Overrides
@@ -868,6 +897,40 @@ export class Vault extends Contract {
 
   "removeStrategyFromQueue(address)"(
     _strategy: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  report(
+    gain: BigNumberish,
+    loss: BigNumberish,
+    _debtPayment: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "report(uint256,uint256,uint256)"(
+    gain: BigNumberish,
+    loss: BigNumberish,
+    _debtPayment: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  revokeStrategy(
+    strategy: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "revokeStrategy(address)"(
+    strategy: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  setEmergencyShutdown(
+    active: boolean,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "setEmergencyShutdown(bool)"(
+    active: boolean,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
@@ -1018,10 +1081,6 @@ export class Vault extends Contract {
   ): Promise<string>;
 
   callStatic: {
-    activation(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "activation()"(overrides?: CallOverrides): Promise<BigNumber>;
-
     addStrategy(
       _strategy: string,
       _debtRatio: BigNumberish,
@@ -1091,6 +1150,16 @@ export class Vault extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
+    debtOutstanding(
+      strategy: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "debtOutstanding(address)"(
+      strategy: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     debtRatio(overrides?: CallOverrides): Promise<BigNumber>;
 
     "debtRatio()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -1115,6 +1184,20 @@ export class Vault extends Contract {
 
     "deposit()"(overrides?: CallOverrides): Promise<void>;
 
+    emergencyShutdown(overrides?: CallOverrides): Promise<boolean>;
+
+    "emergencyShutdown()"(overrides?: CallOverrides): Promise<boolean>;
+
+    expectedReturn(
+      strategy: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "expectedReturn(address)"(
+      strategy: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     governance(overrides?: CallOverrides): Promise<string>;
 
     "governance()"(overrides?: CallOverrides): Promise<string>;
@@ -1131,26 +1214,6 @@ export class Vault extends Contract {
       overrides?: CallOverrides
     ): Promise<boolean>;
 
-    invest(
-      _strategy: string,
-      _amount: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    "invest(address,uint256)"(
-      _strategy: string,
-      _amount: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    lastReport(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "lastReport()"(overrides?: CallOverrides): Promise<BigNumber>;
-
-    lockedProfit(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "lockedProfit()"(overrides?: CallOverrides): Promise<BigNumber>;
-
     lockedProfitDegration(overrides?: CallOverrides): Promise<BigNumber>;
 
     "lockedProfitDegration()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -1159,10 +1222,6 @@ export class Vault extends Contract {
 
     "name()"(overrides?: CallOverrides): Promise<string>;
 
-    performanceFee(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "performanceFee()"(overrides?: CallOverrides): Promise<BigNumber>;
-
     removeStrategyFromQueue(
       _strategy: string,
       overrides?: CallOverrides
@@ -1170,6 +1229,37 @@ export class Vault extends Contract {
 
     "removeStrategyFromQueue(address)"(
       _strategy: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    report(
+      gain: BigNumberish,
+      loss: BigNumberish,
+      _debtPayment: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "report(uint256,uint256,uint256)"(
+      gain: BigNumberish,
+      loss: BigNumberish,
+      _debtPayment: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    revokeStrategy(strategy: string, overrides?: CallOverrides): Promise<void>;
+
+    "revokeStrategy(address)"(
+      strategy: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    setEmergencyShutdown(
+      active: boolean,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "setEmergencyShutdown(bool)"(
+      active: boolean,
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -1333,10 +1423,7 @@ export class Vault extends Contract {
       shares: BigNumberish | null
     ): EventFilter;
 
-    InvestmentMade(
-      strategy: string | null,
-      amount: BigNumberish | null
-    ): EventFilter;
+    EmergencyShutdown(active: null): EventFilter;
 
     StrategyAdded(
       strategy: string | null,
@@ -1350,6 +1437,20 @@ export class Vault extends Contract {
 
     StrategyRemovedFromQueue(strategy: string | null): EventFilter;
 
+    StrategyReported(
+      strategy: string | null,
+      gain: null,
+      loss: null,
+      debtPaid: null,
+      totalGain: null,
+      totalLoss: null,
+      totalDebt: null,
+      debtAdded: null,
+      debtRatio: null
+    ): EventFilter;
+
+    StrategyRevoked(strategy: null): EventFilter;
+
     Transfer(from: string | null, to: string | null, value: null): EventFilter;
 
     UpdateWithdrawalQueue(queue: string[] | null): EventFilter;
@@ -1361,10 +1462,6 @@ export class Vault extends Contract {
   };
 
   estimateGas: {
-    activation(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "activation()"(overrides?: CallOverrides): Promise<BigNumber>;
-
     addStrategy(
       _strategy: string,
       _debtRatio: BigNumberish,
@@ -1434,6 +1531,16 @@ export class Vault extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
+    debtOutstanding(
+      strategy: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "debtOutstanding(address)"(
+      strategy: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     debtRatio(overrides?: CallOverrides): Promise<BigNumber>;
 
     "debtRatio()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -1458,6 +1565,20 @@ export class Vault extends Contract {
 
     "deposit()"(overrides?: PayableOverrides): Promise<BigNumber>;
 
+    emergencyShutdown(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "emergencyShutdown()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    expectedReturn(
+      strategy: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "expectedReturn(address)"(
+      strategy: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     governance(overrides?: CallOverrides): Promise<BigNumber>;
 
     "governance()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -1474,26 +1595,6 @@ export class Vault extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    invest(
-      _strategy: string,
-      _amount: BigNumberish,
-      overrides?: Overrides
-    ): Promise<BigNumber>;
-
-    "invest(address,uint256)"(
-      _strategy: string,
-      _amount: BigNumberish,
-      overrides?: Overrides
-    ): Promise<BigNumber>;
-
-    lastReport(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "lastReport()"(overrides?: CallOverrides): Promise<BigNumber>;
-
-    lockedProfit(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "lockedProfit()"(overrides?: CallOverrides): Promise<BigNumber>;
-
     lockedProfitDegration(overrides?: CallOverrides): Promise<BigNumber>;
 
     "lockedProfitDegration()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -1502,10 +1603,6 @@ export class Vault extends Contract {
 
     "name()"(overrides?: CallOverrides): Promise<BigNumber>;
 
-    performanceFee(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "performanceFee()"(overrides?: CallOverrides): Promise<BigNumber>;
-
     removeStrategyFromQueue(
       _strategy: string,
       overrides?: Overrides
@@ -1513,6 +1610,37 @@ export class Vault extends Contract {
 
     "removeStrategyFromQueue(address)"(
       _strategy: string,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    report(
+      gain: BigNumberish,
+      loss: BigNumberish,
+      _debtPayment: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "report(uint256,uint256,uint256)"(
+      gain: BigNumberish,
+      loss: BigNumberish,
+      _debtPayment: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    revokeStrategy(strategy: string, overrides?: Overrides): Promise<BigNumber>;
+
+    "revokeStrategy(address)"(
+      strategy: string,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    setEmergencyShutdown(
+      active: boolean,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "setEmergencyShutdown(bool)"(
+      active: boolean,
       overrides?: Overrides
     ): Promise<BigNumber>;
 
@@ -1623,10 +1751,6 @@ export class Vault extends Contract {
   };
 
   populateTransaction: {
-    activation(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    "activation()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
     addStrategy(
       _strategy: string,
       _debtRatio: BigNumberish,
@@ -1699,6 +1823,16 @@ export class Vault extends Contract {
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
+    debtOutstanding(
+      strategy: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "debtOutstanding(address)"(
+      strategy: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
     debtRatio(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "debtRatio()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
@@ -1723,6 +1857,22 @@ export class Vault extends Contract {
 
     "deposit()"(overrides?: PayableOverrides): Promise<PopulatedTransaction>;
 
+    emergencyShutdown(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "emergencyShutdown()"(
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    expectedReturn(
+      strategy: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "expectedReturn(address)"(
+      strategy: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
     governance(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "governance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
@@ -1739,26 +1889,6 @@ export class Vault extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    invest(
-      _strategy: string,
-      _amount: BigNumberish,
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    "invest(address,uint256)"(
-      _strategy: string,
-      _amount: BigNumberish,
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    lastReport(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    "lastReport()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    lockedProfit(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    "lockedProfit()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
     lockedProfitDegration(
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
@@ -1771,12 +1901,6 @@ export class Vault extends Contract {
 
     "name()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
-    performanceFee(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    "performanceFee()"(
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
     removeStrategyFromQueue(
       _strategy: string,
       overrides?: Overrides
@@ -1784,6 +1908,40 @@ export class Vault extends Contract {
 
     "removeStrategyFromQueue(address)"(
       _strategy: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    report(
+      gain: BigNumberish,
+      loss: BigNumberish,
+      _debtPayment: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "report(uint256,uint256,uint256)"(
+      gain: BigNumberish,
+      loss: BigNumberish,
+      _debtPayment: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    revokeStrategy(
+      strategy: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "revokeStrategy(address)"(
+      strategy: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    setEmergencyShutdown(
+      active: boolean,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "setEmergencyShutdown(bool)"(
+      active: boolean,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 

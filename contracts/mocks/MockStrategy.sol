@@ -36,4 +36,36 @@ contract MockStrategy is BaseStrategy {
         }
     }
 
+    function prepareReturn(uint256 _debtOutstanding)
+        internal
+        override
+        returns (
+            uint256 _profit,
+            uint256 _loss,
+            uint256 _debtPayment
+        )
+    {
+        // During testing, send this contract some tokens to simulate "Rewards"
+        uint256 totalAssets = want.balanceOf(address(this));
+        uint256 totalDebt = vault.strategies(address(this)).totalDebt;
+        if (totalAssets > _debtOutstanding) {
+            _debtPayment = _debtOutstanding;
+            totalAssets = totalAssets - _debtOutstanding;
+        } else {
+            _debtPayment = totalAssets;
+            totalAssets = 0;
+        }
+        totalDebt = totalDebt -_debtPayment;
+
+        if (totalAssets > totalDebt) {
+            _profit = totalAssets - totalDebt;
+        } else {
+            _loss = totalDebt - totalAssets;
+        }
+    }
+
+    function adjustPosition(uint256 _debtOutstanding) internal override {
+        // Whatever we have "free", consider it "invested" now
+    }
+
 }
