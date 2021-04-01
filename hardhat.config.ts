@@ -28,7 +28,6 @@ const config: HardhatUserConfig = {
   }
 };
 
-
 // If you are defining tasks, they need to access the Hardhat Runtime Environment (hre) explicitly, as a parameter.
 task("accounts", "Prints the list of accounts", async (args, hre) => {
   const accounts = await hre.ethers.getSigners();

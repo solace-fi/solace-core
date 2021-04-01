@@ -152,7 +152,7 @@ contract Vault is ERC20 {
     function setEmergencyShutdown(bool active) external {
         require(msg.sender == governance, "!governance");
         emergencyShutdown = active;
-        // emit EmergencyShutdown(active);
+        emit EmergencyShutdown(active);
     }
 
     /**
