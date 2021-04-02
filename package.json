@@ -28,6 +28,9 @@
     "web3": "^1.3.4"
   },
   "dependencies": {
-    "@openzeppelin/contracts": "^4.0.0-rc.0"
+    "@openzeppelin/contracts": "^4.0.0-rc.0",
+    "@uniswap/v3-core": "^1.0.0-rc.1",
+    "@uniswap/v3-periphery": "^1.0.0-beta.12",
+    "bignumber.js": "^9.0.1"
   }
 }
