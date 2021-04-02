@@ -6,11 +6,11 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 
 /**
- * @title Mock Token
+ * @title Mock ERC-20
  * @author solace.fi
- * @notice Mock Token is only used to test the master contract.
+ * @notice Mock ERC-20 is only used to test the master contract.
  */
-contract MockToken is ERC20 {
+contract MockERC20 is ERC20 {
     using SafeERC20 for IERC20;
 
     /**
