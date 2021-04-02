@@ -2,6 +2,7 @@ import { HardhatUserConfig } from "hardhat/types";
 import { task } from "hardhat/config";
 import "@nomiclabs/hardhat-waffle";
 import "hardhat-typechain";
+import "hardhat-abi-exporter";
 
 
 const config: HardhatUserConfig = {
@@ -9,6 +10,13 @@ const config: HardhatUserConfig = {
   solidity: {
     compilers: [{ version: "0.8.0", settings: {} }],
   },
+  abiExporter: {
+    path: './client/src/abi',
+    clear: true,
+    flat: false,
+    only: [],
+    spacing: 2
+  }
 };
 
 

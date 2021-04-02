@@ -1,4 +1,5 @@
 node_modules
+client
 .DS_Store
 
 #Hardhat files
