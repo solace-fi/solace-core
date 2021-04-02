@@ -8,7 +8,15 @@ import "hardhat-abi-exporter";
 const config: HardhatUserConfig = {
   defaultNetwork: "hardhat",
   solidity: {
-    compilers: [{ version: "0.8.0", settings: {} }],
+    compilers: [{
+      version: "0.8.0",
+      settings: {
+        optimizer: {
+          enabled: true,
+          runs: 800
+        }
+      }
+    }],
   },
   abiExporter: {
     path: './client/src/abi',
