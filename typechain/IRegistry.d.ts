@@ -20,14 +20,11 @@ import { BytesLike } from "@ethersproject/bytes";
 import { Listener, Provider } from "@ethersproject/providers";
 import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
-interface RegistryInterface extends ethers.utils.Interface {
+interface IRegistryInterface extends ethers.utils.Interface {
   functions: {
     "addProduct(address)": FunctionFragment;
     "getProduct(uint256)": FunctionFragment;
-    "governance()": FunctionFragment;
     "isProduct(address)": FunctionFragment;
-    "locker()": FunctionFragment;
-    "master()": FunctionFragment;
     "numProducts()": FunctionFragment;
     "removeProduct(address)": FunctionFragment;
     "setGovernance(address)": FunctionFragment;
@@ -36,9 +33,6 @@ interface RegistryInterface extends ethers.utils.Interface {
     "setSolace(address)": FunctionFragment;
     "setTreasury(address)": FunctionFragment;
     "setVault(address)": FunctionFragment;
-    "solace()": FunctionFragment;
-    "treasury()": FunctionFragment;
-    "vault()": FunctionFragment;
   };
 
   encodeFunctionData(functionFragment: "addProduct", values: [string]): string;
@@ -46,13 +40,7 @@ interface RegistryInterface extends ethers.utils.Interface {
     functionFragment: "getProduct",
     values: [BigNumberish]
   ): string;
-  encodeFunctionData(
-    functionFragment: "governance",
-    values?: undefined
-  ): string;
   encodeFunctionData(functionFragment: "isProduct", values: [string]): string;
-  encodeFunctionData(functionFragment: "locker", values?: undefined): string;
-  encodeFunctionData(functionFragment: "master", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "numProducts",
     values?: undefined
@@ -70,16 +58,10 @@ interface RegistryInterface extends ethers.utils.Interface {
   encodeFunctionData(functionFragment: "setSolace", values: [string]): string;
   encodeFunctionData(functionFragment: "setTreasury", values: [string]): string;
   encodeFunctionData(functionFragment: "setVault", values: [string]): string;
-  encodeFunctionData(functionFragment: "solace", values?: undefined): string;
-  encodeFunctionData(functionFragment: "treasury", values?: undefined): string;
-  encodeFunctionData(functionFragment: "vault", values?: undefined): string;
 
   decodeFunctionResult(functionFragment: "addProduct", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "getProduct", data: BytesLike): Result;
-  decodeFunctionResult(functionFragment: "governance", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "isProduct", data: BytesLike): Result;
-  decodeFunctionResult(functionFragment: "locker", data: BytesLike): Result;
-  decodeFunctionResult(functionFragment: "master", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "numProducts",
     data: BytesLike
@@ -100,32 +82,11 @@ interface RegistryInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "setVault", data: BytesLike): Result;
-  decodeFunctionResult(functionFragment: "solace", data: BytesLike): Result;
-  decodeFunctionResult(functionFragment: "treasury", data: BytesLike): Result;
-  decodeFunctionResult(functionFragment: "vault", data: BytesLike): Result;
 
-  events: {
-    "GovernanceSet(address)": EventFragment;
-    "LockerSet(address)": EventFragment;
-    "MasterSet(address)": EventFragment;
-    "ProductAdded(address)": EventFragment;
-    "ProductRemoved(address)": EventFragment;
-    "SolaceSet(address)": EventFragment;
-    "TreasurySet(address)": EventFragment;
-    "VaultSet(address)": EventFragment;
-  };
-
-  getEvent(nameOrSignatureOrTopic: "GovernanceSet"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "LockerSet"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "MasterSet"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "ProductAdded"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "ProductRemoved"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "SolaceSet"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "TreasurySet"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "VaultSet"): EventFragment;
+  events: {};
 }
 
-export class Registry extends Contract {
+export class IRegistry extends Contract {
   connect(signerOrProvider: Signer | Provider | string): this;
   attach(addressOrName: string): this;
   deployed(): Promise<this>;
@@ -136,7 +97,7 @@ export class Registry extends Contract {
   removeAllListeners(eventName: EventFilter | string): this;
   removeListener(eventName: any, listener: Listener): this;
 
-  interface: RegistryInterface;
+  interface: IRegistryInterface;
 
   functions: {
     addProduct(
@@ -163,18 +124,6 @@ export class Registry extends Contract {
       0: string;
     }>;
 
-    governance(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
-    "governance()"(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
     isProduct(
       _product: string,
       overrides?: CallOverrides
@@ -187,30 +136,6 @@ export class Registry extends Contract {
       overrides?: CallOverrides
     ): Promise<{
       0: boolean;
-    }>;
-
-    locker(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
-    "locker()"(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
-    master(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
-    "master()"(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
     }>;
 
     numProducts(
@@ -294,42 +219,6 @@ export class Registry extends Contract {
       _vault: string,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
-
-    solace(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
-    "solace()"(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
-    treasury(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
-    "treasury()"(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
-    vault(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
-    "vault()"(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
   };
 
   addProduct(
@@ -352,24 +241,12 @@ export class Registry extends Contract {
     overrides?: CallOverrides
   ): Promise<string>;
 
-  governance(overrides?: CallOverrides): Promise<string>;
-
-  "governance()"(overrides?: CallOverrides): Promise<string>;
-
   isProduct(_product: string, overrides?: CallOverrides): Promise<boolean>;
 
   "isProduct(address)"(
     _product: string,
     overrides?: CallOverrides
   ): Promise<boolean>;
-
-  locker(overrides?: CallOverrides): Promise<string>;
-
-  "locker()"(overrides?: CallOverrides): Promise<string>;
-
-  master(overrides?: CallOverrides): Promise<string>;
-
-  "master()"(overrides?: CallOverrides): Promise<string>;
 
   numProducts(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -442,18 +319,6 @@ export class Registry extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  solace(overrides?: CallOverrides): Promise<string>;
-
-  "solace()"(overrides?: CallOverrides): Promise<string>;
-
-  treasury(overrides?: CallOverrides): Promise<string>;
-
-  "treasury()"(overrides?: CallOverrides): Promise<string>;
-
-  vault(overrides?: CallOverrides): Promise<string>;
-
-  "vault()"(overrides?: CallOverrides): Promise<string>;
-
   callStatic: {
     addProduct(_product: string, overrides?: CallOverrides): Promise<void>;
 
@@ -472,24 +337,12 @@ export class Registry extends Contract {
       overrides?: CallOverrides
     ): Promise<string>;
 
-    governance(overrides?: CallOverrides): Promise<string>;
-
-    "governance()"(overrides?: CallOverrides): Promise<string>;
-
     isProduct(_product: string, overrides?: CallOverrides): Promise<boolean>;
 
     "isProduct(address)"(
       _product: string,
       overrides?: CallOverrides
     ): Promise<boolean>;
-
-    locker(overrides?: CallOverrides): Promise<string>;
-
-    "locker()"(overrides?: CallOverrides): Promise<string>;
-
-    master(overrides?: CallOverrides): Promise<string>;
-
-    "master()"(overrides?: CallOverrides): Promise<string>;
 
     numProducts(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -546,37 +399,9 @@ export class Registry extends Contract {
       _vault: string,
       overrides?: CallOverrides
     ): Promise<void>;
-
-    solace(overrides?: CallOverrides): Promise<string>;
-
-    "solace()"(overrides?: CallOverrides): Promise<string>;
-
-    treasury(overrides?: CallOverrides): Promise<string>;
-
-    "treasury()"(overrides?: CallOverrides): Promise<string>;
-
-    vault(overrides?: CallOverrides): Promise<string>;
-
-    "vault()"(overrides?: CallOverrides): Promise<string>;
   };
 
-  filters: {
-    GovernanceSet(_governance: null): EventFilter;
-
-    LockerSet(_locker: null): EventFilter;
-
-    MasterSet(_master: null): EventFilter;
-
-    ProductAdded(_product: null): EventFilter;
-
-    ProductRemoved(_product: null): EventFilter;
-
-    SolaceSet(_solace: null): EventFilter;
-
-    TreasurySet(_treasury: null): EventFilter;
-
-    VaultSet(_vault: null): EventFilter;
-  };
+  filters: {};
 
   estimateGas: {
     addProduct(_product: string, overrides?: Overrides): Promise<BigNumber>;
@@ -596,24 +421,12 @@ export class Registry extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    governance(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "governance()"(overrides?: CallOverrides): Promise<BigNumber>;
-
     isProduct(_product: string, overrides?: CallOverrides): Promise<BigNumber>;
 
     "isProduct(address)"(
       _product: string,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
-
-    locker(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "locker()"(overrides?: CallOverrides): Promise<BigNumber>;
-
-    master(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "master()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     numProducts(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -670,18 +483,6 @@ export class Registry extends Contract {
       _vault: string,
       overrides?: Overrides
     ): Promise<BigNumber>;
-
-    solace(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "solace()"(overrides?: CallOverrides): Promise<BigNumber>;
-
-    treasury(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "treasury()"(overrides?: CallOverrides): Promise<BigNumber>;
-
-    vault(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "vault()"(overrides?: CallOverrides): Promise<BigNumber>;
   };
 
   populateTransaction: {
@@ -705,10 +506,6 @@ export class Registry extends Contract {
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
-    governance(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    "governance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
     isProduct(
       _product: string,
       overrides?: CallOverrides
@@ -718,14 +515,6 @@ export class Registry extends Contract {
       _product: string,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
-
-    locker(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    "locker()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    master(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    "master()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     numProducts(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
@@ -800,17 +589,5 @@ export class Registry extends Contract {
       _vault: string,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
-
-    solace(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    "solace()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    treasury(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    "treasury()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    vault(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    "vault()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
   };
 }

@@ -2,6 +2,7 @@
 pragma solidity 0.8.0;
 
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import "./interface/IRegistry.sol";
 
 
 /**
@@ -9,9 +10,9 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
  * @author solace.fi
  * @notice Tracks the contracts in the Solaverse.
  */
-contract Registry {
+contract Registry is IRegistry {
     using EnumerableSet for EnumerableSet.AddressSet;
-    
+
     /// @notice Governor.
     address public governance;
     /// @notice Solace Token.
@@ -24,12 +25,18 @@ contract Registry {
     address public treasury;
     /// @notice Locker contract.
     address public locker;
-    // Set of strategies.
-    EnumerableSet.AddressSet private strategies;
     // Set of products.
     EnumerableSet.AddressSet private products;
-    // Set of policies.
-    EnumerableSet.AddressSet private policies;
+
+    // events
+    event GovernanceSet(address _governance);
+    event SolaceSet(address _solace);
+    event MasterSet(address _master);
+    event VaultSet(address _vault);
+    event TreasurySet(address _treasury);
+    event LockerSet(address _locker);
+    event ProductAdded(address _product);
+    event ProductRemoved(address _product);
 
     /**
      * @notice Constructs the registry contract.
@@ -43,10 +50,11 @@ contract Registry {
      * Can only be called by the current governor.
      * @param _governance The new governor.
      */
-    function setGovernance(address _governance) external {
+    function setGovernance(address _governance) external override {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
         governance = _governance;
+        emit GovernanceSet(_governance);
     }
 
     /**
@@ -54,10 +62,11 @@ contract Registry {
      * Can only be called by the current governor.
      * @param _solace The solace token address.
      */
-    function setSolace(address _solace) external {
+    function setSolace(address _solace) external override {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
         solace = _solace;
+        emit SolaceSet(_solace);
     }
 
     /**
@@ -65,10 +74,11 @@ contract Registry {
      * Can only be called by the current governor.
      * @param _master The master contract address.
      */
-    function setMaster(address _master) external {
+    function setMaster(address _master) external override {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
         master = _master;
+        emit MasterSet(_master);
     }
 
     /**
@@ -76,10 +86,11 @@ contract Registry {
      * Can only be called by the current governor.
      * @param _vault The vault contract address.
      */
-    function setVault(address _vault) external {
+    function setVault(address _vault) external override {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
         vault = _vault;
+        emit VaultSet(_vault);
     }
 
     /**
@@ -87,10 +98,11 @@ contract Registry {
      * Can only be called by the current governor.
      * @param _treasury The treasury contract address.
      */
-    function setTreasury(address _treasury) external {
+    function setTreasury(address _treasury) external override {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
         treasury = _treasury;
+        emit TreasurySet(_treasury);
     }
 
     /**
@@ -98,32 +110,11 @@ contract Registry {
      * Can only be called by the current governor.
      * @param _locker The locker address.
      */
-    function setLocker(address _locker) external {
+    function setLocker(address _locker) external override {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
         locker = _locker;
-    }
-
-    /**
-     * @notice Adds a new strategy.
-     * Can only be called by the current governor or the vault.
-     * @param _strategy The strategy to add.
-     */
-    function addStrategy(address _strategy) external {
-        // can only be called by governor or the vault
-        require(msg.sender == governance || msg.sender == vault, "!manager");
-        strategies.add(_strategy);
-    }
-
-    /**
-     * @notice Removes a strategy.
-     * Can only be called by the current governor or the vault.
-     * @param _strategy The strategy to remove.
-     */
-    function removeStrategy(address _strategy) external {
-        // can only be called by governor or the vault
-        require(msg.sender == governance || msg.sender == vault, "!manager");
-        strategies.remove(_strategy);
+        emit LockerSet(_locker);
     }
 
     /**
@@ -131,10 +122,11 @@ contract Registry {
      * Can only be called by the current governor.
      * @param _product The product to add.
      */
-    function addProduct(address _product) external {
+    function addProduct(address _product) external override {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
         products.add(_product);
+        emit ProductAdded(_product);
     }
 
     /**
@@ -142,65 +134,18 @@ contract Registry {
      * Can only be called by the current governor.
      * @param _product The product to remove.
      */
-    function removeProduct(address _product) external {
+    function removeProduct(address _product) external override {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
         products.remove(_product);
-    }
-
-    /**
-     * @notice Adds a new policy.
-     * Can only be called by the current governor or a product.
-     * @param _policy The policy to add.
-     */
-    function addPolicy(address _policy) external {
-        // can only be called by governor or a product
-        require(msg.sender == governance || products.contains(msg.sender), "!manager");
-        policies.add(_policy);
-    }
-
-    /**
-     * @notice Removes a policy.
-     * Can only be called by the current governor or a product.
-     * @param _policy The policy to remove.
-     */
-    function removePolicy(address _policy) external {
-        // can only be called by governor or a product
-        require(msg.sender == governance || products.contains(msg.sender), "!manager");
-        policies.remove(_policy);
-    }
-
-    /**
-     * @notice Returns the number of strategies.
-     * @return The number of strategies.
-     */
-    function numStrategies() external view returns (uint256) {
-        return strategies.length();
-    }
-
-    /**
-     * @notice Returns the strategy at the given index.
-     * @param _strategyNum The index to query.
-     * @return The address of the strategy.
-     */
-    function getStrategy(uint256 _strategyNum) external view returns (address) {
-        return strategies.at(_strategyNum);
-    }
-
-    /**
-     * @notice Returns true if the given address is a strategy.
-     * @param _strategy The address to query.
-     * @return True if the address is a strategy.
-     */
-    function isStrategy(address _strategy) external view returns (bool) {
-        return strategies.contains(_strategy);
+        emit ProductRemoved(_product);
     }
 
     /**
      * @notice Returns the number of products.
      * @return The number of products.
      */
-    function numProducts() external view returns (uint256) {
+    function numProducts() external override view returns (uint256) {
         return products.length();
     }
 
@@ -209,7 +154,7 @@ contract Registry {
      * @param _productNum The index to query.
      * @return The address of the product.
      */
-    function getProduct(uint256 _productNum) external view returns (address) {
+    function getProduct(uint256 _productNum) external override view returns (address) {
         return products.at(_productNum);
     }
 
@@ -218,33 +163,7 @@ contract Registry {
      * @param _product The address to query.
      * @return True if the address is a product.
      */
-    function isProduct(address _product) external view returns (bool) {
+    function isProduct(address _product) external override view returns (bool) {
         return products.contains(_product);
-    }
-
-    /**
-     * @notice Returns the number of policies.
-     * @return The number of policies.
-     */
-    function numPolicies() external view returns (uint256) {
-        return policies.length();
-    }
-
-    /**
-     * @notice Returns the policy at the given index.
-     * @param _policyNum The index to query.
-     * @return The address of the policy.
-     */
-    function getPolicy(uint256 _policyNum) external view returns (address) {
-        return policies.at(_policyNum);
-    }
-
-    /**
-     * @notice Returns true if the given address is a policy.
-     * @param _policy The address to query.
-     * @return True if the address is a policy.
-     */
-    function isPolicy(address _policy) external view returns (bool) {
-        return policies.contains(_policy);
     }
 }
