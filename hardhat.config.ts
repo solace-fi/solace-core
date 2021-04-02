@@ -19,7 +19,7 @@ const config: HardhatUserConfig = {
     }],
   },
   abiExporter: {
-    path: './client/src/abi',
+    path: './client/src/constants/abi',
     clear: true,
     flat: false,
     only: [],
