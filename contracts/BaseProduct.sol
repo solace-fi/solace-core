@@ -14,22 +14,22 @@ abstract contract BaseProduct is IProduct {
     using Address for address;
     using EnumerableSet for EnumerableSet.AddressSet;
 
-    event PolicyCreated(uint256 _coverLimit, uint256 _days, uint256 positionAmount, uint256 premium, address policy, uint256 policies.length, uint256 coveredAmount)
+    event PolicyCreated(uint256 _coverLimit, uint256 _seconds, uint256 _positionAmount, uint256 _premium, address _policy)
 
     // Governor
     address public governance;
 
     // Product Details
     address public insuredContract;
-    uint256 public price; // cover price (in wei) per day per wei
+    uint256 public price; // cover price (in wei) per second per wei
     uint256 public cancelFee; // policy cancelation fee
-    uint256 public minPeriod; // minimum policy period in days
-    uint256 public maxPeriod; // maximum policy period in days
+    uint256 public minPeriod; // minimum policy period in seconds
+    uint256 public maxPeriod; // maximum policy period in seconds
     uint256 public maxCoverAmount; // maximum amount of coverage (in wei) this product can sell
 
     // Book-keeping varaibles
     uint256 public policyCount = 0;
-    uint256 public coveredAmount; // current amount covered (in wei)
+    uint256 public activeCoverAmount; // current amount covered (in wei)
     EnumerableSet.AddressSet private policies;
     mapping(address => address) public buyerOf; // buyerOf[policy] = buyer
 
@@ -57,7 +57,7 @@ abstract contract BaseProduct is IProduct {
 
     /**
      * @notice Sets the price for this product
-     * @param _price cover price (in wei) per ether per day
+     * @param _price cover price (in wei) per ether per second
      */
     function setPrice(uint256 _price) external {
         require(msg.sender == governance, "!governance");
@@ -74,8 +74,8 @@ abstract contract BaseProduct is IProduct {
     }
 
     /**
-     * @notice Sets the minimum number of days a policy can be bought for
-     * @param _minPeriod minimum number of days
+     * @notice Sets the minimum number of seconds a policy can be bought for
+     * @param _minPeriod minimum number of seconds
      */
     function setMinPeriod(uint256 _minPeriod) external {
         require(msg.sender == governance, "!governance");
@@ -83,8 +83,8 @@ abstract contract BaseProduct is IProduct {
     }
 
     /**
-     * @notice Sets the maximum number of days a policy can be bought for
-     * @param _maxPeriod maximum number of days
+     * @notice Sets the maximum number of seconds a policy can be bought for
+     * @param _maxPeriod maximum number of seconds
      */
     function setMaxPeriod(uint256 _maxPeriod) external {
         require(msg.sender == governance, "!governance");
@@ -125,20 +125,28 @@ abstract contract BaseProduct is IProduct {
      * @notice Get the total covered amount for all policies under this product
      * @return Amount of total cover denominated in wei
      */
-    function getTotalCovered() external view returns (uint256 coveredAmount){
-        /* Todo update coveredAmount: iterate through each policy and call getTotalPosition(buyerOf[policy]) */
-        return coveredAmount
-    }
+    function getActiveCoverAmount() external view returns (uint256 activeCoverAmount){
+        _updateActiveCoverAmount();
+        return activeCoverAmount;
+    };
+    function _updateActiveCoverAmount() internal returns (uint256 activeCoverAmount){
+        /* TODO remove expired policies */
+    };
+
 
     /*** POLICY VIEW FUNCTIONS 
     View functions that give us data about individual policies
     ****/
 
-    function getPolicyLimit(address _policy) public view returns (uint256 coverLimit){};
+    function getPolicyLimit(address _policy) external view returns (uint256 coverLimit){
+        return _policy.coverAmount / getTotalPosition(buyerOf[_policy]);
+    };
 
     // function getPolicyCoverAmount(address _policy) public view returns (uint256 coverAmount){};
 
-    function getPolicyExpiration(address _policy) public view returns (uint256 expirationDate){};
+    function getPolicyExpiration(address _policy) external view returns (uint256 expirationDate){
+        return _policy.expiration;
+    };
  
 
     /**** QUOTE VIEW FUNCTIONS 
@@ -149,19 +157,19 @@ abstract contract BaseProduct is IProduct {
      * @notice
      *  Provide a premium quote.
      * @param _coverLimit percentage of cover for total position
-     * @param _days length (in days) for policy
+     * @param _seconds length for policy
      * @return The quote for their policy in wei.
      */
-    function _getQuote(uint256 _coverLimit, uint256 _days, uint256 _positionAmount) internal view returns (uint256 premium){
-        require(_days > minPeriod && _days < maxPeriod, 'invalid period');
+    function _getQuote(uint256 _coverLimit, uint256 _seconds, uint256 _positionAmount) internal view returns (uint256 premium){
+        require(_seconds > minPeriod && _seconds < maxPeriod, 'invalid period');
         require(_coverLimit > 0 && _coverLimit < 100, 'invalid cover limit');
-        premium = _positionAmount * _coverLimit * _days * price;
+        premium = _positionAmount * _coverLimit * _seconds * price;
         return premium
     }
 
-    function getQuote(uint256 _coverLimit, uint256 _days) external view returns (uint256 premium){
+    function getQuote(uint256 _coverLimit, uint256 _seconds) external view returns (uint256 premium){
         positionAmount = getTotalPosition(msg.sender);
-        return _getQuote(_coverPercentage, _days, positionAmount)
+        return _getQuote(_coverLimit, _seconds, positionAmount)
     }
 
 
@@ -173,26 +181,30 @@ abstract contract BaseProduct is IProduct {
      * @notice
      *  Purchase and deploy a policy on the behalf of msg.sender
      * @param _coverLimit percentage of cover for total position
-     * @param _days length (in days) for policy
+     * @param _seconds length (in seconds) for policy
      * @return The contract address of the policy
      */
-    function buyPolicy(uint256 _coverLimit, uint256 _days) external payable returns (address policy){
+    function buyPolicy(uint256 _coverLimit, uint256 _seconds) external payable returns (address policy){
+
+        /* TODO deploy ERC721 like UniswapV3 */
+
         positionAmount = getTotalPosition(msg.sender);
-        premium = _getQuote(_coverLimit, _days, positionAmount);
+        premium = _getQuote(_coverLimit, _seconds, positionAmount);
         require(msg.value == premium, 'payment does not match the quote');
-        coveredAmount = getTotalCovered();
-        newCoverAmount = coveredAmount + _coverLimit * positionAmount;
+        activeCoverAmount = getTotalCovered();
+        newPolicyCoverage = _coverLimit * positionAmount
+        newCoverAmount = activeCoverAmount + newPolicyCoverage;
         require(newCoverAmount <= maxCoverAmount, 'max covered amount is reached');
         bytes memory bytecode = type(Policy).creationCode;
-        bytes32 salt = keccak256(abi.encodePacked(_coverLimit, _days));
+        bytes32 salt = keccak256(abi.encodePacked(_coverLimit, _seconds, msg.sender, now));
         assembly {
             policy := create2(0, add(bytecode, 32), mload(bytecode), salt)
         }
         IPolicy(policy).initialize();
-        coveredAmount = newCoverAmount
+        activeCoverAmount = newCoverAmount
         buyerOf[policy] = msg.sender;
         policies.add(policy);
-        emit PolicyCreated(_coverLimit, _days, positionAmount, premium, policy, policies.length, coveredAmount);
+        emit PolicyCreated(_coverLimit, _seconds, positionAmount, premium, policy);
         return policy
     }
 
@@ -211,10 +223,10 @@ abstract contract BaseProduct is IProduct {
      * @notice
      *  Extend a policy contract
      * @param policy address of existing policy
-     * @param _days length (in months) of extension
+     * @param _seconds length of extension
      * @return True if successfully extended else False
      */
-    function extendPolicy(address policy, uint256 _days) external payable returns (bool){
+    function extendPolicy(address policy, uint256 _seconds) external payable returns (bool){
         //Todo(kush): Implement extendPolicy
     }
 
