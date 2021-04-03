@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.0;
 
+/* TODO expose public functions? */
+
 /**
  * @title Interface for product contracts
  * @author solace.fi
@@ -30,14 +32,13 @@ interface IProduct {
     /*** POLICY VIEW FUNCTIONS 
     View functions that give us data about individual policies
     ****/
-    function getPolicyLimit(address _policy) public view returns (uint256 coverLimit);
-    function getPolicyExpiration(address _policy) public view returns (uint256 expirationDate);
+    function getPolicyLimit(address _policy) external view returns (uint256 coverLimit);
+    function getPolicyExpiration(address _policy) external view returns (uint256 expirationDate);
  
 
     /**** QUOTE VIEW FUNCTIONS 
     View functions that give us quotes regarding a policy
     ****/
-    function _getQuote(uint256 _coverLimit, uint256 _days, uint256 _positionAmount) internal view returns (uint256 premium);
     function getQuote(uint256 _coverLimit, uint256 _days) external view returns (uint256 premium);
 
 
