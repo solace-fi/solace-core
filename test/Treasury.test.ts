@@ -173,12 +173,14 @@ describe("Treasury", function () {
 
   describe("paths", function () {
     it("can set paths", async function () {
-      await treasury.connect(governor).setPath(weth.address, wethPath);
+      let tx = await treasury.connect(governor).setPath(weth.address, wethPath);
+      await expect(tx).to.emit(treasury, "PathSet").withArgs(weth.address, wethPath);
       expect(await weth.allowance(treasury.address, uniswapRouter.address)).to.equal(constants.MaxUint256);
     })
 
     it("can set empty paths", async function () {
-      await treasury.connect(governor).setPath(mockToken2.address, defaultPath);
+      let tx = await treasury.connect(governor).setPath(mockToken2.address, defaultPath);
+      await expect(tx).to.emit(treasury, "PathSet").withArgs(mockToken2.address, defaultPath);
       expect(await mockToken2.allowance(treasury.address, uniswapRouter.address)).to.equal(0);
     })
 

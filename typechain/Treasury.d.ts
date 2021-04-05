@@ -87,7 +87,7 @@ interface TreasuryInterface extends ethers.utils.Interface {
   events: {
     "DepositEth(uint256)": EventFragment;
     "DepositToken(address,uint256)": EventFragment;
-    "PathSet(address)": EventFragment;
+    "PathSet(address,bytes)": EventFragment;
     "Spend(address,uint256,address)": EventFragment;
   };
 
@@ -395,7 +395,7 @@ export class Treasury extends Contract {
 
     DepositToken(_token: null, _amount: null): EventFilter;
 
-    PathSet(_token: null): EventFilter;
+    PathSet(_token: null, _path: null): EventFilter;
 
     Spend(_token: null, _amount: null, _recipient: null): EventFilter;
   };

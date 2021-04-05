@@ -1,0 +1,951 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>Treasury Contract &mdash; Solace.fi  documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Vault Contract" href="vault-contract.html" />
+    <link rel="prev" title="Strategy Contract" href="strategy-contract.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="index.html" class="icon icon-home"> Solace.fi
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Contracts</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="locker-contract.html">Locker Contract</a></li>
+<li class="toctree-l1"><a class="reference internal" href="master-contract.html">Master Contract</a></li>
+<li class="toctree-l1"><a class="reference internal" href="multisig-contract.html">Multi-Sig Contract</a></li>
+<li class="toctree-l1"><a class="reference internal" href="policy-contract.html">Policy Contract</a></li>
+<li class="toctree-l1"><a class="reference internal" href="product-contract.html">Product Contract</a></li>
+<li class="toctree-l1"><a class="reference internal" href="proxy-policy-contract.html">Proxy Policy Contract</a></li>
+<li class="toctree-l1"><a class="reference internal" href="registry-contract.html">Registry Contract</a></li>
+<li class="toctree-l1"><a class="reference internal" href="solace-token-contract.html">Solace Token Contract</a></li>
+<li class="toctree-l1"><a class="reference internal" href="strategy-contract.html">Strategy Contract</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Treasury Contract</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#depositing">Depositing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#swapping">Swapping</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#spending">Spending</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#state-variables">State Variables</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#governance">governance</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#solace">solace</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#unirouter">uniRouter</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#weth">weth</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#paths">paths</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#constructor">Constructor</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#view-functions">View Functions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id2">governance</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id3">solace</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id4">uniRouter</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id5">weth</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id6">paths</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#mutative-functions">Mutative Functions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#depositeth">depositEth</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#deposittoken">depositToken</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#restricted-functions">Restricted Functions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#setgovernance">setGovernance</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#spend">spend</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#swap">swap</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#events">Events</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id7">DepositEth</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id8">DepositToken</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id9">Spend</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pathset">PathSet</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#source">Source</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="vault-contract.html">Vault Contract</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Solace.fi</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>Treasury Contract</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="_sources/treasury-contract.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="treasury-contract">
+<h1>Treasury Contract<a class="headerlink" href="#treasury-contract" title="Permalink to this headline">¶</a></h1>
+<p id="id1">Treasury: the war chest of Castle Solace.</p>
+<p>The Treasury is the long-term hold of Solace’s funds. These funds are primarily received as premiums generated while purchasing policies. Treasury will attempt to market swap received assets for long-term storage as Solace. Governance can then spend these accrued funds.</p>
+<div class="section" id="depositing">
+<h2>Depositing<a class="headerlink" href="#depositing" title="Permalink to this headline">¶</a></h2>
+<p>Anyone can deposit Eth, Weth, Solace, or any other ERC-20 token. Eth can be deposited with <cite>depositEth()</cite> or the <cite>receive</cite> and <cite>fallback</cite> functions. ERC-20 tokens can be deposited with <cite>depositToken()</cite>. The most common type of deposits received will be premiums generated while purchasing policies.</p>
+</div>
+<div class="section" id="swapping">
+<h2>Swapping<a class="headerlink" href="#swapping" title="Permalink to this headline">¶</a></h2>
+<p>The Treasury should hold funds as Solace. Any deposit that is not Solace will attempt to swap to Solace via market order on Uniswap V3. This is where the concepts of paths and routing come into play. In short, paths represent a series of pools that are dipped into in the process of a swap. Governance can manually perform swaps and set paths. Any swap attempt that is not successful will hold the deposited funds instead of reverting.</p>
+</div>
+<div class="section" id="spending">
+<h2>Spending<a class="headerlink" href="#spending" title="Permalink to this headline">¶</a></h2>
+<p>Governance can spend accrued funds with <cite>spend()</cite>. Governance can send any amount of any token (typically Solace) to any recipient.</p>
+</div>
+<div class="section" id="state-variables">
+<h2>State Variables<a class="headerlink" href="#state-variables" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="governance">
+<h3>governance<a class="headerlink" href="#governance" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Governance’s address.</p>
+</dd>
+<dt class="field-even">Type</dt>
+<dd class="field-even"><p>address</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="solace">
+<h3>solace<a class="headerlink" href="#solace" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Solace Token’s address.</p>
+</dd>
+<dt class="field-even">Type</dt>
+<dd class="field-even"><p>SOLACE</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="unirouter">
+<h3>uniRouter<a class="headerlink" href="#unirouter" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Address of uniswap router.</p>
+</dd>
+<dt class="field-even">Type</dt>
+<dd class="field-even"><p>ISwapRouter</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="weth">
+<h3>weth<a class="headerlink" href="#weth" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Wrapped Ether.</p>
+</dd>
+<dt class="field-even">Type</dt>
+<dd class="field-even"><p>IWETH10</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="paths">
+<h3>paths<a class="headerlink" href="#paths" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Given a token, what swap path should it take.</p>
+</dd>
+<dt class="field-even">Type</dt>
+<dd class="field-even"><p>mapping(address =&gt; bytes)</p>
+</dd>
+</dl>
+</div>
+</div>
+<div class="section" id="constructor">
+<h2>Constructor<a class="headerlink" href="#constructor" title="Permalink to this headline">¶</a></h2>
+<dl class="field-list">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Constructs the treasury contract.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><div class="line-block">
+<div class="line">SOLACE _solace: Address of the solace token.</div>
+<div class="line">address _uniRouter: Address of uniswap router.</div>
+<div class="line">address _weth: Address of wrapped ether.</div>
+</div>
+</dd>
+</dl>
+</div>
+<div class="section" id="view-functions">
+<h2>View Functions<a class="headerlink" href="#view-functions" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id2">
+<h3>governance<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Governance’s address.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>address: Address of governance.</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="id3">
+<h3>solace<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Solace Token’s address.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>address: Address of Solace Token.</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="id4">
+<h3>uniRouter<a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Address of Uniswap router.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>address: Address of Uniswap router.</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="id5">
+<h3>weth<a class="headerlink" href="#id5" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Wrapped Ether.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>address: Address of wrapped ether contract.</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="id6">
+<h3>paths<a class="headerlink" href="#id6" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Given a token, what swap path should it take.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><p>address _token: The token to query.</p>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>bytes: The path the token should take.</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+</dl>
+</div>
+</div>
+<div class="section" id="mutative-functions">
+<h2>Mutative Functions<a class="headerlink" href="#mutative-functions" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="depositeth">
+<h3>depositEth<a class="headerlink" href="#depositeth" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Deposits some Ether.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>none</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>payable</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="deposittoken">
+<h3>depositToken<a class="headerlink" href="#deposittoken" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Deposit some ERC20 token.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><div class="line-block">
+<div class="line">address _token: The address of the token to deposit.</div>
+<div class="line">uint256 _amount: The amount of the token to deposit.</div>
+</div>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>none</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+</dl>
+</div>
+</div>
+<div class="section" id="restricted-functions">
+<h2>Restricted Functions<a class="headerlink" href="#restricted-functions" title="Permalink to this headline">¶</a></h2>
+<p>These functions can only be called by Governance.</p>
+<div class="section" id="setgovernance">
+<h3>setGovernance<a class="headerlink" href="#setgovernance" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Transfers the governance role to a new governor.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><p>address _governance: The new governor.</p>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>none</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>only governance</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="spend">
+<h3>spend<a class="headerlink" href="#spend" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Spends some tokens.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><div class="line-block">
+<div class="line">address _token: The address of the token to spend.</div>
+<div class="line">uint256 _amount: The amount of the token to spend.</div>
+<div class="line">address _recipient: The address of the token receiver.</div>
+</div>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>none</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>only governance</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="swap">
+<h3>swap<a class="headerlink" href="#swap" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Manually swaps a token using a predefined path.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><p>address _token: The address of the token to swap.</p>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>none</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>only governance</p>
+</dd>
+</dl>
+</div>
+</div>
+<div class="section" id="events">
+<h2>Events<a class="headerlink" href="#events" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id7">
+<h3>DepositEth<a class="headerlink" href="#id7" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Emitted when eth is deposited.</p>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><p>uint256 _amount: The amount of eth that was deposited.</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="id8">
+<h3>DepositToken<a class="headerlink" href="#id8" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Emitted when a token is deposited.</p>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><div class="line-block">
+<div class="line">address _token: The address of the deposited token.</div>
+<div class="line">uint256 _amount: The amount of the deposited token.</div>
+</div>
+</dd>
+</dl>
+</div>
+<div class="section" id="id9">
+<h3>Spend<a class="headerlink" href="#id9" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Emitted when a token is spent.</p>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><div class="line-block">
+<div class="line">address _token: The address of the spent token.</div>
+<div class="line">uint256 _amount: The amount of the spent token.</div>
+<div class="line">address _recipient: The recipient of the spent token.</div>
+</div>
+</dd>
+</dl>
+</div>
+<div class="section" id="pathset">
+<h3>PathSet<a class="headerlink" href="#pathset" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Emitted when a token swap path is set.</p>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><div class="line-block">
+<div class="line">address _token: The token whose path was set.</div>
+<div class="line">bytes _path: The new path.</div>
+</div>
+</dd>
+</dl>
+</div>
+</div>
+<div class="section" id="source">
+<h2>Source<a class="headerlink" href="#source" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-Solidity notranslate"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre>  1
+  2
+  3
+  4
+  5
+  6
+  7
+  8
+  9
+ 10
+ 11
+ 12
+ 13
+ 14
+ 15
+ 16
+ 17
+ 18
+ 19
+ 20
+ 21
+ 22
+ 23
+ 24
+ 25
+ 26
+ 27
+ 28
+ 29
+ 30
+ 31
+ 32
+ 33
+ 34
+ 35
+ 36
+ 37
+ 38
+ 39
+ 40
+ 41
+ 42
+ 43
+ 44
+ 45
+ 46
+ 47
+ 48
+ 49
+ 50
+ 51
+ 52
+ 53
+ 54
+ 55
+ 56
+ 57
+ 58
+ 59
+ 60
+ 61
+ 62
+ 63
+ 64
+ 65
+ 66
+ 67
+ 68
+ 69
+ 70
+ 71
+ 72
+ 73
+ 74
+ 75
+ 76
+ 77
+ 78
+ 79
+ 80
+ 81
+ 82
+ 83
+ 84
+ 85
+ 86
+ 87
+ 88
+ 89
+ 90
+ 91
+ 92
+ 93
+ 94
+ 95
+ 96
+ 97
+ 98
+ 99
+100
+101
+102
+103
+104
+105
+106
+107
+108
+109
+110
+111
+112
+113
+114
+115
+116
+117
+118
+119
+120
+121
+122
+123
+124
+125
+126
+127
+128
+129
+130
+131
+132
+133
+134
+135
+136
+137
+138
+139
+140
+141
+142
+143
+144
+145
+146
+147
+148
+149
+150
+151
+152
+153
+154
+155
+156
+157
+158
+159
+160
+161
+162
+163
+164
+165
+166
+167
+168
+169
+170
+171
+172
+173
+174
+175
+176
+177
+178</pre></div></td><td class="code"><div class="highlight"><pre><span></span><span class="c1">// </span><span class="cs">SPDX-License-Identifier:</span><span class="c1"> GPL-3.0-or-later</span>
+<span class="k">pragma solidity</span> <span class="mf">0.8</span><span class="p">.</span><span class="mi">0</span><span class="p">;</span>
+
+<span class="kn">import</span> <span class="s">&quot;@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol&quot;</span><span class="p">;</span>
+<span class="kn">import</span> <span class="s">&quot;./interface/ISwapRouter.sol&quot;</span><span class="p">;</span>
+<span class="kn">import</span> <span class="s">&quot;./SOLACE.sol&quot;</span><span class="p">;</span>
+<span class="kn">import</span> <span class="s">&quot;./interface/ITreasury.sol&quot;</span><span class="p">;</span>
+<span class="kn">import</span> <span class="s">&quot;./interface/IWETH10.sol&quot;</span><span class="p">;</span>
+
+
+<span class="cm">/**</span>
+<span class="cm"> * </span><span class="cs">@title</span><span class="cm"> Treasury</span>
+<span class="cm"> * </span><span class="cs">@author</span><span class="cm"> solace.</span>
+<span class="cm"> * </span><span class="cs">@notice</span><span class="cm"> The war chest of Castle Solace.</span>
+<span class="cm"> */</span>
+<span class="kd">contract</span> <span class="n">Treasury</span> <span class="k">is</span> <span class="n">ITreasury</span> <span class="p">{</span>
+    <span class="kn">using</span> <span class="n">SafeERC20</span> <span class="k">for</span> <span class="n">IERC20</span><span class="p">;</span>
+
+    <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Native SOLACE Token.</span>
+    <span class="n">SOLACE</span> <span class="k">public</span> <span class="n">solace</span><span class="p">;</span>
+
+    <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Governor.</span>
+    <span class="kt">address</span> <span class="k">public</span> <span class="n">governance</span><span class="p">;</span>
+
+    <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Address of Uniswap router.</span>
+    <span class="n">ISwapRouter</span> <span class="k">public</span> <span class="n">uniRouter</span><span class="p">;</span>
+
+    <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Wrapped ether.</span>
+    <span class="n">IWETH10</span> <span class="k">public</span> <span class="n">weth</span><span class="p">;</span>
+
+    <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Given a token, what swap path should it take.</span>
+    <span class="kd">mapping</span><span class="p">(</span><span class="kt">address</span> <span class="o">=&gt;</span> <span class="kt">bytes</span><span class="p">)</span> <span class="k">public</span> <span class="n">paths</span><span class="p">;</span>
+
+    <span class="c1">// events</span>
+    <span class="c1">// Emitted when eth is deposited</span>
+    <span class="kd">event</span> <span class="n">DepositEth</span><span class="p">(</span><span class="kt">uint256</span> <span class="n">_amount</span><span class="p">);</span>
+    <span class="c1">// Emitted when a token is deposited</span>
+    <span class="kd">event</span> <span class="n">DepositToken</span><span class="p">(</span><span class="kt">address</span> <span class="n">_token</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_amount</span><span class="p">);</span>
+    <span class="c1">// Emitted when a token is spent</span>
+    <span class="kd">event</span> <span class="n">Spend</span><span class="p">(</span><span class="kt">address</span> <span class="n">_token</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_amount</span><span class="p">,</span> <span class="kt">address</span> <span class="n">_recipient</span><span class="p">);</span>
+    <span class="c1">// Emitted when a token swap path is set</span>
+    <span class="kd">event</span> <span class="n">PathSet</span><span class="p">(</span><span class="kt">address</span> <span class="n">_token</span><span class="p">,</span> <span class="kt">bytes</span> <span class="n">_path</span><span class="p">);</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Constructs the treasury contract.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _solace Address of the solace token.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _uniRouter Address of uniswap router.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _weth Address of wrapped ether.</span>
+<span class="cm">     */</span>
+    <span class="kd">constructor</span><span class="p">(</span><span class="n">SOLACE</span> <span class="n">_solace</span><span class="p">,</span> <span class="kt">address</span> <span class="n">_uniRouter</span><span class="p">,</span> <span class="kt">address</span> <span class="n">_weth</span><span class="p">)</span> <span class="k">public</span> <span class="p">{</span>
+        <span class="n">solace</span> <span class="o">=</span> <span class="n">_solace</span><span class="p">;</span>
+        <span class="n">uniRouter</span> <span class="o">=</span> <span class="n">ISwapRouter</span><span class="p">(</span><span class="n">_uniRouter</span><span class="p">);</span>
+        <span class="n">weth</span> <span class="o">=</span> <span class="n">IWETH10</span><span class="p">(</span><span class="n">_weth</span><span class="p">);</span>
+        <span class="n">governance</span> <span class="o">=</span> <span class="nb">msg.sender</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * Fallback function. Deposits eth.</span>
+<span class="cm">     */</span>
+    <span class="k k-Function">fallback</span> <span class="p">()</span> <span class="k">external</span> <span class="k">payable</span> <span class="p">{</span>
+        <span class="n">_depositEth</span><span class="p">();</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Transfers the governance role to a new governor.</span>
+<span class="cm">     * Can only be called by the current governor.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _governance The new governor.</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">setGovernance</span><span class="p">(</span><span class="kt">address</span> <span class="n">_governance</span><span class="p">)</span> <span class="k">external</span> <span class="p">{</span>
+        <span class="c1">// can only be called by governor</span>
+        <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
+        <span class="c1">// set governance</span>
+        <span class="n">governance</span> <span class="o">=</span> <span class="n">_governance</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Sets the swap path for a token.</span>
+<span class="cm">     * Can only be called by the current governor.</span>
+<span class="cm">     * </span><span class="cs">@dev</span><span class="cm"> Also adds or removes infinite approval of the token for the router.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _token The token to set the path for.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _path The path to take.</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">setPath</span><span class="p">(</span><span class="kt">address</span> <span class="n">_token</span><span class="p">,</span> <span class="kt">bytes</span> <span class="k">calldata</span> <span class="n">_path</span><span class="p">)</span> <span class="k">external</span> <span class="p">{</span>
+        <span class="c1">// can only be called by governor</span>
+        <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
+        <span class="c1">// set path</span>
+        <span class="n">paths</span><span class="p">[</span><span class="n">_token</span><span class="p">]</span> <span class="o">=</span> <span class="n">_path</span><span class="p">;</span>
+        <span class="c1">// infinite or zero approval</span>
+        <span class="n">IERC20</span><span class="p">(</span><span class="n">_token</span><span class="p">).</span><span class="n">approve</span><span class="p">(</span><span class="kt">address</span><span class="p">(</span><span class="n">uniRouter</span><span class="p">),</span> <span class="n">_path</span><span class="p">.</span><span class="n">length</span> <span class="o">==</span> <span class="mi">0</span> <span class="o">?</span> <span class="mi">0</span> <span class="o">:</span> <span class="k">type(uint256).max</span><span class="p">);</span>
+        <span class="c1">// emit event</span>
+        <span class="k">emit</span> <span class="n">PathSet</span><span class="p">(</span><span class="n">_token</span><span class="p">,</span> <span class="n">_path</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Deposits some ether.</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">depositEth</span><span class="p">()</span> <span class="k">external</span> <span class="k">override</span> <span class="k">payable</span> <span class="p">{</span>
+        <span class="n">_depositEth</span><span class="p">();</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Deposit some ERC20 token.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _token The address of the token to deposit.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _amount The amount of the token to deposit.</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">depositToken</span><span class="p">(</span><span class="kt">address</span> <span class="n">_token</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_amount</span><span class="p">)</span> <span class="k">external</span> <span class="k">override</span> <span class="p">{</span>
+        <span class="c1">// receive token</span>
+        <span class="n">IERC20</span><span class="p">(</span><span class="n">_token</span><span class="p">).</span><span class="n">safeTransferFrom</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">,</span> <span class="kt">address</span><span class="p">(</span><span class="nb">this</span><span class="p">),</span> <span class="n">_amount</span><span class="p">);</span>
+        <span class="c1">// perform swap</span>
+        <span class="n">_swap</span><span class="p">(</span><span class="n">_token</span><span class="p">);</span>
+        <span class="c1">// emit event</span>
+        <span class="k">emit</span> <span class="n">DepositToken</span><span class="p">(</span><span class="n">_token</span><span class="p">,</span> <span class="n">_amount</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Spends some tokens.</span>
+<span class="cm">     * Can only be called by the current governor.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _token The address of the token to spend.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _amount The amount of the token to spend.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _recipient The address of the token receiver.</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">spend</span><span class="p">(</span><span class="kt">address</span> <span class="n">_token</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_amount</span><span class="p">,</span> <span class="kt">address</span> <span class="n">_recipient</span><span class="p">)</span> <span class="k">external</span> <span class="k">override</span> <span class="p">{</span>
+        <span class="c1">// can only be called by governor</span>
+        <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
+        <span class="c1">// transfer</span>
+        <span class="n">IERC20</span><span class="p">(</span><span class="n">_token</span><span class="p">).</span><span class="n">safeTransfer</span><span class="p">(</span><span class="n">_recipient</span><span class="p">,</span> <span class="n">_amount</span><span class="p">);</span>
+        <span class="c1">// emit event</span>
+        <span class="k">emit</span> <span class="n">Spend</span><span class="p">(</span><span class="n">_token</span><span class="p">,</span> <span class="n">_amount</span><span class="p">,</span> <span class="n">_recipient</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Manually swaps a token using a predefined path.</span>
+<span class="cm">     * Can only be called by the current governor.</span>
+<span class="cm">     * </span><span class="cs">@dev</span><span class="cm"> Swaps the entire balance in case some tokens were unknowingly received.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _token The address of the token to swap.</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">swap</span><span class="p">(</span><span class="kt">address</span> <span class="n">_token</span><span class="p">)</span> <span class="k">external</span> <span class="k">override</span> <span class="p">{</span>
+        <span class="c1">// can only be called by governor</span>
+        <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
+        <span class="n">_swap</span><span class="p">(</span><span class="n">_token</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Deposits some ether.</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">_depositEth</span><span class="p">()</span> <span class="k">internal</span> <span class="p">{</span>
+        <span class="c1">// swap entire balance from eth to weth</span>
+        <span class="c1">// solhint-disable-next-line</span>
+        <span class="n">weth</span><span class="p">.</span><span class="n">deposit</span><span class="p">{</span> <span class="n">value</span><span class="o">:</span> <span class="kt">address</span><span class="p">(</span><span class="nb">this</span><span class="p">).</span><span class="nb">balance</span> <span class="p">}();</span>
+        <span class="c1">// perform swap</span>
+        <span class="n">_swap</span><span class="p">(</span><span class="kt">address</span><span class="p">(</span><span class="n">weth</span><span class="p">));</span>
+        <span class="c1">// emit event</span>
+        <span class="k">emit</span> <span class="n">DepositEth</span><span class="p">(</span><span class="nb">msg.value</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Swaps a token using a predefined path.</span>
+<span class="cm">     * </span><span class="cs">@dev</span><span class="cm"> Swaps the entire balance in case some tokens were unknowingly received.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _token The address of the token to swap.</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">_swap</span><span class="p">(</span><span class="kt">address</span> <span class="n">_token</span><span class="p">)</span> <span class="k">internal</span> <span class="p">{</span>
+        <span class="c1">// get route</span>
+        <span class="kt">bytes</span> <span class="k">memory</span> <span class="n">path</span> <span class="o">=</span> <span class="n">paths</span><span class="p">[</span><span class="n">_token</span><span class="p">];</span>
+        <span class="c1">// hold token if no route</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">path</span><span class="p">.</span><span class="n">length</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="k">return</span><span class="p">;</span>
+        <span class="c1">// get token balance</span>
+        <span class="kt">uint256</span> <span class="nb">balance</span> <span class="o">=</span> <span class="n">IERC20</span><span class="p">(</span><span class="n">_token</span><span class="p">).</span><span class="n">balanceOf</span><span class="p">(</span><span class="kt">address</span><span class="p">(</span><span class="nb">this</span><span class="p">));</span>
+        <span class="c1">// swap</span>
+        <span class="n">uniRouter</span><span class="p">.</span><span class="n">exactInput</span><span class="p">(</span><span class="n">ISwapRouter</span><span class="p">.</span><span class="n">ExactInputParams</span><span class="p">({</span>
+            <span class="n">path</span><span class="o">:</span> <span class="n">path</span><span class="p">,</span>
+            <span class="n">recipient</span><span class="o">:</span> <span class="kt">address</span><span class="p">(</span><span class="nb">this</span><span class="p">),</span>
+            <span class="c1">// solhint-disable-next-line not-rely-on-time</span>
+            <span class="n">deadline</span><span class="o">:</span> <span class="nb">block.timestamp</span><span class="p">,</span>
+            <span class="n">amountIn</span><span class="o">:</span> <span class="nb">balance</span><span class="p">,</span>
+            <span class="n">amountOutMinimum</span><span class="o">:</span> <span class="mi">0</span>
+        <span class="p">}));</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</td></tr></table></div>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="vault-contract.html" class="btn btn-neutral float-right" title="Vault Contract" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="strategy-contract.html" class="btn btn-neutral float-left" title="Strategy Contract" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2021, Solace.fi.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
