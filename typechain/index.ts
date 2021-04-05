@@ -5,22 +5,10 @@ export { Erc20Factory } from "./Erc20Factory";
 export type { Erc20 } from "./Erc20";
 export { MasterFactory } from "./MasterFactory";
 export type { Master } from "./Master";
-<<<<<<< HEAD
-=======
-export { MockProductFactory } from "./MockProductFactory";
-export type { MockProduct } from "./MockProduct";
-export { MockProductFactoryFactory } from "./MockProductFactoryFactory";
-export type { MockProductFactory } from "./MockProductFactory";
->>>>>>> feat(Vault, Strategy): implement harvest and report, update tests
 export { MockStrategyFactory } from "./MockStrategyFactory";
 export type { MockStrategy } from "./MockStrategy";
 export { MockTokenFactory } from "./MockTokenFactory";
 export type { MockToken } from "./MockToken";
-<<<<<<< HEAD
-=======
-export { MockVaultFactory } from "./MockVaultFactory";
-export type { MockVault } from "./MockVault";
->>>>>>> feat(Vault, Strategy): implement harvest and report, update tests
 export { MockWethFactory } from "./MockWethFactory";
 export type { MockWeth } from "./MockWeth";
 export { RegistryFactory } from "./RegistryFactory";
