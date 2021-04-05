@@ -31,7 +31,7 @@ interface ITreasury {
     function spend(address _token, uint256 _amount, address _recipient) external;
 
     /**
-     * @notice Swaps a token using a predefined path.
+     * @notice Manually swaps a token using a predefined path.
      * Can only be called by the current governor.
      * @dev Swaps the entire balance in case some tokens were unknowingly received.
      */
