@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -35,28 +35,22 @@ contract Vault is ERC20 {
 
     uint256 constant DEGREDATION_COEFFICIENT = 10 ** 18;
     uint256 constant MAX_BPS = 10000; // 10k basis points (100%)
+    uint256 constant SECS_PER_YEAR = 31556952; // 365.2425 days
 
     /*************
     GLOBAL VARIABLES
     *************/
 
-    // uint256 public activation;
-    // uint256 public delegatedAssets;
+    uint256 public activation;
+    uint256 public delegatedAssets;
     uint256 public debtRatio; // Debt ratio for the Vault across all strategies (in BPS, <= 10k)
     uint256 public totalDebt; // Amount of tokens that all strategies have borrowed
-    // uint256 public lastReport; // block.timestamp of last report
-    // uint256 public lockedProfit; // how much profit is locked and cant be withdrawn
-    // uint256 public performanceFee;
+    uint256 public lastReport; // block.timestamp of last report
+    uint256 public lockedProfit; // how much profit is locked and cant be withdrawn
+    uint256 public performanceFee;
     uint256 public lockedProfitDegration; // rate per block of degration. DEGREDATION_COEFFICIENT is 100% per block
 
-    uint256 activation;
-    uint256 delegatedAssets;
-    // uint256 debtRatio; // Debt ratio for the Vault across all strategies (in BPS, <= 10k)
-    // uint256 totalDebt; // Amount of tokens that all strategies have borrowed
-    uint256 lastReport; // block.timestamp of last report
-    uint256 lockedProfit; // how much profit is locked and cant be withdrawn
-    uint256 performanceFee;
-    // uint256 lockedProfitDegration; // rate per block of degration. DEGREDATION_COEFFICIENT is 100% per block
+    uint256 public managementFee; // Governance Fee for management of Vault (given to `rewards`)
 
     bool public emergencyShutdown;
 
@@ -65,6 +59,9 @@ contract Vault is ERC20 {
 
     /// address with rights to call governance functions
     address public governance;
+
+    /// Rewards contract/wallet where Governance fees are sent to
+    address public rewards;
     
     /// @notice Determines the order of strategies to pull funds from. Managed by governance
     address[] public withdrawalQueue;
@@ -110,6 +107,8 @@ contract Vault is ERC20 {
 
     constructor (address _token) ERC20("Solace CP Token", "SCP") {
         governance = msg.sender;
+        rewards = msg.sender; // set governance address as rewards destination for now
+        
         token = IERC20(_token);
 
         lastReport = block.timestamp;
@@ -117,6 +116,10 @@ contract Vault is ERC20 {
         
         lockedProfitDegration = (DEGREDATION_COEFFICIENT * 46) / 10 ** 6; // 6 hours in blocks
     }
+
+    /*************
+    EXTERNAL FUNCTIONS
+    *************/
 
     /**
      * @notice Transfers the governance role to a new governor.
@@ -192,7 +195,7 @@ contract Vault is ERC20 {
     ) external {
         require(msg.sender == governance, "!governance");
         require(!emergencyShutdown, "vault is in emergency shutdown");
-        // require(_strategy != address(0), "strategy cannot be set to zero address");
+        require(_strategy != address(0), "strategy cannot be set to zero address");
         require(debtRatio + _debtRatio <= MAX_BPS, "debtRatio exceeds MAX BPS");
         require(_performanceFee <= MAX_BPS - performanceFee, "invalid performance fee");
         require(_minDebtPerHarvest <= _maxDebtPerHarvest, "minDebtPerHarvest exceeds maxDebtPerHarvest");
@@ -414,7 +417,7 @@ contract Vault is ERC20 {
         if (loss > 0) _reportLoss(msg.sender, loss);
 
         // Assess both management fee and performance fee, and issue both as shares of the vault
-        // _assessFees(msg.sender, gain);
+        _assessFees(msg.sender, gain);
 
         // Returns are always "realized gains"
         strategies[msg.sender].totalGain += gain;
@@ -479,17 +482,17 @@ contract Vault is ERC20 {
         // profit is locked and gradually released per block
         lockedProfit = gain;
 
-        // emit StrategyReported(
-        //     msg.sender,
-        //     gain,
-        //     loss,
-        //     debtPayment,
-        //     strategies[msg.sender].totalGain,
-        //     strategies[msg.sender].totalLoss,
-        //     strategies[msg.sender].totalDebt,
-        //     credit,
-        //     strategies[msg.sender].debtRatio
-        // );
+        emit StrategyReported(
+            msg.sender,
+            gain,
+            loss,
+            debtPayment,
+            strategies[msg.sender].totalGain,
+            strategies[msg.sender].totalLoss,
+            strategies[msg.sender].totalDebt,
+            credit,
+            strategies[msg.sender].debtRatio
+        );
 
         if (strategies[msg.sender].debtRatio == 0 || emergencyShutdown) {
             // Take every last penny the Strategy has (Emergency Exit/revokeStrategy)
@@ -500,6 +503,10 @@ contract Vault is ERC20 {
             return debt;
         }
     }
+
+    /*************
+    EXTERNAL VIEW FUNCTIONS
+    *************/
 
     /**
      * @notice Amount of tokens in Vault a Strategy has access to as a credit line.
@@ -545,6 +552,10 @@ contract Vault is ERC20 {
         return _debtOutstanding(strategy);
     }
 
+    /*************
+    INTERNAL FUNCTIONS
+    *************/
+
     function _revokeStrategy(address strategy) internal {
         debtRatio -= strategies[strategy].debtRatio;
         strategies[strategy].debtRatio = 0;
@@ -571,6 +582,68 @@ contract Vault is ERC20 {
         strategies[strategy].debtRatio -= ratioChange;
         debtRatio -= ratioChange;
     }
+
+    /**
+     * @notice Issue new shares to cover fees
+     * In effect, this reduces overall share price by the combined fee
+     * may throw if Vault.totalAssets() > 1e64, or not called for more than a year
+     */
+    function _assessFees(address strategy, uint256 gain) internal {
+        uint256 governanceFee = (
+            (
+                (totalDebt - delegatedAssets)
+                * (block.timestamp - lastReport)
+                * managementFee
+            )
+            / MAX_BPS 
+            / SECS_PER_YEAR
+        );
+        
+        // Strategist fee only applies in certain conditions
+        uint256 strategistFee = 0;
+
+        // NOTE: Applies if Strategy is not shutting down, or it is but all debt paid off
+        // NOTE: No fee is taken when a Strategy is unwinding it's position, until all debt is paid
+        if (gain > 0) {
+            // NOTE: Unlikely to throw unless strategy reports >1e72 harvest profit
+            strategistFee = (gain * strategies[strategy].performanceFee) / MAX_BPS;
+            governanceFee += gain * performanceFee / MAX_BPS;
+        }
+
+        // NOTE: This must be called prior to taking new collateral, or the calculation will be wrong!
+        // NOTE: This must be done at the same time, to ensure the relative ratio of governance_fee : strategist_fee is kept intact
+        uint256 totalFee = governanceFee + strategistFee;
+
+        if (totalFee > 0) {
+            // issue shares as reward
+            uint256 reward;
+            if (totalSupply() == 0) {
+                reward = totalFee;
+            } else {
+                reward = (totalFee * totalSupply()) / _totalAssets();
+            }
+        
+            // Issuance of shares needs to be done before taking the deposit
+            _mint(address(this), reward);
+
+            // Send the rewards out as new shares in this Vault
+            if (strategistFee > 0) {
+                // NOTE: Unlikely to throw unless sqrt(reward) >>> 1e39
+                uint256 strategistReward = (strategistFee * reward) / totalFee;
+                _transfer(address(this), strategy, strategistReward);
+                // NOTE: Strategy distributes rewards at the end of harvest()
+            }
+
+            // Governance earns any dust leftovers from flooring math above
+            if (balanceOf(address(this)) > 0) {
+                _transfer(address(this), rewards, balanceOf(address(this)));
+            }
+        }
+    }
+
+    /*************
+    INTERNAL VIEW FUNCTIONS
+    *************/
 
     /**
      * @notice Quantity of all assets under control of this Vault, including those loaned out to Strategies

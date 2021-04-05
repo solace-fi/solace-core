@@ -188,6 +188,24 @@ describe("Vault", function () {
             await expect(vault.connect(depositor1).report(100, 10, 20 )).to.be.revertedWith("must be called by an active strategy");
             await expect(vault.connect(owner).report(100, 10, 20)).to.be.revertedWith("must be called by an active strategy");
         });
+        it("should emit StrategyReported event", async function () {
+            // Set strategy address and make initial deposit
+            await vault.connect(owner).addStrategy(strategy.address, debtRatio, minDebtPerHarvest, maxDebtPerHarvest, performanceFee);
+            await strategy.connect(owner).setVault(vault.address);
+            await vault.connect(depositor1).deposit({ value: testDepositAmount});
+            // report() is called indirectly by governance through startegy.harvest()
+            expect(await strategy.connect(owner).harvest()).to.emit(vault, 'StrategyReported').withArgs(
+                strategy.address,
+                0, // gain
+                0, // loss
+                0, // debtPaid
+                0, // totalGain
+                0, // totalLoss
+                testDepositAmount.div(MAX_BPS / debtRatio), // totalDebt
+                testDepositAmount.div(MAX_BPS / debtRatio), // debtAdded
+                debtRatio // debtRatio
+            );
+        });
     });
 
     describe("deposit", function () {
