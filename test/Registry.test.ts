@@ -11,7 +11,8 @@ import SolaceArtifact from "../artifacts/contracts/SOLACE.sol/SOLACE.json";
 import MasterArtifact from "../artifacts/contracts/Master.sol/Master.json";
 import VaultArtifact from "../artifacts/contracts/Vault.sol/Vault.json";
 import TreasuryArtifact from "../artifacts/contracts/Treasury.sol/Treasury.json";
-import { Registry, Solace, Master, Vault, Treasury } from "../typechain";
+import WETHArtifact from '../artifacts/contracts/mocks/MockWETH.sol/MockWETH.json';
+import { Registry, Solace, Master, Vault, Treasury, MockWeth } from "../typechain";
 
 chai.use(solidity);
 
@@ -27,6 +28,7 @@ describe("Registry", function () {
   let master: Master;
   let vault: Vault;
   let treasury: Treasury;
+  let weth: MockWeth;
   // mock contracts
   // TODO: switch from mocks and wallets to actual contracts after implementation
   let locker: Wallet;
@@ -38,6 +40,11 @@ describe("Registry", function () {
 
   before(async function () {
     [deployer, governor, user, locker, mockContract1, mockContract2, mockContract3] = provider.getWallets();
+
+    weth = (await deployContract(
+      deployer,
+      WETHArtifact
+  )) as MockWeth;
 
     // deploy registry contract
     registry = (await deployContract(
@@ -63,8 +70,9 @@ describe("Registry", function () {
 
     // deploy vault contract
     vault = (await deployContract(
-        deployer,
-        VaultArtifact
+      deployer,
+      VaultArtifact,
+      [weth.address]
     )) as Vault;
 
     // deploy treasury contract
