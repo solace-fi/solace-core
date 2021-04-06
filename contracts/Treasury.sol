@@ -22,7 +22,7 @@ contract Treasury is ITreasury {
     /// @notice Governor.
     address public governance;
 
-    /// @notice Address of uniswap router.
+    /// @notice Address of Uniswap router.
     ISwapRouter public uniRouter;
 
     /// @notice Wrapped ether.
@@ -32,10 +32,14 @@ contract Treasury is ITreasury {
     mapping(address => bytes) public paths;
 
     // events
+    // Emitted when eth is deposited
     event DepositEth(uint256 _amount);
+    // Emitted when a token is deposited
     event DepositToken(address _token, uint256 _amount);
+    // Emitted when a token is spent
     event Spend(address _token, uint256 _amount, address _recipient);
-    event PathSet(address _token);
+    // Emitted when a token swap path is set
+    event PathSet(address _token, bytes _path);
 
     /**
      * @notice Constructs the treasury contract.
@@ -84,7 +88,7 @@ contract Treasury is ITreasury {
         // infinite or zero approval
         IERC20(_token).approve(address(uniRouter), _path.length == 0 ? 0 : type(uint256).max);
         // emit event
-        emit PathSet(_token);
+        emit PathSet(_token, _path);
     }
 
     /**
@@ -125,9 +129,10 @@ contract Treasury is ITreasury {
     }
 
     /**
-     * @notice Swaps a token using a predefined path.
+     * @notice Manually swaps a token using a predefined path.
      * Can only be called by the current governor.
      * @dev Swaps the entire balance in case some tokens were unknowingly received.
+     * @param _token The address of the token to swap.
      */
     function swap(address _token) external override {
         // can only be called by governor
@@ -151,6 +156,7 @@ contract Treasury is ITreasury {
     /**
      * @notice Swaps a token using a predefined path.
      * @dev Swaps the entire balance in case some tokens were unknowingly received.
+     * @param _token The address of the token to swap.
      */
     function _swap(address _token) internal {
         // get route

@@ -29,13 +29,21 @@ contract Registry is IRegistry {
     EnumerableSet.AddressSet private products;
 
     // events
+    // Emitted when Governance is set
     event GovernanceSet(address _governance);
+    // Emitted when Solace Token is set
     event SolaceSet(address _solace);
+    // Emitted when Master is set
     event MasterSet(address _master);
+    // Emitted when Vault is set
     event VaultSet(address _vault);
+    // Emitted when Treasury is set
     event TreasurySet(address _treasury);
+    // Emitted when Locker is set
     event LockerSet(address _locker);
+    // Emitted when a Product is added
     event ProductAdded(address _product);
+    // Emitted when a Product is removed
     event ProductRemoved(address _product);
 
     /**

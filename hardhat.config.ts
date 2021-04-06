@@ -1,5 +1,6 @@
 import { HardhatUserConfig } from "hardhat/types";
 import { task } from "hardhat/config";
+import "hardhat-contract-sizer";
 import "@nomiclabs/hardhat-waffle";
 import "hardhat-typechain";
 import "hardhat-abi-exporter";
@@ -19,14 +20,13 @@ const config: HardhatUserConfig = {
     }],
   },
   abiExporter: {
-    path: './client/src/abi',
+    path: './client/src/constants/abi',
     clear: true,
     flat: false,
     only: [],
     spacing: 2
   }
 };
-
 
 // If you are defining tasks, they need to access the Hardhat Runtime Environment (hre) explicitly, as a parameter.
 task("accounts", "Prints the list of accounts", async (args, hre) => {

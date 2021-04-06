@@ -44,7 +44,6 @@ contract MockWETH is IWETH10 {
 
     /// @dev Current amount of flash-minted WETH10 token.
     uint256 public override flashMinted;
-
     constructor() {
         uint256 chainId;
         assembly {chainId := chainid()}
@@ -71,7 +70,6 @@ contract MockWETH is IWETH10 {
         assembly {chainId := chainid()}
         return chainId == deploymentChainId ? _DOMAIN_SEPARATOR : _calculateDomainSeparator(chainId);
     }
-
     /// @dev Returns the total supply of WETH10 token as the ETH held in this contract.
     function totalSupply() external view override returns (uint256) {
         return address(this).balance + flashMinted;
@@ -164,7 +162,6 @@ contract MockWETH is IWETH10 {
                 emit Approval(from, msg.sender, reduced);
             }
         }
-
         // _burnFrom(from, value);
         uint256 balance = balanceOf[from];
         require(balance >= value, "WETH: burn amount exceeds balance");
@@ -196,7 +193,6 @@ contract MockWETH is IWETH10 {
         // _approve(msg.sender, spender, value);
         allowance[msg.sender][spender] = value;
         emit Approval(msg.sender, spender, value);
-
         return IApprovalReceiver(spender).onTokenApproval(msg.sender, value, data);
     }
 
@@ -287,7 +283,6 @@ contract MockWETH is IWETH10 {
                 emit Approval(from, msg.sender, reduced);
             }
         }
-
         // _transferFrom(from, to, value);
         if (to != address(0)) { // Transfer
             uint256 balance = balanceOf[from];
@@ -331,7 +326,6 @@ contract MockWETH is IWETH10 {
             require(balance >= value, "WETH: burn amount exceeds balance");
             balanceOf[msg.sender] = balance - value;
             emit Transfer(msg.sender, address(0), value);
-
             (bool success, ) = msg.sender.call{value: value}("");
             require(success, "WETH: ETH transfer failed");
         }
