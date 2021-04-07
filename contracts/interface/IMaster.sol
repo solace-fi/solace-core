@@ -97,7 +97,13 @@ interface IMaster {
      * @param _token The withdraw token.
      */
     function withdrawErc721(uint256 _farmId, uint256 _token) external;
-    
+
+    /**
+     * Withdraw your pending rewards without unstaking your tokens.
+     * @param _farmId The farm to withdraw rewards from.
+     */
+    function withdrawRewards(uint256 _farmId) external;
+
     /**
     * @notice Updates farm information to be up to date to the current block.
     * @param _farmId The farm to update.

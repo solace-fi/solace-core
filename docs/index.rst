@@ -11,7 +11,7 @@ Solace.fi is an insurance protocol for decentralized finance applications on Eth
 Architecture
 ============
 
-.. image:: tech-arch.jpg
+.. image:: ../tech-arch.jpg
     :width: 480px
     :alt: Architecture Diagram
     :align: center

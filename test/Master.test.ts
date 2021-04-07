@@ -84,7 +84,10 @@ describe("Master", function () {
     // deploy vault / cp token
     cpToken = (await deployContract(
         deployer,
-        VaultArtifact
+        VaultArtifact,
+        [
+          weth.address
+        ]
     )) as Vault;
 
     // deploy uniswap factory
@@ -265,7 +268,12 @@ describe("Master", function () {
       await expect(master.connect(farmer1).depositErc20(await master.numFarms(), 1)).to.be.revertedWith("not an erc20 farm");
     })
 
-    it("can withdraw", async function () {
+    it("can withdraw rewards", async function () {
+      await expect(master.connect(farmer1).withdrawRewards(await master.numFarms())).to.be.revertedWith("farm does not exist");
+      await master.connect(farmer1).withdrawRewards(farmId);
+    })
+
+    it("can withdraw deposited tokens", async function () {
       let tx1: Transaction;
       let tx2: Transaction;
       let tx3: Transaction;
@@ -385,7 +393,12 @@ describe("Master", function () {
       await expect(master.connect(farmer1).depositErc721(await master.numFarms(), 1)).to.be.revertedWith("not an erc721 farm");
     })
 
-    it("can withdraw", async function () {
+    it("can withdraw rewards", async function () {
+      await expect(master.connect(farmer1).withdrawRewards(await master.numFarms())).to.be.revertedWith("farm does not exist");
+      await master.connect(farmer1).withdrawRewards(farmId);
+    })
+
+    it("can withdraw deposited tokens", async function () {
       let balance1: BN;
       let balance2: BN;
       let staked1: BN;
@@ -471,6 +484,73 @@ describe("Master", function () {
     })
   })
 
+  describe("updates", async function () {
+    let cpFarmId: BN;
+    let lpFarmId: BN;
+    let allocPoints = BN.from(0);
+
+    beforeEach(async function () {
+      blockNum = BN.from(await provider.getBlockNumber());
+      startBlock = blockNum.add(10);
+      endBlock = blockNum.add(100);
+      cpFarmId = await master.numFarms();
+      await master.connect(governor).createFarmErc20(cpToken.address, allocPoints, startBlock, endBlock);
+      lpFarmId = await master.numFarms();
+      await master.connect(governor).createFarmErc721(lpToken.address, lpAppraiser.address, allocPoints, startBlock, endBlock);
+    })
+
+    it("can update a single erc20 farm", async function () {
+      // init
+      let farmInfo = await master.farmInfo(cpFarmId);
+      expect(farmInfo.lastRewardBlock).to.equal(startBlock);
+      // update before start
+      await master.updateFarm(cpFarmId);
+      farmInfo = await master.farmInfo(cpFarmId);
+      expect(farmInfo.lastRewardBlock).to.equal(startBlock);
+      // update after start
+      await burnBlocks(30);
+      await master.updateFarm(cpFarmId);
+      blockNum = BN.from(await provider.getBlockNumber());
+      farmInfo = await master.farmInfo(cpFarmId);
+      expect(farmInfo.lastRewardBlock).to.equal(blockNum);
+      // update after end
+      await burnBlocks(90);
+      await master.updateFarm(cpFarmId);
+      farmInfo = await master.farmInfo(cpFarmId);
+      expect(farmInfo.lastRewardBlock).to.equal(endBlock);
+    })
+
+    it("can update a single erc721 farm", async function () {
+      // init
+      let farmInfo = await master.farmInfo(lpFarmId);
+      expect(farmInfo.lastRewardBlock).to.equal(startBlock);
+      // update before start
+      await master.updateFarm(lpFarmId);
+      farmInfo = await master.farmInfo(lpFarmId);
+      expect(farmInfo.lastRewardBlock).to.equal(startBlock);
+      // update after start
+      await burnBlocks(30);
+      await master.updateFarm(lpFarmId);
+      blockNum = BN.from(await provider.getBlockNumber());
+      farmInfo = await master.farmInfo(lpFarmId);
+      expect(farmInfo.lastRewardBlock).to.equal(blockNum);
+      // update after end
+      await burnBlocks(90);
+      await master.updateFarm(lpFarmId);
+      farmInfo = await master.farmInfo(lpFarmId);
+      expect(farmInfo.lastRewardBlock).to.equal(endBlock);
+    })
+
+    it("can but doesn't update non existant farms", async function () {
+      let farmId = await master.numFarms();
+      await master.updateFarm(farmId);
+    })
+
+    it("can mass update", async function () {
+      await master.massUpdateFarms();
+    })
+  })
+
   describe("single cp token / erc20 farm rewards", function () {
     let farmId: BN;
     let allocPoints: BN = BN.from("1");
@@ -492,7 +572,7 @@ describe("Master", function () {
       await solaceToken.connect(farmer2).transfer(governor.address, await solaceToken.balanceOf(farmer2.address));
       blockNum = BN.from(await provider.getBlockNumber());
       startBlock = blockNum.add(20);
-      endBlock = blockNum.add(1020);
+      endBlock = blockNum.add(200);
       farmId = await master.numFarms();
       await master.connect(governor).createFarmErc20(cpToken.address, allocPoints, startBlock, endBlock);
       await mintCpToken(farmer1, depositAmount1);
@@ -526,6 +606,8 @@ describe("Master", function () {
       let waitBlocks1: BN = BN.from("10");
       let waitBlocks2: BN = BN.from("20");
       let waitBlocks3: BN = BN.from("30");
+      let waitBlocks4: BN = BN.from("40");
+      let waitBlocks5: BN = BN.from("50");
       // only farmer 1
       await master.connect(farmer1).depositErc20(farmId, depositAmount1);
       await burnBlocksUntil(startBlock.add(waitBlocks1));
@@ -561,24 +643,45 @@ describe("Master", function () {
         (solacePerBlock.mul(30).mul(19).div(20)) // 95% ownership for 30 blocks
       );
       expect(pendingReward2.add(receivedReward2)).to.equal(expectedReward2);
-      // farmer 1 withdraw
-      await master.connect(farmer1).withdrawErc20(farmId, depositAmount1);
-      expect(await cpToken.balanceOf(farmer1.address)).to.equal(depositAmount1);
+
+      // farmer 1 withdraw rewards
+      await master.connect(farmer1).withdrawRewards(farmId);
+      expect(await cpToken.balanceOf(farmer1.address)).to.equal(0);
       pendingReward1 = BN.from(await solaceToken.balanceOf(farmer1.address));
       expectedReward1 = expectedReward1.add(
         (solacePerBlock.mul(1).mul(1).div(20)) // 5% ownership for 1 blocks
       );
       expect(pendingReward1).to.equal(expectedReward1);
-      // farmer 2 withdraw
+      // farmer 2 withdraw rewards
+      await master.connect(farmer2).withdrawRewards(farmId);
+      expect(await cpToken.balanceOf(farmer2.address)).to.equal(0);
+      pendingReward2 = BN.from(await solaceToken.balanceOf(farmer2.address));
+      expectedReward2 = expectedReward2.add(
+        (solacePerBlock.mul(2).mul(19).div(20)) // 95% ownership for 2 blocks
+      );
+      expect(pendingReward2).to.equal(expectedReward2);
+      await burnBlocks(waitBlocks4);
+
+      // farmer 1 withdraw stake
+      await master.connect(farmer1).withdrawErc20(farmId, depositAmount1);
+      expect(await cpToken.balanceOf(farmer1.address)).to.equal(depositAmount1);
+      pendingReward1 = BN.from(await solaceToken.balanceOf(farmer1.address));
+      expectedReward1 = expectedReward1.add(
+        (solacePerBlock.mul(42).mul(1).div(20)) // 5% ownership for 42 blocks
+      );
+      expect(pendingReward1).to.equal(expectedReward1);
+      await burnBlocks(waitBlocks5);
+      // farmer 2 withdraw stake
       await master.connect(farmer2).withdrawErc20(farmId, depositAmount2.add(depositAmount3));
       expect(await cpToken.balanceOf(farmer2.address)).to.equal(depositAmount2.add(depositAmount3));
       pendingReward2 = BN.from(await solaceToken.balanceOf(farmer2.address));
       expectedReward2 = expectedReward2.add(
-        (solacePerBlock.mul(1).mul(19).div(20)).add // 95% ownership for 1 blocks
-        (solacePerBlock) // 100% ownership for 1 block
+        (solacePerBlock.mul(41).mul(19).div(20)).add // 95% ownership for 41 blocks
+        (solacePerBlock.mul(51)) // 100% ownership for 51 blocks
         .sub(1) // off by one error
       );
       expect(pendingReward2).to.equal(expectedReward2);
+
     })
 
     it("does not distribute rewards before farm start", async function () {
@@ -621,7 +724,7 @@ describe("Master", function () {
       // create farm
       blockNum = BN.from(await provider.getBlockNumber());
       startBlock = blockNum.add(20);
-      endBlock = blockNum.add(100);
+      endBlock = blockNum.add(200);
       farmId = await master.numFarms();
       await master.connect(governor).createFarmErc721(lpToken.address, lpAppraiser.address, allocPoints, startBlock, endBlock);
       // token 1
@@ -665,6 +768,8 @@ describe("Master", function () {
       let waitBlocks1: BN = BN.from("10");
       let waitBlocks2: BN = BN.from("20");
       let waitBlocks3: BN = BN.from("30");
+      let waitBlocks4: BN = BN.from("40");
+      let waitBlocks5: BN = BN.from("50");
       // only farmer 1
       await master.connect(farmer1).depositErc721(farmId, tokenId1);
       await burnBlocksUntil(startBlock.add(waitBlocks1));
@@ -700,24 +805,39 @@ describe("Master", function () {
         (solacePerBlock.mul(30).mul(19).div(20)) // 95% ownership for 30 blocks
       );
       expect(pendingReward2.add(receivedReward2)).to.equal(expectedReward2);
-      // farmer 1 withdraw
-      await master.connect(farmer1).withdrawErc721(farmId, tokenId1);
+      // farmer 1 withdraw rewards
+      await master.connect(farmer1).withdrawRewards(farmId);
       pendingReward1 = BN.from(await solaceToken.balanceOf(farmer1.address));
       expectedReward1 = expectedReward1.add(
         (solacePerBlock.mul(1).mul(1).div(20)) // 5% ownership for 1 blocks
       );
       expect(pendingReward1).to.equal(expectedReward1);
-      // farmer 2 withdraw
+      // farmer 2 withdraw rewards
+      await master.connect(farmer2).withdrawRewards(farmId);
+      pendingReward2 = BN.from(await solaceToken.balanceOf(farmer2.address));
+      expectedReward2 = expectedReward2.add(
+        (solacePerBlock.mul(2).mul(19).div(20)) // 95% ownership for 2 blocks
+      );
+      expect(pendingReward2).to.equal(expectedReward2);
+      await burnBlocks(waitBlocks4);
+      // farmer 1 withdraw stake
+      await master.connect(farmer1).withdrawErc721(farmId, tokenId1);
+      pendingReward1 = BN.from(await solaceToken.balanceOf(farmer1.address));
+      expectedReward1 = expectedReward1.add(
+        (solacePerBlock.mul(42).mul(1).div(20)) // 5% ownership for 42 blocks
+      );
+      expect(pendingReward1).to.equal(expectedReward1);
+      await burnBlocks(waitBlocks5);
+      // farmer 2 withdraw stake
       await master.connect(farmer2).withdrawErc721(farmId, tokenId2);
       await master.connect(farmer2).withdrawErc721(farmId, tokenId3);
       pendingReward2 = BN.from(await solaceToken.balanceOf(farmer2.address));
       expectedReward2 = expectedReward2.add(
-        (solacePerBlock.mul(1).mul(19).div(20)).add // 95% ownership for 1 blocks
-        (solacePerBlock.mul(2)) // 100% ownership for 2 blocks
+        (solacePerBlock.mul(41).mul(19).div(20)).add // 95% ownership for 41 blocks
+        (solacePerBlock.mul(52)) // 100% ownership for 52 blocks
         .sub(1) // off by one error
       );
       expect(pendingReward2).to.equal(expectedReward2);
-      // farmer 2 withdraw
     })
 
     it("does not distribute rewards before farm start", async function () {

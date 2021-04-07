@@ -74,17 +74,19 @@ contract Master is IMaster {
     /// @notice The number of farms that have been created.
     uint256 public numFarms;
 
-    event Erc20FarmCreated(uint256 indexed farmId);
-
-    event Erc721FarmCreated(uint256 indexed farmId);
-
-    event DepositErc20(address indexed user, uint256 indexed farmId, uint256 amount);
-
-    event DepositErc721(address indexed user, uint256 indexed farmId, uint256 token);
-
-    event WithdrawErc20(address indexed user, uint256 indexed farmId, uint256 amount);
-
-    event WithdrawErc721(address indexed user, uint256 indexed farmId, uint256 token);
+    // events
+    // Emitted when an ERC20 farm is created.
+    event Erc20FarmCreated(uint256 indexed _farmId);
+    // Emitted when an ERC721 farm is created.
+    event Erc721FarmCreated(uint256 indexed _farmId);
+    // Emitted when ERC20 tokens are deposited onto a farm.
+    event DepositErc20(address indexed _user, uint256 indexed _farmId, uint256 _amount);
+    // Emitted when an ERC721 token is deposited onto a farm.
+    event DepositErc721(address indexed _user, uint256 indexed _farmId, uint256 _token);
+    // Emitted when ERC20 tokens are withdrawn from a farm.
+    event WithdrawErc20(address indexed _user, uint256 indexed _farmId, uint256 _amount);
+    // Emitted when an ERC721 token is withdrawn from a farm.
+    event WithdrawErc721(address indexed _user, uint256 indexed _farmId, uint256 _token);
 
     /// @notice Governor.
     address public governance;
@@ -249,6 +251,7 @@ contract Master is IMaster {
 
     /**
      * @notice Deposit some ERC20 tokens.
+     * User will receive accumulated Solace rewards if any.
      * @param _farmId The farm to deposit to.
      * @param _amount The deposit amount.
      */
@@ -258,13 +261,8 @@ contract Master is IMaster {
         // get farm and farmer information
         FarmInfo storage farm = farmInfo[_farmId];
         UserInfo storage user = userInfo[_farmId][msg.sender];
-        // update farm
-        updateFarm(_farmId);
-        // transfer users pending rewards if nonzero
-        if (user.value > 0) {
-            uint256 pending = user.value * farm.accSolacePerShare / 1e12 - user.rewardDebt;
-            safeTransfer(solace, msg.sender, pending);
-        }
+        // harvest
+        _harvest(_farmId);
         // pull tokens
         IERC20(farm.token).safeTransferFrom(address(msg.sender), address(this), _amount);
         // accounting
@@ -276,6 +274,7 @@ contract Master is IMaster {
 
     /**
      * @notice Deposit an ERC721 token.
+     * User will receive accumulated Solace rewards if any.
      * @param _farmId The farm to deposit to.
      * @param _token The deposit token.
      */
@@ -285,13 +284,8 @@ contract Master is IMaster {
         // get farm and farmer information
         FarmInfo storage farm = farmInfo[_farmId];
         UserInfo storage user = userInfo[_farmId][msg.sender];
-        // update farm
-        updateFarm(_farmId);
-        // transfer users pending rewards if nonzero
-        if (user.value > 0) {
-            uint256 pending = user.value * farm.accSolacePerShare / 1e12 - user.rewardDebt;
-            safeTransfer(solace, msg.sender, pending);
-        }
+        // harvest
+        _harvest(_farmId);
         // pull tokens
         IERC721(farm.token).transferFrom(address(msg.sender), address(this), _token);
         // accounting
@@ -316,17 +310,14 @@ contract Master is IMaster {
         // get farm and farmer information
         FarmInfo storage farm = farmInfo[_farmId];
         UserInfo storage user = userInfo[_farmId][msg.sender];
-        // update farm
-        updateFarm(_farmId);
-        // transfer users pending rewards
-        uint256 pendingSolace = user.value * farm.accSolacePerShare / 1e12 - user.rewardDebt;
-        safeTransfer(solace, msg.sender, pendingSolace);
+        // harvest
+        _harvest(_farmId);
         // accounting
         farm.valueStaked -= _amount;
         user.value -= _amount; // also reverts overwithdraw
         user.rewardDebt = user.value * farm.accSolacePerShare / 1e12;
         // return CP/LP tokens
-        safeTransfer(IERC20(farm.token), msg.sender, _amount);
+        _safeTransfer(IERC20(farm.token), msg.sender, _amount);
         emit WithdrawErc20(msg.sender, _farmId, _amount);
     }
 
@@ -342,22 +333,35 @@ contract Master is IMaster {
         // get farm and farmer information
         FarmInfo storage farm = farmInfo[_farmId];
         UserInfo storage user = userInfo[_farmId][msg.sender];
+        // harvest
+        _harvest(_farmId);
         // cannot withdraw a token you didnt deposit
         require(user.tokensDeposited[_token], "not your token");
-        // update farm
-        updateFarm(_farmId);
-        // transfer users pending rewards
-        uint256 pendingSolace = user.value * farm.accSolacePerShare / 1e12 - user.rewardDebt;
-        safeTransfer(solace, msg.sender, pendingSolace);
         // accounting
-        uint256 value = user.tokenValues[_token];
-        farm.valueStaked -= value;
-        user.value -= value;
+        uint256 tokenValue = user.tokenValues[_token];
+        farm.valueStaked -= tokenValue;
+        user.value -= tokenValue;
         user.rewardDebt = user.value * farm.accSolacePerShare / 1e12;
         user.tokensDeposited[_token] = false;
         // return CP/LP tokens
         IERC721(farm.token).safeTransferFrom(address(this), msg.sender, _token);
         emit WithdrawErc721(msg.sender, _farmId, _token);
+    }
+
+    /**
+     * Withdraw your pending rewards without unstaking your tokens.
+     * @param _farmId The farm to withdraw rewards from.
+     */
+    function withdrawRewards(uint256 _farmId) external override {
+        // cannot get rewards for a non existant farm
+        require(_farmId < numFarms, "farm does not exist");
+        // harvest
+        _harvest(_farmId);
+        // get farm and farmer information
+        FarmInfo storage farm = farmInfo[_farmId];
+        UserInfo storage user = userInfo[_farmId][msg.sender];
+        // accounting
+        user.rewardDebt = user.value * farm.accSolacePerShare / 1e12;
     }
 
     /**
@@ -436,12 +440,27 @@ contract Master is IMaster {
     }
 
     /**
+    * Calculate and transfer a user's rewards.
+    * @param _farmId The farm to withdraw rewards from.
+    */
+    function _harvest(uint256 _farmId) internal {
+      // get farm and farmer information
+      FarmInfo storage farm = farmInfo[_farmId];
+      UserInfo storage user = userInfo[_farmId][msg.sender];
+      // update farm
+      updateFarm(_farmId);
+      // transfer users pending rewards if nonzero
+      uint256 pending = user.value * farm.accSolacePerShare / 1e12 - user.rewardDebt;
+      if (pending > 0) _safeTransfer(solace, msg.sender, pending);
+    }
+
+    /**
      * @notice Safe ERC20 transfer function, just in case a rounding error causes farm to not have enough tokens.
      * @param _token Token address.
      * @param _to The user address to transfer tokens to.
      * @param _amount The total amount of tokens to transfer.
      */
-    function safeTransfer(IERC20 _token, address _to, uint256 _amount) internal {
+    function _safeTransfer(IERC20 _token, address _to, uint256 _amount) internal {
         uint256 balance = _token.balanceOf(address(this));
         uint256 transferAmount = Math.min(_amount, balance);
         _token.safeTransfer(_to, transferAmount);

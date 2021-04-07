@@ -88,13 +88,63 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="locker-contract.html">Locker Contract</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Master Contract</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#state-variables">State Variables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#global">Global</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#per-farm">Per Farm</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#per-user">Per User</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#state-variables">State Variables</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#governance">governance</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#solace">solace</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#solaceperblock">solacePerBlock</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#totalallocpoints">totalAllocPoints</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#farminfo">farmInfo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#userinfo">userInfo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#farmiserc20">farmIsErc20</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#farmiserc721">farmIsErc721</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#numfarms">numFarms</a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="#constructor">Constructor</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#view-functions">View Functions</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#mutative-functions">Mutative Functions</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#restricted-functions">Restricted Functions</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#modifiers">Modifiers</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#events">Events</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#view-functions">View Functions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id2">governance</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id3">solace</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id4">solacePerBlock</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id5">totalAllocPoints</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id6">farmInfo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id7">userInfo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id8">farmIsErc20</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id9">farmIsErc721</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id10">numFarms</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pendingreward">pendingReward</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#getmultiplier">getMultiplier</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#mutative-functions">Mutative Functions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#depositerc20">depositErc20</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#depositerc721">depositErc721</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#withdrawerc20">withdrawErc20</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#withdrawerc721">withdrawErc721</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#withdrawrewards">withdrawRewards</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#updatefarm">updateFarm</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#massupdatefarms">massUpdateFarms</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#restricted-functions">Restricted Functions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#setgovernance">setGovernance</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#createfarmerc20">createFarmErc20</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#createfarmerc721">createFarmErc721</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#setsolaceperblock">setSolacePerBlock</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#setfarmparams">setFarmParams</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#events">Events</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#erc20farmcreated">Erc20FarmCreated</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#erc721farmcreated">Erc721FarmCreated</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id11">DepositErc20</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id12">DepositErc721</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id13">WithdrawErc20</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id14">WithdrawErc721</a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="#source">Source</a></li>
 </ul>
 </li>
@@ -176,28 +226,665 @@
             
   <div class="section" id="master-contract">
 <h1>Master Contract<a class="headerlink" href="#master-contract" title="Permalink to this headline">¶</a></h1>
-<p id="id1">This smart contract will distribute SOLACE token to liquidity (LPs) and capital providers (CPs).
-Reward liquidity providers for ETH-SOLACE pair on DEX(es) who stake their LP tokens, capital providers for our Vault who stake their CP tokens, and stakers of SOLACE.</p>
+<p id="id1">Master: the distributor of Solace.fi.</p>
+<p>Master will distribute SOLACE token to liquidity providers (LPs) and capital providers (CPs).
+Reward liquidity providers for ETH-SOLACE pair on DEX(es) who stake their LP tokens, capital providers for our Vault who stake their CP tokens, and stakers of SOLACE.
+Both ERC-20 and ERC-721 tokens can be staked.</p>
+<p>To accomplish this, Master tracks state at the global level, per farm, and per user.</p>
+<div class="section" id="global">
+<h2>Global<a class="headerlink" href="#global" title="Permalink to this headline">¶</a></h2>
+<p>There are a number of farms <cite>numFarms</cite>. These farms combined will distribute an amount of Solace per block <cite>solacePerBlock</cite>. The amount that each farm distributes can be adjusted using allocation points, globally <cite>totalAllocPoints</cite>.</p>
+</div>
+<div class="section" id="per-farm">
+<h2>Per Farm<a class="headerlink" href="#per-farm" title="Permalink to this headline">¶</a></h2>
+<p>The global mapping <cite>farmInfo</cite> maps a unique farm id to a farm. Each farm can only hold one type of <cite>token</cite>. If that token is an ERC-721, it will be valued by its <cite>appraiser</cite>. The amount of Solace that each farm distributes relative to the other farms is its <cite>allocPoints</cite>. Each farm distributes over a period of time from <cite>startBlock</cite> through <cite>endBlock</cite>, with the last time that rewards were distributed as <cite>lastRewardBlock</cite>. Token amounts are stored as <cite>accSolacePerShare</cite> and <cite>valueStaked</cite>.</p>
+</div>
+<div class="section" id="per-user">
+<h2>Per User<a class="headerlink" href="#per-user" title="Permalink to this headline">¶</a></h2>
+<p>The global mapping <cite>userInfo</cite> maps a unique farm id and user address to information about a farmer. The value that they’ve staked is <cite>value</cite> and they have a <cite>rewardDebt</cite>. If the farm is an ERC-721 farm, <cite>tokensDeposited</cite> hold which tokens they’ve deposited and <cite>tokenValues</cite> hold the value of each token.</p>
+</div>
 <div class="section" id="state-variables">
 <h2>State Variables<a class="headerlink" href="#state-variables" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="governance">
+<h3>governance<a class="headerlink" href="#governance" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Governance’s address.</p>
+</dd>
+<dt class="field-even">Type</dt>
+<dd class="field-even"><p>address</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="solace">
+<h3>solace<a class="headerlink" href="#solace" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Solace Token’s address.</p>
+</dd>
+<dt class="field-even">Type</dt>
+<dd class="field-even"><p>SOLACE</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="solaceperblock">
+<h3>solacePerBlock<a class="headerlink" href="#solaceperblock" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Total solace distributed per block across all farms.</p>
+</dd>
+<dt class="field-even">Type</dt>
+<dd class="field-even"><p>uint256</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="totalallocpoints">
+<h3>totalAllocPoints<a class="headerlink" href="#totalallocpoints" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Total allocation points across all farms.</p>
+</dd>
+<dt class="field-even">Type</dt>
+<dd class="field-even"><p>uint256</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="farminfo">
+<h3>farmInfo<a class="headerlink" href="#farminfo" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Information about each farm.</p>
+</dd>
+<dt class="field-even">Type</dt>
+<dd class="field-even"><p>mapping(uint256 =&gt; FarmInfo)</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="userinfo">
+<h3>userInfo<a class="headerlink" href="#userinfo" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Information about each farmer.</p>
+</dd>
+<dt class="field-even">Type</dt>
+<dd class="field-even"><p>mapping(uint256 =&gt; mapping(address =&gt; UserInfo))</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="farmiserc20">
+<h3>farmIsErc20<a class="headerlink" href="#farmiserc20" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Returns true if farming ERC20 tokens.</p>
+</dd>
+<dt class="field-even">Type</dt>
+<dd class="field-even"><p>mapping(uint256 =&gt; bool)</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="farmiserc721">
+<h3>farmIsErc721<a class="headerlink" href="#farmiserc721" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Returns true if farming ERC721 tokens.</p>
+</dd>
+<dt class="field-even">Type</dt>
+<dd class="field-even"><p>mapping(uint256 =&gt; bool)</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="numfarms">
+<h3>numFarms<a class="headerlink" href="#numfarms" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>The number of farms that have been created.</p>
+</dd>
+<dt class="field-even">Type</dt>
+<dd class="field-even"><p>uint256</p>
+</dd>
+</dl>
+</div>
 </div>
 <div class="section" id="constructor">
 <h2>Constructor<a class="headerlink" href="#constructor" title="Permalink to this headline">¶</a></h2>
+<dl class="field-list">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Constructs the Master contract.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><div class="line-block">
+<div class="line">SOLACE _solace: Address of the solace token.</div>
+<div class="line">uint256 _solacePerBlock: Amount of solace to distribute per block.</div>
+</div>
+</dd>
+</dl>
 </div>
 <div class="section" id="view-functions">
 <h2>View Functions<a class="headerlink" href="#view-functions" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id2">
+<h3>governance<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Governance’s address.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>address: Address of governance.</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="id3">
+<h3>solace<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Solace Token’s address.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>address: Address of Solace Token.</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="id4">
+<h3>solacePerBlock<a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Total solace distributed per block across all farms.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>uint256: Total solace distributed per block across all farms.</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="id5">
+<h3>totalAllocPoints<a class="headerlink" href="#id5" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Total allocation points across all farms.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>uint256: Total allocation points across all farms.</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="id6">
+<h3>farmInfo<a class="headerlink" href="#id6" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Information about each farm.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><p>uint256 _farmId: Index of farm to query.</p>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>FarmInfo: Information about the farm.</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="id7">
+<h3>userInfo<a class="headerlink" href="#id7" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Information about each farmer.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><div class="line-block">
+<div class="line">uint256 _farmId: Index of farm to query.</div>
+<div class="line">address _user: Address of user on farm.</div>
+</div>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>UserInfo: Information about the user.</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="id8">
+<h3>farmIsErc20<a class="headerlink" href="#id8" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Returns true if farming ERC20 tokens.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><p>uint256 _farmId: Index of farm to query.</p>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>bool: True if farming ERC20 tokens.</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="id9">
+<h3>farmIsErc721<a class="headerlink" href="#id9" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Returns true if farming ERC721 tokens.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><p>uint256 _farmId: Index of farm to query.</p>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>bool: True if farming ERC721 tokens.</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="id10">
+<h3>numFarms<a class="headerlink" href="#id10" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>The number of farms that have been created.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>uint256: The number of farms that have been created.</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="pendingreward">
+<h3>pendingReward<a class="headerlink" href="#pendingreward" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Calculates the accumulated balance of reward token for specified user.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><div class="line-block">
+<div class="line">uint256 _farmId: The farm to measure rewards for.</div>
+<div class="line">address _user: The user for whom unclaimed tokens will be shown.</div>
+</div>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>uint256: Total amount of withdrawable reward tokens.</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="getmultiplier">
+<h3>getMultiplier<a class="headerlink" href="#getmultiplier" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Calculates the reward multiplier over the given _from until _to block.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><div class="line-block">
+<div class="line">uint256 _farmId: The farm to measure rewards for.</div>
+<div class="line">uint256 _from: The start of the period to measure rewards for.</div>
+<div class="line">uint256 _to: The end of the period to measure rewards for.</div>
+</div>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>uint256: The weighted multiplier for the given period.</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+</dl>
+</div>
 </div>
 <div class="section" id="mutative-functions">
 <h2>Mutative Functions<a class="headerlink" href="#mutative-functions" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="depositerc20">
+<h3>depositErc20<a class="headerlink" href="#depositerc20" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Deposit some ERC20 tokens. User will receive accumulated Solace rewards if any.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><div class="line-block">
+<div class="line">uint256 _farmId: The farm to deposit to.</div>
+<div class="line">uint256 _amount: The deposit amount.</div>
+</div>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>none</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="depositerc721">
+<h3>depositErc721<a class="headerlink" href="#depositerc721" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Deposit an ERC721 token. User will receive accumulated Solace rewards if any.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><div class="line-block">
+<div class="line">uint256 _farmId: The farm to deposit to.</div>
+<div class="line">uint256 _token: The deposit token.</div>
+</div>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>none</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="withdrawerc20">
+<h3>withdrawErc20<a class="headerlink" href="#withdrawerc20" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Withdraw some ERC20 tokens. User will receive _amount of CP/LP tokens and accumulated Solace rewards.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><div class="line-block">
+<div class="line">uint256 _farmId: The farm to withdraw from.</div>
+<div class="line">uint256 _amount: The withdraw amount.</div>
+</div>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>none</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="withdrawerc721">
+<h3>withdrawErc721<a class="headerlink" href="#withdrawerc721" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Withdraw an ERC721 token. User will receive _token and accumulated Solace rewards.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><div class="line-block">
+<div class="line">uint256 _farmId: The farm to withdraw from.</div>
+<div class="line">uint256 _token: The withdraw token.</div>
+</div>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>none</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="withdrawrewards">
+<h3>withdrawRewards<a class="headerlink" href="#withdrawrewards" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Withdraw your pending rewards without unstaking your tokens.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><p>uint256 _farmId: The farm to withdraw rewards from.</p>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>none</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="updatefarm">
+<h3>updateFarm<a class="headerlink" href="#updatefarm" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Updates farm information to be up to date to the current block.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><p>uint256 _farmId: The farm to update.</p>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>none</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="massupdatefarms">
+<h3>massUpdateFarms<a class="headerlink" href="#massupdatefarms" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Updates all farms to be up to date to the current block.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>none</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+</dl>
+</div>
 </div>
 <div class="section" id="restricted-functions">
 <h2>Restricted Functions<a class="headerlink" href="#restricted-functions" title="Permalink to this headline">¶</a></h2>
+<p>These functions can only be called by Governance.</p>
+<div class="section" id="setgovernance">
+<h3>setGovernance<a class="headerlink" href="#setgovernance" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Transfers the governance role to a new governor.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><p>address _governance: The new governor.</p>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>none</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>only governance</p>
+</dd>
+</dl>
 </div>
-<div class="section" id="modifiers">
-<h2>Modifiers<a class="headerlink" href="#modifiers" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="createfarmerc20">
+<h3>createFarmErc20<a class="headerlink" href="#createfarmerc20" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Constructs a new farm for an ERC20 token.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><div class="line-block">
+<div class="line">address _token: The token to deposit.</div>
+<div class="line">uint256 _allocPoints: Relative amount of solace rewards to distribute per block.</div>
+<div class="line">uint256 _startBlock: When the farm will start.</div>
+<div class="line">uint256 _endBlock: When the farm will end.</div>
+</div>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>uint256: ID of the new farm.</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>only governance</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="createfarmerc721">
+<h3>createFarmErc721<a class="headerlink" href="#createfarmerc721" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Constructs a new farm for an ERC721 token.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><div class="line-block">
+<div class="line">address _token: The token to deposit.</div>
+<div class="line">address _appraiser: The appraiser contract.</div>
+<div class="line">uint256 _allocPoints: Relative amount of solace rewards to distribute per block.</div>
+<div class="line">uint256 _startBlock: When the farm will start.</div>
+<div class="line">uint256 _endBlock: When the farm will end.</div>
+</div>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>uint256: ID of the new farm.</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>only governance</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="setsolaceperblock">
+<h3>setSolacePerBlock<a class="headerlink" href="#setsolaceperblock" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Sets the Solace reward distribution across all farms. Optionally updates all farms.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><div class="line-block">
+<div class="line">uint256 _solacePerBlock: Amount of solace to distribute per block.</div>
+<div class="line">bool _withUpdate: If true, updates all farms.</div>
+</div>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>none</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>only governance</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="setfarmparams">
+<h3>setFarmParams<a class="headerlink" href="#setfarmparams" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Set a farm’s allocation and end block. Optionally updates all farms.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><div class="line-block">
+<div class="line">uint256 _farmId: The farm to set allocation for.</div>
+<div class="line">uint256 _allocPoints: The farm’s new allocation points.</div>
+<div class="line">uint256 _endBlock: The farm’s new end block.</div>
+<div class="line">bool _withUpdate: If true, updates all farms.</div>
+</div>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>none</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>only governance</p>
+</dd>
+</dl>
+</div>
 </div>
 <div class="section" id="events">
 <h2>Events<a class="headerlink" href="#events" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="erc20farmcreated">
+<h3>Erc20FarmCreated<a class="headerlink" href="#erc20farmcreated" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Emitted when an ERC20 farm is created.</p>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><p>uint256 _farmId: Index of the created farm.</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="erc721farmcreated">
+<h3>Erc721FarmCreated<a class="headerlink" href="#erc721farmcreated" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Emitted when an ERC721 farm is created.</p>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><p>uint256 _farmId: Index of the created farm.</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="id11">
+<h3>DepositErc20<a class="headerlink" href="#id11" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Emitted when ERC20 tokens are deposited onto a farm.</p>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><div class="line-block">
+<div class="line">address _user: The user that deposited tokens.</div>
+<div class="line">uint256 _farmId: Index of the farm.</div>
+<div class="line">uint256 _amount: The amount of deposited tokens.</div>
+</div>
+</dd>
+</dl>
+</div>
+<div class="section" id="id12">
+<h3>DepositErc721<a class="headerlink" href="#id12" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Emitted when an ERC721 token is deposited onto a farm.</p>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><div class="line-block">
+<div class="line">address _user: The user that deposited the token.</div>
+<div class="line">uint256 _farmId: Index of the farm.</div>
+<div class="line">uint256 _token: The index of the deposited token.</div>
+</div>
+</dd>
+</dl>
+</div>
+<div class="section" id="id13">
+<h3>WithdrawErc20<a class="headerlink" href="#id13" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Emitted when ERC20 tokens are withdrawn from a farm.</p>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><div class="line-block">
+<div class="line">address _user: The user that withdrew tokens.</div>
+<div class="line">uint256 _farmId: Index of the farm.</div>
+<div class="line">uint256 _amount: The amount of withdrawn tokens.</div>
+</div>
+</dd>
+</dl>
+</div>
+<div class="section" id="id14">
+<h3>WithdrawErc721<a class="headerlink" href="#id14" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Emitted when an ERC721 token is withdrawn from a farm.</p>
+</dd>
+<dt class="field-even">Parameters</dt>
+<dd class="field-even"><div class="line-block">
+<div class="line">address _user: The user that withdrew the token.</div>
+<div class="line">uint256 _farmId: Index of the farm.</div>
+<div class="line">uint256 _token: The index of the withdrawn token.</div>
+</div>
+</dd>
+</dl>
+</div>
 </div>
 <div class="section" id="source">
 <h2>Source<a class="headerlink" href="#source" title="Permalink to this headline">¶</a></h2>
@@ -529,46 +1216,193 @@ Reward liquidity providers for ETH-SOLACE pair on DEX(es) who stake their LP tok
 326
 327
 328
-329</pre></div></td><td class="code"><div class="highlight"><pre><span></span><span class="c1">// </span><span class="cs">SPDX-License-Identifier:</span><span class="c1"> GPL-3.0-or-later</span>
+329
+330
+331
+332
+333
+334
+335
+336
+337
+338
+339
+340
+341
+342
+343
+344
+345
+346
+347
+348
+349
+350
+351
+352
+353
+354
+355
+356
+357
+358
+359
+360
+361
+362
+363
+364
+365
+366
+367
+368
+369
+370
+371
+372
+373
+374
+375
+376
+377
+378
+379
+380
+381
+382
+383
+384
+385
+386
+387
+388
+389
+390
+391
+392
+393
+394
+395
+396
+397
+398
+399
+400
+401
+402
+403
+404
+405
+406
+407
+408
+409
+410
+411
+412
+413
+414
+415
+416
+417
+418
+419
+420
+421
+422
+423
+424
+425
+426
+427
+428
+429
+430
+431
+432
+433
+434
+435
+436
+437
+438
+439
+440
+441
+442
+443
+444
+445
+446
+447
+448
+449
+450
+451
+452
+453
+454
+455
+456
+457
+458
+459
+460
+461
+462
+463
+464
+465
+466
+467
+468</pre></div></td><td class="code"><div class="highlight"><pre><span></span><span class="c1">// </span><span class="cs">SPDX-License-Identifier:</span><span class="c1"> GPL-3.0-or-later</span>
 <span class="k">pragma solidity</span> <span class="mf">0.8</span><span class="p">.</span><span class="mi">0</span><span class="p">;</span>
 
 <span class="kn">import</span> <span class="s">&quot;@openzeppelin/contracts/utils/math/Math.sol&quot;</span><span class="p">;</span>
 <span class="kn">import</span> <span class="s">&quot;@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol&quot;</span><span class="p">;</span>
+<span class="kn">import</span> <span class="s">&quot;@openzeppelin/contracts/token/ERC721/IERC721.sol&quot;</span><span class="p">;</span>
 <span class="kn">import</span> <span class="s">&quot;./SOLACE.sol&quot;</span><span class="p">;</span>
+<span class="kn">import</span> <span class="s">&quot;./interface/INftAppraiser.sol&quot;</span><span class="p">;</span>
+<span class="kn">import</span> <span class="s">&quot;./interface/IMaster.sol&quot;</span><span class="p">;</span>
 
-<span class="c1">/// </span><span class="cs">@title</span><span class="c1"> Master: owner of solace.fi</span>
-<span class="c1">/// </span><span class="cs">@author</span><span class="c1"> solace.fi</span>
-<span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> This contract is the SOLACE token distributor.</span>
 
-<span class="kd">contract</span> <span class="n">Master</span> <span class="p">{</span>
+<span class="cm">/**</span>
+<span class="cm"> * </span><span class="cs">@title</span><span class="cm"> Master: Distributor of solace.fi</span>
+<span class="cm"> * </span><span class="cs">@author</span><span class="cm"> solace.fi</span>
+<span class="cm"> * </span><span class="cs">@notice</span><span class="cm"> This contract is the SOLACE token distributor.</span>
+<span class="cm"> */</span>
+<span class="kd">contract</span> <span class="n">Master</span> <span class="k">is</span> <span class="n">IMaster</span> <span class="p">{</span>
     <span class="kn">using</span> <span class="n">SafeERC20</span> <span class="k">for</span> <span class="n">IERC20</span><span class="p">;</span>
 
     <span class="c1">// Info of each user.</span>
     <span class="kd">struct</span> <span class="n">UserInfo</span> <span class="p">{</span>
-        <span class="kt">uint256</span> <span class="n">amount</span><span class="p">;</span>     <span class="c1">// How many CP or LP tokens the user has provided.</span>
-        <span class="kt">uint256</span> <span class="n">rewardDebt</span><span class="p">;</span> <span class="c1">// Reward debt. See explanation below.</span>
+        <span class="kt">uint256</span> <span class="n">value</span><span class="p">;</span>                            <span class="c1">// Value of user provided tokens.</span>
+        <span class="kt">uint256</span> <span class="n">rewardDebt</span><span class="p">;</span>                       <span class="c1">// Reward debt. See explanation below.</span>
+        <span class="kd">mapping</span><span class="p">(</span><span class="kt">uint256</span> <span class="o">=&gt;</span> <span class="kt">bool</span><span class="p">)</span> <span class="n">tokensDeposited</span><span class="p">;</span> <span class="c1">// If an ERC721 farm, which tokens have been deposited.</span>
+        <span class="kd">mapping</span><span class="p">(</span><span class="kt">uint256</span> <span class="o">=&gt;</span> <span class="kt">uint256</span><span class="p">)</span> <span class="n">tokenValues</span><span class="p">;</span>  <span class="c1">// If an ERC721 farm, the value of deposited tokens.</span>
         <span class="c1">//</span>
         <span class="c1">// We do some fancy math here. Basically, any point in time, the amount of SOLACE</span>
         <span class="c1">// entitled to a user but is pending to be distributed is:</span>
         <span class="c1">//</span>
-        <span class="c1">//   pending reward = (user.amount * farm.accSolacePerShare) - user.rewardDebt</span>
+        <span class="c1">//   pending reward = (user.value * farm.accSolacePerShare) - user.rewardDebt</span>
         <span class="c1">//</span>
         <span class="c1">// Whenever a user deposits or withdraws LP tokens to a farm. Here&#39;s what happens:</span>
         <span class="c1">//   1. The farm&#39;s `accSolacePerShare` and `lastRewardBlock` gets updated.</span>
         <span class="c1">//   2. User receives the pending reward sent to his/her address.</span>
-        <span class="c1">//   3. User&#39;s `amount` gets updated.</span>
+        <span class="c1">//   3. User&#39;s `value` gets updated.</span>
         <span class="c1">//   4. User&#39;s `rewardDebt` gets updated.</span>
     <span class="p">}</span>
 
     <span class="c1">// Info of each farm.</span>
     <span class="kd">struct</span> <span class="n">FarmInfo</span> <span class="p">{</span>
-        <span class="n">IERC20</span> <span class="n">token</span><span class="p">;</span>              <span class="c1">// address of CP or LP token contract</span>
-        <span class="kt">uint256</span> <span class="n">allocPoints</span><span class="p">;</span>       <span class="c1">// how many allocation points assigned to this farm</span>
-        <span class="kt">uint256</span> <span class="n">startBlock</span><span class="p">;</span>        <span class="c1">// when the farm will start</span>
-        <span class="kt">uint256</span> <span class="n">endBlock</span><span class="p">;</span>          <span class="c1">// when the farm will end</span>
-        <span class="kt">uint256</span> <span class="n">lastRewardBlock</span><span class="p">;</span>   <span class="c1">// last time rewards were distributed or farm was updated</span>
-        <span class="kt">uint256</span> <span class="n">accSolacePerShare</span><span class="p">;</span> <span class="c1">// accumulated rewards per share, times 1e12</span>
-        <span class="kt">uint256</span> <span class="n">tokensStaked</span><span class="p">;</span>      <span class="c1">// number of tokens staked by all farmers</span>
+        <span class="kt">address</span> <span class="n">token</span><span class="p">;</span>             <span class="c1">// Address of token contract.</span>
+        <span class="kt">address</span> <span class="n">appraiser</span><span class="p">;</span>         <span class="c1">// If an ERC721 farm, address of the appraiser contract.</span>
+        <span class="kt">uint256</span> <span class="n">allocPoints</span><span class="p">;</span>       <span class="c1">// How many allocation points assigned to this farm.</span>
+        <span class="kt">uint256</span> <span class="n">startBlock</span><span class="p">;</span>        <span class="c1">// When the farm will start.</span>
+        <span class="kt">uint256</span> <span class="n">endBlock</span><span class="p">;</span>          <span class="c1">// When the farm will end.</span>
+        <span class="kt">uint256</span> <span class="n">lastRewardBlock</span><span class="p">;</span>   <span class="c1">// Last time rewards were distributed or farm was updated.</span>
+        <span class="kt">uint256</span> <span class="n">accSolacePerShare</span><span class="p">;</span> <span class="c1">// Accumulated rewards per share, times 1e12.</span>
+        <span class="kt">uint256</span> <span class="n">valueStaked</span><span class="p">;</span>       <span class="c1">// Value of tokens staked by all farmers.</span>
     <span class="p">}</span>
 
     <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Native SOLACE Token.</span>
@@ -578,20 +1412,38 @@ Reward liquidity providers for ETH-SOLACE pair on DEX(es) who stake their LP tok
     <span class="kt">uint256</span> <span class="k">public</span> <span class="n">solacePerBlock</span><span class="p">;</span>
 
     <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Total allocation points across all farms.</span>
-    <span class="kt">uint256</span> <span class="k">public</span> <span class="n">totalAllocPoints</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+    <span class="kt">uint256</span> <span class="k">public</span> <span class="n">totalAllocPoints</span><span class="p">;</span>
 
     <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Information about each farm.</span>
-    <span class="n">FarmInfo</span><span class="p">[]</span> <span class="k">public</span> <span class="n">farmInfo</span><span class="p">;</span>
+    <span class="c1">/// </span><span class="cs">@dev</span><span class="c1"> farm id =&gt; farm info</span>
+    <span class="kd">mapping</span><span class="p">(</span><span class="kt">uint256</span> <span class="o">=&gt;</span> <span class="n">FarmInfo</span><span class="p">)</span> <span class="k">public</span> <span class="n">farmInfo</span><span class="p">;</span>
 
     <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Information about each farmer.</span>
     <span class="c1">/// </span><span class="cs">@dev</span><span class="c1"> farm id =&gt; user address =&gt; user info</span>
-    <span class="kd">mapping</span><span class="p">(</span><span class="kt">address</span> <span class="o">=&gt;</span> <span class="n">UserInfo</span><span class="p">)[]</span> <span class="k">public</span> <span class="n">userInfo</span><span class="p">;</span>
+    <span class="kd">mapping</span><span class="p">(</span><span class="kt">uint256</span> <span class="o">=&gt;</span> <span class="kd">mapping</span><span class="p">(</span><span class="kt">address</span> <span class="o">=&gt;</span> <span class="n">UserInfo</span><span class="p">))</span> <span class="k">public</span> <span class="n">userInfo</span><span class="p">;</span>
 
-    <span class="kd">event</span> <span class="n">FarmCreated</span><span class="p">(</span><span class="kt">uint256</span> <span class="k">indexed</span> <span class="n">farmId</span><span class="p">);</span>
+    <span class="c1">// track farm ids and types</span>
+    <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Returns true if farming ERC20 tokens.</span>
+    <span class="kd">mapping</span><span class="p">(</span><span class="kt">uint256</span> <span class="o">=&gt;</span> <span class="kt">bool</span><span class="p">)</span> <span class="k">public</span> <span class="n">farmIsErc20</span><span class="p">;</span>
+    <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Returns true if farming ERC721 tokens.</span>
+    <span class="kd">mapping</span><span class="p">(</span><span class="kt">uint256</span> <span class="o">=&gt;</span> <span class="kt">bool</span><span class="p">)</span> <span class="k">public</span> <span class="n">farmIsErc721</span><span class="p">;</span>
 
-    <span class="kd">event</span> <span class="n">Deposit</span><span class="p">(</span><span class="kt">address</span> <span class="k">indexed</span> <span class="n">user</span><span class="p">,</span> <span class="kt">uint256</span> <span class="k">indexed</span> <span class="n">farmId</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">amount</span><span class="p">);</span>
+    <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> The number of farms that have been created.</span>
+    <span class="kt">uint256</span> <span class="k">public</span> <span class="n">numFarms</span><span class="p">;</span>
 
-    <span class="kd">event</span> <span class="n">Withdraw</span><span class="p">(</span><span class="kt">address</span> <span class="k">indexed</span> <span class="n">user</span><span class="p">,</span> <span class="kt">uint256</span> <span class="k">indexed</span> <span class="n">farmId</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">amount</span><span class="p">);</span>
+    <span class="c1">// events</span>
+    <span class="c1">// Emitted when an ERC20 farm is created.</span>
+    <span class="kd">event</span> <span class="n">Erc20FarmCreated</span><span class="p">(</span><span class="kt">uint256</span> <span class="k">indexed</span> <span class="n">_farmId</span><span class="p">);</span>
+    <span class="c1">// Emitted when an ERC721 farm is created.</span>
+    <span class="kd">event</span> <span class="n">Erc721FarmCreated</span><span class="p">(</span><span class="kt">uint256</span> <span class="k">indexed</span> <span class="n">_farmId</span><span class="p">);</span>
+    <span class="c1">// Emitted when ERC20 tokens are deposited onto a farm.</span>
+    <span class="kd">event</span> <span class="n">DepositErc20</span><span class="p">(</span><span class="kt">address</span> <span class="k">indexed</span> <span class="n">_user</span><span class="p">,</span> <span class="kt">uint256</span> <span class="k">indexed</span> <span class="n">_farmId</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_amount</span><span class="p">);</span>
+    <span class="c1">// Emitted when an ERC721 token is deposited onto a farm.</span>
+    <span class="kd">event</span> <span class="n">DepositErc721</span><span class="p">(</span><span class="kt">address</span> <span class="k">indexed</span> <span class="n">_user</span><span class="p">,</span> <span class="kt">uint256</span> <span class="k">indexed</span> <span class="n">_farmId</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_token</span><span class="p">);</span>
+    <span class="c1">// Emitted when ERC20 tokens are withdrawn from a farm.</span>
+    <span class="kd">event</span> <span class="n">WithdrawErc20</span><span class="p">(</span><span class="kt">address</span> <span class="k">indexed</span> <span class="n">_user</span><span class="p">,</span> <span class="kt">uint256</span> <span class="k">indexed</span> <span class="n">_farmId</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_amount</span><span class="p">);</span>
+    <span class="c1">// Emitted when an ERC721 token is withdrawn from a farm.</span>
+    <span class="kd">event</span> <span class="n">WithdrawErc721</span><span class="p">(</span><span class="kt">address</span> <span class="k">indexed</span> <span class="n">_user</span><span class="p">,</span> <span class="kt">uint256</span> <span class="k">indexed</span> <span class="n">_farmId</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_token</span><span class="p">);</span>
 
     <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Governor.</span>
     <span class="kt">address</span> <span class="k">public</span> <span class="n">governance</span><span class="p">;</span>
@@ -608,49 +1460,6 @@ Reward liquidity providers for ETH-SOLACE pair on DEX(es) who stake their LP tok
     <span class="p">}</span>
 
     <span class="cm">/**</span>
-<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Constructs a new farm.</span>
-<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _token The token to deposit.</span>
-<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _allocPoints Relative amount of solace rewards to distribute per block.</span>
-<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _startBlock When the farm will start.</span>
-<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _endBlock When the farm will end.</span>
-<span class="cm">     * </span><span class="cs">@return</span><span class="cm"> ID of the new farm.</span>
-<span class="cm">     */</span>
-    <span class="kd">function</span> <span class="n">createFarm</span><span class="p">(</span>
-        <span class="kt">address</span> <span class="n">_token</span><span class="p">,</span>
-        <span class="kt">uint256</span> <span class="n">_allocPoints</span><span class="p">,</span>
-        <span class="kt">uint256</span> <span class="n">_startBlock</span><span class="p">,</span>
-        <span class="kt">uint256</span> <span class="n">_endBlock</span>
-    <span class="p">)</span>
-        <span class="k">external</span> <span class="k">returns</span> <span class="p">(</span><span class="kt">uint256</span><span class="p">)</span>
-    <span class="p">{</span>
-        <span class="c1">// leaving input validation to governor</span>
-        <span class="c1">// require(_token != address(0x0), &quot;cannot farm the null token&quot;);</span>
-        <span class="c1">// require(_startBlock &lt; _endBlock, &quot;duration must be positive&quot;);</span>
-        <span class="c1">// require(_allocPoints &gt; 0, &quot;will not farm for no reward&quot;);</span>
-
-        <span class="c1">// can only be called by governor</span>
-        <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
-
-        <span class="c1">// accounting</span>
-        <span class="kt">uint256</span> <span class="n">farmId</span> <span class="o">=</span> <span class="n">farmInfo</span><span class="p">.</span><span class="n">length</span><span class="p">;</span>
-        <span class="n">totalAllocPoints</span> <span class="o">+=</span> <span class="n">_allocPoints</span><span class="p">;</span>
-        <span class="c1">// create farm info</span>
-        <span class="n">farmInfo</span><span class="p">.</span><span class="nf">push</span><span class="p">(</span><span class="n">FarmInfo</span><span class="p">({</span>
-            <span class="n">token</span><span class="o">:</span> <span class="n">IERC20</span><span class="p">(</span><span class="n">_token</span><span class="p">),</span>
-            <span class="n">startBlock</span><span class="o">:</span> <span class="n">_startBlock</span><span class="p">,</span>
-            <span class="n">endBlock</span><span class="o">:</span> <span class="n">_endBlock</span><span class="p">,</span>
-            <span class="n">allocPoints</span><span class="o">:</span> <span class="n">_allocPoints</span><span class="p">,</span>
-            <span class="n">lastRewardBlock</span><span class="o">:</span> <span class="n">Math</span><span class="p">.</span><span class="n">max</span><span class="p">(</span><span class="nb">block.number</span><span class="p">,</span> <span class="n">_startBlock</span><span class="p">),</span>
-            <span class="n">accSolacePerShare</span><span class="o">:</span> <span class="mi">0</span><span class="p">,</span>
-            <span class="n">tokensStaked</span><span class="o">:</span> <span class="mi">0</span>
-        <span class="p">}));</span>
-        <span class="c1">// create user info</span>
-        <span class="n">userInfo</span><span class="p">.</span><span class="nf">push</span><span class="p">();</span>
-        <span class="k">emit</span> <span class="n">FarmCreated</span><span class="p">(</span><span class="n">farmId</span><span class="p">);</span>
-        <span class="k">return</span> <span class="n">farmId</span><span class="p">;</span>
-    <span class="p">}</span>
-
-    <span class="cm">/**</span>
 <span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Transfers the governance role to a new governor.</span>
 <span class="cm">     * Can only be called by the current governor.</span>
 <span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _governance The new governor.</span>
@@ -662,12 +1471,101 @@ Reward liquidity providers for ETH-SOLACE pair on DEX(es) who stake their LP tok
     <span class="p">}</span>
 
     <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Constructs a new farm for an ERC20 token.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _token The token to deposit.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _allocPoints Relative amount of solace rewards to distribute per block.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _startBlock When the farm will start.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _endBlock When the farm will end.</span>
+<span class="cm">     * </span><span class="cs">@return</span><span class="cm"> ID of the new farm.</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">createFarmErc20</span><span class="p">(</span>
+        <span class="kt">address</span> <span class="n">_token</span><span class="p">,</span>
+        <span class="kt">uint256</span> <span class="n">_allocPoints</span><span class="p">,</span>
+        <span class="kt">uint256</span> <span class="n">_startBlock</span><span class="p">,</span>
+        <span class="kt">uint256</span> <span class="n">_endBlock</span>
+    <span class="p">)</span>
+        <span class="k">external</span> <span class="k">override</span> <span class="k">returns</span> <span class="p">(</span><span class="kt">uint256</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="c1">// leaving input validation to governor</span>
+        <span class="c1">// require(_token != address(0x0), &quot;cannot farm the null token&quot;);</span>
+        <span class="c1">// require(_startBlock &lt; _endBlock, &quot;duration must be positive&quot;);</span>
+        <span class="c1">// require(_allocPoints &gt; 0, &quot;will not farm for no reward&quot;);</span>
+
+        <span class="c1">// can only be called by governor</span>
+        <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
+
+        <span class="c1">// accounting</span>
+        <span class="kt">uint256</span> <span class="n">farmId</span> <span class="o">=</span> <span class="n">numFarms</span><span class="o">++</span><span class="p">;</span>
+        <span class="n">farmIsErc20</span><span class="p">[</span><span class="n">farmId</span><span class="p">]</span> <span class="o">=</span> <span class="kc">true</span><span class="p">;</span>
+        <span class="n">totalAllocPoints</span> <span class="o">+=</span> <span class="n">_allocPoints</span><span class="p">;</span>
+        <span class="c1">// create farm info</span>
+        <span class="n">farmInfo</span><span class="p">[</span><span class="n">farmId</span><span class="p">]</span> <span class="o">=</span> <span class="n">FarmInfo</span><span class="p">({</span>
+            <span class="n">token</span><span class="o">:</span> <span class="n">_token</span><span class="p">,</span>
+            <span class="n">appraiser</span><span class="o">:</span> <span class="kt">address</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span>
+            <span class="n">startBlock</span><span class="o">:</span> <span class="n">_startBlock</span><span class="p">,</span>
+            <span class="n">endBlock</span><span class="o">:</span> <span class="n">_endBlock</span><span class="p">,</span>
+            <span class="n">allocPoints</span><span class="o">:</span> <span class="n">_allocPoints</span><span class="p">,</span>
+            <span class="n">lastRewardBlock</span><span class="o">:</span> <span class="n">Math</span><span class="p">.</span><span class="n">max</span><span class="p">(</span><span class="nb">block.number</span><span class="p">,</span> <span class="n">_startBlock</span><span class="p">),</span>
+            <span class="n">accSolacePerShare</span><span class="o">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="n">valueStaked</span><span class="o">:</span> <span class="mi">0</span>
+        <span class="p">});</span>
+        <span class="k">emit</span> <span class="n">Erc20FarmCreated</span><span class="p">(</span><span class="n">farmId</span><span class="p">);</span>
+        <span class="k">return</span> <span class="n">farmId</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Constructs a new farm for an ERC721 token.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _token The token to deposit.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _appraiser The appraiser contract.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _allocPoints Relative amount of solace rewards to distribute per block.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _startBlock When the farm will start.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _endBlock When the farm will end.</span>
+<span class="cm">     * </span><span class="cs">@return</span><span class="cm"> ID of the new farm.</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">createFarmErc721</span><span class="p">(</span>
+        <span class="kt">address</span> <span class="n">_token</span><span class="p">,</span>
+        <span class="kt">address</span> <span class="n">_appraiser</span><span class="p">,</span>
+        <span class="kt">uint256</span> <span class="n">_allocPoints</span><span class="p">,</span>
+        <span class="kt">uint256</span> <span class="n">_startBlock</span><span class="p">,</span>
+        <span class="kt">uint256</span> <span class="n">_endBlock</span>
+    <span class="p">)</span>
+        <span class="k">external</span> <span class="k">override</span> <span class="k">returns</span> <span class="p">(</span><span class="kt">uint256</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="c1">// leaving input validation to governor</span>
+        <span class="c1">// require(_token != address(0x0), &quot;cannot farm the null token&quot;);</span>
+        <span class="c1">// require(_appraiser != address(0x0), &quot;must have an appraiser&quot;);</span>
+        <span class="c1">// require(_startBlock &lt; _endBlock, &quot;duration must be positive&quot;);</span>
+        <span class="c1">// require(_allocPoints &gt; 0, &quot;will not farm for no reward&quot;);</span>
+
+        <span class="c1">// can only be called by governor</span>
+        <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
+
+        <span class="c1">// accounting</span>
+        <span class="kt">uint256</span> <span class="n">farmId</span> <span class="o">=</span> <span class="n">numFarms</span><span class="o">++</span><span class="p">;</span>
+        <span class="n">farmIsErc721</span><span class="p">[</span><span class="n">farmId</span><span class="p">]</span> <span class="o">=</span> <span class="kc">true</span><span class="p">;</span>
+        <span class="n">totalAllocPoints</span> <span class="o">+=</span> <span class="n">_allocPoints</span><span class="p">;</span>
+        <span class="c1">// create farm info</span>
+        <span class="n">farmInfo</span><span class="p">[</span><span class="n">farmId</span><span class="p">]</span> <span class="o">=</span> <span class="n">FarmInfo</span><span class="p">({</span>
+            <span class="n">token</span><span class="o">:</span> <span class="n">_token</span><span class="p">,</span>
+            <span class="n">appraiser</span><span class="o">:</span> <span class="n">_appraiser</span><span class="p">,</span>
+            <span class="n">startBlock</span><span class="o">:</span> <span class="n">_startBlock</span><span class="p">,</span>
+            <span class="n">endBlock</span><span class="o">:</span> <span class="n">_endBlock</span><span class="p">,</span>
+            <span class="n">allocPoints</span><span class="o">:</span> <span class="n">_allocPoints</span><span class="p">,</span>
+            <span class="n">lastRewardBlock</span><span class="o">:</span> <span class="n">Math</span><span class="p">.</span><span class="n">max</span><span class="p">(</span><span class="nb">block.number</span><span class="p">,</span> <span class="n">_startBlock</span><span class="p">),</span>
+            <span class="n">accSolacePerShare</span><span class="o">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="n">valueStaked</span><span class="o">:</span> <span class="mi">0</span>
+        <span class="p">});</span>
+        <span class="k">emit</span> <span class="n">Erc721FarmCreated</span><span class="p">(</span><span class="n">farmId</span><span class="p">);</span>
+        <span class="k">return</span> <span class="n">farmId</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
 <span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Sets the Solace reward distribution across all farms.</span>
 <span class="cm">     * Optionally updates all farms.</span>
 <span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _solacePerBlock Amount of solace to distribute per block.</span>
 <span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _withUpdate If true, updates all farms.</span>
 <span class="cm">     */</span>
-    <span class="kd">function</span> <span class="n">setSolacePerBlock</span><span class="p">(</span><span class="kt">uint256</span> <span class="n">_solacePerBlock</span><span class="p">,</span> <span class="kt">bool</span> <span class="n">_withUpdate</span><span class="p">)</span> <span class="k">external</span> <span class="p">{</span>
+    <span class="kd">function</span> <span class="n">setSolacePerBlock</span><span class="p">(</span><span class="kt">uint256</span> <span class="n">_solacePerBlock</span><span class="p">,</span> <span class="kt">bool</span> <span class="n">_withUpdate</span><span class="p">)</span> <span class="k">external</span> <span class="k">override</span> <span class="p">{</span>
         <span class="c1">// can only be called by governor</span>
         <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
         <span class="c1">// optional update</span>
@@ -694,12 +1592,12 @@ Reward liquidity providers for ETH-SOLACE pair on DEX(es) who stake their LP tok
         <span class="kt">uint256</span> <span class="n">_endBlock</span><span class="p">,</span>
         <span class="kt">bool</span> <span class="n">_withUpdate</span>
     <span class="p">)</span>
-        <span class="k">external</span>
+        <span class="k">external</span> <span class="k">override</span>
     <span class="p">{</span>
         <span class="c1">// can only be called by governor</span>
         <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
         <span class="c1">// cannot set allocation for a non existant farm</span>
-        <span class="nf">require</span><span class="p">(</span><span class="n">_farmId</span> <span class="o">&lt;</span> <span class="n">farmInfo</span><span class="p">.</span><span class="n">length</span><span class="p">,</span> <span class="s">&quot;farm does not exist&quot;</span><span class="p">);</span>
+        <span class="nf">require</span><span class="p">(</span><span class="n">_farmId</span> <span class="o">&lt;</span> <span class="n">numFarms</span><span class="p">,</span> <span class="s">&quot;farm does not exist&quot;</span><span class="p">);</span>
         <span class="c1">// optional update</span>
         <span class="k">if</span> <span class="p">(</span><span class="n">_withUpdate</span><span class="p">)</span> <span class="n">massUpdateFarms</span><span class="p">();</span>
         <span class="c1">// accounting</span>
@@ -709,59 +1607,118 @@ Reward liquidity providers for ETH-SOLACE pair on DEX(es) who stake their LP tok
     <span class="p">}</span>
 
     <span class="cm">/**</span>
-<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Deposit token function for msg.sender.</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Deposit some ERC20 tokens.</span>
+<span class="cm">     * User will receive accumulated Solace rewards if any.</span>
 <span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _farmId The farm to deposit to.</span>
 <span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _amount The deposit amount.</span>
 <span class="cm">     */</span>
-    <span class="kd">function</span> <span class="n">deposit</span><span class="p">(</span><span class="kt">uint256</span> <span class="n">_farmId</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_amount</span><span class="p">)</span> <span class="k">external</span> <span class="p">{</span>
+    <span class="kd">function</span> <span class="n">depositErc20</span><span class="p">(</span><span class="kt">uint256</span> <span class="n">_farmId</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_amount</span><span class="p">)</span> <span class="k">external</span> <span class="k">override</span> <span class="p">{</span>
         <span class="c1">// cannot deposit onto a non existant farm</span>
-        <span class="nf">require</span><span class="p">(</span><span class="n">_farmId</span> <span class="o">&lt;</span> <span class="n">farmInfo</span><span class="p">.</span><span class="n">length</span><span class="p">,</span> <span class="s">&quot;farm does not exist&quot;</span><span class="p">);</span>
+        <span class="nf">require</span><span class="p">(</span><span class="n">farmIsErc20</span><span class="p">[</span><span class="n">_farmId</span><span class="p">],</span> <span class="s">&quot;not an erc20 farm&quot;</span><span class="p">);</span>
         <span class="c1">// get farm and farmer information</span>
         <span class="n">FarmInfo</span> <span class="k">storage</span> <span class="n">farm</span> <span class="o">=</span> <span class="n">farmInfo</span><span class="p">[</span><span class="n">_farmId</span><span class="p">];</span>
         <span class="n">UserInfo</span> <span class="k">storage</span> <span class="n">user</span> <span class="o">=</span> <span class="n">userInfo</span><span class="p">[</span><span class="n">_farmId</span><span class="p">][</span><span class="nb">msg.sender</span><span class="p">];</span>
-        <span class="c1">// update farm</span>
-        <span class="n">updateFarm</span><span class="p">(</span><span class="n">_farmId</span><span class="p">);</span>
-        <span class="c1">// transfer users pending rewards if nonzero</span>
-        <span class="k">if</span> <span class="p">(</span><span class="n">user</span><span class="p">.</span><span class="n">amount</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
-            <span class="kt">uint256</span> <span class="n">pending</span> <span class="o">=</span> <span class="n">user</span><span class="p">.</span><span class="n">amount</span> <span class="o">*</span> <span class="n">farm</span><span class="p">.</span><span class="n">accSolacePerShare</span> <span class="o">/</span> <span class="mi">1e12</span> <span class="o">-</span> <span class="n">user</span><span class="p">.</span><span class="n">rewardDebt</span><span class="p">;</span>
-            <span class="n">safeTransfer</span><span class="p">(</span><span class="n">solace</span><span class="p">,</span> <span class="nb">msg.sender</span><span class="p">,</span> <span class="n">pending</span><span class="p">);</span>
-        <span class="p">}</span>
+        <span class="c1">// harvest</span>
+        <span class="n">_harvest</span><span class="p">(</span><span class="n">_farmId</span><span class="p">);</span>
         <span class="c1">// pull tokens</span>
-        <span class="n">farm</span><span class="p">.</span><span class="n">token</span><span class="p">.</span><span class="n">safeTransferFrom</span><span class="p">(</span><span class="kt">address</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">),</span> <span class="kt">address</span><span class="p">(</span><span class="nb">this</span><span class="p">),</span> <span class="n">_amount</span><span class="p">);</span>
+        <span class="n">IERC20</span><span class="p">(</span><span class="n">farm</span><span class="p">.</span><span class="n">token</span><span class="p">).</span><span class="n">safeTransferFrom</span><span class="p">(</span><span class="kt">address</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">),</span> <span class="kt">address</span><span class="p">(</span><span class="nb">this</span><span class="p">),</span> <span class="n">_amount</span><span class="p">);</span>
         <span class="c1">// accounting</span>
-        <span class="n">farm</span><span class="p">.</span><span class="n">tokensStaked</span> <span class="o">+=</span> <span class="n">_amount</span><span class="p">;</span>
-        <span class="n">user</span><span class="p">.</span><span class="n">amount</span> <span class="o">+=</span> <span class="n">_amount</span><span class="p">;</span>
-        <span class="n">user</span><span class="p">.</span><span class="n">rewardDebt</span> <span class="o">=</span> <span class="n">user</span><span class="p">.</span><span class="n">amount</span> <span class="o">*</span> <span class="n">farm</span><span class="p">.</span><span class="n">accSolacePerShare</span> <span class="o">/</span> <span class="mi">1e12</span><span class="p">;</span>
-        <span class="k">emit</span> <span class="n">Deposit</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">,</span> <span class="n">_farmId</span><span class="p">,</span> <span class="n">_amount</span><span class="p">);</span>
+        <span class="n">farm</span><span class="p">.</span><span class="n">valueStaked</span> <span class="o">+=</span> <span class="n">_amount</span><span class="p">;</span>
+        <span class="n">user</span><span class="p">.</span><span class="n">value</span> <span class="o">+=</span> <span class="n">_amount</span><span class="p">;</span>
+        <span class="n">user</span><span class="p">.</span><span class="n">rewardDebt</span> <span class="o">=</span> <span class="n">user</span><span class="p">.</span><span class="n">value</span> <span class="o">*</span> <span class="n">farm</span><span class="p">.</span><span class="n">accSolacePerShare</span> <span class="o">/</span> <span class="mi">1e12</span><span class="p">;</span>
+        <span class="k">emit</span> <span class="n">DepositErc20</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">,</span> <span class="n">_farmId</span><span class="p">,</span> <span class="n">_amount</span><span class="p">);</span>
     <span class="p">}</span>
 
     <span class="cm">/**</span>
-<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Withdraw token function for msg.sender.</span>
-<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _farmId The farm to withdraw from.</span>
-<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _amount The withdraw amount.</span>
-<span class="cm">     * Note: _amount will be deducted from amount deposited.</span>
-<span class="cm">     * User will receive _amount of CP/LP tokens and accumulated Solace rewards.</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Deposit an ERC721 token.</span>
+<span class="cm">     * User will receive accumulated Solace rewards if any.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _farmId The farm to deposit to.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _token The deposit token.</span>
 <span class="cm">     */</span>
-    <span class="kd">function</span> <span class="n">withdraw</span><span class="p">(</span><span class="kt">uint256</span> <span class="n">_farmId</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_amount</span><span class="p">)</span> <span class="k">external</span> <span class="p">{</span>
-        <span class="c1">// cannot withdraw from a non existant farm</span>
-        <span class="nf">require</span><span class="p">(</span><span class="n">_farmId</span> <span class="o">&lt;</span> <span class="n">farmInfo</span><span class="p">.</span><span class="n">length</span><span class="p">,</span> <span class="s">&quot;farm does not exist&quot;</span><span class="p">);</span>
+    <span class="kd">function</span> <span class="n">depositErc721</span><span class="p">(</span><span class="kt">uint256</span> <span class="n">_farmId</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_token</span><span class="p">)</span> <span class="k">external</span> <span class="k">override</span> <span class="p">{</span>
+        <span class="c1">// cannot deposit onto a non existant farm</span>
+        <span class="nf">require</span><span class="p">(</span><span class="n">farmIsErc721</span><span class="p">[</span><span class="n">_farmId</span><span class="p">],</span> <span class="s">&quot;not an erc721 farm&quot;</span><span class="p">);</span>
         <span class="c1">// get farm and farmer information</span>
         <span class="n">FarmInfo</span> <span class="k">storage</span> <span class="n">farm</span> <span class="o">=</span> <span class="n">farmInfo</span><span class="p">[</span><span class="n">_farmId</span><span class="p">];</span>
         <span class="n">UserInfo</span> <span class="k">storage</span> <span class="n">user</span> <span class="o">=</span> <span class="n">userInfo</span><span class="p">[</span><span class="n">_farmId</span><span class="p">][</span><span class="nb">msg.sender</span><span class="p">];</span>
-        <span class="c1">// cannot withdraw more than deposited</span>
-        <span class="nf">require</span><span class="p">(</span><span class="n">user</span><span class="p">.</span><span class="n">amount</span> <span class="o">&gt;=</span> <span class="n">_amount</span><span class="p">,</span> <span class="s">&quot;insufficient&quot;</span><span class="p">);</span>
-        <span class="c1">// update farm</span>
-        <span class="n">updateFarm</span><span class="p">(</span><span class="n">_farmId</span><span class="p">);</span>
-        <span class="c1">// transfer users pending rewards</span>
-        <span class="kt">uint256</span> <span class="n">pendingSolace</span> <span class="o">=</span> <span class="n">user</span><span class="p">.</span><span class="n">amount</span> <span class="o">*</span> <span class="n">farm</span><span class="p">.</span><span class="n">accSolacePerShare</span> <span class="o">/</span> <span class="mi">1e12</span> <span class="o">-</span> <span class="n">user</span><span class="p">.</span><span class="n">rewardDebt</span><span class="p">;</span>
-        <span class="n">safeTransfer</span><span class="p">(</span><span class="n">solace</span><span class="p">,</span> <span class="nb">msg.sender</span><span class="p">,</span> <span class="n">pendingSolace</span><span class="p">);</span>
+        <span class="c1">// harvest</span>
+        <span class="n">_harvest</span><span class="p">(</span><span class="n">_farmId</span><span class="p">);</span>
+        <span class="c1">// pull tokens</span>
+        <span class="n">IERC721</span><span class="p">(</span><span class="n">farm</span><span class="p">.</span><span class="n">token</span><span class="p">).</span><span class="n">transferFrom</span><span class="p">(</span><span class="kt">address</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">),</span> <span class="kt">address</span><span class="p">(</span><span class="nb">this</span><span class="p">),</span> <span class="n">_token</span><span class="p">);</span>
         <span class="c1">// accounting</span>
-        <span class="n">farm</span><span class="p">.</span><span class="n">tokensStaked</span> <span class="o">-=</span> <span class="n">_amount</span><span class="p">;</span>
-        <span class="n">user</span><span class="p">.</span><span class="n">amount</span> <span class="o">-=</span> <span class="n">_amount</span><span class="p">;</span>
-        <span class="n">user</span><span class="p">.</span><span class="n">rewardDebt</span> <span class="o">=</span> <span class="n">user</span><span class="p">.</span><span class="n">amount</span> <span class="o">*</span> <span class="n">farm</span><span class="p">.</span><span class="n">accSolacePerShare</span> <span class="o">/</span> <span class="mi">1e12</span><span class="p">;</span>
+        <span class="kt">uint256</span> <span class="n">value</span> <span class="o">=</span> <span class="n">INftAppraiser</span><span class="p">(</span><span class="n">farm</span><span class="p">.</span><span class="n">appraiser</span><span class="p">).</span><span class="n">appraise</span><span class="p">(</span><span class="n">_token</span><span class="p">);</span>
+        <span class="n">farm</span><span class="p">.</span><span class="n">valueStaked</span> <span class="o">+=</span> <span class="n">value</span><span class="p">;</span>
+        <span class="n">user</span><span class="p">.</span><span class="n">value</span> <span class="o">+=</span> <span class="n">value</span><span class="p">;</span>
+        <span class="n">user</span><span class="p">.</span><span class="n">rewardDebt</span> <span class="o">=</span> <span class="n">user</span><span class="p">.</span><span class="n">value</span> <span class="o">*</span> <span class="n">farm</span><span class="p">.</span><span class="n">accSolacePerShare</span> <span class="o">/</span> <span class="mi">1e12</span><span class="p">;</span>
+        <span class="n">user</span><span class="p">.</span><span class="n">tokensDeposited</span><span class="p">[</span><span class="n">_token</span><span class="p">]</span> <span class="o">=</span> <span class="kc">true</span><span class="p">;</span>
+        <span class="n">user</span><span class="p">.</span><span class="n">tokenValues</span><span class="p">[</span><span class="n">_token</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span><span class="p">;</span>
+        <span class="k">emit</span> <span class="n">DepositErc721</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">,</span> <span class="n">_farmId</span><span class="p">,</span> <span class="n">_token</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Withdraw some ERC20 tokens.</span>
+<span class="cm">     * User will receive _amount of CP/LP tokens and accumulated Solace rewards.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _farmId The farm to withdraw from.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _amount The withdraw amount.</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">withdrawErc20</span><span class="p">(</span><span class="kt">uint256</span> <span class="n">_farmId</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_amount</span><span class="p">)</span> <span class="k">external</span> <span class="k">override</span> <span class="p">{</span>
+        <span class="c1">// cannot deposit onto a non existant farm</span>
+        <span class="nf">require</span><span class="p">(</span><span class="n">farmIsErc20</span><span class="p">[</span><span class="n">_farmId</span><span class="p">],</span> <span class="s">&quot;not an erc20 farm&quot;</span><span class="p">);</span>
+        <span class="c1">// get farm and farmer information</span>
+        <span class="n">FarmInfo</span> <span class="k">storage</span> <span class="n">farm</span> <span class="o">=</span> <span class="n">farmInfo</span><span class="p">[</span><span class="n">_farmId</span><span class="p">];</span>
+        <span class="n">UserInfo</span> <span class="k">storage</span> <span class="n">user</span> <span class="o">=</span> <span class="n">userInfo</span><span class="p">[</span><span class="n">_farmId</span><span class="p">][</span><span class="nb">msg.sender</span><span class="p">];</span>
+        <span class="c1">// harvest</span>
+        <span class="n">_harvest</span><span class="p">(</span><span class="n">_farmId</span><span class="p">);</span>
+        <span class="c1">// accounting</span>
+        <span class="n">farm</span><span class="p">.</span><span class="n">valueStaked</span> <span class="o">-=</span> <span class="n">_amount</span><span class="p">;</span>
+        <span class="n">user</span><span class="p">.</span><span class="n">value</span> <span class="o">-=</span> <span class="n">_amount</span><span class="p">;</span> <span class="c1">// also reverts overwithdraw</span>
+        <span class="n">user</span><span class="p">.</span><span class="n">rewardDebt</span> <span class="o">=</span> <span class="n">user</span><span class="p">.</span><span class="n">value</span> <span class="o">*</span> <span class="n">farm</span><span class="p">.</span><span class="n">accSolacePerShare</span> <span class="o">/</span> <span class="mi">1e12</span><span class="p">;</span>
         <span class="c1">// return CP/LP tokens</span>
-        <span class="n">safeTransfer</span><span class="p">(</span><span class="n">farm</span><span class="p">.</span><span class="n">token</span><span class="p">,</span> <span class="nb">msg.sender</span><span class="p">,</span> <span class="n">_amount</span><span class="p">);</span>
-        <span class="k">emit</span> <span class="n">Withdraw</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">,</span> <span class="n">_farmId</span><span class="p">,</span> <span class="n">_amount</span><span class="p">);</span>
+        <span class="n">_safeTransfer</span><span class="p">(</span><span class="n">IERC20</span><span class="p">(</span><span class="n">farm</span><span class="p">.</span><span class="n">token</span><span class="p">),</span> <span class="nb">msg.sender</span><span class="p">,</span> <span class="n">_amount</span><span class="p">);</span>
+        <span class="k">emit</span> <span class="n">WithdrawErc20</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">,</span> <span class="n">_farmId</span><span class="p">,</span> <span class="n">_amount</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Withdraw an ERC721 token.</span>
+<span class="cm">     * User will receive _token and accumulated Solace rewards.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _farmId The farm to withdraw from.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _token The withdraw token.</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">withdrawErc721</span><span class="p">(</span><span class="kt">uint256</span> <span class="n">_farmId</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_token</span><span class="p">)</span> <span class="k">external</span> <span class="k">override</span> <span class="p">{</span>
+        <span class="c1">// cannot deposit onto a non existant farm</span>
+        <span class="nf">require</span><span class="p">(</span><span class="n">farmIsErc721</span><span class="p">[</span><span class="n">_farmId</span><span class="p">],</span> <span class="s">&quot;not an erc721 farm&quot;</span><span class="p">);</span>
+        <span class="c1">// get farm and farmer information</span>
+        <span class="n">FarmInfo</span> <span class="k">storage</span> <span class="n">farm</span> <span class="o">=</span> <span class="n">farmInfo</span><span class="p">[</span><span class="n">_farmId</span><span class="p">];</span>
+        <span class="n">UserInfo</span> <span class="k">storage</span> <span class="n">user</span> <span class="o">=</span> <span class="n">userInfo</span><span class="p">[</span><span class="n">_farmId</span><span class="p">][</span><span class="nb">msg.sender</span><span class="p">];</span>
+        <span class="c1">// harvest</span>
+        <span class="n">_harvest</span><span class="p">(</span><span class="n">_farmId</span><span class="p">);</span>
+        <span class="c1">// cannot withdraw a token you didnt deposit</span>
+        <span class="nf">require</span><span class="p">(</span><span class="n">user</span><span class="p">.</span><span class="n">tokensDeposited</span><span class="p">[</span><span class="n">_token</span><span class="p">],</span> <span class="s">&quot;not your token&quot;</span><span class="p">);</span>
+        <span class="c1">// accounting</span>
+        <span class="kt">uint256</span> <span class="n">tokenValue</span> <span class="o">=</span> <span class="n">user</span><span class="p">.</span><span class="n">tokenValues</span><span class="p">[</span><span class="n">_token</span><span class="p">];</span>
+        <span class="n">farm</span><span class="p">.</span><span class="n">valueStaked</span> <span class="o">-=</span> <span class="n">tokenValue</span><span class="p">;</span>
+        <span class="n">user</span><span class="p">.</span><span class="n">value</span> <span class="o">-=</span> <span class="n">tokenValue</span><span class="p">;</span>
+        <span class="n">user</span><span class="p">.</span><span class="n">rewardDebt</span> <span class="o">=</span> <span class="n">user</span><span class="p">.</span><span class="n">value</span> <span class="o">*</span> <span class="n">farm</span><span class="p">.</span><span class="n">accSolacePerShare</span> <span class="o">/</span> <span class="mi">1e12</span><span class="p">;</span>
+        <span class="n">user</span><span class="p">.</span><span class="n">tokensDeposited</span><span class="p">[</span><span class="n">_token</span><span class="p">]</span> <span class="o">=</span> <span class="kc">false</span><span class="p">;</span>
+        <span class="c1">// return CP/LP tokens</span>
+        <span class="n">IERC721</span><span class="p">(</span><span class="n">farm</span><span class="p">.</span><span class="n">token</span><span class="p">).</span><span class="n">safeTransferFrom</span><span class="p">(</span><span class="kt">address</span><span class="p">(</span><span class="nb">this</span><span class="p">),</span> <span class="nb">msg.sender</span><span class="p">,</span> <span class="n">_token</span><span class="p">);</span>
+        <span class="k">emit</span> <span class="n">WithdrawErc721</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">,</span> <span class="n">_farmId</span><span class="p">,</span> <span class="n">_token</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * Withdraw your pending rewards without unstaking your tokens.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _farmId The farm to withdraw rewards from.</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">withdrawRewards</span><span class="p">(</span><span class="kt">uint256</span> <span class="n">_farmId</span><span class="p">)</span> <span class="k">external</span> <span class="k">override</span> <span class="p">{</span>
+        <span class="c1">// cannot get rewards for a non existant farm</span>
+        <span class="nf">require</span><span class="p">(</span><span class="n">_farmId</span> <span class="o">&lt;</span> <span class="n">numFarms</span><span class="p">,</span> <span class="s">&quot;farm does not exist&quot;</span><span class="p">);</span>
+        <span class="c1">// harvest</span>
+        <span class="n">_harvest</span><span class="p">(</span><span class="n">_farmId</span><span class="p">);</span>
+        <span class="c1">// get farm and farmer information</span>
+        <span class="n">FarmInfo</span> <span class="k">storage</span> <span class="n">farm</span> <span class="o">=</span> <span class="n">farmInfo</span><span class="p">[</span><span class="n">_farmId</span><span class="p">];</span>
+        <span class="n">UserInfo</span> <span class="k">storage</span> <span class="n">user</span> <span class="o">=</span> <span class="n">userInfo</span><span class="p">[</span><span class="n">_farmId</span><span class="p">][</span><span class="nb">msg.sender</span><span class="p">];</span>
+        <span class="c1">// accounting</span>
+        <span class="n">user</span><span class="p">.</span><span class="n">rewardDebt</span> <span class="o">=</span> <span class="n">user</span><span class="p">.</span><span class="n">value</span> <span class="o">*</span> <span class="n">farm</span><span class="p">.</span><span class="n">accSolacePerShare</span> <span class="o">/</span> <span class="mi">1e12</span><span class="p">;</span>
     <span class="p">}</span>
 
     <span class="cm">/**</span>
@@ -770,58 +1727,51 @@ Reward liquidity providers for ETH-SOLACE pair on DEX(es) who stake their LP tok
 <span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _user The user for whom unclaimed tokens will be shown.</span>
 <span class="cm">     * </span><span class="cs">@return</span><span class="cm"> Total amount of withdrawable reward tokens.</span>
 <span class="cm">     */</span>
-    <span class="kd">function</span> <span class="n">pendingReward</span><span class="p">(</span><span class="kt">uint256</span> <span class="n">_farmId</span><span class="p">,</span> <span class="kt">address</span> <span class="n">_user</span><span class="p">)</span> <span class="k">external</span> <span class="k">view</span> <span class="k">returns</span> <span class="p">(</span><span class="kt">uint256</span><span class="p">)</span> <span class="p">{</span>
+    <span class="kd">function</span> <span class="n">pendingReward</span><span class="p">(</span><span class="kt">uint256</span> <span class="n">_farmId</span><span class="p">,</span> <span class="kt">address</span> <span class="n">_user</span><span class="p">)</span> <span class="k">external</span> <span class="k">view</span> <span class="k">override</span> <span class="k">returns</span> <span class="p">(</span><span class="kt">uint256</span><span class="p">)</span> <span class="p">{</span>
         <span class="c1">// no rewards for a non existant farm</span>
-        <span class="k">if</span> <span class="p">(</span><span class="n">_farmId</span> <span class="o">&gt;=</span> <span class="n">farmInfo</span><span class="p">.</span><span class="n">length</span><span class="p">)</span> <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">_farmId</span> <span class="o">&gt;=</span> <span class="n">numFarms</span><span class="p">)</span> <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
         <span class="c1">// get farm and farmer information</span>
         <span class="n">FarmInfo</span> <span class="k">storage</span> <span class="n">farm</span> <span class="o">=</span> <span class="n">farmInfo</span><span class="p">[</span><span class="n">_farmId</span><span class="p">];</span>
         <span class="n">UserInfo</span> <span class="k">storage</span> <span class="n">user</span> <span class="o">=</span> <span class="n">userInfo</span><span class="p">[</span><span class="n">_farmId</span><span class="p">][</span><span class="n">_user</span><span class="p">];</span>
         <span class="c1">// math</span>
         <span class="kt">uint256</span> <span class="n">accSolacePerShare</span> <span class="o">=</span> <span class="n">farm</span><span class="p">.</span><span class="n">accSolacePerShare</span><span class="p">;</span>
-        <span class="k">if</span> <span class="p">(</span><span class="nb">block.number</span> <span class="o">&gt;</span> <span class="n">farm</span><span class="p">.</span><span class="n">lastRewardBlock</span> <span class="o">&amp;&amp;</span> <span class="n">farm</span><span class="p">.</span><span class="n">tokensStaked</span> <span class="o">!=</span> <span class="mi">0</span> <span class="o">&amp;&amp;</span> <span class="n">totalAllocPoints</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">if</span> <span class="p">(</span><span class="nb">block.number</span> <span class="o">&gt;</span> <span class="n">farm</span><span class="p">.</span><span class="n">lastRewardBlock</span> <span class="o">&amp;&amp;</span> <span class="n">farm</span><span class="p">.</span><span class="n">valueStaked</span> <span class="o">!=</span> <span class="mi">0</span> <span class="o">&amp;&amp;</span> <span class="n">totalAllocPoints</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
             <span class="kt">uint256</span> <span class="n">multiplier</span> <span class="o">=</span> <span class="n">getMultiplier</span><span class="p">(</span><span class="n">_farmId</span><span class="p">,</span> <span class="n">farm</span><span class="p">.</span><span class="n">lastRewardBlock</span><span class="p">,</span> <span class="nb">block.number</span><span class="p">);</span>
             <span class="kt">uint256</span> <span class="n">tokenReward</span> <span class="o">=</span> <span class="n">multiplier</span> <span class="o">*</span> <span class="n">solacePerBlock</span> <span class="o">*</span> <span class="n">farm</span><span class="p">.</span><span class="n">allocPoints</span> <span class="o">/</span> <span class="n">totalAllocPoints</span><span class="p">;</span>
-            <span class="n">accSolacePerShare</span> <span class="o">+=</span> <span class="n">tokenReward</span> <span class="o">*</span> <span class="mi">1e12</span> <span class="o">/</span> <span class="n">farm</span><span class="p">.</span><span class="n">tokensStaked</span><span class="p">;</span>
+            <span class="n">accSolacePerShare</span> <span class="o">+=</span> <span class="n">tokenReward</span> <span class="o">*</span> <span class="mi">1e12</span> <span class="o">/</span> <span class="n">farm</span><span class="p">.</span><span class="n">valueStaked</span><span class="p">;</span>
         <span class="p">}</span>
-        <span class="k">return</span> <span class="n">user</span><span class="p">.</span><span class="n">amount</span> <span class="o">*</span> <span class="n">accSolacePerShare</span> <span class="o">/</span> <span class="mi">1e12</span> <span class="o">-</span> <span class="n">user</span><span class="p">.</span><span class="n">rewardDebt</span><span class="p">;</span>
-    <span class="p">}</span>
-
-    <span class="cm">/**</span>
-<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> The number of farms.</span>
-<span class="cm">     * </span><span class="cs">@return</span><span class="cm"> The number of farms.</span>
-<span class="cm">     */</span>
-    <span class="kd">function</span> <span class="n">farmLength</span><span class="p">()</span> <span class="k">external</span> <span class="k">view</span> <span class="k">returns</span> <span class="p">(</span><span class="kt">uint256</span><span class="p">)</span> <span class="p">{</span>
-        <span class="k">return</span> <span class="n">farmInfo</span><span class="p">.</span><span class="n">length</span><span class="p">;</span>
+        <span class="k">return</span> <span class="n">user</span><span class="p">.</span><span class="n">value</span> <span class="o">*</span> <span class="n">accSolacePerShare</span> <span class="o">/</span> <span class="mi">1e12</span> <span class="o">-</span> <span class="n">user</span><span class="p">.</span><span class="n">rewardDebt</span><span class="p">;</span>
     <span class="p">}</span>
 
     <span class="cm">/**</span>
 <span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Updates farm information to be up to date to the current block.</span>
 <span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _farmId The farm to update.</span>
 <span class="cm">     */</span>
-    <span class="kd">function</span> <span class="n">updateFarm</span><span class="p">(</span><span class="kt">uint256</span> <span class="n">_farmId</span><span class="p">)</span> <span class="k">public</span> <span class="p">{</span>
+    <span class="kd">function</span> <span class="n">updateFarm</span><span class="p">(</span><span class="kt">uint256</span> <span class="n">_farmId</span><span class="p">)</span> <span class="k">public</span> <span class="k">override</span> <span class="p">{</span>
         <span class="c1">// dont update a non existant farm</span>
-        <span class="k">if</span> <span class="p">(</span><span class="n">_farmId</span> <span class="o">&gt;=</span> <span class="n">farmInfo</span><span class="p">.</span><span class="n">length</span><span class="p">)</span> <span class="k">return</span><span class="p">;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">_farmId</span> <span class="o">&gt;=</span> <span class="n">numFarms</span><span class="p">)</span> <span class="k">return</span><span class="p">;</span>
         <span class="c1">// get farm information</span>
         <span class="n">FarmInfo</span> <span class="k">storage</span> <span class="n">farm</span> <span class="o">=</span> <span class="n">farmInfo</span><span class="p">[</span><span class="n">_farmId</span><span class="p">];</span>
         <span class="c1">// dont update needlessly</span>
         <span class="k">if</span> <span class="p">(</span><span class="nb">block.number</span> <span class="o">&lt;=</span> <span class="n">farm</span><span class="p">.</span><span class="n">lastRewardBlock</span><span class="p">)</span> <span class="k">return</span><span class="p">;</span>
-        <span class="k">if</span> <span class="p">(</span><span class="n">farm</span><span class="p">.</span><span class="n">tokensStaked</span> <span class="o">==</span> <span class="mi">0</span> <span class="o">||</span> <span class="n">totalAllocPoints</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">farm</span><span class="p">.</span><span class="n">valueStaked</span> <span class="o">==</span> <span class="mi">0</span> <span class="o">||</span> <span class="n">totalAllocPoints</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
             <span class="n">farm</span><span class="p">.</span><span class="n">lastRewardBlock</span> <span class="o">=</span> <span class="n">Math</span><span class="p">.</span><span class="n">min</span><span class="p">(</span><span class="nb">block.number</span><span class="p">,</span> <span class="n">farm</span><span class="p">.</span><span class="n">endBlock</span><span class="p">);</span>
             <span class="k">return</span><span class="p">;</span>
         <span class="p">}</span>
         <span class="c1">// update math</span>
         <span class="kt">uint256</span> <span class="n">multiplier</span> <span class="o">=</span> <span class="n">getMultiplier</span><span class="p">(</span><span class="n">_farmId</span><span class="p">,</span> <span class="n">farm</span><span class="p">.</span><span class="n">lastRewardBlock</span><span class="p">,</span> <span class="nb">block.number</span><span class="p">);</span>
         <span class="kt">uint256</span> <span class="n">tokenReward</span> <span class="o">=</span> <span class="n">multiplier</span> <span class="o">*</span> <span class="n">solacePerBlock</span> <span class="o">*</span> <span class="n">farm</span><span class="p">.</span><span class="n">allocPoints</span> <span class="o">/</span> <span class="n">totalAllocPoints</span><span class="p">;</span>
-        <span class="n">farm</span><span class="p">.</span><span class="n">accSolacePerShare</span> <span class="o">+=</span> <span class="n">tokenReward</span> <span class="o">*</span> <span class="mi">1e12</span> <span class="o">/</span> <span class="n">farm</span><span class="p">.</span><span class="n">tokensStaked</span><span class="p">;</span>
+        <span class="n">farm</span><span class="p">.</span><span class="n">accSolacePerShare</span> <span class="o">+=</span> <span class="n">tokenReward</span> <span class="o">*</span> <span class="mi">1e12</span> <span class="o">/</span> <span class="n">farm</span><span class="p">.</span><span class="n">valueStaked</span><span class="p">;</span>
         <span class="n">farm</span><span class="p">.</span><span class="n">lastRewardBlock</span> <span class="o">=</span> <span class="n">Math</span><span class="p">.</span><span class="n">min</span><span class="p">(</span><span class="nb">block.number</span><span class="p">,</span> <span class="n">farm</span><span class="p">.</span><span class="n">endBlock</span><span class="p">);</span>
     <span class="p">}</span>
 
     <span class="cm">/**</span>
 <span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Updates all farms to be up to date to the current block.</span>
 <span class="cm">     */</span>
-    <span class="kd">function</span> <span class="n">massUpdateFarms</span><span class="p">()</span> <span class="k">public</span> <span class="p">{</span>
-        <span class="kt">uint256</span> <span class="n">length</span> <span class="o">=</span> <span class="n">farmInfo</span><span class="p">.</span><span class="n">length</span><span class="p">;</span>
-        <span class="k">for</span> <span class="p">(</span><span class="kt">uint256</span> <span class="n">farmId</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">farmId</span> <span class="o">&lt;</span> <span class="n">length</span><span class="p">;</span> <span class="o">++</span><span class="n">farmId</span><span class="p">)</span> <span class="p">{</span>
+    <span class="kd">function</span> <span class="n">massUpdateFarms</span><span class="p">()</span> <span class="k">public</span> <span class="k">override</span> <span class="p">{</span>
+        <span class="kt">uint256</span> <span class="n">farmId</span><span class="p">;</span>
+        <span class="kt">uint256</span> <span class="n">_numFarms</span> <span class="o">=</span> <span class="n">numFarms</span><span class="p">;</span> <span class="c1">// copy to memory to save gas</span>
+        <span class="k">for</span> <span class="p">(</span><span class="n">farmId</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">farmId</span> <span class="o">&lt;</span> <span class="n">_numFarms</span><span class="p">;</span> <span class="o">++</span><span class="n">farmId</span><span class="p">)</span> <span class="p">{</span>
             <span class="n">updateFarm</span><span class="p">(</span><span class="n">farmId</span><span class="p">);</span>
         <span class="p">}</span>
     <span class="p">}</span>
@@ -833,9 +1783,9 @@ Reward liquidity providers for ETH-SOLACE pair on DEX(es) who stake their LP tok
 <span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _to The end of the period to measure rewards for.</span>
 <span class="cm">     * </span><span class="cs">@return</span><span class="cm"> The weighted multiplier for the given period.</span>
 <span class="cm">     */</span>
-    <span class="kd">function</span> <span class="n">getMultiplier</span><span class="p">(</span><span class="kt">uint256</span> <span class="n">_farmId</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_from</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_to</span><span class="p">)</span> <span class="k">public</span> <span class="k">view</span> <span class="k">returns</span> <span class="p">(</span><span class="kt">uint256</span><span class="p">)</span> <span class="p">{</span>
-        <span class="c1">// no rewards for non existant farm</span>
-        <span class="k">if</span> <span class="p">(</span><span class="n">_farmId</span> <span class="o">&gt;=</span> <span class="n">farmInfo</span><span class="p">.</span><span class="n">length</span><span class="p">)</span> <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+    <span class="kd">function</span> <span class="n">getMultiplier</span><span class="p">(</span><span class="kt">uint256</span> <span class="n">_farmId</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_from</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_to</span><span class="p">)</span> <span class="k">public</span> <span class="k">view</span> <span class="k">override</span> <span class="k">returns</span> <span class="p">(</span><span class="kt">uint256</span><span class="p">)</span> <span class="p">{</span>
+        <span class="c1">// no reward for non existant farm</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">_farmId</span> <span class="o">&gt;=</span> <span class="n">numFarms</span><span class="p">)</span> <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
         <span class="c1">// get farm information</span>
         <span class="n">FarmInfo</span> <span class="k">storage</span> <span class="n">farm</span> <span class="o">=</span> <span class="n">farmInfo</span><span class="p">[</span><span class="n">_farmId</span><span class="p">];</span>
         <span class="c1">// validate window</span>
@@ -847,12 +1797,27 @@ Reward liquidity providers for ETH-SOLACE pair on DEX(es) who stake their LP tok
     <span class="p">}</span>
 
     <span class="cm">/**</span>
-<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Safe transfer function, just in case a rounding error causes farm to not have enough tokens.</span>
+<span class="cm">    * Calculate and transfer a user&#39;s rewards.</span>
+<span class="cm">    * </span><span class="cs">@param</span><span class="cm"> _farmId The farm to withdraw rewards from.</span>
+<span class="cm">    */</span>
+    <span class="kd">function</span> <span class="n">_harvest</span><span class="p">(</span><span class="kt">uint256</span> <span class="n">_farmId</span><span class="p">)</span> <span class="k">internal</span> <span class="p">{</span>
+      <span class="c1">// get farm and farmer information</span>
+      <span class="n">FarmInfo</span> <span class="k">storage</span> <span class="n">farm</span> <span class="o">=</span> <span class="n">farmInfo</span><span class="p">[</span><span class="n">_farmId</span><span class="p">];</span>
+      <span class="n">UserInfo</span> <span class="k">storage</span> <span class="n">user</span> <span class="o">=</span> <span class="n">userInfo</span><span class="p">[</span><span class="n">_farmId</span><span class="p">][</span><span class="nb">msg.sender</span><span class="p">];</span>
+      <span class="c1">// update farm</span>
+      <span class="n">updateFarm</span><span class="p">(</span><span class="n">_farmId</span><span class="p">);</span>
+      <span class="c1">// transfer users pending rewards if nonzero</span>
+      <span class="kt">uint256</span> <span class="n">pending</span> <span class="o">=</span> <span class="n">user</span><span class="p">.</span><span class="n">value</span> <span class="o">*</span> <span class="n">farm</span><span class="p">.</span><span class="n">accSolacePerShare</span> <span class="o">/</span> <span class="mi">1e12</span> <span class="o">-</span> <span class="n">user</span><span class="p">.</span><span class="n">rewardDebt</span><span class="p">;</span>
+      <span class="k">if</span> <span class="p">(</span><span class="n">pending</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span> <span class="n">_safeTransfer</span><span class="p">(</span><span class="n">solace</span><span class="p">,</span> <span class="nb">msg.sender</span><span class="p">,</span> <span class="n">pending</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Safe ERC20 transfer function, just in case a rounding error causes farm to not have enough tokens.</span>
 <span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _token Token address.</span>
 <span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _to The user address to transfer tokens to.</span>
 <span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _amount The total amount of tokens to transfer.</span>
 <span class="cm">     */</span>
-    <span class="kd">function</span> <span class="n">safeTransfer</span><span class="p">(</span><span class="n">IERC20</span> <span class="n">_token</span><span class="p">,</span> <span class="kt">address</span> <span class="n">_to</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_amount</span><span class="p">)</span> <span class="k">internal</span> <span class="p">{</span>
+    <span class="kd">function</span> <span class="n">_safeTransfer</span><span class="p">(</span><span class="n">IERC20</span> <span class="n">_token</span><span class="p">,</span> <span class="kt">address</span> <span class="n">_to</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_amount</span><span class="p">)</span> <span class="k">internal</span> <span class="p">{</span>
         <span class="kt">uint256</span> <span class="nb">balance</span> <span class="o">=</span> <span class="n">_token</span><span class="p">.</span><span class="n">balanceOf</span><span class="p">(</span><span class="kt">address</span><span class="p">(</span><span class="nb">this</span><span class="p">));</span>
         <span class="kt">uint256</span> <span class="n">transferAmount</span> <span class="o">=</span> <span class="n">Math</span><span class="p">.</span><span class="n">min</span><span class="p">(</span><span class="n">_amount</span><span class="p">,</span> <span class="nb">balance</span><span class="p">);</span>
         <span class="n">_token</span><span class="p">.</span><span class="n">safeTransfer</span><span class="p">(</span><span class="n">_to</span><span class="p">,</span> <span class="n">transferAmount</span><span class="p">);</span>

@@ -7,19 +7,14 @@ export { Erc721Factory } from "./Erc721Factory";
 export type { Erc721 } from "./Erc721";
 export { MasterFactory } from "./MasterFactory";
 export type { Master } from "./Master";
-<<<<<<< HEAD
 export { MockErc20Factory } from "./MockErc20Factory";
 export type { MockErc20 } from "./MockErc20";
 export { MockErc721Factory } from "./MockErc721Factory";
 export type { MockErc721 } from "./MockErc721";
 export { MockErc721AppraiserFactory } from "./MockErc721AppraiserFactory";
 export type { MockErc721Appraiser } from "./MockErc721Appraiser";
-=======
 export { MockStrategyFactory } from "./MockStrategyFactory";
 export type { MockStrategy } from "./MockStrategy";
-export { MockTokenFactory } from "./MockTokenFactory";
-export type { MockToken } from "./MockToken";
->>>>>>> origin
 export { MockWethFactory } from "./MockWethFactory";
 export type { MockWeth } from "./MockWeth";
 export { RegistryFactory } from "./RegistryFactory";

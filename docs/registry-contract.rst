@@ -61,6 +61,7 @@ products
 
 Constructor
 ===========
+
 :Description: Constructs the registry contract.
 :Inputs: none
 

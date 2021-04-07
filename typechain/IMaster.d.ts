@@ -34,6 +34,7 @@ interface IMasterInterface extends ethers.utils.Interface {
     "updateFarm(uint256)": FunctionFragment;
     "withdrawErc20(uint256,uint256)": FunctionFragment;
     "withdrawErc721(uint256,uint256)": FunctionFragment;
+    "withdrawRewards(uint256)": FunctionFragment;
   };
 
   encodeFunctionData(
@@ -84,6 +85,10 @@ interface IMasterInterface extends ethers.utils.Interface {
     functionFragment: "withdrawErc721",
     values: [BigNumberish, BigNumberish]
   ): string;
+  encodeFunctionData(
+    functionFragment: "withdrawRewards",
+    values: [BigNumberish]
+  ): string;
 
   decodeFunctionResult(
     functionFragment: "createFarmErc20",
@@ -128,6 +133,10 @@ interface IMasterInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "withdrawErc721",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "withdrawRewards",
     data: BytesLike
   ): Result;
 
@@ -305,6 +314,16 @@ export class IMaster extends Contract {
       _token: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
+
+    withdrawRewards(
+      _farmId: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "withdrawRewards(uint256)"(
+      _farmId: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
   };
 
   createFarmErc20(
@@ -457,6 +476,16 @@ export class IMaster extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
+  withdrawRewards(
+    _farmId: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "withdrawRewards(uint256)"(
+    _farmId: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
   callStatic: {
     createFarmErc20(
       _token: string,
@@ -602,6 +631,16 @@ export class IMaster extends Contract {
     "withdrawErc721(uint256,uint256)"(
       _farmId: BigNumberish,
       _token: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    withdrawRewards(
+      _farmId: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "withdrawRewards(uint256)"(
+      _farmId: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
   };
@@ -758,6 +797,16 @@ export class IMaster extends Contract {
       _token: BigNumberish,
       overrides?: Overrides
     ): Promise<BigNumber>;
+
+    withdrawRewards(
+      _farmId: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "withdrawRewards(uint256)"(
+      _farmId: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
   };
 
   populateTransaction: {
@@ -908,6 +957,16 @@ export class IMaster extends Contract {
     "withdrawErc721(uint256,uint256)"(
       _farmId: BigNumberish,
       _token: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    withdrawRewards(
+      _farmId: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "withdrawRewards(uint256)"(
+      _farmId: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
   };

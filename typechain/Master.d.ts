@@ -44,6 +44,7 @@ interface MasterInterface extends ethers.utils.Interface {
     "userInfo(uint256,address)": FunctionFragment;
     "withdrawErc20(uint256,uint256)": FunctionFragment;
     "withdrawErc721(uint256,uint256)": FunctionFragment;
+    "withdrawRewards(uint256)": FunctionFragment;
   };
 
   encodeFunctionData(
@@ -128,6 +129,10 @@ interface MasterInterface extends ethers.utils.Interface {
     functionFragment: "withdrawErc721",
     values: [BigNumberish, BigNumberish]
   ): string;
+  encodeFunctionData(
+    functionFragment: "withdrawRewards",
+    values: [BigNumberish]
+  ): string;
 
   decodeFunctionResult(
     functionFragment: "createFarmErc20",
@@ -197,6 +202,10 @@ interface MasterInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "withdrawErc721",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "withdrawRewards",
     data: BytesLike
   ): Result;
 
@@ -552,6 +561,16 @@ export class Master extends Contract {
       _token: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
+
+    withdrawRewards(
+      _farmId: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "withdrawRewards(uint256)"(
+      _farmId: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
   };
 
   createFarmErc20(
@@ -811,6 +830,16 @@ export class Master extends Contract {
   "withdrawErc721(uint256,uint256)"(
     _farmId: BigNumberish,
     _token: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  withdrawRewards(
+    _farmId: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "withdrawRewards(uint256)"(
+    _farmId: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
@@ -1077,35 +1106,45 @@ export class Master extends Contract {
       _token: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
+
+    withdrawRewards(
+      _farmId: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "withdrawRewards(uint256)"(
+      _farmId: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
   };
 
   filters: {
     DepositErc20(
-      user: string | null,
-      farmId: BigNumberish | null,
-      amount: null
+      _user: string | null,
+      _farmId: BigNumberish | null,
+      _amount: null
     ): EventFilter;
 
     DepositErc721(
-      user: string | null,
-      farmId: BigNumberish | null,
-      token: null
+      _user: string | null,
+      _farmId: BigNumberish | null,
+      _token: null
     ): EventFilter;
 
-    Erc20FarmCreated(farmId: BigNumberish | null): EventFilter;
+    Erc20FarmCreated(_farmId: BigNumberish | null): EventFilter;
 
-    Erc721FarmCreated(farmId: BigNumberish | null): EventFilter;
+    Erc721FarmCreated(_farmId: BigNumberish | null): EventFilter;
 
     WithdrawErc20(
-      user: string | null,
-      farmId: BigNumberish | null,
-      amount: null
+      _user: string | null,
+      _farmId: BigNumberish | null,
+      _amount: null
     ): EventFilter;
 
     WithdrawErc721(
-      user: string | null,
-      farmId: BigNumberish | null,
-      token: null
+      _user: string | null,
+      _farmId: BigNumberish | null,
+      _token: null
     ): EventFilter;
   };
 
@@ -1326,6 +1365,16 @@ export class Master extends Contract {
     "withdrawErc721(uint256,uint256)"(
       _farmId: BigNumberish,
       _token: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    withdrawRewards(
+      _farmId: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "withdrawRewards(uint256)"(
+      _farmId: BigNumberish,
       overrides?: Overrides
     ): Promise<BigNumber>;
   };
@@ -1554,6 +1603,16 @@ export class Master extends Contract {
     "withdrawErc721(uint256,uint256)"(
       _farmId: BigNumberish,
       _token: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    withdrawRewards(
+      _farmId: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "withdrawRewards(uint256)"(
+      _farmId: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
   };

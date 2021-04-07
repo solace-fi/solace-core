@@ -53,6 +53,7 @@ paths
 
 Constructor
 ===========
+
 :Description: Constructs the treasury contract.
 :Inputs:
     | SOLACE _solace: Address of the solace token.

@@ -281,4 +281,17 @@ const _abi = [
     stateMutability: "nonpayable",
     type: "function",
   },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_farmId",
+        type: "uint256",
+      },
+    ],
+    name: "withdrawRewards",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
 ];
