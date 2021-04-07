@@ -26,6 +26,7 @@ interface IMasterInterface extends ethers.utils.Interface {
     "createFarmErc721(address,address,uint256,uint256,uint256)": FunctionFragment;
     "depositErc20(uint256,uint256)": FunctionFragment;
     "depositErc721(uint256,uint256)": FunctionFragment;
+    "depositFor(uint256,uint256,address)": FunctionFragment;
     "getMultiplier(uint256,uint256,uint256)": FunctionFragment;
     "massUpdateFarms()": FunctionFragment;
     "pendingReward(uint256,address)": FunctionFragment;
@@ -52,6 +53,10 @@ interface IMasterInterface extends ethers.utils.Interface {
   encodeFunctionData(
     functionFragment: "depositErc721",
     values: [BigNumberish, BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "depositFor",
+    values: [BigNumberish, BigNumberish, string]
   ): string;
   encodeFunctionData(
     functionFragment: "getMultiplier",
@@ -106,6 +111,7 @@ interface IMasterInterface extends ethers.utils.Interface {
     functionFragment: "depositErc721",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(functionFragment: "depositFor", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "getMultiplier",
     data: BytesLike
@@ -212,6 +218,20 @@ export class IMaster extends Contract {
     "depositErc721(uint256,uint256)"(
       _farmId: BigNumberish,
       _token: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    depositFor(
+      _farmId: BigNumberish,
+      _amount: BigNumberish,
+      _farmer: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "depositFor(uint256,uint256,address)"(
+      _farmId: BigNumberish,
+      _amount: BigNumberish,
+      _farmer: string,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
@@ -384,6 +404,20 @@ export class IMaster extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
+  depositFor(
+    _farmId: BigNumberish,
+    _amount: BigNumberish,
+    _farmer: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "depositFor(uint256,uint256,address)"(
+    _farmId: BigNumberish,
+    _amount: BigNumberish,
+    _farmer: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
   getMultiplier(
     _farmId: BigNumberish,
     _from: BigNumberish,
@@ -542,6 +576,20 @@ export class IMaster extends Contract {
     "depositErc721(uint256,uint256)"(
       _farmId: BigNumberish,
       _token: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    depositFor(
+      _farmId: BigNumberish,
+      _amount: BigNumberish,
+      _farmer: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "depositFor(uint256,uint256,address)"(
+      _farmId: BigNumberish,
+      _amount: BigNumberish,
+      _farmer: string,
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -706,6 +754,20 @@ export class IMaster extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
+    depositFor(
+      _farmId: BigNumberish,
+      _amount: BigNumberish,
+      _farmer: string,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "depositFor(uint256,uint256,address)"(
+      _farmId: BigNumberish,
+      _amount: BigNumberish,
+      _farmer: string,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
     getMultiplier(
       _farmId: BigNumberish,
       _from: BigNumberish,
@@ -865,6 +927,20 @@ export class IMaster extends Contract {
     "depositErc721(uint256,uint256)"(
       _farmId: BigNumberish,
       _token: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    depositFor(
+      _farmId: BigNumberish,
+      _amount: BigNumberish,
+      _farmer: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "depositFor(uint256,uint256,address)"(
+      _farmId: BigNumberish,
+      _amount: BigNumberish,
+      _farmer: string,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 

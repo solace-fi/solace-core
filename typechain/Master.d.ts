@@ -26,6 +26,7 @@ interface MasterInterface extends ethers.utils.Interface {
     "createFarmErc721(address,address,uint256,uint256,uint256)": FunctionFragment;
     "depositErc20(uint256,uint256)": FunctionFragment;
     "depositErc721(uint256,uint256)": FunctionFragment;
+    "depositFor(uint256,uint256,address)": FunctionFragment;
     "farmInfo(uint256)": FunctionFragment;
     "farmIsErc20(uint256)": FunctionFragment;
     "farmIsErc721(uint256)": FunctionFragment;
@@ -62,6 +63,10 @@ interface MasterInterface extends ethers.utils.Interface {
   encodeFunctionData(
     functionFragment: "depositErc721",
     values: [BigNumberish, BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "depositFor",
+    values: [BigNumberish, BigNumberish, string]
   ): string;
   encodeFunctionData(
     functionFragment: "farmInfo",
@@ -150,6 +155,7 @@ interface MasterInterface extends ethers.utils.Interface {
     functionFragment: "depositErc721",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(functionFragment: "depositFor", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "farmInfo", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "farmIsErc20",
@@ -295,6 +301,20 @@ export class Master extends Contract {
     "depositErc721(uint256,uint256)"(
       _farmId: BigNumberish,
       _token: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    depositFor(
+      _farmId: BigNumberish,
+      _amount: BigNumberish,
+      _farmer: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "depositFor(uint256,uint256,address)"(
+      _farmId: BigNumberish,
+      _amount: BigNumberish,
+      _farmer: string,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
@@ -631,6 +651,20 @@ export class Master extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
+  depositFor(
+    _farmId: BigNumberish,
+    _amount: BigNumberish,
+    _farmer: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "depositFor(uint256,uint256,address)"(
+    _farmId: BigNumberish,
+    _amount: BigNumberish,
+    _farmer: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
   farmInfo(
     arg0: BigNumberish,
     overrides?: CallOverrides
@@ -899,6 +933,20 @@ export class Master extends Contract {
     "depositErc721(uint256,uint256)"(
       _farmId: BigNumberish,
       _token: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    depositFor(
+      _farmId: BigNumberish,
+      _amount: BigNumberish,
+      _farmer: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "depositFor(uint256,uint256,address)"(
+      _farmId: BigNumberish,
+      _amount: BigNumberish,
+      _farmer: string,
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -1207,6 +1255,20 @@ export class Master extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
+    depositFor(
+      _farmId: BigNumberish,
+      _amount: BigNumberish,
+      _farmer: string,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "depositFor(uint256,uint256,address)"(
+      _farmId: BigNumberish,
+      _amount: BigNumberish,
+      _farmer: string,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
     farmInfo(arg0: BigNumberish, overrides?: CallOverrides): Promise<BigNumber>;
 
     "farmInfo(uint256)"(
@@ -1435,6 +1497,20 @@ export class Master extends Contract {
     "depositErc721(uint256,uint256)"(
       _farmId: BigNumberish,
       _token: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    depositFor(
+      _farmId: BigNumberish,
+      _amount: BigNumberish,
+      _farmer: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "depositFor(uint256,uint256,address)"(
+      _farmId: BigNumberish,
+      _amount: BigNumberish,
+      _farmer: string,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 

@@ -131,4 +131,6 @@ interface IMaster {
      * @return The weighted multiplier for the given period.
      */
     function getMultiplier(uint256 _farmId, uint256 _from, uint256 _to) external view returns (uint256);
+
+    function depositFor(uint256 _farmId, uint256 _amount, address _farmer) external;
 }

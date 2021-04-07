@@ -72,7 +72,7 @@ describe("Registry", function () {
     vault = (await deployContract(
       deployer,
       VaultArtifact,
-      [weth.address]
+      [registry.address, weth.address]
     )) as Vault;
 
     // deploy treasury contract

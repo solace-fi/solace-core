@@ -14,17 +14,17 @@ contract Registry is IRegistry {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     /// @notice Governor.
-    address public governance;
+    address public override governance;
     /// @notice Solace Token.
-    address public solace;
+    address public override solace;
     /// @notice Master contract.
-    address public master;
+    address public override master;
     /// @notice Vault contract.
-    address public vault;
+    address public override vault;
     /// @notice Treasury contract.
-    address public treasury;
+    address public override treasury;
     /// @notice Locker contract.
-    address public locker;
+    address public override locker;
     // Set of products.
     EnumerableSet.AddressSet private products;
 

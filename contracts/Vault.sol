@@ -2,18 +2,20 @@
 
 pragma solidity 0.8.0;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "./interface/IStrategy.sol";
 import "./interface/IWETH10.sol";
+import "./interface/IRegistry.sol";
+import "./interface/IMaster.sol";
 
 /**
  * @title Vault
  * @author solace.fi
  * @notice Capital Providers can deposit ETH to mint shares of the Vault (CP tokens)
  */
-contract Vault is ERC20 {
+contract Vault is ERC20Permit {
     using SafeERC20 for IERC20;
     using Address for address;
 
@@ -62,6 +64,9 @@ contract Vault is ERC20 {
 
     /// Rewards contract/wallet where Governance fees are sent to
     address public rewards;
+
+    /// Registry of protocol contract addresses
+    IRegistry public registry;
     
     /// @notice Determines the order of strategies to pull funds from. Managed by governance
     address[] public withdrawalQueue;
@@ -105,9 +110,11 @@ contract Vault is ERC20 {
     event StrategyRevoked(address strategy);
     event EmergencyShutdown(bool active);
 
-    constructor (address _token) ERC20("Solace CP Token", "SCP") {
+    constructor (address _registry, address _token) ERC20("Solace CP Token", "SCP") ERC20Permit("Solace CP Token") {
         governance = msg.sender;
         rewards = msg.sender; // set governance address as rewards destination for now
+
+        registry = IRegistry(_registry);
         
         token = IERC20(_token);
 
@@ -314,6 +321,27 @@ contract Vault is ERC20 {
         IWETH10(address(token)).deposit{value: amount}();
 
         emit DepositMade(msg.sender, amount, shares);
+    }
+
+    /**
+     * @notice Allows a user to deposit ETH into the Vault and stake CP tokens right away
+     * Shares of the Vault (CP tokens) are minted to caller, calls permit() to Master
+     */
+    function depositAndStake(uint256 farmId, uint256 deadline, uint8 v, bytes32 r, bytes32 s) public payable {
+        // Deposit ETH and mint user CP tokens
+        uint256 beforeDepositBalance = balanceOf(msg.sender);
+        deposit();
+        uint256 afterDepositBalance = balanceOf(msg.sender);
+        uint256 amountToStake = afterDepositBalance - beforeDepositBalance;
+
+        address masterAddress = registry.master();
+        IMaster master = IMaster(masterAddress);
+
+        // Permit Master to spend CP tokens (gasless equivalent of `approve`)
+        permit(msg.sender, masterAddress, amountToStake, deadline, v, r, s);
+
+        // Deposit CP tokens to Master
+        master.depositFor(farmId, amountToStake, msg.sender);
     }
 
     /**

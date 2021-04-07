@@ -135,6 +135,29 @@ const _abi = [
       },
       {
         internalType: "uint256",
+        name: "_amount",
+        type: "uint256",
+      },
+      {
+        internalType: "address",
+        name: "_farmer",
+        type: "address",
+      },
+    ],
+    name: "depositFor",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_farmId",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
         name: "_from",
         type: "uint256",
       },

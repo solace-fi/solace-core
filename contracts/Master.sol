@@ -301,6 +301,30 @@ contract Master is IMaster {
     /**
      * @notice Withdraw some ERC20 tokens.
      * User will receive _amount of CP/LP tokens and accumulated Solace rewards.
+    * @notice deposit token function for another user
+    * @dev transfers tokens from msg.sender and allocates them to _farmer
+    * @param _farmId the farm to deposit to
+    * @param _amount the deposit amount
+    * @param _farmer user to deposit on behalf of
+    */
+    function depositFor(uint256 _farmId, uint256 _amount, address _farmer) external override {
+        // require(_farmId < farmInfo.length, "farm does not exist");
+        FarmInfo storage farm = farmInfo[_farmId];
+        UserInfo storage user = userInfo[_farmId][_farmer];
+        updateFarm(_farmId);
+        if (user.value > 0) {
+            uint256 pending = user.value * farm.accSolacePerShare / 1e12 - user.rewardDebt;
+            // safeTransfer(solace, _farmer, pending);
+        }
+        IERC721(farm.token).safeTransferFrom(_farmer, address(this), _amount);
+        farm.valueStaked += _amount;
+        user.value += _amount;
+        user.rewardDebt = user.value * farm.accSolacePerShare / 1e12;
+        // emit Deposit(_farmer, _farmId, _amount);
+    }
+
+    /**
+     * @notice Withdraw token function for msg.sender.
      * @param _farmId The farm to withdraw from.
      * @param _amount The withdraw amount.
      */

@@ -8,6 +8,15 @@ pragma solidity 0.8.0;
  * @notice Tracks the contracts in the Solaverse.
  */
 interface IRegistry {
+
+    /// Protocol contract address getters
+    function master() external returns (address);
+    function vault() external returns (address);
+    function treasury() external returns (address);
+    function governance() external returns (address);
+    function solace() external returns (address);
+    function locker() external returns (address);
+
     /**
      * @notice Transfers the governance role to a new governor.
      * Can only be called by the current governor.
