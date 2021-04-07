@@ -199,64 +199,764 @@
 </div>
 <div class="section" id="source">
 <h2>Source<a class="headerlink" href="#source" title="Permalink to this headline">¶</a></h2>
-<div class="highlight-Solidity notranslate"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre> 1
- 2
- 3
- 4
- 5
- 6
- 7
- 8
- 9
-10
-11
-12
-13
-14
-15
-16
-17
-18
-19
-20
-21
-22
-23
-24
-25
-26
-27
-28
-29
-30
-31
-32
-33
-34
-35
-36
-37
-38
-39
-40
-41
-42
-43
-44
-45
-46
-47
-48
-49
-50
-51
-52</pre></div></td><td class="code"><div class="highlight"><pre><span></span><span class="c1">// </span><span class="cs">SPDX-License-Identifier:</span><span class="c1"> UNLICENSED</span>
+<div class="highlight-Solidity notranslate"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre>  1
+  2
+  3
+  4
+  5
+  6
+  7
+  8
+  9
+ 10
+ 11
+ 12
+ 13
+ 14
+ 15
+ 16
+ 17
+ 18
+ 19
+ 20
+ 21
+ 22
+ 23
+ 24
+ 25
+ 26
+ 27
+ 28
+ 29
+ 30
+ 31
+ 32
+ 33
+ 34
+ 35
+ 36
+ 37
+ 38
+ 39
+ 40
+ 41
+ 42
+ 43
+ 44
+ 45
+ 46
+ 47
+ 48
+ 49
+ 50
+ 51
+ 52
+ 53
+ 54
+ 55
+ 56
+ 57
+ 58
+ 59
+ 60
+ 61
+ 62
+ 63
+ 64
+ 65
+ 66
+ 67
+ 68
+ 69
+ 70
+ 71
+ 72
+ 73
+ 74
+ 75
+ 76
+ 77
+ 78
+ 79
+ 80
+ 81
+ 82
+ 83
+ 84
+ 85
+ 86
+ 87
+ 88
+ 89
+ 90
+ 91
+ 92
+ 93
+ 94
+ 95
+ 96
+ 97
+ 98
+ 99
+100
+101
+102
+103
+104
+105
+106
+107
+108
+109
+110
+111
+112
+113
+114
+115
+116
+117
+118
+119
+120
+121
+122
+123
+124
+125
+126
+127
+128
+129
+130
+131
+132
+133
+134
+135
+136
+137
+138
+139
+140
+141
+142
+143
+144
+145
+146
+147
+148
+149
+150
+151
+152
+153
+154
+155
+156
+157
+158
+159
+160
+161
+162
+163
+164
+165
+166
+167
+168
+169
+170
+171
+172
+173
+174
+175
+176
+177
+178
+179
+180
+181
+182
+183
+184
+185
+186
+187
+188
+189
+190
+191
+192
+193
+194
+195
+196
+197
+198
+199
+200
+201
+202
+203
+204
+205
+206
+207
+208
+209
+210
+211
+212
+213
+214
+215
+216
+217
+218
+219
+220
+221
+222
+223
+224
+225
+226
+227
+228
+229
+230
+231
+232
+233
+234
+235
+236
+237
+238
+239
+240
+241
+242
+243
+244
+245
+246
+247
+248
+249
+250
+251
+252
+253
+254
+255
+256
+257
+258
+259
+260
+261
+262
+263
+264
+265
+266
+267
+268
+269
+270
+271
+272
+273
+274
+275
+276
+277
+278
+279
+280
+281
+282
+283
+284
+285
+286
+287
+288
+289
+290
+291
+292
+293
+294
+295
+296
+297
+298
+299
+300
+301
+302
+303
+304
+305
+306
+307
+308
+309
+310
+311
+312
+313
+314
+315
+316
+317
+318
+319
+320
+321
+322
+323
+324
+325
+326
+327
+328
+329
+330
+331
+332
+333
+334
+335
+336
+337
+338
+339
+340
+341
+342
+343
+344
+345
+346
+347
+348
+349
+350
+351
+352
+353
+354
+355
+356
+357
+358
+359
+360
+361
+362
+363
+364
+365
+366
+367
+368
+369
+370
+371
+372
+373
+374
+375
+376
+377
+378
+379
+380
+381
+382
+383
+384
+385
+386
+387
+388
+389
+390
+391
+392
+393
+394
+395
+396
+397
+398
+399
+400
+401
+402
+403
+404
+405
+406
+407
+408
+409
+410
+411
+412
+413
+414
+415
+416
+417
+418
+419
+420
+421
+422
+423
+424
+425
+426
+427
+428
+429
+430
+431
+432
+433
+434
+435
+436
+437
+438
+439
+440
+441
+442
+443
+444
+445
+446
+447
+448
+449
+450
+451
+452
+453
+454
+455
+456
+457
+458
+459
+460
+461
+462
+463
+464
+465
+466
+467
+468
+469
+470
+471
+472
+473
+474
+475
+476
+477
+478
+479
+480
+481
+482
+483
+484
+485
+486
+487
+488
+489
+490
+491
+492
+493
+494
+495
+496
+497
+498
+499
+500
+501
+502
+503
+504
+505
+506
+507
+508
+509
+510
+511
+512
+513
+514
+515
+516
+517
+518
+519
+520
+521
+522
+523
+524
+525
+526
+527
+528
+529
+530
+531
+532
+533
+534
+535
+536
+537
+538
+539
+540
+541
+542
+543
+544
+545
+546
+547
+548
+549
+550
+551
+552
+553
+554
+555
+556
+557
+558
+559
+560
+561
+562
+563
+564
+565
+566
+567
+568
+569
+570
+571
+572
+573
+574
+575
+576
+577
+578
+579
+580
+581
+582
+583
+584
+585
+586
+587
+588
+589
+590
+591
+592
+593
+594
+595
+596
+597
+598
+599
+600
+601
+602
+603
+604
+605
+606
+607
+608
+609
+610
+611
+612
+613
+614
+615
+616
+617
+618
+619
+620
+621
+622
+623
+624
+625
+626
+627
+628
+629
+630
+631
+632
+633
+634
+635
+636
+637
+638
+639
+640
+641
+642
+643
+644
+645
+646
+647
+648
+649
+650
+651
+652
+653
+654
+655
+656
+657
+658
+659
+660
+661
+662
+663
+664
+665
+666
+667
+668
+669
+670
+671
+672
+673
+674
+675
+676
+677
+678
+679
+680
+681
+682
+683
+684
+685
+686
+687
+688
+689
+690
+691
+692
+693
+694
+695
+696
+697
+698
+699
+700
+701
+702
+703
+704
+705
+706
+707
+708
+709
+710
+711
+712
+713
+714
+715
+716
+717
+718
+719
+720
+721
+722
+723
+724
+725
+726
+727
+728
+729
+730
+731
+732
+733
+734
+735
+736
+737
+738
+739
+740
+741
+742
+743
+744
+745
+746
+747
+748
+749
+750</pre></div></td><td class="code"><div class="highlight"><pre><span></span><span class="c1">// </span><span class="cs">SPDX-License-Identifier:</span><span class="c1"> GPL-3.0-or-later</span>
 
-<span class="k">pragma solidity</span> <span class="o">^</span><span class="mf">0.8</span><span class="p">.</span><span class="mi">0</span><span class="p">;</span>
+<span class="k">pragma solidity</span> <span class="mf">0.8</span><span class="p">.</span><span class="mi">0</span><span class="p">;</span>
 
 <span class="kn">import</span> <span class="s">&quot;@openzeppelin/contracts/token/ERC20/ERC20.sol&quot;</span><span class="p">;</span>
 <span class="kn">import</span> <span class="s">&quot;@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol&quot;</span><span class="p">;</span>
 <span class="kn">import</span> <span class="s">&quot;@openzeppelin/contracts/utils/Address.sol&quot;</span><span class="p">;</span>
+<span class="kn">import</span> <span class="s">&quot;./interface/IStrategy.sol&quot;</span><span class="p">;</span>
+<span class="kn">import</span> <span class="s">&quot;./interface/IWETH10.sol&quot;</span><span class="p">;</span>
 
 <span class="cm">/**</span>
 <span class="cm"> * </span><span class="cs">@title</span><span class="cm"> Vault</span>
@@ -267,38 +967,734 @@
     <span class="kn">using</span> <span class="n">SafeERC20</span> <span class="k">for</span> <span class="n">IERC20</span><span class="p">;</span>
     <span class="kn">using</span> <span class="n">Address</span> <span class="k">for</span> <span class="kt">address</span><span class="p">;</span>
 
+    <span class="kd">struct</span> <span class="n">StrategyParams</span> <span class="p">{</span>
+        <span class="kt">uint256</span> <span class="n">performanceFee</span><span class="p">;</span> <span class="c1">// Strategist&#39;s fee (basis points)</span>
+        <span class="kt">uint256</span> <span class="n">activation</span><span class="p">;</span> <span class="c1">// Activation block.timestamp</span>
+        <span class="kt">uint256</span> <span class="n">debtRatio</span><span class="p">;</span> <span class="c1">// Maximum borrow amount (in BPS of total assets)</span>
+        <span class="kt">uint256</span> <span class="n">minDebtPerHarvest</span><span class="p">;</span> <span class="c1">// Lower limit on the increase of debt since last harvest</span>
+        <span class="kt">uint256</span> <span class="n">maxDebtPerHarvest</span><span class="p">;</span> <span class="c1">// Upper limit on the increase of debt since last harvest</span>
+        <span class="kt">uint256</span> <span class="n">lastReport</span><span class="p">;</span> <span class="c1">// block.timestamp of the last time a report occured</span>
+        <span class="kt">uint256</span> <span class="n">totalDebt</span><span class="p">;</span> <span class="c1">// Total outstanding debt that Strategy has</span>
+        <span class="kt">uint256</span> <span class="n">totalGain</span><span class="p">;</span> <span class="c1">// Total returns that Strategy has realized for Vault</span>
+        <span class="kt">uint256</span> <span class="n">totalLoss</span><span class="p">;</span> <span class="c1">// Total losses that Strategy has realized for Vault</span>
+    <span class="p">}</span>
+
+    <span class="cm">/*************</span>
+<span class="cm">    GLOBAL CONSTANTS</span>
+<span class="cm">    *************/</span>
+
+    <span class="kt">uint256</span> <span class="k">constant</span> <span class="n">DEGREDATION_COEFFICIENT</span> <span class="o">=</span> <span class="mi">10</span> <span class="o">**</span> <span class="mi">18</span><span class="p">;</span>
+    <span class="kt">uint256</span> <span class="k">constant</span> <span class="n">MAX_BPS</span> <span class="o">=</span> <span class="mi">10000</span><span class="p">;</span> <span class="c1">// 10k basis points (100%)</span>
+    <span class="kt">uint256</span> <span class="k">constant</span> <span class="n">SECS_PER_YEAR</span> <span class="o">=</span> <span class="mi">31556952</span><span class="p">;</span> <span class="c1">// 365.2425 days</span>
+
+    <span class="cm">/*************</span>
+<span class="cm">    GLOBAL VARIABLES</span>
+<span class="cm">    *************/</span>
+
+    <span class="kt">uint256</span> <span class="k">public</span> <span class="n">activation</span><span class="p">;</span>
+    <span class="kt">uint256</span> <span class="k">public</span> <span class="n">delegatedAssets</span><span class="p">;</span>
+    <span class="kt">uint256</span> <span class="k">public</span> <span class="n">debtRatio</span><span class="p">;</span> <span class="c1">// Debt ratio for the Vault across all strategies (in BPS, &lt;= 10k)</span>
+    <span class="kt">uint256</span> <span class="k">public</span> <span class="n">totalDebt</span><span class="p">;</span> <span class="c1">// Amount of tokens that all strategies have borrowed</span>
+    <span class="kt">uint256</span> <span class="k">public</span> <span class="n">lastReport</span><span class="p">;</span> <span class="c1">// block.timestamp of last report</span>
+    <span class="kt">uint256</span> <span class="k">public</span> <span class="n">lockedProfit</span><span class="p">;</span> <span class="c1">// how much profit is locked and cant be withdrawn</span>
+    <span class="kt">uint256</span> <span class="k">public</span> <span class="n">performanceFee</span><span class="p">;</span>
+    <span class="kt">uint256</span> <span class="k">public</span> <span class="n">lockedProfitDegration</span><span class="p">;</span> <span class="c1">// rate per block of degration. DEGREDATION_COEFFICIENT is 100% per block</span>
+
+    <span class="kt">uint256</span> <span class="k">public</span> <span class="n">managementFee</span><span class="p">;</span> <span class="c1">// Governance Fee for management of Vault (given to `rewards`)</span>
+
+    <span class="kt">bool</span> <span class="k">public</span> <span class="n">emergencyShutdown</span><span class="p">;</span>
+
+    <span class="c1">/// WETH</span>
+    <span class="n">IERC20</span> <span class="k">public</span> <span class="n">token</span><span class="p">;</span>
+
+    <span class="c1">/// address with rights to call governance functions</span>
     <span class="kt">address</span> <span class="k">public</span> <span class="n">governance</span><span class="p">;</span>
 
-    <span class="kt">uint256</span> <span class="k">private</span> <span class="n">_ethBalanceBeforeLatestAction</span><span class="p">;</span>
+    <span class="c1">/// Rewards contract/wallet where Governance fees are sent to</span>
+    <span class="kt">address</span> <span class="k">public</span> <span class="n">rewards</span><span class="p">;</span>
+    
+    <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Determines the order of strategies to pull funds from. Managed by governance</span>
+    <span class="kt">address</span><span class="p">[]</span> <span class="k">public</span> <span class="n">withdrawalQueue</span><span class="p">;</span>
 
-    <span class="kd">constructor</span> <span class="p">()</span> <span class="n">ERC20</span><span class="p">(</span><span class="s">&quot;Solace CP Token&quot;</span><span class="p">,</span> <span class="s">&quot;SCP&quot;</span><span class="p">)</span> <span class="p">{</span>
+    <span class="cm">/*************</span>
+<span class="cm">    MAPPINGS</span>
+<span class="cm">    *************/</span>
+
+    <span class="kd">mapping</span> <span class="p">(</span><span class="kt">address</span> <span class="o">=&gt;</span> <span class="n">StrategyParams</span><span class="p">)</span> <span class="k">public</span> <span class="n">strategies</span><span class="p">;</span>
+    <span class="kd">mapping</span> <span class="p">(</span><span class="kt">address</span> <span class="o">=&gt;</span> <span class="kt">uint256</span><span class="p">)</span> <span class="k">internal</span> <span class="n">_strategyDelegatedAssets</span><span class="p">;</span>
+
+    <span class="cm">/*************</span>
+<span class="cm">    EVENTS</span>
+<span class="cm">    *************/</span>
+
+    <span class="kd">event</span> <span class="n">StrategyAdded</span><span class="p">(</span>
+        <span class="kt">address</span> <span class="k">indexed</span> <span class="n">strategy</span><span class="p">,</span>
+        <span class="kt">uint256</span> <span class="n">debtRatio</span><span class="p">,</span>
+        <span class="kt">uint256</span> <span class="n">minDebtPerHarvest</span><span class="p">,</span>
+        <span class="kt">uint256</span> <span class="n">maxDebtPerHarvest</span><span class="p">,</span>
+        <span class="kt">uint256</span> <span class="n">performanceFee</span>
+    <span class="p">);</span>
+
+    <span class="kd">event</span> <span class="n">StrategyReported</span><span class="p">(</span>
+        <span class="kt">address</span> <span class="k">indexed</span> <span class="n">strategy</span><span class="p">,</span>
+        <span class="kt">uint256</span> <span class="n">gain</span><span class="p">,</span>
+        <span class="kt">uint256</span> <span class="n">loss</span><span class="p">,</span>
+        <span class="kt">uint256</span> <span class="n">debtPaid</span><span class="p">,</span>
+        <span class="kt">uint256</span> <span class="n">totalGain</span><span class="p">,</span>
+        <span class="kt">uint256</span> <span class="n">totalLoss</span><span class="p">,</span>
+        <span class="kt">uint256</span> <span class="n">totalDebt</span><span class="p">,</span>
+        <span class="kt">uint256</span> <span class="n">debtAdded</span><span class="p">,</span>
+        <span class="kt">uint256</span> <span class="n">debtRatio</span>
+    <span class="p">);</span>
+
+    <span class="kd">event</span> <span class="n">DepositMade</span><span class="p">(</span><span class="kt">address</span> <span class="k">indexed</span> <span class="n">depositor</span><span class="p">,</span> <span class="kt">uint256</span> <span class="k">indexed</span> <span class="n">amount</span><span class="p">,</span> <span class="kt">uint256</span> <span class="k">indexed</span> <span class="n">shares</span><span class="p">);</span>
+    <span class="kd">event</span> <span class="n">WithdrawalMade</span><span class="p">(</span><span class="kt">address</span> <span class="k">indexed</span> <span class="n">withdrawer</span><span class="p">,</span> <span class="kt">uint256</span> <span class="k">indexed</span> <span class="n">value</span><span class="p">);</span>
+    <span class="kd">event</span> <span class="n">StrategyAddedToQueue</span><span class="p">(</span><span class="kt">address</span> <span class="k">indexed</span> <span class="n">strategy</span><span class="p">);</span>
+    <span class="kd">event</span> <span class="n">StrategyRemovedFromQueue</span><span class="p">(</span><span class="kt">address</span> <span class="k">indexed</span> <span class="n">strategy</span><span class="p">);</span>
+    <span class="kd">event</span> <span class="n">UpdateWithdrawalQueue</span><span class="p">(</span><span class="kt">address</span><span class="p">[]</span> <span class="k">indexed</span> <span class="n">queue</span><span class="p">);</span>
+    <span class="kd">event</span> <span class="n">StrategyRevoked</span><span class="p">(</span><span class="kt">address</span> <span class="n">strategy</span><span class="p">);</span>
+    <span class="kd">event</span> <span class="n">EmergencyShutdown</span><span class="p">(</span><span class="kt">bool</span> <span class="n">active</span><span class="p">);</span>
+
+    <span class="kd">constructor</span> <span class="p">(</span><span class="kt">address</span> <span class="n">_token</span><span class="p">)</span> <span class="n">ERC20</span><span class="p">(</span><span class="s">&quot;Solace CP Token&quot;</span><span class="p">,</span> <span class="s">&quot;SCP&quot;</span><span class="p">)</span> <span class="p">{</span>
         <span class="n">governance</span> <span class="o">=</span> <span class="nb">msg.sender</span><span class="p">;</span>
+        <span class="n">rewards</span> <span class="o">=</span> <span class="nb">msg.sender</span><span class="p">;</span> <span class="c1">// set governance address as rewards destination for now</span>
+        
+        <span class="n">token</span> <span class="o">=</span> <span class="n">IERC20</span><span class="p">(</span><span class="n">_token</span><span class="p">);</span>
+
+        <span class="n">lastReport</span> <span class="o">=</span> <span class="nb">block.timestamp</span><span class="p">;</span>
+        <span class="n">activation</span> <span class="o">=</span> <span class="nb">block.timestamp</span><span class="p">;</span>
+        
+        <span class="n">lockedProfitDegration</span> <span class="o">=</span> <span class="p">(</span><span class="n">DEGREDATION_COEFFICIENT</span> <span class="o">*</span> <span class="mi">46</span><span class="p">)</span> <span class="o">/</span> <span class="mi">10</span> <span class="o">**</span> <span class="mi">6</span><span class="p">;</span> <span class="c1">// 6 hours in blocks</span>
     <span class="p">}</span>
+
+    <span class="cm">/*************</span>
+<span class="cm">    EXTERNAL FUNCTIONS</span>
+<span class="cm">    *************/</span>
 
     <span class="cm">/**</span>
 <span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Transfers the governance role to a new governor.</span>
 <span class="cm">     * Can only be called by the current governor.</span>
 <span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _governance the new governor</span>
 <span class="cm">     */</span>
-    <span class="kd">function</span> <span class="n">setGovernance</span><span class="p">(</span><span class="kt">address</span> <span class="n">_governance</span><span class="p">)</span> <span class="k">public</span> <span class="p">{</span>
+    <span class="kd">function</span> <span class="n">setGovernance</span><span class="p">(</span><span class="kt">address</span> <span class="n">_governance</span><span class="p">)</span> <span class="k">external</span> <span class="p">{</span>
         <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
         <span class="n">governance</span> <span class="o">=</span> <span class="n">_governance</span><span class="p">;</span>
     <span class="p">}</span>
 
     <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Changes the locked profit degration. </span>
+<span class="cm">     * Can only be called by the current governor.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> degration rate of degration in percent per second scaled to 1e18.</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">setLockedProfitDegration</span><span class="p">(</span><span class="kt">uint256</span> <span class="n">degration</span><span class="p">)</span> <span class="k">external</span> <span class="p">{</span>
+        <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
+        <span class="n">lockedProfitDegration</span> <span class="o">=</span> <span class="n">degration</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Activates or deactivates Vault mode where all Strategies go into full withdrawal.</span>
+<span class="cm">     * Can only be called by the current governor.</span>
+<span class="cm">     * During Emergency Shutdown:</span>
+<span class="cm">     * 1. No Users may deposit into the Vault (but may withdraw as usual.)</span>
+<span class="cm">     * 2. Governance may not add new Strategies.</span>
+<span class="cm">     * 3. Each Strategy must pay back their debt as quickly as reasonable to minimally affect their position.</span>
+<span class="cm">     * 4. Only Governance may undo Emergency Shutdown.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> active If true, the Vault goes into Emergency Shutdown.</span>
+<span class="cm">     * If false, the Vault goes back into Normal Operation.</span>
+<span class="cm">    */</span>
+    <span class="kd">function</span> <span class="n">setEmergencyShutdown</span><span class="p">(</span><span class="kt">bool</span> <span class="n">active</span><span class="p">)</span> <span class="k">external</span> <span class="p">{</span>
+        <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
+        <span class="n">emergencyShutdown</span> <span class="o">=</span> <span class="n">active</span><span class="p">;</span>
+        <span class="k">emit</span> <span class="n">EmergencyShutdown</span><span class="p">(</span><span class="n">active</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Sets `withdrawalQueue` to be in the order specified by input array</span>
+<span class="cm">     * </span><span class="cs">@dev</span><span class="cm"> Specify addresses in the order in which funds should be withdrawn.</span>
+<span class="cm">     * The ordering should be least impactful (the Strategy whose core positions will be least impacted by</span>
+<span class="cm">     * having funds removed) first, with the next least impactful second, etc.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _queue array of addresses of strategy contracts</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">setWithdrawalQueue</span><span class="p">(</span><span class="kt">address</span><span class="p">[]</span> <span class="k">memory</span> <span class="n">_queue</span><span class="p">)</span> <span class="k">external</span> <span class="p">{</span>
+        <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
+        <span class="c1">// check that each entry in input array is an active strategy</span>
+        <span class="k">for</span> <span class="p">(</span><span class="kt">uint256</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">_queue</span><span class="p">.</span><span class="n">length</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+            <span class="nf">require</span><span class="p">(</span><span class="n">strategies</span><span class="p">[</span><span class="n">_queue</span><span class="p">[</span><span class="n">i</span><span class="p">]].</span><span class="n">activation</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span> <span class="s">&quot;must be a current strategy&quot;</span><span class="p">);</span>
+        <span class="p">}</span>
+        <span class="c1">// set input to be the new queue</span>
+        <span class="n">withdrawalQueue</span> <span class="o">=</span> <span class="n">_queue</span><span class="p">;</span>
+
+        <span class="k">emit</span> <span class="n">UpdateWithdrawalQueue</span><span class="p">(</span><span class="n">_queue</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Allows governance to approve a new Strategy</span>
+<span class="cm">     * Can only be called by the current governor.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _strategy The address of Strategy contract to add</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _debtRatio The share of the total assets in the `vault that the `strategy` has access to.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _minDebtPerHarvest Lower limit on the increase of debt since last harvest</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _maxDebtPerHarvest Upper limit on the increase of debt since last harvest</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _performanceFee The fee the strategist will receive based on this Vault&#39;s performance.</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">addStrategy</span><span class="p">(</span>
+        <span class="kt">address</span> <span class="n">_strategy</span><span class="p">,</span>
+        <span class="kt">uint256</span> <span class="n">_debtRatio</span><span class="p">,</span>
+        <span class="kt">uint256</span> <span class="n">_minDebtPerHarvest</span><span class="p">,</span>
+        <span class="kt">uint256</span> <span class="n">_maxDebtPerHarvest</span><span class="p">,</span>
+        <span class="kt">uint256</span> <span class="n">_performanceFee</span>
+    <span class="p">)</span> <span class="k">external</span> <span class="p">{</span>
+        <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
+        <span class="nf">require</span><span class="p">(</span><span class="o">!</span><span class="n">emergencyShutdown</span><span class="p">,</span> <span class="s">&quot;vault is in emergency shutdown&quot;</span><span class="p">);</span>
+        <span class="nf">require</span><span class="p">(</span><span class="n">_strategy</span> <span class="o">!=</span> <span class="kt">address</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="s">&quot;strategy cannot be set to zero address&quot;</span><span class="p">);</span>
+        <span class="nf">require</span><span class="p">(</span><span class="n">debtRatio</span> <span class="o">+</span> <span class="n">_debtRatio</span> <span class="o">&lt;=</span> <span class="n">MAX_BPS</span><span class="p">,</span> <span class="s">&quot;debtRatio exceeds MAX BPS&quot;</span><span class="p">);</span>
+        <span class="nf">require</span><span class="p">(</span><span class="n">_performanceFee</span> <span class="o">&lt;=</span> <span class="n">MAX_BPS</span> <span class="o">-</span> <span class="n">performanceFee</span><span class="p">,</span> <span class="s">&quot;invalid performance fee&quot;</span><span class="p">);</span>
+        <span class="nf">require</span><span class="p">(</span><span class="n">_minDebtPerHarvest</span> <span class="o">&lt;=</span> <span class="n">_maxDebtPerHarvest</span><span class="p">,</span> <span class="s">&quot;minDebtPerHarvest exceeds maxDebtPerHarvest&quot;</span><span class="p">);</span>
+        
+        <span class="c1">// Add strategy to approved strategies</span>
+        <span class="n">strategies</span><span class="p">[</span><span class="n">_strategy</span><span class="p">]</span> <span class="o">=</span> <span class="n">StrategyParams</span><span class="p">({</span>
+            <span class="n">performanceFee</span><span class="o">:</span> <span class="n">_performanceFee</span><span class="p">,</span>
+            <span class="n">activation</span><span class="o">:</span> <span class="nb">block.timestamp</span><span class="p">,</span>
+            <span class="n">debtRatio</span><span class="o">:</span> <span class="n">_debtRatio</span><span class="p">,</span>
+            <span class="n">minDebtPerHarvest</span><span class="o">:</span> <span class="n">_minDebtPerHarvest</span><span class="p">,</span>
+            <span class="n">maxDebtPerHarvest</span><span class="o">:</span> <span class="n">_maxDebtPerHarvest</span><span class="p">,</span>
+            <span class="n">lastReport</span><span class="o">:</span> <span class="nb">block.timestamp</span><span class="p">,</span>
+            <span class="n">totalDebt</span><span class="o">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="n">totalGain</span><span class="o">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="n">totalLoss</span><span class="o">:</span> <span class="mi">0</span>
+        <span class="p">});</span>
+
+        <span class="c1">// Append strategy to withdrawal queue</span>
+        <span class="n">withdrawalQueue</span><span class="p">.</span><span class="nf">push</span><span class="p">(</span><span class="n">_strategy</span><span class="p">);</span>
+
+        <span class="n">debtRatio</span> <span class="o">+=</span> <span class="n">_debtRatio</span><span class="p">;</span>
+
+        <span class="k">emit</span> <span class="n">StrategyAdded</span><span class="p">(</span><span class="n">_strategy</span><span class="p">,</span> <span class="n">_debtRatio</span><span class="p">,</span> <span class="n">_minDebtPerHarvest</span><span class="p">,</span> <span class="n">_maxDebtPerHarvest</span><span class="p">,</span> <span class="n">_performanceFee</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Adds `_strategy` to `withdrawalQueue`</span>
+<span class="cm">     * Can only be called by the current governor.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _strategy address of the strategy to add</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">addStrategyToQueue</span><span class="p">(</span><span class="kt">address</span> <span class="n">_strategy</span><span class="p">)</span> <span class="k">external</span> <span class="p">{</span>
+        
+        <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
+        <span class="nf">require</span><span class="p">(</span><span class="n">strategies</span><span class="p">[</span><span class="n">_strategy</span><span class="p">].</span><span class="n">activation</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span> <span class="s">&quot;must be a current strategy&quot;</span><span class="p">);</span>
+        
+        <span class="c1">// check that strategy is not already in the queue</span>
+        <span class="k">for</span> <span class="p">(</span><span class="kt">uint256</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">withdrawalQueue</span><span class="p">.</span><span class="n">length</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+            <span class="nf">require</span><span class="p">(</span><span class="n">withdrawalQueue</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">!=</span> <span class="n">_strategy</span><span class="p">,</span> <span class="s">&quot;strategy already in queue&quot;</span><span class="p">);</span>
+        <span class="p">}</span>
+
+        <span class="n">withdrawalQueue</span><span class="p">.</span><span class="nf">push</span><span class="p">(</span><span class="n">_strategy</span><span class="p">);</span>
+
+        <span class="k">emit</span> <span class="n">StrategyAddedToQueue</span><span class="p">(</span><span class="n">_strategy</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Remove `_strategy` from `withdrawalQueue`</span>
+<span class="cm">     * Can only be called by the current governor.</span>
+<span class="cm">     * Can only be called on an active strategy (added using addStrategy)</span>
+<span class="cm">     * `_strategy` cannot already be in the queue</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _strategy address of the strategy to remove</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">removeStrategyFromQueue</span><span class="p">(</span><span class="kt">address</span> <span class="n">_strategy</span><span class="p">)</span> <span class="k">external</span> <span class="p">{</span>
+        
+        <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
+        <span class="nf">require</span><span class="p">(</span><span class="n">strategies</span><span class="p">[</span><span class="n">_strategy</span><span class="p">].</span><span class="n">activation</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span> <span class="s">&quot;must be a current strategy&quot;</span><span class="p">);</span>
+
+        <span class="kt">address</span><span class="p">[]</span> <span class="k">storage</span> <span class="n">newQueue</span><span class="p">;</span>
+        
+        <span class="k">for</span> <span class="p">(</span><span class="kt">uint256</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">withdrawalQueue</span><span class="p">.</span><span class="n">length</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">withdrawalQueue</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">!=</span> <span class="n">_strategy</span><span class="p">)</span> <span class="p">{</span>
+                <span class="n">newQueue</span><span class="p">.</span><span class="nf">push</span><span class="p">(</span><span class="n">withdrawalQueue</span><span class="p">[</span><span class="n">i</span><span class="p">]);</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+
+        <span class="c1">// we added all the elements back in the queue</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">withdrawalQueue</span><span class="p">.</span><span class="n">length</span> <span class="o">==</span> <span class="n">newQueue</span><span class="p">.</span><span class="n">length</span><span class="p">)</span> <span class="nf">revert</span><span class="p">(</span><span class="s">&quot;strategy not in queue&quot;</span><span class="p">);</span>
+
+        <span class="c1">// set withdrawalQueue to be the new one without the removed strategy</span>
+        <span class="n">withdrawalQueue</span> <span class="o">=</span> <span class="n">newQueue</span><span class="p">;</span>
+        <span class="k">emit</span> <span class="n">StrategyRemovedFromQueue</span><span class="p">(</span><span class="n">_strategy</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Revoke a Strategy, setting its debt limit to 0 and preventing any future deposits.</span>
+<span class="cm">     * Should only be used in the scenario where the Strategy is being retired</span>
+<span class="cm">     * but no migration of the positions are possible, or in the</span>
+<span class="cm">     * extreme scenario that the Strategy needs to be put into &quot;Emergency Exit&quot;</span>
+<span class="cm">     * mode in order for it to exit as quickly as possible. The latter scenario</span>
+<span class="cm">     * could be for any reason that is considered &quot;critical&quot; that the Strategy</span>
+<span class="cm">     * exits its position as fast as possible, such as a sudden change in market</span>
+<span class="cm">     * conditions leading to losses, or an imminent failure in an external</span>
+<span class="cm">     * dependency.</span>
+<span class="cm">     * This may only be called by governance or the Strategy itself.</span>
+<span class="cm">     * A Strategy will only revoke itself during emergency shutdown.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> strategy The Strategy to revoke.</span>
+<span class="cm">    */</span>
+    <span class="kd">function</span> <span class="n">revokeStrategy</span><span class="p">(</span><span class="kt">address</span> <span class="n">strategy</span><span class="p">)</span> <span class="k">external</span> <span class="p">{</span>
+        <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span> <span class="o">||</span>
+            <span class="n">strategies</span><span class="p">[</span><span class="nb">msg.sender</span><span class="p">].</span><span class="n">activation</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span> <span class="s">&quot;must be called by governance or strategy to be revoked&quot;</span>
+        <span class="p">);</span>
+        <span class="n">_revokeStrategy</span><span class="p">(</span><span class="n">strategy</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
 <span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Allows a user to deposit ETH into the Vault (becoming a Capital Provider)</span>
 <span class="cm">     * Shares of the Vault (CP tokens) are minteed to caller</span>
+<span class="cm">     * Called when Vault receives ETH</span>
+<span class="cm">     * Deposits `_amount` `token`, issuing shares to `recipient`.</span>
+<span class="cm">     * Reverts if Vault is in Emergency Shutdown</span>
 <span class="cm">     */</span>
     <span class="kd">function</span> <span class="n">deposit</span><span class="p">()</span> <span class="k">public</span> <span class="k">payable</span> <span class="p">{</span>
+        <span class="nf">require</span><span class="p">(</span><span class="o">!</span><span class="n">emergencyShutdown</span><span class="p">,</span> <span class="s">&quot;cannot deposit when vault is in emergency shutdown&quot;</span><span class="p">);</span>
         <span class="kt">uint256</span> <span class="n">amount</span> <span class="o">=</span> <span class="nb">msg.value</span><span class="p">;</span>
         <span class="kt">uint256</span> <span class="n">shares</span><span class="p">;</span>
         <span class="k">if</span> <span class="p">(</span><span class="n">totalSupply</span><span class="p">()</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
             <span class="n">shares</span> <span class="o">=</span> <span class="n">amount</span><span class="p">;</span>
         <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
-            <span class="n">shares</span> <span class="o">=</span> <span class="p">(</span><span class="n">amount</span> <span class="o">*</span> <span class="n">totalSupply</span><span class="p">())</span> <span class="o">/</span> <span class="n">_ethBalanceBeforeLatestAction</span><span class="p">;</span>
+            <span class="n">shares</span> <span class="o">=</span> <span class="p">(</span><span class="n">amount</span> <span class="o">*</span> <span class="n">totalSupply</span><span class="p">())</span> <span class="o">/</span> <span class="n">_totalAssets</span><span class="p">();</span>
         <span class="p">}</span>
+        
+        <span class="c1">// Issuance of shares needs to be done before taking the deposit</span>
         <span class="n">_mint</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">,</span> <span class="n">shares</span><span class="p">);</span>
-        <span class="n">_ethBalanceBeforeLatestAction</span> <span class="o">=</span> <span class="kt">address</span><span class="p">(</span><span class="nb">this</span><span class="p">).</span><span class="nb">balance</span><span class="p">;</span>
+
+        <span class="c1">// Wrap the depositor&#39;s ETH to add WETH to the vault</span>
+        <span class="n">IWETH10</span><span class="p">(</span><span class="kt">address</span><span class="p">(</span><span class="n">token</span><span class="p">)).</span><span class="n">deposit</span><span class="p">{</span><span class="n">value</span><span class="o">:</span> <span class="n">amount</span><span class="p">}();</span>
+
+        <span class="k">emit</span> <span class="n">DepositMade</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">,</span> <span class="n">amount</span><span class="p">,</span> <span class="n">shares</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Allows a user to redeem shares for ETH</span>
+<span class="cm">     * Burns CP tokens and transfers ETH to the CP</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> shares amount of shares to redeem</span>
+<span class="cm">     * </span><span class="cs">@return</span><span class="cm"> value in ETH that the shares where redeemed for</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">withdraw</span><span class="p">(</span><span class="kt">uint256</span> <span class="n">shares</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">maxLoss</span><span class="p">)</span> <span class="k">external</span> <span class="k">returns</span> <span class="p">(</span><span class="kt">uint256</span><span class="p">)</span> <span class="p">{</span>
+
+        <span class="nf">require</span><span class="p">(</span><span class="n">shares</span> <span class="o">&lt;=</span> <span class="n">balanceOf</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">),</span> <span class="s">&quot;cannot redeem more shares than you own&quot;</span><span class="p">);</span>
+        
+        <span class="kt">uint256</span> <span class="n">value</span> <span class="o">=</span> <span class="n">_shareValue</span><span class="p">(</span><span class="n">shares</span><span class="p">);</span>
+        <span class="kt">uint256</span> <span class="n">totalLoss</span><span class="p">;</span>
+
+        <span class="c1">// If redeemable amount exceeds vaultBalance, withdraw funds from strategies in the withdrawal queue</span>
+        <span class="kt">uint256</span> <span class="n">vaultBalance</span> <span class="o">=</span> <span class="n">token</span><span class="p">.</span><span class="n">balanceOf</span><span class="p">(</span><span class="kt">address</span><span class="p">(</span><span class="nb">this</span><span class="p">));</span>
+        
+        <span class="k">if</span> <span class="p">(</span><span class="n">value</span> <span class="o">&gt;</span> <span class="n">vaultBalance</span><span class="p">)</span> <span class="p">{</span>
+
+            <span class="k">for</span> <span class="p">(</span><span class="kt">uint256</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">withdrawalQueue</span><span class="p">.</span><span class="n">length</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+
+                <span class="c1">// Break if we are done withdrawing from Strategies</span>
+                <span class="n">vaultBalance</span> <span class="o">=</span> <span class="n">token</span><span class="p">.</span><span class="n">balanceOf</span><span class="p">(</span><span class="kt">address</span><span class="p">(</span><span class="nb">this</span><span class="p">));</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">value</span> <span class="o">&lt;=</span> <span class="n">vaultBalance</span><span class="p">)</span> <span class="p">{</span>
+                    <span class="k">break</span><span class="p">;</span>
+                <span class="p">}</span>
+
+                <span class="kt">uint256</span> <span class="n">amountNeeded</span> <span class="o">=</span> <span class="n">value</span> <span class="o">-</span> <span class="n">vaultBalance</span><span class="p">;</span>
+
+                <span class="c1">// Do not withdraw more than the Strategy&#39;s debt so that it can still work based on the profits it has</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">strategies</span><span class="p">[</span><span class="n">withdrawalQueue</span><span class="p">[</span><span class="n">i</span><span class="p">]].</span><span class="n">totalDebt</span> <span class="o">&lt;</span> <span class="n">amountNeeded</span><span class="p">)</span> <span class="p">{</span>
+                    <span class="n">amountNeeded</span> <span class="o">=</span> <span class="n">strategies</span><span class="p">[</span><span class="n">withdrawalQueue</span><span class="p">[</span><span class="n">i</span><span class="p">]].</span><span class="n">totalDebt</span><span class="p">;</span>
+                <span class="p">}</span>
+
+                <span class="c1">// if there is nothing to withdraw from this Strategy, move on to the next one</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">amountNeeded</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="k">continue</span><span class="p">;</span>
+
+                <span class="kt">uint256</span> <span class="n">loss</span> <span class="o">=</span> <span class="n">IStrategy</span><span class="p">(</span><span class="n">withdrawalQueue</span><span class="p">[</span><span class="n">i</span><span class="p">]).</span><span class="n">withdraw</span><span class="p">(</span><span class="n">amountNeeded</span><span class="p">);</span>
+                <span class="kt">uint256</span> <span class="n">withdrawn</span> <span class="o">=</span> <span class="n">token</span><span class="p">.</span><span class="n">balanceOf</span><span class="p">(</span><span class="kt">address</span><span class="p">(</span><span class="nb">this</span><span class="p">))</span> <span class="o">-</span> <span class="n">vaultBalance</span><span class="p">;</span>
+
+                <span class="c1">// Withdrawer incurs any losses from liquidation</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">loss</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+                    <span class="n">value</span> <span class="o">-=</span> <span class="n">loss</span><span class="p">;</span>
+                    <span class="n">totalLoss</span> <span class="o">+=</span> <span class="n">loss</span><span class="p">;</span>
+                    <span class="n">strategies</span><span class="p">[</span><span class="n">withdrawalQueue</span><span class="p">[</span><span class="n">i</span><span class="p">]].</span><span class="n">totalLoss</span> <span class="o">+=</span> <span class="n">loss</span><span class="p">;</span>
+                <span class="p">}</span>
+
+                <span class="c1">// Reduce the Strategy&#39;s debt by the amount withdrawn (&quot;realized returns&quot;)</span>
+                <span class="c1">// This doesn&#39;t add to returns as it&#39;s not earned by &quot;normal means&quot;</span>
+                <span class="n">strategies</span><span class="p">[</span><span class="n">withdrawalQueue</span><span class="p">[</span><span class="n">i</span><span class="p">]].</span><span class="n">totalDebt</span> <span class="o">-=</span> <span class="n">withdrawn</span> <span class="o">+</span> <span class="n">loss</span><span class="p">;</span>
+                <span class="n">totalDebt</span> <span class="o">-=</span> <span class="n">withdrawn</span> <span class="o">+</span> <span class="n">loss</span><span class="p">;</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+
+        <span class="n">vaultBalance</span> <span class="o">=</span> <span class="n">token</span><span class="p">.</span><span class="n">balanceOf</span><span class="p">(</span><span class="kt">address</span><span class="p">(</span><span class="nb">this</span><span class="p">));</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="n">vaultBalance</span> <span class="o">&lt;</span> <span class="n">value</span><span class="p">)</span> <span class="p">{</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">vaultBalance</span><span class="p">;</span>
+            <span class="n">shares</span> <span class="o">=</span> <span class="n">_sharesForAmount</span><span class="p">(</span><span class="n">value</span> <span class="o">+</span> <span class="n">totalLoss</span><span class="p">);</span>
+        <span class="p">}</span>
+
+        <span class="c1">// revert if losses from withdrawing are more than what is considered acceptable.</span>
+        <span class="nf">assert</span><span class="p">(</span><span class="n">totalLoss</span> <span class="o">&lt;=</span> <span class="n">maxLoss</span> <span class="o">*</span> <span class="p">(</span><span class="n">value</span> <span class="o">+</span> <span class="n">totalLoss</span><span class="p">)</span> <span class="o">/</span> <span class="n">MAX_BPS</span><span class="p">);</span>
+
+        <span class="c1">// burn shares and transfer ETH to withdrawer</span>
+        <span class="n">_burn</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">,</span> <span class="n">shares</span><span class="p">);</span>
+        <span class="n">IWETH10</span><span class="p">(</span><span class="kt">address</span><span class="p">(</span><span class="n">token</span><span class="p">)).</span><span class="n">withdraw</span><span class="p">(</span><span class="n">value</span><span class="p">);</span>
+        <span class="k">payable</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">).</span><span class="nf">transfer</span><span class="p">(</span><span class="n">value</span><span class="p">);</span>
+
+        <span class="k">emit</span> <span class="n">WithdrawalMade</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">,</span> <span class="n">value</span><span class="p">);</span>
+
+        <span class="k">return</span> <span class="n">value</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Reports the amount of assets the calling Strategy has free (usually in terms of ROI).</span>
+<span class="cm">     * The performance fee is determined here, off of the strategy&#39;s profits (if any), and sent to governance.</span>
+<span class="cm">     * The strategist&#39;s fee is also determined here (off of profits), to be handled according </span>
+<span class="cm">     * to the strategist on the next harvest.</span>
+<span class="cm">     * This may only be called by a Strategy managed by this Vault.</span>
+<span class="cm">     * </span><span class="cs">@dev</span><span class="cm"> For approved strategies, this is the most efficient behavior.</span>
+<span class="cm">     * The Strategy reports back what it has free, then Vault &quot;decides&quot;</span>
+<span class="cm">     * whether to take some back or give it more. Note that the most it can</span>
+<span class="cm">     * take is `gain + _debtPayment`, and the most it can give is all of the</span>
+<span class="cm">     * remaining reserves. Anything outside of those bounds is abnormal behavior.</span>
+<span class="cm">     * All approved strategies must have increased diligence around</span>
+<span class="cm">     * calling this function, as abnormal behavior could become catastrophic.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> gain Amount Strategy has realized as a gain on it&#39;s investment since its</span>
+<span class="cm">     * last report, and is free to be given back to Vault as earnings</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> loss Amount Strategy has realized as a loss on it&#39;s investment since its</span>
+<span class="cm">     * last report, and should be accounted for on the Vault&#39;s balance sheet</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _debtPayment Amount Strategy has made available to cover outstanding debt</span>
+<span class="cm">     * </span><span class="cs">@return</span><span class="cm"> Amount of debt outstanding (if totalDebt &gt; debtLimit or emergency shutdown).</span>
+<span class="cm">    */</span>
+    <span class="kd">function</span> <span class="n">report</span><span class="p">(</span><span class="kt">uint256</span> <span class="n">gain</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">loss</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_debtPayment</span><span class="p">)</span> <span class="k">external</span> <span class="k">returns</span> <span class="p">(</span><span class="kt">uint256</span><span class="p">)</span> <span class="p">{</span>
+        <span class="nf">require</span><span class="p">(</span><span class="n">strategies</span><span class="p">[</span><span class="nb">msg.sender</span><span class="p">].</span><span class="n">activation</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span> <span class="s">&quot;must be called by an active strategy&quot;</span><span class="p">);</span>
+        <span class="nf">require</span><span class="p">(</span><span class="n">token</span><span class="p">.</span><span class="n">balanceOf</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">gain</span> <span class="o">+</span> <span class="n">_debtPayment</span><span class="p">,</span> <span class="s">&quot;need to have available tokens to withdraw&quot;</span><span class="p">);</span>
+
+        <span class="c1">// Report loss before rest of calculations if possible</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">loss</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span> <span class="n">_reportLoss</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">,</span> <span class="n">loss</span><span class="p">);</span>
+
+        <span class="c1">// Assess both management fee and performance fee, and issue both as shares of the vault</span>
+        <span class="n">_assessFees</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">,</span> <span class="n">gain</span><span class="p">);</span>
+
+        <span class="c1">// Returns are always &quot;realized gains&quot;</span>
+        <span class="n">strategies</span><span class="p">[</span><span class="nb">msg.sender</span><span class="p">].</span><span class="n">totalGain</span> <span class="o">+=</span> <span class="n">gain</span><span class="p">;</span>
+
+        <span class="c1">// Outstanding debt the Strategy wants to take back from the Vault (if any)</span>
+        <span class="c1">// NOTE: debtOutstanding &lt;= StrategyParams.totalDebt</span>
+        <span class="kt">uint256</span> <span class="n">debt</span> <span class="o">=</span> <span class="n">_debtOutstanding</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">);</span>
+        <span class="kt">uint256</span> <span class="n">debtPayment</span><span class="p">;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">debt</span> <span class="o">&lt;</span> <span class="n">_debtPayment</span><span class="p">)</span> <span class="p">{</span>
+            <span class="n">debtPayment</span> <span class="o">=</span> <span class="n">debt</span><span class="p">;</span>
+        <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+            <span class="n">debtPayment</span> <span class="o">=</span> <span class="n">_debtPayment</span><span class="p">;</span>
+        <span class="p">}</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="n">debtPayment</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+            <span class="n">strategies</span><span class="p">[</span><span class="nb">msg.sender</span><span class="p">].</span><span class="n">totalDebt</span> <span class="o">-=</span> <span class="n">debtPayment</span><span class="p">;</span>
+            <span class="n">totalDebt</span> <span class="o">-=</span> <span class="n">debtPayment</span><span class="p">;</span>
+            <span class="n">debt</span> <span class="o">-=</span> <span class="n">debtPayment</span><span class="p">;</span> <span class="c1">// `debt` is being tracked for later</span>
+        <span class="p">}</span>
+
+        <span class="c1">// Compute the line of credit the Vault is able to offer the Strategy (if any)</span>
+        <span class="kt">uint256</span> <span class="n">credit</span> <span class="o">=</span> <span class="n">_creditAvailable</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">);</span>
+
+        <span class="c1">// Update the actual debt based on the full credit we are extending to the Strategy</span>
+        <span class="c1">// or the returns if we are taking funds back</span>
+        <span class="c1">// NOTE: credit + strategies[msg.sender].totalDebt is always &lt; debtLimit</span>
+        <span class="c1">// NOTE: At least one of `credit` or `debt` is always 0 (both can be 0)</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">credit</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+            <span class="n">strategies</span><span class="p">[</span><span class="nb">msg.sender</span><span class="p">].</span><span class="n">totalDebt</span> <span class="o">+=</span> <span class="n">credit</span><span class="p">;</span>
+            <span class="n">totalDebt</span> <span class="o">+=</span> <span class="n">credit</span><span class="p">;</span>
+        <span class="p">}</span>
+
+        <span class="c1">// Give/take balance to Strategy, based on the difference between the reported gains</span>
+        <span class="c1">// (if any), the debt payment (if any), the credit increase we are offering (if any),</span>
+        <span class="c1">// and the debt needed to be paid off (if any)</span>
+        <span class="c1">// NOTE: This is just used to adjust the balance of tokens between the Strategy and</span>
+        <span class="c1">// the Vault based on the Strategy&#39;s debt limit (as well as the Vault&#39;s). </span>
+        <span class="kt">uint256</span> <span class="n">totalAvail</span> <span class="o">=</span> <span class="n">gain</span> <span class="o">+</span> <span class="n">debtPayment</span><span class="p">;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">totalAvail</span> <span class="o">&lt;</span> <span class="n">credit</span><span class="p">){</span>  <span class="c1">// credit surplus, give to Strategy</span>
+            <span class="n">SafeERC20</span><span class="p">.</span><span class="n">safeTransfer</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="nb">msg.sender</span><span class="p">,</span> <span class="n">credit</span> <span class="o">-</span> <span class="n">totalAvail</span><span class="p">);</span>
+        <span class="p">}</span> <span class="k">else</span> <span class="k">if</span> <span class="p">(</span><span class="n">totalAvail</span> <span class="o">&gt;</span> <span class="n">credit</span><span class="p">)</span> <span class="p">{</span>  <span class="c1">// credit deficit, take from Strategy</span>
+            <span class="n">SafeERC20</span><span class="p">.</span><span class="n">safeTransferFrom</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="nb">msg.sender</span><span class="p">,</span> <span class="kt">address</span><span class="p">(</span><span class="nb">this</span><span class="p">),</span> <span class="n">totalAvail</span> <span class="o">-</span> <span class="n">credit</span><span class="p">);</span>
+        <span class="p">}</span>
+        <span class="c1">// else, don&#39;t do anything because it is balanced</span>
+
+        <span class="c1">// Update cached value of delegated assets (used to properly account for mgmt fee in `_assessFees`)</span>
+        <span class="n">delegatedAssets</span> <span class="o">-=</span> <span class="n">_strategyDelegatedAssets</span><span class="p">[</span><span class="nb">msg.sender</span><span class="p">];</span>
+        
+        <span class="c1">// NOTE: Take the min of totalDebt and delegatedAssets) to guard against improper computation</span>
+        <span class="kt">uint256</span> <span class="n">strategyDelegatedAssets</span><span class="p">;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">strategies</span><span class="p">[</span><span class="nb">msg.sender</span><span class="p">].</span><span class="n">totalDebt</span> <span class="o">&lt;</span> <span class="n">IStrategy</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">).</span><span class="n">delegatedAssets</span><span class="p">())</span> <span class="p">{</span>
+            <span class="n">strategyDelegatedAssets</span> <span class="o">=</span> <span class="n">strategies</span><span class="p">[</span><span class="nb">msg.sender</span><span class="p">].</span><span class="n">totalDebt</span><span class="p">;</span>
+        <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+            <span class="n">strategyDelegatedAssets</span> <span class="o">=</span> <span class="n">IStrategy</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">).</span><span class="n">delegatedAssets</span><span class="p">();</span>
+        <span class="p">}</span>
+        <span class="n">delegatedAssets</span> <span class="o">+=</span> <span class="n">strategyDelegatedAssets</span><span class="p">;</span>
+        <span class="n">_strategyDelegatedAssets</span><span class="p">[</span><span class="nb">msg.sender</span><span class="p">]</span> <span class="o">=</span> <span class="n">delegatedAssets</span><span class="p">;</span>
+
+        <span class="c1">// Update reporting time</span>
+        <span class="n">strategies</span><span class="p">[</span><span class="nb">msg.sender</span><span class="p">].</span><span class="n">lastReport</span> <span class="o">=</span> <span class="nb">block.timestamp</span><span class="p">;</span>
+        <span class="n">lastReport</span> <span class="o">=</span> <span class="nb">block.timestamp</span><span class="p">;</span>
+        <span class="c1">// profit is locked and gradually released per block</span>
+        <span class="n">lockedProfit</span> <span class="o">=</span> <span class="n">gain</span><span class="p">;</span>
+
+        <span class="k">emit</span> <span class="n">StrategyReported</span><span class="p">(</span>
+            <span class="nb">msg.sender</span><span class="p">,</span>
+            <span class="n">gain</span><span class="p">,</span>
+            <span class="n">loss</span><span class="p">,</span>
+            <span class="n">debtPayment</span><span class="p">,</span>
+            <span class="n">strategies</span><span class="p">[</span><span class="nb">msg.sender</span><span class="p">].</span><span class="n">totalGain</span><span class="p">,</span>
+            <span class="n">strategies</span><span class="p">[</span><span class="nb">msg.sender</span><span class="p">].</span><span class="n">totalLoss</span><span class="p">,</span>
+            <span class="n">strategies</span><span class="p">[</span><span class="nb">msg.sender</span><span class="p">].</span><span class="n">totalDebt</span><span class="p">,</span>
+            <span class="n">credit</span><span class="p">,</span>
+            <span class="n">strategies</span><span class="p">[</span><span class="nb">msg.sender</span><span class="p">].</span><span class="n">debtRatio</span>
+        <span class="p">);</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="n">strategies</span><span class="p">[</span><span class="nb">msg.sender</span><span class="p">].</span><span class="n">debtRatio</span> <span class="o">==</span> <span class="mi">0</span> <span class="o">||</span> <span class="n">emergencyShutdown</span><span class="p">)</span> <span class="p">{</span>
+            <span class="c1">// Take every last penny the Strategy has (Emergency Exit/revokeStrategy)</span>
+            <span class="c1">// NOTE: This is different than `debt` in order to extract *all* of the returns</span>
+            <span class="k">return</span> <span class="n">IStrategy</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">).</span><span class="n">estimatedTotalAssets</span><span class="p">();</span>
+        <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+            <span class="c1">// Otherwise, just return what we have as debt outstanding</span>
+            <span class="k">return</span> <span class="n">debt</span><span class="p">;</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="cm">/*************</span>
+<span class="cm">    EXTERNAL VIEW FUNCTIONS</span>
+<span class="cm">    *************/</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Amount of tokens in Vault a Strategy has access to as a credit line.</span>
+<span class="cm">     * Check the Strategy&#39;s debt limit, as well as the tokens available in the Vault,</span>
+<span class="cm">     * and determine the maximum amount of tokens (if any) the Strategy may draw on.</span>
+<span class="cm">     * In the rare case the Vault is in emergency shutdown this will return 0.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> strategy The Strategy to check. Defaults to caller.</span>
+<span class="cm">     * </span><span class="cs">@return</span><span class="cm"> The quantity of tokens available for the Strategy to draw on.</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">creditAvailable</span><span class="p">(</span><span class="kt">address</span> <span class="n">strategy</span><span class="p">)</span> <span class="k">external</span> <span class="k">view</span> <span class="k">returns</span> <span class="p">(</span><span class="kt">uint256</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="n">_creditAvailable</span><span class="p">(</span><span class="n">strategy</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">    * </span><span class="cs">@notice</span><span class="cm"> Provide an accurate expected value for the return this `strategy`</span>
+<span class="cm">    * would provide to the Vault the next time `report()` is called</span>
+<span class="cm">    * (since the last time it was called).</span>
+<span class="cm">    * </span><span class="cs">@param</span><span class="cm"> strategy The Strategy to determine the expected return for. Defaults to caller.</span>
+<span class="cm">    * </span><span class="cs">@return</span><span class="cm"> The anticipated amount `strategy` should make on its investment</span>
+<span class="cm">    * since its last report.</span>
+<span class="cm">    */</span>
+    <span class="kd">function</span> <span class="n">expectedReturn</span><span class="p">(</span><span class="kt">address</span> <span class="n">strategy</span><span class="p">)</span> <span class="k">external</span> <span class="k">view</span> <span class="k">returns</span> <span class="p">(</span><span class="kt">uint256</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">_expectedReturn</span><span class="p">(</span><span class="n">strategy</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Returns the total quantity of all assets under control of this</span>
+<span class="cm">        Vault, including those loaned out to a Strategy as well as those currently</span>
+<span class="cm">        held in the Vault.</span>
+<span class="cm">     * </span><span class="cs">@return</span><span class="cm"> The total assets under control of this vault.</span>
+<span class="cm">    */</span>
+    <span class="kd">function</span> <span class="n">totalAssets</span><span class="p">()</span> <span class="k">external</span> <span class="k">view</span> <span class="k">returns</span> <span class="p">(</span><span class="kt">uint256</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="n">_totalAssets</span><span class="p">();</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Determines if `strategy` is past its debt limit and if any tokens</span>
+<span class="cm">     * should be withdrawn to the Vault.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> strategy The Strategy to check. Defaults to the caller.</span>
+<span class="cm">     * </span><span class="cs">@return</span><span class="cm"> The quantity of tokens to withdraw.</span>
+<span class="cm">    */</span>
+    <span class="kd">function</span> <span class="n">debtOutstanding</span><span class="p">(</span><span class="kt">address</span> <span class="n">strategy</span><span class="p">)</span> <span class="k">external</span> <span class="k">view</span> <span class="k">returns</span> <span class="p">(</span><span class="kt">uint256</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="n">_debtOutstanding</span><span class="p">(</span><span class="n">strategy</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="cm">/*************</span>
+<span class="cm">    INTERNAL FUNCTIONS</span>
+<span class="cm">    *************/</span>
+
+    <span class="kd">function</span> <span class="n">_revokeStrategy</span><span class="p">(</span><span class="kt">address</span> <span class="n">strategy</span><span class="p">)</span> <span class="k">internal</span> <span class="p">{</span>
+        <span class="n">debtRatio</span> <span class="o">-=</span> <span class="n">strategies</span><span class="p">[</span><span class="n">strategy</span><span class="p">].</span><span class="n">debtRatio</span><span class="p">;</span>
+        <span class="n">strategies</span><span class="p">[</span><span class="n">strategy</span><span class="p">].</span><span class="n">debtRatio</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+        <span class="k">emit</span> <span class="n">StrategyRevoked</span><span class="p">(</span><span class="n">strategy</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="kd">function</span> <span class="n">_reportLoss</span><span class="p">(</span><span class="kt">address</span> <span class="n">strategy</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">loss</span><span class="p">)</span> <span class="k">internal</span> <span class="p">{</span>
+        <span class="kt">uint256</span> <span class="n">strategyTotalDebt</span> <span class="o">=</span> <span class="n">strategies</span><span class="p">[</span><span class="n">strategy</span><span class="p">].</span><span class="n">totalDebt</span><span class="p">;</span>
+        <span class="nf">require</span><span class="p">(</span><span class="n">strategyTotalDebt</span> <span class="o">&gt;=</span> <span class="n">loss</span><span class="p">,</span> <span class="s">&quot;loss can only be up the amount of debt issued to strategy&quot;</span><span class="p">);</span>
+        <span class="n">strategies</span><span class="p">[</span><span class="n">strategy</span><span class="p">].</span><span class="n">totalLoss</span> <span class="o">+=</span> <span class="n">loss</span><span class="p">;</span>
+        <span class="n">strategies</span><span class="p">[</span><span class="n">strategy</span><span class="p">].</span><span class="n">totalDebt</span> <span class="o">=</span> <span class="n">strategyTotalDebt</span> <span class="o">-</span> <span class="n">loss</span><span class="p">;</span>
+        <span class="n">totalDebt</span> <span class="o">-=</span> <span class="n">loss</span><span class="p">;</span>
+        
+        <span class="c1">// Also, make sure we reduce our trust with the strategy by the same amount</span>
+        <span class="kt">uint256</span> <span class="n">strategyDebtRatio</span> <span class="o">=</span> <span class="n">strategies</span><span class="p">[</span><span class="n">strategy</span><span class="p">].</span><span class="n">debtRatio</span><span class="p">;</span>
+
+        <span class="kt">uint256</span> <span class="n">ratioChange</span><span class="p">;</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="n">loss</span> <span class="o">*</span> <span class="n">MAX_BPS</span> <span class="o">/</span> <span class="n">_totalAssets</span><span class="p">()</span> <span class="o">&lt;</span> <span class="n">strategyDebtRatio</span><span class="p">)</span> <span class="p">{</span>
+            <span class="n">ratioChange</span> <span class="o">=</span> <span class="n">loss</span> <span class="o">*</span> <span class="n">MAX_BPS</span> <span class="o">/</span> <span class="n">_totalAssets</span><span class="p">();</span>
+        <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+            <span class="n">ratioChange</span> <span class="o">=</span> <span class="n">strategyDebtRatio</span><span class="p">;</span>
+        <span class="p">}</span>
+        <span class="n">strategies</span><span class="p">[</span><span class="n">strategy</span><span class="p">].</span><span class="n">debtRatio</span> <span class="o">-=</span> <span class="n">ratioChange</span><span class="p">;</span>
+        <span class="n">debtRatio</span> <span class="o">-=</span> <span class="n">ratioChange</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Issue new shares to cover fees</span>
+<span class="cm">     * In effect, this reduces overall share price by the combined fee</span>
+<span class="cm">     * may throw if Vault.totalAssets() &gt; 1e64, or not called for more than a year</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">_assessFees</span><span class="p">(</span><span class="kt">address</span> <span class="n">strategy</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">gain</span><span class="p">)</span> <span class="k">internal</span> <span class="p">{</span>
+        <span class="kt">uint256</span> <span class="n">governanceFee</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="p">(</span>
+                <span class="p">(</span><span class="n">totalDebt</span> <span class="o">-</span> <span class="n">delegatedAssets</span><span class="p">)</span>
+                <span class="o">*</span> <span class="p">(</span><span class="nb">block.timestamp</span> <span class="o">-</span> <span class="n">lastReport</span><span class="p">)</span>
+                <span class="o">*</span> <span class="n">managementFee</span>
+            <span class="p">)</span>
+            <span class="o">/</span> <span class="n">MAX_BPS</span> 
+            <span class="o">/</span> <span class="n">SECS_PER_YEAR</span>
+        <span class="p">);</span>
+        
+        <span class="c1">// Strategist fee only applies in certain conditions</span>
+        <span class="kt">uint256</span> <span class="n">strategistFee</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+
+        <span class="c1">// NOTE: Applies if Strategy is not shutting down, or it is but all debt paid off</span>
+        <span class="c1">// NOTE: No fee is taken when a Strategy is unwinding it&#39;s position, until all debt is paid</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">gain</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+            <span class="c1">// NOTE: Unlikely to throw unless strategy reports &gt;1e72 harvest profit</span>
+            <span class="n">strategistFee</span> <span class="o">=</span> <span class="p">(</span><span class="n">gain</span> <span class="o">*</span> <span class="n">strategies</span><span class="p">[</span><span class="n">strategy</span><span class="p">].</span><span class="n">performanceFee</span><span class="p">)</span> <span class="o">/</span> <span class="n">MAX_BPS</span><span class="p">;</span>
+            <span class="n">governanceFee</span> <span class="o">+=</span> <span class="n">gain</span> <span class="o">*</span> <span class="n">performanceFee</span> <span class="o">/</span> <span class="n">MAX_BPS</span><span class="p">;</span>
+        <span class="p">}</span>
+
+        <span class="c1">// NOTE: This must be called prior to taking new collateral, or the calculation will be wrong!</span>
+        <span class="c1">// NOTE: This must be done at the same time, to ensure the relative ratio of governance_fee : strategist_fee is kept intact</span>
+        <span class="kt">uint256</span> <span class="n">totalFee</span> <span class="o">=</span> <span class="n">governanceFee</span> <span class="o">+</span> <span class="n">strategistFee</span><span class="p">;</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="n">totalFee</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+            <span class="c1">// issue shares as reward</span>
+            <span class="kt">uint256</span> <span class="n">reward</span><span class="p">;</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">totalSupply</span><span class="p">()</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+                <span class="n">reward</span> <span class="o">=</span> <span class="n">totalFee</span><span class="p">;</span>
+            <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+                <span class="n">reward</span> <span class="o">=</span> <span class="p">(</span><span class="n">totalFee</span> <span class="o">*</span> <span class="n">totalSupply</span><span class="p">())</span> <span class="o">/</span> <span class="n">_totalAssets</span><span class="p">();</span>
+            <span class="p">}</span>
+        
+            <span class="c1">// Issuance of shares needs to be done before taking the deposit</span>
+            <span class="n">_mint</span><span class="p">(</span><span class="kt">address</span><span class="p">(</span><span class="nb">this</span><span class="p">),</span> <span class="n">reward</span><span class="p">);</span>
+
+            <span class="c1">// Send the rewards out as new shares in this Vault</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">strategistFee</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+                <span class="c1">// NOTE: Unlikely to throw unless sqrt(reward) &gt;&gt;&gt; 1e39</span>
+                <span class="kt">uint256</span> <span class="n">strategistReward</span> <span class="o">=</span> <span class="p">(</span><span class="n">strategistFee</span> <span class="o">*</span> <span class="n">reward</span><span class="p">)</span> <span class="o">/</span> <span class="n">totalFee</span><span class="p">;</span>
+                <span class="n">_transfer</span><span class="p">(</span><span class="kt">address</span><span class="p">(</span><span class="nb">this</span><span class="p">),</span> <span class="n">strategy</span><span class="p">,</span> <span class="n">strategistReward</span><span class="p">);</span>
+                <span class="c1">// NOTE: Strategy distributes rewards at the end of harvest()</span>
+            <span class="p">}</span>
+
+            <span class="c1">// Governance earns any dust leftovers from flooring math above</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">balanceOf</span><span class="p">(</span><span class="kt">address</span><span class="p">(</span><span class="nb">this</span><span class="p">))</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+                <span class="n">_transfer</span><span class="p">(</span><span class="kt">address</span><span class="p">(</span><span class="nb">this</span><span class="p">),</span> <span class="n">rewards</span><span class="p">,</span> <span class="n">balanceOf</span><span class="p">(</span><span class="kt">address</span><span class="p">(</span><span class="nb">this</span><span class="p">)));</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="cm">/*************</span>
+<span class="cm">    INTERNAL VIEW FUNCTIONS</span>
+<span class="cm">    *************/</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Quantity of all assets under control of this Vault, including those loaned out to Strategies</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">_totalAssets</span><span class="p">()</span> <span class="k">internal</span> <span class="k">view</span> <span class="k">returns</span> <span class="p">(</span><span class="kt">uint256</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="n">token</span><span class="p">.</span><span class="n">balanceOf</span><span class="p">(</span><span class="kt">address</span><span class="p">(</span><span class="nb">this</span><span class="p">))</span> <span class="o">+</span> <span class="n">totalDebt</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="kd">function</span> <span class="n">_creditAvailable</span><span class="p">(</span><span class="kt">address</span> <span class="n">_strategy</span><span class="p">)</span> <span class="k">internal</span> <span class="k">view</span> <span class="k">returns</span> <span class="p">(</span><span class="kt">uint256</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">emergencyShutdown</span><span class="p">)</span> <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+
+        <span class="kt">uint256</span> <span class="n">vaultTotalAssets</span> <span class="o">=</span> <span class="n">_totalAssets</span><span class="p">();</span>
+        <span class="kt">uint256</span> <span class="n">vaultDebtLimit</span> <span class="o">=</span> <span class="p">(</span><span class="n">debtRatio</span> <span class="o">*</span> <span class="n">vaultTotalAssets</span><span class="p">)</span> <span class="o">/</span> <span class="n">MAX_BPS</span><span class="p">;</span>
+        <span class="kt">uint256</span> <span class="n">strategyDebtLimit</span> <span class="o">=</span> <span class="p">(</span><span class="n">strategies</span><span class="p">[</span><span class="n">_strategy</span><span class="p">].</span><span class="n">debtRatio</span> <span class="o">*</span> <span class="n">vaultTotalAssets</span><span class="p">)</span> <span class="o">/</span> <span class="n">MAX_BPS</span><span class="p">;</span>
+
+        <span class="c1">// No credit available to issue if credit line has been exhasted</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">vaultDebtLimit</span> <span class="o">&lt;=</span> <span class="n">totalDebt</span> <span class="o">||</span> <span class="n">strategyDebtLimit</span> <span class="o">&lt;=</span> <span class="n">strategies</span><span class="p">[</span><span class="n">_strategy</span><span class="p">].</span><span class="n">totalDebt</span><span class="p">)</span> <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+        
+        <span class="kt">uint256</span> <span class="n">available</span> <span class="o">=</span> <span class="n">strategyDebtLimit</span> <span class="o">-</span> <span class="n">strategies</span><span class="p">[</span><span class="n">_strategy</span><span class="p">].</span><span class="n">totalDebt</span><span class="p">;</span>
+
+        <span class="c1">// Adjust by the global debt limit left</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">vaultDebtLimit</span> <span class="o">-</span> <span class="n">totalDebt</span> <span class="o">&lt;</span> <span class="n">available</span><span class="p">)</span> <span class="n">available</span> <span class="o">=</span> <span class="n">vaultDebtLimit</span> <span class="o">-</span> <span class="n">totalDebt</span><span class="p">;</span>
+
+        <span class="c1">// Can only borrow up to what the contract has in reserve</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">token</span><span class="p">.</span><span class="n">balanceOf</span><span class="p">(</span><span class="kt">address</span><span class="p">(</span><span class="nb">this</span><span class="p">))</span> <span class="o">&lt;</span> <span class="n">available</span><span class="p">)</span> <span class="n">available</span> <span class="o">=</span> <span class="n">token</span><span class="p">.</span><span class="n">balanceOf</span><span class="p">(</span><span class="kt">address</span><span class="p">(</span><span class="nb">this</span><span class="p">));</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="n">available</span> <span class="o">&lt;</span> <span class="n">strategies</span><span class="p">[</span><span class="n">_strategy</span><span class="p">].</span><span class="n">minDebtPerHarvest</span><span class="p">)</span> <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="n">strategies</span><span class="p">[</span><span class="n">_strategy</span><span class="p">].</span><span class="n">maxDebtPerHarvest</span> <span class="o">&lt;</span> <span class="n">available</span><span class="p">)</span> <span class="k">return</span> <span class="n">strategies</span><span class="p">[</span><span class="n">_strategy</span><span class="p">].</span><span class="n">maxDebtPerHarvest</span><span class="p">;</span>
+    
+        <span class="k">return</span> <span class="n">available</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="kd">function</span> <span class="n">_expectedReturn</span><span class="p">(</span><span class="kt">address</span> <span class="n">strategy</span><span class="p">)</span> <span class="k">internal</span> <span class="k">view</span> <span class="k">returns</span> <span class="p">(</span><span class="kt">uint256</span><span class="p">)</span> <span class="p">{</span>
+        <span class="kt">uint256</span> <span class="n">strategyLastReport</span> <span class="o">=</span> <span class="n">strategies</span><span class="p">[</span><span class="n">strategy</span><span class="p">].</span><span class="n">lastReport</span><span class="p">;</span>
+        <span class="kt">uint256</span> <span class="n">timeSinceLastHarvest</span> <span class="o">=</span> <span class="nb">block.timestamp</span> <span class="o">-</span> <span class="n">strategyLastReport</span><span class="p">;</span>
+        <span class="kt">uint256</span> <span class="n">totalHarvestTime</span> <span class="o">=</span> <span class="n">strategyLastReport</span> <span class="o">-</span> <span class="n">strategies</span><span class="p">[</span><span class="n">strategy</span><span class="p">].</span><span class="n">activation</span><span class="p">;</span>
+
+        <span class="c1">// NOTE: If either `timeSinceLastHarvest` or `totalHarvestTime` is 0, we can short-circuit to `0`</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">timeSinceLastHarvest</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="o">&amp;&amp;</span> <span class="n">totalHarvestTime</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="o">&amp;&amp;</span> <span class="n">IStrategy</span><span class="p">(</span><span class="n">strategy</span><span class="p">).</span><span class="n">isActive</span><span class="p">())</span> <span class="p">{</span>
+            <span class="c1">// NOTE: Unlikely to throw unless strategy accumalates &gt;1e68 returns</span>
+            <span class="c1">// NOTE: Calculate average over period of time where harvests have occured in the past</span>
+            <span class="k">return</span> <span class="p">(</span><span class="n">strategies</span><span class="p">[</span><span class="n">strategy</span><span class="p">].</span><span class="n">totalGain</span> <span class="o">*</span> <span class="n">timeSinceLastHarvest</span><span class="p">)</span> <span class="o">/</span> <span class="n">totalHarvestTime</span><span class="p">;</span>
+        <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+            <span class="c1">// Covers the scenario when block.timestamp == activation</span>
+            <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Determines the current value of `shares`</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> shares amount of shares to calculate value for.</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">_shareValue</span><span class="p">(</span><span class="kt">uint256</span> <span class="n">shares</span><span class="p">)</span> <span class="k">internal</span> <span class="k">view</span> <span class="k">returns</span> <span class="p">(</span><span class="kt">uint256</span><span class="p">)</span> <span class="p">{</span>
+
+        <span class="c1">// If sqrt(Vault.totalAssets()) &gt;&gt;&gt; 1e39, this could potentially revert</span>
+        <span class="kt">uint256</span> <span class="n">lockedFundsRatio</span> <span class="o">=</span> <span class="p">(</span><span class="nb">block.timestamp</span> <span class="o">-</span> <span class="n">lastReport</span><span class="p">)</span> <span class="o">*</span> <span class="n">lockedProfitDegration</span><span class="p">;</span>
+        <span class="kt">uint256</span> <span class="n">freeFunds</span> <span class="o">=</span> <span class="n">_totalAssets</span><span class="p">();</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="n">lockedFundsRatio</span> <span class="o">&lt;</span> <span class="n">DEGREDATION_COEFFICIENT</span><span class="p">)</span> <span class="p">{</span>
+            <span class="n">freeFunds</span> <span class="o">-=</span> <span class="p">(</span><span class="n">lockedProfit</span> <span class="o">-</span> <span class="p">(</span><span class="n">lockedFundsRatio</span> <span class="o">*</span> <span class="n">lockedProfit</span> <span class="o">/</span> <span class="n">DEGREDATION_COEFFICIENT</span><span class="p">));</span>
+        <span class="p">}</span>
+
+        <span class="c1">// using 1e3 for extra precision here when decimals is low</span>
+        <span class="k">return</span> <span class="p">((</span><span class="mi">10</span> <span class="o">**</span> <span class="mi">3</span> <span class="o">*</span> <span class="p">(</span><span class="n">shares</span> <span class="o">*</span> <span class="n">freeFunds</span><span class="p">))</span> <span class="o">/</span> <span class="n">totalSupply</span><span class="p">())</span> <span class="o">/</span> <span class="mi">10</span> <span class="o">**</span> <span class="mi">3</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Determines how many shares `amount` of token would receive.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> amount of tokens to calculate number of shares for</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">_sharesForAmount</span><span class="p">(</span><span class="kt">uint256</span> <span class="n">amount</span><span class="p">)</span> <span class="k">internal</span> <span class="k">view</span> <span class="k">returns</span> <span class="p">(</span><span class="kt">uint256</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">_totalAssets</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+            <span class="c1">// NOTE: if sqrt(token.totalSupply()) &gt; 1e37, this could potentially revert</span>
+            <span class="k">return</span> <span class="p">((</span><span class="mi">10</span> <span class="o">**</span> <span class="mi">3</span> <span class="o">*</span> <span class="p">(</span><span class="n">amount</span> <span class="o">*</span> <span class="n">totalSupply</span><span class="p">()))</span> <span class="o">/</span> <span class="n">_totalAssets</span><span class="p">())</span> <span class="o">/</span> <span class="mi">10</span> <span class="o">**</span> <span class="mi">3</span><span class="p">;</span>
+        <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+            <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="kd">function</span> <span class="n">_debtOutstanding</span><span class="p">(</span><span class="kt">address</span> <span class="n">strategy</span><span class="p">)</span> <span class="k">internal</span> <span class="k">view</span> <span class="k">returns</span> <span class="p">(</span><span class="kt">uint256</span><span class="p">)</span> <span class="p">{</span>
+        <span class="kt">uint256</span> <span class="n">strategyDebtLimit</span> <span class="o">=</span> <span class="n">strategies</span><span class="p">[</span><span class="n">strategy</span><span class="p">].</span><span class="n">debtRatio</span> <span class="o">*</span> <span class="n">_totalAssets</span><span class="p">()</span> <span class="o">/</span> <span class="n">MAX_BPS</span><span class="p">;</span>
+        <span class="kt">uint256</span> <span class="n">strategyTotalDebt</span> <span class="o">=</span> <span class="n">strategies</span><span class="p">[</span><span class="n">strategy</span><span class="p">].</span><span class="n">totalDebt</span><span class="p">;</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="n">emergencyShutdown</span><span class="p">)</span> <span class="p">{</span>
+            <span class="k">return</span> <span class="n">strategyTotalDebt</span><span class="p">;</span>
+        <span class="p">}</span> <span class="k">else</span> <span class="k">if</span> <span class="p">(</span><span class="n">strategyTotalDebt</span> <span class="o">&lt;=</span> <span class="n">strategyDebtLimit</span><span class="p">)</span> <span class="p">{</span>
+            <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+        <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+            <span class="k">return</span> <span class="n">strategyTotalDebt</span> <span class="o">-</span> <span class="n">strategyDebtLimit</span><span class="p">;</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Fallback function to allow contract to receive ETH</span>
+<span class="cm">     * Mints CP tokens to caller if caller is not Vault or WETH</span>
+<span class="cm">     */</span>
+    <span class="k k-Function">receive</span><span class="p">()</span> <span class="k">external</span> <span class="k">payable</span> <span class="p">{</span>
+        <span class="k">if</span> <span class="p">(</span><span class="nb">msg.sender</span> <span class="o">!=</span> <span class="kt">address</span><span class="p">(</span><span class="n">token</span><span class="p">))</span> <span class="p">{</span>
+            <span class="n">deposit</span><span class="p">();</span>
+        <span class="p">}</span>
     <span class="p">}</span>
 
 <span class="p">}</span>

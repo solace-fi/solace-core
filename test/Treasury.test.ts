@@ -13,9 +13,9 @@ import { encodePath } from "./utilities/path";
 // solace imports
 import SolaceArtifact from "../artifacts/contracts/SOLACE.sol/SOLACE.json";
 import TreasuryArtifact from "../artifacts/contracts/Treasury.sol/Treasury.json";
-import MockTokenArtifact from "../artifacts/contracts/mocks/MockToken.sol/MockToken.json";
+import MockERC20Artifact from "../artifacts/contracts/mocks/MockERC20.sol/MockERC20.json";
 import WETHArtifact from "../artifacts/contracts/mocks/MockWETH.sol/MockWETH.json";
-import { Solace, Treasury, MockToken, MockWeth } from "../typechain";
+import { Solace, Treasury, MockErc20, MockWeth } from "../typechain";
 
 // uniswap imports
 import UniswapV3FactoryArtifact from "@uniswap/v3-core/artifacts/contracts/UniswapV3Factory.sol/UniswapV3Factory.json";
@@ -49,8 +49,8 @@ describe("Treasury", function () {
   let solaceToken: Solace;
   let treasury: Treasury;
   let weth: MockWeth;
-  let mockToken1: MockToken;
-  let mockToken2: MockToken;
+  let mockToken1: MockErc20;
+  let mockToken2: MockErc20;
 
   let wethPath: string;
   let mockToken2Path: string;
@@ -74,24 +74,24 @@ describe("Treasury", function () {
     // deploy mock token 1
     mockToken1 = (await deployContract(
         deployer,
-        MockTokenArtifact,
+        MockERC20Artifact,
         [
           "Mock Token 1",
           "MKT1",
           ONE_MILLION_ETHER
         ]
-    )) as MockToken;
+    )) as MockErc20;
 
     // deploy mock token 2
     mockToken2 = (await deployContract(
         deployer,
-        MockTokenArtifact,
+        MockERC20Artifact,
         [
           "Mock Token 2",
           "MKT2",
           ONE_MILLION_ETHER
         ]
-    )) as MockToken;
+    )) as MockErc20;
 
     // deploy uniswap factory
     uniswapFactory = (await deployContract(

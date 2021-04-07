@@ -20,28 +20,18 @@ import { BytesLike } from "@ethersproject/bytes";
 import { Listener, Provider } from "@ethersproject/providers";
 import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
-interface MasterInterface extends ethers.utils.Interface {
+interface IMasterInterface extends ethers.utils.Interface {
   functions: {
     "createFarmErc20(address,uint256,uint256,uint256)": FunctionFragment;
     "createFarmErc721(address,address,uint256,uint256,uint256)": FunctionFragment;
     "depositErc20(uint256,uint256)": FunctionFragment;
     "depositErc721(uint256,uint256)": FunctionFragment;
-    "farmInfo(uint256)": FunctionFragment;
-    "farmIsErc20(uint256)": FunctionFragment;
-    "farmIsErc721(uint256)": FunctionFragment;
     "getMultiplier(uint256,uint256,uint256)": FunctionFragment;
-    "governance()": FunctionFragment;
     "massUpdateFarms()": FunctionFragment;
-    "numFarms()": FunctionFragment;
     "pendingReward(uint256,address)": FunctionFragment;
     "setFarmParams(uint256,uint256,uint256,bool)": FunctionFragment;
-    "setGovernance(address)": FunctionFragment;
     "setSolacePerBlock(uint256,bool)": FunctionFragment;
-    "solace()": FunctionFragment;
-    "solacePerBlock()": FunctionFragment;
-    "totalAllocPoints()": FunctionFragment;
     "updateFarm(uint256)": FunctionFragment;
-    "userInfo(uint256,address)": FunctionFragment;
     "withdrawErc20(uint256,uint256)": FunctionFragment;
     "withdrawErc721(uint256,uint256)": FunctionFragment;
     "withdrawRewards(uint256)": FunctionFragment;
@@ -64,30 +54,13 @@ interface MasterInterface extends ethers.utils.Interface {
     values: [BigNumberish, BigNumberish]
   ): string;
   encodeFunctionData(
-    functionFragment: "farmInfo",
-    values: [BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "farmIsErc20",
-    values: [BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "farmIsErc721",
-    values: [BigNumberish]
-  ): string;
-  encodeFunctionData(
     functionFragment: "getMultiplier",
     values: [BigNumberish, BigNumberish, BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "governance",
-    values?: undefined
   ): string;
   encodeFunctionData(
     functionFragment: "massUpdateFarms",
     values?: undefined
   ): string;
-  encodeFunctionData(functionFragment: "numFarms", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "pendingReward",
     values: [BigNumberish, string]
@@ -97,29 +70,12 @@ interface MasterInterface extends ethers.utils.Interface {
     values: [BigNumberish, BigNumberish, BigNumberish, boolean]
   ): string;
   encodeFunctionData(
-    functionFragment: "setGovernance",
-    values: [string]
-  ): string;
-  encodeFunctionData(
     functionFragment: "setSolacePerBlock",
     values: [BigNumberish, boolean]
-  ): string;
-  encodeFunctionData(functionFragment: "solace", values?: undefined): string;
-  encodeFunctionData(
-    functionFragment: "solacePerBlock",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
-    functionFragment: "totalAllocPoints",
-    values?: undefined
   ): string;
   encodeFunctionData(
     functionFragment: "updateFarm",
     values: [BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "userInfo",
-    values: [BigNumberish, string]
   ): string;
   encodeFunctionData(
     functionFragment: "withdrawErc20",
@@ -150,25 +106,14 @@ interface MasterInterface extends ethers.utils.Interface {
     functionFragment: "depositErc721",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(functionFragment: "farmInfo", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "farmIsErc20",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "farmIsErc721",
-    data: BytesLike
-  ): Result;
   decodeFunctionResult(
     functionFragment: "getMultiplier",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(functionFragment: "governance", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "massUpdateFarms",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(functionFragment: "numFarms", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "pendingReward",
     data: BytesLike
@@ -178,24 +123,10 @@ interface MasterInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "setGovernance",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
     functionFragment: "setSolacePerBlock",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(functionFragment: "solace", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "solacePerBlock",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "totalAllocPoints",
-    data: BytesLike
-  ): Result;
   decodeFunctionResult(functionFragment: "updateFarm", data: BytesLike): Result;
-  decodeFunctionResult(functionFragment: "userInfo", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "withdrawErc20",
     data: BytesLike
@@ -209,24 +140,10 @@ interface MasterInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
 
-  events: {
-    "DepositErc20(address,uint256,uint256)": EventFragment;
-    "DepositErc721(address,uint256,uint256)": EventFragment;
-    "Erc20FarmCreated(uint256)": EventFragment;
-    "Erc721FarmCreated(uint256)": EventFragment;
-    "WithdrawErc20(address,uint256,uint256)": EventFragment;
-    "WithdrawErc721(address,uint256,uint256)": EventFragment;
-  };
-
-  getEvent(nameOrSignatureOrTopic: "DepositErc20"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "DepositErc721"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "Erc20FarmCreated"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "Erc721FarmCreated"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "WithdrawErc20"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "WithdrawErc721"): EventFragment;
+  events: {};
 }
 
-export class Master extends Contract {
+export class IMaster extends Contract {
   connect(signerOrProvider: Signer | Provider | string): this;
   attach(addressOrName: string): this;
   deployed(): Promise<this>;
@@ -237,7 +154,7 @@ export class Master extends Contract {
   removeAllListeners(eventName: EventFilter | string): this;
   removeListener(eventName: any, listener: Listener): this;
 
-  interface: MasterInterface;
+  interface: IMasterInterface;
 
   functions: {
     createFarmErc20(
@@ -298,78 +215,6 @@ export class Master extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    farmInfo(
-      arg0: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<{
-      token: string;
-      appraiser: string;
-      allocPoints: BigNumber;
-      startBlock: BigNumber;
-      endBlock: BigNumber;
-      lastRewardBlock: BigNumber;
-      accSolacePerShare: BigNumber;
-      valueStaked: BigNumber;
-      0: string;
-      1: string;
-      2: BigNumber;
-      3: BigNumber;
-      4: BigNumber;
-      5: BigNumber;
-      6: BigNumber;
-      7: BigNumber;
-    }>;
-
-    "farmInfo(uint256)"(
-      arg0: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<{
-      token: string;
-      appraiser: string;
-      allocPoints: BigNumber;
-      startBlock: BigNumber;
-      endBlock: BigNumber;
-      lastRewardBlock: BigNumber;
-      accSolacePerShare: BigNumber;
-      valueStaked: BigNumber;
-      0: string;
-      1: string;
-      2: BigNumber;
-      3: BigNumber;
-      4: BigNumber;
-      5: BigNumber;
-      6: BigNumber;
-      7: BigNumber;
-    }>;
-
-    farmIsErc20(
-      arg0: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<{
-      0: boolean;
-    }>;
-
-    "farmIsErc20(uint256)"(
-      arg0: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<{
-      0: boolean;
-    }>;
-
-    farmIsErc721(
-      arg0: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<{
-      0: boolean;
-    }>;
-
-    "farmIsErc721(uint256)"(
-      arg0: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<{
-      0: boolean;
-    }>;
-
     getMultiplier(
       _farmId: BigNumberish,
       _from: BigNumberish,
@@ -388,33 +233,9 @@ export class Master extends Contract {
       0: BigNumber;
     }>;
 
-    governance(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
-    "governance()"(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
     massUpdateFarms(overrides?: Overrides): Promise<ContractTransaction>;
 
     "massUpdateFarms()"(overrides?: Overrides): Promise<ContractTransaction>;
-
-    numFarms(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: BigNumber;
-    }>;
-
-    "numFarms()"(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: BigNumber;
-    }>;
 
     pendingReward(
       _farmId: BigNumberish,
@@ -448,16 +269,6 @@ export class Master extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    setGovernance(
-      _governance: string,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
-    "setGovernance(address)"(
-      _governance: string,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
     setSolacePerBlock(
       _solacePerBlock: BigNumberish,
       _withUpdate: boolean,
@@ -470,42 +281,6 @@ export class Master extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    solace(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
-    "solace()"(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
-    solacePerBlock(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: BigNumber;
-    }>;
-
-    "solacePerBlock()"(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: BigNumber;
-    }>;
-
-    totalAllocPoints(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: BigNumber;
-    }>;
-
-    "totalAllocPoints()"(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: BigNumber;
-    }>;
-
     updateFarm(
       _farmId: BigNumberish,
       overrides?: Overrides
@@ -515,28 +290,6 @@ export class Master extends Contract {
       _farmId: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
-
-    userInfo(
-      arg0: BigNumberish,
-      arg1: string,
-      overrides?: CallOverrides
-    ): Promise<{
-      value: BigNumber;
-      rewardDebt: BigNumber;
-      0: BigNumber;
-      1: BigNumber;
-    }>;
-
-    "userInfo(uint256,address)"(
-      arg0: BigNumberish,
-      arg1: string,
-      overrides?: CallOverrides
-    ): Promise<{
-      value: BigNumber;
-      rewardDebt: BigNumber;
-      0: BigNumber;
-      1: BigNumber;
-    }>;
 
     withdrawErc20(
       _farmId: BigNumberish,
@@ -631,64 +384,6 @@ export class Master extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  farmInfo(
-    arg0: BigNumberish,
-    overrides?: CallOverrides
-  ): Promise<{
-    token: string;
-    appraiser: string;
-    allocPoints: BigNumber;
-    startBlock: BigNumber;
-    endBlock: BigNumber;
-    lastRewardBlock: BigNumber;
-    accSolacePerShare: BigNumber;
-    valueStaked: BigNumber;
-    0: string;
-    1: string;
-    2: BigNumber;
-    3: BigNumber;
-    4: BigNumber;
-    5: BigNumber;
-    6: BigNumber;
-    7: BigNumber;
-  }>;
-
-  "farmInfo(uint256)"(
-    arg0: BigNumberish,
-    overrides?: CallOverrides
-  ): Promise<{
-    token: string;
-    appraiser: string;
-    allocPoints: BigNumber;
-    startBlock: BigNumber;
-    endBlock: BigNumber;
-    lastRewardBlock: BigNumber;
-    accSolacePerShare: BigNumber;
-    valueStaked: BigNumber;
-    0: string;
-    1: string;
-    2: BigNumber;
-    3: BigNumber;
-    4: BigNumber;
-    5: BigNumber;
-    6: BigNumber;
-    7: BigNumber;
-  }>;
-
-  farmIsErc20(arg0: BigNumberish, overrides?: CallOverrides): Promise<boolean>;
-
-  "farmIsErc20(uint256)"(
-    arg0: BigNumberish,
-    overrides?: CallOverrides
-  ): Promise<boolean>;
-
-  farmIsErc721(arg0: BigNumberish, overrides?: CallOverrides): Promise<boolean>;
-
-  "farmIsErc721(uint256)"(
-    arg0: BigNumberish,
-    overrides?: CallOverrides
-  ): Promise<boolean>;
-
   getMultiplier(
     _farmId: BigNumberish,
     _from: BigNumberish,
@@ -703,17 +398,9 @@ export class Master extends Contract {
     overrides?: CallOverrides
   ): Promise<BigNumber>;
 
-  governance(overrides?: CallOverrides): Promise<string>;
-
-  "governance()"(overrides?: CallOverrides): Promise<string>;
-
   massUpdateFarms(overrides?: Overrides): Promise<ContractTransaction>;
 
   "massUpdateFarms()"(overrides?: Overrides): Promise<ContractTransaction>;
-
-  numFarms(overrides?: CallOverrides): Promise<BigNumber>;
-
-  "numFarms()"(overrides?: CallOverrides): Promise<BigNumber>;
 
   pendingReward(
     _farmId: BigNumberish,
@@ -743,16 +430,6 @@ export class Master extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  setGovernance(
-    _governance: string,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
-  "setGovernance(address)"(
-    _governance: string,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
   setSolacePerBlock(
     _solacePerBlock: BigNumberish,
     _withUpdate: boolean,
@@ -765,18 +442,6 @@ export class Master extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  solace(overrides?: CallOverrides): Promise<string>;
-
-  "solace()"(overrides?: CallOverrides): Promise<string>;
-
-  solacePerBlock(overrides?: CallOverrides): Promise<BigNumber>;
-
-  "solacePerBlock()"(overrides?: CallOverrides): Promise<BigNumber>;
-
-  totalAllocPoints(overrides?: CallOverrides): Promise<BigNumber>;
-
-  "totalAllocPoints()"(overrides?: CallOverrides): Promise<BigNumber>;
-
   updateFarm(
     _farmId: BigNumberish,
     overrides?: Overrides
@@ -786,28 +451,6 @@ export class Master extends Contract {
     _farmId: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
-
-  userInfo(
-    arg0: BigNumberish,
-    arg1: string,
-    overrides?: CallOverrides
-  ): Promise<{
-    value: BigNumber;
-    rewardDebt: BigNumber;
-    0: BigNumber;
-    1: BigNumber;
-  }>;
-
-  "userInfo(uint256,address)"(
-    arg0: BigNumberish,
-    arg1: string,
-    overrides?: CallOverrides
-  ): Promise<{
-    value: BigNumber;
-    rewardDebt: BigNumber;
-    0: BigNumber;
-    1: BigNumber;
-  }>;
 
   withdrawErc20(
     _farmId: BigNumberish,
@@ -902,70 +545,6 @@ export class Master extends Contract {
       overrides?: CallOverrides
     ): Promise<void>;
 
-    farmInfo(
-      arg0: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<{
-      token: string;
-      appraiser: string;
-      allocPoints: BigNumber;
-      startBlock: BigNumber;
-      endBlock: BigNumber;
-      lastRewardBlock: BigNumber;
-      accSolacePerShare: BigNumber;
-      valueStaked: BigNumber;
-      0: string;
-      1: string;
-      2: BigNumber;
-      3: BigNumber;
-      4: BigNumber;
-      5: BigNumber;
-      6: BigNumber;
-      7: BigNumber;
-    }>;
-
-    "farmInfo(uint256)"(
-      arg0: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<{
-      token: string;
-      appraiser: string;
-      allocPoints: BigNumber;
-      startBlock: BigNumber;
-      endBlock: BigNumber;
-      lastRewardBlock: BigNumber;
-      accSolacePerShare: BigNumber;
-      valueStaked: BigNumber;
-      0: string;
-      1: string;
-      2: BigNumber;
-      3: BigNumber;
-      4: BigNumber;
-      5: BigNumber;
-      6: BigNumber;
-      7: BigNumber;
-    }>;
-
-    farmIsErc20(
-      arg0: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<boolean>;
-
-    "farmIsErc20(uint256)"(
-      arg0: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<boolean>;
-
-    farmIsErc721(
-      arg0: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<boolean>;
-
-    "farmIsErc721(uint256)"(
-      arg0: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<boolean>;
-
     getMultiplier(
       _farmId: BigNumberish,
       _from: BigNumberish,
@@ -980,17 +559,9 @@ export class Master extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    governance(overrides?: CallOverrides): Promise<string>;
-
-    "governance()"(overrides?: CallOverrides): Promise<string>;
-
     massUpdateFarms(overrides?: CallOverrides): Promise<void>;
 
     "massUpdateFarms()"(overrides?: CallOverrides): Promise<void>;
-
-    numFarms(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "numFarms()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     pendingReward(
       _farmId: BigNumberish,
@@ -1020,16 +591,6 @@ export class Master extends Contract {
       overrides?: CallOverrides
     ): Promise<void>;
 
-    setGovernance(
-      _governance: string,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    "setGovernance(address)"(
-      _governance: string,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
     setSolacePerBlock(
       _solacePerBlock: BigNumberish,
       _withUpdate: boolean,
@@ -1042,46 +603,12 @@ export class Master extends Contract {
       overrides?: CallOverrides
     ): Promise<void>;
 
-    solace(overrides?: CallOverrides): Promise<string>;
-
-    "solace()"(overrides?: CallOverrides): Promise<string>;
-
-    solacePerBlock(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "solacePerBlock()"(overrides?: CallOverrides): Promise<BigNumber>;
-
-    totalAllocPoints(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "totalAllocPoints()"(overrides?: CallOverrides): Promise<BigNumber>;
-
     updateFarm(_farmId: BigNumberish, overrides?: CallOverrides): Promise<void>;
 
     "updateFarm(uint256)"(
       _farmId: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
-
-    userInfo(
-      arg0: BigNumberish,
-      arg1: string,
-      overrides?: CallOverrides
-    ): Promise<{
-      value: BigNumber;
-      rewardDebt: BigNumber;
-      0: BigNumber;
-      1: BigNumber;
-    }>;
-
-    "userInfo(uint256,address)"(
-      arg0: BigNumberish,
-      arg1: string,
-      overrides?: CallOverrides
-    ): Promise<{
-      value: BigNumber;
-      rewardDebt: BigNumber;
-      0: BigNumber;
-      1: BigNumber;
-    }>;
 
     withdrawErc20(
       _farmId: BigNumberish,
@@ -1118,35 +645,7 @@ export class Master extends Contract {
     ): Promise<void>;
   };
 
-  filters: {
-    DepositErc20(
-      _user: string | null,
-      _farmId: BigNumberish | null,
-      _amount: null
-    ): EventFilter;
-
-    DepositErc721(
-      _user: string | null,
-      _farmId: BigNumberish | null,
-      _token: null
-    ): EventFilter;
-
-    Erc20FarmCreated(_farmId: BigNumberish | null): EventFilter;
-
-    Erc721FarmCreated(_farmId: BigNumberish | null): EventFilter;
-
-    WithdrawErc20(
-      _user: string | null,
-      _farmId: BigNumberish | null,
-      _amount: null
-    ): EventFilter;
-
-    WithdrawErc721(
-      _user: string | null,
-      _farmId: BigNumberish | null,
-      _token: null
-    ): EventFilter;
-  };
+  filters: {};
 
   estimateGas: {
     createFarmErc20(
@@ -1207,33 +706,6 @@ export class Master extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    farmInfo(arg0: BigNumberish, overrides?: CallOverrides): Promise<BigNumber>;
-
-    "farmInfo(uint256)"(
-      arg0: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    farmIsErc20(
-      arg0: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    "farmIsErc20(uint256)"(
-      arg0: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    farmIsErc721(
-      arg0: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    "farmIsErc721(uint256)"(
-      arg0: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
     getMultiplier(
       _farmId: BigNumberish,
       _from: BigNumberish,
@@ -1248,17 +720,9 @@ export class Master extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    governance(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "governance()"(overrides?: CallOverrides): Promise<BigNumber>;
-
     massUpdateFarms(overrides?: Overrides): Promise<BigNumber>;
 
     "massUpdateFarms()"(overrides?: Overrides): Promise<BigNumber>;
-
-    numFarms(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "numFarms()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     pendingReward(
       _farmId: BigNumberish,
@@ -1288,16 +752,6 @@ export class Master extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    setGovernance(
-      _governance: string,
-      overrides?: Overrides
-    ): Promise<BigNumber>;
-
-    "setGovernance(address)"(
-      _governance: string,
-      overrides?: Overrides
-    ): Promise<BigNumber>;
-
     setSolacePerBlock(
       _solacePerBlock: BigNumberish,
       _withUpdate: boolean,
@@ -1310,18 +764,6 @@ export class Master extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    solace(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "solace()"(overrides?: CallOverrides): Promise<BigNumber>;
-
-    solacePerBlock(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "solacePerBlock()"(overrides?: CallOverrides): Promise<BigNumber>;
-
-    totalAllocPoints(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "totalAllocPoints()"(overrides?: CallOverrides): Promise<BigNumber>;
-
     updateFarm(
       _farmId: BigNumberish,
       overrides?: Overrides
@@ -1330,18 +772,6 @@ export class Master extends Contract {
     "updateFarm(uint256)"(
       _farmId: BigNumberish,
       overrides?: Overrides
-    ): Promise<BigNumber>;
-
-    userInfo(
-      arg0: BigNumberish,
-      arg1: string,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    "userInfo(uint256,address)"(
-      arg0: BigNumberish,
-      arg1: string,
-      overrides?: CallOverrides
     ): Promise<BigNumber>;
 
     withdrawErc20(
@@ -1438,36 +868,6 @@ export class Master extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    farmInfo(
-      arg0: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    "farmInfo(uint256)"(
-      arg0: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    farmIsErc20(
-      arg0: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    "farmIsErc20(uint256)"(
-      arg0: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    farmIsErc721(
-      arg0: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    "farmIsErc721(uint256)"(
-      arg0: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
     getMultiplier(
       _farmId: BigNumberish,
       _from: BigNumberish,
@@ -1482,17 +882,9 @@ export class Master extends Contract {
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
-    governance(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    "governance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
     massUpdateFarms(overrides?: Overrides): Promise<PopulatedTransaction>;
 
     "massUpdateFarms()"(overrides?: Overrides): Promise<PopulatedTransaction>;
-
-    numFarms(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    "numFarms()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     pendingReward(
       _farmId: BigNumberish,
@@ -1522,16 +914,6 @@ export class Master extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    setGovernance(
-      _governance: string,
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    "setGovernance(address)"(
-      _governance: string,
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
     setSolacePerBlock(
       _solacePerBlock: BigNumberish,
       _withUpdate: boolean,
@@ -1544,22 +926,6 @@ export class Master extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    solace(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    "solace()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    solacePerBlock(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    "solacePerBlock()"(
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    totalAllocPoints(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    "totalAllocPoints()"(
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
     updateFarm(
       _farmId: BigNumberish,
       overrides?: Overrides
@@ -1568,18 +934,6 @@ export class Master extends Contract {
     "updateFarm(uint256)"(
       _farmId: BigNumberish,
       overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    userInfo(
-      arg0: BigNumberish,
-      arg1: string,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    "userInfo(uint256,address)"(
-      arg0: BigNumberish,
-      arg1: string,
-      overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
     withdrawErc20(

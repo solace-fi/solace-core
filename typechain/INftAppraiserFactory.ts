@@ -5,36 +5,35 @@
 import { Contract, Signer } from "ethers";
 import { Provider } from "@ethersproject/providers";
 
-import type { IInvestment } from "./IInvestment";
+import type { INftAppraiser } from "./INftAppraiser";
 
-export class IInvestmentFactory {
+export class INftAppraiserFactory {
   static connect(
     address: string,
     signerOrProvider: Signer | Provider
-  ): IInvestment {
-    return new Contract(address, _abi, signerOrProvider) as IInvestment;
+  ): INftAppraiser {
+    return new Contract(address, _abi, signerOrProvider) as INftAppraiser;
   }
 }
 
 const _abi = [
   {
-    inputs: [],
-    name: "deposit",
-    outputs: [],
-    stateMutability: "payable",
-    type: "function",
-  },
-  {
     inputs: [
       {
         internalType: "uint256",
-        name: "_amount",
+        name: "_tokenId",
         type: "uint256",
       },
     ],
-    name: "withdraw",
-    outputs: [],
-    stateMutability: "nonpayable",
+    name: "appraise",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
     type: "function",
   },
 ];
