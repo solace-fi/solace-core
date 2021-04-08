@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import './interfaces/IProduct.sol';
+import './interface/IProduct.sol';
 import './Policy.sol';
 /**
  * @title BaseProduct
@@ -12,7 +12,7 @@ import './Policy.sol';
  */
 abstract contract BaseProduct is IProduct {
     using Address for address;
-    using EnumerableSet for EnumerableSet.AddressSet;
+    using EnumerableSet for EnumerableSet.Set;
 
     event PolicyCreated(uint256 _coverLimit, uint256 _seconds, uint256 _positionAmount, uint256 _premium, address _policy)
 
@@ -20,7 +20,7 @@ abstract contract BaseProduct is IProduct {
     address public governance;
 
     // Product Details
-    address public insuredContract;
+    address constant insuredContract;
     uint256 public price; // cover price (in wei) per second per wei
     uint256 public cancelFee; // policy cancelation fee
     uint256 public minPeriod; // minimum policy period in seconds
@@ -30,8 +30,14 @@ abstract contract BaseProduct is IProduct {
     // Book-keeping varaibles
     uint256 public policyCount = 0;
     uint256 public activeCoverAmount; // current amount covered (in wei)
-    EnumerableSet.AddressSet private policies;
-    mapping(address => address) public buyerOf; // buyerOf[policy] = buyer
+    EnumerableSet.Set public policies; // policies is a Set containing PolicyInfo structs
+    mapping(uint256 => address) public buyerOf; // buyerOf[policyID] = buyer
+    // mapping(uint256 => PolicyInfo) public policies
+    struct PolicyInfo {
+        uint256 policyID;           // policy ID number (same as the deployed ERC721 tokenID)
+        uint256 expirationBlock;    // expiration block number
+        uint256 coverAmount;        // covered amount up until the expiration block
+    }
 
 
     constructor (
@@ -54,6 +60,17 @@ abstract contract BaseProduct is IProduct {
     /**** GETTERS + SETTERS 
     Functions which get and set important product state variables
     ****/
+
+    /**
+     * @notice Transfers the governance role to a new governor.
+     * Can only be called by the current governor.
+     * @param _governance The new governor.
+     */
+    function setGovernance(address _governance) external {
+        // can only be called by governor
+        require(msg.sender == governance, "!governance");
+        governance = _governance;
+    }
 
     /**
      * @notice Sets the price for this product
@@ -100,6 +117,7 @@ abstract contract BaseProduct is IProduct {
         maxCoverAmount = _maxCoverAmount
     }
 
+
     /**** UNIMPLEMENTED FUNCTIONS 
     Functions that are only implemented by child contracts
     ****/
@@ -122,15 +140,12 @@ abstract contract BaseProduct is IProduct {
     ****/
 
     /**
-     * @notice Get the total covered amount for all policies under this product
-     * @return Amount of total cover denominated in wei
+     * @notice Get the total number of active coverage policies
+     * @dev Should call updateBookKeeping() first to remove any expired policies
+     * @return Number of active policies
      */
-    function getActiveCoverAmount() external view returns (uint256 activeCoverAmount){
-        _updateActiveCoverAmount();
-        return activeCoverAmount;
-    };
-    function _updateActiveCoverAmount() internal returns (uint256 activeCoverAmount){
-        /* TODO remove expired policies */
+    function getActivePolicyCount() external view returns (uint256 activePolicyCount){
+        return policies.length();
     };
 
 
@@ -138,11 +153,13 @@ abstract contract BaseProduct is IProduct {
     View functions that give us data about individual policies
     ****/
 
+    function getPolicyBuyer(uint _policyID) external view returns (address buyer){
+        return buyerOf[_policyID];
+    }
+
     function getPolicyLimit(address _policy) external view returns (uint256 coverLimit){
         return _policy.coverAmount / getTotalPosition(buyerOf[_policy]);
     };
-
-    // function getPolicyCoverAmount(address _policy) public view returns (uint256 coverAmount){};
 
     function getPolicyExpiration(address _policy) external view returns (uint256 expirationDate){
         return _policy.expiration;
@@ -174,8 +191,32 @@ abstract contract BaseProduct is IProduct {
 
 
     /**** MUTATIVE FUNCTIONS 
-    Functions that deploy and change policy contracts
+    Functions that change state variables, deploy and change policy contracts
     ****/
+
+    /**
+     * @notice Updates the product's book-keeping variables, 
+     * removing expired policies from the policies set and updating active cover amount
+     */
+    function _updateBookKeeping() internal {
+        for (uint256 i=0; i < policies.length(); i++) {
+            if (policies[i].expirationBlock < block.number) {
+                policy = policies[i];
+                policies.remove(policy);
+                activeCoverAmount -= policy.coverAmount;
+                }
+        }
+    };
+
+    /**
+     * @notice Updates the product's book-keeping variables, 
+     * removing expired policies from the policies set and updating active cover amount
+     * @return active covered amount and active policy count as a tuple
+     */
+    function updateBookKeeping() external returns (uint256 activeCoverAmount, uint256 activePolicyCount){
+        _updateBookKeeping();
+        return (activeCoverAmount, policies.length());
+    }
 
     /**
      * @notice
