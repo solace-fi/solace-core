@@ -304,8 +304,6 @@ contract Master is IMaster {
         farm.valueStaked += tokenValue;
         user.value += tokenValue;
         user.rewardDebt = user.value * farm.accSolacePerShare / 1e12;
-        //user.tokensDeposited[_token] = true;
-        //user.tokenValues[_token] = value;
         depositedErc721sAndValues[_farmId][msg.sender].set(_token, tokenValue);
         emit DepositErc721(msg.sender, _farmId, _token);
     }
@@ -348,15 +346,12 @@ contract Master is IMaster {
         // harvest
         _harvest(_farmId);
         // cannot withdraw a token you didnt deposit
-        //require(user.tokensDeposited[_token], "not your token");
         require(depositedErc721sAndValues[_farmId][msg.sender].contains(_token), "not your token");
         // accounting
-        //uint256 tokenValue = user.tokenValues[_token];
         uint256 tokenValue = depositedErc721sAndValues[_farmId][msg.sender].get(_token);
         farm.valueStaked -= tokenValue;
         user.value -= tokenValue;
         user.rewardDebt = user.value * farm.accSolacePerShare / 1e12;
-        //user.tokensDeposited[_token] = false;
         depositedErc721sAndValues[_farmId][msg.sender].remove(_token);
         // return CP/LP tokens
         IERC721(farm.token).safeTransferFrom(address(this), msg.sender, _token);
@@ -466,33 +461,37 @@ contract Master is IMaster {
     }
 
     /**
-     * @notice Returns the list of ERC721s that a user has deposited onto a farm.
+     * @notice Returns the list of ERC721s that a user has deposited onto a farm and their values.
      * @param _farmId The farm to list ERC721s.
      * @param _user The user to list ERC721s.
      * @return The list of deposited ERC721s.
+     * @return The values of the tokens.
      */
-    function listDepositedErc721(uint256 _farmId, address _user) external view override returns (uint256[] memory) {
+    function listDepositedErc721(uint256 _farmId, address _user) external view override returns (uint256[] memory, uint256[] memory) {
         require(farmIsErc721[_farmId], "not an erc721 farm");
         uint256 length = depositedErc721sAndValues[_farmId][_user].length();
         uint256[] memory tokens = new uint256[](length);
+        uint256[] memory values = new uint256[](length);
         for(uint256 i = 0; i < length; ++i) {
-            (uint256 _token, ) = depositedErc721sAndValues[_farmId][_user].at(i);
+            (uint256 _token, uint256 _value) = depositedErc721sAndValues[_farmId][_user].at(i);
             tokens[i] = _token;
+            values[i] = _value;
         }
-        return tokens;
+        return (tokens, values);
     }
 
     /**
-     * @notice Returns the id of an ERC721 that a user has deposited onto a farm.
+     * @notice Returns the id of an ERC721 that a user has deposited onto a farm and its value.
      * @param _farmId The farm to get token id for.
      * @param _user The user to get token id for.
      * @param _index The farm-based index of the token.
      * @return The id of the deposited ERC721.
+     * @return The value of the token.
      */
-    function getDepositedErc721At(uint256 _farmId, address _user, uint256 _index) external view override returns (uint256) {
+    function getDepositedErc721At(uint256 _farmId, address _user, uint256 _index) external view override returns (uint256, uint256) {
         require(farmIsErc721[_farmId], "not an erc721 farm");
-        (uint256 _token, ) = depositedErc721sAndValues[_farmId][_user].at(_index);
-        return _token;
+        (uint256 _token, uint256 _value) = depositedErc721sAndValues[_farmId][_user].at(_index);
+        return (_token, _value);
     }
 
     /**

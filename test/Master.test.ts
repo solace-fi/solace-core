@@ -342,7 +342,7 @@ describe("Master", function () {
     it("can deposit", async function () {
       // empty
       expect(await master.countDepositedErc721(farmId, farmer1.address)).to.equal(0);
-      expect(await master.listDepositedErc721(farmId, farmer1.address)).to.deep.equal([]);
+      expect(await master.listDepositedErc721(farmId, farmer1.address)).to.deep.equal([ [], [] ]);
       // farmer 1, deposit 1
       tokenId1 = await mintLpToken(farmer1, weth, solaceToken, FeeAmount.MEDIUM, depositAmount1);
       await lpToken.connect(farmer1).approve(master.address, tokenId1);
@@ -354,8 +354,8 @@ describe("Master", function () {
       userInfo = await master.userInfo(farmId, farmer1.address);
       expect(userInfo.value).to.equal(depositAmount1);
       expect(await master.countDepositedErc721(farmId, farmer1.address)).to.equal(1);
-      expect(await master.getDepositedErc721At(farmId, farmer1.address, 0)).to.equal(tokenId1);
-      expect(await master.listDepositedErc721(farmId, farmer1.address)).to.deep.equal([tokenId1]);
+      expect(await master.getDepositedErc721At(farmId, farmer1.address, 0)).to.deep.equal([tokenId1, depositAmount1]);
+      expect(await master.listDepositedErc721(farmId, farmer1.address)).to.deep.equal([ [tokenId1], [depositAmount1] ]);
       expect(await master.assertDepositedErc721(farmId, farmer1.address, tokenId1)).to.equal(true);
       // farmer 2, deposit 4
       tokenId2 = await mintLpToken(farmer2, weth, solaceToken, FeeAmount.MEDIUM, depositAmount2);
@@ -368,8 +368,8 @@ describe("Master", function () {
       userInfo = await master.userInfo(farmId, farmer2.address);
       expect(userInfo.value).to.equal(depositAmount2);
       expect(await master.countDepositedErc721(farmId, farmer2.address)).to.equal(1);
-      expect(await master.getDepositedErc721At(farmId, farmer2.address, 0)).to.equal(tokenId2);
-      expect(await master.listDepositedErc721(farmId, farmer2.address)).to.deep.equal([tokenId2]);
+      expect(await master.getDepositedErc721At(farmId, farmer2.address, 0)).to.deep.equal([ tokenId2, depositAmount2 ]);
+      expect(await master.listDepositedErc721(farmId, farmer2.address)).to.deep.equal([ [tokenId2], [depositAmount2] ]);
       expect(await master.assertDepositedErc721(farmId, farmer2.address, tokenId2)).to.equal(true);
       // farmer 1, deposit 2
       tokenId3 = await mintLpToken(farmer1, weth, solaceToken, FeeAmount.MEDIUM, depositAmount3);
@@ -382,8 +382,8 @@ describe("Master", function () {
       userInfo = await master.userInfo(farmId, farmer1.address);
       expect(userInfo.value).to.equal(depositAmount1.add(depositAmount3));
       expect(await master.countDepositedErc721(farmId, farmer1.address)).to.equal(2);
-      expect(await master.getDepositedErc721At(farmId, farmer1.address, 1)).to.equal(tokenId3);
-      expect(await master.listDepositedErc721(farmId, farmer1.address)).to.deep.equal([tokenId1,tokenId3]);
+      expect(await master.getDepositedErc721At(farmId, farmer1.address, 1)).to.deep.equal([ tokenId3, depositAmount3 ]);
+      expect(await master.listDepositedErc721(farmId, farmer1.address)).to.deep.equal([ [tokenId1,tokenId3], [depositAmount1,depositAmount3] ]);
       expect(await master.assertDepositedErc721(farmId, farmer1.address, tokenId3)).to.equal(true);
       // non ownership
       expect(await master.assertDepositedErc721(farmId, farmer2.address, tokenId1)).to.equal(false);
@@ -432,8 +432,8 @@ describe("Master", function () {
       userInfo = await master.userInfo(farmId, farmer1.address);
       expect(userInfo.value).to.equal(depositAmount3);
       expect(await master.countDepositedErc721(farmId, farmer1.address)).to.equal(1);
-      expect(await master.getDepositedErc721At(farmId, farmer1.address, 0)).to.equal(tokenId3);
-      expect(await master.listDepositedErc721(farmId, farmer1.address)).to.deep.equal([tokenId3]);
+      expect(await master.getDepositedErc721At(farmId, farmer1.address, 0)).to.deep.equal([ tokenId3, depositAmount3 ]);
+      expect(await master.listDepositedErc721(farmId, farmer1.address)).to.deep.equal([ [tokenId3], [depositAmount3] ]);
       expect(await master.assertDepositedErc721(farmId, farmer1.address, tokenId1)).to.equal(false);
       expect(await master.assertDepositedErc721(farmId, farmer1.address, tokenId3)).to.equal(true);
       // farmer 1, full withdraw
@@ -448,7 +448,7 @@ describe("Master", function () {
       userInfo = await master.userInfo(farmId, farmer1.address);
       expect(userInfo.value).to.equal(0);
       expect(await master.countDepositedErc721(farmId, farmer1.address)).to.equal(0);
-      expect(await master.listDepositedErc721(farmId, farmer1.address)).to.deep.equal([]);
+      expect(await master.listDepositedErc721(farmId, farmer1.address)).to.deep.equal([ [], [] ]);
       expect(await master.assertDepositedErc721(farmId, farmer1.address, tokenId3)).to.equal(false);
       // farmer 2, full withdraw
       balance1 = await lpToken.balanceOf(master.address);
@@ -461,7 +461,7 @@ describe("Master", function () {
       userInfo = await master.userInfo(farmId, farmer2.address);
       expect(userInfo.value).to.equal(0);
       expect(await master.countDepositedErc721(farmId, farmer2.address)).to.equal(0);
-      expect(await master.listDepositedErc721(farmId, farmer2.address)).to.deep.equal([]);
+      expect(await master.listDepositedErc721(farmId, farmer2.address)).to.deep.equal([ [], [] ]);
       expect(await master.assertDepositedErc721(farmId, farmer2.address, tokenId2)).to.equal(false);
     })
 

@@ -292,6 +292,7 @@ export class IMaster extends Contract {
       overrides?: CallOverrides
     ): Promise<{
       0: BigNumber;
+      1: BigNumber;
     }>;
 
     "getDepositedErc721At(uint256,address,uint256)"(
@@ -301,6 +302,7 @@ export class IMaster extends Contract {
       overrides?: CallOverrides
     ): Promise<{
       0: BigNumber;
+      1: BigNumber;
     }>;
 
     getMultiplier(
@@ -327,6 +329,7 @@ export class IMaster extends Contract {
       overrides?: CallOverrides
     ): Promise<{
       0: BigNumber[];
+      1: BigNumber[];
     }>;
 
     "listDepositedErc721(uint256,address)"(
@@ -335,6 +338,7 @@ export class IMaster extends Contract {
       overrides?: CallOverrides
     ): Promise<{
       0: BigNumber[];
+      1: BigNumber[];
     }>;
 
     massUpdateFarms(overrides?: Overrides): Promise<ContractTransaction>;
@@ -519,14 +523,20 @@ export class IMaster extends Contract {
     _user: string,
     _index: BigNumberish,
     overrides?: CallOverrides
-  ): Promise<BigNumber>;
+  ): Promise<{
+    0: BigNumber;
+    1: BigNumber;
+  }>;
 
   "getDepositedErc721At(uint256,address,uint256)"(
     _farmId: BigNumberish,
     _user: string,
     _index: BigNumberish,
     overrides?: CallOverrides
-  ): Promise<BigNumber>;
+  ): Promise<{
+    0: BigNumber;
+    1: BigNumber;
+  }>;
 
   getMultiplier(
     _farmId: BigNumberish,
@@ -546,13 +556,19 @@ export class IMaster extends Contract {
     _farmId: BigNumberish,
     _user: string,
     overrides?: CallOverrides
-  ): Promise<BigNumber[]>;
+  ): Promise<{
+    0: BigNumber[];
+    1: BigNumber[];
+  }>;
 
   "listDepositedErc721(uint256,address)"(
     _farmId: BigNumberish,
     _user: string,
     overrides?: CallOverrides
-  ): Promise<BigNumber[]>;
+  ): Promise<{
+    0: BigNumber[];
+    1: BigNumber[];
+  }>;
 
   massUpdateFarms(overrides?: Overrides): Promise<ContractTransaction>;
 
@@ -732,14 +748,20 @@ export class IMaster extends Contract {
       _user: string,
       _index: BigNumberish,
       overrides?: CallOverrides
-    ): Promise<BigNumber>;
+    ): Promise<{
+      0: BigNumber;
+      1: BigNumber;
+    }>;
 
     "getDepositedErc721At(uint256,address,uint256)"(
       _farmId: BigNumberish,
       _user: string,
       _index: BigNumberish,
       overrides?: CallOverrides
-    ): Promise<BigNumber>;
+    ): Promise<{
+      0: BigNumber;
+      1: BigNumber;
+    }>;
 
     getMultiplier(
       _farmId: BigNumberish,
@@ -759,13 +781,19 @@ export class IMaster extends Contract {
       _farmId: BigNumberish,
       _user: string,
       overrides?: CallOverrides
-    ): Promise<BigNumber[]>;
+    ): Promise<{
+      0: BigNumber[];
+      1: BigNumber[];
+    }>;
 
     "listDepositedErc721(uint256,address)"(
       _farmId: BigNumberish,
       _user: string,
       overrides?: CallOverrides
-    ): Promise<BigNumber[]>;
+    ): Promise<{
+      0: BigNumber[];
+      1: BigNumber[];
+    }>;
 
     massUpdateFarms(overrides?: CallOverrides): Promise<void>;
 

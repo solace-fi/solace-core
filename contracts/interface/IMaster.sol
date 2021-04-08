@@ -141,21 +141,23 @@ interface IMaster {
     function countDepositedErc721(uint256 _farmId, address _user) external view returns (uint256);
 
     /**
-     * @notice Returns the list of ERC721s that a user has deposited onto a farm.
+     * @notice Returns the list of ERC721s that a user has deposited onto a farm and their values.
      * @param _farmId The farm to list ERC721s.
      * @param _user The user to list ERC721s.
      * @return The list of deposited ERC721s.
+     * @return The values of the tokens.
      */
-    function listDepositedErc721(uint256 _farmId, address _user) external view returns (uint256[] memory);
+    function listDepositedErc721(uint256 _farmId, address _user) external view returns (uint256[] memory, uint256[] memory);
 
     /**
-     * @notice Returns the id of an ERC721 that a user has deposited onto a farm.
+     * @notice Returns the id of an ERC721 that a user has deposited onto a farm and its value.
      * @param _farmId The farm to get token id for.
      * @param _user The user to get token id for.
      * @param _index The farm-based index of the token.
      * @return The id of the deposited ERC721.
+     * @return The value of the token.
      */
-    function getDepositedErc721At(uint256 _farmId, address _user, uint256 _index) external view returns (uint256);
+    function getDepositedErc721At(uint256 _farmId, address _user, uint256 _index) external view returns (uint256, uint256);
 
     /**
      * @notice Returns true if a user has deposited a given ERC721.

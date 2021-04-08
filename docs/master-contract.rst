@@ -201,23 +201,25 @@ countDepositedErc721
 
 listDepositedErc721
 -------------------
-:Description: Returns the list of ERC721s that a user has deposited onto a farm.
+:Description: Returns the list of ERC721s that a user has deposited onto a farm and their values.
 :Inputs:
     | uint256 _farmId: The farm to list ERC721s.
     | uint256 _user: The user to list ERC721s.
 :Outputs:
-    uint256[]: The list of deposited ERC721s.
+    | uint256[]: The list of deposited ERC721s.
+    | uint256[]: The values of the tokens.
 :Modifiers: none
 
 getDepositedErc721At
 --------------------
-:Description: Returns the id of an ERC721 that a user has deposited onto a farm.
+:Description: Returns the id of an ERC721 that a user has deposited onto a farm and its value.
 :Inputs:
     | uint256 _farmId: The farm to get token id for.
     | uint256 _user: The user to get token id for.
     | uint256 _index: The farm-based index of the token.
 :Outputs:
     uint256: The id of the deposited ERC721.
+    uint256: The value of the token.
 :Modifiers: none
 
 assertDepositedErc721
