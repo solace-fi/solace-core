@@ -131,4 +131,38 @@ interface IMaster {
      * @return The weighted multiplier for the given period.
      */
     function getMultiplier(uint256 _farmId, uint256 _from, uint256 _to) external view returns (uint256);
+
+    /**
+     * @notice Returns the count of ERC721s that a user has deposited onto a farm.
+     * @param _farmId The farm to check count for.
+     * @param _user The user to check count for.
+     * @return The count of deposited ERC721s.
+     */
+    function countDepositedErc721(uint256 _farmId, address _user) external view returns (uint256);
+
+    /**
+     * @notice Returns the list of ERC721s that a user has deposited onto a farm.
+     * @param _farmId The farm to list ERC721s.
+     * @param _user The user to list ERC721s.
+     * @return The list of deposited ERC721s.
+     */
+    function listDepositedErc721(uint256 _farmId, address _user) external view returns (uint256[] memory);
+
+    /**
+     * @notice Returns the id of an ERC721 that a user has deposited onto a farm.
+     * @param _farmId The farm to get token id for.
+     * @param _user The user to get token id for.
+     * @param _index The farm-based index of the token.
+     * @return The id of the deposited ERC721.
+     */
+    function getDepositedErc721At(uint256 _farmId, address _user, uint256 _index) external view returns (uint256);
+
+    /**
+     * @notice Returns true if a user has deposited a given ERC721.
+     * @param _farmId The farm to check.
+     * @param _user The user to check.
+     * @param _token The token to check.
+     * @return True if the user has deposited the given ERC721.
+     */
+    function assertDepositedErc721(uint256 _farmId, address _user, uint256 _token) external view returns (bool);
 }

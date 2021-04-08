@@ -370,9 +370,10 @@ async function addLiquidity(liquidityProvider: SignerWithAddress, tokenA: Contra
     tickUpper: getMaxTick(TICK_SPACINGS[fee]),
     fee: fee,
     recipient: liquidityProvider.address,
-    amount0Max: constants.MaxUint256,
-    amount1Max: constants.MaxUint256,
-    amount: amount,
+    amount0Desired: amount,
+    amount1Desired: amount,
+    amount0Min: 0,
+    amount1Min: 0,
     deadline: constants.MaxUint256,
   });
 }

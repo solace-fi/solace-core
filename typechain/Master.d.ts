@@ -22,6 +22,8 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
 interface MasterInterface extends ethers.utils.Interface {
   functions: {
+    "assertDepositedErc721(uint256,address,uint256)": FunctionFragment;
+    "countDepositedErc721(uint256,address)": FunctionFragment;
     "createFarmErc20(address,uint256,uint256,uint256)": FunctionFragment;
     "createFarmErc721(address,address,uint256,uint256,uint256)": FunctionFragment;
     "depositErc20(uint256,uint256)": FunctionFragment;
@@ -29,8 +31,10 @@ interface MasterInterface extends ethers.utils.Interface {
     "farmInfo(uint256)": FunctionFragment;
     "farmIsErc20(uint256)": FunctionFragment;
     "farmIsErc721(uint256)": FunctionFragment;
+    "getDepositedErc721At(uint256,address,uint256)": FunctionFragment;
     "getMultiplier(uint256,uint256,uint256)": FunctionFragment;
     "governance()": FunctionFragment;
+    "listDepositedErc721(uint256,address)": FunctionFragment;
     "massUpdateFarms()": FunctionFragment;
     "numFarms()": FunctionFragment;
     "pendingReward(uint256,address)": FunctionFragment;
@@ -47,6 +51,14 @@ interface MasterInterface extends ethers.utils.Interface {
     "withdrawRewards(uint256)": FunctionFragment;
   };
 
+  encodeFunctionData(
+    functionFragment: "assertDepositedErc721",
+    values: [BigNumberish, string, BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "countDepositedErc721",
+    values: [BigNumberish, string]
+  ): string;
   encodeFunctionData(
     functionFragment: "createFarmErc20",
     values: [string, BigNumberish, BigNumberish, BigNumberish]
@@ -76,12 +88,20 @@ interface MasterInterface extends ethers.utils.Interface {
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
+    functionFragment: "getDepositedErc721At",
+    values: [BigNumberish, string, BigNumberish]
+  ): string;
+  encodeFunctionData(
     functionFragment: "getMultiplier",
     values: [BigNumberish, BigNumberish, BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "governance",
     values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "listDepositedErc721",
+    values: [BigNumberish, string]
   ): string;
   encodeFunctionData(
     functionFragment: "massUpdateFarms",
@@ -135,6 +155,14 @@ interface MasterInterface extends ethers.utils.Interface {
   ): string;
 
   decodeFunctionResult(
+    functionFragment: "assertDepositedErc721",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "countDepositedErc721",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "createFarmErc20",
     data: BytesLike
   ): Result;
@@ -160,10 +188,18 @@ interface MasterInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
+    functionFragment: "getDepositedErc721At",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "getMultiplier",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "governance", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "listDepositedErc721",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "massUpdateFarms",
     data: BytesLike
@@ -240,6 +276,40 @@ export class Master extends Contract {
   interface: MasterInterface;
 
   functions: {
+    assertDepositedErc721(
+      _farmId: BigNumberish,
+      _user: string,
+      _token: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: boolean;
+    }>;
+
+    "assertDepositedErc721(uint256,address,uint256)"(
+      _farmId: BigNumberish,
+      _user: string,
+      _token: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: boolean;
+    }>;
+
+    countDepositedErc721(
+      _farmId: BigNumberish,
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    "countDepositedErc721(uint256,address)"(
+      _farmId: BigNumberish,
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
     createFarmErc20(
       _token: string,
       _allocPoints: BigNumberish,
@@ -370,6 +440,24 @@ export class Master extends Contract {
       0: boolean;
     }>;
 
+    getDepositedErc721At(
+      _farmId: BigNumberish,
+      _user: string,
+      _index: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    "getDepositedErc721At(uint256,address,uint256)"(
+      _farmId: BigNumberish,
+      _user: string,
+      _index: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
     getMultiplier(
       _farmId: BigNumberish,
       _from: BigNumberish,
@@ -398,6 +486,22 @@ export class Master extends Contract {
       overrides?: CallOverrides
     ): Promise<{
       0: string;
+    }>;
+
+    listDepositedErc721(
+      _farmId: BigNumberish,
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber[];
+    }>;
+
+    "listDepositedErc721(uint256,address)"(
+      _farmId: BigNumberish,
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber[];
     }>;
 
     massUpdateFarms(overrides?: Overrides): Promise<ContractTransaction>;
@@ -573,6 +677,32 @@ export class Master extends Contract {
     ): Promise<ContractTransaction>;
   };
 
+  assertDepositedErc721(
+    _farmId: BigNumberish,
+    _user: string,
+    _token: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
+
+  "assertDepositedErc721(uint256,address,uint256)"(
+    _farmId: BigNumberish,
+    _user: string,
+    _token: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
+
+  countDepositedErc721(
+    _farmId: BigNumberish,
+    _user: string,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
+
+  "countDepositedErc721(uint256,address)"(
+    _farmId: BigNumberish,
+    _user: string,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
+
   createFarmErc20(
     _token: string,
     _allocPoints: BigNumberish,
@@ -689,6 +819,20 @@ export class Master extends Contract {
     overrides?: CallOverrides
   ): Promise<boolean>;
 
+  getDepositedErc721At(
+    _farmId: BigNumberish,
+    _user: string,
+    _index: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
+
+  "getDepositedErc721At(uint256,address,uint256)"(
+    _farmId: BigNumberish,
+    _user: string,
+    _index: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
+
   getMultiplier(
     _farmId: BigNumberish,
     _from: BigNumberish,
@@ -706,6 +850,18 @@ export class Master extends Contract {
   governance(overrides?: CallOverrides): Promise<string>;
 
   "governance()"(overrides?: CallOverrides): Promise<string>;
+
+  listDepositedErc721(
+    _farmId: BigNumberish,
+    _user: string,
+    overrides?: CallOverrides
+  ): Promise<BigNumber[]>;
+
+  "listDepositedErc721(uint256,address)"(
+    _farmId: BigNumberish,
+    _user: string,
+    overrides?: CallOverrides
+  ): Promise<BigNumber[]>;
 
   massUpdateFarms(overrides?: Overrides): Promise<ContractTransaction>;
 
@@ -844,6 +1000,32 @@ export class Master extends Contract {
   ): Promise<ContractTransaction>;
 
   callStatic: {
+    assertDepositedErc721(
+      _farmId: BigNumberish,
+      _user: string,
+      _token: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
+
+    "assertDepositedErc721(uint256,address,uint256)"(
+      _farmId: BigNumberish,
+      _user: string,
+      _token: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
+
+    countDepositedErc721(
+      _farmId: BigNumberish,
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "countDepositedErc721(uint256,address)"(
+      _farmId: BigNumberish,
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     createFarmErc20(
       _token: string,
       _allocPoints: BigNumberish,
@@ -966,6 +1148,20 @@ export class Master extends Contract {
       overrides?: CallOverrides
     ): Promise<boolean>;
 
+    getDepositedErc721At(
+      _farmId: BigNumberish,
+      _user: string,
+      _index: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "getDepositedErc721At(uint256,address,uint256)"(
+      _farmId: BigNumberish,
+      _user: string,
+      _index: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     getMultiplier(
       _farmId: BigNumberish,
       _from: BigNumberish,
@@ -983,6 +1179,18 @@ export class Master extends Contract {
     governance(overrides?: CallOverrides): Promise<string>;
 
     "governance()"(overrides?: CallOverrides): Promise<string>;
+
+    listDepositedErc721(
+      _farmId: BigNumberish,
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber[]>;
+
+    "listDepositedErc721(uint256,address)"(
+      _farmId: BigNumberish,
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber[]>;
 
     massUpdateFarms(overrides?: CallOverrides): Promise<void>;
 
@@ -1149,6 +1357,32 @@ export class Master extends Contract {
   };
 
   estimateGas: {
+    assertDepositedErc721(
+      _farmId: BigNumberish,
+      _user: string,
+      _token: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "assertDepositedErc721(uint256,address,uint256)"(
+      _farmId: BigNumberish,
+      _user: string,
+      _token: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    countDepositedErc721(
+      _farmId: BigNumberish,
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "countDepositedErc721(uint256,address)"(
+      _farmId: BigNumberish,
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     createFarmErc20(
       _token: string,
       _allocPoints: BigNumberish,
@@ -1234,6 +1468,20 @@ export class Master extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
+    getDepositedErc721At(
+      _farmId: BigNumberish,
+      _user: string,
+      _index: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "getDepositedErc721At(uint256,address,uint256)"(
+      _farmId: BigNumberish,
+      _user: string,
+      _index: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     getMultiplier(
       _farmId: BigNumberish,
       _from: BigNumberish,
@@ -1251,6 +1499,18 @@ export class Master extends Contract {
     governance(overrides?: CallOverrides): Promise<BigNumber>;
 
     "governance()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    listDepositedErc721(
+      _farmId: BigNumberish,
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "listDepositedErc721(uint256,address)"(
+      _farmId: BigNumberish,
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
     massUpdateFarms(overrides?: Overrides): Promise<BigNumber>;
 
@@ -1380,6 +1640,32 @@ export class Master extends Contract {
   };
 
   populateTransaction: {
+    assertDepositedErc721(
+      _farmId: BigNumberish,
+      _user: string,
+      _token: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "assertDepositedErc721(uint256,address,uint256)"(
+      _farmId: BigNumberish,
+      _user: string,
+      _token: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    countDepositedErc721(
+      _farmId: BigNumberish,
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "countDepositedErc721(uint256,address)"(
+      _farmId: BigNumberish,
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
     createFarmErc20(
       _token: string,
       _allocPoints: BigNumberish,
@@ -1468,6 +1754,20 @@ export class Master extends Contract {
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
+    getDepositedErc721At(
+      _farmId: BigNumberish,
+      _user: string,
+      _index: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "getDepositedErc721At(uint256,address,uint256)"(
+      _farmId: BigNumberish,
+      _user: string,
+      _index: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
     getMultiplier(
       _farmId: BigNumberish,
       _from: BigNumberish,
@@ -1485,6 +1785,18 @@ export class Master extends Contract {
     governance(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "governance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    listDepositedErc721(
+      _farmId: BigNumberish,
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "listDepositedErc721(uint256,address)"(
+      _farmId: BigNumberish,
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
 
     massUpdateFarms(overrides?: Overrides): Promise<PopulatedTransaction>;
 

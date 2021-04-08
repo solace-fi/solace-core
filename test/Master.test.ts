@@ -334,15 +334,17 @@ describe("Master", function () {
     let farmInfo: any;
     let userInfo: any;
     let farmId = BN.from(1);
-    let tokenId1: BN, tokenId2: BN, tokenId3: BN;
+    let tokenId1: BN, tokenId2: BN, tokenId3: BN, tokenId4: BN;
     let depositAmount1 = BN.from(1);
     let depositAmount2 = BN.from(4);
     let depositAmount3 = BN.from(2);
 
     it("can deposit", async function () {
+      // empty
+      expect(await master.countDepositedErc721(farmId, farmer1.address)).to.equal(0);
+      expect(await master.listDepositedErc721(farmId, farmer1.address)).to.deep.equal([]);
       // farmer 1, deposit 1
-      await mintLpToken(farmer1, weth, solaceToken, FeeAmount.MEDIUM, depositAmount1);
-      tokenId1 = await lpToken.totalSupply();
+      tokenId1 = await mintLpToken(farmer1, weth, solaceToken, FeeAmount.MEDIUM, depositAmount1);
       await lpToken.connect(farmer1).approve(master.address, tokenId1);
       let tx1 = await master.connect(farmer1).depositErc721(farmId, tokenId1);
       await expect(tx1).to.emit(master, "DepositErc721").withArgs(farmer1.address, farmId, tokenId1);
@@ -351,9 +353,12 @@ describe("Master", function () {
       expect(await lpToken.balanceOf(master.address)).to.equal(1);
       userInfo = await master.userInfo(farmId, farmer1.address);
       expect(userInfo.value).to.equal(depositAmount1);
+      expect(await master.countDepositedErc721(farmId, farmer1.address)).to.equal(1);
+      expect(await master.getDepositedErc721At(farmId, farmer1.address, 0)).to.equal(tokenId1);
+      expect(await master.listDepositedErc721(farmId, farmer1.address)).to.deep.equal([tokenId1]);
+      expect(await master.assertDepositedErc721(farmId, farmer1.address, tokenId1)).to.equal(true);
       // farmer 2, deposit 4
-      await mintLpToken(farmer2, weth, solaceToken, FeeAmount.MEDIUM, depositAmount2);
-      tokenId2 = await lpToken.totalSupply();
+      tokenId2 = await mintLpToken(farmer2, weth, solaceToken, FeeAmount.MEDIUM, depositAmount2);
       await lpToken.connect(farmer2).approve(master.address, tokenId2);
       let tx2 = await master.connect(farmer2).depositErc721(farmId, tokenId2);
       await expect(tx2).to.emit(master, "DepositErc721").withArgs(farmer2.address, farmId, tokenId2);
@@ -362,9 +367,12 @@ describe("Master", function () {
       expect(await lpToken.balanceOf(master.address)).to.equal(2);
       userInfo = await master.userInfo(farmId, farmer2.address);
       expect(userInfo.value).to.equal(depositAmount2);
+      expect(await master.countDepositedErc721(farmId, farmer2.address)).to.equal(1);
+      expect(await master.getDepositedErc721At(farmId, farmer2.address, 0)).to.equal(tokenId2);
+      expect(await master.listDepositedErc721(farmId, farmer2.address)).to.deep.equal([tokenId2]);
+      expect(await master.assertDepositedErc721(farmId, farmer2.address, tokenId2)).to.equal(true);
       // farmer 1, deposit 2
-      await mintLpToken(farmer1, weth, solaceToken, FeeAmount.MEDIUM, depositAmount3);
-      tokenId3 = await lpToken.totalSupply();
+      tokenId3 = await mintLpToken(farmer1, weth, solaceToken, FeeAmount.MEDIUM, depositAmount3);
       await lpToken.connect(farmer1).approve(master.address, tokenId3);
       let tx3 = await master.connect(farmer1).depositErc721(farmId, tokenId3);
       await expect(tx3).to.emit(master, "DepositErc721").withArgs(farmer1.address, farmId, tokenId3);
@@ -373,6 +381,16 @@ describe("Master", function () {
       expect(await lpToken.balanceOf(master.address)).to.equal(3);
       userInfo = await master.userInfo(farmId, farmer1.address);
       expect(userInfo.value).to.equal(depositAmount1.add(depositAmount3));
+      expect(await master.countDepositedErc721(farmId, farmer1.address)).to.equal(2);
+      expect(await master.getDepositedErc721At(farmId, farmer1.address, 1)).to.equal(tokenId3);
+      expect(await master.listDepositedErc721(farmId, farmer1.address)).to.deep.equal([tokenId1,tokenId3]);
+      expect(await master.assertDepositedErc721(farmId, farmer1.address, tokenId3)).to.equal(true);
+      // non ownership
+      expect(await master.assertDepositedErc721(farmId, farmer2.address, tokenId1)).to.equal(false);
+      expect(await master.assertDepositedErc721(farmId, farmer1.address, tokenId2)).to.equal(false);
+      expect(await master.assertDepositedErc721(farmId, farmer2.address, tokenId3)).to.equal(false);
+      tokenId4 = (await lpToken.totalSupply()).add(1);
+      expect(await master.assertDepositedErc721(farmId, farmer1.address, tokenId4)).to.equal(false);
     })
 
     it("cannot deposit when lacking funds", async function () {
@@ -380,8 +398,7 @@ describe("Master", function () {
       let tokenId = (await lpToken.totalSupply()).add(2);
       await expect(master.connect(farmer1).depositErc721(farmId, tokenId)).to.be.reverted;
       // deposit without approval
-      await mintLpToken(farmer1, weth, solaceToken, FeeAmount.MEDIUM, 1);
-      tokenId = await lpToken.totalSupply();
+      tokenId = await mintLpToken(farmer1, weth, solaceToken, FeeAmount.MEDIUM, 1);
       await expect(master.connect(farmer1).depositErc721(farmId, tokenId)).to.be.reverted;
       // deposit someone elses token
       await expect(master.connect(farmer2).depositErc721(farmId, tokenId)).to.be.reverted;
@@ -414,6 +431,11 @@ describe("Master", function () {
       expect(staked1.sub(staked2)).to.equal(depositAmount1);
       userInfo = await master.userInfo(farmId, farmer1.address);
       expect(userInfo.value).to.equal(depositAmount3);
+      expect(await master.countDepositedErc721(farmId, farmer1.address)).to.equal(1);
+      expect(await master.getDepositedErc721At(farmId, farmer1.address, 0)).to.equal(tokenId3);
+      expect(await master.listDepositedErc721(farmId, farmer1.address)).to.deep.equal([tokenId3]);
+      expect(await master.assertDepositedErc721(farmId, farmer1.address, tokenId1)).to.equal(false);
+      expect(await master.assertDepositedErc721(farmId, farmer1.address, tokenId3)).to.equal(true);
       // farmer 1, full withdraw
       balance1 = await lpToken.balanceOf(master.address);
       staked1 = (await master.farmInfo(farmId)).valueStaked;
@@ -425,6 +447,9 @@ describe("Master", function () {
       expect(staked1.sub(staked2)).to.equal(depositAmount3);
       userInfo = await master.userInfo(farmId, farmer1.address);
       expect(userInfo.value).to.equal(0);
+      expect(await master.countDepositedErc721(farmId, farmer1.address)).to.equal(0);
+      expect(await master.listDepositedErc721(farmId, farmer1.address)).to.deep.equal([]);
+      expect(await master.assertDepositedErc721(farmId, farmer1.address, tokenId3)).to.equal(false);
       // farmer 2, full withdraw
       balance1 = await lpToken.balanceOf(master.address);
       let tx3 = await master.connect(farmer2).withdrawErc721(farmId, tokenId2);
@@ -435,6 +460,9 @@ describe("Master", function () {
       expect(balance1.sub(balance2)).to.equal(1);
       userInfo = await master.userInfo(farmId, farmer2.address);
       expect(userInfo.value).to.equal(0);
+      expect(await master.countDepositedErc721(farmId, farmer2.address)).to.equal(0);
+      expect(await master.listDepositedErc721(farmId, farmer2.address)).to.deep.equal([]);
+      expect(await master.assertDepositedErc721(farmId, farmer2.address, tokenId2)).to.equal(false);
     })
 
     it("cannot overwithdraw", async function () {
@@ -457,8 +485,7 @@ describe("Master", function () {
       let farmValue1 = (await master.farmInfo(farmId)).valueStaked;
       let userValue1 = (await master.userInfo(farmId, farmer1.address)).value;
       await lpAppraiser.setPoolValue(weth.address, solaceToken.address, FeeAmount.HIGH, 10);
-      await mintLpToken(farmer1, weth, solaceToken, FeeAmount.HIGH, 7);
-      let tokenId = lpToken.totalSupply();
+      let tokenId = await mintLpToken(farmer1, weth, solaceToken, FeeAmount.HIGH, 7);
       expect(await lpAppraiser.appraise(tokenId)).to.equal(70);
       // deposit
       await lpToken.connect(farmer1).approve(master.address, tokenId);
@@ -728,16 +755,13 @@ describe("Master", function () {
       farmId = await master.numFarms();
       await master.connect(governor).createFarmErc721(lpToken.address, lpAppraiser.address, allocPoints, startBlock, endBlock);
       // token 1
-      await mintLpToken(farmer1, weth, solaceToken, FeeAmount.MEDIUM, depositAmount1);
-      tokenId1 = await lpToken.totalSupply();
+      tokenId1 = await mintLpToken(farmer1, weth, solaceToken, FeeAmount.MEDIUM, depositAmount1);
       await lpToken.connect(farmer1).approve(master.address, tokenId1);
       // token 2
-      await mintLpToken(farmer2, weth, solaceToken, FeeAmount.MEDIUM, depositAmount2);
-      tokenId2 = await lpToken.totalSupply();
+      tokenId2 = await mintLpToken(farmer2, weth, solaceToken, FeeAmount.MEDIUM, depositAmount2);
       await lpToken.connect(farmer2).approve(master.address, tokenId2);
       // token 3
-      await mintLpToken(farmer2, weth, solaceToken, FeeAmount.MEDIUM, depositAmount3);
-      tokenId3 = await lpToken.totalSupply();
+      tokenId3 = await mintLpToken(farmer2, weth, solaceToken, FeeAmount.MEDIUM, depositAmount3);
       await lpToken.connect(farmer2).approve(master.address, tokenId3);
       // zero out solace balances
       await solaceToken.connect(farmer1).transfer(governor.address, await solaceToken.balanceOf(farmer1.address));
@@ -896,13 +920,11 @@ describe("Master", function () {
       await cpToken.connect(farmer2).increaseAllowance(master.address, depositAmount2);
       // farmer 3 tokens
       await solaceToken.connect(governor).transfer(farmer3.address, 10000);
-      await mintLpToken(farmer3, weth, solaceToken, FeeAmount.MEDIUM, depositAmount3);
-      tokenId3 = await lpToken.totalSupply();
+      tokenId3 = await mintLpToken(farmer3, weth, solaceToken, FeeAmount.MEDIUM, depositAmount3);
       await lpToken.connect(farmer3).approve(master.address, tokenId3);
       // farmer 4 tokens
       await solaceToken.connect(governor).transfer(farmer4.address, 10000);
-      await mintLpToken(farmer4, weth, solaceToken, FeeAmount.MEDIUM, depositAmount4);
-      tokenId4 = await lpToken.totalSupply();
+      tokenId4 = await mintLpToken(farmer4, weth, solaceToken, FeeAmount.MEDIUM, depositAmount4);
       await lpToken.connect(farmer4).approve(master.address, tokenId4);
       // zero out solace balances
       await solaceToken.connect(farmer1).transfer(governor.address, await solaceToken.balanceOf(farmer1.address));
@@ -1164,12 +1186,14 @@ async function mintLpToken(liquidityProvider: SignerWithAddress, tokenA: Contrac
     tickUpper: getMaxTick(TICK_SPACINGS[fee]),
     fee: fee,
     recipient: liquidityProvider.address,
-    amount0Max: constants.MaxUint256,
-    amount1Max: constants.MaxUint256,
-    amount: amount,
+    amount0Desired: amount,
+    amount1Desired: amount,
+    amount0Min: 0,
+    amount1Min: 0,
     deadline: constants.MaxUint256,
   });
   let tokenId = await lpToken.totalSupply();
   let position = await lpToken.positions(tokenId);
   expect(position.liquidity).to.equal(amount);
+  return tokenId;
 }

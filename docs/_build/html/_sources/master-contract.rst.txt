@@ -25,7 +25,7 @@ The global mapping `farmInfo` maps a unique farm id to a farm. Each farm can onl
 Per User
 ========
 
-The global mapping `userInfo` maps a unique farm id and user address to information about a farmer. The value that they've staked is `value` and they have a `rewardDebt`. If the farm is an ERC-721 farm, `tokensDeposited` hold which tokens they've deposited and `tokenValues` hold the value of each token.
+The global mapping `userInfo` maps a unique farm id and user address to information about a farmer. The value that they've staked is `value` and they have a `rewardDebt`. If the farm is an ERC-721 farm, the global mapping `depositedErc721sAndValues` will hold a list of the tokens a user deposited and their values.
 
 State Variables
 ===============
@@ -55,10 +55,10 @@ farmInfo
 :Description: Information about each farm.
 :Type: mapping(uint256 => FarmInfo)
 
-userInfo
+numFarms
 --------
-:Description: Information about each farmer.
-:Type: mapping(uint256 => mapping(address => UserInfo))
+:Description: The number of farms that have been created.
+:Type: uint256
 
 farmIsErc20
 -----------
@@ -70,10 +70,15 @@ farmIsErc721
 :Description: Returns true if farming ERC721 tokens.
 :Type: mapping(uint256 => bool)
 
-numFarms
+userInfo
 --------
-:Description: The number of farms that have been created.
-:Type: uint256
+:Description: Information about each farmer.
+:Type: mapping(uint256 => mapping(address => UserInfo))
+
+depositedErc721sAndValues
+-------------------------
+:Description: A list of tokens that a user has deposited onto a farm and their values.
+:Type: mapping(uint256 => mapping(address => EnumerableMap.UintToUintMap))
 
 Constructor
 ===========
@@ -127,14 +132,12 @@ farmInfo
     FarmInfo: Information about the farm.
 :Modifiers: none
 
-userInfo
+numFarms
 --------
-:Description: Information about each farmer.
-:Inputs:
-    | uint256 _farmId: Index of farm to query.
-    | address _user: Address of user on farm.
+:Description: The number of farms that have been created.
+:Inputs: none
 :Outputs:
-    UserInfo: Information about the user.
+    uint256: The number of farms that have been created.
 :Modifiers: none
 
 farmIsErc20
@@ -155,12 +158,14 @@ farmIsErc721
     bool: True if farming ERC721 tokens.
 :Modifiers: none
 
-numFarms
+userInfo
 --------
-:Description: The number of farms that have been created.
-:Inputs: none
+:Description: Information about each farmer.
+:Inputs:
+    | uint256 _farmId: Index of farm to query.
+    | address _user: Address of user on farm.
 :Outputs:
-    uint256: The number of farms that have been created.
+    UserInfo: Information about the user.
 :Modifiers: none
 
 pendingReward
@@ -182,6 +187,48 @@ getMultiplier
     | uint256 _to: The end of the period to measure rewards for.
 :Outputs:
     uint256: The weighted multiplier for the given period.
+:Modifiers: none
+
+countDepositedErc721
+--------------------
+:Description: Returns the count of ERC721s that a user has deposited onto a farm.
+:Inputs:
+    | uint256 _farmId: The farm to check count for.
+    | uint256 _user: The user to check count for.
+:Outputs:
+    uint256: The count of deposited ERC721s.
+:Modifiers: none
+
+listDepositedErc721
+-------------------
+:Description: Returns the list of ERC721s that a user has deposited onto a farm.
+:Inputs:
+    | uint256 _farmId: The farm to list ERC721s.
+    | uint256 _user: The user to list ERC721s.
+:Outputs:
+    uint256[]: The list of deposited ERC721s.
+:Modifiers: none
+
+getDepositedErc721At
+--------------------
+:Description: Returns the id of an ERC721 that a user has deposited onto a farm.
+:Inputs:
+    | uint256 _farmId: The farm to get token id for.
+    | uint256 _user: The user to get token id for.
+    | uint256 _index: The farm-based index of the token.
+:Outputs:
+    uint256: The id of the deposited ERC721.
+:Modifiers: none
+
+assertDepositedErc721
+---------------------
+:Description: Returns true if a user has deposited a given ERC721.
+:Inputs:
+    | uint256 _farmId: The farm to check.
+    | uint256 _user: The user to check.
+    | uint256 _token: The token to check.
+:Outputs:
+    bool: True if the user has deposited the given ERC721.
 :Modifiers: none
 
 Mutative Functions

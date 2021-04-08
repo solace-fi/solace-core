@@ -97,10 +97,11 @@
 <li class="toctree-l3"><a class="reference internal" href="#solaceperblock">solacePerBlock</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#totalallocpoints">totalAllocPoints</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#farminfo">farmInfo</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#userinfo">userInfo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#numfarms">numFarms</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#farmiserc20">farmIsErc20</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#farmiserc721">farmIsErc721</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#numfarms">numFarms</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#userinfo">userInfo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#depositederc721sandvalues">depositedErc721sAndValues</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#constructor">Constructor</a></li>
@@ -110,12 +111,16 @@
 <li class="toctree-l3"><a class="reference internal" href="#id4">solacePerBlock</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#id5">totalAllocPoints</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#id6">farmInfo</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#id7">userInfo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id7">numFarms</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#id8">farmIsErc20</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#id9">farmIsErc721</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#id10">numFarms</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id10">userInfo</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#pendingreward">pendingReward</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#getmultiplier">getMultiplier</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#countdepositederc721">countDepositedErc721</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#listdepositederc721">listDepositedErc721</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#getdepositederc721at">getDepositedErc721At</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#assertdepositederc721">assertDepositedErc721</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#mutative-functions">Mutative Functions</a><ul>
@@ -241,7 +246,7 @@ Both ERC-20 and ERC-721 tokens can be staked.</p>
 </div>
 <div class="section" id="per-user">
 <h2>Per User<a class="headerlink" href="#per-user" title="Permalink to this headline">¶</a></h2>
-<p>The global mapping <cite>userInfo</cite> maps a unique farm id and user address to information about a farmer. The value that they’ve staked is <cite>value</cite> and they have a <cite>rewardDebt</cite>. If the farm is an ERC-721 farm, <cite>tokensDeposited</cite> hold which tokens they’ve deposited and <cite>tokenValues</cite> hold the value of each token.</p>
+<p>The global mapping <cite>userInfo</cite> maps a unique farm id and user address to information about a farmer. The value that they’ve staked is <cite>value</cite> and they have a <cite>rewardDebt</cite>. If the farm is an ERC-721 farm, the global mapping <cite>depositedErc721sAndValues</cite> will hold a list of the tokens a user deposited and their values.</p>
 </div>
 <div class="section" id="state-variables">
 <h2>State Variables<a class="headerlink" href="#state-variables" title="Permalink to this headline">¶</a></h2>
@@ -300,14 +305,14 @@ Both ERC-20 and ERC-721 tokens can be staked.</p>
 </dd>
 </dl>
 </div>
-<div class="section" id="userinfo">
-<h3>userInfo<a class="headerlink" href="#userinfo" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="numfarms">
+<h3>numFarms<a class="headerlink" href="#numfarms" title="Permalink to this headline">¶</a></h3>
 <dl class="field-list simple">
 <dt class="field-odd">Description</dt>
-<dd class="field-odd"><p>Information about each farmer.</p>
+<dd class="field-odd"><p>The number of farms that have been created.</p>
 </dd>
 <dt class="field-even">Type</dt>
-<dd class="field-even"><p>mapping(uint256 =&gt; mapping(address =&gt; UserInfo))</p>
+<dd class="field-even"><p>uint256</p>
 </dd>
 </dl>
 </div>
@@ -333,14 +338,25 @@ Both ERC-20 and ERC-721 tokens can be staked.</p>
 </dd>
 </dl>
 </div>
-<div class="section" id="numfarms">
-<h3>numFarms<a class="headerlink" href="#numfarms" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="userinfo">
+<h3>userInfo<a class="headerlink" href="#userinfo" title="Permalink to this headline">¶</a></h3>
 <dl class="field-list simple">
 <dt class="field-odd">Description</dt>
-<dd class="field-odd"><p>The number of farms that have been created.</p>
+<dd class="field-odd"><p>Information about each farmer.</p>
 </dd>
 <dt class="field-even">Type</dt>
-<dd class="field-even"><p>uint256</p>
+<dd class="field-even"><p>mapping(uint256 =&gt; mapping(address =&gt; UserInfo))</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="depositederc721sandvalues">
+<h3>depositedErc721sAndValues<a class="headerlink" href="#depositederc721sandvalues" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>A list of tokens that a user has deposited onto a farm and their values.</p>
+</dd>
+<dt class="field-even">Type</dt>
+<dd class="field-even"><p>mapping(uint256 =&gt; mapping(address =&gt; EnumerableMap.UintToUintMap))</p>
 </dd>
 </dl>
 </div>
@@ -447,19 +463,16 @@ Both ERC-20 and ERC-721 tokens can be staked.</p>
 </dl>
 </div>
 <div class="section" id="id7">
-<h3>userInfo<a class="headerlink" href="#id7" title="Permalink to this headline">¶</a></h3>
-<dl class="field-list">
+<h3>numFarms<a class="headerlink" href="#id7" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list simple">
 <dt class="field-odd">Description</dt>
-<dd class="field-odd"><p>Information about each farmer.</p>
+<dd class="field-odd"><p>The number of farms that have been created.</p>
 </dd>
 <dt class="field-even">Inputs</dt>
-<dd class="field-even"><div class="line-block">
-<div class="line">uint256 _farmId: Index of farm to query.</div>
-<div class="line">address _user: Address of user on farm.</div>
-</div>
+<dd class="field-even"><p>none</p>
 </dd>
 <dt class="field-odd">Outputs</dt>
-<dd class="field-odd"><p>UserInfo: Information about the user.</p>
+<dd class="field-odd"><p>uint256: The number of farms that have been created.</p>
 </dd>
 <dt class="field-even">Modifiers</dt>
 <dd class="field-even"><p>none</p>
@@ -501,16 +514,19 @@ Both ERC-20 and ERC-721 tokens can be staked.</p>
 </dl>
 </div>
 <div class="section" id="id10">
-<h3>numFarms<a class="headerlink" href="#id10" title="Permalink to this headline">¶</a></h3>
-<dl class="field-list simple">
+<h3>userInfo<a class="headerlink" href="#id10" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list">
 <dt class="field-odd">Description</dt>
-<dd class="field-odd"><p>The number of farms that have been created.</p>
+<dd class="field-odd"><p>Information about each farmer.</p>
 </dd>
 <dt class="field-even">Inputs</dt>
-<dd class="field-even"><p>none</p>
+<dd class="field-even"><div class="line-block">
+<div class="line">uint256 _farmId: Index of farm to query.</div>
+<div class="line">address _user: Address of user on farm.</div>
+</div>
 </dd>
 <dt class="field-odd">Outputs</dt>
-<dd class="field-odd"><p>uint256: The number of farms that have been created.</p>
+<dd class="field-odd"><p>UserInfo: Information about the user.</p>
 </dd>
 <dt class="field-even">Modifiers</dt>
 <dd class="field-even"><p>none</p>
@@ -552,6 +568,88 @@ Both ERC-20 and ERC-721 tokens can be staked.</p>
 </dd>
 <dt class="field-odd">Outputs</dt>
 <dd class="field-odd"><p>uint256: The weighted multiplier for the given period.</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="countdepositederc721">
+<h3>countDepositedErc721<a class="headerlink" href="#countdepositederc721" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Returns the count of ERC721s that a user has deposited onto a farm.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><div class="line-block">
+<div class="line">uint256 _farmId: The farm to check count for.</div>
+<div class="line">uint256 _user: The user to check count for.</div>
+</div>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>uint256: The count of deposited ERC721s.</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="listdepositederc721">
+<h3>listDepositedErc721<a class="headerlink" href="#listdepositederc721" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Returns the list of ERC721s that a user has deposited onto a farm.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><div class="line-block">
+<div class="line">uint256 _farmId: The farm to list ERC721s.</div>
+<div class="line">uint256 _user: The user to list ERC721s.</div>
+</div>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>uint256[]: The list of deposited ERC721s.</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="getdepositederc721at">
+<h3>getDepositedErc721At<a class="headerlink" href="#getdepositederc721at" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Returns the id of an ERC721 that a user has deposited onto a farm.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><div class="line-block">
+<div class="line">uint256 _farmId: The farm to get token id for.</div>
+<div class="line">uint256 _user: The user to get token id for.</div>
+<div class="line">uint256 _index: The farm-based index of the token.</div>
+</div>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>uint256: The id of the deposited ERC721.</p>
+</dd>
+<dt class="field-even">Modifiers</dt>
+<dd class="field-even"><p>none</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="assertdepositederc721">
+<h3>assertDepositedErc721<a class="headerlink" href="#assertdepositederc721" title="Permalink to this headline">¶</a></h3>
+<dl class="field-list">
+<dt class="field-odd">Description</dt>
+<dd class="field-odd"><p>Returns true if a user has deposited a given ERC721.</p>
+</dd>
+<dt class="field-even">Inputs</dt>
+<dd class="field-even"><div class="line-block">
+<div class="line">uint256 _farmId: The farm to check.</div>
+<div class="line">uint256 _user: The user to check.</div>
+<div class="line">uint256 _token: The token to check.</div>
+</div>
+</dd>
+<dt class="field-odd">Outputs</dt>
+<dd class="field-odd"><p>bool: True if the user has deposited the given ERC721.</p>
 </dd>
 <dt class="field-even">Modifiers</dt>
 <dd class="field-even"><p>none</p>
@@ -1355,7 +1453,75 @@ Both ERC-20 and ERC-721 tokens can be staked.</p>
 465
 466
 467
-468</pre></div></td><td class="code"><div class="highlight"><pre><span></span><span class="c1">// </span><span class="cs">SPDX-License-Identifier:</span><span class="c1"> GPL-3.0-or-later</span>
+468
+469
+470
+471
+472
+473
+474
+475
+476
+477
+478
+479
+480
+481
+482
+483
+484
+485
+486
+487
+488
+489
+490
+491
+492
+493
+494
+495
+496
+497
+498
+499
+500
+501
+502
+503
+504
+505
+506
+507
+508
+509
+510
+511
+512
+513
+514
+515
+516
+517
+518
+519
+520
+521
+522
+523
+524
+525
+526
+527
+528
+529
+530
+531
+532
+533
+534
+535
+536</pre></div></td><td class="code"><div class="highlight"><pre><span></span><span class="c1">// </span><span class="cs">SPDX-License-Identifier:</span><span class="c1"> GPL-3.0-or-later</span>
 <span class="k">pragma solidity</span> <span class="mf">0.8</span><span class="p">.</span><span class="mi">0</span><span class="p">;</span>
 
 <span class="kn">import</span> <span class="s">&quot;@openzeppelin/contracts/utils/math/Math.sol&quot;</span><span class="p">;</span>
@@ -1364,6 +1530,7 @@ Both ERC-20 and ERC-721 tokens can be staked.</p>
 <span class="kn">import</span> <span class="s">&quot;./SOLACE.sol&quot;</span><span class="p">;</span>
 <span class="kn">import</span> <span class="s">&quot;./interface/INftAppraiser.sol&quot;</span><span class="p">;</span>
 <span class="kn">import</span> <span class="s">&quot;./interface/IMaster.sol&quot;</span><span class="p">;</span>
+<span class="kn">import</span> <span class="s">&quot;./utils/EnumerableMap.sol&quot;</span><span class="p">;</span>
 
 
 <span class="cm">/**</span>
@@ -1373,37 +1540,12 @@ Both ERC-20 and ERC-721 tokens can be staked.</p>
 <span class="cm"> */</span>
 <span class="kd">contract</span> <span class="n">Master</span> <span class="k">is</span> <span class="n">IMaster</span> <span class="p">{</span>
     <span class="kn">using</span> <span class="n">SafeERC20</span> <span class="k">for</span> <span class="n">IERC20</span><span class="p">;</span>
+    <span class="kn">using</span> <span class="n">EnumerableMap</span> <span class="k">for</span> <span class="n">EnumerableMap</span><span class="p">.</span><span class="n">UintToUintMap</span><span class="p">;</span>
 
-    <span class="c1">// Info of each user.</span>
-    <span class="kd">struct</span> <span class="n">UserInfo</span> <span class="p">{</span>
-        <span class="kt">uint256</span> <span class="n">value</span><span class="p">;</span>                            <span class="c1">// Value of user provided tokens.</span>
-        <span class="kt">uint256</span> <span class="n">rewardDebt</span><span class="p">;</span>                       <span class="c1">// Reward debt. See explanation below.</span>
-        <span class="kd">mapping</span><span class="p">(</span><span class="kt">uint256</span> <span class="o">=&gt;</span> <span class="kt">bool</span><span class="p">)</span> <span class="n">tokensDeposited</span><span class="p">;</span> <span class="c1">// If an ERC721 farm, which tokens have been deposited.</span>
-        <span class="kd">mapping</span><span class="p">(</span><span class="kt">uint256</span> <span class="o">=&gt;</span> <span class="kt">uint256</span><span class="p">)</span> <span class="n">tokenValues</span><span class="p">;</span>  <span class="c1">// If an ERC721 farm, the value of deposited tokens.</span>
-        <span class="c1">//</span>
-        <span class="c1">// We do some fancy math here. Basically, any point in time, the amount of SOLACE</span>
-        <span class="c1">// entitled to a user but is pending to be distributed is:</span>
-        <span class="c1">//</span>
-        <span class="c1">//   pending reward = (user.value * farm.accSolacePerShare) - user.rewardDebt</span>
-        <span class="c1">//</span>
-        <span class="c1">// Whenever a user deposits or withdraws LP tokens to a farm. Here&#39;s what happens:</span>
-        <span class="c1">//   1. The farm&#39;s `accSolacePerShare` and `lastRewardBlock` gets updated.</span>
-        <span class="c1">//   2. User receives the pending reward sent to his/her address.</span>
-        <span class="c1">//   3. User&#39;s `value` gets updated.</span>
-        <span class="c1">//   4. User&#39;s `rewardDebt` gets updated.</span>
-    <span class="p">}</span>
+    <span class="c1">// global variables</span>
 
-    <span class="c1">// Info of each farm.</span>
-    <span class="kd">struct</span> <span class="n">FarmInfo</span> <span class="p">{</span>
-        <span class="kt">address</span> <span class="n">token</span><span class="p">;</span>             <span class="c1">// Address of token contract.</span>
-        <span class="kt">address</span> <span class="n">appraiser</span><span class="p">;</span>         <span class="c1">// If an ERC721 farm, address of the appraiser contract.</span>
-        <span class="kt">uint256</span> <span class="n">allocPoints</span><span class="p">;</span>       <span class="c1">// How many allocation points assigned to this farm.</span>
-        <span class="kt">uint256</span> <span class="n">startBlock</span><span class="p">;</span>        <span class="c1">// When the farm will start.</span>
-        <span class="kt">uint256</span> <span class="n">endBlock</span><span class="p">;</span>          <span class="c1">// When the farm will end.</span>
-        <span class="kt">uint256</span> <span class="n">lastRewardBlock</span><span class="p">;</span>   <span class="c1">// Last time rewards were distributed or farm was updated.</span>
-        <span class="kt">uint256</span> <span class="n">accSolacePerShare</span><span class="p">;</span> <span class="c1">// Accumulated rewards per share, times 1e12.</span>
-        <span class="kt">uint256</span> <span class="n">valueStaked</span><span class="p">;</span>       <span class="c1">// Value of tokens staked by all farmers.</span>
-    <span class="p">}</span>
+    <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Governor.</span>
+    <span class="kt">address</span> <span class="k">public</span> <span class="n">governance</span><span class="p">;</span>
 
     <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Native SOLACE Token.</span>
     <span class="n">SOLACE</span> <span class="k">public</span> <span class="n">solace</span><span class="p">;</span>
@@ -1414,13 +1556,26 @@ Both ERC-20 and ERC-721 tokens can be staked.</p>
     <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Total allocation points across all farms.</span>
     <span class="kt">uint256</span> <span class="k">public</span> <span class="n">totalAllocPoints</span><span class="p">;</span>
 
+    <span class="c1">// per farm variables</span>
+
+    <span class="c1">// Info of each farm.</span>
+    <span class="kd">struct</span> <span class="n">FarmInfo</span> <span class="p">{</span>
+      <span class="kt">address</span> <span class="n">token</span><span class="p">;</span>             <span class="c1">// Address of token contract.</span>
+      <span class="kt">address</span> <span class="n">appraiser</span><span class="p">;</span>         <span class="c1">// If an ERC721 farm, address of the appraiser contract.</span>
+      <span class="kt">uint256</span> <span class="n">allocPoints</span><span class="p">;</span>       <span class="c1">// How many allocation points assigned to this farm.</span>
+      <span class="kt">uint256</span> <span class="n">startBlock</span><span class="p">;</span>        <span class="c1">// When the farm will start.</span>
+      <span class="kt">uint256</span> <span class="n">endBlock</span><span class="p">;</span>          <span class="c1">// When the farm will end.</span>
+      <span class="kt">uint256</span> <span class="n">lastRewardBlock</span><span class="p">;</span>   <span class="c1">// Last time rewards were distributed or farm was updated.</span>
+      <span class="kt">uint256</span> <span class="n">accSolacePerShare</span><span class="p">;</span> <span class="c1">// Accumulated rewards per share, times 1e12.</span>
+      <span class="kt">uint256</span> <span class="n">valueStaked</span><span class="p">;</span>       <span class="c1">// Value of tokens staked by all farmers.</span>
+    <span class="p">}</span>
+
     <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Information about each farm.</span>
     <span class="c1">/// </span><span class="cs">@dev</span><span class="c1"> farm id =&gt; farm info</span>
     <span class="kd">mapping</span><span class="p">(</span><span class="kt">uint256</span> <span class="o">=&gt;</span> <span class="n">FarmInfo</span><span class="p">)</span> <span class="k">public</span> <span class="n">farmInfo</span><span class="p">;</span>
 
-    <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Information about each farmer.</span>
-    <span class="c1">/// </span><span class="cs">@dev</span><span class="c1"> farm id =&gt; user address =&gt; user info</span>
-    <span class="kd">mapping</span><span class="p">(</span><span class="kt">uint256</span> <span class="o">=&gt;</span> <span class="kd">mapping</span><span class="p">(</span><span class="kt">address</span> <span class="o">=&gt;</span> <span class="n">UserInfo</span><span class="p">))</span> <span class="k">public</span> <span class="n">userInfo</span><span class="p">;</span>
+    <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> The number of farms that have been created.</span>
+    <span class="kt">uint256</span> <span class="k">public</span> <span class="n">numFarms</span><span class="p">;</span>
 
     <span class="c1">// track farm ids and types</span>
     <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Returns true if farming ERC20 tokens.</span>
@@ -1428,10 +1583,35 @@ Both ERC-20 and ERC-721 tokens can be staked.</p>
     <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Returns true if farming ERC721 tokens.</span>
     <span class="kd">mapping</span><span class="p">(</span><span class="kt">uint256</span> <span class="o">=&gt;</span> <span class="kt">bool</span><span class="p">)</span> <span class="k">public</span> <span class="n">farmIsErc721</span><span class="p">;</span>
 
-    <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> The number of farms that have been created.</span>
-    <span class="kt">uint256</span> <span class="k">public</span> <span class="n">numFarms</span><span class="p">;</span>
+    <span class="c1">// per user variables</span>
+
+    <span class="c1">// Info of each user.</span>
+    <span class="kd">struct</span> <span class="n">UserInfo</span> <span class="p">{</span>
+      <span class="kt">uint256</span> <span class="n">value</span><span class="p">;</span>                            <span class="c1">// Value of user provided tokens.</span>
+      <span class="kt">uint256</span> <span class="n">rewardDebt</span><span class="p">;</span>                       <span class="c1">// Reward debt. See explanation below.</span>
+      <span class="c1">//</span>
+      <span class="c1">// We do some fancy math here. Basically, any point in time, the amount of SOLACE</span>
+      <span class="c1">// entitled to a user but is pending to be distributed is:</span>
+      <span class="c1">//</span>
+      <span class="c1">//   pending reward = (user.value * farm.accSolacePerShare) - user.rewardDebt</span>
+      <span class="c1">//</span>
+      <span class="c1">// Whenever a user deposits or withdraws LP tokens to a farm. Here&#39;s what happens:</span>
+      <span class="c1">//   1. The farm&#39;s `accSolacePerShare` and `lastRewardBlock` gets updated.</span>
+      <span class="c1">//   2. User receives the pending reward sent to his/her address.</span>
+      <span class="c1">//   3. User&#39;s `value` gets updated.</span>
+      <span class="c1">//   4. User&#39;s `rewardDebt` gets updated.</span>
+    <span class="p">}</span>
+
+    <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Information about each farmer.</span>
+    <span class="c1">/// </span><span class="cs">@dev</span><span class="c1"> farm id =&gt; user address =&gt; user info</span>
+    <span class="kd">mapping</span><span class="p">(</span><span class="kt">uint256</span> <span class="o">=&gt;</span> <span class="kd">mapping</span><span class="p">(</span><span class="kt">address</span> <span class="o">=&gt;</span> <span class="n">UserInfo</span><span class="p">))</span> <span class="k">public</span> <span class="n">userInfo</span><span class="p">;</span>
+
+    <span class="c1">// The ERC721 tokens that a user deposited and their values.</span>
+    <span class="c1">// farm id =&gt; user address =&gt; token id =&gt; token value</span>
+    <span class="kd">mapping</span><span class="p">(</span><span class="kt">uint256</span> <span class="o">=&gt;</span> <span class="kd">mapping</span><span class="p">(</span><span class="kt">address</span> <span class="o">=&gt;</span> <span class="n">EnumerableMap</span><span class="p">.</span><span class="n">UintToUintMap</span><span class="p">))</span> <span class="k">private</span> <span class="n">depositedErc721sAndValues</span><span class="p">;</span>
 
     <span class="c1">// events</span>
+
     <span class="c1">// Emitted when an ERC20 farm is created.</span>
     <span class="kd">event</span> <span class="n">Erc20FarmCreated</span><span class="p">(</span><span class="kt">uint256</span> <span class="k">indexed</span> <span class="n">_farmId</span><span class="p">);</span>
     <span class="c1">// Emitted when an ERC721 farm is created.</span>
@@ -1444,9 +1624,6 @@ Both ERC-20 and ERC-721 tokens can be staked.</p>
     <span class="kd">event</span> <span class="n">WithdrawErc20</span><span class="p">(</span><span class="kt">address</span> <span class="k">indexed</span> <span class="n">_user</span><span class="p">,</span> <span class="kt">uint256</span> <span class="k">indexed</span> <span class="n">_farmId</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_amount</span><span class="p">);</span>
     <span class="c1">// Emitted when an ERC721 token is withdrawn from a farm.</span>
     <span class="kd">event</span> <span class="n">WithdrawErc721</span><span class="p">(</span><span class="kt">address</span> <span class="k">indexed</span> <span class="n">_user</span><span class="p">,</span> <span class="kt">uint256</span> <span class="k">indexed</span> <span class="n">_farmId</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_token</span><span class="p">);</span>
-
-    <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Governor.</span>
-    <span class="kt">address</span> <span class="k">public</span> <span class="n">governance</span><span class="p">;</span>
 
     <span class="cm">/**</span>
 <span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Constructs the master contract.</span>
@@ -1646,12 +1823,13 @@ Both ERC-20 and ERC-721 tokens can be staked.</p>
         <span class="c1">// pull tokens</span>
         <span class="n">IERC721</span><span class="p">(</span><span class="n">farm</span><span class="p">.</span><span class="n">token</span><span class="p">).</span><span class="n">transferFrom</span><span class="p">(</span><span class="kt">address</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">),</span> <span class="kt">address</span><span class="p">(</span><span class="nb">this</span><span class="p">),</span> <span class="n">_token</span><span class="p">);</span>
         <span class="c1">// accounting</span>
-        <span class="kt">uint256</span> <span class="n">value</span> <span class="o">=</span> <span class="n">INftAppraiser</span><span class="p">(</span><span class="n">farm</span><span class="p">.</span><span class="n">appraiser</span><span class="p">).</span><span class="n">appraise</span><span class="p">(</span><span class="n">_token</span><span class="p">);</span>
-        <span class="n">farm</span><span class="p">.</span><span class="n">valueStaked</span> <span class="o">+=</span> <span class="n">value</span><span class="p">;</span>
-        <span class="n">user</span><span class="p">.</span><span class="n">value</span> <span class="o">+=</span> <span class="n">value</span><span class="p">;</span>
+        <span class="kt">uint256</span> <span class="n">tokenValue</span> <span class="o">=</span> <span class="n">INftAppraiser</span><span class="p">(</span><span class="n">farm</span><span class="p">.</span><span class="n">appraiser</span><span class="p">).</span><span class="n">appraise</span><span class="p">(</span><span class="n">_token</span><span class="p">);</span>
+        <span class="n">farm</span><span class="p">.</span><span class="n">valueStaked</span> <span class="o">+=</span> <span class="n">tokenValue</span><span class="p">;</span>
+        <span class="n">user</span><span class="p">.</span><span class="n">value</span> <span class="o">+=</span> <span class="n">tokenValue</span><span class="p">;</span>
         <span class="n">user</span><span class="p">.</span><span class="n">rewardDebt</span> <span class="o">=</span> <span class="n">user</span><span class="p">.</span><span class="n">value</span> <span class="o">*</span> <span class="n">farm</span><span class="p">.</span><span class="n">accSolacePerShare</span> <span class="o">/</span> <span class="mi">1e12</span><span class="p">;</span>
-        <span class="n">user</span><span class="p">.</span><span class="n">tokensDeposited</span><span class="p">[</span><span class="n">_token</span><span class="p">]</span> <span class="o">=</span> <span class="kc">true</span><span class="p">;</span>
-        <span class="n">user</span><span class="p">.</span><span class="n">tokenValues</span><span class="p">[</span><span class="n">_token</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span><span class="p">;</span>
+        <span class="c1">//user.tokensDeposited[_token] = true;</span>
+        <span class="c1">//user.tokenValues[_token] = value;</span>
+        <span class="n">depositedErc721sAndValues</span><span class="p">[</span><span class="n">_farmId</span><span class="p">][</span><span class="nb">msg.sender</span><span class="p">].</span><span class="n">set</span><span class="p">(</span><span class="n">_token</span><span class="p">,</span> <span class="n">tokenValue</span><span class="p">);</span>
         <span class="k">emit</span> <span class="n">DepositErc721</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">,</span> <span class="n">_farmId</span><span class="p">,</span> <span class="n">_token</span><span class="p">);</span>
     <span class="p">}</span>
 
@@ -1693,13 +1871,16 @@ Both ERC-20 and ERC-721 tokens can be staked.</p>
         <span class="c1">// harvest</span>
         <span class="n">_harvest</span><span class="p">(</span><span class="n">_farmId</span><span class="p">);</span>
         <span class="c1">// cannot withdraw a token you didnt deposit</span>
-        <span class="nf">require</span><span class="p">(</span><span class="n">user</span><span class="p">.</span><span class="n">tokensDeposited</span><span class="p">[</span><span class="n">_token</span><span class="p">],</span> <span class="s">&quot;not your token&quot;</span><span class="p">);</span>
+        <span class="c1">//require(user.tokensDeposited[_token], &quot;not your token&quot;);</span>
+        <span class="nf">require</span><span class="p">(</span><span class="n">depositedErc721sAndValues</span><span class="p">[</span><span class="n">_farmId</span><span class="p">][</span><span class="nb">msg.sender</span><span class="p">].</span><span class="n">contains</span><span class="p">(</span><span class="n">_token</span><span class="p">),</span> <span class="s">&quot;not your token&quot;</span><span class="p">);</span>
         <span class="c1">// accounting</span>
-        <span class="kt">uint256</span> <span class="n">tokenValue</span> <span class="o">=</span> <span class="n">user</span><span class="p">.</span><span class="n">tokenValues</span><span class="p">[</span><span class="n">_token</span><span class="p">];</span>
+        <span class="c1">//uint256 tokenValue = user.tokenValues[_token];</span>
+        <span class="kt">uint256</span> <span class="n">tokenValue</span> <span class="o">=</span> <span class="n">depositedErc721sAndValues</span><span class="p">[</span><span class="n">_farmId</span><span class="p">][</span><span class="nb">msg.sender</span><span class="p">].</span><span class="n">get</span><span class="p">(</span><span class="n">_token</span><span class="p">);</span>
         <span class="n">farm</span><span class="p">.</span><span class="n">valueStaked</span> <span class="o">-=</span> <span class="n">tokenValue</span><span class="p">;</span>
         <span class="n">user</span><span class="p">.</span><span class="n">value</span> <span class="o">-=</span> <span class="n">tokenValue</span><span class="p">;</span>
         <span class="n">user</span><span class="p">.</span><span class="n">rewardDebt</span> <span class="o">=</span> <span class="n">user</span><span class="p">.</span><span class="n">value</span> <span class="o">*</span> <span class="n">farm</span><span class="p">.</span><span class="n">accSolacePerShare</span> <span class="o">/</span> <span class="mi">1e12</span><span class="p">;</span>
-        <span class="n">user</span><span class="p">.</span><span class="n">tokensDeposited</span><span class="p">[</span><span class="n">_token</span><span class="p">]</span> <span class="o">=</span> <span class="kc">false</span><span class="p">;</span>
+        <span class="c1">//user.tokensDeposited[_token] = false;</span>
+        <span class="n">depositedErc721sAndValues</span><span class="p">[</span><span class="n">_farmId</span><span class="p">][</span><span class="nb">msg.sender</span><span class="p">].</span><span class="n">remove</span><span class="p">(</span><span class="n">_token</span><span class="p">);</span>
         <span class="c1">// return CP/LP tokens</span>
         <span class="n">IERC721</span><span class="p">(</span><span class="n">farm</span><span class="p">.</span><span class="n">token</span><span class="p">).</span><span class="n">safeTransferFrom</span><span class="p">(</span><span class="kt">address</span><span class="p">(</span><span class="nb">this</span><span class="p">),</span> <span class="nb">msg.sender</span><span class="p">,</span> <span class="n">_token</span><span class="p">);</span>
         <span class="k">emit</span> <span class="n">WithdrawErc721</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">,</span> <span class="n">_farmId</span><span class="p">,</span> <span class="n">_token</span><span class="p">);</span>
@@ -1797,7 +1978,60 @@ Both ERC-20 and ERC-721 tokens can be staked.</p>
     <span class="p">}</span>
 
     <span class="cm">/**</span>
-<span class="cm">    * Calculate and transfer a user&#39;s rewards.</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Returns the count of ERC721s that a user has deposited onto a farm.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _farmId The farm to check count for.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _user The user to check count for.</span>
+<span class="cm">     * </span><span class="cs">@return</span><span class="cm"> The count of deposited ERC721s.</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">countDepositedErc721</span><span class="p">(</span><span class="kt">uint256</span> <span class="n">_farmId</span><span class="p">,</span> <span class="kt">address</span> <span class="n">_user</span><span class="p">)</span> <span class="k">external</span> <span class="k">view</span> <span class="k">override</span> <span class="k">returns</span> <span class="p">(</span><span class="kt">uint256</span><span class="p">)</span> <span class="p">{</span>
+        <span class="nf">require</span><span class="p">(</span><span class="n">farmIsErc721</span><span class="p">[</span><span class="n">_farmId</span><span class="p">],</span> <span class="s">&quot;not an erc721 farm&quot;</span><span class="p">);</span>
+        <span class="k">return</span> <span class="n">depositedErc721sAndValues</span><span class="p">[</span><span class="n">_farmId</span><span class="p">][</span><span class="n">_user</span><span class="p">].</span><span class="n">length</span><span class="p">();</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Returns the list of ERC721s that a user has deposited onto a farm.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _farmId The farm to list ERC721s.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _user The user to list ERC721s.</span>
+<span class="cm">     * </span><span class="cs">@return</span><span class="cm"> The list of deposited ERC721s.</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">listDepositedErc721</span><span class="p">(</span><span class="kt">uint256</span> <span class="n">_farmId</span><span class="p">,</span> <span class="kt">address</span> <span class="n">_user</span><span class="p">)</span> <span class="k">external</span> <span class="k">view</span> <span class="k">override</span> <span class="k">returns</span> <span class="p">(</span><span class="kt">uint256</span><span class="p">[]</span> <span class="k">memory</span><span class="p">)</span> <span class="p">{</span>
+        <span class="nf">require</span><span class="p">(</span><span class="n">farmIsErc721</span><span class="p">[</span><span class="n">_farmId</span><span class="p">],</span> <span class="s">&quot;not an erc721 farm&quot;</span><span class="p">);</span>
+        <span class="kt">uint256</span> <span class="n">length</span> <span class="o">=</span> <span class="n">depositedErc721sAndValues</span><span class="p">[</span><span class="n">_farmId</span><span class="p">][</span><span class="n">_user</span><span class="p">].</span><span class="n">length</span><span class="p">();</span>
+        <span class="kt">uint256</span><span class="p">[]</span> <span class="k">memory</span> <span class="n">tokens</span> <span class="o">=</span> <span class="k">new</span> <span class="kt">uint256</span><span class="p">[](</span><span class="n">length</span><span class="p">);</span>
+        <span class="k">for</span><span class="p">(</span><span class="kt">uint256</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">length</span><span class="p">;</span> <span class="o">++</span><span class="n">i</span><span class="p">)</span> <span class="p">{</span>
+            <span class="p">(</span><span class="kt">uint256</span> <span class="n">_token</span><span class="p">,</span> <span class="p">)</span> <span class="o">=</span> <span class="n">depositedErc721sAndValues</span><span class="p">[</span><span class="n">_farmId</span><span class="p">][</span><span class="n">_user</span><span class="p">].</span><span class="n">at</span><span class="p">(</span><span class="n">i</span><span class="p">);</span>
+            <span class="n">tokens</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">_token</span><span class="p">;</span>
+        <span class="p">}</span>
+        <span class="k">return</span> <span class="n">tokens</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Returns the id of an ERC721 that a user has deposited onto a farm.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _farmId The farm to get token id for.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _user The user to get token id for.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _index The farm-based index of the token.</span>
+<span class="cm">     * </span><span class="cs">@return</span><span class="cm"> The id of the deposited ERC721.</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">getDepositedErc721At</span><span class="p">(</span><span class="kt">uint256</span> <span class="n">_farmId</span><span class="p">,</span> <span class="kt">address</span> <span class="n">_user</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_index</span><span class="p">)</span> <span class="k">external</span> <span class="k">view</span> <span class="k">override</span> <span class="k">returns</span> <span class="p">(</span><span class="kt">uint256</span><span class="p">)</span> <span class="p">{</span>
+        <span class="nf">require</span><span class="p">(</span><span class="n">farmIsErc721</span><span class="p">[</span><span class="n">_farmId</span><span class="p">],</span> <span class="s">&quot;not an erc721 farm&quot;</span><span class="p">);</span>
+        <span class="p">(</span><span class="kt">uint256</span> <span class="n">_token</span><span class="p">,</span> <span class="p">)</span> <span class="o">=</span> <span class="n">depositedErc721sAndValues</span><span class="p">[</span><span class="n">_farmId</span><span class="p">][</span><span class="n">_user</span><span class="p">].</span><span class="n">at</span><span class="p">(</span><span class="n">_index</span><span class="p">);</span>
+        <span class="k">return</span> <span class="n">_token</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Returns true if a user has deposited a given ERC721.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _farmId The farm to check.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _user The user to check.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _token The token to check.</span>
+<span class="cm">     * </span><span class="cs">@return</span><span class="cm"> True if the user has deposited the given ERC721.</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">assertDepositedErc721</span><span class="p">(</span><span class="kt">uint256</span> <span class="n">_farmId</span><span class="p">,</span> <span class="kt">address</span> <span class="n">_user</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_token</span><span class="p">)</span> <span class="k">external</span> <span class="k">view</span> <span class="k">override</span> <span class="k">returns</span> <span class="p">(</span><span class="kt">bool</span><span class="p">)</span> <span class="p">{</span>
+        <span class="nf">require</span><span class="p">(</span><span class="n">farmIsErc721</span><span class="p">[</span><span class="n">_farmId</span><span class="p">],</span> <span class="s">&quot;not an erc721 farm&quot;</span><span class="p">);</span>
+        <span class="k">return</span> <span class="n">depositedErc721sAndValues</span><span class="p">[</span><span class="n">_farmId</span><span class="p">][</span><span class="n">_user</span><span class="p">].</span><span class="n">contains</span><span class="p">(</span><span class="n">_token</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">    * </span><span class="cs">@notice</span><span class="cm"> Calculate and transfer a user&#39;s rewards.</span>
 <span class="cm">    * </span><span class="cs">@param</span><span class="cm"> _farmId The farm to withdraw rewards from.</span>
 <span class="cm">    */</span>
     <span class="kd">function</span> <span class="n">_harvest</span><span class="p">(</span><span class="kt">uint256</span> <span class="n">_farmId</span><span class="p">)</span> <span class="k">internal</span> <span class="p">{</span>
