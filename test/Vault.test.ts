@@ -281,7 +281,7 @@ describe("Vault", function () {
 
     describe("depositAndStake", function () {
         beforeEach("deposit", async function () {
-            await master.createFarm(vault.address, 0, 1, 2);
+            await master.createFarmErc20(vault.address, 0, 1, 2);
         });
         it("should permit master to spend CP tokens", async function () {
             const nonce = await vault.nonces(depositor1.address);
@@ -302,6 +302,28 @@ describe("Vault", function () {
 
             // check vault shares of master
             expect(await vault.balanceOf(master.address)).to.equal(testDepositAmount.mul(callTotalSupply).div(callTotalAssets));
+        });
+        it('should emit DepositMade event', async function () {
+            const nonce = await vault.nonces(depositor1.address);
+            const approve = {
+                owner: depositor1.address,
+                spender: master.address,
+                value: testDepositAmount,
+            }
+            const digest = getPermitDigest(tokenName, vault.address, chainId, approve, nonce, deadline);
+            const { v, r, s } = sign(digest, Buffer.from(depositor1.privateKey.slice(2), 'hex'));
+            expect(await vault.connect(depositor1).depositAndStake(0, deadline, v, r, s, { value: testDepositAmount})).to.emit(vault, 'DepositMade').withArgs(depositor1.address, testDepositAmount, testDepositAmount);
+        });
+        it('should emit DepositErc20FOr event', async function () {
+            const nonce = await vault.nonces(depositor1.address);
+            const approve = {
+                owner: depositor1.address,
+                spender: master.address,
+                value: testDepositAmount,
+            }
+            const digest = getPermitDigest(tokenName, vault.address, chainId, approve, nonce, deadline);
+            const { v, r, s } = sign(digest, Buffer.from(depositor1.privateKey.slice(2), 'hex'));
+            expect(await vault.connect(depositor1).depositAndStake(0, deadline, v, r, s, { value: testDepositAmount})).to.emit(master, 'DepositErc20').withArgs(depositor1.address, 0, testDepositAmount);
         });
     });
 

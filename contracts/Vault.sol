@@ -341,7 +341,7 @@ contract Vault is ERC20Permit {
         permit(msg.sender, masterAddress, amountToStake, deadline, v, r, s);
 
         // Deposit CP tokens to Master
-        master.depositFor(farmId, amountToStake, msg.sender);
+        master.depositErc20For(msg.sender, farmId, amountToStake);
     }
 
     /**
