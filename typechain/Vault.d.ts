@@ -50,6 +50,7 @@ interface VaultInterface extends ethers.utils.Interface {
     "nonces(address)": FunctionFragment;
     "performanceFee()": FunctionFragment;
     "permit(address,address,uint256,uint256,uint8,bytes32,bytes32)": FunctionFragment;
+    "processClaim(address,uint256)": FunctionFragment;
     "registry()": FunctionFragment;
     "removeStrategyFromQueue(address)": FunctionFragment;
     "report(uint256,uint256,uint256)": FunctionFragment;
@@ -168,6 +169,10 @@ interface VaultInterface extends ethers.utils.Interface {
       BytesLike,
       BytesLike
     ]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "processClaim",
+    values: [string, BigNumberish]
   ): string;
   encodeFunctionData(functionFragment: "registry", values?: undefined): string;
   encodeFunctionData(
@@ -300,6 +305,10 @@ interface VaultInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "permit", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "processClaim",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "registry", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "removeStrategyFromQueue",
@@ -738,6 +747,18 @@ export class Vault extends Contract {
       v: BigNumberish,
       r: BytesLike,
       s: BytesLike,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    processClaim(
+      claimant: string,
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "processClaim(address,uint256)"(
+      claimant: string,
+      amount: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
@@ -1216,6 +1237,18 @@ export class Vault extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
+  processClaim(
+    claimant: string,
+    amount: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "processClaim(address,uint256)"(
+    claimant: string,
+    amount: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
   registry(overrides?: CallOverrides): Promise<string>;
 
   "registry()"(overrides?: CallOverrides): Promise<string>;
@@ -1628,6 +1661,18 @@ export class Vault extends Contract {
       v: BigNumberish,
       r: BytesLike,
       s: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    processClaim(
+      claimant: string,
+      amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "processClaim(address,uint256)"(
+      claimant: string,
+      amount: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -2095,6 +2140,18 @@ export class Vault extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
+    processClaim(
+      claimant: string,
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "processClaim(address,uint256)"(
+      claimant: string,
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
     registry(overrides?: CallOverrides): Promise<BigNumber>;
 
     "registry()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -2482,6 +2539,18 @@ export class Vault extends Contract {
       v: BigNumberish,
       r: BytesLike,
       s: BytesLike,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    processClaim(
+      claimant: string,
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "processClaim(address,uint256)"(
+      claimant: string,
+      amount: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 

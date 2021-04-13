@@ -31,6 +31,32 @@ const _abi = [
     type: "function",
   },
   {
+    inputs: [],
+    name: "claimsAdjustor",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "claimsEscrow",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
     inputs: [
       {
         internalType: "uint256",
@@ -129,6 +155,32 @@ const _abi = [
       },
     ],
     name: "removeProduct",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "_claimsAdjustor",
+        type: "address",
+      },
+    ],
+    name: "setClaimsAdjustor",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "_claimsEscrow",
+        type: "address",
+      },
+    ],
+    name: "setClaimsEscrow",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",

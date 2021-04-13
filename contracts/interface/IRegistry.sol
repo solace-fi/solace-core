@@ -16,6 +16,8 @@ interface IRegistry {
     function governance() external returns (address);
     function solace() external returns (address);
     function locker() external returns (address);
+    function claimsAdjustor() external returns (address);
+    function claimsEscrow() external returns (address);
 
     /**
      * @notice Transfers the governance role to a new governor.
@@ -58,6 +60,20 @@ interface IRegistry {
      * @param _locker The locker address.
      */
     function setLocker(address _locker) external;
+
+        /**
+     * @notice Sets the Claims Adjustor contract.
+     * Can only be called by the current governor.
+     * @param _claimsAdjustor The Claims Adjustor address.
+     */
+    function setClaimsAdjustor(address _claimsAdjustor) external;
+
+    /**
+     * @notice Sets the Claims Escrow contract.
+     * Can only be called by the current governor.
+     * @param _claimsEscrow The sClaims Escrow address.
+     */
+    function setClaimsEscrow(address _claimsEscrow) external;
 
     /**
      * @notice Adds a new product.

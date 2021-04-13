@@ -25,6 +25,10 @@ contract Registry is IRegistry {
     address public override treasury;
     /// @notice Locker contract.
     address public override locker;
+    /// @notice Claims Adjustor contract.
+    address public override claimsAdjustor;
+    /// @notice Claims Escrow contract.
+    address public override claimsEscrow;
     // Set of products.
     EnumerableSet.AddressSet private products;
 
@@ -41,6 +45,10 @@ contract Registry is IRegistry {
     event TreasurySet(address _treasury);
     // Emitted when Locker is set
     event LockerSet(address _locker);
+    // Emitted when ClaimsAdjustor is set
+    event ClaimsAdjustorSet(address _claimsAdjustor);
+    // Emitted when ClaimsEscrow is set
+    event ClaimsEscrowSet(address _claimsEscrow);
     // Emitted when a Product is added
     event ProductAdded(address _product);
     // Emitted when a Product is removed
@@ -87,6 +95,30 @@ contract Registry is IRegistry {
         require(msg.sender == governance, "!governance");
         master = _master;
         emit MasterSet(_master);
+    }
+
+    /**
+     * @notice Sets the Claims Adjustor contract.
+     * Can only be called by the current governor.
+     * @param _claimsAdjustor The Claims Adjustor address.
+     */
+    function setClaimsAdjustor(address _claimsAdjustor) external override {
+        // can only be called by governor
+        require(msg.sender == governance, "!governance");
+        claimsAdjustor = _claimsAdjustor;
+        emit ClaimsAdjustorSet(_claimsAdjustor);
+    }
+
+    /**
+     * @notice Sets the Claims Escrow contract.
+     * Can only be called by the current governor.
+     * @param _claimsEscrow The sClaims Escrow address.
+     */
+    function setClaimsEscrow(address _claimsEscrow) external override {
+        // can only be called by governor
+        require(msg.sender == governance, "!governance");
+        claimsEscrow = _claimsEscrow;
+        emit ClaimsEscrowSet(_claimsEscrow);
     }
 
     /**

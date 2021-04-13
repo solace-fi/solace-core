@@ -11,8 +11,10 @@ import SolaceArtifact from "../artifacts/contracts/SOLACE.sol/SOLACE.json";
 import MasterArtifact from "../artifacts/contracts/Master.sol/Master.json";
 import VaultArtifact from "../artifacts/contracts/Vault.sol/Vault.json";
 import TreasuryArtifact from "../artifacts/contracts/Treasury.sol/Treasury.json";
+import ClaimsAdjustorArtifact from '../artifacts/contracts/ClaimsAdjustor.sol/ClaimsAdjustor.json';
+import ClaimsEscrowArtifact from '../artifacts/contracts/ClaimsEscrow.sol/ClaimsEscrow.json';
 import WETHArtifact from '../artifacts/contracts/mocks/MockWETH.sol/MockWETH.json';
-import { Registry, Solace, Master, Vault, Treasury, MockWeth } from "../typechain";
+import { Registry, Solace, Master, Vault, Treasury, ClaimsAdjustor, ClaimsEscrow, MockWeth } from "../typechain";
 
 chai.use(solidity);
 
@@ -28,6 +30,8 @@ describe("Registry", function () {
   let master: Master;
   let vault: Vault;
   let treasury: Treasury;
+  let claimsAdjustor: ClaimsAdjustor;
+  let claimsEscrow: ClaimsEscrow;
   let weth: MockWeth;
   // mock contracts
   // TODO: switch from mocks and wallets to actual contracts after implementation
@@ -67,6 +71,20 @@ describe("Registry", function () {
         1
       ]
     )) as Master;
+
+    // deploy claims adjustor contract
+    claimsEscrow = (await deployContract(
+      deployer,
+      ClaimsEscrowArtifact,
+      [registry.address]
+    )) as ClaimsEscrow;
+    
+    // deploy claims escrow contract
+    claimsAdjustor = (await deployContract(
+      deployer,
+      ClaimsAdjustorArtifact,
+      [registry.address]
+    )) as ClaimsAdjustor;
 
     // deploy vault contract
     vault = (await deployContract(
@@ -179,6 +197,38 @@ describe("Registry", function () {
 
     it("cannot be set by non governor", async function () {
       await expect(registry.connect(user).setLocker(locker.address)).to.be.revertedWith("!governance");
+    })
+  })
+
+  describe("claimsAdjustor", function () {
+    it("starts as the zero address", async function () {
+      expect(await registry.claimsAdjustor()).to.equal(ZERO_ADDRESS);
+    })
+
+    it("can be set", async function () {
+      let tx = await registry.connect(governor).setClaimsAdjustor(claimsAdjustor.address);
+      expect(await registry.claimsAdjustor()).to.equal(claimsAdjustor.address);
+      await expect(tx).to.emit(registry, "ClaimsAdjustorSet").withArgs(claimsAdjustor.address);
+    })
+
+    it("cannot be set by non governor", async function () {
+      await expect(registry.connect(user).setClaimsAdjustor(claimsAdjustor.address)).to.be.revertedWith("!governance");
+    })
+  })
+
+  describe("claimsEscrow", function () {
+    it("starts as the zero address", async function () {
+      expect(await registry.claimsEscrow()).to.equal(ZERO_ADDRESS);
+    })
+
+    it("can be set", async function () {
+      let tx = await registry.connect(governor).setClaimsEscrow(claimsEscrow.address);
+      expect(await registry.claimsEscrow()).to.equal(claimsEscrow.address);
+      await expect(tx).to.emit(registry, "ClaimsEscrowSet").withArgs(claimsEscrow.address);
+    })
+
+    it("cannot be set by non governor", async function () {
+      await expect(registry.connect(user).setClaimsEscrow(claimsEscrow.address)).to.be.revertedWith("!governance");
     })
   })
 
