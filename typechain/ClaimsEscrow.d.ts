@@ -13,6 +13,8 @@ import {
 import {
   Contract,
   ContractTransaction,
+  Overrides,
+  PayableOverrides,
   CallOverrides,
 } from "@ethersproject/contracts";
 import { BytesLike } from "@ethersproject/bytes";
@@ -21,24 +23,48 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
 interface ClaimsEscrowInterface extends ethers.utils.Interface {
   functions: {
+    "claims(uint256)": FunctionFragment;
     "governance()": FunctionFragment;
+    "receiveClaim(address)": FunctionFragment;
     "registry()": FunctionFragment;
+    "withdrawClaimsPayout(uint256)": FunctionFragment;
   };
 
+  encodeFunctionData(
+    functionFragment: "claims",
+    values: [BigNumberish]
+  ): string;
   encodeFunctionData(
     functionFragment: "governance",
     values?: undefined
   ): string;
+  encodeFunctionData(
+    functionFragment: "receiveClaim",
+    values: [string]
+  ): string;
   encodeFunctionData(functionFragment: "registry", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "withdrawClaimsPayout",
+    values: [BigNumberish]
+  ): string;
 
+  decodeFunctionResult(functionFragment: "claims", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "governance", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "receiveClaim",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "registry", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "withdrawClaimsPayout",
+    data: BytesLike
+  ): Result;
 
   events: {
-    "ClaimsWithdrawn(address,uint256)": EventFragment;
+    "ClaimWithdrawn(uint256,address,uint256)": EventFragment;
   };
 
-  getEvent(nameOrSignatureOrTopic: "ClaimsWithdrawn"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "ClaimWithdrawn"): EventFragment;
 }
 
 export class ClaimsEscrow extends Contract {
@@ -55,6 +81,30 @@ export class ClaimsEscrow extends Contract {
   interface: ClaimsEscrowInterface;
 
   functions: {
+    claims(
+      arg0: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      claimant: string;
+      amount: BigNumber;
+      receivedAt: BigNumber;
+      0: string;
+      1: BigNumber;
+      2: BigNumber;
+    }>;
+
+    "claims(uint256)"(
+      arg0: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      claimant: string;
+      amount: BigNumber;
+      receivedAt: BigNumber;
+      0: string;
+      1: BigNumber;
+      2: BigNumber;
+    }>;
+
     governance(
       overrides?: CallOverrides
     ): Promise<{
@@ -67,6 +117,16 @@ export class ClaimsEscrow extends Contract {
       0: string;
     }>;
 
+    receiveClaim(
+      _claimant: string,
+      overrides?: PayableOverrides
+    ): Promise<ContractTransaction>;
+
+    "receiveClaim(address)"(
+      _claimant: string,
+      overrides?: PayableOverrides
+    ): Promise<ContractTransaction>;
+
     registry(
       overrides?: CallOverrides
     ): Promise<{
@@ -78,50 +138,206 @@ export class ClaimsEscrow extends Contract {
     ): Promise<{
       0: string;
     }>;
+
+    withdrawClaimsPayout(
+      claimId: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "withdrawClaimsPayout(uint256)"(
+      claimId: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
   };
+
+  claims(
+    arg0: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<{
+    claimant: string;
+    amount: BigNumber;
+    receivedAt: BigNumber;
+    0: string;
+    1: BigNumber;
+    2: BigNumber;
+  }>;
+
+  "claims(uint256)"(
+    arg0: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<{
+    claimant: string;
+    amount: BigNumber;
+    receivedAt: BigNumber;
+    0: string;
+    1: BigNumber;
+    2: BigNumber;
+  }>;
 
   governance(overrides?: CallOverrides): Promise<string>;
 
   "governance()"(overrides?: CallOverrides): Promise<string>;
 
+  receiveClaim(
+    _claimant: string,
+    overrides?: PayableOverrides
+  ): Promise<ContractTransaction>;
+
+  "receiveClaim(address)"(
+    _claimant: string,
+    overrides?: PayableOverrides
+  ): Promise<ContractTransaction>;
+
   registry(overrides?: CallOverrides): Promise<string>;
 
   "registry()"(overrides?: CallOverrides): Promise<string>;
 
+  withdrawClaimsPayout(
+    claimId: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "withdrawClaimsPayout(uint256)"(
+    claimId: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
   callStatic: {
+    claims(
+      arg0: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      claimant: string;
+      amount: BigNumber;
+      receivedAt: BigNumber;
+      0: string;
+      1: BigNumber;
+      2: BigNumber;
+    }>;
+
+    "claims(uint256)"(
+      arg0: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      claimant: string;
+      amount: BigNumber;
+      receivedAt: BigNumber;
+      0: string;
+      1: BigNumber;
+      2: BigNumber;
+    }>;
+
     governance(overrides?: CallOverrides): Promise<string>;
 
     "governance()"(overrides?: CallOverrides): Promise<string>;
 
+    receiveClaim(
+      _claimant: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "receiveClaim(address)"(
+      _claimant: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     registry(overrides?: CallOverrides): Promise<string>;
 
     "registry()"(overrides?: CallOverrides): Promise<string>;
+
+    withdrawClaimsPayout(
+      claimId: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "withdrawClaimsPayout(uint256)"(
+      claimId: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
   };
 
   filters: {
-    ClaimsWithdrawn(
+    ClaimWithdrawn(
+      claimId: BigNumberish | null,
       claimant: string | null,
       amount: BigNumberish | null
     ): EventFilter;
   };
 
   estimateGas: {
+    claims(arg0: BigNumberish, overrides?: CallOverrides): Promise<BigNumber>;
+
+    "claims(uint256)"(
+      arg0: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     governance(overrides?: CallOverrides): Promise<BigNumber>;
 
     "governance()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+    receiveClaim(
+      _claimant: string,
+      overrides?: PayableOverrides
+    ): Promise<BigNumber>;
+
+    "receiveClaim(address)"(
+      _claimant: string,
+      overrides?: PayableOverrides
+    ): Promise<BigNumber>;
+
     registry(overrides?: CallOverrides): Promise<BigNumber>;
 
     "registry()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    withdrawClaimsPayout(
+      claimId: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "withdrawClaimsPayout(uint256)"(
+      claimId: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
   };
 
   populateTransaction: {
+    claims(
+      arg0: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "claims(uint256)"(
+      arg0: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
     governance(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "governance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
+    receiveClaim(
+      _claimant: string,
+      overrides?: PayableOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "receiveClaim(address)"(
+      _claimant: string,
+      overrides?: PayableOverrides
+    ): Promise<PopulatedTransaction>;
+
     registry(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "registry()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    withdrawClaimsPayout(
+      claimId: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "withdrawClaimsPayout(uint256)"(
+      claimId: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
   };
 }

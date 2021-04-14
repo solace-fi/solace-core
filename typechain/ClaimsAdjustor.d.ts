@@ -13,6 +13,7 @@ import {
 import {
   Contract,
   ContractTransaction,
+  Overrides,
   CallOverrides,
 } from "@ethersproject/contracts";
 import { BytesLike } from "@ethersproject/bytes";
@@ -21,20 +22,33 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
 interface ClaimsAdjustorInterface extends ethers.utils.Interface {
   functions: {
+    "approveClaim(address,uint256)": FunctionFragment;
     "governance()": FunctionFragment;
     "registry()": FunctionFragment;
   };
 
+  encodeFunctionData(
+    functionFragment: "approveClaim",
+    values: [string, BigNumberish]
+  ): string;
   encodeFunctionData(
     functionFragment: "governance",
     values?: undefined
   ): string;
   encodeFunctionData(functionFragment: "registry", values?: undefined): string;
 
+  decodeFunctionResult(
+    functionFragment: "approveClaim",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "governance", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "registry", data: BytesLike): Result;
 
-  events: {};
+  events: {
+    "ClaimApproved(address,uint256)": EventFragment;
+  };
+
+  getEvent(nameOrSignatureOrTopic: "ClaimApproved"): EventFragment;
 }
 
 export class ClaimsAdjustor extends Contract {
@@ -51,6 +65,18 @@ export class ClaimsAdjustor extends Contract {
   interface: ClaimsAdjustorInterface;
 
   functions: {
+    approveClaim(
+      _claimant: string,
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "approveClaim(address,uint256)"(
+      _claimant: string,
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
     governance(
       overrides?: CallOverrides
     ): Promise<{
@@ -76,6 +102,18 @@ export class ClaimsAdjustor extends Contract {
     }>;
   };
 
+  approveClaim(
+    _claimant: string,
+    _amount: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "approveClaim(address,uint256)"(
+    _claimant: string,
+    _amount: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
   governance(overrides?: CallOverrides): Promise<string>;
 
   "governance()"(overrides?: CallOverrides): Promise<string>;
@@ -85,6 +123,18 @@ export class ClaimsAdjustor extends Contract {
   "registry()"(overrides?: CallOverrides): Promise<string>;
 
   callStatic: {
+    approveClaim(
+      _claimant: string,
+      _amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "approveClaim(address,uint256)"(
+      _claimant: string,
+      _amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
     governance(overrides?: CallOverrides): Promise<string>;
 
     "governance()"(overrides?: CallOverrides): Promise<string>;
@@ -94,9 +144,26 @@ export class ClaimsAdjustor extends Contract {
     "registry()"(overrides?: CallOverrides): Promise<string>;
   };
 
-  filters: {};
+  filters: {
+    ClaimApproved(
+      claimant: string | null,
+      amount: BigNumberish | null
+    ): EventFilter;
+  };
 
   estimateGas: {
+    approveClaim(
+      _claimant: string,
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "approveClaim(address,uint256)"(
+      _claimant: string,
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
     governance(overrides?: CallOverrides): Promise<BigNumber>;
 
     "governance()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -107,6 +174,18 @@ export class ClaimsAdjustor extends Contract {
   };
 
   populateTransaction: {
+    approveClaim(
+      _claimant: string,
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "approveClaim(address,uint256)"(
+      _claimant: string,
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
     governance(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "governance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;

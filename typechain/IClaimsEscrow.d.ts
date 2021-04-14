@@ -13,7 +13,7 @@ import {
 import {
   Contract,
   ContractTransaction,
-  Overrides,
+  PayableOverrides,
   CallOverrides,
 } from "@ethersproject/contracts";
 import { BytesLike } from "@ethersproject/bytes";
@@ -22,12 +22,12 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
 interface IClaimsEscrowInterface extends ethers.utils.Interface {
   functions: {
-    "receiveClaim(address,uint256)": FunctionFragment;
+    "receiveClaim(address)": FunctionFragment;
   };
 
   encodeFunctionData(
     functionFragment: "receiveClaim",
-    values: [string, BigNumberish]
+    values: [string]
   ): string;
 
   decodeFunctionResult(
@@ -53,71 +53,61 @@ export class IClaimsEscrow extends Contract {
 
   functions: {
     receiveClaim(
-      claimant: string,
-      amount: BigNumberish,
-      overrides?: Overrides
+      _claimant: string,
+      overrides?: PayableOverrides
     ): Promise<ContractTransaction>;
 
-    "receiveClaim(address,uint256)"(
-      claimant: string,
-      amount: BigNumberish,
-      overrides?: Overrides
+    "receiveClaim(address)"(
+      _claimant: string,
+      overrides?: PayableOverrides
     ): Promise<ContractTransaction>;
   };
 
   receiveClaim(
-    claimant: string,
-    amount: BigNumberish,
-    overrides?: Overrides
+    _claimant: string,
+    overrides?: PayableOverrides
   ): Promise<ContractTransaction>;
 
-  "receiveClaim(address,uint256)"(
-    claimant: string,
-    amount: BigNumberish,
-    overrides?: Overrides
+  "receiveClaim(address)"(
+    _claimant: string,
+    overrides?: PayableOverrides
   ): Promise<ContractTransaction>;
 
   callStatic: {
     receiveClaim(
-      claimant: string,
-      amount: BigNumberish,
+      _claimant: string,
       overrides?: CallOverrides
-    ): Promise<void>;
+    ): Promise<BigNumber>;
 
-    "receiveClaim(address,uint256)"(
-      claimant: string,
-      amount: BigNumberish,
+    "receiveClaim(address)"(
+      _claimant: string,
       overrides?: CallOverrides
-    ): Promise<void>;
+    ): Promise<BigNumber>;
   };
 
   filters: {};
 
   estimateGas: {
     receiveClaim(
-      claimant: string,
-      amount: BigNumberish,
-      overrides?: Overrides
+      _claimant: string,
+      overrides?: PayableOverrides
     ): Promise<BigNumber>;
 
-    "receiveClaim(address,uint256)"(
-      claimant: string,
-      amount: BigNumberish,
-      overrides?: Overrides
+    "receiveClaim(address)"(
+      _claimant: string,
+      overrides?: PayableOverrides
     ): Promise<BigNumber>;
   };
 
   populateTransaction: {
     receiveClaim(
-      claimant: string,
-      amount: BigNumberish,
-      overrides?: Overrides
+      _claimant: string,
+      overrides?: PayableOverrides
     ): Promise<PopulatedTransaction>;
 
-    "receiveClaim(address,uint256)"(
-      claimant: string,
-      amount: BigNumberish,
-      overrides?: Overrides
+    "receiveClaim(address)"(
+      _claimant: string,
+      overrides?: PayableOverrides
     ): Promise<PopulatedTransaction>;
   };
 }

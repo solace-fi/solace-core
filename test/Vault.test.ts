@@ -1,14 +1,16 @@
 import chai from "chai";
-import { waffle } from "hardhat";
+import { ethers, waffle } from "hardhat";
 import VaultArtifact from '../artifacts/contracts/Vault.sol/Vault.json'
 import MasterArtifact from '../artifacts/contracts/Master.sol/Master.json';
 import SolaceArtifact from '../artifacts/contracts/SOLACE.sol/SOLACE.json';
 import StrategyArtifact from '../artifacts/contracts/mocks/MockStrategy.sol/MockStrategy.json'
 import WETHArtifact from '../artifacts/contracts/mocks/MockWETH.sol/MockWETH.json'
 import RegistryArtifact from "../artifacts/contracts/Registry.sol/Registry.json";
+import ClaimsAdjustorArtifact from '../artifacts/contracts/ClaimsAdjustor.sol/ClaimsAdjustor.json';
+import ClaimsEscrowArtifact from '../artifacts/contracts/ClaimsEscrow.sol/ClaimsEscrow.json';
 import { BigNumber as BN, constants } from 'ethers';
 import { getPermitDigest, sign, getDomainSeparator } from './utilities/signature';
-import { Vault, MockStrategy, MockWeth, Registry, Master, Solace } from "../typechain";
+import { Vault, MockStrategy, MockWeth, Registry, Master, Solace, ClaimsAdjustor, ClaimsEscrow } from "../typechain";
 
 const { expect } = chai;
 const { deployContract, solidity } = waffle;
@@ -24,11 +26,14 @@ describe("Vault", function () {
     let registry: Registry;
     let master: Master;
     let solace: Solace;
+    let claimsAdjustor: ClaimsAdjustor;
+    let claimsEscrow: ClaimsEscrow;
 
-    const [owner, newOwner, depositor1, depositor2] = provider.getWallets();
+    const [owner, newOwner, depositor1, depositor2, claimant] = provider.getWallets();
     const tokenName = "Solace CP Token";
     const tokenSymbol = "SCP";
     const testDepositAmount = BN.from("10");
+    const testClaimAmount = BN.from("2");
     const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
     const chainId = 31337;
 
@@ -87,8 +92,22 @@ describe("Vault", function () {
             [vault.address]
         )) as MockStrategy;
 
+        claimsEscrow = (await deployContract(
+            owner,
+            ClaimsEscrowArtifact,
+            [registry.address]
+        )) as ClaimsEscrow;
+
+        claimsAdjustor = (await deployContract(
+            owner,
+            ClaimsAdjustorArtifact,
+            [registry.address]
+        )) as ClaimsAdjustor;
+
         await registry.setVault(vault.address);
         await registry.setMaster(master.address);
+        await registry.setClaimsAdjustor(claimsAdjustor.address);
+        await registry.setClaimsEscrow(claimsEscrow.address);
     });
 
     describe("deployment", function () {
@@ -375,6 +394,21 @@ describe("Vault", function () {
                 let vaultDepositorSigner = vault.connect(depositor1);
                 expect(await vaultDepositorSigner.withdraw(cpBalance, maxLoss)).to.emit(vault, 'WithdrawalMade').withArgs(depositor1.address, testDepositAmount.div(MAX_BPS / debtRatio));
             });
+        });
+    });
+
+    describe("processClaim", function () {
+        beforeEach("deposit", async function () {
+            await vault.connect(depositor1).deposit({ value: testDepositAmount});
+        });
+        it("should revert if not called by the claimsAdjustor", async function () {
+            await expect(vault.connect(owner).processClaim(claimant.address, testClaimAmount)).to.be.revertedWith("!claimsAdjustor");
+        });
+        it('should transfer ETH to the ClaimsEscrow contract', async function () {
+            await expect(() => claimsAdjustor.connect(owner).approveClaim(claimant.address, testClaimAmount)).to.changeEtherBalance(claimsEscrow, testClaimAmount);
+        });
+        it('should emit ClaimProcessed event after function logic is successful', async function () {
+            expect(await claimsAdjustor.connect(owner).approveClaim(claimant.address, testClaimAmount)).to.emit(vault, 'ClaimProcessed').withArgs(claimant.address, testClaimAmount);
         });
     });
 

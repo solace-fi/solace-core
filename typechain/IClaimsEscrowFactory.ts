@@ -21,18 +21,19 @@ const _abi = [
     inputs: [
       {
         internalType: "address",
-        name: "claimant",
+        name: "_claimant",
         type: "address",
-      },
-      {
-        internalType: "uint256",
-        name: "amount",
-        type: "uint256",
       },
     ],
     name: "receiveClaim",
-    outputs: [],
-    stateMutability: "nonpayable",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "claimId",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "payable",
     type: "function",
   },
 ];

@@ -8,5 +8,5 @@ pragma solidity 0.8.0;
  * @notice The interface for the Claims Escrow contract.
  */
 interface IClaimsEscrow {
-    function receiveClaim(address claimant, uint256 amount) external;
+    function receiveClaim(address _claimant) external payable returns (uint256 claimId);
 }
