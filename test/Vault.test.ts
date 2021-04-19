@@ -43,6 +43,7 @@ describe("Vault", function () {
     const performanceFee = 0;
     const maxLoss = 1; // 0.01% BPS
     const newDegration = 10 ** 15;
+    const newMinCapitalRequirement = BN.from("10");
     const deadline = constants.MaxUint256;
 
     const solacePerBlock: BN = BN.from("100000000000000000000"); // 100 e18
@@ -141,6 +142,17 @@ describe("Vault", function () {
             await vault.connect(owner).setLockedProfitDegration(newDegration);
             const callLockedProfitDegration = await vault.lockedProfitDegration();
             expect(callLockedProfitDegration).to.equal(newDegration);
+        });
+    });
+
+    describe("setMinCapitalRequirement", function () {
+        it("should revert if not called by governance", async function () {
+            await expect(vault.connect(depositor1).setMinCapitalRequirement(newMinCapitalRequirement)).to.be.revertedWith("!governance");
+        });
+        it("should successfully set the new lockedProfitDegation", async function () {
+            await vault.connect(owner).setMinCapitalRequirement(newMinCapitalRequirement);
+            const callMCR = await vault.minCapitalRequirement();
+            expect(callMCR).to.equal(newMinCapitalRequirement);
         });
     });
 
@@ -354,6 +366,12 @@ describe("Vault", function () {
         it("should revert if withdrawer tries to redeem more shares than they own", async function () {
             let cpBalance = await vault.balanceOf(depositor1.address);
             await expect(vault.connect(depositor1).withdraw(cpBalance.add(1), maxLoss)).to.be.revertedWith("cannot redeem more shares than you own");
+        });
+        it("should revert if withdrawal brings Vault's totalAssets below the minimum capital requirement", async function () {
+            let cpBalance = await vault.balanceOf(depositor1.address);
+            let newMCR = cpBalance.toString();
+            await vault.connect(owner).setMinCapitalRequirement(newMCR);
+            await expect(vault.connect(depositor1).withdraw(cpBalance, maxLoss)).to.be.revertedWith("withdrawal brings Vault assets below MCR");
         });
         context("when there is enough WETH in the Vault", function () {
             it("should alter WETH balance of Vault contract by amountNeeded", async function () {

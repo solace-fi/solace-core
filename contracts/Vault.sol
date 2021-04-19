@@ -52,6 +52,7 @@ contract Vault is ERC20Permit {
     uint256 public lockedProfit; // how much profit is locked and cant be withdrawn
     uint256 public performanceFee;
     uint256 public lockedProfitDegration; // rate per block of degration. DEGREDATION_COEFFICIENT is 100% per block
+    uint256 public minCapitalRequirement;
 
     uint256 public managementFee; // Governance Fee for management of Vault (given to `rewards`)
 
@@ -148,6 +149,17 @@ contract Vault is ERC20Permit {
     function setLockedProfitDegration(uint256 degration) external {
         require(msg.sender == governance, "!governance");
         lockedProfitDegration = degration;
+    }
+
+    /**
+     * @notice Changes the minimum capital requirement of the vault
+     * Can only be called by the current governor.
+     * During withdrawals, withdrawals are possible down to the Vault's MCR.
+     * @param newMCR The new minimum capital requirement.
+     */
+    function setMinCapitalRequirement(uint256 newMCR) external {
+        require(msg.sender == governance, "!governance");
+        minCapitalRequirement = newMCR;
     }
 
     /**
@@ -379,6 +391,9 @@ contract Vault is ERC20Permit {
         
         uint256 value = _shareValue(shares);
         uint256 totalLoss;
+
+        // Stop withdrawal if process brings the Vault's `totalAssets` value below minimum capital requirement
+        require(_totalAssets() - value >= minCapitalRequirement, "withdrawal brings Vault assets below MCR");
 
         // If redeemable amount exceeds vaultBalance, withdraw funds from strategies in the withdrawal queue
         uint256 vaultBalance = token.balanceOf(address(this));

@@ -46,6 +46,7 @@ interface VaultInterface extends ethers.utils.Interface {
     "lockedProfit()": FunctionFragment;
     "lockedProfitDegration()": FunctionFragment;
     "managementFee()": FunctionFragment;
+    "minCapitalRequirement()": FunctionFragment;
     "name()": FunctionFragment;
     "nonces(address)": FunctionFragment;
     "performanceFee()": FunctionFragment;
@@ -59,6 +60,7 @@ interface VaultInterface extends ethers.utils.Interface {
     "setEmergencyShutdown(bool)": FunctionFragment;
     "setGovernance(address)": FunctionFragment;
     "setLockedProfitDegration(uint256)": FunctionFragment;
+    "setMinCapitalRequirement(uint256)": FunctionFragment;
     "setWithdrawalQueue(address[])": FunctionFragment;
     "strategies(address)": FunctionFragment;
     "symbol()": FunctionFragment;
@@ -152,6 +154,10 @@ interface VaultInterface extends ethers.utils.Interface {
     functionFragment: "managementFee",
     values?: undefined
   ): string;
+  encodeFunctionData(
+    functionFragment: "minCapitalRequirement",
+    values?: undefined
+  ): string;
   encodeFunctionData(functionFragment: "name", values?: undefined): string;
   encodeFunctionData(functionFragment: "nonces", values: [string]): string;
   encodeFunctionData(
@@ -198,6 +204,10 @@ interface VaultInterface extends ethers.utils.Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "setLockedProfitDegration",
+    values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "setMinCapitalRequirement",
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
@@ -298,6 +308,10 @@ interface VaultInterface extends ethers.utils.Interface {
     functionFragment: "managementFee",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(
+    functionFragment: "minCapitalRequirement",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "name", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "nonces", data: BytesLike): Result;
   decodeFunctionResult(
@@ -330,6 +344,10 @@ interface VaultInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "setLockedProfitDegration",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "setMinCapitalRequirement",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -692,6 +710,18 @@ export class Vault extends Contract {
       0: BigNumber;
     }>;
 
+    minCapitalRequirement(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    "minCapitalRequirement()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
     name(
       overrides?: CallOverrides
     ): Promise<{
@@ -849,6 +879,16 @@ export class Vault extends Contract {
 
     "setLockedProfitDegration(uint256)"(
       degration: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    setMinCapitalRequirement(
+      newMCR: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "setMinCapitalRequirement(uint256)"(
+      newMCR: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
@@ -1202,6 +1242,10 @@ export class Vault extends Contract {
 
   "managementFee()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+  minCapitalRequirement(overrides?: CallOverrides): Promise<BigNumber>;
+
+  "minCapitalRequirement()"(overrides?: CallOverrides): Promise<BigNumber>;
+
   name(overrides?: CallOverrides): Promise<string>;
 
   "name()"(overrides?: CallOverrides): Promise<string>;
@@ -1320,6 +1364,16 @@ export class Vault extends Contract {
 
   "setLockedProfitDegration(uint256)"(
     degration: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  setMinCapitalRequirement(
+    newMCR: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "setMinCapitalRequirement(uint256)"(
+    newMCR: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
@@ -1629,6 +1683,10 @@ export class Vault extends Contract {
 
     "managementFee()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+    minCapitalRequirement(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "minCapitalRequirement()"(overrides?: CallOverrides): Promise<BigNumber>;
+
     name(overrides?: CallOverrides): Promise<string>;
 
     "name()"(overrides?: CallOverrides): Promise<string>;
@@ -1744,6 +1802,16 @@ export class Vault extends Contract {
 
     "setLockedProfitDegration(uint256)"(
       degration: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    setMinCapitalRequirement(
+      newMCR: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "setMinCapitalRequirement(uint256)"(
+      newMCR: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -2110,6 +2178,10 @@ export class Vault extends Contract {
 
     "managementFee()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+    minCapitalRequirement(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "minCapitalRequirement()"(overrides?: CallOverrides): Promise<BigNumber>;
+
     name(overrides?: CallOverrides): Promise<BigNumber>;
 
     "name()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -2225,6 +2297,16 @@ export class Vault extends Contract {
 
     "setLockedProfitDegration(uint256)"(
       degration: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    setMinCapitalRequirement(
+      newMCR: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "setMinCapitalRequirement(uint256)"(
+      newMCR: BigNumberish,
       overrides?: Overrides
     ): Promise<BigNumber>;
 
@@ -2507,6 +2589,14 @@ export class Vault extends Contract {
 
     "managementFee()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
+    minCapitalRequirement(
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "minCapitalRequirement()"(
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
     name(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "name()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
@@ -2630,6 +2720,16 @@ export class Vault extends Contract {
 
     "setLockedProfitDegration(uint256)"(
       degration: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    setMinCapitalRequirement(
+      newMCR: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "setMinCapitalRequirement(uint256)"(
+      newMCR: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
