@@ -198,6 +198,30 @@ describe("Vault", function () {
         });
     });
 
+    describe("maxRedeemableShares", function () {
+        it("should return the correct maxRedeemableShares - user can withdraw entire CP token balance", async function () {
+            // set the MCR to be 10
+            let newMCR = BN.from("10");
+            await vault.connect(owner).setMinCapitalRequirement(newMCR);
+
+            // bring Vault assets to 20
+            await vault.connect(depositor1).deposit({ value: testDepositAmount});
+            await vault.connect(depositor2).deposit({ value: testDepositAmount.mul(10)});
+
+            // CP should be able to withdraw their full 10 shares
+            const callBalance = await vault.balanceOf(depositor1.address);
+            expect(await vault.maxRedeemableShares(depositor1.address)).to.equal(callBalance);
+        });
+        it("should return the correct maxRedeemableShares - user can withdraw up to a portion of their CP token balance", async function () {
+            let newMCR = BN.from("2");
+            await vault.connect(owner).setMinCapitalRequirement(newMCR);
+            await vault.connect(depositor1).deposit({ value: testDepositAmount});
+            const callBalance = await vault.balanceOf(depositor1.address);
+            expect(await vault.maxRedeemableShares(depositor1.address)).to.equal(callBalance.sub(newMCR));
+
+        });
+    });
+
     describe("revokeStrategy", function () {
         it("should revert if not called by governance or active strategy", async function () {
             await expect(vault.connect(depositor1).revokeStrategy(strategy.address)).to.be.revertedWith("must be called by governance or strategy to be revoked");

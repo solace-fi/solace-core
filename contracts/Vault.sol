@@ -599,6 +599,26 @@ contract Vault is ERC20Permit {
     }
 
     /**
+    * @notice Returns the maximum redeemable shares by the `user` such that Vault does not go under MCR
+    * @param user Address of user to check
+    * @return Max redeemable shares by the user
+    */
+    function maxRedeemableShares(address user) external view returns (uint256) {
+        uint256 userBalance = balanceOf(user);
+        uint256 vaultBalanceAfterWithdraw = _totalAssets() - _shareValue(userBalance);
+
+        // if user's CP token balance takes Vault `totalAssets` below MCP, 
+        //... return the difference between totalAsset and MCP (in # shares)
+        if (vaultBalanceAfterWithdraw < minCapitalRequirement) {
+            uint256 diff = _totalAssets() - minCapitalRequirement;
+            return _sharesForAmount(_shareValue(diff));
+        } else {
+            // else, user can withdraw up to their balance of CP tokens
+            return userBalance;
+        }
+    }
+
+    /**
      * @notice Returns the total quantity of all assets under control of this
         Vault, including those loaned out to a Strategy as well as those currently
         held in the Vault.

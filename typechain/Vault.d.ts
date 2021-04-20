@@ -46,6 +46,7 @@ interface VaultInterface extends ethers.utils.Interface {
     "lockedProfit()": FunctionFragment;
     "lockedProfitDegration()": FunctionFragment;
     "managementFee()": FunctionFragment;
+    "maxRedeemableShares(address)": FunctionFragment;
     "minCapitalRequirement()": FunctionFragment;
     "name()": FunctionFragment;
     "nonces(address)": FunctionFragment;
@@ -153,6 +154,10 @@ interface VaultInterface extends ethers.utils.Interface {
   encodeFunctionData(
     functionFragment: "managementFee",
     values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "maxRedeemableShares",
+    values: [string]
   ): string;
   encodeFunctionData(
     functionFragment: "minCapitalRequirement",
@@ -306,6 +311,10 @@ interface VaultInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "managementFee",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "maxRedeemableShares",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -705,6 +714,20 @@ export class Vault extends Contract {
     }>;
 
     "managementFee()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    maxRedeemableShares(
+      user: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    "maxRedeemableShares(address)"(
+      user: string,
       overrides?: CallOverrides
     ): Promise<{
       0: BigNumber;
@@ -1242,6 +1265,16 @@ export class Vault extends Contract {
 
   "managementFee()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+  maxRedeemableShares(
+    user: string,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
+
+  "maxRedeemableShares(address)"(
+    user: string,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
+
   minCapitalRequirement(overrides?: CallOverrides): Promise<BigNumber>;
 
   "minCapitalRequirement()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -1682,6 +1715,16 @@ export class Vault extends Contract {
     managementFee(overrides?: CallOverrides): Promise<BigNumber>;
 
     "managementFee()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    maxRedeemableShares(
+      user: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "maxRedeemableShares(address)"(
+      user: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
     minCapitalRequirement(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -2178,6 +2221,16 @@ export class Vault extends Contract {
 
     "managementFee()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+    maxRedeemableShares(
+      user: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "maxRedeemableShares(address)"(
+      user: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     minCapitalRequirement(overrides?: CallOverrides): Promise<BigNumber>;
 
     "minCapitalRequirement()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -2588,6 +2641,16 @@ export class Vault extends Contract {
     managementFee(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "managementFee()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    maxRedeemableShares(
+      user: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "maxRedeemableShares(address)"(
+      user: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
 
     minCapitalRequirement(
       overrides?: CallOverrides
