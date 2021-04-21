@@ -118,6 +118,10 @@ contract Vault is ERC20Permit, IVault {
     event StrategyRevoked(address strategy);
     event EmergencyShutdown(bool active);
     event ClaimProcessed(address indexed claimant, uint256 indexed amount);
+    event StrategyUpdateDebtRatio(address indexed strategy, uint256 indexed newDebtRatio);
+    event StrategyUpdateMinDebtPerHarvest(address indexed strategy, uint256 indexed newMinDebtPerHarvest);
+    event StrategyUpdateMaxDebtPerHarvest(address indexed strategy, uint256 indexed newMaxDebtPerHarvest);
+    event StrategyUpdatePerformanceFee(address indexed strategy, uint256 indexed newPerformanceFee);
 
     constructor (address _registry, address _token) ERC20("Solace CP Token", "SCP") ERC20Permit("Solace CP Token") {
         governance = msg.sender;
@@ -336,6 +340,79 @@ contract Vault is ERC20Permit, IVault {
         escrow.receiveClaim{value: amount}(claimant);
 
         emit ClaimProcessed(claimant, amount);
+    }
+
+    /**
+     * @notice Change the quantity of assets `strategy` may manage.
+     * Can only be called by the current governor.
+     * Can only be called on an active strategy (added using addStrategy)
+     * @param _strategy address of the strategy to update
+     * @param _debtRatio The new `debtRatio` of Strategy (quantity of assets it can manage)
+     */
+    function updateStrategyDebtRatio(address _strategy, uint256 _debtRatio) external {
+        require(msg.sender == governance, "!governance");
+        require(_strategies[_strategy].activation > 0, "must be a current strategy");
+
+        debtRatio -= _strategies[_strategy].debtRatio;
+        _strategies[_strategy].debtRatio = _debtRatio;
+        debtRatio += _debtRatio;
+
+        require(debtRatio <= MAX_BPS, "Vault debt ratioc cannot exceed MAX_BPS");
+        
+        emit StrategyUpdateDebtRatio(_strategy, _debtRatio);
+    }
+
+    /**
+     * @notice Change the quantity assets per block this Vault may deposit to or
+     * withdraw from `strategy`.
+     * Can only be called by the current governor.
+     * Can only be called on an active strategy (added using addStrategy)
+     * @param _strategy Address of the strategy to update
+     * @param _minDebtPerHarvest New lower limit on the increase of debt since last harvest
+     */
+    function updateStrategyMinDebtPerHarvest(address _strategy, uint256 _minDebtPerHarvest) external {
+        require(msg.sender == governance, "!governance");
+        require(_strategies[_strategy].activation > 0, "must be a current strategy");
+        require(_strategies[_strategy].maxDebtPerHarvest >= _minDebtPerHarvest, "cannot exceed Strategy maxDebtPerHarvest");
+
+        _strategies[_strategy].minDebtPerHarvest = _minDebtPerHarvest;
+
+        emit StrategyUpdateMinDebtPerHarvest(_strategy, _minDebtPerHarvest);
+    }
+
+    /**
+     * @notice Change the quantity assets per block this Vault may deposit to or
+     * withdraw from `strategy`.
+     * Can only be called by the current governor.
+     * Can only be called on an active strategy (added using addStrategy)
+     * @param _strategy Address of the strategy to update
+     * @param _maxDebtPerHarvest New upper limit on the increase of debt since last harvest
+     */
+    function updateStrategyMaxDebtPerHarvest(address _strategy, uint256 _maxDebtPerHarvest) external {
+        require(msg.sender == governance, "!governance");
+        require(_strategies[_strategy].activation > 0, "must be a current strategy");
+        require(_strategies[_strategy].minDebtPerHarvest <= _maxDebtPerHarvest, "cannot be lower than Strategy maxDebtPerHarvest");
+
+        _strategies[_strategy].maxDebtPerHarvest = _maxDebtPerHarvest;
+
+        emit StrategyUpdateMaxDebtPerHarvest(_strategy, _maxDebtPerHarvest);
+    }
+
+    /**
+     * @notice Change the fee the strategist will receive based on this Vault's performance
+     * Can only be called by the current governor.
+     * Can only be called on an active strategy (added using addStrategy)
+     * @param _strategy Address of the strategy to update
+     * @param _performanceFee The new fee the strategist will receive.
+     */
+    function updateStrategPerformanceFee(address _strategy, uint256 _performanceFee) external {
+        require(msg.sender == governance, "!governance");
+        require(_strategies[_strategy].activation > 0, "must be a current strategy");
+        require(_performanceFee <= MAX_BPS - performanceFee, "cannot exceed MAX_BPS after Vault performanceFee is deducted");
+
+        _strategies[_strategy].performanceFee = _performanceFee;
+
+        emit StrategyUpdatePerformanceFee(_strategy, _performanceFee);
     }
 
     /**
