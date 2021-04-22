@@ -12,7 +12,9 @@ import CpFarmArtifact from "../artifacts/contracts/CpFarm.sol/CpFarm.json";
 import UniswapLpFarmArtifact from "../artifacts/contracts/UniswapLpFarm.sol/UniswapLpFarm.json";
 import TreasuryArtifact from "../artifacts/contracts/Treasury.sol/Treasury.json";
 import RegistryArtifact from "../artifacts/contracts/Registry.sol/Registry.json";
-import { Solace, Vault, Master, MockWeth, CpFarm, UniswapLpFarm, Treasury, Registry } from "../typechain";
+import ClaimsAdjustorArtifact from '../artifacts/contracts/ClaimsAdjustor.sol/ClaimsAdjustor.json';
+import ClaimsEscrowArtifact from '../artifacts/contracts/ClaimsEscrow.sol/ClaimsEscrow.json';
+import { Solace, Vault, Master, MockWeth, CpFarm, UniswapLpFarm, Treasury, Registry, ClaimsAdjustor, ClaimsEscrow } from "../typechain";
 
 // uniswap imports
 import UniswapV3FactoryArtifact from "@uniswap/v3-core/artifacts/contracts/UniswapV3Factory.sol/UniswapV3Factory.json";
@@ -29,10 +31,16 @@ async function main() {
   console.log("-----------------------------------------------------------");
 
   /*
+   * deploy Registry
+   */
+  let registry = (await deployContract(deployer,RegistryArtifact)) as Registry;
+  logContractAddress("Registry", registry.address);
+  /*
    * deploy SOLACE
    */
   let solace = (await deployContract(deployer, SolaceArtifact)) as Solace;
   logContractAddress("SOLACE", solace.address);
+  await registry.setSolace(solace.address);
   /*
    * deploy WETH
    */
@@ -43,11 +51,13 @@ async function main() {
    */
   let master = (await deployContract(deployer,MasterArtifact,[solace.address,200])) as Master;
   logContractAddress("Master", master.address);
+  await registry.setMaster(master.address);
   /*
    * deploy Vault
    */
-  let vault = (await deployContract(deployer,VaultArtifact,[mockWETH.address])) as Vault;
+  let vault = (await deployContract(deployer,VaultArtifact,[registry.address,mockWETH.address])) as Vault;
   logContractAddress("Vault", vault.address);
+  await registry.setVault(vault.address);
   /*
    * deploy CP Farm
    */
@@ -79,11 +89,17 @@ async function main() {
    */
   let treasury = (await deployContract(deployer,TreasuryArtifact,[solace.address,uniswapRouter.address,mockWETH.address])) as Treasury;
   logContractAddress("Treasury", treasury.address);
+  await registry.setTreasury(treasury.address);
   /*
-   * deploy Registry
+   * deploy claims escrow
    */
-  let registry = (await deployContract(deployer,RegistryArtifact)) as Registry;
-  logContractAddress("Registry", registry.address);
+   let claimsEscrow = (await deployContract(deployer,ClaimsEscrowArtifact,[registry.address])) as ClaimsEscrow;
+   logContractAddress("ClaimsEscrow", claimsEscrow.address);
+   /*
+    * deploy claims adjuster
+    */
+   let claimsAdjustor = (await deployContract(deployer,ClaimsAdjustorArtifact,[registry.address])) as ClaimsAdjustor;
+   logContractAddress("ClaimsAdjustor", claimsAdjustor.address);
 }
 
 main()
