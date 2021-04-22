@@ -23,6 +23,7 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
 interface VaultInterface extends ethers.utils.Interface {
   functions: {
+    "DOMAIN_SEPARATOR()": FunctionFragment;
     "activation()": FunctionFragment;
     "addStrategy(address,uint256,uint256,uint256,uint256)": FunctionFragment;
     "addStrategyToQueue(address)": FunctionFragment;
@@ -36,6 +37,7 @@ interface VaultInterface extends ethers.utils.Interface {
     "decreaseAllowance(address,uint256)": FunctionFragment;
     "delegatedAssets()": FunctionFragment;
     "deposit()": FunctionFragment;
+    "depositAndStake(uint256,uint256,uint8,bytes32,bytes32)": FunctionFragment;
     "emergencyShutdown()": FunctionFragment;
     "expectedReturn(address)": FunctionFragment;
     "governance()": FunctionFragment;
@@ -45,7 +47,10 @@ interface VaultInterface extends ethers.utils.Interface {
     "lockedProfitDegration()": FunctionFragment;
     "managementFee()": FunctionFragment;
     "name()": FunctionFragment;
+    "nonces(address)": FunctionFragment;
     "performanceFee()": FunctionFragment;
+    "permit(address,address,uint256,uint256,uint8,bytes32,bytes32)": FunctionFragment;
+    "registry()": FunctionFragment;
     "removeStrategyFromQueue(address)": FunctionFragment;
     "report(uint256,uint256,uint256)": FunctionFragment;
     "revokeStrategy(address)": FunctionFragment;
@@ -66,6 +71,10 @@ interface VaultInterface extends ethers.utils.Interface {
     "withdrawalQueue(uint256)": FunctionFragment;
   };
 
+  encodeFunctionData(
+    functionFragment: "DOMAIN_SEPARATOR",
+    values?: undefined
+  ): string;
   encodeFunctionData(
     functionFragment: "activation",
     values?: undefined
@@ -107,6 +116,10 @@ interface VaultInterface extends ethers.utils.Interface {
   ): string;
   encodeFunctionData(functionFragment: "deposit", values?: undefined): string;
   encodeFunctionData(
+    functionFragment: "depositAndStake",
+    values: [BigNumberish, BigNumberish, BigNumberish, BytesLike, BytesLike]
+  ): string;
+  encodeFunctionData(
     functionFragment: "emergencyShutdown",
     values?: undefined
   ): string;
@@ -139,10 +152,24 @@ interface VaultInterface extends ethers.utils.Interface {
     values?: undefined
   ): string;
   encodeFunctionData(functionFragment: "name", values?: undefined): string;
+  encodeFunctionData(functionFragment: "nonces", values: [string]): string;
   encodeFunctionData(
     functionFragment: "performanceFee",
     values?: undefined
   ): string;
+  encodeFunctionData(
+    functionFragment: "permit",
+    values: [
+      string,
+      string,
+      BigNumberish,
+      BigNumberish,
+      BigNumberish,
+      BytesLike,
+      BytesLike
+    ]
+  ): string;
+  encodeFunctionData(functionFragment: "registry", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "removeStrategyFromQueue",
     values: [string]
@@ -201,6 +228,10 @@ interface VaultInterface extends ethers.utils.Interface {
     values: [BigNumberish]
   ): string;
 
+  decodeFunctionResult(
+    functionFragment: "DOMAIN_SEPARATOR",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "activation", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "addStrategy",
@@ -233,6 +264,10 @@ interface VaultInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(functionFragment: "deposit", data: BytesLike): Result;
   decodeFunctionResult(
+    functionFragment: "depositAndStake",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "emergencyShutdown",
     data: BytesLike
   ): Result;
@@ -259,10 +294,13 @@ interface VaultInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "name", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "nonces", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "performanceFee",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(functionFragment: "permit", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "registry", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "removeStrategyFromQueue",
     data: BytesLike
@@ -353,6 +391,18 @@ export class Vault extends Contract {
   interface: VaultInterface;
 
   functions: {
+    DOMAIN_SEPARATOR(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "DOMAIN_SEPARATOR()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
     activation(
       overrides?: CallOverrides
     ): Promise<{
@@ -515,6 +565,24 @@ export class Vault extends Contract {
 
     "deposit()"(overrides?: PayableOverrides): Promise<ContractTransaction>;
 
+    depositAndStake(
+      farmId: BigNumberish,
+      deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike,
+      overrides?: PayableOverrides
+    ): Promise<ContractTransaction>;
+
+    "depositAndStake(uint256,uint256,uint8,bytes32,bytes32)"(
+      farmId: BigNumberish,
+      deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike,
+      overrides?: PayableOverrides
+    ): Promise<ContractTransaction>;
+
     emergencyShutdown(
       overrides?: CallOverrides
     ): Promise<{
@@ -625,6 +693,20 @@ export class Vault extends Contract {
       0: string;
     }>;
 
+    nonces(
+      owner: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    "nonces(address)"(
+      owner: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
     performanceFee(
       overrides?: CallOverrides
     ): Promise<{
@@ -635,6 +717,40 @@ export class Vault extends Contract {
       overrides?: CallOverrides
     ): Promise<{
       0: BigNumber;
+    }>;
+
+    permit(
+      owner: string,
+      spender: string,
+      value: BigNumberish,
+      deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "permit(address,address,uint256,uint256,uint8,bytes32,bytes32)"(
+      owner: string,
+      spender: string,
+      value: BigNumberish,
+      deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    registry(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "registry()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
     }>;
 
     removeStrategyFromQueue(
@@ -884,6 +1000,10 @@ export class Vault extends Contract {
     }>;
   };
 
+  DOMAIN_SEPARATOR(overrides?: CallOverrides): Promise<string>;
+
+  "DOMAIN_SEPARATOR()"(overrides?: CallOverrides): Promise<string>;
+
   activation(overrides?: CallOverrides): Promise<BigNumber>;
 
   "activation()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -995,6 +1115,24 @@ export class Vault extends Contract {
 
   "deposit()"(overrides?: PayableOverrides): Promise<ContractTransaction>;
 
+  depositAndStake(
+    farmId: BigNumberish,
+    deadline: BigNumberish,
+    v: BigNumberish,
+    r: BytesLike,
+    s: BytesLike,
+    overrides?: PayableOverrides
+  ): Promise<ContractTransaction>;
+
+  "depositAndStake(uint256,uint256,uint8,bytes32,bytes32)"(
+    farmId: BigNumberish,
+    deadline: BigNumberish,
+    v: BigNumberish,
+    r: BytesLike,
+    s: BytesLike,
+    overrides?: PayableOverrides
+  ): Promise<ContractTransaction>;
+
   emergencyShutdown(overrides?: CallOverrides): Promise<boolean>;
 
   "emergencyShutdown()"(overrides?: CallOverrides): Promise<boolean>;
@@ -1045,9 +1183,42 @@ export class Vault extends Contract {
 
   "name()"(overrides?: CallOverrides): Promise<string>;
 
+  nonces(owner: string, overrides?: CallOverrides): Promise<BigNumber>;
+
+  "nonces(address)"(
+    owner: string,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
+
   performanceFee(overrides?: CallOverrides): Promise<BigNumber>;
 
   "performanceFee()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+  permit(
+    owner: string,
+    spender: string,
+    value: BigNumberish,
+    deadline: BigNumberish,
+    v: BigNumberish,
+    r: BytesLike,
+    s: BytesLike,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "permit(address,address,uint256,uint256,uint8,bytes32,bytes32)"(
+    owner: string,
+    spender: string,
+    value: BigNumberish,
+    deadline: BigNumberish,
+    v: BigNumberish,
+    r: BytesLike,
+    s: BytesLike,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  registry(overrides?: CallOverrides): Promise<string>;
+
+  "registry()"(overrides?: CallOverrides): Promise<string>;
 
   removeStrategyFromQueue(
     _strategy: string,
@@ -1244,6 +1415,10 @@ export class Vault extends Contract {
   ): Promise<string>;
 
   callStatic: {
+    DOMAIN_SEPARATOR(overrides?: CallOverrides): Promise<string>;
+
+    "DOMAIN_SEPARATOR()"(overrides?: CallOverrides): Promise<string>;
+
     activation(overrides?: CallOverrides): Promise<BigNumber>;
 
     "activation()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -1355,6 +1530,24 @@ export class Vault extends Contract {
 
     "deposit()"(overrides?: CallOverrides): Promise<void>;
 
+    depositAndStake(
+      farmId: BigNumberish,
+      deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "depositAndStake(uint256,uint256,uint8,bytes32,bytes32)"(
+      farmId: BigNumberish,
+      deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
     emergencyShutdown(overrides?: CallOverrides): Promise<boolean>;
 
     "emergencyShutdown()"(overrides?: CallOverrides): Promise<boolean>;
@@ -1405,9 +1598,42 @@ export class Vault extends Contract {
 
     "name()"(overrides?: CallOverrides): Promise<string>;
 
+    nonces(owner: string, overrides?: CallOverrides): Promise<BigNumber>;
+
+    "nonces(address)"(
+      owner: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     performanceFee(overrides?: CallOverrides): Promise<BigNumber>;
 
     "performanceFee()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    permit(
+      owner: string,
+      spender: string,
+      value: BigNumberish,
+      deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "permit(address,address,uint256,uint256,uint8,bytes32,bytes32)"(
+      owner: string,
+      spender: string,
+      value: BigNumberish,
+      deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    registry(overrides?: CallOverrides): Promise<string>;
+
+    "registry()"(overrides?: CallOverrides): Promise<string>;
 
     removeStrategyFromQueue(
       _strategy: string,
@@ -1653,6 +1879,10 @@ export class Vault extends Contract {
   };
 
   estimateGas: {
+    DOMAIN_SEPARATOR(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "DOMAIN_SEPARATOR()"(overrides?: CallOverrides): Promise<BigNumber>;
+
     activation(overrides?: CallOverrides): Promise<BigNumber>;
 
     "activation()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -1764,6 +1994,24 @@ export class Vault extends Contract {
 
     "deposit()"(overrides?: PayableOverrides): Promise<BigNumber>;
 
+    depositAndStake(
+      farmId: BigNumberish,
+      deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike,
+      overrides?: PayableOverrides
+    ): Promise<BigNumber>;
+
+    "depositAndStake(uint256,uint256,uint8,bytes32,bytes32)"(
+      farmId: BigNumberish,
+      deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike,
+      overrides?: PayableOverrides
+    ): Promise<BigNumber>;
+
     emergencyShutdown(overrides?: CallOverrides): Promise<BigNumber>;
 
     "emergencyShutdown()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -1814,9 +2062,42 @@ export class Vault extends Contract {
 
     "name()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+    nonces(owner: string, overrides?: CallOverrides): Promise<BigNumber>;
+
+    "nonces(address)"(
+      owner: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     performanceFee(overrides?: CallOverrides): Promise<BigNumber>;
 
     "performanceFee()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    permit(
+      owner: string,
+      spender: string,
+      value: BigNumberish,
+      deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "permit(address,address,uint256,uint256,uint8,bytes32,bytes32)"(
+      owner: string,
+      spender: string,
+      value: BigNumberish,
+      deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    registry(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "registry()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     removeStrategyFromQueue(
       _strategy: string,
@@ -1970,6 +2251,12 @@ export class Vault extends Contract {
   };
 
   populateTransaction: {
+    DOMAIN_SEPARATOR(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "DOMAIN_SEPARATOR()"(
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
     activation(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "activation()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
@@ -2086,6 +2373,24 @@ export class Vault extends Contract {
 
     "deposit()"(overrides?: PayableOverrides): Promise<PopulatedTransaction>;
 
+    depositAndStake(
+      farmId: BigNumberish,
+      deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike,
+      overrides?: PayableOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "depositAndStake(uint256,uint256,uint8,bytes32,bytes32)"(
+      farmId: BigNumberish,
+      deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike,
+      overrides?: PayableOverrides
+    ): Promise<PopulatedTransaction>;
+
     emergencyShutdown(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "emergencyShutdown()"(
@@ -2142,11 +2447,47 @@ export class Vault extends Contract {
 
     "name()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
+    nonces(
+      owner: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "nonces(address)"(
+      owner: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
     performanceFee(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "performanceFee()"(
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
+
+    permit(
+      owner: string,
+      spender: string,
+      value: BigNumberish,
+      deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "permit(address,address,uint256,uint256,uint8,bytes32,bytes32)"(
+      owner: string,
+      spender: string,
+      value: BigNumberish,
+      deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    registry(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "registry()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     removeStrategyFromQueue(
       _strategy: string,

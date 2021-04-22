@@ -111,6 +111,29 @@ const _abi = [
   {
     inputs: [
       {
+        internalType: "address",
+        name: "_farmer",
+        type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "_farmId",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "_token",
+        type: "uint256",
+      },
+    ],
+    name: "depositErc20For",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
         internalType: "uint256",
         name: "_farmId",
         type: "uint256",
@@ -122,6 +145,29 @@ const _abi = [
       },
     ],
     name: "depositErc721",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "_farmer",
+        type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "_farmId",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "_token",
+        type: "uint256",
+      },
+    ],
+    name: "depositErc721For",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",

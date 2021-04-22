@@ -131,4 +131,22 @@ interface IMaster {
      * @return The weighted multiplier for the given period.
      */
     function getMultiplier(uint256 _farmId, uint256 _from, uint256 _to) external view returns (uint256);
+
+    /**
+     * @notice Deposit an ERC20 token on behalf of `_farmer`.
+     * User will receive accumulated Solace rewards if any.
+     * @param _farmer The farmer address we are depositing on behalf of
+     * @param _farmId The farm to deposit to.
+     * @param _token The deposit token.
+     */
+    function depositErc20For(address _farmer, uint256 _farmId, uint256 _token) external;
+
+    /**
+     * @notice Deposit an ERC721 token on behalf of `_farmer`.
+     * User will receive accumulated Solace rewards if any.
+     * @param _farmer The farmer address we are depositing on behalf of
+     * @param _farmId The farm to deposit to.
+     * @param _token The deposit token.
+     */
+    function depositErc721For(address _farmer, uint256 _farmId, uint256 _token) external;
 }

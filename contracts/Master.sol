@@ -299,8 +299,58 @@ contract Master is IMaster {
     }
 
     /**
-     * @notice Withdraw some ERC20 tokens.
-     * User will receive _amount of CP/LP tokens and accumulated Solace rewards.
+     * @notice Deposit some ERC20 tokens.
+     * User will receive accumulated Solace rewards if any.
+     * @param _farmer The farmer address we are depositing on behalf of
+     * @param _farmId The farm to deposit to.
+     * @param _amount The deposit amount.
+     */
+    function depositErc20For(address _farmer, uint256 _farmId, uint256 _amount) external override {
+        // cannot deposit onto a non existant farm
+        require(farmIsErc20[_farmId], "not an erc20 farm");
+        // get farm and farmer information
+        FarmInfo storage farm = farmInfo[_farmId];
+        UserInfo storage user = userInfo[_farmId][_farmer];
+        // harvest
+        _harvest(_farmId);
+        // pull tokens
+        IERC20(farm.token).safeTransferFrom(_farmer, address(this), _amount);
+        // accounting
+        farm.valueStaked += _amount;
+        user.value += _amount;
+        user.rewardDebt = user.value * farm.accSolacePerShare / 1e12;
+        emit DepositErc20(_farmer, _farmId, _amount);
+    }
+
+    /**
+     * @notice Deposit an ERC721 token on behalf of `_farmer`.
+     * User will receive accumulated Solace rewards if any.
+     * @param _farmer The farmer address we are depositing on behalf of
+     * @param _farmId The farm to deposit to.
+     * @param _token The deposit token.
+     */
+    function depositErc721For(address _farmer, uint256 _farmId, uint256 _token) external override {
+        // cannot deposit onto a non existant farm
+        require(farmIsErc721[_farmId], "not an erc721 farm");
+        // get farm and farmer information
+        FarmInfo storage farm = farmInfo[_farmId];
+        UserInfo storage user = userInfo[_farmId][_farmer];
+        // harvest
+        _harvest(_farmId);
+        // pull tokens
+        IERC721(farm.token).transferFrom(_farmer, address(this), _token);
+        // accounting
+        uint256 value = INftAppraiser(farm.appraiser).appraise(_token);
+        farm.valueStaked += value;
+        user.value += value;
+        user.rewardDebt = user.value * farm.accSolacePerShare / 1e12;
+        user.tokensDeposited[_token] = true;
+        user.tokenValues[_token] = value;
+        emit DepositErc721(_farmer, _farmId, _token);
+    }
+
+    /**
+     * @notice Withdraw token function for msg.sender.
      * @param _farmId The farm to withdraw from.
      * @param _amount The withdraw amount.
      */

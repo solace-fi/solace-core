@@ -24,7 +24,10 @@ interface IRegistryInterface extends ethers.utils.Interface {
   functions: {
     "addProduct(address)": FunctionFragment;
     "getProduct(uint256)": FunctionFragment;
+    "governance()": FunctionFragment;
     "isProduct(address)": FunctionFragment;
+    "locker()": FunctionFragment;
+    "master()": FunctionFragment;
     "numProducts()": FunctionFragment;
     "removeProduct(address)": FunctionFragment;
     "setGovernance(address)": FunctionFragment;
@@ -33,6 +36,9 @@ interface IRegistryInterface extends ethers.utils.Interface {
     "setSolace(address)": FunctionFragment;
     "setTreasury(address)": FunctionFragment;
     "setVault(address)": FunctionFragment;
+    "solace()": FunctionFragment;
+    "treasury()": FunctionFragment;
+    "vault()": FunctionFragment;
   };
 
   encodeFunctionData(functionFragment: "addProduct", values: [string]): string;
@@ -40,7 +46,13 @@ interface IRegistryInterface extends ethers.utils.Interface {
     functionFragment: "getProduct",
     values: [BigNumberish]
   ): string;
+  encodeFunctionData(
+    functionFragment: "governance",
+    values?: undefined
+  ): string;
   encodeFunctionData(functionFragment: "isProduct", values: [string]): string;
+  encodeFunctionData(functionFragment: "locker", values?: undefined): string;
+  encodeFunctionData(functionFragment: "master", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "numProducts",
     values?: undefined
@@ -58,10 +70,16 @@ interface IRegistryInterface extends ethers.utils.Interface {
   encodeFunctionData(functionFragment: "setSolace", values: [string]): string;
   encodeFunctionData(functionFragment: "setTreasury", values: [string]): string;
   encodeFunctionData(functionFragment: "setVault", values: [string]): string;
+  encodeFunctionData(functionFragment: "solace", values?: undefined): string;
+  encodeFunctionData(functionFragment: "treasury", values?: undefined): string;
+  encodeFunctionData(functionFragment: "vault", values?: undefined): string;
 
   decodeFunctionResult(functionFragment: "addProduct", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "getProduct", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "governance", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "isProduct", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "locker", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "master", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "numProducts",
     data: BytesLike
@@ -82,6 +100,9 @@ interface IRegistryInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "setVault", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "solace", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "treasury", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "vault", data: BytesLike): Result;
 
   events: {};
 }
@@ -124,6 +145,10 @@ export class IRegistry extends Contract {
       0: string;
     }>;
 
+    governance(overrides?: Overrides): Promise<ContractTransaction>;
+
+    "governance()"(overrides?: Overrides): Promise<ContractTransaction>;
+
     isProduct(
       _product: string,
       overrides?: CallOverrides
@@ -137,6 +162,14 @@ export class IRegistry extends Contract {
     ): Promise<{
       0: boolean;
     }>;
+
+    locker(overrides?: Overrides): Promise<ContractTransaction>;
+
+    "locker()"(overrides?: Overrides): Promise<ContractTransaction>;
+
+    master(overrides?: Overrides): Promise<ContractTransaction>;
+
+    "master()"(overrides?: Overrides): Promise<ContractTransaction>;
 
     numProducts(
       overrides?: CallOverrides
@@ -219,6 +252,18 @@ export class IRegistry extends Contract {
       _vault: string,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
+
+    solace(overrides?: Overrides): Promise<ContractTransaction>;
+
+    "solace()"(overrides?: Overrides): Promise<ContractTransaction>;
+
+    treasury(overrides?: Overrides): Promise<ContractTransaction>;
+
+    "treasury()"(overrides?: Overrides): Promise<ContractTransaction>;
+
+    vault(overrides?: Overrides): Promise<ContractTransaction>;
+
+    "vault()"(overrides?: Overrides): Promise<ContractTransaction>;
   };
 
   addProduct(
@@ -241,12 +286,24 @@ export class IRegistry extends Contract {
     overrides?: CallOverrides
   ): Promise<string>;
 
+  governance(overrides?: Overrides): Promise<ContractTransaction>;
+
+  "governance()"(overrides?: Overrides): Promise<ContractTransaction>;
+
   isProduct(_product: string, overrides?: CallOverrides): Promise<boolean>;
 
   "isProduct(address)"(
     _product: string,
     overrides?: CallOverrides
   ): Promise<boolean>;
+
+  locker(overrides?: Overrides): Promise<ContractTransaction>;
+
+  "locker()"(overrides?: Overrides): Promise<ContractTransaction>;
+
+  master(overrides?: Overrides): Promise<ContractTransaction>;
+
+  "master()"(overrides?: Overrides): Promise<ContractTransaction>;
 
   numProducts(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -319,6 +376,18 @@ export class IRegistry extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
+  solace(overrides?: Overrides): Promise<ContractTransaction>;
+
+  "solace()"(overrides?: Overrides): Promise<ContractTransaction>;
+
+  treasury(overrides?: Overrides): Promise<ContractTransaction>;
+
+  "treasury()"(overrides?: Overrides): Promise<ContractTransaction>;
+
+  vault(overrides?: Overrides): Promise<ContractTransaction>;
+
+  "vault()"(overrides?: Overrides): Promise<ContractTransaction>;
+
   callStatic: {
     addProduct(_product: string, overrides?: CallOverrides): Promise<void>;
 
@@ -337,12 +406,24 @@ export class IRegistry extends Contract {
       overrides?: CallOverrides
     ): Promise<string>;
 
+    governance(overrides?: CallOverrides): Promise<string>;
+
+    "governance()"(overrides?: CallOverrides): Promise<string>;
+
     isProduct(_product: string, overrides?: CallOverrides): Promise<boolean>;
 
     "isProduct(address)"(
       _product: string,
       overrides?: CallOverrides
     ): Promise<boolean>;
+
+    locker(overrides?: CallOverrides): Promise<string>;
+
+    "locker()"(overrides?: CallOverrides): Promise<string>;
+
+    master(overrides?: CallOverrides): Promise<string>;
+
+    "master()"(overrides?: CallOverrides): Promise<string>;
 
     numProducts(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -399,6 +480,18 @@ export class IRegistry extends Contract {
       _vault: string,
       overrides?: CallOverrides
     ): Promise<void>;
+
+    solace(overrides?: CallOverrides): Promise<string>;
+
+    "solace()"(overrides?: CallOverrides): Promise<string>;
+
+    treasury(overrides?: CallOverrides): Promise<string>;
+
+    "treasury()"(overrides?: CallOverrides): Promise<string>;
+
+    vault(overrides?: CallOverrides): Promise<string>;
+
+    "vault()"(overrides?: CallOverrides): Promise<string>;
   };
 
   filters: {};
@@ -421,12 +514,24 @@ export class IRegistry extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
+    governance(overrides?: Overrides): Promise<BigNumber>;
+
+    "governance()"(overrides?: Overrides): Promise<BigNumber>;
+
     isProduct(_product: string, overrides?: CallOverrides): Promise<BigNumber>;
 
     "isProduct(address)"(
       _product: string,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
+
+    locker(overrides?: Overrides): Promise<BigNumber>;
+
+    "locker()"(overrides?: Overrides): Promise<BigNumber>;
+
+    master(overrides?: Overrides): Promise<BigNumber>;
+
+    "master()"(overrides?: Overrides): Promise<BigNumber>;
 
     numProducts(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -483,6 +588,18 @@ export class IRegistry extends Contract {
       _vault: string,
       overrides?: Overrides
     ): Promise<BigNumber>;
+
+    solace(overrides?: Overrides): Promise<BigNumber>;
+
+    "solace()"(overrides?: Overrides): Promise<BigNumber>;
+
+    treasury(overrides?: Overrides): Promise<BigNumber>;
+
+    "treasury()"(overrides?: Overrides): Promise<BigNumber>;
+
+    vault(overrides?: Overrides): Promise<BigNumber>;
+
+    "vault()"(overrides?: Overrides): Promise<BigNumber>;
   };
 
   populateTransaction: {
@@ -506,6 +623,10 @@ export class IRegistry extends Contract {
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
+    governance(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    "governance()"(overrides?: Overrides): Promise<PopulatedTransaction>;
+
     isProduct(
       _product: string,
       overrides?: CallOverrides
@@ -515,6 +636,14 @@ export class IRegistry extends Contract {
       _product: string,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
+
+    locker(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    "locker()"(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    master(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    "master()"(overrides?: Overrides): Promise<PopulatedTransaction>;
 
     numProducts(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
@@ -589,5 +718,17 @@ export class IRegistry extends Contract {
       _vault: string,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
+
+    solace(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    "solace()"(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    treasury(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    "treasury()"(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    vault(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    "vault()"(overrides?: Overrides): Promise<PopulatedTransaction>;
   };
 }

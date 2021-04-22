@@ -1,10 +1,14 @@
 import chai from "chai";
 import { waffle } from "hardhat";
 import VaultArtifact from '../artifacts/contracts/Vault.sol/Vault.json'
+import MasterArtifact from '../artifacts/contracts/Master.sol/Master.json';
+import SolaceArtifact from '../artifacts/contracts/SOLACE.sol/SOLACE.json';
 import StrategyArtifact from '../artifacts/contracts/mocks/MockStrategy.sol/MockStrategy.json'
 import WETHArtifact from '../artifacts/contracts/mocks/MockWETH.sol/MockWETH.json'
-import { BigNumber as BN } from 'ethers';
-import { Vault, MockStrategy, MockWeth } from "../typechain";
+import RegistryArtifact from "../artifacts/contracts/Registry.sol/Registry.json";
+import { BigNumber as BN, constants } from 'ethers';
+import { getPermitDigest, sign, getDomainSeparator } from './utilities/signature';
+import { Vault, MockStrategy, MockWeth, Registry, Master, Solace } from "../typechain";
 
 const { expect } = chai;
 const { deployContract, solidity } = waffle;
@@ -17,12 +21,16 @@ describe("Vault", function () {
     let weth: MockWeth;
     let strategy: MockStrategy;
     let unaddedStrategy: MockStrategy;
+    let registry: Registry;
+    let master: Master;
+    let solace: Solace;
 
     const [owner, newOwner, depositor1, depositor2] = provider.getWallets();
     const tokenName = "Solace CP Token";
     const tokenSymbol = "SCP";
     const testDepositAmount = BN.from("10");
     const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+    const chainId = 31337;
 
     const debtRatio = 1000; // debt ratio is % of MAX_BPS
     const minDebtPerHarvest = 0;
@@ -30,6 +38,9 @@ describe("Vault", function () {
     const performanceFee = 0;
     const maxLoss = 1; // 0.01% BPS
     const newDegration = 10 ** 15;
+    const deadline = constants.MaxUint256;
+
+    const solacePerBlock: BN = BN.from("100000000000000000000"); // 100 e18
 
     const MAX_BPS = 10000;
 
@@ -39,10 +50,29 @@ describe("Vault", function () {
             WETHArtifact
         )) as MockWeth;
 
+        solace = (await deployContract(
+            owner,
+            SolaceArtifact
+        )) as Solace;
+
+        master = (await deployContract(
+            owner,
+            MasterArtifact,
+            [
+                solace.address,
+                solacePerBlock
+            ]
+        )) as Master;
+
+        registry = (await deployContract(
+            owner,
+            RegistryArtifact
+        )) as Registry;
+
         vault = (await deployContract(
             owner,
             VaultArtifact,
-            [weth.address]
+            [registry.address, weth.address]
         )) as Vault;
 
         strategy = (await deployContract(
@@ -56,6 +86,9 @@ describe("Vault", function () {
             StrategyArtifact,
             [vault.address]
         )) as MockStrategy;
+
+        await registry.setVault(vault.address);
+        await registry.setMaster(master.address);
     });
 
     describe("deployment", function () {
@@ -66,6 +99,9 @@ describe("Vault", function () {
         it("should set the governance address", async function () {
             expect(await vault.governance()).to.equal(owner.address);
         });
+        it('should initialize DOMAIN_SEPARATOR correctly', async () => {
+            expect(await vault.DOMAIN_SEPARATOR()).to.equal(getDomainSeparator(tokenName, vault.address, chainId));
+        })
     });
 
     describe("setGovernance", function () {
@@ -240,6 +276,54 @@ describe("Vault", function () {
         });
         it('should emit DepositMade event after function logic is successful', async function () {
             expect(await vault.connect(depositor1).deposit({ value: testDepositAmount})).to.emit(vault, 'DepositMade').withArgs(depositor1.address, testDepositAmount, testDepositAmount);
+        });
+    });
+
+    describe("depositAndStake", function () {
+        beforeEach("deposit", async function () {
+            await master.createFarmErc20(vault.address, 0, 1, 2);
+        });
+        it("should permit master to spend CP tokens", async function () {
+            const nonce = await vault.nonces(depositor1.address);
+            const approve = {
+                owner: depositor1.address,
+                spender: master.address,
+                value: testDepositAmount,
+            }
+            const digest = getPermitDigest(tokenName, vault.address, chainId, approve, nonce, deadline);
+            const { v, r, s } = sign(digest, Buffer.from(depositor1.privateKey.slice(2), 'hex'));
+            await vault.connect(depositor1).depositAndStake(0, deadline, v, r, s, {value: testDepositAmount});
+
+            const callTotalAssets = await vault.totalAssets();
+            const callTotalSupply = await vault.totalSupply();
+
+            // weth balance of vault should have increased by deposit amount
+            expect(await weth.balanceOf(vault.address)).to.equal(testDepositAmount);
+
+            // check vault shares of master
+            expect(await vault.balanceOf(master.address)).to.equal(testDepositAmount.mul(callTotalSupply).div(callTotalAssets));
+        });
+        it('should emit DepositMade event', async function () {
+            const nonce = await vault.nonces(depositor1.address);
+            const approve = {
+                owner: depositor1.address,
+                spender: master.address,
+                value: testDepositAmount,
+            }
+            const digest = getPermitDigest(tokenName, vault.address, chainId, approve, nonce, deadline);
+            const { v, r, s } = sign(digest, Buffer.from(depositor1.privateKey.slice(2), 'hex'));
+            expect(await vault.connect(depositor1).depositAndStake(0, deadline, v, r, s, { value: testDepositAmount})).to.emit(vault, 'DepositMade').withArgs(depositor1.address, testDepositAmount, testDepositAmount);
+        });
+        it('should emit DepositErc20FOr event', async function () {
+            const nonce = await vault.nonces(depositor1.address);
+            const approve = {
+                owner: depositor1.address,
+                spender: master.address,
+                value: testDepositAmount,
+            }
+            const digest = getPermitDigest(tokenName, vault.address, chainId, approve, nonce, deadline);
+            const { v, r, s } = sign(digest, Buffer.from(depositor1.privateKey.slice(2), 'hex'));
+            expect(await vault.connect(depositor1).depositAndStake(0, deadline, v, r, s, { value: testDepositAmount})).to.emit(master, 'DepositErc20').withArgs(depositor1.address, 0, testDepositAmount);
         });
     });
 

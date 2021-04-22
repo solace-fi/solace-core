@@ -4,7 +4,8 @@ import { BigNumber as BN } from 'ethers';
 import VaultArtifact from '../artifacts/contracts/Vault.sol/Vault.json';
 import StrategyArtifact from '../artifacts/contracts/mocks/MockStrategy.sol/MockStrategy.json';
 import WETHArtifact from '../artifacts/contracts/mocks/MockWETH.sol/MockWETH.json';
-import { Vault, MockStrategy, MockWeth } from "../typechain";
+import RegistryArtifact from "../artifacts/contracts/Registry.sol/Registry.json";
+import { Vault, MockStrategy, MockWeth, Registry } from "../typechain";
 
 const { expect } = chai;
 const { deployContract, solidity } = waffle;
@@ -17,6 +18,7 @@ describe("Strategy", function () {
     let newVault: Vault;
     let weth: MockWeth;
     let strategy: MockStrategy;
+    let registry: Registry;
 
     const [owner, newOwner, depositor1] = provider.getWallets();
     const testDepositAmount = BN.from("10");
@@ -29,6 +31,11 @@ describe("Strategy", function () {
     const MAX_BPS = 10000;
 
     beforeEach(async () => {
+        registry = (await deployContract(
+            owner,
+            RegistryArtifact
+        )) as Registry;
+
         weth = (await deployContract(
             owner,
             WETHArtifact
@@ -37,13 +44,13 @@ describe("Strategy", function () {
         vault = (await deployContract(
             owner,
             VaultArtifact,
-            [weth.address]
+            [registry.address, weth.address]
         )) as Vault;
 
         newVault = (await deployContract(
             owner,
             VaultArtifact,
-            [weth.address]
+            [registry.address, weth.address]
         )) as Vault;
 
         strategy = (await deployContract(

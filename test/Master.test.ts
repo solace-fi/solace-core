@@ -11,10 +11,11 @@ import { encodePriceSqrt, FeeAmount, TICK_SPACINGS, getMaxTick, getMinTick } fro
 
 import SolaceArtifact from '../artifacts/contracts/SOLACE.sol/SOLACE.json';
 import MasterArtifact from '../artifacts/contracts/Master.sol/Master.json';
-import VaultArtifact from '../artifacts/contracts/Vault.sol/Vault.json'
+import VaultArtifact from '../artifacts/contracts/Vault.sol/Vault.json';
+import RegistryArtifact from "../artifacts/contracts/Registry.sol/Registry.json";
 import WETHArtifact from "../artifacts/contracts/mocks/MockWETH.sol/MockWETH.json";
 import UniswapLpAppraiserArtifact from "../artifacts/contracts/UniswapLpAppraiser.sol/UniswapLpAppraiser.json";
-import { Solace, Vault, Master, MockWeth, UniswapLpAppraiser } from "../typechain";
+import { Solace, Vault, Master, MockWeth, UniswapLpAppraiser, Registry } from "../typechain";
 
 // uniswap imports
 import UniswapV3FactoryArtifact from "@uniswap/v3-core/artifacts/contracts/UniswapV3Factory.sol/UniswapV3Factory.json";
@@ -40,6 +41,7 @@ let master: Master;
 let cpToken: Vault;
 let weth: MockWeth;
 let lpAppraiser: UniswapLpAppraiser;
+let registry: Registry;
 
 // uniswap contracts
 let uniswapFactory: Contract;
@@ -71,6 +73,11 @@ describe("Master", function () {
         WETHArtifact
     )) as MockWeth;
 
+    registry = (await deployContract(
+        deployer,
+        RegistryArtifact
+    )) as Registry;
+
     // deploy master contract
     master = (await deployContract(
       deployer,
@@ -86,6 +93,7 @@ describe("Master", function () {
         deployer,
         VaultArtifact,
         [
+          registry.address,
           weth.address
         ]
     )) as Vault;
