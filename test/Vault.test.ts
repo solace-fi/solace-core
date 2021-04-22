@@ -191,7 +191,7 @@ describe("Vault", function () {
             await vault.connect(owner).addStrategy(strategy.address, debtRatio, minDebtPerHarvest, maxDebtPerHarvest, performanceFee);
             let vaultDebtRatioAfter = await vault.debtRatio();
             expect(vaultDebtRatioAfter.sub(vaultDebtRatioBefore)).to.equal(debtRatio);
-            
+
             await vault.connect(owner).addStrategy(unaddedStrategy.address, debtRatio, minDebtPerHarvest, maxDebtPerHarvest, performanceFee);
             vaultDebtRatioAfter = await vault.debtRatio();
             expect(vaultDebtRatioAfter).to.equal(debtRatio * 2);
@@ -334,54 +334,6 @@ describe("Vault", function () {
         });
     });
 
-    describe("depositAndStake", function () {
-        beforeEach("deposit", async function () {
-            await master.createFarmErc20(vault.address, 0, 1, 2);
-        });
-        it("should permit master to spend CP tokens", async function () {
-            const nonce = await vault.nonces(depositor1.address);
-            const approve = {
-                owner: depositor1.address,
-                spender: master.address,
-                value: testDepositAmount,
-            }
-            const digest = getPermitDigest(tokenName, vault.address, chainId, approve, nonce, deadline);
-            const { v, r, s } = sign(digest, Buffer.from(depositor1.privateKey.slice(2), 'hex'));
-            await vault.connect(depositor1).depositAndStake(0, deadline, v, r, s, {value: testDepositAmount});
-
-            const callTotalAssets = await vault.totalAssets();
-            const callTotalSupply = await vault.totalSupply();
-
-            // weth balance of vault should have increased by deposit amount
-            expect(await weth.balanceOf(vault.address)).to.equal(testDepositAmount);
-
-            // check vault shares of master
-            expect(await vault.balanceOf(master.address)).to.equal(testDepositAmount.mul(callTotalSupply).div(callTotalAssets));
-        });
-        it('should emit DepositMade event', async function () {
-            const nonce = await vault.nonces(depositor1.address);
-            const approve = {
-                owner: depositor1.address,
-                spender: master.address,
-                value: testDepositAmount,
-            }
-            const digest = getPermitDigest(tokenName, vault.address, chainId, approve, nonce, deadline);
-            const { v, r, s } = sign(digest, Buffer.from(depositor1.privateKey.slice(2), 'hex'));
-            expect(await vault.connect(depositor1).depositAndStake(0, deadline, v, r, s, { value: testDepositAmount})).to.emit(vault, 'DepositMade').withArgs(depositor1.address, testDepositAmount, testDepositAmount);
-        });
-        it('should emit DepositErc20FOr event', async function () {
-            const nonce = await vault.nonces(depositor1.address);
-            const approve = {
-                owner: depositor1.address,
-                spender: master.address,
-                value: testDepositAmount,
-            }
-            const digest = getPermitDigest(tokenName, vault.address, chainId, approve, nonce, deadline);
-            const { v, r, s } = sign(digest, Buffer.from(depositor1.privateKey.slice(2), 'hex'));
-            expect(await vault.connect(depositor1).depositAndStake(0, deadline, v, r, s, { value: testDepositAmount})).to.emit(master, 'DepositErc20').withArgs(depositor1.address, 0, testDepositAmount);
-        });
-    });
-
     describe("withdraw", function () {
         beforeEach("deposit", async function () {
             await vault.connect(owner).addStrategy(strategy.address, debtRatio, minDebtPerHarvest, maxDebtPerHarvest, performanceFee);
@@ -404,9 +356,9 @@ describe("Vault", function () {
             });
             it("should only use WETH from Vault if Vault balance is sufficient", async function () {
                 let cpBalance = await vault.balanceOf(depositor1.address);
-    
+
                 await expect(() => vault.connect(depositor1).withdraw(cpBalance, maxLoss)).to.changeEtherBalance(depositor1, testDepositAmount);
-    
+
                 expect(await vault.balanceOf(depositor1.address)).to.equal(0);
                 expect(await weth.balanceOf(vault.address)).to.equal(0);
                 expect(await weth.balanceOf(strategy.address)).to.equal(0);
@@ -434,7 +386,7 @@ describe("Vault", function () {
             it('should emit WithdrawalMade event after function logic is successful', async function () {
                 let cpBalance = await vault.balanceOf(depositor1.address);
                 let vaultDepositorSigner = vault.connect(depositor1);
-                expect(await vaultDepositorSigner.withdraw(cpBalance, maxLoss)).to.emit(vault, 'WithdrawalMade').withArgs(depositor1.address, testDepositAmount.div(MAX_BPS / debtRatio));
+                await expect(await vaultDepositorSigner.withdraw(cpBalance, maxLoss)).to.emit(vault, 'WithdrawalMade').withArgs(depositor1.address, testDepositAmount);
             });
         });
     });

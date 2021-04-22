@@ -4,7 +4,7 @@ You can deploy in the `localhost` network following these steps:
 `npx hardhat node`
 
 2. Open a new terminal and deploy the smart contracts in the `localhost` network  
-`npx hardhat run --network localhost scripts/deploy.js`
+`npx hardhat run --network localhost scripts/deploy.ts`
 
 As general rule, you can target any network configured in the `hardhat.config.js`  
-`npx hardhat run --network <your-network> scripts/deploy.js`
+`npx hardhat run --network <your-network> scripts/<your-script>.ts`

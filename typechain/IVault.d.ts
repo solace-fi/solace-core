@@ -14,6 +14,7 @@ import {
   Contract,
   ContractTransaction,
   Overrides,
+  PayableOverrides,
   CallOverrides,
 } from "@ethersproject/contracts";
 import { BytesLike } from "@ethersproject/bytes";
@@ -22,21 +23,36 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
 interface IVaultInterface extends ethers.utils.Interface {
   functions: {
-    "balanceOf()": FunctionFragment;
+    "allowance(address,address)": FunctionFragment;
+    "approve(address,uint256)": FunctionFragment;
+    "balanceOf(address)": FunctionFragment;
     "debtOutstanding(address)": FunctionFragment;
+    "deposit()": FunctionFragment;
     "processClaim(address,uint256)": FunctionFragment;
     "report(uint256,uint256,uint256)": FunctionFragment;
     "revokeStrategy(address)": FunctionFragment;
     "strategies(address)": FunctionFragment;
     "token()": FunctionFragment;
-    "withdraw(uint256)": FunctionFragment;
+    "totalSupply()": FunctionFragment;
+    "transfer(address,uint256)": FunctionFragment;
+    "transferFrom(address,address,uint256)": FunctionFragment;
+    "withdraw(uint256,uint256)": FunctionFragment;
   };
 
-  encodeFunctionData(functionFragment: "balanceOf", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "allowance",
+    values: [string, string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "approve",
+    values: [string, BigNumberish]
+  ): string;
+  encodeFunctionData(functionFragment: "balanceOf", values: [string]): string;
   encodeFunctionData(
     functionFragment: "debtOutstanding",
     values: [string]
   ): string;
+  encodeFunctionData(functionFragment: "deposit", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "processClaim",
     values: [string, BigNumberish]
@@ -52,15 +68,30 @@ interface IVaultInterface extends ethers.utils.Interface {
   encodeFunctionData(functionFragment: "strategies", values: [string]): string;
   encodeFunctionData(functionFragment: "token", values?: undefined): string;
   encodeFunctionData(
+    functionFragment: "totalSupply",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "transfer",
+    values: [string, BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "transferFrom",
+    values: [string, string, BigNumberish]
+  ): string;
+  encodeFunctionData(
     functionFragment: "withdraw",
-    values: [BigNumberish]
+    values: [BigNumberish, BigNumberish]
   ): string;
 
+  decodeFunctionResult(functionFragment: "allowance", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "approve", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "balanceOf", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "debtOutstanding",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(functionFragment: "deposit", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "processClaim",
     data: BytesLike
@@ -72,9 +103,24 @@ interface IVaultInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(functionFragment: "strategies", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "token", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "totalSupply",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "transfer", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "transferFrom",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "withdraw", data: BytesLike): Result;
 
-  events: {};
+  events: {
+    "Approval(address,address,uint256)": EventFragment;
+    "Transfer(address,address,uint256)": EventFragment;
+  };
+
+  getEvent(nameOrSignatureOrTopic: "Approval"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "Transfer"): EventFragment;
 }
 
 export class IVault extends Contract {
@@ -91,9 +137,47 @@ export class IVault extends Contract {
   interface: IVaultInterface;
 
   functions: {
-    balanceOf(overrides?: Overrides): Promise<ContractTransaction>;
+    allowance(
+      owner: string,
+      spender: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
 
-    "balanceOf()"(overrides?: Overrides): Promise<ContractTransaction>;
+    "allowance(address,address)"(
+      owner: string,
+      spender: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    approve(
+      spender: string,
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "approve(address,uint256)"(
+      spender: string,
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    balanceOf(
+      account: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    "balanceOf(address)"(
+      account: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
 
     debtOutstanding(
       arg0: string,
@@ -108,6 +192,10 @@ export class IVault extends Contract {
     ): Promise<{
       0: BigNumber;
     }>;
+
+    deposit(overrides?: PayableOverrides): Promise<ContractTransaction>;
+
+    "deposit()"(overrides?: PayableOverrides): Promise<ContractTransaction>;
 
     processClaim(
       claimant: string,
@@ -209,20 +297,87 @@ export class IVault extends Contract {
       0: string;
     }>;
 
-    withdraw(
-      _amount: BigNumberish,
+    totalSupply(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    "totalSupply()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    transfer(
+      recipient: string,
+      amount: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    "withdraw(uint256)"(
+    "transfer(address,uint256)"(
+      recipient: string,
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    transferFrom(
+      sender: string,
+      recipient: string,
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "transferFrom(address,address,uint256)"(
+      sender: string,
+      recipient: string,
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    withdraw(
       _amount: BigNumberish,
+      _maxLoss: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "withdraw(uint256,uint256)"(
+      _amount: BigNumberish,
+      _maxLoss: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
   };
 
-  balanceOf(overrides?: Overrides): Promise<ContractTransaction>;
+  allowance(
+    owner: string,
+    spender: string,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
 
-  "balanceOf()"(overrides?: Overrides): Promise<ContractTransaction>;
+  "allowance(address,address)"(
+    owner: string,
+    spender: string,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
+
+  approve(
+    spender: string,
+    amount: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "approve(address,uint256)"(
+    spender: string,
+    amount: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  balanceOf(account: string, overrides?: CallOverrides): Promise<BigNumber>;
+
+  "balanceOf(address)"(
+    account: string,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
 
   debtOutstanding(arg0: string, overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -230,6 +385,10 @@ export class IVault extends Contract {
     arg0: string,
     overrides?: CallOverrides
   ): Promise<BigNumber>;
+
+  deposit(overrides?: PayableOverrides): Promise<ContractTransaction>;
+
+  "deposit()"(overrides?: PayableOverrides): Promise<ContractTransaction>;
 
   processClaim(
     claimant: string,
@@ -319,20 +478,79 @@ export class IVault extends Contract {
 
   "token()"(overrides?: CallOverrides): Promise<string>;
 
-  withdraw(
-    _amount: BigNumberish,
+  totalSupply(overrides?: CallOverrides): Promise<BigNumber>;
+
+  "totalSupply()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+  transfer(
+    recipient: string,
+    amount: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  "withdraw(uint256)"(
+  "transfer(address,uint256)"(
+    recipient: string,
+    amount: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  transferFrom(
+    sender: string,
+    recipient: string,
+    amount: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "transferFrom(address,address,uint256)"(
+    sender: string,
+    recipient: string,
+    amount: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  withdraw(
     _amount: BigNumberish,
+    _maxLoss: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "withdraw(uint256,uint256)"(
+    _amount: BigNumberish,
+    _maxLoss: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
   callStatic: {
-    balanceOf(overrides?: CallOverrides): Promise<BigNumber>;
+    allowance(
+      owner: string,
+      spender: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
-    "balanceOf()"(overrides?: CallOverrides): Promise<BigNumber>;
+    "allowance(address,address)"(
+      owner: string,
+      spender: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    approve(
+      spender: string,
+      amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
+
+    "approve(address,uint256)"(
+      spender: string,
+      amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
+
+    balanceOf(account: string, overrides?: CallOverrides): Promise<BigNumber>;
+
+    "balanceOf(address)"(
+      account: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
     debtOutstanding(
       arg0: string,
@@ -343,6 +561,10 @@ export class IVault extends Contract {
       arg0: string,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
+
+    deposit(overrides?: CallOverrides): Promise<void>;
+
+    "deposit()"(overrides?: CallOverrides): Promise<void>;
 
     processClaim(
       claimant: string,
@@ -429,20 +651,90 @@ export class IVault extends Contract {
 
     "token()"(overrides?: CallOverrides): Promise<string>;
 
-    withdraw(_amount: BigNumberish, overrides?: CallOverrides): Promise<void>;
+    totalSupply(overrides?: CallOverrides): Promise<BigNumber>;
 
-    "withdraw(uint256)"(
-      _amount: BigNumberish,
+    "totalSupply()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    transfer(
+      recipient: string,
+      amount: BigNumberish,
       overrides?: CallOverrides
-    ): Promise<void>;
+    ): Promise<boolean>;
+
+    "transfer(address,uint256)"(
+      recipient: string,
+      amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
+
+    transferFrom(
+      sender: string,
+      recipient: string,
+      amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
+
+    "transferFrom(address,address,uint256)"(
+      sender: string,
+      recipient: string,
+      amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
+
+    withdraw(
+      _amount: BigNumberish,
+      _maxLoss: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "withdraw(uint256,uint256)"(
+      _amount: BigNumberish,
+      _maxLoss: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
   };
 
-  filters: {};
+  filters: {
+    Approval(
+      owner: string | null,
+      spender: string | null,
+      value: null
+    ): EventFilter;
+
+    Transfer(from: string | null, to: string | null, value: null): EventFilter;
+  };
 
   estimateGas: {
-    balanceOf(overrides?: Overrides): Promise<BigNumber>;
+    allowance(
+      owner: string,
+      spender: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
-    "balanceOf()"(overrides?: Overrides): Promise<BigNumber>;
+    "allowance(address,address)"(
+      owner: string,
+      spender: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    approve(
+      spender: string,
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "approve(address,uint256)"(
+      spender: string,
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    balanceOf(account: string, overrides?: CallOverrides): Promise<BigNumber>;
+
+    "balanceOf(address)"(
+      account: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
     debtOutstanding(
       arg0: string,
@@ -453,6 +745,10 @@ export class IVault extends Contract {
       arg0: string,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
+
+    deposit(overrides?: PayableOverrides): Promise<BigNumber>;
+
+    "deposit()"(overrides?: PayableOverrides): Promise<BigNumber>;
 
     processClaim(
       claimant: string,
@@ -498,18 +794,83 @@ export class IVault extends Contract {
 
     "token()"(overrides?: CallOverrides): Promise<BigNumber>;
 
-    withdraw(_amount: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
+    totalSupply(overrides?: CallOverrides): Promise<BigNumber>;
 
-    "withdraw(uint256)"(
+    "totalSupply()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    transfer(
+      recipient: string,
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "transfer(address,uint256)"(
+      recipient: string,
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    transferFrom(
+      sender: string,
+      recipient: string,
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "transferFrom(address,address,uint256)"(
+      sender: string,
+      recipient: string,
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    withdraw(
       _amount: BigNumberish,
+      _maxLoss: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "withdraw(uint256,uint256)"(
+      _amount: BigNumberish,
+      _maxLoss: BigNumberish,
       overrides?: Overrides
     ): Promise<BigNumber>;
   };
 
   populateTransaction: {
-    balanceOf(overrides?: Overrides): Promise<PopulatedTransaction>;
+    allowance(
+      owner: string,
+      spender: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
 
-    "balanceOf()"(overrides?: Overrides): Promise<PopulatedTransaction>;
+    "allowance(address,address)"(
+      owner: string,
+      spender: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    approve(
+      spender: string,
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "approve(address,uint256)"(
+      spender: string,
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    balanceOf(
+      account: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "balanceOf(address)"(
+      account: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
 
     debtOutstanding(
       arg0: string,
@@ -520,6 +881,10 @@ export class IVault extends Contract {
       arg0: string,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
+
+    deposit(overrides?: PayableOverrides): Promise<PopulatedTransaction>;
+
+    "deposit()"(overrides?: PayableOverrides): Promise<PopulatedTransaction>;
 
     processClaim(
       claimant: string,
@@ -571,13 +936,45 @@ export class IVault extends Contract {
 
     "token()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
-    withdraw(
-      _amount: BigNumberish,
+    totalSupply(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "totalSupply()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    transfer(
+      recipient: string,
+      amount: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    "withdraw(uint256)"(
+    "transfer(address,uint256)"(
+      recipient: string,
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    transferFrom(
+      sender: string,
+      recipient: string,
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "transferFrom(address,address,uint256)"(
+      sender: string,
+      recipient: string,
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    withdraw(
       _amount: BigNumberish,
+      _maxLoss: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "withdraw(uint256,uint256)"(
+      _amount: BigNumberish,
+      _maxLoss: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
   };

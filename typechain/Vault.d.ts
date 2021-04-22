@@ -37,7 +37,6 @@ interface VaultInterface extends ethers.utils.Interface {
     "decreaseAllowance(address,uint256)": FunctionFragment;
     "delegatedAssets()": FunctionFragment;
     "deposit()": FunctionFragment;
-    "depositAndStake(uint256,uint256,uint8,bytes32,bytes32)": FunctionFragment;
     "emergencyShutdown()": FunctionFragment;
     "expectedReturn(address)": FunctionFragment;
     "governance()": FunctionFragment;
@@ -119,10 +118,6 @@ interface VaultInterface extends ethers.utils.Interface {
     values?: undefined
   ): string;
   encodeFunctionData(functionFragment: "deposit", values?: undefined): string;
-  encodeFunctionData(
-    functionFragment: "depositAndStake",
-    values: [BigNumberish, BigNumberish, BigNumberish, BytesLike, BytesLike]
-  ): string;
   encodeFunctionData(
     functionFragment: "emergencyShutdown",
     values?: undefined
@@ -283,10 +278,6 @@ interface VaultInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "deposit", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "depositAndStake",
-    data: BytesLike
-  ): Result;
   decodeFunctionResult(
     functionFragment: "emergencyShutdown",
     data: BytesLike
@@ -603,24 +594,6 @@ export class Vault extends Contract {
 
     "deposit()"(overrides?: PayableOverrides): Promise<ContractTransaction>;
 
-    depositAndStake(
-      farmId: BigNumberish,
-      deadline: BigNumberish,
-      v: BigNumberish,
-      r: BytesLike,
-      s: BytesLike,
-      overrides?: PayableOverrides
-    ): Promise<ContractTransaction>;
-
-    "depositAndStake(uint256,uint256,uint8,bytes32,bytes32)"(
-      farmId: BigNumberish,
-      deadline: BigNumberish,
-      v: BigNumberish,
-      r: BytesLike,
-      s: BytesLike,
-      overrides?: PayableOverrides
-    ): Promise<ContractTransaction>;
-
     emergencyShutdown(
       overrides?: CallOverrides
     ): Promise<{
@@ -926,51 +899,55 @@ export class Vault extends Contract {
     ): Promise<ContractTransaction>;
 
     strategies(
-      arg0: string,
+      _strategy: string,
       overrides?: CallOverrides
     ): Promise<{
-      performanceFee: BigNumber;
-      activation: BigNumber;
-      debtRatio: BigNumber;
-      minDebtPerHarvest: BigNumber;
-      maxDebtPerHarvest: BigNumber;
-      lastReport: BigNumber;
-      totalDebt: BigNumber;
-      totalGain: BigNumber;
-      totalLoss: BigNumber;
-      0: BigNumber;
-      1: BigNumber;
-      2: BigNumber;
-      3: BigNumber;
-      4: BigNumber;
-      5: BigNumber;
-      6: BigNumber;
-      7: BigNumber;
-      8: BigNumber;
+      0: {
+        performanceFee: BigNumber;
+        activation: BigNumber;
+        debtRatio: BigNumber;
+        minDebtPerHarvest: BigNumber;
+        maxDebtPerHarvest: BigNumber;
+        lastReport: BigNumber;
+        totalDebt: BigNumber;
+        totalGain: BigNumber;
+        totalLoss: BigNumber;
+        0: BigNumber;
+        1: BigNumber;
+        2: BigNumber;
+        3: BigNumber;
+        4: BigNumber;
+        5: BigNumber;
+        6: BigNumber;
+        7: BigNumber;
+        8: BigNumber;
+      };
     }>;
 
     "strategies(address)"(
-      arg0: string,
+      _strategy: string,
       overrides?: CallOverrides
     ): Promise<{
-      performanceFee: BigNumber;
-      activation: BigNumber;
-      debtRatio: BigNumber;
-      minDebtPerHarvest: BigNumber;
-      maxDebtPerHarvest: BigNumber;
-      lastReport: BigNumber;
-      totalDebt: BigNumber;
-      totalGain: BigNumber;
-      totalLoss: BigNumber;
-      0: BigNumber;
-      1: BigNumber;
-      2: BigNumber;
-      3: BigNumber;
-      4: BigNumber;
-      5: BigNumber;
-      6: BigNumber;
-      7: BigNumber;
-      8: BigNumber;
+      0: {
+        performanceFee: BigNumber;
+        activation: BigNumber;
+        debtRatio: BigNumber;
+        minDebtPerHarvest: BigNumber;
+        maxDebtPerHarvest: BigNumber;
+        lastReport: BigNumber;
+        totalDebt: BigNumber;
+        totalGain: BigNumber;
+        totalLoss: BigNumber;
+        0: BigNumber;
+        1: BigNumber;
+        2: BigNumber;
+        3: BigNumber;
+        4: BigNumber;
+        5: BigNumber;
+        6: BigNumber;
+        7: BigNumber;
+        8: BigNumber;
+      };
     }>;
 
     symbol(
@@ -1201,24 +1178,6 @@ export class Vault extends Contract {
 
   "deposit()"(overrides?: PayableOverrides): Promise<ContractTransaction>;
 
-  depositAndStake(
-    farmId: BigNumberish,
-    deadline: BigNumberish,
-    v: BigNumberish,
-    r: BytesLike,
-    s: BytesLike,
-    overrides?: PayableOverrides
-  ): Promise<ContractTransaction>;
-
-  "depositAndStake(uint256,uint256,uint8,bytes32,bytes32)"(
-    farmId: BigNumberish,
-    deadline: BigNumberish,
-    v: BigNumberish,
-    r: BytesLike,
-    s: BytesLike,
-    overrides?: PayableOverrides
-  ): Promise<ContractTransaction>;
-
   emergencyShutdown(overrides?: CallOverrides): Promise<boolean>;
 
   "emergencyShutdown()"(overrides?: CallOverrides): Promise<boolean>;
@@ -1421,7 +1380,7 @@ export class Vault extends Contract {
   ): Promise<ContractTransaction>;
 
   strategies(
-    arg0: string,
+    _strategy: string,
     overrides?: CallOverrides
   ): Promise<{
     performanceFee: BigNumber;
@@ -1445,7 +1404,7 @@ export class Vault extends Contract {
   }>;
 
   "strategies(address)"(
-    arg0: string,
+    _strategy: string,
     overrides?: CallOverrides
   ): Promise<{
     performanceFee: BigNumber;
@@ -1652,24 +1611,6 @@ export class Vault extends Contract {
 
     "deposit()"(overrides?: CallOverrides): Promise<void>;
 
-    depositAndStake(
-      farmId: BigNumberish,
-      deadline: BigNumberish,
-      v: BigNumberish,
-      r: BytesLike,
-      s: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    "depositAndStake(uint256,uint256,uint8,bytes32,bytes32)"(
-      farmId: BigNumberish,
-      deadline: BigNumberish,
-      v: BigNumberish,
-      r: BytesLike,
-      s: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
     emergencyShutdown(overrides?: CallOverrides): Promise<boolean>;
 
     "emergencyShutdown()"(overrides?: CallOverrides): Promise<boolean>;
@@ -1869,7 +1810,7 @@ export class Vault extends Contract {
     ): Promise<void>;
 
     strategies(
-      arg0: string,
+      _strategy: string,
       overrides?: CallOverrides
     ): Promise<{
       performanceFee: BigNumber;
@@ -1893,7 +1834,7 @@ export class Vault extends Contract {
     }>;
 
     "strategies(address)"(
-      arg0: string,
+      _strategy: string,
       overrides?: CallOverrides
     ): Promise<{
       performanceFee: BigNumber;
@@ -2157,24 +2098,6 @@ export class Vault extends Contract {
 
     "deposit()"(overrides?: PayableOverrides): Promise<BigNumber>;
 
-    depositAndStake(
-      farmId: BigNumberish,
-      deadline: BigNumberish,
-      v: BigNumberish,
-      r: BytesLike,
-      s: BytesLike,
-      overrides?: PayableOverrides
-    ): Promise<BigNumber>;
-
-    "depositAndStake(uint256,uint256,uint8,bytes32,bytes32)"(
-      farmId: BigNumberish,
-      deadline: BigNumberish,
-      v: BigNumberish,
-      r: BytesLike,
-      s: BytesLike,
-      overrides?: PayableOverrides
-    ): Promise<BigNumber>;
-
     emergencyShutdown(overrides?: CallOverrides): Promise<BigNumber>;
 
     "emergencyShutdown()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -2373,10 +2296,13 @@ export class Vault extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    strategies(arg0: string, overrides?: CallOverrides): Promise<BigNumber>;
+    strategies(
+      _strategy: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
     "strategies(address)"(
-      arg0: string,
+      _strategy: string,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
@@ -2571,24 +2497,6 @@ export class Vault extends Contract {
     deposit(overrides?: PayableOverrides): Promise<PopulatedTransaction>;
 
     "deposit()"(overrides?: PayableOverrides): Promise<PopulatedTransaction>;
-
-    depositAndStake(
-      farmId: BigNumberish,
-      deadline: BigNumberish,
-      v: BigNumberish,
-      r: BytesLike,
-      s: BytesLike,
-      overrides?: PayableOverrides
-    ): Promise<PopulatedTransaction>;
-
-    "depositAndStake(uint256,uint256,uint8,bytes32,bytes32)"(
-      farmId: BigNumberish,
-      deadline: BigNumberish,
-      v: BigNumberish,
-      r: BytesLike,
-      s: BytesLike,
-      overrides?: PayableOverrides
-    ): Promise<PopulatedTransaction>;
 
     emergencyShutdown(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
@@ -2807,12 +2715,12 @@ export class Vault extends Contract {
     ): Promise<PopulatedTransaction>;
 
     strategies(
-      arg0: string,
+      _strategy: string,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
     "strategies(address)"(
-      arg0: string,
+      _strategy: string,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
