@@ -61,6 +61,7 @@ interface VaultInterface extends ethers.utils.Interface {
     "setGovernance(address)": FunctionFragment;
     "setLockedProfitDegration(uint256)": FunctionFragment;
     "setMinCapitalRequirement(uint256)": FunctionFragment;
+    "setPerformanceFee(uint256)": FunctionFragment;
     "setWithdrawalQueue(address[])": FunctionFragment;
     "strategies(address)": FunctionFragment;
     "symbol()": FunctionFragment;
@@ -70,10 +71,10 @@ interface VaultInterface extends ethers.utils.Interface {
     "totalSupply()": FunctionFragment;
     "transfer(address,uint256)": FunctionFragment;
     "transferFrom(address,address,uint256)": FunctionFragment;
-    "updateStrategPerformanceFee(address,uint256)": FunctionFragment;
     "updateStrategyDebtRatio(address,uint256)": FunctionFragment;
     "updateStrategyMaxDebtPerHarvest(address,uint256)": FunctionFragment;
     "updateStrategyMinDebtPerHarvest(address,uint256)": FunctionFragment;
+    "updateStrategyPerformanceFee(address,uint256)": FunctionFragment;
     "withdraw(uint256,uint256)": FunctionFragment;
     "withdrawalQueue(uint256)": FunctionFragment;
   };
@@ -215,6 +216,10 @@ interface VaultInterface extends ethers.utils.Interface {
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
+    functionFragment: "setPerformanceFee",
+    values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
     functionFragment: "setWithdrawalQueue",
     values: [string[]]
   ): string;
@@ -239,10 +244,6 @@ interface VaultInterface extends ethers.utils.Interface {
     values: [string, string, BigNumberish]
   ): string;
   encodeFunctionData(
-    functionFragment: "updateStrategPerformanceFee",
-    values: [string, BigNumberish]
-  ): string;
-  encodeFunctionData(
     functionFragment: "updateStrategyDebtRatio",
     values: [string, BigNumberish]
   ): string;
@@ -252,6 +253,10 @@ interface VaultInterface extends ethers.utils.Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "updateStrategyMinDebtPerHarvest",
+    values: [string, BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "updateStrategyPerformanceFee",
     values: [string, BigNumberish]
   ): string;
   encodeFunctionData(
@@ -371,6 +376,10 @@ interface VaultInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
+    functionFragment: "setPerformanceFee",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "setWithdrawalQueue",
     data: BytesLike
   ): Result;
@@ -392,10 +401,6 @@ interface VaultInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "updateStrategPerformanceFee",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
     functionFragment: "updateStrategyDebtRatio",
     data: BytesLike
   ): Result;
@@ -405,6 +410,10 @@ interface VaultInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "updateStrategyMinDebtPerHarvest",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "updateStrategyPerformanceFee",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "withdraw", data: BytesLike): Result;
@@ -938,6 +947,16 @@ export class Vault extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
+    setPerformanceFee(
+      fee: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "setPerformanceFee(uint256)"(
+      fee: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
     setWithdrawalQueue(
       _queue: string[],
       overrides?: Overrides
@@ -1086,18 +1105,6 @@ export class Vault extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    updateStrategPerformanceFee(
-      _strategy: string,
-      _performanceFee: BigNumberish,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
-    "updateStrategPerformanceFee(address,uint256)"(
-      _strategy: string,
-      _performanceFee: BigNumberish,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
     updateStrategyDebtRatio(
       _strategy: string,
       _debtRatio: BigNumberish,
@@ -1131,6 +1138,18 @@ export class Vault extends Contract {
     "updateStrategyMinDebtPerHarvest(address,uint256)"(
       _strategy: string,
       _minDebtPerHarvest: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    updateStrategyPerformanceFee(
+      _strategy: string,
+      _performanceFee: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "updateStrategyPerformanceFee(address,uint256)"(
+      _strategy: string,
+      _performanceFee: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
@@ -1467,6 +1486,16 @@ export class Vault extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
+  setPerformanceFee(
+    fee: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "setPerformanceFee(uint256)"(
+    fee: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
   setWithdrawalQueue(
     _queue: string[],
     overrides?: Overrides
@@ -1571,18 +1600,6 @@ export class Vault extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  updateStrategPerformanceFee(
-    _strategy: string,
-    _performanceFee: BigNumberish,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
-  "updateStrategPerformanceFee(address,uint256)"(
-    _strategy: string,
-    _performanceFee: BigNumberish,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
   updateStrategyDebtRatio(
     _strategy: string,
     _debtRatio: BigNumberish,
@@ -1616,6 +1633,18 @@ export class Vault extends Contract {
   "updateStrategyMinDebtPerHarvest(address,uint256)"(
     _strategy: string,
     _minDebtPerHarvest: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  updateStrategyPerformanceFee(
+    _strategy: string,
+    _performanceFee: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "updateStrategyPerformanceFee(address,uint256)"(
+    _strategy: string,
+    _performanceFee: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
@@ -1945,6 +1974,16 @@ export class Vault extends Contract {
       overrides?: CallOverrides
     ): Promise<void>;
 
+    setPerformanceFee(
+      fee: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "setPerformanceFee(uint256)"(
+      fee: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
     setWithdrawalQueue(
       _queue: string[],
       overrides?: CallOverrides
@@ -2049,18 +2088,6 @@ export class Vault extends Contract {
       overrides?: CallOverrides
     ): Promise<boolean>;
 
-    updateStrategPerformanceFee(
-      _strategy: string,
-      _performanceFee: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    "updateStrategPerformanceFee(address,uint256)"(
-      _strategy: string,
-      _performanceFee: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
     updateStrategyDebtRatio(
       _strategy: string,
       _debtRatio: BigNumberish,
@@ -2094,6 +2121,18 @@ export class Vault extends Contract {
     "updateStrategyMinDebtPerHarvest(address,uint256)"(
       _strategy: string,
       _minDebtPerHarvest: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    updateStrategyPerformanceFee(
+      _strategy: string,
+      _performanceFee: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "updateStrategyPerformanceFee(address,uint256)"(
+      _strategy: string,
+      _performanceFee: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -2500,6 +2539,16 @@ export class Vault extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
+    setPerformanceFee(
+      fee: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "setPerformanceFee(uint256)"(
+      fee: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
     setWithdrawalQueue(
       _queue: string[],
       overrides?: Overrides
@@ -2566,18 +2615,6 @@ export class Vault extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    updateStrategPerformanceFee(
-      _strategy: string,
-      _performanceFee: BigNumberish,
-      overrides?: Overrides
-    ): Promise<BigNumber>;
-
-    "updateStrategPerformanceFee(address,uint256)"(
-      _strategy: string,
-      _performanceFee: BigNumberish,
-      overrides?: Overrides
-    ): Promise<BigNumber>;
-
     updateStrategyDebtRatio(
       _strategy: string,
       _debtRatio: BigNumberish,
@@ -2611,6 +2648,18 @@ export class Vault extends Contract {
     "updateStrategyMinDebtPerHarvest(address,uint256)"(
       _strategy: string,
       _minDebtPerHarvest: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    updateStrategyPerformanceFee(
+      _strategy: string,
+      _performanceFee: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "updateStrategyPerformanceFee(address,uint256)"(
+      _strategy: string,
+      _performanceFee: BigNumberish,
       overrides?: Overrides
     ): Promise<BigNumber>;
 
@@ -2966,6 +3015,16 @@ export class Vault extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
+    setPerformanceFee(
+      fee: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "setPerformanceFee(uint256)"(
+      fee: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
     setWithdrawalQueue(
       _queue: string[],
       overrides?: Overrides
@@ -3032,18 +3091,6 @@ export class Vault extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    updateStrategPerformanceFee(
-      _strategy: string,
-      _performanceFee: BigNumberish,
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    "updateStrategPerformanceFee(address,uint256)"(
-      _strategy: string,
-      _performanceFee: BigNumberish,
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
     updateStrategyDebtRatio(
       _strategy: string,
       _debtRatio: BigNumberish,
@@ -3077,6 +3124,18 @@ export class Vault extends Contract {
     "updateStrategyMinDebtPerHarvest(address,uint256)"(
       _strategy: string,
       _minDebtPerHarvest: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    updateStrategyPerformanceFee(
+      _strategy: string,
+      _performanceFee: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "updateStrategyPerformanceFee(address,uint256)"(
+      _strategy: string,
+      _performanceFee: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 

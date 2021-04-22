@@ -42,11 +42,17 @@ describe("Vault", function () {
     const maxDebtPerHarvest = BN.from("2");
     const performanceFee = 0;
     const maxLoss = 1; // 0.01% BPS
+
     const newDegration = 10 ** 15;
     const newMinCapitalRequirement = BN.from("10");
     const deadline = constants.MaxUint256;
 
     const solacePerBlock: BN = BN.from("100000000000000000000"); // 100 e18
+    
+    const newDebtRatio = 2000;
+    const newMinDebtPerHarvest = BN.from("2");
+    const newMaxDebtPerHarvest = BN.from("5");
+    const newPerformanceFee = BN.from("10");
 
     const MAX_BPS = 10000;
 
@@ -155,6 +161,22 @@ describe("Vault", function () {
             expect(callMCR).to.equal(newMinCapitalRequirement);
         });
     });
+    
+    describe("setPerformanceFee", function () {
+        it("should revert if not called by governance", async function () {
+            const fee = 1000;
+            await expect(vault.connect(depositor1).setPerformanceFee(fee)).to.be.revertedWith("!governance");
+        });
+        it("should revert if new fee exceeds MAX_BPS", async function () {
+            const invalidFee = 11000;
+            await expect(vault.connect(owner).setPerformanceFee(invalidFee)).to.be.revertedWith("cannot exceed MAX_BPS");
+        });
+        it("should successfully set the new performanceFee", async function () {
+            const fee = 1000;
+            await vault.connect(owner).setPerformanceFee(fee);
+            expect(await vault.performanceFee()).to.equal(fee);
+        });
+    });
 
     describe("setEmergencyShutdown", function () {
         it("should revert if not called by governance", async function () {
@@ -167,6 +189,99 @@ describe("Vault", function () {
             await vault.connect(owner).setEmergencyShutdown(false);
             callShutdownState = await vault.emergencyShutdown();
             expect(callShutdownState).to.be.false;
+        });
+    });
+
+    describe("updateStrategyDebtRatio", function () {
+        beforeEach('set investment address and make initial deposit', async function () {
+            await vault.connect(owner).addStrategy(strategy.address, debtRatio, minDebtPerHarvest, maxDebtPerHarvest, performanceFee);
+        });
+        it("should revert if not called by governance", async function () {
+            await expect(vault.connect(depositor1).updateStrategyDebtRatio(strategy.address, newDebtRatio)).to.be.revertedWith("!governance");
+        });
+        it("should revert if not an active strategy address", async function () {
+            await expect(vault.connect(owner).updateStrategyDebtRatio(unaddedStrategy.address, newDebtRatio)).to.be.revertedWith("must be a current strategy");
+        });
+        it("should update debtRatio for specified strategy", async function () {
+            await vault.connect(owner).updateStrategyDebtRatio(strategy.address, newDebtRatio);
+            expect((await vault.strategies(strategy.address)).debtRatio).to.equal(newDebtRatio);
+        });
+        it("should emit StrategyUpdateDebtRatio event with correct params", async function () {
+            expect(await vault.connect(owner).updateStrategyDebtRatio(strategy.address, newDebtRatio)).to.emit(vault, 'StrategyUpdateDebtRatio').withArgs(strategy.address, newDebtRatio);
+        });
+    });
+
+    describe("updateStrategyMinDebtPerHarvest", function () {
+        beforeEach('set investment address and make initial deposit', async function () {
+            await vault.connect(owner).addStrategy(strategy.address, debtRatio, minDebtPerHarvest, maxDebtPerHarvest, performanceFee);
+        });
+        it("should revert if not called by governance", async function () {
+            await expect(vault.connect(depositor1).updateStrategyMinDebtPerHarvest(strategy.address, newMinDebtPerHarvest)).to.be.revertedWith("!governance");
+        });
+        it("should revert if not an active strategy address", async function () {
+            await expect(vault.connect(owner).updateStrategyMinDebtPerHarvest(unaddedStrategy.address, newMinDebtPerHarvest)).to.be.revertedWith("must be a current strategy");
+        });
+        it("should revert if input newMinDebtPerHarvest exceeds current maxDebtPerHarvest", async function () {
+            const invalidMinDebtPerHarvest = BN.from("6");
+            await expect(vault.connect(owner).updateStrategyMinDebtPerHarvest(strategy.address, invalidMinDebtPerHarvest)).to.be.revertedWith("cannot exceed Strategy maxDebtPerHarvest");
+        });
+        it("should update minDebtPerHarvest for specified strategy", async function () {
+            await vault.connect(owner).updateStrategyMinDebtPerHarvest(strategy.address, newMinDebtPerHarvest);
+            expect((await vault.strategies(strategy.address)).minDebtPerHarvest).to.equal(newMinDebtPerHarvest);
+        });
+        it("should emit StrategyUpdateDebtRatio event with correct params", async function () {
+            expect(await vault.connect(owner).updateStrategyMinDebtPerHarvest(strategy.address, newMinDebtPerHarvest)).to.emit(vault, 'StrategyUpdateMinDebtPerHarvest').withArgs(strategy.address, newMinDebtPerHarvest);
+        });
+    });
+
+    describe("updateStrategyMaxDebtPerHarvest", function () {
+        beforeEach('set investment address and make initial deposit', async function () {
+            await vault.connect(owner).addStrategy(strategy.address, debtRatio, minDebtPerHarvest, maxDebtPerHarvest, performanceFee);
+        });
+        it("should revert if not called by governance", async function () {
+            await expect(vault.connect(depositor1).updateStrategyMaxDebtPerHarvest(strategy.address, newMaxDebtPerHarvest)).to.be.revertedWith("!governance");
+        });
+        it("should revert if not an active strategy address", async function () {
+            await expect(vault.connect(owner).updateStrategyMaxDebtPerHarvest(unaddedStrategy.address, newMaxDebtPerHarvest)).to.be.revertedWith("must be a current strategy");
+        });
+        it("should revert if input newMaxDebtPerHarvest is below current minDebtPerHarvest", async function () {
+            await vault.connect(owner).updateStrategyMinDebtPerHarvest(strategy.address, newMinDebtPerHarvest);
+            const invalidMaxDebtPerHarvest = BN.from("1");
+            await expect(vault.connect(owner).updateStrategyMaxDebtPerHarvest(strategy.address, invalidMaxDebtPerHarvest)).to.be.revertedWith("cannot be lower than Strategy minDebtPerHarvest");
+        });
+        it("should update maxDebtPerHarvest for specified strategy", async function () {
+            await vault.connect(owner).updateStrategyMaxDebtPerHarvest(strategy.address, newMaxDebtPerHarvest);
+            expect((await vault.strategies(strategy.address)).maxDebtPerHarvest).to.equal(newMaxDebtPerHarvest);
+        });
+        it("should emit StrategyUpdateDebtRatio event with correct params", async function () {
+            expect(await vault.connect(owner).updateStrategyMaxDebtPerHarvest(strategy.address, newMaxDebtPerHarvest)).to.emit(vault, 'StrategyUpdateMaxDebtPerHarvest').withArgs(strategy.address, newMaxDebtPerHarvest);
+        });
+    });
+
+    describe("updateStrategyPerformanceFee", function () {
+        beforeEach('set investment address and make initial deposit', async function () {
+            await vault.connect(owner).addStrategy(strategy.address, debtRatio, minDebtPerHarvest, maxDebtPerHarvest, performanceFee);
+        });
+        it("should revert if not called by governance", async function () {
+            await expect(vault.connect(depositor1).updateStrategyPerformanceFee(strategy.address, newPerformanceFee)).to.be.revertedWith("!governance");
+        });
+        it("should revert if not an active strategy address", async function () {
+            await expect(vault.connect(owner).updateStrategyPerformanceFee(unaddedStrategy.address, newPerformanceFee)).to.be.revertedWith("must be a current strategy");
+        });
+        it("should revert newPerformanceFee exceeds MAX_BPS - vault performanceFee", async function () {
+            // set to 90% of MAX_BPS
+            const vaultPerformanceFee = 9000;
+            await vault.connect(owner).setPerformanceFee(vaultPerformanceFee);
+            // ... then exceed that for invalid performance fee
+            const invalidPerformanceFee = 2000;
+            await expect(vault.connect(owner).updateStrategyPerformanceFee(strategy.address, invalidPerformanceFee)).to.be.revertedWith("cannot exceed MAX_BPS after Vault performanceFee is deducted");
+        });
+        it("should update performanceFee for specified strategy", async function () {
+            await vault.connect(owner).updateStrategyPerformanceFee(strategy.address, newPerformanceFee);
+            expect((await vault.strategies(strategy.address)).performanceFee).to.equal(newPerformanceFee);
+        });
+        it("should emit StrategyUpdateDebtRatio event with correct params", async function () {
+            expect(await vault.connect(owner).updateStrategyPerformanceFee(strategy.address, newPerformanceFee)).to.emit(vault, 'StrategyUpdatePerformanceFee').withArgs(strategy.address, newPerformanceFee);
         });
     });
 

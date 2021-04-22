@@ -173,6 +173,17 @@ contract Vault is ERC20Permit, IVault {
     }
 
     /**
+     * @notice Changes the performanceFee of the Vault. 
+     * Can only be called by the current governor.
+     * @param fee New performanceFee to use
+     */
+    function setPerformanceFee(uint256 fee) external {
+        require(msg.sender == governance, "!governance");
+        require(fee <= MAX_BPS, "cannot exceed MAX_BPS");
+        performanceFee = fee;
+    }
+
+    /**
      * @notice Activates or deactivates Vault mode where all Strategies go into full withdrawal.
      * Can only be called by the current governor.
      * During Emergency Shutdown:
@@ -357,7 +368,7 @@ contract Vault is ERC20Permit, IVault {
         _strategies[_strategy].debtRatio = _debtRatio;
         debtRatio += _debtRatio;
 
-        require(debtRatio <= MAX_BPS, "Vault debt ratioc cannot exceed MAX_BPS");
+        require(debtRatio <= MAX_BPS, "Vault debt ratio cannot exceed MAX_BPS");
         
         emit StrategyUpdateDebtRatio(_strategy, _debtRatio);
     }
@@ -405,7 +416,7 @@ contract Vault is ERC20Permit, IVault {
      * @param _strategy Address of the strategy to update
      * @param _performanceFee The new fee the strategist will receive.
      */
-    function updateStrategPerformanceFee(address _strategy, uint256 _performanceFee) external {
+    function updateStrategyPerformanceFee(address _strategy, uint256 _performanceFee) external {
         require(msg.sender == governance, "!governance");
         require(_strategies[_strategy].activation > 0, "must be a current strategy");
         require(_performanceFee <= MAX_BPS - performanceFee, "cannot exceed MAX_BPS after Vault performanceFee is deducted");
