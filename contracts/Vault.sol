@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "./interface/IStrategy.sol";
 import "./interface/IWETH10.sol";
 import "./interface/IRegistry.sol";
+import "./interface/IClaimsEscrow.sol";
 import "./interface/IMaster.sol";
 
 /**
@@ -109,6 +110,7 @@ contract Vault is ERC20Permit {
     event UpdateWithdrawalQueue(address[] indexed queue);
     event StrategyRevoked(address strategy);
     event EmergencyShutdown(bool active);
+    event ClaimProcessed(address indexed claimant, uint256 indexed amount);
 
     constructor (address _registry, address _token) ERC20("Solace CP Token", "SCP") ERC20Permit("Solace CP Token") {
         governance = msg.sender;
@@ -295,6 +297,27 @@ contract Vault is ERC20Permit {
             strategies[msg.sender].activation > 0, "must be called by governance or strategy to be revoked"
         );
         _revokeStrategy(strategy);
+    }
+
+    /**
+     * @notice Allows the Claims Adjustor contract to process a claim
+     * Only callable by the ClaimsAdjustor contract
+     * Sends claimed `amount` to Escrow, where it is withdrawable by the claimant after a cooldown period
+     * @param claimant Address of the claimant
+     * @param amount Amount to pay out
+     * Reverts if Vault is in Emergency Shutdown
+     */
+    function processClaim(address claimant, uint256 amount) external {
+        require(!emergencyShutdown, "cannot process claim when vault is in emergency shutdown");
+        require(msg.sender == registry.claimsAdjustor(), "!claimsAdjustor");
+        
+        // unwrap some WETH to make ETH available for claims payout
+        IWETH10(address(token)).withdraw(amount);
+
+        IClaimsEscrow escrow = IClaimsEscrow(registry.claimsEscrow());
+        escrow.receiveClaim{value: amount}(claimant);
+
+        emit ClaimProcessed(claimant, amount);
     }
 
     /**

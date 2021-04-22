@@ -24,6 +24,7 @@ interface IVaultInterface extends ethers.utils.Interface {
   functions: {
     "balanceOf()": FunctionFragment;
     "debtOutstanding(address)": FunctionFragment;
+    "processClaim(address,uint256)": FunctionFragment;
     "report(uint256,uint256,uint256)": FunctionFragment;
     "revokeStrategy(address)": FunctionFragment;
     "strategies(address)": FunctionFragment;
@@ -35,6 +36,10 @@ interface IVaultInterface extends ethers.utils.Interface {
   encodeFunctionData(
     functionFragment: "debtOutstanding",
     values: [string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "processClaim",
+    values: [string, BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "report",
@@ -54,6 +59,10 @@ interface IVaultInterface extends ethers.utils.Interface {
   decodeFunctionResult(functionFragment: "balanceOf", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "debtOutstanding",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "processClaim",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "report", data: BytesLike): Result;
@@ -99,6 +108,18 @@ export class IVault extends Contract {
     ): Promise<{
       0: BigNumber;
     }>;
+
+    processClaim(
+      claimant: string,
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "processClaim(address,uint256)"(
+      claimant: string,
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
 
     report(
       gain: BigNumberish,
@@ -210,6 +231,18 @@ export class IVault extends Contract {
     overrides?: CallOverrides
   ): Promise<BigNumber>;
 
+  processClaim(
+    claimant: string,
+    amount: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "processClaim(address,uint256)"(
+    claimant: string,
+    amount: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
   report(
     gain: BigNumberish,
     loss: BigNumberish,
@@ -311,6 +344,18 @@ export class IVault extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
+    processClaim(
+      claimant: string,
+      amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "processClaim(address,uint256)"(
+      claimant: string,
+      amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
     report(
       gain: BigNumberish,
       loss: BigNumberish,
@@ -409,6 +454,18 @@ export class IVault extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
+    processClaim(
+      claimant: string,
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "processClaim(address,uint256)"(
+      claimant: string,
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
     report(
       gain: BigNumberish,
       loss: BigNumberish,
@@ -462,6 +519,18 @@ export class IVault extends Contract {
     "debtOutstanding(address)"(
       arg0: string,
       overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    processClaim(
+      claimant: string,
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "processClaim(address,uint256)"(
+      claimant: string,
+      amount: BigNumberish,
+      overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
     report(
