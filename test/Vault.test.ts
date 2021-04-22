@@ -43,6 +43,7 @@ describe("Vault", function () {
     const performanceFee = 0;
     const maxLoss = 1; // 0.01% BPS
     const newDegration = 10 ** 15;
+    const newMinCapitalRequirement = BN.from("10");
     const deadline = constants.MaxUint256;
 
     const solacePerBlock: BN = BN.from("100000000000000000000"); // 100 e18
@@ -144,6 +145,17 @@ describe("Vault", function () {
         });
     });
 
+    describe("setMinCapitalRequirement", function () {
+        it("should revert if not called by governance", async function () {
+            await expect(vault.connect(depositor1).setMinCapitalRequirement(newMinCapitalRequirement)).to.be.revertedWith("!governance");
+        });
+        it("should successfully set the new lockedProfitDegation", async function () {
+            await vault.connect(owner).setMinCapitalRequirement(newMinCapitalRequirement);
+            const callMCR = await vault.minCapitalRequirement();
+            expect(callMCR).to.equal(newMinCapitalRequirement);
+        });
+    });
+
     describe("setEmergencyShutdown", function () {
         it("should revert if not called by governance", async function () {
             await expect(vault.connect(depositor1).setEmergencyShutdown(true)).to.be.revertedWith("!governance");
@@ -183,6 +195,30 @@ describe("Vault", function () {
             await vault.connect(owner).addStrategy(unaddedStrategy.address, debtRatio, minDebtPerHarvest, maxDebtPerHarvest, performanceFee);
             vaultDebtRatioAfter = await vault.debtRatio();
             expect(vaultDebtRatioAfter).to.equal(debtRatio * 2);
+        });
+    });
+
+    describe("maxRedeemableShares", function () {
+        it("should return the correct maxRedeemableShares - user can withdraw entire CP token balance", async function () {
+            // set the MCR to be 10
+            let newMCR = BN.from("10");
+            await vault.connect(owner).setMinCapitalRequirement(newMCR);
+
+            // bring Vault assets to 20
+            await vault.connect(depositor1).deposit({ value: testDepositAmount});
+            await vault.connect(depositor2).deposit({ value: testDepositAmount.mul(10)});
+
+            // CP should be able to withdraw their full 10 shares
+            const callBalance = await vault.balanceOf(depositor1.address);
+            expect(await vault.maxRedeemableShares(depositor1.address)).to.equal(callBalance);
+        });
+        it("should return the correct maxRedeemableShares - user can withdraw up to a portion of their CP token balance", async function () {
+            let newMCR = BN.from("2");
+            await vault.connect(owner).setMinCapitalRequirement(newMCR);
+            await vault.connect(depositor1).deposit({ value: testDepositAmount});
+            const callBalance = await vault.balanceOf(depositor1.address);
+            expect(await vault.maxRedeemableShares(depositor1.address)).to.equal(callBalance.sub(newMCR));
+
         });
     });
 
@@ -354,6 +390,12 @@ describe("Vault", function () {
         it("should revert if withdrawer tries to redeem more shares than they own", async function () {
             let cpBalance = await vault.balanceOf(depositor1.address);
             await expect(vault.connect(depositor1).withdraw(cpBalance.add(1), maxLoss)).to.be.revertedWith("cannot redeem more shares than you own");
+        });
+        it("should revert if withdrawal brings Vault's totalAssets below the minimum capital requirement", async function () {
+            let cpBalance = await vault.balanceOf(depositor1.address);
+            let newMCR = cpBalance.toString();
+            await vault.connect(owner).setMinCapitalRequirement(newMCR);
+            await expect(vault.connect(depositor1).withdraw(cpBalance, maxLoss)).to.be.revertedWith("withdrawal brings Vault assets below MCR");
         });
         context("when there is enough WETH in the Vault", function () {
             it("should alter WETH balance of Vault contract by amountNeeded", async function () {
