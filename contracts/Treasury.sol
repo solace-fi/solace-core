@@ -4,8 +4,8 @@ pragma solidity 0.8.0;
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interface/ISwapRouter.sol";
 import "./SOLACE.sol";
-import "./interface/ITreasury.sol";
 import "./interface/IWETH10.sol";
+import "./interface/ITreasury.sol";
 
 
 /**
@@ -55,9 +55,17 @@ contract Treasury is ITreasury {
     }
 
     /**
+     * Receive function. Deposits eth.
+     */
+    receive () external payable override {
+        _depositEth();
+    }
+
+
+    /**
      * Fallback function. Deposits eth.
      */
-    fallback () external payable {
+    fallback () external payable override {
         _depositEth();
     }
 
@@ -66,7 +74,7 @@ contract Treasury is ITreasury {
      * Can only be called by the current governor.
      * @param _governance The new governor.
      */
-    function setGovernance(address _governance) external {
+    function setGovernance(address _governance) external override {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
         // set governance
@@ -80,7 +88,7 @@ contract Treasury is ITreasury {
      * @param _token The token to set the path for.
      * @param _path The path to take.
      */
-    function setPath(address _token, bytes calldata _path) external {
+    function setPath(address _token, bytes calldata _path) external override {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
         // set path
@@ -132,12 +140,13 @@ contract Treasury is ITreasury {
      * @notice Manually swaps a token using a predefined path.
      * Can only be called by the current governor.
      * @dev Swaps the entire balance in case some tokens were unknowingly received.
+     * Reverts if the swap was unsuccessful.
      * @param _token The address of the token to swap.
      */
     function swap(address _token) external override {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
-        _swap(_token);
+        require(_swap(_token), "swap failed");
     }
 
     /**
@@ -145,7 +154,6 @@ contract Treasury is ITreasury {
      */
     function _depositEth() internal {
         // swap entire balance from eth to weth
-        // solhint-disable-next-line
         weth.deposit{ value: address(this).balance }();
         // perform swap
         _swap(address(weth));
@@ -156,23 +164,29 @@ contract Treasury is ITreasury {
     /**
      * @notice Swaps a token using a predefined path.
      * @dev Swaps the entire balance in case some tokens were unknowingly received.
+     * Does not revert if the swap is unsuccessful.
      * @param _token The address of the token to swap.
+     * @return _success True if swap was successful.
      */
-    function _swap(address _token) internal {
+    function _swap(address _token) internal returns (bool _success) {
         // get route
         bytes memory path = paths[_token];
         // hold token if no route
-        if (path.length == 0) return;
+        if (path.length == 0) return false;
         // get token balance
         uint256 balance = IERC20(_token).balanceOf(address(this));
-        // swap
-        uniRouter.exactInput(ISwapRouter.ExactInputParams({
+        // construct swap params
+        ISwapRouter.ExactInputParams memory swapParams = ISwapRouter.ExactInputParams({
             path: path,
             recipient: address(this),
             // solhint-disable-next-line not-rely-on-time
             deadline: block.timestamp,
             amountIn: balance,
             amountOutMinimum: 0
-        }));
+        });
+        // construct call data
+        bytes memory data = abi.encodeWithSelector(uniRouter.exactInput.selector, swapParams);
+        // low level call
+        (_success, ) = address(uniRouter).call(data);
     }
 }
