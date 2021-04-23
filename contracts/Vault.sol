@@ -402,7 +402,7 @@ contract Vault is ERC20Permit, IVault {
     function updateStrategyMaxDebtPerHarvest(address _strategy, uint256 _maxDebtPerHarvest) external {
         require(msg.sender == governance, "!governance");
         require(_strategies[_strategy].activation > 0, "must be a current strategy");
-        require(_strategies[_strategy].minDebtPerHarvest <= _maxDebtPerHarvest, "cannot be lower than Strategy maxDebtPerHarvest");
+        require(_strategies[_strategy].minDebtPerHarvest <= _maxDebtPerHarvest, "cannot be lower than Strategy minDebtPerHarvest");
 
         _strategies[_strategy].maxDebtPerHarvest = _maxDebtPerHarvest;
 
