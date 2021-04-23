@@ -10,6 +10,32 @@ pragma solidity 0.8.0;
 interface ITreasury {
 
     /**
+     * Receive function. Deposits eth.
+     */
+    receive() external payable;
+
+    /**
+     * Fallback function. Deposits eth.
+     */
+    fallback () external payable;
+
+    /**
+     * @notice Transfers the governance role to a new governor.
+     * Can only be called by the current governor.
+     * @param _governance The new governor.
+     */
+    function setGovernance(address _governance) external;
+
+    /**
+     * @notice Sets the swap path for a token.
+     * Can only be called by the current governor.
+     * @dev Also adds or removes infinite approval of the token for the router.
+     * @param _token The token to set the path for.
+     * @param _path The path to take.
+     */
+    function setPath(address _token, bytes calldata _path) external;
+
+    /**
      * @notice Deposits some ether.
      */
     function depositEth() external payable;

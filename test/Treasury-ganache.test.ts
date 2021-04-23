@@ -1,4 +1,4 @@
-import { waffle, ethers } from "hardhat";
+import { ethers, waffle } from "hardhat";
 const { deployContract, solidity } = waffle;
 import { MockProvider } from "ethereum-waffle";
 const provider: MockProvider = waffle.provider;
@@ -26,7 +26,25 @@ import NonfungiblePositionManager from "@uniswap/v3-periphery/artifacts/contract
 chai.use(solidity);
 
 describe("Treasury", function () {
-  const [deployer, governor, liquidityProvider, mockPolicy, user, randAddress] = provider.getWallets();
+  // users
+  let deployer: any;
+  let governor: any;
+  let liquidityProvider: any;
+  let mockPolicy: any;
+  let user: any;
+  let randAddress: any;
+
+  // uniswap contracts
+  let uniswapFactory: Contract;
+  let uniswapRouter: Contract;
+  let uniswapPositionManager: Contract;
+
+  // vars
+  const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+  const ONE_HUNDRED = BN.from("100");
+  const ONE_ETHER = BN.from("1000000000000000000");
+  const TEN_ETHER = BN.from("10000000000000000000");
+  const ONE_MILLION_ETHER = BN.from("1000000000000000000000000");
 
   // solace contracts
   let solaceToken: Solace;
@@ -43,19 +61,8 @@ describe("Treasury", function () {
   let mockToken4Path: string;
   let defaultPath: string = "0x";
 
-  // uniswap contracts
-  let uniswapFactory: Contract;
-  let uniswapRouter: Contract;
-  let uniswapPositionManager: Contract;
-
-  // vars
-  const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-  const ONE_HUNDRED = BN.from("100");
-  const ONE_ETHER = BN.from("1000000000000000000");
-  const TEN_ETHER = BN.from("10000000000000000000");
-  const ONE_MILLION_ETHER = BN.from("1000000000000000000000000");
-
   before(async function () {
+    [deployer, governor, liquidityProvider, mockPolicy, user, randAddress] = await ethers.getSigners();
     // deploy solace token
     solaceToken = (await deployContract(
       deployer,
@@ -346,7 +353,7 @@ describe("Treasury", function () {
       await expect(treasury.connect(user).swap(weth.address)).to.be.revertedWith("!governance");
     })
 
-    it("reverts swap token with no path", async function () {
+    it("can swap token with no path", async function () {
       let depositAmount = ONE_HUNDRED;
       let treasurySolaceBalanceBefore = await solaceToken.balanceOf(treasury.address);
       let treasuryMockBalanceBefore = await mockToken1.balanceOf(treasury.address);
@@ -435,13 +442,13 @@ describe("Treasury", function () {
   // creates, initializes, and returns a pool
   async function createPool(tokenA: Contract, tokenB: Contract, fee: FeeAmount) {
     let [token0, token1] = sortTokens(tokenA.address, tokenB.address);
-    let pool: Contract;
+    let pool;
     let tx = await uniswapFactory.createPool(token0, token1, fee);
     let events = (await tx.wait()).events;
     expect(events && events.length > 0 && events[0].args && events[0].args.pool);
     if(events && events.length > 0 && events[0].args && events[0].args.pool) {
       let poolAddress = events[0].args.pool;
-      pool = await ethers.getContractAt(UniswapV3PoolArtifact.abi, poolAddress);
+      pool = (new Contract(poolAddress, UniswapV3PoolArtifact.abi)) as Contract;
     } else {
       pool = (new Contract(ZERO_ADDRESS, UniswapV3PoolArtifact.abi)) as Contract;
       expect(true).to.equal(false);

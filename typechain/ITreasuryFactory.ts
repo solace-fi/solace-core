@@ -18,6 +18,10 @@ export class ITreasuryFactory {
 
 const _abi = [
   {
+    stateMutability: "payable",
+    type: "fallback",
+  },
+  {
     inputs: [],
     name: "depositEth",
     outputs: [],
@@ -38,6 +42,37 @@ const _abi = [
       },
     ],
     name: "depositToken",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "_governance",
+        type: "address",
+      },
+    ],
+    name: "setGovernance",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "_token",
+        type: "address",
+      },
+      {
+        internalType: "bytes",
+        name: "_path",
+        type: "bytes",
+      },
+    ],
+    name: "setPath",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -77,5 +112,9 @@ const _abi = [
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
+  },
+  {
+    stateMutability: "payable",
+    type: "receive",
   },
 ];

@@ -717,14 +717,28 @@
 175
 176
 177
-178</pre></div></td><td class="code"><div class="highlight"><pre><span></span><span class="c1">// </span><span class="cs">SPDX-License-Identifier:</span><span class="c1"> GPL-3.0-or-later</span>
+178
+179
+180
+181
+182
+183
+184
+185
+186
+187
+188
+189
+190
+191
+192</pre></div></td><td class="code"><div class="highlight"><pre><span></span><span class="c1">// </span><span class="cs">SPDX-License-Identifier:</span><span class="c1"> GPL-3.0-or-later</span>
 <span class="k">pragma solidity</span> <span class="mf">0.8</span><span class="p">.</span><span class="mi">0</span><span class="p">;</span>
 
 <span class="kn">import</span> <span class="s">&quot;@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol&quot;</span><span class="p">;</span>
 <span class="kn">import</span> <span class="s">&quot;./interface/ISwapRouter.sol&quot;</span><span class="p">;</span>
 <span class="kn">import</span> <span class="s">&quot;./SOLACE.sol&quot;</span><span class="p">;</span>
-<span class="kn">import</span> <span class="s">&quot;./interface/ITreasury.sol&quot;</span><span class="p">;</span>
 <span class="kn">import</span> <span class="s">&quot;./interface/IWETH10.sol&quot;</span><span class="p">;</span>
+<span class="kn">import</span> <span class="s">&quot;./interface/ITreasury.sol&quot;</span><span class="p">;</span>
 
 
 <span class="cm">/**</span>
@@ -774,9 +788,17 @@
     <span class="p">}</span>
 
     <span class="cm">/**</span>
+<span class="cm">     * Receive function. Deposits eth.</span>
+<span class="cm">     */</span>
+    <span class="k k-Function">receive</span> <span class="p">()</span> <span class="k">external</span> <span class="k">payable</span> <span class="k">override</span> <span class="p">{</span>
+        <span class="n">_depositEth</span><span class="p">();</span>
+    <span class="p">}</span>
+
+
+    <span class="cm">/**</span>
 <span class="cm">     * Fallback function. Deposits eth.</span>
 <span class="cm">     */</span>
-    <span class="k k-Function">fallback</span> <span class="p">()</span> <span class="k">external</span> <span class="k">payable</span> <span class="p">{</span>
+    <span class="k k-Function">fallback</span> <span class="p">()</span> <span class="k">external</span> <span class="k">payable</span> <span class="k">override</span> <span class="p">{</span>
         <span class="n">_depositEth</span><span class="p">();</span>
     <span class="p">}</span>
 
@@ -785,7 +807,7 @@
 <span class="cm">     * Can only be called by the current governor.</span>
 <span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _governance The new governor.</span>
 <span class="cm">     */</span>
-    <span class="kd">function</span> <span class="n">setGovernance</span><span class="p">(</span><span class="kt">address</span> <span class="n">_governance</span><span class="p">)</span> <span class="k">external</span> <span class="p">{</span>
+    <span class="kd">function</span> <span class="n">setGovernance</span><span class="p">(</span><span class="kt">address</span> <span class="n">_governance</span><span class="p">)</span> <span class="k">external</span> <span class="k">override</span> <span class="p">{</span>
         <span class="c1">// can only be called by governor</span>
         <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
         <span class="c1">// set governance</span>
@@ -799,7 +821,7 @@
 <span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _token The token to set the path for.</span>
 <span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _path The path to take.</span>
 <span class="cm">     */</span>
-    <span class="kd">function</span> <span class="n">setPath</span><span class="p">(</span><span class="kt">address</span> <span class="n">_token</span><span class="p">,</span> <span class="kt">bytes</span> <span class="k">calldata</span> <span class="n">_path</span><span class="p">)</span> <span class="k">external</span> <span class="p">{</span>
+    <span class="kd">function</span> <span class="n">setPath</span><span class="p">(</span><span class="kt">address</span> <span class="n">_token</span><span class="p">,</span> <span class="kt">bytes</span> <span class="k">calldata</span> <span class="n">_path</span><span class="p">)</span> <span class="k">external</span> <span class="k">override</span> <span class="p">{</span>
         <span class="c1">// can only be called by governor</span>
         <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
         <span class="c1">// set path</span>
@@ -851,12 +873,13 @@
 <span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Manually swaps a token using a predefined path.</span>
 <span class="cm">     * Can only be called by the current governor.</span>
 <span class="cm">     * </span><span class="cs">@dev</span><span class="cm"> Swaps the entire balance in case some tokens were unknowingly received.</span>
+<span class="cm">     * Reverts if the swap was unsuccessful.</span>
 <span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _token The address of the token to swap.</span>
 <span class="cm">     */</span>
     <span class="kd">function</span> <span class="n">swap</span><span class="p">(</span><span class="kt">address</span> <span class="n">_token</span><span class="p">)</span> <span class="k">external</span> <span class="k">override</span> <span class="p">{</span>
         <span class="c1">// can only be called by governor</span>
         <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
-        <span class="n">_swap</span><span class="p">(</span><span class="n">_token</span><span class="p">);</span>
+        <span class="nf">require</span><span class="p">(</span><span class="n">_swap</span><span class="p">(</span><span class="n">_token</span><span class="p">),</span> <span class="s">&quot;swap failed&quot;</span><span class="p">);</span>
     <span class="p">}</span>
 
     <span class="cm">/**</span>
@@ -864,7 +887,6 @@
 <span class="cm">     */</span>
     <span class="kd">function</span> <span class="n">_depositEth</span><span class="p">()</span> <span class="k">internal</span> <span class="p">{</span>
         <span class="c1">// swap entire balance from eth to weth</span>
-        <span class="c1">// solhint-disable-next-line</span>
         <span class="n">weth</span><span class="p">.</span><span class="n">deposit</span><span class="p">{</span> <span class="n">value</span><span class="o">:</span> <span class="kt">address</span><span class="p">(</span><span class="nb">this</span><span class="p">).</span><span class="nb">balance</span> <span class="p">}();</span>
         <span class="c1">// perform swap</span>
         <span class="n">_swap</span><span class="p">(</span><span class="kt">address</span><span class="p">(</span><span class="n">weth</span><span class="p">));</span>
@@ -875,24 +897,30 @@
     <span class="cm">/**</span>
 <span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Swaps a token using a predefined path.</span>
 <span class="cm">     * </span><span class="cs">@dev</span><span class="cm"> Swaps the entire balance in case some tokens were unknowingly received.</span>
+<span class="cm">     * Does not revert if the swap is unsuccessful.</span>
 <span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _token The address of the token to swap.</span>
+<span class="cm">     * </span><span class="cs">@return</span><span class="cm"> _success True if swap was successful.</span>
 <span class="cm">     */</span>
-    <span class="kd">function</span> <span class="n">_swap</span><span class="p">(</span><span class="kt">address</span> <span class="n">_token</span><span class="p">)</span> <span class="k">internal</span> <span class="p">{</span>
+    <span class="kd">function</span> <span class="n">_swap</span><span class="p">(</span><span class="kt">address</span> <span class="n">_token</span><span class="p">)</span> <span class="k">internal</span> <span class="k">returns</span> <span class="p">(</span><span class="kt">bool</span> <span class="n">_success</span><span class="p">)</span> <span class="p">{</span>
         <span class="c1">// get route</span>
         <span class="kt">bytes</span> <span class="k">memory</span> <span class="n">path</span> <span class="o">=</span> <span class="n">paths</span><span class="p">[</span><span class="n">_token</span><span class="p">];</span>
         <span class="c1">// hold token if no route</span>
-        <span class="k">if</span> <span class="p">(</span><span class="n">path</span><span class="p">.</span><span class="n">length</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="k">return</span><span class="p">;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">path</span><span class="p">.</span><span class="n">length</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="k">return</span> <span class="kc">false</span><span class="p">;</span>
         <span class="c1">// get token balance</span>
         <span class="kt">uint256</span> <span class="nb">balance</span> <span class="o">=</span> <span class="n">IERC20</span><span class="p">(</span><span class="n">_token</span><span class="p">).</span><span class="n">balanceOf</span><span class="p">(</span><span class="kt">address</span><span class="p">(</span><span class="nb">this</span><span class="p">));</span>
-        <span class="c1">// swap</span>
-        <span class="n">uniRouter</span><span class="p">.</span><span class="n">exactInput</span><span class="p">(</span><span class="n">ISwapRouter</span><span class="p">.</span><span class="n">ExactInputParams</span><span class="p">({</span>
+        <span class="c1">// construct swap params</span>
+        <span class="n">ISwapRouter</span><span class="p">.</span><span class="n">ExactInputParams</span> <span class="k">memory</span> <span class="n">swapParams</span> <span class="o">=</span> <span class="n">ISwapRouter</span><span class="p">.</span><span class="n">ExactInputParams</span><span class="p">({</span>
             <span class="n">path</span><span class="o">:</span> <span class="n">path</span><span class="p">,</span>
             <span class="n">recipient</span><span class="o">:</span> <span class="kt">address</span><span class="p">(</span><span class="nb">this</span><span class="p">),</span>
             <span class="c1">// solhint-disable-next-line not-rely-on-time</span>
             <span class="n">deadline</span><span class="o">:</span> <span class="nb">block.timestamp</span><span class="p">,</span>
             <span class="n">amountIn</span><span class="o">:</span> <span class="nb">balance</span><span class="p">,</span>
             <span class="n">amountOutMinimum</span><span class="o">:</span> <span class="mi">0</span>
-        <span class="p">}));</span>
+        <span class="p">});</span>
+        <span class="c1">// construct call data</span>
+        <span class="kt">bytes</span> <span class="k">memory</span> <span class="n">data</span> <span class="o">=</span> <span class="nb">abi.encodeWithSelector</span><span class="p">(</span><span class="n">uniRouter</span><span class="p">.</span><span class="n">exactInput</span><span class="p">.</span><span class="nb">selector</span><span class="p">,</span> <span class="n">swapParams</span><span class="p">);</span>
+        <span class="c1">// low level call</span>
+        <span class="p">(</span><span class="n">_success</span><span class="p">,</span> <span class="p">)</span> <span class="o">=</span> <span class="kt">address</span><span class="p">(</span><span class="n">uniRouter</span><span class="p">).</span><span class="nf">call</span><span class="p">(</span><span class="n">data</span><span class="p">);</span>
     <span class="p">}</span>
 <span class="p">}</span>
 </pre></div>
