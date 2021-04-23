@@ -51,9 +51,11 @@ describe("Treasury", function () {
   let weth: MockWeth;
   let mockToken1: MockErc20;
   let mockToken2: MockErc20;
+  let mockToken3: MockErc20;
 
   let wethPath: string;
   let mockToken2Path: string;
+  let mockToken3Path: string;
   let defaultPath: string = "0x";
 
   before(async function () {
@@ -89,6 +91,17 @@ describe("Treasury", function () {
         [
           "Mock Token 2",
           "MKT2",
+          ONE_MILLION_ETHER
+        ]
+    )) as MockErc20;
+
+    // deploy mock token 3
+    mockToken3 = (await deployContract(
+        deployer,
+        MockERC20Artifact,
+        [
+          "Mock Token 3",
+          "MKT3",
           ONE_MILLION_ETHER
         ]
     )) as MockErc20;
@@ -138,22 +151,27 @@ describe("Treasury", function () {
     await solaceToken.connect(governor).transfer(liquidityProvider.address, TEN_ETHER);
     await mockToken1.transfer(liquidityProvider.address, TEN_ETHER);
     await mockToken2.transfer(liquidityProvider.address, TEN_ETHER);
+    await mockToken3.transfer(liquidityProvider.address, TEN_ETHER);
     await weth.connect(mockPolicy).deposit({value: ONE_ETHER});
     await solaceToken.connect(governor).transfer(mockPolicy.address, ONE_ETHER);
     await mockToken1.transfer(mockPolicy.address, ONE_ETHER);
     await mockToken2.transfer(mockPolicy.address, ONE_ETHER);
+    await mockToken3.transfer(mockPolicy.address, ONE_ETHER);
 
     // create pools
     await createPool(weth, solaceToken, FeeAmount.MEDIUM);
     await createPool(mockToken2, solaceToken, FeeAmount.LOW);
+    await createPool(mockToken3, weth, FeeAmount.HIGH);
 
     // add liquidity
     await addLiquidity(liquidityProvider, weth, solaceToken, FeeAmount.MEDIUM, ONE_ETHER);
     await addLiquidity(liquidityProvider, mockToken2, solaceToken, FeeAmount.LOW, ONE_ETHER);
+    await addLiquidity(liquidityProvider, mockToken3, weth, FeeAmount.HIGH, ONE_ETHER);
 
     // encode paths
     wethPath = encodePath([weth.address, solaceToken.address], [FeeAmount.MEDIUM]);
     mockToken2Path = encodePath([mockToken2.address, solaceToken.address], [FeeAmount.LOW]);
+    mockToken3Path = encodePath([mockToken3.address, weth.address, solaceToken.address], [FeeAmount.HIGH, FeeAmount.MEDIUM]);
   })
 
   describe("governance", function () {
@@ -265,6 +283,20 @@ describe("Treasury", function () {
       expect(treasuryMockBalanceAfter).to.equal(0); // should swap mock
       expect(tx).to.emit(treasury, "DepositToken").withArgs(mockToken2.address, depositAmount);
     })
+
+    it("can deposit other token with a multi pool swap path", async function () {
+      // path: mockToken3 -> weth (high fee) -> solace (medium fee)
+      await treasury.connect(governor).setPath(mockToken3.address, mockToken3Path);
+      let depositAmount = ONE_HUNDRED;
+      let treasurySolaceBalanceBefore = await solaceToken.balanceOf(treasury.address);
+      await mockToken3.connect(mockPolicy).increaseAllowance(treasury.address, depositAmount);
+      let tx = await treasury.connect(mockPolicy).depositToken(mockToken3.address, depositAmount);
+      let treasurySolaceBalanceAfter = await solaceToken.balanceOf(treasury.address);
+      let treasuryMockBalanceAfter = await mockToken3.balanceOf(treasury.address);
+      expect(treasurySolaceBalanceAfter).gt(treasurySolaceBalanceBefore); // solace should increase
+      expect(treasuryMockBalanceAfter).to.equal(0); // should swap mock
+      expect(tx).to.emit(treasury, "DepositToken").withArgs(mockToken3.address, depositAmount);
+    })
   })
 
   describe("swap external", function () {
@@ -284,13 +316,24 @@ describe("Treasury", function () {
       expect(treasuryMockBalanceAfter.sub(treasuryMockBalanceBefore)).to.equal(depositAmount); // should hold other token
     })
 
-    it("can swap token with path", async function () {
+    it("can swap token with a swap path", async function () {
       let depositAmount = ONE_HUNDRED;
       let treasurySolaceBalanceBefore = await solaceToken.balanceOf(treasury.address);
       await mockToken2.transfer(treasury.address, depositAmount);
       await treasury.connect(governor).swap(mockToken2.address);
       let treasurySolaceBalanceAfter = await solaceToken.balanceOf(treasury.address);
       let treasuryMockBalanceAfter = await mockToken2.balanceOf(treasury.address);
+      expect(treasurySolaceBalanceAfter).gt(treasurySolaceBalanceBefore); // solace should increase
+      expect(treasuryMockBalanceAfter).to.equal(0); // should swap mock
+    })
+
+    it("can swap token with a multi pool swap path", async function () {
+      let depositAmount = ONE_HUNDRED;
+      let treasurySolaceBalanceBefore = await solaceToken.balanceOf(treasury.address);
+      await mockToken3.transfer(treasury.address, depositAmount);
+      await treasury.connect(governor).swap(mockToken3.address);
+      let treasurySolaceBalanceAfter = await solaceToken.balanceOf(treasury.address);
+      let treasuryMockBalanceAfter = await mockToken3.balanceOf(treasury.address);
       expect(treasurySolaceBalanceAfter).gt(treasurySolaceBalanceBefore); // solace should increase
       expect(treasuryMockBalanceAfter).to.equal(0); // should swap mock
     })
