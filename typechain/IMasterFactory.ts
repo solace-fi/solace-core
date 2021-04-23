@@ -18,29 +18,33 @@ export class IMasterFactory {
 
 const _abi = [
   {
+    anonymous: false,
     inputs: [
       {
+        indexed: true,
+        internalType: "uint256",
+        name: "_farmId",
+        type: "uint256",
+      },
+      {
+        indexed: true,
         internalType: "address",
-        name: "_token",
+        name: "_farmAddress",
         type: "address",
       },
+    ],
+    name: "FarmCreated",
+    type: "event",
+  },
+  {
+    inputs: [
       {
         internalType: "uint256",
-        name: "_allocPoints",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "_startBlock",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "_endBlock",
+        name: "",
         type: "uint256",
       },
     ],
-    name: "createFarmErc20",
+    name: "allocPoints",
     outputs: [
       {
         internalType: "uint256",
@@ -48,38 +52,37 @@ const _abi = [
         type: "uint256",
       },
     ],
-    stateMutability: "nonpayable",
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    name: "farmAddresses",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "view",
     type: "function",
   },
   {
     inputs: [
       {
         internalType: "address",
-        name: "_token",
+        name: "",
         type: "address",
-      },
-      {
-        internalType: "address",
-        name: "_appraiser",
-        type: "address",
-      },
-      {
-        internalType: "uint256",
-        name: "_allocPoints",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "_startBlock",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "_endBlock",
-        type: "uint256",
       },
     ],
-    name: "createFarmErc721",
+    name: "farmIndices",
     outputs: [
       {
         internalType: "uint256",
@@ -87,115 +90,17 @@ const _abi = [
         type: "uint256",
       },
     ],
-    stateMutability: "nonpayable",
+    stateMutability: "view",
     type: "function",
   },
   {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "_farmId",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "_amount",
-        type: "uint256",
-      },
-    ],
-    name: "depositErc20",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "address",
-        name: "_farmer",
-        type: "address",
-      },
-      {
-        internalType: "uint256",
-        name: "_farmId",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "_token",
-        type: "uint256",
-      },
-    ],
-    name: "depositErc20For",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "_farmId",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "_token",
-        type: "uint256",
-      },
-    ],
-    name: "depositErc721",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "address",
-        name: "_farmer",
-        type: "address",
-      },
-      {
-        internalType: "uint256",
-        name: "_farmId",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "_token",
-        type: "uint256",
-      },
-    ],
-    name: "depositErc721For",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "_farmId",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "_from",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "_to",
-        type: "uint256",
-      },
-    ],
-    name: "getMultiplier",
+    inputs: [],
+    name: "governance",
     outputs: [
       {
-        internalType: "uint256",
+        internalType: "address",
         name: "",
-        type: "uint256",
+        type: "address",
       },
     ],
     stateMutability: "view",
@@ -209,19 +114,8 @@ const _abi = [
     type: "function",
   },
   {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "_farmId",
-        type: "uint256",
-      },
-      {
-        internalType: "address",
-        name: "_user",
-        type: "address",
-      },
-    ],
-    name: "pendingReward",
+    inputs: [],
+    name: "numFarms",
     outputs: [
       {
         internalType: "uint256",
@@ -230,6 +124,30 @@ const _abi = [
       },
     ],
     stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "_farmAddress",
+        type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "_allocPoints",
+        type: "uint256",
+      },
+    ],
+    name: "registerFarm",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "farmId",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "nonpayable",
     type: "function",
   },
   {
@@ -244,18 +162,21 @@ const _abi = [
         name: "_allocPoints",
         type: "uint256",
       },
+    ],
+    name: "setAllocPoints",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
       {
-        internalType: "uint256",
-        name: "_endBlock",
-        type: "uint256",
-      },
-      {
-        internalType: "bool",
-        name: "_withUpdate",
-        type: "bool",
+        internalType: "address",
+        name: "_governance",
+        type: "address",
       },
     ],
-    name: "setFarmParams",
+    name: "setGovernance",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -267,11 +188,6 @@ const _abi = [
         name: "_solacePerBlock",
         type: "uint256",
       },
-      {
-        internalType: "bool",
-        name: "_withUpdate",
-        type: "bool",
-      },
     ],
     name: "setSolacePerBlock",
     outputs: [],
@@ -279,65 +195,42 @@ const _abi = [
     type: "function",
   },
   {
-    inputs: [
+    inputs: [],
+    name: "solace",
+    outputs: [
       {
-        internalType: "uint256",
-        name: "_farmId",
-        type: "uint256",
+        internalType: "contract SOLACE",
+        name: "",
+        type: "address",
       },
     ],
-    name: "updateFarm",
-    outputs: [],
-    stateMutability: "nonpayable",
+    stateMutability: "view",
     type: "function",
   },
   {
-    inputs: [
+    inputs: [],
+    name: "solacePerBlock",
+    outputs: [
       {
         internalType: "uint256",
-        name: "_farmId",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "_amount",
+        name: "",
         type: "uint256",
       },
     ],
-    name: "withdrawErc20",
-    outputs: [],
-    stateMutability: "nonpayable",
+    stateMutability: "view",
     type: "function",
   },
   {
-    inputs: [
+    inputs: [],
+    name: "totalAllocPoints",
+    outputs: [
       {
         internalType: "uint256",
-        name: "_farmId",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "_token",
+        name: "",
         type: "uint256",
       },
     ],
-    name: "withdrawErc721",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "_farmId",
-        type: "uint256",
-      },
-    ],
-    name: "withdrawRewards",
-    outputs: [],
-    stateMutability: "nonpayable",
+    stateMutability: "view",
     type: "function",
   },
 ];

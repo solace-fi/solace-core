@@ -2,6 +2,8 @@
 
 pragma solidity ^0.8.0;
 
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 /**
  * @title Vault interface
  * @author solace.fi
@@ -20,11 +22,11 @@ struct StrategyParams {
     uint256 totalLoss;
 }
 
-interface IVault {
+interface IVault is IERC20 {
 
-    function withdraw(uint256 _amount) external;
-    function balanceOf() external returns (uint256);
-    function token() external view returns (address);
+    function deposit() external payable;
+    function withdraw(uint256 _amount, uint256 _maxLoss) external returns (uint256);
+    function token() external view returns (IERC20);
     function debtOutstanding(address) external view returns (uint256);
     function revokeStrategy(address) external;
     function strategies(address) external view returns (StrategyParams memory);

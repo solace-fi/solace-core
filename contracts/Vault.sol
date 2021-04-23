@@ -9,17 +9,17 @@ import "./interface/IStrategy.sol";
 import "./interface/IWETH10.sol";
 import "./interface/IRegistry.sol";
 import "./interface/IClaimsEscrow.sol";
-import "./interface/IMaster.sol";
+import "./interface/IVault.sol";
 
 /**
  * @title Vault
  * @author solace.fi
  * @notice Capital Providers can deposit ETH to mint shares of the Vault (CP tokens)
  */
-contract Vault is ERC20Permit {
+contract Vault is ERC20Permit, IVault {
     using SafeERC20 for IERC20;
     using Address for address;
-
+    /*
     struct StrategyParams {
         uint256 performanceFee; // Strategist's fee (basis points)
         uint256 activation; // Activation block.timestamp
@@ -31,7 +31,7 @@ contract Vault is ERC20Permit {
         uint256 totalGain; // Total returns that Strategy has realized for Vault
         uint256 totalLoss; // Total losses that Strategy has realized for Vault
     }
-
+    */
     /*************
     GLOBAL CONSTANTS
     *************/
@@ -59,7 +59,7 @@ contract Vault is ERC20Permit {
     bool public emergencyShutdown;
 
     /// WETH
-    IERC20 public token;
+    IERC20 public override token;
 
     /// address with rights to call governance functions
     address public governance;
@@ -69,7 +69,7 @@ contract Vault is ERC20Permit {
 
     /// Registry of protocol contract addresses
     IRegistry public registry;
-    
+
     /// @notice Determines the order of strategies to pull funds from. Managed by governance
     address[] public withdrawalQueue;
 
@@ -77,7 +77,13 @@ contract Vault is ERC20Permit {
     MAPPINGS
     *************/
 
-    mapping (address => StrategyParams) public strategies;
+    // TypeError: Overriding public state variable return types differ.
+    //mapping (address => StrategyParams) public override strategies;
+    mapping (address => StrategyParams) internal _strategies;
+    function strategies(address _strategy) external view override returns (StrategyParams memory) {
+        StrategyParams memory params = _strategies[_strategy];
+        return params;
+    }
     mapping (address => uint256) internal _strategyDelegatedAssets;
 
     /*************
@@ -118,12 +124,12 @@ contract Vault is ERC20Permit {
         rewards = msg.sender; // set governance address as rewards destination for now
 
         registry = IRegistry(_registry);
-        
+
         token = IERC20(_token);
 
         lastReport = block.timestamp;
         activation = block.timestamp;
-        
+
         lockedProfitDegration = (DEGREDATION_COEFFICIENT * 46) / 10 ** 6; // 6 hours in blocks
     }
 
@@ -142,7 +148,7 @@ contract Vault is ERC20Permit {
     }
 
     /**
-     * @notice Changes the locked profit degration. 
+     * @notice Changes the locked profit degration.
      * Can only be called by the current governor.
      * @param degration rate of degration in percent per second scaled to 1e18.
      */
@@ -190,7 +196,7 @@ contract Vault is ERC20Permit {
         require(msg.sender == governance, "!governance");
         // check that each entry in input array is an active strategy
         for (uint256 i = 0; i < _queue.length; i++) {
-            require(strategies[_queue[i]].activation > 0, "must be a current strategy");
+            require(_strategies[_queue[i]].activation > 0, "must be a current strategy");
         }
         // set input to be the new queue
         withdrawalQueue = _queue;
@@ -220,9 +226,9 @@ contract Vault is ERC20Permit {
         require(debtRatio + _debtRatio <= MAX_BPS, "debtRatio exceeds MAX BPS");
         require(_performanceFee <= MAX_BPS - performanceFee, "invalid performance fee");
         require(_minDebtPerHarvest <= _maxDebtPerHarvest, "minDebtPerHarvest exceeds maxDebtPerHarvest");
-        
+
         // Add strategy to approved strategies
-        strategies[_strategy] = StrategyParams({
+        _strategies[_strategy] = StrategyParams({
             performanceFee: _performanceFee,
             activation: block.timestamp,
             debtRatio: _debtRatio,
@@ -248,10 +254,10 @@ contract Vault is ERC20Permit {
      * @param _strategy address of the strategy to add
      */
     function addStrategyToQueue(address _strategy) external {
-        
+
         require(msg.sender == governance, "!governance");
-        require(strategies[_strategy].activation > 0, "must be a current strategy");
-        
+        require(_strategies[_strategy].activation > 0, "must be a current strategy");
+
         // check that strategy is not already in the queue
         for (uint256 i = 0; i < withdrawalQueue.length; i++) {
             require(withdrawalQueue[i] != _strategy, "strategy already in queue");
@@ -270,12 +276,12 @@ contract Vault is ERC20Permit {
      * @param _strategy address of the strategy to remove
      */
     function removeStrategyFromQueue(address _strategy) external {
-        
+
         require(msg.sender == governance, "!governance");
-        require(strategies[_strategy].activation > 0, "must be a current strategy");
+        require(_strategies[_strategy].activation > 0, "must be a current strategy");
 
         address[] storage newQueue;
-        
+
         for (uint256 i = 0; i < withdrawalQueue.length; i++) {
             if (withdrawalQueue[i] != _strategy) {
                 newQueue.push(withdrawalQueue[i]);
@@ -304,9 +310,9 @@ contract Vault is ERC20Permit {
      * A Strategy will only revoke itself during emergency shutdown.
      * @param strategy The Strategy to revoke.
     */
-    function revokeStrategy(address strategy) external {
+    function revokeStrategy(address strategy) external override {
         require(msg.sender == governance ||
-            strategies[msg.sender].activation > 0, "must be called by governance or strategy to be revoked"
+            _strategies[msg.sender].activation > 0, "must be called by governance or strategy to be revoked"
         );
         _revokeStrategy(strategy);
     }
@@ -319,10 +325,10 @@ contract Vault is ERC20Permit {
      * @param amount Amount to pay out
      * Reverts if Vault is in Emergency Shutdown
      */
-    function processClaim(address claimant, uint256 amount) external {
+    function processClaim(address claimant, uint256 amount) external override {
         require(!emergencyShutdown, "cannot process claim when vault is in emergency shutdown");
         require(msg.sender == registry.claimsAdjustor(), "!claimsAdjustor");
-        
+
         // unwrap some WETH to make ETH available for claims payout
         IWETH10(address(token)).withdraw(amount);
 
@@ -339,7 +345,7 @@ contract Vault is ERC20Permit {
      * Deposits `_amount` `token`, issuing shares to `recipient`.
      * Reverts if Vault is in Emergency Shutdown
      */
-    function deposit() public payable {
+    function deposit() public payable override {
         require(!emergencyShutdown, "cannot deposit when vault is in emergency shutdown");
         uint256 amount = msg.value;
         uint256 shares;
@@ -348,7 +354,7 @@ contract Vault is ERC20Permit {
         } else {
             shares = (amount * totalSupply()) / _totalAssets();
         }
-        
+
         // Issuance of shares needs to be done before taking the deposit
         _mint(msg.sender, shares);
 
@@ -359,36 +365,15 @@ contract Vault is ERC20Permit {
     }
 
     /**
-     * @notice Allows a user to deposit ETH into the Vault and stake CP tokens right away
-     * Shares of the Vault (CP tokens) are minted to caller, calls permit() to Master
-     */
-    function depositAndStake(uint256 farmId, uint256 deadline, uint8 v, bytes32 r, bytes32 s) public payable {
-        // Deposit ETH and mint user CP tokens
-        uint256 beforeDepositBalance = balanceOf(msg.sender);
-        deposit();
-        uint256 afterDepositBalance = balanceOf(msg.sender);
-        uint256 amountToStake = afterDepositBalance - beforeDepositBalance;
-
-        address masterAddress = registry.master();
-        IMaster master = IMaster(masterAddress);
-
-        // Permit Master to spend CP tokens (gasless equivalent of `approve`)
-        permit(msg.sender, masterAddress, amountToStake, deadline, v, r, s);
-
-        // Deposit CP tokens to Master
-        master.depositErc20For(msg.sender, farmId, amountToStake);
-    }
-
-    /**
      * @notice Allows a user to redeem shares for ETH
      * Burns CP tokens and transfers ETH to the CP
      * @param shares amount of shares to redeem
      * @return value in ETH that the shares where redeemed for
      */
-    function withdraw(uint256 shares, uint256 maxLoss) external returns (uint256) {
+    function withdraw(uint256 shares, uint256 maxLoss) external override returns (uint256) {
 
         require(shares <= balanceOf(msg.sender), "cannot redeem more shares than you own");
-        
+
         uint256 value = _shareValue(shares);
         uint256 totalLoss;
 
@@ -397,7 +382,7 @@ contract Vault is ERC20Permit {
 
         // If redeemable amount exceeds vaultBalance, withdraw funds from strategies in the withdrawal queue
         uint256 vaultBalance = token.balanceOf(address(this));
-        
+
         if (value > vaultBalance) {
 
             for (uint256 i = 0; i < withdrawalQueue.length; i++) {
@@ -411,8 +396,8 @@ contract Vault is ERC20Permit {
                 uint256 amountNeeded = value - vaultBalance;
 
                 // Do not withdraw more than the Strategy's debt so that it can still work based on the profits it has
-                if (strategies[withdrawalQueue[i]].totalDebt < amountNeeded) {
-                    amountNeeded = strategies[withdrawalQueue[i]].totalDebt;
+                if (_strategies[withdrawalQueue[i]].totalDebt < amountNeeded) {
+                    amountNeeded = _strategies[withdrawalQueue[i]].totalDebt;
                 }
 
                 // if there is nothing to withdraw from this Strategy, move on to the next one
@@ -425,12 +410,12 @@ contract Vault is ERC20Permit {
                 if (loss > 0) {
                     value -= loss;
                     totalLoss += loss;
-                    strategies[withdrawalQueue[i]].totalLoss += loss;
+                    _strategies[withdrawalQueue[i]].totalLoss += loss;
                 }
 
                 // Reduce the Strategy's debt by the amount withdrawn ("realized returns")
                 // This doesn't add to returns as it's not earned by "normal means"
-                strategies[withdrawalQueue[i]].totalDebt -= withdrawn + loss;
+                _strategies[withdrawalQueue[i]].totalDebt -= withdrawn + loss;
                 totalDebt -= withdrawn + loss;
             }
         }
@@ -458,7 +443,7 @@ contract Vault is ERC20Permit {
     /**
      * @notice Reports the amount of assets the calling Strategy has free (usually in terms of ROI).
      * The performance fee is determined here, off of the strategy's profits (if any), and sent to governance.
-     * The strategist's fee is also determined here (off of profits), to be handled according 
+     * The strategist's fee is also determined here (off of profits), to be handled according
      * to the strategist on the next harvest.
      * This may only be called by a Strategy managed by this Vault.
      * @dev For approved strategies, this is the most efficient behavior.
@@ -475,8 +460,8 @@ contract Vault is ERC20Permit {
      * @param _debtPayment Amount Strategy has made available to cover outstanding debt
      * @return Amount of debt outstanding (if totalDebt > debtLimit or emergency shutdown).
     */
-    function report(uint256 gain, uint256 loss, uint256 _debtPayment) external returns (uint256) {
-        require(strategies[msg.sender].activation > 0, "must be called by an active strategy");
+    function report(uint256 gain, uint256 loss, uint256 _debtPayment) external override returns (uint256) {
+        require(_strategies[msg.sender].activation > 0, "must be called by an active strategy");
         require(token.balanceOf(msg.sender) >= gain + _debtPayment, "need to have available tokens to withdraw");
 
         // Report loss before rest of calculations if possible
@@ -486,7 +471,7 @@ contract Vault is ERC20Permit {
         _assessFees(msg.sender, gain);
 
         // Returns are always "realized gains"
-        strategies[msg.sender].totalGain += gain;
+        _strategies[msg.sender].totalGain += gain;
 
         // Outstanding debt the Strategy wants to take back from the Vault (if any)
         // NOTE: debtOutstanding <= StrategyParams.totalDebt
@@ -499,7 +484,7 @@ contract Vault is ERC20Permit {
         }
 
         if (debtPayment > 0) {
-            strategies[msg.sender].totalDebt -= debtPayment;
+            _strategies[msg.sender].totalDebt -= debtPayment;
             totalDebt -= debtPayment;
             debt -= debtPayment; // `debt` is being tracked for later
         }
@@ -509,10 +494,10 @@ contract Vault is ERC20Permit {
 
         // Update the actual debt based on the full credit we are extending to the Strategy
         // or the returns if we are taking funds back
-        // NOTE: credit + strategies[msg.sender].totalDebt is always < debtLimit
+        // NOTE: credit + _strategies[msg.sender].totalDebt is always < debtLimit
         // NOTE: At least one of `credit` or `debt` is always 0 (both can be 0)
         if (credit > 0) {
-            strategies[msg.sender].totalDebt += credit;
+            _strategies[msg.sender].totalDebt += credit;
             totalDebt += credit;
         }
 
@@ -520,7 +505,7 @@ contract Vault is ERC20Permit {
         // (if any), the debt payment (if any), the credit increase we are offering (if any),
         // and the debt needed to be paid off (if any)
         // NOTE: This is just used to adjust the balance of tokens between the Strategy and
-        // the Vault based on the Strategy's debt limit (as well as the Vault's). 
+        // the Vault based on the Strategy's debt limit (as well as the Vault's).
         uint256 totalAvail = gain + debtPayment;
         if (totalAvail < credit){  // credit surplus, give to Strategy
             SafeERC20.safeTransfer(token, msg.sender, credit - totalAvail);
@@ -531,11 +516,11 @@ contract Vault is ERC20Permit {
 
         // Update cached value of delegated assets (used to properly account for mgmt fee in `_assessFees`)
         delegatedAssets -= _strategyDelegatedAssets[msg.sender];
-        
+
         // NOTE: Take the min of totalDebt and delegatedAssets) to guard against improper computation
         uint256 strategyDelegatedAssets;
-        if (strategies[msg.sender].totalDebt < IStrategy(msg.sender).delegatedAssets()) {
-            strategyDelegatedAssets = strategies[msg.sender].totalDebt;
+        if (_strategies[msg.sender].totalDebt < IStrategy(msg.sender).delegatedAssets()) {
+            strategyDelegatedAssets = _strategies[msg.sender].totalDebt;
         } else {
             strategyDelegatedAssets = IStrategy(msg.sender).delegatedAssets();
         }
@@ -543,7 +528,7 @@ contract Vault is ERC20Permit {
         _strategyDelegatedAssets[msg.sender] = delegatedAssets;
 
         // Update reporting time
-        strategies[msg.sender].lastReport = block.timestamp;
+        _strategies[msg.sender].lastReport = block.timestamp;
         lastReport = block.timestamp;
         // profit is locked and gradually released per block
         lockedProfit = gain;
@@ -553,14 +538,14 @@ contract Vault is ERC20Permit {
             gain,
             loss,
             debtPayment,
-            strategies[msg.sender].totalGain,
-            strategies[msg.sender].totalLoss,
-            strategies[msg.sender].totalDebt,
+            _strategies[msg.sender].totalGain,
+            _strategies[msg.sender].totalLoss,
+            _strategies[msg.sender].totalDebt,
             credit,
-            strategies[msg.sender].debtRatio
+            _strategies[msg.sender].debtRatio
         );
 
-        if (strategies[msg.sender].debtRatio == 0 || emergencyShutdown) {
+        if (_strategies[msg.sender].debtRatio == 0 || emergencyShutdown) {
             // Take every last penny the Strategy has (Emergency Exit/revokeStrategy)
             // NOTE: This is different than `debt` in order to extract *all* of the returns
             return IStrategy(msg.sender).estimatedTotalAssets();
@@ -607,7 +592,7 @@ contract Vault is ERC20Permit {
         uint256 userBalance = balanceOf(user);
         uint256 vaultBalanceAfterWithdraw = _totalAssets() - _shareValue(userBalance);
 
-        // if user's CP token balance takes Vault `totalAssets` below MCP, 
+        // if user's CP token balance takes Vault `totalAssets` below MCP,
         //... return the difference between totalAsset and MCP (in # shares)
         if (vaultBalanceAfterWithdraw < minCapitalRequirement) {
             uint256 diff = _totalAssets() - minCapitalRequirement;
@@ -634,7 +619,7 @@ contract Vault is ERC20Permit {
      * @param strategy The Strategy to check. Defaults to the caller.
      * @return The quantity of tokens to withdraw.
     */
-    function debtOutstanding(address strategy) external view returns (uint256) {
+    function debtOutstanding(address strategy) external view override returns (uint256) {
         return _debtOutstanding(strategy);
     }
 
@@ -643,20 +628,20 @@ contract Vault is ERC20Permit {
     *************/
 
     function _revokeStrategy(address strategy) internal {
-        debtRatio -= strategies[strategy].debtRatio;
-        strategies[strategy].debtRatio = 0;
+        debtRatio -= _strategies[strategy].debtRatio;
+        _strategies[strategy].debtRatio = 0;
         emit StrategyRevoked(strategy);
     }
 
     function _reportLoss(address strategy, uint256 loss) internal {
-        uint256 strategyTotalDebt = strategies[strategy].totalDebt;
+        uint256 strategyTotalDebt = _strategies[strategy].totalDebt;
         require(strategyTotalDebt >= loss, "loss can only be up the amount of debt issued to strategy");
-        strategies[strategy].totalLoss += loss;
-        strategies[strategy].totalDebt = strategyTotalDebt - loss;
+        _strategies[strategy].totalLoss += loss;
+        _strategies[strategy].totalDebt = strategyTotalDebt - loss;
         totalDebt -= loss;
-        
+
         // Also, make sure we reduce our trust with the strategy by the same amount
-        uint256 strategyDebtRatio = strategies[strategy].debtRatio;
+        uint256 strategyDebtRatio = _strategies[strategy].debtRatio;
 
         uint256 ratioChange;
 
@@ -665,7 +650,7 @@ contract Vault is ERC20Permit {
         } else {
             ratioChange = strategyDebtRatio;
         }
-        strategies[strategy].debtRatio -= ratioChange;
+        _strategies[strategy].debtRatio -= ratioChange;
         debtRatio -= ratioChange;
     }
 
@@ -681,10 +666,10 @@ contract Vault is ERC20Permit {
                 * (block.timestamp - lastReport)
                 * managementFee
             )
-            / MAX_BPS 
+            / MAX_BPS
             / SECS_PER_YEAR
         );
-        
+
         // Strategist fee only applies in certain conditions
         uint256 strategistFee = 0;
 
@@ -692,7 +677,7 @@ contract Vault is ERC20Permit {
         // NOTE: No fee is taken when a Strategy is unwinding it's position, until all debt is paid
         if (gain > 0) {
             // NOTE: Unlikely to throw unless strategy reports >1e72 harvest profit
-            strategistFee = (gain * strategies[strategy].performanceFee) / MAX_BPS;
+            strategistFee = (gain * _strategies[strategy].performanceFee) / MAX_BPS;
             governanceFee += gain * performanceFee / MAX_BPS;
         }
 
@@ -708,7 +693,7 @@ contract Vault is ERC20Permit {
             } else {
                 reward = (totalFee * totalSupply()) / _totalAssets();
             }
-        
+
             // Issuance of shares needs to be done before taking the deposit
             _mint(address(this), reward);
 
@@ -743,12 +728,12 @@ contract Vault is ERC20Permit {
 
         uint256 vaultTotalAssets = _totalAssets();
         uint256 vaultDebtLimit = (debtRatio * vaultTotalAssets) / MAX_BPS;
-        uint256 strategyDebtLimit = (strategies[_strategy].debtRatio * vaultTotalAssets) / MAX_BPS;
+        uint256 strategyDebtLimit = (_strategies[_strategy].debtRatio * vaultTotalAssets) / MAX_BPS;
 
         // No credit available to issue if credit line has been exhasted
-        if (vaultDebtLimit <= totalDebt || strategyDebtLimit <= strategies[_strategy].totalDebt) return 0;
-        
-        uint256 available = strategyDebtLimit - strategies[_strategy].totalDebt;
+        if (vaultDebtLimit <= totalDebt || strategyDebtLimit <= _strategies[_strategy].totalDebt) return 0;
+
+        uint256 available = strategyDebtLimit - _strategies[_strategy].totalDebt;
 
         // Adjust by the global debt limit left
         if (vaultDebtLimit - totalDebt < available) available = vaultDebtLimit - totalDebt;
@@ -756,23 +741,23 @@ contract Vault is ERC20Permit {
         // Can only borrow up to what the contract has in reserve
         if (token.balanceOf(address(this)) < available) available = token.balanceOf(address(this));
 
-        if (available < strategies[_strategy].minDebtPerHarvest) return 0;
+        if (available < _strategies[_strategy].minDebtPerHarvest) return 0;
 
-        if (strategies[_strategy].maxDebtPerHarvest < available) return strategies[_strategy].maxDebtPerHarvest;
-    
+        if (_strategies[_strategy].maxDebtPerHarvest < available) return _strategies[_strategy].maxDebtPerHarvest;
+
         return available;
     }
 
     function _expectedReturn(address strategy) internal view returns (uint256) {
-        uint256 strategyLastReport = strategies[strategy].lastReport;
+        uint256 strategyLastReport = _strategies[strategy].lastReport;
         uint256 timeSinceLastHarvest = block.timestamp - strategyLastReport;
-        uint256 totalHarvestTime = strategyLastReport - strategies[strategy].activation;
+        uint256 totalHarvestTime = strategyLastReport - _strategies[strategy].activation;
 
         // NOTE: If either `timeSinceLastHarvest` or `totalHarvestTime` is 0, we can short-circuit to `0`
         if (timeSinceLastHarvest > 0 && totalHarvestTime > 0 && IStrategy(strategy).isActive()) {
             // NOTE: Unlikely to throw unless strategy accumalates >1e68 returns
             // NOTE: Calculate average over period of time where harvests have occured in the past
-            return (strategies[strategy].totalGain * timeSinceLastHarvest) / totalHarvestTime;
+            return (_strategies[strategy].totalGain * timeSinceLastHarvest) / totalHarvestTime;
         } else {
             // Covers the scenario when block.timestamp == activation
             return 0;
@@ -811,8 +796,8 @@ contract Vault is ERC20Permit {
     }
 
     function _debtOutstanding(address strategy) internal view returns (uint256) {
-        uint256 strategyDebtLimit = strategies[strategy].debtRatio * _totalAssets() / MAX_BPS;
-        uint256 strategyTotalDebt = strategies[strategy].totalDebt;
+        uint256 strategyDebtLimit = _strategies[strategy].debtRatio * _totalAssets() / MAX_BPS;
+        uint256 strategyTotalDebt = _strategies[strategy].totalDebt;
 
         if (emergencyShutdown) {
             return strategyTotalDebt;

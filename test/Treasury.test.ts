@@ -1,4 +1,4 @@
-import { waffle } from "hardhat";
+import { waffle, ethers } from "hardhat";
 const { deployContract, solidity } = waffle;
 import { MockProvider } from "ethereum-waffle";
 const provider: MockProvider = waffle.provider;
@@ -338,13 +338,13 @@ function sortTokens(tokenA: string, tokenB: string) {
 // creates, initializes, and returns a pool
 async function createPool(tokenA: Contract, tokenB: Contract, fee: FeeAmount) {
   let [token0, token1] = sortTokens(tokenA.address, tokenB.address);
-  let pool;
+  let pool: Contract;
   let tx = await uniswapFactory.createPool(token0, token1, fee);
   let events = (await tx.wait()).events;
   expect(events && events.length > 0 && events[0].args && events[0].args.pool);
   if(events && events.length > 0 && events[0].args && events[0].args.pool) {
     let poolAddress = events[0].args.pool;
-    pool = (new Contract(poolAddress, UniswapV3PoolArtifact.abi)) as Contract;
+    pool = await ethers.getContractAt(UniswapV3PoolArtifact.abi, poolAddress);
   } else {
     pool = (new Contract(ZERO_ADDRESS, UniswapV3PoolArtifact.abi)) as Contract;
     expect(true).to.equal(false);
@@ -358,8 +358,7 @@ async function createPool(tokenA: Contract, tokenB: Contract, fee: FeeAmount) {
 }
 
 // adds liquidity to a pool
-// @ts-ignore
-async function addLiquidity(liquidityProvider: SignerWithAddress, tokenA: Contract, tokenB: Contract, fee: FeeAmount, amount: BigNumberish) {
+async function addLiquidity(liquidityProvider: Wallet, tokenA: Contract, tokenB: Contract, fee: FeeAmount, amount: BigNumberish) {
   await tokenA.connect(liquidityProvider).approve(uniswapPositionManager.address, amount);
   await tokenB.connect(liquidityProvider).approve(uniswapPositionManager.address, amount);
   let [token0, token1] = sortTokens(tokenA.address, tokenB.address);
@@ -370,9 +369,10 @@ async function addLiquidity(liquidityProvider: SignerWithAddress, tokenA: Contra
     tickUpper: getMaxTick(TICK_SPACINGS[fee]),
     fee: fee,
     recipient: liquidityProvider.address,
-    amount0Max: constants.MaxUint256,
-    amount1Max: constants.MaxUint256,
-    amount: amount,
+    amount0Desired: amount,
+    amount1Desired: amount,
+    amount0Min: 0,
+    amount1Min: 0,
     deadline: constants.MaxUint256,
   });
 }
