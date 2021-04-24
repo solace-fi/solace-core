@@ -8,7 +8,7 @@ pragma solidity ^0.8.0;
  * @author solace.fi
  */
 interface IProduct {
-    event PolicyCreated(uint256 _coverLimit, uint256 _days, uint256 positionAmount, uint256 premium, address policy, uint256 policies.length, uint256 coveredAmount)
+    event PolicyCreated(uint256 _coverLimit, uint256 _days, uint256 positionAmount, uint256 premium, address policy, uint256 numberOfPolicies, uint256 coveredAmount);
 
     /**** GETTERS + SETTERS 
     Functions which get and set important product state variables
@@ -22,7 +22,7 @@ interface IProduct {
     /**** UNIMPLEMENTED FUNCTIONS 
     Functions that are only implemented by child contracts
     ****/
-    function getTotalPosition(address _buyer) virtual public view returns (uint256 positionAmount);
+    function getTotalPosition(address _buyer) virtual external view returns (uint256 positionAmount);
 
     /**** METRIC VIEW FUNCTIONS 
     View functions which give us total metrics about the product
