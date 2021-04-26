@@ -224,52 +224,53 @@ describe("Treasury", function () {
   describe("deposit", function () {
     it("can deposit solace", async function () {
       let depositAmount = ONE_HUNDRED;
-      let treasuryBalanceBefore = await solaceToken.balanceOf(treasury.address);
+      let balancesBefore = await getBalances(mockPolicy);
       await solaceToken.connect(mockPolicy).increaseAllowance(treasury.address, depositAmount);
       let tx = await treasury.connect(mockPolicy).depositToken(solaceToken.address, depositAmount);
-      let treasuryBalanceAfter = await solaceToken.balanceOf(treasury.address);
-      expect(treasuryBalanceAfter.sub(treasuryBalanceBefore)).to.equal(depositAmount); // solace should increase
+      let balancesAfter = await getBalances(mockPolicy);
+      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
+      expect(balancesDiff.treasurySolace).to.equal(depositAmount); // solace should increase
       expect(tx).to.emit(treasury, "DepositToken").withArgs(solaceToken.address, depositAmount);
     })
 
     it("can deposit eth via depositEth", async function () {
       let depositAmount = ONE_HUNDRED;
-      let treasurySolaceBalanceBefore = await solaceToken.balanceOf(treasury.address);
+      let balancesBefore = await getBalances(mockPolicy);
       let tx = await treasury.connect(mockPolicy).depositEth({value: depositAmount});
-      let treasurySolaceBalanceAfter = await solaceToken.balanceOf(treasury.address);
-      let treasuryEthBalanceAfter = await provider.getBalance(treasury.address);
-      expect(treasurySolaceBalanceAfter).gt(treasurySolaceBalanceBefore); // solace should increase
-      expect(treasuryEthBalanceAfter).to.equal(0); // should swap eth
+      let balancesAfter = await getBalances(mockPolicy);
+      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
+      expect(balancesDiff.treasurySolace).to.be.gt(0); // solace should increase
+      expect(balancesAfter.treasuryEth).to.equal(0); // should swap eth
       expect(tx).to.emit(treasury, "DepositEth").withArgs(depositAmount);
     })
 
     it("can deposit eth via receive", async function () {
       let depositAmount = ONE_HUNDRED;
-      let treasurySolaceBalanceBefore = await solaceToken.balanceOf(treasury.address);
+      let balancesBefore = await getBalances(mockPolicy);
       let tx = await mockPolicy.sendTransaction({
         to: treasury.address,
         value: depositAmount,
         data: "0x"
       });
-      let treasurySolaceBalanceAfter = await solaceToken.balanceOf(treasury.address);
-      let treasuryEthBalanceAfter = await provider.getBalance(treasury.address);
-      expect(treasurySolaceBalanceAfter).gt(treasurySolaceBalanceBefore); // solace should increase
-      expect(treasuryEthBalanceAfter).to.equal(0); // should swap eth
+      let balancesAfter = await getBalances(mockPolicy);
+      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
+      expect(balancesDiff.treasurySolace).to.be.gt(0); // solace should increase
+      expect(balancesAfter.treasuryEth).to.equal(0); // should swap eth
       expect(tx).to.emit(treasury, "DepositEth").withArgs(depositAmount);
     })
 
     it("can deposit eth via fallback", async function () {
       let depositAmount = ONE_HUNDRED;
-      let treasurySolaceBalanceBefore = await solaceToken.balanceOf(treasury.address);
+      let balancesBefore = await getBalances(mockPolicy);
       let tx = await mockPolicy.sendTransaction({
         to: treasury.address,
         value: depositAmount,
         data: "0xabcd"
       });
-      let treasurySolaceBalanceAfter = await solaceToken.balanceOf(treasury.address);
-      let treasuryEthBalanceAfter = await provider.getBalance(treasury.address);
-      expect(treasurySolaceBalanceAfter).gt(treasurySolaceBalanceBefore); // solace should increase
-      expect(treasuryEthBalanceAfter).to.equal(0); // should swap eth
+      let balancesAfter = await getBalances(mockPolicy);
+      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
+      expect(balancesDiff.treasurySolace).to.be.gt(0); // solace should increase
+      expect(balancesAfter.treasuryEth).to.equal(0); // should swap eth
       expect(tx).to.emit(treasury, "DepositEth").withArgs(depositAmount);
     })
 
@@ -277,38 +278,37 @@ describe("Treasury", function () {
       let depositAmount = ONE_HUNDRED;
       await weth.connect(mockPolicy).deposit({value: depositAmount});
       await weth.connect(mockPolicy).approve(treasury.address, depositAmount);
-      let treasurySolaceBalanceBefore = await solaceToken.balanceOf(treasury.address);
+      let balancesBefore = await getBalances(mockPolicy);
       let tx = await treasury.connect(mockPolicy).depositToken(weth.address, depositAmount);
-      let treasurySolaceBalanceAfter = await solaceToken.balanceOf(treasury.address);
-      let treasuryWethBalanceAfter = await weth.balanceOf(treasury.address);
-      expect(treasurySolaceBalanceAfter).gt(treasurySolaceBalanceBefore); // solace should increase
-      expect(treasuryWethBalanceAfter).to.equal(0); // should swap weth
+      let balancesAfter = await getBalances(mockPolicy);
+      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
+      expect(balancesDiff.treasurySolace).to.be.gt(0); // solace should increase
+      expect(balancesAfter.treasuryWeth).to.equal(0); // should swap weth
       expect(tx).to.emit(treasury, "DepositToken").withArgs(weth.address, depositAmount);
     })
 
     it("can deposit other token with no swap path", async function () {
       let depositAmount = ONE_HUNDRED;
-      let treasurySolaceBalanceBefore = await solaceToken.balanceOf(treasury.address);
-      let treasuryMockBalanceBefore = await mockToken1.balanceOf(treasury.address);
+      let balancesBefore = await getBalances(mockPolicy);
       await mockToken1.connect(mockPolicy).increaseAllowance(treasury.address, depositAmount);
       let tx = await treasury.connect(mockPolicy).depositToken(mockToken1.address, depositAmount);
-      let treasurySolaceBalanceAfter = await solaceToken.balanceOf(treasury.address);
-      let treasuryMockBalanceAfter = await mockToken1.balanceOf(treasury.address);
-      expect(treasurySolaceBalanceAfter).to.equal(treasurySolaceBalanceBefore); // solace should not increase
-      expect(treasuryMockBalanceAfter.sub(treasuryMockBalanceBefore)).to.equal(depositAmount); // should hold other token
+      let balancesAfter = await getBalances(mockPolicy);
+      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
+      expect(balancesDiff.treasurySolace).to.equal(0); // solace should not increase
+      expect(balancesDiff.treasuryMock1).to.equal(depositAmount); // should hold other token
       expect(tx).to.emit(treasury, "DepositToken").withArgs(mockToken1.address, depositAmount);
     })
 
     it("can deposit other token with a swap path", async function () {
       await treasury.connect(governor).setPath(mockToken2.address, mockToken2Path);
       let depositAmount = ONE_HUNDRED;
-      let treasurySolaceBalanceBefore = await solaceToken.balanceOf(treasury.address);
+      let balancesBefore = await getBalances(mockPolicy);
       await mockToken2.connect(mockPolicy).increaseAllowance(treasury.address, depositAmount);
       let tx = await treasury.connect(mockPolicy).depositToken(mockToken2.address, depositAmount);
-      let treasurySolaceBalanceAfter = await solaceToken.balanceOf(treasury.address);
-      let treasuryMockBalanceAfter = await mockToken2.balanceOf(treasury.address);
-      expect(treasurySolaceBalanceAfter).gt(treasurySolaceBalanceBefore); // solace should increase
-      expect(treasuryMockBalanceAfter).to.equal(0); // should swap mock
+      let balancesAfter = await getBalances(mockPolicy);
+      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
+      expect(balancesDiff.treasurySolace).to.be.gt(0); // solace should increase
+      expect(balancesAfter.treasuryMock2).to.equal(0); // should swap mock
       expect(tx).to.emit(treasury, "DepositToken").withArgs(mockToken2.address, depositAmount);
     })
 
@@ -316,111 +316,112 @@ describe("Treasury", function () {
       // path: mockToken3 -> weth (high fee) -> solace (medium fee)
       await treasury.connect(governor).setPath(mockToken3.address, mockToken3Path);
       let depositAmount = ONE_HUNDRED;
-      let treasurySolaceBalanceBefore = await solaceToken.balanceOf(treasury.address);
+      let balancesBefore = await getBalances(mockPolicy);
       await mockToken3.connect(mockPolicy).increaseAllowance(treasury.address, depositAmount);
       let tx = await treasury.connect(mockPolicy).depositToken(mockToken3.address, depositAmount);
-      let treasurySolaceBalanceAfter = await solaceToken.balanceOf(treasury.address);
-      let treasuryMockBalanceAfter = await mockToken3.balanceOf(treasury.address);
-      expect(treasurySolaceBalanceAfter).gt(treasurySolaceBalanceBefore); // solace should increase
-      expect(treasuryMockBalanceAfter).to.equal(0); // should swap mock
+      let balancesAfter = await getBalances(mockPolicy);
+      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
+      expect(balancesDiff.treasurySolace).to.be.gt(0); // solace should increase
+      expect(balancesAfter.treasuryMock3).to.equal(0); // should swap mock
       expect(tx).to.emit(treasury, "DepositToken").withArgs(mockToken3.address, depositAmount);
     })
 
     it("can deposit other token even with uniswap errors", async function () {
       await treasury.connect(governor).setPath(mockToken4.address, mockToken4Path);
       let depositAmount = ONE_HUNDRED;
-      let treasurySolaceBalanceBefore = await solaceToken.balanceOf(treasury.address);
-      let treasuryMockBalanceBefore = await mockToken4.balanceOf(treasury.address);
+      let balancesBefore = await getBalances(mockPolicy);
       await mockToken4.connect(mockPolicy).increaseAllowance(treasury.address, depositAmount);
       let tx = await treasury.connect(mockPolicy).depositToken(mockToken4.address, depositAmount);
-      let treasurySolaceBalanceAfter = await solaceToken.balanceOf(treasury.address);
-      let treasuryMockBalanceAfter = await mockToken4.balanceOf(treasury.address);
-      expect(treasurySolaceBalanceAfter).to.equal(treasurySolaceBalanceBefore); // solace should not increase
-      expect(treasuryMockBalanceAfter).to.equal(treasuryMockBalanceBefore.add(depositAmount)); // should hold mock
+      let balancesAfter = await getBalances(mockPolicy);
+      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
+      expect(balancesDiff.treasurySolace).to.equal(0); // solace should not increase
+      expect(balancesDiff.treasuryMock4).to.equal(depositAmount); // should hold mock
       expect(tx).to.emit(treasury, "DepositToken").withArgs(mockToken4.address, depositAmount);
     })
   })
 
   describe("swap external", function () {
     it("non governor cannot swap", async function () {
-      await expect(treasury.connect(user).swap(weth.address)).to.be.revertedWith("!governance");
+      await expect(treasury.connect(user).swap(weth.address, wethPath, 100, 0)).to.be.revertedWith("!governance");
     })
 
-    it("reverts swap token with no path", async function () {
+    it("cannot swap token with no path", async function () {
       let depositAmount = ONE_HUNDRED;
-      let treasurySolaceBalanceBefore = await solaceToken.balanceOf(treasury.address);
-      let treasuryMockBalanceBefore = await mockToken1.balanceOf(treasury.address);
+      let balancesBefore = await getBalances(mockPolicy);
       await mockToken1.transfer(treasury.address, depositAmount);
-      await expect(treasury.connect(governor).swap(mockToken1.address)).to.be.revertedWith("swap failed");
-      let treasurySolaceBalanceAfter = await solaceToken.balanceOf(treasury.address);
-      let treasuryMockBalanceAfter = await mockToken1.balanceOf(treasury.address);
-      expect(treasurySolaceBalanceAfter).to.equal(treasurySolaceBalanceBefore); // solace should not increase
-      expect(treasuryMockBalanceAfter.sub(treasuryMockBalanceBefore)).to.equal(depositAmount); // should hold other token
+      await expect(treasury.connect(governor).swap(mockToken1.address, defaultPath, 100, 0)).to.be.reverted;
+      let balancesAfter = await getBalances(mockPolicy);
+      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
+      expect(balancesDiff.treasurySolace).to.equal(0); // solace should not increase
+      expect(balancesDiff.treasuryMock1).to.equal(depositAmount); // should hold other token
     })
 
     it("can swap token with a swap path", async function () {
       let depositAmount = ONE_HUNDRED;
-      let treasurySolaceBalanceBefore = await solaceToken.balanceOf(treasury.address);
+      let balancesBefore = await getBalances(mockPolicy);
       await mockToken2.transfer(treasury.address, depositAmount);
-      await treasury.connect(governor).swap(mockToken2.address);
-      let treasurySolaceBalanceAfter = await solaceToken.balanceOf(treasury.address);
-      let treasuryMockBalanceAfter = await mockToken2.balanceOf(treasury.address);
-      expect(treasurySolaceBalanceAfter).gt(treasurySolaceBalanceBefore); // solace should increase
-      expect(treasuryMockBalanceAfter).to.equal(0); // should swap mock
+      await treasury.connect(governor).swap(mockToken2.address, mockToken2Path, await mockToken2.balanceOf(treasury.address), 0);
+      let balancesAfter = await getBalances(mockPolicy);
+      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
+      expect(balancesDiff.treasurySolace).to.be.gt(0); // solace should increase
+      expect(balancesAfter.treasuryMock2).to.equal(0); // should swap mock
     })
 
     it("can swap token with a multi pool swap path", async function () {
       let depositAmount = ONE_HUNDRED;
-      let treasurySolaceBalanceBefore = await solaceToken.balanceOf(treasury.address);
+      let balancesBefore = await getBalances(mockPolicy);
       await mockToken3.transfer(treasury.address, depositAmount);
-      await treasury.connect(governor).swap(mockToken3.address);
-      let treasurySolaceBalanceAfter = await solaceToken.balanceOf(treasury.address);
-      let treasuryMockBalanceAfter = await mockToken3.balanceOf(treasury.address);
-      expect(treasurySolaceBalanceAfter).gt(treasurySolaceBalanceBefore); // solace should increase
-      expect(treasuryMockBalanceAfter).to.equal(0); // should swap mock
+      await treasury.connect(governor).swap(mockToken3.address, mockToken3Path, await mockToken3.balanceOf(treasury.address), 0);
+      let balancesAfter = await getBalances(mockPolicy);
+      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
+      expect(balancesDiff.treasurySolace).to.be.gt(0); // solace should increase
+      expect(balancesAfter.treasuryMock3).to.equal(0); // should swap mock
     })
 
     it("cannot swap token with uniswap errors", async function () {
       await treasury.connect(governor).setPath(mockToken4.address, mockToken4Path);
       let depositAmount = ONE_HUNDRED;
-      let treasurySolaceBalanceBefore = await solaceToken.balanceOf(treasury.address);
-      let treasuryMockBalanceBefore = await mockToken4.balanceOf(treasury.address);
+      let balancesBefore = await getBalances(mockPolicy);
       await mockToken4.transfer(treasury.address, depositAmount);
-      await expect(treasury.connect(governor).swap(mockToken4.address)).to.be.revertedWith("swap failed");
-      let treasurySolaceBalanceAfter = await solaceToken.balanceOf(treasury.address);
-      let treasuryMockBalanceAfter = await mockToken4.balanceOf(treasury.address);
-      expect(treasurySolaceBalanceAfter).to.equal(treasurySolaceBalanceBefore); // solace should not increase
-      expect(treasuryMockBalanceAfter).to.equal(treasuryMockBalanceBefore.add(depositAmount)); // should hold mock
+      await expect(treasury.connect(governor).swap(mockToken4.address, mockToken4Path, 100, 0)).to.be.reverted;
+      let balancesAfter = await getBalances(mockPolicy);
+      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
+      expect(balancesDiff.treasurySolace).to.equal(0); // solace should not increase
+      expect(balancesDiff.treasuryMock4).to.equal(depositAmount); // should hold mock
+    })
+
+    it("reverts if not enough received", async function () {
+      let amountIn = ONE_HUNDRED;
+      await mockToken2.transfer(treasury.address, amountIn);
+      let amountOut = 99
+      await expect(treasury.connect(governor).swap(mockToken2.address, mockToken2Path, amountIn, amountOut)).to.be.revertedWith("Too little received");
     })
   })
 
   describe("spend", function () {
     it("non governor cannot spend", async function () {
-      let balance = await solaceToken.balanceOf(treasury.address);
-      await expect(treasury.connect(user).spend(solaceToken.address, balance, governor.address)).to.be.revertedWith("!governance");
+      await expect(treasury.connect(user).spend(solaceToken.address, 100, governor.address)).to.be.revertedWith("!governance");
     })
 
     it("can spend solace", async function () {
       let spendAmount = BN.from("5");
-      let treasuryBalanceBefore = await solaceToken.balanceOf(treasury.address);
-      let userBalanceBefore = await solaceToken.balanceOf(user.address);
+      let balancesBefore = await getBalances(user);
       let tx = await treasury.connect(governor).spend(solaceToken.address, spendAmount, user.address);
-      let treasuryBalanceAfter = await solaceToken.balanceOf(treasury.address);
-      let userBalanceAfter = await solaceToken.balanceOf(user.address);
-      expect(treasuryBalanceBefore.sub(treasuryBalanceAfter)).to.equal(spendAmount);
-      expect(userBalanceAfter.sub(userBalanceBefore)).to.equal(spendAmount);
+      let balancesAfter = await getBalances(user);
+      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
+      expect(balancesDiff.treasurySolace).to.equal(spendAmount.mul(-1));
+      expect(balancesDiff.userSolace).to.equal(spendAmount);
       expect(tx).to.emit(treasury, "Spend").withArgs(solaceToken.address, spendAmount, user.address);
     })
 
     it("can spend unswapped token", async function () {
       let spendAmount = BN.from("5");
-      let treasuryBalanceBefore = await mockToken1.balanceOf(treasury.address);
-      let userBalanceBefore = await mockToken1.balanceOf(user.address);
+      let balancesBefore = await getBalances(user);
       let tx = await treasury.connect(governor).spend(mockToken1.address, spendAmount, user.address);
-      let treasuryBalanceAfter = await mockToken1.balanceOf(treasury.address);
-      let userBalanceAfter = await mockToken1.balanceOf(user.address);
-      expect(treasuryBalanceBefore.sub(treasuryBalanceAfter)).to.equal(spendAmount);
-      expect(userBalanceAfter.sub(userBalanceBefore)).to.equal(spendAmount);
+      let balancesAfter = await getBalances(user);
+      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
+      expect(balancesDiff.treasuryMock1).to.equal(spendAmount.mul(-1));
+      expect(balancesDiff.userMock1).to.equal(spendAmount);
       expect(tx).to.emit(treasury, "Spend").withArgs(mockToken1.address, spendAmount, user.address);
     })
   })
@@ -435,13 +436,13 @@ describe("Treasury", function () {
   // creates, initializes, and returns a pool
   async function createPool(tokenA: Contract, tokenB: Contract, fee: FeeAmount) {
     let [token0, token1] = sortTokens(tokenA.address, tokenB.address);
-    let pool: Contract;
+    let pool;
     let tx = await uniswapFactory.createPool(token0, token1, fee);
     let events = (await tx.wait()).events;
     expect(events && events.length > 0 && events[0].args && events[0].args.pool);
     if(events && events.length > 0 && events[0].args && events[0].args.pool) {
       let poolAddress = events[0].args.pool;
-      pool = await ethers.getContractAt(UniswapV3PoolArtifact.abi, poolAddress);
+      pool = (new Contract(poolAddress, UniswapV3PoolArtifact.abi)) as Contract;
     } else {
       pool = (new Contract(ZERO_ADDRESS, UniswapV3PoolArtifact.abi)) as Contract;
       expect(true).to.equal(false);
@@ -472,5 +473,60 @@ describe("Treasury", function () {
       amount1Min: 0,
       deadline: constants.MaxUint256,
     });
+  }
+
+  interface Balances {
+    userSolace: BN,
+    userEth: BN,
+    userWeth: BN,
+    userMock1: BN,
+    userMock2: BN,
+    userMock3: BN,
+    userMock4: BN,
+    treasurySolace: BN,
+    treasuryEth: BN,
+    treasuryWeth: BN,
+    treasuryMock1: BN,
+    treasuryMock2: BN,
+    treasuryMock3: BN,
+    treasuryMock4: BN,
+  }
+
+  async function getBalances(user: Wallet): Promise<Balances> {
+    return {
+      userSolace: await solaceToken.balanceOf(user.address),
+      userEth: await user.getBalance(),
+      userWeth: await weth.balanceOf(user.address),
+      userMock1: await mockToken1.balanceOf(user.address),
+      userMock2: await mockToken2.balanceOf(user.address),
+      userMock3: await mockToken3.balanceOf(user.address),
+      userMock4: await mockToken4.balanceOf(user.address),
+      treasurySolace: await solaceToken.balanceOf(treasury.address),
+      treasuryEth: await provider.getBalance(treasury.address),
+      treasuryWeth: await weth.balanceOf(treasury.address),
+      treasuryMock1: await mockToken1.balanceOf(treasury.address),
+      treasuryMock2: await mockToken2.balanceOf(treasury.address),
+      treasuryMock3: await mockToken3.balanceOf(treasury.address),
+      treasuryMock4: await mockToken4.balanceOf(treasury.address)
+    }
+  }
+
+  function getBalancesDiff(balances1: Balances, balances2: Balances) : Balances {
+    return {
+      userSolace: balances1.userSolace.sub(balances2.userSolace),
+      userEth: balances1.userEth.sub(balances2.userEth),
+      userWeth: balances1.userWeth.sub(balances2.userWeth),
+      userMock1: balances1.userMock1.sub(balances2.userMock1),
+      userMock2: balances1.userMock2.sub(balances2.userMock2),
+      userMock3: balances1.userMock3.sub(balances2.userMock3),
+      userMock4: balances1.userMock4.sub(balances2.userMock4),
+      treasurySolace: balances1.treasurySolace.sub(balances2.treasurySolace),
+      treasuryEth: balances1.treasuryEth.sub(balances2.treasuryEth),
+      treasuryWeth: balances1.treasuryWeth.sub(balances2.treasuryWeth),
+      treasuryMock1: balances1.treasuryMock1.sub(balances2.treasuryMock1),
+      treasuryMock2: balances1.treasuryMock2.sub(balances2.treasuryMock2),
+      treasuryMock3: balances1.treasuryMock3.sub(balances2.treasuryMock3),
+      treasuryMock4: balances1.treasuryMock4.sub(balances2.treasuryMock4)
+    }
   }
 });

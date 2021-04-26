@@ -31,8 +31,8 @@ interface TreasuryInterface extends ethers.utils.Interface {
     "setPath(address,bytes)": FunctionFragment;
     "solace()": FunctionFragment;
     "spend(address,uint256,address)": FunctionFragment;
-    "swap(address)": FunctionFragment;
-    "uniRouter()": FunctionFragment;
+    "swap(address,bytes,uint256,uint256)": FunctionFragment;
+    "swapRouter()": FunctionFragment;
     "weth()": FunctionFragment;
   };
 
@@ -62,8 +62,14 @@ interface TreasuryInterface extends ethers.utils.Interface {
     functionFragment: "spend",
     values: [string, BigNumberish, string]
   ): string;
-  encodeFunctionData(functionFragment: "swap", values: [string]): string;
-  encodeFunctionData(functionFragment: "uniRouter", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "swap",
+    values: [string, BytesLike, BigNumberish, BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "swapRouter",
+    values?: undefined
+  ): string;
   encodeFunctionData(functionFragment: "weth", values?: undefined): string;
 
   decodeFunctionResult(functionFragment: "depositEth", data: BytesLike): Result;
@@ -81,7 +87,7 @@ interface TreasuryInterface extends ethers.utils.Interface {
   decodeFunctionResult(functionFragment: "solace", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "spend", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "swap", data: BytesLike): Result;
-  decodeFunctionResult(functionFragment: "uniRouter", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "swapRouter", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "weth", data: BytesLike): Result;
 
   events: {
@@ -201,20 +207,29 @@ export class Treasury extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    swap(_token: string, overrides?: Overrides): Promise<ContractTransaction>;
-
-    "swap(address)"(
+    swap(
       _token: string,
+      _path: BytesLike,
+      _amountIn: BigNumberish,
+      _amountOutMinimum: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    uniRouter(
+    "swap(address,bytes,uint256,uint256)"(
+      _token: string,
+      _path: BytesLike,
+      _amountIn: BigNumberish,
+      _amountOutMinimum: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    swapRouter(
       overrides?: CallOverrides
     ): Promise<{
       0: string;
     }>;
 
-    "uniRouter()"(
+    "swapRouter()"(
       overrides?: CallOverrides
     ): Promise<{
       0: string;
@@ -297,16 +312,25 @@ export class Treasury extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  swap(_token: string, overrides?: Overrides): Promise<ContractTransaction>;
-
-  "swap(address)"(
+  swap(
     _token: string,
+    _path: BytesLike,
+    _amountIn: BigNumberish,
+    _amountOutMinimum: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  uniRouter(overrides?: CallOverrides): Promise<string>;
+  "swap(address,bytes,uint256,uint256)"(
+    _token: string,
+    _path: BytesLike,
+    _amountIn: BigNumberish,
+    _amountOutMinimum: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
 
-  "uniRouter()"(overrides?: CallOverrides): Promise<string>;
+  swapRouter(overrides?: CallOverrides): Promise<string>;
+
+  "swapRouter()"(overrides?: CallOverrides): Promise<string>;
 
   weth(overrides?: CallOverrides): Promise<string>;
 
@@ -377,13 +401,25 @@ export class Treasury extends Contract {
       overrides?: CallOverrides
     ): Promise<void>;
 
-    swap(_token: string, overrides?: CallOverrides): Promise<void>;
+    swap(
+      _token: string,
+      _path: BytesLike,
+      _amountIn: BigNumberish,
+      _amountOutMinimum: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
 
-    "swap(address)"(_token: string, overrides?: CallOverrides): Promise<void>;
+    "swap(address,bytes,uint256,uint256)"(
+      _token: string,
+      _path: BytesLike,
+      _amountIn: BigNumberish,
+      _amountOutMinimum: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
 
-    uniRouter(overrides?: CallOverrides): Promise<string>;
+    swapRouter(overrides?: CallOverrides): Promise<string>;
 
-    "uniRouter()"(overrides?: CallOverrides): Promise<string>;
+    "swapRouter()"(overrides?: CallOverrides): Promise<string>;
 
     weth(overrides?: CallOverrides): Promise<string>;
 
@@ -468,13 +504,25 @@ export class Treasury extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    swap(_token: string, overrides?: Overrides): Promise<BigNumber>;
+    swap(
+      _token: string,
+      _path: BytesLike,
+      _amountIn: BigNumberish,
+      _amountOutMinimum: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
 
-    "swap(address)"(_token: string, overrides?: Overrides): Promise<BigNumber>;
+    "swap(address,bytes,uint256,uint256)"(
+      _token: string,
+      _path: BytesLike,
+      _amountIn: BigNumberish,
+      _amountOutMinimum: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
 
-    uniRouter(overrides?: CallOverrides): Promise<BigNumber>;
+    swapRouter(overrides?: CallOverrides): Promise<BigNumber>;
 
-    "uniRouter()"(overrides?: CallOverrides): Promise<BigNumber>;
+    "swapRouter()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     weth(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -552,16 +600,25 @@ export class Treasury extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    swap(_token: string, overrides?: Overrides): Promise<PopulatedTransaction>;
-
-    "swap(address)"(
+    swap(
       _token: string,
+      _path: BytesLike,
+      _amountIn: BigNumberish,
+      _amountOutMinimum: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    uniRouter(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+    "swap(address,bytes,uint256,uint256)"(
+      _token: string,
+      _path: BytesLike,
+      _amountIn: BigNumberish,
+      _amountOutMinimum: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
 
-    "uniRouter()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+    swapRouter(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "swapRouter()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     weth(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
