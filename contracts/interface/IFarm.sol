@@ -16,15 +16,10 @@ interface IFarm {
 
     /// @notice A unique enumerator that identifies the farm type.
     function farmType() external view returns (uint256);
-
-    function stakeToken() external view returns (address);        // Address of token to stake.
-    function rewardToken() external view returns (address);       // Address of token to receive.
+    
     function blockReward() external view returns (uint256);       // Amount of rewardToken distributed per block.
     function startBlock() external view returns (uint256);        // When the farm will start.
     function endBlock() external view returns (uint256);          // When the farm will end.
-    function lastRewardBlock() external view returns (uint256);   // Last time rewards were distributed or farm was updated.
-    function accRewardPerShare() external view returns (uint256); // Accumulated rewards per share, times 1e12.
-    function valueStaked() external view returns (uint256);       // Value of tokens staked by all farmers.
 
     /**
      * @notice Transfers the governance role to a new governor.

@@ -3,14 +3,15 @@ pragma solidity 0.8.0;
 
 import "./IUniswapLpToken.sol";
 import "./../SOLACE.sol";
+import "./IWETH10.sol";
 import "./IFarm.sol";
 
 
 /**
- * @title IUniswapLpFarm: The base type of Master Uniswap LP farms.
+ * @title ISolaceEthLpFarm: The base type of Master Uniswap LP farms.
  * @author solace.fi
  */
-interface IUniswapLpFarm is IFarm {
+interface ISolaceEthLpFarm is IFarm {
     // Emitted when a token is deposited onto the farm.
     event Deposit(address indexed _user, uint256 _token);
     // Emitted when a token is withdrawn from the farm.
@@ -34,6 +35,29 @@ interface IUniswapLpFarm is IFarm {
      * @param s secp256k1 signature
      */
     function depositSigned(address _depositor, uint256 _token, uint256 _deadline, uint8 v, bytes32 r, bytes32 s) external;
+
+    struct MintAndDepositParams {
+        address depositor;
+        uint256 amountSolace;
+        uint256 amount0Desired;
+        uint256 amount1Desired;
+        uint256 amount0Min;
+        uint256 amount1Min;
+        uint256 deadline;
+        int24 tickLower;
+        int24 tickUpper;
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+    }
+
+    /**
+     * @notice Mint a new Uniswap LP token then deposit it.
+     * User will receive accumulated Solace rewards if any.
+     * @param params parameters
+     * @return tokenId The newly minted token id.
+     */
+    function mintAndDeposit(MintAndDepositParams calldata params) external payable returns (uint256 tokenId);
 
     /**
      * @notice Withdraw a token.
@@ -77,6 +101,7 @@ interface IUniswapLpFarm is IFarm {
     // LP Token interface.
     function lpToken() external view returns (IUniswapLpToken);
     function solace() external view returns (SOLACE);
+    function weth() external view returns (IWETH10);
     function lastRewardBlock() external view returns (uint256);   // Last time rewards were distributed or farm was updated.
     function accRewardPerShare() external view returns (uint256); // Accumulated rewards per share, times 1e12.
     function valueStaked() external view returns (uint256);       // Value of tokens staked by all farmers.

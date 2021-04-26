@@ -21,7 +21,7 @@ import { BytesLike } from "@ethersproject/bytes";
 import { Listener, Provider } from "@ethersproject/providers";
 import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
-interface IUniswapLpTokenInterface extends ethers.utils.Interface {
+interface Ierc721PermitInterface extends ethers.utils.Interface {
   functions: {
     "DOMAIN_SEPARATOR()": FunctionFragment;
     "PERMIT_TYPEHASH()": FunctionFragment;
@@ -29,16 +29,11 @@ interface IUniswapLpTokenInterface extends ethers.utils.Interface {
     "balanceOf(address)": FunctionFragment;
     "getApproved(uint256)": FunctionFragment;
     "isApprovedForAll(address,address)": FunctionFragment;
-    "mint(tuple)": FunctionFragment;
     "ownerOf(uint256)": FunctionFragment;
     "permit(address,uint256,uint256,uint8,bytes32,bytes32)": FunctionFragment;
-    "positions(uint256)": FunctionFragment;
     "safeTransferFrom(address,address,uint256)": FunctionFragment;
     "setApprovalForAll(address,bool)": FunctionFragment;
     "supportsInterface(bytes4)": FunctionFragment;
-    "tokenByIndex(uint256)": FunctionFragment;
-    "tokenOfOwnerByIndex(address,uint256)": FunctionFragment;
-    "totalSupply()": FunctionFragment;
     "transferFrom(address,address,uint256)": FunctionFragment;
   };
 
@@ -64,24 +59,6 @@ interface IUniswapLpTokenInterface extends ethers.utils.Interface {
     values: [string, string]
   ): string;
   encodeFunctionData(
-    functionFragment: "mint",
-    values: [
-      {
-        token0: string;
-        token1: string;
-        fee: BigNumberish;
-        tickLower: BigNumberish;
-        tickUpper: BigNumberish;
-        amount0Desired: BigNumberish;
-        amount1Desired: BigNumberish;
-        amount0Min: BigNumberish;
-        amount1Min: BigNumberish;
-        recipient: string;
-        deadline: BigNumberish;
-      }
-    ]
-  ): string;
-  encodeFunctionData(
     functionFragment: "ownerOf",
     values: [BigNumberish]
   ): string;
@@ -97,10 +74,6 @@ interface IUniswapLpTokenInterface extends ethers.utils.Interface {
     ]
   ): string;
   encodeFunctionData(
-    functionFragment: "positions",
-    values: [BigNumberish]
-  ): string;
-  encodeFunctionData(
     functionFragment: "safeTransferFrom",
     values: [string, string, BigNumberish]
   ): string;
@@ -111,18 +84,6 @@ interface IUniswapLpTokenInterface extends ethers.utils.Interface {
   encodeFunctionData(
     functionFragment: "supportsInterface",
     values: [BytesLike]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "tokenByIndex",
-    values: [BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "tokenOfOwnerByIndex",
-    values: [string, BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "totalSupply",
-    values?: undefined
   ): string;
   encodeFunctionData(
     functionFragment: "transferFrom",
@@ -147,10 +108,8 @@ interface IUniswapLpTokenInterface extends ethers.utils.Interface {
     functionFragment: "isApprovedForAll",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(functionFragment: "mint", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "ownerOf", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "permit", data: BytesLike): Result;
-  decodeFunctionResult(functionFragment: "positions", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "safeTransferFrom",
     data: BytesLike
@@ -161,18 +120,6 @@ interface IUniswapLpTokenInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "supportsInterface",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "tokenByIndex",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "tokenOfOwnerByIndex",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "totalSupply",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -191,7 +138,7 @@ interface IUniswapLpTokenInterface extends ethers.utils.Interface {
   getEvent(nameOrSignatureOrTopic: "Transfer"): EventFragment;
 }
 
-export class IUniswapLpToken extends Contract {
+export class Ierc721Permit extends Contract {
   connect(signerOrProvider: Signer | Provider | string): this;
   attach(addressOrName: string): this;
   deployed(): Promise<this>;
@@ -202,7 +149,7 @@ export class IUniswapLpToken extends Contract {
   removeAllListeners(eventName: EventFilter | string): this;
   removeListener(eventName: any, listener: Listener): this;
 
-  interface: IUniswapLpTokenInterface;
+  interface: Ierc721PermitInterface;
 
   functions: {
     DOMAIN_SEPARATOR(
@@ -289,40 +236,6 @@ export class IUniswapLpToken extends Contract {
       0: boolean;
     }>;
 
-    mint(
-      params: {
-        token0: string;
-        token1: string;
-        fee: BigNumberish;
-        tickLower: BigNumberish;
-        tickUpper: BigNumberish;
-        amount0Desired: BigNumberish;
-        amount1Desired: BigNumberish;
-        amount0Min: BigNumberish;
-        amount1Min: BigNumberish;
-        recipient: string;
-        deadline: BigNumberish;
-      },
-      overrides?: PayableOverrides
-    ): Promise<ContractTransaction>;
-
-    "mint(tuple)"(
-      params: {
-        token0: string;
-        token1: string;
-        fee: BigNumberish;
-        tickLower: BigNumberish;
-        tickUpper: BigNumberish;
-        amount0Desired: BigNumberish;
-        amount1Desired: BigNumberish;
-        amount0Min: BigNumberish;
-        amount1Min: BigNumberish;
-        recipient: string;
-        deadline: BigNumberish;
-      },
-      overrides?: PayableOverrides
-    ): Promise<ContractTransaction>;
-
     ownerOf(
       tokenId: BigNumberish,
       overrides?: CallOverrides
@@ -358,66 +271,6 @@ export class IUniswapLpToken extends Contract {
       s: BytesLike,
       overrides?: PayableOverrides
     ): Promise<ContractTransaction>;
-
-    positions(
-      tokenId: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<{
-      nonce: BigNumber;
-      operator: string;
-      token0: string;
-      token1: string;
-      fee: number;
-      tickLower: number;
-      tickUpper: number;
-      liquidity: BigNumber;
-      feeGrowthInside0LastX128: BigNumber;
-      feeGrowthInside1LastX128: BigNumber;
-      tokensOwed0: BigNumber;
-      tokensOwed1: BigNumber;
-      0: BigNumber;
-      1: string;
-      2: string;
-      3: string;
-      4: number;
-      5: number;
-      6: number;
-      7: BigNumber;
-      8: BigNumber;
-      9: BigNumber;
-      10: BigNumber;
-      11: BigNumber;
-    }>;
-
-    "positions(uint256)"(
-      tokenId: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<{
-      nonce: BigNumber;
-      operator: string;
-      token0: string;
-      token1: string;
-      fee: number;
-      tickLower: number;
-      tickUpper: number;
-      liquidity: BigNumber;
-      feeGrowthInside0LastX128: BigNumber;
-      feeGrowthInside1LastX128: BigNumber;
-      tokensOwed0: BigNumber;
-      tokensOwed1: BigNumber;
-      0: BigNumber;
-      1: string;
-      2: string;
-      3: string;
-      4: number;
-      5: number;
-      6: number;
-      7: BigNumber;
-      8: BigNumber;
-      9: BigNumber;
-      10: BigNumber;
-      11: BigNumber;
-    }>;
 
     "safeTransferFrom(address,address,uint256)"(
       from: string,
@@ -458,50 +311,6 @@ export class IUniswapLpToken extends Contract {
       overrides?: CallOverrides
     ): Promise<{
       0: boolean;
-    }>;
-
-    tokenByIndex(
-      index: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<{
-      0: BigNumber;
-    }>;
-
-    "tokenByIndex(uint256)"(
-      index: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<{
-      0: BigNumber;
-    }>;
-
-    tokenOfOwnerByIndex(
-      owner: string,
-      index: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<{
-      tokenId: BigNumber;
-      0: BigNumber;
-    }>;
-
-    "tokenOfOwnerByIndex(address,uint256)"(
-      owner: string,
-      index: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<{
-      tokenId: BigNumber;
-      0: BigNumber;
-    }>;
-
-    totalSupply(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: BigNumber;
-    }>;
-
-    "totalSupply()"(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: BigNumber;
     }>;
 
     transferFrom(
@@ -568,40 +377,6 @@ export class IUniswapLpToken extends Contract {
     overrides?: CallOverrides
   ): Promise<boolean>;
 
-  mint(
-    params: {
-      token0: string;
-      token1: string;
-      fee: BigNumberish;
-      tickLower: BigNumberish;
-      tickUpper: BigNumberish;
-      amount0Desired: BigNumberish;
-      amount1Desired: BigNumberish;
-      amount0Min: BigNumberish;
-      amount1Min: BigNumberish;
-      recipient: string;
-      deadline: BigNumberish;
-    },
-    overrides?: PayableOverrides
-  ): Promise<ContractTransaction>;
-
-  "mint(tuple)"(
-    params: {
-      token0: string;
-      token1: string;
-      fee: BigNumberish;
-      tickLower: BigNumberish;
-      tickUpper: BigNumberish;
-      amount0Desired: BigNumberish;
-      amount1Desired: BigNumberish;
-      amount0Min: BigNumberish;
-      amount1Min: BigNumberish;
-      recipient: string;
-      deadline: BigNumberish;
-    },
-    overrides?: PayableOverrides
-  ): Promise<ContractTransaction>;
-
   ownerOf(tokenId: BigNumberish, overrides?: CallOverrides): Promise<string>;
 
   "ownerOf(uint256)"(
@@ -628,66 +403,6 @@ export class IUniswapLpToken extends Contract {
     s: BytesLike,
     overrides?: PayableOverrides
   ): Promise<ContractTransaction>;
-
-  positions(
-    tokenId: BigNumberish,
-    overrides?: CallOverrides
-  ): Promise<{
-    nonce: BigNumber;
-    operator: string;
-    token0: string;
-    token1: string;
-    fee: number;
-    tickLower: number;
-    tickUpper: number;
-    liquidity: BigNumber;
-    feeGrowthInside0LastX128: BigNumber;
-    feeGrowthInside1LastX128: BigNumber;
-    tokensOwed0: BigNumber;
-    tokensOwed1: BigNumber;
-    0: BigNumber;
-    1: string;
-    2: string;
-    3: string;
-    4: number;
-    5: number;
-    6: number;
-    7: BigNumber;
-    8: BigNumber;
-    9: BigNumber;
-    10: BigNumber;
-    11: BigNumber;
-  }>;
-
-  "positions(uint256)"(
-    tokenId: BigNumberish,
-    overrides?: CallOverrides
-  ): Promise<{
-    nonce: BigNumber;
-    operator: string;
-    token0: string;
-    token1: string;
-    fee: number;
-    tickLower: number;
-    tickUpper: number;
-    liquidity: BigNumber;
-    feeGrowthInside0LastX128: BigNumber;
-    feeGrowthInside1LastX128: BigNumber;
-    tokensOwed0: BigNumber;
-    tokensOwed1: BigNumber;
-    0: BigNumber;
-    1: string;
-    2: string;
-    3: string;
-    4: number;
-    5: number;
-    6: number;
-    7: BigNumber;
-    8: BigNumber;
-    9: BigNumber;
-    10: BigNumber;
-    11: BigNumber;
-  }>;
 
   "safeTransferFrom(address,address,uint256)"(
     from: string,
@@ -725,32 +440,6 @@ export class IUniswapLpToken extends Contract {
     interfaceId: BytesLike,
     overrides?: CallOverrides
   ): Promise<boolean>;
-
-  tokenByIndex(
-    index: BigNumberish,
-    overrides?: CallOverrides
-  ): Promise<BigNumber>;
-
-  "tokenByIndex(uint256)"(
-    index: BigNumberish,
-    overrides?: CallOverrides
-  ): Promise<BigNumber>;
-
-  tokenOfOwnerByIndex(
-    owner: string,
-    index: BigNumberish,
-    overrides?: CallOverrides
-  ): Promise<BigNumber>;
-
-  "tokenOfOwnerByIndex(address,uint256)"(
-    owner: string,
-    index: BigNumberish,
-    overrides?: CallOverrides
-  ): Promise<BigNumber>;
-
-  totalSupply(overrides?: CallOverrides): Promise<BigNumber>;
-
-  "totalSupply()"(overrides?: CallOverrides): Promise<BigNumber>;
 
   transferFrom(
     from: string,
@@ -816,58 +505,6 @@ export class IUniswapLpToken extends Contract {
       overrides?: CallOverrides
     ): Promise<boolean>;
 
-    mint(
-      params: {
-        token0: string;
-        token1: string;
-        fee: BigNumberish;
-        tickLower: BigNumberish;
-        tickUpper: BigNumberish;
-        amount0Desired: BigNumberish;
-        amount1Desired: BigNumberish;
-        amount0Min: BigNumberish;
-        amount1Min: BigNumberish;
-        recipient: string;
-        deadline: BigNumberish;
-      },
-      overrides?: CallOverrides
-    ): Promise<{
-      tokenId: BigNumber;
-      liquidity: BigNumber;
-      amount0: BigNumber;
-      amount1: BigNumber;
-      0: BigNumber;
-      1: BigNumber;
-      2: BigNumber;
-      3: BigNumber;
-    }>;
-
-    "mint(tuple)"(
-      params: {
-        token0: string;
-        token1: string;
-        fee: BigNumberish;
-        tickLower: BigNumberish;
-        tickUpper: BigNumberish;
-        amount0Desired: BigNumberish;
-        amount1Desired: BigNumberish;
-        amount0Min: BigNumberish;
-        amount1Min: BigNumberish;
-        recipient: string;
-        deadline: BigNumberish;
-      },
-      overrides?: CallOverrides
-    ): Promise<{
-      tokenId: BigNumber;
-      liquidity: BigNumber;
-      amount0: BigNumber;
-      amount1: BigNumber;
-      0: BigNumber;
-      1: BigNumber;
-      2: BigNumber;
-      3: BigNumber;
-    }>;
-
     ownerOf(tokenId: BigNumberish, overrides?: CallOverrides): Promise<string>;
 
     "ownerOf(uint256)"(
@@ -894,66 +531,6 @@ export class IUniswapLpToken extends Contract {
       s: BytesLike,
       overrides?: CallOverrides
     ): Promise<void>;
-
-    positions(
-      tokenId: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<{
-      nonce: BigNumber;
-      operator: string;
-      token0: string;
-      token1: string;
-      fee: number;
-      tickLower: number;
-      tickUpper: number;
-      liquidity: BigNumber;
-      feeGrowthInside0LastX128: BigNumber;
-      feeGrowthInside1LastX128: BigNumber;
-      tokensOwed0: BigNumber;
-      tokensOwed1: BigNumber;
-      0: BigNumber;
-      1: string;
-      2: string;
-      3: string;
-      4: number;
-      5: number;
-      6: number;
-      7: BigNumber;
-      8: BigNumber;
-      9: BigNumber;
-      10: BigNumber;
-      11: BigNumber;
-    }>;
-
-    "positions(uint256)"(
-      tokenId: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<{
-      nonce: BigNumber;
-      operator: string;
-      token0: string;
-      token1: string;
-      fee: number;
-      tickLower: number;
-      tickUpper: number;
-      liquidity: BigNumber;
-      feeGrowthInside0LastX128: BigNumber;
-      feeGrowthInside1LastX128: BigNumber;
-      tokensOwed0: BigNumber;
-      tokensOwed1: BigNumber;
-      0: BigNumber;
-      1: string;
-      2: string;
-      3: string;
-      4: number;
-      5: number;
-      6: number;
-      7: BigNumber;
-      8: BigNumber;
-      9: BigNumber;
-      10: BigNumber;
-      11: BigNumber;
-    }>;
 
     "safeTransferFrom(address,address,uint256)"(
       from: string,
@@ -991,32 +568,6 @@ export class IUniswapLpToken extends Contract {
       interfaceId: BytesLike,
       overrides?: CallOverrides
     ): Promise<boolean>;
-
-    tokenByIndex(
-      index: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    "tokenByIndex(uint256)"(
-      index: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    tokenOfOwnerByIndex(
-      owner: string,
-      index: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    "tokenOfOwnerByIndex(address,uint256)"(
-      owner: string,
-      index: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    totalSupply(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "totalSupply()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     transferFrom(
       from: string,
@@ -1103,40 +654,6 @@ export class IUniswapLpToken extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    mint(
-      params: {
-        token0: string;
-        token1: string;
-        fee: BigNumberish;
-        tickLower: BigNumberish;
-        tickUpper: BigNumberish;
-        amount0Desired: BigNumberish;
-        amount1Desired: BigNumberish;
-        amount0Min: BigNumberish;
-        amount1Min: BigNumberish;
-        recipient: string;
-        deadline: BigNumberish;
-      },
-      overrides?: PayableOverrides
-    ): Promise<BigNumber>;
-
-    "mint(tuple)"(
-      params: {
-        token0: string;
-        token1: string;
-        fee: BigNumberish;
-        tickLower: BigNumberish;
-        tickUpper: BigNumberish;
-        amount0Desired: BigNumberish;
-        amount1Desired: BigNumberish;
-        amount0Min: BigNumberish;
-        amount1Min: BigNumberish;
-        recipient: string;
-        deadline: BigNumberish;
-      },
-      overrides?: PayableOverrides
-    ): Promise<BigNumber>;
-
     ownerOf(
       tokenId: BigNumberish,
       overrides?: CallOverrides
@@ -1165,16 +682,6 @@ export class IUniswapLpToken extends Contract {
       r: BytesLike,
       s: BytesLike,
       overrides?: PayableOverrides
-    ): Promise<BigNumber>;
-
-    positions(
-      tokenId: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    "positions(uint256)"(
-      tokenId: BigNumberish,
-      overrides?: CallOverrides
     ): Promise<BigNumber>;
 
     "safeTransferFrom(address,address,uint256)"(
@@ -1213,32 +720,6 @@ export class IUniswapLpToken extends Contract {
       interfaceId: BytesLike,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
-
-    tokenByIndex(
-      index: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    "tokenByIndex(uint256)"(
-      index: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    tokenOfOwnerByIndex(
-      owner: string,
-      index: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    "tokenOfOwnerByIndex(address,uint256)"(
-      owner: string,
-      index: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    totalSupply(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "totalSupply()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     transferFrom(
       from: string,
@@ -1312,40 +793,6 @@ export class IUniswapLpToken extends Contract {
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
-    mint(
-      params: {
-        token0: string;
-        token1: string;
-        fee: BigNumberish;
-        tickLower: BigNumberish;
-        tickUpper: BigNumberish;
-        amount0Desired: BigNumberish;
-        amount1Desired: BigNumberish;
-        amount0Min: BigNumberish;
-        amount1Min: BigNumberish;
-        recipient: string;
-        deadline: BigNumberish;
-      },
-      overrides?: PayableOverrides
-    ): Promise<PopulatedTransaction>;
-
-    "mint(tuple)"(
-      params: {
-        token0: string;
-        token1: string;
-        fee: BigNumberish;
-        tickLower: BigNumberish;
-        tickUpper: BigNumberish;
-        amount0Desired: BigNumberish;
-        amount1Desired: BigNumberish;
-        amount0Min: BigNumberish;
-        amount1Min: BigNumberish;
-        recipient: string;
-        deadline: BigNumberish;
-      },
-      overrides?: PayableOverrides
-    ): Promise<PopulatedTransaction>;
-
     ownerOf(
       tokenId: BigNumberish,
       overrides?: CallOverrides
@@ -1374,16 +821,6 @@ export class IUniswapLpToken extends Contract {
       r: BytesLike,
       s: BytesLike,
       overrides?: PayableOverrides
-    ): Promise<PopulatedTransaction>;
-
-    positions(
-      tokenId: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    "positions(uint256)"(
-      tokenId: BigNumberish,
-      overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
     "safeTransferFrom(address,address,uint256)"(
@@ -1422,32 +859,6 @@ export class IUniswapLpToken extends Contract {
       interfaceId: BytesLike,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
-
-    tokenByIndex(
-      index: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    "tokenByIndex(uint256)"(
-      index: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    tokenOfOwnerByIndex(
-      owner: string,
-      index: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    "tokenOfOwnerByIndex(address,uint256)"(
-      owner: string,
-      index: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    totalSupply(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    "totalSupply()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     transferFrom(
       from: string,

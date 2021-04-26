@@ -3,6 +3,7 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol";
 
 /**
  * @title Vault interface
@@ -22,7 +23,7 @@ struct StrategyParams {
     uint256 totalLoss;
 }
 
-interface IVault is IERC20 {
+interface IVault is IERC20, IERC20Permit {
 
     function deposit() external payable;
     function withdraw(uint256 _amount, uint256 _maxLoss) external returns (uint256);

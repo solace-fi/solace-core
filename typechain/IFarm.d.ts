@@ -22,30 +22,21 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
 interface IFarmInterface extends ethers.utils.Interface {
   functions: {
-    "accRewardPerShare()": FunctionFragment;
     "blockReward()": FunctionFragment;
     "endBlock()": FunctionFragment;
     "farmType()": FunctionFragment;
     "getMultiplier(uint256,uint256)": FunctionFragment;
     "governance()": FunctionFragment;
-    "lastRewardBlock()": FunctionFragment;
     "master()": FunctionFragment;
     "pendingRewards(address)": FunctionFragment;
-    "rewardToken()": FunctionFragment;
     "setEnd(uint256)": FunctionFragment;
     "setGovernance(address)": FunctionFragment;
     "setRewards(uint256)": FunctionFragment;
-    "stakeToken()": FunctionFragment;
     "startBlock()": FunctionFragment;
     "updateFarm()": FunctionFragment;
-    "valueStaked()": FunctionFragment;
     "withdrawRewards()": FunctionFragment;
   };
 
-  encodeFunctionData(
-    functionFragment: "accRewardPerShare",
-    values?: undefined
-  ): string;
   encodeFunctionData(
     functionFragment: "blockReward",
     values?: undefined
@@ -60,18 +51,10 @@ interface IFarmInterface extends ethers.utils.Interface {
     functionFragment: "governance",
     values?: undefined
   ): string;
-  encodeFunctionData(
-    functionFragment: "lastRewardBlock",
-    values?: undefined
-  ): string;
   encodeFunctionData(functionFragment: "master", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "pendingRewards",
     values: [string]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "rewardToken",
-    values?: undefined
   ): string;
   encodeFunctionData(
     functionFragment: "setEnd",
@@ -86,10 +69,6 @@ interface IFarmInterface extends ethers.utils.Interface {
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
-    functionFragment: "stakeToken",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
     functionFragment: "startBlock",
     values?: undefined
   ): string;
@@ -98,18 +77,10 @@ interface IFarmInterface extends ethers.utils.Interface {
     values?: undefined
   ): string;
   encodeFunctionData(
-    functionFragment: "valueStaked",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
     functionFragment: "withdrawRewards",
     values?: undefined
   ): string;
 
-  decodeFunctionResult(
-    functionFragment: "accRewardPerShare",
-    data: BytesLike
-  ): Result;
   decodeFunctionResult(
     functionFragment: "blockReward",
     data: BytesLike
@@ -121,17 +92,9 @@ interface IFarmInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "governance", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "lastRewardBlock",
-    data: BytesLike
-  ): Result;
   decodeFunctionResult(functionFragment: "master", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "pendingRewards",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "rewardToken",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "setEnd", data: BytesLike): Result;
@@ -140,13 +103,8 @@ interface IFarmInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "setRewards", data: BytesLike): Result;
-  decodeFunctionResult(functionFragment: "stakeToken", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "startBlock", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "updateFarm", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "valueStaked",
-    data: BytesLike
-  ): Result;
   decodeFunctionResult(
     functionFragment: "withdrawRewards",
     data: BytesLike
@@ -169,18 +127,6 @@ export class IFarm extends Contract {
   interface: IFarmInterface;
 
   functions: {
-    accRewardPerShare(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: BigNumber;
-    }>;
-
-    "accRewardPerShare()"(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: BigNumber;
-    }>;
-
     blockReward(
       overrides?: CallOverrides
     ): Promise<{
@@ -245,18 +191,6 @@ export class IFarm extends Contract {
       0: string;
     }>;
 
-    lastRewardBlock(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: BigNumber;
-    }>;
-
-    "lastRewardBlock()"(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: BigNumber;
-    }>;
-
     master(
       overrides?: CallOverrides
     ): Promise<{
@@ -281,18 +215,6 @@ export class IFarm extends Contract {
       overrides?: CallOverrides
     ): Promise<{
       0: BigNumber;
-    }>;
-
-    rewardToken(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
-    "rewardToken()"(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
     }>;
 
     setEnd(
@@ -325,18 +247,6 @@ export class IFarm extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    stakeToken(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
-    "stakeToken()"(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
     startBlock(
       overrides?: CallOverrides
     ): Promise<{
@@ -353,26 +263,10 @@ export class IFarm extends Contract {
 
     "updateFarm()"(overrides?: Overrides): Promise<ContractTransaction>;
 
-    valueStaked(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: BigNumber;
-    }>;
-
-    "valueStaked()"(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: BigNumber;
-    }>;
-
     withdrawRewards(overrides?: Overrides): Promise<ContractTransaction>;
 
     "withdrawRewards()"(overrides?: Overrides): Promise<ContractTransaction>;
   };
-
-  accRewardPerShare(overrides?: CallOverrides): Promise<BigNumber>;
-
-  "accRewardPerShare()"(overrides?: CallOverrides): Promise<BigNumber>;
 
   blockReward(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -402,10 +296,6 @@ export class IFarm extends Contract {
 
   "governance()"(overrides?: CallOverrides): Promise<string>;
 
-  lastRewardBlock(overrides?: CallOverrides): Promise<BigNumber>;
-
-  "lastRewardBlock()"(overrides?: CallOverrides): Promise<BigNumber>;
-
   master(overrides?: CallOverrides): Promise<string>;
 
   "master()"(overrides?: CallOverrides): Promise<string>;
@@ -416,10 +306,6 @@ export class IFarm extends Contract {
     _user: string,
     overrides?: CallOverrides
   ): Promise<BigNumber>;
-
-  rewardToken(overrides?: CallOverrides): Promise<string>;
-
-  "rewardToken()"(overrides?: CallOverrides): Promise<string>;
 
   setEnd(
     _endBlock: BigNumberish,
@@ -451,10 +337,6 @@ export class IFarm extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  stakeToken(overrides?: CallOverrides): Promise<string>;
-
-  "stakeToken()"(overrides?: CallOverrides): Promise<string>;
-
   startBlock(overrides?: CallOverrides): Promise<BigNumber>;
 
   "startBlock()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -463,19 +345,11 @@ export class IFarm extends Contract {
 
   "updateFarm()"(overrides?: Overrides): Promise<ContractTransaction>;
 
-  valueStaked(overrides?: CallOverrides): Promise<BigNumber>;
-
-  "valueStaked()"(overrides?: CallOverrides): Promise<BigNumber>;
-
   withdrawRewards(overrides?: Overrides): Promise<ContractTransaction>;
 
   "withdrawRewards()"(overrides?: Overrides): Promise<ContractTransaction>;
 
   callStatic: {
-    accRewardPerShare(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "accRewardPerShare()"(overrides?: CallOverrides): Promise<BigNumber>;
-
     blockReward(overrides?: CallOverrides): Promise<BigNumber>;
 
     "blockReward()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -504,10 +378,6 @@ export class IFarm extends Contract {
 
     "governance()"(overrides?: CallOverrides): Promise<string>;
 
-    lastRewardBlock(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "lastRewardBlock()"(overrides?: CallOverrides): Promise<BigNumber>;
-
     master(overrides?: CallOverrides): Promise<string>;
 
     "master()"(overrides?: CallOverrides): Promise<string>;
@@ -521,10 +391,6 @@ export class IFarm extends Contract {
       _user: string,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
-
-    rewardToken(overrides?: CallOverrides): Promise<string>;
-
-    "rewardToken()"(overrides?: CallOverrides): Promise<string>;
 
     setEnd(_endBlock: BigNumberish, overrides?: CallOverrides): Promise<void>;
 
@@ -553,10 +419,6 @@ export class IFarm extends Contract {
       overrides?: CallOverrides
     ): Promise<void>;
 
-    stakeToken(overrides?: CallOverrides): Promise<string>;
-
-    "stakeToken()"(overrides?: CallOverrides): Promise<string>;
-
     startBlock(overrides?: CallOverrides): Promise<BigNumber>;
 
     "startBlock()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -564,10 +426,6 @@ export class IFarm extends Contract {
     updateFarm(overrides?: CallOverrides): Promise<void>;
 
     "updateFarm()"(overrides?: CallOverrides): Promise<void>;
-
-    valueStaked(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "valueStaked()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     withdrawRewards(overrides?: CallOverrides): Promise<void>;
 
@@ -577,10 +435,6 @@ export class IFarm extends Contract {
   filters: {};
 
   estimateGas: {
-    accRewardPerShare(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "accRewardPerShare()"(overrides?: CallOverrides): Promise<BigNumber>;
-
     blockReward(overrides?: CallOverrides): Promise<BigNumber>;
 
     "blockReward()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -609,10 +463,6 @@ export class IFarm extends Contract {
 
     "governance()"(overrides?: CallOverrides): Promise<BigNumber>;
 
-    lastRewardBlock(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "lastRewardBlock()"(overrides?: CallOverrides): Promise<BigNumber>;
-
     master(overrides?: CallOverrides): Promise<BigNumber>;
 
     "master()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -626,10 +476,6 @@ export class IFarm extends Contract {
       _user: string,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
-
-    rewardToken(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "rewardToken()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     setEnd(_endBlock: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
 
@@ -658,10 +504,6 @@ export class IFarm extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    stakeToken(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "stakeToken()"(overrides?: CallOverrides): Promise<BigNumber>;
-
     startBlock(overrides?: CallOverrides): Promise<BigNumber>;
 
     "startBlock()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -670,22 +512,12 @@ export class IFarm extends Contract {
 
     "updateFarm()"(overrides?: Overrides): Promise<BigNumber>;
 
-    valueStaked(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "valueStaked()"(overrides?: CallOverrides): Promise<BigNumber>;
-
     withdrawRewards(overrides?: Overrides): Promise<BigNumber>;
 
     "withdrawRewards()"(overrides?: Overrides): Promise<BigNumber>;
   };
 
   populateTransaction: {
-    accRewardPerShare(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    "accRewardPerShare()"(
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
     blockReward(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "blockReward()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
@@ -714,12 +546,6 @@ export class IFarm extends Contract {
 
     "governance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
-    lastRewardBlock(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    "lastRewardBlock()"(
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
     master(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "master()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
@@ -733,10 +559,6 @@ export class IFarm extends Contract {
       _user: string,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
-
-    rewardToken(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    "rewardToken()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     setEnd(
       _endBlock: BigNumberish,
@@ -768,10 +590,6 @@ export class IFarm extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    stakeToken(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    "stakeToken()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
     startBlock(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "startBlock()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
@@ -779,10 +597,6 @@ export class IFarm extends Contract {
     updateFarm(overrides?: Overrides): Promise<PopulatedTransaction>;
 
     "updateFarm()"(overrides?: Overrides): Promise<PopulatedTransaction>;
-
-    valueStaked(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    "valueStaked()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     withdrawRewards(overrides?: Overrides): Promise<PopulatedTransaction>;
 

@@ -21,19 +21,24 @@ import { BytesLike } from "@ethersproject/bytes";
 import { Listener, Provider } from "@ethersproject/providers";
 import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
-interface ICpFarmInterface extends ethers.utils.Interface {
+interface ISolaceEthLpFarmInterface extends ethers.utils.Interface {
   functions: {
     "accRewardPerShare()": FunctionFragment;
+    "appraise(uint256)": FunctionFragment;
     "blockReward()": FunctionFragment;
-    "depositCp(uint256)": FunctionFragment;
-    "depositCpSigned(address,uint256,uint256,uint8,bytes32,bytes32)": FunctionFragment;
-    "depositEth()": FunctionFragment;
+    "countDeposited(address)": FunctionFragment;
+    "deposit(uint256)": FunctionFragment;
+    "depositSigned(address,uint256,uint256,uint8,bytes32,bytes32)": FunctionFragment;
     "endBlock()": FunctionFragment;
     "farmType()": FunctionFragment;
+    "getDeposited(address,uint256)": FunctionFragment;
     "getMultiplier(uint256,uint256)": FunctionFragment;
     "governance()": FunctionFragment;
     "lastRewardBlock()": FunctionFragment;
+    "listDeposited(address)": FunctionFragment;
+    "lpToken()": FunctionFragment;
     "master()": FunctionFragment;
+    "mintAndDeposit(tuple)": FunctionFragment;
     "pendingRewards(address)": FunctionFragment;
     "setEnd(uint256)": FunctionFragment;
     "setGovernance(address)": FunctionFragment;
@@ -42,9 +47,8 @@ interface ICpFarmInterface extends ethers.utils.Interface {
     "startBlock()": FunctionFragment;
     "updateFarm()": FunctionFragment;
     "valueStaked()": FunctionFragment;
-    "vault()": FunctionFragment;
-    "withdrawCp(uint256)": FunctionFragment;
-    "withdrawEth(uint256,uint256)": FunctionFragment;
+    "weth()": FunctionFragment;
+    "withdraw(uint256)": FunctionFragment;
     "withdrawRewards()": FunctionFragment;
   };
 
@@ -53,15 +57,23 @@ interface ICpFarmInterface extends ethers.utils.Interface {
     values?: undefined
   ): string;
   encodeFunctionData(
+    functionFragment: "appraise",
+    values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
     functionFragment: "blockReward",
     values?: undefined
   ): string;
   encodeFunctionData(
-    functionFragment: "depositCp",
+    functionFragment: "countDeposited",
+    values: [string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "deposit",
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
-    functionFragment: "depositCpSigned",
+    functionFragment: "depositSigned",
     values: [
       string,
       BigNumberish,
@@ -71,12 +83,12 @@ interface ICpFarmInterface extends ethers.utils.Interface {
       BytesLike
     ]
   ): string;
-  encodeFunctionData(
-    functionFragment: "depositEth",
-    values?: undefined
-  ): string;
   encodeFunctionData(functionFragment: "endBlock", values?: undefined): string;
   encodeFunctionData(functionFragment: "farmType", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "getDeposited",
+    values: [string, BigNumberish]
+  ): string;
   encodeFunctionData(
     functionFragment: "getMultiplier",
     values: [BigNumberish, BigNumberish]
@@ -89,7 +101,31 @@ interface ICpFarmInterface extends ethers.utils.Interface {
     functionFragment: "lastRewardBlock",
     values?: undefined
   ): string;
+  encodeFunctionData(
+    functionFragment: "listDeposited",
+    values: [string]
+  ): string;
+  encodeFunctionData(functionFragment: "lpToken", values?: undefined): string;
   encodeFunctionData(functionFragment: "master", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "mintAndDeposit",
+    values: [
+      {
+        depositor: string;
+        amountSolace: BigNumberish;
+        amount0Desired: BigNumberish;
+        amount1Desired: BigNumberish;
+        amount0Min: BigNumberish;
+        amount1Min: BigNumberish;
+        deadline: BigNumberish;
+        tickLower: BigNumberish;
+        tickUpper: BigNumberish;
+        v: BigNumberish;
+        r: BytesLike;
+        s: BytesLike;
+      }
+    ]
+  ): string;
   encodeFunctionData(
     functionFragment: "pendingRewards",
     values: [string]
@@ -119,14 +155,10 @@ interface ICpFarmInterface extends ethers.utils.Interface {
     functionFragment: "valueStaked",
     values?: undefined
   ): string;
-  encodeFunctionData(functionFragment: "vault", values?: undefined): string;
+  encodeFunctionData(functionFragment: "weth", values?: undefined): string;
   encodeFunctionData(
-    functionFragment: "withdrawCp",
+    functionFragment: "withdraw",
     values: [BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "withdrawEth",
-    values: [BigNumberish, BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "withdrawRewards",
@@ -137,18 +169,26 @@ interface ICpFarmInterface extends ethers.utils.Interface {
     functionFragment: "accRewardPerShare",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(functionFragment: "appraise", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "blockReward",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(functionFragment: "depositCp", data: BytesLike): Result;
   decodeFunctionResult(
-    functionFragment: "depositCpSigned",
+    functionFragment: "countDeposited",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(functionFragment: "depositEth", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "deposit", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "depositSigned",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "endBlock", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "farmType", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "getDeposited",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "getMultiplier",
     data: BytesLike
@@ -158,7 +198,16 @@ interface ICpFarmInterface extends ethers.utils.Interface {
     functionFragment: "lastRewardBlock",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(
+    functionFragment: "listDeposited",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "lpToken", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "master", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "mintAndDeposit",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "pendingRewards",
     data: BytesLike
@@ -176,31 +225,23 @@ interface ICpFarmInterface extends ethers.utils.Interface {
     functionFragment: "valueStaked",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(functionFragment: "vault", data: BytesLike): Result;
-  decodeFunctionResult(functionFragment: "withdrawCp", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "withdrawEth",
-    data: BytesLike
-  ): Result;
+  decodeFunctionResult(functionFragment: "weth", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "withdraw", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "withdrawRewards",
     data: BytesLike
   ): Result;
 
   events: {
-    "DepositCp(address,uint256)": EventFragment;
-    "DepositEth(address,uint256)": EventFragment;
-    "WithdrawCp(address,uint256)": EventFragment;
-    "WithdrawEth(address,uint256)": EventFragment;
+    "Deposit(address,uint256)": EventFragment;
+    "Withdraw(address,uint256)": EventFragment;
   };
 
-  getEvent(nameOrSignatureOrTopic: "DepositCp"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "DepositEth"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "WithdrawCp"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "WithdrawEth"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "Deposit"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "Withdraw"): EventFragment;
 }
 
-export class ICpFarm extends Contract {
+export class ISolaceEthLpFarm extends Contract {
   connect(signerOrProvider: Signer | Provider | string): this;
   attach(addressOrName: string): this;
   deployed(): Promise<this>;
@@ -211,7 +252,7 @@ export class ICpFarm extends Contract {
   removeAllListeners(eventName: EventFilter | string): this;
   removeListener(eventName: any, listener: Listener): this;
 
-  interface: ICpFarmInterface;
+  interface: ISolaceEthLpFarmInterface;
 
   functions: {
     accRewardPerShare(
@@ -223,6 +264,22 @@ export class ICpFarm extends Contract {
     "accRewardPerShare()"(
       overrides?: CallOverrides
     ): Promise<{
+      0: BigNumber;
+    }>;
+
+    appraise(
+      _token: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      _value: BigNumber;
+      0: BigNumber;
+    }>;
+
+    "appraise(uint256)"(
+      _token: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      _value: BigNumber;
       0: BigNumber;
     }>;
 
@@ -238,19 +295,33 @@ export class ICpFarm extends Contract {
       0: BigNumber;
     }>;
 
-    depositCp(
-      _amount: BigNumberish,
+    countDeposited(
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    "countDeposited(address)"(
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    deposit(
+      _token: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    "depositCp(uint256)"(
-      _amount: BigNumberish,
+    "deposit(uint256)"(
+      _token: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    depositCpSigned(
+    depositSigned(
       _depositor: string,
-      _amount: BigNumberish,
+      _token: BigNumberish,
       _deadline: BigNumberish,
       v: BigNumberish,
       r: BytesLike,
@@ -258,19 +329,15 @@ export class ICpFarm extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    "depositCpSigned(address,uint256,uint256,uint8,bytes32,bytes32)"(
+    "depositSigned(address,uint256,uint256,uint8,bytes32,bytes32)"(
       _depositor: string,
-      _amount: BigNumberish,
+      _token: BigNumberish,
       _deadline: BigNumberish,
       v: BigNumberish,
       r: BytesLike,
       s: BytesLike,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
-
-    depositEth(overrides?: PayableOverrides): Promise<ContractTransaction>;
-
-    "depositEth()"(overrides?: PayableOverrides): Promise<ContractTransaction>;
 
     endBlock(
       overrides?: CallOverrides
@@ -294,6 +361,24 @@ export class ICpFarm extends Contract {
       overrides?: CallOverrides
     ): Promise<{
       0: BigNumber;
+    }>;
+
+    getDeposited(
+      _user: string,
+      _index: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+      1: BigNumber;
+    }>;
+
+    "getDeposited(address,uint256)"(
+      _user: string,
+      _index: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+      1: BigNumber;
     }>;
 
     getMultiplier(
@@ -336,6 +421,34 @@ export class ICpFarm extends Contract {
       0: BigNumber;
     }>;
 
+    listDeposited(
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber[];
+      1: BigNumber[];
+    }>;
+
+    "listDeposited(address)"(
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber[];
+      1: BigNumber[];
+    }>;
+
+    lpToken(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "lpToken()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
     master(
       overrides?: CallOverrides
     ): Promise<{
@@ -347,6 +460,42 @@ export class ICpFarm extends Contract {
     ): Promise<{
       0: string;
     }>;
+
+    mintAndDeposit(
+      params: {
+        depositor: string;
+        amountSolace: BigNumberish;
+        amount0Desired: BigNumberish;
+        amount1Desired: BigNumberish;
+        amount0Min: BigNumberish;
+        amount1Min: BigNumberish;
+        deadline: BigNumberish;
+        tickLower: BigNumberish;
+        tickUpper: BigNumberish;
+        v: BigNumberish;
+        r: BytesLike;
+        s: BytesLike;
+      },
+      overrides?: PayableOverrides
+    ): Promise<ContractTransaction>;
+
+    "mintAndDeposit(tuple)"(
+      params: {
+        depositor: string;
+        amountSolace: BigNumberish;
+        amount0Desired: BigNumberish;
+        amount1Desired: BigNumberish;
+        amount0Min: BigNumberish;
+        amount1Min: BigNumberish;
+        deadline: BigNumberish;
+        tickLower: BigNumberish;
+        tickUpper: BigNumberish;
+        v: BigNumberish;
+        r: BytesLike;
+        s: BytesLike;
+      },
+      overrides?: PayableOverrides
+    ): Promise<ContractTransaction>;
 
     pendingRewards(
       _user: string,
@@ -432,37 +581,25 @@ export class ICpFarm extends Contract {
       0: BigNumber;
     }>;
 
-    vault(
+    weth(
       overrides?: CallOverrides
     ): Promise<{
       0: string;
     }>;
 
-    "vault()"(
+    "weth()"(
       overrides?: CallOverrides
     ): Promise<{
       0: string;
     }>;
 
-    withdrawCp(
-      _amount: BigNumberish,
+    withdraw(
+      _token: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    "withdrawCp(uint256)"(
-      _amount: BigNumberish,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
-    withdrawEth(
-      _amount: BigNumberish,
-      _maxLoss: BigNumberish,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
-    "withdrawEth(uint256,uint256)"(
-      _amount: BigNumberish,
-      _maxLoss: BigNumberish,
+    "withdraw(uint256)"(
+      _token: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
@@ -475,23 +612,37 @@ export class ICpFarm extends Contract {
 
   "accRewardPerShare()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+  appraise(_token: BigNumberish, overrides?: CallOverrides): Promise<BigNumber>;
+
+  "appraise(uint256)"(
+    _token: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
+
   blockReward(overrides?: CallOverrides): Promise<BigNumber>;
 
   "blockReward()"(overrides?: CallOverrides): Promise<BigNumber>;
 
-  depositCp(
-    _amount: BigNumberish,
+  countDeposited(_user: string, overrides?: CallOverrides): Promise<BigNumber>;
+
+  "countDeposited(address)"(
+    _user: string,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
+
+  deposit(
+    _token: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  "depositCp(uint256)"(
-    _amount: BigNumberish,
+  "deposit(uint256)"(
+    _token: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  depositCpSigned(
+  depositSigned(
     _depositor: string,
-    _amount: BigNumberish,
+    _token: BigNumberish,
     _deadline: BigNumberish,
     v: BigNumberish,
     r: BytesLike,
@@ -499,19 +650,15 @@ export class ICpFarm extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  "depositCpSigned(address,uint256,uint256,uint8,bytes32,bytes32)"(
+  "depositSigned(address,uint256,uint256,uint8,bytes32,bytes32)"(
     _depositor: string,
-    _amount: BigNumberish,
+    _token: BigNumberish,
     _deadline: BigNumberish,
     v: BigNumberish,
     r: BytesLike,
     s: BytesLike,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
-
-  depositEth(overrides?: PayableOverrides): Promise<ContractTransaction>;
-
-  "depositEth()"(overrides?: PayableOverrides): Promise<ContractTransaction>;
 
   endBlock(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -520,6 +667,24 @@ export class ICpFarm extends Contract {
   farmType(overrides?: CallOverrides): Promise<BigNumber>;
 
   "farmType()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+  getDeposited(
+    _user: string,
+    _index: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<{
+    0: BigNumber;
+    1: BigNumber;
+  }>;
+
+  "getDeposited(address,uint256)"(
+    _user: string,
+    _index: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<{
+    0: BigNumber;
+    1: BigNumber;
+  }>;
 
   getMultiplier(
     _from: BigNumberish,
@@ -541,9 +706,65 @@ export class ICpFarm extends Contract {
 
   "lastRewardBlock()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+  listDeposited(
+    _user: string,
+    overrides?: CallOverrides
+  ): Promise<{
+    0: BigNumber[];
+    1: BigNumber[];
+  }>;
+
+  "listDeposited(address)"(
+    _user: string,
+    overrides?: CallOverrides
+  ): Promise<{
+    0: BigNumber[];
+    1: BigNumber[];
+  }>;
+
+  lpToken(overrides?: CallOverrides): Promise<string>;
+
+  "lpToken()"(overrides?: CallOverrides): Promise<string>;
+
   master(overrides?: CallOverrides): Promise<string>;
 
   "master()"(overrides?: CallOverrides): Promise<string>;
+
+  mintAndDeposit(
+    params: {
+      depositor: string;
+      amountSolace: BigNumberish;
+      amount0Desired: BigNumberish;
+      amount1Desired: BigNumberish;
+      amount0Min: BigNumberish;
+      amount1Min: BigNumberish;
+      deadline: BigNumberish;
+      tickLower: BigNumberish;
+      tickUpper: BigNumberish;
+      v: BigNumberish;
+      r: BytesLike;
+      s: BytesLike;
+    },
+    overrides?: PayableOverrides
+  ): Promise<ContractTransaction>;
+
+  "mintAndDeposit(tuple)"(
+    params: {
+      depositor: string;
+      amountSolace: BigNumberish;
+      amount0Desired: BigNumberish;
+      amount1Desired: BigNumberish;
+      amount0Min: BigNumberish;
+      amount1Min: BigNumberish;
+      deadline: BigNumberish;
+      tickLower: BigNumberish;
+      tickUpper: BigNumberish;
+      v: BigNumberish;
+      r: BytesLike;
+      s: BytesLike;
+    },
+    overrides?: PayableOverrides
+  ): Promise<ContractTransaction>;
 
   pendingRewards(_user: string, overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -598,29 +819,17 @@ export class ICpFarm extends Contract {
 
   "valueStaked()"(overrides?: CallOverrides): Promise<BigNumber>;
 
-  vault(overrides?: CallOverrides): Promise<string>;
+  weth(overrides?: CallOverrides): Promise<string>;
 
-  "vault()"(overrides?: CallOverrides): Promise<string>;
+  "weth()"(overrides?: CallOverrides): Promise<string>;
 
-  withdrawCp(
-    _amount: BigNumberish,
+  withdraw(
+    _token: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  "withdrawCp(uint256)"(
-    _amount: BigNumberish,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
-  withdrawEth(
-    _amount: BigNumberish,
-    _maxLoss: BigNumberish,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
-  "withdrawEth(uint256,uint256)"(
-    _amount: BigNumberish,
-    _maxLoss: BigNumberish,
+  "withdraw(uint256)"(
+    _token: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
@@ -633,20 +842,40 @@ export class ICpFarm extends Contract {
 
     "accRewardPerShare()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+    appraise(
+      _token: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "appraise(uint256)"(
+      _token: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     blockReward(overrides?: CallOverrides): Promise<BigNumber>;
 
     "blockReward()"(overrides?: CallOverrides): Promise<BigNumber>;
 
-    depositCp(_amount: BigNumberish, overrides?: CallOverrides): Promise<void>;
+    countDeposited(
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
-    "depositCp(uint256)"(
-      _amount: BigNumberish,
+    "countDeposited(address)"(
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    deposit(_token: BigNumberish, overrides?: CallOverrides): Promise<void>;
+
+    "deposit(uint256)"(
+      _token: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
 
-    depositCpSigned(
+    depositSigned(
       _depositor: string,
-      _amount: BigNumberish,
+      _token: BigNumberish,
       _deadline: BigNumberish,
       v: BigNumberish,
       r: BytesLike,
@@ -654,19 +883,15 @@ export class ICpFarm extends Contract {
       overrides?: CallOverrides
     ): Promise<void>;
 
-    "depositCpSigned(address,uint256,uint256,uint8,bytes32,bytes32)"(
+    "depositSigned(address,uint256,uint256,uint8,bytes32,bytes32)"(
       _depositor: string,
-      _amount: BigNumberish,
+      _token: BigNumberish,
       _deadline: BigNumberish,
       v: BigNumberish,
       r: BytesLike,
       s: BytesLike,
       overrides?: CallOverrides
     ): Promise<void>;
-
-    depositEth(overrides?: CallOverrides): Promise<void>;
-
-    "depositEth()"(overrides?: CallOverrides): Promise<void>;
 
     endBlock(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -675,6 +900,24 @@ export class ICpFarm extends Contract {
     farmType(overrides?: CallOverrides): Promise<BigNumber>;
 
     "farmType()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    getDeposited(
+      _user: string,
+      _index: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+      1: BigNumber;
+    }>;
+
+    "getDeposited(address,uint256)"(
+      _user: string,
+      _index: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+      1: BigNumber;
+    }>;
 
     getMultiplier(
       _from: BigNumberish,
@@ -696,9 +939,65 @@ export class ICpFarm extends Contract {
 
     "lastRewardBlock()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+    listDeposited(
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber[];
+      1: BigNumber[];
+    }>;
+
+    "listDeposited(address)"(
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber[];
+      1: BigNumber[];
+    }>;
+
+    lpToken(overrides?: CallOverrides): Promise<string>;
+
+    "lpToken()"(overrides?: CallOverrides): Promise<string>;
+
     master(overrides?: CallOverrides): Promise<string>;
 
     "master()"(overrides?: CallOverrides): Promise<string>;
+
+    mintAndDeposit(
+      params: {
+        depositor: string;
+        amountSolace: BigNumberish;
+        amount0Desired: BigNumberish;
+        amount1Desired: BigNumberish;
+        amount0Min: BigNumberish;
+        amount1Min: BigNumberish;
+        deadline: BigNumberish;
+        tickLower: BigNumberish;
+        tickUpper: BigNumberish;
+        v: BigNumberish;
+        r: BytesLike;
+        s: BytesLike;
+      },
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "mintAndDeposit(tuple)"(
+      params: {
+        depositor: string;
+        amountSolace: BigNumberish;
+        amount0Desired: BigNumberish;
+        amount1Desired: BigNumberish;
+        amount0Min: BigNumberish;
+        amount1Min: BigNumberish;
+        deadline: BigNumberish;
+        tickLower: BigNumberish;
+        tickUpper: BigNumberish;
+        v: BigNumberish;
+        r: BytesLike;
+        s: BytesLike;
+      },
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
     pendingRewards(
       _user: string,
@@ -753,26 +1052,14 @@ export class ICpFarm extends Contract {
 
     "valueStaked()"(overrides?: CallOverrides): Promise<BigNumber>;
 
-    vault(overrides?: CallOverrides): Promise<string>;
+    weth(overrides?: CallOverrides): Promise<string>;
 
-    "vault()"(overrides?: CallOverrides): Promise<string>;
+    "weth()"(overrides?: CallOverrides): Promise<string>;
 
-    withdrawCp(_amount: BigNumberish, overrides?: CallOverrides): Promise<void>;
+    withdraw(_token: BigNumberish, overrides?: CallOverrides): Promise<void>;
 
-    "withdrawCp(uint256)"(
-      _amount: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    withdrawEth(
-      _amount: BigNumberish,
-      _maxLoss: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    "withdrawEth(uint256,uint256)"(
-      _amount: BigNumberish,
-      _maxLoss: BigNumberish,
+    "withdraw(uint256)"(
+      _token: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -782,13 +1069,9 @@ export class ICpFarm extends Contract {
   };
 
   filters: {
-    DepositCp(_user: string | null, _amount: null): EventFilter;
+    Deposit(_user: string | null, _token: null): EventFilter;
 
-    DepositEth(_user: string | null, _amount: null): EventFilter;
-
-    WithdrawCp(_user: string | null, _amount: null): EventFilter;
-
-    WithdrawEth(_user: string | null, _amount: null): EventFilter;
+    Withdraw(_user: string | null, _token: null): EventFilter;
   };
 
   estimateGas: {
@@ -796,20 +1079,40 @@ export class ICpFarm extends Contract {
 
     "accRewardPerShare()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+    appraise(
+      _token: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "appraise(uint256)"(
+      _token: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     blockReward(overrides?: CallOverrides): Promise<BigNumber>;
 
     "blockReward()"(overrides?: CallOverrides): Promise<BigNumber>;
 
-    depositCp(_amount: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
+    countDeposited(
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
-    "depositCp(uint256)"(
-      _amount: BigNumberish,
+    "countDeposited(address)"(
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    deposit(_token: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
+
+    "deposit(uint256)"(
+      _token: BigNumberish,
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    depositCpSigned(
+    depositSigned(
       _depositor: string,
-      _amount: BigNumberish,
+      _token: BigNumberish,
       _deadline: BigNumberish,
       v: BigNumberish,
       r: BytesLike,
@@ -817,19 +1120,15 @@ export class ICpFarm extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    "depositCpSigned(address,uint256,uint256,uint8,bytes32,bytes32)"(
+    "depositSigned(address,uint256,uint256,uint8,bytes32,bytes32)"(
       _depositor: string,
-      _amount: BigNumberish,
+      _token: BigNumberish,
       _deadline: BigNumberish,
       v: BigNumberish,
       r: BytesLike,
       s: BytesLike,
       overrides?: Overrides
     ): Promise<BigNumber>;
-
-    depositEth(overrides?: PayableOverrides): Promise<BigNumber>;
-
-    "depositEth()"(overrides?: PayableOverrides): Promise<BigNumber>;
 
     endBlock(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -838,6 +1137,18 @@ export class ICpFarm extends Contract {
     farmType(overrides?: CallOverrides): Promise<BigNumber>;
 
     "farmType()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    getDeposited(
+      _user: string,
+      _index: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "getDeposited(address,uint256)"(
+      _user: string,
+      _index: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
     getMultiplier(
       _from: BigNumberish,
@@ -859,9 +1170,56 @@ export class ICpFarm extends Contract {
 
     "lastRewardBlock()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+    listDeposited(_user: string, overrides?: CallOverrides): Promise<BigNumber>;
+
+    "listDeposited(address)"(
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    lpToken(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "lpToken()"(overrides?: CallOverrides): Promise<BigNumber>;
+
     master(overrides?: CallOverrides): Promise<BigNumber>;
 
     "master()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    mintAndDeposit(
+      params: {
+        depositor: string;
+        amountSolace: BigNumberish;
+        amount0Desired: BigNumberish;
+        amount1Desired: BigNumberish;
+        amount0Min: BigNumberish;
+        amount1Min: BigNumberish;
+        deadline: BigNumberish;
+        tickLower: BigNumberish;
+        tickUpper: BigNumberish;
+        v: BigNumberish;
+        r: BytesLike;
+        s: BytesLike;
+      },
+      overrides?: PayableOverrides
+    ): Promise<BigNumber>;
+
+    "mintAndDeposit(tuple)"(
+      params: {
+        depositor: string;
+        amountSolace: BigNumberish;
+        amount0Desired: BigNumberish;
+        amount1Desired: BigNumberish;
+        amount0Min: BigNumberish;
+        amount1Min: BigNumberish;
+        deadline: BigNumberish;
+        tickLower: BigNumberish;
+        tickUpper: BigNumberish;
+        v: BigNumberish;
+        r: BytesLike;
+        s: BytesLike;
+      },
+      overrides?: PayableOverrides
+    ): Promise<BigNumber>;
 
     pendingRewards(
       _user: string,
@@ -916,29 +1274,14 @@ export class ICpFarm extends Contract {
 
     "valueStaked()"(overrides?: CallOverrides): Promise<BigNumber>;
 
-    vault(overrides?: CallOverrides): Promise<BigNumber>;
+    weth(overrides?: CallOverrides): Promise<BigNumber>;
 
-    "vault()"(overrides?: CallOverrides): Promise<BigNumber>;
+    "weth()"(overrides?: CallOverrides): Promise<BigNumber>;
 
-    withdrawCp(
-      _amount: BigNumberish,
-      overrides?: Overrides
-    ): Promise<BigNumber>;
+    withdraw(_token: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
 
-    "withdrawCp(uint256)"(
-      _amount: BigNumberish,
-      overrides?: Overrides
-    ): Promise<BigNumber>;
-
-    withdrawEth(
-      _amount: BigNumberish,
-      _maxLoss: BigNumberish,
-      overrides?: Overrides
-    ): Promise<BigNumber>;
-
-    "withdrawEth(uint256,uint256)"(
-      _amount: BigNumberish,
-      _maxLoss: BigNumberish,
+    "withdraw(uint256)"(
+      _token: BigNumberish,
       overrides?: Overrides
     ): Promise<BigNumber>;
 
@@ -954,23 +1297,43 @@ export class ICpFarm extends Contract {
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
+    appraise(
+      _token: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "appraise(uint256)"(
+      _token: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
     blockReward(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "blockReward()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
-    depositCp(
-      _amount: BigNumberish,
+    countDeposited(
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "countDeposited(address)"(
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    deposit(
+      _token: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    "depositCp(uint256)"(
-      _amount: BigNumberish,
+    "deposit(uint256)"(
+      _token: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    depositCpSigned(
+    depositSigned(
       _depositor: string,
-      _amount: BigNumberish,
+      _token: BigNumberish,
       _deadline: BigNumberish,
       v: BigNumberish,
       r: BytesLike,
@@ -978,19 +1341,15 @@ export class ICpFarm extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    "depositCpSigned(address,uint256,uint256,uint8,bytes32,bytes32)"(
+    "depositSigned(address,uint256,uint256,uint8,bytes32,bytes32)"(
       _depositor: string,
-      _amount: BigNumberish,
+      _token: BigNumberish,
       _deadline: BigNumberish,
       v: BigNumberish,
       r: BytesLike,
       s: BytesLike,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
-
-    depositEth(overrides?: PayableOverrides): Promise<PopulatedTransaction>;
-
-    "depositEth()"(overrides?: PayableOverrides): Promise<PopulatedTransaction>;
 
     endBlock(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
@@ -999,6 +1358,18 @@ export class ICpFarm extends Contract {
     farmType(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "farmType()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    getDeposited(
+      _user: string,
+      _index: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "getDeposited(address,uint256)"(
+      _user: string,
+      _index: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
 
     getMultiplier(
       _from: BigNumberish,
@@ -1022,9 +1393,59 @@ export class ICpFarm extends Contract {
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
+    listDeposited(
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "listDeposited(address)"(
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    lpToken(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "lpToken()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
     master(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "master()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    mintAndDeposit(
+      params: {
+        depositor: string;
+        amountSolace: BigNumberish;
+        amount0Desired: BigNumberish;
+        amount1Desired: BigNumberish;
+        amount0Min: BigNumberish;
+        amount1Min: BigNumberish;
+        deadline: BigNumberish;
+        tickLower: BigNumberish;
+        tickUpper: BigNumberish;
+        v: BigNumberish;
+        r: BytesLike;
+        s: BytesLike;
+      },
+      overrides?: PayableOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "mintAndDeposit(tuple)"(
+      params: {
+        depositor: string;
+        amountSolace: BigNumberish;
+        amount0Desired: BigNumberish;
+        amount1Desired: BigNumberish;
+        amount0Min: BigNumberish;
+        amount1Min: BigNumberish;
+        deadline: BigNumberish;
+        tickLower: BigNumberish;
+        tickUpper: BigNumberish;
+        v: BigNumberish;
+        r: BytesLike;
+        s: BytesLike;
+      },
+      overrides?: PayableOverrides
+    ): Promise<PopulatedTransaction>;
 
     pendingRewards(
       _user: string,
@@ -1082,29 +1503,17 @@ export class ICpFarm extends Contract {
 
     "valueStaked()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
-    vault(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+    weth(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
-    "vault()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+    "weth()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
-    withdrawCp(
-      _amount: BigNumberish,
+    withdraw(
+      _token: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    "withdrawCp(uint256)"(
-      _amount: BigNumberish,
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    withdrawEth(
-      _amount: BigNumberish,
-      _maxLoss: BigNumberish,
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    "withdrawEth(uint256,uint256)"(
-      _amount: BigNumberish,
-      _maxLoss: BigNumberish,
+    "withdraw(uint256)"(
+      _token: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 

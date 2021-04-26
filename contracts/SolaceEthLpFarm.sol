@@ -7,23 +7,25 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "./libraries/TickBitmap.sol";
 import "./interface/IUniswapLpToken.sol";
 import "./interface/IUniswapV3Pool.sol";
-import "./interface/IUniswapLpFarm.sol";
+import "./interface/ISolaceEthLpFarm.sol";
+
 
 /**
- * @title UniswapLpFarm: A farm that allows for the staking of Uniswap LP tokens.
+ * @title SolaceEthLpFarm: A farm that allows for the staking of Uniswap LP tokens in SOLACE-ETH pools.
  * @author solace.fi
  */
-contract UniswapLpFarm is IUniswapLpFarm {
+contract SolaceEthLpFarm is ISolaceEthLpFarm {
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.UintSet;
     using TickBitmap for mapping(int16 => uint256);
 
     /// @notice A unique enumerator that identifies the farm type.
-    uint256 public override farmType = 2;
+    uint256 public override farmType = 3;
 
     IUniswapLpToken public override lpToken;   // LP Token interface.
     /// @notice Native SOLACE Token.
     SOLACE public override solace;
+    IWETH10 public override weth;
     uint256 public override blockReward;       // Amount of rewardToken distributed per block.
     uint256 public override startBlock;        // When the farm will start.
     uint256 public override endBlock;          // When the farm will end.
@@ -92,6 +94,7 @@ contract UniswapLpFarm is IUniswapLpFarm {
     uint24 public fee;
     int24 public tickSpacing;
     int24 public lastTick;
+    bool solaceIsToken0;
 
     // list of tokens deposited by user
     mapping(address => EnumerableSet.UintSet) private userDeposited;
@@ -111,7 +114,8 @@ contract UniswapLpFarm is IUniswapLpFarm {
         SOLACE _solace,
         uint256 _startBlock,
         uint256 _endBlock,
-        address _pool
+        address _pool,
+        address _weth
     ) public {
         // copy params
         master = _master;
@@ -120,6 +124,7 @@ contract UniswapLpFarm is IUniswapLpFarm {
         startBlock = _startBlock;
         endBlock = _endBlock;
         lastRewardBlock = Math.max(block.number, _startBlock);
+        weth = IWETH10(_weth);
         governance = msg.sender;
         // get pool data
         pool = IUniswapV3Pool(_pool);
@@ -128,6 +133,9 @@ contract UniswapLpFarm is IUniswapLpFarm {
         fee = pool.fee();
         tickSpacing = pool.tickSpacing();
         ( , lastTick, , , , , ) = pool.slot0();
+        // inf allowance to nft manager
+        solace.approve(_lpToken, type(uint256).max);
+        weth.approve(_lpToken, type(uint256).max);
     }
 
     /**
@@ -196,6 +204,50 @@ contract UniswapLpFarm is IUniswapLpFarm {
         lpToken.transferFrom(_depositor, address(this), _token);
         // accounting
         _deposit(_depositor, _token);
+    }
+
+    /**
+     * @notice Mint a new Uniswap LP token then deposit it.
+     * User will receive accumulated Solace rewards if any.
+     * @param params parameters
+     * @return tokenId The newly minted token id.
+     */
+    function mintAndDeposit(MintAndDepositParams calldata params) external payable override returns (uint256 tokenId) {
+        // permit solace
+        solace.permit(params.depositor, address(this), params.amountSolace, params.deadline, params.v, params.r, params.s);
+        // pull solace
+        IERC20(solace).safeTransferFrom(params.depositor, address(this), params.amountSolace);
+        // wrap eth
+        weth.deposit{value: msg.value}();
+        // mint token
+        uint128 liquidity;
+        uint256 amount0;
+        uint256 amount1;
+        ( tokenId, liquidity, amount0, amount1 ) = lpToken.mint(IUniswapLpToken.MintParams({
+            token0: token0,
+            token1: token1,
+            fee: fee,
+            tickLower: params.tickLower,
+            tickUpper: params.tickUpper,
+            amount0Desired: params.amount0Desired,
+            amount1Desired: params.amount1Desired,
+            amount0Min: params.amount0Min,
+            amount1Min: params.amount1Min,
+            recipient: address(this),
+            deadline: params.deadline
+        }));
+        // pay back depositor excess solace
+        uint256 solaceReturnAmount = ((token0 == address(solace))
+            ? params.amountSolace - amount0
+            : params.amountSolace - amount1);
+        if (solaceReturnAmount > 0) IERC20(solace).safeTransfer(params.depositor, solaceReturnAmount);
+        // pay back sender excess eth
+        uint256 ethReturnAmount = ((token0 == address(solace))
+            ? msg.value - amount1
+            : msg.value - amount0);
+        if (ethReturnAmount > 0) weth.withdrawTo(payable(msg.sender), ethReturnAmount);
+        // accounting
+        _deposit(params.depositor, tokenId);
     }
 
     /**
@@ -414,7 +466,8 @@ contract UniswapLpFarm is IUniswapLpFarm {
         // get position
         ( , , address _token0, address _token1, uint24 _fee, int24 tickLower, int24 tickUpper, uint128 liquidity, , , , )
         = lpToken.positions(_token);
-        require(token0 == _token0 && token1 == _token1 && fee == _fee, "wrong pool");
+        // check if correct pool
+        require((fee == _fee) && (token0 == _token0) && (token1 == _token1), "wrong pool");
         // appraise
         _value = _appraise(liquidity, tickLower, tickUpper);
     }
@@ -460,15 +513,21 @@ contract UniswapLpFarm is IUniswapLpFarm {
         IERC20(solace).safeTransferFrom(master, _user, transferAmount);
     }
 
+    /**
+     * @notice Performs the internal accounting for a deposit.
+     * @param _depositor The depositing user.
+     * @param _token The id of the token to deposit.
+     */
     function _deposit(address _depositor, uint256 _token) internal {
+        // get position
+        ( , , address _token0, address _token1, uint24 _fee, int24 tickLower, int24 tickUpper, uint128 liquidity, , , , )
+        = lpToken.positions(_token);
+        // check if correct pool
+        require((fee == _fee) && (token0 == _token0) && (token1 == _token1), "wrong pool");
         // harvest and update farm
         _harvest(_depositor);
         // get farmer information
         UserInfo storage user = userInfo[_depositor];
-        // get position
-        ( , , address _token0, address _token1, uint24 _fee, int24 tickLower, int24 tickUpper, uint128 liquidity, , , , )
-        = lpToken.positions(_token);
-        require(token0 == _token0 && token1 == _token1 && fee == _fee, "wrong pool");
         // record position
         TokenInfo memory _tokenInfo = TokenInfo({
             depositor: _depositor,

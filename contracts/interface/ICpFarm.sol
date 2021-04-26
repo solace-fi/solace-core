@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.0;
 
+import "./IVault.sol";
+import "./../SOLACE.sol";
 import "./IFarm.sol";
 
 
@@ -37,6 +39,18 @@ interface ICpFarm is IFarm {
     function depositCp(uint256 _amount) external;
 
     /**
+     * @notice Deposit some CP tokens using permit.
+     * User will receive accumulated rewards if any.
+     * @param _depositor The depositing user.
+     * @param _amount The deposit amount.
+     * @param _deadline Time the transaction must go through before.
+     * @param v secp256k1 signature
+     * @param r secp256k1 signature
+     * @param s secp256k1 signature
+     */
+    function depositCpSigned(address _depositor, uint256 _amount, uint256 _deadline, uint8 v, bytes32 r, bytes32 s) external;
+
+    /**
      * @notice Deposit some ETH.
      * User will receive accumulated rewards if any.
      */
@@ -57,4 +71,11 @@ interface ICpFarm is IFarm {
      * @param _maxLoss The acceptable amount of loss.
      */
     function withdrawEth(uint256 _amount, uint256 _maxLoss) external;
+
+    function vault() external view returns (IVault);
+    function solace() external view returns (SOLACE);
+
+    function lastRewardBlock() external view returns (uint256);   // Last time rewards were distributed or farm was updated.
+    function accRewardPerShare() external view returns (uint256); // Accumulated rewards per share, times 1e12.
+    function valueStaked() external view returns (uint256);       // Value of tokens staked by all farmers.
 }
