@@ -18,6 +18,7 @@ contract MockERC721 is ERC721Enumerable {
     /// @notice The value of tokens
     mapping(uint256 => uint256) public values;
 
+    // solhint-disable-next-line no-empty-blocks
     constructor(string memory name, string memory symbol) ERC721(name, symbol) {}
 
     /**

@@ -1019,7 +1019,95 @@
 818
 819
 820
-821</pre></div></td><td class="code"><div class="highlight"><pre><span></span><span class="c1">// </span><span class="cs">SPDX-License-Identifier:</span><span class="c1"> GPL-3.0-or-later</span>
+821
+822
+823
+824
+825
+826
+827
+828
+829
+830
+831
+832
+833
+834
+835
+836
+837
+838
+839
+840
+841
+842
+843
+844
+845
+846
+847
+848
+849
+850
+851
+852
+853
+854
+855
+856
+857
+858
+859
+860
+861
+862
+863
+864
+865
+866
+867
+868
+869
+870
+871
+872
+873
+874
+875
+876
+877
+878
+879
+880
+881
+882
+883
+884
+885
+886
+887
+888
+889
+890
+891
+892
+893
+894
+895
+896
+897
+898
+899
+900
+901
+902
+903
+904
+905
+906
+907
+908
+909</pre></div></td><td class="code"><div class="highlight"><pre><span></span><span class="c1">// </span><span class="cs">SPDX-License-Identifier:</span><span class="c1"> GPL-3.0-or-later</span>
 
 <span class="k">pragma solidity</span> <span class="mf">0.8</span><span class="p">.</span><span class="mi">0</span><span class="p">;</span>
 
@@ -1139,6 +1227,10 @@
     <span class="kd">event</span> <span class="n">StrategyRevoked</span><span class="p">(</span><span class="kt">address</span> <span class="n">strategy</span><span class="p">);</span>
     <span class="kd">event</span> <span class="n">EmergencyShutdown</span><span class="p">(</span><span class="kt">bool</span> <span class="n">active</span><span class="p">);</span>
     <span class="kd">event</span> <span class="n">ClaimProcessed</span><span class="p">(</span><span class="kt">address</span> <span class="k">indexed</span> <span class="n">claimant</span><span class="p">,</span> <span class="kt">uint256</span> <span class="k">indexed</span> <span class="n">amount</span><span class="p">);</span>
+    <span class="kd">event</span> <span class="n">StrategyUpdateDebtRatio</span><span class="p">(</span><span class="kt">address</span> <span class="k">indexed</span> <span class="n">strategy</span><span class="p">,</span> <span class="kt">uint256</span> <span class="k">indexed</span> <span class="n">newDebtRatio</span><span class="p">);</span>
+    <span class="kd">event</span> <span class="n">StrategyUpdateMinDebtPerHarvest</span><span class="p">(</span><span class="kt">address</span> <span class="k">indexed</span> <span class="n">strategy</span><span class="p">,</span> <span class="kt">uint256</span> <span class="k">indexed</span> <span class="n">newMinDebtPerHarvest</span><span class="p">);</span>
+    <span class="kd">event</span> <span class="n">StrategyUpdateMaxDebtPerHarvest</span><span class="p">(</span><span class="kt">address</span> <span class="k">indexed</span> <span class="n">strategy</span><span class="p">,</span> <span class="kt">uint256</span> <span class="k">indexed</span> <span class="n">newMaxDebtPerHarvest</span><span class="p">);</span>
+    <span class="kd">event</span> <span class="n">StrategyUpdatePerformanceFee</span><span class="p">(</span><span class="kt">address</span> <span class="k">indexed</span> <span class="n">strategy</span><span class="p">,</span> <span class="kt">uint256</span> <span class="k">indexed</span> <span class="n">newPerformanceFee</span><span class="p">);</span>
 
     <span class="kd">constructor</span> <span class="p">(</span><span class="kt">address</span> <span class="n">_registry</span><span class="p">,</span> <span class="kt">address</span> <span class="n">_token</span><span class="p">)</span> <span class="n">ERC20</span><span class="p">(</span><span class="s">&quot;Solace CP Token&quot;</span><span class="p">,</span> <span class="s">&quot;SCP&quot;</span><span class="p">)</span> <span class="n">ERC20Permit</span><span class="p">(</span><span class="s">&quot;Solace CP Token&quot;</span><span class="p">)</span> <span class="p">{</span>
         <span class="n">governance</span> <span class="o">=</span> <span class="nb">msg.sender</span><span class="p">;</span>
@@ -1187,6 +1279,17 @@
     <span class="kd">function</span> <span class="n">setMinCapitalRequirement</span><span class="p">(</span><span class="kt">uint256</span> <span class="n">newMCR</span><span class="p">)</span> <span class="k">external</span> <span class="p">{</span>
         <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
         <span class="n">minCapitalRequirement</span> <span class="o">=</span> <span class="n">newMCR</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Changes the performanceFee of the Vault. </span>
+<span class="cm">     * Can only be called by the current governor.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> fee New performanceFee to use</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">setPerformanceFee</span><span class="p">(</span><span class="kt">uint256</span> <span class="n">fee</span><span class="p">)</span> <span class="k">external</span> <span class="p">{</span>
+        <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
+        <span class="nf">require</span><span class="p">(</span><span class="n">fee</span> <span class="o">&lt;=</span> <span class="n">MAX_BPS</span><span class="p">,</span> <span class="s">&quot;cannot exceed MAX_BPS&quot;</span><span class="p">);</span>
+        <span class="n">performanceFee</span> <span class="o">=</span> <span class="n">fee</span><span class="p">;</span>
     <span class="p">}</span>
 
     <span class="cm">/**</span>
@@ -1357,6 +1460,79 @@
         <span class="n">escrow</span><span class="p">.</span><span class="n">receiveClaim</span><span class="p">{</span><span class="n">value</span><span class="o">:</span> <span class="n">amount</span><span class="p">}(</span><span class="n">claimant</span><span class="p">);</span>
 
         <span class="k">emit</span> <span class="n">ClaimProcessed</span><span class="p">(</span><span class="n">claimant</span><span class="p">,</span> <span class="n">amount</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Change the quantity of assets `strategy` may manage.</span>
+<span class="cm">     * Can only be called by the current governor.</span>
+<span class="cm">     * Can only be called on an active strategy (added using addStrategy)</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _strategy address of the strategy to update</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _debtRatio The new `debtRatio` of Strategy (quantity of assets it can manage)</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">updateStrategyDebtRatio</span><span class="p">(</span><span class="kt">address</span> <span class="n">_strategy</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_debtRatio</span><span class="p">)</span> <span class="k">external</span> <span class="p">{</span>
+        <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
+        <span class="nf">require</span><span class="p">(</span><span class="n">_strategies</span><span class="p">[</span><span class="n">_strategy</span><span class="p">].</span><span class="n">activation</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span> <span class="s">&quot;must be a current strategy&quot;</span><span class="p">);</span>
+
+        <span class="n">debtRatio</span> <span class="o">-=</span> <span class="n">_strategies</span><span class="p">[</span><span class="n">_strategy</span><span class="p">].</span><span class="n">debtRatio</span><span class="p">;</span>
+        <span class="n">_strategies</span><span class="p">[</span><span class="n">_strategy</span><span class="p">].</span><span class="n">debtRatio</span> <span class="o">=</span> <span class="n">_debtRatio</span><span class="p">;</span>
+        <span class="n">debtRatio</span> <span class="o">+=</span> <span class="n">_debtRatio</span><span class="p">;</span>
+
+        <span class="nf">require</span><span class="p">(</span><span class="n">debtRatio</span> <span class="o">&lt;=</span> <span class="n">MAX_BPS</span><span class="p">,</span> <span class="s">&quot;Vault debt ratio cannot exceed MAX_BPS&quot;</span><span class="p">);</span>
+        
+        <span class="k">emit</span> <span class="n">StrategyUpdateDebtRatio</span><span class="p">(</span><span class="n">_strategy</span><span class="p">,</span> <span class="n">_debtRatio</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Change the quantity assets per block this Vault may deposit to or</span>
+<span class="cm">     * withdraw from `strategy`.</span>
+<span class="cm">     * Can only be called by the current governor.</span>
+<span class="cm">     * Can only be called on an active strategy (added using addStrategy)</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _strategy Address of the strategy to update</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _minDebtPerHarvest New lower limit on the increase of debt since last harvest</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">updateStrategyMinDebtPerHarvest</span><span class="p">(</span><span class="kt">address</span> <span class="n">_strategy</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_minDebtPerHarvest</span><span class="p">)</span> <span class="k">external</span> <span class="p">{</span>
+        <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
+        <span class="nf">require</span><span class="p">(</span><span class="n">_strategies</span><span class="p">[</span><span class="n">_strategy</span><span class="p">].</span><span class="n">activation</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span> <span class="s">&quot;must be a current strategy&quot;</span><span class="p">);</span>
+        <span class="nf">require</span><span class="p">(</span><span class="n">_strategies</span><span class="p">[</span><span class="n">_strategy</span><span class="p">].</span><span class="n">maxDebtPerHarvest</span> <span class="o">&gt;=</span> <span class="n">_minDebtPerHarvest</span><span class="p">,</span> <span class="s">&quot;cannot exceed Strategy maxDebtPerHarvest&quot;</span><span class="p">);</span>
+
+        <span class="n">_strategies</span><span class="p">[</span><span class="n">_strategy</span><span class="p">].</span><span class="n">minDebtPerHarvest</span> <span class="o">=</span> <span class="n">_minDebtPerHarvest</span><span class="p">;</span>
+
+        <span class="k">emit</span> <span class="n">StrategyUpdateMinDebtPerHarvest</span><span class="p">(</span><span class="n">_strategy</span><span class="p">,</span> <span class="n">_minDebtPerHarvest</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Change the quantity assets per block this Vault may deposit to or</span>
+<span class="cm">     * withdraw from `strategy`.</span>
+<span class="cm">     * Can only be called by the current governor.</span>
+<span class="cm">     * Can only be called on an active strategy (added using addStrategy)</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _strategy Address of the strategy to update</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _maxDebtPerHarvest New upper limit on the increase of debt since last harvest</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">updateStrategyMaxDebtPerHarvest</span><span class="p">(</span><span class="kt">address</span> <span class="n">_strategy</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_maxDebtPerHarvest</span><span class="p">)</span> <span class="k">external</span> <span class="p">{</span>
+        <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
+        <span class="nf">require</span><span class="p">(</span><span class="n">_strategies</span><span class="p">[</span><span class="n">_strategy</span><span class="p">].</span><span class="n">activation</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span> <span class="s">&quot;must be a current strategy&quot;</span><span class="p">);</span>
+        <span class="nf">require</span><span class="p">(</span><span class="n">_strategies</span><span class="p">[</span><span class="n">_strategy</span><span class="p">].</span><span class="n">minDebtPerHarvest</span> <span class="o">&lt;=</span> <span class="n">_maxDebtPerHarvest</span><span class="p">,</span> <span class="s">&quot;cannot be lower than Strategy minDebtPerHarvest&quot;</span><span class="p">);</span>
+
+        <span class="n">_strategies</span><span class="p">[</span><span class="n">_strategy</span><span class="p">].</span><span class="n">maxDebtPerHarvest</span> <span class="o">=</span> <span class="n">_maxDebtPerHarvest</span><span class="p">;</span>
+
+        <span class="k">emit</span> <span class="n">StrategyUpdateMaxDebtPerHarvest</span><span class="p">(</span><span class="n">_strategy</span><span class="p">,</span> <span class="n">_maxDebtPerHarvest</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Change the fee the strategist will receive based on this Vault&#39;s performance</span>
+<span class="cm">     * Can only be called by the current governor.</span>
+<span class="cm">     * Can only be called on an active strategy (added using addStrategy)</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _strategy Address of the strategy to update</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _performanceFee The new fee the strategist will receive.</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">updateStrategyPerformanceFee</span><span class="p">(</span><span class="kt">address</span> <span class="n">_strategy</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_performanceFee</span><span class="p">)</span> <span class="k">external</span> <span class="p">{</span>
+        <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
+        <span class="nf">require</span><span class="p">(</span><span class="n">_strategies</span><span class="p">[</span><span class="n">_strategy</span><span class="p">].</span><span class="n">activation</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span> <span class="s">&quot;must be a current strategy&quot;</span><span class="p">);</span>
+        <span class="nf">require</span><span class="p">(</span><span class="n">_performanceFee</span> <span class="o">&lt;=</span> <span class="n">MAX_BPS</span> <span class="o">-</span> <span class="n">performanceFee</span><span class="p">,</span> <span class="s">&quot;cannot exceed MAX_BPS after Vault performanceFee is deducted&quot;</span><span class="p">);</span>
+
+        <span class="n">_strategies</span><span class="p">[</span><span class="n">_strategy</span><span class="p">].</span><span class="n">performanceFee</span> <span class="o">=</span> <span class="n">_performanceFee</span><span class="p">;</span>
+
+        <span class="k">emit</span> <span class="n">StrategyUpdatePerformanceFee</span><span class="p">(</span><span class="n">_strategy</span><span class="p">,</span> <span class="n">_performanceFee</span><span class="p">);</span>
     <span class="p">}</span>
 
     <span class="cm">/**</span>

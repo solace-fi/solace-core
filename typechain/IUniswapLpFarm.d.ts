@@ -27,6 +27,7 @@ interface IUniswapLpFarmInterface extends ethers.utils.Interface {
     "blockReward()": FunctionFragment;
     "countDeposited(address)": FunctionFragment;
     "deposit(uint256)": FunctionFragment;
+    "depositSigned(address,uint256,uint256,uint8,bytes32,bytes32)": FunctionFragment;
     "endBlock()": FunctionFragment;
     "farmType()": FunctionFragment;
     "getDeposited(address,uint256)": FunctionFragment;
@@ -37,11 +38,10 @@ interface IUniswapLpFarmInterface extends ethers.utils.Interface {
     "lpToken()": FunctionFragment;
     "master()": FunctionFragment;
     "pendingRewards(address)": FunctionFragment;
-    "rewardToken()": FunctionFragment;
     "setEnd(uint256)": FunctionFragment;
     "setGovernance(address)": FunctionFragment;
     "setRewards(uint256)": FunctionFragment;
-    "stakeToken()": FunctionFragment;
+    "solace()": FunctionFragment;
     "startBlock()": FunctionFragment;
     "updateFarm()": FunctionFragment;
     "valueStaked()": FunctionFragment;
@@ -68,6 +68,17 @@ interface IUniswapLpFarmInterface extends ethers.utils.Interface {
   encodeFunctionData(
     functionFragment: "deposit",
     values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "depositSigned",
+    values: [
+      string,
+      BigNumberish,
+      BigNumberish,
+      BigNumberish,
+      BytesLike,
+      BytesLike
+    ]
   ): string;
   encodeFunctionData(functionFragment: "endBlock", values?: undefined): string;
   encodeFunctionData(functionFragment: "farmType", values?: undefined): string;
@@ -98,10 +109,6 @@ interface IUniswapLpFarmInterface extends ethers.utils.Interface {
     values: [string]
   ): string;
   encodeFunctionData(
-    functionFragment: "rewardToken",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
     functionFragment: "setEnd",
     values: [BigNumberish]
   ): string;
@@ -113,10 +120,7 @@ interface IUniswapLpFarmInterface extends ethers.utils.Interface {
     functionFragment: "setRewards",
     values: [BigNumberish]
   ): string;
-  encodeFunctionData(
-    functionFragment: "stakeToken",
-    values?: undefined
-  ): string;
+  encodeFunctionData(functionFragment: "solace", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "startBlock",
     values?: undefined
@@ -152,6 +156,10 @@ interface IUniswapLpFarmInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "deposit", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "depositSigned",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "endBlock", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "farmType", data: BytesLike): Result;
   decodeFunctionResult(
@@ -177,17 +185,13 @@ interface IUniswapLpFarmInterface extends ethers.utils.Interface {
     functionFragment: "pendingRewards",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(
-    functionFragment: "rewardToken",
-    data: BytesLike
-  ): Result;
   decodeFunctionResult(functionFragment: "setEnd", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "setGovernance",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "setRewards", data: BytesLike): Result;
-  decodeFunctionResult(functionFragment: "stakeToken", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "solace", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "startBlock", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "updateFarm", data: BytesLike): Result;
   decodeFunctionResult(
@@ -284,6 +288,26 @@ export class IUniswapLpFarm extends Contract {
 
     "deposit(uint256)"(
       _token: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    depositSigned(
+      _depositor: string,
+      _token: BigNumberish,
+      _deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "depositSigned(address,uint256,uint256,uint8,bytes32,bytes32)"(
+      _depositor: string,
+      _token: BigNumberish,
+      _deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
@@ -385,9 +409,17 @@ export class IUniswapLpFarm extends Contract {
       1: BigNumber[];
     }>;
 
-    lpToken(overrides?: Overrides): Promise<ContractTransaction>;
+    lpToken(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
 
-    "lpToken()"(overrides?: Overrides): Promise<ContractTransaction>;
+    "lpToken()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
 
     master(
       overrides?: CallOverrides
@@ -413,18 +445,6 @@ export class IUniswapLpFarm extends Contract {
       overrides?: CallOverrides
     ): Promise<{
       0: BigNumber;
-    }>;
-
-    rewardToken(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
-    "rewardToken()"(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
     }>;
 
     setEnd(
@@ -457,13 +477,13 @@ export class IUniswapLpFarm extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    stakeToken(
+    solace(
       overrides?: CallOverrides
     ): Promise<{
       0: string;
     }>;
 
-    "stakeToken()"(
+    "solace()"(
       overrides?: CallOverrides
     ): Promise<{
       0: string;
@@ -544,6 +564,26 @@ export class IUniswapLpFarm extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
+  depositSigned(
+    _depositor: string,
+    _token: BigNumberish,
+    _deadline: BigNumberish,
+    v: BigNumberish,
+    r: BytesLike,
+    s: BytesLike,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "depositSigned(address,uint256,uint256,uint8,bytes32,bytes32)"(
+    _depositor: string,
+    _token: BigNumberish,
+    _deadline: BigNumberish,
+    v: BigNumberish,
+    r: BytesLike,
+    s: BytesLike,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
   endBlock(overrides?: CallOverrides): Promise<BigNumber>;
 
   "endBlock()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -606,9 +646,9 @@ export class IUniswapLpFarm extends Contract {
     1: BigNumber[];
   }>;
 
-  lpToken(overrides?: Overrides): Promise<ContractTransaction>;
+  lpToken(overrides?: CallOverrides): Promise<string>;
 
-  "lpToken()"(overrides?: Overrides): Promise<ContractTransaction>;
+  "lpToken()"(overrides?: CallOverrides): Promise<string>;
 
   master(overrides?: CallOverrides): Promise<string>;
 
@@ -620,10 +660,6 @@ export class IUniswapLpFarm extends Contract {
     _user: string,
     overrides?: CallOverrides
   ): Promise<BigNumber>;
-
-  rewardToken(overrides?: CallOverrides): Promise<string>;
-
-  "rewardToken()"(overrides?: CallOverrides): Promise<string>;
 
   setEnd(
     _endBlock: BigNumberish,
@@ -655,9 +691,9 @@ export class IUniswapLpFarm extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  stakeToken(overrides?: CallOverrides): Promise<string>;
+  solace(overrides?: CallOverrides): Promise<string>;
 
-  "stakeToken()"(overrides?: CallOverrides): Promise<string>;
+  "solace()"(overrides?: CallOverrides): Promise<string>;
 
   startBlock(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -718,6 +754,26 @@ export class IUniswapLpFarm extends Contract {
 
     "deposit(uint256)"(
       _token: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    depositSigned(
+      _depositor: string,
+      _token: BigNumberish,
+      _deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "depositSigned(address,uint256,uint256,uint8,bytes32,bytes32)"(
+      _depositor: string,
+      _token: BigNumberish,
+      _deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike,
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -801,10 +857,6 @@ export class IUniswapLpFarm extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    rewardToken(overrides?: CallOverrides): Promise<string>;
-
-    "rewardToken()"(overrides?: CallOverrides): Promise<string>;
-
     setEnd(_endBlock: BigNumberish, overrides?: CallOverrides): Promise<void>;
 
     "setEnd(uint256)"(
@@ -832,9 +884,9 @@ export class IUniswapLpFarm extends Contract {
       overrides?: CallOverrides
     ): Promise<void>;
 
-    stakeToken(overrides?: CallOverrides): Promise<string>;
+    solace(overrides?: CallOverrides): Promise<string>;
 
-    "stakeToken()"(overrides?: CallOverrides): Promise<string>;
+    "solace()"(overrides?: CallOverrides): Promise<string>;
 
     startBlock(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -902,6 +954,26 @@ export class IUniswapLpFarm extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
+    depositSigned(
+      _depositor: string,
+      _token: BigNumberish,
+      _deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "depositSigned(address,uint256,uint256,uint8,bytes32,bytes32)"(
+      _depositor: string,
+      _token: BigNumberish,
+      _deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
     endBlock(overrides?: CallOverrides): Promise<BigNumber>;
 
     "endBlock()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -949,9 +1021,9 @@ export class IUniswapLpFarm extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    lpToken(overrides?: Overrides): Promise<BigNumber>;
+    lpToken(overrides?: CallOverrides): Promise<BigNumber>;
 
-    "lpToken()"(overrides?: Overrides): Promise<BigNumber>;
+    "lpToken()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     master(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -966,10 +1038,6 @@ export class IUniswapLpFarm extends Contract {
       _user: string,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
-
-    rewardToken(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "rewardToken()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     setEnd(_endBlock: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
 
@@ -998,9 +1066,9 @@ export class IUniswapLpFarm extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    stakeToken(overrides?: CallOverrides): Promise<BigNumber>;
+    solace(overrides?: CallOverrides): Promise<BigNumber>;
 
-    "stakeToken()"(overrides?: CallOverrides): Promise<BigNumber>;
+    "solace()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     startBlock(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -1067,6 +1135,26 @@ export class IUniswapLpFarm extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
+    depositSigned(
+      _depositor: string,
+      _token: BigNumberish,
+      _deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "depositSigned(address,uint256,uint256,uint8,bytes32,bytes32)"(
+      _depositor: string,
+      _token: BigNumberish,
+      _deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
     endBlock(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "endBlock()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
@@ -1119,9 +1207,9 @@ export class IUniswapLpFarm extends Contract {
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
-    lpToken(overrides?: Overrides): Promise<PopulatedTransaction>;
+    lpToken(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
-    "lpToken()"(overrides?: Overrides): Promise<PopulatedTransaction>;
+    "lpToken()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     master(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
@@ -1136,10 +1224,6 @@ export class IUniswapLpFarm extends Contract {
       _user: string,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
-
-    rewardToken(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    "rewardToken()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     setEnd(
       _endBlock: BigNumberish,
@@ -1171,9 +1255,9 @@ export class IUniswapLpFarm extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    stakeToken(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+    solace(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
-    "stakeToken()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+    "solace()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     startBlock(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 

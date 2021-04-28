@@ -17,8 +17,8 @@ import SolaceArtifact from "../artifacts/contracts/SOLACE.sol/SOLACE.json";
 import MasterArtifact from "../artifacts/contracts/Master.sol/Master.json";
 import WETHArtifact from "../artifacts/contracts/mocks/MockWETH.sol/MockWETH.json";
 import MockERC20Artifact from "../artifacts/contracts/mocks/MockERC20.sol/MockERC20.json";
-import UniswapLpFarmArtifact from "../artifacts/contracts/UniswapLpFarm.sol/UniswapLpFarm.json";
-import { Solace, Master, MockWeth, MockErc20, UniswapLpFarm } from "../typechain";
+import SolaceEthLpFarmArtifact from "../artifacts/contracts/SolaceEthLpFarm.sol/SolaceEthLpFarm.json";
+import { Solace, Master, MockWeth, MockErc20, SolaceEthLpFarm } from "../typechain";
 
 // uniswap imports
 import UniswapV3FactoryArtifact from "@uniswap/v3-core/artifacts/contracts/UniswapV3Factory.sol/UniswapV3Factory.json";
@@ -31,7 +31,7 @@ chai.use(solidity);
 // TODO: due to integer rounding errors, some math may be off by one
 // need to test within a threshold of acceptance
 
-describe("UniswapLpFarm", function () {
+describe("SolaceEthLpFarm", function () {
   // users
   let deployer: Wallet;
   let governor: Wallet;
@@ -46,7 +46,7 @@ describe("UniswapLpFarm", function () {
   let master: Master;
   let weth: MockWeth;
   let mockToken1: MockErc20;
-  let farm: UniswapLpFarm;
+  let farm: SolaceEthLpFarm;
 
   // uniswap contracts
   let uniswapFactory: Contract;
@@ -67,8 +67,9 @@ describe("UniswapLpFarm", function () {
   let blockNum: BN;
   let startBlock: BN;
   let endBlock: BN;
-  let uniswapLpFarmType = 2;
+  let solaceEthLpFarmType = 3;
 
+  const solaceTokenName = "solace.fi";
   const lpTokenName = "Uniswap V3 Positions NFT-V1";
   const chainId = 31337;
   const deadline = constants.MaxUint256;
@@ -179,7 +180,7 @@ describe("UniswapLpFarm", function () {
     startBlock = BN.from(5), endBlock = BN.from(6);
 
     it("can create farms", async function () {
-      farm = await createUniswapLpFarm(lpToken, startBlock, endBlock, mediumPool);
+      farm = await createSolaceEthLpFarm(lpToken, startBlock, endBlock, mediumPool);
     })
 
     it("returns farm information", async function () {
@@ -189,7 +190,7 @@ describe("UniswapLpFarm", function () {
       expect(await farm.blockReward()).to.equal(0);
       expect(await farm.startBlock()).to.equal(startBlock);
       expect(await farm.endBlock()).to.equal(endBlock);
-      expect(await farm.farmType()).to.equal(uniswapLpFarmType);
+      expect(await farm.farmType()).to.equal(solaceEthLpFarmType);
       expect(await farm.valueStaked()).to.equal(0);
     })
   })
@@ -211,21 +212,23 @@ describe("UniswapLpFarm", function () {
 
   describe("deposit and withdraw", function () {
     let userInfo: any;
-    let tokenId1: BN, tokenId2: BN, tokenId3: BN, tokenId4: BN;
+    let tokenId1: BN, tokenId2: BN, tokenId3: BN, tokenId4: BN, tokenId5: BN;
     let depositAmount1 = BN.from(1);
     let depositAmount2 = BN.from(4);
     let depositAmount3 = BN.from(2);
     let depositAmount4 = BN.from(9);
+    let depositAmount5 = BN.from(25);
     let tokenValue1: BN;
     let tokenValue2: BN;
     let tokenValue3: BN;
     let tokenValue4: BN;
+    let tokenValue5: BN;
     let tokenValue12: BN;
     let tokenValue13: BN;
     let tokenValue123: BN;
 
     before(async function () {
-      farm = await createUniswapLpFarm(lpToken, startBlock, endBlock, mediumPool);
+      farm = await createSolaceEthLpFarm(lpToken, startBlock, endBlock, mediumPool);
       await farm.connect(deployer).setGovernance(governor.address);
     })
 
@@ -290,6 +293,51 @@ describe("UniswapLpFarm", function () {
       expect((await farm.tokenInfo(tokenId4)).depositor).to.equal(farmer1.address);
     })
 
+    it("can deposit via mintAndDeposit", async function () {
+      let balancesBefore = await getBalances(farmer1);
+      let excessiveDepositAmount = depositAmount5.mul(10);
+      let nonce = await solaceToken.nonces(farmer1.address);
+      let approve = {
+        owner: farmer1.address,
+        spender: farm.address,
+        value: excessiveDepositAmount
+      };
+      let digest = getPermitDigest(solaceTokenName, solaceToken.address, chainId, approve, nonce, deadline);
+      let { v, r, s } = sign(digest, Buffer.from(farmer1.privateKey.slice(2), 'hex'));
+      let tx1 = await farm.connect(farmer1).mintAndDeposit({
+          depositor: farmer1.address,
+          amountSolace: excessiveDepositAmount,
+          amount0Desired: depositAmount5,
+          amount1Desired: depositAmount5,
+          amount0Min: 0,
+          amount1Min: 0,
+          deadline: deadline,
+          tickLower: getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
+          tickUpper: getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
+          v: v,
+          r: r,
+          s: s,
+      }, {value: excessiveDepositAmount});
+      tokenId5 = await lpToken.totalSupply();
+      tokenValue5 = await farm.appraise(tokenId5);
+      await expect(tx1).to.emit(farm, "Deposit").withArgs(farmer1.address, tokenId5);
+      let balancesAfter = await getBalances(farmer1);
+      let balancesDiff = getBalancesDiff(balancesBefore, balancesAfter);
+      let receipt = await tx1.wait();
+      let gasCost = receipt.gasUsed.mul(tx1.gasPrice);
+      expect(balancesDiff.userEth).to.equal(depositAmount5.add(gasCost));
+      expect(balancesDiff.userSolace).to.equal(depositAmount5);
+      expect(await farm.countDeposited(farmer1.address)).to.equal(4);
+      expect(await farm.getDeposited(farmer1.address, 3)).to.deep.equal([ tokenId5, tokenValue5 ]);
+      expect(await farm.listDeposited(farmer1.address)).to.deep.equal([ [tokenId1,tokenId3,tokenId4,tokenId5], [tokenValue1,tokenValue3,tokenValue4,tokenValue5] ]);
+      expect((await farm.tokenInfo(tokenId5)).depositor).to.equal(farmer1.address);
+      let position = await lpToken.positions(tokenId5);
+      expect(position.token0 == solaceToken.address || position.token1 == solaceToken.address);
+      expect(position.token0 == weth.address || position.token1 == weth.address);
+      expect(position.tickLower).to.equal(getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]));
+      expect(position.tickUpper).to.equal(getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]));
+    })
+
     it("cannot deposit when lacking funds", async function () {
       // non existant token
       let tokenId = (await lpToken.totalSupply()).add(2);
@@ -337,6 +385,15 @@ describe("UniswapLpFarm", function () {
     it("can withdraw deposited tokens", async function () {
       let balance1: BN;
       let balance2: BN;
+      // farmer 1, partial withdraw
+      balance1 = await lpToken.balanceOf(farm.address);
+      let tx5 = await farm.connect(farmer1).withdraw(tokenId5);
+      await expect(tx5).to.emit(farm, "Withdraw").withArgs(farmer1.address, tokenId5);
+      balance2 = await lpToken.balanceOf(farm.address);
+      expect(balance1.sub(balance2)).to.equal(1);
+      userInfo = await farm.userInfo(farmer1.address);
+      expect(await farm.countDeposited(farmer1.address)).to.equal(3);
+      expect((await farm.tokenInfo(tokenId5)).depositor).to.equal(ZERO_ADDRESS);
       // farmer 1, partial withdraw
       balance1 = await lpToken.balanceOf(farm.address);
       let tx4 = await farm.connect(farmer1).withdraw(tokenId4);
@@ -396,7 +453,7 @@ describe("UniswapLpFarm", function () {
       blockNum = BN.from(await provider.getBlockNumber());
       startBlock = blockNum.add(10);
       endBlock = blockNum.add(100);
-      farm = await createUniswapLpFarm(lpToken, startBlock, endBlock, mediumPool);
+      farm = await createSolaceEthLpFarm(lpToken, startBlock, endBlock, mediumPool);
       await farm.setGovernance(governor.address);
     })
 
@@ -468,7 +525,7 @@ describe("UniswapLpFarm", function () {
       blockNum = BN.from(await provider.getBlockNumber());
       startBlock = blockNum.add(20);
       endBlock = blockNum.add(400);
-      farm = await createUniswapLpFarm(lpToken, startBlock, endBlock, mediumPool);
+      farm = await createSolaceEthLpFarm(lpToken, startBlock, endBlock, mediumPool);
       await farm.setGovernance(governor.address);
       await master.connect(governor).registerFarm(farm.address, allocPoints);
     })
@@ -761,7 +818,7 @@ describe("UniswapLpFarm", function () {
       blockNum = BN.from(await provider.getBlockNumber());
       startBlock = blockNum.add(20);
       endBlock = blockNum.add(30);
-      farm = await createUniswapLpFarm(lpToken, startBlock, endBlock, mediumPool);
+      farm = await createSolaceEthLpFarm(lpToken, startBlock, endBlock, mediumPool);
       await farm.setGovernance(governor.address);
       await master.connect(governor).registerFarm(farm.address, allocPoints);
     })
@@ -794,7 +851,7 @@ describe("UniswapLpFarm", function () {
       blockNum = BN.from(await provider.getBlockNumber());
       startBlock = blockNum.add(20);
       endBlock = blockNum.add(30);
-      farm = await createUniswapLpFarm(lpToken, startBlock, endBlock, mediumPool);
+      farm = await createSolaceEthLpFarm(lpToken, startBlock, endBlock, mediumPool);
       await farm.setGovernance(governor.address);
       await master.connect(governor).registerFarm(farm.address, 100);
       // increase solace distribution
@@ -863,7 +920,7 @@ describe("UniswapLpFarm", function () {
     return pool;
   }
 
-  async function createUniswapLpFarm(
+  async function createSolaceEthLpFarm(
     stakeToken: Contract = lpToken,
     startBlock: BigNumberish = BN.from(0),
     endBlock: BigNumberish = BN.from(0),
@@ -871,16 +928,17 @@ describe("UniswapLpFarm", function () {
   ) {
     let farm = (await deployContract(
       deployer,
-      UniswapLpFarmArtifact,
+      SolaceEthLpFarmArtifact,
       [
         master.address,
         stakeToken.address,
         solaceToken.address,
         startBlock,
         endBlock,
-        pool.address
+        pool.address,
+        weth.address
       ]
-    )) as UniswapLpFarm;
+    )) as SolaceEthLpFarm;
     return farm;
   }
 
@@ -909,15 +967,25 @@ describe("UniswapLpFarm", function () {
       deadline: constants.MaxUint256,
     });
     let tokenId = await lpToken.totalSupply();
-    //let position = await lpToken.positions(tokenId);
-    //expect(position.liquidity).to.equal(amount);
-    //console.log('')
-    //console.log(`token id   : ${tokenId}`)
-    //console.log(`amount     : ${amount}`)
-    //console.log(`fee        : ${position.fee}`)
-    //console.log(`tick lower : ${position.tickLower}`)
-    //console.log(`tick upper : ${position.tickUpper}`)
-    //console.log(`liquidity  : ${position.liquidity}`)
     return tokenId;
+  }
+
+  interface Balances {
+    userEth: BN,
+    userSolace: BN
+  }
+
+  async function getBalances(user: Wallet): Promise<Balances> {
+    return {
+      userEth: await user.getBalance(),
+      userSolace: await solaceToken.balanceOf(user.address),
+    }
+  }
+
+  function getBalancesDiff(balances1: Balances, balances2: Balances) : Balances {
+    return {
+      userEth: balances1.userEth.sub(balances2.userEth),
+      userSolace: balances1.userSolace.sub(balances2.userSolace)
+    }
   }
 });

@@ -13,6 +13,7 @@ import "./pool/IUniswapV3PoolEvents.sol";
 /// @notice A Uniswap pool facilitates swapping and automated market making between any two assets that strictly conform
 /// to the ERC20 specification
 /// @dev The pool interface is broken up into many smaller pieces
+// solhint-disable-next-line no-empty-blocks
 interface IUniswapV3Pool is
     IUniswapV3PoolImmutables,
     IUniswapV3PoolState,

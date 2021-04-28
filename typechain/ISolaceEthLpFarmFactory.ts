@@ -5,14 +5,14 @@
 import { Contract, Signer } from "ethers";
 import { Provider } from "@ethersproject/providers";
 
-import type { ICpFarm } from "./ICpFarm";
+import type { ISolaceEthLpFarm } from "./ISolaceEthLpFarm";
 
-export class ICpFarmFactory {
+export class ISolaceEthLpFarmFactory {
   static connect(
     address: string,
     signerOrProvider: Signer | Provider
-  ): ICpFarm {
-    return new Contract(address, _abi, signerOrProvider) as ICpFarm;
+  ): ISolaceEthLpFarm {
+    return new Contract(address, _abi, signerOrProvider) as ISolaceEthLpFarm;
   }
 }
 
@@ -29,11 +29,11 @@ const _abi = [
       {
         indexed: false,
         internalType: "uint256",
-        name: "_amount",
+        name: "_token",
         type: "uint256",
       },
     ],
-    name: "DepositCp",
+    name: "Deposit",
     type: "event",
   },
   {
@@ -48,54 +48,12 @@ const _abi = [
       {
         indexed: false,
         internalType: "uint256",
-        name: "_amount",
+        name: "_token",
         type: "uint256",
       },
     ],
-    name: "DepositEth",
+    name: "Withdraw",
     type: "event",
-  },
-  {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: true,
-        internalType: "address",
-        name: "_user",
-        type: "address",
-      },
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "_amount",
-        type: "uint256",
-      },
-    ],
-    name: "WithdrawCp",
-    type: "event",
-  },
-  {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: true,
-        internalType: "address",
-        name: "_user",
-        type: "address",
-      },
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "_amount",
-        type: "uint256",
-      },
-    ],
-    name: "WithdrawEth",
-    type: "event",
-  },
-  {
-    stateMutability: "payable",
-    type: "fallback",
   },
   {
     inputs: [],
@@ -104,6 +62,25 @@ const _abi = [
       {
         internalType: "uint256",
         name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_token",
+        type: "uint256",
+      },
+    ],
+    name: "appraise",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "_value",
         type: "uint256",
       },
     ],
@@ -126,12 +103,31 @@ const _abi = [
   {
     inputs: [
       {
+        internalType: "address",
+        name: "_user",
+        type: "address",
+      },
+    ],
+    name: "countDeposited",
+    outputs: [
+      {
         internalType: "uint256",
-        name: "_amount",
+        name: "",
         type: "uint256",
       },
     ],
-    name: "depositCp",
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_token",
+        type: "uint256",
+      },
+    ],
+    name: "deposit",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -145,7 +141,7 @@ const _abi = [
       },
       {
         internalType: "uint256",
-        name: "_amount",
+        name: "_token",
         type: "uint256",
       },
       {
@@ -169,16 +165,9 @@ const _abi = [
         type: "bytes32",
       },
     ],
-    name: "depositCpSigned",
+    name: "depositSigned",
     outputs: [],
     stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "depositEth",
-    outputs: [],
-    stateMutability: "payable",
     type: "function",
   },
   {
@@ -198,6 +187,35 @@ const _abi = [
     inputs: [],
     name: "farmType",
     outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "_user",
+        type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "_index",
+        type: "uint256",
+      },
+    ],
+    name: "getDeposited",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
       {
         internalType: "uint256",
         name: "",
@@ -258,6 +276,43 @@ const _abi = [
     type: "function",
   },
   {
+    inputs: [
+      {
+        internalType: "address",
+        name: "_user",
+        type: "address",
+      },
+    ],
+    name: "listDeposited",
+    outputs: [
+      {
+        internalType: "uint256[]",
+        name: "",
+        type: "uint256[]",
+      },
+      {
+        internalType: "uint256[]",
+        name: "",
+        type: "uint256[]",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "lpToken",
+    outputs: [
+      {
+        internalType: "contract IUniswapLpToken",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
     inputs: [],
     name: "master",
     outputs: [
@@ -268,6 +323,87 @@ const _abi = [
       },
     ],
     stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        components: [
+          {
+            internalType: "address",
+            name: "depositor",
+            type: "address",
+          },
+          {
+            internalType: "uint256",
+            name: "amountSolace",
+            type: "uint256",
+          },
+          {
+            internalType: "uint256",
+            name: "amount0Desired",
+            type: "uint256",
+          },
+          {
+            internalType: "uint256",
+            name: "amount1Desired",
+            type: "uint256",
+          },
+          {
+            internalType: "uint256",
+            name: "amount0Min",
+            type: "uint256",
+          },
+          {
+            internalType: "uint256",
+            name: "amount1Min",
+            type: "uint256",
+          },
+          {
+            internalType: "uint256",
+            name: "deadline",
+            type: "uint256",
+          },
+          {
+            internalType: "int24",
+            name: "tickLower",
+            type: "int24",
+          },
+          {
+            internalType: "int24",
+            name: "tickUpper",
+            type: "int24",
+          },
+          {
+            internalType: "uint8",
+            name: "v",
+            type: "uint8",
+          },
+          {
+            internalType: "bytes32",
+            name: "r",
+            type: "bytes32",
+          },
+          {
+            internalType: "bytes32",
+            name: "s",
+            type: "bytes32",
+          },
+        ],
+        internalType: "struct ISolaceEthLpFarm.MintAndDepositParams",
+        name: "params",
+        type: "tuple",
+      },
+    ],
+    name: "mintAndDeposit",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "tokenId",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "payable",
     type: "function",
   },
   {
@@ -376,10 +512,10 @@ const _abi = [
   },
   {
     inputs: [],
-    name: "vault",
+    name: "weth",
     outputs: [
       {
-        internalType: "contract IVault",
+        internalType: "contract IWETH10",
         name: "",
         type: "address",
       },
@@ -391,29 +527,11 @@ const _abi = [
     inputs: [
       {
         internalType: "uint256",
-        name: "_amount",
+        name: "_token",
         type: "uint256",
       },
     ],
-    name: "withdrawCp",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "_amount",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "_maxLoss",
-        type: "uint256",
-      },
-    ],
-    name: "withdrawEth",
+    name: "withdraw",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -424,9 +542,5 @@ const _abi = [
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
-  },
-  {
-    stateMutability: "payable",
-    type: "receive",
   },
 ];

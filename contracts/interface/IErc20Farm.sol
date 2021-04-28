@@ -28,4 +28,10 @@ interface IErc20Farm is IFarm {
      * @param _amount The withdraw amount.
      */
     function withdraw(uint256 _amount) external;
+
+    function stakeToken() external view returns (address);        // Address of token to stake.
+    function rewardToken() external view returns (address);       // Address of token to receive.
+    function lastRewardBlock() external view returns (uint256);   // Last time rewards were distributed or farm was updated.
+    function accRewardPerShare() external view returns (uint256); // Accumulated rewards per share, times 1e12.
+    function valueStaked() external view returns (uint256);       // Value of tokens staked by all farmers.
 }

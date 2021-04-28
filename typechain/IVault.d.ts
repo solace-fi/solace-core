@@ -23,11 +23,14 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
 interface IVaultInterface extends ethers.utils.Interface {
   functions: {
+    "DOMAIN_SEPARATOR()": FunctionFragment;
     "allowance(address,address)": FunctionFragment;
     "approve(address,uint256)": FunctionFragment;
     "balanceOf(address)": FunctionFragment;
     "debtOutstanding(address)": FunctionFragment;
     "deposit()": FunctionFragment;
+    "nonces(address)": FunctionFragment;
+    "permit(address,address,uint256,uint256,uint8,bytes32,bytes32)": FunctionFragment;
     "processClaim(address,uint256)": FunctionFragment;
     "report(uint256,uint256,uint256)": FunctionFragment;
     "revokeStrategy(address)": FunctionFragment;
@@ -39,6 +42,10 @@ interface IVaultInterface extends ethers.utils.Interface {
     "withdraw(uint256,uint256)": FunctionFragment;
   };
 
+  encodeFunctionData(
+    functionFragment: "DOMAIN_SEPARATOR",
+    values?: undefined
+  ): string;
   encodeFunctionData(
     functionFragment: "allowance",
     values: [string, string]
@@ -53,6 +60,19 @@ interface IVaultInterface extends ethers.utils.Interface {
     values: [string]
   ): string;
   encodeFunctionData(functionFragment: "deposit", values?: undefined): string;
+  encodeFunctionData(functionFragment: "nonces", values: [string]): string;
+  encodeFunctionData(
+    functionFragment: "permit",
+    values: [
+      string,
+      string,
+      BigNumberish,
+      BigNumberish,
+      BigNumberish,
+      BytesLike,
+      BytesLike
+    ]
+  ): string;
   encodeFunctionData(
     functionFragment: "processClaim",
     values: [string, BigNumberish]
@@ -84,6 +104,10 @@ interface IVaultInterface extends ethers.utils.Interface {
     values: [BigNumberish, BigNumberish]
   ): string;
 
+  decodeFunctionResult(
+    functionFragment: "DOMAIN_SEPARATOR",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "allowance", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "approve", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "balanceOf", data: BytesLike): Result;
@@ -92,6 +116,8 @@ interface IVaultInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "deposit", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "nonces", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "permit", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "processClaim",
     data: BytesLike
@@ -137,6 +163,18 @@ export class IVault extends Contract {
   interface: IVaultInterface;
 
   functions: {
+    DOMAIN_SEPARATOR(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "DOMAIN_SEPARATOR()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
     allowance(
       owner: string,
       spender: string,
@@ -196,6 +234,42 @@ export class IVault extends Contract {
     deposit(overrides?: PayableOverrides): Promise<ContractTransaction>;
 
     "deposit()"(overrides?: PayableOverrides): Promise<ContractTransaction>;
+
+    nonces(
+      owner: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    "nonces(address)"(
+      owner: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    permit(
+      owner: string,
+      spender: string,
+      value: BigNumberish,
+      deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "permit(address,address,uint256,uint256,uint8,bytes32,bytes32)"(
+      owner: string,
+      spender: string,
+      value: BigNumberish,
+      deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
 
     processClaim(
       claimant: string,
@@ -348,6 +422,10 @@ export class IVault extends Contract {
     ): Promise<ContractTransaction>;
   };
 
+  DOMAIN_SEPARATOR(overrides?: CallOverrides): Promise<string>;
+
+  "DOMAIN_SEPARATOR()"(overrides?: CallOverrides): Promise<string>;
+
   allowance(
     owner: string,
     spender: string,
@@ -389,6 +467,35 @@ export class IVault extends Contract {
   deposit(overrides?: PayableOverrides): Promise<ContractTransaction>;
 
   "deposit()"(overrides?: PayableOverrides): Promise<ContractTransaction>;
+
+  nonces(owner: string, overrides?: CallOverrides): Promise<BigNumber>;
+
+  "nonces(address)"(
+    owner: string,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
+
+  permit(
+    owner: string,
+    spender: string,
+    value: BigNumberish,
+    deadline: BigNumberish,
+    v: BigNumberish,
+    r: BytesLike,
+    s: BytesLike,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "permit(address,address,uint256,uint256,uint8,bytes32,bytes32)"(
+    owner: string,
+    spender: string,
+    value: BigNumberish,
+    deadline: BigNumberish,
+    v: BigNumberish,
+    r: BytesLike,
+    s: BytesLike,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
 
   processClaim(
     claimant: string,
@@ -521,6 +628,10 @@ export class IVault extends Contract {
   ): Promise<ContractTransaction>;
 
   callStatic: {
+    DOMAIN_SEPARATOR(overrides?: CallOverrides): Promise<string>;
+
+    "DOMAIN_SEPARATOR()"(overrides?: CallOverrides): Promise<string>;
+
     allowance(
       owner: string,
       spender: string,
@@ -565,6 +676,35 @@ export class IVault extends Contract {
     deposit(overrides?: CallOverrides): Promise<void>;
 
     "deposit()"(overrides?: CallOverrides): Promise<void>;
+
+    nonces(owner: string, overrides?: CallOverrides): Promise<BigNumber>;
+
+    "nonces(address)"(
+      owner: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    permit(
+      owner: string,
+      spender: string,
+      value: BigNumberish,
+      deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "permit(address,address,uint256,uint256,uint8,bytes32,bytes32)"(
+      owner: string,
+      spender: string,
+      value: BigNumberish,
+      deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<void>;
 
     processClaim(
       claimant: string,
@@ -705,6 +845,10 @@ export class IVault extends Contract {
   };
 
   estimateGas: {
+    DOMAIN_SEPARATOR(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "DOMAIN_SEPARATOR()"(overrides?: CallOverrides): Promise<BigNumber>;
+
     allowance(
       owner: string,
       spender: string,
@@ -749,6 +893,35 @@ export class IVault extends Contract {
     deposit(overrides?: PayableOverrides): Promise<BigNumber>;
 
     "deposit()"(overrides?: PayableOverrides): Promise<BigNumber>;
+
+    nonces(owner: string, overrides?: CallOverrides): Promise<BigNumber>;
+
+    "nonces(address)"(
+      owner: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    permit(
+      owner: string,
+      spender: string,
+      value: BigNumberish,
+      deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "permit(address,address,uint256,uint256,uint8,bytes32,bytes32)"(
+      owner: string,
+      spender: string,
+      value: BigNumberish,
+      deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
 
     processClaim(
       claimant: string,
@@ -838,6 +1011,12 @@ export class IVault extends Contract {
   };
 
   populateTransaction: {
+    DOMAIN_SEPARATOR(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "DOMAIN_SEPARATOR()"(
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
     allowance(
       owner: string,
       spender: string,
@@ -885,6 +1064,38 @@ export class IVault extends Contract {
     deposit(overrides?: PayableOverrides): Promise<PopulatedTransaction>;
 
     "deposit()"(overrides?: PayableOverrides): Promise<PopulatedTransaction>;
+
+    nonces(
+      owner: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "nonces(address)"(
+      owner: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    permit(
+      owner: string,
+      spender: string,
+      value: BigNumberish,
+      deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "permit(address,address,uint256,uint256,uint8,bytes32,bytes32)"(
+      owner: string,
+      spender: string,
+      value: BigNumberish,
+      deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
 
     processClaim(
       claimant: string,

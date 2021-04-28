@@ -133,6 +133,44 @@ const _abi = [
     type: "function",
   },
   {
+    inputs: [
+      {
+        internalType: "address",
+        name: "_depositor",
+        type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "_token",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "_deadline",
+        type: "uint256",
+      },
+      {
+        internalType: "uint8",
+        name: "v",
+        type: "uint8",
+      },
+      {
+        internalType: "bytes32",
+        name: "r",
+        type: "bytes32",
+      },
+      {
+        internalType: "bytes32",
+        name: "s",
+        type: "bytes32",
+      },
+    ],
+    name: "depositSigned",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
     inputs: [],
     name: "endBlock",
     outputs: [
@@ -271,7 +309,7 @@ const _abi = [
         type: "address",
       },
     ],
-    stateMutability: "nonpayable",
+    stateMutability: "view",
     type: "function",
   },
   {
@@ -301,19 +339,6 @@ const _abi = [
         internalType: "uint256",
         name: "",
         type: "uint256",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "rewardToken",
-    outputs: [
-      {
-        internalType: "address",
-        name: "",
-        type: "address",
       },
     ],
     stateMutability: "view",
@@ -360,10 +385,10 @@ const _abi = [
   },
   {
     inputs: [],
-    name: "stakeToken",
+    name: "solace",
     outputs: [
       {
-        internalType: "address",
+        internalType: "contract SOLACE",
         name: "",
         type: "address",
       },

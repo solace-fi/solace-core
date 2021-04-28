@@ -17,9 +17,9 @@ contract CpFarm is ICpFarm {
     /// @notice A unique enumerator that identifies the farm type.
     uint256 public override farmType = 1;
 
-    IVault public vault;
-    address public override stakeToken;        // Address of token to stake.
-    address public override rewardToken;       // Address of token to receive.
+    IVault public override vault;
+    /// @notice Native SOLACE Token.
+    SOLACE public override solace;
     uint256 public override blockReward;       // Amount of rewardToken distributed per block.
     uint256 public override startBlock;        // When the farm will start.
     uint256 public override endBlock;          // When the farm will end.
@@ -58,20 +58,22 @@ contract CpFarm is ICpFarm {
 
     /**
      * @notice Constructs the farm.
-     * @param _rewardToken Address of the reward token.
      * @param _master Address of the Master contract.
+     * @param _vault Address of the Vault contract.
+     * @param _solace Address of the SOLACE token contract.
+     * @param _startBlock When farming will begin.
+     * @param _endBlock When farming will end.
      */
     constructor(
         address _master,
         address _vault,
-        address _rewardToken,
+        SOLACE _solace,
         uint256 _startBlock,
         uint256 _endBlock
     ) public {
         master = _master;
-        stakeToken = _vault;
         vault = IVault(_vault);
-        rewardToken = _rewardToken;
+        solace = _solace;
         startBlock = _startBlock;
         endBlock = _endBlock;
         lastRewardBlock = Math.max(block.number, _startBlock);
@@ -135,17 +137,29 @@ contract CpFarm is ICpFarm {
      * @param _amount The deposit amount.
      */
     function depositCp(uint256 _amount) external override {
-        // harvest and update farm
-        _harvest();
-        // get farmer information
-        UserInfo storage user = userInfo[msg.sender];
         // pull tokens
-        IERC20(stakeToken).safeTransferFrom(address(msg.sender), address(this), _amount);
+        IERC20(vault).safeTransferFrom(msg.sender, address(this), _amount);
         // accounting
-        valueStaked += _amount;
-        user.value += _amount;
-        user.rewardDebt = user.value * accRewardPerShare / 1e12;
-        emit DepositCp(msg.sender, _amount);
+        _depositCp(msg.sender, _amount);
+    }
+
+    /**
+     * @notice Deposit some CP tokens using permit.
+     * User will receive accumulated rewards if any.
+     * @param _depositor The depositing user.
+     * @param _amount The deposit amount.
+     * @param _deadline Time the transaction must go through before.
+     * @param v secp256k1 signature
+     * @param r secp256k1 signature
+     * @param s secp256k1 signature
+     */
+    function depositCpSigned(address _depositor, uint256 _amount, uint256 _deadline, uint8 v, bytes32 r, bytes32 s) external override {
+        // permit
+        vault.permit(_depositor, address(this), _amount, _deadline, v, r, s);
+        // pull tokens
+        IERC20(vault).safeTransferFrom(_depositor, address(this), _amount);
+        // accounting
+        _depositCp(_depositor, _amount);
     }
 
     /**
@@ -163,7 +177,7 @@ contract CpFarm is ICpFarm {
      */
     function withdrawCp(uint256 _amount) external override {
         // harvest and update farm
-        _harvest();
+        _harvest(msg.sender);
         // get farmer information
         UserInfo storage user = userInfo[msg.sender];
         // accounting
@@ -171,7 +185,7 @@ contract CpFarm is ICpFarm {
         user.value -= _amount; // also reverts overwithdraw
         user.rewardDebt = user.value * accRewardPerShare / 1e12;
         // return staked tokens
-        IERC20(stakeToken).safeTransfer(msg.sender, _amount);
+        IERC20(vault).safeTransfer(msg.sender, _amount);
         emit WithdrawCp(msg.sender, _amount);
     }
 
@@ -184,7 +198,7 @@ contract CpFarm is ICpFarm {
      */
     function withdrawEth(uint256 _amount, uint256 _maxLoss) external override {
         // harvest and update farm
-        _harvest();
+        _harvest(msg.sender);
         // get farmer information
         UserInfo storage user = userInfo[msg.sender];
         // accounting
@@ -202,7 +216,7 @@ contract CpFarm is ICpFarm {
      */
     function withdrawRewards() external override {
         // harvest
-        _harvest();
+        _harvest(msg.sender);
         // get farmer information
         UserInfo storage user = userInfo[msg.sender];
         // accounting
@@ -262,7 +276,7 @@ contract CpFarm is ICpFarm {
      */
     function _depositEth() internal {
         // harvest and update farm
-        _harvest();
+        _harvest(msg.sender);
         // get farmer information
         UserInfo storage user = userInfo[msg.sender];
         // exchange eth for cp
@@ -277,20 +291,38 @@ contract CpFarm is ICpFarm {
     }
 
     /**
+     * @notice Deposit some CP tokens.
+     * User will receive accumulated rewards if any.
+     * @param _depositor The depositing user.
+     * @param _amount The deposit amount.
+     */
+    function _depositCp(address _depositor, uint256 _amount) internal {
+        // harvest and update farm
+        _harvest(_depositor);
+        // get farmer information
+        UserInfo storage user = userInfo[_depositor];
+        // accounting
+        valueStaked += _amount;
+        user.value += _amount;
+        user.rewardDebt = user.value * accRewardPerShare / 1e12;
+        emit DepositCp(_depositor, _amount);
+    }
+
+    /**
     * @notice Calculate and transfer a user's rewards.
     */
-    function _harvest() internal {
+    function _harvest(address _user) internal {
         // update farm
         updateFarm();
         // get farmer information
-        UserInfo storage user = userInfo[msg.sender];
+        UserInfo storage user = userInfo[_user];
         // transfer users pending rewards if nonzero
         uint256 pending = user.value * accRewardPerShare / 1e12 - user.rewardDebt + user.unpaidRewards;
         if (pending == 0) return;
         // safe transfer rewards
-        uint256 balance = IERC20(rewardToken).balanceOf(master);
+        uint256 balance = solace.balanceOf(master);
         uint256 transferAmount = Math.min(pending, balance);
         user.unpaidRewards = pending - transferAmount;
-        IERC20(rewardToken).safeTransferFrom(master, msg.sender, transferAmount);
+        IERC20(solace).safeTransferFrom(master, _user, transferAmount);
     }
 }

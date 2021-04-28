@@ -52,4 +52,10 @@ interface IErc721Farm is IFarm {
      * @return The value of the token.
      */
     function getDeposited(address _user, uint256 _index) external view returns (uint256, uint256);
+
+    function stakeToken() external view returns (address);        // Address of token to stake.
+    function rewardToken() external view returns (address);       // Address of token to receive.
+    function lastRewardBlock() external view returns (uint256);   // Last time rewards were distributed or farm was updated.
+    function accRewardPerShare() external view returns (uint256); // Accumulated rewards per share, times 1e12.
+    function valueStaked() external view returns (uint256);       // Value of tokens staked by all farmers.
 }

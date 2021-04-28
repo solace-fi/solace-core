@@ -31,6 +31,8 @@ export { RegistryFactory } from "./RegistryFactory";
 export type { Registry } from "./Registry";
 export { SolaceFactory } from "./SolaceFactory";
 export type { Solace } from "./Solace";
+export { SolaceEthLpFarmFactory } from "./SolaceEthLpFarmFactory";
+export type { SolaceEthLpFarm } from "./SolaceEthLpFarm";
 export { TreasuryFactory } from "./TreasuryFactory";
 export type { Treasury } from "./Treasury";
 export { UniswapLpAppraiserFactory } from "./UniswapLpAppraiserFactory";
