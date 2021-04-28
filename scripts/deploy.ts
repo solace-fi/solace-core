@@ -102,20 +102,20 @@ async function main() {
    logContractAddress("ClaimsAdjustor", claimsAdjustor.address);
 
    console.log('');
-   console.log(`REACT_APP_REGISTRY_CONTRACT_ADDRESS="${registry.address}"`);
-   console.log(`REACT_APP_SOLACE_CONTRACT_ADDRESS="${solace.address}"`);
-   console.log(`REACT_APP_WETH_CONTRACT_ADDRESS="${mockWETH.address}"`);
-   console.log(`REACT_APP_MASTER_CONTRACT_ADDRESS="${master.address}"`);
-   console.log(`REACT_APP_CPFARM_CONTRACT_ADDRESS="${cpFarm.address}"`);
-   console.log(`REACT_APP_LPFARM_CONTRACT_ADDRESS="${lpFarm.address}"`);
-   console.log(`REACT_APP_VAULT_CONTRACT_ADDRESS="${vault.address}"`);
-   console.log(`REACT_APP_TREASURY_CONTRACT_ADDRESS="${treasury.address}"`);
-   console.log(`REACT_APP_CLAIMS_ESCROW_CONTRACT_ADDRESS="${claimsEscrow.address}"`);
-   console.log(`REACT_APP_CLAIMS_ADJUSTOR_CONTRACT_ADDRESS="${claimsAdjustor.address}"`);
-   console.log(`REACT_APP_UNISWAP_FACTORY_CONTRACT_ADDRESS="${uniswapFactory.address}"`);
-   console.log(`REACT_APP_UNISWAP_ROUTER_CONTRACT_ADDRESS="${uniswapRouter.address}"`);
-   console.log(`REACT_APP_UNISWAP_LPTOKEN_CONTRACT_ADDRESS="${lpToken.address}"`);
-   console.log(`REACT_APP_UNISWAP_POOL_CONTRACT_ADDRESS="${pool.address}"`);
+   console.log(`REACT_APP_REGISTRY_CONTRACT_ADDRESS=${registry.address}`);
+   console.log(`REACT_APP_SOLACE_CONTRACT_ADDRESS=${solace.address}`);
+   console.log(`REACT_APP_WETH_CONTRACT_ADDRESS=${mockWETH.address}`);
+   console.log(`REACT_APP_MASTER_CONTRACT_ADDRESS=${master.address}`);
+   console.log(`REACT_APP_CPFARM_CONTRACT_ADDRESS=${cpFarm.address}`);
+   console.log(`REACT_APP_LPFARM_CONTRACT_ADDRESS=${lpFarm.address}`);
+   console.log(`REACT_APP_VAULT_CONTRACT_ADDRESS=${vault.address}`);
+   console.log(`REACT_APP_TREASURY_CONTRACT_ADDRESS=${treasury.address}`);
+   console.log(`REACT_APP_CLAIMS_ESCROW_CONTRACT_ADDRESS=${claimsEscrow.address}`);
+   console.log(`REACT_APP_CLAIMS_ADJUSTOR_CONTRACT_ADDRESS=${claimsAdjustor.address}`);
+   console.log(`REACT_APP_UNISWAP_FACTORY_CONTRACT_ADDRESS=${uniswapFactory.address}`);
+   console.log(`REACT_APP_UNISWAP_ROUTER_CONTRACT_ADDRESS=${uniswapRouter.address}`);
+   console.log(`REACT_APP_UNISWAP_LPTOKEN_CONTRACT_ADDRESS=${lpToken.address}`);
+   console.log(`REACT_APP_UNISWAP_POOL_CONTRACT_ADDRESS=${pool.address}`);
    console.log('')
 }
 
