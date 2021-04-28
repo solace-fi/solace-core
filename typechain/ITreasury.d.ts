@@ -28,7 +28,7 @@ interface ITreasuryInterface extends ethers.utils.Interface {
     "setGovernance(address)": FunctionFragment;
     "setPath(address,bytes)": FunctionFragment;
     "spend(address,uint256,address)": FunctionFragment;
-    "swap(address)": FunctionFragment;
+    "swap(address,bytes,uint256,uint256)": FunctionFragment;
   };
 
   encodeFunctionData(
@@ -51,7 +51,10 @@ interface ITreasuryInterface extends ethers.utils.Interface {
     functionFragment: "spend",
     values: [string, BigNumberish, string]
   ): string;
-  encodeFunctionData(functionFragment: "swap", values: [string]): string;
+  encodeFunctionData(
+    functionFragment: "swap",
+    values: [string, BytesLike, BigNumberish, BigNumberish]
+  ): string;
 
   decodeFunctionResult(functionFragment: "depositEth", data: BytesLike): Result;
   decodeFunctionResult(
@@ -135,10 +138,19 @@ export class ITreasury extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    swap(_token: string, overrides?: Overrides): Promise<ContractTransaction>;
-
-    "swap(address)"(
+    swap(
       _token: string,
+      _path: BytesLike,
+      _amountIn: BigNumberish,
+      _amountOutMinimum: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "swap(address,bytes,uint256,uint256)"(
+      _token: string,
+      _path: BytesLike,
+      _amountIn: BigNumberish,
+      _amountOutMinimum: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
   };
@@ -195,10 +207,19 @@ export class ITreasury extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  swap(_token: string, overrides?: Overrides): Promise<ContractTransaction>;
-
-  "swap(address)"(
+  swap(
     _token: string,
+    _path: BytesLike,
+    _amountIn: BigNumberish,
+    _amountOutMinimum: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "swap(address,bytes,uint256,uint256)"(
+    _token: string,
+    _path: BytesLike,
+    _amountIn: BigNumberish,
+    _amountOutMinimum: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
@@ -255,9 +276,21 @@ export class ITreasury extends Contract {
       overrides?: CallOverrides
     ): Promise<void>;
 
-    swap(_token: string, overrides?: CallOverrides): Promise<void>;
+    swap(
+      _token: string,
+      _path: BytesLike,
+      _amountIn: BigNumberish,
+      _amountOutMinimum: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
 
-    "swap(address)"(_token: string, overrides?: CallOverrides): Promise<void>;
+    "swap(address,bytes,uint256,uint256)"(
+      _token: string,
+      _path: BytesLike,
+      _amountIn: BigNumberish,
+      _amountOutMinimum: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
   };
 
   filters: {};
@@ -315,9 +348,21 @@ export class ITreasury extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    swap(_token: string, overrides?: Overrides): Promise<BigNumber>;
+    swap(
+      _token: string,
+      _path: BytesLike,
+      _amountIn: BigNumberish,
+      _amountOutMinimum: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
 
-    "swap(address)"(_token: string, overrides?: Overrides): Promise<BigNumber>;
+    "swap(address,bytes,uint256,uint256)"(
+      _token: string,
+      _path: BytesLike,
+      _amountIn: BigNumberish,
+      _amountOutMinimum: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
   };
 
   populateTransaction: {
@@ -373,10 +418,19 @@ export class ITreasury extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    swap(_token: string, overrides?: Overrides): Promise<PopulatedTransaction>;
-
-    "swap(address)"(
+    swap(
       _token: string,
+      _path: BytesLike,
+      _amountIn: BigNumberish,
+      _amountOutMinimum: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "swap(address,bytes,uint256,uint256)"(
+      _token: string,
+      _path: BytesLike,
+      _amountIn: BigNumberish,
+      _amountOutMinimum: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
   };

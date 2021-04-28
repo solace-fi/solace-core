@@ -57,9 +57,14 @@ interface ITreasury {
     function spend(address _token, uint256 _amount, address _recipient) external;
 
     /**
-     * @notice Manually swaps a token using a predefined path.
+     * @notice Manually swaps a token.
      * Can only be called by the current governor.
      * @dev Swaps the entire balance in case some tokens were unknowingly received.
+     * Reverts if the swap was unsuccessful.
+     * @param _token The address of the token to swap.
+     * @param _path The path of pools to take.
+     * @param _amountIn The amount to swap.
+     * @param _amountOutMinimum The minimum about to receive.
      */
-    function swap(address _token) external;
+    function swap(address _token, bytes calldata _path, uint256 _amountIn, uint256 _amountOutMinimum) external;
 }

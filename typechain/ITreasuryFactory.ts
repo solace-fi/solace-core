@@ -107,6 +107,21 @@ const _abi = [
         name: "_token",
         type: "address",
       },
+      {
+        internalType: "bytes",
+        name: "_path",
+        type: "bytes",
+      },
+      {
+        internalType: "uint256",
+        name: "_amountIn",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "_amountOutMinimum",
+        type: "uint256",
+      },
     ],
     name: "swap",
     outputs: [],

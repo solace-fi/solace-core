@@ -23,7 +23,7 @@ contract Treasury is ITreasury {
     address public governance;
 
     /// @notice Address of Uniswap router.
-    ISwapRouter public uniRouter;
+    ISwapRouter public swapRouter;
 
     /// @notice Wrapped ether.
     IWETH10 public weth;
@@ -44,12 +44,12 @@ contract Treasury is ITreasury {
     /**
      * @notice Constructs the treasury contract.
      * @param _solace Address of the solace token.
-     * @param _uniRouter Address of uniswap router.
+     * @param _swapRouter Address of uniswap router.
      * @param _weth Address of wrapped ether.
      */
-    constructor(SOLACE _solace, address _uniRouter, address _weth) public {
+    constructor(SOLACE _solace, address _swapRouter, address _weth) public {
         solace = _solace;
-        uniRouter = ISwapRouter(_uniRouter);
+        swapRouter = ISwapRouter(_swapRouter);
         weth = IWETH10(_weth);
         governance = msg.sender;
     }
@@ -94,7 +94,7 @@ contract Treasury is ITreasury {
         // set path
         paths[_token] = _path;
         // infinite or zero approval
-        IERC20(_token).approve(address(uniRouter), _path.length == 0 ? 0 : type(uint256).max);
+        IERC20(_token).approve(address(swapRouter), _path.length == 0 ? 0 : type(uint256).max);
         // emit event
         emit PathSet(_token, _path);
     }
@@ -137,16 +137,27 @@ contract Treasury is ITreasury {
     }
 
     /**
-     * @notice Manually swaps a token using a predefined path.
+     * @notice Manually swaps a token.
      * Can only be called by the current governor.
      * @dev Swaps the entire balance in case some tokens were unknowingly received.
      * Reverts if the swap was unsuccessful.
      * @param _token The address of the token to swap.
+     * @param _path The path of pools to take.
+     * @param _amountIn The amount to swap.
+     * @param _amountOutMinimum The minimum about to receive.
      */
-    function swap(address _token) external override {
+    function swap(address _token, bytes calldata _path, uint256 _amountIn, uint256 _amountOutMinimum) external override {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
-        require(_swap(_token), "swap failed");
+        // swap
+        swapRouter.exactInput(ISwapRouter.ExactInputParams({
+            path: _path,
+            recipient: address(this),
+            // solhint-disable-next-line not-rely-on-time
+            deadline: block.timestamp,
+            amountIn: _amountIn,
+            amountOutMinimum: _amountOutMinimum
+        }));
     }
 
     /**
@@ -175,18 +186,16 @@ contract Treasury is ITreasury {
         if (path.length == 0) return false;
         // get token balance
         uint256 balance = IERC20(_token).balanceOf(address(this));
-        // construct swap params
-        ISwapRouter.ExactInputParams memory swapParams = ISwapRouter.ExactInputParams({
+        // construct call data
+        bytes memory data = abi.encodeWithSelector(swapRouter.exactInput.selector, ISwapRouter.ExactInputParams({
             path: path,
             recipient: address(this),
             // solhint-disable-next-line not-rely-on-time
             deadline: block.timestamp,
             amountIn: balance,
             amountOutMinimum: 0
-        });
-        // construct call data
-        bytes memory data = abi.encodeWithSelector(uniRouter.exactInput.selector, swapParams);
+        }));
         // low level call
-        (_success, ) = address(uniRouter).call(data);
+        (_success, ) = address(swapRouter).call(data);
     }
 }
