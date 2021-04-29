@@ -22,7 +22,4 @@ import './PolicyManager.sol';
  */
 abstract contract ProtocolProduct is IProduct {
     using Address for address;
-    using EnumerableSet for EnumerableSet.Set;
-
-
 }
