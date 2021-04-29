@@ -26,7 +26,13 @@ import NonfungiblePositionManager from "@uniswap/v3-periphery/artifacts/contract
 chai.use(solidity);
 
 describe("Treasury", function () {
-  const [deployer, governor, liquidityProvider, mockPolicy, user, randAddress] = provider.getWallets();
+  // users
+  let deployer: any;
+  let governor: any;
+  let liquidityProvider: any;
+  let mockPolicy: any;
+  let user: any;
+  let randAddress: any;
 
   // solace contracts
   let solaceToken: Solace;
@@ -56,6 +62,26 @@ describe("Treasury", function () {
   const ONE_MILLION_ETHER = BN.from("1000000000000000000000000");
 
   before(async function () {
+    const network = await provider.getNetwork();
+    if(network.chainId == 31337) {
+      console.log('');
+      console.log('    #############################################################################################');
+      console.log('    #                                                                                           #');
+      console.log('    #  NOTICE:                                                                                  #');
+      console.log('    #                                                                                           #');
+      console.log('    #  This test will throw errors when run on the hardhat network.                             #');
+      console.log('    #  Hardhat is aware of the issue but have not fixed it yet.                                 #');
+      console.log('    #  You will need to run this test on a different network.                                   #');
+      console.log('    #  Run "ganache-cli" in another terminal.                                                   #');
+      console.log('    #  Then run "npx hardhat test test/Treasury.test.ts --network localhost" in this terminal.  #');
+      console.log('    #                                                                                           #');
+      console.log('    #############################################################################################');
+      console.log('');
+      [deployer, governor, liquidityProvider, mockPolicy, user, randAddress] = provider.getWallets();
+    } else {
+      [deployer, governor, liquidityProvider, mockPolicy, user, randAddress] = await ethers.getSigners();
+    }
+
     // deploy solace token
     solaceToken = (await deployContract(
       deployer,

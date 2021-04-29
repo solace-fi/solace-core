@@ -12,10 +12,10 @@ import { encodePriceSqrt, FeeAmount, TICK_SPACINGS, getMaxTick, getMinTick } fro
 import SolaceArtifact from '../artifacts/contracts/SOLACE.sol/SOLACE.json';
 import MasterArtifact from '../artifacts/contracts/Master.sol/Master.json';
 import CpFarmArtifact from "../artifacts/contracts/CpFarm.sol/CpFarm.json";
-import UniswapLpFarmArtifact from "../artifacts/contracts/UniswapLpFarm.sol/UniswapLpFarm.json";
+import SolaceEthLpFarmArtifact from "../artifacts/contracts/SolaceEthLpFarm.sol/SolaceEthLpFarm.json";
 import VaultArtifact from '../artifacts/contracts/Vault.sol/Vault.json'
 import WETHArtifact from "../artifacts/contracts/mocks/MockWETH.sol/MockWETH.json";
-import { Solace, Vault, Master, CpFarm, UniswapLpFarm, MockWeth } from "../typechain";
+import { Solace, Vault, Master, CpFarm, SolaceEthLpFarm, MockWeth } from "../typechain";
 
 // uniswap imports
 import UniswapV3FactoryArtifact from "@uniswap/v3-core/artifacts/contracts/UniswapV3Factory.sol/UniswapV3Factory.json";
@@ -164,7 +164,7 @@ describe("Master", function () {
 
     it("can create uniswap farms", async function () {
       // create second farm
-      farm2 = await createUniswapLpFarm(lpToken, startBlock, endBlock, mediumPool);
+      farm2 = await createSolaceEthLpFarm(lpToken, startBlock, endBlock, mediumPool);
       await farm2.setGovernance(governor.address);
       await expect(farm2.setGovernance(governor.address)).to.be.revertedWith("!governance");
       let tx = await master.connect(governor).registerFarm(farm2.address, 0);
@@ -175,7 +175,7 @@ describe("Master", function () {
     it("rejects farm creation by non governor", async function () {
       farm3 = await createCpFarm();
       await expect(master.connect(farmer1).registerFarm(farm3.address, 0)).to.be.revertedWith("!governance");
-      farm4 = await createUniswapLpFarm();
+      farm4 = await createSolaceEthLpFarm();
       await expect(master.connect(farmer1).registerFarm(farm4.address, 0)).to.be.revertedWith("!governance");
     })
 
@@ -197,7 +197,7 @@ describe("Master", function () {
 
   describe("updates", async function () {
     let cpFarm: CpFarm;
-    let lpFarm: UniswapLpFarm;
+    let lpFarm: SolaceEthLpFarm;
     let allocPoints = BN.from(0);
 
     beforeEach(async function () {
@@ -207,7 +207,7 @@ describe("Master", function () {
       cpFarm = await createCpFarm(startBlock, endBlock);
       await cpFarm.setGovernance(governor.address);
       await master.connect(governor).registerFarm(cpFarm.address, allocPoints);
-      lpFarm = await createUniswapLpFarm(lpToken, startBlock, endBlock, mediumPool);
+      lpFarm = await createSolaceEthLpFarm(lpToken, startBlock, endBlock, mediumPool);
       await lpFarm.setGovernance(governor.address);
       await master.connect(governor).registerFarm(lpFarm.address, allocPoints);
     })
@@ -241,7 +241,7 @@ describe("Master", function () {
     let cpFarmId: BN;
     let cpFarm: CpFarm;
     let lpFarmId: BN;
-    let lpFarm: UniswapLpFarm;
+    let lpFarm: SolaceEthLpFarm;
     // start with 4:1 alloc, switch to 9:1
     let cpAllocPoints1: BN = BN.from("20");
     let cpAllocPoints2: BN = BN.from("45");
@@ -295,7 +295,7 @@ describe("Master", function () {
       await cpFarm.setGovernance(governor.address);
       await master.connect(governor).registerFarm(cpFarm.address, cpAllocPoints1);
       cpFarmId = await master.numFarms();
-      lpFarm = await createUniswapLpFarm(lpToken, blockNum.add(45), blockNum.add(250), mediumPool);
+      lpFarm = await createSolaceEthLpFarm(lpToken, blockNum.add(45), blockNum.add(250), mediumPool);
       await lpFarm.setGovernance(governor.address);
       await master.connect(governor).registerFarm(lpFarm.address, lpAllocPoints);
       lpFarmId = await master.numFarms();
@@ -551,7 +551,7 @@ describe("Master", function () {
     return farm;
   }
 
-  async function createUniswapLpFarm(
+  async function createSolaceEthLpFarm(
     stakeToken: Contract = lpToken,
     startBlock: BigNumberish = BN.from(0),
     endBlock: BigNumberish = BN.from(0),
@@ -559,16 +559,17 @@ describe("Master", function () {
   ) {
     let farm = (await deployContract(
       deployer,
-      UniswapLpFarmArtifact,
+      SolaceEthLpFarmArtifact,
       [
         master.address,
         stakeToken.address,
         solaceToken.address,
         startBlock,
         endBlock,
-        pool.address
+        pool.address,
+        weth.address
       ]
-    )) as UniswapLpFarm;
+    )) as SolaceEthLpFarm;
     return farm;
   }
 
