@@ -27,6 +27,8 @@ export { MockStrategyFactory } from "./MockStrategyFactory";
 export type { MockStrategy } from "./MockStrategy";
 export { MockWethFactory } from "./MockWethFactory";
 export type { MockWeth } from "./MockWeth";
+export { PolicyManagerFactory } from "./PolicyManagerFactory";
+export type { PolicyManager } from "./PolicyManager";
 export { RegistryFactory } from "./RegistryFactory";
 export type { Registry } from "./Registry";
 export { SolaceFactory } from "./SolaceFactory";

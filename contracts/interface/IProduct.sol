@@ -22,7 +22,7 @@ interface IProduct {
     /**** UNIMPLEMENTED FUNCTIONS 
     Functions that are only implemented by child contracts
     ****/
-    function getTotalPosition(address _buyer) virtual external view returns (uint256 positionAmount);
+    function getTotalPosition(address _buyer) external view returns (uint256 positionAmount);
 
     /**** METRIC VIEW FUNCTIONS 
     View functions which give us total metrics about the product
@@ -39,14 +39,14 @@ interface IProduct {
     /**** QUOTE VIEW FUNCTIONS 
     View functions that give us quotes regarding a policy
     ****/
-    function getQuote(uint256 _coverLimit, uint256 _days) external view returns (uint256 premium);
+    function getQuote(uint256 _coverLimit, uint256 _blocks, address _positionContract) external view returns (uint256);
 
 
     /**** MUTATIVE FUNCTIONS 
     Functions that deploy and change policy contracts
     ****/
-    function buyPolicy(uint256 _coverLimit, uint256 _days) external payable returns (address policy);
-    function updateCoverLimit(address _policy, uint256 _coverLimit) external payable returns (bool);
-    function extendPolicy(address policy, uint256 _days) external payable returns (bool);
-    function cancelPolicy(address policy) external returns (bool);
+    function buyPolicy(uint256 _coverLimit, uint256 _blocks, address _positionContract) external payable returns (uint256 policyID);
+    // function updateCoverLimit(address _policy, uint256 _coverLimit) external payable returns (bool);
+    // function extendPolicy(address policy, uint256 _days) external payable returns (bool);
+    // function cancelPolicy(address policy) external returns (bool);
 }
