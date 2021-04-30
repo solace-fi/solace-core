@@ -9,12 +9,12 @@ import WETHArtifact from "../artifacts/contracts/mocks/MockWETH.sol/MockWETH.jso
 import MasterArtifact from '../artifacts/contracts/Master.sol/Master.json';
 import VaultArtifact from '../artifacts/contracts/Vault.sol/Vault.json'
 import CpFarmArtifact from "../artifacts/contracts/CpFarm.sol/CpFarm.json";
-import UniswapLpFarmArtifact from "../artifacts/contracts/UniswapLpFarm.sol/UniswapLpFarm.json";
+import SolaceEthLpFarmArtifact from "../artifacts/contracts/SolaceEthLpFarm.sol/SolaceEthLpFarm.json";
 import TreasuryArtifact from "../artifacts/contracts/Treasury.sol/Treasury.json";
 import RegistryArtifact from "../artifacts/contracts/Registry.sol/Registry.json";
 import ClaimsAdjustorArtifact from '../artifacts/contracts/ClaimsAdjustor.sol/ClaimsAdjustor.json';
 import ClaimsEscrowArtifact from '../artifacts/contracts/ClaimsEscrow.sol/ClaimsEscrow.json';
-import { Solace, Vault, Master, MockWeth, CpFarm, UniswapLpFarm, Treasury, Registry, ClaimsAdjustor, ClaimsEscrow } from "../typechain";
+import { Solace, Vault, Master, MockWeth, CpFarm, SolaceEthLpFarm, Treasury, Registry, ClaimsAdjustor, ClaimsEscrow } from "../typechain";
 
 // uniswap imports
 import UniswapV3FactoryArtifact from "@uniswap/v3-core/artifacts/contracts/UniswapV3Factory.sol/UniswapV3Factory.json";
@@ -63,7 +63,7 @@ async function main() {
    */
   let cpFarm = (await deployContract(deployer,CpFarmArtifact,[master.address,vault.address,solace.address,0,2000])) as CpFarm;
   logContractAddress("CpFarm", cpFarm.address);
-  await master.registerFarm(cpFarm.address, 1);
+  await master.registerFarm(cpFarm.address, 50);
   /*
    * deploy Uniswap and Uniswap accessories
    */
@@ -82,8 +82,9 @@ async function main() {
   /*
    * deploy LP Farm
    */
-  let lpFarm = (await deployContract(deployer,UniswapLpFarmArtifact,[master.address,lpToken.address,solace.address,0,2000,pool.address])) as UniswapLpFarm;
+  let lpFarm = (await deployContract(deployer,SolaceEthLpFarmArtifact,[master.address,lpToken.address,solace.address,0,2000,pool.address,mockWETH.address])) as SolaceEthLpFarm;
   logContractAddress("LpFarm", lpFarm.address);
+  await master.registerFarm(lpFarm.address, 50);
   /*
    * deploy Treasury
    */

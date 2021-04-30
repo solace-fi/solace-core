@@ -11,14 +11,14 @@
     "@nomiclabs/hardhat-waffle": "^2.0.1",
     "@nomiclabs/hardhat-web3": "^2.0.0",
     "@typechain/ethers-v5": "^2.0.0",
-    "@types/chai": "^4.2.16",
+    "@types/chai": "^4.2.17",
     "@types/mocha": "^8.2.2",
-    "@types/node": "^14.14.41",
+    "@types/node": "^15.0.1",
     "bignumber.js": "^9.0.1",
     "chai": "^4.3.4",
     "ethereum-waffle": "^3.3.0",
     "ethereumjs-util": "^7.0.10",
-    "ethers": "^5.1.3",
+    "ethers": "^5.1.4",
     "hardhat": "^2.2.1",
     "hardhat-abi-exporter": "^2.2.1",
     "hardhat-contract-sizer": "^2.0.3",
@@ -33,6 +33,6 @@
   "dependencies": {
     "@openzeppelin/contracts": "^4.0.0",
     "@uniswap/v3-core": "^1.0.0-rc.2",
-    "@uniswap/v3-periphery": "^1.0.0-beta.22"
+    "@uniswap/v3-periphery": "^1.0.0-beta.23"
   }
 }
