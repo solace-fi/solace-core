@@ -4,10 +4,20 @@ import "hardhat-contract-sizer";
 import "@nomiclabs/hardhat-waffle";
 import "hardhat-typechain";
 import "hardhat-abi-exporter";
-
+import { config as dotenv_config } from 'dotenv';
+dotenv_config();
 
 const config: HardhatUserConfig = {
   defaultNetwork: "hardhat",
+  networks: {
+    hardhat: { },
+    localhost: { url: "http://127.0.0.1:8545" },
+    kovan: {
+      url: process.env.KOVAN_URL,
+      chainId: 42,
+      accounts: JSON.parse(process.env.KOVAN_ACCOUNTS || '')
+    }
+  },
   solidity: {
     compilers: [{
       version: "0.8.0",
@@ -25,6 +35,9 @@ const config: HardhatUserConfig = {
     flat: false,
     only: [],
     spacing: 2
+  },
+  mocha: {
+    timeout: 3600000 // one hour
   }
 };
 
