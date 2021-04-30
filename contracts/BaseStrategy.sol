@@ -35,7 +35,7 @@ abstract contract BaseStrategy {
         want = IERC20(vault.token());
 
         // Give Vault unlimited access to `want` so that WETH can be transferred during `vault.report()`
-        SafeERC20.safeApprove(want, _vault, 2^256-1);
+        SafeERC20.safeApprove(want, _vault, type(uint256).max);
     }
 
     /**
