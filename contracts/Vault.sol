@@ -201,7 +201,7 @@ contract Vault is ERC20Permit, IVault {
     }
 
     /**
-     * @notice Sets `withdrawalQueue` to be in the order specified by input array
+     * @notice Sets `withdrawalQueue` to be in the order specified by input array `_queue`
      * @dev Specify addresses in the order in which funds should be withdrawn.
      * The ordering should be least impactful (the Strategy whose core positions will be least impacted by
      * having funds removed) first, with the next least impactful second, etc.
@@ -286,8 +286,7 @@ contract Vault is ERC20Permit, IVault {
     /**
      * @notice Remove `_strategy` from `withdrawalQueue`
      * Can only be called by the current governor.
-     * Can only be called on an active strategy (added using addStrategy)
-     * `_strategy` cannot already be in the queue
+     * Can only be called on an active strategy, added using `addStrategy()`
      * @param _strategy address of the strategy to remove
      */
     function removeStrategyFromQueue(address _strategy) external {
@@ -297,6 +296,7 @@ contract Vault is ERC20Permit, IVault {
 
         address[] storage newQueue;
 
+        // readd all the strategies from the queue EXCEPT the Strategy we want to remove
         for (uint256 i = 0; i < withdrawalQueue.length; i++) {
             if (withdrawalQueue[i] != _strategy) {
                 newQueue.push(withdrawalQueue[i]);
@@ -533,7 +533,7 @@ contract Vault is ERC20Permit, IVault {
      * The performance fee is determined here, off of the strategy's profits (if any), and sent to governance.
      * The strategist's fee is also determined here (off of profits), to be handled according
      * to the strategist on the next harvest.
-     * This may only be called by a Strategy managed by this Vault.
+     * Can only be called by a Strategy managed by this Vault.
      * @dev For approved strategies, this is the most efficient behavior.
      * The Strategy reports back what it has free, then Vault "decides"
      * whether to take some back or give it more. Note that the most it can
@@ -829,6 +829,7 @@ contract Vault is ERC20Permit, IVault {
         // Can only borrow up to what the contract has in reserve
         if (token.balanceOf(address(this)) < available) available = token.balanceOf(address(this));
 
+        // Adjust by min and max borrow limits (per harvest)
         if (available < _strategies[_strategy].minDebtPerHarvest) return 0;
 
         if (_strategies[_strategy].maxDebtPerHarvest < available) return _strategies[_strategy].maxDebtPerHarvest;
