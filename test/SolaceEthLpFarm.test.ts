@@ -80,7 +80,10 @@ describe("SolaceEthLpFarm", function () {
     // deploy solace token
     solaceToken = (await deployContract(
       deployer,
-      SolaceArtifact
+      SolaceArtifact,
+      [
+        governor.address
+      ]
     )) as Solace;
 
     // deploy weth
@@ -105,6 +108,7 @@ describe("SolaceEthLpFarm", function () {
       deployer,
       MasterArtifact,
       [
+        governor.address,
         solaceToken.address,
         solacePerBlock
       ]
@@ -137,10 +141,8 @@ describe("SolaceEthLpFarm", function () {
       ]
     )) as Contract;
 
-    await master.setGovernance(governor.address);
-
     // transfer tokens
-    await solaceToken.addMinter(governor.address);
+    await solaceToken.connect(governor).addMinter(governor.address);
     await solaceToken.connect(governor).mint(master.address, ONE_MILLION_ETHER);
     await solaceToken.connect(governor).mint(governor.address, ONE_MILLION_ETHER);
     await solaceToken.connect(governor).transfer(farmer1.address, TEN_ETHER);
@@ -197,16 +199,17 @@ describe("SolaceEthLpFarm", function () {
 
   describe("governance", function () {
     it("starts with the correct governor", async function () {
-      expect(await farm.governance()).to.equal(deployer.address);
-    })
-
-    it("can transfer governance", async function () {
-      await farm.connect(deployer).setGovernance(governor.address);
       expect(await farm.governance()).to.equal(governor.address);
     })
 
+    it("can transfer governance", async function () {
+      await farm.connect(governor).setGovernance(deployer.address);
+      expect(await farm.governance()).to.equal(deployer.address);
+    })
+
     it("rejects governance transfer by non governor", async function () {
-      await expect(farm.connect(deployer).setGovernance(governor.address)).to.be.revertedWith("!governance");
+      await expect(farm.connect(governor).setGovernance(deployer.address)).to.be.revertedWith("!governance");
+      await farm.connect(deployer).setGovernance(governor.address);
     })
   })
 
@@ -229,7 +232,6 @@ describe("SolaceEthLpFarm", function () {
 
     before(async function () {
       farm = await createSolaceEthLpFarm(lpToken, startBlock, endBlock, mediumPool);
-      await farm.connect(deployer).setGovernance(governor.address);
     })
 
     it("can deposit", async function () {
@@ -454,7 +456,6 @@ describe("SolaceEthLpFarm", function () {
       startBlock = blockNum.add(10);
       endBlock = blockNum.add(100);
       farm = await createSolaceEthLpFarm(lpToken, startBlock, endBlock, mediumPool);
-      await farm.setGovernance(governor.address);
     })
 
     it("can update a single farm", async function () {
@@ -526,7 +527,6 @@ describe("SolaceEthLpFarm", function () {
       startBlock = blockNum.add(20);
       endBlock = blockNum.add(400);
       farm = await createSolaceEthLpFarm(lpToken, startBlock, endBlock, mediumPool);
-      await farm.setGovernance(governor.address);
       await master.connect(governor).registerFarm(farm.address, allocPoints);
     })
 
@@ -819,7 +819,6 @@ describe("SolaceEthLpFarm", function () {
       startBlock = blockNum.add(20);
       endBlock = blockNum.add(30);
       farm = await createSolaceEthLpFarm(lpToken, startBlock, endBlock, mediumPool);
-      await farm.setGovernance(governor.address);
       await master.connect(governor).registerFarm(farm.address, allocPoints);
     })
 
@@ -852,7 +851,6 @@ describe("SolaceEthLpFarm", function () {
       startBlock = blockNum.add(20);
       endBlock = blockNum.add(30);
       farm = await createSolaceEthLpFarm(lpToken, startBlock, endBlock, mediumPool);
-      await farm.setGovernance(governor.address);
       await master.connect(governor).registerFarm(farm.address, 100);
       // increase solace distribution
       await master.connect(governor).setSolacePerBlock(await solaceToken.balanceOf(master.address));
@@ -930,6 +928,7 @@ describe("SolaceEthLpFarm", function () {
       deployer,
       SolaceEthLpFarmArtifact,
       [
+        governor.address,
         master.address,
         stakeToken.address,
         solaceToken.address,

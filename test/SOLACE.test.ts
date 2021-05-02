@@ -20,7 +20,10 @@ describe('SolaceToken', () => {
   beforeEach(async () => {
     solace = (await deployContract(
       owner,
-      SolaceArtifact
+      SolaceArtifact,
+      [
+        owner.address
+      ]
     )) as Solace;
   })
 
@@ -83,7 +86,7 @@ describe('SolaceToken', () => {
       await solace.connect(owner).addMinter(minter.address);
       expect(await solace.minters(minter.address)).to.equal(true);
     })
-  
+
     it('can remove minters', async function () {
       await solace.connect(owner).removeMinter(minter.address);
       expect(await solace.minters(minter.address)).to.equal(false);

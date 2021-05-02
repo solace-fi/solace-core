@@ -123,8 +123,8 @@ contract Vault is ERC20Permit, IVault {
     event StrategyUpdateMaxDebtPerHarvest(address indexed strategy, uint256 indexed newMaxDebtPerHarvest);
     event StrategyUpdatePerformanceFee(address indexed strategy, uint256 indexed newPerformanceFee);
 
-    constructor (address _registry, address _token) ERC20("Solace CP Token", "SCP") ERC20Permit("Solace CP Token") {
-        governance = msg.sender;
+    constructor (address _governance, address _registry, address _token) ERC20("Solace CP Token", "SCP") ERC20Permit("Solace CP Token") {
+        governance = _governance;
         rewards = msg.sender; // set governance address as rewards destination for now
 
         registry = IRegistry(_registry);
@@ -173,7 +173,7 @@ contract Vault is ERC20Permit, IVault {
     }
 
     /**
-     * @notice Changes the performanceFee of the Vault. 
+     * @notice Changes the performanceFee of the Vault.
      * Can only be called by the current governor.
      * @param fee New performanceFee to use
      */
@@ -369,7 +369,7 @@ contract Vault is ERC20Permit, IVault {
         debtRatio += _debtRatio;
 
         require(debtRatio <= MAX_BPS, "Vault debt ratio cannot exceed MAX_BPS");
-        
+
         emit StrategyUpdateDebtRatio(_strategy, _debtRatio);
     }
 

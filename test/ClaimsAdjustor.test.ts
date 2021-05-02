@@ -33,13 +33,14 @@ describe("ClaimsAdjustor", function () {
 
         registry = (await deployContract(
             owner,
-            RegistryArtifact
+            RegistryArtifact,
+            [owner.address]
         )) as Registry;
 
         vault = (await deployContract(
             owner,
             VaultArtifact,
-            [registry.address, weth.address]
+            [owner.address, registry.address, weth.address]
         )) as Vault;
 
         claimsEscrow = (await deployContract(

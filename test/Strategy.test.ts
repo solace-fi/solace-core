@@ -23,7 +23,7 @@ describe("Strategy", function () {
     const [owner, newOwner, depositor1] = provider.getWallets();
     const testDepositAmount = BN.from("10");
 
-    const debtRatio = 1000; 
+    const debtRatio = 1000;
     const minDebtPerHarvest = 0;
     const maxDebtPerHarvest = 1000;
     const performanceFee = 0;
@@ -33,7 +33,8 @@ describe("Strategy", function () {
     beforeEach(async () => {
         registry = (await deployContract(
             owner,
-            RegistryArtifact
+            RegistryArtifact,
+            [owner.address,]
         )) as Registry;
 
         weth = (await deployContract(
@@ -44,13 +45,13 @@ describe("Strategy", function () {
         vault = (await deployContract(
             owner,
             VaultArtifact,
-            [registry.address, weth.address]
+            [owner.address, registry.address, weth.address]
         )) as Vault;
 
         newVault = (await deployContract(
             owner,
             VaultArtifact,
-            [registry.address, weth.address]
+            [owner.address, registry.address, weth.address]
         )) as Vault;
 
         strategy = (await deployContract(

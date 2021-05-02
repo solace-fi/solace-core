@@ -53,13 +53,19 @@ describe("Registry", function () {
     // deploy registry contract
     registry = (await deployContract(
       deployer,
-      RegistryArtifact
+      RegistryArtifact,
+      [
+        governor.address
+      ]
     )) as Registry;
 
     // deploy solace token
     solaceToken = (await deployContract(
       deployer,
-      SolaceArtifact
+      SolaceArtifact,
+      [
+        governor.address
+      ]
     )) as Solace;
 
     // deploy master contract
@@ -67,6 +73,7 @@ describe("Registry", function () {
       deployer,
       MasterArtifact,
       [
+        governor.address,
         solaceToken.address,
         1
       ]
@@ -78,7 +85,7 @@ describe("Registry", function () {
       ClaimsEscrowArtifact,
       [registry.address]
     )) as ClaimsEscrow;
-    
+
     // deploy claims escrow contract
     claimsAdjustor = (await deployContract(
       deployer,
@@ -90,7 +97,7 @@ describe("Registry", function () {
     vault = (await deployContract(
       deployer,
       VaultArtifact,
-      [registry.address, weth.address]
+      [governor.address, registry.address, weth.address]
     )) as Vault;
 
     // deploy treasury contract
@@ -98,6 +105,7 @@ describe("Registry", function () {
       deployer,
       TreasuryArtifact,
       [
+        governor.address,
         solaceToken.address,
         ZERO_ADDRESS,
         ZERO_ADDRESS
@@ -107,16 +115,17 @@ describe("Registry", function () {
 
   describe("governance", function () {
     it("starts with the correct governor", async function () {
-      expect(await registry.governance()).to.equal(deployer.address);
-    })
-
-    it("can transfer governance", async function () {
-      await registry.connect(deployer).setGovernance(governor.address);
       expect(await registry.governance()).to.equal(governor.address);
     })
 
+    it("can transfer governance", async function () {
+      await registry.connect(governor).setGovernance(deployer.address);
+      expect(await registry.governance()).to.equal(deployer.address);
+    })
+
     it("rejects governance transfer by non governor", async function () {
-      await expect(registry.connect(deployer).setGovernance(registry.address)).to.be.revertedWith("!governance");
+      await expect(registry.connect(governor).setGovernance(registry.address)).to.be.revertedWith("!governance");
+      await registry.connect(deployer).setGovernance(governor.address);
     })
   })
 

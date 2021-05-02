@@ -48,7 +48,7 @@ describe("Vault", function () {
     const deadline = constants.MaxUint256;
 
     const solacePerBlock: BN = BN.from("100000000000000000000"); // 100 e18
-    
+
     const newDebtRatio = 2000;
     const newMinDebtPerHarvest = BN.from("2");
     const newMaxDebtPerHarvest = BN.from("5");
@@ -64,13 +64,17 @@ describe("Vault", function () {
 
         solace = (await deployContract(
             owner,
-            SolaceArtifact
+            SolaceArtifact,
+            [
+              newOwner.address,
+            ]
         )) as Solace;
 
         master = (await deployContract(
             owner,
             MasterArtifact,
             [
+                newOwner.address,
                 solace.address,
                 solacePerBlock
             ]
@@ -78,13 +82,16 @@ describe("Vault", function () {
 
         registry = (await deployContract(
             owner,
-            RegistryArtifact
+            RegistryArtifact,
+            [
+              owner.address
+            ]
         )) as Registry;
 
         vault = (await deployContract(
             owner,
             VaultArtifact,
-            [registry.address, weth.address]
+            [owner.address, registry.address, weth.address]
         )) as Vault;
 
         strategy = (await deployContract(
@@ -161,7 +168,7 @@ describe("Vault", function () {
             expect(callMCR).to.equal(newMinCapitalRequirement);
         });
     });
-    
+
     describe("setPerformanceFee", function () {
         it("should revert if not called by governance", async function () {
             const fee = 1000;

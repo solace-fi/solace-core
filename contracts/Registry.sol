@@ -56,9 +56,10 @@ contract Registry is IRegistry {
 
     /**
      * @notice Constructs the registry contract.
+     * @param _governance Address of the governor.
      */
-    constructor() public {
-        governance = msg.sender;
+    constructor(address _governance) public {
+        governance = _governance;
     }
 
     /**
