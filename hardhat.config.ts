@@ -5,7 +5,6 @@ import "@nomiclabs/hardhat-waffle";
 import "hardhat-typechain";
 import "hardhat-abi-exporter";
 
-
 const config: HardhatUserConfig = {
   defaultNetwork: "hardhat",
   solidity: {
@@ -17,7 +16,7 @@ const config: HardhatUserConfig = {
           runs: 800
         }
       }
-    }],
+    }],   
   },
   abiExporter: {
     path: './client/src/constants/abi',
