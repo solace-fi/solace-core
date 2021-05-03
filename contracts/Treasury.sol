@@ -43,15 +43,16 @@ contract Treasury is ITreasury {
 
     /**
      * @notice Constructs the treasury contract.
+     * @param _governance Address of the governor.
      * @param _solace Address of the solace token.
      * @param _swapRouter Address of uniswap router.
      * @param _weth Address of wrapped ether.
      */
-    constructor(SOLACE _solace, address _swapRouter, address _weth) public {
+    constructor(address _governance, SOLACE _solace, address _swapRouter, address _weth) public {
+        governance = _governance;
         solace = _solace;
         swapRouter = ISwapRouter(_swapRouter);
         weth = IWETH10(_weth);
-        governance = msg.sender;
     }
 
     /**

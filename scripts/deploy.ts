@@ -2,7 +2,8 @@ import { waffle, ethers } from "hardhat";
 const { deployContract } = waffle;
 import { BigNumber as BN, Contract } from "ethers";
 
-import { encodePriceSqrt, FeeAmount } from "./../test/utilities/uniswap";
+import { logContractAddress, createPool } from "./utils";
+import { FeeAmount } from "../test/utilities/uniswap";
 
 import SolaceArtifact from '../artifacts/contracts/SOLACE.sol/SOLACE.json';
 import WETHArtifact from "../artifacts/contracts/mocks/MockWETH.sol/MockWETH.json";
@@ -77,7 +78,7 @@ async function main() {
   let lpToken = (await deployContract(deployer,NonfungiblePositionManagerArtifact,[uniswapFactory.address,mockWETH.address,ZERO_ADDRESS])) as Contract;
   logContractAddress("UniswapLpToken", lpToken.address);
   // create uniswap solace-weth pool
-  let pool = await createPool(uniswapFactory, mockWETH, solace, FeeAmount.MEDIUM);
+  let pool = await createPool(deployer, uniswapFactory, mockWETH.address, solace.address, FeeAmount.MEDIUM);
   logContractAddress("UniswapPool", pool.address);
   /*
    * deploy LP Farm
@@ -102,7 +103,9 @@ async function main() {
    let claimsAdjustor = (await deployContract(deployer,ClaimsAdjustorArtifact,[registry.address])) as ClaimsAdjustor;
    logContractAddress("ClaimsAdjustor", claimsAdjustor.address);
 
-   console.log('');
+   console.log(``);
+   console.log(`Copy and paste this into the .env file in the frontend client.`)
+   console.log(``);
    console.log(`REACT_APP_REGISTRY_CONTRACT_ADDRESS=${registry.address}`);
    console.log(`REACT_APP_SOLACE_CONTRACT_ADDRESS=${solace.address}`);
    console.log(`REACT_APP_WETH_CONTRACT_ADDRESS=${mockWETH.address}`);
@@ -126,34 +129,3 @@ main()
         console.error(error);
         process.exit(1);
   });
-
-
-// helper functions
-
-function expandStr(str: String, len: number) {
-  let s = str;
-  while(s.length < len) s = `${s} `
-  return s;
-}
-
-function logContractAddress(contractName: String, address: String) {
-  console.log(`${expandStr(contractName,14)} | ${address}`)
-}
-
-// uniswap requires tokens to be in order
-function sortTokens(tokenA: string, tokenB: string) {
-  return BN.from(tokenA).lt(BN.from(tokenB)) ? [tokenA, tokenB] : [tokenB, tokenA];
-}
-
-// creates, initializes, and returns a pool
-async function createPool(uniswapFactory: Contract, tokenA: Contract, tokenB: Contract, fee: FeeAmount) {
-  let [token0, token1] = sortTokens(tokenA.address, tokenB.address);
-  let pool: Contract;
-  let tx = await uniswapFactory.createPool(token0, token1, fee);
-  let events = (await tx.wait()).events;
-  let poolAddress = events[0].args.pool;
-  pool = await ethers.getContractAt(UniswapV3PoolArtifact.abi, poolAddress);
-  let sqrtPrice = encodePriceSqrt(1,1);
-  await pool.initialize(sqrtPrice);
-  return pool;
-}

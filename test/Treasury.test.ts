@@ -85,7 +85,10 @@ describe("Treasury", function () {
     // deploy solace token
     solaceToken = (await deployContract(
       deployer,
-      SolaceArtifact
+      SolaceArtifact,
+      [
+        governor.address,
+      ]
     )) as Solace;
 
     // deploy weth
@@ -170,6 +173,7 @@ describe("Treasury", function () {
       deployer,
       TreasuryArtifact,
       [
+        governor.address,
         solaceToken.address,
         uniswapRouter.address,
         weth.address
@@ -177,7 +181,7 @@ describe("Treasury", function () {
     )) as Treasury;
 
     // transfer tokens
-    await solaceToken.addMinter(governor.address);
+    await solaceToken.connect(governor).addMinter(governor.address);
     await solaceToken.connect(governor).mint(governor.address, ONE_MILLION_ETHER);
     await weth.connect(liquidityProvider).deposit({value: TEN_ETHER});
     await solaceToken.connect(governor).transfer(liquidityProvider.address, TEN_ETHER);
@@ -211,16 +215,17 @@ describe("Treasury", function () {
 
   describe("governance", function () {
     it("begins with correct governor", async function () {
-      expect(await treasury.governance()).to.equal(deployer.address);
-    })
-
-    it("can transfer governance", async function () {
-      await treasury.connect(deployer).setGovernance(governor.address);
       expect(await treasury.governance()).to.equal(governor.address);
     })
 
+    it("can transfer governance", async function () {
+      await treasury.connect(governor).setGovernance(deployer.address);
+      expect(await treasury.governance()).to.equal(deployer.address);
+    })
+
     it("reverts governance transfers by non-governor", async function () {
-      await expect(treasury.connect(deployer).setGovernance(treasury.address)).to.be.revertedWith("!governance");
+      await expect(treasury.connect(governor).setGovernance(treasury.address)).to.be.revertedWith("!governance");
+      await treasury.connect(deployer).setGovernance(governor.address);
     })
   })
 

@@ -101,6 +101,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm {
 
     /**
      * @notice Constructs the farm.
+     * @param _governance Address of the governor.
      * @param _master Address of the Master contract.
      * @param _lpToken Address of the Uniswap NonFungiblePositionManager contract.
      * @param _solace Address of the SOLACE token contract.
@@ -109,6 +110,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm {
      * @param _pool Address of the UniswapV3Pool.
      */
     constructor(
+        address _governance,
         address _master,
         address _lpToken,
         SOLACE _solace,
@@ -118,6 +120,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm {
         address _weth
     ) public {
         // copy params
+        governance = _governance;
         master = _master;
         lpToken = IUniswapLpToken(_lpToken);
         solace = _solace;
@@ -125,7 +128,6 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm {
         endBlock = _endBlock;
         lastRewardBlock = Math.max(block.number, _startBlock);
         weth = IWETH10(_weth);
-        governance = msg.sender;
         // get pool data
         pool = IUniswapV3Pool(_pool);
         token0 = pool.token0();
@@ -150,7 +152,8 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm {
     }
 
     /**
-     * Sets the amount of reward token to distribute per block.
+     * @notice Sets the amount of reward token to distribute per block.
+     * Only affects future rewards.
      * @param _blockReward Amount to distribute per block.
      */
     function setRewards(uint256 _blockReward) external override {
@@ -163,16 +166,16 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm {
     }
 
     /**
-     * Sets the farm's end block. Used to extend the duration.
+     * @notice Sets the farm's end block. Used to extend the duration.
      * @param _endBlock The new end block.
      */
     function setEnd(uint256 _endBlock) external override {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
-        // update
-        updateFarm();
         // accounting
         endBlock = _endBlock;
+        // update
+        updateFarm();
     }
 
     /**

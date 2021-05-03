@@ -1232,8 +1232,8 @@
     <span class="kd">event</span> <span class="n">StrategyUpdateMaxDebtPerHarvest</span><span class="p">(</span><span class="kt">address</span> <span class="k">indexed</span> <span class="n">strategy</span><span class="p">,</span> <span class="kt">uint256</span> <span class="k">indexed</span> <span class="n">newMaxDebtPerHarvest</span><span class="p">);</span>
     <span class="kd">event</span> <span class="n">StrategyUpdatePerformanceFee</span><span class="p">(</span><span class="kt">address</span> <span class="k">indexed</span> <span class="n">strategy</span><span class="p">,</span> <span class="kt">uint256</span> <span class="k">indexed</span> <span class="n">newPerformanceFee</span><span class="p">);</span>
 
-    <span class="kd">constructor</span> <span class="p">(</span><span class="kt">address</span> <span class="n">_registry</span><span class="p">,</span> <span class="kt">address</span> <span class="n">_token</span><span class="p">)</span> <span class="n">ERC20</span><span class="p">(</span><span class="s">&quot;Solace CP Token&quot;</span><span class="p">,</span> <span class="s">&quot;SCP&quot;</span><span class="p">)</span> <span class="n">ERC20Permit</span><span class="p">(</span><span class="s">&quot;Solace CP Token&quot;</span><span class="p">)</span> <span class="p">{</span>
-        <span class="n">governance</span> <span class="o">=</span> <span class="nb">msg.sender</span><span class="p">;</span>
+    <span class="kd">constructor</span> <span class="p">(</span><span class="kt">address</span> <span class="n">_governance</span><span class="p">,</span> <span class="kt">address</span> <span class="n">_registry</span><span class="p">,</span> <span class="kt">address</span> <span class="n">_token</span><span class="p">)</span> <span class="n">ERC20</span><span class="p">(</span><span class="s">&quot;Solace CP Token&quot;</span><span class="p">,</span> <span class="s">&quot;SCP&quot;</span><span class="p">)</span> <span class="n">ERC20Permit</span><span class="p">(</span><span class="s">&quot;Solace CP Token&quot;</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">governance</span> <span class="o">=</span> <span class="n">_governance</span><span class="p">;</span>
         <span class="n">rewards</span> <span class="o">=</span> <span class="nb">msg.sender</span><span class="p">;</span> <span class="c1">// set governance address as rewards destination for now</span>
 
         <span class="n">registry</span> <span class="o">=</span> <span class="n">IRegistry</span><span class="p">(</span><span class="n">_registry</span><span class="p">);</span>
@@ -1282,7 +1282,7 @@
     <span class="p">}</span>
 
     <span class="cm">/**</span>
-<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Changes the performanceFee of the Vault. </span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Changes the performanceFee of the Vault.</span>
 <span class="cm">     * Can only be called by the current governor.</span>
 <span class="cm">     * </span><span class="cs">@param</span><span class="cm"> fee New performanceFee to use</span>
 <span class="cm">     */</span>
@@ -1478,7 +1478,7 @@
         <span class="n">debtRatio</span> <span class="o">+=</span> <span class="n">_debtRatio</span><span class="p">;</span>
 
         <span class="nf">require</span><span class="p">(</span><span class="n">debtRatio</span> <span class="o">&lt;=</span> <span class="n">MAX_BPS</span><span class="p">,</span> <span class="s">&quot;Vault debt ratio cannot exceed MAX_BPS&quot;</span><span class="p">);</span>
-        
+
         <span class="k">emit</span> <span class="n">StrategyUpdateDebtRatio</span><span class="p">(</span><span class="n">_strategy</span><span class="p">,</span> <span class="n">_debtRatio</span><span class="p">);</span>
     <span class="p">}</span>
 

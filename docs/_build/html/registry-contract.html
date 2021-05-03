@@ -918,7 +918,8 @@
 206
 207
 208
-209</pre></div></td><td class="code"><div class="highlight"><pre><span></span><span class="c1">// </span><span class="cs">SPDX-License-Identifier:</span><span class="c1"> GPL-3.0-or-later</span>
+209
+210</pre></div></td><td class="code"><div class="highlight"><pre><span></span><span class="c1">// </span><span class="cs">SPDX-License-Identifier:</span><span class="c1"> GPL-3.0-or-later</span>
 <span class="k">pragma solidity</span> <span class="mf">0.8</span><span class="p">.</span><span class="mi">0</span><span class="p">;</span>
 
 <span class="kn">import</span> <span class="s">&quot;@openzeppelin/contracts/utils/structs/EnumerableSet.sol&quot;</span><span class="p">;</span>
@@ -976,9 +977,10 @@
 
     <span class="cm">/**</span>
 <span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Constructs the registry contract.</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _governance Address of the governor.</span>
 <span class="cm">     */</span>
-    <span class="kd">constructor</span><span class="p">()</span> <span class="k">public</span> <span class="p">{</span>
-        <span class="n">governance</span> <span class="o">=</span> <span class="nb">msg.sender</span><span class="p">;</span>
+    <span class="kd">constructor</span><span class="p">(</span><span class="kt">address</span> <span class="n">_governance</span><span class="p">)</span> <span class="k">public</span> <span class="p">{</span>
+        <span class="n">governance</span> <span class="o">=</span> <span class="n">_governance</span><span class="p">;</span>
     <span class="p">}</span>
 
     <span class="cm">/**</span>

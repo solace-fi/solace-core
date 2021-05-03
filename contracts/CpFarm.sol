@@ -58,6 +58,7 @@ contract CpFarm is ICpFarm {
 
     /**
      * @notice Constructs the farm.
+     * @param _governance Address of the governor.
      * @param _master Address of the Master contract.
      * @param _vault Address of the Vault contract.
      * @param _solace Address of the SOLACE token contract.
@@ -65,19 +66,20 @@ contract CpFarm is ICpFarm {
      * @param _endBlock When farming will end.
      */
     constructor(
+        address _governance,
         address _master,
         address _vault,
         SOLACE _solace,
         uint256 _startBlock,
         uint256 _endBlock
     ) public {
+        governance = _governance;
         master = _master;
         vault = IVault(_vault);
         solace = _solace;
         startBlock = _startBlock;
         endBlock = _endBlock;
         lastRewardBlock = Math.max(block.number, _startBlock);
-        governance = msg.sender;
     }
 
     /**
@@ -106,7 +108,8 @@ contract CpFarm is ICpFarm {
     }
 
     /**
-     * Sets the amount of reward token to distribute per block.
+     * @notice Sets the amount of reward token to distribute per block.
+     * Only affects future rewards.
      * @param _blockReward Amount to distribute per block.
      */
     function setRewards(uint256 _blockReward) external override {
@@ -119,16 +122,16 @@ contract CpFarm is ICpFarm {
     }
 
     /**
-     * Sets the farm's end block. Used to extend the duration.
+     * @notice Sets the farm's end block. Used to extend the duration.
      * @param _endBlock The new end block.
      */
     function setEnd(uint256 _endBlock) external override {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
-        // update
-        updateFarm();
         // accounting
         endBlock = _endBlock;
+        // update
+        updateFarm();
     }
 
     /**

@@ -12,7 +12,7 @@ chai.use(solidity);
 describe('SolaceToken', () => {
   let solace: Solace;
   const [owner, governor, minter, receiver1, receiver2] = provider.getWallets();
-  const name = 'solace.fi';
+  const name = 'solace';
   const symbol = 'SOLACE';
   const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
   const amount = 10
@@ -20,7 +20,10 @@ describe('SolaceToken', () => {
   beforeEach(async () => {
     solace = (await deployContract(
       owner,
-      SolaceArtifact
+      SolaceArtifact,
+      [
+        owner.address
+      ]
     )) as Solace;
   })
 
@@ -79,11 +82,15 @@ describe('SolaceToken', () => {
   })
 
   describe('minters', function () {
+    it('owner is minter', async function () {
+      expect(await solace.minters(owner.address)).to.be.true;
+    })
+
     it('can add minters', async function (){
       await solace.connect(owner).addMinter(minter.address);
       expect(await solace.minters(minter.address)).to.equal(true);
     })
-  
+
     it('can remove minters', async function () {
       await solace.connect(owner).removeMinter(minter.address);
       expect(await solace.minters(minter.address)).to.equal(false);

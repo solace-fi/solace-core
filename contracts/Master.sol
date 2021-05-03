@@ -42,13 +42,14 @@ contract Master is IMaster {
 
     /**
      * @notice Constructs the master contract.
+     * @param _governance Address of the governor.
      * @param _solace Address of the solace token.
      * @param _solacePerBlock Amount of solace to distribute per block.
      */
-    constructor(SOLACE _solace, uint256 _solacePerBlock) public {
+    constructor(address _governance, SOLACE _solace, uint256 _solacePerBlock) public {
+        governance = _governance;
         solace = _solace;
         solacePerBlock = _solacePerBlock;
-        governance = msg.sender;
     }
 
     /**

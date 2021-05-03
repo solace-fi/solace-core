@@ -51,7 +51,10 @@ describe("CpFarm", function () {
     // deploy solace token
     solaceToken = (await deployContract(
       deployer,
-      SolaceArtifact
+      SolaceArtifact,
+      [
+        governor.address
+      ]
     )) as Solace;
 
     // deploy weth
@@ -65,6 +68,7 @@ describe("CpFarm", function () {
       deployer,
       MasterArtifact,
       [
+        governor.address,
         solaceToken.address,
         solacePerBlock
       ]
@@ -75,15 +79,14 @@ describe("CpFarm", function () {
         deployer,
         VaultArtifact,
         [
+          governor.address,
           ZERO_ADDRESS,
           weth.address
         ]
     )) as Vault;
 
-    await master.setGovernance(governor.address);
-
     // transfer tokens
-    await solaceToken.addMinter(governor.address);
+    await solaceToken.connect(governor).addMinter(governor.address);
     await solaceToken.connect(governor).mint(master.address, ONE_MILLION_ETHER);
     await solaceToken.connect(governor).mint(governor.address, ONE_MILLION_ETHER);
   })
@@ -109,16 +112,17 @@ describe("CpFarm", function () {
 
   describe("governance", function () {
     it("starts with the correct governor", async function () {
-      expect(await farm1.governance()).to.equal(deployer.address);
-    })
-
-    it("can transfer governance", async function () {
-      await farm1.connect(deployer).setGovernance(governor.address);
       expect(await farm1.governance()).to.equal(governor.address);
     })
 
+    it("can transfer governance", async function () {
+      await farm1.connect(governor).setGovernance(deployer.address);
+      expect(await farm1.governance()).to.equal(deployer.address);
+    })
+
     it("rejects governance transfer by non governor", async function () {
-      await expect(farm1.connect(deployer).setGovernance(governor.address)).to.be.revertedWith("!governance");
+      await expect(farm1.connect(governor).setGovernance(farm1.address)).to.be.revertedWith("!governance");
+      await farm1.connect(deployer).setGovernance(governor.address);
     })
   })
 
@@ -312,7 +316,6 @@ describe("CpFarm", function () {
       startBlock = blockNum.add(10);
       endBlock = blockNum.add(100);
       farm2 = await createCpFarm(startBlock, endBlock);
-      await farm2.setGovernance(governor.address);
       //await master.connect(governor).registerFarm(farm2.address, allocPoints);
     })
 
@@ -358,7 +361,6 @@ describe("CpFarm", function () {
       startBlock = blockNum.add(20);
       endBlock = blockNum.add(200);
       farm = await createCpFarm(startBlock, endBlock);
-      await farm.setGovernance(governor.address);
       await master.connect(governor).registerFarm(farm.address, allocPoints);
       farmId = await master.numFarms();
     })
@@ -487,7 +489,6 @@ describe("CpFarm", function () {
       startBlock = blockNum.add(20);
       endBlock = blockNum.add(30);
       farm3 = await createCpFarm(startBlock, endBlock);
-      await farm3.setGovernance(governor.address);
       await master.connect(governor).registerFarm(farm3.address, 100);
       // increase solace distribution
       await master.connect(governor).setSolacePerBlock(await solaceToken.balanceOf(master.address));
@@ -534,6 +535,7 @@ describe("CpFarm", function () {
       deployer,
       CpFarmArtifact,
       [
+        governor.address,
         master.address,
         vault.address,
         solaceToken.address,

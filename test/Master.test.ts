@@ -57,7 +57,10 @@ describe("Master", function () {
     // deploy solace token
     solaceToken = (await deployContract(
       deployer,
-      SolaceArtifact
+      SolaceArtifact,
+      [
+        governor.address
+      ]
     )) as Solace;
 
     // deploy weth
@@ -71,6 +74,7 @@ describe("Master", function () {
       deployer,
       MasterArtifact,
       [
+        governor.address,
         solaceToken.address,
         solacePerBlock
       ]
@@ -81,6 +85,7 @@ describe("Master", function () {
         deployer,
         VaultArtifact,
         [
+          governor.address,
           ZERO_ADDRESS,
           weth.address
         ]
@@ -104,7 +109,7 @@ describe("Master", function () {
     )) as Contract;
 
     // transfer tokens
-    await solaceToken.addMinter(governor.address);
+    await solaceToken.connect(governor).addMinter(governor.address);
     await solaceToken.connect(governor).mint(master.address, ONE_MILLION_ETHER);
     await solaceToken.connect(governor).mint(governor.address, ONE_MILLION_ETHER);
     await solaceToken.connect(governor).transfer(farmer1.address, TEN_ETHER);
@@ -133,16 +138,17 @@ describe("Master", function () {
 
   describe("governance", function () {
     it("starts with the correct governor", async function () {
-      expect(await master.governance()).to.equal(deployer.address);
-    })
-
-    it("can transfer governance", async function () {
-      await master.connect(deployer).setGovernance(governor.address);
       expect(await master.governance()).to.equal(governor.address);
     })
 
+    it("can transfer governance", async function () {
+      await master.connect(governor).setGovernance(deployer.address);
+      expect(await master.governance()).to.equal(deployer.address);
+    })
+
     it("rejects governance transfer by non governor", async function () {
-      await expect(master.connect(deployer).setGovernance(governor.address)).to.be.revertedWith("!governance");
+      await expect(master.connect(governor).setGovernance(deployer.address)).to.be.revertedWith("!governance");
+      await master.connect(deployer).setGovernance(governor.address);
     })
   })
 
@@ -155,8 +161,7 @@ describe("Master", function () {
       expect(await master.numFarms()).to.equal(0);
       // create first farm
       farm1 = await createCpFarm(startBlock, endBlock);
-      await farm1.setGovernance(governor.address);
-      await expect(farm1.setGovernance(governor.address)).to.be.revertedWith("!governance");
+      await expect(farm1.connect(deployer).setGovernance(governor.address)).to.be.revertedWith("!governance");
       let tx = await master.connect(governor).registerFarm(farm1.address, 0);
       await expect(tx).to.emit(master, "FarmCreated").withArgs(1, farm1.address);
       expect(await master.numFarms()).to.equal(1);
@@ -165,8 +170,7 @@ describe("Master", function () {
     it("can create uniswap farms", async function () {
       // create second farm
       farm2 = await createSolaceEthLpFarm(lpToken, startBlock, endBlock, mediumPool);
-      await farm2.setGovernance(governor.address);
-      await expect(farm2.setGovernance(governor.address)).to.be.revertedWith("!governance");
+      await expect(farm2.connect(deployer).setGovernance(governor.address)).to.be.revertedWith("!governance");
       let tx = await master.connect(governor).registerFarm(farm2.address, 0);
       await expect(tx).to.emit(master, "FarmCreated").withArgs(2, farm2.address);
       expect(await master.numFarms()).to.equal(2);
@@ -205,10 +209,8 @@ describe("Master", function () {
       startBlock = blockNum.add(10);
       endBlock = blockNum.add(100);
       cpFarm = await createCpFarm(startBlock, endBlock);
-      await cpFarm.setGovernance(governor.address);
       await master.connect(governor).registerFarm(cpFarm.address, allocPoints);
       lpFarm = await createSolaceEthLpFarm(lpToken, startBlock, endBlock, mediumPool);
-      await lpFarm.setGovernance(governor.address);
       await master.connect(governor).registerFarm(lpFarm.address, allocPoints);
     })
 
@@ -292,11 +294,9 @@ describe("Master", function () {
       blockNum = BN.from(await provider.getBlockNumber());
       // farms start and end at different times, math should still work
       cpFarm = await createCpFarm(blockNum.add(25), blockNum.add(500));
-      await cpFarm.setGovernance(governor.address);
       await master.connect(governor).registerFarm(cpFarm.address, cpAllocPoints1);
       cpFarmId = await master.numFarms();
       lpFarm = await createSolaceEthLpFarm(lpToken, blockNum.add(45), blockNum.add(250), mediumPool);
-      await lpFarm.setGovernance(governor.address);
       await master.connect(governor).registerFarm(lpFarm.address, lpAllocPoints);
       lpFarmId = await master.numFarms();
 
@@ -541,6 +541,7 @@ describe("Master", function () {
       deployer,
       CpFarmArtifact,
       [
+        governor.address,
         master.address,
         vault.address,
         solaceToken.address,
@@ -561,6 +562,7 @@ describe("Master", function () {
       deployer,
       SolaceEthLpFarmArtifact,
       [
+        governor.address,
         master.address,
         stakeToken.address,
         solaceToken.address,

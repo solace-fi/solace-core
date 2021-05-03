@@ -22,9 +22,11 @@ contract SOLACE is ERC20Permit {
 
     /**
      * @notice Constructs the Solace Token contract.
+     * @param _governance Address of the governor.
      */
-    constructor() ERC20("solace.fi", "SOLACE") ERC20Permit("solace.fi"){
-        governance = msg.sender;
+    constructor(address _governance) ERC20("solace", "SOLACE") ERC20Permit("solace"){
+        governance = _governance;
+        minters[_governance] = true;
     }
 
     /**
