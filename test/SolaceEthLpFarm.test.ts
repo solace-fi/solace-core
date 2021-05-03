@@ -451,7 +451,7 @@ describe("SolaceEthLpFarm", function () {
   })
 
   describe("updates", async function () {
-    beforeEach(async function () {
+    before(async function () {
       blockNum = BN.from(await provider.getBlockNumber());
       startBlock = blockNum.add(10);
       endBlock = blockNum.add(100);
@@ -473,6 +473,15 @@ describe("SolaceEthLpFarm", function () {
       await burnBlocks(90);
       await farm.updateFarm();
       expect(await farm.lastRewardBlock()).to.equal(endBlock);
+    })
+
+    it("can set end", async function () {
+      await expect(farm.connect(farmer1).setEnd(1)).to.be.revertedWith("!governance");
+      let newEndBlock = endBlock.add(50);
+      await farm.connect(governor).setEnd(newEndBlock);
+      blockNum = BN.from(await provider.getBlockNumber());
+      expect(await farm.lastRewardBlock()).to.equal(blockNum);
+      expect(await farm.endBlock()).to.equal(newEndBlock);
     })
   })
 

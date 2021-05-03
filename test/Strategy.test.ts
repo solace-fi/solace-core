@@ -68,6 +68,9 @@ describe("Strategy", function () {
         it("should set the vault address", async function () {
             expect(await strategy.vault()).to.equal(vault.address);
         });
+        it("should start inactive", async function () {
+          expect(await strategy.isActive()).to.equal(false);
+        });
     });
 
     describe("setGovernance", function () {
@@ -125,6 +128,13 @@ describe("Strategy", function () {
             expect(strategyObject.debtRatio).to.equal(0);
             expect(vaultDebtRatio).to.equal(0);
         });
+        it("should remain active until full withdraw", async function () {
+          expect(await strategy.isActive()).to.equal(true);
+          await strategy.connect(owner).setEmergencyExit();
+          expect(await strategy.isActive()).to.equal(true);
+          await vault.connect(depositor1).withdraw(testDepositAmount, 0);
+          expect(await strategy.isActive()).to.equal(false);
+        });
     });
 
     describe("deposit", function () {
@@ -176,6 +186,21 @@ describe("Strategy", function () {
             vaultBalance = await weth.balanceOf(vault.address);
             expect(strategyBalance).to.equal(testDepositAmount.div(MAX_BPS / debtRatio));
             expect(vaultBalance).to.equal(testDepositAmount.sub(testDepositAmount.div(MAX_BPS / debtRatio)));
+        });
+
+        it("should allow harvest while in emergency exit", async function () {
+            await strategy.connect(owner).setEmergencyExit();
+            expect(await strategy.connect(owner).harvest()).to.emit(strategy, 'Harvested').withArgs(0, 0, 0, 0);
+        });
+
+        it("should allow harvest with profit while in emergency exit", async function () {
+            let profitAmount = 100;
+            await weth.connect(depositor1).depositTo(strategy.address, {value: profitAmount});
+            //await weth.connect(depositor1).deposit({value: profitAmount});
+            //await weth.connect(depositor).
+            //await weth.connect(depositor1).transfer(strategy.address, profitAmount);
+            await strategy.connect(owner).setEmergencyExit();
+            expect(await strategy.connect(owner).harvest()).to.emit(strategy, 'Harvested').withArgs(profitAmount, 0, 0, 0);
         });
     });
 

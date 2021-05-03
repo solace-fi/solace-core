@@ -30,6 +30,7 @@ interface VaultInterface extends ethers.utils.Interface {
     "allowance(address,address)": FunctionFragment;
     "approve(address,uint256)": FunctionFragment;
     "balanceOf(address)": FunctionFragment;
+    "c_0x12c65615(bytes32)": FunctionFragment;
     "creditAvailable(address)": FunctionFragment;
     "debtOutstanding(address)": FunctionFragment;
     "debtRatio()": FunctionFragment;
@@ -104,6 +105,10 @@ interface VaultInterface extends ethers.utils.Interface {
     values: [string, BigNumberish]
   ): string;
   encodeFunctionData(functionFragment: "balanceOf", values: [string]): string;
+  encodeFunctionData(
+    functionFragment: "c_0x12c65615",
+    values: [BytesLike]
+  ): string;
   encodeFunctionData(
     functionFragment: "creditAvailable",
     values: [string]
@@ -284,6 +289,10 @@ interface VaultInterface extends ethers.utils.Interface {
   decodeFunctionResult(functionFragment: "allowance", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "approve", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "balanceOf", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "c_0x12c65615",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "creditAvailable",
     data: BytesLike
@@ -571,6 +580,20 @@ export class Vault extends Contract {
       overrides?: CallOverrides
     ): Promise<{
       0: BigNumber;
+    }>;
+
+    c_0x12c65615(
+      c__0x12c65615: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: void;
+    }>;
+
+    "c_0x12c65615(bytes32)"(
+      c__0x12c65615: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: void;
     }>;
 
     creditAvailable(
@@ -1247,6 +1270,16 @@ export class Vault extends Contract {
     overrides?: CallOverrides
   ): Promise<BigNumber>;
 
+  c_0x12c65615(
+    c__0x12c65615: BytesLike,
+    overrides?: CallOverrides
+  ): Promise<void>;
+
+  "c_0x12c65615(bytes32)"(
+    c__0x12c65615: BytesLike,
+    overrides?: CallOverrides
+  ): Promise<void>;
+
   creditAvailable(
     strategy: string,
     overrides?: CallOverrides
@@ -1737,6 +1770,16 @@ export class Vault extends Contract {
       account: string,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
+
+    c_0x12c65615(
+      c__0x12c65615: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "c_0x12c65615(bytes32)"(
+      c__0x12c65615: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<void>;
 
     creditAvailable(
       strategy: string,
@@ -2303,6 +2346,16 @@ export class Vault extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
+    c_0x12c65615(
+      c__0x12c65615: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "c_0x12c65615(bytes32)"(
+      c__0x12c65615: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     creditAvailable(
       strategy: string,
       overrides?: CallOverrides
@@ -2756,6 +2809,16 @@ export class Vault extends Contract {
 
     "balanceOf(address)"(
       account: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    c_0x12c65615(
+      c__0x12c65615: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "c_0x12c65615(bytes32)"(
+      c__0x12c65615: BytesLike,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 

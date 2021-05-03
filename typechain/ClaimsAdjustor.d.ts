@@ -23,6 +23,7 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 interface ClaimsAdjustorInterface extends ethers.utils.Interface {
   functions: {
     "approveClaim(address,uint256)": FunctionFragment;
+    "c_0x850d8632(bytes32)": FunctionFragment;
     "governance()": FunctionFragment;
     "registry()": FunctionFragment;
   };
@@ -32,6 +33,10 @@ interface ClaimsAdjustorInterface extends ethers.utils.Interface {
     values: [string, BigNumberish]
   ): string;
   encodeFunctionData(
+    functionFragment: "c_0x850d8632",
+    values: [BytesLike]
+  ): string;
+  encodeFunctionData(
     functionFragment: "governance",
     values?: undefined
   ): string;
@@ -39,6 +44,10 @@ interface ClaimsAdjustorInterface extends ethers.utils.Interface {
 
   decodeFunctionResult(
     functionFragment: "approveClaim",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "c_0x850d8632",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "governance", data: BytesLike): Result;
@@ -77,6 +86,20 @@ export class ClaimsAdjustor extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
+    c_0x850d8632(
+      c__0x850d8632: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: void;
+    }>;
+
+    "c_0x850d8632(bytes32)"(
+      c__0x850d8632: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: void;
+    }>;
+
     governance(
       overrides?: CallOverrides
     ): Promise<{
@@ -114,6 +137,16 @@ export class ClaimsAdjustor extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
+  c_0x850d8632(
+    c__0x850d8632: BytesLike,
+    overrides?: CallOverrides
+  ): Promise<void>;
+
+  "c_0x850d8632(bytes32)"(
+    c__0x850d8632: BytesLike,
+    overrides?: CallOverrides
+  ): Promise<void>;
+
   governance(overrides?: CallOverrides): Promise<string>;
 
   "governance()"(overrides?: CallOverrides): Promise<string>;
@@ -132,6 +165,16 @@ export class ClaimsAdjustor extends Contract {
     "approveClaim(address,uint256)"(
       _claimant: string,
       _amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    c_0x850d8632(
+      c__0x850d8632: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "c_0x850d8632(bytes32)"(
+      c__0x850d8632: BytesLike,
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -164,6 +207,16 @@ export class ClaimsAdjustor extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
+    c_0x850d8632(
+      c__0x850d8632: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "c_0x850d8632(bytes32)"(
+      c__0x850d8632: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     governance(overrides?: CallOverrides): Promise<BigNumber>;
 
     "governance()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -184,6 +237,16 @@ export class ClaimsAdjustor extends Contract {
       _claimant: string,
       _amount: BigNumberish,
       overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    c_0x850d8632(
+      c__0x850d8632: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "c_0x850d8632(bytes32)"(
+      c__0x850d8632: BytesLike,
+      overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
     governance(overrides?: CallOverrides): Promise<PopulatedTransaction>;

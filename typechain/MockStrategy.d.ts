@@ -22,6 +22,9 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
 interface MockStrategyInterface extends ethers.utils.Interface {
   functions: {
+    "_takeFunds(uint256)": FunctionFragment;
+    "c_0xa8ea111c(bytes32)": FunctionFragment;
+    "c_0xaf268904(bytes32)": FunctionFragment;
     "delegatedAssets()": FunctionFragment;
     "emergencyExit()": FunctionFragment;
     "estimatedTotalAssets()": FunctionFragment;
@@ -37,6 +40,18 @@ interface MockStrategyInterface extends ethers.utils.Interface {
     "withdraw(uint256)": FunctionFragment;
   };
 
+  encodeFunctionData(
+    functionFragment: "_takeFunds",
+    values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "c_0xa8ea111c",
+    values: [BytesLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "c_0xaf268904",
+    values: [BytesLike]
+  ): string;
   encodeFunctionData(
     functionFragment: "delegatedAssets",
     values?: undefined
@@ -75,6 +90,15 @@ interface MockStrategyInterface extends ethers.utils.Interface {
     values: [BigNumberish]
   ): string;
 
+  decodeFunctionResult(functionFragment: "_takeFunds", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "c_0xa8ea111c",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "c_0xaf268904",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "delegatedAssets",
     data: BytesLike
@@ -130,6 +154,44 @@ export class MockStrategy extends Contract {
   interface: MockStrategyInterface;
 
   functions: {
+    _takeFunds(
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "_takeFunds(uint256)"(
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    c_0xa8ea111c(
+      c__0xa8ea111c: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: void;
+    }>;
+
+    "c_0xa8ea111c(bytes32)"(
+      c__0xa8ea111c: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: void;
+    }>;
+
+    c_0xaf268904(
+      c__0xaf268904: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: void;
+    }>;
+
+    "c_0xaf268904(bytes32)"(
+      c__0xaf268904: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: void;
+    }>;
+
     delegatedAssets(
       overrides?: CallOverrides
     ): Promise<{
@@ -265,6 +327,36 @@ export class MockStrategy extends Contract {
     ): Promise<ContractTransaction>;
   };
 
+  _takeFunds(
+    amount: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "_takeFunds(uint256)"(
+    amount: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  c_0xa8ea111c(
+    c__0xa8ea111c: BytesLike,
+    overrides?: CallOverrides
+  ): Promise<void>;
+
+  "c_0xa8ea111c(bytes32)"(
+    c__0xa8ea111c: BytesLike,
+    overrides?: CallOverrides
+  ): Promise<void>;
+
+  c_0xaf268904(
+    c__0xaf268904: BytesLike,
+    overrides?: CallOverrides
+  ): Promise<void>;
+
+  "c_0xaf268904(bytes32)"(
+    c__0xaf268904: BytesLike,
+    overrides?: CallOverrides
+  ): Promise<void>;
+
   delegatedAssets(overrides?: CallOverrides): Promise<BigNumber>;
 
   "delegatedAssets()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -333,6 +425,33 @@ export class MockStrategy extends Contract {
   ): Promise<ContractTransaction>;
 
   callStatic: {
+    _takeFunds(amount: BigNumberish, overrides?: CallOverrides): Promise<void>;
+
+    "_takeFunds(uint256)"(
+      amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    c_0xa8ea111c(
+      c__0xa8ea111c: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "c_0xa8ea111c(bytes32)"(
+      c__0xa8ea111c: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    c_0xaf268904(
+      c__0xaf268904: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "c_0xaf268904(bytes32)"(
+      c__0xaf268904: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
     delegatedAssets(overrides?: CallOverrides): Promise<BigNumber>;
 
     "delegatedAssets()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -413,6 +532,33 @@ export class MockStrategy extends Contract {
   };
 
   estimateGas: {
+    _takeFunds(amount: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
+
+    "_takeFunds(uint256)"(
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    c_0xa8ea111c(
+      c__0xa8ea111c: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "c_0xa8ea111c(bytes32)"(
+      c__0xa8ea111c: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    c_0xaf268904(
+      c__0xaf268904: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "c_0xaf268904(bytes32)"(
+      c__0xaf268904: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     delegatedAssets(overrides?: CallOverrides): Promise<BigNumber>;
 
     "delegatedAssets()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -482,6 +628,36 @@ export class MockStrategy extends Contract {
   };
 
   populateTransaction: {
+    _takeFunds(
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "_takeFunds(uint256)"(
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    c_0xa8ea111c(
+      c__0xa8ea111c: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "c_0xa8ea111c(bytes32)"(
+      c__0xa8ea111c: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    c_0xaf268904(
+      c__0xaf268904: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "c_0xaf268904(bytes32)"(
+      c__0xaf268904: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
     delegatedAssets(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "delegatedAssets()"(

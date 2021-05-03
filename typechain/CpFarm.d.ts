@@ -25,6 +25,7 @@ interface CpFarmInterface extends ethers.utils.Interface {
   functions: {
     "accRewardPerShare()": FunctionFragment;
     "blockReward()": FunctionFragment;
+    "c_0xf0317263(bytes32)": FunctionFragment;
     "depositCp(uint256)": FunctionFragment;
     "depositCpSigned(address,uint256,uint256,uint8,bytes32,bytes32)": FunctionFragment;
     "depositEth()": FunctionFragment;
@@ -56,6 +57,10 @@ interface CpFarmInterface extends ethers.utils.Interface {
   encodeFunctionData(
     functionFragment: "blockReward",
     values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "c_0xf0317263",
+    values: [BytesLike]
   ): string;
   encodeFunctionData(
     functionFragment: "depositCp",
@@ -141,6 +146,10 @@ interface CpFarmInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "blockReward",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "c_0xf0317263",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "depositCp", data: BytesLike): Result;
@@ -239,6 +248,20 @@ export class CpFarm extends Contract {
       overrides?: CallOverrides
     ): Promise<{
       0: BigNumber;
+    }>;
+
+    c_0xf0317263(
+      c__0xf0317263: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: void;
+    }>;
+
+    "c_0xf0317263(bytes32)"(
+      c__0xf0317263: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: void;
     }>;
 
     depositCp(
@@ -506,6 +529,16 @@ export class CpFarm extends Contract {
 
   "blockReward()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+  c_0xf0317263(
+    c__0xf0317263: BytesLike,
+    overrides?: CallOverrides
+  ): Promise<void>;
+
+  "c_0xf0317263(bytes32)"(
+    c__0xf0317263: BytesLike,
+    overrides?: CallOverrides
+  ): Promise<void>;
+
   depositCp(
     _amount: BigNumberish,
     overrides?: Overrides
@@ -687,6 +720,16 @@ export class CpFarm extends Contract {
     blockReward(overrides?: CallOverrides): Promise<BigNumber>;
 
     "blockReward()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    c_0xf0317263(
+      c__0xf0317263: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "c_0xf0317263(bytes32)"(
+      c__0xf0317263: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<void>;
 
     depositCp(_amount: BigNumberish, overrides?: CallOverrides): Promise<void>;
 
@@ -875,6 +918,16 @@ export class CpFarm extends Contract {
 
     "blockReward()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+    c_0xf0317263(
+      c__0xf0317263: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "c_0xf0317263(bytes32)"(
+      c__0xf0317263: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     depositCp(_amount: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
 
     "depositCp(uint256)"(
@@ -1039,6 +1092,16 @@ export class CpFarm extends Contract {
     blockReward(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "blockReward()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    c_0xf0317263(
+      c__0xf0317263: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "c_0xf0317263(bytes32)"(
+      c__0xf0317263: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
 
     depositCp(
       _amount: BigNumberish,

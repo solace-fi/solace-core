@@ -4,6 +4,7 @@ import "hardhat-contract-sizer";
 import "@nomiclabs/hardhat-waffle";
 import "hardhat-typechain";
 import "hardhat-abi-exporter";
+import "solidity-coverage";
 import { config as dotenv_config } from 'dotenv';
 dotenv_config();
 

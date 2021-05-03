@@ -45,9 +45,9 @@ const chainId = 31337;
 const deadline = constants.MaxUint256;
 
 describe("CpFarm", function () {
-  const [deployer, governor, farmer1, farmer2, farmer3, farmer4] = provider.getWallets();
+  const [deployer, governor, farmer1, farmer2, farmer3, farmer4, mockVault] = provider.getWallets();
 
-    before(async function () {
+  before(async function () {
     // deploy solace token
     solaceToken = (await deployContract(
       deployer,
@@ -311,7 +311,7 @@ describe("CpFarm", function () {
     let farm2: CpFarm;
     let allocPoints = BN.from(0);
 
-    beforeEach(async function () {
+    before(async function () {
       blockNum = BN.from(await provider.getBlockNumber());
       startBlock = blockNum.add(10);
       endBlock = blockNum.add(100);
@@ -334,6 +334,15 @@ describe("CpFarm", function () {
       await burnBlocks(90);
       await farm2.updateFarm();
       expect(await farm2.lastRewardBlock()).to.equal(endBlock);
+    })
+
+    it("can set end", async function () {
+      await expect(farm2.connect(farmer1).setEnd(1)).to.be.revertedWith("!governance");
+      let newEndBlock = endBlock.add(50);
+      await farm2.connect(governor).setEnd(newEndBlock);
+      blockNum = BN.from(await provider.getBlockNumber());
+      expect(await farm2.lastRewardBlock()).to.equal(blockNum);
+      expect(await farm2.endBlock()).to.equal(newEndBlock);
     })
   })
 
@@ -525,11 +534,64 @@ describe("CpFarm", function () {
     })
   })
 
+  describe("edge cases", function () {
+    let farm4: CpFarm;
+    let depositAmount: BN;
+
+    before(async function () {
+      farm4 = await createCpFarm(0, 1000, mockVault.address);
+      depositAmount = BN.from(100);
+    });
+
+    it("can receive eth from vault via receive()", async function () {
+      let balancesBefore = await getBalances(mockVault, farm4);
+      let tx = await mockVault.sendTransaction({
+        to: farm4.address,
+        value: depositAmount,
+        data: "0x"
+      });
+      let balancesAfter = await getBalances(mockVault, farm4);
+      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
+      let receipt = await tx.wait();
+      let gasCost = receipt.gasUsed.mul(tx.gasPrice);
+      expect(balancesDiff.userEth).to.equal(depositAmount.mul(-1).sub(gasCost));
+      expect(balancesDiff.userStake).to.equal(0); // vault gains no stake
+    })
+
+    it("can receive eth from vault via fallback()", async function () {
+      let balancesBefore = await getBalances(mockVault, farm4);
+      let tx = await mockVault.sendTransaction({
+        to: farm4.address,
+        value: depositAmount,
+        data: "0xabcd"
+      });
+      let balancesAfter = await getBalances(mockVault, farm4);
+      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
+      let receipt = await tx.wait();
+      let gasCost = receipt.gasUsed.mul(tx.gasPrice);
+      expect(balancesDiff.userEth).to.equal(depositAmount.mul(-1).sub(gasCost));
+      expect(balancesDiff.userStake).to.equal(0); // vault gains no stake
+    })
+
+    it("rejects setRewards by non master", async function () {
+      await expect(farm4.connect(governor).setRewards(ONE_MILLION_ETHER)).to.be.revertedWith("!master");
+      await expect(farm4.connect(farmer1).setRewards(ONE_MILLION_ETHER)).to.be.revertedWith("!master");
+    })
+
+    it("can get multiplier", async function () {
+      await master.connect(governor).registerFarm(farm4.address, 1);
+      let blockReward = await farm4.blockReward();
+      expect(await farm4.getMultiplier(20, 30)).to.equal(blockReward.mul(10));
+      expect(await farm4.getMultiplier(30, 20)).to.equal(0);
+    })
+  })
+
   // helper functions
 
   async function createCpFarm(
     startBlock: BigNumberish = BN.from(0),
     endBlock: BigNumberish = BN.from(0),
+    vaultAddress: string = vault.address,
   ) {
     let farm = (await deployContract(
       deployer,
@@ -537,7 +599,7 @@ describe("CpFarm", function () {
       [
         governor.address,
         master.address,
-        vault.address,
+        vaultAddress,
         solaceToken.address,
         startBlock,
         endBlock,

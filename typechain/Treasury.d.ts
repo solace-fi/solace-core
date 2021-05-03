@@ -23,6 +23,7 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
 interface TreasuryInterface extends ethers.utils.Interface {
   functions: {
+    "c_0x8bd7155c(bytes32)": FunctionFragment;
     "depositEth()": FunctionFragment;
     "depositToken(address,uint256)": FunctionFragment;
     "governance()": FunctionFragment;
@@ -36,6 +37,10 @@ interface TreasuryInterface extends ethers.utils.Interface {
     "weth()": FunctionFragment;
   };
 
+  encodeFunctionData(
+    functionFragment: "c_0x8bd7155c",
+    values: [BytesLike]
+  ): string;
   encodeFunctionData(
     functionFragment: "depositEth",
     values?: undefined
@@ -72,6 +77,10 @@ interface TreasuryInterface extends ethers.utils.Interface {
   ): string;
   encodeFunctionData(functionFragment: "weth", values?: undefined): string;
 
+  decodeFunctionResult(
+    functionFragment: "c_0x8bd7155c",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "depositEth", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "depositToken",
@@ -117,6 +126,20 @@ export class Treasury extends Contract {
   interface: TreasuryInterface;
 
   functions: {
+    c_0x8bd7155c(
+      c__0x8bd7155c: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: void;
+    }>;
+
+    "c_0x8bd7155c(bytes32)"(
+      c__0x8bd7155c: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: void;
+    }>;
+
     depositEth(overrides?: PayableOverrides): Promise<ContractTransaction>;
 
     "depositEth()"(overrides?: PayableOverrides): Promise<ContractTransaction>;
@@ -248,6 +271,16 @@ export class Treasury extends Contract {
     }>;
   };
 
+  c_0x8bd7155c(
+    c__0x8bd7155c: BytesLike,
+    overrides?: CallOverrides
+  ): Promise<void>;
+
+  "c_0x8bd7155c(bytes32)"(
+    c__0x8bd7155c: BytesLike,
+    overrides?: CallOverrides
+  ): Promise<void>;
+
   depositEth(overrides?: PayableOverrides): Promise<ContractTransaction>;
 
   "depositEth()"(overrides?: PayableOverrides): Promise<ContractTransaction>;
@@ -337,6 +370,16 @@ export class Treasury extends Contract {
   "weth()"(overrides?: CallOverrides): Promise<string>;
 
   callStatic: {
+    c_0x8bd7155c(
+      c__0x8bd7155c: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "c_0x8bd7155c(bytes32)"(
+      c__0x8bd7155c: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
     depositEth(overrides?: CallOverrides): Promise<void>;
 
     "depositEth()"(overrides?: CallOverrides): Promise<void>;
@@ -437,6 +480,16 @@ export class Treasury extends Contract {
   };
 
   estimateGas: {
+    c_0x8bd7155c(
+      c__0x8bd7155c: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "c_0x8bd7155c(bytes32)"(
+      c__0x8bd7155c: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     depositEth(overrides?: PayableOverrides): Promise<BigNumber>;
 
     "depositEth()"(overrides?: PayableOverrides): Promise<BigNumber>;
@@ -530,6 +583,16 @@ export class Treasury extends Contract {
   };
 
   populateTransaction: {
+    c_0x8bd7155c(
+      c__0x8bd7155c: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "c_0x8bd7155c(bytes32)"(
+      c__0x8bd7155c: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
     depositEth(overrides?: PayableOverrides): Promise<PopulatedTransaction>;
 
     "depositEth()"(overrides?: PayableOverrides): Promise<PopulatedTransaction>;
