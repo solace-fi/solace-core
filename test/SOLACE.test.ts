@@ -82,6 +82,10 @@ describe('SolaceToken', () => {
   })
 
   describe('minters', function () {
+    it('owner is minter', async function () {
+      expect(await solace.minters(owner.address)).to.be.true;
+    })
+
     it('can add minters', async function (){
       await solace.connect(owner).addMinter(minter.address);
       expect(await solace.minters(minter.address)).to.equal(true);

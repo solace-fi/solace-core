@@ -30,8 +30,10 @@ const WETH_ADDRESS = "0x9273113C307f2f795C6d4D25c436d85435c73f9f"
 const UNISWAP_FACTORY_ADDRESS = "0x815BCC87613315327E04e4A3b7c96a79Ae80760c";
 const UNISWAP_ROUTER_ADDRESS = "0x483B27F0cF5AF935371d52A7F810799cD141E3dc";
 const UNISWAP_LPTOKEN_ADDRESS = "0x3255160392215494bee8B5aBf8C4C40965d0986C";
-const BLOCK_REWARD = BN.from("17361000000000000"); // 100 solace per day
-const HUNDRED_MILLION = BN.from("100000000");
+
+const START_BLOCK = BN.from(8523000); // May 3, 2021 on Rinkeby
+const END_BLOCK = START_BLOCK.add(2500000); // little over a year
+const BLOCK_REWARD = BN.from("60000000000000000000"); // 60 SOLACE
 
 async function main() {
   // deploy Registry
@@ -59,7 +61,7 @@ async function main() {
 
   // deploy CP Farm
   console.log("Deploying CP Farm");
-  let cpFarm = (await deployContract(ledgerSigner,CpFarmArtifact,[MULTI_SIG_ADDRESS,master.address,vault.address,solace.address,0,HUNDRED_MILLION])) as CpFarm;
+  let cpFarm = (await deployContract(ledgerSigner,CpFarmArtifact,[MULTI_SIG_ADDRESS,master.address,vault.address,solace.address,START_BLOCK,END_BLOCK])) as CpFarm;
   console.log(`Deployed CP Farm to ${cpFarm.address}`);
 
   // deploy Uniswap and Uniswap accessories
@@ -75,7 +77,7 @@ async function main() {
   console.log(`Deployed SOLACE-ETH pool to ${pool.address}`);
 
   // deploy LP Farm
-  let lpFarm = (await deployContract(ledgerSigner,SolaceEthLpFarmArtifact,[MULTI_SIG_ADDRESS,master.address,lpToken.address,solace.address,0,HUNDRED_MILLION,pool.address,WETH_ADDRESS])) as SolaceEthLpFarm;
+  let lpFarm = (await deployContract(ledgerSigner,SolaceEthLpFarmArtifact,[MULTI_SIG_ADDRESS,master.address,lpToken.address,solace.address,START_BLOCK,END_BLOCK,pool.address,WETH_ADDRESS])) as SolaceEthLpFarm;
   console.log(`Deployed LP Farm to ${lpFarm.address}`);
 
   // deploy Treasury

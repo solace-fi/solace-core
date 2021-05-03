@@ -26,6 +26,7 @@ contract SOLACE is ERC20Permit {
      */
     constructor(address _governance) ERC20("solace", "SOLACE") ERC20Permit("solace"){
         governance = _governance;
+        minters[_governance] = true;
     }
 
     /**
