@@ -12,7 +12,7 @@ chai.use(solidity);
 describe('SolaceToken', () => {
   let solace: Solace;
   const [owner, governor, minter, receiver1, receiver2] = provider.getWallets();
-  const name = 'solace.fi';
+  const name = 'solace';
   const symbol = 'SOLACE';
   const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
   const amount = 10

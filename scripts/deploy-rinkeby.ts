@@ -70,7 +70,7 @@ async function main() {
   // deploy uniswap nft / lp token
   let lpToken = await ethers.getContractAt(NonfungiblePositionManagerArtifact.abi, UNISWAP_LPTOKEN_ADDRESS);
   // create uniswap solace-weth pool
-  console.log("Deploying SOLACE-ETH Pool");
+  console.log("Deploying then initializing SOLACE-ETH Pool");
   let pool = await createPool(ledgerSigner, uniswapFactory, WETH_ADDRESS, solace.address, FeeAmount.MEDIUM);
   console.log(`Deployed SOLACE-ETH pool to ${pool.address}`);
 

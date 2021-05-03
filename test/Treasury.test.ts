@@ -77,7 +77,6 @@ describe("Treasury", function () {
       console.log('    #                                                                                           #');
       console.log('    #############################################################################################');
       console.log('');
-      process.exit(0);
       [deployer, governor, liquidityProvider, mockPolicy, user, randAddress] = provider.getWallets();
     } else {
       [deployer, governor, liquidityProvider, mockPolicy, user, randAddress] = await ethers.getSigners();

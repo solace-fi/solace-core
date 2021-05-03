@@ -69,7 +69,7 @@ describe("SolaceEthLpFarm", function () {
   let endBlock: BN;
   let solaceEthLpFarmType = 3;
 
-  const solaceTokenName = "solace.fi";
+  const solaceTokenName = "solace";
   const lpTokenName = "Uniswap V3 Positions NFT-V1";
   const chainId = 31337;
   const deadline = constants.MaxUint256;
