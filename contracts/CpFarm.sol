@@ -108,7 +108,8 @@ contract CpFarm is ICpFarm {
     }
 
     /**
-     * Sets the amount of reward token to distribute per block.
+     * @notice Sets the amount of reward token to distribute per block.
+     * Only affects future rewards.
      * @param _blockReward Amount to distribute per block.
      */
     function setRewards(uint256 _blockReward) external override {
@@ -121,16 +122,16 @@ contract CpFarm is ICpFarm {
     }
 
     /**
-     * Sets the farm's end block. Used to extend the duration.
+     * @notice Sets the farm's end block. Used to extend the duration.
      * @param _endBlock The new end block.
      */
     function setEnd(uint256 _endBlock) external override {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
-        // update
-        updateFarm();
         // accounting
         endBlock = _endBlock;
+        // update
+        updateFarm();
     }
 
     /**
