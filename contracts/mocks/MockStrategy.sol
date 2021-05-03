@@ -68,4 +68,9 @@ contract MockStrategy is BaseStrategy {
         // Whatever we have "free", consider it "invested" now
     }
 
+    // NOTE: test-only function to simulate losses
+    function _takeFunds(uint256 amount) public {
+        want.transfer(msg.sender, amount);
+    }
+
 }

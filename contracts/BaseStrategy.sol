@@ -17,6 +17,7 @@ abstract contract BaseStrategy {
     using SafeERC20 for IERC20;
 
     address public governance;
+
     IVault public vault;
     IERC20 public want;
 
@@ -32,6 +33,9 @@ abstract contract BaseStrategy {
 
         // setting want per strategy as Vault wants ETH
         want = IERC20(vault.token());
+
+        // Give Vault unlimited access to `want` so that WETH can be transferred during `vault.report()`
+        SafeERC20.safeApprove(want, _vault, type(uint256).max);
     }
 
     /**
@@ -58,7 +62,7 @@ abstract contract BaseStrategy {
      * @notice Activates emergency exit. Once activated, the Strategy will exit its
      *  position upon the next harvest, depositing all funds into the Vault as
      *  quickly as is reasonable given on-chain conditions.
-     *  This may only be called by governance or the strategist.
+     *  Can only be called by the current governor.
      * @dev See `vault.setEmergencyShutdown()` and `harvest()` for further details.
      */
     function setEmergencyExit() external {
@@ -72,6 +76,7 @@ abstract contract BaseStrategy {
      * @notice Transfers an amount of ETH to the Vault
      * Can only be called by the vault contract.
      * @param _amountNeeded amount needed by Vault
+     * @return _loss Any realized losses
      */
     function withdraw(uint256 _amountNeeded) external returns (uint256 _loss) {
         require(msg.sender == address(vault), "!vault");
@@ -89,7 +94,7 @@ abstract contract BaseStrategy {
      *  In the rare case the Strategy is in emergency shutdown, this will exit
      *  the Strategy's position.
      *
-     *  This may only be called by governance, the strategist, or the keeper.
+     *  Can only be called by the current governor (as well as strategist or keeper in the future).
      * @dev
      *  When `harvest()` is called, the Strategy reports to the Vault (via
      *  `vault.report()`), so in some cases `harvest()` must be called in order
@@ -133,16 +138,16 @@ abstract contract BaseStrategy {
     /**
      * @notice
      *  The amount (priced in want) of the total assets managed by this strategy should not count
-     *  towards Yearn's TVL calculations.
+     *  towards Solace TVL calculations.
      * @dev
-     *  You can override this field to set it to a non-zero value if some of the assets of this
-     *  Strategy is somehow delegated inside another part of of Yearn's ecosystem e.g. another Vault.
-     *  Note that this value must be strictly less than or equal to the amount provided by
-     *  `estimatedTotalAssets()` below, as the TVL calc will be total assets minus delegated assets.
+     *  You can override this field to set it to a non-zero value should some of the assets of this
+     *  Strategy is somehow delegated inside another part of of Solace's ecosystem e.g. another Vault.
+     *  This value must be strictly less than or equal to the amount provided by `estimatedTotalAssets()`,
+     *  as the TVL calc will be total assets minus delegated assets.
      *  Also note that this value is used to determine the total assets under management by this
      *  strategy, for the purposes of computing the management fee in `Vault`
      * @return
-     *  The amount of assets this strategy manages that should not be included in Yearn's Total Value
+     *  The amount of assets this strategy manages that should not be included in Solace's Total Value
      *  Locked (TVL) calculation across it's ecosystem.
      */
     function delegatedAssets() external virtual view returns (uint256) {
@@ -153,7 +158,7 @@ abstract contract BaseStrategy {
      * @notice
      *  Provide an accurate estimate for the total amount of assets
      *  (principle + return) that this Strategy is currently managing,
-     *  denominated in terms of `want` tokens.
+     *  denominated in `want` tokens.
      *
      *  This total should be realizable from this Strategy if it 
      *  were to divest its entire position based on current on-chain conditions.
@@ -187,6 +192,7 @@ abstract contract BaseStrategy {
      *  liquidation. If there is a difference between them, `_loss` indicates whether the
      *  difference is due to a realized loss, or if there is some other sitution at play
      *  (e.g. locked funds) where the amount made available is less than what is needed.
+     *
      *  NOTE: The invariant `_liquidatedAmount + _loss <= _amountNeeded` should always be maintained
      */
     function liquidatePosition(uint256 _amountNeeded) internal virtual returns (uint256 _liquidatedAmount, uint256 _loss);
@@ -194,7 +200,8 @@ abstract contract BaseStrategy {
     /**
      * Perform any adjustments to the core position(s) of this Strategy given
      * what change the Vault made in the "investable capital" available to the
-     * Strategy. Note that all "free capital" in the Strategy after the report
+     * Strategy.
+     * NOTE: all "free capital" in the Strategy after the report
      * was made is available for reinvestment. Also note that this number
      * could be 0, and you should handle that scenario accordingly.
      *
@@ -203,9 +210,11 @@ abstract contract BaseStrategy {
     function adjustPosition(uint256 _debtOutstanding) internal virtual;
 
     /**
+     * @notice
      * Perform any Strategy unwinding or other calls necessary to capture the
      * "free return" this Strategy has generated since the last time its core
      * position(s) were adjusted. Examples include unwrapping extra rewards.
+     * @dev
      * This call is only used during "normal operation" of a Strategy, and
      * should be optimized to minimize losses as much as possible.
      *
