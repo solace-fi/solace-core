@@ -22,7 +22,6 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
 interface BaseStrategyInterface extends ethers.utils.Interface {
   functions: {
-    "c_0xaf268904(bytes32)": FunctionFragment;
     "delegatedAssets()": FunctionFragment;
     "emergencyExit()": FunctionFragment;
     "estimatedTotalAssets()": FunctionFragment;
@@ -37,10 +36,6 @@ interface BaseStrategyInterface extends ethers.utils.Interface {
     "withdraw(uint256)": FunctionFragment;
   };
 
-  encodeFunctionData(
-    functionFragment: "c_0xaf268904",
-    values: [BytesLike]
-  ): string;
   encodeFunctionData(
     functionFragment: "delegatedAssets",
     values?: undefined
@@ -75,10 +70,6 @@ interface BaseStrategyInterface extends ethers.utils.Interface {
     values: [BigNumberish]
   ): string;
 
-  decodeFunctionResult(
-    functionFragment: "c_0xaf268904",
-    data: BytesLike
-  ): Result;
   decodeFunctionResult(
     functionFragment: "delegatedAssets",
     data: BytesLike
@@ -130,20 +121,6 @@ export class BaseStrategy extends Contract {
   interface: BaseStrategyInterface;
 
   functions: {
-    c_0xaf268904(
-      c__0xaf268904: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<{
-      0: void;
-    }>;
-
-    "c_0xaf268904(bytes32)"(
-      c__0xaf268904: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<{
-      0: void;
-    }>;
-
     delegatedAssets(
       overrides?: CallOverrides
     ): Promise<{
@@ -267,16 +244,6 @@ export class BaseStrategy extends Contract {
     ): Promise<ContractTransaction>;
   };
 
-  c_0xaf268904(
-    c__0xaf268904: BytesLike,
-    overrides?: CallOverrides
-  ): Promise<void>;
-
-  "c_0xaf268904(bytes32)"(
-    c__0xaf268904: BytesLike,
-    overrides?: CallOverrides
-  ): Promise<void>;
-
   delegatedAssets(overrides?: CallOverrides): Promise<BigNumber>;
 
   "delegatedAssets()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -341,16 +308,6 @@ export class BaseStrategy extends Contract {
   ): Promise<ContractTransaction>;
 
   callStatic: {
-    c_0xaf268904(
-      c__0xaf268904: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    "c_0xaf268904(bytes32)"(
-      c__0xaf268904: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
     delegatedAssets(overrides?: CallOverrides): Promise<BigNumber>;
 
     "delegatedAssets()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -427,16 +384,6 @@ export class BaseStrategy extends Contract {
   };
 
   estimateGas: {
-    c_0xaf268904(
-      c__0xaf268904: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    "c_0xaf268904(bytes32)"(
-      c__0xaf268904: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
     delegatedAssets(overrides?: CallOverrides): Promise<BigNumber>;
 
     "delegatedAssets()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -502,16 +449,6 @@ export class BaseStrategy extends Contract {
   };
 
   populateTransaction: {
-    c_0xaf268904(
-      c__0xaf268904: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    "c_0xaf268904(bytes32)"(
-      c__0xaf268904: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
     delegatedAssets(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "delegatedAssets()"(

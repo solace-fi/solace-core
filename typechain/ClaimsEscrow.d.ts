@@ -23,7 +23,6 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
 interface ClaimsEscrowInterface extends ethers.utils.Interface {
   functions: {
-    "c_0xf5aa4efd(bytes32)": FunctionFragment;
     "claims(uint256)": FunctionFragment;
     "governance()": FunctionFragment;
     "receiveClaim(address)": FunctionFragment;
@@ -31,10 +30,6 @@ interface ClaimsEscrowInterface extends ethers.utils.Interface {
     "withdrawClaimsPayout(uint256)": FunctionFragment;
   };
 
-  encodeFunctionData(
-    functionFragment: "c_0xf5aa4efd",
-    values: [BytesLike]
-  ): string;
   encodeFunctionData(
     functionFragment: "claims",
     values: [BigNumberish]
@@ -53,10 +48,6 @@ interface ClaimsEscrowInterface extends ethers.utils.Interface {
     values: [BigNumberish]
   ): string;
 
-  decodeFunctionResult(
-    functionFragment: "c_0xf5aa4efd",
-    data: BytesLike
-  ): Result;
   decodeFunctionResult(functionFragment: "claims", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "governance", data: BytesLike): Result;
   decodeFunctionResult(
@@ -90,20 +81,6 @@ export class ClaimsEscrow extends Contract {
   interface: ClaimsEscrowInterface;
 
   functions: {
-    c_0xf5aa4efd(
-      c__0xf5aa4efd: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<{
-      0: void;
-    }>;
-
-    "c_0xf5aa4efd(bytes32)"(
-      c__0xf5aa4efd: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<{
-      0: void;
-    }>;
-
     claims(
       arg0: BigNumberish,
       overrides?: CallOverrides
@@ -173,16 +150,6 @@ export class ClaimsEscrow extends Contract {
     ): Promise<ContractTransaction>;
   };
 
-  c_0xf5aa4efd(
-    c__0xf5aa4efd: BytesLike,
-    overrides?: CallOverrides
-  ): Promise<void>;
-
-  "c_0xf5aa4efd(bytes32)"(
-    c__0xf5aa4efd: BytesLike,
-    overrides?: CallOverrides
-  ): Promise<void>;
-
   claims(
     arg0: BigNumberish,
     overrides?: CallOverrides
@@ -236,16 +203,6 @@ export class ClaimsEscrow extends Contract {
   ): Promise<ContractTransaction>;
 
   callStatic: {
-    c_0xf5aa4efd(
-      c__0xf5aa4efd: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    "c_0xf5aa4efd(bytes32)"(
-      c__0xf5aa4efd: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
     claims(
       arg0: BigNumberish,
       overrides?: CallOverrides
@@ -308,16 +265,6 @@ export class ClaimsEscrow extends Contract {
   };
 
   estimateGas: {
-    c_0xf5aa4efd(
-      c__0xf5aa4efd: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    "c_0xf5aa4efd(bytes32)"(
-      c__0xf5aa4efd: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
     claims(arg0: BigNumberish, overrides?: CallOverrides): Promise<BigNumber>;
 
     "claims(uint256)"(
@@ -355,16 +302,6 @@ export class ClaimsEscrow extends Contract {
   };
 
   populateTransaction: {
-    c_0xf5aa4efd(
-      c__0xf5aa4efd: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    "c_0xf5aa4efd(bytes32)"(
-      c__0xf5aa4efd: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
     claims(
       arg0: BigNumberish,
       overrides?: CallOverrides

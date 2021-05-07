@@ -190,17 +190,22 @@ describe("Strategy", function () {
 
         it("should allow harvest while in emergency exit", async function () {
             await strategy.connect(owner).setEmergencyExit();
-            expect(await strategy.connect(owner).harvest()).to.emit(strategy, 'Harvested').withArgs(0, 0, 0, 0);
+            await expect(await strategy.connect(owner).harvest()).to.emit(strategy, 'Harvested').withArgs(0, 0, 0, 0);
         });
 
         it("should allow harvest with profit while in emergency exit", async function () {
             let profitAmount = 100;
             await weth.connect(depositor1).depositTo(strategy.address, {value: profitAmount});
-            //await weth.connect(depositor1).deposit({value: profitAmount});
-            //await weth.connect(depositor).
-            //await weth.connect(depositor1).transfer(strategy.address, profitAmount);
             await strategy.connect(owner).setEmergencyExit();
-            expect(await strategy.connect(owner).harvest()).to.emit(strategy, 'Harvested').withArgs(profitAmount, 0, 0, 0);
+            await expect(await strategy.connect(owner).harvest()).to.emit(strategy, 'Harvested').withArgs(profitAmount, 0, 0, 0);
+        });
+
+        it("should liquidate position", async function () {
+            let lossAmount = BN.from(1);
+            await strategy.connect(owner).harvest();
+            await strategy._takeFunds(lossAmount);
+            await strategy.connect(owner).setEmergencyExit();
+            await expect(await strategy.connect(owner).harvest()).to.emit(strategy, 'Harvested').withArgs(0, lossAmount, 0, 0);
         });
     });
 

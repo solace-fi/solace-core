@@ -23,7 +23,6 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 interface MasterInterface extends ethers.utils.Interface {
   functions: {
     "allocPoints(uint256)": FunctionFragment;
-    "c_0x78554c2d(bytes32)": FunctionFragment;
     "farmAddresses(uint256)": FunctionFragment;
     "farmIndices(address)": FunctionFragment;
     "governance()": FunctionFragment;
@@ -41,10 +40,6 @@ interface MasterInterface extends ethers.utils.Interface {
   encodeFunctionData(
     functionFragment: "allocPoints",
     values: [BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "c_0x78554c2d",
-    values: [BytesLike]
   ): string;
   encodeFunctionData(
     functionFragment: "farmAddresses",
@@ -88,10 +83,6 @@ interface MasterInterface extends ethers.utils.Interface {
 
   decodeFunctionResult(
     functionFragment: "allocPoints",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "c_0x78554c2d",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -167,20 +158,6 @@ export class Master extends Contract {
       overrides?: CallOverrides
     ): Promise<{
       0: BigNumber;
-    }>;
-
-    c_0x78554c2d(
-      c__0x78554c2d: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<{
-      0: void;
-    }>;
-
-    "c_0x78554c2d(bytes32)"(
-      c__0x78554c2d: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<{
-      0: void;
     }>;
 
     farmAddresses(
@@ -330,16 +307,6 @@ export class Master extends Contract {
     overrides?: CallOverrides
   ): Promise<BigNumber>;
 
-  c_0x78554c2d(
-    c__0x78554c2d: BytesLike,
-    overrides?: CallOverrides
-  ): Promise<void>;
-
-  "c_0x78554c2d(bytes32)"(
-    c__0x78554c2d: BytesLike,
-    overrides?: CallOverrides
-  ): Promise<void>;
-
   farmAddresses(arg0: BigNumberish, overrides?: CallOverrides): Promise<string>;
 
   "farmAddresses(uint256)"(
@@ -432,16 +399,6 @@ export class Master extends Contract {
       arg0: BigNumberish,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
-
-    c_0x78554c2d(
-      c__0x78554c2d: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    "c_0x78554c2d(bytes32)"(
-      c__0x78554c2d: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<void>;
 
     farmAddresses(
       arg0: BigNumberish,
@@ -547,16 +504,6 @@ export class Master extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    c_0x78554c2d(
-      c__0x78554c2d: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    "c_0x78554c2d(bytes32)"(
-      c__0x78554c2d: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
     farmAddresses(
       arg0: BigNumberish,
       overrides?: CallOverrides
@@ -651,16 +598,6 @@ export class Master extends Contract {
 
     "allocPoints(uint256)"(
       arg0: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    c_0x78554c2d(
-      c__0x78554c2d: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    "c_0x78554c2d(bytes32)"(
-      c__0x78554c2d: BytesLike,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 

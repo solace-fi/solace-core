@@ -30,7 +30,6 @@ interface MockWethInterface extends ethers.utils.Interface {
     "approve(address,uint256)": FunctionFragment;
     "approveAndCall(address,uint256,bytes)": FunctionFragment;
     "balanceOf(address)": FunctionFragment;
-    "c_0x21c42171(bytes32)": FunctionFragment;
     "decimals()": FunctionFragment;
     "deploymentChainId()": FunctionFragment;
     "deposit()": FunctionFragment;
@@ -75,10 +74,6 @@ interface MockWethInterface extends ethers.utils.Interface {
     values: [string, BigNumberish, BytesLike]
   ): string;
   encodeFunctionData(functionFragment: "balanceOf", values: [string]): string;
-  encodeFunctionData(
-    functionFragment: "c_0x21c42171",
-    values: [BytesLike]
-  ): string;
   encodeFunctionData(functionFragment: "decimals", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "deploymentChainId",
@@ -157,10 +152,6 @@ interface MockWethInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "balanceOf", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "c_0x21c42171",
-    data: BytesLike
-  ): Result;
   decodeFunctionResult(functionFragment: "decimals", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "deploymentChainId",
@@ -313,20 +304,6 @@ export class MockWeth extends Contract {
       overrides?: CallOverrides
     ): Promise<{
       0: BigNumber;
-    }>;
-
-    c_0x21c42171(
-      c__0x21c42171: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<{
-      0: void;
-    }>;
-
-    "c_0x21c42171(bytes32)"(
-      c__0x21c42171: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<{
-      0: void;
     }>;
 
     decimals(
@@ -597,16 +574,6 @@ export class MockWeth extends Contract {
     overrides?: CallOverrides
   ): Promise<BigNumber>;
 
-  c_0x21c42171(
-    c__0x21c42171: BytesLike,
-    overrides?: CallOverrides
-  ): Promise<void>;
-
-  "c_0x21c42171(bytes32)"(
-    c__0x21c42171: BytesLike,
-    overrides?: CallOverrides
-  ): Promise<void>;
-
   decimals(overrides?: CallOverrides): Promise<number>;
 
   "decimals()"(overrides?: CallOverrides): Promise<number>;
@@ -820,16 +787,6 @@ export class MockWeth extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    c_0x21c42171(
-      c__0x21c42171: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    "c_0x21c42171(bytes32)"(
-      c__0x21c42171: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
     decimals(overrides?: CallOverrides): Promise<number>;
 
     "decimals()"(overrides?: CallOverrides): Promise<number>;
@@ -1042,16 +999,6 @@ export class MockWeth extends Contract {
 
     "balanceOf(address)"(
       arg0: string,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    c_0x21c42171(
-      c__0x21c42171: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    "c_0x21c42171(bytes32)"(
-      c__0x21c42171: BytesLike,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
@@ -1269,16 +1216,6 @@ export class MockWeth extends Contract {
 
     "balanceOf(address)"(
       arg0: string,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    c_0x21c42171(
-      c__0x21c42171: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    "c_0x21c42171(bytes32)"(
-      c__0x21c42171: BytesLike,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 

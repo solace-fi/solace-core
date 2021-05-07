@@ -5,6 +5,8 @@
 rm -rf artifacts
 rm -rf cache
 rm -rf client
+rm -rf coverage
+rm coverage.json
 rm -rf docs/_build/html
 rm -rf docs/_build/md
 rm -rf node_modules

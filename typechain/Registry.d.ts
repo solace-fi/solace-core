@@ -23,7 +23,6 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 interface RegistryInterface extends ethers.utils.Interface {
   functions: {
     "addProduct(address)": FunctionFragment;
-    "c_0x1ccd5727(bytes32)": FunctionFragment;
     "claimsAdjustor()": FunctionFragment;
     "claimsEscrow()": FunctionFragment;
     "getProduct(uint256)": FunctionFragment;
@@ -47,10 +46,6 @@ interface RegistryInterface extends ethers.utils.Interface {
   };
 
   encodeFunctionData(functionFragment: "addProduct", values: [string]): string;
-  encodeFunctionData(
-    functionFragment: "c_0x1ccd5727",
-    values: [BytesLike]
-  ): string;
   encodeFunctionData(
     functionFragment: "claimsAdjustor",
     values?: undefined
@@ -100,10 +95,6 @@ interface RegistryInterface extends ethers.utils.Interface {
   encodeFunctionData(functionFragment: "vault", values?: undefined): string;
 
   decodeFunctionResult(functionFragment: "addProduct", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "c_0x1ccd5727",
-    data: BytesLike
-  ): Result;
   decodeFunctionResult(
     functionFragment: "claimsAdjustor",
     data: BytesLike
@@ -197,20 +188,6 @@ export class Registry extends Contract {
       _product: string,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
-
-    c_0x1ccd5727(
-      c__0x1ccd5727: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<{
-      0: void;
-    }>;
-
-    "c_0x1ccd5727(bytes32)"(
-      c__0x1ccd5727: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<{
-      0: void;
-    }>;
 
     claimsAdjustor(
       overrides?: CallOverrides
@@ -449,16 +426,6 @@ export class Registry extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  c_0x1ccd5727(
-    c__0x1ccd5727: BytesLike,
-    overrides?: CallOverrides
-  ): Promise<void>;
-
-  "c_0x1ccd5727(bytes32)"(
-    c__0x1ccd5727: BytesLike,
-    overrides?: CallOverrides
-  ): Promise<void>;
-
   claimsAdjustor(overrides?: CallOverrides): Promise<string>;
 
   "claimsAdjustor()"(overrides?: CallOverrides): Promise<string>;
@@ -604,16 +571,6 @@ export class Registry extends Contract {
 
     "addProduct(address)"(
       _product: string,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    c_0x1ccd5727(
-      c__0x1ccd5727: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    "c_0x1ccd5727(bytes32)"(
-      c__0x1ccd5727: BytesLike,
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -773,16 +730,6 @@ export class Registry extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    c_0x1ccd5727(
-      c__0x1ccd5727: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    "c_0x1ccd5727(bytes32)"(
-      c__0x1ccd5727: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
     claimsAdjustor(overrides?: CallOverrides): Promise<BigNumber>;
 
     "claimsAdjustor()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -918,16 +865,6 @@ export class Registry extends Contract {
     "addProduct(address)"(
       _product: string,
       overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    c_0x1ccd5727(
-      c__0x1ccd5727: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    "c_0x1ccd5727(bytes32)"(
-      c__0x1ccd5727: BytesLike,
-      overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
     claimsAdjustor(overrides?: CallOverrides): Promise<PopulatedTransaction>;

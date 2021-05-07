@@ -11,6 +11,7 @@ import "./interface/IRegistry.sol";
 import "./interface/IClaimsEscrow.sol";
 import "./interface/IVault.sol";
 
+
 /**
  * @title Vault
  * @author solace.fi
@@ -173,7 +174,7 @@ contract Vault is ERC20Permit, IVault {
     }
 
     /**
-     * @notice Changes the performanceFee of the Vault. 
+     * @notice Changes the performanceFee of the Vault.
      * Can only be called by the current governor.
      * @param fee New performanceFee to use
      */
@@ -369,7 +370,7 @@ contract Vault is ERC20Permit, IVault {
         debtRatio += _debtRatio;
 
         require(debtRatio <= MAX_BPS, "Vault debt ratio cannot exceed MAX_BPS");
-        
+
         emit StrategyUpdateDebtRatio(_strategy, _debtRatio);
     }
 
@@ -428,7 +429,7 @@ contract Vault is ERC20Permit, IVault {
 
     /**
      * @notice Allows a user to deposit ETH into the Vault (becoming a Capital Provider)
-     * Shares of the Vault (CP tokens) are minteed to caller
+     * Shares of the Vault (CP tokens) are minted to caller
      * Called when Vault receives ETH
      * Deposits `_amount` `token`, issuing shares to `recipient`.
      * Reverts if Vault is in Emergency Shutdown
@@ -456,10 +457,10 @@ contract Vault is ERC20Permit, IVault {
      * @notice Allows a user to redeem shares for ETH
      * Burns CP tokens and transfers ETH to the CP
      * @param shares amount of shares to redeem
+     * @param maxLoss acceptable amount of loss in bps of
      * @return value in ETH that the shares where redeemed for
      */
     function withdraw(uint256 shares, uint256 maxLoss) external override returns (uint256) {
-
         require(shares <= balanceOf(msg.sender), "cannot redeem more shares than you own");
 
         uint256 value = _shareValue(shares);
@@ -470,23 +471,15 @@ contract Vault is ERC20Permit, IVault {
 
         // If redeemable amount exceeds vaultBalance, withdraw funds from strategies in the withdrawal queue
         uint256 vaultBalance = token.balanceOf(address(this));
-
         if (value > vaultBalance) {
 
             for (uint256 i = 0; i < withdrawalQueue.length; i++) {
 
-                // Break if we are done withdrawing from Strategies
-                vaultBalance = token.balanceOf(address(this));
-                if (value <= vaultBalance) {
-                    break;
-                }
-
-                uint256 amountNeeded = value - vaultBalance;
-
-                // Do not withdraw more than the Strategy's debt so that it can still work based on the profits it has
-                if (_strategies[withdrawalQueue[i]].totalDebt < amountNeeded) {
-                    amountNeeded = _strategies[withdrawalQueue[i]].totalDebt;
-                }
+                uint256 amountNeeded = min(
+                    value - vaultBalance,
+                    // Do not withdraw more than the Strategy's debt so that it can still work based on the profits it has
+                    _strategies[withdrawalQueue[i]].totalDebt
+                );
 
                 // if there is nothing to withdraw from this Strategy, move on to the next one
                 if (amountNeeded == 0) continue;
@@ -505,6 +498,12 @@ contract Vault is ERC20Permit, IVault {
                 // This doesn't add to returns as it's not earned by "normal means"
                 _strategies[withdrawalQueue[i]].totalDebt -= withdrawn + loss;
                 totalDebt -= withdrawn + loss;
+
+                // Break if we are done withdrawing from Strategies
+                vaultBalance = token.balanceOf(address(this));
+                if (value <= vaultBalance) {
+                  break;
+                }
             }
         }
 
@@ -514,9 +513,8 @@ contract Vault is ERC20Permit, IVault {
             value = vaultBalance;
             shares = _sharesForAmount(value + totalLoss);
         }
-
         // revert if losses from withdrawing are more than what is considered acceptable.
-        assert(totalLoss <= maxLoss * (value + totalLoss) / MAX_BPS);
+        require(totalLoss <= maxLoss * (value + totalLoss) / MAX_BPS, "too much loss");
 
         // burn shares and transfer ETH to withdrawer
         _burn(msg.sender, shares);
@@ -564,12 +562,7 @@ contract Vault is ERC20Permit, IVault {
         // Outstanding debt the Strategy wants to take back from the Vault (if any)
         // NOTE: debtOutstanding <= StrategyParams.totalDebt
         uint256 debt = _debtOutstanding(msg.sender);
-        uint256 debtPayment;
-        if (debt < _debtPayment) {
-            debtPayment = debt;
-        } else {
-            debtPayment = _debtPayment;
-        }
+        uint256 debtPayment = min(debt, _debtPayment);
 
         if (debtPayment > 0) {
             _strategies[msg.sender].totalDebt -= debtPayment;
@@ -579,7 +572,6 @@ contract Vault is ERC20Permit, IVault {
 
         // Compute the line of credit the Vault is able to offer the Strategy (if any)
         uint256 credit = _creditAvailable(msg.sender);
-
         // Update the actual debt based on the full credit we are extending to the Strategy
         // or the returns if we are taking funds back
         // NOTE: credit + _strategies[msg.sender].totalDebt is always < debtLimit
@@ -606,12 +598,7 @@ contract Vault is ERC20Permit, IVault {
         delegatedAssets -= _strategyDelegatedAssets[msg.sender];
 
         // NOTE: Take the min of totalDebt and delegatedAssets) to guard against improper computation
-        uint256 strategyDelegatedAssets;
-        if (_strategies[msg.sender].totalDebt < IStrategy(msg.sender).delegatedAssets()) {
-            strategyDelegatedAssets = _strategies[msg.sender].totalDebt;
-        } else {
-            strategyDelegatedAssets = IStrategy(msg.sender).delegatedAssets();
-        }
+        uint256 strategyDelegatedAssets = min(_strategies[msg.sender].totalDebt, IStrategy(msg.sender).delegatedAssets());
         delegatedAssets += strategyDelegatedAssets;
         _strategyDelegatedAssets[msg.sender] = delegatedAssets;
 
@@ -668,7 +655,7 @@ contract Vault is ERC20Permit, IVault {
     * since its last report.
     */
     function expectedReturn(address strategy) external view returns (uint256) {
-        _expectedReturn(strategy);
+        return _expectedReturn(strategy);
     }
 
     /**
@@ -731,13 +718,9 @@ contract Vault is ERC20Permit, IVault {
         // Also, make sure we reduce our trust with the strategy by the same amount
         uint256 strategyDebtRatio = _strategies[strategy].debtRatio;
 
-        uint256 ratioChange;
-
-        if (loss * MAX_BPS / _totalAssets() < strategyDebtRatio) {
-            ratioChange = loss * MAX_BPS / _totalAssets();
-        } else {
-            ratioChange = strategyDebtRatio;
-        }
+        uint256 ratioChange = _totalAssets() == 0
+          ? strategyDebtRatio
+          : min(loss * MAX_BPS / _totalAssets(), strategyDebtRatio);
         _strategies[strategy].debtRatio -= ratioChange;
         debtRatio -= ratioChange;
     }
@@ -775,12 +758,9 @@ contract Vault is ERC20Permit, IVault {
 
         if (totalFee > 0) {
             // issue shares as reward
-            uint256 reward;
-            if (totalSupply() == 0) {
-                reward = totalFee;
-            } else {
-                reward = (totalFee * totalSupply()) / _totalAssets();
-            }
+            uint256 reward = totalSupply() == 0 || _totalAssets() == 0
+                ? totalFee
+                : totalFee * totalSupply() / _totalAssets();
 
             // Issuance of shares needs to be done before taking the deposit
             _mint(address(this), reward);
@@ -817,24 +797,22 @@ contract Vault is ERC20Permit, IVault {
         uint256 vaultTotalAssets = _totalAssets();
         uint256 vaultDebtLimit = (debtRatio * vaultTotalAssets) / MAX_BPS;
         uint256 strategyDebtLimit = (_strategies[_strategy].debtRatio * vaultTotalAssets) / MAX_BPS;
-
         // No credit available to issue if credit line has been exhasted
         if (vaultDebtLimit <= totalDebt || strategyDebtLimit <= _strategies[_strategy].totalDebt) return 0;
 
-        uint256 available = strategyDebtLimit - _strategies[_strategy].totalDebt;
-
-        // Adjust by the global debt limit left
-        if (vaultDebtLimit - totalDebt < available) available = vaultDebtLimit - totalDebt;
-
-        // Can only borrow up to what the contract has in reserve
-        if (token.balanceOf(address(this)) < available) available = token.balanceOf(address(this));
-
+        uint256 available = min(
+            strategyDebtLimit - _strategies[_strategy].totalDebt,
+            min(
+                // Adjust by the global debt limit left
+                vaultDebtLimit - totalDebt,
+                // Can only borrow up to what the contract has in reserve
+                token.balanceOf(address(this))
+            )
+        );
         // Adjust by min and max borrow limits (per harvest)
         if (available < _strategies[_strategy].minDebtPerHarvest) return 0;
 
-        if (_strategies[_strategy].maxDebtPerHarvest < available) return _strategies[_strategy].maxDebtPerHarvest;
-
-        return available;
+        return min(_strategies[_strategy].maxDebtPerHarvest, available);
     }
 
     function _expectedReturn(address strategy) internal view returns (uint256) {
@@ -868,7 +846,9 @@ contract Vault is ERC20Permit, IVault {
         }
 
         // using 1e3 for extra precision here when decimals is low
-        return ((10 ** 3 * (shares * freeFunds)) / totalSupply()) / 10 ** 3;
+        return totalSupply() == 0
+            ? 0
+            : ((10 ** 3 * (shares * freeFunds)) / totalSupply()) / 10 ** 3;
     }
 
     /**
@@ -876,12 +856,10 @@ contract Vault is ERC20Permit, IVault {
      * @param amount of tokens to calculate number of shares for
      */
     function _sharesForAmount(uint256 amount) internal view returns (uint256) {
-        if (_totalAssets() > 0) {
-            // NOTE: if sqrt(token.totalSupply()) > 1e37, this could potentially revert
-            return ((10 ** 3 * (amount * totalSupply())) / _totalAssets()) / 10 ** 3;
-        } else {
-            return 0;
-        }
+        // NOTE: if sqrt(token.totalSupply()) > 1e37, this could potentially revert
+        return _totalAssets() > 0
+            ? ((10 ** 3 * (amount * totalSupply())) / _totalAssets()) / 10 ** 3
+            : 0;
     }
 
     function _debtOutstanding(address strategy) internal view returns (uint256) {
@@ -897,11 +875,25 @@ contract Vault is ERC20Permit, IVault {
         }
     }
 
+    function min(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a < b ? a : b;
+    }
+
     /**
      * @notice Fallback function to allow contract to receive ETH
      * Mints CP tokens to caller if caller is not Vault or WETH
      */
     receive() external payable {
+        if (msg.sender != address(token)) {
+            deposit();
+        }
+    }
+
+    /**
+     * @notice Fallback function to allow contract to receive ETH
+     * Mints CP tokens to caller if caller is not Vault or WETH
+     */
+    fallback() external payable {
         if (msg.sender != address(token)) {
             deposit();
         }

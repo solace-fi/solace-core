@@ -22,9 +22,8 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
 interface MockStrategyInterface extends ethers.utils.Interface {
   functions: {
+    "_report(uint256,uint256,uint256)": FunctionFragment;
     "_takeFunds(uint256)": FunctionFragment;
-    "c_0xa8ea111c(bytes32)": FunctionFragment;
-    "c_0xaf268904(bytes32)": FunctionFragment;
     "delegatedAssets()": FunctionFragment;
     "emergencyExit()": FunctionFragment;
     "estimatedTotalAssets()": FunctionFragment;
@@ -32,6 +31,7 @@ interface MockStrategyInterface extends ethers.utils.Interface {
     "harvest()": FunctionFragment;
     "isActive()": FunctionFragment;
     "protectedToken()": FunctionFragment;
+    "setDelegatedAssets(uint256)": FunctionFragment;
     "setEmergencyExit()": FunctionFragment;
     "setGovernance(address)": FunctionFragment;
     "setVault(address)": FunctionFragment;
@@ -41,16 +41,12 @@ interface MockStrategyInterface extends ethers.utils.Interface {
   };
 
   encodeFunctionData(
+    functionFragment: "_report",
+    values: [BigNumberish, BigNumberish, BigNumberish]
+  ): string;
+  encodeFunctionData(
     functionFragment: "_takeFunds",
     values: [BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "c_0xa8ea111c",
-    values: [BytesLike]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "c_0xaf268904",
-    values: [BytesLike]
   ): string;
   encodeFunctionData(
     functionFragment: "delegatedAssets",
@@ -75,6 +71,10 @@ interface MockStrategyInterface extends ethers.utils.Interface {
     values?: undefined
   ): string;
   encodeFunctionData(
+    functionFragment: "setDelegatedAssets",
+    values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
     functionFragment: "setEmergencyExit",
     values?: undefined
   ): string;
@@ -90,15 +90,8 @@ interface MockStrategyInterface extends ethers.utils.Interface {
     values: [BigNumberish]
   ): string;
 
+  decodeFunctionResult(functionFragment: "_report", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "_takeFunds", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "c_0xa8ea111c",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "c_0xaf268904",
-    data: BytesLike
-  ): Result;
   decodeFunctionResult(
     functionFragment: "delegatedAssets",
     data: BytesLike
@@ -116,6 +109,10 @@ interface MockStrategyInterface extends ethers.utils.Interface {
   decodeFunctionResult(functionFragment: "isActive", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "protectedToken",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "setDelegatedAssets",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -154,6 +151,20 @@ export class MockStrategy extends Contract {
   interface: MockStrategyInterface;
 
   functions: {
+    _report(
+      gain: BigNumberish,
+      loss: BigNumberish,
+      _debtPayment: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "_report(uint256,uint256,uint256)"(
+      gain: BigNumberish,
+      loss: BigNumberish,
+      _debtPayment: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
     _takeFunds(
       amount: BigNumberish,
       overrides?: Overrides
@@ -163,34 +174,6 @@ export class MockStrategy extends Contract {
       amount: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
-
-    c_0xa8ea111c(
-      c__0xa8ea111c: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<{
-      0: void;
-    }>;
-
-    "c_0xa8ea111c(bytes32)"(
-      c__0xa8ea111c: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<{
-      0: void;
-    }>;
-
-    c_0xaf268904(
-      c__0xaf268904: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<{
-      0: void;
-    }>;
-
-    "c_0xaf268904(bytes32)"(
-      c__0xaf268904: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<{
-      0: void;
-    }>;
 
     delegatedAssets(
       overrides?: CallOverrides
@@ -268,6 +251,16 @@ export class MockStrategy extends Contract {
       0: string;
     }>;
 
+    setDelegatedAssets(
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "setDelegatedAssets(uint256)"(
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
     setEmergencyExit(overrides?: Overrides): Promise<ContractTransaction>;
 
     "setEmergencyExit()"(overrides?: Overrides): Promise<ContractTransaction>;
@@ -327,6 +320,20 @@ export class MockStrategy extends Contract {
     ): Promise<ContractTransaction>;
   };
 
+  _report(
+    gain: BigNumberish,
+    loss: BigNumberish,
+    _debtPayment: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "_report(uint256,uint256,uint256)"(
+    gain: BigNumberish,
+    loss: BigNumberish,
+    _debtPayment: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
   _takeFunds(
     amount: BigNumberish,
     overrides?: Overrides
@@ -336,26 +343,6 @@ export class MockStrategy extends Contract {
     amount: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
-
-  c_0xa8ea111c(
-    c__0xa8ea111c: BytesLike,
-    overrides?: CallOverrides
-  ): Promise<void>;
-
-  "c_0xa8ea111c(bytes32)"(
-    c__0xa8ea111c: BytesLike,
-    overrides?: CallOverrides
-  ): Promise<void>;
-
-  c_0xaf268904(
-    c__0xaf268904: BytesLike,
-    overrides?: CallOverrides
-  ): Promise<void>;
-
-  "c_0xaf268904(bytes32)"(
-    c__0xaf268904: BytesLike,
-    overrides?: CallOverrides
-  ): Promise<void>;
 
   delegatedAssets(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -384,6 +371,16 @@ export class MockStrategy extends Contract {
   protectedToken(overrides?: CallOverrides): Promise<string>;
 
   "protectedToken()"(overrides?: CallOverrides): Promise<string>;
+
+  setDelegatedAssets(
+    _amount: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "setDelegatedAssets(uint256)"(
+    _amount: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
 
   setEmergencyExit(overrides?: Overrides): Promise<ContractTransaction>;
 
@@ -425,30 +422,24 @@ export class MockStrategy extends Contract {
   ): Promise<ContractTransaction>;
 
   callStatic: {
+    _report(
+      gain: BigNumberish,
+      loss: BigNumberish,
+      _debtPayment: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "_report(uint256,uint256,uint256)"(
+      gain: BigNumberish,
+      loss: BigNumberish,
+      _debtPayment: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
     _takeFunds(amount: BigNumberish, overrides?: CallOverrides): Promise<void>;
 
     "_takeFunds(uint256)"(
       amount: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    c_0xa8ea111c(
-      c__0xa8ea111c: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    "c_0xa8ea111c(bytes32)"(
-      c__0xa8ea111c: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    c_0xaf268904(
-      c__0xaf268904: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    "c_0xaf268904(bytes32)"(
-      c__0xaf268904: BytesLike,
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -479,6 +470,16 @@ export class MockStrategy extends Contract {
     protectedToken(overrides?: CallOverrides): Promise<string>;
 
     "protectedToken()"(overrides?: CallOverrides): Promise<string>;
+
+    setDelegatedAssets(
+      _amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "setDelegatedAssets(uint256)"(
+      _amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
 
     setEmergencyExit(overrides?: CallOverrides): Promise<void>;
 
@@ -532,31 +533,25 @@ export class MockStrategy extends Contract {
   };
 
   estimateGas: {
+    _report(
+      gain: BigNumberish,
+      loss: BigNumberish,
+      _debtPayment: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "_report(uint256,uint256,uint256)"(
+      gain: BigNumberish,
+      loss: BigNumberish,
+      _debtPayment: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
     _takeFunds(amount: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
 
     "_takeFunds(uint256)"(
       amount: BigNumberish,
       overrides?: Overrides
-    ): Promise<BigNumber>;
-
-    c_0xa8ea111c(
-      c__0xa8ea111c: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    "c_0xa8ea111c(bytes32)"(
-      c__0xa8ea111c: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    c_0xaf268904(
-      c__0xaf268904: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    "c_0xaf268904(bytes32)"(
-      c__0xaf268904: BytesLike,
-      overrides?: CallOverrides
     ): Promise<BigNumber>;
 
     delegatedAssets(overrides?: CallOverrides): Promise<BigNumber>;
@@ -586,6 +581,16 @@ export class MockStrategy extends Contract {
     protectedToken(overrides?: CallOverrides): Promise<BigNumber>;
 
     "protectedToken()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    setDelegatedAssets(
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "setDelegatedAssets(uint256)"(
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
 
     setEmergencyExit(overrides?: Overrides): Promise<BigNumber>;
 
@@ -628,6 +633,20 @@ export class MockStrategy extends Contract {
   };
 
   populateTransaction: {
+    _report(
+      gain: BigNumberish,
+      loss: BigNumberish,
+      _debtPayment: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "_report(uint256,uint256,uint256)"(
+      gain: BigNumberish,
+      loss: BigNumberish,
+      _debtPayment: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
     _takeFunds(
       amount: BigNumberish,
       overrides?: Overrides
@@ -636,26 +655,6 @@ export class MockStrategy extends Contract {
     "_takeFunds(uint256)"(
       amount: BigNumberish,
       overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    c_0xa8ea111c(
-      c__0xa8ea111c: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    "c_0xa8ea111c(bytes32)"(
-      c__0xa8ea111c: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    c_0xaf268904(
-      c__0xaf268904: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    "c_0xaf268904(bytes32)"(
-      c__0xaf268904: BytesLike,
-      overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
     delegatedAssets(overrides?: CallOverrides): Promise<PopulatedTransaction>;
@@ -692,6 +691,16 @@ export class MockStrategy extends Contract {
 
     "protectedToken()"(
       overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    setDelegatedAssets(
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "setDelegatedAssets(uint256)"(
+      _amount: BigNumberish,
+      overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
     setEmergencyExit(overrides?: Overrides): Promise<PopulatedTransaction>;
