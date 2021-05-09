@@ -1107,7 +1107,25 @@
 906
 907
 908
-909</pre></div></td><td class="code"><div class="highlight"><pre><span></span><span class="c1">// </span><span class="cs">SPDX-License-Identifier:</span><span class="c1"> GPL-3.0-or-later</span>
+909
+910
+911
+912
+913
+914
+915
+916
+917
+918
+919
+920
+921
+922
+923
+924
+925
+926
+927</pre></div></td><td class="code"><div class="highlight"><pre><span></span><span class="c1">// </span><span class="cs">SPDX-License-Identifier:</span><span class="c1"> GPL-3.0-or-later</span>
 
 <span class="k">pragma solidity</span> <span class="mf">0.8</span><span class="p">.</span><span class="mi">0</span><span class="p">;</span>
 
@@ -1310,7 +1328,7 @@
     <span class="p">}</span>
 
     <span class="cm">/**</span>
-<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Sets `withdrawalQueue` to be in the order specified by input array</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Sets `withdrawalQueue` to be in the order specified by input array `_queue`</span>
 <span class="cm">     * </span><span class="cs">@dev</span><span class="cm"> Specify addresses in the order in which funds should be withdrawn.</span>
 <span class="cm">     * The ordering should be least impactful (the Strategy whose core positions will be least impacted by</span>
 <span class="cm">     * having funds removed) first, with the next least impactful second, etc.</span>
@@ -1395,8 +1413,7 @@
     <span class="cm">/**</span>
 <span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Remove `_strategy` from `withdrawalQueue`</span>
 <span class="cm">     * Can only be called by the current governor.</span>
-<span class="cm">     * Can only be called on an active strategy (added using addStrategy)</span>
-<span class="cm">     * `_strategy` cannot already be in the queue</span>
+<span class="cm">     * Can only be called on an active strategy, added using `addStrategy()`</span>
 <span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _strategy address of the strategy to remove</span>
 <span class="cm">     */</span>
     <span class="kd">function</span> <span class="n">removeStrategyFromQueue</span><span class="p">(</span><span class="kt">address</span> <span class="n">_strategy</span><span class="p">)</span> <span class="k">external</span> <span class="p">{</span>
@@ -1406,6 +1423,7 @@
 
         <span class="kt">address</span><span class="p">[]</span> <span class="k">storage</span> <span class="n">newQueue</span><span class="p">;</span>
 
+        <span class="c1">// readd all the strategies from the queue EXCEPT the Strategy we want to remove</span>
         <span class="k">for</span> <span class="p">(</span><span class="kt">uint256</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">withdrawalQueue</span><span class="p">.</span><span class="n">length</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
             <span class="k">if</span> <span class="p">(</span><span class="n">withdrawalQueue</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">!=</span> <span class="n">_strategy</span><span class="p">)</span> <span class="p">{</span>
                 <span class="n">newQueue</span><span class="p">.</span><span class="nf">push</span><span class="p">(</span><span class="n">withdrawalQueue</span><span class="p">[</span><span class="n">i</span><span class="p">]);</span>
@@ -1537,7 +1555,7 @@
 
     <span class="cm">/**</span>
 <span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Allows a user to deposit ETH into the Vault (becoming a Capital Provider)</span>
-<span class="cm">     * Shares of the Vault (CP tokens) are minteed to caller</span>
+<span class="cm">     * Shares of the Vault (CP tokens) are minted to caller</span>
 <span class="cm">     * Called when Vault receives ETH</span>
 <span class="cm">     * Deposits `_amount` `token`, issuing shares to `recipient`.</span>
 <span class="cm">     * Reverts if Vault is in Emergency Shutdown</span>
@@ -1558,6 +1576,23 @@
         <span class="c1">// Wrap the depositor&#39;s ETH to add WETH to the vault</span>
         <span class="n">IWETH10</span><span class="p">(</span><span class="kt">address</span><span class="p">(</span><span class="n">token</span><span class="p">)).</span><span class="n">deposit</span><span class="p">{</span><span class="n">value</span><span class="o">:</span> <span class="n">amount</span><span class="p">}();</span>
 
+        <span class="k">emit</span> <span class="n">DepositMade</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">,</span> <span class="n">amount</span><span class="p">,</span> <span class="n">shares</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Allows a user to deposit WETH into the Vault (becoming a Capital Provider)</span>
+<span class="cm">     * Shares of the Vault (CP tokens) are minted to caller</span>
+<span class="cm">     * Deposits `_amount` `token`, issuing shares to `recipient`.</span>
+<span class="cm">     * Reverts if Vault is in Emergency Shutdown</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">depositWeth</span><span class="p">(</span><span class="kt">uint256</span> <span class="n">amount</span><span class="p">)</span> <span class="k">external</span> <span class="k">override</span> <span class="p">{</span>
+        <span class="nf">require</span><span class="p">(</span><span class="o">!</span><span class="n">emergencyShutdown</span><span class="p">,</span> <span class="s">&quot;cannot deposit when vault is in emergency shutdown&quot;</span><span class="p">);</span>
+        <span class="kt">uint256</span> <span class="n">shares</span> <span class="o">=</span> <span class="n">totalSupply</span><span class="p">()</span> <span class="o">==</span> <span class="mi">0</span>
+            <span class="o">?</span> <span class="n">amount</span>
+            <span class="o">:</span> <span class="p">(</span><span class="n">amount</span> <span class="o">*</span> <span class="n">totalSupply</span><span class="p">())</span> <span class="o">/</span> <span class="n">_totalAssets</span><span class="p">();</span>
+        <span class="c1">// Issuance of shares needs to be done before taking the deposit</span>
+        <span class="n">_mint</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">,</span> <span class="n">shares</span><span class="p">);</span>
+        <span class="n">token</span><span class="p">.</span><span class="n">safeTransferFrom</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">,</span> <span class="kt">address</span><span class="p">(</span><span class="nb">this</span><span class="p">),</span> <span class="n">amount</span><span class="p">);</span>
         <span class="k">emit</span> <span class="n">DepositMade</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">,</span> <span class="n">amount</span><span class="p">,</span> <span class="n">shares</span><span class="p">);</span>
     <span class="p">}</span>
 
@@ -1642,7 +1677,7 @@
 <span class="cm">     * The performance fee is determined here, off of the strategy&#39;s profits (if any), and sent to governance.</span>
 <span class="cm">     * The strategist&#39;s fee is also determined here (off of profits), to be handled according</span>
 <span class="cm">     * to the strategist on the next harvest.</span>
-<span class="cm">     * This may only be called by a Strategy managed by this Vault.</span>
+<span class="cm">     * Can only be called by a Strategy managed by this Vault.</span>
 <span class="cm">     * </span><span class="cs">@dev</span><span class="cm"> For approved strategies, this is the most efficient behavior.</span>
 <span class="cm">     * The Strategy reports back what it has free, then Vault &quot;decides&quot;</span>
 <span class="cm">     * whether to take some back or give it more. Note that the most it can</span>
@@ -1938,6 +1973,7 @@
         <span class="c1">// Can only borrow up to what the contract has in reserve</span>
         <span class="k">if</span> <span class="p">(</span><span class="n">token</span><span class="p">.</span><span class="n">balanceOf</span><span class="p">(</span><span class="kt">address</span><span class="p">(</span><span class="nb">this</span><span class="p">))</span> <span class="o">&lt;</span> <span class="n">available</span><span class="p">)</span> <span class="n">available</span> <span class="o">=</span> <span class="n">token</span><span class="p">.</span><span class="n">balanceOf</span><span class="p">(</span><span class="kt">address</span><span class="p">(</span><span class="nb">this</span><span class="p">));</span>
 
+        <span class="c1">// Adjust by min and max borrow limits (per harvest)</span>
         <span class="k">if</span> <span class="p">(</span><span class="n">available</span> <span class="o">&lt;</span> <span class="n">_strategies</span><span class="p">[</span><span class="n">_strategy</span><span class="p">].</span><span class="n">minDebtPerHarvest</span><span class="p">)</span> <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
 
         <span class="k">if</span> <span class="p">(</span><span class="n">_strategies</span><span class="p">[</span><span class="n">_strategy</span><span class="p">].</span><span class="n">maxDebtPerHarvest</span> <span class="o">&lt;</span> <span class="n">available</span><span class="p">)</span> <span class="k">return</span> <span class="n">_strategies</span><span class="p">[</span><span class="n">_strategy</span><span class="p">].</span><span class="n">maxDebtPerHarvest</span><span class="p">;</span>

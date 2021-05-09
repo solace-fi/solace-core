@@ -20,6 +20,7 @@ import { Solace, Vault, Master, CpFarm, SolaceEthLpFarm, MockWeth } from "../typ
 // uniswap imports
 import UniswapV3FactoryArtifact from "@uniswap/v3-core/artifacts/contracts/UniswapV3Factory.sol/UniswapV3Factory.json";
 import UniswapV3PoolArtifact from "@uniswap/v3-core/artifacts/contracts/UniswapV3Pool.sol/UniswapV3Pool.json";
+import SwapRouterArtifact from "@uniswap/v3-periphery/artifacts/contracts/SwapRouter.sol/SwapRouter.json";
 import NonfungiblePositionManagerArtifact from "@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json";
 
 chai.use(solidity);
@@ -35,6 +36,7 @@ let weth: MockWeth;
 
 // uniswap contracts
 let uniswapFactory: Contract;
+let uniswapRouter: Contract;
 let lpToken: Contract;
 
 // pools
@@ -95,6 +97,16 @@ describe("Master", function () {
     uniswapFactory = (await deployContract(
       deployer,
       UniswapV3FactoryArtifact
+    )) as Contract;
+
+    // deploy uniswap router
+    uniswapRouter = (await deployContract(
+      deployer,
+      SwapRouterArtifact,
+      [
+        uniswapFactory.address,
+        weth.address
+      ]
     )) as Contract;
 
     // deploy uniswap nft / lp token
@@ -547,6 +559,8 @@ describe("Master", function () {
         solaceToken.address,
         startBlock,
         endBlock,
+        uniswapRouter.address,
+        weth.address
       ]
     )) as CpFarm;
     return farm;

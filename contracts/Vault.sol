@@ -428,7 +428,7 @@ contract Vault is ERC20Permit, IVault {
 
     /**
      * @notice Allows a user to deposit ETH into the Vault (becoming a Capital Provider)
-     * Shares of the Vault (CP tokens) are minteed to caller
+     * Shares of the Vault (CP tokens) are minted to caller
      * Called when Vault receives ETH
      * Deposits `_amount` `token`, issuing shares to `recipient`.
      * Reverts if Vault is in Emergency Shutdown
@@ -449,6 +449,23 @@ contract Vault is ERC20Permit, IVault {
         // Wrap the depositor's ETH to add WETH to the vault
         IWETH10(address(token)).deposit{value: amount}();
 
+        emit DepositMade(msg.sender, amount, shares);
+    }
+
+    /**
+     * @notice Allows a user to deposit WETH into the Vault (becoming a Capital Provider)
+     * Shares of the Vault (CP tokens) are minted to caller
+     * Deposits `_amount` `token`, issuing shares to `recipient`.
+     * Reverts if Vault is in Emergency Shutdown
+     */
+    function depositWeth(uint256 amount) external override {
+        require(!emergencyShutdown, "cannot deposit when vault is in emergency shutdown");
+        uint256 shares = totalSupply() == 0
+            ? amount
+            : (amount * totalSupply()) / _totalAssets();
+        // Issuance of shares needs to be done before taking the deposit
+        _mint(msg.sender, shares);
+        token.safeTransferFrom(msg.sender, address(this), amount);
         emit DepositMade(msg.sender, amount, shares);
     }
 

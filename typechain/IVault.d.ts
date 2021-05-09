@@ -29,6 +29,7 @@ interface IVaultInterface extends ethers.utils.Interface {
     "balanceOf(address)": FunctionFragment;
     "debtOutstanding(address)": FunctionFragment;
     "deposit()": FunctionFragment;
+    "depositWeth(uint256)": FunctionFragment;
     "nonces(address)": FunctionFragment;
     "permit(address,address,uint256,uint256,uint8,bytes32,bytes32)": FunctionFragment;
     "processClaim(address,uint256)": FunctionFragment;
@@ -60,6 +61,10 @@ interface IVaultInterface extends ethers.utils.Interface {
     values: [string]
   ): string;
   encodeFunctionData(functionFragment: "deposit", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "depositWeth",
+    values: [BigNumberish]
+  ): string;
   encodeFunctionData(functionFragment: "nonces", values: [string]): string;
   encodeFunctionData(
     functionFragment: "permit",
@@ -116,6 +121,10 @@ interface IVaultInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "deposit", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "depositWeth",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "nonces", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "permit", data: BytesLike): Result;
   decodeFunctionResult(
@@ -234,6 +243,16 @@ export class IVault extends Contract {
     deposit(overrides?: PayableOverrides): Promise<ContractTransaction>;
 
     "deposit()"(overrides?: PayableOverrides): Promise<ContractTransaction>;
+
+    depositWeth(
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "depositWeth(uint256)"(
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
 
     nonces(
       owner: string,
@@ -468,6 +487,16 @@ export class IVault extends Contract {
 
   "deposit()"(overrides?: PayableOverrides): Promise<ContractTransaction>;
 
+  depositWeth(
+    amount: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "depositWeth(uint256)"(
+    amount: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
   nonces(owner: string, overrides?: CallOverrides): Promise<BigNumber>;
 
   "nonces(address)"(
@@ -676,6 +705,13 @@ export class IVault extends Contract {
     deposit(overrides?: CallOverrides): Promise<void>;
 
     "deposit()"(overrides?: CallOverrides): Promise<void>;
+
+    depositWeth(amount: BigNumberish, overrides?: CallOverrides): Promise<void>;
+
+    "depositWeth(uint256)"(
+      amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
 
     nonces(owner: string, overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -894,6 +930,16 @@ export class IVault extends Contract {
 
     "deposit()"(overrides?: PayableOverrides): Promise<BigNumber>;
 
+    depositWeth(
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "depositWeth(uint256)"(
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
     nonces(owner: string, overrides?: CallOverrides): Promise<BigNumber>;
 
     "nonces(address)"(
@@ -1064,6 +1110,16 @@ export class IVault extends Contract {
     deposit(overrides?: PayableOverrides): Promise<PopulatedTransaction>;
 
     "deposit()"(overrides?: PayableOverrides): Promise<PopulatedTransaction>;
+
+    depositWeth(
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "depositWeth(uint256)"(
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
 
     nonces(
       owner: string,

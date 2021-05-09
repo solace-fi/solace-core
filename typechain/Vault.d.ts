@@ -37,6 +37,7 @@ interface VaultInterface extends ethers.utils.Interface {
     "decreaseAllowance(address,uint256)": FunctionFragment;
     "delegatedAssets()": FunctionFragment;
     "deposit()": FunctionFragment;
+    "depositWeth(uint256)": FunctionFragment;
     "emergencyShutdown()": FunctionFragment;
     "expectedReturn(address)": FunctionFragment;
     "governance()": FunctionFragment;
@@ -123,6 +124,10 @@ interface VaultInterface extends ethers.utils.Interface {
     values?: undefined
   ): string;
   encodeFunctionData(functionFragment: "deposit", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "depositWeth",
+    values: [BigNumberish]
+  ): string;
   encodeFunctionData(
     functionFragment: "emergencyShutdown",
     values?: undefined
@@ -303,6 +308,10 @@ interface VaultInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "deposit", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "depositWeth",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "emergencyShutdown",
     data: BytesLike
@@ -652,6 +661,16 @@ export class Vault extends Contract {
     deposit(overrides?: PayableOverrides): Promise<ContractTransaction>;
 
     "deposit()"(overrides?: PayableOverrides): Promise<ContractTransaction>;
+
+    depositWeth(
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "depositWeth(uint256)"(
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
 
     emergencyShutdown(
       overrides?: CallOverrides
@@ -1295,6 +1314,16 @@ export class Vault extends Contract {
 
   "deposit()"(overrides?: PayableOverrides): Promise<ContractTransaction>;
 
+  depositWeth(
+    amount: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "depositWeth(uint256)"(
+    amount: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
   emergencyShutdown(overrides?: CallOverrides): Promise<boolean>;
 
   "emergencyShutdown()"(overrides?: CallOverrides): Promise<boolean>;
@@ -1785,6 +1814,13 @@ export class Vault extends Contract {
     deposit(overrides?: CallOverrides): Promise<void>;
 
     "deposit()"(overrides?: CallOverrides): Promise<void>;
+
+    depositWeth(amount: BigNumberish, overrides?: CallOverrides): Promise<void>;
+
+    "depositWeth(uint256)"(
+      amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
 
     emergencyShutdown(overrides?: CallOverrides): Promise<boolean>;
 
@@ -2351,6 +2387,16 @@ export class Vault extends Contract {
 
     "deposit()"(overrides?: PayableOverrides): Promise<BigNumber>;
 
+    depositWeth(
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "depositWeth(uint256)"(
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
     emergencyShutdown(overrides?: CallOverrides): Promise<BigNumber>;
 
     "emergencyShutdown()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -2808,6 +2854,16 @@ export class Vault extends Contract {
     deposit(overrides?: PayableOverrides): Promise<PopulatedTransaction>;
 
     "deposit()"(overrides?: PayableOverrides): Promise<PopulatedTransaction>;
+
+    depositWeth(
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "depositWeth(uint256)"(
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
 
     emergencyShutdown(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 

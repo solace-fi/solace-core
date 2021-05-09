@@ -270,7 +270,8 @@
 68
 69
 70
-71</pre></div></td><td class="code"><div class="highlight"><pre><span></span><span class="c1">// </span><span class="cs">SPDX-License-Identifier:</span><span class="c1"> Unlicense</span>
+71
+72</pre></div></td><td class="code"><div class="highlight"><pre><span></span><span class="c1">// </span><span class="cs">SPDX-License-Identifier:</span><span class="c1"> Unlicense</span>
 <span class="k">pragma solidity</span> <span class="o">^</span><span class="mf">0.8</span><span class="p">.</span><span class="mi">0</span><span class="p">;</span>
 
 <span class="kn">import</span> <span class="s">&quot;@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol&quot;</span><span class="p">;</span>
@@ -298,6 +299,7 @@
 <span class="cm">     */</span>
     <span class="kd">constructor</span><span class="p">(</span><span class="kt">address</span> <span class="n">_governance</span><span class="p">)</span> <span class="n">ERC20</span><span class="p">(</span><span class="s">&quot;solace&quot;</span><span class="p">,</span> <span class="s">&quot;SOLACE&quot;</span><span class="p">)</span> <span class="n">ERC20Permit</span><span class="p">(</span><span class="s">&quot;solace&quot;</span><span class="p">){</span>
         <span class="n">governance</span> <span class="o">=</span> <span class="n">_governance</span><span class="p">;</span>
+        <span class="n">minters</span><span class="p">[</span><span class="n">_governance</span><span class="p">]</span> <span class="o">=</span> <span class="kc">true</span><span class="p">;</span>
     <span class="p">}</span>
 
     <span class="cm">/**</span>

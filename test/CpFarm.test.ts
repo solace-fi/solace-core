@@ -6,6 +6,7 @@ import { Transaction, BigNumber as BN, Contract, constants, BigNumberish, Wallet
 import chai from "chai";
 const { expect } = chai;
 
+import { encodePriceSqrt, FeeAmount, TICK_SPACINGS, getMaxTick, getMinTick } from "./utilities/uniswap";
 import { burnBlocks, burnBlocksUntil } from "./utilities/time";
 import { bnAddSub, bnMulDiv } from "./utilities/math";
 import { getPermitDigest, sign, getDomainSeparator } from './utilities/signature';
@@ -16,6 +17,12 @@ import MasterArtifact from '../artifacts/contracts/Master.sol/Master.json';
 import VaultArtifact from '../artifacts/contracts/Vault.sol/Vault.json'
 import CpFarmArtifact from "../artifacts/contracts/CpFarm.sol/CpFarm.json";
 import { Solace, Vault, Master, MockWeth, CpFarm } from "../typechain";
+
+// uniswap imports
+import UniswapV3FactoryArtifact from "@uniswap/v3-core/artifacts/contracts/UniswapV3Factory.sol/UniswapV3Factory.json";
+import UniswapV3PoolArtifact from "@uniswap/v3-core/artifacts/contracts/UniswapV3Pool.sol/UniswapV3Pool.json";
+import SwapRouterArtifact from "@uniswap/v3-periphery/artifacts/contracts/SwapRouter.sol/SwapRouter.json";
+import NonfungiblePositionManager from "@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json";
 
 chai.use(solidity);
 
@@ -29,11 +36,16 @@ let vault: Vault;
 let farm1: CpFarm;
 let weth: MockWeth;
 
+// uniswap contracts
+let uniswapFactory: Contract;
+let uniswapRouter: Contract;
+let uniswapPositionManager: Contract;
+
 // vars
 let solacePerBlock = BN.from("100000000000000000000"); // 100 e18
 let solacePerBlock2 = BN.from("200000000000000000000"); // 200 e18
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-const TEN_ETHER = BN.from("10000000000000000000");
+const TEN_ETHER = BN.from("1000000000000000000");
 const ONE_MILLION_ETHER = BN.from("1000000000000000000000000");
 let blockNum: BN;
 let startBlock: BN;
@@ -45,7 +57,7 @@ const chainId = 31337;
 const deadline = constants.MaxUint256;
 
 describe("CpFarm", function () {
-  const [deployer, governor, farmer1, farmer2, farmer3, farmer4] = provider.getWallets();
+  const [deployer, governor, farmer1, farmer2, farmer3, farmer4, liquidityProvider] = provider.getWallets();
 
     before(async function () {
     // deploy solace token
@@ -85,10 +97,44 @@ describe("CpFarm", function () {
         ]
     )) as Vault;
 
+    // deploy uniswap factory
+    uniswapFactory = (await deployContract(
+      deployer,
+      UniswapV3FactoryArtifact
+    )) as Contract;
+
+    // deploy uniswap router
+    uniswapRouter = (await deployContract(
+      deployer,
+      SwapRouterArtifact,
+      [
+        uniswapFactory.address,
+        weth.address
+      ]
+    )) as Contract;
+
+    // deploy uniswap position manager
+    uniswapPositionManager = (await deployContract(
+      deployer,
+      NonfungiblePositionManager,
+      [
+        uniswapFactory.address,
+        weth.address,
+        ZERO_ADDRESS
+      ]
+    )) as Contract;
+
     // transfer tokens
     await solaceToken.connect(governor).addMinter(governor.address);
     await solaceToken.connect(governor).mint(master.address, ONE_MILLION_ETHER);
     await solaceToken.connect(governor).mint(governor.address, ONE_MILLION_ETHER);
+    await solaceToken.connect(governor).mint(liquidityProvider.address, TEN_ETHER);
+    await weth.connect(liquidityProvider).deposit({value: TEN_ETHER});
+
+    // create pool
+    await createPool(weth, solaceToken, FeeAmount.MEDIUM);
+    // add liquidity
+    await addLiquidity(liquidityProvider, weth, solaceToken, FeeAmount.MEDIUM, TEN_ETHER);
   })
 
   describe("farm creation", function () {
@@ -525,6 +571,45 @@ describe("CpFarm", function () {
     })
   })
 
+  describe("compound rewards", function () {
+    let farm4: CpFarm;
+
+    before(async function () {
+      // deactivate all previous farms
+      let numFarms = (await master.numFarms()).toNumber();
+      for(var farmNum = 1; farmNum <= numFarms; ++farmNum) {
+        await master.connect(governor).setAllocPoints(farmNum, 0);
+      }
+      await master.connect(governor).setSolacePerBlock(solacePerBlock);
+      await solaceToken.connect(governor).mint(master.address, ONE_MILLION_ETHER);
+      blockNum = BN.from(await provider.getBlockNumber());
+      startBlock = blockNum.add(20);
+      endBlock = blockNum.add(30);
+      farm4 = await createCpFarm(startBlock, endBlock);
+      await master.connect(governor).registerFarm(farm4.address, 100);
+    })
+
+    it("does nothing if no rewards to compound", async function () {
+      let balancesBefore = await getBalances(farmer1, farm4);
+      await expect(await farm4.connect(farmer1).compoundRewards()).to.not.emit(farm4, 'RewardsCompounded').withArgs(farmer1.address);
+      let balancesAfter = await getBalances(farmer1, farm4);
+      expect(balancesAfter.userStake).to.equal(0);
+      expect(balancesAfter.masterSolace).to.equal(balancesBefore.masterSolace);
+    })
+
+    it("users can compound rewards", async function () {
+      let waitBlocks = BN.from("10");
+      let depositAmount = BN.from("20");
+      await farm4.connect(farmer1).depositEth({value:depositAmount});
+      await burnBlocksUntil(startBlock.add(waitBlocks));
+      let balancesBefore = await getBalances(farmer1, farm4);
+      await expect(await farm4.connect(farmer1).compoundRewards()).to.emit(farm4, 'RewardsCompounded').withArgs(farmer1.address);
+      let balancesAfter = await getBalances(farmer1, farm4);
+      expect(balancesAfter.userStake).to.be.gt(balancesBefore.userStake);
+      expect(balancesAfter.masterSolace).to.be.lt(balancesBefore.masterSolace);
+    })
+  })
+
   // helper functions
 
   async function createCpFarm(
@@ -541,6 +626,8 @@ describe("CpFarm", function () {
         solaceToken.address,
         startBlock,
         endBlock,
+        uniswapRouter.address,
+        weth.address
       ]
     )) as CpFarm;
     return farm;
@@ -550,8 +637,10 @@ describe("CpFarm", function () {
     userEth: BN,
     userCp: BN,
     userStake: BN,
+    userPendingRewards: BN,
     farmCp: BN,
-    farmStake: BN
+    farmStake: BN,
+    masterSolace: BN
   }
 
   async function getBalances(user: Wallet, farm: CpFarm): Promise<Balances> {
@@ -559,8 +648,10 @@ describe("CpFarm", function () {
       userEth: await user.getBalance(),
       userCp: await vault.balanceOf(user.address),
       userStake: (await farm.userInfo(user.address)).value,
+      userPendingRewards: await farm.pendingRewards(user.address),
       farmCp: await vault.balanceOf(farm.address),
-      farmStake: await farm.valueStaked()
+      farmStake: await farm.valueStaked(),
+      masterSolace: await solaceToken.balanceOf(master.address)
     }
   }
 
@@ -569,8 +660,57 @@ describe("CpFarm", function () {
       userEth: balances1.userEth.sub(balances2.userEth),
       userCp: balances1.userCp.sub(balances2.userCp),
       userStake: balances1.userStake.sub(balances2.userStake),
+      userPendingRewards: balances1.userPendingRewards.sub(balances2.userPendingRewards),
       farmCp: balances1.farmCp.sub(balances2.farmCp),
-      farmStake: balances1.farmStake.sub(balances2.farmStake)
+      farmStake: balances1.farmStake.sub(balances2.farmStake),
+      masterSolace: balances1.masterSolace.sub(balances2.masterSolace)
     }
+  }
+
+  // uniswap requires tokens to be in order
+  function sortTokens(tokenA: string, tokenB: string) {
+    return BN.from(tokenA).lt(BN.from(tokenB)) ? [tokenA, tokenB] : [tokenB, tokenA];
+  }
+
+  // creates, initializes, and returns a pool
+  async function createPool(tokenA: Contract, tokenB: Contract, fee: FeeAmount) {
+    let [token0, token1] = sortTokens(tokenA.address, tokenB.address);
+    let pool;
+    let tx = await uniswapFactory.createPool(token0, token1, fee);
+    let events = (await tx.wait()).events;
+    expect(events && events.length > 0 && events[0].args && events[0].args.pool);
+    if(events && events.length > 0 && events[0].args && events[0].args.pool) {
+      let poolAddress = events[0].args.pool;
+      pool = (new Contract(poolAddress, UniswapV3PoolArtifact.abi)) as Contract;
+    } else {
+      pool = (new Contract(ZERO_ADDRESS, UniswapV3PoolArtifact.abi)) as Contract;
+      expect(true).to.equal(false);
+    }
+    expect(pool).to.exist;
+    if(pool){
+      let sqrtPrice = encodePriceSqrt(1,1);
+      await pool.connect(governor).initialize(sqrtPrice);
+    }
+    return pool;
+  }
+
+  // adds liquidity to a pool
+  async function addLiquidity(liquidityProvider: Wallet, tokenA: Contract, tokenB: Contract, fee: FeeAmount, amount: BigNumberish) {
+    await tokenA.connect(liquidityProvider).approve(uniswapPositionManager.address, amount);
+    await tokenB.connect(liquidityProvider).approve(uniswapPositionManager.address, amount);
+    let [token0, token1] = sortTokens(tokenA.address, tokenB.address);
+    await uniswapPositionManager.connect(liquidityProvider).mint({
+      token0: token0,
+      token1: token1,
+      tickLower: getMinTick(TICK_SPACINGS[fee]),
+      tickUpper: getMaxTick(TICK_SPACINGS[fee]),
+      fee: fee,
+      recipient: liquidityProvider.address,
+      amount0Desired: amount,
+      amount1Desired: amount,
+      amount0Min: 0,
+      amount1Min: 0,
+      deadline: constants.MaxUint256,
+    });
   }
 });

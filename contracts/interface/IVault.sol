@@ -26,6 +26,7 @@ struct StrategyParams {
 interface IVault is IERC20, IERC20Permit {
 
     function deposit() external payable;
+    function depositWeth(uint256 amount) external;
     function withdraw(uint256 _amount, uint256 _maxLoss) external returns (uint256);
     function token() external view returns (IERC20);
     function debtOutstanding(address) external view returns (uint256);

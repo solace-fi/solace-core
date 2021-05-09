@@ -25,6 +25,7 @@ interface ICpFarmInterface extends ethers.utils.Interface {
   functions: {
     "accRewardPerShare()": FunctionFragment;
     "blockReward()": FunctionFragment;
+    "compoundRewards()": FunctionFragment;
     "depositCp(uint256)": FunctionFragment;
     "depositCpSigned(address,uint256,uint256,uint8,bytes32,bytes32)": FunctionFragment;
     "depositEth()": FunctionFragment;
@@ -54,6 +55,10 @@ interface ICpFarmInterface extends ethers.utils.Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "blockReward",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "compoundRewards",
     values?: undefined
   ): string;
   encodeFunctionData(
@@ -141,6 +146,10 @@ interface ICpFarmInterface extends ethers.utils.Interface {
     functionFragment: "blockReward",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(
+    functionFragment: "compoundRewards",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "depositCp", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "depositCpSigned",
@@ -190,12 +199,14 @@ interface ICpFarmInterface extends ethers.utils.Interface {
   events: {
     "DepositCp(address,uint256)": EventFragment;
     "DepositEth(address,uint256)": EventFragment;
+    "RewardsCompounded(address)": EventFragment;
     "WithdrawCp(address,uint256)": EventFragment;
     "WithdrawEth(address,uint256)": EventFragment;
   };
 
   getEvent(nameOrSignatureOrTopic: "DepositCp"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "DepositEth"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "RewardsCompounded"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "WithdrawCp"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "WithdrawEth"): EventFragment;
 }
@@ -237,6 +248,10 @@ export class ICpFarm extends Contract {
     ): Promise<{
       0: BigNumber;
     }>;
+
+    compoundRewards(overrides?: Overrides): Promise<ContractTransaction>;
+
+    "compoundRewards()"(overrides?: Overrides): Promise<ContractTransaction>;
 
     depositCp(
       _amount: BigNumberish,
@@ -479,6 +494,10 @@ export class ICpFarm extends Contract {
 
   "blockReward()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+  compoundRewards(overrides?: Overrides): Promise<ContractTransaction>;
+
+  "compoundRewards()"(overrides?: Overrides): Promise<ContractTransaction>;
+
   depositCp(
     _amount: BigNumberish,
     overrides?: Overrides
@@ -637,6 +656,10 @@ export class ICpFarm extends Contract {
 
     "blockReward()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+    compoundRewards(overrides?: CallOverrides): Promise<void>;
+
+    "compoundRewards()"(overrides?: CallOverrides): Promise<void>;
+
     depositCp(_amount: BigNumberish, overrides?: CallOverrides): Promise<void>;
 
     "depositCp(uint256)"(
@@ -786,6 +809,8 @@ export class ICpFarm extends Contract {
 
     DepositEth(_user: string | null, _amount: null): EventFilter;
 
+    RewardsCompounded(_user: string | null): EventFilter;
+
     WithdrawCp(_user: string | null, _amount: null): EventFilter;
 
     WithdrawEth(_user: string | null, _amount: null): EventFilter;
@@ -799,6 +824,10 @@ export class ICpFarm extends Contract {
     blockReward(overrides?: CallOverrides): Promise<BigNumber>;
 
     "blockReward()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    compoundRewards(overrides?: Overrides): Promise<BigNumber>;
+
+    "compoundRewards()"(overrides?: Overrides): Promise<BigNumber>;
 
     depositCp(_amount: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
 
@@ -957,6 +986,10 @@ export class ICpFarm extends Contract {
     blockReward(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "blockReward()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    compoundRewards(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    "compoundRewards()"(overrides?: Overrides): Promise<PopulatedTransaction>;
 
     depositCp(
       _amount: BigNumberish,

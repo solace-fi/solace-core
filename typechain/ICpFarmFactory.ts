@@ -64,6 +64,19 @@ const _abi = [
         name: "_user",
         type: "address",
       },
+    ],
+    name: "RewardsCompounded",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address",
+        name: "_user",
+        type: "address",
+      },
       {
         indexed: false,
         internalType: "uint256",
@@ -121,6 +134,13 @@ const _abi = [
       },
     ],
     stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "compoundRewards",
+    outputs: [],
+    stateMutability: "nonpayable",
     type: "function",
   },
   {

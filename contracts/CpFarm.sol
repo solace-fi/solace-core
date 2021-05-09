@@ -5,6 +5,7 @@ import "./libraries/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interface/IVault.sol";
 import "./interface/ICpFarm.sol";
+import "./interface/ISwapRouter.sol";
 
 
 /**
@@ -13,6 +14,7 @@ import "./interface/ICpFarm.sol";
  */
 contract CpFarm is ICpFarm {
     using SafeERC20 for IERC20;
+    using SafeERC20 for SOLACE;
 
     /// @notice A unique enumerator that identifies the farm type.
     uint256 public override farmType = 1;
@@ -56,6 +58,12 @@ contract CpFarm is ICpFarm {
     /// @notice Master contract.
     address public override master;
 
+    /// @notice Address of Uniswap router.
+    ISwapRouter public swapRouter;
+
+    // @notice WETH
+    IERC20 public weth;
+
     /**
      * @notice Constructs the farm.
      * @param _governance Address of the governor.
@@ -64,6 +72,8 @@ contract CpFarm is ICpFarm {
      * @param _solace Address of the SOLACE token contract.
      * @param _startBlock When farming will begin.
      * @param _endBlock When farming will end.
+     * @param _swapRouter Address of uniswap router.
+     * @param _weth Address of weth.
      */
     constructor(
         address _governance,
@@ -71,7 +81,9 @@ contract CpFarm is ICpFarm {
         address _vault,
         SOLACE _solace,
         uint256 _startBlock,
-        uint256 _endBlock
+        uint256 _endBlock,
+        address _swapRouter,
+        address _weth
     ) public {
         governance = _governance;
         master = _master;
@@ -80,6 +92,10 @@ contract CpFarm is ICpFarm {
         startBlock = _startBlock;
         endBlock = _endBlock;
         lastRewardBlock = Math.max(block.number, _startBlock);
+        swapRouter = ISwapRouter(_swapRouter);
+        weth = IERC20(_weth);
+        solace.approve(_swapRouter, type(uint256).max);
+        weth.approve(_vault, type(uint256).max);
     }
 
     /**
@@ -171,6 +187,47 @@ contract CpFarm is ICpFarm {
      */
     function depositEth() external payable override {
         _depositEth();
+    }
+
+    /**
+     * Your money already makes you money. Now make your money make more money!
+     * @notice Withdraws your SOLACE rewards, swaps it for WETH, then deposits that WETH onto the farm.
+     */
+    function compoundRewards() external override {
+        // update farm
+        updateFarm();
+        // get farmer information
+        UserInfo storage user = userInfo[msg.sender];
+        // calculate pending rewards
+        uint256 pending = user.value * accRewardPerShare / 1e12 - user.rewardDebt + user.unpaidRewards;
+        if (pending == 0) return;
+        // calculate safe swap amount
+        uint256 balance = solace.balanceOf(master);
+        uint256 solaceSwapAmount = Math.min(pending, balance);
+        user.unpaidRewards = pending - solaceSwapAmount;
+        // transfer solace from master
+        solace.safeTransferFrom(master, address(this), solaceSwapAmount);
+        // swap solace for weth
+        uint256 wethDepositAmount = swapRouter.exactInputSingle(ISwapRouter.ExactInputSingleParams({
+            tokenIn: address(solace),
+            tokenOut: address(weth),
+            fee: 3000, // medium pool
+            recipient: address(this),
+            // solhint-disable-next-line not-rely-on-time
+            deadline: block.timestamp,
+            amountIn: solaceSwapAmount,
+            amountOutMinimum: 0,
+            sqrtPriceLimitX96: 0
+        }));
+        // exchange weth for cp
+        uint256 balanceBefore = vault.balanceOf(address(this));
+        vault.depositWeth(wethDepositAmount);
+        uint256 cpAmount = vault.balanceOf(address(this)) - balanceBefore;
+        // accounting
+        valueStaked += cpAmount;
+        user.value += cpAmount;
+        user.rewardDebt = user.value * accRewardPerShare / 1e12;
+        emit RewardsCompounded(msg.sender);
     }
 
     /**
