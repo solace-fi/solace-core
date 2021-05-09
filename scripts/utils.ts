@@ -29,6 +29,7 @@ export async function createPool(creator: Signer, uniswapFactory: Contract, toke
   let poolAddress = events[0].args.pool;
   pool = await ethers.getContractAt(UniswapV3PoolArtifact.abi, poolAddress);
   let sqrtPrice = encodePriceSqrt(1,1);
-  await pool.connect(creator).initialize(sqrtPrice);
+  let tx2 = await pool.connect(creator).initialize(sqrtPrice);
+  await tx2.wait();
   return pool;
 }

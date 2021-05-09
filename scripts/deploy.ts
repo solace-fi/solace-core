@@ -98,7 +98,9 @@ async function deployRegistry() {
   } else {
     console.log("Deploying Registry");
     registry = (await deployContract(deployer, RegistryArtifact, [signerAddress])) as Registry;
-    console.log(`Deployed Registry to ${registry.address}`);
+    console.log(`Deploying Registry to ${registry.address}`);
+    await registry.deployed();
+    console.log("Deployment confirmed");
   }
 }
 
@@ -108,11 +110,15 @@ async function deploySolace() {
   } else {
     console.log("Deploying SOLACE");
     solace = (await deployContract(deployer, SolaceArtifact, [governorAddress])) as Solace;
-    console.log(`Deployed SOLACE to ${solace.address}`);
+    console.log(`Deploying SOLACE to ${solace.address}`);
+    await solace.deployed();
+    console.log("Deployment confirmed");
   }
   if(await registry.solace() != solace.address && await registry.governance() == signerAddress) {
     console.log("Registering SOLACE");
-    await registry.connect(deployer).setSolace(solace.address);
+    let tx = await registry.connect(deployer).setSolace(solace.address);
+    await tx.wait();
+    console.log("Registration confirmed");
   }
 }
 
@@ -122,7 +128,9 @@ async function deployWeth() {
   } else {
     console.log("Deploying WETH");
     weth = (await deployContract(deployer, WETHArtifact)) as MockWeth;
-    console.log(`Deployed WETH to ${weth.address}`);
+    console.log(`Deploying WETH to ${weth.address}`);
+    await weth.deployed();
+    console.log("Deployment confirmed");
   }
 }
 
@@ -132,11 +140,15 @@ async function deployMaster() {
   } else {
     console.log("Deploying Master");
     master = (await deployContract(deployer,MasterArtifact,[governorAddress,solace.address,BLOCK_REWARD])) as Master;
-    console.log(`Deployed Master to ${master.address}`);
+    console.log(`Deploying Master to ${master.address}`);
+    await master.deployed();
+    console.log("Deployment confirmed");
   }
   if(await registry.master() != master.address && await registry.governance() == signerAddress) {
     console.log("Registering Master");
-    await registry.connect(deployer).setMaster(master.address);
+    let tx = await registry.connect(deployer).setMaster(master.address);
+    await tx.wait();
+    console.log("Registration confirmed");
   }
 }
 
@@ -146,11 +158,15 @@ async function deployVault() {
   } else {
     console.log("Deploying Vault");
     vault = (await deployContract(deployer,VaultArtifact,[governorAddress,registry.address,weth.address])) as Vault;
-    console.log(`Deployed Vault to ${vault.address}`);
+    console.log(`Deploying Vault to ${vault.address}`);
+    await vault.deployed();
+    console.log("Deployment confirmed");
   }
   if(await registry.vault() != vault.address && await registry.governance() == signerAddress) {
     console.log("Registering Vault");
-    await registry.connect(deployer).setVault(vault.address);
+    let tx = await registry.connect(deployer).setVault(vault.address);
+    await tx.wait();
+    console.log("Registration confirmed");
   }
 }
 
@@ -160,11 +176,15 @@ async function deployCpFarm() {
   } else {
     console.log("Deploying CP Farm");
     cpFarm = (await deployContract(deployer,CpFarmArtifact,[governorAddress,master.address,vault.address,solace.address,START_BLOCK,END_BLOCK])) as CpFarm;
-    console.log(`Deployed CP Farm to ${cpFarm.address}`);
+    console.log(`Deploying CP Farm to ${cpFarm.address}`);
+    await cpFarm.deployed();
+    console.log("Deployment confirmed");
   }
   if((await master.farmIndices(cpFarm.address)).eq(0)) {
     console.log("Registering CP Farm");
-    await master.connect(governor).registerFarm(cpFarm.address, 50);
+    let tx = await master.connect(governor).registerFarm(cpFarm.address, 50);
+    await tx.wait();
+    console.log("Registration confirmed");
   }
 }
 
@@ -174,7 +194,9 @@ async function deployUniswapFactory() {
   } else {
     console.log("Deploying Uniswap Factory");
     uniswapFactory = await deployContract(deployer,UniswapV3FactoryArtifact);
-    console.log(`Deployed Uniswap Factory to ${uniswapFactory.address}`);
+    console.log(`Deploying Uniswap Factory to ${uniswapFactory.address}`);
+    await uniswapFactory.deployed();
+    console.log("Deployment confirmed");
   }
 }
 
@@ -184,7 +206,9 @@ async function deployUniswapRouter() {
   } else {
     console.log("Deploying Uniswap Router");
     uniswapRouter = await deployContract(deployer,SwapRouterArtifact,[uniswapFactory.address,weth.address]);
-    console.log(`Deployed Uniswap Router to ${uniswapRouter.address}`);
+    console.log(`Deploying Uniswap Router to ${uniswapRouter.address}`);
+    await uniswapRouter.deployed();
+    console.log("Deployment confirmed");
   }
 }
 
@@ -194,7 +218,9 @@ async function deployUniswapLpToken() {
   } else {
     console.log("Deploying Uniswap LP Token");
     lpToken = await deployContract(deployer,NonfungiblePositionManagerArtifact,[uniswapFactory.address,weth.address,ZERO_ADDRESS]);
-    console.log(`Deployed Uniswap LP Token to ${lpToken.address}`);
+    console.log(`Deploying Uniswap LP Token to ${lpToken.address}`);
+    await lpToken.deployed();
+    console.log("Deployment confirmed");
   }
 }
 
@@ -214,11 +240,15 @@ async function deployLpFarm() {
   } else {
     console.log("Deploying LP Farm");
     lpFarm = (await deployContract(deployer,SolaceEthLpFarmArtifact,[governorAddress,master.address,lpToken.address,solace.address,START_BLOCK,END_BLOCK,pool.address,weth.address])) as SolaceEthLpFarm;
-    console.log(`Deployed LP Farm to ${lpFarm.address}`);
+    console.log(`Deploying LP Farm to ${lpFarm.address}`);
+    await lpFarm.deployed();
+    console.log("Deployment confirmed");
   }
   if((await master.farmIndices(lpFarm.address)).eq(0)) {
     console.log("Registering LP Farm");
-    await master.connect(governor).registerFarm(lpFarm.address, 50);
+    let tx = await master.connect(governor).registerFarm(lpFarm.address, 50);
+    await tx.wait();
+    console.log("Registration confirmed");
   }
 }
 
@@ -228,11 +258,15 @@ async function deployTreasury() {
   } else {
     console.log("Deploying Treasury");
     treasury = (await deployContract(deployer,TreasuryArtifact,[governorAddress,solace.address,uniswapRouter.address,weth.address])) as Treasury;
-    console.log(`Deployed Treasury to ${treasury.address}`);
+    console.log(`Deploying Treasury to ${treasury.address}`);
+    await treasury.deployed();
+    console.log("Deployment confirmed");
   }
   if(await registry.treasury() != treasury.address && await registry.governance() == signerAddress) {
     console.log("Registering Treasury");
-    await registry.connect(deployer).setTreasury(treasury.address);
+    let tx = await registry.connect(deployer).setTreasury(treasury.address);
+    await tx.wait();
+    console.log("Registration confirmed");
   }
 }
 
@@ -243,11 +277,15 @@ async function deployClaimsEscrow() {
   else {
     console.log("Deploying Claims Escrow");
     claimsEscrow = (await deployContract(deployer,ClaimsEscrowArtifact,[registry.address])) as ClaimsEscrow;
-    console.log(`Deployed Claims Escrow to ${claimsEscrow.address}`);
+    console.log(`Deploying Claims Escrow to ${claimsEscrow.address}`);
+    await claimsEscrow.deployed();
+    console.log("Deployment confirmed");
   }
   if(await registry.claimsEscrow() != claimsEscrow.address && await registry.governance() == signerAddress) {
     console.log("Registering Claims Escrow");
-    await registry.connect(deployer).setClaimsEscrow(claimsEscrow.address);
+    let tx = await registry.connect(deployer).setClaimsEscrow(claimsEscrow.address);
+    await tx.wait();
+    console.log("Registration confirmed");
   }
 }
 
@@ -258,18 +296,24 @@ async function deployClaimsAdjustor() {
   else {
     console.log("Deploying Claims Adjustor");
     claimsAdjustor = (await deployContract(deployer,ClaimsAdjustorArtifact,[registry.address])) as ClaimsAdjustor;
-    console.log(`Deployed Claims Adjustor to ${claimsAdjustor.address}`);
+    console.log(`Deploying Claims Adjustor to ${claimsAdjustor.address}`);
+    await claimsAdjustor.deployed();
+    console.log("Deployment confirmed");
   }
   if(await registry.claimsAdjustor() != claimsAdjustor.address && await registry.governance() == signerAddress) {
     console.log("Registering Claims Adjustor");
-    await registry.connect(deployer).setClaimsAdjustor(claimsAdjustor.address);
+    let tx = await registry.connect(deployer).setClaimsAdjustor(claimsAdjustor.address);
+    await tx.wait();
+    console.log("Registration confirmed");
   }
 }
 
 async function transferRegistry() {
   if(await registry.governance() == signerAddress) {
     console.log("Transfering Registry");
-    await registry.connect(deployer).setGovernance(governorAddress);
+    let tx = await registry.connect(deployer).setGovernance(governorAddress);
+    await tx.wait();
+    console.log("Registry transfer confirmed");
   }
 }
 
