@@ -2,7 +2,7 @@
 # performs a fresh compile and test of all contracts.
 
 rm -rf artifacts
-rm -rf cachez
+rm -rf cache
 rm -rf client
 rm -rf docs/_build/html
 rm -rf docs/_build/md

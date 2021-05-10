@@ -1,7 +1,7 @@
 import { waffle, ethers } from "hardhat";
 const { deployContract } = waffle;
 import { BigNumber as BN, Contract, Signer, Wallet } from "ethers";
-
+const fs = require("fs");
 import { logContractAddress, createPool } from "./utils";
 import { FeeAmount } from "../test/utilities/uniswap";
 
@@ -336,24 +336,26 @@ async function logAddresses() {
   logContractAddress("UniswapLpToken", lpToken.address);
   logContractAddress("UniswapPool", pool.address);
 
-  console.log(``);
+  let react_str = `
+REACT_APP_REGISTRY_CONTRACT_ADDRESS=${registry.address}
+REACT_APP_SOLACE_CONTRACT_ADDRESS=${solace.address}
+REACT_APP_WETH_CONTRACT_ADDRESS=${weth.address}
+REACT_APP_MASTER_CONTRACT_ADDRESS=${master.address}
+REACT_APP_CPFARM_CONTRACT_ADDRESS=${cpFarm.address}
+REACT_APP_VAULT_CONTRACT_ADDRESS=${vault.address}
+REACT_APP_LPFARM_CONTRACT_ADDRESS=${lpFarm.address}
+REACT_APP_TREASURY_CONTRACT_ADDRESS=${treasury.address}
+REACT_APP_CLAIMS_ESCROW_CONTRACT_ADDRESS=${claimsEscrow.address}
+REACT_APP_CLAIMS_ADJUSTOR_CONTRACT_ADDRESS=${claimsAdjustor.address}
+REACT_APP_UNISWAP_FACTORY_CONTRACT_ADDRESS=${uniswapFactory.address}
+REACT_APP_UNISWAP_ROUTER_CONTRACT_ADDRESS=${uniswapRouter.address}
+REACT_APP_UNISWAP_LPTOKEN_CONTRACT_ADDRESS=${lpToken.address}
+REACT_APP_UNISWAP_POOL_CONTRACT_ADDRESS=${pool.address}
+`;
+
   console.log(`Copy and paste this into the .env file in the frontend client.`)
-  console.log(``);
-  console.log(`REACT_APP_REGISTRY_CONTRACT_ADDRESS=${registry.address}`);
-  console.log(`REACT_APP_SOLACE_CONTRACT_ADDRESS=${solace.address}`);
-  console.log(`REACT_APP_WETH_CONTRACT_ADDRESS=${weth.address}`);
-  console.log(`REACT_APP_MASTER_CONTRACT_ADDRESS=${master.address}`);
-  console.log(`REACT_APP_CPFARM_CONTRACT_ADDRESS=${cpFarm.address}`);
-  console.log(`REACT_APP_VAULT_CONTRACT_ADDRESS=${vault.address}`);
-  console.log(`REACT_APP_LPFARM_CONTRACT_ADDRESS=${lpFarm.address}`);
-  console.log(`REACT_APP_TREASURY_CONTRACT_ADDRESS=${treasury.address}`);
-  console.log(`REACT_APP_CLAIMS_ESCROW_CONTRACT_ADDRESS=${claimsEscrow.address}`);
-  console.log(`REACT_APP_CLAIMS_ADJUSTOR_CONTRACT_ADDRESS=${claimsAdjustor.address}`);
-  console.log(`REACT_APP_UNISWAP_FACTORY_CONTRACT_ADDRESS=${uniswapFactory.address}`);
-  console.log(`REACT_APP_UNISWAP_ROUTER_CONTRACT_ADDRESS=${uniswapRouter.address}`);
-  console.log(`REACT_APP_UNISWAP_LPTOKEN_CONTRACT_ADDRESS=${lpToken.address}`);
-  console.log(`REACT_APP_UNISWAP_POOL_CONTRACT_ADDRESS=${pool.address}`);
-  console.log("")
+  console.log(react_str);
+  fs.writeFileSync('scripts/contract_locations.txt', react_str);
 }
 
 main()
