@@ -15,6 +15,8 @@ contract Registry is IRegistry {
 
     /// @notice Governor.
     address public override governance;
+    /// @notice Governance to take over.
+    address public override newGovernance;
     /// @notice Solace Token.
     address public override solace;
     /// @notice Master contract.
@@ -32,28 +34,6 @@ contract Registry is IRegistry {
     // Set of products.
     EnumerableSet.AddressSet private products;
 
-    // events
-    // Emitted when Governance is set
-    event GovernanceSet(address _governance);
-    // Emitted when Solace Token is set
-    event SolaceSet(address _solace);
-    // Emitted when Master is set
-    event MasterSet(address _master);
-    // Emitted when Vault is set
-    event VaultSet(address _vault);
-    // Emitted when Treasury is set
-    event TreasurySet(address _treasury);
-    // Emitted when Locker is set
-    event LockerSet(address _locker);
-    // Emitted when ClaimsAdjustor is set
-    event ClaimsAdjustorSet(address _claimsAdjustor);
-    // Emitted when ClaimsEscrow is set
-    event ClaimsEscrowSet(address _claimsEscrow);
-    // Emitted when a Product is added
-    event ProductAdded(address _product);
-    // Emitted when a Product is removed
-    event ProductRemoved(address _product);
-
     /**
      * @notice Constructs the registry contract.
      * @param _governance Address of the governor.
@@ -63,15 +43,26 @@ contract Registry is IRegistry {
     }
 
     /**
-     * @notice Transfers the governance role to a new governor.
+     * @notice Allows governance to be transferred to a new governor.
      * Can only be called by the current governor.
      * @param _governance The new governor.
      */
     function setGovernance(address _governance) external override {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
-        governance = _governance;
-        emit GovernanceSet(_governance);
+        newGovernance = _governance;
+    }
+
+    /**
+     * @notice Accepts the governance role.
+     * Can only be called by the new governor.
+     */
+    function acceptGovernance() external override {
+        // can only be called by new governor
+        require(msg.sender == newGovernance, "!governance");
+        governance = newGovernance;
+        newGovernance = address(0x0);
+        emit GovernanceTransferred(msg.sender);
     }
 
     /**

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Unlicense
-pragma solidity ^0.8.0;
+pragma solidity 0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
@@ -15,8 +15,15 @@ contract SOLACE is ERC20Permit {
     using SafeERC20 for IERC20;
     using Address for address;
 
-    /// @notice governor
+    /// @notice Governor.
     address public governance;
+
+    /// @notice Governance to take over.
+    address public newGovernance;
+
+    // Emitted when Governance is set
+    event GovernanceTransferred(address _newGovernance);
+
     /// @notice minters
     mapping (address => bool) public minters;
 
@@ -26,6 +33,7 @@ contract SOLACE is ERC20Permit {
      */
     constructor(address _governance) ERC20("solace", "SOLACE") ERC20Permit("solace"){
         governance = _governance;
+        minters[_governance] = true;
     }
 
     /**
@@ -40,13 +48,26 @@ contract SOLACE is ERC20Permit {
     }
 
     /**
-     * @notice Transfers the governance role to a new governor.
+     * @notice Allows governance to be transferred to a new governor.
      * Can only be called by the current governor.
-     * @param _governance the new governor
+     * @param _governance The new governor.
      */
-    function setGovernance(address _governance) public {
+    function setGovernance(address _governance) external {
+        // can only be called by governor
         require(msg.sender == governance, "!governance");
-        governance = _governance;
+        newGovernance = _governance;
+    }
+
+    /**
+     * @notice Accepts the governance role.
+     * Can only be called by the new governor.
+     */
+    function acceptGovernance() external {
+        // can only be called by new governor
+        require(msg.sender == newGovernance, "!governance");
+        governance = newGovernance;
+        newGovernance = address(0x0);
+        emit GovernanceTransferred(msg.sender);
     }
 
     /**

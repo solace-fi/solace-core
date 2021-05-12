@@ -11,9 +11,9 @@ import SolaceArtifact from "../artifacts/contracts/SOLACE.sol/SOLACE.json";
 import MasterArtifact from "../artifacts/contracts/Master.sol/Master.json";
 import VaultArtifact from "../artifacts/contracts/Vault.sol/Vault.json";
 import TreasuryArtifact from "../artifacts/contracts/Treasury.sol/Treasury.json";
-import ClaimsAdjustorArtifact from '../artifacts/contracts/ClaimsAdjustor.sol/ClaimsAdjustor.json';
-import ClaimsEscrowArtifact from '../artifacts/contracts/ClaimsEscrow.sol/ClaimsEscrow.json';
-import WETHArtifact from '../artifacts/contracts/mocks/MockWETH.sol/MockWETH.json';
+import ClaimsAdjustorArtifact from "../artifacts/contracts/ClaimsAdjustor.sol/ClaimsAdjustor.json";
+import ClaimsEscrowArtifact from "../artifacts/contracts/ClaimsEscrow.sol/ClaimsEscrow.json";
+import WETHArtifact from "../artifacts/contracts/mocks/MockWETH.sol/MockWETH.json";
 import { Registry, Solace, Master, Vault, Treasury, ClaimsAdjustor, ClaimsEscrow, MockWeth } from "../typechain";
 
 chai.use(solidity);
@@ -118,14 +118,28 @@ describe("Registry", function () {
       expect(await registry.governance()).to.equal(governor.address);
     })
 
-    it("can transfer governance", async function () {
+    it("rejects setting new governance by non governor", async function () {
+      await expect(registry.connect(user).setGovernance(user.address)).to.be.revertedWith("!governance");
+    })
+
+    it("can set new governance", async function () {
       await registry.connect(governor).setGovernance(deployer.address);
-      expect(await registry.governance()).to.equal(deployer.address);
+      expect(await registry.governance()).to.equal(governor.address);
+      expect(await registry.newGovernance()).to.equal(deployer.address);
     })
 
     it("rejects governance transfer by non governor", async function () {
-      await expect(registry.connect(governor).setGovernance(registry.address)).to.be.revertedWith("!governance");
+      await expect(registry.connect(user).acceptGovernance()).to.be.revertedWith("!governance");
+    })
+
+    it("can transfer governance", async function () {
+      let tx = await registry.connect(deployer).acceptGovernance();
+      await expect(tx).to.emit(registry, "GovernanceTransferred").withArgs(deployer.address);
+      expect(await registry.governance()).to.equal(deployer.address);
+      expect(await registry.newGovernance()).to.equal(ZERO_ADDRESS);
+
       await registry.connect(deployer).setGovernance(governor.address);
+      await registry.connect(governor).acceptGovernance();
     })
   })
 

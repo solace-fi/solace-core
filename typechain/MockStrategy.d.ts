@@ -24,12 +24,14 @@ interface MockStrategyInterface extends ethers.utils.Interface {
   functions: {
     "_report(uint256,uint256,uint256)": FunctionFragment;
     "_takeFunds(uint256)": FunctionFragment;
+    "acceptGovernance()": FunctionFragment;
     "delegatedAssets()": FunctionFragment;
     "emergencyExit()": FunctionFragment;
     "estimatedTotalAssets()": FunctionFragment;
     "governance()": FunctionFragment;
     "harvest()": FunctionFragment;
     "isActive()": FunctionFragment;
+    "newGovernance()": FunctionFragment;
     "protectedToken()": FunctionFragment;
     "setDelegatedAssets(uint256)": FunctionFragment;
     "setEmergencyExit()": FunctionFragment;
@@ -49,6 +51,10 @@ interface MockStrategyInterface extends ethers.utils.Interface {
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
+    functionFragment: "acceptGovernance",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
     functionFragment: "delegatedAssets",
     values?: undefined
   ): string;
@@ -66,6 +72,10 @@ interface MockStrategyInterface extends ethers.utils.Interface {
   ): string;
   encodeFunctionData(functionFragment: "harvest", values?: undefined): string;
   encodeFunctionData(functionFragment: "isActive", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "newGovernance",
+    values?: undefined
+  ): string;
   encodeFunctionData(
     functionFragment: "protectedToken",
     values?: undefined
@@ -93,6 +103,10 @@ interface MockStrategyInterface extends ethers.utils.Interface {
   decodeFunctionResult(functionFragment: "_report", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "_takeFunds", data: BytesLike): Result;
   decodeFunctionResult(
+    functionFragment: "acceptGovernance",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "delegatedAssets",
     data: BytesLike
   ): Result;
@@ -107,6 +121,10 @@ interface MockStrategyInterface extends ethers.utils.Interface {
   decodeFunctionResult(functionFragment: "governance", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "harvest", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "isActive", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "newGovernance",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "protectedToken",
     data: BytesLike
@@ -130,10 +148,12 @@ interface MockStrategyInterface extends ethers.utils.Interface {
 
   events: {
     "EmergencyExitEnabled()": EventFragment;
+    "GovernanceTransferred(address)": EventFragment;
     "Harvested(uint256,uint256,uint256,uint256)": EventFragment;
   };
 
   getEvent(nameOrSignatureOrTopic: "EmergencyExitEnabled"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "GovernanceTransferred"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "Harvested"): EventFragment;
 }
 
@@ -174,6 +194,10 @@ export class MockStrategy extends Contract {
       amount: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
+
+    acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
 
     delegatedAssets(
       overrides?: CallOverrides
@@ -237,6 +261,18 @@ export class MockStrategy extends Contract {
       overrides?: CallOverrides
     ): Promise<{
       0: boolean;
+    }>;
+
+    newGovernance(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "newGovernance()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
     }>;
 
     protectedToken(
@@ -344,6 +380,10 @@ export class MockStrategy extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
+  acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+  "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
+
   delegatedAssets(overrides?: CallOverrides): Promise<BigNumber>;
 
   "delegatedAssets()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -367,6 +407,10 @@ export class MockStrategy extends Contract {
   isActive(overrides?: CallOverrides): Promise<boolean>;
 
   "isActive()"(overrides?: CallOverrides): Promise<boolean>;
+
+  newGovernance(overrides?: CallOverrides): Promise<string>;
+
+  "newGovernance()"(overrides?: CallOverrides): Promise<string>;
 
   protectedToken(overrides?: CallOverrides): Promise<string>;
 
@@ -443,6 +487,10 @@ export class MockStrategy extends Contract {
       overrides?: CallOverrides
     ): Promise<void>;
 
+    acceptGovernance(overrides?: CallOverrides): Promise<void>;
+
+    "acceptGovernance()"(overrides?: CallOverrides): Promise<void>;
+
     delegatedAssets(overrides?: CallOverrides): Promise<BigNumber>;
 
     "delegatedAssets()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -466,6 +514,10 @@ export class MockStrategy extends Contract {
     isActive(overrides?: CallOverrides): Promise<boolean>;
 
     "isActive()"(overrides?: CallOverrides): Promise<boolean>;
+
+    newGovernance(overrides?: CallOverrides): Promise<string>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<string>;
 
     protectedToken(overrides?: CallOverrides): Promise<string>;
 
@@ -524,6 +576,8 @@ export class MockStrategy extends Contract {
   filters: {
     EmergencyExitEnabled(): EventFilter;
 
+    GovernanceTransferred(_newGovernance: null): EventFilter;
+
     Harvested(
       profit: null,
       loss: null,
@@ -554,6 +608,10 @@ export class MockStrategy extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
+    acceptGovernance(overrides?: Overrides): Promise<BigNumber>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<BigNumber>;
+
     delegatedAssets(overrides?: CallOverrides): Promise<BigNumber>;
 
     "delegatedAssets()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -577,6 +635,10 @@ export class MockStrategy extends Contract {
     isActive(overrides?: CallOverrides): Promise<BigNumber>;
 
     "isActive()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    newGovernance(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     protectedToken(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -657,6 +719,10 @@ export class MockStrategy extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
+    acceptGovernance(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<PopulatedTransaction>;
+
     delegatedAssets(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "delegatedAssets()"(
@@ -686,6 +752,10 @@ export class MockStrategy extends Contract {
     isActive(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "isActive()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    newGovernance(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     protectedToken(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 

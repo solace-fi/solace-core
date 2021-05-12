@@ -270,8 +270,29 @@
 68
 69
 70
-71</pre></div></td><td class="code"><div class="highlight"><pre><span></span><span class="c1">// </span><span class="cs">SPDX-License-Identifier:</span><span class="c1"> Unlicense</span>
-<span class="k">pragma solidity</span> <span class="o">^</span><span class="mf">0.8</span><span class="p">.</span><span class="mi">0</span><span class="p">;</span>
+71
+72
+73
+74
+75
+76
+77
+78
+79
+80
+81
+82
+83
+84
+85
+86
+87
+88
+89
+90
+91
+92</pre></div></td><td class="code"><div class="highlight"><pre><span></span><span class="c1">// </span><span class="cs">SPDX-License-Identifier:</span><span class="c1"> Unlicense</span>
+<span class="k">pragma solidity</span> <span class="mf">0.8</span><span class="p">.</span><span class="mi">0</span><span class="p">;</span>
 
 <span class="kn">import</span> <span class="s">&quot;@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol&quot;</span><span class="p">;</span>
 <span class="kn">import</span> <span class="s">&quot;@openzeppelin/contracts/utils/Address.sol&quot;</span><span class="p">;</span>
@@ -287,8 +308,15 @@
     <span class="kn">using</span> <span class="n">SafeERC20</span> <span class="k">for</span> <span class="n">IERC20</span><span class="p">;</span>
     <span class="kn">using</span> <span class="n">Address</span> <span class="k">for</span> <span class="kt">address</span><span class="p">;</span>
 
-    <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> governor</span>
+    <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Governor.</span>
     <span class="kt">address</span> <span class="k">public</span> <span class="n">governance</span><span class="p">;</span>
+
+    <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Governance to take over.</span>
+    <span class="kt">address</span> <span class="k">public</span> <span class="n">newGovernance</span><span class="p">;</span>
+
+    <span class="c1">// Emitted when Governance is set</span>
+    <span class="kd">event</span> <span class="n">GovernanceTransferred</span><span class="p">(</span><span class="kt">address</span> <span class="n">_newGovernance</span><span class="p">);</span>
+
     <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> minters</span>
     <span class="kd">mapping</span> <span class="p">(</span><span class="kt">address</span> <span class="o">=&gt;</span> <span class="kt">bool</span><span class="p">)</span> <span class="k">public</span> <span class="n">minters</span><span class="p">;</span>
 
@@ -298,6 +326,7 @@
 <span class="cm">     */</span>
     <span class="kd">constructor</span><span class="p">(</span><span class="kt">address</span> <span class="n">_governance</span><span class="p">)</span> <span class="n">ERC20</span><span class="p">(</span><span class="s">&quot;solace&quot;</span><span class="p">,</span> <span class="s">&quot;SOLACE&quot;</span><span class="p">)</span> <span class="n">ERC20Permit</span><span class="p">(</span><span class="s">&quot;solace&quot;</span><span class="p">){</span>
         <span class="n">governance</span> <span class="o">=</span> <span class="n">_governance</span><span class="p">;</span>
+        <span class="n">minters</span><span class="p">[</span><span class="n">_governance</span><span class="p">]</span> <span class="o">=</span> <span class="kc">true</span><span class="p">;</span>
     <span class="p">}</span>
 
     <span class="cm">/**</span>
@@ -312,13 +341,26 @@
     <span class="p">}</span>
 
     <span class="cm">/**</span>
-<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Transfers the governance role to a new governor.</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Allows governance to be transferred to a new governor.</span>
 <span class="cm">     * Can only be called by the current governor.</span>
-<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _governance the new governor</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _governance The new governor.</span>
 <span class="cm">     */</span>
-    <span class="kd">function</span> <span class="n">setGovernance</span><span class="p">(</span><span class="kt">address</span> <span class="n">_governance</span><span class="p">)</span> <span class="k">public</span> <span class="p">{</span>
+    <span class="kd">function</span> <span class="n">setGovernance</span><span class="p">(</span><span class="kt">address</span> <span class="n">_governance</span><span class="p">)</span> <span class="k">external</span> <span class="p">{</span>
+        <span class="c1">// can only be called by governor</span>
         <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
-        <span class="n">governance</span> <span class="o">=</span> <span class="n">_governance</span><span class="p">;</span>
+        <span class="n">newGovernance</span> <span class="o">=</span> <span class="n">_governance</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Accepts the governance role.</span>
+<span class="cm">     * Can only be called by the new governor.</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">acceptGovernance</span><span class="p">()</span> <span class="k">external</span> <span class="p">{</span>
+        <span class="c1">// can only be called by new governor</span>
+        <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">newGovernance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
+        <span class="n">governance</span> <span class="o">=</span> <span class="n">newGovernance</span><span class="p">;</span>
+        <span class="n">newGovernance</span> <span class="o">=</span> <span class="kt">address</span><span class="p">(</span><span class="mh">0x0</span><span class="p">);</span>
+        <span class="k">emit</span> <span class="n">GovernanceTransferred</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">);</span>
     <span class="p">}</span>
 
     <span class="cm">/**</span>

@@ -24,6 +24,7 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 interface SolaceEthLpFarmInterface extends ethers.utils.Interface {
   functions: {
     "accRewardPerShare()": FunctionFragment;
+    "acceptGovernance()": FunctionFragment;
     "appraise(uint256)": FunctionFragment;
     "blockReward()": FunctionFragment;
     "countDeposited(address)": FunctionFragment;
@@ -41,6 +42,7 @@ interface SolaceEthLpFarmInterface extends ethers.utils.Interface {
     "lpToken()": FunctionFragment;
     "master()": FunctionFragment;
     "mintAndDeposit(tuple)": FunctionFragment;
+    "newGovernance()": FunctionFragment;
     "pendingRewards(address)": FunctionFragment;
     "pool()": FunctionFragment;
     "setEnd(uint256)": FunctionFragment;
@@ -62,6 +64,10 @@ interface SolaceEthLpFarmInterface extends ethers.utils.Interface {
 
   encodeFunctionData(
     functionFragment: "accRewardPerShare",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "acceptGovernance",
     values?: undefined
   ): string;
   encodeFunctionData(
@@ -137,6 +143,10 @@ interface SolaceEthLpFarmInterface extends ethers.utils.Interface {
     ]
   ): string;
   encodeFunctionData(
+    functionFragment: "newGovernance",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
     functionFragment: "pendingRewards",
     values: [string]
   ): string;
@@ -191,6 +201,10 @@ interface SolaceEthLpFarmInterface extends ethers.utils.Interface {
     functionFragment: "accRewardPerShare",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(
+    functionFragment: "acceptGovernance",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "appraise", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "blockReward",
@@ -233,6 +247,10 @@ interface SolaceEthLpFarmInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
+    functionFragment: "newGovernance",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "pendingRewards",
     data: BytesLike
   ): Result;
@@ -266,12 +284,20 @@ interface SolaceEthLpFarmInterface extends ethers.utils.Interface {
   ): Result;
 
   events: {
-    "Deposit(address,uint256)": EventFragment;
-    "Withdraw(address,uint256)": EventFragment;
+    "FarmEndSet(uint256)": EventFragment;
+    "GovernanceTransferred(address)": EventFragment;
+    "RewardsSet(uint256)": EventFragment;
+    "TokenDeposited(address,uint256)": EventFragment;
+    "TokenWithdrawn(address,uint256)": EventFragment;
+    "UserRewarded(address,uint256)": EventFragment;
   };
 
-  getEvent(nameOrSignatureOrTopic: "Deposit"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "Withdraw"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "FarmEndSet"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "GovernanceTransferred"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "RewardsSet"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "TokenDeposited"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "TokenWithdrawn"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "UserRewarded"): EventFragment;
 }
 
 export class SolaceEthLpFarm extends Contract {
@@ -299,6 +325,10 @@ export class SolaceEthLpFarm extends Contract {
     ): Promise<{
       0: BigNumber;
     }>;
+
+    acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
 
     appraise(
       _token: BigNumberish,
@@ -554,6 +584,18 @@ export class SolaceEthLpFarm extends Contract {
       overrides?: PayableOverrides
     ): Promise<ContractTransaction>;
 
+    newGovernance(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "newGovernance()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
     pendingRewards(
       _user: string,
       overrides?: CallOverrides
@@ -773,6 +815,10 @@ export class SolaceEthLpFarm extends Contract {
 
   "accRewardPerShare()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+  acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+  "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
+
   appraise(_token: BigNumberish, overrides?: CallOverrides): Promise<BigNumber>;
 
   "appraise(uint256)"(
@@ -935,6 +981,10 @@ export class SolaceEthLpFarm extends Contract {
     overrides?: PayableOverrides
   ): Promise<ContractTransaction>;
 
+  newGovernance(overrides?: CallOverrides): Promise<string>;
+
+  "newGovernance()"(overrides?: CallOverrides): Promise<string>;
+
   pendingRewards(_user: string, overrides?: CallOverrides): Promise<BigNumber>;
 
   "pendingRewards(address)"(
@@ -1082,6 +1132,10 @@ export class SolaceEthLpFarm extends Contract {
     accRewardPerShare(overrides?: CallOverrides): Promise<BigNumber>;
 
     "accRewardPerShare()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    acceptGovernance(overrides?: CallOverrides): Promise<void>;
+
+    "acceptGovernance()"(overrides?: CallOverrides): Promise<void>;
 
     appraise(
       _token: BigNumberish,
@@ -1248,6 +1302,10 @@ export class SolaceEthLpFarm extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
+    newGovernance(overrides?: CallOverrides): Promise<string>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<string>;
+
     pendingRewards(
       _user: string,
       overrides?: CallOverrides
@@ -1390,15 +1448,27 @@ export class SolaceEthLpFarm extends Contract {
   };
 
   filters: {
-    Deposit(_user: string | null, _token: null): EventFilter;
+    FarmEndSet(_endBlock: null): EventFilter;
 
-    Withdraw(_user: string | null, _token: null): EventFilter;
+    GovernanceTransferred(_newGovernance: null): EventFilter;
+
+    RewardsSet(_blockReward: null): EventFilter;
+
+    TokenDeposited(_user: string | null, _token: null): EventFilter;
+
+    TokenWithdrawn(_user: string | null, _token: null): EventFilter;
+
+    UserRewarded(_user: string | null, _amount: null): EventFilter;
   };
 
   estimateGas: {
     accRewardPerShare(overrides?: CallOverrides): Promise<BigNumber>;
 
     "accRewardPerShare()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    acceptGovernance(overrides?: Overrides): Promise<BigNumber>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<BigNumber>;
 
     appraise(
       _token: BigNumberish,
@@ -1550,6 +1620,10 @@ export class SolaceEthLpFarm extends Contract {
       overrides?: PayableOverrides
     ): Promise<BigNumber>;
 
+    newGovernance(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<BigNumber>;
+
     pendingRewards(
       _user: string,
       overrides?: CallOverrides
@@ -1658,6 +1732,10 @@ export class SolaceEthLpFarm extends Contract {
     "accRewardPerShare()"(
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
+
+    acceptGovernance(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<PopulatedTransaction>;
 
     appraise(
       _token: BigNumberish,
@@ -1816,6 +1894,10 @@ export class SolaceEthLpFarm extends Contract {
       },
       overrides?: PayableOverrides
     ): Promise<PopulatedTransaction>;
+
+    newGovernance(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     pendingRewards(
       _user: string,

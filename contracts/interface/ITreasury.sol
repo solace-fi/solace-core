@@ -9,6 +9,24 @@ pragma solidity 0.8.0;
  */
 interface ITreasury {
 
+    /// @notice Governance.
+    function governance() external view returns (address);
+
+    /// @notice Governance to take over.
+    function newGovernance() external view returns (address);
+
+    // events
+    // Emitted when eth is deposited
+    event EthDeposited(uint256 _amount);
+    // Emitted when a token is deposited
+    event TokenDeposited(address _token, uint256 _amount);
+    // Emitted when a token is spent
+    event FundsSpent(address _token, uint256 _amount, address _recipient);
+    // Emitted when a token swap path is set
+    event PathSet(address _token, bytes _path);
+    // Emitted when Governance is set
+    event GovernanceTransferred(address _newGovernance);
+
     /**
      * Receive function. Deposits eth.
      */
@@ -25,6 +43,12 @@ interface ITreasury {
      * @param _governance The new governor.
      */
     function setGovernance(address _governance) external;
+
+    /**
+     * @notice Accepts the governance role.
+     * Can only be called by the new governor.
+     */
+    function acceptGovernance() external;
 
     /**
      * @notice Sets the swap path for a token.
@@ -61,10 +85,9 @@ interface ITreasury {
      * Can only be called by the current governor.
      * @dev Swaps the entire balance in case some tokens were unknowingly received.
      * Reverts if the swap was unsuccessful.
-     * @param _token The address of the token to swap.
      * @param _path The path of pools to take.
      * @param _amountIn The amount to swap.
      * @param _amountOutMinimum The minimum about to receive.
      */
-    function swap(address _token, bytes calldata _path, uint256 _amountIn, uint256 _amountOutMinimum) external;
+    function swap(bytes calldata _path, uint256 _amountIn, uint256 _amountOutMinimum) external;
 }

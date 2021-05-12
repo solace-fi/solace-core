@@ -9,15 +9,42 @@ pragma solidity 0.8.0;
  */
 interface IRegistry {
 
+    /// @notice Governance.
+    function governance() external view returns (address);
+
+    /// @notice Governance to take over.
+    function newGovernance() external view returns (address);
+
     /// Protocol contract address getters
     function master() external returns (address);
     function vault() external returns (address);
     function treasury() external returns (address);
-    function governance() external returns (address);
     function solace() external returns (address);
     function locker() external returns (address);
     function claimsAdjustor() external returns (address);
     function claimsEscrow() external returns (address);
+
+    // events
+    // Emitted when Governance is set
+    event GovernanceTransferred(address _newGovernance);
+    // Emitted when Solace Token is set
+    event SolaceSet(address _solace);
+    // Emitted when Master is set
+    event MasterSet(address _master);
+    // Emitted when Vault is set
+    event VaultSet(address _vault);
+    // Emitted when Treasury is set
+    event TreasurySet(address _treasury);
+    // Emitted when Locker is set
+    event LockerSet(address _locker);
+    // Emitted when ClaimsAdjustor is set
+    event ClaimsAdjustorSet(address _claimsAdjustor);
+    // Emitted when ClaimsEscrow is set
+    event ClaimsEscrowSet(address _claimsEscrow);
+    // Emitted when a Product is added
+    event ProductAdded(address _product);
+    // Emitted when a Product is removed
+    event ProductRemoved(address _product);
 
     /**
      * @notice Transfers the governance role to a new governor.
@@ -25,6 +52,12 @@ interface IRegistry {
      * @param _governance The new governor.
      */
     function setGovernance(address _governance) external;
+
+    /**
+     * @notice Accepts the governance role.
+     * Can only be called by the new governor.
+     */
+    function acceptGovernance() external;
 
     /**
      * @notice Sets the solace token contract.

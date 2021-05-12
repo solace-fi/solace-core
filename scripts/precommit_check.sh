@@ -5,15 +5,17 @@
 rm -rf artifacts
 rm -rf cache
 rm -rf client
+rm -rf typechain
+rm -rf contracts_processed
+rm -rf node_modules
 rm -rf coverage
 rm coverage.json
 rm -rf docs/_build/html
 rm -rf docs/_build/md
-rm -rf node_modules
-rm -rf typechain
 
-# install packages, compile, test
+# install packages. process, compile, and test contracts
 npm install
+python3 scripts/process_contracts.py
 npx hardhat compile
 npx hardhat test
 

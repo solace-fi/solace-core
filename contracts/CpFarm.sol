@@ -3,19 +3,22 @@ pragma solidity 0.8.0;
 
 import "./libraries/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "./ReentrancyGuard.sol";
 import "./interface/IVault.sol";
 import "./interface/ICpFarm.sol";
+import "./interface/ISwapRouter.sol";
 
 
 /**
  * @title CpFarm: A farm that allows for the staking of CP tokens.
  * @author solace.fi
  */
-contract CpFarm is ICpFarm {
+contract CpFarm is ICpFarm, ReentrancyGuard {
     using SafeERC20 for IERC20;
+    using SafeERC20 for SOLACE;
 
     /// @notice A unique enumerator that identifies the farm type.
-    uint256 public override farmType = 1;
+    uint256 public constant override farmType = 1;
 
     IVault public override vault;
     /// @notice Native SOLACE Token.
@@ -53,8 +56,17 @@ contract CpFarm is ICpFarm {
     /// @notice Governor.
     address public override governance;
 
+    /// @notice Governance to take over.
+    address public override newGovernance;
+
     /// @notice Master contract.
     address public override master;
+
+    /// @notice Address of Uniswap router.
+    ISwapRouter public swapRouter;
+
+    // @notice WETH
+    IERC20 public weth;
 
     /**
      * @notice Constructs the farm.
@@ -64,6 +76,8 @@ contract CpFarm is ICpFarm {
      * @param _solace Address of the SOLACE token contract.
      * @param _startBlock When farming will begin.
      * @param _endBlock When farming will end.
+     * @param _swapRouter Address of uniswap router.
+     * @param _weth Address of weth.
      */
     constructor(
         address _governance,
@@ -71,7 +85,9 @@ contract CpFarm is ICpFarm {
         address _vault,
         SOLACE _solace,
         uint256 _startBlock,
-        uint256 _endBlock
+        uint256 _endBlock,
+        address _swapRouter,
+        address _weth
     ) public {
         governance = _governance;
         master = _master;
@@ -80,31 +96,48 @@ contract CpFarm is ICpFarm {
         startBlock = _startBlock;
         endBlock = _endBlock;
         lastRewardBlock = Math.max(block.number, _startBlock);
+        swapRouter = ISwapRouter(_swapRouter);
+        weth = IERC20(_weth);
+        solace.approve(_swapRouter, type(uint256).max);
+        weth.approve(_vault, type(uint256).max);
+        reenteranceWhitelist(_vault, true);
     }
 
     /**
      * Receive function. Deposits eth.
      */
-    receive () external payable override {
+    receive () external payable override nonReentrant {
         if (msg.sender != address(vault)) _depositEth();
     }
 
     /**
      * Fallback function. Deposits eth.
      */
-    fallback () external payable override {
+    fallback () external payable override nonReentrant {
         if (msg.sender != address(vault)) _depositEth();
     }
 
     /**
-     * @notice Transfers the governance role to a new governor.
+     * @notice Allows governance to be transferred to a new governor.
      * Can only be called by the current governor.
      * @param _governance The new governor.
      */
     function setGovernance(address _governance) external override {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
-        governance = _governance;
+        newGovernance = _governance;
+    }
+
+    /**
+     * @notice Accepts the governance role.
+     * Can only be called by the new governor.
+     */
+    function acceptGovernance() external override {
+        // can only be called by new governor
+        require(msg.sender == newGovernance, "!governance");
+        governance = newGovernance;
+        newGovernance = address(0x0);
+        emit GovernanceTransferred(msg.sender);
     }
 
     /**
@@ -119,6 +152,7 @@ contract CpFarm is ICpFarm {
         updateFarm();
         // accounting
         blockReward = _blockReward;
+        emit RewardsSet(_blockReward);
     }
 
     /**
@@ -132,6 +166,7 @@ contract CpFarm is ICpFarm {
         endBlock = _endBlock;
         // update
         updateFarm();
+        emit FarmEndSet(_endBlock);
     }
 
     /**
@@ -139,7 +174,7 @@ contract CpFarm is ICpFarm {
      * User will receive accumulated rewards if any.
      * @param _amount The deposit amount.
      */
-    function depositCp(uint256 _amount) external override {
+    function depositCp(uint256 _amount) external override nonReentrant {
         // pull tokens
         IERC20(vault).safeTransferFrom(msg.sender, address(this), _amount);
         // accounting
@@ -156,7 +191,7 @@ contract CpFarm is ICpFarm {
      * @param r secp256k1 signature
      * @param s secp256k1 signature
      */
-    function depositCpSigned(address _depositor, uint256 _amount, uint256 _deadline, uint8 v, bytes32 r, bytes32 s) external override {
+    function depositCpSigned(address _depositor, uint256 _amount, uint256 _deadline, uint8 v, bytes32 r, bytes32 s) external override nonReentrant {
         // permit
         vault.permit(_depositor, address(this), _amount, _deadline, v, r, s);
         // pull tokens
@@ -166,10 +201,51 @@ contract CpFarm is ICpFarm {
     }
 
     /**
+     * Your money already makes you money. Now make your money make more money!
+     * @notice Withdraws your SOLACE rewards, swaps it for WETH, then deposits that WETH onto the farm.
+     */
+    function compoundRewards() external override nonReentrant {
+        // update farm
+        updateFarm();
+        // get farmer information
+        UserInfo storage user = userInfo[msg.sender];
+        // calculate pending rewards
+        uint256 pending = user.value * accRewardPerShare / 1e12 - user.rewardDebt + user.unpaidRewards;
+        if (pending == 0) return;
+        // calculate safe swap amount
+        uint256 balance = solace.balanceOf(master);
+        uint256 solaceSwapAmount = Math.min(pending, balance);
+        user.unpaidRewards = pending - solaceSwapAmount;
+        // transfer solace from master
+        solace.safeTransferFrom(master, address(this), solaceSwapAmount);
+        // swap solace for weth
+        uint256 wethDepositAmount = swapRouter.exactInputSingle(ISwapRouter.ExactInputSingleParams({
+            tokenIn: address(solace),
+            tokenOut: address(weth),
+            fee: 3000, // medium pool
+            recipient: address(this),
+            // solhint-disable-next-line not-rely-on-time
+            deadline: block.timestamp,
+            amountIn: solaceSwapAmount,
+            amountOutMinimum: 0,
+            sqrtPriceLimitX96: 0
+        }));
+        // exchange weth for cp
+        uint256 balanceBefore = vault.balanceOf(address(this));
+        vault.depositWeth(wethDepositAmount);
+        uint256 cpAmount = vault.balanceOf(address(this)) - balanceBefore;
+        // accounting
+        valueStaked += cpAmount;
+        user.value += cpAmount;
+        user.rewardDebt = user.value * accRewardPerShare / 1e12;
+        emit RewardsCompounded(msg.sender);
+    }
+
+    /**
      * @notice Deposit some ETH.
      * User will receive accumulated rewards if any.
      */
-    function depositEth() external payable override {
+    function depositEth() external payable override nonReentrant {
         _depositEth();
     }
 
@@ -178,7 +254,7 @@ contract CpFarm is ICpFarm {
      * User will receive _amount of deposited tokens and accumulated rewards.
      * @param _amount The withdraw amount.
      */
-    function withdrawCp(uint256 _amount) external override {
+    function withdrawCp(uint256 _amount) external override nonReentrant {
         // harvest and update farm
         _harvest(msg.sender);
         // get farmer information
@@ -189,7 +265,7 @@ contract CpFarm is ICpFarm {
         user.rewardDebt = user.value * accRewardPerShare / 1e12;
         // return staked tokens
         IERC20(vault).safeTransfer(msg.sender, _amount);
-        emit WithdrawCp(msg.sender, _amount);
+        emit CpWithdrawn(msg.sender, _amount);
     }
 
     /**
@@ -199,7 +275,7 @@ contract CpFarm is ICpFarm {
      * @param _amount The withdraw amount.
      * @param _maxLoss The acceptable amount of loss.
      */
-    function withdrawEth(uint256 _amount, uint256 _maxLoss) external override {
+    function withdrawEth(uint256 _amount, uint256 _maxLoss) external override nonReentrant {
         // harvest and update farm
         _harvest(msg.sender);
         // get farmer information
@@ -211,13 +287,13 @@ contract CpFarm is ICpFarm {
         uint256 ethAmount = vault.withdraw(_amount, _maxLoss);
         // return eth
         payable(msg.sender).transfer(ethAmount);
-        emit WithdrawEth(msg.sender, _amount);
+        emit EthWithdrawn(msg.sender, _amount);
     }
 
     /**
      * Withdraw your rewards without unstaking your tokens.
      */
-    function withdrawRewards() external override {
+    function withdrawRewards() external override nonReentrant {
         // harvest
         _harvest(msg.sender);
         // get farmer information
@@ -290,7 +366,7 @@ contract CpFarm is ICpFarm {
         valueStaked += cpAmount;
         user.value += cpAmount;
         user.rewardDebt = user.value * accRewardPerShare / 1e12;
-        emit DepositEth(msg.sender, msg.value);
+        emit EthDeposited(msg.sender, msg.value);
     }
 
     /**
@@ -308,7 +384,7 @@ contract CpFarm is ICpFarm {
         valueStaked += _amount;
         user.value += _amount;
         user.rewardDebt = user.value * accRewardPerShare / 1e12;
-        emit DepositCp(_depositor, _amount);
+        emit CpDeposited(_depositor, _amount);
     }
 
     /**
@@ -327,5 +403,6 @@ contract CpFarm is ICpFarm {
         uint256 transferAmount = Math.min(pending, balance);
         user.unpaidRewards = pending - transferAmount;
         IERC20(solace).safeTransferFrom(master, _user, transferAmount);
+        emit UserRewarded(_user, transferAmount);
     }
 }

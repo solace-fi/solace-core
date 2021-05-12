@@ -13,13 +13,21 @@ import "./IFarm.sol";
 interface ICpFarm is IFarm {
 
     // Emitted when CP tokens are deposited onto the farm.
-    event DepositCp(address indexed _user, uint256 _amount);
+    event CpDeposited(address indexed _user, uint256 _amount);
     // Emitted when ETH is deposited onto the farm.
-    event DepositEth(address indexed _user, uint256 _amount);
+    event EthDeposited(address indexed _user, uint256 _amount);
+    // Emitted when a user compounds their rewards.
+    event RewardsCompounded(address indexed _user);
     // Emitted when CP tokens are withdrawn from the farm.
-    event WithdrawCp(address indexed _user, uint256 _amount);
+    event CpWithdrawn(address indexed _user, uint256 _amount);
     // Emitted when ETH is withdrawn from the farm.
-    event WithdrawEth(address indexed _user, uint256 _amount);
+    event EthWithdrawn(address indexed _user, uint256 _amount);
+    // Emitted when a user is rewarded.
+    event UserRewarded(address indexed _user, uint256 _amount);
+    // Emitted when block reward is changed.
+    event RewardsSet(uint256 _blockReward);
+    // Emitted when the end block is changed.
+    event FarmEndSet(uint256 _endBlock);
 
     /**
      * Receive function. Deposits eth.
@@ -55,6 +63,12 @@ interface ICpFarm is IFarm {
      * User will receive accumulated rewards if any.
      */
     function depositEth() external payable;
+
+    /**
+     * Your money already makes you money. Now make your money make more money!
+     * @notice Withdraws your SOLACE rewards, swaps it for WETH, then deposits that WETH onto the farm.
+     */
+    function compoundRewards() external;
 
     /**
      * @notice Withdraw some CP tokens.

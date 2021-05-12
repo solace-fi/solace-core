@@ -30,3 +30,10 @@ export async function burnBlocksUntil(
   }
   return burnedBlocks;
 }
+
+// wait a number of milliseconds
+export async function wait(delay:number=1000) {
+  return new Promise((resolve,_) => {
+    setTimeout(()=>resolve(0), delay);
+  })
+}

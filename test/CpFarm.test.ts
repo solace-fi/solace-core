@@ -6,21 +6,26 @@ import { Transaction, BigNumber as BN, Contract, constants, BigNumberish, Wallet
 import chai from "chai";
 const { expect } = chai;
 
+import { expectClose } from "./utilities/chai_extensions";
+import { encodePriceSqrt, FeeAmount, TICK_SPACINGS, getMaxTick, getMinTick } from "./utilities/uniswap";
 import { burnBlocks, burnBlocksUntil } from "./utilities/time";
 import { bnAddSub, bnMulDiv } from "./utilities/math";
-import { getPermitDigest, sign, getDomainSeparator } from './utilities/signature';
+import { getPermitDigest, sign, getDomainSeparator } from "./utilities/signature";
 
-import SolaceArtifact from '../artifacts/contracts/SOLACE.sol/SOLACE.json';
+import SolaceArtifact from "../artifacts/contracts/SOLACE.sol/SOLACE.json";
 import WETHArtifact from "../artifacts/contracts/mocks/MockWETH.sol/MockWETH.json";
-import MasterArtifact from '../artifacts/contracts/Master.sol/Master.json';
-import VaultArtifact from '../artifacts/contracts/Vault.sol/Vault.json'
+import MasterArtifact from "../artifacts/contracts/Master.sol/Master.json";
+import VaultArtifact from "../artifacts/contracts/Vault.sol/Vault.json"
 import CpFarmArtifact from "../artifacts/contracts/CpFarm.sol/CpFarm.json";
 import { Solace, Vault, Master, MockWeth, CpFarm } from "../typechain";
 
-chai.use(solidity);
+// uniswap imports
+import UniswapV3FactoryArtifact from "@uniswap/v3-core/artifacts/contracts/UniswapV3Factory.sol/UniswapV3Factory.json";
+import UniswapV3PoolArtifact from "@uniswap/v3-core/artifacts/contracts/UniswapV3Pool.sol/UniswapV3Pool.json";
+import SwapRouterArtifact from "@uniswap/v3-periphery/artifacts/contracts/SwapRouter.sol/SwapRouter.json";
+import NonfungiblePositionManagerArtifact from "@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json";
 
-// TODO: due to integer rounding errors, some math may be off by one
-// need to test within a threshold of acceptance
+chai.use(solidity);
 
 // contracts
 let solaceToken: Solace;
@@ -28,6 +33,11 @@ let master: Master;
 let vault: Vault;
 let farm1: CpFarm;
 let weth: MockWeth;
+
+// uniswap contracts
+let uniswapFactory: Contract;
+let uniswapRouter: Contract;
+let uniswapPositionManager: Contract;
 
 // vars
 let solacePerBlock = BN.from("100000000000000000000"); // 100 e18
@@ -45,7 +55,7 @@ const chainId = 31337;
 const deadline = constants.MaxUint256;
 
 describe("CpFarm", function () {
-  const [deployer, governor, farmer1, farmer2, farmer3, farmer4, mockVault] = provider.getWallets();
+  const [deployer, governor, farmer1, farmer2, mockVault, liquidityProvider] = provider.getWallets();
 
   before(async function () {
     // deploy solace token
@@ -85,10 +95,44 @@ describe("CpFarm", function () {
         ]
     )) as Vault;
 
+    // deploy uniswap factory
+    uniswapFactory = (await deployContract(
+      deployer,
+      UniswapV3FactoryArtifact
+    )) as Contract;
+
+    // deploy uniswap router
+    uniswapRouter = (await deployContract(
+      deployer,
+      SwapRouterArtifact,
+      [
+        uniswapFactory.address,
+        weth.address
+      ]
+    )) as Contract;
+
+    // deploy uniswap position manager
+    uniswapPositionManager = (await deployContract(
+      deployer,
+      NonfungiblePositionManagerArtifact,
+      [
+        uniswapFactory.address,
+        weth.address,
+        ZERO_ADDRESS
+      ]
+    )) as Contract;
+
     // transfer tokens
     await solaceToken.connect(governor).addMinter(governor.address);
     await solaceToken.connect(governor).mint(master.address, ONE_MILLION_ETHER);
     await solaceToken.connect(governor).mint(governor.address, ONE_MILLION_ETHER);
+    await solaceToken.connect(governor).mint(liquidityProvider.address, TEN_ETHER);
+    await weth.connect(liquidityProvider).deposit({value: TEN_ETHER});
+
+    // create pool
+    await createPool(weth, solaceToken, FeeAmount.MEDIUM);
+    // add liquidity
+    await addLiquidity(liquidityProvider, weth, solaceToken, FeeAmount.MEDIUM, TEN_ETHER);
   })
 
   describe("farm creation", function () {
@@ -115,14 +159,28 @@ describe("CpFarm", function () {
       expect(await farm1.governance()).to.equal(governor.address);
     })
 
-    it("can transfer governance", async function () {
+    it("rejects setting new governance by non governor", async function () {
+      await expect(farm1.connect(farmer1).setGovernance(farmer1.address)).to.be.revertedWith("!governance");
+    })
+
+    it("can set new governance", async function () {
       await farm1.connect(governor).setGovernance(deployer.address);
-      expect(await farm1.governance()).to.equal(deployer.address);
+      expect(await farm1.governance()).to.equal(governor.address);
+      expect(await farm1.newGovernance()).to.equal(deployer.address);
     })
 
     it("rejects governance transfer by non governor", async function () {
-      await expect(farm1.connect(governor).setGovernance(farm1.address)).to.be.revertedWith("!governance");
+      await expect(farm1.connect(farmer1).acceptGovernance()).to.be.revertedWith("!governance");
+    })
+
+    it("can transfer governance", async function () {
+      let tx = await farm1.connect(deployer).acceptGovernance();
+      await expect(tx).to.emit(farm1, "GovernanceTransferred").withArgs(deployer.address);
+      expect(await farm1.governance()).to.equal(deployer.address);
+      expect(await farm1.newGovernance()).to.equal(ZERO_ADDRESS);
+
       await farm1.connect(deployer).setGovernance(governor.address);
+      await farm1.connect(governor).acceptGovernance();
     })
   })
 
@@ -134,7 +192,7 @@ describe("CpFarm", function () {
       let depositAmount1 = BN.from(1);
       balancesBefore = await getBalances(farmer1, farm1);
       let tx1 = await farm1.connect(farmer1).depositEth({value:depositAmount1});
-      await expect(tx1).to.emit(farm1, "DepositEth").withArgs(farmer1.address, depositAmount1);
+      await expect(tx1).to.emit(farm1, "EthDeposited").withArgs(farmer1.address, depositAmount1);
       balancesAfter = await getBalances(farmer1, farm1);
       balancesDiff = getBalancesDiff(balancesAfter, balancesBefore)
       expect(balancesDiff.farmStake).to.equal(depositAmount1);
@@ -144,7 +202,7 @@ describe("CpFarm", function () {
       let depositAmount2 = BN.from(4);
       balancesBefore = await getBalances(farmer2, farm1);
       let tx2 = await farm1.connect(farmer2).depositEth({value:depositAmount2});
-      await expect(tx2).to.emit(farm1, "DepositEth").withArgs(farmer2.address, depositAmount2);
+      await expect(tx2).to.emit(farm1, "EthDeposited").withArgs(farmer2.address, depositAmount2);
       balancesAfter = await getBalances(farmer2, farm1);
       balancesDiff = getBalancesDiff(balancesAfter, balancesBefore)
       expect(balancesDiff.farmStake).to.equal(depositAmount2);
@@ -154,7 +212,7 @@ describe("CpFarm", function () {
       let depositAmount3 = BN.from(2);
       balancesBefore = await getBalances(farmer1, farm1);
       let tx3 = await farm1.connect(farmer1).depositEth({value:depositAmount3});
-      await expect(tx3).to.emit(farm1, "DepositEth").withArgs(farmer1.address, depositAmount3);
+      await expect(tx3).to.emit(farm1, "EthDeposited").withArgs(farmer1.address, depositAmount3);
       balancesAfter = await getBalances(farmer1, farm1);
       balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       expect(balancesDiff.farmStake).to.equal(depositAmount3);
@@ -170,7 +228,7 @@ describe("CpFarm", function () {
         value: depositAmount4,
         data: "0x"
       })
-      await expect(tx).to.emit(farm1, "DepositEth").withArgs(farmer2.address, depositAmount4);
+      await expect(tx).to.emit(farm1, "EthDeposited").withArgs(farmer2.address, depositAmount4);
       balancesAfter = await getBalances(farmer2, farm1);
       balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       expect(balancesDiff.farmStake).to.equal(depositAmount4);
@@ -186,7 +244,7 @@ describe("CpFarm", function () {
         value: depositAmount5,
         data: "0xabcd"
       })
-      await expect(tx).to.emit(farm1, "DepositEth").withArgs(farmer2.address, depositAmount5);
+      await expect(tx).to.emit(farm1, "EthDeposited").withArgs(farmer2.address, depositAmount5);
       balancesAfter = await getBalances(farmer2, farm1);
       balancesDiff = getBalancesDiff(balancesAfter, balancesBefore)
       expect(balancesDiff.farmStake).to.equal(depositAmount5);
@@ -213,7 +271,7 @@ describe("CpFarm", function () {
       await vault.connect(farmer1).deposit({value: depositAmount6});
       await vault.connect(farmer1).increaseAllowance(farm1.address, depositAmount6);
       let tx1 = await farm1.connect(farmer1).depositCp(depositAmount6);
-      await expect(tx1).to.emit(farm1, "DepositCp").withArgs(farmer1.address, depositAmount6);
+      await expect(tx1).to.emit(farm1, "CpDeposited").withArgs(farmer1.address, depositAmount6);
       balancesAfter = await getBalances(farmer1, farm1);
       balancesDiff = getBalancesDiff(balancesAfter, balancesBefore)
       expect(balancesDiff.farmStake).to.equal(depositAmount6);
@@ -225,7 +283,7 @@ describe("CpFarm", function () {
       await vault.connect(farmer2).deposit({value: depositAmount7});
       await vault.connect(farmer2).increaseAllowance(farm1.address, depositAmount7);
       let tx2 = await farm1.connect(farmer2).depositCp(depositAmount7);
-      await expect(tx2).to.emit(farm1, "DepositCp").withArgs(farmer2.address, depositAmount7);
+      await expect(tx2).to.emit(farm1, "CpDeposited").withArgs(farmer2.address, depositAmount7);
       balancesAfter = await getBalances(farmer2, farm1);
       balancesDiff = getBalancesDiff(balancesAfter, balancesBefore)
       expect(balancesDiff.farmStake).to.equal(depositAmount7);
@@ -245,9 +303,9 @@ describe("CpFarm", function () {
         value: depositAmount8
       };
       let digest = getPermitDigest(cpTokenName, vault.address, chainId, approve, nonce, deadline);
-      let { v, r, s } = sign(digest, Buffer.from(farmer1.privateKey.slice(2), 'hex'));
+      let { v, r, s } = sign(digest, Buffer.from(farmer1.privateKey.slice(2), "hex"));
       let tx1 = await farm1.connect(farmer2).depositCpSigned(farmer1.address, depositAmount8, deadline, v, r, s);
-      await expect(tx1).to.emit(farm1, "DepositCp").withArgs(farmer1.address, depositAmount8);
+      await expect(tx1).to.emit(farm1, "CpDeposited").withArgs(farmer1.address, depositAmount8);
       balancesAfter = await getBalances(farmer1, farm1);
       balancesDiff = getBalancesDiff(balancesAfter, balancesBefore)
       expect(balancesDiff.farmStake).to.equal(depositAmount8);
@@ -275,7 +333,7 @@ describe("CpFarm", function () {
       let withdrawAmount1 = BN.from(99);
       balancesBefore = await getBalances(farmer1, farm1);
       let tx1 = await farm1.connect(farmer1).withdrawEth(withdrawAmount1, 0, {gasLimit: 200000}); // TODO: make gas more predictable?
-      await expect(tx1).to.emit(farm1, "WithdrawEth").withArgs(farmer1.address, withdrawAmount1);
+      await expect(tx1).to.emit(farm1, "EthWithdrawn").withArgs(farmer1.address, withdrawAmount1);
       balancesAfter = await getBalances(farmer1, farm1);
       balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       let receipt = await tx1.wait();
@@ -291,7 +349,7 @@ describe("CpFarm", function () {
       let withdrawAmount2 = BN.from(20);
       balancesBefore = await getBalances(farmer1, farm1);
       let tx1 = await farm1.connect(farmer1).withdrawCp(withdrawAmount2);
-      await expect(tx1).to.emit(farm1, "WithdrawCp").withArgs(farmer1.address, withdrawAmount2);
+      await expect(tx1).to.emit(farm1, "CpWithdrawn").withArgs(farmer1.address, withdrawAmount2);
       balancesAfter = await getBalances(farmer1, farm1);
       balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       expect(balancesDiff.userCp).to.equal(withdrawAmount2);
@@ -387,12 +445,12 @@ describe("CpFarm", function () {
       // potential withdraw
       pendingReward1 = await farm.pendingRewards(farmer1.address);
       expectedReward1 = solacePerBlock.mul(waitBlocks);
-      expect(pendingReward1).to.equal(expectedReward1);
+      expectClose(pendingReward1, expectedReward1);
       // actual withdraw
       await farm.connect(farmer1).withdrawEth(depositAmount1, 0);
       pendingReward1 = await solaceToken.balanceOf(farmer1.address);
       expectedReward1 = solacePerBlock.mul(waitBlocks.add(1));
-      expect(pendingReward1).to.equal(expectedReward1);
+      expectClose(pendingReward1, expectedReward1);
     })
 
     it("fairly provides rewards to all farmers", async function () {
@@ -413,11 +471,11 @@ describe("CpFarm", function () {
         (solacePerBlock.mul(11).mul(1)).add // 100% ownership for 11 blocks
         (solacePerBlock.mul(20).mul(1).div(5)) // 20% ownership for 20 blocks
       );
-      expect(pendingReward1).to.equal(expectedReward1);
+      expectClose(pendingReward1, expectedReward1);
       // check farmer 2 rewards
       pendingReward2 = BN.from(await farm.pendingRewards(farmer2.address));
       expectedReward2 = solacePerBlock.mul(20).mul(4).div(5); // 80% ownership for 20 blocks
-      expect(pendingReward2).to.equal(expectedReward2);
+      expectClose(pendingReward2, expectedReward2);
       // farmer 2 deposit more
       await farm.connect(farmer2).depositEth({value:depositAmount3});
       await burnBlocks(waitBlocks3);
@@ -427,7 +485,7 @@ describe("CpFarm", function () {
         (solacePerBlock.mul(1).mul(1).div(5)).add // 20% ownership for 1 blocks
         (solacePerBlock.mul(30).mul(1).div(20)) // 5% ownership for 30 blocks
       );
-      expect(pendingReward1).to.equal(expectedReward1);
+      expectClose(pendingReward1, expectedReward1);
       // check farmer 2 rewards
       pendingReward2 = BN.from(await farm.pendingRewards(farmer2.address));
       receivedReward2 = BN.from(await solaceToken.balanceOf(farmer2.address));
@@ -435,7 +493,7 @@ describe("CpFarm", function () {
         (solacePerBlock.mul(1).mul(4).div(5)).add // 80% ownership for 1 blocks
         (solacePerBlock.mul(30).mul(19).div(20)) // 95% ownership for 30 blocks
       );
-      expect(pendingReward2.add(receivedReward2)).to.equal(expectedReward2);
+      expectClose(pendingReward2.add(receivedReward2), expectedReward2);
 
       // farmer 1 withdraw rewards
       await farm.connect(farmer1).withdrawRewards();
@@ -444,7 +502,7 @@ describe("CpFarm", function () {
       expectedReward1 = expectedReward1.add(
         (solacePerBlock.mul(1).mul(1).div(20)) // 5% ownership for 1 blocks
       );
-      expect(pendingReward1).to.equal(expectedReward1);
+      expectClose(pendingReward1, expectedReward1);
       // farmer 2 withdraw rewards
       await farm.connect(farmer2).withdrawRewards();
       expect(await vault.balanceOf(farmer2.address)).to.equal(0);
@@ -452,7 +510,7 @@ describe("CpFarm", function () {
       expectedReward2 = expectedReward2.add(
         (solacePerBlock.mul(2).mul(19).div(20)) // 95% ownership for 2 blocks
       );
-      expect(pendingReward2).to.equal(expectedReward2);
+      expectClose(pendingReward2, expectedReward2);
       await burnBlocks(waitBlocks4);
 
       // farmer 1 withdraw stake
@@ -461,7 +519,7 @@ describe("CpFarm", function () {
       expectedReward1 = expectedReward1.add(
         (solacePerBlock.mul(42).mul(1).div(20)) // 5% ownership for 42 blocks
       );
-      expect(pendingReward1).to.equal(expectedReward1);
+      expectClose(pendingReward1, expectedReward1);
       await burnBlocks(waitBlocks5);
       // farmer 2 withdraw stake
       await farm.connect(farmer2).withdrawEth(depositAmount2.add(depositAmount3), 0);
@@ -469,9 +527,8 @@ describe("CpFarm", function () {
       expectedReward2 = expectedReward2.add(
         (solacePerBlock.mul(41).mul(19).div(20)).add // 95% ownership for 41 blocks
         (solacePerBlock.mul(51)) // 100% ownership for 51 blocks
-        .sub(1) // off by one error
       );
-      expect(pendingReward2).to.equal(expectedReward2);
+      expectClose(pendingReward2, expectedReward2);
     })
 
     it("does not distribute rewards before farm start", async function () {
@@ -486,7 +543,7 @@ describe("CpFarm", function () {
       let pendingReward1 = await farm.pendingRewards(farmer1.address);
       await burnBlocks(BN.from(10));
       let pendingReward2 = await farm.pendingRewards(farmer1.address);
-      expect(pendingReward2).to.equal(pendingReward1);
+      expectClose(pendingReward2, pendingReward1);
     })
   })
 
@@ -586,6 +643,45 @@ describe("CpFarm", function () {
     })
   })
 
+  describe("compound rewards", function () {
+    let farm4: CpFarm;
+
+    before(async function () {
+      // deactivate all previous farms
+      let numFarms = (await master.numFarms()).toNumber();
+      for(var farmNum = 1; farmNum <= numFarms; ++farmNum) {
+        await master.connect(governor).setAllocPoints(farmNum, 0);
+      }
+      await master.connect(governor).setSolacePerBlock(solacePerBlock);
+      await solaceToken.connect(governor).mint(master.address, ONE_MILLION_ETHER);
+      blockNum = BN.from(await provider.getBlockNumber());
+      startBlock = blockNum.add(20);
+      endBlock = blockNum.add(30);
+      farm4 = await createCpFarm(startBlock, endBlock);
+      await master.connect(governor).registerFarm(farm4.address, 100);
+    })
+
+    it("does nothing if no rewards to compound", async function () {
+      let balancesBefore = await getBalances(farmer1, farm4);
+      await expect(await farm4.connect(farmer1).compoundRewards()).to.not.emit(farm4, "RewardsCompounded").withArgs(farmer1.address);
+      let balancesAfter = await getBalances(farmer1, farm4);
+      expect(balancesAfter.userStake).to.equal(0);
+      expect(balancesAfter.masterSolace).to.equal(balancesBefore.masterSolace);
+    })
+
+    it("users can compound rewards", async function () {
+      let waitBlocks = BN.from("10");
+      let depositAmount = BN.from("20");
+      await farm4.connect(farmer1).depositEth({value:depositAmount});
+      await burnBlocksUntil(startBlock.add(waitBlocks));
+      let balancesBefore = await getBalances(farmer1, farm4);
+      await expect(await farm4.connect(farmer1).compoundRewards()).to.emit(farm4, "RewardsCompounded").withArgs(farmer1.address);
+      let balancesAfter = await getBalances(farmer1, farm4);
+      expect(balancesAfter.userStake).to.be.gt(balancesBefore.userStake);
+      expect(balancesAfter.masterSolace).to.be.lt(balancesBefore.masterSolace);
+    })
+  })
+
   // helper functions
 
   async function createCpFarm(
@@ -603,6 +699,8 @@ describe("CpFarm", function () {
         solaceToken.address,
         startBlock,
         endBlock,
+        uniswapRouter.address,
+        weth.address
       ]
     )) as CpFarm;
     return farm;
@@ -612,8 +710,10 @@ describe("CpFarm", function () {
     userEth: BN,
     userCp: BN,
     userStake: BN,
+    userPendingRewards: BN,
     farmCp: BN,
-    farmStake: BN
+    farmStake: BN,
+    masterSolace: BN
   }
 
   async function getBalances(user: Wallet, farm: CpFarm): Promise<Balances> {
@@ -621,8 +721,10 @@ describe("CpFarm", function () {
       userEth: await user.getBalance(),
       userCp: await vault.balanceOf(user.address),
       userStake: (await farm.userInfo(user.address)).value,
+      userPendingRewards: await farm.pendingRewards(user.address),
       farmCp: await vault.balanceOf(farm.address),
-      farmStake: await farm.valueStaked()
+      farmStake: await farm.valueStaked(),
+      masterSolace: await solaceToken.balanceOf(master.address)
     }
   }
 
@@ -631,8 +733,57 @@ describe("CpFarm", function () {
       userEth: balances1.userEth.sub(balances2.userEth),
       userCp: balances1.userCp.sub(balances2.userCp),
       userStake: balances1.userStake.sub(balances2.userStake),
+      userPendingRewards: balances1.userPendingRewards.sub(balances2.userPendingRewards),
       farmCp: balances1.farmCp.sub(balances2.farmCp),
-      farmStake: balances1.farmStake.sub(balances2.farmStake)
+      farmStake: balances1.farmStake.sub(balances2.farmStake),
+      masterSolace: balances1.masterSolace.sub(balances2.masterSolace)
     }
+  }
+
+  // uniswap requires tokens to be in order
+  function sortTokens(tokenA: string, tokenB: string) {
+    return BN.from(tokenA).lt(BN.from(tokenB)) ? [tokenA, tokenB] : [tokenB, tokenA];
+  }
+
+  // creates, initializes, and returns a pool
+  async function createPool(tokenA: Contract, tokenB: Contract, fee: FeeAmount) {
+    let [token0, token1] = sortTokens(tokenA.address, tokenB.address);
+    let pool;
+    let tx = await uniswapFactory.createPool(token0, token1, fee);
+    let events = (await tx.wait()).events;
+    expect(events && events.length > 0 && events[0].args && events[0].args.pool);
+    if(events && events.length > 0 && events[0].args && events[0].args.pool) {
+      let poolAddress = events[0].args.pool;
+      pool = (new Contract(poolAddress, UniswapV3PoolArtifact.abi)) as Contract;
+    } else {
+      pool = (new Contract(ZERO_ADDRESS, UniswapV3PoolArtifact.abi)) as Contract;
+      expect(true).to.equal(false);
+    }
+    expect(pool).to.exist;
+    if(pool){
+      let sqrtPrice = encodePriceSqrt(1,1);
+      await pool.connect(governor).initialize(sqrtPrice);
+    }
+    return pool;
+  }
+
+  // adds liquidity to a pool
+  async function addLiquidity(liquidityProvider: Wallet, tokenA: Contract, tokenB: Contract, fee: FeeAmount, amount: BigNumberish) {
+    await tokenA.connect(liquidityProvider).approve(uniswapPositionManager.address, amount);
+    await tokenB.connect(liquidityProvider).approve(uniswapPositionManager.address, amount);
+    let [token0, token1] = sortTokens(tokenA.address, tokenB.address);
+    await uniswapPositionManager.connect(liquidityProvider).mint({
+      token0: token0,
+      token1: token1,
+      tickLower: getMinTick(TICK_SPACINGS[fee]),
+      tickUpper: getMaxTick(TICK_SPACINGS[fee]),
+      fee: fee,
+      recipient: liquidityProvider.address,
+      amount0Desired: amount,
+      amount1Desired: amount,
+      amount0Min: 0,
+      amount1Min: 0,
+      deadline: constants.MaxUint256,
+    });
   }
 });

@@ -17,6 +17,9 @@ contract Master is IMaster {
     /// @notice Governor.
     address public override governance;
 
+    /// @notice Governance to take over.
+    address public override newGovernance;
+
     /// @notice Native SOLACE Token.
     SOLACE public override solace;
 
@@ -53,14 +56,26 @@ contract Master is IMaster {
     }
 
     /**
-     * @notice Transfers the governance role to a new governor.
+     * @notice Allows governance to be transferred to a new governor.
      * Can only be called by the current governor.
      * @param _governance The new governor.
      */
     function setGovernance(address _governance) external override {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
-        governance = _governance;
+        newGovernance = _governance;
+    }
+
+    /**
+     * @notice Accepts the governance role.
+     * Can only be called by the new governor.
+     */
+    function acceptGovernance() external override {
+        // can only be called by new governor
+        require(msg.sender == newGovernance, "!governance");
+        governance = newGovernance;
+        newGovernance = address(0x0);
+        emit GovernanceTransferred(msg.sender);
     }
 
     /**
@@ -107,15 +122,15 @@ contract Master is IMaster {
         // accounting
         solacePerBlock = _solacePerBlock;
         _updateRewards();
+        emit RewardsSet(_solacePerBlock);
     }
 
     /**
     * @notice Updates all farms to be up to date to the current block.
     */
     function massUpdateFarms() public override {
-      uint256 farmId;
       uint256 _numFarms = numFarms; // copy to memory to save gas
-      for (farmId = 1; farmId <= _numFarms; ++farmId) {
+      for (uint256 farmId = 1; farmId <= _numFarms; ++farmId) {
         IFarm(farmAddresses[farmId]).updateFarm();
       }
     }
@@ -135,10 +150,11 @@ contract Master is IMaster {
      * @notice Updates each farm's block rewards.
      */
     function _updateRewards() internal {
-        uint256 farmId;
         uint256 _numFarms = numFarms; // copy to memory to save gas
-        for (farmId = 1; farmId <= _numFarms; ++farmId) {
-            uint256 blockReward = totalAllocPoints == 0 ? 0 : solacePerBlock * allocPoints[farmId] / totalAllocPoints;
+        uint256 _solacePerBlock = solacePerBlock;
+        uint256 _totalAllocPoints = totalAllocPoints;
+        for (uint256 farmId = 1; farmId <= _numFarms; ++farmId) {
+            uint256 blockReward = _totalAllocPoints == 0 ? 0 : _solacePerBlock * allocPoints[farmId] / _totalAllocPoints;
             IFarm(farmAddresses[farmId]).setRewards(blockReward);
         }
     }

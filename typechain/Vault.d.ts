@@ -24,6 +24,7 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 interface VaultInterface extends ethers.utils.Interface {
   functions: {
     "DOMAIN_SEPARATOR()": FunctionFragment;
+    "acceptGovernance()": FunctionFragment;
     "activation()": FunctionFragment;
     "addStrategy(address,uint256,uint256,uint256,uint256)": FunctionFragment;
     "addStrategyToQueue(address)": FunctionFragment;
@@ -37,6 +38,7 @@ interface VaultInterface extends ethers.utils.Interface {
     "decreaseAllowance(address,uint256)": FunctionFragment;
     "delegatedAssets()": FunctionFragment;
     "deposit()": FunctionFragment;
+    "depositWeth(uint256)": FunctionFragment;
     "emergencyShutdown()": FunctionFragment;
     "expectedReturn(address)": FunctionFragment;
     "governance()": FunctionFragment;
@@ -48,6 +50,7 @@ interface VaultInterface extends ethers.utils.Interface {
     "maxRedeemableShares(address)": FunctionFragment;
     "minCapitalRequirement()": FunctionFragment;
     "name()": FunctionFragment;
+    "newGovernance()": FunctionFragment;
     "nonces(address)": FunctionFragment;
     "performanceFee()": FunctionFragment;
     "permit(address,address,uint256,uint256,uint8,bytes32,bytes32)": FunctionFragment;
@@ -81,6 +84,10 @@ interface VaultInterface extends ethers.utils.Interface {
 
   encodeFunctionData(
     functionFragment: "DOMAIN_SEPARATOR",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "acceptGovernance",
     values?: undefined
   ): string;
   encodeFunctionData(
@@ -124,6 +131,10 @@ interface VaultInterface extends ethers.utils.Interface {
   ): string;
   encodeFunctionData(functionFragment: "deposit", values?: undefined): string;
   encodeFunctionData(
+    functionFragment: "depositWeth",
+    values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
     functionFragment: "emergencyShutdown",
     values?: undefined
   ): string;
@@ -164,6 +175,10 @@ interface VaultInterface extends ethers.utils.Interface {
     values?: undefined
   ): string;
   encodeFunctionData(functionFragment: "name", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "newGovernance",
+    values?: undefined
+  ): string;
   encodeFunctionData(functionFragment: "nonces", values: [string]): string;
   encodeFunctionData(
     functionFragment: "performanceFee",
@@ -272,6 +287,10 @@ interface VaultInterface extends ethers.utils.Interface {
     functionFragment: "DOMAIN_SEPARATOR",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(
+    functionFragment: "acceptGovernance",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "activation", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "addStrategy",
@@ -303,6 +322,10 @@ interface VaultInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "deposit", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "depositWeth",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "emergencyShutdown",
     data: BytesLike
@@ -338,6 +361,10 @@ interface VaultInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "name", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "newGovernance",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "nonces", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "performanceFee",
@@ -427,6 +454,7 @@ interface VaultInterface extends ethers.utils.Interface {
     "ClaimProcessed(address,uint256)": EventFragment;
     "DepositMade(address,uint256,uint256)": EventFragment;
     "EmergencyShutdown(bool)": EventFragment;
+    "GovernanceTransferred(address)": EventFragment;
     "StrategyAdded(address,uint256,uint256,uint256,uint256)": EventFragment;
     "StrategyAddedToQueue(address)": EventFragment;
     "StrategyRemovedFromQueue(address)": EventFragment;
@@ -445,6 +473,7 @@ interface VaultInterface extends ethers.utils.Interface {
   getEvent(nameOrSignatureOrTopic: "ClaimProcessed"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "DepositMade"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "EmergencyShutdown"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "GovernanceTransferred"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "StrategyAdded"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "StrategyAddedToQueue"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "StrategyRemovedFromQueue"): EventFragment;
@@ -490,6 +519,10 @@ export class Vault extends Contract {
     ): Promise<{
       0: string;
     }>;
+
+    acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
 
     activation(
       overrides?: CallOverrides
@@ -653,6 +686,16 @@ export class Vault extends Contract {
 
     "deposit()"(overrides?: PayableOverrides): Promise<ContractTransaction>;
 
+    depositWeth(
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "depositWeth(uint256)"(
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
     emergencyShutdown(
       overrides?: CallOverrides
     ): Promise<{
@@ -784,6 +827,18 @@ export class Vault extends Contract {
     }>;
 
     "name()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    newGovernance(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "newGovernance()"(
       overrides?: CallOverrides
     ): Promise<{
       0: string;
@@ -1184,6 +1239,10 @@ export class Vault extends Contract {
 
   "DOMAIN_SEPARATOR()"(overrides?: CallOverrides): Promise<string>;
 
+  acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+  "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
+
   activation(overrides?: CallOverrides): Promise<BigNumber>;
 
   "activation()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -1295,6 +1354,16 @@ export class Vault extends Contract {
 
   "deposit()"(overrides?: PayableOverrides): Promise<ContractTransaction>;
 
+  depositWeth(
+    amount: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "depositWeth(uint256)"(
+    amount: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
   emergencyShutdown(overrides?: CallOverrides): Promise<boolean>;
 
   "emergencyShutdown()"(overrides?: CallOverrides): Promise<boolean>;
@@ -1358,6 +1427,10 @@ export class Vault extends Contract {
   name(overrides?: CallOverrides): Promise<string>;
 
   "name()"(overrides?: CallOverrides): Promise<string>;
+
+  newGovernance(overrides?: CallOverrides): Promise<string>;
+
+  "newGovernance()"(overrides?: CallOverrides): Promise<string>;
 
   nonces(owner: string, overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -1675,6 +1748,10 @@ export class Vault extends Contract {
 
     "DOMAIN_SEPARATOR()"(overrides?: CallOverrides): Promise<string>;
 
+    acceptGovernance(overrides?: CallOverrides): Promise<void>;
+
+    "acceptGovernance()"(overrides?: CallOverrides): Promise<void>;
+
     activation(overrides?: CallOverrides): Promise<BigNumber>;
 
     "activation()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -1786,6 +1863,13 @@ export class Vault extends Contract {
 
     "deposit()"(overrides?: CallOverrides): Promise<void>;
 
+    depositWeth(amount: BigNumberish, overrides?: CallOverrides): Promise<void>;
+
+    "depositWeth(uint256)"(
+      amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
     emergencyShutdown(overrides?: CallOverrides): Promise<boolean>;
 
     "emergencyShutdown()"(overrides?: CallOverrides): Promise<boolean>;
@@ -1849,6 +1933,10 @@ export class Vault extends Contract {
     name(overrides?: CallOverrides): Promise<string>;
 
     "name()"(overrides?: CallOverrides): Promise<string>;
+
+    newGovernance(overrides?: CallOverrides): Promise<string>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<string>;
 
     nonces(owner: string, overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -2179,6 +2267,8 @@ export class Vault extends Contract {
 
     EmergencyShutdown(active: null): EventFilter;
 
+    GovernanceTransferred(_newGovernance: null): EventFilter;
+
     StrategyAdded(
       strategy: string | null,
       debtRatio: null,
@@ -2239,6 +2329,10 @@ export class Vault extends Contract {
     DOMAIN_SEPARATOR(overrides?: CallOverrides): Promise<BigNumber>;
 
     "DOMAIN_SEPARATOR()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    acceptGovernance(overrides?: Overrides): Promise<BigNumber>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<BigNumber>;
 
     activation(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -2351,6 +2445,16 @@ export class Vault extends Contract {
 
     "deposit()"(overrides?: PayableOverrides): Promise<BigNumber>;
 
+    depositWeth(
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "depositWeth(uint256)"(
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
     emergencyShutdown(overrides?: CallOverrides): Promise<BigNumber>;
 
     "emergencyShutdown()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -2414,6 +2518,10 @@ export class Vault extends Contract {
     name(overrides?: CallOverrides): Promise<BigNumber>;
 
     "name()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    newGovernance(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     nonces(owner: string, overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -2693,6 +2801,10 @@ export class Vault extends Contract {
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
+    acceptGovernance(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<PopulatedTransaction>;
+
     activation(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "activation()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
@@ -2809,6 +2921,16 @@ export class Vault extends Contract {
 
     "deposit()"(overrides?: PayableOverrides): Promise<PopulatedTransaction>;
 
+    depositWeth(
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "depositWeth(uint256)"(
+      amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
     emergencyShutdown(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "emergencyShutdown()"(
@@ -2882,6 +3004,10 @@ export class Vault extends Contract {
     name(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "name()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    newGovernance(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     nonces(
       owner: string,

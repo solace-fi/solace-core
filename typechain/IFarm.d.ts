@@ -22,12 +22,14 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
 interface IFarmInterface extends ethers.utils.Interface {
   functions: {
+    "acceptGovernance()": FunctionFragment;
     "blockReward()": FunctionFragment;
     "endBlock()": FunctionFragment;
     "farmType()": FunctionFragment;
     "getMultiplier(uint256,uint256)": FunctionFragment;
     "governance()": FunctionFragment;
     "master()": FunctionFragment;
+    "newGovernance()": FunctionFragment;
     "pendingRewards(address)": FunctionFragment;
     "setEnd(uint256)": FunctionFragment;
     "setGovernance(address)": FunctionFragment;
@@ -37,6 +39,10 @@ interface IFarmInterface extends ethers.utils.Interface {
     "withdrawRewards()": FunctionFragment;
   };
 
+  encodeFunctionData(
+    functionFragment: "acceptGovernance",
+    values?: undefined
+  ): string;
   encodeFunctionData(
     functionFragment: "blockReward",
     values?: undefined
@@ -52,6 +58,10 @@ interface IFarmInterface extends ethers.utils.Interface {
     values?: undefined
   ): string;
   encodeFunctionData(functionFragment: "master", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "newGovernance",
+    values?: undefined
+  ): string;
   encodeFunctionData(
     functionFragment: "pendingRewards",
     values: [string]
@@ -82,6 +92,10 @@ interface IFarmInterface extends ethers.utils.Interface {
   ): string;
 
   decodeFunctionResult(
+    functionFragment: "acceptGovernance",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "blockReward",
     data: BytesLike
   ): Result;
@@ -93,6 +107,10 @@ interface IFarmInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(functionFragment: "governance", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "master", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "newGovernance",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "pendingRewards",
     data: BytesLike
@@ -110,7 +128,11 @@ interface IFarmInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
 
-  events: {};
+  events: {
+    "GovernanceTransferred(address)": EventFragment;
+  };
+
+  getEvent(nameOrSignatureOrTopic: "GovernanceTransferred"): EventFragment;
 }
 
 export class IFarm extends Contract {
@@ -127,6 +149,10 @@ export class IFarm extends Contract {
   interface: IFarmInterface;
 
   functions: {
+    acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
+
     blockReward(
       overrides?: CallOverrides
     ): Promise<{
@@ -203,6 +229,18 @@ export class IFarm extends Contract {
       0: string;
     }>;
 
+    newGovernance(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "newGovernance()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
     pendingRewards(
       _user: string,
       overrides?: CallOverrides
@@ -268,6 +306,10 @@ export class IFarm extends Contract {
     "withdrawRewards()"(overrides?: Overrides): Promise<ContractTransaction>;
   };
 
+  acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+  "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
+
   blockReward(overrides?: CallOverrides): Promise<BigNumber>;
 
   "blockReward()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -299,6 +341,10 @@ export class IFarm extends Contract {
   master(overrides?: CallOverrides): Promise<string>;
 
   "master()"(overrides?: CallOverrides): Promise<string>;
+
+  newGovernance(overrides?: CallOverrides): Promise<string>;
+
+  "newGovernance()"(overrides?: CallOverrides): Promise<string>;
 
   pendingRewards(_user: string, overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -350,6 +396,10 @@ export class IFarm extends Contract {
   "withdrawRewards()"(overrides?: Overrides): Promise<ContractTransaction>;
 
   callStatic: {
+    acceptGovernance(overrides?: CallOverrides): Promise<void>;
+
+    "acceptGovernance()"(overrides?: CallOverrides): Promise<void>;
+
     blockReward(overrides?: CallOverrides): Promise<BigNumber>;
 
     "blockReward()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -381,6 +431,10 @@ export class IFarm extends Contract {
     master(overrides?: CallOverrides): Promise<string>;
 
     "master()"(overrides?: CallOverrides): Promise<string>;
+
+    newGovernance(overrides?: CallOverrides): Promise<string>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<string>;
 
     pendingRewards(
       _user: string,
@@ -432,9 +486,15 @@ export class IFarm extends Contract {
     "withdrawRewards()"(overrides?: CallOverrides): Promise<void>;
   };
 
-  filters: {};
+  filters: {
+    GovernanceTransferred(_newGovernance: null): EventFilter;
+  };
 
   estimateGas: {
+    acceptGovernance(overrides?: Overrides): Promise<BigNumber>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<BigNumber>;
+
     blockReward(overrides?: CallOverrides): Promise<BigNumber>;
 
     "blockReward()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -466,6 +526,10 @@ export class IFarm extends Contract {
     master(overrides?: CallOverrides): Promise<BigNumber>;
 
     "master()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    newGovernance(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     pendingRewards(
       _user: string,
@@ -518,6 +582,10 @@ export class IFarm extends Contract {
   };
 
   populateTransaction: {
+    acceptGovernance(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<PopulatedTransaction>;
+
     blockReward(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "blockReward()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
@@ -549,6 +617,10 @@ export class IFarm extends Contract {
     master(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "master()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    newGovernance(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     pendingRewards(
       _user: string,

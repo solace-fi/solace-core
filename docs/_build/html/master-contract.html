@@ -1032,7 +1032,23 @@ Both ERC-20 and ERC-721 tokens can be staked.</p>
 142
 143
 144
-145</pre></div></td><td class="code"><div class="highlight"><pre><span></span><span class="c1">// </span><span class="cs">SPDX-License-Identifier:</span><span class="c1"> GPL-3.0-or-later</span>
+145
+146
+147
+148
+149
+150
+151
+152
+153
+154
+155
+156
+157
+158
+159
+160
+161</pre></div></td><td class="code"><div class="highlight"><pre><span></span><span class="c1">// </span><span class="cs">SPDX-License-Identifier:</span><span class="c1"> GPL-3.0-or-later</span>
 <span class="k">pragma solidity</span> <span class="mf">0.8</span><span class="p">.</span><span class="mi">0</span><span class="p">;</span>
 
 <span class="kn">import</span> <span class="s">&quot;./libraries/Math.sol&quot;</span><span class="p">;</span>
@@ -1050,6 +1066,9 @@ Both ERC-20 and ERC-721 tokens can be staked.</p>
 
     <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Governor.</span>
     <span class="kt">address</span> <span class="k">public</span> <span class="k">override</span> <span class="n">governance</span><span class="p">;</span>
+
+    <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Governance to take over.</span>
+    <span class="kt">address</span> <span class="k">public</span> <span class="k">override</span> <span class="n">newGovernance</span><span class="p">;</span>
 
     <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Native SOLACE Token.</span>
     <span class="n">SOLACE</span> <span class="k">public</span> <span class="k">override</span> <span class="n">solace</span><span class="p">;</span>
@@ -1087,14 +1106,26 @@ Both ERC-20 and ERC-721 tokens can be staked.</p>
     <span class="p">}</span>
 
     <span class="cm">/**</span>
-<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Transfers the governance role to a new governor.</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Allows governance to be transferred to a new governor.</span>
 <span class="cm">     * Can only be called by the current governor.</span>
 <span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _governance The new governor.</span>
 <span class="cm">     */</span>
     <span class="kd">function</span> <span class="n">setGovernance</span><span class="p">(</span><span class="kt">address</span> <span class="n">_governance</span><span class="p">)</span> <span class="k">external</span> <span class="k">override</span> <span class="p">{</span>
         <span class="c1">// can only be called by governor</span>
         <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
-        <span class="n">governance</span> <span class="o">=</span> <span class="n">_governance</span><span class="p">;</span>
+        <span class="n">newGovernance</span> <span class="o">=</span> <span class="n">_governance</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Accepts the governance role.</span>
+<span class="cm">     * Can only be called by the new governor.</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">acceptGovernance</span><span class="p">()</span> <span class="k">external</span> <span class="k">override</span> <span class="p">{</span>
+        <span class="c1">// can only be called by new governor</span>
+        <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">newGovernance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
+        <span class="n">governance</span> <span class="o">=</span> <span class="n">newGovernance</span><span class="p">;</span>
+        <span class="n">newGovernance</span> <span class="o">=</span> <span class="kt">address</span><span class="p">(</span><span class="mh">0x0</span><span class="p">);</span>
+        <span class="k">emit</span> <span class="n">GovernanceTransferred</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">);</span>
     <span class="p">}</span>
 
     <span class="cm">/**</span>
@@ -1141,15 +1172,15 @@ Both ERC-20 and ERC-721 tokens can be staked.</p>
         <span class="c1">// accounting</span>
         <span class="n">solacePerBlock</span> <span class="o">=</span> <span class="n">_solacePerBlock</span><span class="p">;</span>
         <span class="n">_updateRewards</span><span class="p">();</span>
+        <span class="k">emit</span> <span class="n">RewardsSet</span><span class="p">(</span><span class="n">_solacePerBlock</span><span class="p">);</span>
     <span class="p">}</span>
 
     <span class="cm">/**</span>
 <span class="cm">    * </span><span class="cs">@notice</span><span class="cm"> Updates all farms to be up to date to the current block.</span>
 <span class="cm">    */</span>
     <span class="kd">function</span> <span class="n">massUpdateFarms</span><span class="p">()</span> <span class="k">public</span> <span class="k">override</span> <span class="p">{</span>
-      <span class="kt">uint256</span> <span class="n">farmId</span><span class="p">;</span>
       <span class="kt">uint256</span> <span class="n">_numFarms</span> <span class="o">=</span> <span class="n">numFarms</span><span class="p">;</span> <span class="c1">// copy to memory to save gas</span>
-      <span class="k">for</span> <span class="p">(</span><span class="n">farmId</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span> <span class="n">farmId</span> <span class="o">&lt;=</span> <span class="n">_numFarms</span><span class="p">;</span> <span class="o">++</span><span class="n">farmId</span><span class="p">)</span> <span class="p">{</span>
+      <span class="k">for</span> <span class="p">(</span><span class="kt">uint256</span> <span class="n">farmId</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span> <span class="n">farmId</span> <span class="o">&lt;=</span> <span class="n">_numFarms</span><span class="p">;</span> <span class="o">++</span><span class="n">farmId</span><span class="p">)</span> <span class="p">{</span>
         <span class="n">IFarm</span><span class="p">(</span><span class="n">farmAddresses</span><span class="p">[</span><span class="n">farmId</span><span class="p">]).</span><span class="n">updateFarm</span><span class="p">();</span>
       <span class="p">}</span>
     <span class="p">}</span>
@@ -1169,10 +1200,11 @@ Both ERC-20 and ERC-721 tokens can be staked.</p>
 <span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Updates each farm&#39;s block rewards.</span>
 <span class="cm">     */</span>
     <span class="kd">function</span> <span class="n">_updateRewards</span><span class="p">()</span> <span class="k">internal</span> <span class="p">{</span>
-        <span class="kt">uint256</span> <span class="n">farmId</span><span class="p">;</span>
         <span class="kt">uint256</span> <span class="n">_numFarms</span> <span class="o">=</span> <span class="n">numFarms</span><span class="p">;</span> <span class="c1">// copy to memory to save gas</span>
-        <span class="k">for</span> <span class="p">(</span><span class="n">farmId</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span> <span class="n">farmId</span> <span class="o">&lt;=</span> <span class="n">_numFarms</span><span class="p">;</span> <span class="o">++</span><span class="n">farmId</span><span class="p">)</span> <span class="p">{</span>
-            <span class="kt">uint256</span> <span class="n">blockReward</span> <span class="o">=</span> <span class="n">totalAllocPoints</span> <span class="o">==</span> <span class="mi">0</span> <span class="o">?</span> <span class="mi">0</span> <span class="o">:</span> <span class="n">solacePerBlock</span> <span class="o">*</span> <span class="n">allocPoints</span><span class="p">[</span><span class="n">farmId</span><span class="p">]</span> <span class="o">/</span> <span class="n">totalAllocPoints</span><span class="p">;</span>
+        <span class="kt">uint256</span> <span class="n">_solacePerBlock</span> <span class="o">=</span> <span class="n">solacePerBlock</span><span class="p">;</span>
+        <span class="kt">uint256</span> <span class="n">_totalAllocPoints</span> <span class="o">=</span> <span class="n">totalAllocPoints</span><span class="p">;</span>
+        <span class="k">for</span> <span class="p">(</span><span class="kt">uint256</span> <span class="n">farmId</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span> <span class="n">farmId</span> <span class="o">&lt;=</span> <span class="n">_numFarms</span><span class="p">;</span> <span class="o">++</span><span class="n">farmId</span><span class="p">)</span> <span class="p">{</span>
+            <span class="kt">uint256</span> <span class="n">blockReward</span> <span class="o">=</span> <span class="n">_totalAllocPoints</span> <span class="o">==</span> <span class="mi">0</span> <span class="o">?</span> <span class="mi">0</span> <span class="o">:</span> <span class="n">_solacePerBlock</span> <span class="o">*</span> <span class="n">allocPoints</span><span class="p">[</span><span class="n">farmId</span><span class="p">]</span> <span class="o">/</span> <span class="n">_totalAllocPoints</span><span class="p">;</span>
             <span class="n">IFarm</span><span class="p">(</span><span class="n">farmAddresses</span><span class="p">[</span><span class="n">farmId</span><span class="p">]).</span><span class="n">setRewards</span><span class="p">(</span><span class="n">blockReward</span><span class="p">);</span>
         <span class="p">}</span>
     <span class="p">}</span>

@@ -14,7 +14,11 @@ contract ClaimsEscrow {
         uint256 receivedAt; // used to determine withdrawability after cooldown period
     }
 
+    /// @notice Governor.
     address public governance;
+
+    /// @notice Governance to take over.
+    address public newGovernance;
 
     uint256 constant COOLDOWN_PERIOD = 1209600; // 14 days
 
@@ -27,11 +31,36 @@ contract ClaimsEscrow {
     mapping (uint256 => Claim) public claims;
 
     event ClaimWithdrawn(uint256 indexed claimId, address indexed claimant, uint256 indexed amount);
+    // Emitted when Governance is set
+    event GovernanceTransferred(address _newGovernance);
 
     constructor (address _registry) {
         governance = msg.sender;
         registry = IRegistry(_registry);
         _claimId = 0;
+    }
+
+    /**
+     * @notice Allows governance to be transferred to a new governor.
+     * Can only be called by the current governor.
+     * @param _governance The new governor.
+     */
+    function setGovernance(address _governance) external {
+        // can only be called by governor
+        require(msg.sender == governance, "!governance");
+        newGovernance = _governance;
+    }
+
+    /**
+     * @notice Accepts the governance role.
+     * Can only be called by the new governor.
+     */
+    function acceptGovernance() external {
+        // can only be called by new governor
+        require(msg.sender == newGovernance, "!governance");
+        governance = newGovernance;
+        newGovernance = address(0x0);
+        emit GovernanceTransferred(msg.sender);
     }
 
     /**
@@ -43,8 +72,8 @@ contract ClaimsEscrow {
     function receiveClaim(address _claimant) external payable returns (uint256 claimId) {
         require(msg.sender == registry.vault(), "!vault");
 
-        uint256 claimId = _claimId;
-        
+        claimId = _claimId;
+
         // Add claim to claims mapping
         claims[claimId] = Claim({
             claimant: _claimant,

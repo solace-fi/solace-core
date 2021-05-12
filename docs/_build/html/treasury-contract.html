@@ -741,10 +741,15 @@
 199
 200
 201
-202</pre></div></td><td class="code"><div class="highlight"><pre><span></span><span class="c1">// </span><span class="cs">SPDX-License-Identifier:</span><span class="c1"> GPL-3.0-or-later</span>
+202
+203
+204
+205
+206</pre></div></td><td class="code"><div class="highlight"><pre><span></span><span class="c1">// </span><span class="cs">SPDX-License-Identifier:</span><span class="c1"> GPL-3.0-or-later</span>
 <span class="k">pragma solidity</span> <span class="mf">0.8</span><span class="p">.</span><span class="mi">0</span><span class="p">;</span>
 
 <span class="kn">import</span> <span class="s">&quot;@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol&quot;</span><span class="p">;</span>
+<span class="kn">import</span> <span class="s">&quot;./ReentrancyGuard.sol&quot;</span><span class="p">;</span>
 <span class="kn">import</span> <span class="s">&quot;./interface/ISwapRouter.sol&quot;</span><span class="p">;</span>
 <span class="kn">import</span> <span class="s">&quot;./SOLACE.sol&quot;</span><span class="p">;</span>
 <span class="kn">import</span> <span class="s">&quot;./interface/IWETH10.sol&quot;</span><span class="p">;</span>
@@ -756,14 +761,17 @@
 <span class="cm"> * </span><span class="cs">@author</span><span class="cm"> solace.</span>
 <span class="cm"> * </span><span class="cs">@notice</span><span class="cm"> The war chest of Castle Solace.</span>
 <span class="cm"> */</span>
-<span class="kd">contract</span> <span class="n">Treasury</span> <span class="k">is</span> <span class="n">ITreasury</span> <span class="p">{</span>
+<span class="kd">contract</span> <span class="n">Treasury</span> <span class="k">is</span> <span class="n">ITreasury</span><span class="p">,</span> <span class="n">ReentrancyGuard</span> <span class="p">{</span>
     <span class="kn">using</span> <span class="n">SafeERC20</span> <span class="k">for</span> <span class="n">IERC20</span><span class="p">;</span>
 
     <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Native SOLACE Token.</span>
     <span class="n">SOLACE</span> <span class="k">public</span> <span class="n">solace</span><span class="p">;</span>
 
     <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Governor.</span>
-    <span class="kt">address</span> <span class="k">public</span> <span class="n">governance</span><span class="p">;</span>
+    <span class="kt">address</span> <span class="k">public</span> <span class="k">override</span> <span class="n">governance</span><span class="p">;</span>
+
+    <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Governance to take over.</span>
+    <span class="kt">address</span> <span class="k">public</span> <span class="k">override</span> <span class="n">newGovernance</span><span class="p">;</span>
 
     <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Address of Uniswap router.</span>
     <span class="n">ISwapRouter</span> <span class="k">public</span> <span class="n">swapRouter</span><span class="p">;</span>
@@ -773,16 +781,6 @@
 
     <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Given a token, what swap path should it take.</span>
     <span class="kd">mapping</span><span class="p">(</span><span class="kt">address</span> <span class="o">=&gt;</span> <span class="kt">bytes</span><span class="p">)</span> <span class="k">public</span> <span class="n">paths</span><span class="p">;</span>
-
-    <span class="c1">// events</span>
-    <span class="c1">// Emitted when eth is deposited</span>
-    <span class="kd">event</span> <span class="n">DepositEth</span><span class="p">(</span><span class="kt">uint256</span> <span class="n">_amount</span><span class="p">);</span>
-    <span class="c1">// Emitted when a token is deposited</span>
-    <span class="kd">event</span> <span class="n">DepositToken</span><span class="p">(</span><span class="kt">address</span> <span class="n">_token</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_amount</span><span class="p">);</span>
-    <span class="c1">// Emitted when a token is spent</span>
-    <span class="kd">event</span> <span class="n">Spend</span><span class="p">(</span><span class="kt">address</span> <span class="n">_token</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_amount</span><span class="p">,</span> <span class="kt">address</span> <span class="n">_recipient</span><span class="p">);</span>
-    <span class="c1">// Emitted when a token swap path is set</span>
-    <span class="kd">event</span> <span class="n">PathSet</span><span class="p">(</span><span class="kt">address</span> <span class="n">_token</span><span class="p">,</span> <span class="kt">bytes</span> <span class="n">_path</span><span class="p">);</span>
 
     <span class="cm">/**</span>
 <span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Constructs the treasury contract.</span>
@@ -801,7 +799,7 @@
     <span class="cm">/**</span>
 <span class="cm">     * Receive function. Deposits eth.</span>
 <span class="cm">     */</span>
-    <span class="k k-Function">receive</span> <span class="p">()</span> <span class="k">external</span> <span class="k">payable</span> <span class="k">override</span> <span class="p">{</span>
+    <span class="k k-Function">receive</span> <span class="p">()</span> <span class="k">external</span> <span class="k">payable</span> <span class="k">override</span> <span class="n">nonReentrant</span> <span class="p">{</span>
         <span class="n">_depositEth</span><span class="p">();</span>
     <span class="p">}</span>
 
@@ -809,20 +807,31 @@
     <span class="cm">/**</span>
 <span class="cm">     * Fallback function. Deposits eth.</span>
 <span class="cm">     */</span>
-    <span class="k k-Function">fallback</span> <span class="p">()</span> <span class="k">external</span> <span class="k">payable</span> <span class="k">override</span> <span class="p">{</span>
+    <span class="k k-Function">fallback</span> <span class="p">()</span> <span class="k">external</span> <span class="k">payable</span> <span class="k">override</span> <span class="n">nonReentrant</span> <span class="p">{</span>
         <span class="n">_depositEth</span><span class="p">();</span>
     <span class="p">}</span>
 
     <span class="cm">/**</span>
-<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Transfers the governance role to a new governor.</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Allows governance to be transferred to a new governor.</span>
 <span class="cm">     * Can only be called by the current governor.</span>
 <span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _governance The new governor.</span>
 <span class="cm">     */</span>
     <span class="kd">function</span> <span class="n">setGovernance</span><span class="p">(</span><span class="kt">address</span> <span class="n">_governance</span><span class="p">)</span> <span class="k">external</span> <span class="k">override</span> <span class="p">{</span>
         <span class="c1">// can only be called by governor</span>
         <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
-        <span class="c1">// set governance</span>
-        <span class="n">governance</span> <span class="o">=</span> <span class="n">_governance</span><span class="p">;</span>
+        <span class="n">newGovernance</span> <span class="o">=</span> <span class="n">_governance</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Accepts the governance role.</span>
+<span class="cm">     * Can only be called by the new governor.</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">acceptGovernance</span><span class="p">()</span> <span class="k">external</span> <span class="k">override</span> <span class="p">{</span>
+        <span class="c1">// can only be called by new governor</span>
+        <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">newGovernance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
+        <span class="n">governance</span> <span class="o">=</span> <span class="n">newGovernance</span><span class="p">;</span>
+        <span class="n">newGovernance</span> <span class="o">=</span> <span class="kt">address</span><span class="p">(</span><span class="mh">0x0</span><span class="p">);</span>
+        <span class="k">emit</span> <span class="n">GovernanceTransferred</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">);</span>
     <span class="p">}</span>
 
     <span class="cm">/**</span>
@@ -832,7 +841,7 @@
 <span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _token The token to set the path for.</span>
 <span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _path The path to take.</span>
 <span class="cm">     */</span>
-    <span class="kd">function</span> <span class="n">setPath</span><span class="p">(</span><span class="kt">address</span> <span class="n">_token</span><span class="p">,</span> <span class="kt">bytes</span> <span class="k">calldata</span> <span class="n">_path</span><span class="p">)</span> <span class="k">external</span> <span class="k">override</span> <span class="p">{</span>
+    <span class="kd">function</span> <span class="n">setPath</span><span class="p">(</span><span class="kt">address</span> <span class="n">_token</span><span class="p">,</span> <span class="kt">bytes</span> <span class="k">calldata</span> <span class="n">_path</span><span class="p">)</span> <span class="k">external</span> <span class="k">override</span> <span class="n">nonReentrant</span> <span class="p">{</span>
         <span class="c1">// can only be called by governor</span>
         <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
         <span class="c1">// set path</span>
@@ -846,7 +855,7 @@
     <span class="cm">/**</span>
 <span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Deposits some ether.</span>
 <span class="cm">     */</span>
-    <span class="kd">function</span> <span class="n">depositEth</span><span class="p">()</span> <span class="k">external</span> <span class="k">override</span> <span class="k">payable</span> <span class="p">{</span>
+    <span class="kd">function</span> <span class="n">depositEth</span><span class="p">()</span> <span class="k">external</span> <span class="k">override</span> <span class="k">payable</span> <span class="n">nonReentrant</span> <span class="p">{</span>
         <span class="n">_depositEth</span><span class="p">();</span>
     <span class="p">}</span>
 
@@ -855,13 +864,13 @@
 <span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _token The address of the token to deposit.</span>
 <span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _amount The amount of the token to deposit.</span>
 <span class="cm">     */</span>
-    <span class="kd">function</span> <span class="n">depositToken</span><span class="p">(</span><span class="kt">address</span> <span class="n">_token</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_amount</span><span class="p">)</span> <span class="k">external</span> <span class="k">override</span> <span class="p">{</span>
+    <span class="kd">function</span> <span class="n">depositToken</span><span class="p">(</span><span class="kt">address</span> <span class="n">_token</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_amount</span><span class="p">)</span> <span class="k">external</span> <span class="k">override</span> <span class="n">nonReentrant</span> <span class="p">{</span>
         <span class="c1">// receive token</span>
         <span class="n">IERC20</span><span class="p">(</span><span class="n">_token</span><span class="p">).</span><span class="n">safeTransferFrom</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">,</span> <span class="kt">address</span><span class="p">(</span><span class="nb">this</span><span class="p">),</span> <span class="n">_amount</span><span class="p">);</span>
         <span class="c1">// perform swap</span>
         <span class="n">_swap</span><span class="p">(</span><span class="n">_token</span><span class="p">);</span>
         <span class="c1">// emit event</span>
-        <span class="k">emit</span> <span class="n">DepositToken</span><span class="p">(</span><span class="n">_token</span><span class="p">,</span> <span class="n">_amount</span><span class="p">);</span>
+        <span class="k">emit</span> <span class="n">TokenDeposited</span><span class="p">(</span><span class="n">_token</span><span class="p">,</span> <span class="n">_amount</span><span class="p">);</span>
     <span class="p">}</span>
 
     <span class="cm">/**</span>
@@ -871,13 +880,13 @@
 <span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _amount The amount of the token to spend.</span>
 <span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _recipient The address of the token receiver.</span>
 <span class="cm">     */</span>
-    <span class="kd">function</span> <span class="n">spend</span><span class="p">(</span><span class="kt">address</span> <span class="n">_token</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_amount</span><span class="p">,</span> <span class="kt">address</span> <span class="n">_recipient</span><span class="p">)</span> <span class="k">external</span> <span class="k">override</span> <span class="p">{</span>
+    <span class="kd">function</span> <span class="n">spend</span><span class="p">(</span><span class="kt">address</span> <span class="n">_token</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_amount</span><span class="p">,</span> <span class="kt">address</span> <span class="n">_recipient</span><span class="p">)</span> <span class="k">external</span> <span class="k">override</span> <span class="n">nonReentrant</span> <span class="p">{</span>
         <span class="c1">// can only be called by governor</span>
         <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
         <span class="c1">// transfer</span>
         <span class="n">IERC20</span><span class="p">(</span><span class="n">_token</span><span class="p">).</span><span class="n">safeTransfer</span><span class="p">(</span><span class="n">_recipient</span><span class="p">,</span> <span class="n">_amount</span><span class="p">);</span>
         <span class="c1">// emit event</span>
-        <span class="k">emit</span> <span class="n">Spend</span><span class="p">(</span><span class="n">_token</span><span class="p">,</span> <span class="n">_amount</span><span class="p">,</span> <span class="n">_recipient</span><span class="p">);</span>
+        <span class="k">emit</span> <span class="n">FundsSpent</span><span class="p">(</span><span class="n">_token</span><span class="p">,</span> <span class="n">_amount</span><span class="p">,</span> <span class="n">_recipient</span><span class="p">);</span>
     <span class="p">}</span>
 
     <span class="cm">/**</span>
@@ -885,12 +894,11 @@
 <span class="cm">     * Can only be called by the current governor.</span>
 <span class="cm">     * </span><span class="cs">@dev</span><span class="cm"> Swaps the entire balance in case some tokens were unknowingly received.</span>
 <span class="cm">     * Reverts if the swap was unsuccessful.</span>
-<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _token The address of the token to swap.</span>
 <span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _path The path of pools to take.</span>
 <span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _amountIn The amount to swap.</span>
 <span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _amountOutMinimum The minimum about to receive.</span>
 <span class="cm">     */</span>
-    <span class="kd">function</span> <span class="n">swap</span><span class="p">(</span><span class="kt">address</span> <span class="n">_token</span><span class="p">,</span> <span class="kt">bytes</span> <span class="k">calldata</span> <span class="n">_path</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_amountIn</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_amountOutMinimum</span><span class="p">)</span> <span class="k">external</span> <span class="k">override</span> <span class="p">{</span>
+    <span class="kd">function</span> <span class="n">swap</span><span class="p">(</span><span class="kt">bytes</span> <span class="k">calldata</span> <span class="n">_path</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_amountIn</span><span class="p">,</span> <span class="kt">uint256</span> <span class="n">_amountOutMinimum</span><span class="p">)</span> <span class="k">external</span> <span class="k">override</span> <span class="n">nonReentrant</span> <span class="p">{</span>
         <span class="c1">// can only be called by governor</span>
         <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
         <span class="c1">// swap</span>
@@ -913,7 +921,7 @@
         <span class="c1">// perform swap</span>
         <span class="n">_swap</span><span class="p">(</span><span class="kt">address</span><span class="p">(</span><span class="n">weth</span><span class="p">));</span>
         <span class="c1">// emit event</span>
-        <span class="k">emit</span> <span class="n">DepositEth</span><span class="p">(</span><span class="nb">msg.value</span><span class="p">);</span>
+        <span class="k">emit</span> <span class="n">EthDeposited</span><span class="p">(</span><span class="nb">msg.value</span><span class="p">);</span>
     <span class="p">}</span>
 
     <span class="cm">/**</span>

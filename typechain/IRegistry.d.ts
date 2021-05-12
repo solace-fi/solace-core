@@ -22,6 +22,7 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
 interface IRegistryInterface extends ethers.utils.Interface {
   functions: {
+    "acceptGovernance()": FunctionFragment;
     "addProduct(address)": FunctionFragment;
     "claimsAdjustor()": FunctionFragment;
     "claimsEscrow()": FunctionFragment;
@@ -30,6 +31,7 @@ interface IRegistryInterface extends ethers.utils.Interface {
     "isProduct(address)": FunctionFragment;
     "locker()": FunctionFragment;
     "master()": FunctionFragment;
+    "newGovernance()": FunctionFragment;
     "numProducts()": FunctionFragment;
     "removeProduct(address)": FunctionFragment;
     "setClaimsAdjustor(address)": FunctionFragment;
@@ -45,6 +47,10 @@ interface IRegistryInterface extends ethers.utils.Interface {
     "vault()": FunctionFragment;
   };
 
+  encodeFunctionData(
+    functionFragment: "acceptGovernance",
+    values?: undefined
+  ): string;
   encodeFunctionData(functionFragment: "addProduct", values: [string]): string;
   encodeFunctionData(
     functionFragment: "claimsAdjustor",
@@ -65,6 +71,10 @@ interface IRegistryInterface extends ethers.utils.Interface {
   encodeFunctionData(functionFragment: "isProduct", values: [string]): string;
   encodeFunctionData(functionFragment: "locker", values?: undefined): string;
   encodeFunctionData(functionFragment: "master", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "newGovernance",
+    values?: undefined
+  ): string;
   encodeFunctionData(
     functionFragment: "numProducts",
     values?: undefined
@@ -94,6 +104,10 @@ interface IRegistryInterface extends ethers.utils.Interface {
   encodeFunctionData(functionFragment: "treasury", values?: undefined): string;
   encodeFunctionData(functionFragment: "vault", values?: undefined): string;
 
+  decodeFunctionResult(
+    functionFragment: "acceptGovernance",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "addProduct", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "claimsAdjustor",
@@ -108,6 +122,10 @@ interface IRegistryInterface extends ethers.utils.Interface {
   decodeFunctionResult(functionFragment: "isProduct", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "locker", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "master", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "newGovernance",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "numProducts",
     data: BytesLike
@@ -140,7 +158,29 @@ interface IRegistryInterface extends ethers.utils.Interface {
   decodeFunctionResult(functionFragment: "treasury", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "vault", data: BytesLike): Result;
 
-  events: {};
+  events: {
+    "ClaimsAdjustorSet(address)": EventFragment;
+    "ClaimsEscrowSet(address)": EventFragment;
+    "GovernanceTransferred(address)": EventFragment;
+    "LockerSet(address)": EventFragment;
+    "MasterSet(address)": EventFragment;
+    "ProductAdded(address)": EventFragment;
+    "ProductRemoved(address)": EventFragment;
+    "SolaceSet(address)": EventFragment;
+    "TreasurySet(address)": EventFragment;
+    "VaultSet(address)": EventFragment;
+  };
+
+  getEvent(nameOrSignatureOrTopic: "ClaimsAdjustorSet"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "ClaimsEscrowSet"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "GovernanceTransferred"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "LockerSet"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "MasterSet"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "ProductAdded"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "ProductRemoved"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "SolaceSet"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "TreasurySet"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "VaultSet"): EventFragment;
 }
 
 export class IRegistry extends Contract {
@@ -157,6 +197,10 @@ export class IRegistry extends Contract {
   interface: IRegistryInterface;
 
   functions: {
+    acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
+
     addProduct(
       _product: string,
       overrides?: Overrides
@@ -189,9 +233,17 @@ export class IRegistry extends Contract {
       0: string;
     }>;
 
-    governance(overrides?: Overrides): Promise<ContractTransaction>;
+    governance(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
 
-    "governance()"(overrides?: Overrides): Promise<ContractTransaction>;
+    "governance()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
 
     isProduct(
       _product: string,
@@ -214,6 +266,18 @@ export class IRegistry extends Contract {
     master(overrides?: Overrides): Promise<ContractTransaction>;
 
     "master()"(overrides?: Overrides): Promise<ContractTransaction>;
+
+    newGovernance(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "newGovernance()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
 
     numProducts(
       overrides?: CallOverrides
@@ -330,6 +394,10 @@ export class IRegistry extends Contract {
     "vault()"(overrides?: Overrides): Promise<ContractTransaction>;
   };
 
+  acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+  "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
+
   addProduct(
     _product: string,
     overrides?: Overrides
@@ -358,9 +426,9 @@ export class IRegistry extends Contract {
     overrides?: CallOverrides
   ): Promise<string>;
 
-  governance(overrides?: Overrides): Promise<ContractTransaction>;
+  governance(overrides?: CallOverrides): Promise<string>;
 
-  "governance()"(overrides?: Overrides): Promise<ContractTransaction>;
+  "governance()"(overrides?: CallOverrides): Promise<string>;
 
   isProduct(_product: string, overrides?: CallOverrides): Promise<boolean>;
 
@@ -376,6 +444,10 @@ export class IRegistry extends Contract {
   master(overrides?: Overrides): Promise<ContractTransaction>;
 
   "master()"(overrides?: Overrides): Promise<ContractTransaction>;
+
+  newGovernance(overrides?: CallOverrides): Promise<string>;
+
+  "newGovernance()"(overrides?: CallOverrides): Promise<string>;
 
   numProducts(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -481,6 +553,10 @@ export class IRegistry extends Contract {
   "vault()"(overrides?: Overrides): Promise<ContractTransaction>;
 
   callStatic: {
+    acceptGovernance(overrides?: CallOverrides): Promise<void>;
+
+    "acceptGovernance()"(overrides?: CallOverrides): Promise<void>;
+
     addProduct(_product: string, overrides?: CallOverrides): Promise<void>;
 
     "addProduct(address)"(
@@ -524,6 +600,10 @@ export class IRegistry extends Contract {
     master(overrides?: CallOverrides): Promise<string>;
 
     "master()"(overrides?: CallOverrides): Promise<string>;
+
+    newGovernance(overrides?: CallOverrides): Promise<string>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<string>;
 
     numProducts(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -614,9 +694,33 @@ export class IRegistry extends Contract {
     "vault()"(overrides?: CallOverrides): Promise<string>;
   };
 
-  filters: {};
+  filters: {
+    ClaimsAdjustorSet(_claimsAdjustor: null): EventFilter;
+
+    ClaimsEscrowSet(_claimsEscrow: null): EventFilter;
+
+    GovernanceTransferred(_newGovernance: null): EventFilter;
+
+    LockerSet(_locker: null): EventFilter;
+
+    MasterSet(_master: null): EventFilter;
+
+    ProductAdded(_product: null): EventFilter;
+
+    ProductRemoved(_product: null): EventFilter;
+
+    SolaceSet(_solace: null): EventFilter;
+
+    TreasurySet(_treasury: null): EventFilter;
+
+    VaultSet(_vault: null): EventFilter;
+  };
 
   estimateGas: {
+    acceptGovernance(overrides?: Overrides): Promise<BigNumber>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<BigNumber>;
+
     addProduct(_product: string, overrides?: Overrides): Promise<BigNumber>;
 
     "addProduct(address)"(
@@ -642,9 +746,9 @@ export class IRegistry extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    governance(overrides?: Overrides): Promise<BigNumber>;
+    governance(overrides?: CallOverrides): Promise<BigNumber>;
 
-    "governance()"(overrides?: Overrides): Promise<BigNumber>;
+    "governance()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     isProduct(_product: string, overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -660,6 +764,10 @@ export class IRegistry extends Contract {
     master(overrides?: Overrides): Promise<BigNumber>;
 
     "master()"(overrides?: Overrides): Promise<BigNumber>;
+
+    newGovernance(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     numProducts(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -751,6 +859,10 @@ export class IRegistry extends Contract {
   };
 
   populateTransaction: {
+    acceptGovernance(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<PopulatedTransaction>;
+
     addProduct(
       _product: string,
       overrides?: Overrides
@@ -779,9 +891,9 @@ export class IRegistry extends Contract {
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
-    governance(overrides?: Overrides): Promise<PopulatedTransaction>;
+    governance(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
-    "governance()"(overrides?: Overrides): Promise<PopulatedTransaction>;
+    "governance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     isProduct(
       _product: string,
@@ -800,6 +912,10 @@ export class IRegistry extends Contract {
     master(overrides?: Overrides): Promise<PopulatedTransaction>;
 
     "master()"(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    newGovernance(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     numProducts(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 

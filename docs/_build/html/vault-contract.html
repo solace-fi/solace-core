@@ -1100,7 +1100,41 @@
 899
 900
 901
-902</pre></div></td><td class="code"><div class="highlight"><pre><span></span><span class="c1">// </span><span class="cs">SPDX-License-Identifier:</span><span class="c1"> GPL-3.0-or-later</span>
+902
+903
+904
+905
+906
+907
+908
+909
+910
+911
+912
+913
+914
+915
+916
+917
+918
+919
+920
+921
+922
+923
+924
+925
+926
+927
+928
+929
+930
+931
+932
+933
+934
+935
+936</pre></div></td><td class="code"><div class="highlight"><pre><span></span><span class="c1">// </span><span class="cs">SPDX-License-Identifier:</span><span class="c1"> GPL-3.0-or-later</span>
 
 <span class="k">pragma solidity</span> <span class="mf">0.8</span><span class="p">.</span><span class="mi">0</span><span class="p">;</span>
 
@@ -1164,8 +1198,11 @@
     <span class="c1">/// WETH</span>
     <span class="n">IERC20</span> <span class="k">public</span> <span class="k">override</span> <span class="n">token</span><span class="p">;</span>
 
-    <span class="c1">/// address with rights to call governance functions</span>
-    <span class="kt">address</span> <span class="k">public</span> <span class="n">governance</span><span class="p">;</span>
+    <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Governor.</span>
+    <span class="kt">address</span> <span class="k">public</span> <span class="k">override</span> <span class="n">governance</span><span class="p">;</span>
+
+    <span class="c1">/// </span><span class="cs">@notice</span><span class="c1"> Governance to take over.</span>
+    <span class="kt">address</span> <span class="k">public</span> <span class="k">override</span> <span class="n">newGovernance</span><span class="p">;</span>
 
     <span class="c1">/// Rewards contract/wallet where Governance fees are sent to</span>
     <span class="kt">address</span> <span class="k">public</span> <span class="n">rewards</span><span class="p">;</span>
@@ -1245,13 +1282,26 @@
 <span class="cm">    *************/</span>
 
     <span class="cm">/**</span>
-<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Transfers the governance role to a new governor.</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Allows governance to be transferred to a new governor.</span>
 <span class="cm">     * Can only be called by the current governor.</span>
-<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _governance the new governor</span>
+<span class="cm">     * </span><span class="cs">@param</span><span class="cm"> _governance The new governor.</span>
 <span class="cm">     */</span>
-    <span class="kd">function</span> <span class="n">setGovernance</span><span class="p">(</span><span class="kt">address</span> <span class="n">_governance</span><span class="p">)</span> <span class="k">external</span> <span class="p">{</span>
+    <span class="kd">function</span> <span class="n">setGovernance</span><span class="p">(</span><span class="kt">address</span> <span class="n">_governance</span><span class="p">)</span> <span class="k">external</span> <span class="k">override</span> <span class="p">{</span>
+        <span class="c1">// can only be called by governor</span>
         <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
-        <span class="n">governance</span> <span class="o">=</span> <span class="n">_governance</span><span class="p">;</span>
+        <span class="n">newGovernance</span> <span class="o">=</span> <span class="n">_governance</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Accepts the governance role.</span>
+<span class="cm">     * Can only be called by the new governor.</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">acceptGovernance</span><span class="p">()</span> <span class="k">external</span> <span class="k">override</span> <span class="p">{</span>
+        <span class="c1">// can only be called by new governor</span>
+        <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">newGovernance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
+        <span class="n">governance</span> <span class="o">=</span> <span class="n">newGovernance</span><span class="p">;</span>
+        <span class="n">newGovernance</span> <span class="o">=</span> <span class="kt">address</span><span class="p">(</span><span class="mh">0x0</span><span class="p">);</span>
+        <span class="k">emit</span> <span class="n">GovernanceTransferred</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">);</span>
     <span class="p">}</span>
 
     <span class="cm">/**</span>
@@ -1397,20 +1447,21 @@
         <span class="nf">require</span><span class="p">(</span><span class="nb">msg.sender</span> <span class="o">==</span> <span class="n">governance</span><span class="p">,</span> <span class="s">&quot;!governance&quot;</span><span class="p">);</span>
         <span class="nf">require</span><span class="p">(</span><span class="n">_strategies</span><span class="p">[</span><span class="n">_strategy</span><span class="p">].</span><span class="n">activation</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span> <span class="s">&quot;must be a current strategy&quot;</span><span class="p">);</span>
 
-        <span class="kt">address</span><span class="p">[]</span> <span class="k">storage</span> <span class="n">newQueue</span><span class="p">;</span>
-
-        <span class="c1">// readd all the strategies from the queue EXCEPT the Strategy we want to remove</span>
-        <span class="k">for</span> <span class="p">(</span><span class="kt">uint256</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">withdrawalQueue</span><span class="p">.</span><span class="n">length</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
-            <span class="k">if</span> <span class="p">(</span><span class="n">withdrawalQueue</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">!=</span> <span class="n">_strategy</span><span class="p">)</span> <span class="p">{</span>
-                <span class="n">newQueue</span><span class="p">.</span><span class="nf">push</span><span class="p">(</span><span class="n">withdrawalQueue</span><span class="p">[</span><span class="n">i</span><span class="p">]);</span>
+        <span class="kt">uint256</span> <span class="n">addIndex</span><span class="p">;</span>
+        <span class="kt">uint256</span> <span class="n">removeIndex</span><span class="p">;</span>
+        <span class="kt">uint256</span> <span class="n">length</span> <span class="o">=</span> <span class="n">withdrawalQueue</span><span class="p">.</span><span class="n">length</span><span class="p">;</span>
+        <span class="k">for</span><span class="p">(</span><span class="n">removeIndex</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">removeIndex</span> <span class="o">&lt;</span> <span class="n">length</span><span class="p">;</span> <span class="o">++</span><span class="n">removeIndex</span><span class="p">)</span> <span class="p">{</span>
+            <span class="k">if</span><span class="p">(</span><span class="n">addIndex</span> <span class="o">!=</span> <span class="n">removeIndex</span><span class="p">)</span> <span class="p">{</span>
+                <span class="n">withdrawalQueue</span><span class="p">[</span><span class="n">addIndex</span><span class="p">]</span> <span class="o">=</span> <span class="n">withdrawalQueue</span><span class="p">[</span><span class="n">removeIndex</span><span class="p">];</span>
+            <span class="p">}</span>
+            <span class="k">if</span><span class="p">(</span><span class="n">withdrawalQueue</span><span class="p">[</span><span class="n">removeIndex</span><span class="p">]</span> <span class="o">!=</span> <span class="n">_strategy</span><span class="p">)</span> <span class="p">{</span>
+                <span class="o">++</span><span class="n">addIndex</span><span class="p">;</span>
             <span class="p">}</span>
         <span class="p">}</span>
-
-        <span class="c1">// we added all the elements back in the queue</span>
-        <span class="k">if</span> <span class="p">(</span><span class="n">withdrawalQueue</span><span class="p">.</span><span class="n">length</span> <span class="o">==</span> <span class="n">newQueue</span><span class="p">.</span><span class="n">length</span><span class="p">)</span> <span class="nf">revert</span><span class="p">(</span><span class="s">&quot;strategy not in queue&quot;</span><span class="p">);</span>
-
-        <span class="c1">// set withdrawalQueue to be the new one without the removed strategy</span>
-        <span class="n">withdrawalQueue</span> <span class="o">=</span> <span class="n">newQueue</span><span class="p">;</span>
+        <span class="nf">require</span><span class="p">(</span><span class="n">addIndex</span> <span class="o">!=</span> <span class="n">removeIndex</span><span class="p">,</span> <span class="s">&quot;strategy not in queue&quot;</span><span class="p">);</span>
+        <span class="k">for</span><span class="p">(</span><span class="n">addIndex</span><span class="p">;</span> <span class="n">addIndex</span> <span class="o">&lt;</span> <span class="n">removeIndex</span><span class="p">;</span> <span class="o">--</span><span class="n">removeIndex</span><span class="p">)</span> <span class="p">{</span>
+            <span class="n">withdrawalQueue</span><span class="p">.</span><span class="n">pop</span><span class="p">();</span>
+        <span class="p">}</span>
         <span class="k">emit</span> <span class="n">StrategyRemovedFromQueue</span><span class="p">(</span><span class="n">_strategy</span><span class="p">);</span>
     <span class="p">}</span>
 
@@ -1552,6 +1603,23 @@
         <span class="c1">// Wrap the depositor&#39;s ETH to add WETH to the vault</span>
         <span class="n">IWETH10</span><span class="p">(</span><span class="kt">address</span><span class="p">(</span><span class="n">token</span><span class="p">)).</span><span class="n">deposit</span><span class="p">{</span><span class="n">value</span><span class="o">:</span> <span class="n">amount</span><span class="p">}();</span>
 
+        <span class="k">emit</span> <span class="n">DepositMade</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">,</span> <span class="n">amount</span><span class="p">,</span> <span class="n">shares</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="cm">/**</span>
+<span class="cm">     * </span><span class="cs">@notice</span><span class="cm"> Allows a user to deposit WETH into the Vault (becoming a Capital Provider)</span>
+<span class="cm">     * Shares of the Vault (CP tokens) are minted to caller</span>
+<span class="cm">     * Deposits `_amount` `token`, issuing shares to `recipient`.</span>
+<span class="cm">     * Reverts if Vault is in Emergency Shutdown</span>
+<span class="cm">     */</span>
+    <span class="kd">function</span> <span class="n">depositWeth</span><span class="p">(</span><span class="kt">uint256</span> <span class="n">amount</span><span class="p">)</span> <span class="k">external</span> <span class="k">override</span> <span class="p">{</span>
+        <span class="nf">require</span><span class="p">(</span><span class="o">!</span><span class="n">emergencyShutdown</span><span class="p">,</span> <span class="s">&quot;cannot deposit when vault is in emergency shutdown&quot;</span><span class="p">);</span>
+        <span class="kt">uint256</span> <span class="n">shares</span> <span class="o">=</span> <span class="n">totalSupply</span><span class="p">()</span> <span class="o">==</span> <span class="mi">0</span>
+            <span class="o">?</span> <span class="n">amount</span>
+            <span class="o">:</span> <span class="p">(</span><span class="n">amount</span> <span class="o">*</span> <span class="n">totalSupply</span><span class="p">())</span> <span class="o">/</span> <span class="n">_totalAssets</span><span class="p">();</span>
+        <span class="c1">// Issuance of shares needs to be done before taking the deposit</span>
+        <span class="n">_mint</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">,</span> <span class="n">shares</span><span class="p">);</span>
+        <span class="n">token</span><span class="p">.</span><span class="n">safeTransferFrom</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">,</span> <span class="kt">address</span><span class="p">(</span><span class="nb">this</span><span class="p">),</span> <span class="n">amount</span><span class="p">);</span>
         <span class="k">emit</span> <span class="n">DepositMade</span><span class="p">(</span><span class="nb">msg.sender</span><span class="p">,</span> <span class="n">amount</span><span class="p">,</span> <span class="n">shares</span><span class="p">);</span>
     <span class="p">}</span>
 

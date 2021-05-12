@@ -62,8 +62,11 @@ contract Vault is ERC20Permit, IVault {
     /// WETH
     IERC20 public override token;
 
-    /// address with rights to call governance functions
-    address public governance;
+    /// @notice Governor.
+    address public override governance;
+
+    /// @notice Governance to take over.
+    address public override newGovernance;
 
     /// Rewards contract/wallet where Governance fees are sent to
     address public rewards;
@@ -143,13 +146,26 @@ contract Vault is ERC20Permit, IVault {
     *************/
 
     /**
-     * @notice Transfers the governance role to a new governor.
+     * @notice Allows governance to be transferred to a new governor.
      * Can only be called by the current governor.
-     * @param _governance the new governor
+     * @param _governance The new governor.
      */
-    function setGovernance(address _governance) external {
+    function setGovernance(address _governance) external override {
+        // can only be called by governor
         require(msg.sender == governance, "!governance");
-        governance = _governance;
+        newGovernance = _governance;
+    }
+
+    /**
+     * @notice Accepts the governance role.
+     * Can only be called by the new governor.
+     */
+    function acceptGovernance() external override {
+        // can only be called by new governor
+        require(msg.sender == newGovernance, "!governance");
+        governance = newGovernance;
+        newGovernance = address(0x0);
+        emit GovernanceTransferred(msg.sender);
     }
 
     /**
@@ -295,20 +311,21 @@ contract Vault is ERC20Permit, IVault {
         require(msg.sender == governance, "!governance");
         require(_strategies[_strategy].activation > 0, "must be a current strategy");
 
-        address[] storage newQueue;
-
-        // readd all the strategies from the queue EXCEPT the Strategy we want to remove
-        for (uint256 i = 0; i < withdrawalQueue.length; i++) {
-            if (withdrawalQueue[i] != _strategy) {
-                newQueue.push(withdrawalQueue[i]);
+        uint256 addIndex;
+        uint256 removeIndex;
+        uint256 length = withdrawalQueue.length;
+        for(removeIndex = 0; removeIndex < length; ++removeIndex) {
+            if(addIndex != removeIndex) {
+                withdrawalQueue[addIndex] = withdrawalQueue[removeIndex];
+            }
+            if(withdrawalQueue[removeIndex] != _strategy) {
+                ++addIndex;
             }
         }
-
-        // we added all the elements back in the queue
-        if (withdrawalQueue.length == newQueue.length) revert("strategy not in queue");
-
-        // set withdrawalQueue to be the new one without the removed strategy
-        withdrawalQueue = newQueue;
+        require(addIndex != removeIndex, "strategy not in queue");
+        for(addIndex; addIndex < removeIndex; --removeIndex) {
+            withdrawalQueue.pop();
+        }
         emit StrategyRemovedFromQueue(_strategy);
     }
 
@@ -450,6 +467,23 @@ contract Vault is ERC20Permit, IVault {
         // Wrap the depositor's ETH to add WETH to the vault
         IWETH10(address(token)).deposit{value: amount}();
 
+        emit DepositMade(msg.sender, amount, shares);
+    }
+
+    /**
+     * @notice Allows a user to deposit WETH into the Vault (becoming a Capital Provider)
+     * Shares of the Vault (CP tokens) are minted to caller
+     * Deposits `_amount` `token`, issuing shares to `recipient`.
+     * Reverts if Vault is in Emergency Shutdown
+     */
+    function depositWeth(uint256 amount) external override {
+        require(!emergencyShutdown, "cannot deposit when vault is in emergency shutdown");
+        uint256 shares = totalSupply() == 0
+            ? amount
+            : (amount * totalSupply()) / _totalAssets();
+        // Issuance of shares needs to be done before taking the deposit
+        _mint(msg.sender, shares);
+        token.safeTransferFrom(msg.sender, address(this), amount);
         emit DepositMade(msg.sender, amount, shares);
     }
 
