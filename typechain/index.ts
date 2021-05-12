@@ -23,6 +23,8 @@ export { MockErc721Factory } from "./MockErc721Factory";
 export type { MockErc721 } from "./MockErc721";
 export { MockErc721AppraiserFactory } from "./MockErc721AppraiserFactory";
 export type { MockErc721Appraiser } from "./MockErc721Appraiser";
+export { MockProductFactory } from "./MockProductFactory";
+export type { MockProduct } from "./MockProduct";
 export { MockStrategyFactory } from "./MockStrategyFactory";
 export type { MockStrategy } from "./MockStrategy";
 export { MockWethFactory } from "./MockWethFactory";
