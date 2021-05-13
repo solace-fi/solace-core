@@ -1,25 +1,17 @@
 import chai from "chai";
 import { ethers, waffle } from "hardhat";
-import VaultArtifact from "../artifacts/contracts/Vault.sol/Vault.json"
-import MasterArtifact from "../artifacts/contracts/Master.sol/Master.json";
-import SolaceArtifact from "../artifacts/contracts/SOLACE.sol/SOLACE.json";
-import StrategyArtifact from "../artifacts/contracts/mocks/MockStrategy.sol/MockStrategy.json"
-import WETHArtifact from "../artifacts/contracts/mocks/MockWETH.sol/MockWETH.json"
-import RegistryArtifact from "../artifacts/contracts/Registry.sol/Registry.json";
-import ClaimsAdjustorArtifact from "../artifacts/contracts/ClaimsAdjustor.sol/ClaimsAdjustor.json";
-import ClaimsEscrowArtifact from "../artifacts/contracts/ClaimsEscrow.sol/ClaimsEscrow.json";
 import { BigNumber as BN, constants } from "ethers";
 import { getPermitDigest, sign, getDomainSeparator } from "./utilities/signature";
-import { Vault, MockStrategy, MockWeth, Registry, Master, Solace, ClaimsAdjustor, ClaimsEscrow } from "../typechain";
-import { SSL_OP_SSLEAY_080_CLIENT_DH_BUG } from "node:constants";
-
 const { expect } = chai;
 const { deployContract, solidity } = waffle;
 const provider = waffle.provider;
-
 chai.use(solidity);
 
+import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
+import { Vault, MockStrategy, MockWeth, Registry, Master, Solace, ClaimsAdjustor, ClaimsEscrow } from "../typechain";
+
 describe("Vault", function () {
+    let artifacts: ArtifactImports;
     let vault: Vault;
     let weth: MockWeth;
     let strategy: MockStrategy;
@@ -58,15 +50,19 @@ describe("Vault", function () {
 
     const MAX_BPS = 10000;
 
+    before(async function () {
+      artifacts = await import_artifacts();
+    })
+
     beforeEach(async () => {
         weth = (await deployContract(
             owner,
-            WETHArtifact
+            artifacts.WETH
         )) as MockWeth;
 
         solace = (await deployContract(
             owner,
-            SolaceArtifact,
+            artifacts.SOLACE,
             [
               newOwner.address,
             ]
@@ -74,7 +70,7 @@ describe("Vault", function () {
 
         master = (await deployContract(
             owner,
-            MasterArtifact,
+            artifacts.Master,
             [
                 newOwner.address,
                 solace.address,
@@ -84,7 +80,7 @@ describe("Vault", function () {
 
         registry = (await deployContract(
             owner,
-            RegistryArtifact,
+            artifacts.Registry,
             [
               owner.address
             ]
@@ -92,37 +88,37 @@ describe("Vault", function () {
 
         vault = (await deployContract(
             owner,
-            VaultArtifact,
+            artifacts.Vault,
             [owner.address, registry.address, weth.address]
         )) as Vault;
 
         strategy = (await deployContract(
             owner,
-            StrategyArtifact,
+            artifacts.MockStrategy,
             [vault.address]
         )) as MockStrategy;
 
         unaddedStrategy = (await deployContract(
             owner,
-            StrategyArtifact,
+            artifacts.MockStrategy,
             [vault.address]
         )) as MockStrategy;
 
         thirdStrategy = (await deployContract(
             owner,
-            StrategyArtifact,
+            artifacts.MockStrategy,
             [vault.address]
         )) as MockStrategy;
 
         claimsEscrow = (await deployContract(
             owner,
-            ClaimsEscrowArtifact,
+            artifacts.ClaimsEscrow,
             [registry.address]
         )) as ClaimsEscrow;
 
         claimsAdjustor = (await deployContract(
             owner,
-            ClaimsAdjustorArtifact,
+            artifacts.ClaimsAdjustor,
             [registry.address]
         )) as ClaimsAdjustor;
 
@@ -709,7 +705,7 @@ describe("Vault", function () {
         it("should hold if receive() sent by weth", async function () {
             let mockVault = (await deployContract(
                 owner,
-                VaultArtifact,
+                artifacts.Vault,
                 [owner.address, registry.address, depositor1.address]
             )) as Vault;
             await depositor1.sendTransaction({
@@ -722,7 +718,7 @@ describe("Vault", function () {
         it("should hold if fallback() sent by weth", async function () {
             let mockVault = (await deployContract(
                 owner,
-                VaultArtifact,
+                artifacts.Vault,
                 [owner.address, registry.address, depositor1.address]
             )) as Vault;
             await depositor1.sendTransaction({

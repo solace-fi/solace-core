@@ -6,26 +6,16 @@ import { BigNumber as BN, BigNumberish, constants, Wallet } from "ethers";
 import { Contract } from "@ethersproject/contracts";
 import chai from "chai";
 const { expect } = chai;
+chai.use(solidity);
 
 import { encodePriceSqrt, FeeAmount, TICK_SPACINGS, getMaxTick, getMinTick } from "./utilities/uniswap";
 import { encodePath } from "./utilities/path";
 
-// solace imports
-import SolaceArtifact from "../artifacts/contracts/SOLACE.sol/SOLACE.json";
-import TreasuryArtifact from "../artifacts/contracts/Treasury.sol/Treasury.json";
-import MockERC20Artifact from "../artifacts/contracts/mocks/MockERC20.sol/MockERC20.json";
-import WETHArtifact from "../artifacts/contracts/mocks/MockWETH.sol/MockWETH.json";
+import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
 import { Solace, Treasury, MockErc20, MockWeth } from "../typechain";
 
-// uniswap imports
-import UniswapV3FactoryArtifact from "@uniswap/v3-core/artifacts/contracts/UniswapV3Factory.sol/UniswapV3Factory.json";
-import UniswapV3PoolArtifact from "@uniswap/v3-core/artifacts/contracts/UniswapV3Pool.sol/UniswapV3Pool.json";
-import SwapRouterArtifact from "@uniswap/v3-periphery/artifacts/contracts/SwapRouter.sol/SwapRouter.json";
-import NonfungiblePositionManager from "@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json";
-
-chai.use(solidity);
-
 describe("Treasury", function () {
+  let artifacts: ArtifactImports;
   // users
   let deployer: any;
   let governor: any;
@@ -82,10 +72,12 @@ describe("Treasury", function () {
       [deployer, governor, liquidityProvider, mockPolicy, user, randAddress] = await ethers.getSigners();
     }
 
+    artifacts = await import_artifacts();
+
     // deploy solace token
     solaceToken = (await deployContract(
       deployer,
-      SolaceArtifact,
+      artifacts.SOLACE,
       [
         governor.address,
       ]
@@ -94,13 +86,13 @@ describe("Treasury", function () {
     // deploy weth
     weth = (await deployContract(
         deployer,
-        WETHArtifact
+        artifacts.WETH
     )) as MockWeth;
 
     // deploy mock token 1
     mockToken1 = (await deployContract(
         deployer,
-        MockERC20Artifact,
+        artifacts.MockERC20,
         [
           "Mock Token 1",
           "MKT1",
@@ -111,7 +103,7 @@ describe("Treasury", function () {
     // deploy mock token 2
     mockToken2 = (await deployContract(
         deployer,
-        MockERC20Artifact,
+        artifacts.MockERC20,
         [
           "Mock Token 2",
           "MKT2",
@@ -122,7 +114,7 @@ describe("Treasury", function () {
     // deploy mock token 3
     mockToken3 = (await deployContract(
         deployer,
-        MockERC20Artifact,
+        artifacts.MockERC20,
         [
           "Mock Token 3",
           "MKT3",
@@ -133,7 +125,7 @@ describe("Treasury", function () {
     // deploy mock token 4
     mockToken4 = (await deployContract(
         deployer,
-        MockERC20Artifact,
+        artifacts.MockERC20,
         [
           "Mock Token 4",
           "MKT4",
@@ -144,13 +136,13 @@ describe("Treasury", function () {
     // deploy uniswap factory
     uniswapFactory = (await deployContract(
       deployer,
-      UniswapV3FactoryArtifact
+      artifacts.UniswapV3Factory
     )) as Contract;
 
     // deploy uniswap router
     uniswapRouter = (await deployContract(
       deployer,
-      SwapRouterArtifact,
+      artifacts.SwapRouter,
       [
         uniswapFactory.address,
         weth.address
@@ -160,7 +152,7 @@ describe("Treasury", function () {
     // deploy uniswap position manager
     uniswapPositionManager = (await deployContract(
       deployer,
-      NonfungiblePositionManager,
+      artifacts.NonfungiblePositionManager,
       [
         uniswapFactory.address,
         weth.address,
@@ -171,7 +163,7 @@ describe("Treasury", function () {
     // deploy treasury contract
     treasury = (await deployContract(
       deployer,
-      TreasuryArtifact,
+      artifacts.Treasury,
       [
         governor.address,
         solaceToken.address,
@@ -487,9 +479,9 @@ describe("Treasury", function () {
     expect(events && events.length > 0 && events[0].args && events[0].args.pool);
     if(events && events.length > 0 && events[0].args && events[0].args.pool) {
       let poolAddress = events[0].args.pool;
-      pool = (new Contract(poolAddress, UniswapV3PoolArtifact.abi)) as Contract;
+      pool = (new Contract(poolAddress, artifacts.UniswapV3Pool.abi)) as Contract;
     } else {
-      pool = (new Contract(ZERO_ADDRESS, UniswapV3PoolArtifact.abi)) as Contract;
+      pool = (new Contract(ZERO_ADDRESS, artifacts.UniswapV3Pool.abi)) as Contract;
       expect(true).to.equal(false);
     }
     expect(pool).to.exist;

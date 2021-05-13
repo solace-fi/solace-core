@@ -5,20 +5,14 @@ const provider: MockProvider = waffle.provider;
 import { Wallet } from "ethers";
 import chai from "chai";
 const { expect } = chai;
-
-import RegistryArtifact from "../artifacts/contracts/Registry.sol/Registry.json";
-import SolaceArtifact from "../artifacts/contracts/SOLACE.sol/SOLACE.json";
-import MasterArtifact from "../artifacts/contracts/Master.sol/Master.json";
-import VaultArtifact from "../artifacts/contracts/Vault.sol/Vault.json";
-import TreasuryArtifact from "../artifacts/contracts/Treasury.sol/Treasury.json";
-import ClaimsAdjustorArtifact from "../artifacts/contracts/ClaimsAdjustor.sol/ClaimsAdjustor.json";
-import ClaimsEscrowArtifact from "../artifacts/contracts/ClaimsEscrow.sol/ClaimsEscrow.json";
-import WETHArtifact from "../artifacts/contracts/mocks/MockWETH.sol/MockWETH.json";
-import { Registry, Solace, Master, Vault, Treasury, ClaimsAdjustor, ClaimsEscrow, MockWeth } from "../typechain";
-
 chai.use(solidity);
 
+import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
+import { Registry, Solace, Master, Vault, Treasury, ClaimsAdjustor, ClaimsEscrow, MockWeth } from "../typechain";
+
+
 describe("Registry", function () {
+  let artifacts: ArtifactImports;
   // users
   let deployer: Wallet;
   let governor: Wallet;
@@ -44,16 +38,17 @@ describe("Registry", function () {
 
   before(async function () {
     [deployer, governor, user, locker, mockContract1, mockContract2, mockContract3] = provider.getWallets();
-
+    artifacts = await import_artifacts();
+    
     weth = (await deployContract(
       deployer,
-      WETHArtifact
+      artifacts.WETH
   )) as MockWeth;
 
     // deploy registry contract
     registry = (await deployContract(
       deployer,
-      RegistryArtifact,
+      artifacts.Registry,
       [
         governor.address
       ]
@@ -62,7 +57,7 @@ describe("Registry", function () {
     // deploy solace token
     solaceToken = (await deployContract(
       deployer,
-      SolaceArtifact,
+      artifacts.SOLACE,
       [
         governor.address
       ]
@@ -71,7 +66,7 @@ describe("Registry", function () {
     // deploy master contract
     master = (await deployContract(
       deployer,
-      MasterArtifact,
+      artifacts.Master,
       [
         governor.address,
         solaceToken.address,
@@ -82,28 +77,28 @@ describe("Registry", function () {
     // deploy claims adjustor contract
     claimsEscrow = (await deployContract(
       deployer,
-      ClaimsEscrowArtifact,
+      artifacts.ClaimsEscrow,
       [registry.address]
     )) as ClaimsEscrow;
 
     // deploy claims escrow contract
     claimsAdjustor = (await deployContract(
       deployer,
-      ClaimsAdjustorArtifact,
+      artifacts.ClaimsAdjustor,
       [registry.address]
     )) as ClaimsAdjustor;
 
     // deploy vault contract
     vault = (await deployContract(
       deployer,
-      VaultArtifact,
+      artifacts.Vault,
       [governor.address, registry.address, weth.address]
     )) as Vault;
 
     // deploy treasury contract
     treasury = (await deployContract(
       deployer,
-      TreasuryArtifact,
+      artifacts.Treasury,
       [
         governor.address,
         solaceToken.address,

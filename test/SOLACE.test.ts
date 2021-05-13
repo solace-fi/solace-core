@@ -1,13 +1,12 @@
 import chai from "chai";
 import { waffle } from "hardhat";
-import SolaceArtifact from "../artifacts/contracts/SOLACE.sol/SOLACE.json"
-import { Solace } from "../typechain";
-
 const { expect } = chai;
 const { deployContract, solidity } = waffle;
 const provider = waffle.provider;
-
 chai.use(solidity);
+
+import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
+import { Solace } from "../typechain";
 
 describe("SolaceToken", () => {
   let solace: Solace;
@@ -15,12 +14,17 @@ describe("SolaceToken", () => {
   const name = "solace";
   const symbol = "SOLACE";
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-  const amount = 10
+  const amount = 10;
+  let artifacts: ArtifactImports;
+
+  before(async function () {
+    artifacts = await import_artifacts();
+  })
 
   beforeEach(async () => {
     solace = (await deployContract(
       owner,
-      SolaceArtifact,
+      artifacts.SOLACE,
       [
         owner.address
       ]

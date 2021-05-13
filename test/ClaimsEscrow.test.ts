@@ -1,18 +1,14 @@
 import chai from "chai";
 import { waffle } from "hardhat";
-import VaultArtifact from "../artifacts/contracts/Vault.sol/Vault.json"
-import WETHArtifact from "../artifacts/contracts/mocks/MockWETH.sol/MockWETH.json"
-import RegistryArtifact from "../artifacts/contracts/Registry.sol/Registry.json";
-import ClaimsAdjustorArtifact from "../artifacts/contracts/ClaimsAdjustor.sol/ClaimsAdjustor.json";
-import ClaimsEscrowArtifact from "../artifacts/contracts/ClaimsEscrow.sol/ClaimsEscrow.json";
-import { Registry, Vault, ClaimsAdjustor, ClaimsEscrow, MockWeth } from "../typechain";
 import { BigNumber as BN } from "ethers";
-
 const { expect } = chai;
 const { deployContract, solidity } = waffle;
 const provider = waffle.provider;
-
 chai.use(solidity);
+
+import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
+import { Registry, Vault, ClaimsAdjustor, ClaimsEscrow, MockWeth } from "../typechain";
+
 
 describe("ClaimsEscrow", function () {
     let vault: Vault;
@@ -20,6 +16,7 @@ describe("ClaimsEscrow", function () {
     let registry: Registry;
     let claimsAdjustor: ClaimsAdjustor;
     let claimsEscrow: ClaimsEscrow;
+    let artifacts: ArtifactImports;
 
     const [owner, newOwner, depositor1, claimant] = provider.getWallets();
     const testDepositAmount = BN.from("10");
@@ -27,33 +24,37 @@ describe("ClaimsEscrow", function () {
     const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
     const COOLDOWN_PERIOD = 1209600; // 14 days
 
+    before(async function () {
+      artifacts = await import_artifacts();
+    })
+
     beforeEach(async () => {
         weth = (await deployContract(
             owner,
-            WETHArtifact
+            artifacts.WETH
         )) as MockWeth;
 
         registry = (await deployContract(
             owner,
-            RegistryArtifact,
+            artifacts.Registry,
             [owner.address]
         )) as Registry;
 
         vault = (await deployContract(
             owner,
-            VaultArtifact,
+            artifacts.Vault,
             [owner.address, registry.address, weth.address]
         )) as Vault;
 
         claimsEscrow = (await deployContract(
             owner,
-            ClaimsEscrowArtifact,
+            artifacts.ClaimsEscrow,
             [registry.address]
         )) as ClaimsEscrow;
 
         claimsAdjustor = (await deployContract(
             owner,
-            ClaimsAdjustorArtifact,
+            artifacts.ClaimsAdjustor,
             [registry.address]
         )) as ClaimsAdjustor;
 
