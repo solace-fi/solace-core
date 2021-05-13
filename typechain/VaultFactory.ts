@@ -14,30 +14,18 @@ export class VaultFactory extends ContractFactory {
   }
 
   deploy(
-    _governance: string,
     _registry: string,
     _token: string,
     overrides?: Overrides
   ): Promise<Vault> {
-    return super.deploy(
-      _governance,
-      _registry,
-      _token,
-      overrides || {}
-    ) as Promise<Vault>;
+    return super.deploy(_registry, _token, overrides || {}) as Promise<Vault>;
   }
   getDeployTransaction(
-    _governance: string,
     _registry: string,
     _token: string,
     overrides?: Overrides
   ): TransactionRequest {
-    return super.getDeployTransaction(
-      _governance,
-      _registry,
-      _token,
-      overrides || {}
-    );
+    return super.getDeployTransaction(_registry, _token, overrides || {});
   }
   attach(address: string): Vault {
     return super.attach(address) as Vault;
@@ -53,11 +41,6 @@ export class VaultFactory extends ContractFactory {
 const _abi = [
   {
     inputs: [
-      {
-        internalType: "address",
-        name: "_governance",
-        type: "address",
-      },
       {
         internalType: "address",
         name: "_registry",

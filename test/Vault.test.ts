@@ -11,6 +11,7 @@ import ClaimsEscrowArtifact from "../artifacts/contracts/ClaimsEscrow.sol/Claims
 import { BigNumber as BN, constants } from "ethers";
 import { getPermitDigest, sign, getDomainSeparator } from "./utilities/signature";
 import { Vault, MockStrategy, MockWeth, Registry, Master, Solace, ClaimsAdjustor, ClaimsEscrow } from "../typechain";
+import { SSL_OP_SSLEAY_080_CLIENT_DH_BUG } from "node:constants";
 
 const { expect } = chai;
 const { deployContract, solidity } = waffle;
