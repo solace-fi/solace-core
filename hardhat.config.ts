@@ -4,8 +4,10 @@ import "hardhat-contract-sizer";
 import "@nomiclabs/hardhat-waffle";
 import "hardhat-typechain";
 import "hardhat-abi-exporter";
+import "solidity-coverage";
 import { config as dotenv_config } from 'dotenv';
 dotenv_config();
+const USE_PROCESSED_FILES = process.env.USE_PROCESSED_FILES === "true";
 
 const config: HardhatUserConfig = {
   defaultNetwork: "hardhat",
@@ -28,6 +30,12 @@ const config: HardhatUserConfig = {
         }
       }
     }],
+  },
+  paths: {
+    sources: USE_PROCESSED_FILES ? "./contracts_processed" : "./contracts",
+    tests: "./test",
+    cache: "./cache",
+    artifacts: "./artifacts"
   },
   abiExporter: {
     path: './client/src/constants/abi',

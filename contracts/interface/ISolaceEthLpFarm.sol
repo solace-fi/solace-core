@@ -13,9 +13,15 @@ import "./IFarm.sol";
  */
 interface ISolaceEthLpFarm is IFarm {
     // Emitted when a token is deposited onto the farm.
-    event Deposit(address indexed _user, uint256 _token);
+    event TokenDeposited(address indexed _user, uint256 _token);
     // Emitted when a token is withdrawn from the farm.
-    event Withdraw(address indexed _user, uint256 _token);
+    event TokenWithdrawn(address indexed _user, uint256 _token);
+    // Emitted when a user is rewarded.
+    event UserRewarded(address indexed _user, uint256 _amount);
+    // Emitted when block reward is changed.
+    event RewardsSet(uint256 _blockReward);
+    // Emitted when the end block is changed.
+    event FarmEndSet(uint256 _endBlock);
 
     /**
      * @notice Deposit a token.

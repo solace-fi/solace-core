@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol";
@@ -25,7 +25,17 @@ struct StrategyParams {
 
 interface IVault is IERC20, IERC20Permit {
 
+    /// @notice Governance.
+    function governance() external view returns (address);
+
+    /// @notice Governance to take over.
+    function newGovernance() external view returns (address);
+
+    // Emitted when Governance is set
+    event GovernanceTransferred(address _newGovernance);
+
     function deposit() external payable;
+    function depositWeth(uint256 amount) external;
     function withdraw(uint256 _amount, uint256 _maxLoss) external returns (uint256);
     function token() external view returns (IERC20);
     function debtOutstanding(address) external view returns (uint256);
@@ -37,4 +47,17 @@ interface IVault is IERC20, IERC20Permit {
         uint256 loss,
         uint256 _debtPayment
     ) external returns (uint256);
+
+    /**
+     * @notice Transfers the governance role to a new governor.
+     * Can only be called by the current governor.
+     * @param _governance The new governor.
+     */
+    function setGovernance(address _governance) external;
+
+    /**
+     * @notice Accepts the governance role.
+     * Can only be called by the new governor.
+     */
+    function acceptGovernance() external;
 }

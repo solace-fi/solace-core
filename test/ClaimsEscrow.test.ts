@@ -1,12 +1,12 @@
 import chai from "chai";
 import { waffle } from "hardhat";
-import VaultArtifact from '../artifacts/contracts/Vault.sol/Vault.json'
-import WETHArtifact from '../artifacts/contracts/mocks/MockWETH.sol/MockWETH.json'
+import VaultArtifact from "../artifacts/contracts/Vault.sol/Vault.json"
+import WETHArtifact from "../artifacts/contracts/mocks/MockWETH.sol/MockWETH.json"
 import RegistryArtifact from "../artifacts/contracts/Registry.sol/Registry.json";
-import ClaimsAdjustorArtifact from '../artifacts/contracts/ClaimsAdjustor.sol/ClaimsAdjustor.json';
-import ClaimsEscrowArtifact from '../artifacts/contracts/ClaimsEscrow.sol/ClaimsEscrow.json';
+import ClaimsAdjustorArtifact from "../artifacts/contracts/ClaimsAdjustor.sol/ClaimsAdjustor.json";
+import ClaimsEscrowArtifact from "../artifacts/contracts/ClaimsEscrow.sol/ClaimsEscrow.json";
 import { Registry, Vault, ClaimsAdjustor, ClaimsEscrow, MockWeth } from "../typechain";
-import { BigNumber as BN } from 'ethers';
+import { BigNumber as BN } from "ethers";
 
 const { expect } = chai;
 const { deployContract, solidity } = waffle;
@@ -21,10 +21,10 @@ describe("ClaimsEscrow", function () {
     let claimsAdjustor: ClaimsAdjustor;
     let claimsEscrow: ClaimsEscrow;
 
-    const [owner, depositor1, claimant] = provider.getWallets();
+    const [owner, newOwner, depositor1, claimant] = provider.getWallets();
     const testDepositAmount = BN.from("10");
     const testClaimAmount = BN.from("2");
-    const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+    const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
     const COOLDOWN_PERIOD = 1209600; // 14 days
 
     beforeEach(async () => {
@@ -68,6 +68,24 @@ describe("ClaimsEscrow", function () {
         });
     });
 
+    describe("setGovernance", function () {
+        it("should allow governance to set new governance address", async function () {
+            expect(await claimsEscrow.governance()).to.equal(owner.address);
+            await claimsEscrow.connect(owner).setGovernance(newOwner.address);
+            expect(await claimsEscrow.governance()).to.equal(owner.address);
+            expect(await claimsEscrow.newGovernance()).to.equal(newOwner.address);
+            let tx = await claimsEscrow.connect(newOwner).acceptGovernance();
+            await expect(tx).to.emit(claimsEscrow, "GovernanceTransferred").withArgs(newOwner.address);
+            expect(await claimsEscrow.governance()).to.equal(newOwner.address);
+            expect(await claimsEscrow.newGovernance()).to.equal(ZERO_ADDRESS);
+        });
+        it("should revert if not called by governance", async function () {
+            await expect(claimsEscrow.connect(depositor1).setGovernance(depositor1.address)).to.be.revertedWith("!governance");
+            await claimsEscrow.connect(owner).setGovernance(newOwner.address);
+            await expect(claimsEscrow.connect(depositor1).acceptGovernance()).to.be.revertedWith("!governance");
+        });
+    });
+
     describe("receiveClaim", function () {
         beforeEach("deposit", async function () {
             await vault.connect(depositor1).deposit({ value: testDepositAmount});
@@ -99,9 +117,9 @@ describe("ClaimsEscrow", function () {
             await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add 14 days
             await expect(() => claimsEscrow.connect(claimant).withdrawClaimsPayout(0)).to.changeEtherBalance(claimant, testClaimAmount);
         });
-        it('should emit ClaimWithdrawn event after function logic is successful', async function () {
+        it("should emit ClaimWithdrawn event after function logic is successful", async function () {
             await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add 14 days
-            expect(await claimsEscrow.connect(claimant).withdrawClaimsPayout(0)).to.emit(claimsEscrow, 'ClaimWithdrawn').withArgs(0, claimant.address, testClaimAmount);
+            expect(await claimsEscrow.connect(claimant).withdrawClaimsPayout(0)).to.emit(claimsEscrow, "ClaimWithdrawn").withArgs(0, claimant.address, testClaimAmount);
         });
         it("should delete the Claim object after successful withdrawal", async function () {
             await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add 14 days

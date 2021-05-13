@@ -22,12 +22,14 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
 interface BaseStrategyInterface extends ethers.utils.Interface {
   functions: {
+    "acceptGovernance()": FunctionFragment;
     "delegatedAssets()": FunctionFragment;
     "emergencyExit()": FunctionFragment;
     "estimatedTotalAssets()": FunctionFragment;
     "governance()": FunctionFragment;
     "harvest()": FunctionFragment;
     "isActive()": FunctionFragment;
+    "newGovernance()": FunctionFragment;
     "setEmergencyExit()": FunctionFragment;
     "setGovernance(address)": FunctionFragment;
     "setVault(address)": FunctionFragment;
@@ -36,6 +38,10 @@ interface BaseStrategyInterface extends ethers.utils.Interface {
     "withdraw(uint256)": FunctionFragment;
   };
 
+  encodeFunctionData(
+    functionFragment: "acceptGovernance",
+    values?: undefined
+  ): string;
   encodeFunctionData(
     functionFragment: "delegatedAssets",
     values?: undefined
@@ -55,6 +61,10 @@ interface BaseStrategyInterface extends ethers.utils.Interface {
   encodeFunctionData(functionFragment: "harvest", values?: undefined): string;
   encodeFunctionData(functionFragment: "isActive", values?: undefined): string;
   encodeFunctionData(
+    functionFragment: "newGovernance",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
     functionFragment: "setEmergencyExit",
     values?: undefined
   ): string;
@@ -71,6 +81,10 @@ interface BaseStrategyInterface extends ethers.utils.Interface {
   ): string;
 
   decodeFunctionResult(
+    functionFragment: "acceptGovernance",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "delegatedAssets",
     data: BytesLike
   ): Result;
@@ -86,6 +100,10 @@ interface BaseStrategyInterface extends ethers.utils.Interface {
   decodeFunctionResult(functionFragment: "harvest", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "isActive", data: BytesLike): Result;
   decodeFunctionResult(
+    functionFragment: "newGovernance",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "setEmergencyExit",
     data: BytesLike
   ): Result;
@@ -100,10 +118,12 @@ interface BaseStrategyInterface extends ethers.utils.Interface {
 
   events: {
     "EmergencyExitEnabled()": EventFragment;
+    "GovernanceTransferred(address)": EventFragment;
     "Harvested(uint256,uint256,uint256,uint256)": EventFragment;
   };
 
   getEvent(nameOrSignatureOrTopic: "EmergencyExitEnabled"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "GovernanceTransferred"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "Harvested"): EventFragment;
 }
 
@@ -121,6 +141,10 @@ export class BaseStrategy extends Contract {
   interface: BaseStrategyInterface;
 
   functions: {
+    acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
+
     delegatedAssets(
       overrides?: CallOverrides
     ): Promise<{
@@ -185,6 +209,18 @@ export class BaseStrategy extends Contract {
       0: boolean;
     }>;
 
+    newGovernance(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "newGovernance()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
     setEmergencyExit(overrides?: Overrides): Promise<ContractTransaction>;
 
     "setEmergencyExit()"(overrides?: Overrides): Promise<ContractTransaction>;
@@ -244,6 +280,10 @@ export class BaseStrategy extends Contract {
     ): Promise<ContractTransaction>;
   };
 
+  acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+  "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
+
   delegatedAssets(overrides?: CallOverrides): Promise<BigNumber>;
 
   "delegatedAssets()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -267,6 +307,10 @@ export class BaseStrategy extends Contract {
   isActive(overrides?: CallOverrides): Promise<boolean>;
 
   "isActive()"(overrides?: CallOverrides): Promise<boolean>;
+
+  newGovernance(overrides?: CallOverrides): Promise<string>;
+
+  "newGovernance()"(overrides?: CallOverrides): Promise<string>;
 
   setEmergencyExit(overrides?: Overrides): Promise<ContractTransaction>;
 
@@ -308,6 +352,10 @@ export class BaseStrategy extends Contract {
   ): Promise<ContractTransaction>;
 
   callStatic: {
+    acceptGovernance(overrides?: CallOverrides): Promise<void>;
+
+    "acceptGovernance()"(overrides?: CallOverrides): Promise<void>;
+
     delegatedAssets(overrides?: CallOverrides): Promise<BigNumber>;
 
     "delegatedAssets()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -331,6 +379,10 @@ export class BaseStrategy extends Contract {
     isActive(overrides?: CallOverrides): Promise<boolean>;
 
     "isActive()"(overrides?: CallOverrides): Promise<boolean>;
+
+    newGovernance(overrides?: CallOverrides): Promise<string>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<string>;
 
     setEmergencyExit(overrides?: CallOverrides): Promise<void>;
 
@@ -375,6 +427,8 @@ export class BaseStrategy extends Contract {
   filters: {
     EmergencyExitEnabled(): EventFilter;
 
+    GovernanceTransferred(_newGovernance: null): EventFilter;
+
     Harvested(
       profit: null,
       loss: null,
@@ -384,6 +438,10 @@ export class BaseStrategy extends Contract {
   };
 
   estimateGas: {
+    acceptGovernance(overrides?: Overrides): Promise<BigNumber>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<BigNumber>;
+
     delegatedAssets(overrides?: CallOverrides): Promise<BigNumber>;
 
     "delegatedAssets()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -407,6 +465,10 @@ export class BaseStrategy extends Contract {
     isActive(overrides?: CallOverrides): Promise<BigNumber>;
 
     "isActive()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    newGovernance(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     setEmergencyExit(overrides?: Overrides): Promise<BigNumber>;
 
@@ -449,6 +511,10 @@ export class BaseStrategy extends Contract {
   };
 
   populateTransaction: {
+    acceptGovernance(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<PopulatedTransaction>;
+
     delegatedAssets(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "delegatedAssets()"(
@@ -478,6 +544,10 @@ export class BaseStrategy extends Contract {
     isActive(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "isActive()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    newGovernance(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     setEmergencyExit(overrides?: Overrides): Promise<PopulatedTransaction>;
 

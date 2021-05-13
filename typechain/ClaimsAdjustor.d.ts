@@ -22,11 +22,18 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
 interface ClaimsAdjustorInterface extends ethers.utils.Interface {
   functions: {
+    "acceptGovernance()": FunctionFragment;
     "approveClaim(address,uint256)": FunctionFragment;
     "governance()": FunctionFragment;
+    "newGovernance()": FunctionFragment;
     "registry()": FunctionFragment;
+    "setGovernance(address)": FunctionFragment;
   };
 
+  encodeFunctionData(
+    functionFragment: "acceptGovernance",
+    values?: undefined
+  ): string;
   encodeFunctionData(
     functionFragment: "approveClaim",
     values: [string, BigNumberish]
@@ -35,20 +42,42 @@ interface ClaimsAdjustorInterface extends ethers.utils.Interface {
     functionFragment: "governance",
     values?: undefined
   ): string;
+  encodeFunctionData(
+    functionFragment: "newGovernance",
+    values?: undefined
+  ): string;
   encodeFunctionData(functionFragment: "registry", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "setGovernance",
+    values: [string]
+  ): string;
 
+  decodeFunctionResult(
+    functionFragment: "acceptGovernance",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "approveClaim",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "governance", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "newGovernance",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "registry", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "setGovernance",
+    data: BytesLike
+  ): Result;
 
   events: {
     "ClaimApproved(address,uint256)": EventFragment;
+    "GovernanceTransferred(address)": EventFragment;
   };
 
   getEvent(nameOrSignatureOrTopic: "ClaimApproved"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "GovernanceTransferred"): EventFragment;
 }
 
 export class ClaimsAdjustor extends Contract {
@@ -65,6 +94,10 @@ export class ClaimsAdjustor extends Contract {
   interface: ClaimsAdjustorInterface;
 
   functions: {
+    acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
+
     approveClaim(
       _claimant: string,
       _amount: BigNumberish,
@@ -89,6 +122,18 @@ export class ClaimsAdjustor extends Contract {
       0: string;
     }>;
 
+    newGovernance(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "newGovernance()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
     registry(
       overrides?: CallOverrides
     ): Promise<{
@@ -100,7 +145,21 @@ export class ClaimsAdjustor extends Contract {
     ): Promise<{
       0: string;
     }>;
+
+    setGovernance(
+      _governance: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "setGovernance(address)"(
+      _governance: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
   };
+
+  acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+  "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
 
   approveClaim(
     _claimant: string,
@@ -118,11 +177,29 @@ export class ClaimsAdjustor extends Contract {
 
   "governance()"(overrides?: CallOverrides): Promise<string>;
 
+  newGovernance(overrides?: CallOverrides): Promise<string>;
+
+  "newGovernance()"(overrides?: CallOverrides): Promise<string>;
+
   registry(overrides?: CallOverrides): Promise<string>;
 
   "registry()"(overrides?: CallOverrides): Promise<string>;
 
+  setGovernance(
+    _governance: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "setGovernance(address)"(
+    _governance: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
   callStatic: {
+    acceptGovernance(overrides?: CallOverrides): Promise<void>;
+
+    "acceptGovernance()"(overrides?: CallOverrides): Promise<void>;
+
     approveClaim(
       _claimant: string,
       _amount: BigNumberish,
@@ -139,9 +216,23 @@ export class ClaimsAdjustor extends Contract {
 
     "governance()"(overrides?: CallOverrides): Promise<string>;
 
+    newGovernance(overrides?: CallOverrides): Promise<string>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<string>;
+
     registry(overrides?: CallOverrides): Promise<string>;
 
     "registry()"(overrides?: CallOverrides): Promise<string>;
+
+    setGovernance(
+      _governance: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "setGovernance(address)"(
+      _governance: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
   };
 
   filters: {
@@ -149,9 +240,15 @@ export class ClaimsAdjustor extends Contract {
       claimant: string | null,
       amount: BigNumberish | null
     ): EventFilter;
+
+    GovernanceTransferred(_newGovernance: null): EventFilter;
   };
 
   estimateGas: {
+    acceptGovernance(overrides?: Overrides): Promise<BigNumber>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<BigNumber>;
+
     approveClaim(
       _claimant: string,
       _amount: BigNumberish,
@@ -168,12 +265,30 @@ export class ClaimsAdjustor extends Contract {
 
     "governance()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+    newGovernance(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<BigNumber>;
+
     registry(overrides?: CallOverrides): Promise<BigNumber>;
 
     "registry()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    setGovernance(
+      _governance: string,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "setGovernance(address)"(
+      _governance: string,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
   };
 
   populateTransaction: {
+    acceptGovernance(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<PopulatedTransaction>;
+
     approveClaim(
       _claimant: string,
       _amount: BigNumberish,
@@ -190,8 +305,22 @@ export class ClaimsAdjustor extends Contract {
 
     "governance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
+    newGovernance(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
     registry(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "registry()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    setGovernance(
+      _governance: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "setGovernance(address)"(
+      _governance: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
   };
 }

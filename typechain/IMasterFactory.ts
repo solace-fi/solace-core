@@ -37,6 +37,39 @@ const _abi = [
     type: "event",
   },
   {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: false,
+        internalType: "address",
+        name: "_newGovernance",
+        type: "address",
+      },
+    ],
+    name: "GovernanceTransferred",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "_solacePerBlock",
+        type: "uint256",
+      },
+    ],
+    name: "RewardsSet",
+    type: "event",
+  },
+  {
+    inputs: [],
+    name: "acceptGovernance",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
     inputs: [
       {
         internalType: "uint256",
@@ -111,6 +144,19 @@ const _abi = [
     name: "massUpdateFarms",
     outputs: [],
     stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "newGovernance",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "view",
     type: "function",
   },
   {

@@ -8,3 +8,11 @@ You can deploy in the `localhost` network following these steps:
 
 As general rule, you can target any network configured in the `hardhat.config.js`  
 `npx hardhat run --network <your-network> scripts/<your-script>.ts`
+
+# Preprocessing Contracts
+Many tools such as Etherscan, Slither, and MythX require contracts to be preprocessed before they can be used. This includes flattening and correcting licensing amongst other things. You're welcome to process them manually, but if not:
+```
+python3 scripts/process_contracts.py
+```
+
+You can switch between using the source files and the preprocessed files by setting the `USE_PROCESSED_FILES` flag in `.env` to true or false.

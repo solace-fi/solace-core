@@ -23,13 +23,20 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
 interface ClaimsEscrowInterface extends ethers.utils.Interface {
   functions: {
+    "acceptGovernance()": FunctionFragment;
     "claims(uint256)": FunctionFragment;
     "governance()": FunctionFragment;
+    "newGovernance()": FunctionFragment;
     "receiveClaim(address)": FunctionFragment;
     "registry()": FunctionFragment;
+    "setGovernance(address)": FunctionFragment;
     "withdrawClaimsPayout(uint256)": FunctionFragment;
   };
 
+  encodeFunctionData(
+    functionFragment: "acceptGovernance",
+    values?: undefined
+  ): string;
   encodeFunctionData(
     functionFragment: "claims",
     values: [BigNumberish]
@@ -39,22 +46,42 @@ interface ClaimsEscrowInterface extends ethers.utils.Interface {
     values?: undefined
   ): string;
   encodeFunctionData(
+    functionFragment: "newGovernance",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
     functionFragment: "receiveClaim",
     values: [string]
   ): string;
   encodeFunctionData(functionFragment: "registry", values?: undefined): string;
   encodeFunctionData(
+    functionFragment: "setGovernance",
+    values: [string]
+  ): string;
+  encodeFunctionData(
     functionFragment: "withdrawClaimsPayout",
     values: [BigNumberish]
   ): string;
 
+  decodeFunctionResult(
+    functionFragment: "acceptGovernance",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "claims", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "governance", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "newGovernance",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "receiveClaim",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "registry", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "setGovernance",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "withdrawClaimsPayout",
     data: BytesLike
@@ -62,9 +89,11 @@ interface ClaimsEscrowInterface extends ethers.utils.Interface {
 
   events: {
     "ClaimWithdrawn(uint256,address,uint256)": EventFragment;
+    "GovernanceTransferred(address)": EventFragment;
   };
 
   getEvent(nameOrSignatureOrTopic: "ClaimWithdrawn"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "GovernanceTransferred"): EventFragment;
 }
 
 export class ClaimsEscrow extends Contract {
@@ -81,6 +110,10 @@ export class ClaimsEscrow extends Contract {
   interface: ClaimsEscrowInterface;
 
   functions: {
+    acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
+
     claims(
       arg0: BigNumberish,
       overrides?: CallOverrides
@@ -117,6 +150,18 @@ export class ClaimsEscrow extends Contract {
       0: string;
     }>;
 
+    newGovernance(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "newGovernance()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
     receiveClaim(
       _claimant: string,
       overrides?: PayableOverrides
@@ -139,6 +184,16 @@ export class ClaimsEscrow extends Contract {
       0: string;
     }>;
 
+    setGovernance(
+      _governance: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "setGovernance(address)"(
+      _governance: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
     withdrawClaimsPayout(
       claimId: BigNumberish,
       overrides?: Overrides
@@ -149,6 +204,10 @@ export class ClaimsEscrow extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
   };
+
+  acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+  "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
 
   claims(
     arg0: BigNumberish,
@@ -178,6 +237,10 @@ export class ClaimsEscrow extends Contract {
 
   "governance()"(overrides?: CallOverrides): Promise<string>;
 
+  newGovernance(overrides?: CallOverrides): Promise<string>;
+
+  "newGovernance()"(overrides?: CallOverrides): Promise<string>;
+
   receiveClaim(
     _claimant: string,
     overrides?: PayableOverrides
@@ -192,6 +255,16 @@ export class ClaimsEscrow extends Contract {
 
   "registry()"(overrides?: CallOverrides): Promise<string>;
 
+  setGovernance(
+    _governance: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "setGovernance(address)"(
+    _governance: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
   withdrawClaimsPayout(
     claimId: BigNumberish,
     overrides?: Overrides
@@ -203,6 +276,10 @@ export class ClaimsEscrow extends Contract {
   ): Promise<ContractTransaction>;
 
   callStatic: {
+    acceptGovernance(overrides?: CallOverrides): Promise<void>;
+
+    "acceptGovernance()"(overrides?: CallOverrides): Promise<void>;
+
     claims(
       arg0: BigNumberish,
       overrides?: CallOverrides
@@ -231,6 +308,10 @@ export class ClaimsEscrow extends Contract {
 
     "governance()"(overrides?: CallOverrides): Promise<string>;
 
+    newGovernance(overrides?: CallOverrides): Promise<string>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<string>;
+
     receiveClaim(
       _claimant: string,
       overrides?: CallOverrides
@@ -244,6 +325,16 @@ export class ClaimsEscrow extends Contract {
     registry(overrides?: CallOverrides): Promise<string>;
 
     "registry()"(overrides?: CallOverrides): Promise<string>;
+
+    setGovernance(
+      _governance: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "setGovernance(address)"(
+      _governance: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
 
     withdrawClaimsPayout(
       claimId: BigNumberish,
@@ -262,9 +353,15 @@ export class ClaimsEscrow extends Contract {
       claimant: string | null,
       amount: BigNumberish | null
     ): EventFilter;
+
+    GovernanceTransferred(_newGovernance: null): EventFilter;
   };
 
   estimateGas: {
+    acceptGovernance(overrides?: Overrides): Promise<BigNumber>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<BigNumber>;
+
     claims(arg0: BigNumberish, overrides?: CallOverrides): Promise<BigNumber>;
 
     "claims(uint256)"(
@@ -275,6 +372,10 @@ export class ClaimsEscrow extends Contract {
     governance(overrides?: CallOverrides): Promise<BigNumber>;
 
     "governance()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    newGovernance(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     receiveClaim(
       _claimant: string,
@@ -290,6 +391,16 @@ export class ClaimsEscrow extends Contract {
 
     "registry()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+    setGovernance(
+      _governance: string,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "setGovernance(address)"(
+      _governance: string,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
     withdrawClaimsPayout(
       claimId: BigNumberish,
       overrides?: Overrides
@@ -302,6 +413,10 @@ export class ClaimsEscrow extends Contract {
   };
 
   populateTransaction: {
+    acceptGovernance(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<PopulatedTransaction>;
+
     claims(
       arg0: BigNumberish,
       overrides?: CallOverrides
@@ -316,6 +431,10 @@ export class ClaimsEscrow extends Contract {
 
     "governance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
+    newGovernance(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
     receiveClaim(
       _claimant: string,
       overrides?: PayableOverrides
@@ -329,6 +448,16 @@ export class ClaimsEscrow extends Contract {
     registry(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "registry()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    setGovernance(
+      _governance: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "setGovernance(address)"(
+      _governance: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
 
     withdrawClaimsPayout(
       claimId: BigNumberish,

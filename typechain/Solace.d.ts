@@ -23,6 +23,7 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 interface SolaceInterface extends ethers.utils.Interface {
   functions: {
     "DOMAIN_SEPARATOR()": FunctionFragment;
+    "acceptGovernance()": FunctionFragment;
     "addMinter(address)": FunctionFragment;
     "allowance(address,address)": FunctionFragment;
     "approve(address,uint256)": FunctionFragment;
@@ -34,6 +35,7 @@ interface SolaceInterface extends ethers.utils.Interface {
     "mint(address,uint256)": FunctionFragment;
     "minters(address)": FunctionFragment;
     "name()": FunctionFragment;
+    "newGovernance()": FunctionFragment;
     "nonces(address)": FunctionFragment;
     "permit(address,address,uint256,uint256,uint8,bytes32,bytes32)": FunctionFragment;
     "removeMinter(address)": FunctionFragment;
@@ -46,6 +48,10 @@ interface SolaceInterface extends ethers.utils.Interface {
 
   encodeFunctionData(
     functionFragment: "DOMAIN_SEPARATOR",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "acceptGovernance",
     values?: undefined
   ): string;
   encodeFunctionData(functionFragment: "addMinter", values: [string]): string;
@@ -77,6 +83,10 @@ interface SolaceInterface extends ethers.utils.Interface {
   ): string;
   encodeFunctionData(functionFragment: "minters", values: [string]): string;
   encodeFunctionData(functionFragment: "name", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "newGovernance",
+    values?: undefined
+  ): string;
   encodeFunctionData(functionFragment: "nonces", values: [string]): string;
   encodeFunctionData(
     functionFragment: "permit",
@@ -116,6 +126,10 @@ interface SolaceInterface extends ethers.utils.Interface {
     functionFragment: "DOMAIN_SEPARATOR",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(
+    functionFragment: "acceptGovernance",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "addMinter", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "allowance", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "approve", data: BytesLike): Result;
@@ -133,6 +147,10 @@ interface SolaceInterface extends ethers.utils.Interface {
   decodeFunctionResult(functionFragment: "mint", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "minters", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "name", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "newGovernance",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "nonces", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "permit", data: BytesLike): Result;
   decodeFunctionResult(
@@ -156,10 +174,12 @@ interface SolaceInterface extends ethers.utils.Interface {
 
   events: {
     "Approval(address,address,uint256)": EventFragment;
+    "GovernanceTransferred(address)": EventFragment;
     "Transfer(address,address,uint256)": EventFragment;
   };
 
   getEvent(nameOrSignatureOrTopic: "Approval"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "GovernanceTransferred"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "Transfer"): EventFragment;
 }
 
@@ -188,6 +208,10 @@ export class Solace extends Contract {
     ): Promise<{
       0: string;
     }>;
+
+    acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
 
     addMinter(
       _minter: string,
@@ -327,6 +351,18 @@ export class Solace extends Contract {
       0: string;
     }>;
 
+    newGovernance(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "newGovernance()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
     nonces(
       owner: string,
       overrides?: CallOverrides
@@ -438,6 +474,10 @@ export class Solace extends Contract {
 
   "DOMAIN_SEPARATOR()"(overrides?: CallOverrides): Promise<string>;
 
+  acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+  "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
+
   addMinter(
     _minter: string,
     overrides?: Overrides
@@ -531,6 +571,10 @@ export class Solace extends Contract {
 
   "name()"(overrides?: CallOverrides): Promise<string>;
 
+  newGovernance(overrides?: CallOverrides): Promise<string>;
+
+  "newGovernance()"(overrides?: CallOverrides): Promise<string>;
+
   nonces(owner: string, overrides?: CallOverrides): Promise<BigNumber>;
 
   "nonces(address)"(
@@ -618,6 +662,10 @@ export class Solace extends Contract {
     DOMAIN_SEPARATOR(overrides?: CallOverrides): Promise<string>;
 
     "DOMAIN_SEPARATOR()"(overrides?: CallOverrides): Promise<string>;
+
+    acceptGovernance(overrides?: CallOverrides): Promise<void>;
+
+    "acceptGovernance()"(overrides?: CallOverrides): Promise<void>;
 
     addMinter(_minter: string, overrides?: CallOverrides): Promise<void>;
 
@@ -712,6 +760,10 @@ export class Solace extends Contract {
 
     "name()"(overrides?: CallOverrides): Promise<string>;
 
+    newGovernance(overrides?: CallOverrides): Promise<string>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<string>;
+
     nonces(owner: string, overrides?: CallOverrides): Promise<BigNumber>;
 
     "nonces(address)"(
@@ -800,6 +852,8 @@ export class Solace extends Contract {
       value: null
     ): EventFilter;
 
+    GovernanceTransferred(_newGovernance: null): EventFilter;
+
     Transfer(from: string | null, to: string | null, value: null): EventFilter;
   };
 
@@ -807,6 +861,10 @@ export class Solace extends Contract {
     DOMAIN_SEPARATOR(overrides?: CallOverrides): Promise<BigNumber>;
 
     "DOMAIN_SEPARATOR()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    acceptGovernance(overrides?: Overrides): Promise<BigNumber>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<BigNumber>;
 
     addMinter(_minter: string, overrides?: Overrides): Promise<BigNumber>;
 
@@ -901,6 +959,10 @@ export class Solace extends Contract {
 
     "name()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+    newGovernance(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<BigNumber>;
+
     nonces(owner: string, overrides?: CallOverrides): Promise<BigNumber>;
 
     "nonces(address)"(
@@ -988,6 +1050,10 @@ export class Solace extends Contract {
     "DOMAIN_SEPARATOR()"(
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
+
+    acceptGovernance(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<PopulatedTransaction>;
 
     addMinter(
       _minter: string,
@@ -1090,6 +1156,10 @@ export class Solace extends Contract {
     name(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "name()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    newGovernance(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     nonces(
       owner: string,

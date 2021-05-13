@@ -24,7 +24,9 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 interface ICpFarmInterface extends ethers.utils.Interface {
   functions: {
     "accRewardPerShare()": FunctionFragment;
+    "acceptGovernance()": FunctionFragment;
     "blockReward()": FunctionFragment;
+    "compoundRewards()": FunctionFragment;
     "depositCp(uint256)": FunctionFragment;
     "depositCpSigned(address,uint256,uint256,uint8,bytes32,bytes32)": FunctionFragment;
     "depositEth()": FunctionFragment;
@@ -34,6 +36,7 @@ interface ICpFarmInterface extends ethers.utils.Interface {
     "governance()": FunctionFragment;
     "lastRewardBlock()": FunctionFragment;
     "master()": FunctionFragment;
+    "newGovernance()": FunctionFragment;
     "pendingRewards(address)": FunctionFragment;
     "setEnd(uint256)": FunctionFragment;
     "setGovernance(address)": FunctionFragment;
@@ -53,7 +56,15 @@ interface ICpFarmInterface extends ethers.utils.Interface {
     values?: undefined
   ): string;
   encodeFunctionData(
+    functionFragment: "acceptGovernance",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
     functionFragment: "blockReward",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "compoundRewards",
     values?: undefined
   ): string;
   encodeFunctionData(
@@ -90,6 +101,10 @@ interface ICpFarmInterface extends ethers.utils.Interface {
     values?: undefined
   ): string;
   encodeFunctionData(functionFragment: "master", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "newGovernance",
+    values?: undefined
+  ): string;
   encodeFunctionData(
     functionFragment: "pendingRewards",
     values: [string]
@@ -138,7 +153,15 @@ interface ICpFarmInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
+    functionFragment: "acceptGovernance",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "blockReward",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "compoundRewards",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "depositCp", data: BytesLike): Result;
@@ -159,6 +182,10 @@ interface ICpFarmInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "master", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "newGovernance",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "pendingRewards",
     data: BytesLike
@@ -188,16 +215,26 @@ interface ICpFarmInterface extends ethers.utils.Interface {
   ): Result;
 
   events: {
-    "DepositCp(address,uint256)": EventFragment;
-    "DepositEth(address,uint256)": EventFragment;
-    "WithdrawCp(address,uint256)": EventFragment;
-    "WithdrawEth(address,uint256)": EventFragment;
+    "CpDeposited(address,uint256)": EventFragment;
+    "CpWithdrawn(address,uint256)": EventFragment;
+    "EthDeposited(address,uint256)": EventFragment;
+    "EthWithdrawn(address,uint256)": EventFragment;
+    "FarmEndSet(uint256)": EventFragment;
+    "GovernanceTransferred(address)": EventFragment;
+    "RewardsCompounded(address)": EventFragment;
+    "RewardsSet(uint256)": EventFragment;
+    "UserRewarded(address,uint256)": EventFragment;
   };
 
-  getEvent(nameOrSignatureOrTopic: "DepositCp"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "DepositEth"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "WithdrawCp"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "WithdrawEth"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "CpDeposited"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "CpWithdrawn"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "EthDeposited"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "EthWithdrawn"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "FarmEndSet"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "GovernanceTransferred"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "RewardsCompounded"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "RewardsSet"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "UserRewarded"): EventFragment;
 }
 
 export class ICpFarm extends Contract {
@@ -226,6 +263,10 @@ export class ICpFarm extends Contract {
       0: BigNumber;
     }>;
 
+    acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
+
     blockReward(
       overrides?: CallOverrides
     ): Promise<{
@@ -237,6 +278,10 @@ export class ICpFarm extends Contract {
     ): Promise<{
       0: BigNumber;
     }>;
+
+    compoundRewards(overrides?: Overrides): Promise<ContractTransaction>;
+
+    "compoundRewards()"(overrides?: Overrides): Promise<ContractTransaction>;
 
     depositCp(
       _amount: BigNumberish,
@@ -343,6 +388,18 @@ export class ICpFarm extends Contract {
     }>;
 
     "master()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    newGovernance(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "newGovernance()"(
       overrides?: CallOverrides
     ): Promise<{
       0: string;
@@ -475,9 +532,17 @@ export class ICpFarm extends Contract {
 
   "accRewardPerShare()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+  acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+  "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
+
   blockReward(overrides?: CallOverrides): Promise<BigNumber>;
 
   "blockReward()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+  compoundRewards(overrides?: Overrides): Promise<ContractTransaction>;
+
+  "compoundRewards()"(overrides?: Overrides): Promise<ContractTransaction>;
 
   depositCp(
     _amount: BigNumberish,
@@ -544,6 +609,10 @@ export class ICpFarm extends Contract {
   master(overrides?: CallOverrides): Promise<string>;
 
   "master()"(overrides?: CallOverrides): Promise<string>;
+
+  newGovernance(overrides?: CallOverrides): Promise<string>;
+
+  "newGovernance()"(overrides?: CallOverrides): Promise<string>;
 
   pendingRewards(_user: string, overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -633,9 +702,17 @@ export class ICpFarm extends Contract {
 
     "accRewardPerShare()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+    acceptGovernance(overrides?: CallOverrides): Promise<void>;
+
+    "acceptGovernance()"(overrides?: CallOverrides): Promise<void>;
+
     blockReward(overrides?: CallOverrides): Promise<BigNumber>;
 
     "blockReward()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    compoundRewards(overrides?: CallOverrides): Promise<void>;
+
+    "compoundRewards()"(overrides?: CallOverrides): Promise<void>;
 
     depositCp(_amount: BigNumberish, overrides?: CallOverrides): Promise<void>;
 
@@ -699,6 +776,10 @@ export class ICpFarm extends Contract {
     master(overrides?: CallOverrides): Promise<string>;
 
     "master()"(overrides?: CallOverrides): Promise<string>;
+
+    newGovernance(overrides?: CallOverrides): Promise<string>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<string>;
 
     pendingRewards(
       _user: string,
@@ -782,13 +863,23 @@ export class ICpFarm extends Contract {
   };
 
   filters: {
-    DepositCp(_user: string | null, _amount: null): EventFilter;
+    CpDeposited(_user: string | null, _amount: null): EventFilter;
 
-    DepositEth(_user: string | null, _amount: null): EventFilter;
+    CpWithdrawn(_user: string | null, _amount: null): EventFilter;
 
-    WithdrawCp(_user: string | null, _amount: null): EventFilter;
+    EthDeposited(_user: string | null, _amount: null): EventFilter;
 
-    WithdrawEth(_user: string | null, _amount: null): EventFilter;
+    EthWithdrawn(_user: string | null, _amount: null): EventFilter;
+
+    FarmEndSet(_endBlock: null): EventFilter;
+
+    GovernanceTransferred(_newGovernance: null): EventFilter;
+
+    RewardsCompounded(_user: string | null): EventFilter;
+
+    RewardsSet(_blockReward: null): EventFilter;
+
+    UserRewarded(_user: string | null, _amount: null): EventFilter;
   };
 
   estimateGas: {
@@ -796,9 +887,17 @@ export class ICpFarm extends Contract {
 
     "accRewardPerShare()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+    acceptGovernance(overrides?: Overrides): Promise<BigNumber>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<BigNumber>;
+
     blockReward(overrides?: CallOverrides): Promise<BigNumber>;
 
     "blockReward()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    compoundRewards(overrides?: Overrides): Promise<BigNumber>;
+
+    "compoundRewards()"(overrides?: Overrides): Promise<BigNumber>;
 
     depositCp(_amount: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
 
@@ -862,6 +961,10 @@ export class ICpFarm extends Contract {
     master(overrides?: CallOverrides): Promise<BigNumber>;
 
     "master()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    newGovernance(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     pendingRewards(
       _user: string,
@@ -954,9 +1057,17 @@ export class ICpFarm extends Contract {
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
+    acceptGovernance(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<PopulatedTransaction>;
+
     blockReward(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "blockReward()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    compoundRewards(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    "compoundRewards()"(overrides?: Overrides): Promise<PopulatedTransaction>;
 
     depositCp(
       _amount: BigNumberish,
@@ -1025,6 +1136,10 @@ export class ICpFarm extends Contract {
     master(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "master()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    newGovernance(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     pendingRewards(
       _user: string,

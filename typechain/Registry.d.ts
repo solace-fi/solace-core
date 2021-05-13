@@ -22,6 +22,7 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
 interface RegistryInterface extends ethers.utils.Interface {
   functions: {
+    "acceptGovernance()": FunctionFragment;
     "addProduct(address)": FunctionFragment;
     "claimsAdjustor()": FunctionFragment;
     "claimsEscrow()": FunctionFragment;
@@ -30,6 +31,7 @@ interface RegistryInterface extends ethers.utils.Interface {
     "isProduct(address)": FunctionFragment;
     "locker()": FunctionFragment;
     "master()": FunctionFragment;
+    "newGovernance()": FunctionFragment;
     "numProducts()": FunctionFragment;
     "removeProduct(address)": FunctionFragment;
     "setClaimsAdjustor(address)": FunctionFragment;
@@ -45,6 +47,10 @@ interface RegistryInterface extends ethers.utils.Interface {
     "vault()": FunctionFragment;
   };
 
+  encodeFunctionData(
+    functionFragment: "acceptGovernance",
+    values?: undefined
+  ): string;
   encodeFunctionData(functionFragment: "addProduct", values: [string]): string;
   encodeFunctionData(
     functionFragment: "claimsAdjustor",
@@ -65,6 +71,10 @@ interface RegistryInterface extends ethers.utils.Interface {
   encodeFunctionData(functionFragment: "isProduct", values: [string]): string;
   encodeFunctionData(functionFragment: "locker", values?: undefined): string;
   encodeFunctionData(functionFragment: "master", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "newGovernance",
+    values?: undefined
+  ): string;
   encodeFunctionData(
     functionFragment: "numProducts",
     values?: undefined
@@ -94,6 +104,10 @@ interface RegistryInterface extends ethers.utils.Interface {
   encodeFunctionData(functionFragment: "treasury", values?: undefined): string;
   encodeFunctionData(functionFragment: "vault", values?: undefined): string;
 
+  decodeFunctionResult(
+    functionFragment: "acceptGovernance",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "addProduct", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "claimsAdjustor",
@@ -108,6 +122,10 @@ interface RegistryInterface extends ethers.utils.Interface {
   decodeFunctionResult(functionFragment: "isProduct", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "locker", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "master", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "newGovernance",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "numProducts",
     data: BytesLike
@@ -143,7 +161,7 @@ interface RegistryInterface extends ethers.utils.Interface {
   events: {
     "ClaimsAdjustorSet(address)": EventFragment;
     "ClaimsEscrowSet(address)": EventFragment;
-    "GovernanceSet(address)": EventFragment;
+    "GovernanceTransferred(address)": EventFragment;
     "LockerSet(address)": EventFragment;
     "MasterSet(address)": EventFragment;
     "ProductAdded(address)": EventFragment;
@@ -155,7 +173,7 @@ interface RegistryInterface extends ethers.utils.Interface {
 
   getEvent(nameOrSignatureOrTopic: "ClaimsAdjustorSet"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "ClaimsEscrowSet"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "GovernanceSet"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "GovernanceTransferred"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "LockerSet"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "MasterSet"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "ProductAdded"): EventFragment;
@@ -179,6 +197,10 @@ export class Registry extends Contract {
   interface: RegistryInterface;
 
   functions: {
+    acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
+
     addProduct(
       _product: string,
       overrides?: Overrides
@@ -272,6 +294,18 @@ export class Registry extends Contract {
     }>;
 
     "master()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    newGovernance(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "newGovernance()"(
       overrides?: CallOverrides
     ): Promise<{
       0: string;
@@ -416,6 +450,10 @@ export class Registry extends Contract {
     }>;
   };
 
+  acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+  "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
+
   addProduct(
     _product: string,
     overrides?: Overrides
@@ -462,6 +500,10 @@ export class Registry extends Contract {
   master(overrides?: CallOverrides): Promise<string>;
 
   "master()"(overrides?: CallOverrides): Promise<string>;
+
+  newGovernance(overrides?: CallOverrides): Promise<string>;
+
+  "newGovernance()"(overrides?: CallOverrides): Promise<string>;
 
   numProducts(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -567,6 +609,10 @@ export class Registry extends Contract {
   "vault()"(overrides?: CallOverrides): Promise<string>;
 
   callStatic: {
+    acceptGovernance(overrides?: CallOverrides): Promise<void>;
+
+    "acceptGovernance()"(overrides?: CallOverrides): Promise<void>;
+
     addProduct(_product: string, overrides?: CallOverrides): Promise<void>;
 
     "addProduct(address)"(
@@ -610,6 +656,10 @@ export class Registry extends Contract {
     master(overrides?: CallOverrides): Promise<string>;
 
     "master()"(overrides?: CallOverrides): Promise<string>;
+
+    newGovernance(overrides?: CallOverrides): Promise<string>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<string>;
 
     numProducts(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -705,7 +755,7 @@ export class Registry extends Contract {
 
     ClaimsEscrowSet(_claimsEscrow: null): EventFilter;
 
-    GovernanceSet(_governance: null): EventFilter;
+    GovernanceTransferred(_newGovernance: null): EventFilter;
 
     LockerSet(_locker: null): EventFilter;
 
@@ -723,6 +773,10 @@ export class Registry extends Contract {
   };
 
   estimateGas: {
+    acceptGovernance(overrides?: Overrides): Promise<BigNumber>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<BigNumber>;
+
     addProduct(_product: string, overrides?: Overrides): Promise<BigNumber>;
 
     "addProduct(address)"(
@@ -766,6 +820,10 @@ export class Registry extends Contract {
     master(overrides?: CallOverrides): Promise<BigNumber>;
 
     "master()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    newGovernance(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     numProducts(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -857,6 +915,10 @@ export class Registry extends Contract {
   };
 
   populateTransaction: {
+    acceptGovernance(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<PopulatedTransaction>;
+
     addProduct(
       _product: string,
       overrides?: Overrides
@@ -908,6 +970,10 @@ export class Registry extends Contract {
     master(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "master()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    newGovernance(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     numProducts(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 

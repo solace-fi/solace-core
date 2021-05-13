@@ -2,7 +2,8 @@ node_modules
 client
 .DS_Store
 .env
-contracts_flat
+contracts_processed
+coverage
 
 #Hardhat files
 cache

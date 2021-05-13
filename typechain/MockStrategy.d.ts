@@ -22,14 +22,18 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
 interface MockStrategyInterface extends ethers.utils.Interface {
   functions: {
+    "_report(uint256,uint256,uint256)": FunctionFragment;
     "_takeFunds(uint256)": FunctionFragment;
+    "acceptGovernance()": FunctionFragment;
     "delegatedAssets()": FunctionFragment;
     "emergencyExit()": FunctionFragment;
     "estimatedTotalAssets()": FunctionFragment;
     "governance()": FunctionFragment;
     "harvest()": FunctionFragment;
     "isActive()": FunctionFragment;
+    "newGovernance()": FunctionFragment;
     "protectedToken()": FunctionFragment;
+    "setDelegatedAssets(uint256)": FunctionFragment;
     "setEmergencyExit()": FunctionFragment;
     "setGovernance(address)": FunctionFragment;
     "setVault(address)": FunctionFragment;
@@ -39,8 +43,16 @@ interface MockStrategyInterface extends ethers.utils.Interface {
   };
 
   encodeFunctionData(
+    functionFragment: "_report",
+    values: [BigNumberish, BigNumberish, BigNumberish]
+  ): string;
+  encodeFunctionData(
     functionFragment: "_takeFunds",
     values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "acceptGovernance",
+    values?: undefined
   ): string;
   encodeFunctionData(
     functionFragment: "delegatedAssets",
@@ -61,8 +73,16 @@ interface MockStrategyInterface extends ethers.utils.Interface {
   encodeFunctionData(functionFragment: "harvest", values?: undefined): string;
   encodeFunctionData(functionFragment: "isActive", values?: undefined): string;
   encodeFunctionData(
+    functionFragment: "newGovernance",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
     functionFragment: "protectedToken",
     values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "setDelegatedAssets",
+    values: [BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "setEmergencyExit",
@@ -80,7 +100,12 @@ interface MockStrategyInterface extends ethers.utils.Interface {
     values: [BigNumberish]
   ): string;
 
+  decodeFunctionResult(functionFragment: "_report", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "_takeFunds", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "acceptGovernance",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "delegatedAssets",
     data: BytesLike
@@ -97,7 +122,15 @@ interface MockStrategyInterface extends ethers.utils.Interface {
   decodeFunctionResult(functionFragment: "harvest", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "isActive", data: BytesLike): Result;
   decodeFunctionResult(
+    functionFragment: "newGovernance",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "protectedToken",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "setDelegatedAssets",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -115,10 +148,12 @@ interface MockStrategyInterface extends ethers.utils.Interface {
 
   events: {
     "EmergencyExitEnabled()": EventFragment;
+    "GovernanceTransferred(address)": EventFragment;
     "Harvested(uint256,uint256,uint256,uint256)": EventFragment;
   };
 
   getEvent(nameOrSignatureOrTopic: "EmergencyExitEnabled"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "GovernanceTransferred"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "Harvested"): EventFragment;
 }
 
@@ -136,6 +171,20 @@ export class MockStrategy extends Contract {
   interface: MockStrategyInterface;
 
   functions: {
+    _report(
+      gain: BigNumberish,
+      loss: BigNumberish,
+      _debtPayment: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "_report(uint256,uint256,uint256)"(
+      gain: BigNumberish,
+      loss: BigNumberish,
+      _debtPayment: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
     _takeFunds(
       amount: BigNumberish,
       overrides?: Overrides
@@ -145,6 +194,10 @@ export class MockStrategy extends Contract {
       amount: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
+
+    acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
 
     delegatedAssets(
       overrides?: CallOverrides
@@ -210,6 +263,18 @@ export class MockStrategy extends Contract {
       0: boolean;
     }>;
 
+    newGovernance(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "newGovernance()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
     protectedToken(
       overrides?: CallOverrides
     ): Promise<{
@@ -221,6 +286,16 @@ export class MockStrategy extends Contract {
     ): Promise<{
       0: string;
     }>;
+
+    setDelegatedAssets(
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "setDelegatedAssets(uint256)"(
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
 
     setEmergencyExit(overrides?: Overrides): Promise<ContractTransaction>;
 
@@ -281,6 +356,20 @@ export class MockStrategy extends Contract {
     ): Promise<ContractTransaction>;
   };
 
+  _report(
+    gain: BigNumberish,
+    loss: BigNumberish,
+    _debtPayment: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "_report(uint256,uint256,uint256)"(
+    gain: BigNumberish,
+    loss: BigNumberish,
+    _debtPayment: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
   _takeFunds(
     amount: BigNumberish,
     overrides?: Overrides
@@ -290,6 +379,10 @@ export class MockStrategy extends Contract {
     amount: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
+
+  acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+  "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
 
   delegatedAssets(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -315,9 +408,23 @@ export class MockStrategy extends Contract {
 
   "isActive()"(overrides?: CallOverrides): Promise<boolean>;
 
+  newGovernance(overrides?: CallOverrides): Promise<string>;
+
+  "newGovernance()"(overrides?: CallOverrides): Promise<string>;
+
   protectedToken(overrides?: CallOverrides): Promise<string>;
 
   "protectedToken()"(overrides?: CallOverrides): Promise<string>;
+
+  setDelegatedAssets(
+    _amount: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "setDelegatedAssets(uint256)"(
+    _amount: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
 
   setEmergencyExit(overrides?: Overrides): Promise<ContractTransaction>;
 
@@ -359,12 +466,30 @@ export class MockStrategy extends Contract {
   ): Promise<ContractTransaction>;
 
   callStatic: {
+    _report(
+      gain: BigNumberish,
+      loss: BigNumberish,
+      _debtPayment: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "_report(uint256,uint256,uint256)"(
+      gain: BigNumberish,
+      loss: BigNumberish,
+      _debtPayment: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
     _takeFunds(amount: BigNumberish, overrides?: CallOverrides): Promise<void>;
 
     "_takeFunds(uint256)"(
       amount: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
+
+    acceptGovernance(overrides?: CallOverrides): Promise<void>;
+
+    "acceptGovernance()"(overrides?: CallOverrides): Promise<void>;
 
     delegatedAssets(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -390,9 +515,23 @@ export class MockStrategy extends Contract {
 
     "isActive()"(overrides?: CallOverrides): Promise<boolean>;
 
+    newGovernance(overrides?: CallOverrides): Promise<string>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<string>;
+
     protectedToken(overrides?: CallOverrides): Promise<string>;
 
     "protectedToken()"(overrides?: CallOverrides): Promise<string>;
+
+    setDelegatedAssets(
+      _amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "setDelegatedAssets(uint256)"(
+      _amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
 
     setEmergencyExit(overrides?: CallOverrides): Promise<void>;
 
@@ -437,6 +576,8 @@ export class MockStrategy extends Contract {
   filters: {
     EmergencyExitEnabled(): EventFilter;
 
+    GovernanceTransferred(_newGovernance: null): EventFilter;
+
     Harvested(
       profit: null,
       loss: null,
@@ -446,12 +587,30 @@ export class MockStrategy extends Contract {
   };
 
   estimateGas: {
+    _report(
+      gain: BigNumberish,
+      loss: BigNumberish,
+      _debtPayment: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "_report(uint256,uint256,uint256)"(
+      gain: BigNumberish,
+      loss: BigNumberish,
+      _debtPayment: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
     _takeFunds(amount: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
 
     "_takeFunds(uint256)"(
       amount: BigNumberish,
       overrides?: Overrides
     ): Promise<BigNumber>;
+
+    acceptGovernance(overrides?: Overrides): Promise<BigNumber>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<BigNumber>;
 
     delegatedAssets(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -477,9 +636,23 @@ export class MockStrategy extends Contract {
 
     "isActive()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+    newGovernance(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<BigNumber>;
+
     protectedToken(overrides?: CallOverrides): Promise<BigNumber>;
 
     "protectedToken()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    setDelegatedAssets(
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "setDelegatedAssets(uint256)"(
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
 
     setEmergencyExit(overrides?: Overrides): Promise<BigNumber>;
 
@@ -522,6 +695,20 @@ export class MockStrategy extends Contract {
   };
 
   populateTransaction: {
+    _report(
+      gain: BigNumberish,
+      loss: BigNumberish,
+      _debtPayment: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "_report(uint256,uint256,uint256)"(
+      gain: BigNumberish,
+      loss: BigNumberish,
+      _debtPayment: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
     _takeFunds(
       amount: BigNumberish,
       overrides?: Overrides
@@ -531,6 +718,10 @@ export class MockStrategy extends Contract {
       amount: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
+
+    acceptGovernance(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<PopulatedTransaction>;
 
     delegatedAssets(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
@@ -562,10 +753,24 @@ export class MockStrategy extends Contract {
 
     "isActive()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
+    newGovernance(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
     protectedToken(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "protectedToken()"(
       overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    setDelegatedAssets(
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "setDelegatedAssets(uint256)"(
+      _amount: BigNumberish,
+      overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
     setEmergencyExit(overrides?: Overrides): Promise<PopulatedTransaction>;

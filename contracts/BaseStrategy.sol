@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.0;
 
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -16,7 +16,11 @@ abstract contract BaseStrategy {
     using Address for address;
     using SafeERC20 for IERC20;
 
+    /// @notice Governor.
     address public governance;
+
+    /// @notice Governance to take over.
+    address public newGovernance;
 
     IVault public vault;
     IERC20 public want;
@@ -25,6 +29,8 @@ abstract contract BaseStrategy {
 
     event EmergencyExitEnabled();
     event Harvested(uint256 profit, uint256 loss, uint256 debtPayment, uint256 debtOutstanding);
+    // Emitted when Governance is set
+    event GovernanceTransferred(address _newGovernance);
 
     constructor (address _vault) {
         governance = msg.sender;
@@ -39,13 +45,26 @@ abstract contract BaseStrategy {
     }
 
     /**
-     * @notice Transfers the governance role to a new governor.
+     * @notice Allows governance to be transferred to a new governor.
      * Can only be called by the current governor.
-     * @param _governance the new governor
+     * @param _governance The new governor.
      */
     function setGovernance(address _governance) external {
+        // can only be called by governor
         require(msg.sender == governance, "!governance");
-        governance = _governance;
+        newGovernance = _governance;
+    }
+
+    /**
+     * @notice Accepts the governance role.
+     * Can only be called by the new governor.
+     */
+    function acceptGovernance() external {
+        // can only be called by new governor
+        require(msg.sender == newGovernance, "!governance");
+        governance = newGovernance;
+        newGovernance = address(0x0);
+        emit GovernanceTransferred(msg.sender);
     }
 
     /**
@@ -160,10 +179,10 @@ abstract contract BaseStrategy {
      *  (principle + return) that this Strategy is currently managing,
      *  denominated in `want` tokens.
      *
-     *  This total should be realizable from this Strategy if it 
+     *  This total should be realizable from this Strategy if it
      *  were to divest its entire position based on current on-chain conditions.
      * @dev
-     *  This function relies on external systems, which could be manipulated by 
+     *  This function relies on external systems, which could be manipulated by
      *  the attacker to give an inflated (or reduced) value produced by this function,
      *  based on current on-chain conditions (e.g. this function is possible to influence
      *  through flashloan attacks, oracle manipulations, or other DeFi attack mechanisms).
@@ -187,7 +206,7 @@ abstract contract BaseStrategy {
      * @notice
      *  Liquidate up to `_amountNeeded` of `want` of this strategy's positions,
      *  irregardless of slippage. Any excess will be re-invested with `adjustPosition()`.
-     * @dev  
+     * @dev
     *   This function should return the amount of `want` tokens made available by the
      *  liquidation. If there is a difference between them, `_loss` indicates whether the
      *  difference is due to a realized loss, or if there is some other sitution at play

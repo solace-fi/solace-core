@@ -1,9 +1,9 @@
 import chai from "chai";
 import { waffle } from "hardhat";
-import { BigNumber as BN } from 'ethers';
-import VaultArtifact from '../artifacts/contracts/Vault.sol/Vault.json';
-import StrategyArtifact from '../artifacts/contracts/mocks/MockStrategy.sol/MockStrategy.json';
-import WETHArtifact from '../artifacts/contracts/mocks/MockWETH.sol/MockWETH.json';
+import { BigNumber as BN } from "ethers";
+import VaultArtifact from "../artifacts/contracts/Vault.sol/Vault.json";
+import StrategyArtifact from "../artifacts/contracts/mocks/MockStrategy.sol/MockStrategy.json";
+import WETHArtifact from "../artifacts/contracts/mocks/MockWETH.sol/MockWETH.json";
 import RegistryArtifact from "../artifacts/contracts/Registry.sol/Registry.json";
 import { Vault, MockStrategy, MockWeth, Registry } from "../typechain";
 
@@ -29,6 +29,7 @@ describe("Strategy", function () {
     const performanceFee = 0;
 
     const MAX_BPS = 10000;
+    const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
     beforeEach(async () => {
         registry = (await deployContract(
@@ -68,15 +69,26 @@ describe("Strategy", function () {
         it("should set the vault address", async function () {
             expect(await strategy.vault()).to.equal(vault.address);
         });
+        it("should start inactive", async function () {
+          expect(await strategy.isActive()).to.equal(false);
+        });
     });
 
     describe("setGovernance", function () {
         it("should allow governance to set new governance address", async function () {
+            expect(await strategy.governance()).to.equal(owner.address);
             await strategy.connect(owner).setGovernance(newOwner.address);
+            expect(await strategy.governance()).to.equal(owner.address);
+            expect(await strategy.newGovernance()).to.equal(newOwner.address);
+            let tx = await strategy.connect(newOwner).acceptGovernance();
+            await expect(tx).to.emit(strategy, "GovernanceTransferred").withArgs(newOwner.address);
             expect(await strategy.governance()).to.equal(newOwner.address);
+            expect(await strategy.newGovernance()).to.equal(ZERO_ADDRESS);
         });
         it("should revert if not called by governance", async function () {
             await expect(strategy.connect(depositor1).setGovernance(depositor1.address)).to.be.revertedWith("!governance");
+            await strategy.connect(owner).setGovernance(newOwner.address);
+            await expect(strategy.connect(depositor1).acceptGovernance()).to.be.revertedWith("!governance");
         });
     });
 
@@ -91,7 +103,7 @@ describe("Strategy", function () {
     });
 
     describe("setEmergencyExit", function () {
-        beforeEach('set strategy address and make initial deposit', async function () {
+        beforeEach("set strategy address and make initial deposit", async function () {
             await vault.connect(owner).addStrategy(strategy.address, debtRatio, minDebtPerHarvest, maxDebtPerHarvest, performanceFee);
             await strategy.connect(owner).setVault(vault.address);
             await vault.connect(depositor1).deposit({ value: testDepositAmount});
@@ -105,7 +117,7 @@ describe("Strategy", function () {
             expect(await strategy.emergencyExit()).to.be.true;
         });
         it("should emit StrategyRevoked event from Vault", async function () {
-            expect(await strategy.connect(owner).setEmergencyExit()).to.emit(vault, 'StrategyRevoked').withArgs(strategy.address);
+            expect(await strategy.connect(owner).setEmergencyExit()).to.emit(vault, "StrategyRevoked").withArgs(strategy.address);
         });
         it("should set the debtRatio of strategy to 0", async function () {
             let strategyObject = await vault.strategies(strategy.address);
@@ -125,10 +137,17 @@ describe("Strategy", function () {
             expect(strategyObject.debtRatio).to.equal(0);
             expect(vaultDebtRatio).to.equal(0);
         });
+        it("should remain active until full withdraw", async function () {
+          expect(await strategy.isActive()).to.equal(true);
+          await strategy.connect(owner).setEmergencyExit();
+          expect(await strategy.isActive()).to.equal(true);
+          await vault.connect(depositor1).withdraw(testDepositAmount, 0);
+          expect(await strategy.isActive()).to.equal(false);
+        });
     });
 
     describe("deposit", function () {
-        beforeEach('set strategy address and make initial deposit', async function () {
+        beforeEach("set strategy address and make initial deposit", async function () {
             await vault.connect(owner).addStrategy(strategy.address, debtRatio, minDebtPerHarvest, maxDebtPerHarvest, performanceFee);
             await strategy.connect(owner).setVault(vault.address);
             await vault.connect(depositor1).deposit({ value: testDepositAmount});
@@ -142,7 +161,7 @@ describe("Strategy", function () {
     });
 
     describe("harvest", function () {
-        beforeEach('set strategy address and make initial deposit', async function () {
+        beforeEach("set strategy address and make initial deposit", async function () {
             await vault.connect(owner).addStrategy(strategy.address, debtRatio, minDebtPerHarvest, maxDebtPerHarvest, performanceFee);
             await strategy.connect(owner).setVault(vault.address);
             await vault.connect(depositor1).deposit({ value: testDepositAmount});
@@ -161,7 +180,7 @@ describe("Strategy", function () {
         });
 
         it("should emit Harvested event", async function () {
-            expect(await strategy.connect(owner).harvest()).to.emit(strategy, 'Harvested').withArgs(0, 0, 0, 0);
+            expect(await strategy.connect(owner).harvest()).to.emit(strategy, "Harvested").withArgs(0, 0, 0, 0);
         });
 
         it("should allow governance to call harvest", async function () {
@@ -177,10 +196,30 @@ describe("Strategy", function () {
             expect(strategyBalance).to.equal(testDepositAmount.div(MAX_BPS / debtRatio));
             expect(vaultBalance).to.equal(testDepositAmount.sub(testDepositAmount.div(MAX_BPS / debtRatio)));
         });
+
+        it("should allow harvest while in emergency exit", async function () {
+            await strategy.connect(owner).setEmergencyExit();
+            await expect(await strategy.connect(owner).harvest()).to.emit(strategy, "Harvested").withArgs(0, 0, 0, 0);
+        });
+
+        it("should allow harvest with profit while in emergency exit", async function () {
+            let profitAmount = 100;
+            await weth.connect(depositor1).depositTo(strategy.address, {value: profitAmount});
+            await strategy.connect(owner).setEmergencyExit();
+            await expect(await strategy.connect(owner).harvest()).to.emit(strategy, "Harvested").withArgs(profitAmount, 0, 0, 0);
+        });
+
+        it("should liquidate position", async function () {
+            let lossAmount = BN.from(1);
+            await strategy.connect(owner).harvest();
+            await strategy._takeFunds(lossAmount);
+            await strategy.connect(owner).setEmergencyExit();
+            await expect(await strategy.connect(owner).harvest()).to.emit(strategy, "Harvested").withArgs(0, lossAmount, 0, 0);
+        });
     });
 
     describe("withdraw", function () {
-        beforeEach('set strategy address and make initial deposit', async function () {
+        beforeEach("set strategy address and make initial deposit", async function () {
             await vault.connect(owner).addStrategy(strategy.address, debtRatio, minDebtPerHarvest, maxDebtPerHarvest, performanceFee);
             await vault.connect(depositor1).deposit({ value: testDepositAmount});
             await strategy.connect(owner).harvest();

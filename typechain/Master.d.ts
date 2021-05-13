@@ -22,11 +22,13 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
 interface MasterInterface extends ethers.utils.Interface {
   functions: {
+    "acceptGovernance()": FunctionFragment;
     "allocPoints(uint256)": FunctionFragment;
     "farmAddresses(uint256)": FunctionFragment;
     "farmIndices(address)": FunctionFragment;
     "governance()": FunctionFragment;
     "massUpdateFarms()": FunctionFragment;
+    "newGovernance()": FunctionFragment;
     "numFarms()": FunctionFragment;
     "registerFarm(address,uint256)": FunctionFragment;
     "setAllocPoints(uint256,uint256)": FunctionFragment;
@@ -37,6 +39,10 @@ interface MasterInterface extends ethers.utils.Interface {
     "totalAllocPoints()": FunctionFragment;
   };
 
+  encodeFunctionData(
+    functionFragment: "acceptGovernance",
+    values?: undefined
+  ): string;
   encodeFunctionData(
     functionFragment: "allocPoints",
     values: [BigNumberish]
@@ -52,6 +58,10 @@ interface MasterInterface extends ethers.utils.Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "massUpdateFarms",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "newGovernance",
     values?: undefined
   ): string;
   encodeFunctionData(functionFragment: "numFarms", values?: undefined): string;
@@ -82,6 +92,10 @@ interface MasterInterface extends ethers.utils.Interface {
   ): string;
 
   decodeFunctionResult(
+    functionFragment: "acceptGovernance",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "allocPoints",
     data: BytesLike
   ): Result;
@@ -96,6 +110,10 @@ interface MasterInterface extends ethers.utils.Interface {
   decodeFunctionResult(functionFragment: "governance", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "massUpdateFarms",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "newGovernance",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "numFarms", data: BytesLike): Result;
@@ -127,9 +145,13 @@ interface MasterInterface extends ethers.utils.Interface {
 
   events: {
     "FarmCreated(uint256,address)": EventFragment;
+    "GovernanceTransferred(address)": EventFragment;
+    "RewardsSet(uint256)": EventFragment;
   };
 
   getEvent(nameOrSignatureOrTopic: "FarmCreated"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "GovernanceTransferred"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "RewardsSet"): EventFragment;
 }
 
 export class Master extends Contract {
@@ -146,6 +168,10 @@ export class Master extends Contract {
   interface: MasterInterface;
 
   functions: {
+    acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
+
     allocPoints(
       arg0: BigNumberish,
       overrides?: CallOverrides
@@ -203,6 +229,18 @@ export class Master extends Contract {
     massUpdateFarms(overrides?: Overrides): Promise<ContractTransaction>;
 
     "massUpdateFarms()"(overrides?: Overrides): Promise<ContractTransaction>;
+
+    newGovernance(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "newGovernance()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
 
     numFarms(
       overrides?: CallOverrides
@@ -297,6 +335,10 @@ export class Master extends Contract {
     }>;
   };
 
+  acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+  "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
+
   allocPoints(
     arg0: BigNumberish,
     overrides?: CallOverrides
@@ -328,6 +370,10 @@ export class Master extends Contract {
   massUpdateFarms(overrides?: Overrides): Promise<ContractTransaction>;
 
   "massUpdateFarms()"(overrides?: Overrides): Promise<ContractTransaction>;
+
+  newGovernance(overrides?: CallOverrides): Promise<string>;
+
+  "newGovernance()"(overrides?: CallOverrides): Promise<string>;
 
   numFarms(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -390,6 +436,10 @@ export class Master extends Contract {
   "totalAllocPoints()"(overrides?: CallOverrides): Promise<BigNumber>;
 
   callStatic: {
+    acceptGovernance(overrides?: CallOverrides): Promise<void>;
+
+    "acceptGovernance()"(overrides?: CallOverrides): Promise<void>;
+
     allocPoints(
       arg0: BigNumberish,
       overrides?: CallOverrides
@@ -424,6 +474,10 @@ export class Master extends Contract {
     massUpdateFarms(overrides?: CallOverrides): Promise<void>;
 
     "massUpdateFarms()"(overrides?: CallOverrides): Promise<void>;
+
+    newGovernance(overrides?: CallOverrides): Promise<string>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<string>;
 
     numFarms(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -491,9 +545,17 @@ export class Master extends Contract {
       _farmId: BigNumberish | null,
       _farmAddress: string | null
     ): EventFilter;
+
+    GovernanceTransferred(_newGovernance: null): EventFilter;
+
+    RewardsSet(_solacePerBlock: null): EventFilter;
   };
 
   estimateGas: {
+    acceptGovernance(overrides?: Overrides): Promise<BigNumber>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<BigNumber>;
+
     allocPoints(
       arg0: BigNumberish,
       overrides?: CallOverrides
@@ -528,6 +590,10 @@ export class Master extends Contract {
     massUpdateFarms(overrides?: Overrides): Promise<BigNumber>;
 
     "massUpdateFarms()"(overrides?: Overrides): Promise<BigNumber>;
+
+    newGovernance(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     numFarms(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -591,6 +657,10 @@ export class Master extends Contract {
   };
 
   populateTransaction: {
+    acceptGovernance(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<PopulatedTransaction>;
+
     allocPoints(
       arg0: BigNumberish,
       overrides?: CallOverrides
@@ -628,6 +698,10 @@ export class Master extends Contract {
     massUpdateFarms(overrides?: Overrides): Promise<PopulatedTransaction>;
 
     "massUpdateFarms()"(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    newGovernance(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     numFarms(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 

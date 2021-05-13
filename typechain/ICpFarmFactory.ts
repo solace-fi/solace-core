@@ -33,7 +33,7 @@ const _abi = [
         type: "uint256",
       },
     ],
-    name: "DepositCp",
+    name: "CpDeposited",
     type: "event",
   },
   {
@@ -52,7 +52,7 @@ const _abi = [
         type: "uint256",
       },
     ],
-    name: "DepositEth",
+    name: "CpWithdrawn",
     type: "event",
   },
   {
@@ -71,7 +71,7 @@ const _abi = [
         type: "uint256",
       },
     ],
-    name: "WithdrawCp",
+    name: "EthDeposited",
     type: "event",
   },
   {
@@ -90,7 +90,78 @@ const _abi = [
         type: "uint256",
       },
     ],
-    name: "WithdrawEth",
+    name: "EthWithdrawn",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "_endBlock",
+        type: "uint256",
+      },
+    ],
+    name: "FarmEndSet",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: false,
+        internalType: "address",
+        name: "_newGovernance",
+        type: "address",
+      },
+    ],
+    name: "GovernanceTransferred",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address",
+        name: "_user",
+        type: "address",
+      },
+    ],
+    name: "RewardsCompounded",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "_blockReward",
+        type: "uint256",
+      },
+    ],
+    name: "RewardsSet",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address",
+        name: "_user",
+        type: "address",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "_amount",
+        type: "uint256",
+      },
+    ],
+    name: "UserRewarded",
     type: "event",
   },
   {
@@ -112,6 +183,13 @@ const _abi = [
   },
   {
     inputs: [],
+    name: "acceptGovernance",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
     name: "blockReward",
     outputs: [
       {
@@ -121,6 +199,13 @@ const _abi = [
       },
     ],
     stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "compoundRewards",
+    outputs: [],
+    stateMutability: "nonpayable",
     type: "function",
   },
   {
@@ -260,6 +345,19 @@ const _abi = [
   {
     inputs: [],
     name: "master",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "newGovernance",
     outputs: [
       {
         internalType: "address",

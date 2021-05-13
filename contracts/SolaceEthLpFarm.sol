@@ -4,6 +4,7 @@ pragma solidity 0.8.0;
 import "./libraries/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import "./ReentrancyGuard.sol";
 import "./libraries/TickBitmap.sol";
 import "./interface/IUniswapLpToken.sol";
 import "./interface/IUniswapV3Pool.sol";
@@ -14,7 +15,7 @@ import "./interface/ISolaceEthLpFarm.sol";
  * @title SolaceEthLpFarm: A farm that allows for the staking of Uniswap LP tokens in SOLACE-ETH pools.
  * @author solace.fi
  */
-contract SolaceEthLpFarm is ISolaceEthLpFarm {
+contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.UintSet;
     using TickBitmap for mapping(int16 => uint256);
@@ -84,6 +85,9 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm {
     /// @notice Governor.
     address public override governance;
 
+    /// @notice Governance to take over.
+    address public override newGovernance;
+
     /// @notice Master contract.
     address public override master;
 
@@ -141,14 +145,26 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm {
     }
 
     /**
-     * @notice Transfers the governance role to a new governor.
+     * @notice Allows governance to be transferred to a new governor.
      * Can only be called by the current governor.
      * @param _governance The new governor.
      */
     function setGovernance(address _governance) external override {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
-        governance = _governance;
+        newGovernance = _governance;
+    }
+
+    /**
+     * @notice Accepts the governance role.
+     * Can only be called by the new governor.
+     */
+    function acceptGovernance() external override {
+        // can only be called by new governor
+        require(msg.sender == newGovernance, "!governance");
+        governance = newGovernance;
+        newGovernance = address(0x0);
+        emit GovernanceTransferred(msg.sender);
     }
 
     /**
@@ -163,6 +179,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm {
         updateFarm();
         // accounting
         blockReward = _blockReward;
+        emit RewardsSet(_blockReward);
     }
 
     /**
@@ -176,6 +193,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm {
         endBlock = _endBlock;
         // update
         updateFarm();
+        emit FarmEndSet(_endBlock);
     }
 
     /**
@@ -183,7 +201,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm {
      * User will receive accumulated Solace rewards if any.
      * @param _token The deposit token.
      */
-    function deposit(uint256 _token) external override {
+    function deposit(uint256 _token) external override nonReentrant {
         // pull token
         lpToken.transferFrom(msg.sender, address(this), _token);
         // accounting
@@ -200,7 +218,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm {
      * @param r secp256k1 signature
      * @param s secp256k1 signature
      */
-    function depositSigned(address _depositor, uint256 _token, uint256 _deadline, uint8 v, bytes32 r, bytes32 s) external override {
+    function depositSigned(address _depositor, uint256 _token, uint256 _deadline, uint8 v, bytes32 r, bytes32 s) external override nonReentrant {
         // permit
         lpToken.permit(address(this), _token, _deadline, v, r, s);
         // pull token
@@ -215,7 +233,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm {
      * @param params parameters
      * @return tokenId The newly minted token id.
      */
-    function mintAndDeposit(MintAndDepositParams calldata params) external payable override returns (uint256 tokenId) {
+    function mintAndDeposit(MintAndDepositParams calldata params) external payable override nonReentrant returns (uint256 tokenId) {
         // permit solace
         solace.permit(params.depositor, address(this), params.amountSolace, params.deadline, params.v, params.r, params.s);
         // pull solace
@@ -258,7 +276,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm {
      * User will receive _token and accumulated rewards.
      * @param _token The withdraw token.
      */
-    function withdraw(uint256 _token) external override {
+    function withdraw(uint256 _token) external override nonReentrant {
         // harvest and update farm
         _harvest(msg.sender);
         // get farmer information
@@ -288,13 +306,13 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm {
         // return staked token
         lpToken.safeTransferFrom(address(this), msg.sender, _token);
         // emit event
-        emit Withdraw(msg.sender, _token);
+        emit TokenWithdrawn(msg.sender, _token);
     }
 
     /**
     * Withdraw your rewards without unstaking your tokens.
     */
-    function withdrawRewards() external override {
+    function withdrawRewards() external override nonReentrant {
         // harvest and update farm
         _harvest(msg.sender);
         // get farmer information
@@ -475,27 +493,16 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm {
         _value = _appraise(liquidity, tickLower, tickUpper);
     }
 
-    /*
-     * The following variables can be used to tune the appraisal curve.
-     * See the Solace.fi UniswapLpFarm blog for more info.
-     */
-    uint256 private constant APPRAISAL_A = 20000;
-    uint256 private constant APPRAISAL_B = 40000;
-    uint256 private constant APPRAISAL_B2 = APPRAISAL_B**2;
-
     /**
      * @notice Appraise a Uniswap LP token.
+     * @dev We have experimented with many different appraisal functions that incentivize different LP strategies. We decided to simply use liquidity as our metric of value as LPs of existing pools appear to be acting rationally.
      * @param _liquidity The liquidity provided by the token.
      * @param _tickLower The token's lower tick.
      * @param _tickUpper The token's upper tick.
      * @return _value The token's value.
      */
     function _appraise(uint128 _liquidity, int24 _tickLower, int24 _tickUpper) internal pure returns (uint256 _value) {
-        uint256 width = (uint256(int256(_tickUpper - _tickLower)));
-        _value = _liquidity * width;
-        if (width > APPRAISAL_A) {
-            _value = _value * APPRAISAL_B2 / ( (width-APPRAISAL_A)**2 + APPRAISAL_B2);
-        }
+        return uint256(_liquidity);
     }
 
     /**
@@ -514,6 +521,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm {
         uint256 transferAmount = Math.min(pending, balance);
         user.unpaidRewards = int256(pending - transferAmount);
         IERC20(solace).safeTransferFrom(master, _user, transferAmount);
+        emit UserRewarded(_user, transferAmount);
     }
 
     /**
@@ -557,7 +565,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm {
         ticks[_tokenInfo.tickUpper].tokens.add(_token);
         ticks[_tokenInfo.tickUpper].valueNet -= int256(_tokenInfo.value);
         // emit event
-        emit Deposit(_depositor, _token);
+        emit TokenDeposited(_depositor, _token);
     }
 
     /**

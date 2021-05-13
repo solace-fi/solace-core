@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.0;
 
 import "../BaseStrategy.sol";
+
 
 /**
  * @title MockStrategy
@@ -29,8 +30,7 @@ contract MockStrategy is BaseStrategy {
         } else {
             // NOTE: Just in case something was stolen from this contract
             if (totalDebt > totalAssets) {
-                _loss = totalDebt - totalAssets;
-                if (_loss > _amountNeeded) _loss = _amountNeeded;
+                _loss = min(totalDebt - totalAssets, _amountNeeded);
             }
             _liquidatedAmount = _amountNeeded;
         }
@@ -50,12 +50,12 @@ contract MockStrategy is BaseStrategy {
         uint256 totalDebt = vault.strategies(address(this)).totalDebt;
         if (totalAssets > _debtOutstanding) {
             _debtPayment = _debtOutstanding;
-            totalAssets = totalAssets - _debtOutstanding;
+            totalAssets -= _debtOutstanding;
         } else {
             _debtPayment = totalAssets;
             totalAssets = 0;
         }
-        totalDebt = totalDebt -_debtPayment;
+        totalDebt -= _debtPayment;
 
         if (totalAssets > totalDebt) {
             _profit = totalAssets - totalDebt;
@@ -68,9 +68,31 @@ contract MockStrategy is BaseStrategy {
         // Whatever we have "free", consider it "invested" now
     }
 
+    function min(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a < b ? a : b;
+    }
+
     // NOTE: test-only function to simulate losses
     function _takeFunds(uint256 amount) public {
         want.transfer(msg.sender, amount);
     }
 
+    // NOTE: test-only function to test reports
+    function _report(uint256 gain, uint256 loss, uint256 _debtPayment) public {
+        vault.report(gain, loss, _debtPayment);
+    }
+
+    // NOTE: test-only functions to test reports
+    uint256 private _delegatedAssets;
+
+    function delegatedAssets() external view override returns (uint256) {
+        return _delegatedAssets;
+        //return BaseStrategy(address(this)).delegatedAssets() + _delegatedAssets;
+        //return super.delegatedAssets() + _delegatedAssets;
+        //return BaseStrategy.delegatedAssets() + _delegatedAssets;
+    }
+
+    function setDelegatedAssets(uint256 _amount) external {
+        _delegatedAssets = _amount;
+    }
 }
