@@ -42,12 +42,14 @@ interface IFarm {
 
     /**
      * @notice Sets the amount of reward token to distribute per block.
+     * Can only be called by Master.
      * @param _blockReward Amount to distribute per block.
      */
     function setRewards(uint256 _blockReward) external;
 
     /**
      * @notice Sets the farm's end block. Used to extend the duration.
+     * Can only be called by the current governor.
      * @param _endBlock The new end block.
      */
     function setEnd(uint256 _endBlock) external;

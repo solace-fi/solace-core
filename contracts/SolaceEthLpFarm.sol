@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./libraries/TickBitmap.sol";
 import "./interface/IUniswapLpToken.sol";
 import "./interface/IUniswapV3Pool.sol";
+import "./interface/ILpAppraisor.sol";
 import "./interface/ISolaceEthLpFarm.sol";
 
 
@@ -103,6 +104,9 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard {
     // list of tokens deposited by user
     mapping(address => EnumerableSet.UintSet) private userDeposited;
 
+    /// @notice Uniswap V3 Position Appraisor
+    ILpAppraisor public appraisor;
+
     /**
      * @notice Constructs the farm.
      * @param _governance Address of the governor.
@@ -121,7 +125,8 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard {
         uint256 _startBlock,
         uint256 _endBlock,
         address _pool,
-        address _weth
+        address _weth,
+        address _appraisor
     ) public {
         // copy params
         governance = _governance;
@@ -132,6 +137,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard {
         endBlock = _endBlock;
         lastRewardBlock = Math.max(block.number, _startBlock);
         weth = IWETH10(_weth);
+        appraisor = ILpAppraisor(_appraisor);
         // get pool data
         pool = IUniswapV3Pool(_pool);
         token0 = pool.token0();
@@ -170,6 +176,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard {
     /**
      * @notice Sets the amount of reward token to distribute per block.
      * Only affects future rewards.
+     * Can only be called by Master.
      * @param _blockReward Amount to distribute per block.
      */
     function setRewards(uint256 _blockReward) external override {
@@ -184,6 +191,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard {
 
     /**
      * @notice Sets the farm's end block. Used to extend the duration.
+     * Can only be called by the current governor.
      * @param _endBlock The new end block.
      */
     function setEnd(uint256 _endBlock) external override {
@@ -197,34 +205,45 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard {
     }
 
     /**
+     * @notice Sets the appraisal function.
+     * Can only be called by the current governor.
+     * @param _appraisor The new appraisor.
+     */
+    function setAppraisor(address _appraisor) external override {
+        // can only be called by governor
+        require(msg.sender == governance, "!governance");
+        appraisor = ILpAppraisor(_appraisor);
+    }
+
+    /**
      * @notice Deposit a Uniswap LP token.
      * User will receive accumulated Solace rewards if any.
-     * @param _token The deposit token.
+     * @param _tokenId The id of the token to deposit.
      */
-    function deposit(uint256 _token) external override nonReentrant {
+    function deposit(uint256 _tokenId) external override nonReentrant {
         // pull token
-        lpToken.transferFrom(msg.sender, address(this), _token);
+        lpToken.transferFrom(msg.sender, address(this), _tokenId);
         // accounting
-        _deposit(msg.sender, _token);
+        _deposit(msg.sender, _tokenId);
     }
 
     /**
      * @notice Deposit a Uniswap LP token using permit.
      * User will receive accumulated Solace rewards if any.
      * @param _depositor The depositing user.
-     * @param _token The deposit token.
+     * @param _tokenId The id of the token to deposit.
      * @param _deadline Time the transaction must go through before.
      * @param v secp256k1 signature
      * @param r secp256k1 signature
      * @param s secp256k1 signature
      */
-    function depositSigned(address _depositor, uint256 _token, uint256 _deadline, uint8 v, bytes32 r, bytes32 s) external override nonReentrant {
+    function depositSigned(address _depositor, uint256 _tokenId, uint256 _deadline, uint8 v, bytes32 r, bytes32 s) external override nonReentrant {
         // permit
-        lpToken.permit(address(this), _token, _deadline, v, r, s);
+        lpToken.permit(address(this), _tokenId, _deadline, v, r, s);
         // pull token
-        lpToken.transferFrom(_depositor, address(this), _token);
+        lpToken.transferFrom(_depositor, address(this), _tokenId);
         // accounting
-        _deposit(_depositor, _token);
+        _deposit(_depositor, _tokenId);
     }
 
     /**
@@ -273,16 +292,16 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard {
 
     /**
      * @notice Withdraw a Uniswap LP token.
-     * User will receive _token and accumulated rewards.
-     * @param _token The withdraw token.
+     * User will receive _tokenId and accumulated rewards.
+     * @param _tokenId The id of the token to withdraw.
      */
-    function withdraw(uint256 _token) external override nonReentrant {
+    function withdraw(uint256 _tokenId) external override nonReentrant {
         // harvest and update farm
         _harvest(msg.sender);
         // get farmer information
         UserInfo storage user = userInfo[msg.sender];
         // get token info
-        TokenInfo memory _tokenInfo = tokenInfo[_token];
+        TokenInfo memory _tokenInfo = tokenInfo[_tokenId];
         // cannot withdraw a token you didnt deposit
         require(_tokenInfo.depositor == msg.sender, "not your token");
         // accounting
@@ -292,21 +311,21 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard {
           valueStaked -= _tokenInfo.value;
         }
         user.rewardDebt = user.value * accRewardPerShare / 1e12;
-        userDeposited[msg.sender].remove(_token);
+        userDeposited[msg.sender].remove(_tokenId);
         // remove position from tick lower
-        ticks[_tokenInfo.tickLower].tokens.remove(_token);
+        ticks[_tokenInfo.tickLower].tokens.remove(_tokenId);
         ticks[_tokenInfo.tickLower].valueNet -= int256(_tokenInfo.value);
         if (ticks[_tokenInfo.tickLower].tokens.length() == 0) tickBitmap.flipTick(_tokenInfo.tickLower, tickSpacing);
         // remove position from tick upper
-        ticks[_tokenInfo.tickUpper].tokens.remove(_token);
+        ticks[_tokenInfo.tickUpper].tokens.remove(_tokenId);
         ticks[_tokenInfo.tickUpper].valueNet += int256(_tokenInfo.value);
         if (ticks[_tokenInfo.tickUpper].tokens.length() == 0) tickBitmap.flipTick(_tokenInfo.tickUpper, tickSpacing);
         // delete token info
-        delete tokenInfo[_token];
+        delete tokenInfo[_tokenId];
         // return staked token
-        lpToken.safeTransferFrom(address(this), msg.sender, _token);
+        lpToken.safeTransferFrom(address(this), msg.sender, _tokenId);
         // emit event
-        emit TokenWithdrawn(msg.sender, _token);
+        emit TokenWithdrawn(msg.sender, _tokenId);
     }
 
     /**
@@ -498,25 +517,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard {
      * @return _value The token's value.
      */
     function appraise(uint256 _token) external view override returns (uint256 _value) {
-        // get position
-        ( , , address _token0, address _token1, uint24 _fee, int24 tickLower, int24 tickUpper, uint128 liquidity, , , , )
-        = lpToken.positions(_token);
-        // check if correct pool
-        require((fee == _fee) && (token0 == _token0) && (token1 == _token1), "wrong pool");
-        // appraise
-        _value = _appraise(liquidity, tickLower, tickUpper);
-    }
-
-    /**
-     * @notice Appraise a Uniswap LP token.
-     * @dev We have experimented with many different appraisal functions that incentivize different LP strategies. We decided to simply use liquidity as our metric of value as LPs of existing pools appear to be acting rationally.
-     * @param _liquidity The liquidity provided by the token.
-     * @param _tickLower The token's lower tick.
-     * @param _tickUpper The token's upper tick.
-     * @return _value The token's value.
-     */
-    function _appraise(uint128 _liquidity, int24 _tickLower, int24 _tickUpper) internal pure returns (uint256 _value) {
-        return uint256(_liquidity);
+        return appraisor.appraise(_token);
     }
 
     /**
@@ -541,12 +542,12 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard {
     /**
      * @notice Performs the internal accounting for a deposit.
      * @param _depositor The depositing user.
-     * @param _token The id of the token to deposit.
+     * @param _tokenId The id of the token to deposit.
      */
-    function _deposit(address _depositor, uint256 _token) internal {
+    function _deposit(address _depositor, uint256 _tokenId) internal {
         // get position
         ( , , address _token0, address _token1, uint24 _fee, int24 tickLower, int24 tickUpper, uint128 liquidity, , , , )
-        = lpToken.positions(_token);
+        = lpToken.positions(_tokenId);
         // check if correct pool
         require((fee == _fee) && (token0 == _token0) && (token1 == _token1), "wrong pool");
         // harvest and update farm
@@ -559,9 +560,9 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard {
             tickLower: tickLower,
             tickUpper: tickUpper,
             liquidity: liquidity,
-            value: _appraise(liquidity, tickLower, tickUpper)
+            value: appraisor.appraise(_tokenId)
         });
-        tokenInfo[_token] = _tokenInfo;
+        tokenInfo[_tokenId] = _tokenInfo;
         // accounting
         if (_tokenInfo.tickLower <= lastTick && lastTick < _tokenInfo.tickUpper) {
             // add if in range
@@ -569,17 +570,17 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard {
             valueStaked += _tokenInfo.value;
         }
         user.rewardDebt = user.value * accRewardPerShare / 1e12;
-        userDeposited[_depositor].add(_token);
+        userDeposited[_depositor].add(_tokenId);
         // add position to tick lower
         if (ticks[_tokenInfo.tickLower].tokens.length() == 0) tickBitmap.flipTick(_tokenInfo.tickLower, tickSpacing);
-        ticks[_tokenInfo.tickLower].tokens.add(_token);
+        ticks[_tokenInfo.tickLower].tokens.add(_tokenId);
         ticks[_tokenInfo.tickLower].valueNet += int256(_tokenInfo.value);
         // add position to tick upper
         if (ticks[_tokenInfo.tickUpper].tokens.length() == 0) tickBitmap.flipTick(_tokenInfo.tickUpper, tickSpacing);
-        ticks[_tokenInfo.tickUpper].tokens.add(_token);
+        ticks[_tokenInfo.tickUpper].tokens.add(_tokenId);
         ticks[_tokenInfo.tickUpper].valueNet -= int256(_tokenInfo.value);
         // emit event
-        emit TokenDeposited(_depositor, _token);
+        emit TokenDeposited(_depositor, _tokenId);
     }
 
     /**
