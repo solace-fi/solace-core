@@ -4,9 +4,13 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import './interface/IProduct.sol';
-import './PolicyManager.sol';
+import './interface/IPolicyManager.sol';
+import './interface/ITreasury.sol';
 
 /* TODO
+ * - create IPolicyManager.sol
+ * - treasury refund() function, check transfer to treasury when buyPolicy()
+ * - add events
  * - optimize _updateActivePolicies()
  * - update, extend, cancel policy functions
  */
@@ -27,7 +31,10 @@ abstract contract BaseProduct is IProduct {
     address public governance;
 
     // Policy Manager
-    PolicyManager public policyManager; // Policy manager ERC721 contract
+    IPolicyManager public policyManager; // Policy manager ERC721 contract
+
+    // Treasury
+    ITreasury public treasury; // Treasury contract
 
     // Product Details
     address public coveredPlatform; // a platform contract which locates contracts that are covered by this product
@@ -58,6 +65,7 @@ abstract contract BaseProduct is IProduct {
 
     constructor (
         PolicyManager _policyManager,
+        Treasury _treasury,
         address _coveredPlatform,
         address _claimsAdjuster,
         uint256 _price,
@@ -68,6 +76,7 @@ abstract contract BaseProduct is IProduct {
     {
         governance = msg.sender;
         policyManager = _policyManager;
+        treasury = _treasury;
         coveredPlatform = _coveredPlatform;
         claimsAdjuster = _claimsAdjuster;
         price = _price;
@@ -165,7 +174,7 @@ abstract contract BaseProduct is IProduct {
      * @param _positionContract address of the exact smart contract the buyer has their position in (e.g., for UniswapProduct this would be Pair's address)
      * @return positionAmount The user's total position in wei in the product's protocol.
      */
-    function appraisePosition(address _buyer, address _positionContract) public view virtual returns (uint256 positionAmount) {}
+    function appraisePosition(address _policyholder, address _positionContract) public view virtual returns (uint256 positionAmount) {}
  
     /**** QUOTE VIEW FUNCTIONS 
     View functions that give us quotes regarding a policy purchase
@@ -218,15 +227,16 @@ abstract contract BaseProduct is IProduct {
 
     /**
      * @notice
-     *  Purchase and deploy a policy on the behalf of the buyer
+     *  Purchase and deploy a policy on the behalf of the policyholder
      * @param _coverLimit percentage of cover for total position
      * @param _blocks length (in blocks) for policy
-     * @param _positionContract contract address where the buyer has a position to be covered
+     * @param _policyholder who's liquidity is being covered by the policy
+     * @param _positionContract contract address where the policyholder has a position to be covered
      * @return policyID The contract address of the policy
      */
-    function buyPolicy(uint256 _coverLimit, uint256 _blocks, address _positionContract) external payable override returns (uint256 policyID){
+    function buyPolicy(uint256 _coverLimit, uint256 _blocks, address _policyholder, address _positionContract) external payable override returns (uint256 policyID){
         // check that the buyer has a position in the covered protocol
-        uint256 positionAmount = appraisePosition(msg.sender, _positionContract);
+        uint256 positionAmount = appraisePosition(_policyholder, _positionContract);
         require(positionAmount != 0, 'zero position value');
         // check that the product can provide coverage for this policy
         uint256 coverAmount = _coverLimit/100 * positionAmount;
@@ -238,9 +248,12 @@ abstract contract BaseProduct is IProduct {
         require(_blocks > minPeriod && _blocks < maxPeriod, 'invalid period');
         require(_coverLimit > 0 && _coverLimit < 100, 'invalid cover limit percentage');
 
+        // transfer premium to the treasury
+        payable(treasury).transfer(msg.value);
+
         // create the policy
         uint256 expirationBlock = block.number + _blocks;
-        policyID = policyManager.createPolicy(msg.sender, _positionContract, expirationBlock, coverAmount, price);
+        policyID = policyManager.createPolicy(_policyholder, _positionContract, expirationBlock, coverAmount, price);
 
         // update local book-keeping variables
         activeCoverAmount += coverAmount;
@@ -270,11 +283,19 @@ abstract contract BaseProduct is IProduct {
     //  */
     // function extendPolicy(address policy, uint256 _blocks) external payable override returns (bool){}
 
-    // /**
-    //  * @notice
-    //  *  Cancel and destroy a policy.
-    //  * @param policy address of existing policy
-    //  * @return True if successfully cancelled else False
-    //  */
-    // function cancelPolicy(address policy) external override returns (bool){}
+    /**
+     * @notice
+     *  Cancel and destroy a policy.
+     * @param policy address of existing policy
+     * @return True if successfully cancelled else False
+     */
+    function cancelPolicy(uint256 _policyID) external override returns (bool){
+        require(policyManager.getPolicyholder(_policyID) == msg.sender,'!policyholder');
+        uint256 memory blocksLeft = policyManager.getPolicyExpirationBlock(_policyID) - block.number;
+        uint256 memory refundAmount = blocksLeft * policyManager.getPolicyPrice(_policyID);
+        require(refundAmount > cancelFee, 'refund amount less than cancelation fee');
+        policyManager.burn(_policyID);
+        treasury.refund(msg.sender, refundAmount - cancelFee);
+        return True;
+    }
 }
