@@ -32,13 +32,6 @@ const _abi = [
   },
   {
     inputs: [],
-    name: "deposit",
-    outputs: [],
-    stateMutability: "payable",
-    type: "function",
-  },
-  {
-    inputs: [],
     name: "estimatedTotalAssets",
     outputs: [
       {

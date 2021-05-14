@@ -23,6 +23,7 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 interface MockStrategyInterface extends ethers.utils.Interface {
   functions: {
     "_report(uint256,uint256,uint256)": FunctionFragment;
+    "_revokeStrategy(address)": FunctionFragment;
     "_takeFunds(uint256)": FunctionFragment;
     "acceptGovernance()": FunctionFragment;
     "delegatedAssets()": FunctionFragment;
@@ -45,6 +46,10 @@ interface MockStrategyInterface extends ethers.utils.Interface {
   encodeFunctionData(
     functionFragment: "_report",
     values: [BigNumberish, BigNumberish, BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "_revokeStrategy",
+    values: [string]
   ): string;
   encodeFunctionData(
     functionFragment: "_takeFunds",
@@ -101,6 +106,10 @@ interface MockStrategyInterface extends ethers.utils.Interface {
   ): string;
 
   decodeFunctionResult(functionFragment: "_report", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "_revokeStrategy",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "_takeFunds", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "acceptGovernance",
@@ -182,6 +191,16 @@ export class MockStrategy extends Contract {
       gain: BigNumberish,
       loss: BigNumberish,
       _debtPayment: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    _revokeStrategy(
+      _strategy: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "_revokeStrategy(address)"(
+      _strategy: string,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
@@ -370,6 +389,16 @@ export class MockStrategy extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
+  _revokeStrategy(
+    _strategy: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "_revokeStrategy(address)"(
+    _strategy: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
   _takeFunds(
     amount: BigNumberish,
     overrides?: Overrides
@@ -477,6 +506,16 @@ export class MockStrategy extends Contract {
       gain: BigNumberish,
       loss: BigNumberish,
       _debtPayment: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    _revokeStrategy(
+      _strategy: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "_revokeStrategy(address)"(
+      _strategy: string,
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -601,6 +640,16 @@ export class MockStrategy extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
+    _revokeStrategy(
+      _strategy: string,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "_revokeStrategy(address)"(
+      _strategy: string,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
     _takeFunds(amount: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
 
     "_takeFunds(uint256)"(
@@ -706,6 +755,16 @@ export class MockStrategy extends Contract {
       gain: BigNumberish,
       loss: BigNumberish,
       _debtPayment: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    _revokeStrategy(
+      _strategy: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "_revokeStrategy(address)"(
+      _strategy: string,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 

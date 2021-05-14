@@ -451,7 +451,7 @@ interface VaultInterface extends ethers.utils.Interface {
 
   events: {
     "Approval(address,address,uint256)": EventFragment;
-    "ClaimProcessed(address,uint256)": EventFragment;
+    "ClaimProcessed(uint256,address,uint256)": EventFragment;
     "DepositMade(address,uint256,uint256)": EventFragment;
     "EmergencyShutdown(bool)": EventFragment;
     "GovernanceTransferred(address)": EventFragment;
@@ -2255,6 +2255,7 @@ export class Vault extends Contract {
     ): EventFilter;
 
     ClaimProcessed(
+      claimId: BigNumberish | null,
       claimant: string | null,
       amount: BigNumberish | null
     ): EventFilter;

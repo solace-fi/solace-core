@@ -95,4 +95,9 @@ contract MockStrategy is BaseStrategy {
     function setDelegatedAssets(uint256 _amount) external {
         _delegatedAssets = _amount;
     }
+
+    // NOTE: test-only function to test revoking strategies
+    function _revokeStrategy(address _strategy) external {
+        vault.revokeStrategy(_strategy);
+    }
 }

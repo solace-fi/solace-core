@@ -14,7 +14,6 @@ import {
   Contract,
   ContractTransaction,
   Overrides,
-  PayableOverrides,
   CallOverrides,
 } from "@ethersproject/contracts";
 import { BytesLike } from "@ethersproject/bytes";
@@ -24,7 +23,6 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 interface IStrategyInterface extends ethers.utils.Interface {
   functions: {
     "delegatedAssets()": FunctionFragment;
-    "deposit()": FunctionFragment;
     "estimatedTotalAssets()": FunctionFragment;
     "harvest()": FunctionFragment;
     "isActive()": FunctionFragment;
@@ -35,7 +33,6 @@ interface IStrategyInterface extends ethers.utils.Interface {
     functionFragment: "delegatedAssets",
     values?: undefined
   ): string;
-  encodeFunctionData(functionFragment: "deposit", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "estimatedTotalAssets",
     values?: undefined
@@ -51,7 +48,6 @@ interface IStrategyInterface extends ethers.utils.Interface {
     functionFragment: "delegatedAssets",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(functionFragment: "deposit", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "estimatedTotalAssets",
     data: BytesLike
@@ -88,10 +84,6 @@ export class IStrategy extends Contract {
     ): Promise<{
       0: BigNumber;
     }>;
-
-    deposit(overrides?: PayableOverrides): Promise<ContractTransaction>;
-
-    "deposit()"(overrides?: PayableOverrides): Promise<ContractTransaction>;
 
     estimatedTotalAssets(
       overrides?: CallOverrides
@@ -136,10 +128,6 @@ export class IStrategy extends Contract {
 
   "delegatedAssets()"(overrides?: CallOverrides): Promise<BigNumber>;
 
-  deposit(overrides?: PayableOverrides): Promise<ContractTransaction>;
-
-  "deposit()"(overrides?: PayableOverrides): Promise<ContractTransaction>;
-
   estimatedTotalAssets(overrides?: CallOverrides): Promise<BigNumber>;
 
   "estimatedTotalAssets()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -166,10 +154,6 @@ export class IStrategy extends Contract {
     delegatedAssets(overrides?: CallOverrides): Promise<BigNumber>;
 
     "delegatedAssets()"(overrides?: CallOverrides): Promise<BigNumber>;
-
-    deposit(overrides?: CallOverrides): Promise<void>;
-
-    "deposit()"(overrides?: CallOverrides): Promise<void>;
 
     estimatedTotalAssets(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -201,10 +185,6 @@ export class IStrategy extends Contract {
 
     "delegatedAssets()"(overrides?: CallOverrides): Promise<BigNumber>;
 
-    deposit(overrides?: PayableOverrides): Promise<BigNumber>;
-
-    "deposit()"(overrides?: PayableOverrides): Promise<BigNumber>;
-
     estimatedTotalAssets(overrides?: CallOverrides): Promise<BigNumber>;
 
     "estimatedTotalAssets()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -231,10 +211,6 @@ export class IStrategy extends Contract {
     "delegatedAssets()"(
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
-
-    deposit(overrides?: PayableOverrides): Promise<PopulatedTransaction>;
-
-    "deposit()"(overrides?: PayableOverrides): Promise<PopulatedTransaction>;
 
     estimatedTotalAssets(
       overrides?: CallOverrides

@@ -374,11 +374,28 @@ describe("Vault", function () {
     });
 
     describe("revokeStrategy", function () {
-        it("should revert if not called by governance or active strategy", async function () {
+        it("should revert if not called by governance or the strategy", async function () {
+            await vault.connect(owner).addStrategy(strategy.address, debtRatio, minDebtPerHarvest, maxDebtPerHarvest, performanceFee);
             await expect(vault.connect(depositor1).revokeStrategy(strategy.address)).to.be.revertedWith("must be called by governance or strategy to be revoked");
         });
+        it("should revert if a strategy is revoking another strategy", async function () {
+            await vault.connect(owner).addStrategy(strategy.address, debtRatio, minDebtPerHarvest, maxDebtPerHarvest, performanceFee);
+            await vault.connect(owner).addStrategy(unaddedStrategy.address, debtRatio, minDebtPerHarvest, maxDebtPerHarvest, performanceFee);
+            await expect(strategy._revokeStrategy(unaddedStrategy.address)).to.be.revertedWith("must be called by governance or strategy to be revoked");
+        });
+        it("should revert if revoking an inactive strategy", async function () {
+            await expect(vault.connect(owner).revokeStrategy(strategy.address)).to.be.revertedWith("must be a current strategy");
+            await expect(strategy._revokeStrategy(strategy.address)).to.be.revertedWith("must be a current strategy");
+        });
         it("should allow governance to revoke a strategy", async function () {
-            await vault.connect(owner).revokeStrategy(strategy.address);
+            await vault.connect(owner).addStrategy(strategy.address, debtRatio, minDebtPerHarvest, maxDebtPerHarvest, performanceFee);
+            let tx = await vault.connect(owner).revokeStrategy(strategy.address);
+            await expect(tx).to.emit(vault, "StrategyRevoked").withArgs(strategy.address);
+        });
+        it("should allow a strategy to revoke itself", async function () {
+            await vault.connect(owner).addStrategy(strategy.address, debtRatio, minDebtPerHarvest, maxDebtPerHarvest, performanceFee);
+            let tx = await strategy._revokeStrategy(strategy.address);
+            await expect(tx).to.emit(vault, "StrategyRevoked").withArgs(strategy.address);
         });
     });
 
@@ -823,7 +840,7 @@ describe("Vault", function () {
             await expect(() => claimsAdjustor.connect(owner).approveClaim(claimant.address, testClaimAmount)).to.changeEtherBalance(claimsEscrow, testClaimAmount);
         });
         it("should emit ClaimProcessed event after function logic is successful", async function () {
-            expect(await claimsAdjustor.connect(owner).approveClaim(claimant.address, testClaimAmount)).to.emit(vault, "ClaimProcessed").withArgs(claimant.address, testClaimAmount);
+            await expect(await claimsAdjustor.connect(owner).approveClaim(claimant.address, testClaimAmount)).to.emit(vault, "ClaimProcessed").withArgs(0, claimant.address, testClaimAmount);
         });
         it("should revert if vault is in emergency shutdown", async function () {
             await vault.connect(owner).setEmergencyShutdown(true);

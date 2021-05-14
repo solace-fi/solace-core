@@ -3,11 +3,10 @@ pragma solidity 0.8.0;
 
 import "./libraries/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "./ReentrancyGuard.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./interface/IVault.sol";
 import "./interface/ICpFarm.sol";
 import "./interface/ISwapRouter.sol";
-
 
 /**
  * @title CpFarm: A farm that allows for the staking of CP tokens.
@@ -100,20 +99,19 @@ contract CpFarm is ICpFarm, ReentrancyGuard {
         weth = IERC20(_weth);
         solace.approve(_swapRouter, type(uint256).max);
         weth.approve(_vault, type(uint256).max);
-        reenteranceWhitelist(_vault, true);
     }
 
     /**
      * Receive function. Deposits eth.
      */
-    receive () external payable override nonReentrant {
+    receive () external payable override {
         if (msg.sender != address(vault)) _depositEth();
     }
 
     /**
      * Fallback function. Deposits eth.
      */
-    fallback () external payable override nonReentrant {
+    fallback () external payable override {
         if (msg.sender != address(vault)) _depositEth();
     }
 
@@ -174,7 +172,7 @@ contract CpFarm is ICpFarm, ReentrancyGuard {
      * User will receive accumulated rewards if any.
      * @param _amount The deposit amount.
      */
-    function depositCp(uint256 _amount) external override nonReentrant {
+    function depositCp(uint256 _amount) external override {
         // pull tokens
         IERC20(vault).safeTransferFrom(msg.sender, address(this), _amount);
         // accounting
@@ -191,7 +189,7 @@ contract CpFarm is ICpFarm, ReentrancyGuard {
      * @param r secp256k1 signature
      * @param s secp256k1 signature
      */
-    function depositCpSigned(address _depositor, uint256 _amount, uint256 _deadline, uint8 v, bytes32 r, bytes32 s) external override nonReentrant {
+    function depositCpSigned(address _depositor, uint256 _amount, uint256 _deadline, uint8 v, bytes32 r, bytes32 s) external override {
         // permit
         vault.permit(_depositor, address(this), _amount, _deadline, v, r, s);
         // pull tokens
@@ -245,7 +243,7 @@ contract CpFarm is ICpFarm, ReentrancyGuard {
      * @notice Deposit some ETH.
      * User will receive accumulated rewards if any.
      */
-    function depositEth() external payable override nonReentrant {
+    function depositEth() external payable override {
         _depositEth();
     }
 
@@ -353,7 +351,7 @@ contract CpFarm is ICpFarm, ReentrancyGuard {
     /**
      * @notice Deposits some ether.
      */
-    function _depositEth() internal {
+    function _depositEth() internal nonReentrant {
         // harvest and update farm
         _harvest(msg.sender);
         // get farmer information
@@ -375,7 +373,7 @@ contract CpFarm is ICpFarm, ReentrancyGuard {
      * @param _depositor The depositing user.
      * @param _amount The deposit amount.
      */
-    function _depositCp(address _depositor, uint256 _amount) internal {
+    function _depositCp(address _depositor, uint256 _amount) internal nonReentrant {
         // harvest and update farm
         _harvest(_depositor);
         // get farmer information
