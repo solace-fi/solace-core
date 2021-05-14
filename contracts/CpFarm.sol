@@ -199,6 +199,14 @@ contract CpFarm is ICpFarm, ReentrancyGuard {
     }
 
     /**
+     * @notice Deposit some ETH.
+     * User will receive accumulated rewards if any.
+     */
+    function depositEth() external payable override {
+        _depositEth();
+    }
+
+    /**
      * Your money already makes you money. Now make your money make more money!
      * @notice Withdraws your SOLACE rewards, swaps it for WETH, then deposits that WETH onto the farm.
      */
@@ -237,14 +245,6 @@ contract CpFarm is ICpFarm, ReentrancyGuard {
         user.value += cpAmount;
         user.rewardDebt = user.value * accRewardPerShare / 1e12;
         emit RewardsCompounded(msg.sender);
-    }
-
-    /**
-     * @notice Deposit some ETH.
-     * User will receive accumulated rewards if any.
-     */
-    function depositEth() external payable override {
-        _depositEth();
     }
 
     /**
@@ -289,13 +289,27 @@ contract CpFarm is ICpFarm, ReentrancyGuard {
     }
 
     /**
-     * Withdraw your rewards without unstaking your tokens.
+     * @notice Withdraw your rewards without unstaking your tokens.
      */
     function withdrawRewards() external override nonReentrant {
         // harvest
         _harvest(msg.sender);
         // get farmer information
         UserInfo storage user = userInfo[msg.sender];
+        // accounting
+        user.rewardDebt = user.value * accRewardPerShare / 1e12;
+    }
+
+    /**
+     * @notice Withdraw a users rewards without unstaking their tokens.
+     * Can only be called by Master.
+     */
+    function withdrawRewardsForUser(address _user) external override nonReentrant {
+        require(msg.sender == master || msg.sender == _user, "!master");
+        // harvest
+        _harvest(_user);
+        // get farmer information
+        UserInfo storage user = userInfo[_user];
         // accounting
         user.rewardDebt = user.value * accRewardPerShare / 1e12;
     }

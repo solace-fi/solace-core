@@ -310,13 +310,27 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard {
     }
 
     /**
-    * Withdraw your rewards without unstaking your tokens.
-    */
+     * @notice Withdraw your rewards without unstaking your tokens.
+     */
     function withdrawRewards() external override nonReentrant {
         // harvest and update farm
         _harvest(msg.sender);
         // get farmer information
         UserInfo storage user = userInfo[msg.sender];
+        // accounting
+        user.rewardDebt = user.value * accRewardPerShare / 1e12;
+    }
+
+    /**
+     * @notice Withdraw a users rewards without unstaking their tokens.
+     * Can only be called by Master.
+     */
+    function withdrawRewardsForUser(address _user) external override nonReentrant {
+        require(msg.sender == master || msg.sender == _user, "!master");
+        // harvest and update farm
+        _harvest(_user);
+        // get farmer information
+        UserInfo storage user = userInfo[_user];
         // accounting
         user.rewardDebt = user.value * accRewardPerShare / 1e12;
     }

@@ -26,7 +26,7 @@ interface IFarm {
 
     // Emitted when Governance is set
     event GovernanceTransferred(address _newGovernance);
-    
+
     /**
      * @notice Transfers the governance role to a new governor.
      * Can only be called by the current governor.
@@ -41,21 +41,27 @@ interface IFarm {
     function acceptGovernance() external;
 
     /**
-     * Sets the amount of reward token to distribute per block.
+     * @notice Sets the amount of reward token to distribute per block.
      * @param _blockReward Amount to distribute per block.
      */
     function setRewards(uint256 _blockReward) external;
 
     /**
-     * Sets the farm's end block. Used to extend the duration.
+     * @notice Sets the farm's end block. Used to extend the duration.
      * @param _endBlock The new end block.
      */
     function setEnd(uint256 _endBlock) external;
 
     /**
-     * Withdraw your rewards without unstaking your tokens.
+     * @notice Withdraw your rewards without unstaking your tokens.
      */
     function withdrawRewards() external;
+
+    /**
+     * @notice Withdraw a users rewards without unstaking their tokens.
+     * Can only be called by Master.
+     */
+    function withdrawRewardsForUser(address _user) external;
 
     /**
      * @notice Calculates the accumulated balance of reward token for specified user.

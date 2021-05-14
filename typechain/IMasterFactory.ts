@@ -279,4 +279,11 @@ const _abi = [
     stateMutability: "view",
     type: "function",
   },
+  {
+    inputs: [],
+    name: "withdrawRewards",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
 ];

@@ -85,7 +85,12 @@ interface IMaster {
     function setSolacePerBlock(uint256 _solacePerBlock) external;
 
     /**
-    * @notice Updates all farms to be up to date to the current block.
-    */
+     * @notice Updates all farms to be up to date to the current block.
+     */
     function massUpdateFarms() external;
+
+    /**
+     * @notice Withdraw your rewards from all farms.
+     */
+    function withdrawRewards() external;
 }

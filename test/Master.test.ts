@@ -513,6 +513,54 @@ describe("Master", function () {
       expectedReward4 = expectedReward4;
       expectClose(pendingReward4, expectedReward4);
     })
+
+    it("allows farmers to withdraw rewards from multiple farms", async function () {
+      await master.connect(governor).setSolacePerBlock(solacePerBlock);
+      await solaceToken.connect(governor).mint(master.address, ONE_MILLION_ETHER);
+      let numFarms = (await master.numFarms()).toNumber();
+      for(var farmId = 1; farmId <= numFarms; ++farmId) {
+        await master.connect(governor).setAllocPoints(farmId, 0);
+      }
+
+      blockNum = BN.from(await provider.getBlockNumber());
+      let cpFarm2 = await createCpFarm(blockNum, blockNum.add(100));
+      await master.connect(governor).registerFarm(cpFarm2.address, 50);
+      cpFarmId = await master.numFarms();
+      let lpFarm2 = await createSolaceEthLpFarm(lpToken, blockNum, blockNum.add(100), mediumPool);
+      await master.connect(governor).registerFarm(lpFarm2.address, 50);
+      lpFarmId = await master.numFarms();
+
+      // user in all farms
+      await cpFarm2.connect(farmer3).depositEth({value: 2000});
+      await lpToken.connect(farmer3).approve(lpFarm2.address, tokenId3);
+      await lpFarm2.connect(farmer3).deposit(tokenId3);
+      await burnBlocksUntil(blockNum.add(25), true);
+      await master.massUpdateFarms();
+
+      let pendingRewardsCp = await cpFarm2.pendingRewards(farmer3.address);
+      expect(pendingRewardsCp).to.be.gt(0);
+      let pendingRewardsLp = await lpFarm2.pendingRewards(farmer3.address);
+      expect(pendingRewardsLp).to.be.gt(0);
+
+      let balanceBefore = await solaceToken.balanceOf(farmer3.address);
+      let tx1 = await master.connect(farmer3).withdrawRewards();
+      let rewards = (await solaceToken.balanceOf(farmer3.address)).sub(balanceBefore);
+      expect(rewards).to.be.gte(pendingRewardsCp.add(pendingRewardsLp));
+      await expect(tx1).to.emit(cpFarm2, "UserRewarded");
+      await expect(tx1).to.emit(lpFarm2, "UserRewarded");
+
+      // user in no farms
+      pendingRewardsCp = await cpFarm2.pendingRewards(farmer4.address);
+      expect(pendingRewardsCp).to.be.eq(0);
+      pendingRewardsLp = await lpFarm2.pendingRewards(farmer4.address);
+      expect(pendingRewardsLp).to.be.eq(0);
+      balanceBefore = await solaceToken.balanceOf(farmer4.address);
+      let tx2 = await master.connect(farmer4).withdrawRewards();
+      rewards = (await solaceToken.balanceOf(farmer4.address)).sub(balanceBefore);
+      await expect(tx2).to.not.emit(cpFarm2, "UserRewarded");
+      await expect(tx2).to.not.emit(lpFarm2, "UserRewarded");
+      expect(rewards).to.be.eq(0);
+    })
   })
 
   // helper functions
