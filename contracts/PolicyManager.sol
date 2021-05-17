@@ -6,6 +6,8 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 
+import "hardhat/console.sol";
+
 
 /* TODO
  * - keep track of addresses who's policies expired and burned to later give discounts
@@ -243,5 +245,4 @@ contract PolicyManager is ERC721URIStorage, ERC721Enumerable {
     function tokenURI(uint256 tokenId) public view virtual override(ERC721, ERC721URIStorage) returns (string memory) {
         ERC721URIStorage.tokenURI(tokenId);
     }
-
-}
+}   

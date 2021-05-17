@@ -42,8 +42,7 @@ contract MockProduct is BaseProduct {
      * @return positionAmount The user's total position in wei in the product's protocol.
      */
     function appraisePosition(address _buyer, address _positionContract) public view override virtual returns (uint256 positionAmount) {
-      // !TODO need to implment from UniswapFactory
-      return 0;
+      return 100; // test for now in production this will be from a pool contract 
     } 
 
     function getPolicyExpiration(address _policy) external override view returns (uint256 expirationDate) {
