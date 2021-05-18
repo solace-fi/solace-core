@@ -15,7 +15,6 @@ import './interface/ITreasury.sol';
  * - update, extend, cancel policy functions
  */
 
-
 /**
  * @title BaseProduct
  * @author solace.fi
@@ -39,7 +38,7 @@ abstract contract BaseProduct is IProduct {
     // Product Details
     address public coveredPlatform; // a platform contract which locates contracts that are covered by this product
                                     // (e.g., UniswapProduct will have Factory as coveredPlatform contract, because
-                                    // every Pair address can be located through getPair() function)
+                                    // every Pair address can be located through getPool() function)
     address public claimsAdjuster; // address of the parametric auto claims adjuster
     uint256 public price; // cover price (in wei) per block per wei
     uint256 public cancelFee; // policy cancelation fee
@@ -53,7 +52,7 @@ abstract contract BaseProduct is IProduct {
     uint256 public activeCoverAmount; // current amount covered (in wei)
     uint256[] public activePolicyIDs;
 
-    // EnumerableSet.Set public policies; // a Set containing active policy's PolicyInfo structs
+    // EnumerableSet.Set public policies; // a Set containing active policy"s PolicyInfo structs
     // mapping(uint256 => address) public buyerOf; // buyerOf[policyID] = buyer
     // // mapping(uint256 => PolicyInfo) public policies
     // struct PolicyInfo {
@@ -216,7 +215,7 @@ abstract contract BaseProduct is IProduct {
     }
 
     /**
-     * @notice Updates the product's book-keeping variables, 
+     * @notice Updates the product"s book-keeping variables, 
      * removing expired policies from the policies set and updating active cover amount
      * @return activeCoverAmount and activePolicyCount active covered amount and active policy count as a tuple
      */
@@ -232,21 +231,23 @@ abstract contract BaseProduct is IProduct {
      * @param _blocks length (in blocks) for policy
      * @param _policyholder who's liquidity is being covered by the policy
      * @param _positionContract contract address where the policyholder has a position to be covered
+
      * @return policyID The contract address of the policy
      */
     function buyPolicy(uint256 _coverLimit, uint256 _blocks, address _policyholder, address _positionContract) external payable override returns (uint256 policyID){
         // check that the buyer has a position in the covered protocol
         uint256 positionAmount = appraisePosition(_policyholder, _positionContract);
         require(positionAmount != 0, 'zero position value');
+
         // check that the product can provide coverage for this policy
         uint256 coverAmount = _coverLimit/100 * positionAmount;
-        require(activeCoverAmount + coverAmount <= maxCoverAmount, 'max covered amount is reached');
+        require(activeCoverAmount + coverAmount <= maxCoverAmount, "max covered amount is reached");
         // check that the buyer has paid the correct premium
         uint256 premium = _getQuote(_coverLimit, _blocks, positionAmount);
-        require(msg.value == premium && premium != 0, 'payment does not match the quote or premium is zero');
+        require(msg.value == premium && premium != 0, "payment does not match the quote or premium is zero");
         // check that the buyer provided valid period and coverage limit
-        require(_blocks > minPeriod && _blocks < maxPeriod, 'invalid period');
-        require(_coverLimit > 0 && _coverLimit < 100, 'invalid cover limit percentage');
+        require(_blocks > minPeriod && _blocks < maxPeriod, "invalid period");
+        require(_coverLimit > 0 && _coverLimit < 100, "invalid cover limit percentage");
 
         // transfer premium to the treasury
         payable(treasury).transfer(msg.value);
