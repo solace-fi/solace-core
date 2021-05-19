@@ -1,18 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity ^0.8.0;
+pragma solidity 0.8.0;
 
 import "@openzeppelin/contracts/utils/Address.sol";
-import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import './interface/IProduct.sol';
 import './interface/IPolicyManager.sol';
 import './interface/ITreasury.sol';
 
 /* TODO
- * - create IPolicyManager.sol
  * - treasury refund() function, check transfer to treasury when buyPolicy()
  * - add events
- * - optimize _updateActivePolicies()
- * - update, extend, cancel policy functions
+ * - optimize _updateActivePolicies(), store in the expiration order (minheap)
+ * - update cover amount (or cover limit?) policy function
  */
 
 /**
@@ -22,9 +20,10 @@ import './interface/ITreasury.sol';
  */
 abstract contract BaseProduct is IProduct {
     using Address for address;
-    // using EnumerableSet for EnumerableSet.Set;
 
     event PolicyCreated(uint256 policyID);
+    event PolicyExtended(uint256 policyID);
+    event PolicyCanceled(uint256 policyID);
 
     // Governor
     address public governance;
@@ -48,18 +47,8 @@ abstract contract BaseProduct is IProduct {
 
     // Book-keeping varaibles
     uint256 public productPolicyCount; // total policy count this product sold
-    // uint256 public activePolicyCount; // current active policy count
     uint256 public activeCoverAmount; // current amount covered (in wei)
     uint256[] public activePolicyIDs;
-
-    // EnumerableSet.Set public policies; // a Set containing active policy"s PolicyInfo structs
-    // mapping(uint256 => address) public buyerOf; // buyerOf[policyID] = buyer
-    // // mapping(uint256 => PolicyInfo) public policies
-    // struct PolicyInfo {
-    //     uint256 policyID;           // policy ID number (same as the deployed ERC721 tokenID)
-    //     uint256 expirationBlock;    // expiration block number
-    //     uint256 coverAmount;        // covered amount up until the expiration block
-    // }
 
 
     constructor (
@@ -273,16 +262,57 @@ abstract contract BaseProduct is IProduct {
     //  * @param _coverLimit new cover percentage
     //  * @return True if coverlimit is successfully increased else False
     //  */
-    // function updateCoverLimit(address _policy, uint256 _coverLimit) external payable override returns (bool){}
+    // function updateCoverLimit(uint256 _policyID, uint256 _coverLimit) external payable override returns (bool){
+    //     // check that the msg.sender is the policyholder
+    //     address policyholder = policyManager.getPolicyholder(_policyID);
+    //     require(policyholder == msg.sender,'!policyholder');
+    //     // compute the extra premium = newPremium - paidPremium (or the refund amount)
+    //     uint256 previousPrice = policyManager.getPolicyPrice(_policyID);
+    //     uint256 expirationBlock = policyManager.getPolicyExpirationBlock(_policyID);
+    //     uint256 remainingBlocks = expirationBlock - block.number;
+    //     uint256 previousCoverAmount = policyManager.getPolicyCoverAmount(_policyID);
+    //     uint256 paidPremium = previousCoverAmount * remainingBlocks * previousPrice;
+    //     // whats new cover amount ? should we appraise again?
+    //     uint256 newPremium = newCoverAmount * remainingBlocks * price;
+    //     if (newPremium >= paidPremium) {
+    //         uint256 premium = newPremium - paidPremium;
+    //         // check that the buyer has paid the correct premium
+    //         require(msg.value == premium && premium != 0, "payment does not match the quote or premium is zero");
+    //         // transfer premium to the treasury
+    //         payable(treasury).transfer(msg.value);
+    //     } else {
+    //         uint256 refund = paidPremium - newPremium;
+    //         treasury.refund(msg.sender, refundAmount - cancelFee);
+    //     }
+    //     // update policy's URI
+    //     // emit event
+    // }
 
-    // /**
-    //  * @notice
-    //  *  Extend a policy contract
-    //  * @param policy address of existing policy
-    //  * @param _blocks length of extension
-    //  * @return True if successfully extended else False
-    //  */
-    // function extendPolicy(address policy, uint256 _blocks) external payable override returns (bool){}
+    /**
+     * @notice
+     *  Extend a policy contract
+     * @param policy address of existing policy
+     * @param _blocks length of extension
+     * @return True if successfully extended else False
+     */
+    function extendPolicy(uint256 _policyID, uint256 _blocks) external payable override returns (bool){
+        // check that the msg.sender is the policyholder
+        address policyholder = policyManager.getPolicyholder(_policyID);
+        require(policyholder == msg.sender,'!policyholder');
+        // compute the premium
+        uint256 coverAmount = policyManager.getPolicyCoverAmount(_policyID);
+        uint256 premium = coverAmount * _blocks * price;
+        // check that the buyer has paid the correct premium
+        require(msg.value == premium && premium != 0, "payment does not match the quote or premium is zero");
+        // transfer premium to the treasury
+        payable(treasury).transfer(msg.value);
+        // update the policy's URI
+        newExpirationBlock = policyManager.getPolicyExpirationBlock(_policyID) + _blocks;
+        positionContract = policyManager.getPolicyPositionContract(_policyID);
+        policyManager.setTokenURI(_policyID, policyholder, positionContract, newExpirationBlock, coverAmount, price);
+        emit PolicyExtended(_policyID);
+        return True;
+    }
 
     /**
      * @notice
@@ -297,6 +327,7 @@ abstract contract BaseProduct is IProduct {
         require(refundAmount > cancelFee, 'refund amount less than cancelation fee');
         policyManager.burn(_policyID);
         treasury.refund(msg.sender, refundAmount - cancelFee);
+        emit PolicyCanceled(_policyID);
         return True;
     }
 }

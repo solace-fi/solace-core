@@ -37,5 +37,4 @@ interface IPolicyManager {
     ****/
     function supportsInterface(bytes4 interfaceId) public view returns (bool) {}
     function tokenURI(uint256 tokenId) public view returns (string memory) {}
-
 }
