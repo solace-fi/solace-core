@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./interface/ISwapRouter.sol";
 import "./SOLACE.sol";
-import "./interface/IWETH10.sol";
+import "contracts/mocks/WETH9.sol";
 import "./interface/ITreasury.sol";
 
 
@@ -30,7 +30,7 @@ contract Treasury is ITreasury, ReentrancyGuard {
     ISwapRouter public swapRouter;
 
     /// @notice Wrapped ether.
-    IWETH10 public weth;
+    WETH9 public weth;
 
     /// @notice Given a token, what swap path should it take.
     mapping(address => bytes) public paths;
@@ -46,7 +46,7 @@ contract Treasury is ITreasury, ReentrancyGuard {
         governance = _governance;
         solace = _solace;
         swapRouter = ISwapRouter(_swapRouter);
-        weth = IWETH10(_weth);
+        weth = WETH9(payable(_weth));
     }
 
     /**

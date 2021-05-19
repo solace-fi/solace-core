@@ -8,7 +8,7 @@ const { expect } = chai;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Registry, Solace, Master, Vault, Treasury, ClaimsAdjustor, ClaimsEscrow, MockWeth } from "../typechain";
+import { Registry, Solace, Master, Vault, Treasury, ClaimsAdjustor, ClaimsEscrow, Weth9 } from "../typechain";
 
 
 describe("Registry", function () {
@@ -26,7 +26,7 @@ describe("Registry", function () {
   let treasury: Treasury;
   let claimsAdjustor: ClaimsAdjustor;
   let claimsEscrow: ClaimsEscrow;
-  let weth: MockWeth;
+  let weth: Weth9;
   // mock contracts
   // TODO: switch from mocks and wallets to actual contracts after implementation
   let locker: Wallet;
@@ -39,11 +39,11 @@ describe("Registry", function () {
   before(async function () {
     [deployer, governor, user, locker, mockContract1, mockContract2, mockContract3] = provider.getWallets();
     artifacts = await import_artifacts();
-    
+
     weth = (await deployContract(
       deployer,
       artifacts.WETH
-  )) as MockWeth;
+  )) as Weth9;
 
     // deploy registry contract
     registry = (await deployContract(

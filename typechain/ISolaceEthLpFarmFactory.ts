@@ -606,7 +606,7 @@ const _abi = [
     name: "weth",
     outputs: [
       {
-        internalType: "contract IWETH10",
+        internalType: "contract IWETH9",
         name: "",
         type: "address",
       },

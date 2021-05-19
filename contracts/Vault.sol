@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./interface/IStrategy.sol";
-import "./interface/IWETH10.sol";
+import "./interface/IWETH9.sol";
 import "./interface/IRegistry.sol";
 import "./interface/IClaimsEscrow.sol";
 import "./interface/IVault.sol";
@@ -365,7 +365,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
         require(msg.sender == registry.claimsAdjustor(), "!claimsAdjustor");
 
         // unwrap some WETH to make ETH available for claims payout
-        IWETH10(address(token)).withdraw(amount);
+        IWETH9(payable(address(token))).withdraw(amount);
 
         IClaimsEscrow escrow = IClaimsEscrow(registry.claimsEscrow());
         uint256 claimId = escrow.receiveClaim{value: amount}(claimant);
@@ -467,7 +467,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
         _mint(msg.sender, shares);
 
         // Wrap the depositor's ETH to add WETH to the vault
-        IWETH10(address(token)).deposit{value: amount}();
+        IWETH9(payable(address(token))).deposit{value: amount}();
 
         emit DepositMade(msg.sender, amount, shares);
     }
@@ -553,7 +553,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
         require(totalLoss <= maxLoss * (value + totalLoss) / MAX_BPS, "too much loss");
         // burn shares and transfer ETH to withdrawer
         _burn(msg.sender, shares);
-        IWETH10(address(token)).withdraw(value);
+        IWETH9(payable(address(token))).withdraw(value);
         payable(msg.sender).transfer(value);
         emit WithdrawalMade(msg.sender, value);
 

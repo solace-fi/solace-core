@@ -7,13 +7,13 @@ const provider = waffle.provider;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Vault, MockStrategy, MockWeth, Registry } from "../typechain";
+import { Vault, MockStrategy, Weth9, Registry } from "../typechain";
 
 describe("Strategy", function () {
     let artifacts: ArtifactImports;
     let vault: Vault;
     let newVault: Vault;
-    let weth: MockWeth;
+    let weth: Weth9;
     let strategy: MockStrategy;
     let registry: Registry;
 
@@ -42,7 +42,7 @@ describe("Strategy", function () {
         weth = (await deployContract(
             owner,
             artifacts.WETH
-        )) as MockWeth;
+        )) as Weth9;
 
         vault = (await deployContract(
             owner,
@@ -205,7 +205,9 @@ describe("Strategy", function () {
 
         it("should allow harvest with profit while in emergency exit", async function () {
             let profitAmount = 100;
-            await weth.connect(depositor1).depositTo(strategy.address, {value: profitAmount});
+            //await weth.connect(depositor1).depositTo(strategy.address, {value: profitAmount});
+            await weth.connect(depositor1).deposit({value: profitAmount});
+            await weth.connect(depositor1).transfer(strategy.address, profitAmount);
             await strategy.connect(owner).setEmergencyExit();
             await expect(await strategy.connect(owner).harvest()).to.emit(strategy, "Harvested").withArgs(profitAmount, 0, 0, 0);
         });

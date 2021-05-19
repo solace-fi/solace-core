@@ -3,7 +3,7 @@ pragma solidity 0.8.0;
 
 import "./IUniswapLpToken.sol";
 import "./../SOLACE.sol";
-import "./IWETH10.sol";
+import "./IWETH9.sol";
 import "./IFarm.sol";
 
 
@@ -114,7 +114,7 @@ interface ISolaceEthLpFarm is IFarm {
     // LP Token interface.
     function lpToken() external view returns (IUniswapLpToken);
     function solace() external view returns (SOLACE);
-    function weth() external view returns (IWETH10);
+    function weth() external view returns (IWETH9);
     function lastRewardBlock() external view returns (uint256);   // Last time rewards were distributed or farm was updated.
     function accRewardPerShare() external view returns (uint256); // Accumulated rewards per share, times 1e12.
     function valueStaked() external view returns (uint256);       // Value of tokens staked by all farmers.

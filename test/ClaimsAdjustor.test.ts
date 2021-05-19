@@ -7,11 +7,11 @@ const provider = waffle.provider;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Registry, Vault, ClaimsAdjustor, ClaimsEscrow, MockWeth } from "../typechain";
+import { Registry, Vault, ClaimsAdjustor, ClaimsEscrow, Weth9 } from "../typechain";
 
 describe("ClaimsAdjustor", function () {
     let vault: Vault;
-    let weth: MockWeth;
+    let weth: Weth9;
     let registry: Registry;
     let claimsAdjustor: ClaimsAdjustor;
     let claimsEscrow: ClaimsEscrow;
@@ -30,7 +30,7 @@ describe("ClaimsAdjustor", function () {
         weth = (await deployContract(
             owner,
             artifacts.WETH
-        )) as MockWeth;
+        )) as Weth9;
 
         registry = (await deployContract(
             owner,

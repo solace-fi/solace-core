@@ -11,7 +11,7 @@ import { burnBlocks, burnBlocksUntil } from "./utilities/time";
 import { encodePriceSqrt, FeeAmount, TICK_SPACINGS, getMaxTick, getMinTick } from "./utilities/uniswap";
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Solace, Vault, Master, CpFarm, SolaceEthLpFarm, MockWeth, LpAppraisor } from "../typechain";
+import { Solace, Vault, Master, CpFarm, SolaceEthLpFarm, Weth9, LpAppraisor } from "../typechain";
 
 chai.use(solidity);
 
@@ -19,7 +19,7 @@ chai.use(solidity);
 let solaceToken: Solace;
 let master: Master;
 let vault: Vault;
-let weth: MockWeth;
+let weth: Weth9;
 let lpTokenAppraisor: LpAppraisor;
 
 // uniswap contracts
@@ -60,7 +60,7 @@ describe("Master", function () {
     weth = (await deployContract(
         deployer,
         artifacts.WETH
-    )) as MockWeth;
+    )) as Weth9;
 
     // deploy master contract
     master = (await deployContract(

@@ -14,7 +14,7 @@ import { bnAddSub, bnMulDiv } from "./utilities/math";
 import { getPermitDigest, sign, getDomainSeparator } from "./utilities/signature";
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Solace, Vault, Master, MockWeth, CpFarm } from "../typechain";
+import { Solace, Vault, Master, Weth9, CpFarm } from "../typechain";
 
 
 // contracts
@@ -22,7 +22,7 @@ let solaceToken: Solace;
 let master: Master;
 let vault: Vault;
 let farm1: CpFarm;
-let weth: MockWeth;
+let weth: Weth9;
 
 // uniswap contracts
 let uniswapFactory: Contract;
@@ -63,7 +63,7 @@ describe("CpFarm", function () {
     weth = (await deployContract(
         deployer,
         artifacts.WETH,
-    )) as MockWeth;
+    )) as Weth9;
 
     // deploy master contract
     master = (await deployContract(

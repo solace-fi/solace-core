@@ -8,12 +8,12 @@ const provider = waffle.provider;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Vault, MockStrategy, MockWeth, Registry, Master, Solace, ClaimsAdjustor, ClaimsEscrow } from "../typechain";
+import { Vault, MockStrategy, Weth9, Registry, Master, Solace, ClaimsAdjustor, ClaimsEscrow } from "../typechain";
 
 describe("Vault", function () {
     let artifacts: ArtifactImports;
     let vault: Vault;
-    let weth: MockWeth;
+    let weth: Weth9;
     let strategy: MockStrategy;
     let unaddedStrategy: MockStrategy;
     let thirdStrategy: MockStrategy;
@@ -58,7 +58,7 @@ describe("Vault", function () {
         weth = (await deployContract(
             owner,
             artifacts.WETH
-        )) as MockWeth;
+        )) as Weth9;
 
         solace = (await deployContract(
             owner,
@@ -634,7 +634,8 @@ describe("Vault", function () {
         });
         it("should account for debt payment", async function () {
             await vault.connect(owner).addStrategy(strategy.address, debtRatio, minDebtPerHarvest, maxDebtPerHarvest, performanceFee);
-            await weth.connect(depositor1).depositTo(strategy.address, {value: 1});
+            await weth.connect(depositor1).deposit({value: 1});
+            await weth.connect(depositor1).transfer(strategy.address, 1);
             await expect(await strategy._report(0, 0, 1)).to.emit(vault, "StrategyReported"); // TODO: withargs
         });
         it("should account for delegated assets", async function () {
@@ -650,13 +651,15 @@ describe("Vault", function () {
         });
         it("should report gains with strategist fees", async function () {
             await vault.connect(owner).addStrategy(strategy.address, debtRatio, minDebtPerHarvest, maxDebtPerHarvest, 10000);
-            await weth.connect(depositor1).depositTo(strategy.address, {value: 100});
+            await weth.connect(depositor1).deposit({value: 100});
+            await weth.connect(depositor1).transfer(strategy.address, 100);
             await expect(await strategy._report(100, 0, 0)).to.emit(vault, "StrategyReported"); // TODO: withargs
         });
         it("should report gains with governance fees", async function () {
             await vault.connect(owner).addStrategy(strategy.address, debtRatio, minDebtPerHarvest, maxDebtPerHarvest, performanceFee);
             await vault.connect(owner).setPerformanceFee(10000);
-            await weth.connect(depositor1).depositTo(strategy.address, {value: 100});
+            await weth.connect(depositor1).deposit({value: 100});
+            await weth.connect(depositor1).transfer(strategy.address, 100);
             await expect(await strategy._report(100, 0, 0)).to.emit(vault, "StrategyReported"); // TODO: withargs
         });
         it("should report loss then pay debt", async function () {
@@ -665,7 +668,8 @@ describe("Vault", function () {
           await strategy.connect(owner).harvest();
           await strategy._report(0, 10000, 0);
           await vault.connect(owner).updateStrategyDebtRatio(strategy.address, 0);
-          await weth.connect(depositor1).depositTo(strategy.address, {value: 1000000});
+          await weth.connect(depositor1).deposit({value: 1000000});
+          await weth.connect(depositor1).transfer(strategy.address, 1000000);
           await expect(await strategy._report(0, 0, 10000)).to.emit(vault, "StrategyReported"); // TODO: withargs
         })
 ;    });
@@ -868,7 +872,8 @@ describe("Vault", function () {
         });
         it("should return zero if less than the minimum", async function () {
             await vault.connect(owner).addStrategy(strategy.address, debtRatio, 10000, 10000, performanceFee);
-            await weth.connect(depositor1).depositTo(vault.address, {value: 10000});
+            await weth.connect(depositor1).deposit({value: 10000});
+            await weth.connect(depositor1).transfer(strategy.address, 10000);
             expect(await vault.creditAvailable(strategy.address)).to.equal(0);
         });
     })
@@ -885,7 +890,8 @@ describe("Vault", function () {
             await vault.connect(owner).addStrategy(strategy.address, debtRatio, minDebtPerHarvest, maxDebtPerHarvest, performanceFee);
             await strategy.connect(owner).harvest();
             await provider.send("evm_increaseTime", [120]);
-            await weth.connect(depositor1).depositTo(strategy.address, {value: 100});
+            await weth.connect(depositor1).deposit({value: 100});
+            await weth.connect(depositor1).transfer(strategy.address, 100);
             await strategy._report(100, 0, 0);
             await provider.send("evm_increaseTime", [60]);
             await weth.deposit({value: 0});

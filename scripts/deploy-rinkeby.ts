@@ -11,7 +11,7 @@ import { logContractAddress, createPool } from "./utils";
 import { FeeAmount } from "../test/utilities/uniswap";
 
 import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_importer";
-import { Solace, MockWeth, Vault, Master, CpFarm, SolaceEthLpFarm, Treasury, Registry, LpAppraisor } from "../typechain";
+import { Solace, Weth9, Vault, Master, CpFarm, SolaceEthLpFarm, Treasury, Registry, LpAppraisor } from "../typechain";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const MULTI_SIG_ADDRESS = "0xB0bcf50b18f0DCa889EdC4a299aF4cEd7cB4cb17";
@@ -22,17 +22,17 @@ const MULTI_SIG_ADDRESS = "0xB0bcf50b18f0DCa889EdC4a299aF4cEd7cB4cb17";
 // Contracts that have already been deployed will not be redeployed.
 const REGISTRY_ADDRESS        = "0x218EEa1517F9CCc0f115fea6cd48f55afD49a3f8";
 const SOLACE_ADDRESS          = "0x44B843794416911630e74bAB05021458122c40A0";
-const WETH_ADDRESS            = "0x9273113C307f2f795C6d4D25c436d85435c73f9f"
+const WETH_ADDRESS            = "0xc778417E063141139Fce010982780140Aa0cD5Ab"
 const MASTER_ADDRESS          = "0xE458cd47D29E06CCe18a1D95AD2712F223d3a6DC";
-const VAULT_ADDRESS           = "0x7DC316cC09C8A081d4Bfb632b5c3F4631d06E5A4";
-const CPFARM_ADDRESS          = "0x0f56D2086779d41d95DfbA92B1aa705E75DDb991";
-const LPAPPRAISOR_ADDRESS     = "";
-const LPFARM_ADDRESS          = "0x56D7cCbe87653b9d10be80D1eCC49cD48e32C881";
-const TREASURY_ADDRESS        = "0x138f8EfdEbd74c613EeEF89D8157bb4481EDf8A3";
-const UNISWAP_POOL_ADDRESS    = "0x4e05423247BD4f836C05281e5511633e22b9afcb";
-const UNISWAP_FACTORY_ADDRESS = "0x815BCC87613315327E04e4A3b7c96a79Ae80760c";
-const UNISWAP_ROUTER_ADDRESS  = "0x483B27F0cF5AF935371d52A7F810799cD141E3dc";
-const UNISWAP_LPTOKEN_ADDRESS = "0x3255160392215494bee8B5aBf8C4C40965d0986C";
+const VAULT_ADDRESS           = "0xB01866e0Ef4D87368F675A83Fd3491072561A9C4";
+const CPFARM_ADDRESS          = "0xD3F4db71939D91c9efcA23FCA60318E3099e3e8B";
+const LPFARM_ADDRESS          = "0xC6cdf0093981f52991b8aaCe63800eAC9f2c96E9";
+const LPAPPRAISOR_ADDRESS     = "0x5c764BE8890fA09A71122342D53cCbdc748da39C";
+const TREASURY_ADDRESS        = "0xc80fC38a2773a071E0732308c36885F372e0B443";
+const UNISWAP_FACTORY_ADDRESS = "0x1F98431c8aD98523631AE4a59f267346ea31F984";
+const UNISWAP_ROUTER_ADDRESS  = "0xE592427A0AEce92De3Edee1F18E0157C05861564";
+const UNISWAP_LPTOKEN_ADDRESS = "0xC36442b4a4522E871399CD717aBDD847Ab11FE88";
+const UNISWAP_POOL_ADDRESS    = "0x29998355C51F2eddff0B12a183B8BDD590EDaed1";
 
 // farm params
 const START_BLOCK = BN.from(8523000); // May 3, 2021 on Rinkeby
@@ -42,7 +42,7 @@ const BLOCK_REWARD = BN.from("60000000000000000000"); // 60 SOLACE
 let artifacts: ArtifactImports;
 let registry: Registry;
 let solace: Solace;
-let weth: MockWeth;
+let weth: Weth9;
 let master: Master;
 let vault: Vault;
 let cpFarm: CpFarm;
@@ -52,7 +52,7 @@ let uniswapFactory: Contract;
 let uniswapRouter: Contract;
 let lpToken: Contract;
 let pool: Contract;
-let lpTokenAppraiser: LpAppraisor;
+let lpTokenAppraisor: LpAppraisor;
 
 let signerAddress: string;
 let governorAddress = MULTI_SIG_ADDRESS;
@@ -104,10 +104,10 @@ async function deploySolace() {
 
 async function deployWeth() {
   if(!!WETH_ADDRESS) {
-    weth = (await ethers.getContractAt(artifacts.WETH.abi, WETH_ADDRESS)) as MockWeth;
+    weth = (await ethers.getContractAt(artifacts.WETH.abi, WETH_ADDRESS)) as Weth9;
   } else {
     console.log("Deploying WETH");
-    weth = (await deployContract(deployer,artifacts.WETH)) as MockWeth;
+    weth = (await deployContract(deployer,artifacts.WETH)) as Weth9;
     console.log(`Deployed WETH to ${weth.address}`);
   }
 }
@@ -192,12 +192,12 @@ async function deployUniswapPool() {
 
 async function deployLpTokenAppraisor() {
   if(!!LPAPPRAISOR_ADDRESS) {
-    lpTokenAppraiser = (await ethers.getContractAt(artifacts.LpAppraisor.abi, LPAPPRAISOR_ADDRESS)) as LpAppraisor;
+    lpTokenAppraisor = (await ethers.getContractAt(artifacts.LpAppraisor.abi, LPAPPRAISOR_ADDRESS)) as LpAppraisor;
   } else {
     console.log("Deploying LP Token Appraisor");
-    lpTokenAppraiser = (await deployContract(deployer,artifacts.LpAppraisor,[governorAddress,lpToken.address,20000,40000])) as LpAppraisor;
-    console.log(`Deploying LP Token Appraisor to ${lpTokenAppraiser.address}`);
-    await lpTokenAppraiser.deployed();
+    lpTokenAppraisor = (await deployContract(deployer,artifacts.LpAppraisor,[governorAddress,lpToken.address,20000,40000])) as LpAppraisor;
+    console.log(`Deploying LP Token Appraisor to ${lpTokenAppraisor.address}`);
+    await lpTokenAppraisor.deployed();
     console.log("Deployment confirmed");
   }
 }
@@ -207,7 +207,8 @@ async function deployLpFarm() {
     lpFarm = (await ethers.getContractAt(artifacts.SolaceEthLpFarm.abi, LPFARM_ADDRESS)) as SolaceEthLpFarm;
   } else {
     console.log("Deploying LP Farm");
-    lpFarm = (await deployContract(deployer,artifacts.SolaceEthLpFarm,[governorAddress,master.address,lpToken.address,solace.address,START_BLOCK,END_BLOCK,pool.address,weth.address])) as SolaceEthLpFarm;
+    lpFarm = (await deployContract(deployer,artifacts.SolaceEthLpFarm,[governorAddress,master.address,lpToken.address,solace.address,START_BLOCK,END_BLOCK,pool.address,weth.address,lpTokenAppraisor.address])) as SolaceEthLpFarm;
+
     console.log(`Deployed LP Farm to ${lpFarm.address}`);
   }
 }

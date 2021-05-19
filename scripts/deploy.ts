@@ -6,7 +6,7 @@ import { logContractAddress, createPool } from "./utils";
 import { FeeAmount } from "../test/utilities/uniswap";
 
 import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_importer";
-import { Solace, Vault, Master, MockWeth, CpFarm, SolaceEthLpFarm, Treasury, Registry, ClaimsAdjustor, ClaimsEscrow, LpAppraisor } from "../typechain";
+import { Solace, Vault, Master, Weth9, CpFarm, SolaceEthLpFarm, Treasury, Registry, ClaimsAdjustor, ClaimsEscrow, LpAppraisor } from "../typechain";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -20,8 +20,8 @@ const WETH_ADDRESS            = ""
 const MASTER_ADDRESS          = "";
 const VAULT_ADDRESS           = "";
 const CPFARM_ADDRESS          = "";
-const LPAPPRAISOR_ADDRESS     = "";
 const LPFARM_ADDRESS          = "";
+const LPAPPRAISOR_ADDRESS     = "";
 const TREASURY_ADDRESS        = "";
 const CLAIMS_ESCROW_ADDRESS   = "";
 const CLAIMS_ADJUSTOR_ADDRESS = "";
@@ -38,7 +38,7 @@ const BLOCK_REWARD = BN.from("60000000000000000000"); // 60 SOLACE
 let artifacts: ArtifactImports;
 let registry: Registry;
 let solace: Solace;
-let weth: MockWeth;
+let weth: Weth9;
 let master: Master;
 let vault: Vault;
 let cpFarm: CpFarm;
@@ -50,7 +50,7 @@ let uniswapFactory: Contract;
 let uniswapRouter: Contract;
 let lpToken: Contract;
 let pool: Contract;
-let lpTokenAppraiser: LpAppraisor;
+let lpTokenAppraisor: LpAppraisor;
 
 let deployer: Signer;
 let governor: Signer;
@@ -115,10 +115,10 @@ async function deploySolace() {
 
 async function deployWeth() {
   if(!!WETH_ADDRESS) {
-    weth = (await ethers.getContractAt(artifacts.WETH.abi, WETH_ADDRESS)) as MockWeth;
+    weth = (await ethers.getContractAt(artifacts.WETH.abi, WETH_ADDRESS)) as Weth9;
   } else {
     console.log("Deploying WETH");
-    weth = (await deployContract(deployer, artifacts.WETH)) as MockWeth;
+    weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
     console.log(`Deploying WETH to ${weth.address}`);
     await weth.deployed();
     console.log("Deployment confirmed");
@@ -227,12 +227,12 @@ async function deployUniswapPool() {
 
 async function deployLpTokenAppraisor() {
   if(!!LPAPPRAISOR_ADDRESS) {
-    lpTokenAppraiser = (await ethers.getContractAt(artifacts.LpAppraisor.abi, LPAPPRAISOR_ADDRESS)) as LpAppraisor;
+    lpTokenAppraisor = (await ethers.getContractAt(artifacts.LpAppraisor.abi, LPAPPRAISOR_ADDRESS)) as LpAppraisor;
   } else {
     console.log("Deploying LP Token Appraisor");
-    lpTokenAppraiser = (await deployContract(deployer,artifacts.LpAppraisor,[governorAddress,lpToken.address,20000,40000])) as LpAppraisor;
-    console.log(`Deploying LP Token Appraisor to ${lpTokenAppraiser.address}`);
-    await lpTokenAppraiser.deployed();
+    lpTokenAppraisor = (await deployContract(deployer,artifacts.LpAppraisor,[governorAddress,lpToken.address,20000,40000])) as LpAppraisor;
+    console.log(`Deploying LP Token Appraisor to ${lpTokenAppraisor.address}`);
+    await lpTokenAppraisor.deployed();
     console.log("Deployment confirmed");
   }
 }
@@ -242,7 +242,7 @@ async function deployLpFarm() {
     lpFarm = (await ethers.getContractAt(artifacts.SolaceEthLpFarm.abi, LPFARM_ADDRESS)) as SolaceEthLpFarm;
   } else {
     console.log("Deploying LP Farm");
-    lpFarm = (await deployContract(deployer,artifacts.SolaceEthLpFarm,[governorAddress,master.address,lpToken.address,solace.address,START_BLOCK,END_BLOCK,pool.address,weth.address,lpTokenAppraiser.address])) as SolaceEthLpFarm;
+    lpFarm = (await deployContract(deployer,artifacts.SolaceEthLpFarm,[governorAddress,master.address,lpToken.address,solace.address,START_BLOCK,END_BLOCK,pool.address,weth.address,lpTokenAppraisor.address])) as SolaceEthLpFarm;
     console.log(`Deploying LP Farm to ${lpFarm.address}`);
     await lpFarm.deployed();
     console.log("Deployment confirmed");
@@ -339,6 +339,7 @@ async function logAddresses() {
   logContractAddress("Master", master.address);
   logContractAddress("CpFarm", cpFarm.address);
   logContractAddress("LpFarm", lpFarm.address);
+  logContractAddress("lpTokenAppraisor", lpTokenAppraisor.address);
   logContractAddress("Treasury", treasury.address);
   logContractAddress("ClaimsEscrow", claimsEscrow.address);
   logContractAddress("ClaimsAdjustor", claimsAdjustor.address);
@@ -355,6 +356,7 @@ REACT_APP_MASTER_CONTRACT_ADDRESS=${master.address}
 REACT_APP_CPFARM_CONTRACT_ADDRESS=${cpFarm.address}
 REACT_APP_VAULT_CONTRACT_ADDRESS=${vault.address}
 REACT_APP_LPFARM_CONTRACT_ADDRESS=${lpFarm.address}
+REACT_APP_LPTOKENAPPRAISOR_CONTRACT_ADDRESS=${lpTokenAppraisor.address}
 REACT_APP_TREASURY_CONTRACT_ADDRESS=${treasury.address}
 REACT_APP_CLAIMS_ESCROW_CONTRACT_ADDRESS=${claimsEscrow.address}
 REACT_APP_CLAIMS_ADJUSTOR_CONTRACT_ADDRESS=${claimsAdjustor.address}
