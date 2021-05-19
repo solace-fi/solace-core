@@ -2,6 +2,7 @@ import chai from "chai";
 import { waffle } from "hardhat";
 import PolicyManagerArtifact from '../artifacts/contracts/PolicyManager.sol/PolicyManager.json'
 import { PolicyManager } from "../typechain";
+import { Transaction, BigNumber as BN, Contract, constants, BigNumberish, Wallet } from "ethers";
 
 const { expect } = chai;
 const { deployContract, solidity } = waffle;
@@ -15,7 +16,7 @@ describe('PolicyManager', () => {
   const name = 'Solace Policy';
   const symbol = 'SPT';
   const expirationBlock = 123456;
-  const coverAmount = 10000000000000000000; // 10 Ether in wei
+  const coverAmount = BN.from("100000000000000"); // 10 Ether in wei
   const price = 1000; // price in wei for block/wei
   
 
@@ -73,32 +74,34 @@ describe('PolicyManager', () => {
   describe('product', function () {
 
     before(async function () {
-        // await policyManager.connect(owner).addProduct(product1.address);
-        // await policyManager.connect(product1).createPolicy(policyholder,expirationBlock,coverAmount,price);
-        // await policyManager.connect(product1).createPolicy(policyholder,expirationBlock,coverAmount,price);
+      await policyManager.connect(governor).addProduct(governor.address);
     })
 
     it('can create policy', async function (){
-    })
+      let tokenID = await policyManager.connect(governor).createPolicy(buyer.address, positionContract.address, expirationBlock, coverAmount, price);
+      let receipt = await tokenID.wait();
+      expect(receipt.logs[0].topics[3]).to.equal('0x0000000000000000000000000000000000000000000000000000000000000000');
+    })  
 
     it('can burn policy', async function (){
-    })
+      let tokenID = await policyManager.connect(governor).createPolicy(buyer.address, positionContract.address, expirationBlock, coverAmount, price);
+      let receipt = (await tokenID.wait())
+      expect(receipt.logs[0].topics[3]).to.equal("0x0000000000000000000000000000000000000000000000000000000000000001") // 1 policy creaeted
 
-    it('can set token (policy) URI', async function (){
-    })    
+      await policyManager.connect(governor).burn(0); // burn tokenID 0
+      await policyManager.connect(governor).burn(1); // burn tokenID 1
+      let totalPolicyCount = await policyManager.totalPolicyCount();
+      expect(totalPolicyCount).to.equal(0); // all policies are gone
+    })  
   })
 
-  describe('policyholder', function () {
+  describe('policyholder', function () { 
 
-    before(async function () {
-        // await policyManager.connect(governor).addProduct(product1.address);
-        await policyManager.connect(product1).createPolicy(buyer.address, positionContract.address, expirationBlock, coverAmount, price);
-        await policyManager.connect(product1).createPolicy(buyer.address, positionContract.address, expirationBlock, coverAmount, price);
-    })
-
-    it('can view all my policies', async function (){
-      expect(await policyManager.connect(buyer).myPolicies()).to.equal([0,1]);
-    })
+    it('can view all my policies', async function (){   
+      let tokenID = await policyManager.connect(governor).createPolicy(buyer.address, positionContract.address, expirationBlock, coverAmount, price);
+      let myPolicies = await policyManager.connect(buyer).myPolicies();
+      expect(myPolicies.length).to.equal(1); // 1 policy created
+    })  
 
     it('can view my policy expiration block', async function (){
       let policyID = (await policyManager.connect(buyer).myPolicies())[0]
@@ -106,8 +109,9 @@ describe('PolicyManager', () => {
     })
 
     it('can view my policy coverage amount', async function (){
-      let policyID = (await policyManager.connect(buyer).myPolicies())[1]
-      expect(await policyManager.connect(buyer).getPolicyCoverAmount(policyID)).to.equal(coverAmount);
+      let policyID = (await policyManager.connect(buyer).myPolicies());  
+      let policyCoverAmount = await policyManager.connect(buyer).getPolicyCoverAmount(0);
+      expect(policyCoverAmount.toNumber()).to.equal(coverAmount);
     })
   })
 })

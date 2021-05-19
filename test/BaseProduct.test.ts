@@ -131,30 +131,23 @@ describe('MockProduct', () => {
         expect(quote).to.equal(expectedPremium);
       })
       it('can buyPolicy', async function () {
-        // adding the position contract to the policy manager
-        const testProduct = '0xcf7ed3acca5a467e9e704c703e8d87f634fb0fc9'; // test product address which is the same as the first hardhat signer
-        (await policyManager.connect(owner).addProduct(testProduct));
+        // adding the owner product to the ProductManager
+        (await policyManager.connect(owner).addProduct("0xcf7ed3acca5a467e9e704c703e8d87f634fb0fc9")); // when using { value: quote } below it defaults to send from the first account
         // position contract set
-        expect(await policyManager.productIsActive(testProduct)).to.equal(true);
+        expect(await policyManager.productIsActive("0xcf7ed3acca5a467e9e704c703e8d87f634fb0fc9")).to.equal(true);
 
-        let coverLimit = 50 // cover 50% of the position
+        let coverLimit = 50 // cover 50% of the position      
         let blocks = BN.from(25100) // less than the max
-        let quote = BN.from(await mockProduct.connect(product1).getQuote(coverLimit, blocks, positionContract.address));
-        let res = (await mockProduct.buyPolicy(coverLimit, blocks, testProduct, { value: quote }));
+        let quote = BN.from(await mockProduct.connect(buyer).getQuote(coverLimit, blocks, positionContract.address));
+        let res = (await mockProduct.buyPolicy(coverLimit, blocks, positionContract.address, { value: quote }));  
         let receipt = await res.wait()
         expect(receipt.logs[0].topics[3]).to.equal('0x0000000000000000000000000000000000000000000000000000000000000000') // the last element in the logs array is the policyID, in this case policyID = 0
       })  
-    //   it('can updateActivePolicies', async function () {
-    //     console.log(await policyManager.getPolicyExpirationBlock(0));
-    //     // console.log(await mockProduct.activePolicyIDs(0));
-    //     console.log("params")
-    //     console.log(await policyManager.getPolicyParams(0));
-    //     let activeCoverAmount, policyAmount = await mockProduct.updateActivePolicies();
-    //     console.log(activeCoverAmount)
-    //     console.log(policyAmount)
-    //     expect(activeCoverAmount).to.equal(0); // no policiess taken yet
-    //     expect(policyAmount).to.equal(0);  // check against active policy number and totalcover amount
-    //   })
-    // })
-  })
-})
+      // it('can updateActivePolicies', async function () {
+      //   let activeCoverAmount, activePolicyCount = await mockProduct.updateActivePolicies();
+      //   let receipt = await activePolicyCount.wait();
+      //   expect(activeCoverAmount).to.equal(100);
+      // })
+    })
+  })  
+})  

@@ -6,8 +6,6 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "./interface/IProduct.sol";
 import "./PolicyManager.sol";
 
-import "hardhat/console.sol";
-
 /* TODO
  * - optimize _updateActivePolicies()
  * - update, extend, cancel policy functions
@@ -201,11 +199,7 @@ abstract contract BaseProduct is IProduct {
      */
     function _updateActivePolicies() internal {
         for (uint256 i=0; i < activePolicyIDs.length; i++) {
-            console.log(block.number);
-            console.log("Policy: ");
-            console.log(policyManager.getPolicyExpirationBlock(activePolicyIDs[i]));
             if (policyManager.getPolicyExpirationBlock(activePolicyIDs[i]) < block.number) {
-                console.log(true);
                 activeCoverAmount -= policyManager.getPolicyCoverAmount(activePolicyIDs[i]);
                 policyManager.burn(activePolicyIDs[i]);
                 delete activePolicyIDs[i];
