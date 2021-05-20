@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity ^0.8.0;
+pragma solidity 0.8.0;
 
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 
 /* TODO
+ * - add events
  * - keep track of addresses who's policies expired and burned to later give discounts
  * - restrict transfers or separate buyer-policyholder notions
  */
@@ -50,7 +51,7 @@ contract PolicyManager is ERC721URIStorage, ERC721Enumerable {
      * Can only be called by the current governor.
      * @param _governance the new governor
      */
-    function setGovernance(address _governance) public {
+    function setGovernance(address _governance) external {
         require(msg.sender == governance, "!governance");
         governance = _governance;
     }
@@ -60,7 +61,7 @@ contract PolicyManager is ERC721URIStorage, ERC721Enumerable {
      * Can only be called by the current governor.
      * @param _product the new product
      */
-    function addProduct(address _product) public {
+    function addProduct(address _product) external {
         require(msg.sender == governance, "!governance");
         productIsActive[_product] = true;
     }
@@ -70,7 +71,7 @@ contract PolicyManager is ERC721URIStorage, ERC721Enumerable {
      * Can only be called by the current governor.
      * @param _product the product to remove
      */
-    function removeProduct(address _product) public {
+    function removeProduct(address _product) external {
         require(msg.sender == governance, "!governance");
         productIsActive[_product] = false;
     }
@@ -84,10 +85,21 @@ contract PolicyManager is ERC721URIStorage, ERC721Enumerable {
         PolicyTokenURIParams memory params = _decodeTokenURI(encodedTokenURI);
         return params;
     }
-    
-    function getPolicyholderAddress(uint256 _policyID) external view returns (address policyholder){}
 
-    function getPolicyProduct(uint256 _policyID) external view returns (address product){}
+    function getPolicyholder(uint256 _policyID) external view returns (address){
+        PolicyTokenURIParams memory params = getPolicyParams(_policyID);
+        return params.policyholder;
+    }
+
+    function getPolicyProduct(uint256 _policyID) external view returns (address){
+        PolicyTokenURIParams memory params = getPolicyParams(_policyID);
+        return params.product;
+    }
+
+    function getPolicyPositionContract(uint256 _policyID) external view returns (address){
+        PolicyTokenURIParams memory params = getPolicyParams(_policyID);
+        return params.positionContract;
+    }
 
     function getPolicyExpirationBlock(uint256 _policyID) external view returns (uint256) {
         PolicyTokenURIParams memory params = getPolicyParams(_policyID);
@@ -99,7 +111,10 @@ contract PolicyManager is ERC721URIStorage, ERC721Enumerable {
         return params.coverAmount;
     }
     
-    function getPolicyPrice(uint256 _policyID) external view returns (uint256 price){}
+    function getPolicyPrice(uint256 _policyID) external view returns (uint256){
+        PolicyTokenURIParams memory params = getPolicyParams(_policyID);
+        return params.price;
+    }
 
     function myPolicies() external view returns (uint256[] memory tokenIDs) {
         uint256 tokenCount = balanceOf(msg.sender);

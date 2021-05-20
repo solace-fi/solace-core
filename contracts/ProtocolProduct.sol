@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity ^0.8.0;
+pragma solidity 0.8.0;
 
 import "@openzeppelin/contracts/utils/Address.sol";
-import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import './interface/IProduct.sol';
-import './PolicyManager.sol';
+import './interface/IPolicyManager.sol';
+import './interface/ITreasury.sol';
 
 /* TODO
  * - vaults, pools, and other contract can ask for a quote (someone can ask on behalf of the contract),
