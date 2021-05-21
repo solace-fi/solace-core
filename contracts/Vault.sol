@@ -56,7 +56,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     uint256 public lockedProfitDegration; // rate per block of degration. DEGREDATION_COEFFICIENT is 100% per block
     uint256 public minCapitalRequirement;
 
-    uint256 public managementFee = 200; // Governance Fee for management of Vault (given to `rewards`)
+    uint256 public managementFee; // Governance Fee for management of Vault (given to `rewards`)
 
     bool public emergencyShutdown;
 
