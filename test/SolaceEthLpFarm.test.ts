@@ -5,6 +5,7 @@ const provider: MockProvider = waffle.provider;
 import { Transaction, BigNumber as BN, Contract, constants, BigNumberish, Wallet } from "ethers";
 import chai from "chai";
 const { expect } = chai;
+chai.use(solidity);
 
 import { expectClose } from "./utilities/chai_extensions";
 import { burnBlocks, burnBlocksUntil } from "./utilities/time";
@@ -14,22 +15,12 @@ import { bnAddSub, bnMulDiv } from "./utilities/math";
 import { getPermitDigest, sign, getDomainSeparator } from "./utilities/signature";
 import getPermitNFTSignature from "./utilities/getPermitNFTSignature";
 
-import SolaceArtifact from "../artifacts/contracts/SOLACE.sol/SOLACE.json";
-import MasterArtifact from "../artifacts/contracts/Master.sol/Master.json";
-import WETHArtifact from "../artifacts/contracts/mocks/MockWETH.sol/MockWETH.json";
-import MockERC20Artifact from "../artifacts/contracts/mocks/MockERC20.sol/MockERC20.json";
-import SolaceEthLpFarmArtifact from "../artifacts/contracts/SolaceEthLpFarm.sol/SolaceEthLpFarm.json";
+import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
 import { Solace, Master, MockWeth, MockErc20, SolaceEthLpFarm } from "../typechain";
 
-// uniswap imports
-import UniswapV3FactoryArtifact from "@uniswap/v3-core/artifacts/contracts/UniswapV3Factory.sol/UniswapV3Factory.json";
-import UniswapV3PoolArtifact from "@uniswap/v3-core/artifacts/contracts/UniswapV3Pool.sol/UniswapV3Pool.json";
-import SwapRouterArtifact from "@uniswap/v3-periphery/artifacts/contracts/SwapRouter.sol/SwapRouter.json";
-import NonfungiblePositionManagerArtifact from "@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json";
-
-chai.use(solidity);
-
 describe("SolaceEthLpFarm", function () {
+  let artifacts: ArtifactImports;
+
   // users
   let deployer: Wallet;
   let governor: Wallet;
@@ -74,11 +65,12 @@ describe("SolaceEthLpFarm", function () {
 
   before(async function () {
     [deployer, governor, farmer1, farmer2, farmer3, farmer4, trader] = provider.getWallets();
+    artifacts = await import_artifacts();
 
     // deploy solace token
     solaceToken = (await deployContract(
       deployer,
-      SolaceArtifact,
+      artifacts.SOLACE,
       [
         governor.address
       ]
@@ -87,13 +79,13 @@ describe("SolaceEthLpFarm", function () {
     // deploy weth
     weth = (await deployContract(
         deployer,
-        WETHArtifact
+        artifacts.WETH
     )) as MockWeth;
 
     // deploy mock token 1
     mockToken1 = (await deployContract(
         deployer,
-        MockERC20Artifact,
+        artifacts.MockERC20,
         [
           "Mock Token 1",
           "MKT1",
@@ -104,7 +96,7 @@ describe("SolaceEthLpFarm", function () {
     // deploy master contract
     master = (await deployContract(
       deployer,
-      MasterArtifact,
+      artifacts.Master,
       [
         governor.address,
         solaceToken.address,
@@ -115,13 +107,13 @@ describe("SolaceEthLpFarm", function () {
     // deploy uniswap factory
     uniswapFactory = (await deployContract(
       deployer,
-      UniswapV3FactoryArtifact
+      artifacts.UniswapV3Factory
     )) as Contract;
 
     // deploy uniswap router
     uniswapRouter = (await deployContract(
       deployer,
-      SwapRouterArtifact,
+      artifacts.SwapRouter,
       [
         uniswapFactory.address,
         weth.address
@@ -131,7 +123,7 @@ describe("SolaceEthLpFarm", function () {
     // deploy uniswap nft / lp token
     lpToken = (await deployContract(
       deployer,
-      NonfungiblePositionManagerArtifact,
+      artifacts.NonfungiblePositionManager,
       [
         uniswapFactory.address,
         weth.address,
@@ -916,9 +908,9 @@ describe("SolaceEthLpFarm", function () {
     expect(events && events.length > 0 && events[0].args && events[0].args.pool);
     if(events && events.length > 0 && events[0].args && events[0].args.pool) {
       let poolAddress = events[0].args.pool;
-      pool = await ethers.getContractAt(UniswapV3PoolArtifact.abi, poolAddress);
+      pool = await ethers.getContractAt(artifacts.UniswapV3Pool.abi, poolAddress);
     } else {
-      pool = (new Contract(ZERO_ADDRESS, UniswapV3PoolArtifact.abi)) as Contract;
+      pool = (new Contract(ZERO_ADDRESS, artifacts.UniswapV3Pool.abi)) as Contract;
       expect(true).to.equal(false);
     }
     expect(pool).to.exist;
@@ -937,7 +929,7 @@ describe("SolaceEthLpFarm", function () {
   ) {
     let farm = (await deployContract(
       deployer,
-      SolaceEthLpFarmArtifact,
+      artifacts.SolaceEthLpFarm,
       [
         governor.address,
         master.address,

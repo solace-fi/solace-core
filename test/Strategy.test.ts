@@ -1,19 +1,16 @@
 import chai from "chai";
 import { waffle } from "hardhat";
 import { BigNumber as BN } from "ethers";
-import VaultArtifact from "../artifacts/contracts/Vault.sol/Vault.json";
-import StrategyArtifact from "../artifacts/contracts/mocks/MockStrategy.sol/MockStrategy.json";
-import WETHArtifact from "../artifacts/contracts/mocks/MockWETH.sol/MockWETH.json";
-import RegistryArtifact from "../artifacts/contracts/Registry.sol/Registry.json";
-import { Vault, MockStrategy, MockWeth, Registry } from "../typechain";
-
 const { expect } = chai;
 const { deployContract, solidity } = waffle;
 const provider = waffle.provider;
-
 chai.use(solidity);
 
+import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
+import { Vault, MockStrategy, MockWeth, Registry } from "../typechain";
+
 describe("Strategy", function () {
+    let artifacts: ArtifactImports;
     let vault: Vault;
     let newVault: Vault;
     let weth: MockWeth;
@@ -31,33 +28,37 @@ describe("Strategy", function () {
     const MAX_BPS = 10000;
     const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
+    before(async function () {
+      artifacts = await import_artifacts();
+    })
+
     beforeEach(async () => {
         registry = (await deployContract(
             owner,
-            RegistryArtifact,
+            artifacts.Registry,
             [owner.address,]
         )) as Registry;
 
         weth = (await deployContract(
             owner,
-            WETHArtifact
+            artifacts.WETH
         )) as MockWeth;
 
         vault = (await deployContract(
             owner,
-            VaultArtifact,
+            artifacts.Vault,
             [owner.address, registry.address, weth.address]
         )) as Vault;
 
         newVault = (await deployContract(
             owner,
-            VaultArtifact,
+            artifacts.Vault,
             [owner.address, registry.address, weth.address]
         )) as Vault;
 
         strategy = (await deployContract(
             owner,
-            StrategyArtifact,
+            artifacts.MockStrategy,
             [vault.address]
         )) as MockStrategy;
     });

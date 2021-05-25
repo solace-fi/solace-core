@@ -6,13 +6,14 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interface/IVault.sol";
+import "./interface/IStrategy.sol";
 
 /**
  * @title BaseStrategy
  * @author solace.fi
  * @notice To be inherited by individual Strategy contracts to execute on for investing pooled CP funds.
  */
-abstract contract BaseStrategy {
+abstract contract BaseStrategy is IStrategy {
     using Address for address;
     using SafeERC20 for IERC20;
 
@@ -97,7 +98,7 @@ abstract contract BaseStrategy {
      * @param _amountNeeded amount needed by Vault
      * @return _loss Any realized losses
      */
-    function withdraw(uint256 _amountNeeded) external returns (uint256 _loss) {
+    function withdraw(uint256 _amountNeeded) external override returns (uint256 _loss) {
         require(msg.sender == address(vault), "!vault");
         // Liquidate to `want`, up to `_amountNeeded`
         uint256 amountFreed;
@@ -122,7 +123,7 @@ abstract contract BaseStrategy {
      *  called to report to the Vault on the Strategy's position, especially if
      *  any losses have occurred.
     */
-    function harvest() external {
+    function harvest() external override {
         require(msg.sender == governance, "!governance");
         uint256 profit = 0;
         uint256 loss = 0;
@@ -169,7 +170,7 @@ abstract contract BaseStrategy {
      *  The amount of assets this strategy manages that should not be included in Solace's Total Value
      *  Locked (TVL) calculation across it's ecosystem.
      */
-    function delegatedAssets() external virtual view returns (uint256) {
+    function delegatedAssets() external virtual override view returns (uint256) {
         return 0;
     }
 
@@ -188,7 +189,7 @@ abstract contract BaseStrategy {
      *  through flashloan attacks, oracle manipulations, or other DeFi attack mechanisms).
      * @return The estimated total assets in this Strategy.
      */
-    function estimatedTotalAssets() public virtual view returns (uint256);
+    function estimatedTotalAssets() public virtual override view returns (uint256);
 
     /**
      * @notice
@@ -198,7 +199,7 @@ abstract contract BaseStrategy {
      *  events can be tracked externally by indexing agents.
      * @return True if the strategy is actively managing a position.
      */
-    function isActive() public view returns (bool) {
+    function isActive() public view override returns (bool) {
         return vault.strategies(address(this)).debtRatio > 0 || estimatedTotalAssets() > 0;
     }
 

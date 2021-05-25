@@ -5,6 +5,7 @@ pragma solidity 0.8.0;
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./interface/IStrategy.sol";
 import "./interface/IWETH10.sol";
 import "./interface/IRegistry.sol";
@@ -17,7 +18,7 @@ import "./interface/IVault.sol";
  * @author solace.fi
  * @notice Capital Providers can deposit ETH to mint shares of the Vault (CP tokens)
  */
-contract Vault is ERC20Permit, IVault {
+contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using Address for address;
     /*
@@ -121,7 +122,7 @@ contract Vault is ERC20Permit, IVault {
     event UpdateWithdrawalQueue(address[] indexed queue);
     event StrategyRevoked(address strategy);
     event EmergencyShutdown(bool active);
-    event ClaimProcessed(address indexed claimant, uint256 indexed amount);
+    event ClaimProcessed(uint256 indexed claimId, address indexed claimant, uint256 indexed amount);
     event StrategyUpdateDebtRatio(address indexed strategy, uint256 indexed newDebtRatio);
     event StrategyUpdateMinDebtPerHarvest(address indexed strategy, uint256 indexed newMinDebtPerHarvest);
     event StrategyUpdateMaxDebtPerHarvest(address indexed strategy, uint256 indexed newMaxDebtPerHarvest);
@@ -227,7 +228,8 @@ contract Vault is ERC20Permit, IVault {
     function setWithdrawalQueue(address[] memory _queue) external {
         require(msg.sender == governance, "!governance");
         // check that each entry in input array is an active strategy
-        for (uint256 i = 0; i < _queue.length; i++) {
+        uint256 length = _queue.length;
+        for (uint256 i = 0; i < length; ++i) {
             require(_strategies[_queue[i]].activation > 0, "must be a current strategy");
         }
         // set input to be the new queue
@@ -291,7 +293,8 @@ contract Vault is ERC20Permit, IVault {
         require(_strategies[_strategy].activation > 0, "must be a current strategy");
 
         // check that strategy is not already in the queue
-        for (uint256 i = 0; i < withdrawalQueue.length; i++) {
+        uint256 length = withdrawalQueue.length;
+        for (uint256 i = 0; i < length; i++) {
             require(withdrawalQueue[i] != _strategy, "strategy already in queue");
         }
 
@@ -344,9 +347,8 @@ contract Vault is ERC20Permit, IVault {
      * @param strategy The Strategy to revoke.
     */
     function revokeStrategy(address strategy) external override {
-        require(msg.sender == governance ||
-            _strategies[msg.sender].activation > 0, "must be called by governance or strategy to be revoked"
-        );
+        require(msg.sender == governance || msg.sender == strategy, "must be called by governance or strategy to be revoked");
+        require(_strategies[strategy].activation > 0, "must be a current strategy");
         _revokeStrategy(strategy);
     }
 
@@ -366,9 +368,9 @@ contract Vault is ERC20Permit, IVault {
         IWETH10(address(token)).withdraw(amount);
 
         IClaimsEscrow escrow = IClaimsEscrow(registry.claimsEscrow());
-        escrow.receiveClaim{value: amount}(claimant);
+        uint256 claimId = escrow.receiveClaim{value: amount}(claimant);
 
-        emit ClaimProcessed(claimant, amount);
+        emit ClaimProcessed(claimId, claimant, amount);
     }
 
     /**
@@ -451,7 +453,7 @@ contract Vault is ERC20Permit, IVault {
      * Deposits `_amount` `token`, issuing shares to `recipient`.
      * Reverts if Vault is in Emergency Shutdown
      */
-    function deposit() public payable override {
+    function deposit() public payable override nonReentrant {
         require(!emergencyShutdown, "cannot deposit when vault is in emergency shutdown");
         uint256 amount = msg.value;
         uint256 shares;
@@ -476,14 +478,14 @@ contract Vault is ERC20Permit, IVault {
      * Deposits `_amount` `token`, issuing shares to `recipient`.
      * Reverts if Vault is in Emergency Shutdown
      */
-    function depositWeth(uint256 amount) external override {
+    function depositWeth(uint256 amount) external override nonReentrant {
         require(!emergencyShutdown, "cannot deposit when vault is in emergency shutdown");
         uint256 shares = totalSupply() == 0
             ? amount
             : (amount * totalSupply()) / _totalAssets();
         // Issuance of shares needs to be done before taking the deposit
         _mint(msg.sender, shares);
-        token.safeTransferFrom(msg.sender, address(this), amount);
+        SafeERC20.safeTransferFrom(token, msg.sender, address(this), amount);
         emit DepositMade(msg.sender, amount, shares);
     }
 
@@ -494,7 +496,7 @@ contract Vault is ERC20Permit, IVault {
      * @param maxLoss acceptable amount of loss in bps of
      * @return value in ETH that the shares where redeemed for
      */
-    function withdraw(uint256 shares, uint256 maxLoss) external override returns (uint256) {
+    function withdraw(uint256 shares, uint256 maxLoss) external override nonReentrant returns (uint256) {
         require(shares <= balanceOf(msg.sender), "cannot redeem more shares than you own");
 
         uint256 value = _shareValue(shares);
@@ -502,13 +504,13 @@ contract Vault is ERC20Permit, IVault {
 
         // Stop withdrawal if process brings the Vault's `totalAssets` value below minimum capital requirement
         require(_totalAssets() - value >= minCapitalRequirement, "withdrawal brings Vault assets below MCR");
-
         // If redeemable amount exceeds vaultBalance, withdraw funds from strategies in the withdrawal queue
         uint256 vaultBalance = token.balanceOf(address(this));
         if (value > vaultBalance) {
 
-            for (uint256 i = 0; i < withdrawalQueue.length; i++) {
-
+            uint256 _totalDebt = totalDebt;
+            uint256 length = withdrawalQueue.length;
+            for (uint256 i = 0; i < length; ++i) {
                 uint256 amountNeeded = min(
                     value - vaultBalance,
                     // Do not withdraw more than the Strategy's debt so that it can still work based on the profits it has
@@ -531,7 +533,7 @@ contract Vault is ERC20Permit, IVault {
                 // Reduce the Strategy's debt by the amount withdrawn ("realized returns")
                 // This doesn't add to returns as it's not earned by "normal means"
                 _strategies[withdrawalQueue[i]].totalDebt -= withdrawn + loss;
-                totalDebt -= withdrawn + loss;
+                _totalDebt -= withdrawn + loss;
 
                 // Break if we are done withdrawing from Strategies
                 vaultBalance = token.balanceOf(address(this));
@@ -539,22 +541,20 @@ contract Vault is ERC20Permit, IVault {
                   break;
                 }
             }
+            if(totalDebt != _totalDebt) totalDebt = _totalDebt;
         }
 
         vaultBalance = token.balanceOf(address(this));
-
         if (vaultBalance < value) {
             value = vaultBalance;
             shares = _sharesForAmount(value + totalLoss);
         }
         // revert if losses from withdrawing are more than what is considered acceptable.
         require(totalLoss <= maxLoss * (value + totalLoss) / MAX_BPS, "too much loss");
-
         // burn shares and transfer ETH to withdrawer
         _burn(msg.sender, shares);
         IWETH10(address(token)).withdraw(value);
         payable(msg.sender).transfer(value);
-
         emit WithdrawalMade(msg.sender, value);
 
         return value;
@@ -580,7 +580,7 @@ contract Vault is ERC20Permit, IVault {
      * @param _debtPayment Amount Strategy has made available to cover outstanding debt
      * @return Amount of debt outstanding (if totalDebt > debtLimit or emergency shutdown).
     */
-    function report(uint256 gain, uint256 loss, uint256 _debtPayment) external override returns (uint256) {
+    function report(uint256 gain, uint256 loss, uint256 _debtPayment) external override nonReentrant returns (uint256) {
         require(_strategies[msg.sender].activation > 0, "must be called by an active strategy");
         require(token.balanceOf(msg.sender) >= gain + _debtPayment, "need to have available tokens to withdraw");
 
