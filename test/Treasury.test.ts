@@ -12,7 +12,7 @@ import { encodePriceSqrt, FeeAmount, TICK_SPACINGS, getMaxTick, getMinTick } fro
 import { encodePath } from "./utilities/path";
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Solace, Treasury, MockErc20, MockWeth } from "../typechain";
+import { Solace, Treasury, MockErc20, Weth9 } from "../typechain";
 
 describe("Treasury", function () {
   let artifacts: ArtifactImports;
@@ -27,7 +27,7 @@ describe("Treasury", function () {
   // solace contracts
   let solaceToken: Solace;
   let treasury: Treasury;
-  let weth: MockWeth;
+  let weth: Weth9;
   let mockToken1: MockErc20; // no path
   let mockToken2: MockErc20; // single pool path
   let mockToken3: MockErc20; // multi pool path
@@ -87,7 +87,7 @@ describe("Treasury", function () {
     weth = (await deployContract(
         deployer,
         artifacts.WETH
-    )) as MockWeth;
+    )) as Weth9;
 
     // deploy mock token 1
     mockToken1 = (await deployContract(

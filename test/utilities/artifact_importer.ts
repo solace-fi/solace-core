@@ -26,7 +26,7 @@ export async function import_artifacts() {
   artifacts.SOLACE = await import(`${artifact_dir}/SOLACE.sol/SOLACE.json`);
   artifacts.SolaceEthLpFarm = await import(`${artifact_dir}/SolaceEthLpFarm.sol/SolaceEthLpFarm.json`);
   artifacts.Treasury = await import (`${artifact_dir}/Treasury.sol/Treasury.json`);
-  artifacts.WETH = await import(`${artifact_dir}/mocks/MockWETH.sol/MockWETH.json`);
+  artifacts.WETH = await import(`${artifact_dir}/mocks/WETH9.sol/WETH9.json`);
   artifacts.Vault = await import(`${artifact_dir}/Vault.sol/Vault.json`);
   artifacts.MockERC20 = await import(`${artifact_dir}/mocks/MockERC20.sol/MockERC20.json`);
   artifacts.MockStrategy = await import(`${artifact_dir}/mocks/MockStrategy.sol/MockStrategy.json`);

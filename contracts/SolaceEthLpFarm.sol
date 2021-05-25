@@ -27,7 +27,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard {
     IUniswapLpToken public override lpToken;   // LP Token interface.
     /// @notice Native SOLACE Token.
     SOLACE public override solace;
-    IWETH10 public override weth;
+    IWETH9 public override weth;
     uint256 public override blockReward;       // Amount of rewardToken distributed per block.
     uint256 public override startBlock;        // When the farm will start.
     uint256 public override endBlock;          // When the farm will end.
@@ -136,7 +136,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard {
         startBlock = _startBlock;
         endBlock = _endBlock;
         lastRewardBlock = Math.max(block.number, _startBlock);
-        weth = IWETH10(_weth);
+        weth = IWETH9(payable(_weth));
         appraisor = ILpAppraisor(_appraisor);
         // get pool data
         pool = IUniswapV3Pool(_pool);
@@ -149,6 +149,10 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard {
         solace.approve(_lpToken, type(uint256).max);
         weth.approve(_lpToken, type(uint256).max);
     }
+
+    receive () external payable {}
+
+    fallback () external payable {}
 
     /**
      * @notice Allows governance to be transferred to a new governor.
@@ -285,7 +289,10 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard {
         uint256 ethReturnAmount = ((token0 == address(solace))
             ? msg.value - amount1
             : msg.value - amount0);
-        if (ethReturnAmount > 0) weth.withdrawTo(payable(msg.sender), ethReturnAmount);
+        if (ethReturnAmount > 0) {
+          weth.withdraw(ethReturnAmount);
+          payable(msg.sender).transfer(ethReturnAmount);
+        }
         // accounting
         _deposit(params.depositor, tokenId);
     }

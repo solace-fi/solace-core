@@ -16,7 +16,7 @@ import { getPermitDigest, sign, getDomainSeparator } from "./utilities/signature
 import getPermitNFTSignature from "./utilities/getPermitNFTSignature";
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Solace, Master, MockWeth, MockErc20, SolaceEthLpFarm, LpAppraisor } from "../typechain";
+import { Solace, Master, Weth9, MockErc20, SolaceEthLpFarm, LpAppraisor } from "../typechain";
 
 describe("LpAppraisor", function () {
   let artifacts: ArtifactImports;
@@ -29,7 +29,7 @@ describe("LpAppraisor", function () {
   // contracts
   let solaceToken: Solace;
   let master: Master;
-  let weth: MockWeth;
+  let weth: Weth9;
   let farm: SolaceEthLpFarm;
   let lpTokenAppraisor1: LpAppraisor;
   let lpTokenAppraisor2: LpAppraisor;
@@ -76,7 +76,7 @@ describe("LpAppraisor", function () {
     weth = (await deployContract(
         deployer,
         artifacts.WETH
-    )) as MockWeth;
+    )) as Weth9;
 
     // deploy master contract
     master = (await deployContract(
