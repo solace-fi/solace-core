@@ -67,4 +67,7 @@ interface ITreasury {
      * @param _amountOutMinimum The minimum about to receive.
      */
     function swap(address _token, bytes calldata _path, uint256 _amountIn, uint256 _amountOutMinimum) external;
+
+    // used in Product
+    function refund(address _user, uint256 _amount) external;
 }

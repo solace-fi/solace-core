@@ -4,7 +4,15 @@ import MockProductArtifact from '../artifacts/contracts/mocks/MockProduct.sol/Mo
 import PolicyManagerArtifact from '../artifacts/contracts/PolicyManager.sol/PolicyManager.json'
 import ClaimsAdjusterArtifact from '../artifacts/contracts/ClaimsAdjustor.sol/ClaimsAdjustor.json'
 import RegistryArtifact from "../artifacts/contracts/Registry.sol/Registry.json";
-import { PolicyManager, ClaimsAdjustor, Registry, MockProduct } from "../typechain";
+import SolaceArtifact from "../artifacts/contracts/SOLACE.sol/SOLACE.json"
+import WETHArtifact from "../artifacts/contracts/mocks/MockWETH.sol/MockWETH.json";
+import TreasuryArtifact from "../artifacts/contracts/Treasury.sol/Treasury.json";
+import { PolicyManager, ClaimsAdjustor, Registry, MockProduct, Solace, MockWeth, Treasury } from "../typechain";
+
+// uniswap imports
+import UniswapV3FactoryArtifact from "@uniswap/v3-core/artifacts/contracts/UniswapV3Factory.sol/UniswapV3Factory.json";
+import SwapRouterArtifact from "@uniswap/v3-periphery/artifacts/contracts/SwapRouter.sol/SwapRouter.json";
+
 import { Transaction, BigNumber as BN, Contract, constants, BigNumberish, Wallet } from "ethers";
 
 const { expect } = chai;
@@ -17,7 +25,12 @@ describe('MockProduct', () => {
  let registry: Registry;
  let coveredPlatform: "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f"; // testing UniswapFactory for cover
  let claimsAdjuster: ClaimsAdjustor;
+ let solace: Solace;
+ let weth: MockWeth;
+ let treasury: Treasury;
  let mockProduct: MockProduct;
+ let uniswapFactory: Contract;
+ let uniswapRouter: Contract;
  const [owner, governor] = provider.getWallets();
  const minPeriod = 6450; // this is about 1 day
  const maxPeriod = 45100; // this is about 1 week from https://ycharts.c om/indicators/ethereum_blocks_per_day
@@ -32,9 +45,10 @@ describe('MockProduct', () => {
    PolicyManagerArtifact
   )) as PolicyManager;
 
+  // deploy registry
   registry = (await deployContract(
    owner,
-   RegistryArtifact 
+   RegistryArtifact
   )) as Registry;
 
   // deploy claims adjuster
@@ -42,14 +56,54 @@ describe('MockProduct', () => {
    owner,
    ClaimsAdjusterArtifact,
    [registry.address]
-  )) as ClaimsAdjustor; 
+  )) as ClaimsAdjustor;
+
+  // deploy solace
+  solace = (await deployContract(
+    owner,
+    SolaceArtifact
+  )) as Solace;
+
+  // deploy weth
+  weth = (await deployContract(
+      owner,
+      WETHArtifact
+  )) as MockWeth;
+
+  // deploy uniswap factory
+  uniswapFactory = (await deployContract(
+    owner,
+    UniswapV3FactoryArtifact
+  )) as Contract;
+
+  // deploy uniswap router
+  uniswapRouter = (await deployContract(
+    owner,
+    SwapRouterArtifact,
+    [
+      uniswapFactory.address,
+      weth.address
+    ]
+  )) as Contract;
+
+  // deploy treasury contract
+  treasury = (await deployContract(
+    owner,
+    TreasuryArtifact,
+    [
+      solace.address,
+      uniswapRouter.address,
+      weth.address
+    ]
+  )) as Treasury;
 
   // deploy BaseProduct
   mockProduct = (await deployContract(
    owner,
    MockProductArtifact,
    [
-    policyManager.address,  
+    policyManager.address,
+    treasury.address,
     claimsAdjuster.address, // this is for the coveredPlatform
     claimsAdjuster.address,
     price,
@@ -77,7 +131,7 @@ describe('MockProduct', () => {
    await expect(mockProduct.connect(owner).setClaimsAdjuster(claimsAdjuster.address)).to.be.revertedWith("!governance");
   });
  })
-  
+
  describe('productParameters', () => {
   it('can set setPrice', async function () {
    await mockProduct.connect(governor).setPrice(price);

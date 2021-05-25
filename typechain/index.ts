@@ -31,6 +31,8 @@ export { MockWethFactory } from "./MockWethFactory";
 export type { MockWeth } from "./MockWeth";
 export { PolicyManagerFactory } from "./PolicyManagerFactory";
 export type { PolicyManager } from "./PolicyManager";
+export { UniswapV3ProductFactory } from "./UniswapV3ProductFactory";
+export type { UniswapV3Product } from "./UniswapV3Product";
 export { RegistryFactory } from "./RegistryFactory";
 export type { Registry } from "./Registry";
 export { SolaceFactory } from "./SolaceFactory";

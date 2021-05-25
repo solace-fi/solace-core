@@ -27,6 +27,7 @@ interface TreasuryInterface extends ethers.utils.Interface {
     "depositToken(address,uint256)": FunctionFragment;
     "governance()": FunctionFragment;
     "paths(address)": FunctionFragment;
+    "refund(address,uint256)": FunctionFragment;
     "setGovernance(address)": FunctionFragment;
     "setPath(address,bytes)": FunctionFragment;
     "solace()": FunctionFragment;
@@ -49,6 +50,10 @@ interface TreasuryInterface extends ethers.utils.Interface {
     values?: undefined
   ): string;
   encodeFunctionData(functionFragment: "paths", values: [string]): string;
+  encodeFunctionData(
+    functionFragment: "refund",
+    values: [string, BigNumberish]
+  ): string;
   encodeFunctionData(
     functionFragment: "setGovernance",
     values: [string]
@@ -79,6 +84,7 @@ interface TreasuryInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(functionFragment: "governance", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "paths", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "refund", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "setGovernance",
     data: BytesLike
@@ -158,6 +164,18 @@ export class Treasury extends Contract {
     ): Promise<{
       0: string;
     }>;
+
+    refund(
+      _user: string,
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "refund(address,uint256)"(
+      _user: string,
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
 
     setGovernance(
       _governance: string,
@@ -272,6 +290,18 @@ export class Treasury extends Contract {
 
   "paths(address)"(arg0: string, overrides?: CallOverrides): Promise<string>;
 
+  refund(
+    _user: string,
+    _amount: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "refund(address,uint256)"(
+    _user: string,
+    _amount: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
   setGovernance(
     _governance: string,
     overrides?: Overrides
@@ -360,6 +390,18 @@ export class Treasury extends Contract {
     paths(arg0: string, overrides?: CallOverrides): Promise<string>;
 
     "paths(address)"(arg0: string, overrides?: CallOverrides): Promise<string>;
+
+    refund(
+      _user: string,
+      _amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "refund(address,uint256)"(
+      _user: string,
+      _amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
 
     setGovernance(
       _governance: string,
@@ -464,6 +506,18 @@ export class Treasury extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
+    refund(
+      _user: string,
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "refund(address,uint256)"(
+      _user: string,
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
     setGovernance(
       _governance: string,
       overrides?: Overrides
@@ -558,6 +612,18 @@ export class Treasury extends Contract {
     "paths(address)"(
       arg0: string,
       overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    refund(
+      _user: string,
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "refund(address,uint256)"(
+      _user: string,
+      _amount: BigNumberish,
+      overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
     setGovernance(

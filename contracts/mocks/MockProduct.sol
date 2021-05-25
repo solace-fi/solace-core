@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.0;
 
+import '../interface/IPolicyManager.sol';
 import "../BaseProduct.sol";
 
 /**
@@ -12,15 +13,17 @@ import "../BaseProduct.sol";
 contract MockProduct is BaseProduct {
 
    constructor (
-        PolicyManager _policyManager,
+        IPolicyManager _policyManager,
+        ITreasury _treasury,
         address _coveredPlatform,
         address _claimsAdjuster,
         uint256 _price,
-        uint256 _cancelFee, 
+        uint256 _cancelFee,
         uint256 _minPeriod,
         uint256 _maxPeriod,
         uint256 _maxCoverAmount) BaseProduct(
         _policyManager,
+        _treasury,
         _coveredPlatform,
         _claimsAdjuster,
         _price,
@@ -44,26 +47,5 @@ contract MockProduct is BaseProduct {
     function appraisePosition(address _buyer, address _positionContract) public view override virtual returns (uint256 positionAmount) {
       // !TODO need to implment from UniswapFactory
       return 0;
-    } 
-
-    function getPolicyExpiration(address _policy) external override view returns (uint256 expirationDate) {
-      return maxPeriod;
     }
-
-    function getPolicyLimit(address _policy) external override view returns (uint256 coverLimit) {
-      return maxCoverAmount;
-    }
-
-    function getTotalCovered() external override view returns (uint256 coveredAmount) {
-      return activeCoverAmount;
-    }
-
-    function getTotalPosition(address _buyer) external override view returns (uint256 positionAmount) {
-      // iterate over activePolicyIds to get users total position
-      for (uint i = 0; i < activePolicyIDs.length; i++) {
-         if (policyManager.getPolicyholderAddress(i) == _buyer) {
-           return policyManager.getPolicyCoverAmount(i);
-         }
-      }
-    }
-} 
+}

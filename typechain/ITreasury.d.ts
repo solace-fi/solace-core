@@ -25,6 +25,7 @@ interface ITreasuryInterface extends ethers.utils.Interface {
   functions: {
     "depositEth()": FunctionFragment;
     "depositToken(address,uint256)": FunctionFragment;
+    "refund(address,uint256)": FunctionFragment;
     "setGovernance(address)": FunctionFragment;
     "setPath(address,bytes)": FunctionFragment;
     "spend(address,uint256,address)": FunctionFragment;
@@ -37,6 +38,10 @@ interface ITreasuryInterface extends ethers.utils.Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "depositToken",
+    values: [string, BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "refund",
     values: [string, BigNumberish]
   ): string;
   encodeFunctionData(
@@ -61,6 +66,7 @@ interface ITreasuryInterface extends ethers.utils.Interface {
     functionFragment: "depositToken",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(functionFragment: "refund", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "setGovernance",
     data: BytesLike
@@ -98,6 +104,18 @@ export class ITreasury extends Contract {
 
     "depositToken(address,uint256)"(
       _token: string,
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    refund(
+      _user: string,
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "refund(address,uint256)"(
+      _user: string,
       _amount: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
@@ -171,6 +189,18 @@ export class ITreasury extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
+  refund(
+    _user: string,
+    _amount: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "refund(address,uint256)"(
+    _user: string,
+    _amount: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
   setGovernance(
     _governance: string,
     overrides?: Overrides
@@ -236,6 +266,18 @@ export class ITreasury extends Contract {
 
     "depositToken(address,uint256)"(
       _token: string,
+      _amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    refund(
+      _user: string,
+      _amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "refund(address,uint256)"(
+      _user: string,
       _amount: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
@@ -312,6 +354,18 @@ export class ITreasury extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
+    refund(
+      _user: string,
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "refund(address,uint256)"(
+      _user: string,
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
     setGovernance(
       _governance: string,
       overrides?: Overrides
@@ -378,6 +432,18 @@ export class ITreasury extends Contract {
 
     "depositToken(address,uint256)"(
       _token: string,
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    refund(
+      _user: string,
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "refund(address,uint256)"(
+      _user: string,
       _amount: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;

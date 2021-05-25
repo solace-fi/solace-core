@@ -23,7 +23,9 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
 interface IProductInterface extends ethers.utils.Interface {
   functions: {
-    "buyPolicy(uint256,uint256,address)": FunctionFragment;
+    "buyPolicy(uint256,uint256,address,address)": FunctionFragment;
+    "cancelPolicy(uint256)": FunctionFragment;
+    "extendPolicy(uint256,uint256)": FunctionFragment;
     "getPolicyExpiration(address)": FunctionFragment;
     "getPolicyLimit(address)": FunctionFragment;
     "getQuote(uint256,uint256,address)": FunctionFragment;
@@ -38,7 +40,15 @@ interface IProductInterface extends ethers.utils.Interface {
 
   encodeFunctionData(
     functionFragment: "buyPolicy",
-    values: [BigNumberish, BigNumberish, string]
+    values: [BigNumberish, BigNumberish, string, string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "cancelPolicy",
+    values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "extendPolicy",
+    values: [BigNumberish, BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "getPolicyExpiration",
@@ -83,6 +93,14 @@ interface IProductInterface extends ethers.utils.Interface {
 
   decodeFunctionResult(functionFragment: "buyPolicy", data: BytesLike): Result;
   decodeFunctionResult(
+    functionFragment: "cancelPolicy",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "extendPolicy",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "getPolicyExpiration",
     data: BytesLike
   ): Result;
@@ -117,11 +135,7 @@ interface IProductInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(functionFragment: "setPrice", data: BytesLike): Result;
 
-  events: {
-    "PolicyCreated(uint256,uint256,uint256,uint256,address,uint256,uint256)": EventFragment;
-  };
-
-  getEvent(nameOrSignatureOrTopic: "PolicyCreated"): EventFragment;
+  events: {};
 }
 
 export class IProduct extends Contract {
@@ -141,14 +155,38 @@ export class IProduct extends Contract {
     buyPolicy(
       _coverLimit: BigNumberish,
       _blocks: BigNumberish,
+      _policyholder: string,
       _positionContract: string,
       overrides?: PayableOverrides
     ): Promise<ContractTransaction>;
 
-    "buyPolicy(uint256,uint256,address)"(
+    "buyPolicy(uint256,uint256,address,address)"(
       _coverLimit: BigNumberish,
       _blocks: BigNumberish,
+      _policyholder: string,
       _positionContract: string,
+      overrides?: PayableOverrides
+    ): Promise<ContractTransaction>;
+
+    cancelPolicy(
+      _policyID: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "cancelPolicy(uint256)"(
+      _policyID: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    extendPolicy(
+      _policyID: BigNumberish,
+      _blocks: BigNumberish,
+      overrides?: PayableOverrides
+    ): Promise<ContractTransaction>;
+
+    "extendPolicy(uint256,uint256)"(
+      _policyID: BigNumberish,
+      _blocks: BigNumberish,
       overrides?: PayableOverrides
     ): Promise<ContractTransaction>;
 
@@ -286,14 +324,38 @@ export class IProduct extends Contract {
   buyPolicy(
     _coverLimit: BigNumberish,
     _blocks: BigNumberish,
+    _policyholder: string,
     _positionContract: string,
     overrides?: PayableOverrides
   ): Promise<ContractTransaction>;
 
-  "buyPolicy(uint256,uint256,address)"(
+  "buyPolicy(uint256,uint256,address,address)"(
     _coverLimit: BigNumberish,
     _blocks: BigNumberish,
+    _policyholder: string,
     _positionContract: string,
+    overrides?: PayableOverrides
+  ): Promise<ContractTransaction>;
+
+  cancelPolicy(
+    _policyID: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "cancelPolicy(uint256)"(
+    _policyID: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  extendPolicy(
+    _policyID: BigNumberish,
+    _blocks: BigNumberish,
+    overrides?: PayableOverrides
+  ): Promise<ContractTransaction>;
+
+  "extendPolicy(uint256,uint256)"(
+    _policyID: BigNumberish,
+    _blocks: BigNumberish,
     overrides?: PayableOverrides
   ): Promise<ContractTransaction>;
 
@@ -399,16 +461,40 @@ export class IProduct extends Contract {
     buyPolicy(
       _coverLimit: BigNumberish,
       _blocks: BigNumberish,
+      _policyholder: string,
       _positionContract: string,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    "buyPolicy(uint256,uint256,address)"(
+    "buyPolicy(uint256,uint256,address,address)"(
       _coverLimit: BigNumberish,
       _blocks: BigNumberish,
+      _policyholder: string,
       _positionContract: string,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
+
+    cancelPolicy(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
+
+    "cancelPolicy(uint256)"(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
+
+    extendPolicy(
+      _policyID: BigNumberish,
+      _blocks: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
+
+    "extendPolicy(uint256,uint256)"(
+      _policyID: BigNumberish,
+      _blocks: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
 
     getPolicyExpiration(
       _policy: string,
@@ -506,30 +592,44 @@ export class IProduct extends Contract {
     ): Promise<void>;
   };
 
-  filters: {
-    PolicyCreated(
-      _coverLimit: null,
-      _days: null,
-      positionAmount: null,
-      premium: null,
-      policy: null,
-      numberOfPolicies: null,
-      coveredAmount: null
-    ): EventFilter;
-  };
+  filters: {};
 
   estimateGas: {
     buyPolicy(
       _coverLimit: BigNumberish,
       _blocks: BigNumberish,
+      _policyholder: string,
       _positionContract: string,
       overrides?: PayableOverrides
     ): Promise<BigNumber>;
 
-    "buyPolicy(uint256,uint256,address)"(
+    "buyPolicy(uint256,uint256,address,address)"(
       _coverLimit: BigNumberish,
       _blocks: BigNumberish,
+      _policyholder: string,
       _positionContract: string,
+      overrides?: PayableOverrides
+    ): Promise<BigNumber>;
+
+    cancelPolicy(
+      _policyID: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "cancelPolicy(uint256)"(
+      _policyID: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    extendPolicy(
+      _policyID: BigNumberish,
+      _blocks: BigNumberish,
+      overrides?: PayableOverrides
+    ): Promise<BigNumber>;
+
+    "extendPolicy(uint256,uint256)"(
+      _policyID: BigNumberish,
+      _blocks: BigNumberish,
       overrides?: PayableOverrides
     ): Promise<BigNumber>;
 
@@ -633,14 +733,38 @@ export class IProduct extends Contract {
     buyPolicy(
       _coverLimit: BigNumberish,
       _blocks: BigNumberish,
+      _policyholder: string,
       _positionContract: string,
       overrides?: PayableOverrides
     ): Promise<PopulatedTransaction>;
 
-    "buyPolicy(uint256,uint256,address)"(
+    "buyPolicy(uint256,uint256,address,address)"(
       _coverLimit: BigNumberish,
       _blocks: BigNumberish,
+      _policyholder: string,
       _positionContract: string,
+      overrides?: PayableOverrides
+    ): Promise<PopulatedTransaction>;
+
+    cancelPolicy(
+      _policyID: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "cancelPolicy(uint256)"(
+      _policyID: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    extendPolicy(
+      _policyID: BigNumberish,
+      _blocks: BigNumberish,
+      overrides?: PayableOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "extendPolicy(uint256,uint256)"(
+      _policyID: BigNumberish,
+      _blocks: BigNumberish,
       overrides?: PayableOverrides
     ): Promise<PopulatedTransaction>;
 

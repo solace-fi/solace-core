@@ -52,8 +52,8 @@ abstract contract BaseProduct is IProduct {
 
 
     constructor (
-        PolicyManager _policyManager,
-        Treasury _treasury,
+        IPolicyManager _policyManager,
+        ITreasury _treasury,
         address _coveredPlatform,
         address _claimsAdjuster,
         uint256 _price,
@@ -76,7 +76,7 @@ abstract contract BaseProduct is IProduct {
         activeCoverAmount = 0;
     }
 
-    /**** GETTERS + SETTERS 
+    /**** GETTERS + SETTERS
     Functions which get and set important product state variables
     ****/
 
@@ -111,7 +111,7 @@ abstract contract BaseProduct is IProduct {
 
     /**
      * @notice Sets the fee that user must pay upon canceling the policy
-     * @param _cancelFee policy cancelation fee 
+     * @param _cancelFee policy cancelation fee
      */
     function setCancelFee(uint256 _cancelFee) external override {
         require(msg.sender == governance, "!governance");
@@ -146,7 +146,7 @@ abstract contract BaseProduct is IProduct {
     }
 
 
-    /**** UNIMPLEMENTED FUNCTIONS 
+    /**** UNIMPLEMENTED FUNCTIONS
     Functions that are only implemented by child product contracts
     ****/
 
@@ -158,13 +158,13 @@ abstract contract BaseProduct is IProduct {
      *  Every product will have a different mechanism to read and determine
      *  a user's total position in that product's protocol. This method will
      *  only be implemented in the inheriting product contracts
-     * @param _buyer buyer requiesting the coverage quote
+     * @param _policyholder buyer requesting the coverage quote
      * @param _positionContract address of the exact smart contract the buyer has their position in (e.g., for UniswapProduct this would be Pair's address)
      * @return positionAmount The user's total position in wei in the product's protocol.
      */
     function appraisePosition(address _policyholder, address _positionContract) public view virtual returns (uint256 positionAmount) {}
- 
-    /**** QUOTE VIEW FUNCTIONS 
+
+    /**** QUOTE VIEW FUNCTIONS
     View functions that give us quotes regarding a policy purchase
     ****/
 
@@ -186,7 +186,7 @@ abstract contract BaseProduct is IProduct {
     }
 
 
-    /**** MUTATIVE FUNCTIONS 
+    /**** MUTATIVE FUNCTIONS
     Functions that change state variables, deploy and change policy contracts
     ****/
 
@@ -204,7 +204,7 @@ abstract contract BaseProduct is IProduct {
     }
 
     /**
-     * @notice Updates the product"s book-keeping variables, 
+     * @notice Updates the product"s book-keeping variables,
      * removing expired policies from the policies set and updating active cover amount
      * @return activeCoverAmount and activePolicyCount active covered amount and active policy count as a tuple
      */
@@ -291,7 +291,7 @@ abstract contract BaseProduct is IProduct {
     /**
      * @notice
      *  Extend a policy contract
-     * @param policy address of existing policy
+     * @param _policyID address of existing policy
      * @param _blocks length of extension
      * @return True if successfully extended else False
      */
@@ -307,27 +307,48 @@ abstract contract BaseProduct is IProduct {
         // transfer premium to the treasury
         payable(treasury).transfer(msg.value);
         // update the policy's URI
-        newExpirationBlock = policyManager.getPolicyExpirationBlock(_policyID) + _blocks;
-        positionContract = policyManager.getPolicyPositionContract(_policyID);
+        uint256 newExpirationBlock = policyManager.getPolicyExpirationBlock(_policyID) + _blocks;
+        address positionContract = policyManager.getPolicyPositionContract(_policyID);
         policyManager.setTokenURI(_policyID, policyholder, positionContract, newExpirationBlock, coverAmount, price);
         emit PolicyExtended(_policyID);
-        return True;
+        return true;
     }
 
     /**
      * @notice
      *  Cancel and destroy a policy.
-     * @param policy address of existing policy
+     * @param _policyID address of existing policy
      * @return True if successfully cancelled else False
      */
     function cancelPolicy(uint256 _policyID) external override returns (bool){
         require(policyManager.getPolicyholder(_policyID) == msg.sender,'!policyholder');
-        uint256 memory blocksLeft = policyManager.getPolicyExpirationBlock(_policyID) - block.number;
-        uint256 memory refundAmount = blocksLeft * policyManager.getPolicyPrice(_policyID);
+        uint256 blocksLeft = policyManager.getPolicyExpirationBlock(_policyID) - block.number;
+        uint256 refundAmount = blocksLeft * policyManager.getPolicyPrice(_policyID);
         require(refundAmount > cancelFee, 'refund amount less than cancelation fee');
         policyManager.burn(_policyID);
         treasury.refund(msg.sender, refundAmount - cancelFee);
         emit PolicyCanceled(_policyID);
-        return True;
+        return true;
+    }
+
+    function getPolicyExpiration(address _policy) external override view returns (uint256 expirationDate) {
+        return maxPeriod;
+    }
+
+    function getPolicyLimit(address _policy) external override view returns (uint256 coverLimit) {
+        return maxCoverAmount;
+    }
+
+    function getTotalCovered() external override view returns (uint256 coveredAmount) {
+        return activeCoverAmount;
+    }
+
+    function getTotalPosition(address _buyer) external override view returns (uint256 positionAmount) {
+        // iterate over activePolicyIds to get users total position
+        for (uint i = 0; i < activePolicyIDs.length; i++) {
+             if (policyManager.getPolicyholder(i) == _buyer) {
+                return policyManager.getPolicyCoverAmount(i);
+             }
+        }
     }
 }

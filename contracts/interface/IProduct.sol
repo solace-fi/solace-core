@@ -8,9 +8,9 @@ pragma solidity 0.8.0;
  * @author solace.fi
  */
 interface IProduct {
-    event PolicyCreated(uint256 _coverLimit, uint256 _days, uint256 positionAmount, uint256 premium, address policy, uint256 numberOfPolicies, uint256 coveredAmount);
+    //event PolicyCreated(uint256 _coverLimit, uint256 _days, uint256 positionAmount, uint256 premium, address policy, uint256 numberOfPolicies, uint256 coveredAmount);
 
-    /**** GETTERS + SETTERS 
+    /**** GETTERS + SETTERS
     Functions which get and set important product state variables
     ****/
     function setPrice(uint256 _price) external;
@@ -19,34 +19,34 @@ interface IProduct {
     function setMaxPeriod(uint256 _maxPeriod) external;
     function setMaxCoverAmount(uint256 _maxCoverAmount) external;
 
-    /**** UNIMPLEMENTED FUNCTIONS 
+    /**** UNIMPLEMENTED FUNCTIONS
     Functions that are only implemented by child contracts
     ****/
     function getTotalPosition(address _buyer) external view returns (uint256 positionAmount);
 
-    /**** METRIC VIEW FUNCTIONS 
+    /**** METRIC VIEW FUNCTIONS
     View functions which give us total metrics about the product
     ****/
     function getTotalCovered() external view returns (uint256 coveredAmount);
 
-    /*** POLICY VIEW FUNCTIONS 
+    /*** POLICY VIEW FUNCTIONS
     View functions that give us data about individual policies
     ****/
     function getPolicyLimit(address _policy) external view returns (uint256 coverLimit);
     function getPolicyExpiration(address _policy) external view returns (uint256 expirationDate);
- 
 
-    /**** QUOTE VIEW FUNCTIONS 
+
+    /**** QUOTE VIEW FUNCTIONS
     View functions that give us quotes regarding a policy
     ****/
     function getQuote(uint256 _coverLimit, uint256 _blocks, address _positionContract) external view returns (uint256);
 
 
-    /**** MUTATIVE FUNCTIONS 
+    /**** MUTATIVE FUNCTIONS
     Functions that deploy and change policy contracts
     ****/
-    function buyPolicy(uint256 _coverLimit, uint256 _blocks, address _positionContract) external payable returns (uint256 policyID);
+    function buyPolicy(uint256 _coverLimit, uint256 _blocks, address _policyholder, address _positionContract) external payable returns (uint256 policyID);
     // function updateCoverLimit(address _policy, uint256 _coverLimit) external payable returns (bool);
-    // function extendPolicy(address policy, uint256 _days) external payable returns (bool);
-    // function cancelPolicy(address policy) external returns (bool);
+    function extendPolicy(uint256 _policyID, uint256 _blocks) external payable returns (bool);
+    function cancelPolicy(uint256 _policyID) external returns (bool);
 }

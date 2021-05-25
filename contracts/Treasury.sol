@@ -160,6 +160,11 @@ contract Treasury is ITreasury {
         }));
     }
 
+    // used in Product
+    function refund(address _user, uint256 _amount) external override {
+        // TODO: implement
+    }
+
     /**
      * @notice Deposits some ether.
      */

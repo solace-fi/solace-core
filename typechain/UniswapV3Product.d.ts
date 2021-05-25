@@ -21,7 +21,7 @@ import { BytesLike } from "@ethersproject/bytes";
 import { Listener, Provider } from "@ethersproject/providers";
 import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
-interface MockProductInterface extends ethers.utils.Interface {
+interface UniswapV3ProductInterface extends ethers.utils.Interface {
   functions: {
     "activeCoverAmount()": FunctionFragment;
     "activePolicyIDs(uint256)": FunctionFragment;
@@ -41,6 +41,7 @@ interface MockProductInterface extends ethers.utils.Interface {
     "maxCoverAmount()": FunctionFragment;
     "maxPeriod()": FunctionFragment;
     "minPeriod()": FunctionFragment;
+    "paths(address)": FunctionFragment;
     "policyManager()": FunctionFragment;
     "price()": FunctionFragment;
     "productPolicyCount()": FunctionFragment;
@@ -50,7 +51,9 @@ interface MockProductInterface extends ethers.utils.Interface {
     "setMaxCoverAmount(uint256)": FunctionFragment;
     "setMaxPeriod(uint256)": FunctionFragment;
     "setMinPeriod(uint256)": FunctionFragment;
+    "setPath(address,bytes)": FunctionFragment;
     "setPrice(uint256)": FunctionFragment;
+    "tokenToEth(address,uint256)": FunctionFragment;
     "treasury()": FunctionFragment;
     "updateActivePolicies()": FunctionFragment;
   };
@@ -118,6 +121,7 @@ interface MockProductInterface extends ethers.utils.Interface {
   ): string;
   encodeFunctionData(functionFragment: "maxPeriod", values?: undefined): string;
   encodeFunctionData(functionFragment: "minPeriod", values?: undefined): string;
+  encodeFunctionData(functionFragment: "paths", values: [string]): string;
   encodeFunctionData(
     functionFragment: "policyManager",
     values?: undefined
@@ -152,8 +156,16 @@ interface MockProductInterface extends ethers.utils.Interface {
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
+    functionFragment: "setPath",
+    values: [string, BytesLike]
+  ): string;
+  encodeFunctionData(
     functionFragment: "setPrice",
     values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "tokenToEth",
+    values: [string, BigNumberish]
   ): string;
   encodeFunctionData(functionFragment: "treasury", values?: undefined): string;
   encodeFunctionData(
@@ -215,6 +227,7 @@ interface MockProductInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(functionFragment: "maxPeriod", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "minPeriod", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "paths", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "policyManager",
     data: BytesLike
@@ -248,7 +261,9 @@ interface MockProductInterface extends ethers.utils.Interface {
     functionFragment: "setMinPeriod",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(functionFragment: "setPath", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "setPrice", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "tokenToEth", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "treasury", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "updateActivePolicies",
@@ -266,7 +281,7 @@ interface MockProductInterface extends ethers.utils.Interface {
   getEvent(nameOrSignatureOrTopic: "PolicyExtended"): EventFragment;
 }
 
-export class MockProduct extends Contract {
+export class UniswapV3Product extends Contract {
   connect(signerOrProvider: Signer | Provider | string): this;
   attach(addressOrName: string): this;
   deployed(): Promise<this>;
@@ -277,7 +292,7 @@ export class MockProduct extends Contract {
   removeAllListeners(eventName: EventFilter | string): this;
   removeListener(eventName: any, listener: Listener): this;
 
-  interface: MockProductInterface;
+  interface: UniswapV3ProductInterface;
 
   functions: {
     activeCoverAmount(
@@ -307,7 +322,7 @@ export class MockProduct extends Contract {
     }>;
 
     appraisePosition(
-      _buyer: string,
+      _policyholder: string,
       _positionContract: string,
       overrides?: CallOverrides
     ): Promise<{
@@ -316,7 +331,7 @@ export class MockProduct extends Contract {
     }>;
 
     "appraisePosition(address,address)"(
-      _buyer: string,
+      _policyholder: string,
       _positionContract: string,
       overrides?: CallOverrides
     ): Promise<{
@@ -526,6 +541,20 @@ export class MockProduct extends Contract {
       0: BigNumber;
     }>;
 
+    paths(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "paths(address)"(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
     policyManager(
       overrides?: CallOverrides
     ): Promise<{
@@ -622,6 +651,18 @@ export class MockProduct extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
+    setPath(
+      _token: string,
+      _path: BytesLike,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "setPath(address,bytes)"(
+      _token: string,
+      _path: BytesLike,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
     setPrice(
       _price: BigNumberish,
       overrides?: Overrides
@@ -631,6 +672,24 @@ export class MockProduct extends Contract {
       _price: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
+
+    tokenToEth(
+      _token: string,
+      _amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      ethAmount: BigNumber;
+      0: BigNumber;
+    }>;
+
+    "tokenToEth(address,uint256)"(
+      _token: string,
+      _amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      ethAmount: BigNumber;
+      0: BigNumber;
+    }>;
 
     treasury(
       overrides?: CallOverrides
@@ -666,13 +725,13 @@ export class MockProduct extends Contract {
   ): Promise<BigNumber>;
 
   appraisePosition(
-    _buyer: string,
+    _policyholder: string,
     _positionContract: string,
     overrides?: CallOverrides
   ): Promise<BigNumber>;
 
   "appraisePosition(address,address)"(
-    _buyer: string,
+    _policyholder: string,
     _positionContract: string,
     overrides?: CallOverrides
   ): Promise<BigNumber>;
@@ -791,6 +850,10 @@ export class MockProduct extends Contract {
 
   "minPeriod()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+  paths(arg0: string, overrides?: CallOverrides): Promise<string>;
+
+  "paths(address)"(arg0: string, overrides?: CallOverrides): Promise<string>;
+
   policyManager(overrides?: CallOverrides): Promise<string>;
 
   "policyManager()"(overrides?: CallOverrides): Promise<string>;
@@ -863,6 +926,18 @@ export class MockProduct extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
+  setPath(
+    _token: string,
+    _path: BytesLike,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "setPath(address,bytes)"(
+    _token: string,
+    _path: BytesLike,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
   setPrice(
     _price: BigNumberish,
     overrides?: Overrides
@@ -872,6 +947,18 @@ export class MockProduct extends Contract {
     _price: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
+
+  tokenToEth(
+    _token: string,
+    _amount: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
+
+  "tokenToEth(address,uint256)"(
+    _token: string,
+    _amount: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
 
   treasury(overrides?: CallOverrides): Promise<string>;
 
@@ -897,13 +984,13 @@ export class MockProduct extends Contract {
     ): Promise<BigNumber>;
 
     appraisePosition(
-      _buyer: string,
+      _policyholder: string,
       _positionContract: string,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
     "appraisePosition(address,address)"(
-      _buyer: string,
+      _policyholder: string,
       _positionContract: string,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
@@ -1022,6 +1109,10 @@ export class MockProduct extends Contract {
 
     "minPeriod()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+    paths(arg0: string, overrides?: CallOverrides): Promise<string>;
+
+    "paths(address)"(arg0: string, overrides?: CallOverrides): Promise<string>;
+
     policyManager(overrides?: CallOverrides): Promise<string>;
 
     "policyManager()"(overrides?: CallOverrides): Promise<string>;
@@ -1094,12 +1185,36 @@ export class MockProduct extends Contract {
       overrides?: CallOverrides
     ): Promise<void>;
 
+    setPath(
+      _token: string,
+      _path: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "setPath(address,bytes)"(
+      _token: string,
+      _path: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
     setPrice(_price: BigNumberish, overrides?: CallOverrides): Promise<void>;
 
     "setPrice(uint256)"(
       _price: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
+
+    tokenToEth(
+      _token: string,
+      _amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "tokenToEth(address,uint256)"(
+      _token: string,
+      _amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
     treasury(overrides?: CallOverrides): Promise<string>;
 
@@ -1144,13 +1259,13 @@ export class MockProduct extends Contract {
     ): Promise<BigNumber>;
 
     appraisePosition(
-      _buyer: string,
+      _policyholder: string,
       _positionContract: string,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
     "appraisePosition(address,address)"(
-      _buyer: string,
+      _policyholder: string,
       _positionContract: string,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
@@ -1269,6 +1384,13 @@ export class MockProduct extends Contract {
 
     "minPeriod()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+    paths(arg0: string, overrides?: CallOverrides): Promise<BigNumber>;
+
+    "paths(address)"(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     policyManager(overrides?: CallOverrides): Promise<BigNumber>;
 
     "policyManager()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -1341,11 +1463,35 @@ export class MockProduct extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
+    setPath(
+      _token: string,
+      _path: BytesLike,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "setPath(address,bytes)"(
+      _token: string,
+      _path: BytesLike,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
     setPrice(_price: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
 
     "setPrice(uint256)"(
       _price: BigNumberish,
       overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    tokenToEth(
+      _token: string,
+      _amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "tokenToEth(address,uint256)"(
+      _token: string,
+      _amount: BigNumberish,
+      overrides?: CallOverrides
     ): Promise<BigNumber>;
 
     treasury(overrides?: CallOverrides): Promise<BigNumber>;
@@ -1375,13 +1521,13 @@ export class MockProduct extends Contract {
     ): Promise<PopulatedTransaction>;
 
     appraisePosition(
-      _buyer: string,
+      _policyholder: string,
       _positionContract: string,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
     "appraisePosition(address,address)"(
-      _buyer: string,
+      _policyholder: string,
       _positionContract: string,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
@@ -1508,6 +1654,16 @@ export class MockProduct extends Contract {
 
     "minPeriod()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
+    paths(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "paths(address)"(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
     policyManager(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "policyManager()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
@@ -1584,6 +1740,18 @@ export class MockProduct extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
+    setPath(
+      _token: string,
+      _path: BytesLike,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "setPath(address,bytes)"(
+      _token: string,
+      _path: BytesLike,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
     setPrice(
       _price: BigNumberish,
       overrides?: Overrides
@@ -1592,6 +1760,18 @@ export class MockProduct extends Contract {
     "setPrice(uint256)"(
       _price: BigNumberish,
       overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    tokenToEth(
+      _token: string,
+      _amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "tokenToEth(address,uint256)"(
+      _token: string,
+      _amount: BigNumberish,
+      overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
     treasury(overrides?: CallOverrides): Promise<PopulatedTransaction>;

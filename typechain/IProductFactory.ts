@@ -18,55 +18,6 @@ export class IProductFactory {
 
 const _abi = [
   {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "_coverLimit",
-        type: "uint256",
-      },
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "_days",
-        type: "uint256",
-      },
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "positionAmount",
-        type: "uint256",
-      },
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "premium",
-        type: "uint256",
-      },
-      {
-        indexed: false,
-        internalType: "address",
-        name: "policy",
-        type: "address",
-      },
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "numberOfPolicies",
-        type: "uint256",
-      },
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "coveredAmount",
-        type: "uint256",
-      },
-    ],
-    name: "PolicyCreated",
-    type: "event",
-  },
-  {
     inputs: [
       {
         internalType: "uint256",
@@ -80,6 +31,11 @@ const _abi = [
       },
       {
         internalType: "address",
+        name: "_policyholder",
+        type: "address",
+      },
+      {
+        internalType: "address",
         name: "_positionContract",
         type: "address",
       },
@@ -90,6 +46,49 @@ const _abi = [
         internalType: "uint256",
         name: "policyID",
         type: "uint256",
+      },
+    ],
+    stateMutability: "payable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_policyID",
+        type: "uint256",
+      },
+    ],
+    name: "cancelPolicy",
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool",
+      },
+    ],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_policyID",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "_blocks",
+        type: "uint256",
+      },
+    ],
+    name: "extendPolicy",
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool",
       },
     ],
     stateMutability: "payable",

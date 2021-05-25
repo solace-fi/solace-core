@@ -3,6 +3,7 @@ import { waffle } from "hardhat";
 import PolicyManagerArtifact from '../artifacts/contracts/PolicyManager.sol/PolicyManager.json'
 import { PolicyManager } from "../typechain";
 
+import { Transaction, BigNumber as BN, Contract, constants, BigNumberish, Wallet } from "ethers";
 const { expect } = chai;
 const { deployContract, solidity } = waffle;
 const provider = waffle.provider;
@@ -15,9 +16,9 @@ describe('PolicyManager', () => {
   const name = 'Solace Policy';
   const symbol = 'SPT';
   const expirationBlock = 123456;
-  const coverAmount = 10000000000000000000; // 10 Ether in wei
+  const coverAmount = "10000000000000000000"; // 10 Ether in wei
   const price = 1000; // price in wei for block/wei
-  
+
 
   before(async () => {
     policyManager = (await deployContract(
@@ -56,7 +57,7 @@ describe('PolicyManager', () => {
       await policyManager.connect(governor).addProduct(product1.address);
       expect(await policyManager.productIsActive(product1.address)).to.equal(true);
     })
-  
+
     it('can remove products', async function () {
       await policyManager.connect(governor).removeProduct(product1.address);
       expect(await policyManager.productIsActive(product1.address)).to.equal(false);
@@ -85,7 +86,7 @@ describe('PolicyManager', () => {
     })
 
     it('can set token (policy) URI', async function (){
-    })    
+    })
   })
 
   describe('policyholder', function () {
@@ -97,7 +98,7 @@ describe('PolicyManager', () => {
     })
 
     it('can view all my policies', async function (){
-      expect(await policyManager.connect(buyer).myPolicies()).to.equal([0,1]);
+      expect(await policyManager.connect(buyer).myPolicies()).to.deep.equal([BN.from(0), BN.from(1)]);
     })
 
     it('can view my policy expiration block', async function (){

@@ -27,6 +27,19 @@ const _abi = [
         type: "uint256",
       },
     ],
+    name: "PolicyCanceled",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "policyID",
+        type: "uint256",
+      },
+    ],
     name: "PolicyCreated",
     type: "event",
   },
@@ -36,47 +49,11 @@ const _abi = [
       {
         indexed: false,
         internalType: "uint256",
-        name: "_coverLimit",
-        type: "uint256",
-      },
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "_days",
-        type: "uint256",
-      },
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "positionAmount",
-        type: "uint256",
-      },
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "premium",
-        type: "uint256",
-      },
-      {
-        indexed: false,
-        internalType: "address",
-        name: "policy",
-        type: "address",
-      },
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "numberOfPolicies",
-        type: "uint256",
-      },
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "coveredAmount",
+        name: "policyID",
         type: "uint256",
       },
     ],
-    name: "PolicyCreated",
+    name: "PolicyExtended",
     type: "event",
   },
   {
@@ -115,7 +92,7 @@ const _abi = [
     inputs: [
       {
         internalType: "address",
-        name: "_buyer",
+        name: "_policyholder",
         type: "address",
       },
       {
@@ -149,6 +126,11 @@ const _abi = [
       },
       {
         internalType: "address",
+        name: "_policyholder",
+        type: "address",
+      },
+      {
+        internalType: "address",
         name: "_positionContract",
         type: "address",
       },
@@ -178,6 +160,25 @@ const _abi = [
     type: "function",
   },
   {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_policyID",
+        type: "uint256",
+      },
+    ],
+    name: "cancelPolicy",
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool",
+      },
+    ],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
     inputs: [],
     name: "claimsAdjuster",
     outputs: [
@@ -201,6 +202,30 @@ const _abi = [
       },
     ],
     stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_policyID",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "_blocks",
+        type: "uint256",
+      },
+    ],
+    name: "extendPolicy",
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool",
+      },
+    ],
+    stateMutability: "payable",
     type: "function",
   },
   {
@@ -359,7 +384,7 @@ const _abi = [
     name: "policyManager",
     outputs: [
       {
-        internalType: "contract PolicyManager",
+        internalType: "contract IPolicyManager",
         name: "",
         type: "address",
       },
@@ -482,6 +507,19 @@ const _abi = [
     name: "setPrice",
     outputs: [],
     stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "treasury",
+    outputs: [
+      {
+        internalType: "contract ITreasury",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "view",
     type: "function",
   },
   {
