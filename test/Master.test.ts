@@ -11,7 +11,7 @@ import { burnBlocks, burnBlocksUntil } from "./utilities/time";
 import { encodePriceSqrt, FeeAmount, TICK_SPACINGS, getMaxTick, getMinTick } from "./utilities/uniswap";
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Solace, Vault, Master, CpFarm, SolaceEthLpFarm, MockWeth } from "../typechain";
+import { Solace, Vault, Master, CpFarm, SolaceEthLpFarm, MockWeth, LpAppraisor } from "../typechain";
 
 chai.use(solidity);
 
@@ -20,6 +20,7 @@ let solaceToken: Solace;
 let master: Master;
 let vault: Vault;
 let weth: MockWeth;
+let lpTokenAppraisor: LpAppraisor;
 
 // uniswap contracts
 let uniswapFactory: Contract;
@@ -109,6 +110,18 @@ describe("Master", function () {
         weth.address
       ]
     )) as Contract;
+
+    // deploy uniswap lp token appraisor
+    lpTokenAppraisor = (await deployContract(
+      deployer,
+      artifacts.LpAppraisor,
+      [
+        governor.address,
+        lpToken.address,
+        20000,
+        40000
+      ]
+    )) as LpAppraisor;
 
     // transfer tokens
     await solaceToken.connect(governor).addMinter(governor.address);
@@ -630,7 +643,8 @@ describe("Master", function () {
         startBlock,
         endBlock,
         pool.address,
-        weth.address
+        weth.address,
+        lpTokenAppraisor.address
       ]
     )) as SolaceEthLpFarm;
     return farm;

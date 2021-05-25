@@ -26,6 +26,7 @@ interface SolaceEthLpFarmInterface extends ethers.utils.Interface {
     "accRewardPerShare()": FunctionFragment;
     "acceptGovernance()": FunctionFragment;
     "appraise(uint256)": FunctionFragment;
+    "appraisor()": FunctionFragment;
     "blockReward()": FunctionFragment;
     "countDeposited(address)": FunctionFragment;
     "deposit(uint256)": FunctionFragment;
@@ -45,6 +46,7 @@ interface SolaceEthLpFarmInterface extends ethers.utils.Interface {
     "newGovernance()": FunctionFragment;
     "pendingRewards(address)": FunctionFragment;
     "pool()": FunctionFragment;
+    "setAppraisor(address)": FunctionFragment;
     "setEnd(uint256)": FunctionFragment;
     "setGovernance(address)": FunctionFragment;
     "setRewards(uint256)": FunctionFragment;
@@ -75,6 +77,7 @@ interface SolaceEthLpFarmInterface extends ethers.utils.Interface {
     functionFragment: "appraise",
     values: [BigNumberish]
   ): string;
+  encodeFunctionData(functionFragment: "appraisor", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "blockReward",
     values?: undefined
@@ -153,6 +156,10 @@ interface SolaceEthLpFarmInterface extends ethers.utils.Interface {
   ): string;
   encodeFunctionData(functionFragment: "pool", values?: undefined): string;
   encodeFunctionData(
+    functionFragment: "setAppraisor",
+    values: [string]
+  ): string;
+  encodeFunctionData(
     functionFragment: "setEnd",
     values: [BigNumberish]
   ): string;
@@ -211,6 +218,7 @@ interface SolaceEthLpFarmInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "appraise", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "appraisor", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "blockReward",
     data: BytesLike
@@ -260,6 +268,10 @@ interface SolaceEthLpFarmInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "pool", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "setAppraisor",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "setEnd", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "setGovernance",
@@ -355,6 +367,18 @@ export class SolaceEthLpFarm extends Contract {
       0: BigNumber;
     }>;
 
+    appraisor(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "appraisor()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
     blockReward(
       overrides?: CallOverrides
     ): Promise<{
@@ -382,18 +406,18 @@ export class SolaceEthLpFarm extends Contract {
     }>;
 
     deposit(
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
     "deposit(uint256)"(
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
     depositSigned(
       _depositor: string,
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       _deadline: BigNumberish,
       v: BigNumberish,
       r: BytesLike,
@@ -403,7 +427,7 @@ export class SolaceEthLpFarm extends Contract {
 
     "depositSigned(address,uint256,uint256,uint8,bytes32,bytes32)"(
       _depositor: string,
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       _deadline: BigNumberish,
       v: BigNumberish,
       r: BytesLike,
@@ -631,6 +655,16 @@ export class SolaceEthLpFarm extends Contract {
       0: string;
     }>;
 
+    setAppraisor(
+      _appraisor: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "setAppraisor(address)"(
+      _appraisor: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
     setEnd(
       _endBlock: BigNumberish,
       overrides?: Overrides
@@ -806,12 +840,12 @@ export class SolaceEthLpFarm extends Contract {
     }>;
 
     withdraw(
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
     "withdraw(uint256)"(
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
@@ -845,6 +879,10 @@ export class SolaceEthLpFarm extends Contract {
     overrides?: CallOverrides
   ): Promise<BigNumber>;
 
+  appraisor(overrides?: CallOverrides): Promise<string>;
+
+  "appraisor()"(overrides?: CallOverrides): Promise<string>;
+
   blockReward(overrides?: CallOverrides): Promise<BigNumber>;
 
   "blockReward()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -857,18 +895,18 @@ export class SolaceEthLpFarm extends Contract {
   ): Promise<BigNumber>;
 
   deposit(
-    _token: BigNumberish,
+    _tokenId: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
   "deposit(uint256)"(
-    _token: BigNumberish,
+    _tokenId: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
   depositSigned(
     _depositor: string,
-    _token: BigNumberish,
+    _tokenId: BigNumberish,
     _deadline: BigNumberish,
     v: BigNumberish,
     r: BytesLike,
@@ -878,7 +916,7 @@ export class SolaceEthLpFarm extends Contract {
 
   "depositSigned(address,uint256,uint256,uint8,bytes32,bytes32)"(
     _depositor: string,
-    _token: BigNumberish,
+    _tokenId: BigNumberish,
     _deadline: BigNumberish,
     v: BigNumberish,
     r: BytesLike,
@@ -1015,6 +1053,16 @@ export class SolaceEthLpFarm extends Contract {
 
   "pool()"(overrides?: CallOverrides): Promise<string>;
 
+  setAppraisor(
+    _appraisor: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "setAppraisor(address)"(
+    _appraisor: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
   setEnd(
     _endBlock: BigNumberish,
     overrides?: Overrides
@@ -1134,12 +1182,12 @@ export class SolaceEthLpFarm extends Contract {
   "weth()"(overrides?: CallOverrides): Promise<string>;
 
   withdraw(
-    _token: BigNumberish,
+    _tokenId: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
   "withdraw(uint256)"(
-    _token: BigNumberish,
+    _tokenId: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
@@ -1176,6 +1224,10 @@ export class SolaceEthLpFarm extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
+    appraisor(overrides?: CallOverrides): Promise<string>;
+
+    "appraisor()"(overrides?: CallOverrides): Promise<string>;
+
     blockReward(overrides?: CallOverrides): Promise<BigNumber>;
 
     "blockReward()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -1190,16 +1242,16 @@ export class SolaceEthLpFarm extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    deposit(_token: BigNumberish, overrides?: CallOverrides): Promise<void>;
+    deposit(_tokenId: BigNumberish, overrides?: CallOverrides): Promise<void>;
 
     "deposit(uint256)"(
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
 
     depositSigned(
       _depositor: string,
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       _deadline: BigNumberish,
       v: BigNumberish,
       r: BytesLike,
@@ -1209,7 +1261,7 @@ export class SolaceEthLpFarm extends Contract {
 
     "depositSigned(address,uint256,uint256,uint8,bytes32,bytes32)"(
       _depositor: string,
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       _deadline: BigNumberish,
       v: BigNumberish,
       r: BytesLike,
@@ -1349,6 +1401,13 @@ export class SolaceEthLpFarm extends Contract {
 
     "pool()"(overrides?: CallOverrides): Promise<string>;
 
+    setAppraisor(_appraisor: string, overrides?: CallOverrides): Promise<void>;
+
+    "setAppraisor(address)"(
+      _appraisor: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
     setEnd(_endBlock: BigNumberish, overrides?: CallOverrides): Promise<void>;
 
     "setEnd(uint256)"(
@@ -1464,10 +1523,10 @@ export class SolaceEthLpFarm extends Contract {
 
     "weth()"(overrides?: CallOverrides): Promise<string>;
 
-    withdraw(_token: BigNumberish, overrides?: CallOverrides): Promise<void>;
+    withdraw(_tokenId: BigNumberish, overrides?: CallOverrides): Promise<void>;
 
     "withdraw(uint256)"(
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -1519,6 +1578,10 @@ export class SolaceEthLpFarm extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
+    appraisor(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "appraisor()"(overrides?: CallOverrides): Promise<BigNumber>;
+
     blockReward(overrides?: CallOverrides): Promise<BigNumber>;
 
     "blockReward()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -1533,16 +1596,16 @@ export class SolaceEthLpFarm extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    deposit(_token: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
+    deposit(_tokenId: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
 
     "deposit(uint256)"(
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       overrides?: Overrides
     ): Promise<BigNumber>;
 
     depositSigned(
       _depositor: string,
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       _deadline: BigNumberish,
       v: BigNumberish,
       r: BytesLike,
@@ -1552,7 +1615,7 @@ export class SolaceEthLpFarm extends Contract {
 
     "depositSigned(address,uint256,uint256,uint8,bytes32,bytes32)"(
       _depositor: string,
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       _deadline: BigNumberish,
       v: BigNumberish,
       r: BytesLike,
@@ -1677,6 +1740,13 @@ export class SolaceEthLpFarm extends Contract {
 
     "pool()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+    setAppraisor(_appraisor: string, overrides?: Overrides): Promise<BigNumber>;
+
+    "setAppraisor(address)"(
+      _appraisor: string,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
     setEnd(_endBlock: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
 
     "setEnd(uint256)"(
@@ -1753,10 +1823,10 @@ export class SolaceEthLpFarm extends Contract {
 
     "weth()"(overrides?: CallOverrides): Promise<BigNumber>;
 
-    withdraw(_token: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
+    withdraw(_tokenId: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
 
     "withdraw(uint256)"(
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       overrides?: Overrides
     ): Promise<BigNumber>;
 
@@ -1796,6 +1866,10 @@ export class SolaceEthLpFarm extends Contract {
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
+    appraisor(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "appraisor()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
     blockReward(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "blockReward()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
@@ -1811,18 +1885,18 @@ export class SolaceEthLpFarm extends Contract {
     ): Promise<PopulatedTransaction>;
 
     deposit(
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
     "deposit(uint256)"(
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
     depositSigned(
       _depositor: string,
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       _deadline: BigNumberish,
       v: BigNumberish,
       r: BytesLike,
@@ -1832,7 +1906,7 @@ export class SolaceEthLpFarm extends Contract {
 
     "depositSigned(address,uint256,uint256,uint8,bytes32,bytes32)"(
       _depositor: string,
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       _deadline: BigNumberish,
       v: BigNumberish,
       r: BytesLike,
@@ -1962,6 +2036,16 @@ export class SolaceEthLpFarm extends Contract {
 
     "pool()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
+    setAppraisor(
+      _appraisor: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "setAppraisor(address)"(
+      _appraisor: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
     setEnd(
       _endBlock: BigNumberish,
       overrides?: Overrides
@@ -2045,12 +2129,12 @@ export class SolaceEthLpFarm extends Contract {
     "weth()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     withdraw(
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
     "withdraw(uint256)"(
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 

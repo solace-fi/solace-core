@@ -24,23 +24,30 @@ interface ISolaceEthLpFarm is IFarm {
     event FarmEndSet(uint256 _endBlock);
 
     /**
+     * @notice Sets the appraisal function.
+     * Can only be called by the current governor.
+     * @param _appraisor The new appraisor.
+     */
+    function setAppraisor(address _appraisor) external;
+
+    /**
      * @notice Deposit a token.
      * User will receive accumulated rewards if any.
-     * @param _token The deposit token.
+     * @param _tokenId The id of the token to deposit.
      */
-    function deposit(uint256 _token) external;
+    function deposit(uint256 _tokenId) external;
 
     /**
      * @notice Deposit a Uniswap LP token using permit.
      * User will receive accumulated Solace rewards if any.
      * @param _depositor The depositing user.
-     * @param _token The deposit token.
+     * @param _tokenId The id of the token to deposit.
      * @param _deadline Time the transaction must go through before.
      * @param v secp256k1 signature
      * @param r secp256k1 signature
      * @param s secp256k1 signature
      */
-    function depositSigned(address _depositor, uint256 _token, uint256 _deadline, uint8 v, bytes32 r, bytes32 s) external;
+    function depositSigned(address _depositor, uint256 _tokenId, uint256 _deadline, uint8 v, bytes32 r, bytes32 s) external;
 
     struct MintAndDepositParams {
         address depositor;
@@ -67,10 +74,10 @@ interface ISolaceEthLpFarm is IFarm {
 
     /**
      * @notice Withdraw a token.
-     * User will receive _token and accumulated rewards.
-     * @param _token The withdraw token.
+     * User will receive _tokenId and accumulated rewards.
+     * @param _tokenId The id of the token to withdraw.
      */
-    function withdraw(uint256 _token) external;
+    function withdraw(uint256 _tokenId) external;
 
     /**
      * @notice Returns the count of ERC721s that a user has deposited onto a farm.
@@ -99,10 +106,10 @@ interface ISolaceEthLpFarm is IFarm {
     /**
      * @notice Appraise a Uniswap LP Token.
      * Token must exist and must exist in the correct pool.
-     * @param _token The id of the token to appraise.
+     * @param _tokenId The id of the token to appraise.
      * @return _value The token's value.
      */
-    function appraise(uint256 _token) external view returns (uint256 _value);
+    function appraise(uint256 _tokenId) external view returns (uint256 _value);
 
     // LP Token interface.
     function lpToken() external view returns (IUniswapLpToken);

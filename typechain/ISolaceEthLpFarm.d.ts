@@ -42,6 +42,7 @@ interface ISolaceEthLpFarmInterface extends ethers.utils.Interface {
     "mintAndDeposit(tuple)": FunctionFragment;
     "newGovernance()": FunctionFragment;
     "pendingRewards(address)": FunctionFragment;
+    "setAppraisor(address)": FunctionFragment;
     "setEnd(uint256)": FunctionFragment;
     "setGovernance(address)": FunctionFragment;
     "setRewards(uint256)": FunctionFragment;
@@ -142,6 +143,10 @@ interface ISolaceEthLpFarmInterface extends ethers.utils.Interface {
     values: [string]
   ): string;
   encodeFunctionData(
+    functionFragment: "setAppraisor",
+    values: [string]
+  ): string;
+  encodeFunctionData(
     functionFragment: "setEnd",
     values: [BigNumberish]
   ): string;
@@ -235,6 +240,10 @@ interface ISolaceEthLpFarmInterface extends ethers.utils.Interface {
     functionFragment: "pendingRewards",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(
+    functionFragment: "setAppraisor",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "setEnd", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "setGovernance",
@@ -307,7 +316,7 @@ export class ISolaceEthLpFarm extends Contract {
     "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
 
     appraise(
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       overrides?: CallOverrides
     ): Promise<{
       _value: BigNumber;
@@ -315,7 +324,7 @@ export class ISolaceEthLpFarm extends Contract {
     }>;
 
     "appraise(uint256)"(
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       overrides?: CallOverrides
     ): Promise<{
       _value: BigNumber;
@@ -349,18 +358,18 @@ export class ISolaceEthLpFarm extends Contract {
     }>;
 
     deposit(
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
     "deposit(uint256)"(
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
     depositSigned(
       _depositor: string,
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       _deadline: BigNumberish,
       v: BigNumberish,
       r: BytesLike,
@@ -370,7 +379,7 @@ export class ISolaceEthLpFarm extends Contract {
 
     "depositSigned(address,uint256,uint256,uint8,bytes32,bytes32)"(
       _depositor: string,
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       _deadline: BigNumberish,
       v: BigNumberish,
       r: BytesLike,
@@ -562,6 +571,16 @@ export class ISolaceEthLpFarm extends Contract {
       0: BigNumber;
     }>;
 
+    setAppraisor(
+      _appraisor: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "setAppraisor(address)"(
+      _appraisor: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
     setEnd(
       _endBlock: BigNumberish,
       overrides?: Overrides
@@ -645,12 +664,12 @@ export class ISolaceEthLpFarm extends Contract {
     }>;
 
     withdraw(
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
     "withdraw(uint256)"(
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
@@ -677,10 +696,13 @@ export class ISolaceEthLpFarm extends Contract {
 
   "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
 
-  appraise(_token: BigNumberish, overrides?: CallOverrides): Promise<BigNumber>;
+  appraise(
+    _tokenId: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
 
   "appraise(uint256)"(
-    _token: BigNumberish,
+    _tokenId: BigNumberish,
     overrides?: CallOverrides
   ): Promise<BigNumber>;
 
@@ -696,18 +718,18 @@ export class ISolaceEthLpFarm extends Contract {
   ): Promise<BigNumber>;
 
   deposit(
-    _token: BigNumberish,
+    _tokenId: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
   "deposit(uint256)"(
-    _token: BigNumberish,
+    _tokenId: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
   depositSigned(
     _depositor: string,
-    _token: BigNumberish,
+    _tokenId: BigNumberish,
     _deadline: BigNumberish,
     v: BigNumberish,
     r: BytesLike,
@@ -717,7 +739,7 @@ export class ISolaceEthLpFarm extends Contract {
 
   "depositSigned(address,uint256,uint256,uint8,bytes32,bytes32)"(
     _depositor: string,
-    _token: BigNumberish,
+    _tokenId: BigNumberish,
     _deadline: BigNumberish,
     v: BigNumberish,
     r: BytesLike,
@@ -842,6 +864,16 @@ export class ISolaceEthLpFarm extends Contract {
     overrides?: CallOverrides
   ): Promise<BigNumber>;
 
+  setAppraisor(
+    _appraisor: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "setAppraisor(address)"(
+    _appraisor: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
   setEnd(
     _endBlock: BigNumberish,
     overrides?: Overrides
@@ -893,12 +925,12 @@ export class ISolaceEthLpFarm extends Contract {
   "weth()"(overrides?: CallOverrides): Promise<string>;
 
   withdraw(
-    _token: BigNumberish,
+    _tokenId: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
   "withdraw(uint256)"(
-    _token: BigNumberish,
+    _tokenId: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
@@ -926,12 +958,12 @@ export class ISolaceEthLpFarm extends Contract {
     "acceptGovernance()"(overrides?: CallOverrides): Promise<void>;
 
     appraise(
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
     "appraise(uint256)"(
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
@@ -949,16 +981,16 @@ export class ISolaceEthLpFarm extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    deposit(_token: BigNumberish, overrides?: CallOverrides): Promise<void>;
+    deposit(_tokenId: BigNumberish, overrides?: CallOverrides): Promise<void>;
 
     "deposit(uint256)"(
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
 
     depositSigned(
       _depositor: string,
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       _deadline: BigNumberish,
       v: BigNumberish,
       r: BytesLike,
@@ -968,7 +1000,7 @@ export class ISolaceEthLpFarm extends Contract {
 
     "depositSigned(address,uint256,uint256,uint8,bytes32,bytes32)"(
       _depositor: string,
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       _deadline: BigNumberish,
       v: BigNumberish,
       r: BytesLike,
@@ -1096,6 +1128,13 @@ export class ISolaceEthLpFarm extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
+    setAppraisor(_appraisor: string, overrides?: CallOverrides): Promise<void>;
+
+    "setAppraisor(address)"(
+      _appraisor: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
     setEnd(_endBlock: BigNumberish, overrides?: CallOverrides): Promise<void>;
 
     "setEnd(uint256)"(
@@ -1143,10 +1182,10 @@ export class ISolaceEthLpFarm extends Contract {
 
     "weth()"(overrides?: CallOverrides): Promise<string>;
 
-    withdraw(_token: BigNumberish, overrides?: CallOverrides): Promise<void>;
+    withdraw(_tokenId: BigNumberish, overrides?: CallOverrides): Promise<void>;
 
     "withdraw(uint256)"(
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -1189,12 +1228,12 @@ export class ISolaceEthLpFarm extends Contract {
     "acceptGovernance()"(overrides?: Overrides): Promise<BigNumber>;
 
     appraise(
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
     "appraise(uint256)"(
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
@@ -1212,16 +1251,16 @@ export class ISolaceEthLpFarm extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    deposit(_token: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
+    deposit(_tokenId: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
 
     "deposit(uint256)"(
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       overrides?: Overrides
     ): Promise<BigNumber>;
 
     depositSigned(
       _depositor: string,
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       _deadline: BigNumberish,
       v: BigNumberish,
       r: BytesLike,
@@ -1231,7 +1270,7 @@ export class ISolaceEthLpFarm extends Contract {
 
     "depositSigned(address,uint256,uint256,uint8,bytes32,bytes32)"(
       _depositor: string,
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       _deadline: BigNumberish,
       v: BigNumberish,
       r: BytesLike,
@@ -1344,6 +1383,13 @@ export class ISolaceEthLpFarm extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
+    setAppraisor(_appraisor: string, overrides?: Overrides): Promise<BigNumber>;
+
+    "setAppraisor(address)"(
+      _appraisor: string,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
     setEnd(_endBlock: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
 
     "setEnd(uint256)"(
@@ -1391,10 +1437,10 @@ export class ISolaceEthLpFarm extends Contract {
 
     "weth()"(overrides?: CallOverrides): Promise<BigNumber>;
 
-    withdraw(_token: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
+    withdraw(_tokenId: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
 
     "withdraw(uint256)"(
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       overrides?: Overrides
     ): Promise<BigNumber>;
 
@@ -1425,12 +1471,12 @@ export class ISolaceEthLpFarm extends Contract {
     "acceptGovernance()"(overrides?: Overrides): Promise<PopulatedTransaction>;
 
     appraise(
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
     "appraise(uint256)"(
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
@@ -1449,18 +1495,18 @@ export class ISolaceEthLpFarm extends Contract {
     ): Promise<PopulatedTransaction>;
 
     deposit(
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
     "deposit(uint256)"(
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
     depositSigned(
       _depositor: string,
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       _deadline: BigNumberish,
       v: BigNumberish,
       r: BytesLike,
@@ -1470,7 +1516,7 @@ export class ISolaceEthLpFarm extends Contract {
 
     "depositSigned(address,uint256,uint256,uint8,bytes32,bytes32)"(
       _depositor: string,
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       _deadline: BigNumberish,
       v: BigNumberish,
       r: BytesLike,
@@ -1588,6 +1634,16 @@ export class ISolaceEthLpFarm extends Contract {
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
+    setAppraisor(
+      _appraisor: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "setAppraisor(address)"(
+      _appraisor: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
     setEnd(
       _endBlock: BigNumberish,
       overrides?: Overrides
@@ -1639,12 +1695,12 @@ export class ISolaceEthLpFarm extends Contract {
     "weth()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     withdraw(
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
     "withdraw(uint256)"(
-      _token: BigNumberish,
+      _tokenId: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 

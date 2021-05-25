@@ -16,7 +16,7 @@ import { getPermitDigest, sign, getDomainSeparator } from "./utilities/signature
 import getPermitNFTSignature from "./utilities/getPermitNFTSignature";
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Solace, Master, MockWeth, MockErc20, SolaceEthLpFarm } from "../typechain";
+import { Solace, Master, MockWeth, MockErc20, SolaceEthLpFarm, LpAppraisor } from "../typechain";
 
 describe("SolaceEthLpFarm", function () {
   let artifacts: ArtifactImports;
@@ -36,6 +36,7 @@ describe("SolaceEthLpFarm", function () {
   let weth: MockWeth;
   let mockToken1: MockErc20;
   let farm: SolaceEthLpFarm;
+  let lpTokenAppraisor: LpAppraisor;
 
   // uniswap contracts
   let uniswapFactory: Contract;
@@ -130,6 +131,18 @@ describe("SolaceEthLpFarm", function () {
         ZERO_ADDRESS
       ]
     )) as Contract;
+
+    // deploy uniswap lp token appraisor
+    lpTokenAppraisor = (await deployContract(
+      deployer,
+      artifacts.LpAppraisor,
+      [
+        governor.address,
+        lpToken.address,
+        20000,
+        40000
+      ]
+    )) as LpAppraisor;
 
     // transfer tokens
     await solaceToken.connect(governor).addMinter(governor.address);
@@ -244,7 +257,7 @@ describe("SolaceEthLpFarm", function () {
       expect(await farm.listDeposited(farmer1.address)).to.deep.equal([ [], [] ]);
       // farmer 1, deposit 1
       tokenId1 = await mintLpToken(farmer1, weth, solaceToken, FeeAmount.MEDIUM, depositAmount1);
-      tokenValue1 = await farm.appraise(tokenId1);
+      tokenValue1 = await lpTokenAppraisor.appraise(tokenId1);
       expect((await farm.tokenInfo(tokenId1)).depositor).to.equal(ZERO_ADDRESS);
       await lpToken.connect(farmer1).approve(farm.address, tokenId1);
       let tx1 = await farm.connect(farmer1).deposit(tokenId1);
@@ -257,7 +270,7 @@ describe("SolaceEthLpFarm", function () {
       expect((await farm.tokenInfo(tokenId1)).depositor).to.equal(farmer1.address);
       // farmer 2, deposit 4
       tokenId2 = await mintLpToken(farmer2, weth, solaceToken, FeeAmount.MEDIUM, depositAmount2);
-      tokenValue2 = await farm.appraise(tokenId2);
+      tokenValue2 = await lpTokenAppraisor.appraise(tokenId2);
       tokenValue12 = tokenValue1.add(tokenValue2);
       await lpToken.connect(farmer2).approve(farm.address, tokenId2);
       let tx2 = await farm.connect(farmer2).deposit(tokenId2);
@@ -270,7 +283,7 @@ describe("SolaceEthLpFarm", function () {
       expect((await farm.tokenInfo(tokenId2)).depositor).to.equal(farmer2.address);
       // farmer 1, deposit 2
       tokenId3 = await mintLpToken(farmer1, weth, solaceToken, FeeAmount.MEDIUM, depositAmount3);
-      tokenValue3 = await farm.appraise(tokenId3);
+      tokenValue3 = await lpTokenAppraisor.appraise(tokenId3);
       tokenValue13 = tokenValue1.add(tokenValue3);
       tokenValue123 = tokenValue1.add(tokenValue2).add(tokenValue3);
       await lpToken.connect(farmer1).approve(farm.address, tokenId3);
@@ -286,7 +299,7 @@ describe("SolaceEthLpFarm", function () {
 
     it("can deposit via permit", async function () {
       tokenId4 = await mintLpToken(farmer1, weth, solaceToken, FeeAmount.MEDIUM, depositAmount4);
-      tokenValue4 = await farm.appraise(tokenId4);
+      tokenValue4 = await lpTokenAppraisor.appraise(tokenId4);
       expect((await farm.tokenInfo(tokenId4)).depositor).to.equal(ZERO_ADDRESS);
       const { v, r, s } = await getPermitNFTSignature(farmer1, lpToken, farm.address, tokenId4, deadline);
       let tx1 = await farm.connect(farmer1).depositSigned(farmer1.address, tokenId4, deadline, v, r, s);
@@ -325,7 +338,7 @@ describe("SolaceEthLpFarm", function () {
           s: s,
       }, {value: excessiveDepositAmount});
       tokenId5 = await lpToken.totalSupply();
-      tokenValue5 = await farm.appraise(tokenId5);
+      tokenValue5 = await lpTokenAppraisor.appraise(tokenId5);
       await expect(tx1).to.emit(farm, "TokenDeposited").withArgs(farmer1.address, tokenId5);
       let balancesAfter = await getBalances(farmer1);
       let balancesDiff = getBalancesDiff(balancesBefore, balancesAfter);
@@ -557,7 +570,7 @@ describe("SolaceEthLpFarm", function () {
         tick.sub(1 * spacing),
         tick.add(2 * spacing)
       );
-      tokenValue1 = await farm.appraise(tokenId1);
+      tokenValue1 = await lpTokenAppraisor.appraise(tokenId1);
       await lpToken.connect(farmer1).approve(farm.address, tokenId1);
       await farm.connect(farmer1).deposit(tokenId1);
       expect((await farm.userInfo(farmer1.address)).value).to.equal(tokenValue1);
@@ -572,7 +585,7 @@ describe("SolaceEthLpFarm", function () {
         tick.add(0 * spacing),
         tick.add(1 * spacing)
       );
-      tokenValue2 = await farm.appraise(tokenId2);
+      tokenValue2 = await lpTokenAppraisor.appraise(tokenId2);
       tokenValue12 = tokenValue1.add(tokenValue2);
       await lpToken.connect(farmer2).approve(farm.address, tokenId2);
       await farm.connect(farmer2).deposit(tokenId2);
@@ -588,7 +601,7 @@ describe("SolaceEthLpFarm", function () {
         tick.add(1 * spacing),
         tick.add(2 * spacing)
       );
-      tokenValue3 = await farm.appraise(tokenId3);
+      tokenValue3 = await lpTokenAppraisor.appraise(tokenId3);
       tokenValue13 = tokenValue1.add(tokenValue3);
       tokenValue23 = tokenValue2.add(tokenValue3);
       tokenValue123 = tokenValue1.add(tokenValue2).add(tokenValue3);
@@ -943,7 +956,8 @@ describe("SolaceEthLpFarm", function () {
         startBlock,
         endBlock,
         pool.address,
-        weth.address
+        weth.address,
+        lpTokenAppraisor.address
       ]
     )) as SolaceEthLpFarm;
     return farm;

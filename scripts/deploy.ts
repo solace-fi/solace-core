@@ -5,23 +5,8 @@ const fs = require("fs");
 import { logContractAddress, createPool } from "./utils";
 import { FeeAmount } from "../test/utilities/uniswap";
 
-import SolaceArtifact from '../artifacts/contracts/SOLACE.sol/SOLACE.json';
-import WETHArtifact from "../artifacts/contracts/mocks/MockWETH.sol/MockWETH.json";
-import MasterArtifact from '../artifacts/contracts/Master.sol/Master.json';
-import VaultArtifact from '../artifacts/contracts/Vault.sol/Vault.json'
-import CpFarmArtifact from "../artifacts/contracts/CpFarm.sol/CpFarm.json";
-import SolaceEthLpFarmArtifact from "../artifacts/contracts/SolaceEthLpFarm.sol/SolaceEthLpFarm.json";
-import TreasuryArtifact from "../artifacts/contracts/Treasury.sol/Treasury.json";
-import RegistryArtifact from "../artifacts/contracts/Registry.sol/Registry.json";
-import ClaimsAdjustorArtifact from '../artifacts/contracts/ClaimsAdjustor.sol/ClaimsAdjustor.json';
-import ClaimsEscrowArtifact from '../artifacts/contracts/ClaimsEscrow.sol/ClaimsEscrow.json';
-import { Solace, Vault, Master, MockWeth, CpFarm, SolaceEthLpFarm, Treasury, Registry, ClaimsAdjustor, ClaimsEscrow } from "../typechain";
-
-// uniswap imports
-import UniswapV3FactoryArtifact from "@uniswap/v3-core/artifacts/contracts/UniswapV3Factory.sol/UniswapV3Factory.json";
-import UniswapV3PoolArtifact from "@uniswap/v3-core/artifacts/contracts/UniswapV3Pool.sol/UniswapV3Pool.json";
-import SwapRouterArtifact from "@uniswap/v3-periphery/artifacts/contracts/SwapRouter.sol/SwapRouter.json";
-import NonfungiblePositionManagerArtifact from "@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json";
+import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_importer";
+import { Solace, Vault, Master, MockWeth, CpFarm, SolaceEthLpFarm, Treasury, Registry, ClaimsAdjustor, ClaimsEscrow, LpAppraisor } from "../typechain";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -35,6 +20,7 @@ const WETH_ADDRESS            = ""
 const MASTER_ADDRESS          = "";
 const VAULT_ADDRESS           = "";
 const CPFARM_ADDRESS          = "";
+const LPAPPRAISOR_ADDRESS     = "";
 const LPFARM_ADDRESS          = "";
 const TREASURY_ADDRESS        = "";
 const CLAIMS_ESCROW_ADDRESS   = "";
@@ -49,6 +35,7 @@ const START_BLOCK = BN.from(0);
 const END_BLOCK = BN.from(2102400); // one year
 const BLOCK_REWARD = BN.from("60000000000000000000"); // 60 SOLACE
 
+let artifacts: ArtifactImports;
 let registry: Registry;
 let solace: Solace;
 let weth: MockWeth;
@@ -63,6 +50,7 @@ let uniswapFactory: Contract;
 let uniswapRouter: Contract;
 let lpToken: Contract;
 let pool: Contract;
+let lpTokenAppraiser: LpAppraisor;
 
 let deployer: Signer;
 let governor: Signer;
@@ -70,6 +58,7 @@ let signerAddress: string;
 let governorAddress: string;
 
 async function main() {
+  artifacts = await import_artifacts();
   [deployer, governor] = await ethers.getSigners();
   signerAddress = await deployer.getAddress();
   governorAddress = await governor.getAddress();
@@ -84,6 +73,7 @@ async function main() {
   await deployVault();
   await deployMaster();
   await deployCpFarm();
+  await deployLpTokenAppraisor();
   await deployLpFarm();
   await deployTreasury();
   await deployClaimsEscrow();
@@ -95,10 +85,10 @@ async function main() {
 
 async function deployRegistry() {
   if(!!REGISTRY_ADDRESS) {
-    registry = (await ethers.getContractAt(RegistryArtifact.abi, REGISTRY_ADDRESS)) as Registry;
+    registry = (await ethers.getContractAt(artifacts.Registry.abi, REGISTRY_ADDRESS)) as Registry;
   } else {
     console.log("Deploying Registry");
-    registry = (await deployContract(deployer, RegistryArtifact, [signerAddress])) as Registry;
+    registry = (await deployContract(deployer, artifacts.Registry, [signerAddress])) as Registry;
     console.log(`Deploying Registry to ${registry.address}`);
     await registry.deployed();
     console.log("Deployment confirmed");
@@ -107,10 +97,10 @@ async function deployRegistry() {
 
 async function deploySolace() {
   if(!!SOLACE_ADDRESS) {
-    solace = (await ethers.getContractAt(SolaceArtifact.abi, SOLACE_ADDRESS)) as Solace;
+    solace = (await ethers.getContractAt(artifacts.SOLACE.abi, SOLACE_ADDRESS)) as Solace;
   } else {
     console.log("Deploying SOLACE");
-    solace = (await deployContract(deployer, SolaceArtifact, [governorAddress])) as Solace;
+    solace = (await deployContract(deployer, artifacts.SOLACE, [governorAddress])) as Solace;
     console.log(`Deploying SOLACE to ${solace.address}`);
     await solace.deployed();
     console.log("Deployment confirmed");
@@ -125,10 +115,10 @@ async function deploySolace() {
 
 async function deployWeth() {
   if(!!WETH_ADDRESS) {
-    weth = (await ethers.getContractAt(WETHArtifact.abi, WETH_ADDRESS)) as MockWeth;
+    weth = (await ethers.getContractAt(artifacts.WETH.abi, WETH_ADDRESS)) as MockWeth;
   } else {
     console.log("Deploying WETH");
-    weth = (await deployContract(deployer, WETHArtifact)) as MockWeth;
+    weth = (await deployContract(deployer, artifacts.WETH)) as MockWeth;
     console.log(`Deploying WETH to ${weth.address}`);
     await weth.deployed();
     console.log("Deployment confirmed");
@@ -137,10 +127,10 @@ async function deployWeth() {
 
 async function deployMaster() {
   if(!!MASTER_ADDRESS) {
-    master = (await ethers.getContractAt(MasterArtifact.abi, MASTER_ADDRESS)) as Master;
+    master = (await ethers.getContractAt(artifacts.Master.abi, MASTER_ADDRESS)) as Master;
   } else {
     console.log("Deploying Master");
-    master = (await deployContract(deployer,MasterArtifact,[governorAddress,solace.address,BLOCK_REWARD])) as Master;
+    master = (await deployContract(deployer,artifacts.Master,[governorAddress,solace.address,BLOCK_REWARD])) as Master;
     console.log(`Deploying Master to ${master.address}`);
     await master.deployed();
     console.log("Deployment confirmed");
@@ -155,10 +145,10 @@ async function deployMaster() {
 
 async function deployVault() {
   if(!!VAULT_ADDRESS) {
-    vault = (await ethers.getContractAt(VaultArtifact.abi, VAULT_ADDRESS)) as Vault;
+    vault = (await ethers.getContractAt(artifacts.Vault.abi, VAULT_ADDRESS)) as Vault;
   } else {
     console.log("Deploying Vault");
-    vault = (await deployContract(deployer,VaultArtifact,[governorAddress,registry.address,weth.address])) as Vault;
+    vault = (await deployContract(deployer,artifacts.Vault,[governorAddress,registry.address,weth.address])) as Vault;
     console.log(`Deploying Vault to ${vault.address}`);
     await vault.deployed();
     console.log("Deployment confirmed");
@@ -173,10 +163,10 @@ async function deployVault() {
 
 async function deployCpFarm() {
   if(!!CPFARM_ADDRESS) {
-    cpFarm = (await ethers.getContractAt(CpFarmArtifact.abi, CPFARM_ADDRESS)) as CpFarm;
+    cpFarm = (await ethers.getContractAt(artifacts.CpFarm.abi, CPFARM_ADDRESS)) as CpFarm;
   } else {
     console.log("Deploying CP Farm");
-    cpFarm = (await deployContract(deployer,CpFarmArtifact,[governorAddress,master.address,vault.address,solace.address,START_BLOCK,END_BLOCK,uniswapRouter.address,weth.address])) as CpFarm;
+    cpFarm = (await deployContract(deployer,artifacts.CpFarm,[governorAddress,master.address,vault.address,solace.address,START_BLOCK,END_BLOCK,uniswapRouter.address,weth.address])) as CpFarm;
     console.log(`Deploying CP Farm to ${cpFarm.address}`);
     await cpFarm.deployed();
     console.log("Deployment confirmed");
@@ -191,10 +181,10 @@ async function deployCpFarm() {
 
 async function deployUniswapFactory() {
   if(!!UNISWAP_FACTORY_ADDRESS) {
-    uniswapFactory = await ethers.getContractAt(UniswapV3FactoryArtifact.abi, UNISWAP_FACTORY_ADDRESS);
+    uniswapFactory = await ethers.getContractAt(artifacts.UniswapV3Factory.abi, UNISWAP_FACTORY_ADDRESS);
   } else {
     console.log("Deploying Uniswap Factory");
-    uniswapFactory = await deployContract(deployer,UniswapV3FactoryArtifact);
+    uniswapFactory = await deployContract(deployer,artifacts.UniswapV3Factory);
     console.log(`Deploying Uniswap Factory to ${uniswapFactory.address}`);
     await uniswapFactory.deployed();
     console.log("Deployment confirmed");
@@ -203,10 +193,10 @@ async function deployUniswapFactory() {
 
 async function deployUniswapRouter() {
   if(!!UNISWAP_ROUTER_ADDRESS) {
-    uniswapRouter = await ethers.getContractAt(SwapRouterArtifact.abi, UNISWAP_ROUTER_ADDRESS);
+    uniswapRouter = await ethers.getContractAt(artifacts.SwapRouter.abi, UNISWAP_ROUTER_ADDRESS);
   } else {
     console.log("Deploying Uniswap Router");
-    uniswapRouter = await deployContract(deployer,SwapRouterArtifact,[uniswapFactory.address,weth.address]);
+    uniswapRouter = await deployContract(deployer,artifacts.SwapRouter,[uniswapFactory.address,weth.address]);
     console.log(`Deploying Uniswap Router to ${uniswapRouter.address}`);
     await uniswapRouter.deployed();
     console.log("Deployment confirmed");
@@ -215,10 +205,10 @@ async function deployUniswapRouter() {
 
 async function deployUniswapLpToken() {
   if(!!UNISWAP_LPTOKEN_ADDRESS) {
-    lpToken = await ethers.getContractAt(NonfungiblePositionManagerArtifact.abi, UNISWAP_LPTOKEN_ADDRESS);
+    lpToken = await ethers.getContractAt(artifacts.NonfungiblePositionManager.abi, UNISWAP_LPTOKEN_ADDRESS);
   } else {
     console.log("Deploying Uniswap LP Token");
-    lpToken = await deployContract(deployer,NonfungiblePositionManagerArtifact,[uniswapFactory.address,weth.address,ZERO_ADDRESS]);
+    lpToken = await deployContract(deployer,artifacts.NonfungiblePositionManager,[uniswapFactory.address,weth.address,ZERO_ADDRESS]);
     console.log(`Deploying Uniswap LP Token to ${lpToken.address}`);
     await lpToken.deployed();
     console.log("Deployment confirmed");
@@ -227,7 +217,7 @@ async function deployUniswapLpToken() {
 
 async function deployUniswapPool() {
   if(!!UNISWAP_POOL_ADDRESS) {
-    pool = await ethers.getContractAt(UniswapV3PoolArtifact.abi, UNISWAP_POOL_ADDRESS);
+    pool = await ethers.getContractAt(artifacts.UniswapV3Pool.abi, UNISWAP_POOL_ADDRESS);
   } else {
     console.log("Deploying then initializing SOLACE-ETH Pool");
     pool = await createPool(deployer, uniswapFactory, weth.address, solace.address, FeeAmount.MEDIUM);
@@ -235,12 +225,24 @@ async function deployUniswapPool() {
   }
 }
 
+async function deployLpTokenAppraisor() {
+  if(!!LPAPPRAISOR_ADDRESS) {
+    lpTokenAppraiser = (await ethers.getContractAt(artifacts.LpAppraisor.abi, LPAPPRAISOR_ADDRESS)) as LpAppraisor;
+  } else {
+    console.log("Deploying LP Token Appraisor");
+    lpTokenAppraiser = (await deployContract(deployer,artifacts.LpAppraisor,[governorAddress,lpToken.address,20000,40000])) as LpAppraisor;
+    console.log(`Deploying LP Token Appraisor to ${lpTokenAppraiser.address}`);
+    await lpTokenAppraiser.deployed();
+    console.log("Deployment confirmed");
+  }
+}
+
 async function deployLpFarm() {
   if(!!LPFARM_ADDRESS) {
-    lpFarm = (await ethers.getContractAt(SolaceEthLpFarmArtifact.abi, LPFARM_ADDRESS)) as SolaceEthLpFarm;
+    lpFarm = (await ethers.getContractAt(artifacts.SolaceEthLpFarm.abi, LPFARM_ADDRESS)) as SolaceEthLpFarm;
   } else {
     console.log("Deploying LP Farm");
-    lpFarm = (await deployContract(deployer,SolaceEthLpFarmArtifact,[governorAddress,master.address,lpToken.address,solace.address,START_BLOCK,END_BLOCK,pool.address,weth.address])) as SolaceEthLpFarm;
+    lpFarm = (await deployContract(deployer,artifacts.SolaceEthLpFarm,[governorAddress,master.address,lpToken.address,solace.address,START_BLOCK,END_BLOCK,pool.address,weth.address,lpTokenAppraiser.address])) as SolaceEthLpFarm;
     console.log(`Deploying LP Farm to ${lpFarm.address}`);
     await lpFarm.deployed();
     console.log("Deployment confirmed");
@@ -255,10 +257,10 @@ async function deployLpFarm() {
 
 async function deployTreasury() {
   if(!!TREASURY_ADDRESS) {
-    treasury = (await ethers.getContractAt(TreasuryArtifact.abi, TREASURY_ADDRESS)) as Treasury;
+    treasury = (await ethers.getContractAt(artifacts.Treasury.abi, TREASURY_ADDRESS)) as Treasury;
   } else {
     console.log("Deploying Treasury");
-    treasury = (await deployContract(deployer,TreasuryArtifact,[governorAddress,solace.address,uniswapRouter.address,weth.address])) as Treasury;
+    treasury = (await deployContract(deployer,artifacts.Treasury,[governorAddress,solace.address,uniswapRouter.address,weth.address])) as Treasury;
     console.log(`Deploying Treasury to ${treasury.address}`);
     await treasury.deployed();
     console.log("Deployment confirmed");
@@ -273,11 +275,11 @@ async function deployTreasury() {
 
 async function deployClaimsEscrow() {
   if(!!CLAIMS_ESCROW_ADDRESS) {
-    claimsEscrow = (await ethers.getContractAt(ClaimsEscrowArtifact.abi, CLAIMS_ESCROW_ADDRESS)) as ClaimsEscrow;
+    claimsEscrow = (await ethers.getContractAt(artifacts.ClaimsEscrow.abi, CLAIMS_ESCROW_ADDRESS)) as ClaimsEscrow;
   }
   else {
     console.log("Deploying Claims Escrow");
-    claimsEscrow = (await deployContract(deployer,ClaimsEscrowArtifact,[registry.address])) as ClaimsEscrow;
+    claimsEscrow = (await deployContract(deployer,artifacts.ClaimsEscrow,[registry.address])) as ClaimsEscrow;
     console.log(`Deploying Claims Escrow to ${claimsEscrow.address}`);
     await claimsEscrow.deployed();
     console.log("Deployment confirmed");
@@ -292,11 +294,11 @@ async function deployClaimsEscrow() {
 
 async function deployClaimsAdjustor() {
   if(!!CLAIMS_ADJUSTOR_ADDRESS) {
-    claimsAdjustor = (await ethers.getContractAt(ClaimsAdjustorArtifact.abi, CLAIMS_ADJUSTOR_ADDRESS)) as ClaimsAdjustor;
+    claimsAdjustor = (await ethers.getContractAt(artifacts.ClaimsAdjustor.abi, CLAIMS_ADJUSTOR_ADDRESS)) as ClaimsAdjustor;
   }
   else {
     console.log("Deploying Claims Adjustor");
-    claimsAdjustor = (await deployContract(deployer,ClaimsAdjustorArtifact,[registry.address])) as ClaimsAdjustor;
+    claimsAdjustor = (await deployContract(deployer,artifacts.ClaimsAdjustor,[registry.address])) as ClaimsAdjustor;
     console.log(`Deploying Claims Adjustor to ${claimsAdjustor.address}`);
     await claimsAdjustor.deployed();
     console.log("Deployment confirmed");

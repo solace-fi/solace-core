@@ -137,7 +137,7 @@ const _abi = [
     inputs: [
       {
         internalType: "uint256",
-        name: "_token",
+        name: "_tokenId",
         type: "uint256",
       },
     ],
@@ -188,7 +188,7 @@ const _abi = [
     inputs: [
       {
         internalType: "uint256",
-        name: "_token",
+        name: "_tokenId",
         type: "uint256",
       },
     ],
@@ -206,7 +206,7 @@ const _abi = [
       },
       {
         internalType: "uint256",
-        name: "_token",
+        name: "_tokenId",
         type: "uint256",
       },
       {
@@ -506,6 +506,19 @@ const _abi = [
   {
     inputs: [
       {
+        internalType: "address",
+        name: "_appraisor",
+        type: "address",
+      },
+    ],
+    name: "setAppraisor",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
         internalType: "uint256",
         name: "_endBlock",
         type: "uint256",
@@ -605,7 +618,7 @@ const _abi = [
     inputs: [
       {
         internalType: "uint256",
-        name: "_token",
+        name: "_tokenId",
         type: "uint256",
       },
     ],

@@ -20,6 +20,7 @@ export async function import_artifacts() {
   artifacts.ClaimsAdjustor = await import(`${artifact_dir}/ClaimsAdjustor.sol/ClaimsAdjustor.json`);
   artifacts.ClaimsEscrow = await import(`${artifact_dir}/ClaimsEscrow.sol/ClaimsEscrow.json`);
   artifacts.CpFarm = await import(`${artifact_dir}/CpFarm.sol/CpFarm.json`);
+  artifacts.LpAppraisor = await import(`${artifact_dir}/LpAppraisor.sol/LpAppraisor.json`);
   artifacts.Master = await import(`${artifact_dir}/Master.sol/Master.json`);
   artifacts.Registry = await import(`${artifact_dir}/Registry.sol/Registry.json`);
   artifacts.SOLACE = await import(`${artifact_dir}/SOLACE.sol/SOLACE.json`);
