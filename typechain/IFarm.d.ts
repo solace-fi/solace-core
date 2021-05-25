@@ -37,6 +37,7 @@ interface IFarmInterface extends ethers.utils.Interface {
     "startBlock()": FunctionFragment;
     "updateFarm()": FunctionFragment;
     "withdrawRewards()": FunctionFragment;
+    "withdrawRewardsForUser(address)": FunctionFragment;
   };
 
   encodeFunctionData(
@@ -90,6 +91,10 @@ interface IFarmInterface extends ethers.utils.Interface {
     functionFragment: "withdrawRewards",
     values?: undefined
   ): string;
+  encodeFunctionData(
+    functionFragment: "withdrawRewardsForUser",
+    values: [string]
+  ): string;
 
   decodeFunctionResult(
     functionFragment: "acceptGovernance",
@@ -125,6 +130,10 @@ interface IFarmInterface extends ethers.utils.Interface {
   decodeFunctionResult(functionFragment: "updateFarm", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "withdrawRewards",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "withdrawRewardsForUser",
     data: BytesLike
   ): Result;
 
@@ -304,6 +313,16 @@ export class IFarm extends Contract {
     withdrawRewards(overrides?: Overrides): Promise<ContractTransaction>;
 
     "withdrawRewards()"(overrides?: Overrides): Promise<ContractTransaction>;
+
+    withdrawRewardsForUser(
+      _user: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "withdrawRewardsForUser(address)"(
+      _user: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
   };
 
   acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
@@ -395,6 +414,16 @@ export class IFarm extends Contract {
 
   "withdrawRewards()"(overrides?: Overrides): Promise<ContractTransaction>;
 
+  withdrawRewardsForUser(
+    _user: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "withdrawRewardsForUser(address)"(
+    _user: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
   callStatic: {
     acceptGovernance(overrides?: CallOverrides): Promise<void>;
 
@@ -484,6 +513,16 @@ export class IFarm extends Contract {
     withdrawRewards(overrides?: CallOverrides): Promise<void>;
 
     "withdrawRewards()"(overrides?: CallOverrides): Promise<void>;
+
+    withdrawRewardsForUser(
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "withdrawRewardsForUser(address)"(
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
   };
 
   filters: {
@@ -579,6 +618,16 @@ export class IFarm extends Contract {
     withdrawRewards(overrides?: Overrides): Promise<BigNumber>;
 
     "withdrawRewards()"(overrides?: Overrides): Promise<BigNumber>;
+
+    withdrawRewardsForUser(
+      _user: string,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "withdrawRewardsForUser(address)"(
+      _user: string,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
   };
 
   populateTransaction: {
@@ -673,5 +722,15 @@ export class IFarm extends Contract {
     withdrawRewards(overrides?: Overrides): Promise<PopulatedTransaction>;
 
     "withdrawRewards()"(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    withdrawRewardsForUser(
+      _user: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "withdrawRewardsForUser(address)"(
+      _user: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
   };
 }

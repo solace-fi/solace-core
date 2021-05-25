@@ -126,13 +126,26 @@ contract Master is IMaster {
     }
 
     /**
-    * @notice Updates all farms to be up to date to the current block.
-    */
+     * @notice Updates all farms to be up to date to the current block.
+     */
     function massUpdateFarms() public override {
-      uint256 _numFarms = numFarms; // copy to memory to save gas
-      for (uint256 farmId = 1; farmId <= _numFarms; ++farmId) {
-        IFarm(farmAddresses[farmId]).updateFarm();
-      }
+        uint256 _numFarms = numFarms; // copy to memory to save gas
+        for (uint256 farmId = 1; farmId <= _numFarms; ++farmId) {
+            IFarm(farmAddresses[farmId]).updateFarm();
+        }
+    }
+
+    /**
+     * @notice Withdraw your rewards from all farms.
+     */
+    function withdrawRewards() external override {
+        uint256 _numFarms = numFarms; // copy to memory to save gas
+        for (uint256 farmId = 1; farmId <= _numFarms; ++farmId) {
+            IFarm farm = IFarm(farmAddresses[farmId]);
+            if(farm.pendingRewards(msg.sender) > 0) {
+                farm.withdrawRewardsForUser(msg.sender);
+            }
+        }
     }
 
     /**

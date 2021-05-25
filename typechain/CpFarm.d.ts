@@ -52,6 +52,7 @@ interface CpFarmInterface extends ethers.utils.Interface {
     "withdrawCp(uint256)": FunctionFragment;
     "withdrawEth(uint256,uint256)": FunctionFragment;
     "withdrawRewards()": FunctionFragment;
+    "withdrawRewardsForUser(address)": FunctionFragment;
   };
 
   encodeFunctionData(
@@ -156,6 +157,10 @@ interface CpFarmInterface extends ethers.utils.Interface {
     functionFragment: "withdrawRewards",
     values?: undefined
   ): string;
+  encodeFunctionData(
+    functionFragment: "withdrawRewardsForUser",
+    values: [string]
+  ): string;
 
   decodeFunctionResult(
     functionFragment: "accRewardPerShare",
@@ -223,6 +228,10 @@ interface CpFarmInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "withdrawRewards",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "withdrawRewardsForUser",
     data: BytesLike
   ): Result;
 
@@ -586,6 +595,16 @@ export class CpFarm extends Contract {
     withdrawRewards(overrides?: Overrides): Promise<ContractTransaction>;
 
     "withdrawRewards()"(overrides?: Overrides): Promise<ContractTransaction>;
+
+    withdrawRewardsForUser(
+      _user: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "withdrawRewardsForUser(address)"(
+      _user: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
   };
 
   accRewardPerShare(overrides?: CallOverrides): Promise<BigNumber>;
@@ -789,6 +808,16 @@ export class CpFarm extends Contract {
 
   "withdrawRewards()"(overrides?: Overrides): Promise<ContractTransaction>;
 
+  withdrawRewardsForUser(
+    _user: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "withdrawRewardsForUser(address)"(
+    _user: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
   callStatic: {
     accRewardPerShare(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -984,6 +1013,16 @@ export class CpFarm extends Contract {
     withdrawRewards(overrides?: CallOverrides): Promise<void>;
 
     "withdrawRewards()"(overrides?: CallOverrides): Promise<void>;
+
+    withdrawRewardsForUser(
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "withdrawRewardsForUser(address)"(
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
   };
 
   filters: {
@@ -1187,6 +1226,16 @@ export class CpFarm extends Contract {
     withdrawRewards(overrides?: Overrides): Promise<BigNumber>;
 
     "withdrawRewards()"(overrides?: Overrides): Promise<BigNumber>;
+
+    withdrawRewardsForUser(
+      _user: string,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "withdrawRewardsForUser(address)"(
+      _user: string,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
   };
 
   populateTransaction: {
@@ -1383,5 +1432,15 @@ export class CpFarm extends Contract {
     withdrawRewards(overrides?: Overrides): Promise<PopulatedTransaction>;
 
     "withdrawRewards()"(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    withdrawRewardsForUser(
+      _user: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "withdrawRewardsForUser(address)"(
+      _user: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
   };
 }

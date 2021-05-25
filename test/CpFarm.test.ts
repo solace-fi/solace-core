@@ -316,8 +316,13 @@ describe("CpFarm", function () {
       await expect(farm1.connect(farmer2).depositCp(1)).to.be.reverted;
     })
 
+    it("cannot withdraw another user's rewards", async function () {
+      await expect(farm1.connect(farmer1).withdrawRewardsForUser(farmer2.address)).to.be.revertedWith("!master");
+    })
+
     it("can withdraw rewards", async function () {
       await farm1.connect(farmer1).withdrawRewards(); // value checked in later tests
+      await farm1.connect(farmer1).withdrawRewardsForUser(farmer1.address); // value checked in later tests
     })
 
     it("can withdraw eth", async function () {

@@ -37,6 +37,7 @@ interface MasterInterface extends ethers.utils.Interface {
     "solace()": FunctionFragment;
     "solacePerBlock()": FunctionFragment;
     "totalAllocPoints()": FunctionFragment;
+    "withdrawRewards()": FunctionFragment;
   };
 
   encodeFunctionData(
@@ -90,6 +91,10 @@ interface MasterInterface extends ethers.utils.Interface {
     functionFragment: "totalAllocPoints",
     values?: undefined
   ): string;
+  encodeFunctionData(
+    functionFragment: "withdrawRewards",
+    values?: undefined
+  ): string;
 
   decodeFunctionResult(
     functionFragment: "acceptGovernance",
@@ -140,6 +145,10 @@ interface MasterInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "totalAllocPoints",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "withdrawRewards",
     data: BytesLike
   ): Result;
 
@@ -333,6 +342,10 @@ export class Master extends Contract {
     ): Promise<{
       0: BigNumber;
     }>;
+
+    withdrawRewards(overrides?: Overrides): Promise<ContractTransaction>;
+
+    "withdrawRewards()"(overrides?: Overrides): Promise<ContractTransaction>;
   };
 
   acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
@@ -434,6 +447,10 @@ export class Master extends Contract {
   totalAllocPoints(overrides?: CallOverrides): Promise<BigNumber>;
 
   "totalAllocPoints()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+  withdrawRewards(overrides?: Overrides): Promise<ContractTransaction>;
+
+  "withdrawRewards()"(overrides?: Overrides): Promise<ContractTransaction>;
 
   callStatic: {
     acceptGovernance(overrides?: CallOverrides): Promise<void>;
@@ -538,6 +555,10 @@ export class Master extends Contract {
     totalAllocPoints(overrides?: CallOverrides): Promise<BigNumber>;
 
     "totalAllocPoints()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    withdrawRewards(overrides?: CallOverrides): Promise<void>;
+
+    "withdrawRewards()"(overrides?: CallOverrides): Promise<void>;
   };
 
   filters: {
@@ -654,6 +675,10 @@ export class Master extends Contract {
     totalAllocPoints(overrides?: CallOverrides): Promise<BigNumber>;
 
     "totalAllocPoints()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    withdrawRewards(overrides?: Overrides): Promise<BigNumber>;
+
+    "withdrawRewards()"(overrides?: Overrides): Promise<BigNumber>;
   };
 
   populateTransaction: {
@@ -766,5 +791,9 @@ export class Master extends Contract {
     "totalAllocPoints()"(
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
+
+    withdrawRewards(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    "withdrawRewards()"(overrides?: Overrides): Promise<PopulatedTransaction>;
   };
 }

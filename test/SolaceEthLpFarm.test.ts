@@ -384,8 +384,13 @@ describe("SolaceEthLpFarm", function () {
       await expect(farm.connect(farmer1).deposit(tokenId2)).to.be.revertedWith("wrong pool");
     })
 
+    it("cannot withdraw another user's rewards", async function () {
+      await expect(farm.connect(farmer1).withdrawRewardsForUser(farmer2.address)).to.be.revertedWith("!master");
+    })
+
     it("can withdraw rewards", async function () {
       await farm.connect(farmer1).withdrawRewards(); // value checked in later tests
+      await farm.connect(farmer1).withdrawRewardsForUser(farmer1.address); // value checked in later tests
     })
 
     it("can withdraw deposited tokens", async function () {
