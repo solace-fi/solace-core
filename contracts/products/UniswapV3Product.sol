@@ -14,12 +14,15 @@ import "../BaseProduct.sol";
 contract UniswapV3Product is BaseProduct {
     using Path for bytes;
 
-    address factory;
-    address weth;
+    IUniswapV3Factory public factory;
+    //address public factory;
+    address public weth;
 
     /// @notice Given a token, what swap path should it take.
     /// If no path is provided, attempt to intelligently swap.
     mapping(address => bytes) public paths;
+
+    uint24[] public fees = [500, 3000, 10000];
 
     constructor (
         IPolicyManager _policyManager,
@@ -44,7 +47,8 @@ contract UniswapV3Product is BaseProduct {
         _maxPeriod,
         _maxCoverAmount
     ) {
-        factory = _factory;
+        factory = IUniswapV3Factory(_factory);
+        //factory = _factory;
         weth = _weth;
     }
 
@@ -69,7 +73,8 @@ contract UniswapV3Product is BaseProduct {
         address tokenB,
         uint24 fee
     ) private view returns (IUniswapV3Pool) {
-        return IUniswapV3Pool(PoolAddress.computeAddress(factory, PoolAddress.getPoolKey(tokenA, tokenB, fee)));
+        //return IUniswapV3Pool(PoolAddress.computeAddress(factory, PoolAddress.getPoolKey(tokenA, tokenB, fee)));
+        return IUniswapV3Pool(factory.getPool(tokenA, tokenB, fee));
     }
 
     /**
@@ -107,8 +112,9 @@ contract UniswapV3Product is BaseProduct {
     }
 
     function tokenToEth(address _token, uint256 _amount) public view returns (uint256 ethAmount) {
+        address _weth = weth;
         // 1 weth == 1 eth
-        if(_token == weth) return _amount;
+        if(_token == _weth) return _amount;
         // get route
         /*
         bytes memory path = paths[_token];
@@ -127,8 +133,29 @@ contract UniswapV3Product is BaseProduct {
                 }
             }
         }
-        // attempt to intelligently swap
         */
+        // attempt to intelligently swap
+        // find the token/weth pool with the most liquidity
+        IUniswapV3Pool bestPool; // = address(0x0)
+        uint128 bestLiquidity; // = 0
+        uint256 numFees = fees.length;
+        for(uint256 feeNum = 0; feeNum < numFees; ++feeNum){
+            IUniswapV3Pool nextPool = getPool(_token, _weth, fees[feeNum]);
+            if(address(nextPool) != address(0x0)) {
+                uint128 nextLiquidity = nextPool.liquidity();
+                if(nextLiquidity > bestLiquidity) {
+                    bestPool = nextPool;
+                    bestLiquidity = nextLiquidity;
+                }
+            }
+        }
+        // if a pool exists, use it to swap
+        if(bestLiquidity > 0) {
+            (uint160 sqrtRatioX96, , , , , , ) = bestPool.slot0();
+            //_amount =
+            // price math here
+        }
+        // no swap path found
         return 0;
     }
 }

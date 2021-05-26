@@ -32,6 +32,8 @@ interface UniswapV3ProductInterface extends ethers.utils.Interface {
     "claimsAdjuster()": FunctionFragment;
     "coveredPlatform()": FunctionFragment;
     "extendPolicy(uint256,uint256)": FunctionFragment;
+    "factory()": FunctionFragment;
+    "fees(uint256)": FunctionFragment;
     "getPolicyExpiration(address)": FunctionFragment;
     "getPolicyLimit(address)": FunctionFragment;
     "getQuote(uint256,uint256,address)": FunctionFragment;
@@ -56,6 +58,7 @@ interface UniswapV3ProductInterface extends ethers.utils.Interface {
     "tokenToEth(address,uint256)": FunctionFragment;
     "treasury()": FunctionFragment;
     "updateActivePolicies()": FunctionFragment;
+    "weth()": FunctionFragment;
   };
 
   encodeFunctionData(
@@ -91,6 +94,8 @@ interface UniswapV3ProductInterface extends ethers.utils.Interface {
     functionFragment: "extendPolicy",
     values: [BigNumberish, BigNumberish]
   ): string;
+  encodeFunctionData(functionFragment: "factory", values?: undefined): string;
+  encodeFunctionData(functionFragment: "fees", values: [BigNumberish]): string;
   encodeFunctionData(
     functionFragment: "getPolicyExpiration",
     values: [string]
@@ -172,6 +177,7 @@ interface UniswapV3ProductInterface extends ethers.utils.Interface {
     functionFragment: "updateActivePolicies",
     values?: undefined
   ): string;
+  encodeFunctionData(functionFragment: "weth", values?: undefined): string;
 
   decodeFunctionResult(
     functionFragment: "activeCoverAmount",
@@ -203,6 +209,8 @@ interface UniswapV3ProductInterface extends ethers.utils.Interface {
     functionFragment: "extendPolicy",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(functionFragment: "factory", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "fees", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "getPolicyExpiration",
     data: BytesLike
@@ -269,6 +277,7 @@ interface UniswapV3ProductInterface extends ethers.utils.Interface {
     functionFragment: "updateActivePolicies",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(functionFragment: "weth", data: BytesLike): Result;
 
   events: {
     "PolicyCanceled(uint256)": EventFragment;
@@ -412,6 +421,32 @@ export class UniswapV3Product extends Contract {
       _blocks: BigNumberish,
       overrides?: PayableOverrides
     ): Promise<ContractTransaction>;
+
+    factory(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "factory()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    fees(
+      arg0: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: number;
+    }>;
+
+    "fees(uint256)"(
+      arg0: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: number;
+    }>;
 
     getPolicyExpiration(
       _policy: string,
@@ -708,6 +743,18 @@ export class UniswapV3Product extends Contract {
     "updateActivePolicies()"(
       overrides?: Overrides
     ): Promise<ContractTransaction>;
+
+    weth(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "weth()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
   };
 
   activeCoverAmount(overrides?: CallOverrides): Promise<BigNumber>;
@@ -785,6 +832,17 @@ export class UniswapV3Product extends Contract {
     _blocks: BigNumberish,
     overrides?: PayableOverrides
   ): Promise<ContractTransaction>;
+
+  factory(overrides?: CallOverrides): Promise<string>;
+
+  "factory()"(overrides?: CallOverrides): Promise<string>;
+
+  fees(arg0: BigNumberish, overrides?: CallOverrides): Promise<number>;
+
+  "fees(uint256)"(
+    arg0: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<number>;
 
   getPolicyExpiration(
     _policy: string,
@@ -968,6 +1026,10 @@ export class UniswapV3Product extends Contract {
 
   "updateActivePolicies()"(overrides?: Overrides): Promise<ContractTransaction>;
 
+  weth(overrides?: CallOverrides): Promise<string>;
+
+  "weth()"(overrides?: CallOverrides): Promise<string>;
+
   callStatic: {
     activeCoverAmount(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -1044,6 +1106,17 @@ export class UniswapV3Product extends Contract {
       _blocks: BigNumberish,
       overrides?: CallOverrides
     ): Promise<boolean>;
+
+    factory(overrides?: CallOverrides): Promise<string>;
+
+    "factory()"(overrides?: CallOverrides): Promise<string>;
+
+    fees(arg0: BigNumberish, overrides?: CallOverrides): Promise<number>;
+
+    "fees(uint256)"(
+      arg0: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<number>;
 
     getPolicyExpiration(
       _policy: string,
@@ -1233,6 +1306,10 @@ export class UniswapV3Product extends Contract {
       0: BigNumber;
       1: BigNumber;
     }>;
+
+    weth(overrides?: CallOverrides): Promise<string>;
+
+    "weth()"(overrides?: CallOverrides): Promise<string>;
   };
 
   filters: {
@@ -1318,6 +1395,17 @@ export class UniswapV3Product extends Contract {
       _policyID: BigNumberish,
       _blocks: BigNumberish,
       overrides?: PayableOverrides
+    ): Promise<BigNumber>;
+
+    factory(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "factory()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    fees(arg0: BigNumberish, overrides?: CallOverrides): Promise<BigNumber>;
+
+    "fees(uint256)"(
+      arg0: BigNumberish,
+      overrides?: CallOverrides
     ): Promise<BigNumber>;
 
     getPolicyExpiration(
@@ -1501,6 +1589,10 @@ export class UniswapV3Product extends Contract {
     updateActivePolicies(overrides?: Overrides): Promise<BigNumber>;
 
     "updateActivePolicies()"(overrides?: Overrides): Promise<BigNumber>;
+
+    weth(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "weth()"(overrides?: CallOverrides): Promise<BigNumber>;
   };
 
   populateTransaction: {
@@ -1584,6 +1676,20 @@ export class UniswapV3Product extends Contract {
       _policyID: BigNumberish,
       _blocks: BigNumberish,
       overrides?: PayableOverrides
+    ): Promise<PopulatedTransaction>;
+
+    factory(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "factory()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    fees(
+      arg0: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "fees(uint256)"(
+      arg0: BigNumberish,
+      overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
     getPolicyExpiration(
@@ -1783,5 +1889,9 @@ export class UniswapV3Product extends Contract {
     "updateActivePolicies()"(
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
+
+    weth(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "weth()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
   };
 }

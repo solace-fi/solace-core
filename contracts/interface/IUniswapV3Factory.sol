@@ -3,7 +3,7 @@
 pragma solidity 0.8.0;
 
 /// @title The interface for the Uniswap V3 Factory
-    /// @notice The Uniswap V3 Factory facilitates creation of Uniswap V3 pools and control over the protocol fees
+/// @notice The Uniswap V3 Factory facilitates creation of Uniswap V3 pools and control over the protocol fees
 interface IUniswapV3Factory {
     /// @notice Emitted when the owner of the factory is changed
     /// @param oldOwner The owner before the owner was changed
@@ -20,7 +20,7 @@ interface IUniswapV3Factory {
         address indexed token0,
         address indexed token1,
         uint24 indexed fee,
-        int24 tickSpacing,  
+        int24 tickSpacing,
         address pool
     );
 

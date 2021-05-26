@@ -12,9 +12,9 @@ import { encodePriceSqrt, FeeAmount, TICK_SPACINGS, getMaxTick, getMinTick } fro
 import { encodePath } from "./utilities/path";
 chai.use(solidity);
 
-import UniswapV3ProductArtifact from '../artifacts/contracts/products/UniswapV3Product.sol/UniswapV3Product.json'
-import PolicyManagerArtifact from '../artifacts/contracts/PolicyManager.sol/PolicyManager.json'
-import ClaimsAdjusterArtifact from '../artifacts/contracts/ClaimsAdjustor.sol/ClaimsAdjustor.json'
+import UniswapV3ProductArtifact from "../artifacts/contracts/products/UniswapV3Product.sol/UniswapV3Product.json"
+import PolicyManagerArtifact from "../artifacts/contracts/PolicyManager.sol/PolicyManager.json"
+import ClaimsAdjusterArtifact from "../artifacts/contracts/ClaimsAdjustor.sol/ClaimsAdjustor.json"
 import RegistryArtifact from "../artifacts/contracts/Registry.sol/Registry.json";
 import SolaceArtifact from "../artifacts/contracts/SOLACE.sol/SOLACE.json"
 import WETHArtifact from "../artifacts/contracts/mocks/MockWETH.sol/MockWETH.json";
@@ -28,7 +28,7 @@ import UniswapV3PoolArtifact from "@uniswap/v3-core/artifacts/contracts/UniswapV
 import SwapRouterArtifact from "@uniswap/v3-periphery/artifacts/contracts/SwapRouter.sol/SwapRouter.json";
 import NonfungiblePositionManager from "@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json";
 
-describe('UniswapV3Product', () => {
+describe("UniswapV3Product", () => {
   const [deployer, governor, liquidityProvider, user] = provider.getWallets();
 
   // solace contracts
@@ -50,9 +50,11 @@ describe('UniswapV3Product', () => {
   let uniswapPositionManager: Contract;
 
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-  const ONE_HUNDRED = BN.from("100");
-  const ONE_ETHER = BN.from("1000000000000000000");
-  const TEN_ETHER = BN.from("10000000000000000000");
+  const ONE_HUNDRED       = BN.from("100");
+  const TEN_THOUSAND      = BN.from("10000");
+  const HUNDRED_THOUSAND  = BN.from("100000");
+  const ONE_ETHER         = BN.from("1000000000000000000");
+  const TEN_ETHER         = BN.from("10000000000000000000");
   const ONE_MILLION_ETHER = BN.from("1000000000000000000000000");
 
   //let coveredPlatform: "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f"; // testing UniswapFactory for cover
@@ -201,8 +203,9 @@ describe('UniswapV3Product', () => {
     // transfer tokens
     await solace.connect(deployer).addMinter(governor.address);
     await solace.connect(governor).mint(governor.address, ONE_MILLION_ETHER);
-    await weth.connect(liquidityProvider).deposit({value: TEN_ETHER});
     await solace.connect(governor).transfer(liquidityProvider.address, TEN_ETHER);
+    await weth.connect(liquidityProvider).deposit({value: TEN_ETHER});
+    await weth.connect(user).deposit({value: TEN_ETHER});
     await mockToken1.transfer(liquidityProvider.address, TEN_ETHER);
     await mockToken2.transfer(liquidityProvider.address, TEN_ETHER);
     await mockToken3.transfer(liquidityProvider.address, TEN_ETHER);
@@ -225,15 +228,15 @@ describe('UniswapV3Product', () => {
     //mockToken4Path = encodePath([randAddress.address, randAddress.address], [FeeAmount.MEDIUM]);
   })
 
-  describe('governance', function () {
-    it('can transfer governance', async function () {
+  describe("governance", function () {
+    it("can transfer governance", async function () {
       await product.setGovernance(governor.address);
       expect(await product.governance()).to.equal(governor.address);
     })
   })
 
-  describe('claimsAdjuster', function () {
-    it('should set claimsAdjuster', async function () {
+  describe("claimsAdjuster", function () {
+    it("should set claimsAdjuster", async function () {
       await product.connect(governor).setClaimsAdjuster(claimsAdjuster.address);
       expect(await product.claimsAdjuster()).to.equal(claimsAdjuster.address);
     });
@@ -242,36 +245,36 @@ describe('UniswapV3Product', () => {
     });
   })
 
-  describe('productParameters', function () {
-    it('can set setPrice', async function () {
+  describe("productParameters", function () {
+    it("can set setPrice", async function () {
       await product.connect(governor).setPrice(price);
       expect(await product.price()).to.equal(price);
     })
     it("should revert if not called by governance", async function () {
       await expect(product.connect(deployer).setClaimsAdjuster(claimsAdjuster.address)).to.be.revertedWith("!governance");
     });
-    it('can set cancelFee', async function () {
+    it("can set cancelFee", async function () {
       await product.connect(governor).setCancelFee(cancelFee);
       expect(await product.cancelFee()).to.equal(cancelFee);
     })
     it("should revert if not called by governance", async function () {
       await expect(product.connect(deployer).setCancelFee(cancelFee)).to.be.revertedWith("!governance");
     });
-    it('can set minPeriod', async function () {
+    it("can set minPeriod", async function () {
       await product.connect(governor).setMinPeriod(minPeriod);
       expect(await product.minPeriod()).to.equal(minPeriod);
     })
     it("should revert if not called by governance", async function () {
       await expect(product.connect(deployer).setMinPeriod(minPeriod)).to.be.revertedWith("!governance");
     });
-    it('can set maxPeriod', async function () {
+    it("can set maxPeriod", async function () {
       await product.connect(governor).setMaxPeriod(maxPeriod);
       expect(await product.maxPeriod()).to.equal(maxPeriod);
     })
     it("should revert if not called by governance", async function () {
       await expect(product.connect(deployer).setMaxPeriod(maxPeriod)).to.be.revertedWith("!governance");
     });
-    it('can set maxCoverAmount', async function () {
+    it("can set maxCoverAmount", async function () {
       await product.connect(governor).setMaxCoverAmount(maxCoverAmount);
       expect(await product.maxCoverAmount()).to.equal(maxCoverAmount);
     })
@@ -287,17 +290,51 @@ describe('UniswapV3Product', () => {
 
     it("tokens that cannot be converted to eth have no value", async function () {
       await createPool(mockToken1, mockToken2, FeeAmount.LOW);
-      let tokenId = await mintLpToken(liquidityProvider, mockToken1, mockToken2, FeeAmount.LOW, ONE_ETHER);
+      let [_, tokenId] = await mintLpToken(liquidityProvider, mockToken1, mockToken2, FeeAmount.LOW, ONE_ETHER);
       expect(await product.appraisePosition(liquidityProvider.address, uniswapPositionManager.address)).to.equal(0);
       await burnLpToken(liquidityProvider, tokenId);
     })
 
     it("only position in a token/eth pool should only have eth value", async function () {
       await createPool(mockToken1, weth, FeeAmount.LOW);
-      let tokenId = await mintLpToken(liquidityProvider, mockToken1, weth, FeeAmount.LOW, ONE_ETHER);
+      let [_, tokenId] = await mintLpToken(liquidityProvider, mockToken1, weth, FeeAmount.LOW, ONE_ETHER);
       expectClose(await product.appraisePosition(liquidityProvider.address, uniswapPositionManager.address), ONE_ETHER);
       await burnLpToken(liquidityProvider, tokenId);
       expect(await product.appraisePosition(liquidityProvider.address, uniswapPositionManager.address)).to.equal(0);
+    })
+
+    it("should swap other token in pool with liquidity", async function () {
+      // add liquidity to pool
+      let [_, tokenId1] = await mintLpToken(liquidityProvider, mockToken1, weth, FeeAmount.LOW, ONE_ETHER);
+      // swap eth to mock1
+      let balances1 = await getBalances(user);
+      await mockToken1.connect(user).approve(uniswapRouter.address, constants.MaxUint256);
+      await weth.connect(user).approve(uniswapRouter.address, constants.MaxUint256);
+      let tx1 = await uniswapRouter.connect(user).exactInputSingle({
+        tokenIn: weth.address,
+        tokenOut: mockToken1.address,
+        fee: FeeAmount.LOW,
+        recipient: user.address,
+        deadline: constants.MaxUint256,
+        amountIn: HUNDRED_THOUSAND,
+        amountOutMinimum: 0,
+        sqrtPriceLimitX96: 0
+      });
+      let balances2 = await getBalances(user);
+      let receipt1 = await tx1.wait();
+      let gasCost1 = receipt1.gasUsed.mul(tx1.gasPrice);
+      // create position
+      let [tx2, tokenId2] = await mintLpToken(user, mockToken1, weth, FeeAmount.LOW, balances2.userMock1);
+      let receipt2 = await tx2.wait();
+      let gasCost2 = receipt2.gasUsed.mul(tx2.gasPrice);
+      let balances3 = await getBalances(user);
+      // appraise position
+      let ethCost = getBalancesDiff(balances1, balances3).userEth.sub(gasCost1).sub(gasCost2);
+      let ethValue = await product.appraisePosition(user.address, uniswapPositionManager.address);
+      expect(ethValue).to.equal(ethCost);
+      // zero pool
+      await burnLpToken(liquidityProvider, tokenId1);
+      await burnLpToken(user, tokenId2);
     })
   })
 
@@ -340,10 +377,10 @@ describe('UniswapV3Product', () => {
     tickLower: BigNumberish = getMinTick(TICK_SPACINGS[fee]),
     tickUpper: BigNumberish = getMaxTick(TICK_SPACINGS[fee])
   ) {
-    await tokenA.connect(liquidityProvider).approve(uniswapPositionManager.address, amount);
-    await tokenB.connect(liquidityProvider).approve(uniswapPositionManager.address, amount);
+    await tokenA.connect(liquidityProvider).approve(uniswapPositionManager.address, constants.MaxUint256);
+    await tokenB.connect(liquidityProvider).approve(uniswapPositionManager.address, constants.MaxUint256);
     let [token0, token1] = sortTokens(tokenA.address, tokenB.address);
-    await uniswapPositionManager.connect(liquidityProvider).mint({
+    let tx = await uniswapPositionManager.connect(liquidityProvider).mint({
       token0: token0,
       token1: token1,
       tickLower: tickLower,
@@ -357,7 +394,7 @@ describe('UniswapV3Product', () => {
       deadline: constants.MaxUint256,
     });
     let tokenId = await uniswapPositionManager.totalSupply();
-    return tokenId;
+    return [tx, tokenId];
   }
 
   async function burnLpToken(
@@ -369,8 +406,55 @@ describe('UniswapV3Product', () => {
       tokenId: tokenId,
       liquidity: position.liquidity,
       amount0Min: 0,
-      amount1Min: 1,
+      amount1Min: 0,
       deadline: constants.MaxUint256
     })
+    // token still exists but with zero liquidity
+  }
+
+  interface Balances {
+    userSolace: BN,
+    userEth: BN,
+    userWeth: BN,
+    userMock1: BN,
+    userMock2: BN,
+    userMock3: BN,
+    userMock4: BN
+  }
+
+  async function getBalances(user: Wallet): Promise<Balances> {
+    return {
+      userSolace: await solace.balanceOf(user.address),
+      userEth: await user.getBalance(),
+      userWeth: await weth.balanceOf(user.address),
+      userMock1: await mockToken1.balanceOf(user.address),
+      userMock2: await mockToken2.balanceOf(user.address),
+      userMock3: await mockToken3.balanceOf(user.address),
+      userMock4: await mockToken4.balanceOf(user.address)
+    }
+  }
+
+  function getBalancesDiff(balances1: Balances, balances2: Balances) : Balances {
+    return {
+      userSolace: balances1.userSolace.sub(balances2.userSolace),
+      userEth: balances1.userEth.sub(balances2.userEth),
+      userWeth: balances1.userWeth.sub(balances2.userWeth),
+      userMock1: balances1.userMock1.sub(balances2.userMock1),
+      userMock2: balances1.userMock2.sub(balances2.userMock2),
+      userMock3: balances1.userMock3.sub(balances2.userMock3),
+      userMock4: balances1.userMock4.sub(balances2.userMock4)
+    }
+  }
+
+  function printBalances(balances: Balances): void {
+    console.log("{");
+    console.log(`  solace : ${balances.userSolace}`);
+    console.log(`  eth    : ${balances.userEth}`);
+    console.log(`  weth   : ${balances.userWeth}`);
+    console.log(`  mock1  : ${balances.userMock1}`);
+    console.log(`  mock2  : ${balances.userMock2}`);
+    console.log(`  mock3  : ${balances.userMock3}`);
+    console.log(`  mock4  : ${balances.userMock4}`);
+    console.log("}");
   }
 })

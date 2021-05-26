@@ -2,9 +2,9 @@
 pragma solidity 0.8.0;
 
 import "@openzeppelin/contracts/utils/Address.sol";
-import './interface/IProduct.sol';
-import './interface/IPolicyManager.sol';
-import './interface/ITreasury.sol';
+import "./interface/IProduct.sol";
+import "./interface/IPolicyManager.sol";
+import "./interface/ITreasury.sol";
 
 /* TODO
  * - treasury refund() function, check transfer to treasury when buyPolicy()
@@ -226,7 +226,7 @@ abstract contract BaseProduct is IProduct {
     function buyPolicy(uint256 _coverLimit, uint256 _blocks, address _policyholder, address _positionContract) external payable override returns (uint256 policyID){
         // check that the buyer has a position in the covered protocol
         uint256 positionAmount = appraisePosition(_policyholder, _positionContract);
-        require(positionAmount != 0, 'zero position value');
+        require(positionAmount != 0, "zero position value");
 
         // check that the product can provide coverage for this policy
         uint256 coverAmount = _coverLimit/100 * positionAmount;
@@ -265,7 +265,7 @@ abstract contract BaseProduct is IProduct {
     // function updateCoverLimit(uint256 _policyID, uint256 _coverLimit) external payable override returns (bool){
     //     // check that the msg.sender is the policyholder
     //     address policyholder = policyManager.getPolicyholder(_policyID);
-    //     require(policyholder == msg.sender,'!policyholder');
+    //     require(policyholder == msg.sender,"!policyholder");
     //     // compute the extra premium = newPremium - paidPremium (or the refund amount)
     //     uint256 previousPrice = policyManager.getPolicyPrice(_policyID);
     //     uint256 expirationBlock = policyManager.getPolicyExpirationBlock(_policyID);
@@ -298,7 +298,7 @@ abstract contract BaseProduct is IProduct {
     function extendPolicy(uint256 _policyID, uint256 _blocks) external payable override returns (bool){
         // check that the msg.sender is the policyholder
         address policyholder = policyManager.getPolicyholder(_policyID);
-        require(policyholder == msg.sender,'!policyholder');
+        require(policyholder == msg.sender,"!policyholder");
         // compute the premium
         uint256 coverAmount = policyManager.getPolicyCoverAmount(_policyID);
         uint256 premium = coverAmount * _blocks * price;
@@ -321,10 +321,10 @@ abstract contract BaseProduct is IProduct {
      * @return True if successfully cancelled else False
      */
     function cancelPolicy(uint256 _policyID) external override returns (bool){
-        require(policyManager.getPolicyholder(_policyID) == msg.sender,'!policyholder');
+        require(policyManager.getPolicyholder(_policyID) == msg.sender,"!policyholder");
         uint256 blocksLeft = policyManager.getPolicyExpirationBlock(_policyID) - block.number;
         uint256 refundAmount = blocksLeft * policyManager.getPolicyPrice(_policyID);
-        require(refundAmount > cancelFee, 'refund amount less than cancelation fee');
+        require(refundAmount > cancelFee, "refund amount less than cancelation fee");
         policyManager.burn(_policyID);
         treasury.refund(msg.sender, refundAmount - cancelFee);
         emit PolicyCanceled(_policyID);
