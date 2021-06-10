@@ -18,104 +18,8 @@ export class ITreasuryFactory {
 
 const _abi = [
   {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "_amount",
-        type: "uint256",
-      },
-    ],
-    name: "EthDeposited",
-    type: "event",
-  },
-  {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: false,
-        internalType: "address",
-        name: "_token",
-        type: "address",
-      },
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "_amount",
-        type: "uint256",
-      },
-      {
-        indexed: false,
-        internalType: "address",
-        name: "_recipient",
-        type: "address",
-      },
-    ],
-    name: "FundsSpent",
-    type: "event",
-  },
-  {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: false,
-        internalType: "address",
-        name: "_newGovernance",
-        type: "address",
-      },
-    ],
-    name: "GovernanceTransferred",
-    type: "event",
-  },
-  {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: false,
-        internalType: "address",
-        name: "_token",
-        type: "address",
-      },
-      {
-        indexed: false,
-        internalType: "bytes",
-        name: "_path",
-        type: "bytes",
-      },
-    ],
-    name: "PathSet",
-    type: "event",
-  },
-  {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: false,
-        internalType: "address",
-        name: "_token",
-        type: "address",
-      },
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "_amount",
-        type: "uint256",
-      },
-    ],
-    name: "TokenDeposited",
-    type: "event",
-  },
-  {
     stateMutability: "payable",
     type: "fallback",
-  },
-  {
-    inputs: [],
-    name: "acceptGovernance",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
   },
   {
     inputs: [],
@@ -143,29 +47,21 @@ const _abi = [
     type: "function",
   },
   {
-    inputs: [],
-    name: "governance",
-    outputs: [
+    inputs: [
       {
         internalType: "address",
-        name: "",
+        name: "_user",
         type: "address",
       },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "newGovernance",
-    outputs: [
       {
-        internalType: "address",
-        name: "",
-        type: "address",
+        internalType: "uint256",
+        name: "_amount",
+        type: "uint256",
       },
     ],
-    stateMutability: "view",
+    name: "refund",
+    outputs: [],
+    stateMutability: "nonpayable",
     type: "function",
   },
   {
@@ -224,6 +120,11 @@ const _abi = [
   },
   {
     inputs: [
+      {
+        internalType: "address",
+        name: "_token",
+        type: "address",
+      },
       {
         internalType: "bytes",
         name: "_path",

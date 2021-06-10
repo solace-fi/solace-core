@@ -127,7 +127,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard {
         address _pool,
         address _weth,
         address _appraisor
-    ) public {
+    ) {
         // copy params
         governance = _governance;
         master = _master;

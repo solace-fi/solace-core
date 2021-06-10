@@ -30,7 +30,7 @@ contract LpAppraisor is ILpAppraisor {
         address _lpToken,
         uint256 _curve_A,
         uint256 _curve_B
-    ) public {
+    ) {
         governance = _governance;
         lpToken = IUniswapLpToken(_lpToken);
         curve_A = _curve_A;

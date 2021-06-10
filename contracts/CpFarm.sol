@@ -87,7 +87,7 @@ contract CpFarm is ICpFarm, ReentrancyGuard {
         uint256 _endBlock,
         address _swapRouter,
         address _weth
-    ) public {
+    ) {
         governance = _governance;
         master = _master;
         vault = IVault(_vault);

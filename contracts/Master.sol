@@ -49,7 +49,7 @@ contract Master is IMaster {
      * @param _solace Address of the solace token.
      * @param _solacePerBlock Amount of solace to distribute per block.
      */
-    constructor(address _governance, SOLACE _solace, uint256 _solacePerBlock) public {
+    constructor(address _governance, SOLACE _solace, uint256 _solacePerBlock) {
         governance = _governance;
         solace = _solace;
         solacePerBlock = _solacePerBlock;
