@@ -3,6 +3,8 @@
 /* eslint-disable */
 export { Erc20Factory } from "./Erc20Factory";
 export type { Erc20 } from "./Erc20";
+export { Erc721Factory } from "./Erc721Factory";
+export type { Erc721 } from "./Erc721";
 export { ClaimsAdjustorFactory } from "./ClaimsAdjustorFactory";
 export type { ClaimsAdjustor } from "./ClaimsAdjustor";
 export { ClaimsEscrowFactory } from "./ClaimsEscrowFactory";
@@ -19,6 +21,8 @@ export { MockStrategyFactory } from "./MockStrategyFactory";
 export type { MockStrategy } from "./MockStrategy";
 export { Weth9Factory } from "./Weth9Factory";
 export type { Weth9 } from "./Weth9";
+export { PolicyManagerFactory } from "./PolicyManagerFactory";
+export type { PolicyManager } from "./PolicyManager";
 export { RegistryFactory } from "./RegistryFactory";
 export type { Registry } from "./Registry";
 export { SolaceFactory } from "./SolaceFactory";
