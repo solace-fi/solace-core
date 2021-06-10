@@ -112,7 +112,7 @@ contract UniswapLpFarm is IUniswapLpFarm {
         uint256 _startBlock,
         uint256 _endBlock,
         address _pool
-    ) public {
+    ) {
         // copy params
         master = _master;
         lpToken = IUniswapLpToken(_lpToken);

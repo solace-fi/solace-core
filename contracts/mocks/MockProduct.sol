@@ -12,7 +12,8 @@ import "../BaseProduct.sol";
 contract MockProduct is BaseProduct {
 
    constructor (
-        PolicyManager _policyManager,
+        IPolicyManager _policyManager,
+        ITreasury _treasury,
         address _coveredPlatform,
         address _claimsAdjuster,
         uint256 _price,
@@ -21,6 +22,7 @@ contract MockProduct is BaseProduct {
         uint256 _maxPeriod,
         uint256 _maxCoverAmount) BaseProduct(
         _policyManager,
+        _treasury,
         _coveredPlatform,
         _claimsAdjuster,
         _price,
@@ -46,22 +48,22 @@ contract MockProduct is BaseProduct {
       return 0;
     } 
 
-    function getPolicyExpiration(address _policy) external override view returns (uint256 expirationDate) {
+    function getPolicyExpiration(address _policy) external view returns (uint256 expirationDate) {
       return maxPeriod;
     }
 
-    function getPolicyLimit(address _policy) external override view returns (uint256 coverLimit) {
+    function getPolicyLimit(address _policy) external view returns (uint256 coverLimit) {
       return maxCoverAmount;
     }
 
-    function getTotalCovered() external override view returns (uint256 coveredAmount) {
+    function getTotalCovered() external view returns (uint256 coveredAmount) {
       return activeCoverAmount;
     }
 
-    function getTotalPosition(address _buyer) external override view returns (uint256 positionAmount) {
+    function getTotalPosition(address _buyer) external view returns (uint256 positionAmount) {
       // iterate over activePolicyIds to get users total position
       for (uint i = 0; i < activePolicyIDs.length; i++) {
-         if (policyManager.getPolicyholderAddress(i) == _buyer) {
+         if (policyManager.getPolicyholder(i) == _buyer) {
            return policyManager.getPolicyCoverAmount(i);
          }
       }

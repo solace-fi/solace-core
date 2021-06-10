@@ -30,7 +30,7 @@ contract UniswapLpAppraiser is INftAppraiser {
      * @notice Constructs the Uniswap LP Appraiser contract.
      * @param _contract The address of the token contract.
      */
-    constructor(address _contract) public {
+    constructor(address _contract) {
         nftContract = _contract;
         governance = msg.sender;
     }

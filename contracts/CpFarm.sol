@@ -70,7 +70,7 @@ contract CpFarm is ICpFarm {
         SOLACE _solace,
         uint256 _startBlock,
         uint256 _endBlock
-    ) public {
+    ) {
         master = _master;
         vault = IVault(_vault);
         solace = _solace;

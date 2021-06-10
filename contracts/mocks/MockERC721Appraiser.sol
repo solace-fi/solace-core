@@ -14,7 +14,7 @@ contract MockERC721Appraiser is INftAppraiser {
 
     address public nftContract;
 
-    constructor(address _contract) public {
+    constructor(address _contract) {
         nftContract = _contract;
     }
 

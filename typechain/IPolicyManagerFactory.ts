@@ -5,14 +5,14 @@
 import { Contract, Signer } from "ethers";
 import { Provider } from "@ethersproject/providers";
 
-import type { BaseProduct } from "./BaseProduct";
+import type { IPolicyManager } from "./IPolicyManager";
 
-export class BaseProductFactory {
+export class IPolicyManagerFactory {
   static connect(
     address: string,
     signerOrProvider: Signer | Provider
-  ): BaseProduct {
-    return new Contract(address, _abi, signerOrProvider) as BaseProduct;
+  ): IPolicyManager {
+    return new Contract(address, _abi, signerOrProvider) as IPolicyManager;
   }
 }
 
@@ -23,11 +23,11 @@ const _abi = [
       {
         indexed: false,
         internalType: "uint256",
-        name: "policyID",
+        name: "tokenID",
         type: "uint256",
       },
     ],
-    name: "PolicyCanceled",
+    name: "PolicyBurned",
     type: "event",
   },
   {
@@ -36,7 +36,7 @@ const _abi = [
       {
         indexed: false,
         internalType: "uint256",
-        name: "policyID",
+        name: "tokenID",
         type: "uint256",
       },
     ],
@@ -48,44 +48,51 @@ const _abi = [
     inputs: [
       {
         indexed: false,
-        internalType: "uint256",
-        name: "policyID",
-        type: "uint256",
+        internalType: "address",
+        name: "product",
+        type: "address",
       },
     ],
-    name: "PolicyExtended",
+    name: "ProductAdded",
     type: "event",
   },
   {
-    inputs: [],
-    name: "activeCoverAmount",
-    outputs: [
+    anonymous: false,
+    inputs: [
       {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
+        indexed: false,
+        internalType: "address",
+        name: "product",
+        type: "address",
       },
     ],
-    stateMutability: "view",
+    name: "ProductRemoved",
+    type: "event",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "_product",
+        type: "address",
+      },
+    ],
+    name: "addProduct",
+    outputs: [],
+    stateMutability: "nonpayable",
     type: "function",
   },
   {
     inputs: [
       {
         internalType: "uint256",
-        name: "",
+        name: "_tokenId",
         type: "uint256",
       },
     ],
-    name: "activePolicyIDs",
-    outputs: [
-      {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "view",
+    name: "burn",
+    outputs: [],
+    stateMutability: "nonpayable",
     type: "function",
   },
   {
@@ -100,55 +107,42 @@ const _abi = [
         name: "_positionContract",
         type: "address",
       },
-    ],
-    name: "appraisePosition",
-    outputs: [
       {
         internalType: "uint256",
-        name: "positionAmount",
+        name: "_expirationBlock",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "_coverAmount",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "_price",
         type: "uint256",
       },
     ],
-    stateMutability: "view",
+    name: "createPolicy",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "tokenID",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "nonpayable",
     type: "function",
   },
   {
     inputs: [
       {
         internalType: "uint256",
-        name: "_coverLimit",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "_blocks",
-        type: "uint256",
-      },
-      {
-        internalType: "address",
-        name: "_policyholder",
-        type: "address",
-      },
-      {
-        internalType: "address",
-        name: "_positionContract",
-        type: "address",
-      },
-    ],
-    name: "buyPolicy",
-    outputs: [
-      {
-        internalType: "uint256",
-        name: "policyID",
+        name: "_policyID",
         type: "uint256",
       },
     ],
-    stateMutability: "payable",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "cancelFee",
+    name: "getPolicyCoverAmount",
     outputs: [
       {
         internalType: "uint256",
@@ -167,27 +161,77 @@ const _abi = [
         type: "uint256",
       },
     ],
-    name: "cancelPolicy",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "claimsAdjuster",
+    name: "getPolicyExpirationBlock",
     outputs: [
       {
-        internalType: "address",
+        internalType: "uint256",
         name: "",
-        type: "address",
+        type: "uint256",
       },
     ],
     stateMutability: "view",
     type: "function",
   },
   {
-    inputs: [],
-    name: "coveredPlatform",
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_policyID",
+        type: "uint256",
+      },
+    ],
+    name: "getPolicyParams",
+    outputs: [
+      {
+        components: [
+          {
+            internalType: "address",
+            name: "policyholder",
+            type: "address",
+          },
+          {
+            internalType: "address",
+            name: "product",
+            type: "address",
+          },
+          {
+            internalType: "address",
+            name: "positionContract",
+            type: "address",
+          },
+          {
+            internalType: "uint256",
+            name: "expirationBlock",
+            type: "uint256",
+          },
+          {
+            internalType: "uint256",
+            name: "coverAmount",
+            type: "uint256",
+          },
+          {
+            internalType: "uint256",
+            name: "price",
+            type: "uint256",
+          },
+        ],
+        internalType: "struct IPolicyManager.PolicyTokenURIParams",
+        name: "",
+        type: "tuple",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_policyID",
+        type: "uint256",
+      },
+    ],
+    name: "getPolicyPositionContract",
     outputs: [
       {
         internalType: "address",
@@ -205,127 +249,8 @@ const _abi = [
         name: "_policyID",
         type: "uint256",
       },
-      {
-        internalType: "uint256",
-        name: "_blocks",
-        type: "uint256",
-      },
     ],
-    name: "extendPolicy",
-    outputs: [],
-    stateMutability: "payable",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "_coverLimit",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "_blocks",
-        type: "uint256",
-      },
-      {
-        internalType: "address",
-        name: "_positionContract",
-        type: "address",
-      },
-    ],
-    name: "getQuote",
-    outputs: [
-      {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "governance",
-    outputs: [
-      {
-        internalType: "address",
-        name: "",
-        type: "address",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "maxCoverAmount",
-    outputs: [
-      {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "maxPeriod",
-    outputs: [
-      {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "minPeriod",
-    outputs: [
-      {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "policyManager",
-    outputs: [
-      {
-        internalType: "contract IPolicyManager",
-        name: "",
-        type: "address",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "price",
-    outputs: [
-      {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "productPolicyCount",
+    name: "getPolicyPrice",
     outputs: [
       {
         internalType: "uint256",
@@ -340,24 +265,62 @@ const _abi = [
     inputs: [
       {
         internalType: "uint256",
-        name: "_cancelFee",
+        name: "_policyID",
         type: "uint256",
       },
     ],
-    name: "setCancelFee",
-    outputs: [],
-    stateMutability: "nonpayable",
+    name: "getPolicyProduct",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_policyID",
+        type: "uint256",
+      },
+    ],
+    name: "getPolicyholder",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "myPolicies",
+    outputs: [
+      {
+        internalType: "uint256[]",
+        name: "",
+        type: "uint256[]",
+      },
+    ],
+    stateMutability: "view",
     type: "function",
   },
   {
     inputs: [
       {
         internalType: "address",
-        name: "_claimsAdjuster",
+        name: "_product",
         type: "address",
       },
     ],
-    name: "setClaimsAdjuster",
+    name: "removeProduct",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -379,83 +342,76 @@ const _abi = [
     inputs: [
       {
         internalType: "uint256",
-        name: "_maxCoverAmount",
+        name: "_tokenId",
         type: "uint256",
       },
-    ],
-    name: "setMaxCoverAmount",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [
+      {
+        internalType: "address",
+        name: "_policyholder",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "_positionContract",
+        type: "address",
+      },
       {
         internalType: "uint256",
-        name: "_maxPeriod",
+        name: "_expirationBlock",
         type: "uint256",
       },
-    ],
-    name: "setMaxPeriod",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [
       {
         internalType: "uint256",
-        name: "_minPeriod",
+        name: "_coverAmount",
         type: "uint256",
       },
-    ],
-    name: "setMinPeriod",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [
       {
         internalType: "uint256",
         name: "_price",
         type: "uint256",
       },
     ],
-    name: "setPrice",
+    name: "setTokenURI",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
   },
   {
-    inputs: [],
-    name: "treasury",
+    inputs: [
+      {
+        internalType: "bytes4",
+        name: "interfaceId",
+        type: "bytes4",
+      },
+    ],
+    name: "supportsInterface",
     outputs: [
       {
-        internalType: "contract ITreasury",
+        internalType: "bool",
         name: "",
-        type: "address",
+        type: "bool",
       },
     ],
     stateMutability: "view",
     type: "function",
   },
   {
-    inputs: [],
-    name: "updateActivePolicies",
-    outputs: [
+    inputs: [
       {
         internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "",
+        name: "tokenId",
         type: "uint256",
       },
     ],
-    stateMutability: "nonpayable",
+    name: "tokenURI",
+    outputs: [
+      {
+        internalType: "string",
+        name: "",
+        type: "string",
+      },
+    ],
+    stateMutability: "view",
     type: "function",
   },
 ];

@@ -65,7 +65,7 @@ contract Erc20Farm is IErc20Farm {
         address _rewardToken,
         uint256 _startBlock,
         uint256 _endBlock
-    ) public {
+    ) {
         master = _master;
         stakeToken = _stakeToken;
         rewardToken = _rewardToken;

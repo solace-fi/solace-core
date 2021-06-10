@@ -57,7 +57,7 @@ contract Registry is IRegistry {
     /**
      * @notice Constructs the registry contract.
      */
-    constructor() public {
+    constructor() {
         governance = msg.sender;
     }
 

@@ -116,7 +116,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm {
         uint256 _endBlock,
         address _pool,
         address _weth
-    ) public {
+    ) {
         // copy params
         master = _master;
         lpToken = IUniswapLpToken(_lpToken);

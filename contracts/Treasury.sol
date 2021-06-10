@@ -47,7 +47,7 @@ contract Treasury is ITreasury {
      * @param _swapRouter Address of uniswap router.
      * @param _weth Address of wrapped ether.
      */
-    constructor(SOLACE _solace, address _swapRouter, address _weth) public {
+    constructor(SOLACE _solace, address _swapRouter, address _weth) {
         solace = _solace;
         swapRouter = ISwapRouter(_swapRouter);
         weth = IWETH10(_weth);
@@ -158,6 +158,11 @@ contract Treasury is ITreasury {
             amountIn: _amountIn,
             amountOutMinimum: _amountOutMinimum
         }));
+    }
+
+    // used in Product
+    function refund(address _user, uint256 _amount) external override {
+        // TODO: implement
     }
 
     /**

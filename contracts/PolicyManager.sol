@@ -8,9 +8,7 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 
 
 /* TODO
- * - add events
  * - keep track of addresses who's policies expired and burned to later give discounts
- * - restrict transfers or separate buyer-policyholder notions
  */
 
 /**
@@ -20,6 +18,11 @@ import "@openzeppelin/contracts/utils/Strings.sol";
  */
 contract PolicyManager is ERC721URIStorage, ERC721Enumerable {
     using Address for address;
+
+    event ProductAdded(address product);
+    event ProductRemoved(address product);
+    event PolicyCreated(uint256 tokenID);
+    event PolicyBurned(uint256 tokenID);
 
     /// @notice governor
     address public governance;
@@ -63,6 +66,7 @@ contract PolicyManager is ERC721URIStorage, ERC721Enumerable {
     function addProduct(address _product) external {
         require(msg.sender == governance, "!governance");
         productIsActive[_product] = true;
+        emit ProductAdded(_product);
     }
 
     /**
@@ -73,6 +77,7 @@ contract PolicyManager is ERC721URIStorage, ERC721Enumerable {
     function removeProduct(address _product) external {
         require(msg.sender == governance, "!governance");
         productIsActive[_product] = false;
+        emit ProductRemoved(_product);
     }
 
     /*** POLICY VIEW FUNCTIONS 
@@ -161,8 +166,9 @@ contract PolicyManager is ERC721URIStorage, ERC721Enumerable {
         tokenID = totalPolicyCount++;
         _beforeTokenTransfer(address(0), _policyholder, tokenID);
         _mint(_policyholder, tokenID);
-        string memory tokenURI = _encodeTokenURI(tokenURIParams);
-        _setTokenURI(tokenID, tokenURI);
+        string memory tokenUri = _encodeTokenURI(tokenURIParams);
+        _setTokenURI(tokenID, tokenUri);
+        emit PolicyCreated(tokenID);
         return tokenID;
     }
 
@@ -195,8 +201,8 @@ contract PolicyManager is ERC721URIStorage, ERC721Enumerable {
             coverAmount: _coverAmount,
             price: _price
         });
-        string memory tokenURI = _encodeTokenURI(tokenURIParams);
-        _setTokenURI(_tokenId, tokenURI);
+        string memory tokenUri = _encodeTokenURI(tokenURIParams);
+        _setTokenURI(_tokenId, tokenUri);
     }
 
     /**
@@ -208,16 +214,17 @@ contract PolicyManager is ERC721URIStorage, ERC721Enumerable {
         require(productIsActive[msg.sender], "product !active");
         _beforeTokenTransfer(ownerOf(_tokenId), address(0), _tokenId);
         _burn(_tokenId);
+        emit PolicyBurned(_tokenId);
     }
 
     /**
      * @notice Encodes `tokenURI`
      * @param _params policy tokenURI parameteres passed as PolicyTokenURIParams struct
-     * @return string `tokenURI`
+     * @return uri
      */
-    function _encodeTokenURI(PolicyTokenURIParams memory _params) internal pure returns (string memory) {
-        string memory tokenURI = string(abi.encode(_params));
-        return tokenURI;
+    function _encodeTokenURI(PolicyTokenURIParams memory _params) internal pure returns (string memory uri) {
+        uri = string(abi.encode(_params));
+        return uri;
     }
 
     /**

@@ -43,7 +43,7 @@ contract ClaimsEscrow {
     function receiveClaim(address _claimant) external payable returns (uint256 claimId) {
         require(msg.sender == registry.vault(), "!vault");
 
-        uint256 claimId = _claimId;
+        claimId = _claimId;
         
         // Add claim to claims mapping
         claims[claimId] = Claim({
