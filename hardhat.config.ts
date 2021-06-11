@@ -12,7 +12,12 @@ const USE_PROCESSED_FILES = process.env.USE_PROCESSED_FILES === "true";
 const config: HardhatUserConfig = {
   defaultNetwork: "hardhat",
   networks: {
-    hardhat: { },
+    hardhat: {
+      forking: {
+        url: process.env.MAINNET_URL || '',
+        blockNumber: 12500000
+      }
+    },
     localhost: { url: "http://127.0.0.1:8545" },
     rinkeby: {
       url: process.env.RINKEBY_URL,
