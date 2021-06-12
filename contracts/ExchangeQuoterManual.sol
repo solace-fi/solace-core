@@ -21,12 +21,38 @@ contract ExchangeQuoterManual is IExchangeQuoter {
     // given a token, how much eth could one token buy (respecting decimals)
     mapping(address => uint256) public rates;
 
+    // Emitted when Governance is set
+    event GovernanceTransferred(address _newGovernance);
+
     /**
      * @notice Constructs the ExchangeQuoter contract.
      * @param _governance Address of the governor.
      */
     constructor(address _governance) {
         governance = _governance;
+    }
+
+    /**
+     * @notice Allows governance to be transferred to a new governor.
+     * Can only be called by the current governor.
+     * @param _governance The new governor.
+     */
+    function setGovernance(address _governance) external {
+        // can only be called by governor
+        require(msg.sender == governance, "!governance");
+        newGovernance = _governance;
+    }
+
+    /**
+     * @notice Accepts the governance role.
+     * Can only be called by the new governor.
+     */
+    function acceptGovernance() external {
+        // can only be called by new governor
+        require(msg.sender == newGovernance, "!governance");
+        governance = newGovernance;
+        newGovernance = address(0x0);
+        emit GovernanceTransferred(msg.sender);
     }
 
     /**

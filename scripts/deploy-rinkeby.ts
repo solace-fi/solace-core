@@ -1,7 +1,7 @@
 import hardhat from "hardhat";
 const { waffle, ethers } = hardhat;
 const { deployContract, provider } = waffle;
-import { BigNumber as BN, Contract } from "ethers";
+import { BigNumber as BN, Contract, constants } from "ethers";
 import { config as dotenv_config } from "dotenv";
 dotenv_config();
 import { LedgerSigner } from "@ethersproject/hardware-wallets";
@@ -11,7 +11,7 @@ import { logContractAddress, createPool } from "./utils";
 import { FeeAmount } from "../test/utilities/uniswap";
 
 import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_importer";
-import { Solace, Weth9, Vault, Master, CpFarm, SolaceEthLpFarm, Treasury, Registry, LpAppraisor } from "../typechain";
+import { Solace, Weth9, Vault, Master, CpFarm, SolaceEthLpFarm, Treasury, Registry, LpAppraisor, PolicyManager, ExchangeQuoterManual, CompoundProduct } from "../typechain";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const MULTI_SIG_ADDRESS = "0xB0bcf50b18f0DCa889EdC4a299aF4cEd7cB4cb17";
@@ -20,24 +20,37 @@ const MULTI_SIG_ADDRESS = "0xB0bcf50b18f0DCa889EdC4a299aF4cEd7cB4cb17";
 // Fill them in as they are deployed.
 // In case of failure during deployment, simply rerun the script.
 // Contracts that have already been deployed will not be redeployed.
-const REGISTRY_ADDRESS        = "0x218EEa1517F9CCc0f115fea6cd48f55afD49a3f8";
-const SOLACE_ADDRESS          = "0x44B843794416911630e74bAB05021458122c40A0";
-const WETH_ADDRESS            = "0xc778417E063141139Fce010982780140Aa0cD5Ab"
-const MASTER_ADDRESS          = "0xE458cd47D29E06CCe18a1D95AD2712F223d3a6DC";
-const VAULT_ADDRESS           = "0xB01866e0Ef4D87368F675A83Fd3491072561A9C4";
-const CPFARM_ADDRESS          = "0xD3F4db71939D91c9efcA23FCA60318E3099e3e8B";
-const LPFARM_ADDRESS          = "0xC6cdf0093981f52991b8aaCe63800eAC9f2c96E9";
-const LPAPPRAISOR_ADDRESS     = "0x5c764BE8890fA09A71122342D53cCbdc748da39C";
-const TREASURY_ADDRESS        = "0xc80fC38a2773a071E0732308c36885F372e0B443";
-const UNISWAP_FACTORY_ADDRESS = "0x1F98431c8aD98523631AE4a59f267346ea31F984";
-const UNISWAP_ROUTER_ADDRESS  = "0xE592427A0AEce92De3Edee1F18E0157C05861564";
-const UNISWAP_LPTOKEN_ADDRESS = "0xC36442b4a4522E871399CD717aBDD847Ab11FE88";
-const UNISWAP_POOL_ADDRESS    = "0x29998355C51F2eddff0B12a183B8BDD590EDaed1";
+const REGISTRY_ADDRESS         = "0x218EEa1517F9CCc0f115fea6cd48f55afD49a3f8";
+const SOLACE_ADDRESS           = "0x44B843794416911630e74bAB05021458122c40A0";
+const WETH_ADDRESS             = "0xc778417E063141139Fce010982780140Aa0cD5Ab"
+const MASTER_ADDRESS           = "0xE458cd47D29E06CCe18a1D95AD2712F223d3a6DC";
+const VAULT_ADDRESS            = "0xB01866e0Ef4D87368F675A83Fd3491072561A9C4";
+const CPFARM_ADDRESS           = "0xD3F4db71939D91c9efcA23FCA60318E3099e3e8B";
+const LPFARM_ADDRESS           = "0xC6cdf0093981f52991b8aaCe63800eAC9f2c96E9";
+const LPAPPRAISOR_ADDRESS      = "0x5c764BE8890fA09A71122342D53cCbdc748da39C";
+const TREASURY_ADDRESS         = "0xBE89BC18af93Cb31c020a826C10B90b8BdcDC483";
+
+const POLICY_MANAGER_ADDRESS   = "0xe24dAF6eA8F405F328b27a751d6A5c2867422A06";
+const QUOTER_MANUAL_ADDRESS    = "0xAC162c43D533CE1fd732bcE94894e7EF212A77a1";
+const COMPOUND_PRODUCT_ADDRESS = "0xe24dAF6eA8F405F328b27a751d6A5c2867422A06";
+
+const UNISWAP_FACTORY_ADDRESS  = "0x1F98431c8aD98523631AE4a59f267346ea31F984";
+const UNISWAP_ROUTER_ADDRESS   = "0xE592427A0AEce92De3Edee1F18E0157C05861564";
+const UNISWAP_LPTOKEN_ADDRESS  = "0xC36442b4a4522E871399CD717aBDD847Ab11FE88";
+const UNISWAP_POOL_ADDRESS     = "0x29998355C51F2eddff0B12a183B8BDD590EDaed1";
+const COMPTROLLER_ADDRESS      = "0x2EAa9D77AE4D8f9cdD9FAAcd44016E746485bddb";
 
 // farm params
 const START_BLOCK = BN.from(8523000); // May 3, 2021 on Rinkeby
 const END_BLOCK = START_BLOCK.add(2500000); // little over a year
 const BLOCK_REWARD = BN.from("60000000000000000000"); // 60 SOLACE
+
+const minPeriod = 6450; // this is about 1 day
+const maxPeriod = 45100; // this is about 1 week from https://ycharts.c om/indicators/ethereum_blocks_per_day
+const maxCoverAmount = BN.from("10000000000000000"); // 1000 Ether in wei
+const cancelFee = BN.from("100000000"); // 0.1 Ether in wei or 1% of the maxCoverAmount
+const price = 11173; // 2.60%/yr
+
 
 let artifacts: ArtifactImports;
 let registry: Registry;
@@ -53,6 +66,10 @@ let uniswapRouter: Contract;
 let lpToken: Contract;
 let pool: Contract;
 let lpTokenAppraisor: LpAppraisor;
+
+let policyManager: PolicyManager;
+let quoterManual: ExchangeQuoterManual;
+let compoundProduct: CompoundProduct;
 
 let signerAddress: string;
 let governorAddress = MULTI_SIG_ADDRESS;
@@ -75,6 +92,11 @@ async function main() {
   await deployLpFarm();
   await deployTreasury();
   await transferRegistry();
+
+  await deployPolicyManager();
+  await deployQuoterManual();
+  await deployCompoundProduct();
+
   await logAddresses();
 }
 
@@ -227,6 +249,36 @@ async function deployTreasury() {
   }
 }
 
+async function deployPolicyManager() {
+  if(!!POLICY_MANAGER_ADDRESS) {
+    policyManager = (await ethers.getContractAt(artifacts.PolicyManager.abi, POLICY_MANAGER_ADDRESS)) as PolicyManager;
+  } else {
+    console.log("Deploying PolicyManager");
+    policyManager = (await deployContract(deployer,artifacts.PolicyManager)) as PolicyManager;
+    console.log(`Deployed PolicyManager to ${policyManager.address}`);
+  }
+}
+
+async function deployQuoterManual() {
+  if(!!QUOTER_MANUAL_ADDRESS) {
+    quoterManual = (await ethers.getContractAt(artifacts.ExchangeQuoterManual.abi, QUOTER_MANUAL_ADDRESS)) as ExchangeQuoterManual;
+  } else {
+    console.log("Deploying ExchangeQuoterManual");
+    quoterManual = (await deployContract(deployer,artifacts.ExchangeQuoterManual,[signerAddress])) as ExchangeQuoterManual;
+    console.log(`Deployed ExchangeQuoterManual to ${quoterManual.address}`);
+  }
+}
+
+async function deployCompoundProduct() {
+  if(!!COMPOUND_PRODUCT_ADDRESS) {
+    compoundProduct = (await ethers.getContractAt(artifacts.CompoundProduct.abi, COMPOUND_PRODUCT_ADDRESS)) as CompoundProduct;
+  } else {
+    console.log("Deploying CompoundProduct");
+    compoundProduct = (await deployContract(deployer,artifacts.CompoundProduct,[policyManager.address,treasury.address,COMPTROLLER_ADDRESS,ZERO_ADDRESS,price,cancelFee,minPeriod,maxPeriod,maxCoverAmount,quoterManual.address])) as CompoundProduct;
+    console.log(`Deployed CompoundProduct to ${compoundProduct.address}`);
+  }
+}
+
 async function transferRegistry() {
   if(await registry.governance() == signerAddress) {
     console.log("Transfering Registry");
@@ -246,6 +298,9 @@ async function logAddresses() {
   logContractAddress("CpFarm", cpFarm.address);
   logContractAddress("LpFarm", lpFarm.address);
   logContractAddress("Treasury", treasury.address);
+  logContractAddress("PolicyManager", policyManager.address);
+  logContractAddress("QuoterManual", quoterManual.address);
+  logContractAddress("CompoundProduct", compoundProduct.address);
   logContractAddress("UniswapFactory", uniswapFactory.address);
   logContractAddress("UniswapRouter", uniswapRouter.address);
   logContractAddress("UniswapLpToken", lpToken.address);
@@ -262,6 +317,8 @@ async function logAddresses() {
   console.log(`REACT_APP_VAULT_CONTRACT_ADDRESS=${vault.address}`);
   console.log(`REACT_APP_LPFARM_CONTRACT_ADDRESS=${lpFarm.address}`);
   console.log(`REACT_APP_TREASURY_CONTRACT_ADDRESS=${treasury.address}`);
+  console.log(`REACT_APP_POLICY_MANAGER_CONTRACT_ADDRESS=${policyManager.address}`);
+  console.log(`REACT_APP_COMPOUND_PRODUCT_CONTRACT_ADDRESS=${compoundProduct.address}`);
   console.log(`REACT_APP_UNISWAP_FACTORY_CONTRACT_ADDRESS=${uniswapFactory.address}`);
   console.log(`REACT_APP_UNISWAP_ROUTER_CONTRACT_ADDRESS=${uniswapRouter.address}`);
   console.log(`REACT_APP_UNISWAP_LPTOKEN_CONTRACT_ADDRESS=${lpToken.address}`);

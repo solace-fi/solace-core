@@ -30,6 +30,7 @@ interface CompoundProductInterface extends ethers.utils.Interface {
     "cancelFee()": FunctionFragment;
     "cancelPolicy(uint256)": FunctionFragment;
     "claimsAdjuster()": FunctionFragment;
+    "comptroller()": FunctionFragment;
     "coveredPlatform()": FunctionFragment;
     "extendPolicy(uint256,uint256)": FunctionFragment;
     "getQuote(uint256,uint256,address)": FunctionFragment;
@@ -77,6 +78,10 @@ interface CompoundProductInterface extends ethers.utils.Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "claimsAdjuster",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "comptroller",
     values?: undefined
   ): string;
   encodeFunctionData(
@@ -173,6 +178,10 @@ interface CompoundProductInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "claimsAdjuster",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "comptroller",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -354,6 +363,18 @@ export class CompoundProduct extends Contract {
     }>;
 
     "claimsAdjuster()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    comptroller(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "comptroller()"(
       overrides?: CallOverrides
     ): Promise<{
       0: string;
@@ -666,6 +687,10 @@ export class CompoundProduct extends Contract {
 
   "claimsAdjuster()"(overrides?: CallOverrides): Promise<string>;
 
+  comptroller(overrides?: CallOverrides): Promise<string>;
+
+  "comptroller()"(overrides?: CallOverrides): Promise<string>;
+
   coveredPlatform(overrides?: CallOverrides): Promise<string>;
 
   "coveredPlatform()"(overrides?: CallOverrides): Promise<string>;
@@ -886,6 +911,10 @@ export class CompoundProduct extends Contract {
     claimsAdjuster(overrides?: CallOverrides): Promise<string>;
 
     "claimsAdjuster()"(overrides?: CallOverrides): Promise<string>;
+
+    comptroller(overrides?: CallOverrides): Promise<string>;
+
+    "comptroller()"(overrides?: CallOverrides): Promise<string>;
 
     coveredPlatform(overrides?: CallOverrides): Promise<string>;
 
@@ -1124,6 +1153,10 @@ export class CompoundProduct extends Contract {
 
     "claimsAdjuster()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+    comptroller(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "comptroller()"(overrides?: CallOverrides): Promise<BigNumber>;
+
     coveredPlatform(overrides?: CallOverrides): Promise<BigNumber>;
 
     "coveredPlatform()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -1346,6 +1379,10 @@ export class CompoundProduct extends Contract {
     "claimsAdjuster()"(
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
+
+    comptroller(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "comptroller()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     coveredPlatform(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 

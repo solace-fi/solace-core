@@ -6,7 +6,8 @@ import "../BaseProduct.sol";
 
 
 interface IComptroller {
-    function markets(address market) external view returns (bool isListed, uint256 collateralFactorMantissa, bool isComped);
+    //function markets(address market) external view returns (bool isListed, uint256 collateralFactorMantissa, bool isComped); // mainnet
+    function markets(address market) external view returns (bool isListed, uint256 collateralFactorMantissa); // rinkeby
 }
 
 interface ICToken {
@@ -18,8 +19,7 @@ interface ICToken {
 
 contract CompoundProduct is BaseProduct {
 
-    //IComptroller public comptroller;
-    IComptroller comptroller = IComptroller(0x3d9819210A31b4961b30EF54bE2aeD79B9c9Cd3B);
+    IComptroller public comptroller;
     IExchangeQuoter public quoter;
 
     constructor (
@@ -32,7 +32,6 @@ contract CompoundProduct is BaseProduct {
         uint256 _minPeriod,
         uint256 _maxPeriod,
         uint256 _maxCoverAmount,
-        address _comptroller,
         address _quoter
     ) BaseProduct(
         _policyManager,
@@ -45,7 +44,7 @@ contract CompoundProduct is BaseProduct {
         _maxPeriod,
         _maxCoverAmount
     ) {
-        //comptroller = IComptroller(_comptroller);
+        comptroller = IComptroller(_coveredPlatform);
         quoter = IExchangeQuoter(_quoter);
     }
 
@@ -76,7 +75,8 @@ contract CompoundProduct is BaseProduct {
     // and https://etherscan.io/accounts/label/compound
     function appraisePosition(address _policyholder, address _positionContract) public view override returns (uint256 positionAmount) {
         // verify _positionContract
-        (bool isListed, , ) = comptroller.markets(_positionContract);
+        //(bool isListed, , ) = comptroller.markets(_positionContract); // mainnet
+        (bool isListed, ) = comptroller.markets(_positionContract); // rinkeby
         require(isListed, "Invalid position contract");
         // swap math
         ICToken token = ICToken(_positionContract);

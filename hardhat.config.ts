@@ -14,8 +14,10 @@ const config: HardhatUserConfig = {
   networks: {
     hardhat: {
       forking: {
-        url: process.env.MAINNET_URL || '',
-        blockNumber: 12500000
+        //url: process.env.MAINNET_URL || '',
+        //blockNumber: 12500000
+        url: process.env.RINKEBY_URL || '',
+        blockNumber: 8750000
       }
     },
     localhost: { url: "http://127.0.0.1:8545" },

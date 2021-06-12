@@ -22,13 +22,19 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
 interface ExchangeQuoterManualInterface extends ethers.utils.Interface {
   functions: {
+    "acceptGovernance()": FunctionFragment;
     "governance()": FunctionFragment;
     "newGovernance()": FunctionFragment;
     "rates(address)": FunctionFragment;
+    "setGovernance(address)": FunctionFragment;
     "setRates(address[],uint256[])": FunctionFragment;
     "tokenToEth(address,uint256)": FunctionFragment;
   };
 
+  encodeFunctionData(
+    functionFragment: "acceptGovernance",
+    values?: undefined
+  ): string;
   encodeFunctionData(
     functionFragment: "governance",
     values?: undefined
@@ -39,6 +45,10 @@ interface ExchangeQuoterManualInterface extends ethers.utils.Interface {
   ): string;
   encodeFunctionData(functionFragment: "rates", values: [string]): string;
   encodeFunctionData(
+    functionFragment: "setGovernance",
+    values: [string]
+  ): string;
+  encodeFunctionData(
     functionFragment: "setRates",
     values: [string[], BigNumberish[]]
   ): string;
@@ -47,16 +57,28 @@ interface ExchangeQuoterManualInterface extends ethers.utils.Interface {
     values: [string, BigNumberish]
   ): string;
 
+  decodeFunctionResult(
+    functionFragment: "acceptGovernance",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "governance", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "newGovernance",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "rates", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "setGovernance",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "setRates", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "tokenToEth", data: BytesLike): Result;
 
-  events: {};
+  events: {
+    "GovernanceTransferred(address)": EventFragment;
+  };
+
+  getEvent(nameOrSignatureOrTopic: "GovernanceTransferred"): EventFragment;
 }
 
 export class ExchangeQuoterManual extends Contract {
@@ -73,6 +95,10 @@ export class ExchangeQuoterManual extends Contract {
   interface: ExchangeQuoterManualInterface;
 
   functions: {
+    acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
+
     governance(
       overrides?: CallOverrides
     ): Promise<{
@@ -111,6 +137,16 @@ export class ExchangeQuoterManual extends Contract {
       0: BigNumber;
     }>;
 
+    setGovernance(
+      _governance: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "setGovernance(address)"(
+      _governance: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
     setRates(
       _tokens: string[],
       _rates: BigNumberish[],
@@ -140,6 +176,10 @@ export class ExchangeQuoterManual extends Contract {
     }>;
   };
 
+  acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+  "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
+
   governance(overrides?: CallOverrides): Promise<string>;
 
   "governance()"(overrides?: CallOverrides): Promise<string>;
@@ -151,6 +191,16 @@ export class ExchangeQuoterManual extends Contract {
   rates(arg0: string, overrides?: CallOverrides): Promise<BigNumber>;
 
   "rates(address)"(arg0: string, overrides?: CallOverrides): Promise<BigNumber>;
+
+  setGovernance(
+    _governance: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "setGovernance(address)"(
+    _governance: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
 
   setRates(
     _tokens: string[],
@@ -177,6 +227,10 @@ export class ExchangeQuoterManual extends Contract {
   ): Promise<BigNumber>;
 
   callStatic: {
+    acceptGovernance(overrides?: CallOverrides): Promise<void>;
+
+    "acceptGovernance()"(overrides?: CallOverrides): Promise<void>;
+
     governance(overrides?: CallOverrides): Promise<string>;
 
     "governance()"(overrides?: CallOverrides): Promise<string>;
@@ -191,6 +245,16 @@ export class ExchangeQuoterManual extends Contract {
       arg0: string,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
+
+    setGovernance(
+      _governance: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "setGovernance(address)"(
+      _governance: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
 
     setRates(
       _tokens: string[],
@@ -217,9 +281,15 @@ export class ExchangeQuoterManual extends Contract {
     ): Promise<BigNumber>;
   };
 
-  filters: {};
+  filters: {
+    GovernanceTransferred(_newGovernance: null): EventFilter;
+  };
 
   estimateGas: {
+    acceptGovernance(overrides?: Overrides): Promise<BigNumber>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<BigNumber>;
+
     governance(overrides?: CallOverrides): Promise<BigNumber>;
 
     "governance()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -233,6 +303,16 @@ export class ExchangeQuoterManual extends Contract {
     "rates(address)"(
       arg0: string,
       overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    setGovernance(
+      _governance: string,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "setGovernance(address)"(
+      _governance: string,
+      overrides?: Overrides
     ): Promise<BigNumber>;
 
     setRates(
@@ -261,6 +341,10 @@ export class ExchangeQuoterManual extends Contract {
   };
 
   populateTransaction: {
+    acceptGovernance(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<PopulatedTransaction>;
+
     governance(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "governance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
@@ -277,6 +361,16 @@ export class ExchangeQuoterManual extends Contract {
     "rates(address)"(
       arg0: string,
       overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    setGovernance(
+      _governance: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "setGovernance(address)"(
+      _governance: string,
+      overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
     setRates(

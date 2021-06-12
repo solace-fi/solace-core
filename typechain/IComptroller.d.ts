@@ -51,10 +51,8 @@ export class IComptroller extends Contract {
     ): Promise<{
       isListed: boolean;
       collateralFactorMantissa: BigNumber;
-      isComped: boolean;
       0: boolean;
       1: BigNumber;
-      2: boolean;
     }>;
 
     "markets(address)"(
@@ -63,10 +61,8 @@ export class IComptroller extends Contract {
     ): Promise<{
       isListed: boolean;
       collateralFactorMantissa: BigNumber;
-      isComped: boolean;
       0: boolean;
       1: BigNumber;
-      2: boolean;
     }>;
   };
 
@@ -76,10 +72,8 @@ export class IComptroller extends Contract {
   ): Promise<{
     isListed: boolean;
     collateralFactorMantissa: BigNumber;
-    isComped: boolean;
     0: boolean;
     1: BigNumber;
-    2: boolean;
   }>;
 
   "markets(address)"(
@@ -88,10 +82,8 @@ export class IComptroller extends Contract {
   ): Promise<{
     isListed: boolean;
     collateralFactorMantissa: BigNumber;
-    isComped: boolean;
     0: boolean;
     1: BigNumber;
-    2: boolean;
   }>;
 
   callStatic: {
@@ -101,10 +93,8 @@ export class IComptroller extends Contract {
     ): Promise<{
       isListed: boolean;
       collateralFactorMantissa: BigNumber;
-      isComped: boolean;
       0: boolean;
       1: BigNumber;
-      2: boolean;
     }>;
 
     "markets(address)"(
@@ -113,10 +103,8 @@ export class IComptroller extends Contract {
     ): Promise<{
       isListed: boolean;
       collateralFactorMantissa: BigNumber;
-      isComped: boolean;
       0: boolean;
       1: BigNumber;
-      2: boolean;
     }>;
   };
 

@@ -37,11 +37,6 @@ const _abi = [
         name: "collateralFactorMantissa",
         type: "uint256",
       },
-      {
-        internalType: "bool",
-        name: "isComped",
-        type: "bool",
-      },
     ],
     stateMutability: "view",
     type: "function",

@@ -63,7 +63,7 @@ abstract contract BaseProduct is IProduct {
         treasury = _treasury;
         coveredPlatform = _coveredPlatform;
         claimsAdjuster = _claimsAdjuster;
-        price = _price * 1e12;
+        price = _price;
         cancelFee = _cancelFee;
         minPeriod = _minPeriod;
         maxPeriod = _maxPeriod;
@@ -72,7 +72,7 @@ abstract contract BaseProduct is IProduct {
         activeCoverAmount = 0;
     }
 
-    /**** GETTERS + SETTERS 
+    /**** GETTERS + SETTERS
     Functions which get and set important product state variables
     ****/
 
@@ -102,12 +102,12 @@ abstract contract BaseProduct is IProduct {
      */
     function setPrice(uint256 _price) external override {
         require(msg.sender == governance, "!governance");
-        price = _price * 1e12;
+        price = _price;
     }
 
     /**
      * @notice Sets the fee that user must pay upon canceling the policy
-     * @param _cancelFee policy cancelation fee 
+     * @param _cancelFee policy cancelation fee
      */
     function setCancelFee(uint256 _cancelFee) external override {
         require(msg.sender == governance, "!governance");
@@ -142,7 +142,7 @@ abstract contract BaseProduct is IProduct {
     }
 
 
-    /**** UNIMPLEMENTED FUNCTIONS 
+    /**** UNIMPLEMENTED FUNCTIONS
     Functions that are only implemented by child product contracts
     ****/
 
@@ -158,9 +158,9 @@ abstract contract BaseProduct is IProduct {
      * @param _positionContract address of the exact smart contract the buyer has their position in (e.g., for UniswapProduct this would be Pair's address)
      * @return positionAmount The user's total position in wei in the product's protocol.
      */
-    function appraisePosition(address _policyholder, address _positionContract) public view override virtual returns (uint256 positionAmount) {}
- 
-    /**** QUOTE VIEW FUNCTIONS 
+    function appraisePosition(address _policyholder, address _positionContract) public view override virtual returns (uint256 positionAmount);
+
+    /**** QUOTE VIEW FUNCTIONS
     View functions that give us quotes regarding a policy purchase
     ****/
 
@@ -182,7 +182,7 @@ abstract contract BaseProduct is IProduct {
     }
 
 
-    /**** MUTATIVE FUNCTIONS 
+    /**** MUTATIVE FUNCTIONS
     Functions that change state variables, deploy and change policy contracts
     ****/
 
@@ -200,7 +200,7 @@ abstract contract BaseProduct is IProduct {
     }
 
     /**
-     * @notice Updates the product"s book-keeping variables, 
+     * @notice Updates the product's book-keeping variables,
      * removing expired policies from the policies set and updating active cover amount
      * @return activeCoverAmount and activePolicyCount active covered amount and active policy count as a tuple
      */
@@ -239,7 +239,7 @@ abstract contract BaseProduct is IProduct {
 
         // create the policy
         uint256 expirationBlock = block.number + _blocks;
-        policyID = policyManager.createPolicy(_policyholder, _positionContract, expirationBlock, coverAmount, price/1e12);
+        policyID = policyManager.createPolicy(_policyholder, _positionContract, expirationBlock, coverAmount, price);
 
         // update local book-keeping variables
         activeCoverAmount += coverAmount;
@@ -305,7 +305,7 @@ abstract contract BaseProduct is IProduct {
         // update the policy's URI
         uint256 newExpirationBlock = policyManager.getPolicyExpirationBlock(_policyID) + _blocks;
         address positionContract = policyManager.getPolicyPositionContract(_policyID);
-        policyManager.setTokenURI(_policyID, policyholder, positionContract, newExpirationBlock, coverAmount, price/1e12);
+        policyManager.setTokenURI(_policyID, policyholder, positionContract, newExpirationBlock, coverAmount, price);
         emit PolicyExtended(_policyID);
     }
 
