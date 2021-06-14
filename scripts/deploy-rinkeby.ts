@@ -30,9 +30,9 @@ const LPFARM_ADDRESS           = "0xC6cdf0093981f52991b8aaCe63800eAC9f2c96E9";
 const LPAPPRAISOR_ADDRESS      = "0x5c764BE8890fA09A71122342D53cCbdc748da39C";
 const TREASURY_ADDRESS         = "0xBE89BC18af93Cb31c020a826C10B90b8BdcDC483";
 
-const POLICY_MANAGER_ADDRESS   = "0xe24dAF6eA8F405F328b27a751d6A5c2867422A06";
+const POLICY_MANAGER_ADDRESS   = "0x0B27dD1660406e170ff4c4315D65Bd085F31a07a";
 const QUOTER_MANUAL_ADDRESS    = "0xAC162c43D533CE1fd732bcE94894e7EF212A77a1";
-const COMPOUND_PRODUCT_ADDRESS = "0xe24dAF6eA8F405F328b27a751d6A5c2867422A06";
+const COMPOUND_PRODUCT_ADDRESS = "0x660985613a2257107C9aE41EfBd9074932609893";
 
 const UNISWAP_FACTORY_ADDRESS  = "0x1F98431c8aD98523631AE4a59f267346ea31F984";
 const UNISWAP_ROUTER_ADDRESS   = "0xE592427A0AEce92De3Edee1F18E0157C05861564";
@@ -46,11 +46,10 @@ const END_BLOCK = START_BLOCK.add(2500000); // little over a year
 const BLOCK_REWARD = BN.from("60000000000000000000"); // 60 SOLACE
 
 const minPeriod = 6450; // this is about 1 day
-const maxPeriod = 45100; // this is about 1 week from https://ycharts.c om/indicators/ethereum_blocks_per_day
-const maxCoverAmount = BN.from("10000000000000000"); // 1000 Ether in wei
-const cancelFee = BN.from("100000000"); // 0.1 Ether in wei or 1% of the maxCoverAmount
+const maxPeriod = 2354250; // this is about 1 year from https://ycharts.com/indicators/ethereum_blocks_per_day
+const maxCoverAmount = BN.from("1000000000000000000000"); // 1000 Ether in wei
+const cancelFee = BN.from("100000000000000000"); // 0.1 Ether in wei
 const price = 11173; // 2.60%/yr
-
 
 let artifacts: ArtifactImports;
 let registry: Registry;
@@ -276,6 +275,16 @@ async function deployCompoundProduct() {
     console.log("Deploying CompoundProduct");
     compoundProduct = (await deployContract(deployer,artifacts.CompoundProduct,[policyManager.address,treasury.address,COMPTROLLER_ADDRESS,ZERO_ADDRESS,price,cancelFee,minPeriod,maxPeriod,maxCoverAmount,quoterManual.address])) as CompoundProduct;
     console.log(`Deployed CompoundProduct to ${compoundProduct.address}`);
+  }
+  if(await policyManager.governance() == signerAddress && !(await policyManager.productIsActive(compoundProduct.address))) {
+    console.log("Registering CompoundProduct in PolicyManager");
+    await policyManager.connect(deployer).addProduct(compoundProduct.address);
+  }
+  if((await policyManager.totalSupply()).eq(0)) {
+    console.log("buying policy");
+    var quote = await compoundProduct.getQuote("0x0fb78424e5021404093aa0cfcf50b176b30a3c1d", "0xd6801a1dffcd0a410336ef88def4320d6df1883e", 5000, 19350);
+    quote = quote.mul(11).div(10);
+    await compoundProduct.connect(deployer).buyPolicy("0x0fb78424e5021404093aa0cfcf50b176b30a3c1d", "0xd6801a1dffcd0a410336ef88def4320d6df1883e", 5000, 19350, {value: quote});
   }
 }
 

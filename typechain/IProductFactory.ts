@@ -83,16 +83,6 @@ const _abi = [
   {
     inputs: [
       {
-        internalType: "uint256",
-        name: "_coverLimit",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "_blocks",
-        type: "uint256",
-      },
-      {
         internalType: "address",
         name: "_policyholder",
         type: "address",
@@ -101,6 +91,16 @@ const _abi = [
         internalType: "address",
         name: "_positionContract",
         type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "_coverLimit",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "_blocks",
+        type: "uint256",
       },
     ],
     name: "buyPolicy",
@@ -148,6 +148,16 @@ const _abi = [
   {
     inputs: [
       {
+        internalType: "address",
+        name: "_policyholder",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "_positionContract",
+        type: "address",
+      },
+      {
         internalType: "uint256",
         name: "_coverLimit",
         type: "uint256",
@@ -156,11 +166,6 @@ const _abi = [
         internalType: "uint256",
         name: "_blocks",
         type: "uint256",
-      },
-      {
-        internalType: "address",
-        name: "_positionContract",
-        type: "address",
       },
     ],
     name: "getQuote",

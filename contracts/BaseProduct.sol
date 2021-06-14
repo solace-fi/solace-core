@@ -2,9 +2,9 @@
 pragma solidity 0.8.0;
 
 import "@openzeppelin/contracts/utils/Address.sol";
-import './interface/IProduct.sol';
-import './interface/IPolicyManager.sol';
-import './interface/ITreasury.sol';
+import "./interface/IProduct.sol";
+import "./interface/IPolicyManager.sol";
+import "./interface/ITreasury.sol";
 
 /* TODO
  * - treasury refund() function, check transfer to treasury when buyPolicy()
@@ -176,8 +176,8 @@ abstract contract BaseProduct is IProduct {
         return premium;
     }
 
-    function getQuote(uint256 _coverLimit, uint256 _blocks, address _positionContract) external view override returns (uint256){
-        uint256 positionAmount = appraisePosition(msg.sender, _positionContract);
+    function getQuote(address _policyholder, address _positionContract, uint256 _coverLimit, uint256 _blocks) external view override returns (uint256){
+        uint256 positionAmount = appraisePosition(_policyholder, _positionContract);
         return _getQuote(_coverLimit, _blocks, positionAmount);
     }
 
@@ -219,23 +219,26 @@ abstract contract BaseProduct is IProduct {
 
      * @return policyID The contract address of the policy
      */
-    function buyPolicy(uint256 _coverLimit, uint256 _blocks, address _policyholder, address _positionContract) external payable override returns (uint256 policyID){
+    function buyPolicy(address _policyholder, address _positionContract, uint256 _coverLimit, uint256 _blocks) external payable override returns (uint256 policyID){
         // check that the buyer has a position in the covered protocol
         uint256 positionAmount = appraisePosition(_policyholder, _positionContract);
-        require(positionAmount != 0, 'zero position value');
+        require(positionAmount != 0, "zero position value");
 
         // check that the product can provide coverage for this policy
         uint256 coverAmount = _coverLimit * positionAmount / 1e4;
         require(activeCoverAmount + coverAmount <= maxCoverAmount, "max covered amount is reached");
+
         // check that the buyer has paid the correct premium
         uint256 premium = _getQuote(_coverLimit, _blocks, positionAmount);
-        require(msg.value == premium && premium != 0, "payment does not match the quote or premium is zero");
+        require(msg.value >= premium && premium != 0, "insufficient payment or premium is zero");
+
+        // TODO: safe return extra
         // check that the buyer provided valid period and coverage limit
-        require(_blocks > minPeriod && _blocks < maxPeriod, "invalid period");
+        require(_blocks >= minPeriod && _blocks <= maxPeriod, "invalid period");
         require(_coverLimit > 0 && _coverLimit <= 1e4, "invalid cover limit percentage");
 
         // transfer premium to the treasury
-        payable(treasury).transfer(msg.value);
+        treasury.depositEth{value: premium}();
 
         // create the policy
         uint256 expirationBlock = block.number + _blocks;
@@ -247,7 +250,7 @@ abstract contract BaseProduct is IProduct {
         productPolicyCount++;
 
         emit PolicyCreated(policyID);
-
+        
         return policyID;
     }
 
@@ -294,18 +297,18 @@ abstract contract BaseProduct is IProduct {
     function extendPolicy(uint256 _policyID, uint256 _blocks) external payable override {
         // check that the msg.sender is the policyholder
         address policyholder = policyManager.getPolicyholder(_policyID);
-        require(policyholder == msg.sender,'!policyholder');
+        require(policyholder == msg.sender,"!policyholder");
         // compute the premium
         uint256 coverAmount = policyManager.getPolicyCoverAmount(_policyID);
         uint256 premium = coverAmount * _blocks * price / 1e12;
         // check that the buyer has paid the correct premium
-        require(msg.value == premium && premium != 0, "payment does not match the quote or premium is zero");
+        require(msg.value >= premium && premium != 0, "insufficient payment or premium is zero");
         // transfer premium to the treasury
-        payable(treasury).transfer(msg.value);
+        treasury.depositEth{value: premium}();
         // update the policy's URI
         uint256 newExpirationBlock = policyManager.getPolicyExpirationBlock(_policyID) + _blocks;
         address positionContract = policyManager.getPolicyPositionContract(_policyID);
-        policyManager.setTokenURI(_policyID, policyholder, positionContract, newExpirationBlock, coverAmount, price);
+        policyManager.setPolicyInfo(_policyID, policyholder, positionContract, newExpirationBlock, coverAmount, price);
         emit PolicyExtended(_policyID);
     }
 
@@ -315,10 +318,10 @@ abstract contract BaseProduct is IProduct {
      * @param _policyID id number of the existing policy
      */
     function cancelPolicy(uint256 _policyID) external override {
-        require(policyManager.getPolicyholder(_policyID) == msg.sender,'!policyholder');
+        require(policyManager.getPolicyholder(_policyID) == msg.sender,"!policyholder");
         uint256 blocksLeft = policyManager.getPolicyExpirationBlock(_policyID) - block.number;
         uint256 refundAmount = blocksLeft * policyManager.getPolicyPrice(_policyID);
-        require(refundAmount > cancelFee, 'refund amount less than cancelation fee');
+        require(refundAmount > cancelFee, "refund amount less than cancelation fee");
         policyManager.burn(_policyID);
         treasury.refund(msg.sender, refundAmount - cancelFee);
         emit PolicyCanceled(_policyID);

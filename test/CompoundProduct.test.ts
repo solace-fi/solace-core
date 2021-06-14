@@ -10,18 +10,26 @@ chai.use(solidity);
 import { expectClose } from "./utilities/chai_extensions";
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { CompoundProduct, ExchangeQuoter, ExchangeQuoterManual } from "../typechain";
+import { PolicyManager, CompoundProduct, ExchangeQuoter, ExchangeQuoterManual } from "../typechain";
 
 
 describe('CompoundProduct', () => {
   const [deployer, user] = provider.getWallets();
   let artifacts: ArtifactImports;
 
+  let policyManager: PolicyManager;
   let product: CompoundProduct;
   let quoter: ExchangeQuoter;
   let quoter2: ExchangeQuoterManual;
 
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+  const minPeriod = 6450; // this is about 1 day
+  const maxPeriod = 45100; // this is about 1 week from https://ycharts.c om/indicators/ethereum_blocks_per_day
+  const threeDays = 19350;
+  const maxCoverAmount = BN.from("1000000000000000000000"); // 1000 Ether in wei
+  const cancelFee = BN.from("100000000000000000"); // 0.1 Ether in wei
+  const price = 11173; // 2.60%/yr
+
   // mainnet
   /*
   const ONE_SPLIT_VIEW = "0xC586BeF4a0992C495Cf22e1aeEE4E446CECDee0E";
@@ -44,13 +52,21 @@ describe('CompoundProduct', () => {
   */
 
   // rinkeby
+  const TREASURY = "0xBE89BC18af93Cb31c020a826C10B90b8BdcDC483";
   const COMPTROLLER = "0x2EAa9D77AE4D8f9cdD9FAAcd44016E746485bddb";
   const cETH = "0xd6801a1DfFCd0a410336Ef88DeF4320D6DF1883e";
   const USER1 = "0x0fb78424e5021404093aA0cFcf50B176B30a3c1d";
-  const BALANCE1 = "1234824727748402390";
+  const BALANCE1 = "1236588650796795918";
+
 
   before(async () => {
     artifacts = await import_artifacts();
+
+    // deploy policy manager
+    policyManager = (await deployContract(
+      deployer,
+      artifacts.PolicyManager
+    )) as PolicyManager;
 
     // deploy exchange quoter
     /*
@@ -107,15 +123,15 @@ describe('CompoundProduct', () => {
       deployer,
       artifacts.CompoundProduct,
       [
-        ZERO_ADDRESS,
-        ZERO_ADDRESS,
+        policyManager.address,
+        TREASURY,
         COMPTROLLER,
         ZERO_ADDRESS,
-        0,
-        0,
-        0,
-        0,
-        0,
+        price,
+        cancelFee,
+        minPeriod,
+        maxPeriod,
+        maxCoverAmount,
         quoter2.address
       ]
     )) as CompoundProduct;
@@ -147,5 +163,40 @@ describe('CompoundProduct', () => {
       expect(await product.appraisePosition(USER3, cUSDC)).to.equal(BALANCE13);
     })
     */
+  })
+
+  describe('implementedFunctions', function () {
+    it('can getQuote', async function () {
+      let price = BN.from(await product.price());
+      let coverLimit = 5000 // cover 50% of the position
+      let blocks = BN.from(threeDays)
+      let expectedPremium = BN.from("133673718330036");
+      let quote = BN.from(await product.getQuote(USER1, cETH, coverLimit, blocks))
+      expect(quote).to.equal(expectedPremium);
+    })
+    it('can buyPolicy', async function () {
+      expect(await policyManager.totalSupply()).to.equal(0);
+      expect(await policyManager.balanceOf(USER1)).to.equal(0);
+      // adding the owner product to the ProductManager
+      (await policyManager.connect(deployer).addProduct(product.address)); // when using { value: quote } below it defaults to send from the first account
+      // position contract set
+      expect(await policyManager.productIsActive(product.address)).to.equal(true);
+
+      let coverLimit = 5000 // cover 50% of the position
+      let blocks = threeDays
+      let quote = BN.from(await product.getQuote(USER1, cETH, coverLimit, blocks));
+      let res = (await product.buyPolicy(USER1, cETH, coverLimit, blocks, { value: quote }));
+      let receipt = await res.wait()
+      if(receipt.events) {
+        var event = receipt.events.filter(event => event.event == "PolicyCreated")[0]
+        if(event.args) {
+          expect(event.args[0]).to.equal(0); // policyID
+        }
+      }
+      //expect(receipt.logs[0].topics[3]).to.equal('0x0000000000000000000000000000000000000000000000000000000000000000') // the last element in the logs array is the policyID, in this case policyID = 0
+      expect(await policyManager.totalSupply()).to.equal(1);
+      expect(await policyManager.balanceOf(USER1)).to.equal(1);
+      //console.log(await policyManager.tokenURI(0));
+    })
   })
 })

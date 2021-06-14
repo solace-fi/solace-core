@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
+import "./interface/IPolicyManager.sol";
 
 
 /* TODO
@@ -16,23 +17,22 @@ import "@openzeppelin/contracts/utils/Strings.sol";
  * @author solace.fi
  * @notice Creates new and modifies existing coverage policy ERC721 tokens
  */
-contract PolicyManager is ERC721URIStorage, ERC721Enumerable {
+contract PolicyManager is ERC721Enumerable, IPolicyManager {
     using Address for address;
 
-    event ProductAdded(address product);
-    event ProductRemoved(address product);
-    event PolicyCreated(uint256 tokenID);
-    event PolicyBurned(uint256 tokenID);
+    /// @notice Governor.
+    address public override governance;
 
-    /// @notice governor
-    address public governance;
+    /// @notice Governance to take over.
+    address public override newGovernance;
+
     /// @notice active products
     mapping (address => bool) public productIsActive;
 
     /// @notice total policy count
     uint256 public totalPolicyCount = 0;
 
-    struct PolicyTokenURIParams {
+    struct PolicyInfo {
         address policyholder;
         address product;
         address positionContract;
@@ -40,6 +40,8 @@ contract PolicyManager is ERC721URIStorage, ERC721Enumerable {
         uint256 coverAmount;
         uint256 price;
     }
+
+    mapping(uint256 => PolicyInfo) private _policyInfo;
 
     /**
      * @notice Constructs the Policy Deployer ERC721 Token contract.
@@ -49,13 +51,26 @@ contract PolicyManager is ERC721URIStorage, ERC721Enumerable {
     }
 
     /**
-     * @notice Transfers the governance role to a new governor.
+     * @notice Allows governance to be transferred to a new governor.
      * Can only be called by the current governor.
-     * @param _governance the new governor
+     * @param _governance The new governor.
      */
-    function setGovernance(address _governance) external {
+    function setGovernance(address _governance) external override {
+        // can only be called by governor
         require(msg.sender == governance, "!governance");
-        governance = _governance;
+        newGovernance = _governance;
+    }
+
+    /**
+     * @notice Accepts the governance role.
+     * Can only be called by the new governor.
+     */
+    function acceptGovernance() external override {
+        // can only be called by new governor
+        require(msg.sender == newGovernance, "!governance");
+        governance = newGovernance;
+        newGovernance = address(0x0);
+        emit GovernanceTransferred(msg.sender);
     }
 
     /**
@@ -63,7 +78,7 @@ contract PolicyManager is ERC721URIStorage, ERC721Enumerable {
      * Can only be called by the current governor.
      * @param _product the new product
      */
-    function addProduct(address _product) external {
+    function addProduct(address _product) external override {
         require(msg.sender == governance, "!governance");
         productIsActive[_product] = true;
         emit ProductAdded(_product);
@@ -74,64 +89,64 @@ contract PolicyManager is ERC721URIStorage, ERC721Enumerable {
      * Can only be called by the current governor.
      * @param _product the product to remove
      */
-    function removeProduct(address _product) external {
+    function removeProduct(address _product) external override {
         require(msg.sender == governance, "!governance");
         productIsActive[_product] = false;
         emit ProductRemoved(_product);
     }
 
-    /*** POLICY VIEW FUNCTIONS 
+    /*** POLICY VIEW FUNCTIONS
     View functions that give us data about policies
     ****/
 
-    function getPolicyParams(uint256 _policyID) public view returns (PolicyTokenURIParams memory) {
-        string memory encodedTokenURI = tokenURI(_policyID);
-        PolicyTokenURIParams memory params = _decodeTokenURI(encodedTokenURI);
-        return params;
+    function getPolicyInfo(uint256 _policyID) external view override returns (address policyholder, address product, address positionContract, uint256 expirationBlock, uint256 coverAmount, uint256 price){
+        require(ownerOf(_policyID) != address(0), "query for nonexistent token");
+        PolicyInfo memory info = _policyInfo[_policyID];
+        return (info.policyholder, info.product, info.positionContract, info.expirationBlock, info.coverAmount, info.price);
     }
 
-    function getPolicyholder(uint256 _policyID) external view returns (address){
-        PolicyTokenURIParams memory params = getPolicyParams(_policyID);
-        return params.policyholder;
+    function getPolicyholder(uint256 _policyID) external view override returns (address){
+        require(ownerOf(_policyID) != address(0), "query for nonexistent token");
+        return _policyInfo[_policyID].policyholder;
     }
 
-    function getPolicyProduct(uint256 _policyID) external view returns (address){
-        PolicyTokenURIParams memory params = getPolicyParams(_policyID);
-        return params.product;
+    function getPolicyProduct(uint256 _policyID) external view override returns (address){
+        require(ownerOf(_policyID) != address(0), "query for nonexistent token");
+        return _policyInfo[_policyID].product;
     }
 
-    function getPolicyPositionContract(uint256 _policyID) external view returns (address){
-        PolicyTokenURIParams memory params = getPolicyParams(_policyID);
-        return params.positionContract;
+    function getPolicyPositionContract(uint256 _policyID) external view override returns (address){
+        require(ownerOf(_policyID) != address(0), "query for nonexistent token");
+        return _policyInfo[_policyID].positionContract;
     }
 
-    function getPolicyExpirationBlock(uint256 _policyID) external view returns (uint256) {
-        PolicyTokenURIParams memory params = getPolicyParams(_policyID);
-        return params.expirationBlock;
+    function getPolicyExpirationBlock(uint256 _policyID) external view override returns (uint256) {
+        require(ownerOf(_policyID) != address(0), "query for nonexistent token");
+        return _policyInfo[_policyID].expirationBlock;
     }
 
-    function getPolicyCoverAmount(uint256 _policyID) external view returns (uint256) {
-        PolicyTokenURIParams memory params = getPolicyParams(_policyID);
-        return params.coverAmount;
-    }
-    
-    function getPolicyPrice(uint256 _policyID) external view returns (uint256){
-        PolicyTokenURIParams memory params = getPolicyParams(_policyID);
-        return params.price;
+    function getPolicyCoverAmount(uint256 _policyID) external view override returns (uint256) {
+        require(ownerOf(_policyID) != address(0), "query for nonexistent token");
+        return _policyInfo[_policyID].coverAmount;
     }
 
-    function myPolicies() external view returns (uint256[] memory tokenIDs) {
-        uint256 tokenCount = balanceOf(msg.sender);
+    function getPolicyPrice(uint256 _policyID) external view override returns (uint256){
+        require(ownerOf(_policyID) != address(0), "query for nonexistent token");
+        return _policyInfo[_policyID].price;
+    }
+
+    function listPolicies(address _policyholder) external view override returns (uint256[] memory tokenIDs) {
+        uint256 tokenCount = balanceOf(_policyholder);
         tokenIDs = new uint256[](tokenCount);
         for (uint256 index=0; index < tokenCount; index++) {
-            tokenIDs[index] = tokenOfOwnerByIndex(msg.sender,index);
+            tokenIDs[index] = tokenOfOwnerByIndex(_policyholder, index);
         }
         return tokenIDs;
     }
 
-    
 
-    /*** POLICY MUTATIVE FUNCTIONS 
+
+    /*** POLICY MUTATIVE FUNCTIONS
     Functions that create, modify, and destroy policies
     ****/
 
@@ -151,11 +166,11 @@ contract PolicyManager is ERC721URIStorage, ERC721Enumerable {
         uint256 _expirationBlock,
         uint256 _coverAmount,
         uint256 _price
-        ) 
-        external returns (uint256 tokenID)
+        )
+        external override returns (uint256 tokenID)
     {
         require(productIsActive[msg.sender], "product !active");
-        PolicyTokenURIParams memory tokenURIParams = PolicyTokenURIParams({
+        PolicyInfo memory info = PolicyInfo({
             policyholder: _policyholder,
             product: msg.sender,
             positionContract: _positionContract,
@@ -164,10 +179,8 @@ contract PolicyManager is ERC721URIStorage, ERC721Enumerable {
             price: _price
         });
         tokenID = totalPolicyCount++;
-        _beforeTokenTransfer(address(0), _policyholder, tokenID);
+        _policyInfo[tokenID] = info;
         _mint(_policyholder, tokenID);
-        string memory tokenUri = _encodeTokenURI(tokenURIParams);
-        _setTokenURI(tokenID, tokenUri);
         emit PolicyCreated(tokenID);
         return tokenID;
     }
@@ -175,25 +188,25 @@ contract PolicyManager is ERC721URIStorage, ERC721Enumerable {
     /**
      * @notice Exposes setTokenURI function for products to modify policies
      * The caller must be a product.
-     * @param _tokenId tokenID (aka policyID)
+     * @param _policyId aka tokenID
      * @param _policyholder receiver of new policy token
      * @param _positionContract contract address where the position is covered
      * @param _expirationBlock policy expiration block number
      * @param _coverAmount policy coverage amount (in wei)
      * @param _price coverage price
      */
-    function setTokenURI(
-        uint256 _tokenId,
+    function setPolicyInfo(
+        uint256 _policyId,
         address _policyholder,
         address _positionContract,
         uint256 _expirationBlock,
         uint256 _coverAmount,
         uint256 _price
         )
-        external
+        external override
     {
         require(productIsActive[msg.sender], "product !active");
-        PolicyTokenURIParams memory tokenURIParams = PolicyTokenURIParams({
+        PolicyInfo memory info = PolicyInfo({
             policyholder: _policyholder,
             product: msg.sender,
             positionContract: _positionContract,
@@ -201,8 +214,7 @@ contract PolicyManager is ERC721URIStorage, ERC721Enumerable {
             coverAmount: _coverAmount,
             price: _price
         });
-        string memory tokenUri = _encodeTokenURI(tokenURIParams);
-        _setTokenURI(_tokenId, tokenUri);
+        _policyInfo[_policyId] = info;
     }
 
     /**
@@ -210,19 +222,19 @@ contract PolicyManager is ERC721URIStorage, ERC721Enumerable {
      * The caller must be a product.
      * @param _tokenId tokenID (aka policyID)
      */
-    function burn(uint256 _tokenId) external {
+    function burn(uint256 _tokenId) external override {
         require(productIsActive[msg.sender], "product !active");
-        _beforeTokenTransfer(ownerOf(_tokenId), address(0), _tokenId);
         _burn(_tokenId);
+        delete _policyInfo[_tokenId];
         emit PolicyBurned(_tokenId);
     }
 
     /**
      * @notice Encodes `tokenURI`
-     * @param _params policy tokenURI parameteres passed as PolicyTokenURIParams struct
+     * @param _params policy tokenURI parameteres passed as PolicyInfo struct
      * @return uri
      */
-    function _encodeTokenURI(PolicyTokenURIParams memory _params) internal pure returns (string memory uri) {
+    function _encodeTokenURI(PolicyInfo memory _params) internal pure returns (string memory uri) {
         uri = string(abi.encode(_params));
         return uri;
     }
@@ -232,38 +244,18 @@ contract PolicyManager is ERC721URIStorage, ERC721Enumerable {
      * @param _tokenURI policy tokenURI passed as a string
      * @return struct `params`
      */
-    function _decodeTokenURI(string memory _tokenURI) internal pure returns (PolicyTokenURIParams memory) {
-        PolicyTokenURIParams memory params = abi.decode(bytes(_tokenURI), (PolicyTokenURIParams));
+    function _decodeTokenURI(string memory _tokenURI) internal pure returns (PolicyInfo memory) {
+        PolicyInfo memory params = abi.decode(bytes(_tokenURI), (PolicyInfo));
         return params;
     }
 
 
-    /*** ERC721 INHERITANCE FUNCTIONS 
+    /*** ERC721 INHERITANCE FUNCTIONS
     Overrides that properly set functionality through parent contracts
     ****/
 
-    /**
-     * @dev Must use _beforeTokenTransfer() to keep track of the tokens according to Enumerable 
-     */
-    function _transfer(address from, address to, uint256 tokenId) internal override {
-        _beforeTokenTransfer(from, to, tokenId);
-        super._transfer(from, to, tokenId);
-    }
-
-    function _beforeTokenTransfer(address from, address to, uint256 tokenId) internal virtual override(ERC721, ERC721Enumerable) {
-        ERC721Enumerable._beforeTokenTransfer(from, to, tokenId);
-    }
-
-    function _burn(uint256 tokenId) internal virtual override(ERC721, ERC721URIStorage) {
-        ERC721URIStorage._burn(tokenId);
-    }
-
-    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC721, ERC721Enumerable) returns (bool) {
-        ERC721Enumerable.supportsInterface(interfaceId);
-    }
-
-    function tokenURI(uint256 tokenId) public view virtual override(ERC721, ERC721URIStorage) returns (string memory) {
-        ERC721URIStorage.tokenURI(tokenId);
+    function tokenURI(uint256 tokenId) public view override returns (string memory) {
+        return _encodeTokenURI(_policyInfo[tokenId]);
     }
 
 }
