@@ -19,7 +19,7 @@ import { BytesLike } from "@ethersproject/bytes";
 import { Listener, Provider } from "@ethersproject/providers";
 import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
-interface IComptrollerInterface extends ethers.utils.Interface {
+interface IComptrollerRinkebyInterface extends ethers.utils.Interface {
   functions: {
     "markets(address)": FunctionFragment;
   };
@@ -31,7 +31,7 @@ interface IComptrollerInterface extends ethers.utils.Interface {
   events: {};
 }
 
-export class IComptroller extends Contract {
+export class IComptrollerRinkeby extends Contract {
   connect(signerOrProvider: Signer | Provider | string): this;
   attach(addressOrName: string): this;
   deployed(): Promise<this>;
@@ -42,7 +42,7 @@ export class IComptroller extends Contract {
   removeAllListeners(eventName: EventFilter | string): this;
   removeListener(eventName: any, listener: Listener): this;
 
-  interface: IComptrollerInterface;
+  interface: IComptrollerRinkebyInterface;
 
   functions: {
     markets(
@@ -51,10 +51,8 @@ export class IComptroller extends Contract {
     ): Promise<{
       isListed: boolean;
       collateralFactorMantissa: BigNumber;
-      isComped: boolean;
       0: boolean;
       1: BigNumber;
-      2: boolean;
     }>;
 
     "markets(address)"(
@@ -63,10 +61,8 @@ export class IComptroller extends Contract {
     ): Promise<{
       isListed: boolean;
       collateralFactorMantissa: BigNumber;
-      isComped: boolean;
       0: boolean;
       1: BigNumber;
-      2: boolean;
     }>;
   };
 
@@ -76,10 +72,8 @@ export class IComptroller extends Contract {
   ): Promise<{
     isListed: boolean;
     collateralFactorMantissa: BigNumber;
-    isComped: boolean;
     0: boolean;
     1: BigNumber;
-    2: boolean;
   }>;
 
   "markets(address)"(
@@ -88,10 +82,8 @@ export class IComptroller extends Contract {
   ): Promise<{
     isListed: boolean;
     collateralFactorMantissa: BigNumber;
-    isComped: boolean;
     0: boolean;
     1: BigNumber;
-    2: boolean;
   }>;
 
   callStatic: {
@@ -101,10 +93,8 @@ export class IComptroller extends Contract {
     ): Promise<{
       isListed: boolean;
       collateralFactorMantissa: BigNumber;
-      isComped: boolean;
       0: boolean;
       1: BigNumber;
-      2: boolean;
     }>;
 
     "markets(address)"(
@@ -113,10 +103,8 @@ export class IComptroller extends Contract {
     ): Promise<{
       isListed: boolean;
       collateralFactorMantissa: BigNumber;
-      isComped: boolean;
       0: boolean;
       1: BigNumber;
-      2: boolean;
     }>;
   };
 

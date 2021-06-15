@@ -5,8 +5,8 @@ import "../interface/IExchangeQuoter.sol";
 import "../BaseProduct.sol";
 
 
-interface IComptroller {
-    function markets(address market) external view returns (bool isListed, uint256 collateralFactorMantissa, bool isComped);
+interface IComptrollerRinkeby {
+    function markets(address market) external view returns (bool isListed, uint256 collateralFactorMantissa);
 }
 
 interface ICToken {
@@ -16,9 +16,9 @@ interface ICToken {
     function underlying() external view returns (address);
 }
 
-contract CompoundProduct is BaseProduct {
+contract CompoundProductRinkeby is BaseProduct {
 
-    IComptroller public comptroller;
+    IComptrollerRinkeby public comptroller;
     IExchangeQuoter public quoter;
 
     constructor (
@@ -43,7 +43,7 @@ contract CompoundProduct is BaseProduct {
         _maxPeriod,
         _maxCoverAmount
     ) {
-        comptroller = IComptroller(_coveredPlatform);
+        comptroller = IComptrollerRinkeby(_coveredPlatform);
         quoter = IExchangeQuoter(_quoter);
     }
 
@@ -55,7 +55,7 @@ contract CompoundProduct is BaseProduct {
     function setComptroller(address _comptroller) external {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
-        comptroller = IComptroller(_comptroller);
+        comptroller = IComptrollerRinkeby(_comptroller);
     }
 
     /**
@@ -74,7 +74,7 @@ contract CompoundProduct is BaseProduct {
     // and https://etherscan.io/accounts/label/compound
     function appraisePosition(address _policyholder, address _positionContract) public view override returns (uint256 positionAmount) {
         // verify _positionContract
-        (bool isListed, , ) = comptroller.markets(_positionContract);
+        (bool isListed, ) = comptroller.markets(_positionContract);
         require(isListed, "Invalid position contract");
         // swap math
         ICToken token = ICToken(_positionContract);

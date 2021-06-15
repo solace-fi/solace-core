@@ -5,14 +5,14 @@
 import { Contract, Signer } from "ethers";
 import { Provider } from "@ethersproject/providers";
 
-import type { IComptroller } from "./IComptroller";
+import type { IComptrollerRinkeby } from "./IComptrollerRinkeby";
 
-export class IComptrollerFactory {
+export class IComptrollerRinkebyFactory {
   static connect(
     address: string,
     signerOrProvider: Signer | Provider
-  ): IComptroller {
-    return new Contract(address, _abi, signerOrProvider) as IComptroller;
+  ): IComptrollerRinkeby {
+    return new Contract(address, _abi, signerOrProvider) as IComptrollerRinkeby;
   }
 }
 
@@ -36,11 +36,6 @@ const _abi = [
         internalType: "uint256",
         name: "collateralFactorMantissa",
         type: "uint256",
-      },
-      {
-        internalType: "bool",
-        name: "isComped",
-        type: "bool",
       },
     ],
     stateMutability: "view",

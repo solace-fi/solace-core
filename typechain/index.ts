@@ -29,6 +29,8 @@ export { PolicyManagerFactory } from "./PolicyManagerFactory";
 export type { PolicyManager } from "./PolicyManager";
 export { CompoundProductFactory } from "./CompoundProductFactory";
 export type { CompoundProduct } from "./CompoundProduct";
+export { CompoundProductRinkebyFactory } from "./CompoundProductRinkebyFactory";
+export type { CompoundProductRinkeby } from "./CompoundProductRinkeby";
 export { RegistryFactory } from "./RegistryFactory";
 export type { Registry } from "./Registry";
 export { SolaceFactory } from "./SolaceFactory";
