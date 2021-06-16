@@ -21,7 +21,7 @@ import { BytesLike } from "@ethersproject/bytes";
 import { Listener, Provider } from "@ethersproject/providers";
 import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
-interface BaseProductInterface extends ethers.utils.Interface {
+interface CompoundProductInterface extends ethers.utils.Interface {
   functions: {
     "activeCoverAmount()": FunctionFragment;
     "activePolicyIDs(uint256)": FunctionFragment;
@@ -30,6 +30,7 @@ interface BaseProductInterface extends ethers.utils.Interface {
     "cancelFee()": FunctionFragment;
     "cancelPolicy(uint256)": FunctionFragment;
     "claimsAdjuster()": FunctionFragment;
+    "comptroller()": FunctionFragment;
     "coveredPlatform()": FunctionFragment;
     "extendPolicy(uint256,uint256)": FunctionFragment;
     "getQuote(address,address,uint256,uint256)": FunctionFragment;
@@ -40,8 +41,11 @@ interface BaseProductInterface extends ethers.utils.Interface {
     "policyManager()": FunctionFragment;
     "price()": FunctionFragment;
     "productPolicyCount()": FunctionFragment;
+    "quoter()": FunctionFragment;
     "setCancelFee(uint256)": FunctionFragment;
     "setClaimsAdjuster(address)": FunctionFragment;
+    "setComptroller(address)": FunctionFragment;
+    "setExchangeQuoter(address)": FunctionFragment;
     "setGovernance(address)": FunctionFragment;
     "setMaxCoverAmount(uint256)": FunctionFragment;
     "setMaxPeriod(uint256)": FunctionFragment;
@@ -77,6 +81,10 @@ interface BaseProductInterface extends ethers.utils.Interface {
     values?: undefined
   ): string;
   encodeFunctionData(
+    functionFragment: "comptroller",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
     functionFragment: "coveredPlatform",
     values?: undefined
   ): string;
@@ -107,12 +115,21 @@ interface BaseProductInterface extends ethers.utils.Interface {
     functionFragment: "productPolicyCount",
     values?: undefined
   ): string;
+  encodeFunctionData(functionFragment: "quoter", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "setCancelFee",
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "setClaimsAdjuster",
+    values: [string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "setComptroller",
+    values: [string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "setExchangeQuoter",
     values: [string]
   ): string;
   encodeFunctionData(
@@ -164,6 +181,10 @@ interface BaseProductInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
+    functionFragment: "comptroller",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "coveredPlatform",
     data: BytesLike
   ): Result;
@@ -188,12 +209,21 @@ interface BaseProductInterface extends ethers.utils.Interface {
     functionFragment: "productPolicyCount",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(functionFragment: "quoter", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "setCancelFee",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
     functionFragment: "setClaimsAdjuster",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "setComptroller",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "setExchangeQuoter",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -230,7 +260,7 @@ interface BaseProductInterface extends ethers.utils.Interface {
   getEvent(nameOrSignatureOrTopic: "PolicyExtended"): EventFragment;
 }
 
-export class BaseProduct extends Contract {
+export class CompoundProduct extends Contract {
   connect(signerOrProvider: Signer | Provider | string): this;
   attach(addressOrName: string): this;
   deployed(): Promise<this>;
@@ -241,7 +271,7 @@ export class BaseProduct extends Contract {
   removeAllListeners(eventName: EventFilter | string): this;
   removeListener(eventName: any, listener: Listener): this;
 
-  interface: BaseProductInterface;
+  interface: CompoundProductInterface;
 
   functions: {
     activeCoverAmount(
@@ -333,6 +363,18 @@ export class BaseProduct extends Contract {
     }>;
 
     "claimsAdjuster()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    comptroller(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "comptroller()"(
       overrides?: CallOverrides
     ): Promise<{
       0: string;
@@ -466,6 +508,18 @@ export class BaseProduct extends Contract {
       0: BigNumber;
     }>;
 
+    quoter(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "quoter()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
     setCancelFee(
       _cancelFee: BigNumberish,
       overrides?: Overrides
@@ -483,6 +537,26 @@ export class BaseProduct extends Contract {
 
     "setClaimsAdjuster(address)"(
       _claimsAdjuster: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    setComptroller(
+      _comptroller: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "setComptroller(address)"(
+      _comptroller: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    setExchangeQuoter(
+      _quoter: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "setExchangeQuoter(address)"(
+      _quoter: string,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
@@ -615,6 +689,10 @@ export class BaseProduct extends Contract {
 
   "claimsAdjuster()"(overrides?: CallOverrides): Promise<string>;
 
+  comptroller(overrides?: CallOverrides): Promise<string>;
+
+  "comptroller()"(overrides?: CallOverrides): Promise<string>;
+
   coveredPlatform(overrides?: CallOverrides): Promise<string>;
 
   "coveredPlatform()"(overrides?: CallOverrides): Promise<string>;
@@ -675,6 +753,10 @@ export class BaseProduct extends Contract {
 
   "productPolicyCount()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+  quoter(overrides?: CallOverrides): Promise<string>;
+
+  "quoter()"(overrides?: CallOverrides): Promise<string>;
+
   setCancelFee(
     _cancelFee: BigNumberish,
     overrides?: Overrides
@@ -692,6 +774,26 @@ export class BaseProduct extends Contract {
 
   "setClaimsAdjuster(address)"(
     _claimsAdjuster: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  setComptroller(
+    _comptroller: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "setComptroller(address)"(
+    _comptroller: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  setExchangeQuoter(
+    _quoter: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "setExchangeQuoter(address)"(
+    _quoter: string,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
@@ -814,6 +916,10 @@ export class BaseProduct extends Contract {
 
     "claimsAdjuster()"(overrides?: CallOverrides): Promise<string>;
 
+    comptroller(overrides?: CallOverrides): Promise<string>;
+
+    "comptroller()"(overrides?: CallOverrides): Promise<string>;
+
     coveredPlatform(overrides?: CallOverrides): Promise<string>;
 
     "coveredPlatform()"(overrides?: CallOverrides): Promise<string>;
@@ -874,6 +980,10 @@ export class BaseProduct extends Contract {
 
     "productPolicyCount()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+    quoter(overrides?: CallOverrides): Promise<string>;
+
+    "quoter()"(overrides?: CallOverrides): Promise<string>;
+
     setCancelFee(
       _cancelFee: BigNumberish,
       overrides?: CallOverrides
@@ -891,6 +1001,26 @@ export class BaseProduct extends Contract {
 
     "setClaimsAdjuster(address)"(
       _claimsAdjuster: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    setComptroller(
+      _comptroller: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "setComptroller(address)"(
+      _comptroller: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    setExchangeQuoter(
+      _quoter: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "setExchangeQuoter(address)"(
+      _quoter: string,
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -1029,6 +1159,10 @@ export class BaseProduct extends Contract {
 
     "claimsAdjuster()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+    comptroller(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "comptroller()"(overrides?: CallOverrides): Promise<BigNumber>;
+
     coveredPlatform(overrides?: CallOverrides): Promise<BigNumber>;
 
     "coveredPlatform()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -1089,6 +1223,10 @@ export class BaseProduct extends Contract {
 
     "productPolicyCount()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+    quoter(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "quoter()"(overrides?: CallOverrides): Promise<BigNumber>;
+
     setCancelFee(
       _cancelFee: BigNumberish,
       overrides?: Overrides
@@ -1106,6 +1244,26 @@ export class BaseProduct extends Contract {
 
     "setClaimsAdjuster(address)"(
       _claimsAdjuster: string,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    setComptroller(
+      _comptroller: string,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "setComptroller(address)"(
+      _comptroller: string,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    setExchangeQuoter(
+      _quoter: string,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "setExchangeQuoter(address)"(
+      _quoter: string,
       overrides?: Overrides
     ): Promise<BigNumber>;
 
@@ -1230,6 +1388,10 @@ export class BaseProduct extends Contract {
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
+    comptroller(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "comptroller()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
     coveredPlatform(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "coveredPlatform()"(
@@ -1298,6 +1460,10 @@ export class BaseProduct extends Contract {
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
+    quoter(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "quoter()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
     setCancelFee(
       _cancelFee: BigNumberish,
       overrides?: Overrides
@@ -1315,6 +1481,26 @@ export class BaseProduct extends Contract {
 
     "setClaimsAdjuster(address)"(
       _claimsAdjuster: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    setComptroller(
+      _comptroller: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "setComptroller(address)"(
+      _comptroller: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    setExchangeQuoter(
+      _quoter: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "setExchangeQuoter(address)"(
+      _quoter: string,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 

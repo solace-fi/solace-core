@@ -23,15 +23,22 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
 interface ITreasuryInterface extends ethers.utils.Interface {
   functions: {
+    "acceptGovernance()": FunctionFragment;
     "depositEth()": FunctionFragment;
     "depositToken(address,uint256)": FunctionFragment;
+    "governance()": FunctionFragment;
+    "newGovernance()": FunctionFragment;
     "refund(address,uint256)": FunctionFragment;
     "setGovernance(address)": FunctionFragment;
     "setPath(address,bytes)": FunctionFragment;
     "spend(address,uint256,address)": FunctionFragment;
-    "swap(address,bytes,uint256,uint256)": FunctionFragment;
+    "swap(bytes,uint256,uint256)": FunctionFragment;
   };
 
+  encodeFunctionData(
+    functionFragment: "acceptGovernance",
+    values?: undefined
+  ): string;
   encodeFunctionData(
     functionFragment: "depositEth",
     values?: undefined
@@ -39,6 +46,14 @@ interface ITreasuryInterface extends ethers.utils.Interface {
   encodeFunctionData(
     functionFragment: "depositToken",
     values: [string, BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "governance",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "newGovernance",
+    values?: undefined
   ): string;
   encodeFunctionData(
     functionFragment: "refund",
@@ -58,12 +73,21 @@ interface ITreasuryInterface extends ethers.utils.Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "swap",
-    values: [string, BytesLike, BigNumberish, BigNumberish]
+    values: [BytesLike, BigNumberish, BigNumberish]
   ): string;
 
+  decodeFunctionResult(
+    functionFragment: "acceptGovernance",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "depositEth", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "depositToken",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "governance", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "newGovernance",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "refund", data: BytesLike): Result;
@@ -75,7 +99,19 @@ interface ITreasuryInterface extends ethers.utils.Interface {
   decodeFunctionResult(functionFragment: "spend", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "swap", data: BytesLike): Result;
 
-  events: {};
+  events: {
+    "EthDeposited(uint256)": EventFragment;
+    "FundsSpent(address,uint256,address)": EventFragment;
+    "GovernanceTransferred(address)": EventFragment;
+    "PathSet(address,bytes)": EventFragment;
+    "TokenDeposited(address,uint256)": EventFragment;
+  };
+
+  getEvent(nameOrSignatureOrTopic: "EthDeposited"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "FundsSpent"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "GovernanceTransferred"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "PathSet"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "TokenDeposited"): EventFragment;
 }
 
 export class ITreasury extends Contract {
@@ -92,6 +128,10 @@ export class ITreasury extends Contract {
   interface: ITreasuryInterface;
 
   functions: {
+    acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
+
     depositEth(overrides?: PayableOverrides): Promise<ContractTransaction>;
 
     "depositEth()"(overrides?: PayableOverrides): Promise<ContractTransaction>;
@@ -107,6 +147,30 @@ export class ITreasury extends Contract {
       _amount: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
+
+    governance(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "governance()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    newGovernance(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "newGovernance()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
 
     refund(
       _user: string,
@@ -157,21 +221,23 @@ export class ITreasury extends Contract {
     ): Promise<ContractTransaction>;
 
     swap(
-      _token: string,
       _path: BytesLike,
       _amountIn: BigNumberish,
       _amountOutMinimum: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    "swap(address,bytes,uint256,uint256)"(
-      _token: string,
+    "swap(bytes,uint256,uint256)"(
       _path: BytesLike,
       _amountIn: BigNumberish,
       _amountOutMinimum: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
   };
+
+  acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+  "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
 
   depositEth(overrides?: PayableOverrides): Promise<ContractTransaction>;
 
@@ -188,6 +254,14 @@ export class ITreasury extends Contract {
     _amount: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
+
+  governance(overrides?: CallOverrides): Promise<string>;
+
+  "governance()"(overrides?: CallOverrides): Promise<string>;
+
+  newGovernance(overrides?: CallOverrides): Promise<string>;
+
+  "newGovernance()"(overrides?: CallOverrides): Promise<string>;
 
   refund(
     _user: string,
@@ -238,15 +312,13 @@ export class ITreasury extends Contract {
   ): Promise<ContractTransaction>;
 
   swap(
-    _token: string,
     _path: BytesLike,
     _amountIn: BigNumberish,
     _amountOutMinimum: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  "swap(address,bytes,uint256,uint256)"(
-    _token: string,
+  "swap(bytes,uint256,uint256)"(
     _path: BytesLike,
     _amountIn: BigNumberish,
     _amountOutMinimum: BigNumberish,
@@ -254,6 +326,10 @@ export class ITreasury extends Contract {
   ): Promise<ContractTransaction>;
 
   callStatic: {
+    acceptGovernance(overrides?: CallOverrides): Promise<void>;
+
+    "acceptGovernance()"(overrides?: CallOverrides): Promise<void>;
+
     depositEth(overrides?: CallOverrides): Promise<void>;
 
     "depositEth()"(overrides?: CallOverrides): Promise<void>;
@@ -270,6 +346,14 @@ export class ITreasury extends Contract {
       overrides?: CallOverrides
     ): Promise<void>;
 
+    governance(overrides?: CallOverrides): Promise<string>;
+
+    "governance()"(overrides?: CallOverrides): Promise<string>;
+
+    newGovernance(overrides?: CallOverrides): Promise<string>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<string>;
+
     refund(
       _user: string,
       _amount: BigNumberish,
@@ -319,15 +403,13 @@ export class ITreasury extends Contract {
     ): Promise<void>;
 
     swap(
-      _token: string,
       _path: BytesLike,
       _amountIn: BigNumberish,
       _amountOutMinimum: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
 
-    "swap(address,bytes,uint256,uint256)"(
-      _token: string,
+    "swap(bytes,uint256,uint256)"(
       _path: BytesLike,
       _amountIn: BigNumberish,
       _amountOutMinimum: BigNumberish,
@@ -335,9 +417,23 @@ export class ITreasury extends Contract {
     ): Promise<void>;
   };
 
-  filters: {};
+  filters: {
+    EthDeposited(_amount: null): EventFilter;
+
+    FundsSpent(_token: null, _amount: null, _recipient: null): EventFilter;
+
+    GovernanceTransferred(_newGovernance: null): EventFilter;
+
+    PathSet(_token: null, _path: null): EventFilter;
+
+    TokenDeposited(_token: null, _amount: null): EventFilter;
+  };
 
   estimateGas: {
+    acceptGovernance(overrides?: Overrides): Promise<BigNumber>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<BigNumber>;
+
     depositEth(overrides?: PayableOverrides): Promise<BigNumber>;
 
     "depositEth()"(overrides?: PayableOverrides): Promise<BigNumber>;
@@ -354,6 +450,14 @@ export class ITreasury extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
+    governance(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "governance()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    newGovernance(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<BigNumber>;
+
     refund(
       _user: string,
       _amount: BigNumberish,
@@ -403,15 +507,13 @@ export class ITreasury extends Contract {
     ): Promise<BigNumber>;
 
     swap(
-      _token: string,
       _path: BytesLike,
       _amountIn: BigNumberish,
       _amountOutMinimum: BigNumberish,
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    "swap(address,bytes,uint256,uint256)"(
-      _token: string,
+    "swap(bytes,uint256,uint256)"(
       _path: BytesLike,
       _amountIn: BigNumberish,
       _amountOutMinimum: BigNumberish,
@@ -420,6 +522,10 @@ export class ITreasury extends Contract {
   };
 
   populateTransaction: {
+    acceptGovernance(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<PopulatedTransaction>;
+
     depositEth(overrides?: PayableOverrides): Promise<PopulatedTransaction>;
 
     "depositEth()"(overrides?: PayableOverrides): Promise<PopulatedTransaction>;
@@ -436,6 +542,14 @@ export class ITreasury extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
+    governance(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "governance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    newGovernance(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
     refund(
       _user: string,
       _amount: BigNumberish,
@@ -485,15 +599,13 @@ export class ITreasury extends Contract {
     ): Promise<PopulatedTransaction>;
 
     swap(
-      _token: string,
       _path: BytesLike,
       _amountIn: BigNumberish,
       _amountOutMinimum: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    "swap(address,bytes,uint256,uint256)"(
-      _token: string,
+    "swap(bytes,uint256,uint256)"(
       _path: BytesLike,
       _amountIn: BigNumberish,
       _amountOutMinimum: BigNumberish,

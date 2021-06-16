@@ -22,6 +22,19 @@ const _abi = [
     inputs: [
       {
         indexed: false,
+        internalType: "address",
+        name: "_newGovernance",
+        type: "address",
+      },
+    ],
+    name: "GovernanceTransferred",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: false,
         internalType: "uint256",
         name: "tokenID",
         type: "uint256",
@@ -68,6 +81,13 @@ const _abi = [
     ],
     name: "ProductRemoved",
     type: "event",
+  },
+  {
+    inputs: [],
+    name: "acceptGovernance",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
   },
   {
     inputs: [
@@ -180,44 +200,37 @@ const _abi = [
         type: "uint256",
       },
     ],
-    name: "getPolicyParams",
+    name: "getPolicyInfo",
     outputs: [
       {
-        components: [
-          {
-            internalType: "address",
-            name: "policyholder",
-            type: "address",
-          },
-          {
-            internalType: "address",
-            name: "product",
-            type: "address",
-          },
-          {
-            internalType: "address",
-            name: "positionContract",
-            type: "address",
-          },
-          {
-            internalType: "uint256",
-            name: "expirationBlock",
-            type: "uint256",
-          },
-          {
-            internalType: "uint256",
-            name: "coverAmount",
-            type: "uint256",
-          },
-          {
-            internalType: "uint256",
-            name: "price",
-            type: "uint256",
-          },
-        ],
-        internalType: "struct IPolicyManager.PolicyTokenURIParams",
-        name: "",
-        type: "tuple",
+        internalType: "address",
+        name: "policyholder",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "product",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "positionContract",
+        type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "expirationBlock",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "coverAmount",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "price",
+        type: "uint256",
       },
     ],
     stateMutability: "view",
@@ -301,12 +314,44 @@ const _abi = [
   },
   {
     inputs: [],
-    name: "myPolicies",
+    name: "governance",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "_policyholder",
+        type: "address",
+      },
+    ],
+    name: "listPolicies",
     outputs: [
       {
         internalType: "uint256[]",
         name: "",
         type: "uint256[]",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "newGovernance",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
       },
     ],
     stateMutability: "view",
@@ -342,7 +387,7 @@ const _abi = [
     inputs: [
       {
         internalType: "uint256",
-        name: "_tokenId",
+        name: "_policyId",
         type: "uint256",
       },
       {
@@ -371,47 +416,9 @@ const _abi = [
         type: "uint256",
       },
     ],
-    name: "setTokenURI",
+    name: "setPolicyInfo",
     outputs: [],
     stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "bytes4",
-        name: "interfaceId",
-        type: "bytes4",
-      },
-    ],
-    name: "supportsInterface",
-    outputs: [
-      {
-        internalType: "bool",
-        name: "",
-        type: "bool",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "tokenId",
-        type: "uint256",
-      },
-    ],
-    name: "tokenURI",
-    outputs: [
-      {
-        internalType: "string",
-        name: "",
-        type: "string",
-      },
-    ],
-    stateMutability: "view",
     type: "function",
   },
 ];

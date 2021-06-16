@@ -2,9 +2,10 @@
 pragma solidity 0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./interface/ISwapRouter.sol";
 import "./SOLACE.sol";
-import "./interface/IWETH10.sol";
+import "contracts/mocks/WETH9.sol";
 import "./interface/ITreasury.sol";
 
 
@@ -13,51 +14,45 @@ import "./interface/ITreasury.sol";
  * @author solace.
  * @notice The war chest of Castle Solace.
  */
-contract Treasury is ITreasury {
+contract Treasury is ITreasury, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     /// @notice Native SOLACE Token.
     SOLACE public solace;
 
     /// @notice Governor.
-    address public governance;
+    address public override governance;
+
+    /// @notice Governance to take over.
+    address public override newGovernance;
 
     /// @notice Address of Uniswap router.
     ISwapRouter public swapRouter;
 
     /// @notice Wrapped ether.
-    IWETH10 public weth;
+    WETH9 public weth;
 
     /// @notice Given a token, what swap path should it take.
     mapping(address => bytes) public paths;
 
-    // events
-    // Emitted when eth is deposited
-    event DepositEth(uint256 _amount);
-    // Emitted when a token is deposited
-    event DepositToken(address _token, uint256 _amount);
-    // Emitted when a token is spent
-    event Spend(address _token, uint256 _amount, address _recipient);
-    // Emitted when a token swap path is set
-    event PathSet(address _token, bytes _path);
-
     /**
      * @notice Constructs the treasury contract.
+     * @param _governance Address of the governor.
      * @param _solace Address of the solace token.
      * @param _swapRouter Address of uniswap router.
      * @param _weth Address of wrapped ether.
      */
-    constructor(SOLACE _solace, address _swapRouter, address _weth) {
+    constructor(address _governance, SOLACE _solace, address _swapRouter, address _weth) public {
+        governance = _governance;
         solace = _solace;
         swapRouter = ISwapRouter(_swapRouter);
-        weth = IWETH10(_weth);
-        governance = msg.sender;
+        weth = WETH9(payable(_weth));
     }
 
     /**
      * Receive function. Deposits eth.
      */
-    receive () external payable override {
+    receive () external payable override nonReentrant {
         _depositEth();
     }
 
@@ -65,20 +60,31 @@ contract Treasury is ITreasury {
     /**
      * Fallback function. Deposits eth.
      */
-    fallback () external payable override {
+    fallback () external payable override nonReentrant {
         _depositEth();
     }
 
     /**
-     * @notice Transfers the governance role to a new governor.
+     * @notice Allows governance to be transferred to a new governor.
      * Can only be called by the current governor.
      * @param _governance The new governor.
      */
     function setGovernance(address _governance) external override {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
-        // set governance
-        governance = _governance;
+        newGovernance = _governance;
+    }
+
+    /**
+     * @notice Accepts the governance role.
+     * Can only be called by the new governor.
+     */
+    function acceptGovernance() external override {
+        // can only be called by new governor
+        require(msg.sender == newGovernance, "!governance");
+        governance = newGovernance;
+        newGovernance = address(0x0);
+        emit GovernanceTransferred(msg.sender);
     }
 
     /**
@@ -88,7 +94,7 @@ contract Treasury is ITreasury {
      * @param _token The token to set the path for.
      * @param _path The path to take.
      */
-    function setPath(address _token, bytes calldata _path) external override {
+    function setPath(address _token, bytes calldata _path) external override nonReentrant {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
         // set path
@@ -102,7 +108,7 @@ contract Treasury is ITreasury {
     /**
      * @notice Deposits some ether.
      */
-    function depositEth() external override payable {
+    function depositEth() external override payable nonReentrant {
         _depositEth();
     }
 
@@ -111,13 +117,13 @@ contract Treasury is ITreasury {
      * @param _token The address of the token to deposit.
      * @param _amount The amount of the token to deposit.
      */
-    function depositToken(address _token, uint256 _amount) external override {
+    function depositToken(address _token, uint256 _amount) external override nonReentrant {
         // receive token
         IERC20(_token).safeTransferFrom(msg.sender, address(this), _amount);
         // perform swap
         _swap(_token);
         // emit event
-        emit DepositToken(_token, _amount);
+        emit TokenDeposited(_token, _amount);
     }
 
     /**
@@ -127,13 +133,13 @@ contract Treasury is ITreasury {
      * @param _amount The amount of the token to spend.
      * @param _recipient The address of the token receiver.
      */
-    function spend(address _token, uint256 _amount, address _recipient) external override {
+    function spend(address _token, uint256 _amount, address _recipient) external override nonReentrant {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
         // transfer
         IERC20(_token).safeTransfer(_recipient, _amount);
         // emit event
-        emit Spend(_token, _amount, _recipient);
+        emit FundsSpent(_token, _amount, _recipient);
     }
 
     /**
@@ -141,12 +147,11 @@ contract Treasury is ITreasury {
      * Can only be called by the current governor.
      * @dev Swaps the entire balance in case some tokens were unknowingly received.
      * Reverts if the swap was unsuccessful.
-     * @param _token The address of the token to swap.
      * @param _path The path of pools to take.
      * @param _amountIn The amount to swap.
      * @param _amountOutMinimum The minimum about to receive.
      */
-    function swap(address _token, bytes calldata _path, uint256 _amountIn, uint256 _amountOutMinimum) external override {
+    function swap(bytes calldata _path, uint256 _amountIn, uint256 _amountOutMinimum) external override {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
         // swap
@@ -174,7 +179,7 @@ contract Treasury is ITreasury {
         // perform swap
         _swap(address(weth));
         // emit event
-        emit DepositEth(msg.value);
+        emit EthDeposited(msg.value);
     }
 
     /**

@@ -31,6 +31,12 @@ export async function import_artifacts() {
   artifacts.MockERC20 = await import(`${artifact_dir}/mocks/MockERC20.sol/MockERC20.json`);
   artifacts.MockStrategy = await import(`${artifact_dir}/mocks/MockStrategy.sol/MockStrategy.json`);
 
+  artifacts.PolicyManager = await import(`${artifact_dir}/PolicyManager.sol/PolicyManager.json`);
+  artifacts.CompoundProduct = await import(`${artifact_dir}/products/CompoundProduct.sol/CompoundProduct.json`);
+  artifacts.CompoundProductRinkeby = await import(`${artifact_dir}/products/CompoundProductRinkeby.sol/CompoundProductRinkeby.json`);
+  artifacts.ExchangeQuoter = await import(`${artifact_dir}/ExchangeQuoter.sol/ExchangeQuoter.json`);
+  artifacts.ExchangeQuoterManual = await import(`${artifact_dir}/ExchangeQuoterManual.sol/ExchangeQuoterManual.json`);
+
   // uniswap imports
   artifacts.UniswapV3Factory = await import("@uniswap/v3-core/artifacts/contracts/UniswapV3Factory.sol/UniswapV3Factory.json");
   artifacts.UniswapV3Pool = await import("@uniswap/v3-core/artifacts/contracts/UniswapV3Pool.sol/UniswapV3Pool.json");

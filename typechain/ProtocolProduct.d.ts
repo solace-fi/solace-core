@@ -24,10 +24,10 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 interface ProtocolProductInterface extends ethers.utils.Interface {
   functions: {
     "appraisePosition(address,address)": FunctionFragment;
-    "buyPolicy(uint256,uint256,address,address)": FunctionFragment;
+    "buyPolicy(address,address,uint256,uint256)": FunctionFragment;
     "cancelPolicy(uint256)": FunctionFragment;
     "extendPolicy(uint256,uint256)": FunctionFragment;
-    "getQuote(uint256,uint256,address)": FunctionFragment;
+    "getQuote(address,address,uint256,uint256)": FunctionFragment;
     "setCancelFee(uint256)": FunctionFragment;
     "setClaimsAdjuster(address)": FunctionFragment;
     "setGovernance(address)": FunctionFragment;
@@ -44,7 +44,7 @@ interface ProtocolProductInterface extends ethers.utils.Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "buyPolicy",
-    values: [BigNumberish, BigNumberish, string, string]
+    values: [string, string, BigNumberish, BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "cancelPolicy",
@@ -56,7 +56,7 @@ interface ProtocolProductInterface extends ethers.utils.Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "getQuote",
-    values: [BigNumberish, BigNumberish, string]
+    values: [string, string, BigNumberish, BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "setCancelFee",
@@ -179,18 +179,18 @@ export class ProtocolProduct extends Contract {
     }>;
 
     buyPolicy(
-      _coverLimit: BigNumberish,
-      _blocks: BigNumberish,
       _policyholder: string,
       _positionContract: string,
+      _coverLimit: BigNumberish,
+      _blocks: BigNumberish,
       overrides?: PayableOverrides
     ): Promise<ContractTransaction>;
 
-    "buyPolicy(uint256,uint256,address,address)"(
-      _coverLimit: BigNumberish,
-      _blocks: BigNumberish,
+    "buyPolicy(address,address,uint256,uint256)"(
       _policyholder: string,
       _positionContract: string,
+      _coverLimit: BigNumberish,
+      _blocks: BigNumberish,
       overrides?: PayableOverrides
     ): Promise<ContractTransaction>;
 
@@ -217,18 +217,20 @@ export class ProtocolProduct extends Contract {
     ): Promise<ContractTransaction>;
 
     getQuote(
+      _policyholder: string,
+      _positionContract: string,
       _coverLimit: BigNumberish,
       _blocks: BigNumberish,
-      _positionContract: string,
       overrides?: CallOverrides
     ): Promise<{
       0: BigNumber;
     }>;
 
-    "getQuote(uint256,uint256,address)"(
+    "getQuote(address,address,uint256,uint256)"(
+      _policyholder: string,
+      _positionContract: string,
       _coverLimit: BigNumberish,
       _blocks: BigNumberish,
-      _positionContract: string,
       overrides?: CallOverrides
     ): Promise<{
       0: BigNumber;
@@ -324,18 +326,18 @@ export class ProtocolProduct extends Contract {
   ): Promise<BigNumber>;
 
   buyPolicy(
-    _coverLimit: BigNumberish,
-    _blocks: BigNumberish,
     _policyholder: string,
     _positionContract: string,
+    _coverLimit: BigNumberish,
+    _blocks: BigNumberish,
     overrides?: PayableOverrides
   ): Promise<ContractTransaction>;
 
-  "buyPolicy(uint256,uint256,address,address)"(
-    _coverLimit: BigNumberish,
-    _blocks: BigNumberish,
+  "buyPolicy(address,address,uint256,uint256)"(
     _policyholder: string,
     _positionContract: string,
+    _coverLimit: BigNumberish,
+    _blocks: BigNumberish,
     overrides?: PayableOverrides
   ): Promise<ContractTransaction>;
 
@@ -362,16 +364,18 @@ export class ProtocolProduct extends Contract {
   ): Promise<ContractTransaction>;
 
   getQuote(
+    _policyholder: string,
+    _positionContract: string,
     _coverLimit: BigNumberish,
     _blocks: BigNumberish,
-    _positionContract: string,
     overrides?: CallOverrides
   ): Promise<BigNumber>;
 
-  "getQuote(uint256,uint256,address)"(
+  "getQuote(address,address,uint256,uint256)"(
+    _policyholder: string,
+    _positionContract: string,
     _coverLimit: BigNumberish,
     _blocks: BigNumberish,
-    _positionContract: string,
     overrides?: CallOverrides
   ): Promise<BigNumber>;
 
@@ -463,18 +467,18 @@ export class ProtocolProduct extends Contract {
     ): Promise<BigNumber>;
 
     buyPolicy(
-      _coverLimit: BigNumberish,
-      _blocks: BigNumberish,
       _policyholder: string,
       _positionContract: string,
+      _coverLimit: BigNumberish,
+      _blocks: BigNumberish,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    "buyPolicy(uint256,uint256,address,address)"(
-      _coverLimit: BigNumberish,
-      _blocks: BigNumberish,
+    "buyPolicy(address,address,uint256,uint256)"(
       _policyholder: string,
       _positionContract: string,
+      _coverLimit: BigNumberish,
+      _blocks: BigNumberish,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
@@ -501,16 +505,18 @@ export class ProtocolProduct extends Contract {
     ): Promise<void>;
 
     getQuote(
+      _policyholder: string,
+      _positionContract: string,
       _coverLimit: BigNumberish,
       _blocks: BigNumberish,
-      _positionContract: string,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    "getQuote(uint256,uint256,address)"(
+    "getQuote(address,address,uint256,uint256)"(
+      _policyholder: string,
+      _positionContract: string,
       _coverLimit: BigNumberish,
       _blocks: BigNumberish,
-      _positionContract: string,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
@@ -618,18 +624,18 @@ export class ProtocolProduct extends Contract {
     ): Promise<BigNumber>;
 
     buyPolicy(
-      _coverLimit: BigNumberish,
-      _blocks: BigNumberish,
       _policyholder: string,
       _positionContract: string,
+      _coverLimit: BigNumberish,
+      _blocks: BigNumberish,
       overrides?: PayableOverrides
     ): Promise<BigNumber>;
 
-    "buyPolicy(uint256,uint256,address,address)"(
-      _coverLimit: BigNumberish,
-      _blocks: BigNumberish,
+    "buyPolicy(address,address,uint256,uint256)"(
       _policyholder: string,
       _positionContract: string,
+      _coverLimit: BigNumberish,
+      _blocks: BigNumberish,
       overrides?: PayableOverrides
     ): Promise<BigNumber>;
 
@@ -656,16 +662,18 @@ export class ProtocolProduct extends Contract {
     ): Promise<BigNumber>;
 
     getQuote(
+      _policyholder: string,
+      _positionContract: string,
       _coverLimit: BigNumberish,
       _blocks: BigNumberish,
-      _positionContract: string,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    "getQuote(uint256,uint256,address)"(
+    "getQuote(address,address,uint256,uint256)"(
+      _policyholder: string,
+      _positionContract: string,
       _coverLimit: BigNumberish,
       _blocks: BigNumberish,
-      _positionContract: string,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
@@ -755,18 +763,18 @@ export class ProtocolProduct extends Contract {
     ): Promise<PopulatedTransaction>;
 
     buyPolicy(
-      _coverLimit: BigNumberish,
-      _blocks: BigNumberish,
       _policyholder: string,
       _positionContract: string,
+      _coverLimit: BigNumberish,
+      _blocks: BigNumberish,
       overrides?: PayableOverrides
     ): Promise<PopulatedTransaction>;
 
-    "buyPolicy(uint256,uint256,address,address)"(
-      _coverLimit: BigNumberish,
-      _blocks: BigNumberish,
+    "buyPolicy(address,address,uint256,uint256)"(
       _policyholder: string,
       _positionContract: string,
+      _coverLimit: BigNumberish,
+      _blocks: BigNumberish,
       overrides?: PayableOverrides
     ): Promise<PopulatedTransaction>;
 
@@ -793,16 +801,18 @@ export class ProtocolProduct extends Contract {
     ): Promise<PopulatedTransaction>;
 
     getQuote(
+      _policyholder: string,
+      _positionContract: string,
       _coverLimit: BigNumberish,
       _blocks: BigNumberish,
-      _positionContract: string,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
-    "getQuote(uint256,uint256,address)"(
+    "getQuote(address,address,uint256,uint256)"(
+      _policyholder: string,
+      _positionContract: string,
       _coverLimit: BigNumberish,
       _blocks: BigNumberish,
-      _positionContract: string,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
