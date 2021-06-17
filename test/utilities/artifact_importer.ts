@@ -32,8 +32,10 @@ export async function import_artifacts() {
   artifacts.MockStrategy = await import(`${artifact_dir}/mocks/MockStrategy.sol/MockStrategy.json`);
 
   artifacts.PolicyManager = await import(`${artifact_dir}/PolicyManager.sol/PolicyManager.json`);
+  artifacts.AaveV2Product = await import(`${artifact_dir}/products/AaveV2Product.sol/AaveV2Product.json`);
   artifacts.CompoundProduct = await import(`${artifact_dir}/products/CompoundProduct.sol/CompoundProduct.json`);
   artifacts.CompoundProductRinkeby = await import(`${artifact_dir}/products/CompoundProductRinkeby.sol/CompoundProductRinkeby.json`);
+  
   artifacts.ExchangeQuoter = await import(`${artifact_dir}/ExchangeQuoter.sol/ExchangeQuoter.json`);
   artifacts.ExchangeQuoterManual = await import(`${artifact_dir}/ExchangeQuoterManual.sol/ExchangeQuoterManual.json`);
 

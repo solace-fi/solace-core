@@ -27,6 +27,8 @@ export { Weth9Factory } from "./Weth9Factory";
 export type { Weth9 } from "./Weth9";
 export { PolicyManagerFactory } from "./PolicyManagerFactory";
 export type { PolicyManager } from "./PolicyManager";
+export { AaveV2ProductFactory } from "./AaveV2ProductFactory";
+export type { AaveV2Product } from "./AaveV2Product";
 export { CompoundProductFactory } from "./CompoundProductFactory";
 export type { CompoundProduct } from "./CompoundProduct";
 export { CompoundProductRinkebyFactory } from "./CompoundProductRinkebyFactory";
