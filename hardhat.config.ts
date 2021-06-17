@@ -5,6 +5,7 @@ import "@nomiclabs/hardhat-waffle";
 import "hardhat-typechain";
 import "hardhat-abi-exporter";
 import "solidity-coverage";
+import "hardhat-gas-reporter";
 import { config as dotenv_config } from 'dotenv';
 dotenv_config();
 const USE_PROCESSED_FILES = process.env.USE_PROCESSED_FILES === "true";
@@ -62,6 +63,12 @@ const config: HardhatUserConfig = {
   },
   mocha: {
     timeout: 3600000 // one hour
+  },
+  gasReporter: {
+    enabled: true,
+    currency: 'USD',
+    gasPrice: 20,
+    coinmarketcap: process.env.CMC_API_KEY
   }
 };
 

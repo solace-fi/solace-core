@@ -22,8 +22,6 @@ interface ITreasury {
     event TokenDeposited(address _token, uint256 _amount);
     // Emitted when a token is spent
     event FundsSpent(address _token, uint256 _amount, address _recipient);
-    // Emitted when a token swap path is set
-    event PathSet(address _token, bytes _path);
     // Emitted when Governance is set
     event GovernanceTransferred(address _newGovernance);
 
@@ -49,15 +47,6 @@ interface ITreasury {
      * Can only be called by the new governor.
      */
     function acceptGovernance() external;
-
-    /**
-     * @notice Sets the swap path for a token.
-     * Can only be called by the current governor.
-     * @dev Also adds or removes infinite approval of the token for the router.
-     * @param _token The token to set the path for.
-     * @param _path The path to take.
-     */
-    function setPath(address _token, bytes calldata _path) external;
 
     /**
      * @notice Deposits some ether.
@@ -89,7 +78,35 @@ interface ITreasury {
      * @param _amountIn The amount to swap.
      * @param _amountOutMinimum The minimum about to receive.
      */
-    function swap(bytes calldata _path, uint256 _amountIn, uint256 _amountOutMinimum) external;
+    function swap(bytes memory _path, uint256 _amountIn, uint256 _amountOutMinimum) external;
+
+    /**
+     * @notice Sets the premium recipients and their weights.
+     * Can only be called by the current governor.
+     * @param _recipients The premium recipients.
+     * @param _weights The recipient weights.
+     */
+    function setPremiumRecipients(address[] calldata _recipients, uint32[] calldata _weights) external;
+
+    /**
+     * @notice Routes the premiums to the recipients
+     * Can only be called by the current governor.
+     */
+    function routePremiums() external;
+
+    /**
+     * @notice Wraps some eth into weth.
+     * Can only be called by the current governor.
+     * @param _amount The amount to wrap.
+     */
+    function wrap(uint256 _amount) external;
+
+    /**
+     * @notice Unwraps some weth into eth.
+     * Can only be called by the current governor.
+     * @param _amount The amount to unwrap.
+     */
+    function unwrap(uint256 _amount) external;
 
     // used in Product
     function refund(address _user, uint256 _amount) external;

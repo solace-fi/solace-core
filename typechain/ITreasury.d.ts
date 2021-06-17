@@ -29,10 +29,13 @@ interface ITreasuryInterface extends ethers.utils.Interface {
     "governance()": FunctionFragment;
     "newGovernance()": FunctionFragment;
     "refund(address,uint256)": FunctionFragment;
+    "routePremiums()": FunctionFragment;
     "setGovernance(address)": FunctionFragment;
-    "setPath(address,bytes)": FunctionFragment;
+    "setPremiumRecipients(address[],uint32[])": FunctionFragment;
     "spend(address,uint256,address)": FunctionFragment;
     "swap(bytes,uint256,uint256)": FunctionFragment;
+    "unwrap(uint256)": FunctionFragment;
+    "wrap(uint256)": FunctionFragment;
   };
 
   encodeFunctionData(
@@ -60,12 +63,16 @@ interface ITreasuryInterface extends ethers.utils.Interface {
     values: [string, BigNumberish]
   ): string;
   encodeFunctionData(
+    functionFragment: "routePremiums",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
     functionFragment: "setGovernance",
     values: [string]
   ): string;
   encodeFunctionData(
-    functionFragment: "setPath",
-    values: [string, BytesLike]
+    functionFragment: "setPremiumRecipients",
+    values: [string[], BigNumberish[]]
   ): string;
   encodeFunctionData(
     functionFragment: "spend",
@@ -75,6 +82,11 @@ interface ITreasuryInterface extends ethers.utils.Interface {
     functionFragment: "swap",
     values: [BytesLike, BigNumberish, BigNumberish]
   ): string;
+  encodeFunctionData(
+    functionFragment: "unwrap",
+    values: [BigNumberish]
+  ): string;
+  encodeFunctionData(functionFragment: "wrap", values: [BigNumberish]): string;
 
   decodeFunctionResult(
     functionFragment: "acceptGovernance",
@@ -92,25 +104,32 @@ interface ITreasuryInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(functionFragment: "refund", data: BytesLike): Result;
   decodeFunctionResult(
+    functionFragment: "routePremiums",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "setGovernance",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(functionFragment: "setPath", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "setPremiumRecipients",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "spend", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "swap", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "unwrap", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "wrap", data: BytesLike): Result;
 
   events: {
     "EthDeposited(uint256)": EventFragment;
     "FundsSpent(address,uint256,address)": EventFragment;
     "GovernanceTransferred(address)": EventFragment;
-    "PathSet(address,bytes)": EventFragment;
     "TokenDeposited(address,uint256)": EventFragment;
   };
 
   getEvent(nameOrSignatureOrTopic: "EthDeposited"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "FundsSpent"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "GovernanceTransferred"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "PathSet"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "TokenDeposited"): EventFragment;
 }
 
@@ -184,6 +203,10 @@ export class ITreasury extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
+    routePremiums(overrides?: Overrides): Promise<ContractTransaction>;
+
+    "routePremiums()"(overrides?: Overrides): Promise<ContractTransaction>;
+
     setGovernance(
       _governance: string,
       overrides?: Overrides
@@ -194,15 +217,15 @@ export class ITreasury extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    setPath(
-      _token: string,
-      _path: BytesLike,
+    setPremiumRecipients(
+      _recipients: string[],
+      _weights: BigNumberish[],
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    "setPath(address,bytes)"(
-      _token: string,
-      _path: BytesLike,
+    "setPremiumRecipients(address[],uint32[])"(
+      _recipients: string[],
+      _weights: BigNumberish[],
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
@@ -231,6 +254,26 @@ export class ITreasury extends Contract {
       _path: BytesLike,
       _amountIn: BigNumberish,
       _amountOutMinimum: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    unwrap(
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "unwrap(uint256)"(
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    wrap(
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "wrap(uint256)"(
+      _amount: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
   };
@@ -275,6 +318,10 @@ export class ITreasury extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
+  routePremiums(overrides?: Overrides): Promise<ContractTransaction>;
+
+  "routePremiums()"(overrides?: Overrides): Promise<ContractTransaction>;
+
   setGovernance(
     _governance: string,
     overrides?: Overrides
@@ -285,15 +332,15 @@ export class ITreasury extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  setPath(
-    _token: string,
-    _path: BytesLike,
+  setPremiumRecipients(
+    _recipients: string[],
+    _weights: BigNumberish[],
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  "setPath(address,bytes)"(
-    _token: string,
-    _path: BytesLike,
+  "setPremiumRecipients(address[],uint32[])"(
+    _recipients: string[],
+    _weights: BigNumberish[],
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
@@ -322,6 +369,26 @@ export class ITreasury extends Contract {
     _path: BytesLike,
     _amountIn: BigNumberish,
     _amountOutMinimum: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  unwrap(
+    _amount: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "unwrap(uint256)"(
+    _amount: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  wrap(
+    _amount: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "wrap(uint256)"(
+    _amount: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
@@ -366,6 +433,10 @@ export class ITreasury extends Contract {
       overrides?: CallOverrides
     ): Promise<void>;
 
+    routePremiums(overrides?: CallOverrides): Promise<void>;
+
+    "routePremiums()"(overrides?: CallOverrides): Promise<void>;
+
     setGovernance(
       _governance: string,
       overrides?: CallOverrides
@@ -376,15 +447,15 @@ export class ITreasury extends Contract {
       overrides?: CallOverrides
     ): Promise<void>;
 
-    setPath(
-      _token: string,
-      _path: BytesLike,
+    setPremiumRecipients(
+      _recipients: string[],
+      _weights: BigNumberish[],
       overrides?: CallOverrides
     ): Promise<void>;
 
-    "setPath(address,bytes)"(
-      _token: string,
-      _path: BytesLike,
+    "setPremiumRecipients(address[],uint32[])"(
+      _recipients: string[],
+      _weights: BigNumberish[],
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -415,6 +486,20 @@ export class ITreasury extends Contract {
       _amountOutMinimum: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
+
+    unwrap(_amount: BigNumberish, overrides?: CallOverrides): Promise<void>;
+
+    "unwrap(uint256)"(
+      _amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    wrap(_amount: BigNumberish, overrides?: CallOverrides): Promise<void>;
+
+    "wrap(uint256)"(
+      _amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
   };
 
   filters: {
@@ -423,8 +508,6 @@ export class ITreasury extends Contract {
     FundsSpent(_token: null, _amount: null, _recipient: null): EventFilter;
 
     GovernanceTransferred(_newGovernance: null): EventFilter;
-
-    PathSet(_token: null, _path: null): EventFilter;
 
     TokenDeposited(_token: null, _amount: null): EventFilter;
   };
@@ -470,6 +553,10 @@ export class ITreasury extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
+    routePremiums(overrides?: Overrides): Promise<BigNumber>;
+
+    "routePremiums()"(overrides?: Overrides): Promise<BigNumber>;
+
     setGovernance(
       _governance: string,
       overrides?: Overrides
@@ -480,15 +567,15 @@ export class ITreasury extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    setPath(
-      _token: string,
-      _path: BytesLike,
+    setPremiumRecipients(
+      _recipients: string[],
+      _weights: BigNumberish[],
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    "setPath(address,bytes)"(
-      _token: string,
-      _path: BytesLike,
+    "setPremiumRecipients(address[],uint32[])"(
+      _recipients: string[],
+      _weights: BigNumberish[],
       overrides?: Overrides
     ): Promise<BigNumber>;
 
@@ -517,6 +604,20 @@ export class ITreasury extends Contract {
       _path: BytesLike,
       _amountIn: BigNumberish,
       _amountOutMinimum: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    unwrap(_amount: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
+
+    "unwrap(uint256)"(
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    wrap(_amount: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
+
+    "wrap(uint256)"(
+      _amount: BigNumberish,
       overrides?: Overrides
     ): Promise<BigNumber>;
   };
@@ -562,6 +663,10 @@ export class ITreasury extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
+    routePremiums(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    "routePremiums()"(overrides?: Overrides): Promise<PopulatedTransaction>;
+
     setGovernance(
       _governance: string,
       overrides?: Overrides
@@ -572,15 +677,15 @@ export class ITreasury extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    setPath(
-      _token: string,
-      _path: BytesLike,
+    setPremiumRecipients(
+      _recipients: string[],
+      _weights: BigNumberish[],
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    "setPath(address,bytes)"(
-      _token: string,
-      _path: BytesLike,
+    "setPremiumRecipients(address[],uint32[])"(
+      _recipients: string[],
+      _weights: BigNumberish[],
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
@@ -609,6 +714,26 @@ export class ITreasury extends Contract {
       _path: BytesLike,
       _amountIn: BigNumberish,
       _amountOutMinimum: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    unwrap(
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "unwrap(uint256)"(
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    wrap(
+      _amount: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "wrap(uint256)"(
+      _amount: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
   };
