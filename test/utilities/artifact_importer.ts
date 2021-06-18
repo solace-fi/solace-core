@@ -34,6 +34,7 @@ export async function import_artifacts() {
   artifacts.PolicyManager = await import(`${artifact_dir}/PolicyManager.sol/PolicyManager.json`);
   artifacts.CompoundProduct = await import(`${artifact_dir}/products/CompoundProduct.sol/CompoundProduct.json`);
   artifacts.CompoundProductRinkeby = await import(`${artifact_dir}/products/CompoundProductRinkeby.sol/CompoundProductRinkeby.json`);
+  artifacts.CurveProduct = await import(`${artifact_dir}/products/CurveProduct.sol/CurveProduct.json`);
   artifacts.YearnV2Product = await import(`${artifact_dir}/products/YearnV2Product.sol/YearnV2Product.json`);
 
   artifacts.ExchangeQuoter = await import(`${artifact_dir}/ExchangeQuoter.sol/ExchangeQuoter.json`);
