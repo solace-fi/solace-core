@@ -33,6 +33,8 @@ export { CompoundProductRinkebyFactory } from "./CompoundProductRinkebyFactory";
 export type { CompoundProductRinkeby } from "./CompoundProductRinkeby";
 export { CurveProductFactory } from "./CurveProductFactory";
 export type { CurveProduct } from "./CurveProduct";
+export { YearnV2ProductFactory } from "./YearnV2ProductFactory";
+export type { YearnV2Product } from "./YearnV2Product";
 export { RegistryFactory } from "./RegistryFactory";
 export type { Registry } from "./Registry";
 export { SolaceFactory } from "./SolaceFactory";
