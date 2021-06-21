@@ -32,8 +32,11 @@ contract Treasury is ITreasury, ReentrancyGuard {
     /// @notice Wrapped ether.
     WETH9 public weth;
 
-    /// @notice Given a token, what swap path should it take.
-    mapping(address => bytes) public paths;
+    address public constant ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+
+    address[] public premiumRecipients;
+    uint32[] public recipientWeights;
+    uint32 public weightSum;
 
     /**
      * @notice Constructs the treasury contract.
@@ -52,16 +55,16 @@ contract Treasury is ITreasury, ReentrancyGuard {
     /**
      * Receive function. Deposits eth.
      */
-    receive () external payable override nonReentrant {
-        _depositEth();
+    receive () external payable override {
+        emit EthDeposited(msg.value);
     }
 
 
     /**
      * Fallback function. Deposits eth.
      */
-    fallback () external payable override nonReentrant {
-        _depositEth();
+    fallback () external payable override {
+        emit EthDeposited(msg.value);
     }
 
     /**
@@ -88,28 +91,11 @@ contract Treasury is ITreasury, ReentrancyGuard {
     }
 
     /**
-     * @notice Sets the swap path for a token.
-     * Can only be called by the current governor.
-     * @dev Also adds or removes infinite approval of the token for the router.
-     * @param _token The token to set the path for.
-     * @param _path The path to take.
-     */
-    function setPath(address _token, bytes calldata _path) external override nonReentrant {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
-        // set path
-        paths[_token] = _path;
-        // infinite or zero approval
-        IERC20(_token).approve(address(swapRouter), _path.length == 0 ? 0 : type(uint256).max);
-        // emit event
-        emit PathSet(_token, _path);
-    }
-
-    /**
      * @notice Deposits some ether.
      */
-    function depositEth() external override payable nonReentrant {
-        _depositEth();
+    function depositEth() external override payable {
+        // emit event
+        emit EthDeposited(msg.value);
     }
 
     /**
@@ -120,8 +106,6 @@ contract Treasury is ITreasury, ReentrancyGuard {
     function depositToken(address _token, uint256 _amount) external override nonReentrant {
         // receive token
         IERC20(_token).safeTransferFrom(msg.sender, address(this), _amount);
-        // perform swap
-        _swap(_token);
         // emit event
         emit TokenDeposited(_token, _amount);
     }
@@ -136,8 +120,10 @@ contract Treasury is ITreasury, ReentrancyGuard {
     function spend(address _token, uint256 _amount, address _recipient) external override nonReentrant {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
-        // transfer
-        IERC20(_token).safeTransfer(_recipient, _amount);
+        // transfer eth
+        if(_token == ETH_ADDRESS) payable(_recipient).transfer(_amount);
+        // transfer token
+        else IERC20(_token).safeTransfer(_recipient, _amount);
         // emit event
         emit FundsSpent(_token, _amount, _recipient);
     }
@@ -151,9 +137,18 @@ contract Treasury is ITreasury, ReentrancyGuard {
      * @param _amountIn The amount to swap.
      * @param _amountOutMinimum The minimum about to receive.
      */
-    function swap(bytes calldata _path, uint256 _amountIn, uint256 _amountOutMinimum) external override {
+    function swap(bytes memory _path, uint256 _amountIn, uint256 _amountOutMinimum) external override {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
+        // check allowance
+        address tokenAddr;
+        assembly {
+            tokenAddr := div(mload(add(add(_path, 0x20), 0)), 0x1000000000000000000000000)
+        }
+        IERC20 token = IERC20(tokenAddr);
+        if(token.allowance(address(this), address(swapRouter)) < _amountIn) {
+            token.approve(address(swapRouter), type(uint256).max);
+        }
         // swap
         swapRouter.exactInput(ISwapRouter.ExactInputParams({
             path: _path,
@@ -165,47 +160,70 @@ contract Treasury is ITreasury, ReentrancyGuard {
         }));
     }
 
+    /**
+     * @notice Sets the premium recipients and their weights.
+     * Can only be called by the current governor.
+     * @param _recipients The premium recipients.
+     * @param _weights The recipient weights.
+     */
+    function setPremiumRecipients(address[] calldata _recipients, uint32[] calldata _weights) external override {
+        // can only be called by governor
+        require(msg.sender == governance, "!governance");
+        // check recipient - weight map
+        require(_recipients.length + 1 == _weights.length, "length mismatch");
+        uint32 sum = 0;
+        uint256 length = _weights.length;
+        for(uint256 i = 0; i < length; i++) sum += _weights[i];
+        weightSum = sum;
+        premiumRecipients = _recipients;
+        recipientWeights = _weights;
+    }
+
+    /**
+     * @notice Routes the premiums to the recipients
+     * Can only be called by the current governor.
+     */
+    function routePremiums() external override nonReentrant {
+        // can only be called by governor
+        require(msg.sender == governance, "!governance");
+        uint256 div = weightSum;
+        // assumes that premiums and nothing else are stored as eth
+        uint256 balance = address(this).balance;
+        uint256 length = premiumRecipients.length;
+        // transfer to all recipients
+        for(uint i = 0; i < length; i++) {
+            uint256 amount = balance * recipientWeights[i] / div;
+            if(amount > 0) payable(premiumRecipients[i]).transfer(amount);
+        }
+        // hold treasury share as weth
+        balance = address(this).balance;
+        if(balance > 0) weth.deposit{value: balance}();
+    }
+
+    /**
+     * @notice Wraps some eth into weth.
+     * Can only be called by the current governor.
+     * @param _amount The amount to wrap.
+     */
+    function wrap(uint256 _amount) external override {
+        // can only be called by governor
+        require(msg.sender == governance, "!governance");
+        weth.deposit{value: _amount}();
+    }
+
+    /**
+     * @notice Unwraps some weth into eth.
+     * Can only be called by the current governor.
+     * @param _amount The amount to unwrap.
+     */
+    function unwrap(uint256 _amount) external override {
+        // can only be called by governor
+        require(msg.sender == governance, "!governance");
+        weth.withdraw(_amount);
+    }
+
     // used in Product
     function refund(address _user, uint256 _amount) external override {
-        // TODO: implement
-    }
-
-    /**
-     * @notice Deposits some ether.
-     */
-    function _depositEth() internal {
-        // swap entire balance from eth to weth
-        weth.deposit{ value: address(this).balance }();
-        // perform swap
-        _swap(address(weth));
-        // emit event
-        emit EthDeposited(msg.value);
-    }
-
-    /**
-     * @notice Swaps a token using a predefined path.
-     * @dev Swaps the entire balance in case some tokens were unknowingly received.
-     * Does not revert if the swap is unsuccessful.
-     * @param _token The address of the token to swap.
-     * @return _success True if swap was successful.
-     */
-    function _swap(address _token) internal returns (bool _success) {
-        // get route
-        bytes memory path = paths[_token];
-        // hold token if no route
-        if (path.length == 0) return false;
-        // get token balance
-        uint256 balance = IERC20(_token).balanceOf(address(this));
-        // construct call data
-        bytes memory data = abi.encodeWithSelector(swapRouter.exactInput.selector, ISwapRouter.ExactInputParams({
-            path: path,
-            recipient: address(this),
-            // solhint-disable-next-line not-rely-on-time
-            deadline: block.timestamp,
-            amountIn: balance,
-            amountOutMinimum: 0
-        }));
-        // low level call
-        (_success, ) = address(swapRouter).call(data);
+      // TODO: implement
     }
 }

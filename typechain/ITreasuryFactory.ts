@@ -79,25 +79,6 @@ const _abi = [
       },
       {
         indexed: false,
-        internalType: "bytes",
-        name: "_path",
-        type: "bytes",
-      },
-    ],
-    name: "PathSet",
-    type: "event",
-  },
-  {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: false,
-        internalType: "address",
-        name: "_token",
-        type: "address",
-      },
-      {
-        indexed: false,
         internalType: "uint256",
         name: "_amount",
         type: "uint256",
@@ -187,6 +168,13 @@ const _abi = [
     type: "function",
   },
   {
+    inputs: [],
+    name: "routePremiums",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
     inputs: [
       {
         internalType: "address",
@@ -202,17 +190,17 @@ const _abi = [
   {
     inputs: [
       {
-        internalType: "address",
-        name: "_token",
-        type: "address",
+        internalType: "address[]",
+        name: "_recipients",
+        type: "address[]",
       },
       {
-        internalType: "bytes",
-        name: "_path",
-        type: "bytes",
+        internalType: "uint32[]",
+        name: "_weights",
+        type: "uint32[]",
       },
     ],
-    name: "setPath",
+    name: "setPremiumRecipients",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -259,6 +247,32 @@ const _abi = [
       },
     ],
     name: "swap",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_amount",
+        type: "uint256",
+      },
+    ],
+    name: "unwrap",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_amount",
+        type: "uint256",
+      },
+    ],
+    name: "wrap",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
