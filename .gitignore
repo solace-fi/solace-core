@@ -8,3 +8,5 @@ coverage
 #Hardhat files
 cache
 artifacts
+
+*-ignore

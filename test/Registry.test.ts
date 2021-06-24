@@ -8,7 +8,7 @@ const { expect } = chai;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Registry, Solace, Master, Vault, Treasury, ClaimsAdjustor, ClaimsEscrow, Weth9 } from "../typechain";
+import { Registry, Solace, Master, Vault, Treasury, ClaimsEscrow, Weth9, PolicyManager } from "../typechain";
 
 
 describe("Registry", function () {
@@ -24,8 +24,8 @@ describe("Registry", function () {
   let master: Master;
   let vault: Vault;
   let treasury: Treasury;
-  let claimsAdjustor: ClaimsAdjustor;
   let claimsEscrow: ClaimsEscrow;
+  let policyManager: PolicyManager;
   let weth: Weth9;
   // mock contracts
   // TODO: switch from mocks and wallets to actual contracts after implementation
@@ -43,7 +43,7 @@ describe("Registry", function () {
     weth = (await deployContract(
       deployer,
       artifacts.WETH
-  )) as Weth9;
+    )) as Weth9;
 
     // deploy registry contract
     registry = (await deployContract(
@@ -74,19 +74,14 @@ describe("Registry", function () {
       ]
     )) as Master;
 
-    // deploy claims adjustor contract
+    // deploy claims escrow contract
     claimsEscrow = (await deployContract(
       deployer,
       artifacts.ClaimsEscrow,
-      [registry.address]
+      [governor.address, registry.address]
     )) as ClaimsEscrow;
 
     // deploy claims escrow contract
-    claimsAdjustor = (await deployContract(
-      deployer,
-      artifacts.ClaimsAdjustor,
-      [registry.address]
-    )) as ClaimsAdjustor;
 
     // deploy vault contract
     vault = (await deployContract(
@@ -101,11 +96,21 @@ describe("Registry", function () {
       artifacts.Treasury,
       [
         governor.address,
-        solaceToken.address,
+        ZERO_ADDRESS,
         ZERO_ADDRESS,
         ZERO_ADDRESS
       ]
     )) as Treasury;
+
+    // deploy policy manager
+    policyManager = (await deployContract(
+      deployer,
+      artifacts.PolicyManager,
+      [
+        governor.address
+      ]
+    )) as PolicyManager;
+
   })
 
   describe("governance", function () {
@@ -218,22 +223,6 @@ describe("Registry", function () {
     })
   })
 
-  describe("claimsAdjustor", function () {
-    it("starts as the zero address", async function () {
-      expect(await registry.claimsAdjustor()).to.equal(ZERO_ADDRESS);
-    })
-
-    it("can be set", async function () {
-      let tx = await registry.connect(governor).setClaimsAdjustor(claimsAdjustor.address);
-      expect(await registry.claimsAdjustor()).to.equal(claimsAdjustor.address);
-      await expect(tx).to.emit(registry, "ClaimsAdjustorSet").withArgs(claimsAdjustor.address);
-    })
-
-    it("cannot be set by non governor", async function () {
-      await expect(registry.connect(user).setClaimsAdjustor(claimsAdjustor.address)).to.be.revertedWith("!governance");
-    })
-  })
-
   describe("claimsEscrow", function () {
     it("starts as the zero address", async function () {
       expect(await registry.claimsEscrow()).to.equal(ZERO_ADDRESS);
@@ -250,40 +239,19 @@ describe("Registry", function () {
     })
   })
 
-  describe("products", function () {
-    it("starts with no products", async function () {
-      expect(await registry.numProducts()).to.equal(0);
+  describe("policyManager", function () {
+    it("starts as the zero address", async function () {
+      expect(await registry.policyManager()).to.equal(ZERO_ADDRESS);
     })
 
-    it("can add products", async function () {
-      let tx1 = await registry.connect(governor).addProduct(mockContract1.address);
-      expect(await registry.numProducts()).to.equal(1);
-      await expect(tx1).to.emit(registry, "ProductAdded").withArgs(mockContract1.address);
-      let tx2 = await registry.connect(governor).addProduct(mockContract2.address);
-      expect(await registry.numProducts()).to.equal(2);
-      await expect(tx2).to.emit(registry, "ProductAdded").withArgs(mockContract2.address);
+    it("can be set", async function () {
+      let tx = await registry.connect(governor).setPolicyManager(policyManager.address);
+      expect(await registry.policyManager()).to.equal(policyManager.address);
+      await expect(tx).to.emit(registry, "PolicyManagerSet").withArgs(policyManager.address);
     })
 
-    it("returns products", async function () {
-      expect(await registry.numProducts()).to.equal(2);
-      expect(await registry.getProduct(0)).to.equal(mockContract1.address);
-      expect(await registry.getProduct(1)).to.equal(mockContract2.address);
-      expect(await registry.isProduct(mockContract1.address)).to.equal(true);
-      expect(await registry.isProduct(mockContract2.address)).to.equal(true);
-      expect(await registry.isProduct(mockContract3.address)).to.equal(false);
-    })
-
-    it("rejects adds and removes by non governor", async function () {
-      await expect(registry.connect(user).addProduct(mockContract3.address)).to.be.revertedWith("!governance");
-      await expect(registry.connect(user).removeProduct(mockContract1.address)).to.be.revertedWith("!governance");
-    })
-
-    it("can remove products", async function () {
-      let tx1 = await registry.connect(governor).removeProduct(mockContract1.address);
-      expect(await registry.numProducts()).to.equal(1);
-      expect(await registry.isProduct(mockContract1.address)).to.equal(false);
-      await expect(tx1).to.emit(registry, "ProductRemoved").withArgs(mockContract1.address);
-      expect(await registry.getProduct(0)).to.equal(mockContract2.address);
+    it("cannot be set by non governor", async function () {
+      await expect(registry.connect(user).setPolicyManager(policyManager.address)).to.be.revertedWith("!governance");
     })
   })
 });

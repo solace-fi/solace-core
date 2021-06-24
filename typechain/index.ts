@@ -5,8 +5,6 @@ export { Erc20Factory } from "./Erc20Factory";
 export type { Erc20 } from "./Erc20";
 export { Erc721Factory } from "./Erc721Factory";
 export type { Erc721 } from "./Erc721";
-export { ClaimsAdjustorFactory } from "./ClaimsAdjustorFactory";
-export type { ClaimsAdjustor } from "./ClaimsAdjustor";
 export { ClaimsEscrowFactory } from "./ClaimsEscrowFactory";
 export type { ClaimsEscrow } from "./ClaimsEscrow";
 export { CpFarmFactory } from "./CpFarmFactory";

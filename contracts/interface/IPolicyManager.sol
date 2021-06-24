@@ -45,22 +45,43 @@ interface IPolicyManager /*is IERC721Enumerable, IERC721Metadata*/ {
      */
     function removeProduct(address _product) external;
 
+    /**
+     * @notice Checks is an address is an active product.
+     * @param _product The product to check.
+     * @return True if the product is active.
+     */
+    function productIsActive(address _product) external view returns (bool);
+
+    /**
+     * @notice Returns the number of products.
+     * @return The number of products.
+     */
+    function numProducts() external view returns (uint256);
+
+    /**
+     * @notice Returns the product at the given index.
+     * @param _productNum The index to query.
+     * @return The address of the product.
+     */
+    function getProduct(uint256 _productNum) external view returns (address);
+
     /*** POLICY VIEW FUNCTIONS
     View functions that give us data about policies
     ****/
-    function getPolicyInfo(uint256 _policyID) external view returns (address policyholder, address product, address positionContract, uint256 expirationBlock, uint256 coverAmount, uint256 price);
+    function getPolicyInfo(uint256 _policyID) external view returns (address policyholder, address product, address positionContract, uint256 coverAmount, uint64 expirationBlock, uint24 price);
     function getPolicyholder(uint256 _policyID) external view returns (address);
     function getPolicyProduct(uint256 _policyID) external view returns (address);
     function getPolicyPositionContract(uint256 _policyID) external view returns (address);
-    function getPolicyExpirationBlock(uint256 _policyID) external view returns (uint256);
+    function getPolicyExpirationBlock(uint256 _policyID) external view returns (uint64);
     function getPolicyCoverAmount(uint256 _policyID) external view returns (uint256);
-    function getPolicyPrice(uint256 _policyID) external view returns (uint256);
+    function getPolicyPrice(uint256 _policyID) external view returns (uint24);
     function listPolicies(address _policyholder) external view returns (uint256[] memory);
+    function hasActivePolicy(address _product, address _policyholder, address _positionContract) external view returns (bool);
 
     /*** POLICY MUTATIVE FUNCTIONS
     Functions that create, modify, and destroy policies
     ****/
-    function createPolicy(address _policyholder, address _positionContract, uint256 _expirationBlock, uint256 _coverAmount, uint256 _price) external returns (uint256 tokenID);
-    function setPolicyInfo(uint256 _policyId, address _policyholder, address _positionContract, uint256 _expirationBlock, uint256 _coverAmount, uint256 _price) external;
+    function createPolicy(address _policyholder, address _positionContract, uint256 _coverAmount, uint64 _expirationBlock, uint24 _price) external returns (uint256 tokenID);
+    function setPolicyInfo(uint256 _policyId, address _policyholder, address _positionContract, uint256 _coverAmount, uint64 _expirationBlock, uint24 _price) external;
     function burn(uint256 _tokenId) external;
 }

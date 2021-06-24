@@ -23,21 +23,46 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
 interface IProductInterface extends ethers.utils.Interface {
   functions: {
+    "acceptGovernance()": FunctionFragment;
+    "activeCoverAmount()": FunctionFragment;
+    "activePolicyIDs(uint256)": FunctionFragment;
     "appraisePosition(address,address)": FunctionFragment;
-    "buyPolicy(address,address,uint256,uint256)": FunctionFragment;
+    "buyPolicy(address,address,uint256,uint64)": FunctionFragment;
+    "cancelFee()": FunctionFragment;
     "cancelPolicy(uint256)": FunctionFragment;
-    "extendPolicy(uint256,uint256)": FunctionFragment;
-    "getQuote(address,address,uint256,uint256)": FunctionFragment;
-    "setCancelFee(uint256)": FunctionFragment;
-    "setClaimsAdjuster(address)": FunctionFragment;
+    "coveredPlatform()": FunctionFragment;
+    "extendPolicy(uint256,uint64)": FunctionFragment;
+    "getQuote(address,address,uint256,uint64)": FunctionFragment;
+    "governance()": FunctionFragment;
+    "maxCoverAmount()": FunctionFragment;
+    "maxCoverPerUser()": FunctionFragment;
+    "maxPeriod()": FunctionFragment;
+    "minPeriod()": FunctionFragment;
+    "newGovernance()": FunctionFragment;
+    "price()": FunctionFragment;
+    "productPolicyCount()": FunctionFragment;
+    "setCancelFee(uint64)": FunctionFragment;
     "setGovernance(address)": FunctionFragment;
     "setMaxCoverAmount(uint256)": FunctionFragment;
-    "setMaxPeriod(uint256)": FunctionFragment;
-    "setMinPeriod(uint256)": FunctionFragment;
-    "setPrice(uint256)": FunctionFragment;
+    "setMaxCoverPerUser(uint256)": FunctionFragment;
+    "setMaxPeriod(uint64)": FunctionFragment;
+    "setMinPeriod(uint64)": FunctionFragment;
+    "setPrice(uint24)": FunctionFragment;
     "updateActivePolicies()": FunctionFragment;
   };
 
+  encodeFunctionData(
+    functionFragment: "acceptGovernance",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "activeCoverAmount",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "activePolicyIDs",
+    values: [BigNumberish]
+  ): string;
   encodeFunctionData(
     functionFragment: "appraisePosition",
     values: [string, string]
@@ -46,9 +71,14 @@ interface IProductInterface extends ethers.utils.Interface {
     functionFragment: "buyPolicy",
     values: [string, string, BigNumberish, BigNumberish]
   ): string;
+  encodeFunctionData(functionFragment: "cancelFee", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "cancelPolicy",
     values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "coveredPlatform",
+    values?: undefined
   ): string;
   encodeFunctionData(
     functionFragment: "extendPolicy",
@@ -59,12 +89,31 @@ interface IProductInterface extends ethers.utils.Interface {
     values: [string, string, BigNumberish, BigNumberish]
   ): string;
   encodeFunctionData(
-    functionFragment: "setCancelFee",
-    values: [BigNumberish]
+    functionFragment: "governance",
+    values?: undefined
   ): string;
   encodeFunctionData(
-    functionFragment: "setClaimsAdjuster",
-    values: [string]
+    functionFragment: "maxCoverAmount",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "maxCoverPerUser",
+    values?: undefined
+  ): string;
+  encodeFunctionData(functionFragment: "maxPeriod", values?: undefined): string;
+  encodeFunctionData(functionFragment: "minPeriod", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "newGovernance",
+    values?: undefined
+  ): string;
+  encodeFunctionData(functionFragment: "price", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "productPolicyCount",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "setCancelFee",
+    values: [BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "setGovernance",
@@ -72,6 +121,10 @@ interface IProductInterface extends ethers.utils.Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "setMaxCoverAmount",
+    values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "setMaxCoverPerUser",
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
@@ -92,12 +145,29 @@ interface IProductInterface extends ethers.utils.Interface {
   ): string;
 
   decodeFunctionResult(
+    functionFragment: "acceptGovernance",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "activeCoverAmount",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "activePolicyIDs",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "appraisePosition",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "buyPolicy", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "cancelFee", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "cancelPolicy",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "coveredPlatform",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -105,12 +175,28 @@ interface IProductInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "getQuote", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "governance", data: BytesLike): Result;
   decodeFunctionResult(
-    functionFragment: "setCancelFee",
+    functionFragment: "maxCoverAmount",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "setClaimsAdjuster",
+    functionFragment: "maxCoverPerUser",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "maxPeriod", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "minPeriod", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "newGovernance",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "price", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "productPolicyCount",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "setCancelFee",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -119,6 +205,10 @@ interface IProductInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "setMaxCoverAmount",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "setMaxCoverPerUser",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -136,11 +226,13 @@ interface IProductInterface extends ethers.utils.Interface {
   ): Result;
 
   events: {
+    "GovernanceTransferred(address)": EventFragment;
     "PolicyCanceled(uint256)": EventFragment;
     "PolicyCreated(uint256)": EventFragment;
     "PolicyExtended(uint256)": EventFragment;
   };
 
+  getEvent(nameOrSignatureOrTopic: "GovernanceTransferred"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "PolicyCanceled"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "PolicyCreated"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "PolicyExtended"): EventFragment;
@@ -160,6 +252,36 @@ export class IProduct extends Contract {
   interface: IProductInterface;
 
   functions: {
+    acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
+
+    activeCoverAmount(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    "activeCoverAmount()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    activePolicyIDs(
+      i: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    "activePolicyIDs(uint256)"(
+      i: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
     appraisePosition(
       _policyholder: string,
       _positionContract: string,
@@ -186,13 +308,25 @@ export class IProduct extends Contract {
       overrides?: PayableOverrides
     ): Promise<ContractTransaction>;
 
-    "buyPolicy(address,address,uint256,uint256)"(
+    "buyPolicy(address,address,uint256,uint64)"(
       _policyholder: string,
       _positionContract: string,
       _coverLimit: BigNumberish,
       _blocks: BigNumberish,
       overrides?: PayableOverrides
     ): Promise<ContractTransaction>;
+
+    cancelFee(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    "cancelFee()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
 
     cancelPolicy(
       _policyID: BigNumberish,
@@ -204,13 +338,25 @@ export class IProduct extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
+    coveredPlatform(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "coveredPlatform()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
     extendPolicy(
       _policyID: BigNumberish,
       _blocks: BigNumberish,
       overrides?: PayableOverrides
     ): Promise<ContractTransaction>;
 
-    "extendPolicy(uint256,uint256)"(
+    "extendPolicy(uint256,uint64)"(
       _policyID: BigNumberish,
       _blocks: BigNumberish,
       overrides?: PayableOverrides
@@ -226,11 +372,107 @@ export class IProduct extends Contract {
       0: BigNumber;
     }>;
 
-    "getQuote(address,address,uint256,uint256)"(
+    "getQuote(address,address,uint256,uint64)"(
       _policyholder: string,
       _positionContract: string,
       _coverLimit: BigNumberish,
       _blocks: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    governance(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "governance()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    maxCoverAmount(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    "maxCoverAmount()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    maxCoverPerUser(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    "maxCoverPerUser()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    maxPeriod(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    "maxPeriod()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    minPeriod(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    "minPeriod()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    newGovernance(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "newGovernance()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    price(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: number;
+    }>;
+
+    "price()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: number;
+    }>;
+
+    productPolicyCount(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    "productPolicyCount()"(
       overrides?: CallOverrides
     ): Promise<{
       0: BigNumber;
@@ -241,18 +483,8 @@ export class IProduct extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    "setCancelFee(uint256)"(
+    "setCancelFee(uint64)"(
       _cancelFee: BigNumberish,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
-    setClaimsAdjuster(
-      _claimsAdjuster: string,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
-    "setClaimsAdjuster(address)"(
-      _claimsAdjuster: string,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
@@ -276,12 +508,22 @@ export class IProduct extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
+    setMaxCoverPerUser(
+      _maxCoverPerUser: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "setMaxCoverPerUser(uint256)"(
+      _maxCoverPerUser: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
     setMaxPeriod(
       _maxPeriod: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    "setMaxPeriod(uint256)"(
+    "setMaxPeriod(uint64)"(
       _maxPeriod: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
@@ -291,7 +533,7 @@ export class IProduct extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    "setMinPeriod(uint256)"(
+    "setMinPeriod(uint64)"(
       _minPeriod: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
@@ -301,7 +543,7 @@ export class IProduct extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    "setPrice(uint256)"(
+    "setPrice(uint24)"(
       _price: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
@@ -312,6 +554,24 @@ export class IProduct extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
   };
+
+  acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+  "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
+
+  activeCoverAmount(overrides?: CallOverrides): Promise<BigNumber>;
+
+  "activeCoverAmount()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+  activePolicyIDs(
+    i: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
+
+  "activePolicyIDs(uint256)"(
+    i: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
 
   appraisePosition(
     _policyholder: string,
@@ -333,13 +593,17 @@ export class IProduct extends Contract {
     overrides?: PayableOverrides
   ): Promise<ContractTransaction>;
 
-  "buyPolicy(address,address,uint256,uint256)"(
+  "buyPolicy(address,address,uint256,uint64)"(
     _policyholder: string,
     _positionContract: string,
     _coverLimit: BigNumberish,
     _blocks: BigNumberish,
     overrides?: PayableOverrides
   ): Promise<ContractTransaction>;
+
+  cancelFee(overrides?: CallOverrides): Promise<BigNumber>;
+
+  "cancelFee()"(overrides?: CallOverrides): Promise<BigNumber>;
 
   cancelPolicy(
     _policyID: BigNumberish,
@@ -351,13 +615,17 @@ export class IProduct extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
+  coveredPlatform(overrides?: CallOverrides): Promise<string>;
+
+  "coveredPlatform()"(overrides?: CallOverrides): Promise<string>;
+
   extendPolicy(
     _policyID: BigNumberish,
     _blocks: BigNumberish,
     overrides?: PayableOverrides
   ): Promise<ContractTransaction>;
 
-  "extendPolicy(uint256,uint256)"(
+  "extendPolicy(uint256,uint64)"(
     _policyID: BigNumberish,
     _blocks: BigNumberish,
     overrides?: PayableOverrides
@@ -371,7 +639,7 @@ export class IProduct extends Contract {
     overrides?: CallOverrides
   ): Promise<BigNumber>;
 
-  "getQuote(address,address,uint256,uint256)"(
+  "getQuote(address,address,uint256,uint64)"(
     _policyholder: string,
     _positionContract: string,
     _coverLimit: BigNumberish,
@@ -379,23 +647,45 @@ export class IProduct extends Contract {
     overrides?: CallOverrides
   ): Promise<BigNumber>;
 
+  governance(overrides?: CallOverrides): Promise<string>;
+
+  "governance()"(overrides?: CallOverrides): Promise<string>;
+
+  maxCoverAmount(overrides?: CallOverrides): Promise<BigNumber>;
+
+  "maxCoverAmount()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+  maxCoverPerUser(overrides?: CallOverrides): Promise<BigNumber>;
+
+  "maxCoverPerUser()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+  maxPeriod(overrides?: CallOverrides): Promise<BigNumber>;
+
+  "maxPeriod()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+  minPeriod(overrides?: CallOverrides): Promise<BigNumber>;
+
+  "minPeriod()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+  newGovernance(overrides?: CallOverrides): Promise<string>;
+
+  "newGovernance()"(overrides?: CallOverrides): Promise<string>;
+
+  price(overrides?: CallOverrides): Promise<number>;
+
+  "price()"(overrides?: CallOverrides): Promise<number>;
+
+  productPolicyCount(overrides?: CallOverrides): Promise<BigNumber>;
+
+  "productPolicyCount()"(overrides?: CallOverrides): Promise<BigNumber>;
+
   setCancelFee(
     _cancelFee: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  "setCancelFee(uint256)"(
+  "setCancelFee(uint64)"(
     _cancelFee: BigNumberish,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
-  setClaimsAdjuster(
-    _claimsAdjuster: string,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
-  "setClaimsAdjuster(address)"(
-    _claimsAdjuster: string,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
@@ -419,12 +709,22 @@ export class IProduct extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
+  setMaxCoverPerUser(
+    _maxCoverPerUser: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "setMaxCoverPerUser(uint256)"(
+    _maxCoverPerUser: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
   setMaxPeriod(
     _maxPeriod: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  "setMaxPeriod(uint256)"(
+  "setMaxPeriod(uint64)"(
     _maxPeriod: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
@@ -434,7 +734,7 @@ export class IProduct extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  "setMinPeriod(uint256)"(
+  "setMinPeriod(uint64)"(
     _minPeriod: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
@@ -444,7 +744,7 @@ export class IProduct extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  "setPrice(uint256)"(
+  "setPrice(uint24)"(
     _price: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
@@ -454,6 +754,24 @@ export class IProduct extends Contract {
   "updateActivePolicies()"(overrides?: Overrides): Promise<ContractTransaction>;
 
   callStatic: {
+    acceptGovernance(overrides?: CallOverrides): Promise<void>;
+
+    "acceptGovernance()"(overrides?: CallOverrides): Promise<void>;
+
+    activeCoverAmount(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "activeCoverAmount()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    activePolicyIDs(
+      i: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "activePolicyIDs(uint256)"(
+      i: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     appraisePosition(
       _policyholder: string,
       _positionContract: string,
@@ -474,13 +792,17 @@ export class IProduct extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    "buyPolicy(address,address,uint256,uint256)"(
+    "buyPolicy(address,address,uint256,uint64)"(
       _policyholder: string,
       _positionContract: string,
       _coverLimit: BigNumberish,
       _blocks: BigNumberish,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
+
+    cancelFee(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "cancelFee()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     cancelPolicy(
       _policyID: BigNumberish,
@@ -492,13 +814,17 @@ export class IProduct extends Contract {
       overrides?: CallOverrides
     ): Promise<void>;
 
+    coveredPlatform(overrides?: CallOverrides): Promise<string>;
+
+    "coveredPlatform()"(overrides?: CallOverrides): Promise<string>;
+
     extendPolicy(
       _policyID: BigNumberish,
       _blocks: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
 
-    "extendPolicy(uint256,uint256)"(
+    "extendPolicy(uint256,uint64)"(
       _policyID: BigNumberish,
       _blocks: BigNumberish,
       overrides?: CallOverrides
@@ -512,7 +838,7 @@ export class IProduct extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    "getQuote(address,address,uint256,uint256)"(
+    "getQuote(address,address,uint256,uint64)"(
       _policyholder: string,
       _positionContract: string,
       _coverLimit: BigNumberish,
@@ -520,23 +846,45 @@ export class IProduct extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
+    governance(overrides?: CallOverrides): Promise<string>;
+
+    "governance()"(overrides?: CallOverrides): Promise<string>;
+
+    maxCoverAmount(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "maxCoverAmount()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    maxCoverPerUser(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "maxCoverPerUser()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    maxPeriod(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "maxPeriod()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    minPeriod(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "minPeriod()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    newGovernance(overrides?: CallOverrides): Promise<string>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<string>;
+
+    price(overrides?: CallOverrides): Promise<number>;
+
+    "price()"(overrides?: CallOverrides): Promise<number>;
+
+    productPolicyCount(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "productPolicyCount()"(overrides?: CallOverrides): Promise<BigNumber>;
+
     setCancelFee(
       _cancelFee: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
 
-    "setCancelFee(uint256)"(
+    "setCancelFee(uint64)"(
       _cancelFee: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    setClaimsAdjuster(
-      _claimsAdjuster: string,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    "setClaimsAdjuster(address)"(
-      _claimsAdjuster: string,
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -560,12 +908,22 @@ export class IProduct extends Contract {
       overrides?: CallOverrides
     ): Promise<void>;
 
+    setMaxCoverPerUser(
+      _maxCoverPerUser: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "setMaxCoverPerUser(uint256)"(
+      _maxCoverPerUser: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
     setMaxPeriod(
       _maxPeriod: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
 
-    "setMaxPeriod(uint256)"(
+    "setMaxPeriod(uint64)"(
       _maxPeriod: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
@@ -575,14 +933,14 @@ export class IProduct extends Contract {
       overrides?: CallOverrides
     ): Promise<void>;
 
-    "setMinPeriod(uint256)"(
+    "setMinPeriod(uint64)"(
       _minPeriod: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
 
     setPrice(_price: BigNumberish, overrides?: CallOverrides): Promise<void>;
 
-    "setPrice(uint256)"(
+    "setPrice(uint24)"(
       _price: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
@@ -603,6 +961,8 @@ export class IProduct extends Contract {
   };
 
   filters: {
+    GovernanceTransferred(_newGovernance: null): EventFilter;
+
     PolicyCanceled(policyID: null): EventFilter;
 
     PolicyCreated(policyID: null): EventFilter;
@@ -611,6 +971,24 @@ export class IProduct extends Contract {
   };
 
   estimateGas: {
+    acceptGovernance(overrides?: Overrides): Promise<BigNumber>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<BigNumber>;
+
+    activeCoverAmount(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "activeCoverAmount()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    activePolicyIDs(
+      i: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "activePolicyIDs(uint256)"(
+      i: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     appraisePosition(
       _policyholder: string,
       _positionContract: string,
@@ -631,13 +1009,17 @@ export class IProduct extends Contract {
       overrides?: PayableOverrides
     ): Promise<BigNumber>;
 
-    "buyPolicy(address,address,uint256,uint256)"(
+    "buyPolicy(address,address,uint256,uint64)"(
       _policyholder: string,
       _positionContract: string,
       _coverLimit: BigNumberish,
       _blocks: BigNumberish,
       overrides?: PayableOverrides
     ): Promise<BigNumber>;
+
+    cancelFee(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "cancelFee()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     cancelPolicy(
       _policyID: BigNumberish,
@@ -649,13 +1031,17 @@ export class IProduct extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
+    coveredPlatform(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "coveredPlatform()"(overrides?: CallOverrides): Promise<BigNumber>;
+
     extendPolicy(
       _policyID: BigNumberish,
       _blocks: BigNumberish,
       overrides?: PayableOverrides
     ): Promise<BigNumber>;
 
-    "extendPolicy(uint256,uint256)"(
+    "extendPolicy(uint256,uint64)"(
       _policyID: BigNumberish,
       _blocks: BigNumberish,
       overrides?: PayableOverrides
@@ -669,7 +1055,7 @@ export class IProduct extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    "getQuote(address,address,uint256,uint256)"(
+    "getQuote(address,address,uint256,uint64)"(
       _policyholder: string,
       _positionContract: string,
       _coverLimit: BigNumberish,
@@ -677,23 +1063,45 @@ export class IProduct extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
+    governance(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "governance()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    maxCoverAmount(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "maxCoverAmount()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    maxCoverPerUser(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "maxCoverPerUser()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    maxPeriod(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "maxPeriod()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    minPeriod(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "minPeriod()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    newGovernance(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    price(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "price()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    productPolicyCount(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "productPolicyCount()"(overrides?: CallOverrides): Promise<BigNumber>;
+
     setCancelFee(
       _cancelFee: BigNumberish,
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    "setCancelFee(uint256)"(
+    "setCancelFee(uint64)"(
       _cancelFee: BigNumberish,
-      overrides?: Overrides
-    ): Promise<BigNumber>;
-
-    setClaimsAdjuster(
-      _claimsAdjuster: string,
-      overrides?: Overrides
-    ): Promise<BigNumber>;
-
-    "setClaimsAdjuster(address)"(
-      _claimsAdjuster: string,
       overrides?: Overrides
     ): Promise<BigNumber>;
 
@@ -717,12 +1125,22 @@ export class IProduct extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
+    setMaxCoverPerUser(
+      _maxCoverPerUser: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "setMaxCoverPerUser(uint256)"(
+      _maxCoverPerUser: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
     setMaxPeriod(
       _maxPeriod: BigNumberish,
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    "setMaxPeriod(uint256)"(
+    "setMaxPeriod(uint64)"(
       _maxPeriod: BigNumberish,
       overrides?: Overrides
     ): Promise<BigNumber>;
@@ -732,14 +1150,14 @@ export class IProduct extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    "setMinPeriod(uint256)"(
+    "setMinPeriod(uint64)"(
       _minPeriod: BigNumberish,
       overrides?: Overrides
     ): Promise<BigNumber>;
 
     setPrice(_price: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
 
-    "setPrice(uint256)"(
+    "setPrice(uint24)"(
       _price: BigNumberish,
       overrides?: Overrides
     ): Promise<BigNumber>;
@@ -750,6 +1168,26 @@ export class IProduct extends Contract {
   };
 
   populateTransaction: {
+    acceptGovernance(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    activeCoverAmount(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "activeCoverAmount()"(
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    activePolicyIDs(
+      i: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "activePolicyIDs(uint256)"(
+      i: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
     appraisePosition(
       _policyholder: string,
       _positionContract: string,
@@ -770,13 +1208,17 @@ export class IProduct extends Contract {
       overrides?: PayableOverrides
     ): Promise<PopulatedTransaction>;
 
-    "buyPolicy(address,address,uint256,uint256)"(
+    "buyPolicy(address,address,uint256,uint64)"(
       _policyholder: string,
       _positionContract: string,
       _coverLimit: BigNumberish,
       _blocks: BigNumberish,
       overrides?: PayableOverrides
     ): Promise<PopulatedTransaction>;
+
+    cancelFee(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "cancelFee()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     cancelPolicy(
       _policyID: BigNumberish,
@@ -788,13 +1230,19 @@ export class IProduct extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
+    coveredPlatform(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "coveredPlatform()"(
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
     extendPolicy(
       _policyID: BigNumberish,
       _blocks: BigNumberish,
       overrides?: PayableOverrides
     ): Promise<PopulatedTransaction>;
 
-    "extendPolicy(uint256,uint256)"(
+    "extendPolicy(uint256,uint64)"(
       _policyID: BigNumberish,
       _blocks: BigNumberish,
       overrides?: PayableOverrides
@@ -808,11 +1256,51 @@ export class IProduct extends Contract {
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
-    "getQuote(address,address,uint256,uint256)"(
+    "getQuote(address,address,uint256,uint64)"(
       _policyholder: string,
       _positionContract: string,
       _coverLimit: BigNumberish,
       _blocks: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    governance(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "governance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    maxCoverAmount(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "maxCoverAmount()"(
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    maxCoverPerUser(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "maxCoverPerUser()"(
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    maxPeriod(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "maxPeriod()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    minPeriod(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "minPeriod()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    newGovernance(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    price(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "price()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    productPolicyCount(
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "productPolicyCount()"(
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
@@ -821,18 +1309,8 @@ export class IProduct extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    "setCancelFee(uint256)"(
+    "setCancelFee(uint64)"(
       _cancelFee: BigNumberish,
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    setClaimsAdjuster(
-      _claimsAdjuster: string,
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    "setClaimsAdjuster(address)"(
-      _claimsAdjuster: string,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
@@ -856,12 +1334,22 @@ export class IProduct extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
+    setMaxCoverPerUser(
+      _maxCoverPerUser: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "setMaxCoverPerUser(uint256)"(
+      _maxCoverPerUser: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
     setMaxPeriod(
       _maxPeriod: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    "setMaxPeriod(uint256)"(
+    "setMaxPeriod(uint64)"(
       _maxPeriod: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
@@ -871,7 +1359,7 @@ export class IProduct extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    "setMinPeriod(uint256)"(
+    "setMinPeriod(uint64)"(
       _minPeriod: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
@@ -881,7 +1369,7 @@ export class IProduct extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    "setPrice(uint256)"(
+    "setPrice(uint24)"(
       _price: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;

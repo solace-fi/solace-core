@@ -11,10 +11,11 @@ import { logContractAddress, createPool } from "./utils";
 import { FeeAmount } from "../test/utilities/uniswap";
 
 import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_importer";
-import { Solace, Weth9, Vault, Master, CpFarm, SolaceEthLpFarm, Treasury, Registry, LpAppraisor, PolicyManager, ExchangeQuoterManual, CompoundProduct } from "../typechain";
+import { Solace, Weth9, Vault, Master, CpFarm, SolaceEthLpFarm, Treasury, Registry, LpAppraisor, PolicyManager, ExchangeQuoterManual, CompoundProductRinkeby } from "../typechain";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const MULTI_SIG_ADDRESS = "0xB0bcf50b18f0DCa889EdC4a299aF4cEd7cB4cb17";
+const PACLAS_SIGNER = "0x5b9Fa5eF9D366d7cB5296E1f3F4013D55EBdf4A4";
 
 // These will be empty strings before deployment.
 // Fill them in as they are deployed.
@@ -30,9 +31,11 @@ const LPFARM_ADDRESS           = "0xC6cdf0093981f52991b8aaCe63800eAC9f2c96E9";
 const LPAPPRAISOR_ADDRESS      = "0x5c764BE8890fA09A71122342D53cCbdc748da39C";
 const TREASURY_ADDRESS         = "0xBE89BC18af93Cb31c020a826C10B90b8BdcDC483";
 
-const POLICY_MANAGER_ADDRESS   = "0x0B27dD1660406e170ff4c4315D65Bd085F31a07a";
+//const POLICY_MANAGER_ADDRESS   = "0x0B27dD1660406e170ff4c4315D65Bd085F31a07a";
+const POLICY_MANAGER_ADDRESS   = "0x5682b79F24e999576Ab8A9C9C0E81Bfc168B960F";
 const QUOTER_MANUAL_ADDRESS    = "0xAC162c43D533CE1fd732bcE94894e7EF212A77a1";
-const COMPOUND_PRODUCT_ADDRESS = "0x660985613a2257107C9aE41EfBd9074932609893";
+//const COMPOUND_PRODUCT_ADDRESS = "0x660985613a2257107C9aE41EfBd9074932609893";
+const COMPOUND_PRODUCT_ADDRESS = "0xB08807D96dC2bF753Cee983353aF57d7cA530173";
 
 const UNISWAP_FACTORY_ADDRESS  = "0x1F98431c8aD98523631AE4a59f267346ea31F984";
 const UNISWAP_ROUTER_ADDRESS   = "0xE592427A0AEce92De3Edee1F18E0157C05861564";
@@ -48,8 +51,9 @@ const BLOCK_REWARD = BN.from("60000000000000000000"); // 60 SOLACE
 const minPeriod = 6450; // this is about 1 day
 const maxPeriod = 2354250; // this is about 1 year from https://ycharts.com/indicators/ethereum_blocks_per_day
 const maxCoverAmount = BN.from("1000000000000000000000"); // 1000 Ether in wei
+const maxCoverPerUser = BN.from("10000000000000000000"); // 10 Ether in wei
 const cancelFee = BN.from("100000000000000000"); // 0.1 Ether in wei
-const price = 11173; // 2.60%/yr
+const price = 11044; // 2.60%/yr
 
 let artifacts: ArtifactImports;
 let registry: Registry;
@@ -68,7 +72,7 @@ let lpTokenAppraisor: LpAppraisor;
 
 let policyManager: PolicyManager;
 let quoterManual: ExchangeQuoterManual;
-let compoundProduct: CompoundProduct;
+let compoundProduct: CompoundProductRinkeby;
 
 let signerAddress: string;
 let governorAddress = MULTI_SIG_ADDRESS;
@@ -270,11 +274,15 @@ async function deployQuoterManual() {
 
 async function deployCompoundProduct() {
   if(!!COMPOUND_PRODUCT_ADDRESS) {
-    compoundProduct = (await ethers.getContractAt(artifacts.CompoundProduct.abi, COMPOUND_PRODUCT_ADDRESS)) as CompoundProduct;
+    compoundProduct = (await ethers.getContractAt(artifacts.CompoundProductRinkeby.abi, COMPOUND_PRODUCT_ADDRESS)) as CompoundProductRinkeby;
   } else {
     console.log("Deploying CompoundProduct");
-    compoundProduct = (await deployContract(deployer,artifacts.CompoundProduct,[policyManager.address,treasury.address,COMPTROLLER_ADDRESS,ZERO_ADDRESS,price,cancelFee,minPeriod,maxPeriod,maxCoverAmount,quoterManual.address])) as CompoundProduct;
+    compoundProduct = (await deployContract(deployer,artifacts.CompoundProductRinkeby,[policyManager.address,treasury.address,COMPTROLLER_ADDRESS,ZERO_ADDRESS,price,cancelFee,minPeriod,maxPeriod,maxCoverAmount,maxCoverPerUser,quoterManual.address])) as CompoundProductRinkeby;
     console.log(`Deployed CompoundProduct to ${compoundProduct.address}`);
+  }
+  if(await policyManager.governance() == signerAddress && !(await compoundProduct.isAuthorizedSigner(PACLAS_SIGNER))){
+    console.log("Adding paclas as authorized signer");
+    await compoundProduct.connect(deployer).addSigner(PACLAS_SIGNER);
   }
   if(await policyManager.governance() == signerAddress && !(await policyManager.productIsActive(compoundProduct.address))) {
     console.log("Registering CompoundProduct in PolicyManager");
@@ -284,6 +292,8 @@ async function deployCompoundProduct() {
     console.log("buying policy");
     var quote = await compoundProduct.getQuote("0x0fb78424e5021404093aa0cfcf50b176b30a3c1d", "0xd6801a1dffcd0a410336ef88def4320d6df1883e", 5000, 19350);
     quote = quote.mul(11).div(10);
+    await compoundProduct.connect(deployer).buyPolicy("0x0fb78424e5021404093aa0cfcf50b176b30a3c1d", "0xd6801a1dffcd0a410336ef88def4320d6df1883e", 5000, 19350, {value: quote});
+    console.log("buying another");
     await compoundProduct.connect(deployer).buyPolicy("0x0fb78424e5021404093aa0cfcf50b176b30a3c1d", "0xd6801a1dffcd0a410336ef88def4320d6df1883e", 5000, 19350, {value: quote});
   }
 }

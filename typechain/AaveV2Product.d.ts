@@ -23,37 +23,51 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
 interface AaveV2ProductInterface extends ethers.utils.Interface {
   functions: {
+    "ETH_ADDRESS()": FunctionFragment;
+    "acceptGovernance()": FunctionFragment;
     "activeCoverAmount()": FunctionFragment;
     "activePolicyIDs(uint256)": FunctionFragment;
+    "addSigner(address)": FunctionFragment;
     "appraisePosition(address,address)": FunctionFragment;
-    "buyPolicy(address,address,uint256,uint256)": FunctionFragment;
+    "buyPolicy(address,address,uint256,uint64)": FunctionFragment;
     "cancelFee()": FunctionFragment;
     "cancelPolicy(uint256)": FunctionFragment;
-    "claimsAdjuster()": FunctionFragment;
     "coveredPlatform()": FunctionFragment;
-    "extendPolicy(uint256,uint256)": FunctionFragment;
-    "getQuote(address,address,uint256,uint256)": FunctionFragment;
+    "extendPolicy(uint256,uint64)": FunctionFragment;
+    "getQuote(address,address,uint256,uint64)": FunctionFragment;
     "governance()": FunctionFragment;
+    "isAuthorizedSigner(address)": FunctionFragment;
     "maxCoverAmount()": FunctionFragment;
+    "maxCoverPerUser()": FunctionFragment;
     "maxPeriod()": FunctionFragment;
     "minPeriod()": FunctionFragment;
+    "newGovernance()": FunctionFragment;
     "policyManager()": FunctionFragment;
     "price()": FunctionFragment;
     "productPolicyCount()": FunctionFragment;
     "provider()": FunctionFragment;
     "quoter()": FunctionFragment;
-    "setCancelFee(uint256)": FunctionFragment;
-    "setClaimsAdjuster(address)": FunctionFragment;
+    "registry()": FunctionFragment;
+    "removeSigner(address)": FunctionFragment;
+    "setCancelFee(uint64)": FunctionFragment;
     "setExchangeQuoter(address)": FunctionFragment;
     "setGovernance(address)": FunctionFragment;
     "setMaxCoverAmount(uint256)": FunctionFragment;
-    "setMaxPeriod(uint256)": FunctionFragment;
-    "setMinPeriod(uint256)": FunctionFragment;
-    "setPrice(uint256)": FunctionFragment;
-    "treasury()": FunctionFragment;
+    "setMaxCoverPerUser(uint256)": FunctionFragment;
+    "setMaxPeriod(uint64)": FunctionFragment;
+    "setMinPeriod(uint64)": FunctionFragment;
+    "setPrice(uint24)": FunctionFragment;
     "updateActivePolicies()": FunctionFragment;
   };
 
+  encodeFunctionData(
+    functionFragment: "ETH_ADDRESS",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "acceptGovernance",
+    values?: undefined
+  ): string;
   encodeFunctionData(
     functionFragment: "activeCoverAmount",
     values?: undefined
@@ -62,6 +76,7 @@ interface AaveV2ProductInterface extends ethers.utils.Interface {
     functionFragment: "activePolicyIDs",
     values: [BigNumberish]
   ): string;
+  encodeFunctionData(functionFragment: "addSigner", values: [string]): string;
   encodeFunctionData(
     functionFragment: "appraisePosition",
     values: [string, string]
@@ -74,10 +89,6 @@ interface AaveV2ProductInterface extends ethers.utils.Interface {
   encodeFunctionData(
     functionFragment: "cancelPolicy",
     values: [BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "claimsAdjuster",
-    values?: undefined
   ): string;
   encodeFunctionData(
     functionFragment: "coveredPlatform",
@@ -96,11 +107,23 @@ interface AaveV2ProductInterface extends ethers.utils.Interface {
     values?: undefined
   ): string;
   encodeFunctionData(
+    functionFragment: "isAuthorizedSigner",
+    values: [string]
+  ): string;
+  encodeFunctionData(
     functionFragment: "maxCoverAmount",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "maxCoverPerUser",
     values?: undefined
   ): string;
   encodeFunctionData(functionFragment: "maxPeriod", values?: undefined): string;
   encodeFunctionData(functionFragment: "minPeriod", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "newGovernance",
+    values?: undefined
+  ): string;
   encodeFunctionData(
     functionFragment: "policyManager",
     values?: undefined
@@ -112,13 +135,14 @@ interface AaveV2ProductInterface extends ethers.utils.Interface {
   ): string;
   encodeFunctionData(functionFragment: "provider", values?: undefined): string;
   encodeFunctionData(functionFragment: "quoter", values?: undefined): string;
+  encodeFunctionData(functionFragment: "registry", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "removeSigner",
+    values: [string]
+  ): string;
   encodeFunctionData(
     functionFragment: "setCancelFee",
     values: [BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "setClaimsAdjuster",
-    values: [string]
   ): string;
   encodeFunctionData(
     functionFragment: "setExchangeQuoter",
@@ -130,6 +154,10 @@ interface AaveV2ProductInterface extends ethers.utils.Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "setMaxCoverAmount",
+    values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "setMaxCoverPerUser",
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
@@ -144,12 +172,19 @@ interface AaveV2ProductInterface extends ethers.utils.Interface {
     functionFragment: "setPrice",
     values: [BigNumberish]
   ): string;
-  encodeFunctionData(functionFragment: "treasury", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "updateActivePolicies",
     values?: undefined
   ): string;
 
+  decodeFunctionResult(
+    functionFragment: "ETH_ADDRESS",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "acceptGovernance",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "activeCoverAmount",
     data: BytesLike
@@ -158,6 +193,7 @@ interface AaveV2ProductInterface extends ethers.utils.Interface {
     functionFragment: "activePolicyIDs",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(functionFragment: "addSigner", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "appraisePosition",
     data: BytesLike
@@ -166,10 +202,6 @@ interface AaveV2ProductInterface extends ethers.utils.Interface {
   decodeFunctionResult(functionFragment: "cancelFee", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "cancelPolicy",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "claimsAdjuster",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -183,11 +215,23 @@ interface AaveV2ProductInterface extends ethers.utils.Interface {
   decodeFunctionResult(functionFragment: "getQuote", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "governance", data: BytesLike): Result;
   decodeFunctionResult(
+    functionFragment: "isAuthorizedSigner",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "maxCoverAmount",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "maxCoverPerUser",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "maxPeriod", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "minPeriod", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "newGovernance",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "policyManager",
     data: BytesLike
@@ -199,12 +243,13 @@ interface AaveV2ProductInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(functionFragment: "provider", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "quoter", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "registry", data: BytesLike): Result;
   decodeFunctionResult(
-    functionFragment: "setCancelFee",
+    functionFragment: "removeSigner",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "setClaimsAdjuster",
+    functionFragment: "setCancelFee",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -220,6 +265,10 @@ interface AaveV2ProductInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
+    functionFragment: "setMaxCoverPerUser",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "setMaxPeriod",
     data: BytesLike
   ): Result;
@@ -228,21 +277,28 @@ interface AaveV2ProductInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "setPrice", data: BytesLike): Result;
-  decodeFunctionResult(functionFragment: "treasury", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "updateActivePolicies",
     data: BytesLike
   ): Result;
 
   events: {
+    "ClaimSubmitted(uint256)": EventFragment;
+    "GovernanceTransferred(address)": EventFragment;
     "PolicyCanceled(uint256)": EventFragment;
     "PolicyCreated(uint256)": EventFragment;
     "PolicyExtended(uint256)": EventFragment;
+    "SignerAdded(address)": EventFragment;
+    "SignerRemoved(address)": EventFragment;
   };
 
+  getEvent(nameOrSignatureOrTopic: "ClaimSubmitted"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "GovernanceTransferred"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "PolicyCanceled"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "PolicyCreated"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "PolicyExtended"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "SignerAdded"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "SignerRemoved"): EventFragment;
 }
 
 export class AaveV2Product extends Contract {
@@ -259,6 +315,22 @@ export class AaveV2Product extends Contract {
   interface: AaveV2ProductInterface;
 
   functions: {
+    ETH_ADDRESS(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "ETH_ADDRESS()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
+
     activeCoverAmount(
       overrides?: CallOverrides
     ): Promise<{
@@ -284,6 +356,16 @@ export class AaveV2Product extends Contract {
     ): Promise<{
       0: BigNumber;
     }>;
+
+    addSigner(
+      _signer: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "addSigner(address)"(
+      _signer: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
 
     appraisePosition(
       _policyholder: string,
@@ -311,7 +393,7 @@ export class AaveV2Product extends Contract {
       overrides?: PayableOverrides
     ): Promise<ContractTransaction>;
 
-    "buyPolicy(address,address,uint256,uint256)"(
+    "buyPolicy(address,address,uint256,uint64)"(
       _policyholder: string,
       _positionContract: string,
       _coverLimit: BigNumberish,
@@ -341,18 +423,6 @@ export class AaveV2Product extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    claimsAdjuster(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
-    "claimsAdjuster()"(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
     coveredPlatform(
       overrides?: CallOverrides
     ): Promise<{
@@ -371,7 +441,7 @@ export class AaveV2Product extends Contract {
       overrides?: PayableOverrides
     ): Promise<ContractTransaction>;
 
-    "extendPolicy(uint256,uint256)"(
+    "extendPolicy(uint256,uint64)"(
       _policyID: BigNumberish,
       _blocks: BigNumberish,
       overrides?: PayableOverrides
@@ -387,7 +457,7 @@ export class AaveV2Product extends Contract {
       0: BigNumber;
     }>;
 
-    "getQuote(address,address,uint256,uint256)"(
+    "getQuote(address,address,uint256,uint64)"(
       _policyholder: string,
       _positionContract: string,
       _coverLimit: BigNumberish,
@@ -409,6 +479,20 @@ export class AaveV2Product extends Contract {
       0: string;
     }>;
 
+    isAuthorizedSigner(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: boolean;
+    }>;
+
+    "isAuthorizedSigner(address)"(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: boolean;
+    }>;
+
     maxCoverAmount(
       overrides?: CallOverrides
     ): Promise<{
@@ -416,6 +500,18 @@ export class AaveV2Product extends Contract {
     }>;
 
     "maxCoverAmount()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    maxCoverPerUser(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    "maxCoverPerUser()"(
       overrides?: CallOverrides
     ): Promise<{
       0: BigNumber;
@@ -445,6 +541,18 @@ export class AaveV2Product extends Contract {
       0: BigNumber;
     }>;
 
+    newGovernance(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "newGovernance()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
     policyManager(
       overrides?: CallOverrides
     ): Promise<{
@@ -460,13 +568,13 @@ export class AaveV2Product extends Contract {
     price(
       overrides?: CallOverrides
     ): Promise<{
-      0: BigNumber;
+      0: number;
     }>;
 
     "price()"(
       overrides?: CallOverrides
     ): Promise<{
-      0: BigNumber;
+      0: number;
     }>;
 
     productPolicyCount(
@@ -505,23 +613,35 @@ export class AaveV2Product extends Contract {
       0: string;
     }>;
 
+    registry(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "registry()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    removeSigner(
+      _signer: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "removeSigner(address)"(
+      _signer: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
     setCancelFee(
       _cancelFee: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    "setCancelFee(uint256)"(
+    "setCancelFee(uint64)"(
       _cancelFee: BigNumberish,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
-    setClaimsAdjuster(
-      _claimsAdjuster: string,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
-    "setClaimsAdjuster(address)"(
-      _claimsAdjuster: string,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
@@ -555,12 +675,22 @@ export class AaveV2Product extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
+    setMaxCoverPerUser(
+      _maxCoverPerUser: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "setMaxCoverPerUser(uint256)"(
+      _maxCoverPerUser: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
     setMaxPeriod(
       _maxPeriod: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    "setMaxPeriod(uint256)"(
+    "setMaxPeriod(uint64)"(
       _maxPeriod: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
@@ -570,7 +700,7 @@ export class AaveV2Product extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    "setMinPeriod(uint256)"(
+    "setMinPeriod(uint64)"(
       _minPeriod: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
@@ -580,22 +710,10 @@ export class AaveV2Product extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    "setPrice(uint256)"(
+    "setPrice(uint24)"(
       _price: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
-
-    treasury(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
-    "treasury()"(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
 
     updateActivePolicies(overrides?: Overrides): Promise<ContractTransaction>;
 
@@ -603,6 +721,14 @@ export class AaveV2Product extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
   };
+
+  ETH_ADDRESS(overrides?: CallOverrides): Promise<string>;
+
+  "ETH_ADDRESS()"(overrides?: CallOverrides): Promise<string>;
+
+  acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
+
+  "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
 
   activeCoverAmount(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -617,6 +743,16 @@ export class AaveV2Product extends Contract {
     arg0: BigNumberish,
     overrides?: CallOverrides
   ): Promise<BigNumber>;
+
+  addSigner(
+    _signer: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "addSigner(address)"(
+    _signer: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
 
   appraisePosition(
     _policyholder: string,
@@ -638,7 +774,7 @@ export class AaveV2Product extends Contract {
     overrides?: PayableOverrides
   ): Promise<ContractTransaction>;
 
-  "buyPolicy(address,address,uint256,uint256)"(
+  "buyPolicy(address,address,uint256,uint64)"(
     _policyholder: string,
     _positionContract: string,
     _coverLimit: BigNumberish,
@@ -660,10 +796,6 @@ export class AaveV2Product extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  claimsAdjuster(overrides?: CallOverrides): Promise<string>;
-
-  "claimsAdjuster()"(overrides?: CallOverrides): Promise<string>;
-
   coveredPlatform(overrides?: CallOverrides): Promise<string>;
 
   "coveredPlatform()"(overrides?: CallOverrides): Promise<string>;
@@ -674,7 +806,7 @@ export class AaveV2Product extends Contract {
     overrides?: PayableOverrides
   ): Promise<ContractTransaction>;
 
-  "extendPolicy(uint256,uint256)"(
+  "extendPolicy(uint256,uint64)"(
     _policyID: BigNumberish,
     _blocks: BigNumberish,
     overrides?: PayableOverrides
@@ -688,7 +820,7 @@ export class AaveV2Product extends Contract {
     overrides?: CallOverrides
   ): Promise<BigNumber>;
 
-  "getQuote(address,address,uint256,uint256)"(
+  "getQuote(address,address,uint256,uint64)"(
     _policyholder: string,
     _positionContract: string,
     _coverLimit: BigNumberish,
@@ -700,9 +832,20 @@ export class AaveV2Product extends Contract {
 
   "governance()"(overrides?: CallOverrides): Promise<string>;
 
+  isAuthorizedSigner(arg0: string, overrides?: CallOverrides): Promise<boolean>;
+
+  "isAuthorizedSigner(address)"(
+    arg0: string,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
+
   maxCoverAmount(overrides?: CallOverrides): Promise<BigNumber>;
 
   "maxCoverAmount()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+  maxCoverPerUser(overrides?: CallOverrides): Promise<BigNumber>;
+
+  "maxCoverPerUser()"(overrides?: CallOverrides): Promise<BigNumber>;
 
   maxPeriod(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -712,13 +855,17 @@ export class AaveV2Product extends Contract {
 
   "minPeriod()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+  newGovernance(overrides?: CallOverrides): Promise<string>;
+
+  "newGovernance()"(overrides?: CallOverrides): Promise<string>;
+
   policyManager(overrides?: CallOverrides): Promise<string>;
 
   "policyManager()"(overrides?: CallOverrides): Promise<string>;
 
-  price(overrides?: CallOverrides): Promise<BigNumber>;
+  price(overrides?: CallOverrides): Promise<number>;
 
-  "price()"(overrides?: CallOverrides): Promise<BigNumber>;
+  "price()"(overrides?: CallOverrides): Promise<number>;
 
   productPolicyCount(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -732,23 +879,27 @@ export class AaveV2Product extends Contract {
 
   "quoter()"(overrides?: CallOverrides): Promise<string>;
 
+  registry(overrides?: CallOverrides): Promise<string>;
+
+  "registry()"(overrides?: CallOverrides): Promise<string>;
+
+  removeSigner(
+    _signer: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "removeSigner(address)"(
+    _signer: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
   setCancelFee(
     _cancelFee: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  "setCancelFee(uint256)"(
+  "setCancelFee(uint64)"(
     _cancelFee: BigNumberish,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
-  setClaimsAdjuster(
-    _claimsAdjuster: string,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
-  "setClaimsAdjuster(address)"(
-    _claimsAdjuster: string,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
@@ -782,12 +933,22 @@ export class AaveV2Product extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
+  setMaxCoverPerUser(
+    _maxCoverPerUser: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "setMaxCoverPerUser(uint256)"(
+    _maxCoverPerUser: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
   setMaxPeriod(
     _maxPeriod: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  "setMaxPeriod(uint256)"(
+  "setMaxPeriod(uint64)"(
     _maxPeriod: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
@@ -797,7 +958,7 @@ export class AaveV2Product extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  "setMinPeriod(uint256)"(
+  "setMinPeriod(uint64)"(
     _minPeriod: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
@@ -807,20 +968,24 @@ export class AaveV2Product extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  "setPrice(uint256)"(
+  "setPrice(uint24)"(
     _price: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
-
-  treasury(overrides?: CallOverrides): Promise<string>;
-
-  "treasury()"(overrides?: CallOverrides): Promise<string>;
 
   updateActivePolicies(overrides?: Overrides): Promise<ContractTransaction>;
 
   "updateActivePolicies()"(overrides?: Overrides): Promise<ContractTransaction>;
 
   callStatic: {
+    ETH_ADDRESS(overrides?: CallOverrides): Promise<string>;
+
+    "ETH_ADDRESS()"(overrides?: CallOverrides): Promise<string>;
+
+    acceptGovernance(overrides?: CallOverrides): Promise<void>;
+
+    "acceptGovernance()"(overrides?: CallOverrides): Promise<void>;
+
     activeCoverAmount(overrides?: CallOverrides): Promise<BigNumber>;
 
     "activeCoverAmount()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -834,6 +999,13 @@ export class AaveV2Product extends Contract {
       arg0: BigNumberish,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
+
+    addSigner(_signer: string, overrides?: CallOverrides): Promise<void>;
+
+    "addSigner(address)"(
+      _signer: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
 
     appraisePosition(
       _policyholder: string,
@@ -855,7 +1027,7 @@ export class AaveV2Product extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    "buyPolicy(address,address,uint256,uint256)"(
+    "buyPolicy(address,address,uint256,uint64)"(
       _policyholder: string,
       _positionContract: string,
       _coverLimit: BigNumberish,
@@ -877,10 +1049,6 @@ export class AaveV2Product extends Contract {
       overrides?: CallOverrides
     ): Promise<void>;
 
-    claimsAdjuster(overrides?: CallOverrides): Promise<string>;
-
-    "claimsAdjuster()"(overrides?: CallOverrides): Promise<string>;
-
     coveredPlatform(overrides?: CallOverrides): Promise<string>;
 
     "coveredPlatform()"(overrides?: CallOverrides): Promise<string>;
@@ -891,7 +1059,7 @@ export class AaveV2Product extends Contract {
       overrides?: CallOverrides
     ): Promise<void>;
 
-    "extendPolicy(uint256,uint256)"(
+    "extendPolicy(uint256,uint64)"(
       _policyID: BigNumberish,
       _blocks: BigNumberish,
       overrides?: CallOverrides
@@ -905,7 +1073,7 @@ export class AaveV2Product extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    "getQuote(address,address,uint256,uint256)"(
+    "getQuote(address,address,uint256,uint64)"(
       _policyholder: string,
       _positionContract: string,
       _coverLimit: BigNumberish,
@@ -917,9 +1085,23 @@ export class AaveV2Product extends Contract {
 
     "governance()"(overrides?: CallOverrides): Promise<string>;
 
+    isAuthorizedSigner(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
+
+    "isAuthorizedSigner(address)"(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
+
     maxCoverAmount(overrides?: CallOverrides): Promise<BigNumber>;
 
     "maxCoverAmount()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    maxCoverPerUser(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "maxCoverPerUser()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     maxPeriod(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -929,13 +1111,17 @@ export class AaveV2Product extends Contract {
 
     "minPeriod()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+    newGovernance(overrides?: CallOverrides): Promise<string>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<string>;
+
     policyManager(overrides?: CallOverrides): Promise<string>;
 
     "policyManager()"(overrides?: CallOverrides): Promise<string>;
 
-    price(overrides?: CallOverrides): Promise<BigNumber>;
+    price(overrides?: CallOverrides): Promise<number>;
 
-    "price()"(overrides?: CallOverrides): Promise<BigNumber>;
+    "price()"(overrides?: CallOverrides): Promise<number>;
 
     productPolicyCount(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -949,23 +1135,24 @@ export class AaveV2Product extends Contract {
 
     "quoter()"(overrides?: CallOverrides): Promise<string>;
 
+    registry(overrides?: CallOverrides): Promise<string>;
+
+    "registry()"(overrides?: CallOverrides): Promise<string>;
+
+    removeSigner(_signer: string, overrides?: CallOverrides): Promise<void>;
+
+    "removeSigner(address)"(
+      _signer: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
     setCancelFee(
       _cancelFee: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
 
-    "setCancelFee(uint256)"(
+    "setCancelFee(uint64)"(
       _cancelFee: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    setClaimsAdjuster(
-      _claimsAdjuster: string,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    "setClaimsAdjuster(address)"(
-      _claimsAdjuster: string,
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -999,12 +1186,22 @@ export class AaveV2Product extends Contract {
       overrides?: CallOverrides
     ): Promise<void>;
 
+    setMaxCoverPerUser(
+      _maxCoverPerUser: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "setMaxCoverPerUser(uint256)"(
+      _maxCoverPerUser: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
     setMaxPeriod(
       _maxPeriod: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
 
-    "setMaxPeriod(uint256)"(
+    "setMaxPeriod(uint64)"(
       _maxPeriod: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
@@ -1014,21 +1211,17 @@ export class AaveV2Product extends Contract {
       overrides?: CallOverrides
     ): Promise<void>;
 
-    "setMinPeriod(uint256)"(
+    "setMinPeriod(uint64)"(
       _minPeriod: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
 
     setPrice(_price: BigNumberish, overrides?: CallOverrides): Promise<void>;
 
-    "setPrice(uint256)"(
+    "setPrice(uint24)"(
       _price: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
-
-    treasury(overrides?: CallOverrides): Promise<string>;
-
-    "treasury()"(overrides?: CallOverrides): Promise<string>;
 
     updateActivePolicies(
       overrides?: CallOverrides
@@ -1046,14 +1239,30 @@ export class AaveV2Product extends Contract {
   };
 
   filters: {
+    ClaimSubmitted(policyId: BigNumberish | null): EventFilter;
+
+    GovernanceTransferred(_newGovernance: null): EventFilter;
+
     PolicyCanceled(policyID: null): EventFilter;
 
     PolicyCreated(policyID: null): EventFilter;
 
     PolicyExtended(policyID: null): EventFilter;
+
+    SignerAdded(_signer: null): EventFilter;
+
+    SignerRemoved(_signer: null): EventFilter;
   };
 
   estimateGas: {
+    ETH_ADDRESS(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "ETH_ADDRESS()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    acceptGovernance(overrides?: Overrides): Promise<BigNumber>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<BigNumber>;
+
     activeCoverAmount(overrides?: CallOverrides): Promise<BigNumber>;
 
     "activeCoverAmount()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -1066,6 +1275,13 @@ export class AaveV2Product extends Contract {
     "activePolicyIDs(uint256)"(
       arg0: BigNumberish,
       overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    addSigner(_signer: string, overrides?: Overrides): Promise<BigNumber>;
+
+    "addSigner(address)"(
+      _signer: string,
+      overrides?: Overrides
     ): Promise<BigNumber>;
 
     appraisePosition(
@@ -1088,7 +1304,7 @@ export class AaveV2Product extends Contract {
       overrides?: PayableOverrides
     ): Promise<BigNumber>;
 
-    "buyPolicy(address,address,uint256,uint256)"(
+    "buyPolicy(address,address,uint256,uint64)"(
       _policyholder: string,
       _positionContract: string,
       _coverLimit: BigNumberish,
@@ -1110,10 +1326,6 @@ export class AaveV2Product extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    claimsAdjuster(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "claimsAdjuster()"(overrides?: CallOverrides): Promise<BigNumber>;
-
     coveredPlatform(overrides?: CallOverrides): Promise<BigNumber>;
 
     "coveredPlatform()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -1124,7 +1336,7 @@ export class AaveV2Product extends Contract {
       overrides?: PayableOverrides
     ): Promise<BigNumber>;
 
-    "extendPolicy(uint256,uint256)"(
+    "extendPolicy(uint256,uint64)"(
       _policyID: BigNumberish,
       _blocks: BigNumberish,
       overrides?: PayableOverrides
@@ -1138,7 +1350,7 @@ export class AaveV2Product extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    "getQuote(address,address,uint256,uint256)"(
+    "getQuote(address,address,uint256,uint64)"(
       _policyholder: string,
       _positionContract: string,
       _coverLimit: BigNumberish,
@@ -1150,9 +1362,23 @@ export class AaveV2Product extends Contract {
 
     "governance()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+    isAuthorizedSigner(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "isAuthorizedSigner(address)"(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     maxCoverAmount(overrides?: CallOverrides): Promise<BigNumber>;
 
     "maxCoverAmount()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    maxCoverPerUser(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "maxCoverPerUser()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     maxPeriod(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -1161,6 +1387,10 @@ export class AaveV2Product extends Contract {
     minPeriod(overrides?: CallOverrides): Promise<BigNumber>;
 
     "minPeriod()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    newGovernance(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     policyManager(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -1182,23 +1412,24 @@ export class AaveV2Product extends Contract {
 
     "quoter()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+    registry(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "registry()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    removeSigner(_signer: string, overrides?: Overrides): Promise<BigNumber>;
+
+    "removeSigner(address)"(
+      _signer: string,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
     setCancelFee(
       _cancelFee: BigNumberish,
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    "setCancelFee(uint256)"(
+    "setCancelFee(uint64)"(
       _cancelFee: BigNumberish,
-      overrides?: Overrides
-    ): Promise<BigNumber>;
-
-    setClaimsAdjuster(
-      _claimsAdjuster: string,
-      overrides?: Overrides
-    ): Promise<BigNumber>;
-
-    "setClaimsAdjuster(address)"(
-      _claimsAdjuster: string,
       overrides?: Overrides
     ): Promise<BigNumber>;
 
@@ -1232,12 +1463,22 @@ export class AaveV2Product extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
+    setMaxCoverPerUser(
+      _maxCoverPerUser: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "setMaxCoverPerUser(uint256)"(
+      _maxCoverPerUser: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
     setMaxPeriod(
       _maxPeriod: BigNumberish,
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    "setMaxPeriod(uint256)"(
+    "setMaxPeriod(uint64)"(
       _maxPeriod: BigNumberish,
       overrides?: Overrides
     ): Promise<BigNumber>;
@@ -1247,21 +1488,17 @@ export class AaveV2Product extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    "setMinPeriod(uint256)"(
+    "setMinPeriod(uint64)"(
       _minPeriod: BigNumberish,
       overrides?: Overrides
     ): Promise<BigNumber>;
 
     setPrice(_price: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
 
-    "setPrice(uint256)"(
+    "setPrice(uint24)"(
       _price: BigNumberish,
       overrides?: Overrides
     ): Promise<BigNumber>;
-
-    treasury(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "treasury()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     updateActivePolicies(overrides?: Overrides): Promise<BigNumber>;
 
@@ -1269,6 +1506,14 @@ export class AaveV2Product extends Contract {
   };
 
   populateTransaction: {
+    ETH_ADDRESS(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "ETH_ADDRESS()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    acceptGovernance(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    "acceptGovernance()"(overrides?: Overrides): Promise<PopulatedTransaction>;
+
     activeCoverAmount(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "activeCoverAmount()"(
@@ -1283,6 +1528,16 @@ export class AaveV2Product extends Contract {
     "activePolicyIDs(uint256)"(
       arg0: BigNumberish,
       overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    addSigner(
+      _signer: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "addSigner(address)"(
+      _signer: string,
+      overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
     appraisePosition(
@@ -1305,7 +1560,7 @@ export class AaveV2Product extends Contract {
       overrides?: PayableOverrides
     ): Promise<PopulatedTransaction>;
 
-    "buyPolicy(address,address,uint256,uint256)"(
+    "buyPolicy(address,address,uint256,uint64)"(
       _policyholder: string,
       _positionContract: string,
       _coverLimit: BigNumberish,
@@ -1327,12 +1582,6 @@ export class AaveV2Product extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    claimsAdjuster(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    "claimsAdjuster()"(
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
     coveredPlatform(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "coveredPlatform()"(
@@ -1345,7 +1594,7 @@ export class AaveV2Product extends Contract {
       overrides?: PayableOverrides
     ): Promise<PopulatedTransaction>;
 
-    "extendPolicy(uint256,uint256)"(
+    "extendPolicy(uint256,uint64)"(
       _policyID: BigNumberish,
       _blocks: BigNumberish,
       overrides?: PayableOverrides
@@ -1359,7 +1608,7 @@ export class AaveV2Product extends Contract {
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
-    "getQuote(address,address,uint256,uint256)"(
+    "getQuote(address,address,uint256,uint64)"(
       _policyholder: string,
       _positionContract: string,
       _coverLimit: BigNumberish,
@@ -1371,9 +1620,25 @@ export class AaveV2Product extends Contract {
 
     "governance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
+    isAuthorizedSigner(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "isAuthorizedSigner(address)"(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
     maxCoverAmount(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "maxCoverAmount()"(
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    maxCoverPerUser(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "maxCoverPerUser()"(
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
@@ -1384,6 +1649,10 @@ export class AaveV2Product extends Contract {
     minPeriod(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "minPeriod()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    newGovernance(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "newGovernance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     policyManager(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
@@ -1409,23 +1678,27 @@ export class AaveV2Product extends Contract {
 
     "quoter()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
+    registry(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "registry()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    removeSigner(
+      _signer: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "removeSigner(address)"(
+      _signer: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
     setCancelFee(
       _cancelFee: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    "setCancelFee(uint256)"(
+    "setCancelFee(uint64)"(
       _cancelFee: BigNumberish,
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    setClaimsAdjuster(
-      _claimsAdjuster: string,
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    "setClaimsAdjuster(address)"(
-      _claimsAdjuster: string,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
@@ -1459,12 +1732,22 @@ export class AaveV2Product extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
+    setMaxCoverPerUser(
+      _maxCoverPerUser: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "setMaxCoverPerUser(uint256)"(
+      _maxCoverPerUser: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
     setMaxPeriod(
       _maxPeriod: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    "setMaxPeriod(uint256)"(
+    "setMaxPeriod(uint64)"(
       _maxPeriod: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
@@ -1474,7 +1757,7 @@ export class AaveV2Product extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    "setMinPeriod(uint256)"(
+    "setMinPeriod(uint64)"(
       _minPeriod: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
@@ -1484,14 +1767,10 @@ export class AaveV2Product extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    "setPrice(uint256)"(
+    "setPrice(uint24)"(
       _price: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
-
-    treasury(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    "treasury()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     updateActivePolicies(overrides?: Overrides): Promise<PopulatedTransaction>;
 

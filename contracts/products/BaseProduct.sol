@@ -2,9 +2,10 @@
 pragma solidity 0.8.0;
 
 import "@openzeppelin/contracts/utils/Address.sol";
-import "./interface/IProduct.sol";
-import "./interface/IPolicyManager.sol";
-import "./interface/ITreasury.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "../interface/IProduct.sol";
+import "../interface/IPolicyManager.sol";
+import "../interface/ITreasury.sol";
 
 /* TODO
  * - treasury refund() function, check transfer to treasury when buyPolicy()
@@ -18,11 +19,13 @@ import "./interface/ITreasury.sol";
  * @author solace.fi
  * @notice To be inherited by individual Product contracts.
  */
-abstract contract BaseProduct is IProduct {
+abstract contract BaseProduct is IProduct, ReentrancyGuard {
     using Address for address;
 
-    // Governor
-    address public governance;
+    /// @notice Governor.
+    address public override governance;
+    /// @notice Governance to take over.
+    address public override newGovernance;
 
     // Policy Manager
     IPolicyManager public policyManager; // Policy manager ERC721 contract
@@ -31,43 +34,43 @@ abstract contract BaseProduct is IProduct {
     ITreasury public treasury; // Treasury contract
 
     // Product Details
-    address public coveredPlatform; // a platform contract which locates contracts that are covered by this product
+    address public override coveredPlatform; // a platform contract which locates contracts that are covered by this product
                                     // (e.g., UniswapProduct will have Factory as coveredPlatform contract, because
                                     // every Pair address can be located through getPool() function)
-    address public claimsAdjuster; // address of the parametric auto claims adjuster
-    uint256 public price; // cover price (in wei) per block per wei (multiplied by 1e12 to avoid underflow upon construction or setter)
-    uint256 public cancelFee; // policy cancelation fee
-    uint256 public minPeriod; // minimum policy period in blocks
-    uint256 public maxPeriod; // maximum policy period in blocks
-    uint256 public maxCoverAmount; // maximum amount of coverage (in wei) this product can sell
+    uint256 public override maxCoverAmount; // maximum amount of coverage (in wei) this product can sell
+    uint256 public override maxCoverPerUser;
+    uint64 public override minPeriod; // minimum policy period in blocks
+    uint64 public override maxPeriod; // maximum policy period in blocks
+    uint64 public override cancelFee; // policy cancelation fee
+    uint24 public override price; // cover price (in wei) per block per wei (multiplied by 1e12 to avoid underflow upon construction or setter)
 
-    // Book-keeping varaibles
-    uint256 public productPolicyCount; // total policy count this product sold
-    uint256 public activeCoverAmount; // current amount covered (in wei)
-    uint256[] public activePolicyIDs;
+    // Book-keeping variables
+    uint256 public override productPolicyCount; // total policy count this product sold
+    uint256 public override activeCoverAmount; // current amount covered (in wei)
+    uint256[] public override activePolicyIDs;
 
 
     constructor (
         IPolicyManager _policyManager,
         ITreasury _treasury,
         address _coveredPlatform,
-        address _claimsAdjuster,
-        uint256 _price,
-        uint256 _cancelFee,
-        uint256 _minPeriod,
-        uint256 _maxPeriod,
-        uint256 _maxCoverAmount)
-    {
+        uint256 _maxCoverAmount,
+        uint256 _maxCoverPerUser,
+        uint64 _minPeriod,
+        uint64 _maxPeriod,
+        uint64 _cancelFee,
+        uint24 _price
+    ) {
         governance = msg.sender;
         policyManager = _policyManager;
         treasury = _treasury;
         coveredPlatform = _coveredPlatform;
-        claimsAdjuster = _claimsAdjuster;
-        price = _price;
-        cancelFee = _cancelFee;
+        maxCoverAmount = _maxCoverAmount;
+        maxCoverPerUser = _maxCoverPerUser;
         minPeriod = _minPeriod;
         maxPeriod = _maxPeriod;
-        maxCoverAmount = _maxCoverAmount;
+        cancelFee = _cancelFee;
+        price = _price;
         productPolicyCount = 0;
         activeCoverAmount = 0;
     }
@@ -77,30 +80,33 @@ abstract contract BaseProduct is IProduct {
     ****/
 
     /**
-     * @notice Transfers the governance role to a new governor.
+     * @notice Allows governance to be transferred to a new governor.
      * Can only be called by the current governor.
      * @param _governance The new governor.
      */
     function setGovernance(address _governance) external override {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
-        governance = _governance;
+        newGovernance = _governance;
     }
 
     /**
-     * @notice Sets the claims adjuster for this product
-     * @param _claimsAdjuster address of the claims adjuster contract
+     * @notice Accepts the governance role.
+     * Can only be called by the new governor.
      */
-    function setClaimsAdjuster(address _claimsAdjuster) external override {
-        require(msg.sender == governance, "!governance");
-        claimsAdjuster = _claimsAdjuster;
+    function acceptGovernance() external override {
+        // can only be called by new governor
+        require(msg.sender == newGovernance, "!governance");
+        governance = newGovernance;
+        newGovernance = address(0x0);
+        emit GovernanceTransferred(msg.sender);
     }
 
     /**
      * @notice Sets the price for this product
      * @param _price cover price (in wei) per ether per block
      */
-    function setPrice(uint256 _price) external override {
+    function setPrice(uint24 _price) external override {
         require(msg.sender == governance, "!governance");
         price = _price;
     }
@@ -109,7 +115,7 @@ abstract contract BaseProduct is IProduct {
      * @notice Sets the fee that user must pay upon canceling the policy
      * @param _cancelFee policy cancelation fee
      */
-    function setCancelFee(uint256 _cancelFee) external override {
+    function setCancelFee(uint64 _cancelFee) external override {
         require(msg.sender == governance, "!governance");
         cancelFee = _cancelFee;
     }
@@ -118,7 +124,7 @@ abstract contract BaseProduct is IProduct {
      * @notice Sets the minimum number of blocks a policy can be purchased for
      * @param _minPeriod minimum number of blocks
      */
-    function setMinPeriod(uint256 _minPeriod) external override {
+    function setMinPeriod(uint64 _minPeriod) external override {
         require(msg.sender == governance, "!governance");
         minPeriod = _minPeriod;
     }
@@ -127,18 +133,27 @@ abstract contract BaseProduct is IProduct {
      * @notice Sets the maximum number of blocks a policy can be purchased for
      * @param _maxPeriod maximum number of blocks
      */
-    function setMaxPeriod(uint256 _maxPeriod) external override {
+    function setMaxPeriod(uint64 _maxPeriod) external override {
         require(msg.sender == governance, "!governance");
         maxPeriod = _maxPeriod;
     }
 
     /**
-     * @notice Sets the maximum coverage amount this product can provide
+     * @notice Sets the maximum coverage amount this product can provide to all users
      * @param _maxCoverAmount maximum coverage amount (in wei)
      */
     function setMaxCoverAmount(uint256 _maxCoverAmount) external override {
         require(msg.sender == governance, "!governance");
         maxCoverAmount = _maxCoverAmount;
+    }
+
+    /**
+     * @notice Sets the maximum coverage amount this product can provide to a single user
+     * @param _maxCoverPerUser maximum coverage amount (in wei)
+     */
+    function setMaxCoverPerUser(uint256 _maxCoverPerUser) external override {
+        require(msg.sender == governance, "!governance");
+        maxCoverPerUser = _maxCoverPerUser;
     }
 
 
@@ -171,16 +186,15 @@ abstract contract BaseProduct is IProduct {
      * @param _blocks length for policy
      * @return premium The quote for their policy in wei.
      */
-    function _getQuote(uint256 _coverLimit, uint256 _blocks, uint256 _positionAmount) internal view returns (uint256 premium){
+    function _getQuote(uint256 _coverLimit, uint64 _blocks, uint256 _positionAmount) internal view returns (uint256 premium){
         premium = _positionAmount * _coverLimit * _blocks * price / 1e16;
         return premium;
     }
 
-    function getQuote(address _policyholder, address _positionContract, uint256 _coverLimit, uint256 _blocks) external view override returns (uint256){
+    function getQuote(address _policyholder, address _positionContract, uint256 _coverLimit, uint64 _blocks) external view override returns (uint256){
         uint256 positionAmount = appraisePosition(_policyholder, _positionContract);
         return _getQuote(_coverLimit, _blocks, positionAmount);
     }
-
 
     /**** MUTATIVE FUNCTIONS
     Functions that change state variables, deploy and change policy contracts
@@ -219,7 +233,10 @@ abstract contract BaseProduct is IProduct {
 
      * @return policyID The contract address of the policy
      */
-    function buyPolicy(address _policyholder, address _positionContract, uint256 _coverLimit, uint256 _blocks) external payable override returns (uint256 policyID){
+    function buyPolicy(address _policyholder, address _positionContract, uint256 _coverLimit, uint64 _blocks) external payable override nonReentrant returns (uint256 policyID){
+        // check that the policy holder doesn't already have an identical policy
+        //require(!policyManager.hasActivePolicy(address(this), _policyholder, _positionContract), "duplicate policy");
+
         // check that the buyer has a position in the covered protocol
         uint256 positionAmount = appraisePosition(_policyholder, _positionContract);
         require(positionAmount != 0, "zero position value");
@@ -227,12 +244,13 @@ abstract contract BaseProduct is IProduct {
         // check that the product can provide coverage for this policy
         uint256 coverAmount = _coverLimit * positionAmount / 1e4;
         require(activeCoverAmount + coverAmount <= maxCoverAmount, "max covered amount is reached");
+        require(coverAmount <= maxCoverPerUser, "over max cover single user");
 
         // check that the buyer has paid the correct premium
         uint256 premium = _getQuote(_coverLimit, _blocks, positionAmount);
         require(msg.value >= premium && premium != 0, "insufficient payment or premium is zero");
+        if(msg.value > premium) payable(msg.sender).transfer(msg.value - premium);
 
-        // TODO: safe return extra
         // check that the buyer provided valid period and coverage limit
         require(_blocks >= minPeriod && _blocks <= maxPeriod, "invalid period");
         require(_coverLimit > 0 && _coverLimit <= 1e4, "invalid cover limit percentage");
@@ -241,8 +259,8 @@ abstract contract BaseProduct is IProduct {
         treasury.depositEth{value: premium}();
 
         // create the policy
-        uint256 expirationBlock = block.number + _blocks;
-        policyID = policyManager.createPolicy(_policyholder, _positionContract, expirationBlock, coverAmount, price);
+        uint64 expirationBlock = uint64(block.number + _blocks);
+        policyID = policyManager.createPolicy(_policyholder, _positionContract, coverAmount, expirationBlock, price);
 
         // update local book-keeping variables
         activeCoverAmount += coverAmount;
@@ -250,7 +268,7 @@ abstract contract BaseProduct is IProduct {
         productPolicyCount++;
 
         emit PolicyCreated(policyID);
-        
+
         return policyID;
     }
 
@@ -294,21 +312,22 @@ abstract contract BaseProduct is IProduct {
      * @param _policyID id number of the existing policy
      * @param _blocks length of extension
      */
-    function extendPolicy(uint256 _policyID, uint256 _blocks) external payable override {
+    function extendPolicy(uint256 _policyID, uint64 _blocks) external payable override nonReentrant {
         // check that the msg.sender is the policyholder
-        address policyholder = policyManager.getPolicyholder(_policyID);
+        (address policyholder, address product, address positionContract, uint256 coverAmount, uint64 expirationBlock, uint24 price) = policyManager.getPolicyInfo(_policyID);
         require(policyholder == msg.sender,"!policyholder");
+        require(product == address(this), "wrong product");
+
         // compute the premium
-        uint256 coverAmount = policyManager.getPolicyCoverAmount(_policyID);
         uint256 premium = coverAmount * _blocks * price / 1e12;
         // check that the buyer has paid the correct premium
         require(msg.value >= premium && premium != 0, "insufficient payment or premium is zero");
+        if(msg.value > premium) payable(msg.sender).transfer(msg.value - premium);
         // transfer premium to the treasury
         treasury.depositEth{value: premium}();
         // update the policy's URI
-        uint256 newExpirationBlock = policyManager.getPolicyExpirationBlock(_policyID) + _blocks;
-        address positionContract = policyManager.getPolicyPositionContract(_policyID);
-        policyManager.setPolicyInfo(_policyID, policyholder, positionContract, newExpirationBlock, coverAmount, price);
+        uint64 newExpirationBlock = expirationBlock + _blocks; // TODO: duration check
+        policyManager.setPolicyInfo(_policyID, policyholder, positionContract, coverAmount, newExpirationBlock, price);
         emit PolicyExtended(_policyID);
     }
 
@@ -317,10 +336,13 @@ abstract contract BaseProduct is IProduct {
      *  Cancel and destroy a policy.
      * @param _policyID id number of the existing policy
      */
-    function cancelPolicy(uint256 _policyID) external override {
-        require(policyManager.getPolicyholder(_policyID) == msg.sender,"!policyholder");
-        uint256 blocksLeft = policyManager.getPolicyExpirationBlock(_policyID) - block.number;
-        uint256 refundAmount = blocksLeft * policyManager.getPolicyPrice(_policyID);
+    function cancelPolicy(uint256 _policyID) external override nonReentrant {
+        (address policyholder, address product, , uint256 coverAmount, uint64 expirationBlock, uint24 price) = policyManager.getPolicyInfo(_policyID);
+        require(policyholder == msg.sender,"!policyholder");
+        require(product == address(this), "wrong product");
+
+        uint64 blocksLeft = expirationBlock - uint64(block.number);
+        uint256 refundAmount = blocksLeft * coverAmount * price / 1e12;
         require(refundAmount > cancelFee, "refund amount less than cancelation fee");
         policyManager.burn(_policyID);
         treasury.refund(msg.sender, refundAmount - cancelFee);

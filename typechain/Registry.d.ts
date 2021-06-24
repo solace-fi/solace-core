@@ -23,22 +23,17 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 interface RegistryInterface extends ethers.utils.Interface {
   functions: {
     "acceptGovernance()": FunctionFragment;
-    "addProduct(address)": FunctionFragment;
-    "claimsAdjustor()": FunctionFragment;
     "claimsEscrow()": FunctionFragment;
-    "getProduct(uint256)": FunctionFragment;
     "governance()": FunctionFragment;
-    "isProduct(address)": FunctionFragment;
     "locker()": FunctionFragment;
     "master()": FunctionFragment;
     "newGovernance()": FunctionFragment;
-    "numProducts()": FunctionFragment;
-    "removeProduct(address)": FunctionFragment;
-    "setClaimsAdjustor(address)": FunctionFragment;
+    "policyManager()": FunctionFragment;
     "setClaimsEscrow(address)": FunctionFragment;
     "setGovernance(address)": FunctionFragment;
     "setLocker(address)": FunctionFragment;
     "setMaster(address)": FunctionFragment;
+    "setPolicyManager(address)": FunctionFragment;
     "setSolace(address)": FunctionFragment;
     "setTreasury(address)": FunctionFragment;
     "setVault(address)": FunctionFragment;
@@ -51,24 +46,14 @@ interface RegistryInterface extends ethers.utils.Interface {
     functionFragment: "acceptGovernance",
     values?: undefined
   ): string;
-  encodeFunctionData(functionFragment: "addProduct", values: [string]): string;
-  encodeFunctionData(
-    functionFragment: "claimsAdjustor",
-    values?: undefined
-  ): string;
   encodeFunctionData(
     functionFragment: "claimsEscrow",
     values?: undefined
   ): string;
   encodeFunctionData(
-    functionFragment: "getProduct",
-    values: [BigNumberish]
-  ): string;
-  encodeFunctionData(
     functionFragment: "governance",
     values?: undefined
   ): string;
-  encodeFunctionData(functionFragment: "isProduct", values: [string]): string;
   encodeFunctionData(functionFragment: "locker", values?: undefined): string;
   encodeFunctionData(functionFragment: "master", values?: undefined): string;
   encodeFunctionData(
@@ -76,16 +61,8 @@ interface RegistryInterface extends ethers.utils.Interface {
     values?: undefined
   ): string;
   encodeFunctionData(
-    functionFragment: "numProducts",
+    functionFragment: "policyManager",
     values?: undefined
-  ): string;
-  encodeFunctionData(
-    functionFragment: "removeProduct",
-    values: [string]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "setClaimsAdjustor",
-    values: [string]
   ): string;
   encodeFunctionData(
     functionFragment: "setClaimsEscrow",
@@ -97,6 +74,10 @@ interface RegistryInterface extends ethers.utils.Interface {
   ): string;
   encodeFunctionData(functionFragment: "setLocker", values: [string]): string;
   encodeFunctionData(functionFragment: "setMaster", values: [string]): string;
+  encodeFunctionData(
+    functionFragment: "setPolicyManager",
+    values: [string]
+  ): string;
   encodeFunctionData(functionFragment: "setSolace", values: [string]): string;
   encodeFunctionData(functionFragment: "setTreasury", values: [string]): string;
   encodeFunctionData(functionFragment: "setVault", values: [string]): string;
@@ -108,18 +89,11 @@ interface RegistryInterface extends ethers.utils.Interface {
     functionFragment: "acceptGovernance",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(functionFragment: "addProduct", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "claimsAdjustor",
-    data: BytesLike
-  ): Result;
   decodeFunctionResult(
     functionFragment: "claimsEscrow",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(functionFragment: "getProduct", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "governance", data: BytesLike): Result;
-  decodeFunctionResult(functionFragment: "isProduct", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "locker", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "master", data: BytesLike): Result;
   decodeFunctionResult(
@@ -127,15 +101,7 @@ interface RegistryInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "numProducts",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "removeProduct",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "setClaimsAdjustor",
+    functionFragment: "policyManager",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -148,6 +114,10 @@ interface RegistryInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(functionFragment: "setLocker", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "setMaster", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "setPolicyManager",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "setSolace", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "setTreasury",
@@ -159,25 +129,21 @@ interface RegistryInterface extends ethers.utils.Interface {
   decodeFunctionResult(functionFragment: "vault", data: BytesLike): Result;
 
   events: {
-    "ClaimsAdjustorSet(address)": EventFragment;
     "ClaimsEscrowSet(address)": EventFragment;
     "GovernanceTransferred(address)": EventFragment;
     "LockerSet(address)": EventFragment;
     "MasterSet(address)": EventFragment;
-    "ProductAdded(address)": EventFragment;
-    "ProductRemoved(address)": EventFragment;
+    "PolicyManagerSet(address)": EventFragment;
     "SolaceSet(address)": EventFragment;
     "TreasurySet(address)": EventFragment;
     "VaultSet(address)": EventFragment;
   };
 
-  getEvent(nameOrSignatureOrTopic: "ClaimsAdjustorSet"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "ClaimsEscrowSet"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "GovernanceTransferred"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "LockerSet"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "MasterSet"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "ProductAdded"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "ProductRemoved"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "PolicyManagerSet"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "SolaceSet"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "TreasurySet"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "VaultSet"): EventFragment;
@@ -201,28 +167,6 @@ export class Registry extends Contract {
 
     "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
 
-    addProduct(
-      _product: string,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
-    "addProduct(address)"(
-      _product: string,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
-    claimsAdjustor(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
-    "claimsAdjustor()"(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
     claimsEscrow(
       overrides?: CallOverrides
     ): Promise<{
@@ -230,20 +174,6 @@ export class Registry extends Contract {
     }>;
 
     "claimsEscrow()"(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
-    getProduct(
-      _productNum: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
-    "getProduct(uint256)"(
-      _productNum: BigNumberish,
       overrides?: CallOverrides
     ): Promise<{
       0: string;
@@ -259,20 +189,6 @@ export class Registry extends Contract {
       overrides?: CallOverrides
     ): Promise<{
       0: string;
-    }>;
-
-    isProduct(
-      _product: string,
-      overrides?: CallOverrides
-    ): Promise<{
-      0: boolean;
-    }>;
-
-    "isProduct(address)"(
-      _product: string,
-      overrides?: CallOverrides
-    ): Promise<{
-      0: boolean;
     }>;
 
     locker(
@@ -311,37 +227,17 @@ export class Registry extends Contract {
       0: string;
     }>;
 
-    numProducts(
+    policyManager(
       overrides?: CallOverrides
     ): Promise<{
-      0: BigNumber;
+      0: string;
     }>;
 
-    "numProducts()"(
+    "policyManager()"(
       overrides?: CallOverrides
     ): Promise<{
-      0: BigNumber;
+      0: string;
     }>;
-
-    removeProduct(
-      _product: string,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
-    "removeProduct(address)"(
-      _product: string,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
-    setClaimsAdjustor(
-      _claimsAdjustor: string,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
-    "setClaimsAdjustor(address)"(
-      _claimsAdjustor: string,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
 
     setClaimsEscrow(
       _claimsEscrow: string,
@@ -380,6 +276,16 @@ export class Registry extends Contract {
 
     "setMaster(address)"(
       _master: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    setPolicyManager(
+      _policyManager: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "setPolicyManager(address)"(
+      _policyManager: string,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
@@ -454,44 +360,13 @@ export class Registry extends Contract {
 
   "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
 
-  addProduct(
-    _product: string,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
-  "addProduct(address)"(
-    _product: string,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
-  claimsAdjustor(overrides?: CallOverrides): Promise<string>;
-
-  "claimsAdjustor()"(overrides?: CallOverrides): Promise<string>;
-
   claimsEscrow(overrides?: CallOverrides): Promise<string>;
 
   "claimsEscrow()"(overrides?: CallOverrides): Promise<string>;
 
-  getProduct(
-    _productNum: BigNumberish,
-    overrides?: CallOverrides
-  ): Promise<string>;
-
-  "getProduct(uint256)"(
-    _productNum: BigNumberish,
-    overrides?: CallOverrides
-  ): Promise<string>;
-
   governance(overrides?: CallOverrides): Promise<string>;
 
   "governance()"(overrides?: CallOverrides): Promise<string>;
-
-  isProduct(_product: string, overrides?: CallOverrides): Promise<boolean>;
-
-  "isProduct(address)"(
-    _product: string,
-    overrides?: CallOverrides
-  ): Promise<boolean>;
 
   locker(overrides?: CallOverrides): Promise<string>;
 
@@ -505,29 +380,9 @@ export class Registry extends Contract {
 
   "newGovernance()"(overrides?: CallOverrides): Promise<string>;
 
-  numProducts(overrides?: CallOverrides): Promise<BigNumber>;
+  policyManager(overrides?: CallOverrides): Promise<string>;
 
-  "numProducts()"(overrides?: CallOverrides): Promise<BigNumber>;
-
-  removeProduct(
-    _product: string,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
-  "removeProduct(address)"(
-    _product: string,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
-  setClaimsAdjustor(
-    _claimsAdjustor: string,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
-  "setClaimsAdjustor(address)"(
-    _claimsAdjustor: string,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
+  "policyManager()"(overrides?: CallOverrides): Promise<string>;
 
   setClaimsEscrow(
     _claimsEscrow: string,
@@ -566,6 +421,16 @@ export class Registry extends Contract {
 
   "setMaster(address)"(
     _master: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  setPolicyManager(
+    _policyManager: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "setPolicyManager(address)"(
+    _policyManager: string,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
@@ -613,41 +478,13 @@ export class Registry extends Contract {
 
     "acceptGovernance()"(overrides?: CallOverrides): Promise<void>;
 
-    addProduct(_product: string, overrides?: CallOverrides): Promise<void>;
-
-    "addProduct(address)"(
-      _product: string,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    claimsAdjustor(overrides?: CallOverrides): Promise<string>;
-
-    "claimsAdjustor()"(overrides?: CallOverrides): Promise<string>;
-
     claimsEscrow(overrides?: CallOverrides): Promise<string>;
 
     "claimsEscrow()"(overrides?: CallOverrides): Promise<string>;
 
-    getProduct(
-      _productNum: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<string>;
-
-    "getProduct(uint256)"(
-      _productNum: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<string>;
-
     governance(overrides?: CallOverrides): Promise<string>;
 
     "governance()"(overrides?: CallOverrides): Promise<string>;
-
-    isProduct(_product: string, overrides?: CallOverrides): Promise<boolean>;
-
-    "isProduct(address)"(
-      _product: string,
-      overrides?: CallOverrides
-    ): Promise<boolean>;
 
     locker(overrides?: CallOverrides): Promise<string>;
 
@@ -661,26 +498,9 @@ export class Registry extends Contract {
 
     "newGovernance()"(overrides?: CallOverrides): Promise<string>;
 
-    numProducts(overrides?: CallOverrides): Promise<BigNumber>;
+    policyManager(overrides?: CallOverrides): Promise<string>;
 
-    "numProducts()"(overrides?: CallOverrides): Promise<BigNumber>;
-
-    removeProduct(_product: string, overrides?: CallOverrides): Promise<void>;
-
-    "removeProduct(address)"(
-      _product: string,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    setClaimsAdjustor(
-      _claimsAdjustor: string,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    "setClaimsAdjustor(address)"(
-      _claimsAdjustor: string,
-      overrides?: CallOverrides
-    ): Promise<void>;
+    "policyManager()"(overrides?: CallOverrides): Promise<string>;
 
     setClaimsEscrow(
       _claimsEscrow: string,
@@ -713,6 +533,16 @@ export class Registry extends Contract {
 
     "setMaster(address)"(
       _master: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    setPolicyManager(
+      _policyManager: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "setPolicyManager(address)"(
+      _policyManager: string,
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -751,8 +581,6 @@ export class Registry extends Contract {
   };
 
   filters: {
-    ClaimsAdjustorSet(_claimsAdjustor: null): EventFilter;
-
     ClaimsEscrowSet(_claimsEscrow: null): EventFilter;
 
     GovernanceTransferred(_newGovernance: null): EventFilter;
@@ -761,9 +589,7 @@ export class Registry extends Contract {
 
     MasterSet(_master: null): EventFilter;
 
-    ProductAdded(_product: null): EventFilter;
-
-    ProductRemoved(_product: null): EventFilter;
+    PolicyManagerSet(_policyManager: null): EventFilter;
 
     SolaceSet(_solace: null): EventFilter;
 
@@ -777,41 +603,13 @@ export class Registry extends Contract {
 
     "acceptGovernance()"(overrides?: Overrides): Promise<BigNumber>;
 
-    addProduct(_product: string, overrides?: Overrides): Promise<BigNumber>;
-
-    "addProduct(address)"(
-      _product: string,
-      overrides?: Overrides
-    ): Promise<BigNumber>;
-
-    claimsAdjustor(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "claimsAdjustor()"(overrides?: CallOverrides): Promise<BigNumber>;
-
     claimsEscrow(overrides?: CallOverrides): Promise<BigNumber>;
 
     "claimsEscrow()"(overrides?: CallOverrides): Promise<BigNumber>;
 
-    getProduct(
-      _productNum: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    "getProduct(uint256)"(
-      _productNum: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
     governance(overrides?: CallOverrides): Promise<BigNumber>;
 
     "governance()"(overrides?: CallOverrides): Promise<BigNumber>;
-
-    isProduct(_product: string, overrides?: CallOverrides): Promise<BigNumber>;
-
-    "isProduct(address)"(
-      _product: string,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
 
     locker(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -825,26 +623,9 @@ export class Registry extends Contract {
 
     "newGovernance()"(overrides?: CallOverrides): Promise<BigNumber>;
 
-    numProducts(overrides?: CallOverrides): Promise<BigNumber>;
+    policyManager(overrides?: CallOverrides): Promise<BigNumber>;
 
-    "numProducts()"(overrides?: CallOverrides): Promise<BigNumber>;
-
-    removeProduct(_product: string, overrides?: Overrides): Promise<BigNumber>;
-
-    "removeProduct(address)"(
-      _product: string,
-      overrides?: Overrides
-    ): Promise<BigNumber>;
-
-    setClaimsAdjustor(
-      _claimsAdjustor: string,
-      overrides?: Overrides
-    ): Promise<BigNumber>;
-
-    "setClaimsAdjustor(address)"(
-      _claimsAdjustor: string,
-      overrides?: Overrides
-    ): Promise<BigNumber>;
+    "policyManager()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     setClaimsEscrow(
       _claimsEscrow: string,
@@ -877,6 +658,16 @@ export class Registry extends Contract {
 
     "setMaster(address)"(
       _master: string,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    setPolicyManager(
+      _policyManager: string,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "setPolicyManager(address)"(
+      _policyManager: string,
       overrides?: Overrides
     ): Promise<BigNumber>;
 
@@ -919,49 +710,13 @@ export class Registry extends Contract {
 
     "acceptGovernance()"(overrides?: Overrides): Promise<PopulatedTransaction>;
 
-    addProduct(
-      _product: string,
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    "addProduct(address)"(
-      _product: string,
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    claimsAdjustor(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    "claimsAdjustor()"(
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
     claimsEscrow(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "claimsEscrow()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
-    getProduct(
-      _productNum: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    "getProduct(uint256)"(
-      _productNum: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
     governance(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "governance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    isProduct(
-      _product: string,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    "isProduct(address)"(
-      _product: string,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
 
     locker(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
@@ -975,29 +730,9 @@ export class Registry extends Contract {
 
     "newGovernance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
-    numProducts(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+    policyManager(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
-    "numProducts()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    removeProduct(
-      _product: string,
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    "removeProduct(address)"(
-      _product: string,
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    setClaimsAdjustor(
-      _claimsAdjustor: string,
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    "setClaimsAdjustor(address)"(
-      _claimsAdjustor: string,
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
+    "policyManager()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     setClaimsEscrow(
       _claimsEscrow: string,
@@ -1036,6 +771,16 @@ export class Registry extends Contract {
 
     "setMaster(address)"(
       _master: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    setPolicyManager(
+      _policyManager: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "setPolicyManager(address)"(
+      _policyManager: string,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 

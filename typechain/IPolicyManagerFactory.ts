@@ -129,18 +129,18 @@ const _abi = [
       },
       {
         internalType: "uint256",
-        name: "_expirationBlock",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
         name: "_coverAmount",
         type: "uint256",
       },
       {
-        internalType: "uint256",
+        internalType: "uint64",
+        name: "_expirationBlock",
+        type: "uint64",
+      },
+      {
+        internalType: "uint24",
         name: "_price",
-        type: "uint256",
+        type: "uint24",
       },
     ],
     name: "createPolicy",
@@ -184,9 +184,9 @@ const _abi = [
     name: "getPolicyExpirationBlock",
     outputs: [
       {
-        internalType: "uint256",
+        internalType: "uint64",
         name: "",
-        type: "uint256",
+        type: "uint64",
       },
     ],
     stateMutability: "view",
@@ -219,18 +219,18 @@ const _abi = [
       },
       {
         internalType: "uint256",
-        name: "expirationBlock",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
         name: "coverAmount",
         type: "uint256",
       },
       {
-        internalType: "uint256",
+        internalType: "uint64",
+        name: "expirationBlock",
+        type: "uint64",
+      },
+      {
+        internalType: "uint24",
         name: "price",
-        type: "uint256",
+        type: "uint24",
       },
     ],
     stateMutability: "view",
@@ -266,9 +266,9 @@ const _abi = [
     name: "getPolicyPrice",
     outputs: [
       {
-        internalType: "uint256",
+        internalType: "uint24",
         name: "",
-        type: "uint256",
+        type: "uint24",
       },
     ],
     stateMutability: "view",
@@ -313,6 +313,25 @@ const _abi = [
     type: "function",
   },
   {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_productNum",
+        type: "uint256",
+      },
+    ],
+    name: "getProduct",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
     inputs: [],
     name: "governance",
     outputs: [
@@ -320,6 +339,35 @@ const _abi = [
         internalType: "address",
         name: "",
         type: "address",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "_product",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "_policyholder",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "_positionContract",
+        type: "address",
+      },
+    ],
+    name: "hasActivePolicy",
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool",
       },
     ],
     stateMutability: "view",
@@ -352,6 +400,38 @@ const _abi = [
         internalType: "address",
         name: "",
         type: "address",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "numProducts",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "_product",
+        type: "address",
+      },
+    ],
+    name: "productIsActive",
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool",
       },
     ],
     stateMutability: "view",
@@ -402,18 +482,18 @@ const _abi = [
       },
       {
         internalType: "uint256",
-        name: "_expirationBlock",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
         name: "_coverAmount",
         type: "uint256",
       },
       {
-        internalType: "uint256",
+        internalType: "uint64",
+        name: "_expirationBlock",
+        type: "uint64",
+      },
+      {
+        internalType: "uint24",
         name: "_price",
-        type: "uint256",
+        type: "uint24",
       },
     ],
     name: "setPolicyInfo",

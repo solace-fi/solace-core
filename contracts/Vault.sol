@@ -10,6 +10,7 @@ import "./interface/IStrategy.sol";
 import "./interface/IWETH9.sol";
 import "./interface/IRegistry.sol";
 import "./interface/IClaimsEscrow.sol";
+import "./interface/IPolicyManager.sol";
 import "./interface/IVault.sol";
 
 
@@ -353,8 +354,8 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     }
 
     /**
-     * @notice Allows the Claims Adjustor contract to process a claim
-     * Only callable by the ClaimsAdjustor contract
+     * @notice Allows product contracts to process a claim
+     * Only callable by active products
      * Sends claimed `amount` to Escrow, where it is withdrawable by the claimant after a cooldown period
      * @param claimant Address of the claimant
      * @param amount Amount to pay out
@@ -362,15 +363,17 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
      */
     function processClaim(address claimant, uint256 amount) external override {
         require(!emergencyShutdown, "cannot process claim when vault is in emergency shutdown");
-        require(msg.sender == registry.claimsAdjustor(), "!claimsAdjustor");
+        require(IPolicyManager(registry.policyManager()).productIsActive(msg.sender), "!product");
 
         // unwrap some WETH to make ETH available for claims payout
-        IWETH9(payable(address(token))).withdraw(amount);
+        IWETH9 weth = IWETH9(payable(address(token)));
+        uint256 transferAmount = min(weth.balanceOf(address(this)), amount);
+        weth.withdraw(transferAmount);
 
-        IClaimsEscrow escrow = IClaimsEscrow(registry.claimsEscrow());
-        uint256 claimId = escrow.receiveClaim{value: amount}(claimant);
+        IClaimsEscrow escrow = IClaimsEscrow(payable(registry.claimsEscrow()));
+        uint256 claimId = escrow.receiveClaim{value: transferAmount}(claimant);
 
-        emit ClaimProcessed(claimId, claimant, amount);
+        emit ClaimProcessed(claimId, claimant, transferAmount);
     }
 
     /**
