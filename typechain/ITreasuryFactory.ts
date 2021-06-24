@@ -171,7 +171,7 @@ const _abi = [
     inputs: [],
     name: "routePremiums",
     outputs: [],
-    stateMutability: "nonpayable",
+    stateMutability: "payable",
     type: "function",
   },
   {
@@ -254,12 +254,38 @@ const _abi = [
   {
     inputs: [
       {
+        internalType: "address",
+        name: "_user",
+        type: "address",
+      },
+    ],
+    name: "unpaidRewards",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
         internalType: "uint256",
         name: "_amount",
         type: "uint256",
       },
     ],
     name: "unwrap",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "withdraw",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",

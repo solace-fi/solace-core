@@ -32,16 +32,18 @@ interface TreasuryInterface extends ethers.utils.Interface {
     "premiumRecipients(uint256)": FunctionFragment;
     "recipientWeights(uint256)": FunctionFragment;
     "refund(address,uint256)": FunctionFragment;
+    "registry()": FunctionFragment;
     "routePremiums()": FunctionFragment;
     "setGovernance(address)": FunctionFragment;
     "setPremiumRecipients(address[],uint32[])": FunctionFragment;
-    "solace()": FunctionFragment;
     "spend(address,uint256,address)": FunctionFragment;
     "swap(bytes,uint256,uint256)": FunctionFragment;
     "swapRouter()": FunctionFragment;
+    "unpaidRewards(address)": FunctionFragment;
     "unwrap(uint256)": FunctionFragment;
     "weightSum()": FunctionFragment;
     "weth()": FunctionFragment;
+    "withdraw()": FunctionFragment;
     "wrap(uint256)": FunctionFragment;
   };
 
@@ -81,6 +83,7 @@ interface TreasuryInterface extends ethers.utils.Interface {
     functionFragment: "refund",
     values: [string, BigNumberish]
   ): string;
+  encodeFunctionData(functionFragment: "registry", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "routePremiums",
     values?: undefined
@@ -93,7 +96,6 @@ interface TreasuryInterface extends ethers.utils.Interface {
     functionFragment: "setPremiumRecipients",
     values: [string[], BigNumberish[]]
   ): string;
-  encodeFunctionData(functionFragment: "solace", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "spend",
     values: [string, BigNumberish, string]
@@ -107,11 +109,16 @@ interface TreasuryInterface extends ethers.utils.Interface {
     values?: undefined
   ): string;
   encodeFunctionData(
+    functionFragment: "unpaidRewards",
+    values: [string]
+  ): string;
+  encodeFunctionData(
     functionFragment: "unwrap",
     values: [BigNumberish]
   ): string;
   encodeFunctionData(functionFragment: "weightSum", values?: undefined): string;
   encodeFunctionData(functionFragment: "weth", values?: undefined): string;
+  encodeFunctionData(functionFragment: "withdraw", values?: undefined): string;
   encodeFunctionData(functionFragment: "wrap", values: [BigNumberish]): string;
 
   decodeFunctionResult(
@@ -141,6 +148,7 @@ interface TreasuryInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "refund", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "registry", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "routePremiums",
     data: BytesLike
@@ -153,13 +161,17 @@ interface TreasuryInterface extends ethers.utils.Interface {
     functionFragment: "setPremiumRecipients",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(functionFragment: "solace", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "spend", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "swap", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "swapRouter", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "unpaidRewards",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "unwrap", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "weightSum", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "weth", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "withdraw", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "wrap", data: BytesLike): Result;
 
   events: {
@@ -285,9 +297,23 @@ export class Treasury extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    routePremiums(overrides?: Overrides): Promise<ContractTransaction>;
+    registry(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
 
-    "routePremiums()"(overrides?: Overrides): Promise<ContractTransaction>;
+    "registry()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    routePremiums(overrides?: PayableOverrides): Promise<ContractTransaction>;
+
+    "routePremiums()"(
+      overrides?: PayableOverrides
+    ): Promise<ContractTransaction>;
 
     setGovernance(
       _governance: string,
@@ -310,18 +336,6 @@ export class Treasury extends Contract {
       _weights: BigNumberish[],
       overrides?: Overrides
     ): Promise<ContractTransaction>;
-
-    solace(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
-    "solace()"(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
 
     spend(
       _token: string,
@@ -363,6 +377,20 @@ export class Treasury extends Contract {
       0: string;
     }>;
 
+    unpaidRewards(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    "unpaidRewards(address)"(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
     unwrap(
       _amount: BigNumberish,
       overrides?: Overrides
@@ -396,6 +424,10 @@ export class Treasury extends Contract {
     ): Promise<{
       0: string;
     }>;
+
+    withdraw(overrides?: Overrides): Promise<ContractTransaction>;
+
+    "withdraw()"(overrides?: Overrides): Promise<ContractTransaction>;
 
     wrap(
       _amount: BigNumberish,
@@ -472,9 +504,13 @@ export class Treasury extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  routePremiums(overrides?: Overrides): Promise<ContractTransaction>;
+  registry(overrides?: CallOverrides): Promise<string>;
 
-  "routePremiums()"(overrides?: Overrides): Promise<ContractTransaction>;
+  "registry()"(overrides?: CallOverrides): Promise<string>;
+
+  routePremiums(overrides?: PayableOverrides): Promise<ContractTransaction>;
+
+  "routePremiums()"(overrides?: PayableOverrides): Promise<ContractTransaction>;
 
   setGovernance(
     _governance: string,
@@ -497,10 +533,6 @@ export class Treasury extends Contract {
     _weights: BigNumberish[],
     overrides?: Overrides
   ): Promise<ContractTransaction>;
-
-  solace(overrides?: CallOverrides): Promise<string>;
-
-  "solace()"(overrides?: CallOverrides): Promise<string>;
 
   spend(
     _token: string,
@@ -534,6 +566,13 @@ export class Treasury extends Contract {
 
   "swapRouter()"(overrides?: CallOverrides): Promise<string>;
 
+  unpaidRewards(arg0: string, overrides?: CallOverrides): Promise<BigNumber>;
+
+  "unpaidRewards(address)"(
+    arg0: string,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
+
   unwrap(
     _amount: BigNumberish,
     overrides?: Overrides
@@ -551,6 +590,10 @@ export class Treasury extends Contract {
   weth(overrides?: CallOverrides): Promise<string>;
 
   "weth()"(overrides?: CallOverrides): Promise<string>;
+
+  withdraw(overrides?: Overrides): Promise<ContractTransaction>;
+
+  "withdraw()"(overrides?: Overrides): Promise<ContractTransaction>;
 
   wrap(
     _amount: BigNumberish,
@@ -627,6 +670,10 @@ export class Treasury extends Contract {
       overrides?: CallOverrides
     ): Promise<void>;
 
+    registry(overrides?: CallOverrides): Promise<string>;
+
+    "registry()"(overrides?: CallOverrides): Promise<string>;
+
     routePremiums(overrides?: CallOverrides): Promise<void>;
 
     "routePremiums()"(overrides?: CallOverrides): Promise<void>;
@@ -652,10 +699,6 @@ export class Treasury extends Contract {
       _weights: BigNumberish[],
       overrides?: CallOverrides
     ): Promise<void>;
-
-    solace(overrides?: CallOverrides): Promise<string>;
-
-    "solace()"(overrides?: CallOverrides): Promise<string>;
 
     spend(
       _token: string,
@@ -689,6 +732,13 @@ export class Treasury extends Contract {
 
     "swapRouter()"(overrides?: CallOverrides): Promise<string>;
 
+    unpaidRewards(arg0: string, overrides?: CallOverrides): Promise<BigNumber>;
+
+    "unpaidRewards(address)"(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     unwrap(_amount: BigNumberish, overrides?: CallOverrides): Promise<void>;
 
     "unwrap(uint256)"(
@@ -703,6 +753,10 @@ export class Treasury extends Contract {
     weth(overrides?: CallOverrides): Promise<string>;
 
     "weth()"(overrides?: CallOverrides): Promise<string>;
+
+    withdraw(overrides?: CallOverrides): Promise<void>;
+
+    "withdraw()"(overrides?: CallOverrides): Promise<void>;
 
     wrap(_amount: BigNumberish, overrides?: CallOverrides): Promise<void>;
 
@@ -787,9 +841,13 @@ export class Treasury extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    routePremiums(overrides?: Overrides): Promise<BigNumber>;
+    registry(overrides?: CallOverrides): Promise<BigNumber>;
 
-    "routePremiums()"(overrides?: Overrides): Promise<BigNumber>;
+    "registry()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    routePremiums(overrides?: PayableOverrides): Promise<BigNumber>;
+
+    "routePremiums()"(overrides?: PayableOverrides): Promise<BigNumber>;
 
     setGovernance(
       _governance: string,
@@ -812,10 +870,6 @@ export class Treasury extends Contract {
       _weights: BigNumberish[],
       overrides?: Overrides
     ): Promise<BigNumber>;
-
-    solace(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "solace()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     spend(
       _token: string,
@@ -849,6 +903,13 @@ export class Treasury extends Contract {
 
     "swapRouter()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+    unpaidRewards(arg0: string, overrides?: CallOverrides): Promise<BigNumber>;
+
+    "unpaidRewards(address)"(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     unwrap(_amount: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
 
     "unwrap(uint256)"(
@@ -863,6 +924,10 @@ export class Treasury extends Contract {
     weth(overrides?: CallOverrides): Promise<BigNumber>;
 
     "weth()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    withdraw(overrides?: Overrides): Promise<BigNumber>;
+
+    "withdraw()"(overrides?: Overrides): Promise<BigNumber>;
 
     wrap(_amount: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
 
@@ -937,9 +1002,15 @@ export class Treasury extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    routePremiums(overrides?: Overrides): Promise<PopulatedTransaction>;
+    registry(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
-    "routePremiums()"(overrides?: Overrides): Promise<PopulatedTransaction>;
+    "registry()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    routePremiums(overrides?: PayableOverrides): Promise<PopulatedTransaction>;
+
+    "routePremiums()"(
+      overrides?: PayableOverrides
+    ): Promise<PopulatedTransaction>;
 
     setGovernance(
       _governance: string,
@@ -962,10 +1033,6 @@ export class Treasury extends Contract {
       _weights: BigNumberish[],
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
-
-    solace(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    "solace()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     spend(
       _token: string,
@@ -999,6 +1066,16 @@ export class Treasury extends Contract {
 
     "swapRouter()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
+    unpaidRewards(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "unpaidRewards(address)"(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
     unwrap(
       _amount: BigNumberish,
       overrides?: Overrides
@@ -1016,6 +1093,10 @@ export class Treasury extends Contract {
     weth(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "weth()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    withdraw(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    "withdraw()"(overrides?: Overrides): Promise<PopulatedTransaction>;
 
     wrap(
       _amount: BigNumberish,
