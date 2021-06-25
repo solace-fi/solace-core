@@ -19,6 +19,8 @@ export { MasterFactory } from "./MasterFactory";
 export type { Master } from "./Master";
 export { MockErc20Factory } from "./MockErc20Factory";
 export type { MockErc20 } from "./MockErc20";
+export { MockProductFactory } from "./MockProductFactory";
+export type { MockProduct } from "./MockProduct";
 export { MockStrategyFactory } from "./MockStrategyFactory";
 export type { MockStrategy } from "./MockStrategy";
 export { Weth9Factory } from "./Weth9Factory";

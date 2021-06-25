@@ -252,6 +252,12 @@ if(process.env.FORK_NETWORK === "mainnet"){
         expect(await policyManager.totalSupply()).to.equal(1);
         expect(await policyManager.balanceOf(USER1)).to.equal(1);
       })
+      it("cannot buy duplicate policy", async function () {
+        let coverLimit = 1 // cover 0.01% of the position
+        let blocks = threeDays
+        let quote = BN.from(await product.getQuote(USER1, cETH, coverLimit, blocks));
+        await expect(product.buyPolicy(USER1, cETH, coverLimit, blocks, { value: quote })).to.be.revertedWith("duplicate policy");
+      })
     })
 
     describe("submitClaim", function () {

@@ -3,12 +3,14 @@ pragma solidity 0.8.0;
 
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "../interface/IProduct.sol";
 import "../interface/IPolicyManager.sol";
 import "../interface/ITreasury.sol";
+import "../interface/IVault.sol";
+import "../interface/IRegistry.sol";
+import "../interface/IProduct.sol";
 
 /* TODO
- * - treasury refund() function, check transfer to treasury when buyPolicy()
+ * - check transfer to treasury when buyPolicy()
  * - optimize _updateActivePolicies(), store in the expiration order (minheap)
  * - implement updateCoverLimit() so user can adjust exposure as their position changes in value
  * - implement transferPolicy() so a user can transfer their LP tokens somewhere else and update that on their policy
@@ -30,8 +32,7 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
     // Policy Manager
     IPolicyManager public policyManager; // Policy manager ERC721 contract
 
-    // Treasury
-    ITreasury public treasury; // Treasury contract
+    IRegistry public registry;
 
     // Product Details
     address public override coveredPlatform; // a platform contract which locates contracts that are covered by this product
@@ -49,10 +50,16 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
     uint256 public override activeCoverAmount; // current amount covered (in wei)
     uint256[] public override activePolicyIDs;
 
+    mapping(address => bool) public isAuthorizedSigner;
+    address public constant ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+
+    event SignerAdded(address _signer);
+    event SignerRemoved(address _signer);
+    event ClaimSubmitted(uint256 indexed policyId);
 
     constructor (
         IPolicyManager _policyManager,
-        ITreasury _treasury,
+        IRegistry _registry,
         address _coveredPlatform,
         uint256 _maxCoverAmount,
         uint256 _maxCoverPerUser,
@@ -63,7 +70,7 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
     ) {
         governance = msg.sender;
         policyManager = _policyManager;
-        treasury = _treasury;
+        registry = _registry;
         coveredPlatform = _coveredPlatform;
         maxCoverAmount = _maxCoverAmount;
         maxCoverPerUser = _maxCoverPerUser;
@@ -156,6 +163,20 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
         maxCoverPerUser = _maxCoverPerUser;
     }
 
+    function addSigner(address _signer) external {
+        // can only be called by governor
+        require(msg.sender == governance, "!governance");
+        isAuthorizedSigner[_signer] = true;
+        emit SignerAdded(_signer);
+    }
+
+    function removeSigner(address _signer) external {
+        // can only be called by governor
+        require(msg.sender == governance, "!governance");
+        isAuthorizedSigner[_signer] = false;
+        emit SignerRemoved(_signer);
+    }
+
 
     /**** UNIMPLEMENTED FUNCTIONS
     Functions that are only implemented by child product contracts
@@ -235,7 +256,7 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
      */
     function buyPolicy(address _policyholder, address _positionContract, uint256 _coverLimit, uint64 _blocks) external payable override nonReentrant returns (uint256 policyID){
         // check that the policy holder doesn't already have an identical policy
-        //require(!policyManager.hasActivePolicy(address(this), _policyholder, _positionContract), "duplicate policy");
+        require(!policyManager.hasActivePolicy(address(this), _policyholder, _positionContract), "duplicate policy");
 
         // check that the buyer has a position in the covered protocol
         uint256 positionAmount = appraisePosition(_policyholder, _positionContract);
@@ -256,7 +277,7 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
         require(_coverLimit > 0 && _coverLimit <= 1e4, "invalid cover limit percentage");
 
         // transfer premium to the treasury
-        treasury.depositEth{value: premium}();
+        ITreasury(payable(registry.treasury())).depositEth{value: premium}();
 
         // create the policy
         uint64 expirationBlock = uint64(block.number + _blocks);
@@ -324,9 +345,12 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
         require(msg.value >= premium && premium != 0, "insufficient payment or premium is zero");
         if(msg.value > premium) payable(msg.sender).transfer(msg.value - premium);
         // transfer premium to the treasury
-        treasury.depositEth{value: premium}();
+        ITreasury(payable(registry.treasury())).depositEth{value: premium}();
+        // check that the buyer provided valid period
+        uint64 newExpirationBlock = expirationBlock + _blocks;
+        uint64 duration = newExpirationBlock - uint64(block.number);
+        require(duration >= minPeriod && duration <= maxPeriod, "invalid period");
         // update the policy's URI
-        uint64 newExpirationBlock = expirationBlock + _blocks; // TODO: duration check
         policyManager.setPolicyInfo(_policyID, policyholder, positionContract, coverAmount, newExpirationBlock, price);
         emit PolicyExtended(_policyID);
     }
@@ -345,7 +369,7 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
         uint256 refundAmount = blocksLeft * coverAmount * price / 1e12;
         require(refundAmount > cancelFee, "refund amount less than cancelation fee");
         policyManager.burn(_policyID);
-        treasury.refund(msg.sender, refundAmount - cancelFee);
+        ITreasury(payable(registry.treasury())).refund(msg.sender, refundAmount - cancelFee);
         emit PolicyCanceled(_policyID);
     }
 }
