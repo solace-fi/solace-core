@@ -76,12 +76,29 @@ interface IPolicyManager /*is IERC721Enumerable, IERC721Metadata*/ {
     function getPolicyCoverAmount(uint256 _policyID) external view returns (uint256);
     function getPolicyPrice(uint256 _policyID) external view returns (uint24);
     function listPolicies(address _policyholder) external view returns (uint256[] memory);
-    function hasActivePolicy(address _product, address _policyholder, address _positionContract) external view returns (bool);
+    function policyIsActive(uint256 _policyID) external view returns (bool);
+    function policyHasEnded(uint256 _policyID) external view returns (bool);
 
     /*** POLICY MUTATIVE FUNCTIONS
     Functions that create, modify, and destroy policies
     ****/
-    function createPolicy(address _policyholder, address _positionContract, uint256 _coverAmount, uint64 _expirationBlock, uint24 _price) external returns (uint256 tokenID);
+    /**
+     * @notice Creates new ERC721 policy `tokenID` for `to`.
+     * The caller must be a product.
+     * @param _policyholder receiver of new policy token
+     * @param _positionContract contract address where the position is covered
+     * @param _expirationBlock policy expiration block number
+     * @param _coverAmount policy coverage amount (in wei)
+     * @param _price coverage price
+     * @return policyID (aka tokenID)
+     */
+    function createPolicy(
+        address _policyholder,
+        address _positionContract,
+        uint256 _coverAmount,
+        uint64 _expirationBlock,
+        uint24 _price
+    ) external returns (uint256 policyID);
     function setPolicyInfo(uint256 _policyId, address _policyholder, address _positionContract, uint256 _coverAmount, uint64 _expirationBlock, uint24 _price) external;
     function burn(uint256 _tokenId) external;
 }

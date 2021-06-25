@@ -49,6 +49,7 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
     uint256 public override productPolicyCount; // total policy count this product sold
     uint256 public override activeCoverAmount; // current amount covered (in wei)
     uint256[] public override activePolicyIDs;
+    mapping(bytes32 => uint256) private policyHashIdMap;
 
     mapping(address => bool) public isAuthorizedSigner;
     address public constant ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
@@ -224,12 +225,13 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
     /**
      * @notice Updates active policy count and active cover amount
      */
-    function _updateActivePolicies() internal {
-        for (uint256 i=0; i < activePolicyIDs.length; i++) {
-            if (policyManager.getPolicyExpirationBlock(activePolicyIDs[i]) < block.number) {
-                activeCoverAmount -= policyManager.getPolicyCoverAmount(activePolicyIDs[i]);
+
+    function _updateActivePolicies(uint256[] calldata _policyIDs) internal {
+        for (uint256 i = 0; i < _policyIDs.length; i++) {
+            if (policyManager.getPolicyExpirationBlock(_policyIDs[i]) < block.number) {
+                activeCoverAmount -= policyManager.getPolicyCoverAmount(_policyIDs[i]);
                 policyManager.burn(activePolicyIDs[i]);
-                delete activePolicyIDs[i];
+                delete activePolicyIDs[i]; // todo: need to change to enumerable set or map
             }
         }
     }
@@ -239,8 +241,8 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
      * removing expired policies from the policies set and updating active cover amount
      * @return activeCoverAmount and activePolicyCount active covered amount and active policy count as a tuple
      */
-    function updateActivePolicies() external override returns (uint256, uint256){
-        _updateActivePolicies();
+    function updateActivePolicies(uint256[] calldata _policyIDs) external override returns (uint256, uint256) {
+        _updateActivePolicies(_policyIDs);
         return (activeCoverAmount, activePolicyIDs.length);
     }
 
@@ -251,12 +253,13 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
      * @param _blocks length (in blocks) for policy
      * @param _policyholder who's liquidity is being covered by the policy
      * @param _positionContract contract address where the policyholder has a position to be covered
-
      * @return policyID The contract address of the policy
      */
     function buyPolicy(address _policyholder, address _positionContract, uint256 _coverLimit, uint64 _blocks) external payable override nonReentrant returns (uint256 policyID){
         // check that the policy holder doesn't already have an identical policy
-        require(!policyManager.hasActivePolicy(address(this), _policyholder, _positionContract), "duplicate policy");
+        bytes32 policyHash = keccak256(abi.encodePacked(_policyholder, _positionContract));
+        uint256 policyID = policyHashIdMap[policyHash];
+        require(!policyManager.policyIsActive(policyID), "duplicate policy");
 
         // check that the buyer has a position in the covered protocol
         uint256 positionAmount = appraisePosition(_policyholder, _positionContract);
@@ -287,6 +290,7 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
         activeCoverAmount += coverAmount;
         activePolicyIDs.push(policyID);
         productPolicyCount++;
+        policyHashIdMap[policyHash] = policyID;
 
         emit PolicyCreated(policyID);
 

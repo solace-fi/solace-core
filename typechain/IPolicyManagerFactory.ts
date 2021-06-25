@@ -147,7 +147,7 @@ const _abi = [
     outputs: [
       {
         internalType: "uint256",
-        name: "tokenID",
+        name: "policyID",
         type: "uint256",
       },
     ],
@@ -348,35 +348,6 @@ const _abi = [
     inputs: [
       {
         internalType: "address",
-        name: "_product",
-        type: "address",
-      },
-      {
-        internalType: "address",
-        name: "_policyholder",
-        type: "address",
-      },
-      {
-        internalType: "address",
-        name: "_positionContract",
-        type: "address",
-      },
-    ],
-    name: "hasActivePolicy",
-    outputs: [
-      {
-        internalType: "bool",
-        name: "",
-        type: "bool",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "address",
         name: "_policyholder",
         type: "address",
       },
@@ -413,6 +384,44 @@ const _abi = [
         internalType: "uint256",
         name: "",
         type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_policyID",
+        type: "uint256",
+      },
+    ],
+    name: "policyHasEnded",
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_policyID",
+        type: "uint256",
+      },
+    ],
+    name: "policyIsActive",
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool",
       },
     ],
     stateMutability: "view",

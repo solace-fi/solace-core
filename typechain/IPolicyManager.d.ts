@@ -35,10 +35,11 @@ interface IPolicyManagerInterface extends ethers.utils.Interface {
     "getPolicyholder(uint256)": FunctionFragment;
     "getProduct(uint256)": FunctionFragment;
     "governance()": FunctionFragment;
-    "hasActivePolicy(address,address,address)": FunctionFragment;
     "listPolicies(address)": FunctionFragment;
     "newGovernance()": FunctionFragment;
     "numProducts()": FunctionFragment;
+    "policyHasEnded(uint256)": FunctionFragment;
+    "policyIsActive(uint256)": FunctionFragment;
     "productIsActive(address)": FunctionFragment;
     "removeProduct(address)": FunctionFragment;
     "setGovernance(address)": FunctionFragment;
@@ -92,10 +93,6 @@ interface IPolicyManagerInterface extends ethers.utils.Interface {
     values?: undefined
   ): string;
   encodeFunctionData(
-    functionFragment: "hasActivePolicy",
-    values: [string, string, string]
-  ): string;
-  encodeFunctionData(
     functionFragment: "listPolicies",
     values: [string]
   ): string;
@@ -106,6 +103,14 @@ interface IPolicyManagerInterface extends ethers.utils.Interface {
   encodeFunctionData(
     functionFragment: "numProducts",
     values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "policyHasEnded",
+    values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "policyIsActive",
+    values: [BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "productIsActive",
@@ -172,10 +177,6 @@ interface IPolicyManagerInterface extends ethers.utils.Interface {
   decodeFunctionResult(functionFragment: "getProduct", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "governance", data: BytesLike): Result;
   decodeFunctionResult(
-    functionFragment: "hasActivePolicy",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
     functionFragment: "listPolicies",
     data: BytesLike
   ): Result;
@@ -185,6 +186,14 @@ interface IPolicyManagerInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "numProducts",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "policyHasEnded",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "policyIsActive",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -421,24 +430,6 @@ export class IPolicyManager extends Contract {
       0: string;
     }>;
 
-    hasActivePolicy(
-      _product: string,
-      _policyholder: string,
-      _positionContract: string,
-      overrides?: CallOverrides
-    ): Promise<{
-      0: boolean;
-    }>;
-
-    "hasActivePolicy(address,address,address)"(
-      _product: string,
-      _policyholder: string,
-      _positionContract: string,
-      overrides?: CallOverrides
-    ): Promise<{
-      0: boolean;
-    }>;
-
     listPolicies(
       _policyholder: string,
       overrides?: CallOverrides
@@ -475,6 +466,34 @@ export class IPolicyManager extends Contract {
       overrides?: CallOverrides
     ): Promise<{
       0: BigNumber;
+    }>;
+
+    policyHasEnded(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: boolean;
+    }>;
+
+    "policyHasEnded(uint256)"(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: boolean;
+    }>;
+
+    policyIsActive(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: boolean;
+    }>;
+
+    "policyIsActive(uint256)"(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: boolean;
     }>;
 
     productIsActive(
@@ -684,20 +703,6 @@ export class IPolicyManager extends Contract {
 
   "governance()"(overrides?: CallOverrides): Promise<string>;
 
-  hasActivePolicy(
-    _product: string,
-    _policyholder: string,
-    _positionContract: string,
-    overrides?: CallOverrides
-  ): Promise<boolean>;
-
-  "hasActivePolicy(address,address,address)"(
-    _product: string,
-    _policyholder: string,
-    _positionContract: string,
-    overrides?: CallOverrides
-  ): Promise<boolean>;
-
   listPolicies(
     _policyholder: string,
     overrides?: CallOverrides
@@ -715,6 +720,26 @@ export class IPolicyManager extends Contract {
   numProducts(overrides?: CallOverrides): Promise<BigNumber>;
 
   "numProducts()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+  policyHasEnded(
+    _policyID: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
+
+  "policyHasEnded(uint256)"(
+    _policyID: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
+
+  policyIsActive(
+    _policyID: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
+
+  "policyIsActive(uint256)"(
+    _policyID: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
 
   productIsActive(
     _product: string,
@@ -913,20 +938,6 @@ export class IPolicyManager extends Contract {
 
     "governance()"(overrides?: CallOverrides): Promise<string>;
 
-    hasActivePolicy(
-      _product: string,
-      _policyholder: string,
-      _positionContract: string,
-      overrides?: CallOverrides
-    ): Promise<boolean>;
-
-    "hasActivePolicy(address,address,address)"(
-      _product: string,
-      _policyholder: string,
-      _positionContract: string,
-      overrides?: CallOverrides
-    ): Promise<boolean>;
-
     listPolicies(
       _policyholder: string,
       overrides?: CallOverrides
@@ -944,6 +955,26 @@ export class IPolicyManager extends Contract {
     numProducts(overrides?: CallOverrides): Promise<BigNumber>;
 
     "numProducts()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    policyHasEnded(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
+
+    "policyHasEnded(uint256)"(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
+
+    policyIsActive(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
+
+    "policyIsActive(uint256)"(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
 
     productIsActive(
       _product: string,
@@ -1126,20 +1157,6 @@ export class IPolicyManager extends Contract {
 
     "governance()"(overrides?: CallOverrides): Promise<BigNumber>;
 
-    hasActivePolicy(
-      _product: string,
-      _policyholder: string,
-      _positionContract: string,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    "hasActivePolicy(address,address,address)"(
-      _product: string,
-      _policyholder: string,
-      _positionContract: string,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
     listPolicies(
       _policyholder: string,
       overrides?: CallOverrides
@@ -1157,6 +1174,26 @@ export class IPolicyManager extends Contract {
     numProducts(overrides?: CallOverrides): Promise<BigNumber>;
 
     "numProducts()"(overrides?: CallOverrides): Promise<BigNumber>;
+
+    policyHasEnded(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "policyHasEnded(uint256)"(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    policyIsActive(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "policyIsActive(uint256)"(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
     productIsActive(
       _product: string,
@@ -1333,20 +1370,6 @@ export class IPolicyManager extends Contract {
 
     "governance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
-    hasActivePolicy(
-      _product: string,
-      _policyholder: string,
-      _positionContract: string,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    "hasActivePolicy(address,address,address)"(
-      _product: string,
-      _policyholder: string,
-      _positionContract: string,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
     listPolicies(
       _policyholder: string,
       overrides?: CallOverrides
@@ -1364,6 +1387,26 @@ export class IPolicyManager extends Contract {
     numProducts(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "numProducts()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    policyHasEnded(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "policyHasEnded(uint256)"(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    policyIsActive(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "policyIsActive(uint256)"(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
 
     productIsActive(
       _product: string,

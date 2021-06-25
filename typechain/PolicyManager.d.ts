@@ -39,14 +39,15 @@ interface PolicyManagerInterface extends ethers.utils.Interface {
     "getPolicyholder(uint256)": FunctionFragment;
     "getProduct(uint256)": FunctionFragment;
     "governance()": FunctionFragment;
-    "hasActivePolicy(address,address,address)": FunctionFragment;
     "isApprovedForAll(address,address)": FunctionFragment;
     "listPolicies(address)": FunctionFragment;
     "name()": FunctionFragment;
     "newGovernance()": FunctionFragment;
     "numProducts()": FunctionFragment;
     "ownerOf(uint256)": FunctionFragment;
-    "policySearchMap(address,address,address)": FunctionFragment;
+    "policyHasEnded(uint256)": FunctionFragment;
+    "policyInfo(uint256)": FunctionFragment;
+    "policyIsActive(uint256)": FunctionFragment;
     "productIsActive(address)": FunctionFragment;
     "removeProduct(address)": FunctionFragment;
     "safeTransferFrom(address,address,uint256)": FunctionFragment;
@@ -123,10 +124,6 @@ interface PolicyManagerInterface extends ethers.utils.Interface {
     values?: undefined
   ): string;
   encodeFunctionData(
-    functionFragment: "hasActivePolicy",
-    values: [string, string, string]
-  ): string;
-  encodeFunctionData(
     functionFragment: "isApprovedForAll",
     values: [string, string]
   ): string;
@@ -148,8 +145,16 @@ interface PolicyManagerInterface extends ethers.utils.Interface {
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
-    functionFragment: "policySearchMap",
-    values: [string, string, string]
+    functionFragment: "policyHasEnded",
+    values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "policyInfo",
+    values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "policyIsActive",
+    values: [BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "productIsActive",
@@ -263,10 +268,6 @@ interface PolicyManagerInterface extends ethers.utils.Interface {
   decodeFunctionResult(functionFragment: "getProduct", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "governance", data: BytesLike): Result;
   decodeFunctionResult(
-    functionFragment: "hasActivePolicy",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
     functionFragment: "isApprovedForAll",
     data: BytesLike
   ): Result;
@@ -285,7 +286,12 @@ interface PolicyManagerInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(functionFragment: "ownerOf", data: BytesLike): Result;
   decodeFunctionResult(
-    functionFragment: "policySearchMap",
+    functionFragment: "policyHasEnded",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "policyInfo", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "policyIsActive",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -616,24 +622,6 @@ export class PolicyManager extends Contract {
       0: string;
     }>;
 
-    hasActivePolicy(
-      _product: string,
-      _policyholder: string,
-      _positionContract: string,
-      overrides?: CallOverrides
-    ): Promise<{
-      0: boolean;
-    }>;
-
-    "hasActivePolicy(address,address,address)"(
-      _product: string,
-      _policyholder: string,
-      _positionContract: string,
-      overrides?: CallOverrides
-    ): Promise<{
-      0: boolean;
-    }>;
-
     isApprovedForAll(
       owner: string,
       operator: string,
@@ -716,22 +704,68 @@ export class PolicyManager extends Contract {
       0: string;
     }>;
 
-    policySearchMap(
-      arg0: string,
-      arg1: string,
-      arg2: string,
+    policyHasEnded(
+      _policyID: BigNumberish,
       overrides?: CallOverrides
     ): Promise<{
-      0: BigNumber;
+      0: boolean;
     }>;
 
-    "policySearchMap(address,address,address)"(
-      arg0: string,
-      arg1: string,
-      arg2: string,
+    "policyHasEnded(uint256)"(
+      _policyID: BigNumberish,
       overrides?: CallOverrides
     ): Promise<{
+      0: boolean;
+    }>;
+
+    policyInfo(
+      arg0: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      coverAmount: BigNumber;
+      expirationBlock: BigNumber;
+      price: number;
+      policyholder: string;
+      product: string;
+      positionContract: string;
       0: BigNumber;
+      1: BigNumber;
+      2: number;
+      3: string;
+      4: string;
+      5: string;
+    }>;
+
+    "policyInfo(uint256)"(
+      arg0: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      coverAmount: BigNumber;
+      expirationBlock: BigNumber;
+      price: number;
+      policyholder: string;
+      product: string;
+      positionContract: string;
+      0: BigNumber;
+      1: BigNumber;
+      2: number;
+      3: string;
+      4: string;
+      5: string;
+    }>;
+
+    policyIsActive(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: boolean;
+    }>;
+
+    "policyIsActive(uint256)"(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: boolean;
     }>;
 
     productIsActive(
@@ -1115,20 +1149,6 @@ export class PolicyManager extends Contract {
 
   "governance()"(overrides?: CallOverrides): Promise<string>;
 
-  hasActivePolicy(
-    _product: string,
-    _policyholder: string,
-    _positionContract: string,
-    overrides?: CallOverrides
-  ): Promise<boolean>;
-
-  "hasActivePolicy(address,address,address)"(
-    _product: string,
-    _policyholder: string,
-    _positionContract: string,
-    overrides?: CallOverrides
-  ): Promise<boolean>;
-
   isApprovedForAll(
     owner: string,
     operator: string,
@@ -1170,19 +1190,61 @@ export class PolicyManager extends Contract {
     overrides?: CallOverrides
   ): Promise<string>;
 
-  policySearchMap(
-    arg0: string,
-    arg1: string,
-    arg2: string,
+  policyHasEnded(
+    _policyID: BigNumberish,
     overrides?: CallOverrides
-  ): Promise<BigNumber>;
+  ): Promise<boolean>;
 
-  "policySearchMap(address,address,address)"(
-    arg0: string,
-    arg1: string,
-    arg2: string,
+  "policyHasEnded(uint256)"(
+    _policyID: BigNumberish,
     overrides?: CallOverrides
-  ): Promise<BigNumber>;
+  ): Promise<boolean>;
+
+  policyInfo(
+    arg0: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<{
+    coverAmount: BigNumber;
+    expirationBlock: BigNumber;
+    price: number;
+    policyholder: string;
+    product: string;
+    positionContract: string;
+    0: BigNumber;
+    1: BigNumber;
+    2: number;
+    3: string;
+    4: string;
+    5: string;
+  }>;
+
+  "policyInfo(uint256)"(
+    arg0: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<{
+    coverAmount: BigNumber;
+    expirationBlock: BigNumber;
+    price: number;
+    policyholder: string;
+    product: string;
+    positionContract: string;
+    0: BigNumber;
+    1: BigNumber;
+    2: number;
+    3: string;
+    4: string;
+    5: string;
+  }>;
+
+  policyIsActive(
+    _policyID: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
+
+  "policyIsActive(uint256)"(
+    _policyID: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
 
   productIsActive(
     _product: string,
@@ -1512,20 +1574,6 @@ export class PolicyManager extends Contract {
 
     "governance()"(overrides?: CallOverrides): Promise<string>;
 
-    hasActivePolicy(
-      _product: string,
-      _policyholder: string,
-      _positionContract: string,
-      overrides?: CallOverrides
-    ): Promise<boolean>;
-
-    "hasActivePolicy(address,address,address)"(
-      _product: string,
-      _policyholder: string,
-      _positionContract: string,
-      overrides?: CallOverrides
-    ): Promise<boolean>;
-
     isApprovedForAll(
       owner: string,
       operator: string,
@@ -1567,19 +1615,61 @@ export class PolicyManager extends Contract {
       overrides?: CallOverrides
     ): Promise<string>;
 
-    policySearchMap(
-      arg0: string,
-      arg1: string,
-      arg2: string,
+    policyHasEnded(
+      _policyID: BigNumberish,
       overrides?: CallOverrides
-    ): Promise<BigNumber>;
+    ): Promise<boolean>;
 
-    "policySearchMap(address,address,address)"(
-      arg0: string,
-      arg1: string,
-      arg2: string,
+    "policyHasEnded(uint256)"(
+      _policyID: BigNumberish,
       overrides?: CallOverrides
-    ): Promise<BigNumber>;
+    ): Promise<boolean>;
+
+    policyInfo(
+      arg0: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      coverAmount: BigNumber;
+      expirationBlock: BigNumber;
+      price: number;
+      policyholder: string;
+      product: string;
+      positionContract: string;
+      0: BigNumber;
+      1: BigNumber;
+      2: number;
+      3: string;
+      4: string;
+      5: string;
+    }>;
+
+    "policyInfo(uint256)"(
+      arg0: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      coverAmount: BigNumber;
+      expirationBlock: BigNumber;
+      price: number;
+      policyholder: string;
+      product: string;
+      positionContract: string;
+      0: BigNumber;
+      1: BigNumber;
+      2: number;
+      3: string;
+      4: string;
+      5: string;
+    }>;
+
+    policyIsActive(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
+
+    "policyIsActive(uint256)"(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
 
     productIsActive(
       _product: string,
@@ -1911,20 +2001,6 @@ export class PolicyManager extends Contract {
 
     "governance()"(overrides?: CallOverrides): Promise<BigNumber>;
 
-    hasActivePolicy(
-      _product: string,
-      _policyholder: string,
-      _positionContract: string,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    "hasActivePolicy(address,address,address)"(
-      _product: string,
-      _policyholder: string,
-      _positionContract: string,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
     isApprovedForAll(
       owner: string,
       operator: string,
@@ -1969,17 +2045,33 @@ export class PolicyManager extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    policySearchMap(
-      arg0: string,
-      arg1: string,
-      arg2: string,
+    policyHasEnded(
+      _policyID: BigNumberish,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    "policySearchMap(address,address,address)"(
-      arg0: string,
-      arg1: string,
-      arg2: string,
+    "policyHasEnded(uint256)"(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    policyInfo(
+      arg0: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "policyInfo(uint256)"(
+      arg0: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    policyIsActive(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "policyIsActive(uint256)"(
+      _policyID: BigNumberish,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
@@ -2295,20 +2387,6 @@ export class PolicyManager extends Contract {
 
     "governance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
-    hasActivePolicy(
-      _product: string,
-      _policyholder: string,
-      _positionContract: string,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    "hasActivePolicy(address,address,address)"(
-      _product: string,
-      _policyholder: string,
-      _positionContract: string,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
     isApprovedForAll(
       owner: string,
       operator: string,
@@ -2353,17 +2431,33 @@ export class PolicyManager extends Contract {
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
-    policySearchMap(
-      arg0: string,
-      arg1: string,
-      arg2: string,
+    policyHasEnded(
+      _policyID: BigNumberish,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
-    "policySearchMap(address,address,address)"(
-      arg0: string,
-      arg1: string,
-      arg2: string,
+    "policyHasEnded(uint256)"(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    policyInfo(
+      arg0: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "policyInfo(uint256)"(
+      arg0: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    policyIsActive(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "policyIsActive(uint256)"(
+      _policyID: BigNumberish,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 

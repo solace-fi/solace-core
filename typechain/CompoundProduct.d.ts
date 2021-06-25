@@ -59,7 +59,7 @@ interface CompoundProductInterface extends ethers.utils.Interface {
     "setMinPeriod(uint64)": FunctionFragment;
     "setPrice(uint24)": FunctionFragment;
     "submitClaim(uint256,address,uint256,address,uint256,uint256,bytes)": FunctionFragment;
-    "updateActivePolicies()": FunctionFragment;
+    "updateActivePolicies(uint256[])": FunctionFragment;
   };
 
   encodeFunctionData(
@@ -195,7 +195,7 @@ interface CompoundProductInterface extends ethers.utils.Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "updateActivePolicies",
-    values?: undefined
+    values: [BigNumberish[]]
   ): string;
 
   decodeFunctionResult(
@@ -779,9 +779,13 @@ export class CompoundProduct extends Contract {
       overrides?: PayableOverrides
     ): Promise<ContractTransaction>;
 
-    updateActivePolicies(overrides?: Overrides): Promise<ContractTransaction>;
+    updateActivePolicies(
+      _policyIDs: BigNumberish[],
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
 
-    "updateActivePolicies()"(
+    "updateActivePolicies(uint256[])"(
+      _policyIDs: BigNumberish[],
       overrides?: Overrides
     ): Promise<ContractTransaction>;
   };
@@ -1069,9 +1073,15 @@ export class CompoundProduct extends Contract {
     overrides?: PayableOverrides
   ): Promise<ContractTransaction>;
 
-  updateActivePolicies(overrides?: Overrides): Promise<ContractTransaction>;
+  updateActivePolicies(
+    _policyIDs: BigNumberish[],
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
 
-  "updateActivePolicies()"(overrides?: Overrides): Promise<ContractTransaction>;
+  "updateActivePolicies(uint256[])"(
+    _policyIDs: BigNumberish[],
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
 
   callStatic: {
     ETH_ADDRESS(overrides?: CallOverrides): Promise<string>;
@@ -1352,13 +1362,15 @@ export class CompoundProduct extends Contract {
     ): Promise<void>;
 
     updateActivePolicies(
+      _policyIDs: BigNumberish[],
       overrides?: CallOverrides
     ): Promise<{
       0: BigNumber;
       1: BigNumber;
     }>;
 
-    "updateActivePolicies()"(
+    "updateActivePolicies(uint256[])"(
+      _policyIDs: BigNumberish[],
       overrides?: CallOverrides
     ): Promise<{
       0: BigNumber;
@@ -1660,9 +1672,15 @@ export class CompoundProduct extends Contract {
       overrides?: PayableOverrides
     ): Promise<BigNumber>;
 
-    updateActivePolicies(overrides?: Overrides): Promise<BigNumber>;
+    updateActivePolicies(
+      _policyIDs: BigNumberish[],
+      overrides?: Overrides
+    ): Promise<BigNumber>;
 
-    "updateActivePolicies()"(overrides?: Overrides): Promise<BigNumber>;
+    "updateActivePolicies(uint256[])"(
+      _policyIDs: BigNumberish[],
+      overrides?: Overrides
+    ): Promise<BigNumber>;
   };
 
   populateTransaction: {
@@ -1964,9 +1982,13 @@ export class CompoundProduct extends Contract {
       overrides?: PayableOverrides
     ): Promise<PopulatedTransaction>;
 
-    updateActivePolicies(overrides?: Overrides): Promise<PopulatedTransaction>;
+    updateActivePolicies(
+      _policyIDs: BigNumberish[],
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
 
-    "updateActivePolicies()"(
+    "updateActivePolicies(uint256[])"(
+      _policyIDs: BigNumberish[],
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
   };

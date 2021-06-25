@@ -43,10 +43,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
     }
 
     // policy id => policy info
-    mapping(uint256 => PolicyInfo) private _policyInfo;
-
-    // product => policy holder => position contract => policy id
-    mapping(address => mapping(address => mapping(address => uint256))) public policySearchMap;
+    mapping(uint256 => PolicyInfo) public policyInfo;
 
     /**
      * @notice Constructs the Policy Deployer ERC721 Token contract.
@@ -132,43 +129,43 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
 
     function getPolicyInfo(uint256 _policyID) external view override returns (address policyholder, address product, address positionContract, uint256 coverAmount, uint64 expirationBlock, uint24 price){
         require(_exists(_policyID), "query for nonexistent token");
-        PolicyInfo memory info = _policyInfo[_policyID];
+        PolicyInfo memory info = policyInfo[_policyID];
         return (info.policyholder, info.product, info.positionContract, info.coverAmount, info.expirationBlock, info.price);
     }
 
     function getPolicyholder(uint256 _policyID) external view override returns (address){
         require(_exists(_policyID), "query for nonexistent token");
-        return _policyInfo[_policyID].policyholder;
+        return policyInfo[_policyID].policyholder;
     }
 
     function getPolicyProduct(uint256 _policyID) external view override returns (address){
         require(_exists(_policyID), "query for nonexistent token");
-        return _policyInfo[_policyID].product;
+        return policyInfo[_policyID].product;
     }
 
     function getPolicyPositionContract(uint256 _policyID) external view override returns (address){
         require(_exists(_policyID), "query for nonexistent token");
-        return _policyInfo[_policyID].positionContract;
+        return policyInfo[_policyID].positionContract;
     }
 
     function getPolicyExpirationBlock(uint256 _policyID) external view override returns (uint64) {
         require(_exists(_policyID), "query for nonexistent token");
-        return _policyInfo[_policyID].expirationBlock;
+        return policyInfo[_policyID].expirationBlock;
     }
 
     function getPolicyIsActive(uint256 _policyID) external view returns (bool) {
         //require(_exists(_policyID), "query for nonexistent token");
-        return _policyInfo[_policyID].expirationBlock >= block.number;
+        return policyInfo[_policyID].expirationBlock >= block.number;
     }
 
     function getPolicyCoverAmount(uint256 _policyID) external view override returns (uint256) {
         require(_exists(_policyID), "query for nonexistent token");
-        return _policyInfo[_policyID].coverAmount;
+        return policyInfo[_policyID].coverAmount;
     }
 
     function getPolicyPrice(uint256 _policyID) external view override returns (uint24){
         require(_exists(_policyID), "query for nonexistent token");
-        return _policyInfo[_policyID].price;
+        return policyInfo[_policyID].price;
     }
 
     function listPolicies(address _policyholder) external view override returns (uint256[] memory tokenIDs) {
@@ -180,10 +177,14 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
         return tokenIDs;
     }
 
+    function policyIsActive(uint256 _policyID) external view override returns (bool) {
+        return policyInfo[_policyID].expirationBlock >= block.number;
+    }
 
-    function hasActivePolicy(address _product, address _policyholder, address _positionContract) external view override returns (bool) {
-      uint256 policyId = policySearchMap[_product][_policyholder][_positionContract];
-      return _policyInfo[policyId].expirationBlock >= block.number;
+    // returns false if never existed either
+    function policyHasEnded(uint256 _policyID) external view override returns (bool) {
+        uint64 expBlock = policyInfo[_policyID].expirationBlock;
+        return expBlock > 0 && expBlock < block.number;
     }
 
 
@@ -199,7 +200,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
      * @param _expirationBlock policy expiration block number
      * @param _coverAmount policy coverage amount (in wei)
      * @param _price coverage price
-     * @return tokenID (aka policyID)
+     * @return policyID (aka tokenID)
      */
     function createPolicy(
         address _policyholder,
@@ -207,9 +208,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
         uint256 _coverAmount,
         uint64 _expirationBlock,
         uint24 _price
-        )
-        external override returns (uint256 tokenID)
-    {
+    ) external override returns (uint256 policyID) {
         require(products.contains(msg.sender), "product !active");
         PolicyInfo memory info = PolicyInfo({
             policyholder: _policyholder,
@@ -219,12 +218,13 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
             coverAmount: _coverAmount,
             price: _price
         });
-        tokenID = ++totalPolicyCount; // starts at 1
-        _policyInfo[tokenID] = info;
-        policySearchMap[msg.sender][_policyholder][_positionContract] = tokenID;
-        _mint(_policyholder, tokenID);
-        emit PolicyCreated(tokenID);
-        return tokenID;
+        policyID = ++totalPolicyCount; // starts at 1
+        policyInfo[policyID] = info;
+        //policyHashIdMap[_policyHash] = policyID;
+        //policySearchMap[msg.sender][_policyholder][_positionContract] = tokenID;
+        _mint(_policyholder, policyID);
+        emit PolicyCreated(policyID);
+        return policyID;
     }
 
     /**
@@ -248,7 +248,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
         external override
     {
         require(_exists(_policyId), "query for nonexistent token");
-        require(_policyInfo[_policyId].product == msg.sender, "wrong product");
+        require(policyInfo[_policyId].product == msg.sender, "wrong product");
         PolicyInfo memory info = PolicyInfo({
             policyholder: _policyholder,
             product: msg.sender,
@@ -257,7 +257,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
             coverAmount: _coverAmount,
             price: _price
         });
-        _policyInfo[_policyId] = info;
+        policyInfo[_policyId] = info;
         //policySearchMap[msg.sender][_policyholder][_positionContract] = tokenID;
     }
 
@@ -268,12 +268,13 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
      */
     function burn(uint256 _policyId) external override {
         //require(products.contains(msg.sender), "product !active");
-        //require(_policyInfo[_policyId].product == msg.sender || _policyInfo[_policyId].policyholder == msg.sender, "not owner and not authorized");
+        //require(policyInfo[_policyId].product == msg.sender || policyInfo[_policyId].policyholder == msg.sender, "not owner and not authorized");
         _burn(_policyId);
-        address policyholder = _policyInfo[_policyId].policyholder;
-        address positionContract = _policyInfo[_policyId].positionContract;
-        delete _policyInfo[_policyId];
-        delete policySearchMap[msg.sender][policyholder][positionContract];
+        address policyholder = policyInfo[_policyId].policyholder;
+        address positionContract = policyInfo[_policyId].positionContract;
+        delete policyInfo[_policyId];
+        //delete policySearchMap[msg.sender][policyholder][positionContract];
+        //delete policyHashIdMap ?
         emit PolicyBurned(_policyId);
     }
 
@@ -303,7 +304,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
     ****/
 
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
-        return _encodeTokenURI(_policyInfo[tokenId]);
+        return _encodeTokenURI(policyInfo[tokenId]);
     }
 
 }

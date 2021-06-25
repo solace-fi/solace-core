@@ -576,7 +576,13 @@ const _abi = [
     type: "function",
   },
   {
-    inputs: [],
+    inputs: [
+      {
+        internalType: "uint256[]",
+        name: "_policyIDs",
+        type: "uint256[]",
+      },
+    ],
     name: "updateActivePolicies",
     outputs: [
       {

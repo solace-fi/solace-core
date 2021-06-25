@@ -56,7 +56,7 @@ interface YearnV2ProductInterface extends ethers.utils.Interface {
     "setMaxPeriod(uint64)": FunctionFragment;
     "setMinPeriod(uint64)": FunctionFragment;
     "setPrice(uint24)": FunctionFragment;
-    "updateActivePolicies()": FunctionFragment;
+    "updateActivePolicies(uint256[])": FunctionFragment;
     "yregistry()": FunctionFragment;
   };
 
@@ -173,7 +173,7 @@ interface YearnV2ProductInterface extends ethers.utils.Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "updateActivePolicies",
-    values?: undefined
+    values: [BigNumberish[]]
   ): string;
   encodeFunctionData(functionFragment: "yregistry", values?: undefined): string;
 
@@ -703,9 +703,13 @@ export class YearnV2Product extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    updateActivePolicies(overrides?: Overrides): Promise<ContractTransaction>;
+    updateActivePolicies(
+      _policyIDs: BigNumberish[],
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
 
-    "updateActivePolicies()"(
+    "updateActivePolicies(uint256[])"(
+      _policyIDs: BigNumberish[],
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
@@ -969,9 +973,15 @@ export class YearnV2Product extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  updateActivePolicies(overrides?: Overrides): Promise<ContractTransaction>;
+  updateActivePolicies(
+    _policyIDs: BigNumberish[],
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
 
-  "updateActivePolicies()"(overrides?: Overrides): Promise<ContractTransaction>;
+  "updateActivePolicies(uint256[])"(
+    _policyIDs: BigNumberish[],
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
 
   yregistry(overrides?: CallOverrides): Promise<string>;
 
@@ -1220,13 +1230,15 @@ export class YearnV2Product extends Contract {
     ): Promise<void>;
 
     updateActivePolicies(
+      _policyIDs: BigNumberish[],
       overrides?: CallOverrides
     ): Promise<{
       0: BigNumber;
       1: BigNumber;
     }>;
 
-    "updateActivePolicies()"(
+    "updateActivePolicies(uint256[])"(
+      _policyIDs: BigNumberish[],
       overrides?: CallOverrides
     ): Promise<{
       0: BigNumber;
@@ -1496,9 +1508,15 @@ export class YearnV2Product extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    updateActivePolicies(overrides?: Overrides): Promise<BigNumber>;
+    updateActivePolicies(
+      _policyIDs: BigNumberish[],
+      overrides?: Overrides
+    ): Promise<BigNumber>;
 
-    "updateActivePolicies()"(overrides?: Overrides): Promise<BigNumber>;
+    "updateActivePolicies(uint256[])"(
+      _policyIDs: BigNumberish[],
+      overrides?: Overrides
+    ): Promise<BigNumber>;
 
     yregistry(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -1768,9 +1786,13 @@ export class YearnV2Product extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    updateActivePolicies(overrides?: Overrides): Promise<PopulatedTransaction>;
+    updateActivePolicies(
+      _policyIDs: BigNumberish[],
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
 
-    "updateActivePolicies()"(
+    "updateActivePolicies(uint256[])"(
+      _policyIDs: BigNumberish[],
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
