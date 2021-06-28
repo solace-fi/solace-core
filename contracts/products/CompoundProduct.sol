@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.0;
 
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 import "../interface/IExchangeQuoter.sol";
-import "../BaseProduct.sol";
+import "./BaseProduct.sol";
 
 
 interface IComptroller {
@@ -16,33 +18,36 @@ interface ICToken {
     function underlying() external view returns (address);
 }
 
-contract CompoundProduct is BaseProduct {
+contract CompoundProduct is BaseProduct, EIP712 {
+    using SafeERC20 for IERC20;
 
     IComptroller public comptroller;
     IExchangeQuoter public quoter;
 
+    bytes32 private immutable _EXCHANGE_TYPEHASH = keccak256("CompoundProductExchange(uint256 policyId,address tokenIn,uint256 amountIn,address tokenOut,uint256 amountOut,uint256 deadline)");
+
     constructor (
         IPolicyManager _policyManager,
-        ITreasury _treasury,
+        IRegistry _registry,
         address _coveredPlatform,
-        address _claimsAdjuster,
-        uint256 _price,
-        uint256 _cancelFee,
-        uint256 _minPeriod,
-        uint256 _maxPeriod,
         uint256 _maxCoverAmount,
+        uint256 _maxCoverPerUser,
+        uint64 _minPeriod,
+        uint64 _maxPeriod,
+        uint64 _cancelFee,
+        uint24 _price,
         address _quoter
     ) BaseProduct(
         _policyManager,
-        _treasury,
+        _registry,
         _coveredPlatform,
-        _claimsAdjuster,
-        _price,
-        _cancelFee,
+        _maxCoverAmount,
+        _maxCoverPerUser,
         _minPeriod,
         _maxPeriod,
-        _maxCoverAmount
-    ) {
+        _cancelFee,
+        _price
+    ) EIP712("Solace.fi-CompoundProduct", "1") {
         comptroller = IComptroller(_coveredPlatform);
         quoter = IExchangeQuoter(_quoter);
     }
@@ -83,6 +88,42 @@ contract CompoundProduct is BaseProduct {
         balance = balance * exchangeRate / 1e18;
         if(compareStrings(token.symbol(), "cETH")) return balance;
         return quoter.tokenToEth(token.underlying(), balance);
+    }
+
+    // TODO: allow for multiple tokens in and out
+    function submitClaim(
+        uint256 policyId,
+        address tokenIn,
+        uint256 amountIn,
+        address tokenOut,
+        uint256 amountOut,
+        uint256 deadline,
+        bytes calldata signature
+    ) external payable {
+        // TODO: check for duplicate claim
+        // validate inputs
+        // solhint-disable-next-line not-rely-on-time
+        require(block.timestamp <= deadline, "expired deadline");
+        (address policyholder, address product, , , , ) = policyManager.getPolicyInfo(policyId);
+        require(policyholder == msg.sender, "!policyholder"); // TODO: allow submit by paclas?
+        require(product == address(this), "wrong product");
+        // verify signature
+        {
+        bytes32 structHash = keccak256(abi.encode(_EXCHANGE_TYPEHASH, policyId, tokenIn, amountIn, tokenOut, amountOut, deadline));
+        bytes32 hash = _hashTypedDataV4(structHash);
+        address signer = ECDSA.recover(hash, signature);
+        require(isAuthorizedSigner[signer], "invalid signature");
+        }
+        // pull tokens
+        if(tokenIn == ETH_ADDRESS) {
+            require(msg.value >= amountIn);
+            ITreasury(payable(registry.treasury())).depositEth{value: msg.value}();
+        }
+        else IERC20(tokenIn).safeTransferFrom(msg.sender, registry.treasury(), amountIn);
+        // submit claim to ClaimsEscrow
+        // TODO: only allowed tokenOut is eth, allow for others
+        IVault(registry.vault()).processClaim(policyholder, amountOut);
+        emit ClaimSubmitted(policyId);
     }
 
     /**

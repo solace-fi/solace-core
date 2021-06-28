@@ -17,7 +17,6 @@ export async function import_artifacts() {
 
   // solace imports
   let artifact_dir = process.env.USE_PROCESSED_FILES === "true" ? "../../artifacts/contracts_processed" : "../../artifacts/contracts";
-  artifacts.ClaimsAdjustor = await import(`${artifact_dir}/ClaimsAdjustor.sol/ClaimsAdjustor.json`);
   artifacts.ClaimsEscrow = await import(`${artifact_dir}/ClaimsEscrow.sol/ClaimsEscrow.json`);
   artifacts.CpFarm = await import(`${artifact_dir}/CpFarm.sol/CpFarm.json`);
   artifacts.LpAppraisor = await import(`${artifact_dir}/LpAppraisor.sol/LpAppraisor.json`);
@@ -45,6 +44,9 @@ export async function import_artifacts() {
   artifacts.UniswapV3Pool = await import("@uniswap/v3-core/artifacts/contracts/UniswapV3Pool.sol/UniswapV3Pool.json");
   artifacts.SwapRouter = await import("@uniswap/v3-periphery/artifacts/contracts/SwapRouter.sol/SwapRouter.json");
   artifacts.NonfungiblePositionManager = await import("@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json");
+
+  // compound imports
+  artifacts.ICETH = await import(`${artifact_dir}/interface/ICEth.sol/ICEth.json`);
 
   return artifacts;
 }

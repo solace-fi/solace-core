@@ -23,19 +23,6 @@ const _abi = [
       {
         indexed: false,
         internalType: "address",
-        name: "_claimsAdjustor",
-        type: "address",
-      },
-    ],
-    name: "ClaimsAdjustorSet",
-    type: "event",
-  },
-  {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: false,
-        internalType: "address",
         name: "_claimsEscrow",
         type: "address",
       },
@@ -88,24 +75,11 @@ const _abi = [
       {
         indexed: false,
         internalType: "address",
-        name: "_product",
+        name: "_policyManager",
         type: "address",
       },
     ],
-    name: "ProductAdded",
-    type: "event",
-  },
-  {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: false,
-        internalType: "address",
-        name: "_product",
-        type: "address",
-      },
-    ],
-    name: "ProductRemoved",
+    name: "PolicyManagerSet",
     type: "event",
   },
   {
@@ -155,53 +129,8 @@ const _abi = [
     type: "function",
   },
   {
-    inputs: [
-      {
-        internalType: "address",
-        name: "_product",
-        type: "address",
-      },
-    ],
-    name: "addProduct",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "claimsAdjustor",
-    outputs: [
-      {
-        internalType: "address",
-        name: "",
-        type: "address",
-      },
-    ],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
     inputs: [],
     name: "claimsEscrow",
-    outputs: [
-      {
-        internalType: "address",
-        name: "",
-        type: "address",
-      },
-    ],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "_productNum",
-        type: "uint256",
-      },
-    ],
-    name: "getProduct",
     outputs: [
       {
         internalType: "address",
@@ -226,25 +155,6 @@ const _abi = [
     type: "function",
   },
   {
-    inputs: [
-      {
-        internalType: "address",
-        name: "_product",
-        type: "address",
-      },
-    ],
-    name: "isProduct",
-    outputs: [
-      {
-        internalType: "bool",
-        name: "",
-        type: "bool",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
     inputs: [],
     name: "locker",
     outputs: [
@@ -254,7 +164,7 @@ const _abi = [
         type: "address",
       },
     ],
-    stateMutability: "nonpayable",
+    stateMutability: "view",
     type: "function",
   },
   {
@@ -267,7 +177,7 @@ const _abi = [
         type: "address",
       },
     ],
-    stateMutability: "nonpayable",
+    stateMutability: "view",
     type: "function",
   },
   {
@@ -285,41 +195,15 @@ const _abi = [
   },
   {
     inputs: [],
-    name: "numProducts",
+    name: "policyManager",
     outputs: [
       {
-        internalType: "uint256",
+        internalType: "address",
         name: "",
-        type: "uint256",
+        type: "address",
       },
     ],
     stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "address",
-        name: "_product",
-        type: "address",
-      },
-    ],
-    name: "removeProduct",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "address",
-        name: "_claimsAdjustor",
-        type: "address",
-      },
-    ],
-    name: "setClaimsAdjustor",
-    outputs: [],
-    stateMutability: "nonpayable",
     type: "function",
   },
   {
@@ -378,6 +262,19 @@ const _abi = [
     inputs: [
       {
         internalType: "address",
+        name: "_policyManager",
+        type: "address",
+      },
+    ],
+    name: "setPolicyManager",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
         name: "_solace",
         type: "address",
       },
@@ -423,7 +320,7 @@ const _abi = [
         type: "address",
       },
     ],
-    stateMutability: "nonpayable",
+    stateMutability: "view",
     type: "function",
   },
   {
@@ -436,7 +333,7 @@ const _abi = [
         type: "address",
       },
     ],
-    stateMutability: "nonpayable",
+    stateMutability: "view",
     type: "function",
   },
   {
@@ -449,7 +346,7 @@ const _abi = [
         type: "address",
       },
     ],
-    stateMutability: "nonpayable",
+    stateMutability: "view",
     type: "function",
   },
 ];

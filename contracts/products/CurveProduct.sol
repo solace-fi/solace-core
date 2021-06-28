@@ -3,7 +3,7 @@ pragma solidity 0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../interface/IExchangeQuoter.sol";
-import "../BaseProduct.sol";
+import "./BaseProduct.sol";
 
 
 interface ICurveAddressProvider {
@@ -28,25 +28,25 @@ contract CurveProduct is BaseProduct {
 
     constructor (
         IPolicyManager _policyManager,
-        ITreasury _treasury,
+        IRegistry _registry,
         address _coveredPlatform,
-        address _claimsAdjuster,
-        uint256 _price,
-        uint256 _cancelFee,
-        uint256 _minPeriod,
-        uint256 _maxPeriod,
         uint256 _maxCoverAmount,
+        uint256 _maxCoverPerUser,
+        uint64 _minPeriod,
+        uint64 _maxPeriod,
+        uint64 _cancelFee,
+        uint24 _price,
         address _quoter
     ) BaseProduct(
         _policyManager,
-        _treasury,
+        _registry,
         _coveredPlatform,
-        _claimsAdjuster,
-        _price,
-        _cancelFee,
+        _maxCoverAmount,
+        _maxCoverPerUser,
         _minPeriod,
         _maxPeriod,
-        _maxCoverAmount
+        _cancelFee,
+        _price
     ) {
         addressProvider = ICurveAddressProvider(_coveredPlatform);
         quoter = IExchangeQuoter(_quoter);

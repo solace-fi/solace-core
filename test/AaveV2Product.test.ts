@@ -30,6 +30,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
     const maxPeriod = 45150; // this is about 1 week from https://ycharts.c om/indicators/ethereum_blocks_per_day
     const threeDays = 19350;
     const maxCoverAmount = BN.from("1000000000000000000000"); // 1000 Ether in wei
+    const maxCoverPerUser = BN.from("10000000000000000000"); // 10 Ether in wei
     const cancelFee = BN.from("100000000000000000"); // 0.1 Ether in wei
     const price = 11044; // 2.60%/yr
 
@@ -48,7 +49,10 @@ if(process.env.FORK_NETWORK === "mainnet"){
       // deploy policy manager
       policyManager = (await deployContract(
         deployer,
-        artifacts.PolicyManager
+        artifacts.PolicyManager,
+        [
+          deployer.address
+        ]
       )) as PolicyManager;
 
       // deploy exchange quoter
@@ -97,12 +101,12 @@ if(process.env.FORK_NETWORK === "mainnet"){
           policyManager.address,
           treasury.address,
           AAVE_DATA_PROVIDER,
-          ZERO_ADDRESS,
-          price,
-          cancelFee,
+          maxCoverAmount,
+          maxCoverPerUser,
           minPeriod,
           maxPeriod,
-          maxCoverAmount,
+          cancelFee,
+          price,
           quoter.address
         ]
       )) as unknown as AaveV2Product;

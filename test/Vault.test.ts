@@ -8,7 +8,7 @@ const provider = waffle.provider;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Vault, MockStrategy, Weth9, Registry, Master, Solace, ClaimsAdjustor, ClaimsEscrow } from "../typechain";
+import { Vault, MockStrategy, Weth9, Registry, Master, Solace, ClaimsEscrow, PolicyManager } from "../typechain";
 
 describe("Vault", function () {
     let artifacts: ArtifactImports;
@@ -20,10 +20,10 @@ describe("Vault", function () {
     let registry: Registry;
     let master: Master;
     let solace: Solace;
-    let claimsAdjustor: ClaimsAdjustor;
     let claimsEscrow: ClaimsEscrow;
+    let policyManager: PolicyManager;
 
-    const [owner, newOwner, depositor1, depositor2, claimant] = provider.getWallets();
+    const [owner, newOwner, depositor1, depositor2, claimant, mockProduct] = provider.getWallets();
     const tokenName = "Solace CP Token";
     const tokenSymbol = "SCP";
     const testDepositAmount = BN.from("10");
@@ -113,19 +113,23 @@ describe("Vault", function () {
         claimsEscrow = (await deployContract(
             owner,
             artifacts.ClaimsEscrow,
-            [registry.address]
+            [owner.address, registry.address]
         )) as ClaimsEscrow;
 
-        claimsAdjustor = (await deployContract(
-            owner,
-            artifacts.ClaimsAdjustor,
-            [registry.address]
-        )) as ClaimsAdjustor;
+        // deploy policy manager
+        policyManager = (await deployContract(
+          owner,
+          artifacts.PolicyManager,
+          [
+            owner.address
+          ]
+        )) as PolicyManager;
 
         await registry.setVault(vault.address);
         await registry.setMaster(master.address);
-        await registry.setClaimsAdjustor(claimsAdjustor.address);
         await registry.setClaimsEscrow(claimsEscrow.address);
+        await registry.setPolicyManager(policyManager.address);
+        await policyManager.addProduct(mockProduct.address);
     });
 
     describe("deployment", function () {
@@ -837,18 +841,18 @@ describe("Vault", function () {
         beforeEach("deposit", async function () {
             await vault.connect(depositor1).deposit({ value: testDepositAmount});
         });
-        it("should revert if not called by the claimsAdjustor", async function () {
-            await expect(vault.connect(owner).processClaim(claimant.address, testClaimAmount)).to.be.revertedWith("!claimsAdjustor");
+        it("should revert if not called by a product", async function () {
+            await expect(vault.connect(owner).processClaim(claimant.address, testClaimAmount)).to.be.revertedWith("!product");
         });
         it("should transfer ETH to the ClaimsEscrow contract", async function () {
-            await expect(() => claimsAdjustor.connect(owner).approveClaim(claimant.address, testClaimAmount)).to.changeEtherBalance(claimsEscrow, testClaimAmount);
+            await expect(() => vault.connect(mockProduct).processClaim(claimant.address, testClaimAmount)).to.changeEtherBalance(claimsEscrow, testClaimAmount);
         });
         it("should emit ClaimProcessed event after function logic is successful", async function () {
-            await expect(await claimsAdjustor.connect(owner).approveClaim(claimant.address, testClaimAmount)).to.emit(vault, "ClaimProcessed").withArgs(0, claimant.address, testClaimAmount);
+            await expect(await vault.connect(mockProduct).processClaim(claimant.address, testClaimAmount)).to.emit(vault, "ClaimProcessed").withArgs(1, claimant.address, testClaimAmount);
         });
         it("should revert if vault is in emergency shutdown", async function () {
             await vault.connect(owner).setEmergencyShutdown(true);
-            await expect(claimsAdjustor.connect(owner).approveClaim(claimant.address, testClaimAmount)).to.be.revertedWith("cannot process claim when vault is in emergency shutdown");
+            await expect(vault.connect(mockProduct).processClaim(claimant.address, testClaimAmount)).to.be.revertedWith("cannot process claim when vault is in emergency shutdown");
         })
     });
 

@@ -22,6 +22,19 @@ const _abi = [
     inputs: [
       {
         indexed: false,
+        internalType: "address",
+        name: "_newGovernance",
+        type: "address",
+      },
+    ],
+    name: "GovernanceTransferred",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: false,
         internalType: "uint256",
         name: "policyID",
         type: "uint256",
@@ -55,6 +68,45 @@ const _abi = [
     ],
     name: "PolicyExtended",
     type: "event",
+  },
+  {
+    inputs: [],
+    name: "acceptGovernance",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "activeCoverAmount",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "i",
+        type: "uint256",
+      },
+    ],
+    name: "activePolicyIDs",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
   },
   {
     inputs: [
@@ -98,9 +150,9 @@ const _abi = [
         type: "uint256",
       },
       {
-        internalType: "uint256",
+        internalType: "uint64",
         name: "_blocks",
-        type: "uint256",
+        type: "uint64",
       },
     ],
     name: "buyPolicy",
@@ -112,6 +164,19 @@ const _abi = [
       },
     ],
     stateMutability: "payable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "cancelFee",
+    outputs: [
+      {
+        internalType: "uint64",
+        name: "",
+        type: "uint64",
+      },
+    ],
+    stateMutability: "view",
     type: "function",
   },
   {
@@ -128,6 +193,19 @@ const _abi = [
     type: "function",
   },
   {
+    inputs: [],
+    name: "coveredPlatform",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
     inputs: [
       {
         internalType: "uint256",
@@ -135,9 +213,9 @@ const _abi = [
         type: "uint256",
       },
       {
-        internalType: "uint256",
+        internalType: "uint64",
         name: "_blocks",
-        type: "uint256",
+        type: "uint64",
       },
     ],
     name: "extendPolicy",
@@ -163,9 +241,9 @@ const _abi = [
         type: "uint256",
       },
       {
-        internalType: "uint256",
+        internalType: "uint64",
         name: "_blocks",
-        type: "uint256",
+        type: "uint64",
       },
     ],
     name: "getQuote",
@@ -180,27 +258,118 @@ const _abi = [
     type: "function",
   },
   {
-    inputs: [
+    inputs: [],
+    name: "governance",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "maxCoverAmount",
+    outputs: [
       {
         internalType: "uint256",
-        name: "_cancelFee",
+        name: "",
         type: "uint256",
       },
     ],
-    name: "setCancelFee",
-    outputs: [],
-    stateMutability: "nonpayable",
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "maxCoverPerUser",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "maxPeriod",
+    outputs: [
+      {
+        internalType: "uint64",
+        name: "",
+        type: "uint64",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "minPeriod",
+    outputs: [
+      {
+        internalType: "uint64",
+        name: "",
+        type: "uint64",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "newGovernance",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "price",
+    outputs: [
+      {
+        internalType: "uint24",
+        name: "",
+        type: "uint24",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "productPolicyCount",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
     type: "function",
   },
   {
     inputs: [
       {
-        internalType: "address",
-        name: "_claimsAdjuster",
-        type: "address",
+        internalType: "uint64",
+        name: "_cancelFee",
+        type: "uint64",
       },
     ],
-    name: "setClaimsAdjuster",
+    name: "setCancelFee",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -235,8 +404,21 @@ const _abi = [
     inputs: [
       {
         internalType: "uint256",
-        name: "_maxPeriod",
+        name: "_maxCoverPerUser",
         type: "uint256",
+      },
+    ],
+    name: "setMaxCoverPerUser",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint64",
+        name: "_maxPeriod",
+        type: "uint64",
       },
     ],
     name: "setMaxPeriod",
@@ -247,9 +429,9 @@ const _abi = [
   {
     inputs: [
       {
-        internalType: "uint256",
+        internalType: "uint64",
         name: "_minPeriod",
-        type: "uint256",
+        type: "uint64",
       },
     ],
     name: "setMinPeriod",
@@ -260,9 +442,9 @@ const _abi = [
   {
     inputs: [
       {
-        internalType: "uint256",
+        internalType: "uint24",
         name: "_price",
-        type: "uint256",
+        type: "uint24",
       },
     ],
     name: "setPrice",
@@ -271,7 +453,13 @@ const _abi = [
     type: "function",
   },
   {
-    inputs: [],
+    inputs: [
+      {
+        internalType: "uint256[]",
+        name: "_policyIDs",
+        type: "uint256[]",
+      },
+    ],
     name: "updateActivePolicies",
     outputs: [
       {
