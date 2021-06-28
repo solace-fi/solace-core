@@ -4,27 +4,28 @@ pragma solidity 0.8.0;
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./interface/ISwapRouter.sol";
-import "./SOLACE.sol";
 import "contracts/mocks/WETH9.sol";
+import "./interface/IRegistry.sol";
+import "./interface/IPolicyManager.sol";
 import "./interface/ITreasury.sol";
 
 
 /**
  * @title Treasury
- * @author solace.
+ * @author solace.fi
  * @notice The war chest of Castle Solace.
  */
 contract Treasury is ITreasury, ReentrancyGuard {
     using SafeERC20 for IERC20;
-
-    /// @notice Native SOLACE Token.
-    SOLACE public solace;
 
     /// @notice Governor.
     address public override governance;
 
     /// @notice Governance to take over.
     address public override newGovernance;
+
+    /// @notice Registry
+    IRegistry public registry;
 
     /// @notice Address of Uniswap router.
     ISwapRouter public swapRouter;
@@ -38,18 +39,21 @@ contract Treasury is ITreasury, ReentrancyGuard {
     uint32[] public recipientWeights;
     uint32 public weightSum;
 
+    /// @notice The amount of eth that a user is owed if any.
+    mapping(address => uint256) public override unpaidRewards;
+
     /**
      * @notice Constructs the treasury contract.
      * @param _governance Address of the governor.
-     * @param _solace Address of the solace token.
      * @param _swapRouter Address of uniswap router.
      * @param _weth Address of wrapped ether.
+     * @param _registry Address of registry.
      */
-    constructor(address _governance, SOLACE _solace, address _swapRouter, address _weth) public {
+    constructor(address _governance, address _swapRouter, address _weth, address _registry) public {
         governance = _governance;
-        solace = _solace;
         swapRouter = ISwapRouter(_swapRouter);
         weth = WETH9(payable(_weth));
+        registry = IRegistry(_registry);
     }
 
     /**
@@ -223,7 +227,41 @@ contract Treasury is ITreasury, ReentrancyGuard {
     }
 
     // used in Product
-    function refund(address _user, uint256 _amount) external override {
-      // TODO: implement
+    function refund(address _user, uint256 _amount) external override nonReentrant {
+        // check if from active product
+        require(IPolicyManager(registry.policyManager()).productIsActive(msg.sender), "!product");
+        transferEth(_user, _amount);
+    }
+
+    /**
+     * @notice Pull any unpaid rewards.
+     */
+    function withdraw() external override nonReentrant {
+        transferEth(msg.sender, 0);
+    }
+
+    /**
+     * @notice Transfers a user some eth.
+     * Also adds on their unpaid rewards, and stores new unpaid rewards.
+     * @param _user The user to pay.
+     * @param _amount The amount to pay _before_ unpaid rewards.
+     */
+    function transferEth(address _user, uint256 _amount) internal {
+        // account for unpaid rewards
+        _amount += unpaidRewards[_user];
+        if(_amount == 0) return;
+        // unwrap weth if necessary
+        if(address(this).balance < _amount) {
+            uint256 diff = _amount - address(this).balance;
+            weth.withdraw(min(weth.balanceOf(address(this)), diff));
+        }
+        // send eth
+        uint256 transferAmount = min(address(this).balance, _amount);
+        unpaidRewards[_user] = _amount - transferAmount;
+        payable(_user).transfer(transferAmount);
+    }
+
+    function min(uint256 _a, uint256 _b) internal pure returns (uint256 _c) {
+        return _a <= _b ? _a : _b;
     }
 }

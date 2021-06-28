@@ -16,13 +16,13 @@ interface IRegistry {
     function newGovernance() external view returns (address);
 
     /// Protocol contract address getters
-    function master() external returns (address);
-    function vault() external returns (address);
-    function treasury() external returns (address);
-    function solace() external returns (address);
-    function locker() external returns (address);
-    function claimsAdjustor() external returns (address);
-    function claimsEscrow() external returns (address);
+    function master() external view returns (address);
+    function vault() external view returns (address);
+    function treasury() external view returns (address);
+    function solace() external view returns (address);
+    function locker() external view returns (address);
+    function claimsEscrow() external view returns (address);
+    function policyManager() external view returns (address);
 
     // events
     // Emitted when Governance is set
@@ -37,14 +37,10 @@ interface IRegistry {
     event TreasurySet(address _treasury);
     // Emitted when Locker is set
     event LockerSet(address _locker);
-    // Emitted when ClaimsAdjustor is set
-    event ClaimsAdjustorSet(address _claimsAdjustor);
     // Emitted when ClaimsEscrow is set
     event ClaimsEscrowSet(address _claimsEscrow);
-    // Emitted when a Product is added
-    event ProductAdded(address _product);
-    // Emitted when a Product is removed
-    event ProductRemoved(address _product);
+    // Emitted when PolicyManager is set
+    event PolicyManagerSet(address _policyManager);
 
     /**
      * @notice Transfers the governance role to a new governor.
@@ -94,51 +90,17 @@ interface IRegistry {
      */
     function setLocker(address _locker) external;
 
-        /**
-     * @notice Sets the Claims Adjustor contract.
-     * Can only be called by the current governor.
-     * @param _claimsAdjustor The Claims Adjustor address.
-     */
-    function setClaimsAdjustor(address _claimsAdjustor) external;
-
     /**
      * @notice Sets the Claims Escrow contract.
      * Can only be called by the current governor.
-     * @param _claimsEscrow The sClaims Escrow address.
+     * @param _claimsEscrow The Claims Escrow address.
      */
     function setClaimsEscrow(address _claimsEscrow) external;
 
     /**
-     * @notice Adds a new product.
+     * @notice Sets the PolicyManager contract.
      * Can only be called by the current governor.
-     * @param _product The product to add.
+     * @param _policyManager The PolicyManager address.
      */
-    function addProduct(address _product) external;
-
-    /**
-     * @notice Removes a product.
-     * Can only be called by the current governor.
-     * @param _product The product to remove.
-     */
-    function removeProduct(address _product) external;
-
-    /**
-     * @notice Returns the number of products.
-     * @return The number of products.
-     */
-    function numProducts() external view returns (uint256);
-
-    /**
-     * @notice Returns the product at the given index.
-     * @param _productNum The index to query.
-     * @return The address of the product.
-     */
-    function getProduct(uint256 _productNum) external view returns (address);
-
-    /**
-     * @notice Returns true if the given address is a product.
-     * @param _product The address to query.
-     * @return True if the address is a product.
-     */
-    function isProduct(address _product) external view returns (bool);
+    function setPolicyManager(address _policyManager) external;
 }

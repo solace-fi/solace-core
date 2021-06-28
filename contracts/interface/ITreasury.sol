@@ -9,12 +9,6 @@ pragma solidity 0.8.0;
  */
 interface ITreasury {
 
-    /// @notice Governance.
-    function governance() external view returns (address);
-
-    /// @notice Governance to take over.
-    function newGovernance() external view returns (address);
-
     // events
     // Emitted when eth is deposited
     event EthDeposited(uint256 _amount);
@@ -34,6 +28,12 @@ interface ITreasury {
      * Fallback function. Deposits eth.
      */
     fallback () external payable;
+
+    /// @notice Governance.
+    function governance() external view returns (address);
+
+    /// @notice Governance to take over.
+    function newGovernance() external view returns (address);
 
     /**
      * @notice Transfers the governance role to a new governor.
@@ -110,4 +110,16 @@ interface ITreasury {
 
     // used in Product
     function refund(address _user, uint256 _amount) external;
+
+    /**
+     * @notice The amount of eth that a user is owed if any.
+     * @param _user The user.
+     * @return The amount.
+     */
+    function unpaidRewards(address _user) external view returns (uint256);
+
+    /**
+     * @notice Pull any unpaid rewards.
+     */
+    function withdraw() external;
 }

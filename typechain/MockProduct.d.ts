@@ -21,7 +21,7 @@ import { BytesLike } from "@ethersproject/bytes";
 import { Listener, Provider } from "@ethersproject/providers";
 import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
-interface CompoundProductInterface extends ethers.utils.Interface {
+interface MockProductInterface extends ethers.utils.Interface {
   functions: {
     "ETH_ADDRESS()": FunctionFragment;
     "acceptGovernance()": FunctionFragment;
@@ -32,10 +32,12 @@ interface CompoundProductInterface extends ethers.utils.Interface {
     "buyPolicy(address,address,uint256,uint64)": FunctionFragment;
     "cancelFee()": FunctionFragment;
     "cancelPolicy(uint256)": FunctionFragment;
-    "comptroller()": FunctionFragment;
     "coveredPlatform()": FunctionFragment;
     "extendPolicy(uint256,uint64)": FunctionFragment;
+    "getPolicyExpiration(address)": FunctionFragment;
+    "getPolicyLimit(address)": FunctionFragment;
     "getQuote(address,address,uint256,uint64)": FunctionFragment;
+    "getTotalCovered()": FunctionFragment;
     "governance()": FunctionFragment;
     "isAuthorizedSigner(address)": FunctionFragment;
     "maxCoverAmount()": FunctionFragment;
@@ -46,19 +48,15 @@ interface CompoundProductInterface extends ethers.utils.Interface {
     "policyManager()": FunctionFragment;
     "price()": FunctionFragment;
     "productPolicyCount()": FunctionFragment;
-    "quoter()": FunctionFragment;
     "registry()": FunctionFragment;
     "removeSigner(address)": FunctionFragment;
     "setCancelFee(uint64)": FunctionFragment;
-    "setComptroller(address)": FunctionFragment;
-    "setExchangeQuoter(address)": FunctionFragment;
     "setGovernance(address)": FunctionFragment;
     "setMaxCoverAmount(uint256)": FunctionFragment;
     "setMaxCoverPerUser(uint256)": FunctionFragment;
     "setMaxPeriod(uint64)": FunctionFragment;
     "setMinPeriod(uint64)": FunctionFragment;
     "setPrice(uint24)": FunctionFragment;
-    "submitClaim(uint256,address,uint256,address,uint256,uint256,bytes)": FunctionFragment;
     "updateActivePolicies(uint256[])": FunctionFragment;
   };
 
@@ -93,10 +91,6 @@ interface CompoundProductInterface extends ethers.utils.Interface {
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
-    functionFragment: "comptroller",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
     functionFragment: "coveredPlatform",
     values?: undefined
   ): string;
@@ -105,8 +99,20 @@ interface CompoundProductInterface extends ethers.utils.Interface {
     values: [BigNumberish, BigNumberish]
   ): string;
   encodeFunctionData(
+    functionFragment: "getPolicyExpiration",
+    values: [string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "getPolicyLimit",
+    values: [string]
+  ): string;
+  encodeFunctionData(
     functionFragment: "getQuote",
     values: [string, string, BigNumberish, BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "getTotalCovered",
+    values?: undefined
   ): string;
   encodeFunctionData(
     functionFragment: "governance",
@@ -139,7 +145,6 @@ interface CompoundProductInterface extends ethers.utils.Interface {
     functionFragment: "productPolicyCount",
     values?: undefined
   ): string;
-  encodeFunctionData(functionFragment: "quoter", values?: undefined): string;
   encodeFunctionData(functionFragment: "registry", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "removeSigner",
@@ -148,14 +153,6 @@ interface CompoundProductInterface extends ethers.utils.Interface {
   encodeFunctionData(
     functionFragment: "setCancelFee",
     values: [BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "setComptroller",
-    values: [string]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "setExchangeQuoter",
-    values: [string]
   ): string;
   encodeFunctionData(
     functionFragment: "setGovernance",
@@ -180,18 +177,6 @@ interface CompoundProductInterface extends ethers.utils.Interface {
   encodeFunctionData(
     functionFragment: "setPrice",
     values: [BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "submitClaim",
-    values: [
-      BigNumberish,
-      string,
-      BigNumberish,
-      string,
-      BigNumberish,
-      BigNumberish,
-      BytesLike
-    ]
   ): string;
   encodeFunctionData(
     functionFragment: "updateActivePolicies",
@@ -226,10 +211,6 @@ interface CompoundProductInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "comptroller",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
     functionFragment: "coveredPlatform",
     data: BytesLike
   ): Result;
@@ -237,7 +218,19 @@ interface CompoundProductInterface extends ethers.utils.Interface {
     functionFragment: "extendPolicy",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(
+    functionFragment: "getPolicyExpiration",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "getPolicyLimit",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "getQuote", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "getTotalCovered",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "governance", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "isAuthorizedSigner",
@@ -266,7 +259,6 @@ interface CompoundProductInterface extends ethers.utils.Interface {
     functionFragment: "productPolicyCount",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(functionFragment: "quoter", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "registry", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "removeSigner",
@@ -274,14 +266,6 @@ interface CompoundProductInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "setCancelFee",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "setComptroller",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "setExchangeQuoter",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -306,10 +290,6 @@ interface CompoundProductInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(functionFragment: "setPrice", data: BytesLike): Result;
   decodeFunctionResult(
-    functionFragment: "submitClaim",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
     functionFragment: "updateActivePolicies",
     data: BytesLike
   ): Result;
@@ -333,7 +313,7 @@ interface CompoundProductInterface extends ethers.utils.Interface {
   getEvent(nameOrSignatureOrTopic: "SignerRemoved"): EventFragment;
 }
 
-export class CompoundProduct extends Contract {
+export class MockProduct extends Contract {
   connect(signerOrProvider: Signer | Provider | string): this;
   attach(addressOrName: string): this;
   deployed(): Promise<this>;
@@ -344,7 +324,7 @@ export class CompoundProduct extends Contract {
   removeAllListeners(eventName: EventFilter | string): this;
   removeListener(eventName: any, listener: Listener): this;
 
-  interface: CompoundProductInterface;
+  interface: MockProductInterface;
 
   functions: {
     ETH_ADDRESS(
@@ -400,7 +380,7 @@ export class CompoundProduct extends Contract {
     ): Promise<ContractTransaction>;
 
     appraisePosition(
-      _policyholder: string,
+      _buyer: string,
       _positionContract: string,
       overrides?: CallOverrides
     ): Promise<{
@@ -409,7 +389,7 @@ export class CompoundProduct extends Contract {
     }>;
 
     "appraisePosition(address,address)"(
-      _policyholder: string,
+      _buyer: string,
       _positionContract: string,
       overrides?: CallOverrides
     ): Promise<{
@@ -455,18 +435,6 @@ export class CompoundProduct extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    comptroller(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
-    "comptroller()"(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
     coveredPlatform(
       overrides?: CallOverrides
     ): Promise<{
@@ -491,6 +459,38 @@ export class CompoundProduct extends Contract {
       overrides?: PayableOverrides
     ): Promise<ContractTransaction>;
 
+    getPolicyExpiration(
+      _policy: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      expirationDate: BigNumber;
+      0: BigNumber;
+    }>;
+
+    "getPolicyExpiration(address)"(
+      _policy: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      expirationDate: BigNumber;
+      0: BigNumber;
+    }>;
+
+    getPolicyLimit(
+      _policy: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      coverLimit: BigNumber;
+      0: BigNumber;
+    }>;
+
+    "getPolicyLimit(address)"(
+      _policy: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      coverLimit: BigNumber;
+      0: BigNumber;
+    }>;
+
     getQuote(
       _policyholder: string,
       _positionContract: string,
@@ -508,6 +508,20 @@ export class CompoundProduct extends Contract {
       _blocks: BigNumberish,
       overrides?: CallOverrides
     ): Promise<{
+      0: BigNumber;
+    }>;
+
+    getTotalCovered(
+      overrides?: CallOverrides
+    ): Promise<{
+      coveredAmount: BigNumber;
+      0: BigNumber;
+    }>;
+
+    "getTotalCovered()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      coveredAmount: BigNumber;
       0: BigNumber;
     }>;
 
@@ -633,18 +647,6 @@ export class CompoundProduct extends Contract {
       0: BigNumber;
     }>;
 
-    quoter(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
-    "quoter()"(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: string;
-    }>;
-
     registry(
       overrides?: CallOverrides
     ): Promise<{
@@ -674,26 +676,6 @@ export class CompoundProduct extends Contract {
 
     "setCancelFee(uint64)"(
       _cancelFee: BigNumberish,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
-    setComptroller(
-      _comptroller: string,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
-    "setComptroller(address)"(
-      _comptroller: string,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
-    setExchangeQuoter(
-      _quoter: string,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
-    "setExchangeQuoter(address)"(
-      _quoter: string,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
@@ -757,28 +739,6 @@ export class CompoundProduct extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    submitClaim(
-      policyId: BigNumberish,
-      tokenIn: string,
-      amountIn: BigNumberish,
-      tokenOut: string,
-      amountOut: BigNumberish,
-      deadline: BigNumberish,
-      signature: BytesLike,
-      overrides?: PayableOverrides
-    ): Promise<ContractTransaction>;
-
-    "submitClaim(uint256,address,uint256,address,uint256,uint256,bytes)"(
-      policyId: BigNumberish,
-      tokenIn: string,
-      amountIn: BigNumberish,
-      tokenOut: string,
-      amountOut: BigNumberish,
-      deadline: BigNumberish,
-      signature: BytesLike,
-      overrides?: PayableOverrides
-    ): Promise<ContractTransaction>;
-
     updateActivePolicies(
       _policyIDs: BigNumberish[],
       overrides?: Overrides
@@ -823,13 +783,13 @@ export class CompoundProduct extends Contract {
   ): Promise<ContractTransaction>;
 
   appraisePosition(
-    _policyholder: string,
+    _buyer: string,
     _positionContract: string,
     overrides?: CallOverrides
   ): Promise<BigNumber>;
 
   "appraisePosition(address,address)"(
-    _policyholder: string,
+    _buyer: string,
     _positionContract: string,
     overrides?: CallOverrides
   ): Promise<BigNumber>;
@@ -864,10 +824,6 @@ export class CompoundProduct extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  comptroller(overrides?: CallOverrides): Promise<string>;
-
-  "comptroller()"(overrides?: CallOverrides): Promise<string>;
-
   coveredPlatform(overrides?: CallOverrides): Promise<string>;
 
   "coveredPlatform()"(overrides?: CallOverrides): Promise<string>;
@@ -884,6 +840,26 @@ export class CompoundProduct extends Contract {
     overrides?: PayableOverrides
   ): Promise<ContractTransaction>;
 
+  getPolicyExpiration(
+    _policy: string,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
+
+  "getPolicyExpiration(address)"(
+    _policy: string,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
+
+  getPolicyLimit(
+    _policy: string,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
+
+  "getPolicyLimit(address)"(
+    _policy: string,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
+
   getQuote(
     _policyholder: string,
     _positionContract: string,
@@ -899,6 +875,10 @@ export class CompoundProduct extends Contract {
     _blocks: BigNumberish,
     overrides?: CallOverrides
   ): Promise<BigNumber>;
+
+  getTotalCovered(overrides?: CallOverrides): Promise<BigNumber>;
+
+  "getTotalCovered()"(overrides?: CallOverrides): Promise<BigNumber>;
 
   governance(overrides?: CallOverrides): Promise<string>;
 
@@ -943,10 +923,6 @@ export class CompoundProduct extends Contract {
 
   "productPolicyCount()"(overrides?: CallOverrides): Promise<BigNumber>;
 
-  quoter(overrides?: CallOverrides): Promise<string>;
-
-  "quoter()"(overrides?: CallOverrides): Promise<string>;
-
   registry(overrides?: CallOverrides): Promise<string>;
 
   "registry()"(overrides?: CallOverrides): Promise<string>;
@@ -968,26 +944,6 @@ export class CompoundProduct extends Contract {
 
   "setCancelFee(uint64)"(
     _cancelFee: BigNumberish,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
-  setComptroller(
-    _comptroller: string,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
-  "setComptroller(address)"(
-    _comptroller: string,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
-  setExchangeQuoter(
-    _quoter: string,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
-  "setExchangeQuoter(address)"(
-    _quoter: string,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
@@ -1051,28 +1007,6 @@ export class CompoundProduct extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  submitClaim(
-    policyId: BigNumberish,
-    tokenIn: string,
-    amountIn: BigNumberish,
-    tokenOut: string,
-    amountOut: BigNumberish,
-    deadline: BigNumberish,
-    signature: BytesLike,
-    overrides?: PayableOverrides
-  ): Promise<ContractTransaction>;
-
-  "submitClaim(uint256,address,uint256,address,uint256,uint256,bytes)"(
-    policyId: BigNumberish,
-    tokenIn: string,
-    amountIn: BigNumberish,
-    tokenOut: string,
-    amountOut: BigNumberish,
-    deadline: BigNumberish,
-    signature: BytesLike,
-    overrides?: PayableOverrides
-  ): Promise<ContractTransaction>;
-
   updateActivePolicies(
     _policyIDs: BigNumberish[],
     overrides?: Overrides
@@ -1114,13 +1048,13 @@ export class CompoundProduct extends Contract {
     ): Promise<void>;
 
     appraisePosition(
-      _policyholder: string,
+      _buyer: string,
       _positionContract: string,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
     "appraisePosition(address,address)"(
-      _policyholder: string,
+      _buyer: string,
       _positionContract: string,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
@@ -1155,10 +1089,6 @@ export class CompoundProduct extends Contract {
       overrides?: CallOverrides
     ): Promise<void>;
 
-    comptroller(overrides?: CallOverrides): Promise<string>;
-
-    "comptroller()"(overrides?: CallOverrides): Promise<string>;
-
     coveredPlatform(overrides?: CallOverrides): Promise<string>;
 
     "coveredPlatform()"(overrides?: CallOverrides): Promise<string>;
@@ -1175,6 +1105,26 @@ export class CompoundProduct extends Contract {
       overrides?: CallOverrides
     ): Promise<void>;
 
+    getPolicyExpiration(
+      _policy: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "getPolicyExpiration(address)"(
+      _policy: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    getPolicyLimit(
+      _policy: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "getPolicyLimit(address)"(
+      _policy: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     getQuote(
       _policyholder: string,
       _positionContract: string,
@@ -1190,6 +1140,10 @@ export class CompoundProduct extends Contract {
       _blocks: BigNumberish,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
+
+    getTotalCovered(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "getTotalCovered()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     governance(overrides?: CallOverrides): Promise<string>;
 
@@ -1237,10 +1191,6 @@ export class CompoundProduct extends Contract {
 
     "productPolicyCount()"(overrides?: CallOverrides): Promise<BigNumber>;
 
-    quoter(overrides?: CallOverrides): Promise<string>;
-
-    "quoter()"(overrides?: CallOverrides): Promise<string>;
-
     registry(overrides?: CallOverrides): Promise<string>;
 
     "registry()"(overrides?: CallOverrides): Promise<string>;
@@ -1259,26 +1209,6 @@ export class CompoundProduct extends Contract {
 
     "setCancelFee(uint64)"(
       _cancelFee: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    setComptroller(
-      _comptroller: string,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    "setComptroller(address)"(
-      _comptroller: string,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    setExchangeQuoter(
-      _quoter: string,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    "setExchangeQuoter(address)"(
-      _quoter: string,
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -1336,28 +1266,6 @@ export class CompoundProduct extends Contract {
 
     "setPrice(uint24)"(
       _price: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    submitClaim(
-      policyId: BigNumberish,
-      tokenIn: string,
-      amountIn: BigNumberish,
-      tokenOut: string,
-      amountOut: BigNumberish,
-      deadline: BigNumberish,
-      signature: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    "submitClaim(uint256,address,uint256,address,uint256,uint256,bytes)"(
-      policyId: BigNumberish,
-      tokenIn: string,
-      amountIn: BigNumberish,
-      tokenOut: string,
-      amountOut: BigNumberish,
-      deadline: BigNumberish,
-      signature: BytesLike,
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -1425,13 +1333,13 @@ export class CompoundProduct extends Contract {
     ): Promise<BigNumber>;
 
     appraisePosition(
-      _policyholder: string,
+      _buyer: string,
       _positionContract: string,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
     "appraisePosition(address,address)"(
-      _policyholder: string,
+      _buyer: string,
       _positionContract: string,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
@@ -1466,10 +1374,6 @@ export class CompoundProduct extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    comptroller(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "comptroller()"(overrides?: CallOverrides): Promise<BigNumber>;
-
     coveredPlatform(overrides?: CallOverrides): Promise<BigNumber>;
 
     "coveredPlatform()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -1484,6 +1388,26 @@ export class CompoundProduct extends Contract {
       _policyID: BigNumberish,
       _blocks: BigNumberish,
       overrides?: PayableOverrides
+    ): Promise<BigNumber>;
+
+    getPolicyExpiration(
+      _policy: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "getPolicyExpiration(address)"(
+      _policy: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    getPolicyLimit(
+      _policy: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "getPolicyLimit(address)"(
+      _policy: string,
+      overrides?: CallOverrides
     ): Promise<BigNumber>;
 
     getQuote(
@@ -1501,6 +1425,10 @@ export class CompoundProduct extends Contract {
       _blocks: BigNumberish,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
+
+    getTotalCovered(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "getTotalCovered()"(overrides?: CallOverrides): Promise<BigNumber>;
 
     governance(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -1548,10 +1476,6 @@ export class CompoundProduct extends Contract {
 
     "productPolicyCount()"(overrides?: CallOverrides): Promise<BigNumber>;
 
-    quoter(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "quoter()"(overrides?: CallOverrides): Promise<BigNumber>;
-
     registry(overrides?: CallOverrides): Promise<BigNumber>;
 
     "registry()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -1570,26 +1494,6 @@ export class CompoundProduct extends Contract {
 
     "setCancelFee(uint64)"(
       _cancelFee: BigNumberish,
-      overrides?: Overrides
-    ): Promise<BigNumber>;
-
-    setComptroller(
-      _comptroller: string,
-      overrides?: Overrides
-    ): Promise<BigNumber>;
-
-    "setComptroller(address)"(
-      _comptroller: string,
-      overrides?: Overrides
-    ): Promise<BigNumber>;
-
-    setExchangeQuoter(
-      _quoter: string,
-      overrides?: Overrides
-    ): Promise<BigNumber>;
-
-    "setExchangeQuoter(address)"(
-      _quoter: string,
       overrides?: Overrides
     ): Promise<BigNumber>;
 
@@ -1650,28 +1554,6 @@ export class CompoundProduct extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    submitClaim(
-      policyId: BigNumberish,
-      tokenIn: string,
-      amountIn: BigNumberish,
-      tokenOut: string,
-      amountOut: BigNumberish,
-      deadline: BigNumberish,
-      signature: BytesLike,
-      overrides?: PayableOverrides
-    ): Promise<BigNumber>;
-
-    "submitClaim(uint256,address,uint256,address,uint256,uint256,bytes)"(
-      policyId: BigNumberish,
-      tokenIn: string,
-      amountIn: BigNumberish,
-      tokenOut: string,
-      amountOut: BigNumberish,
-      deadline: BigNumberish,
-      signature: BytesLike,
-      overrides?: PayableOverrides
-    ): Promise<BigNumber>;
-
     updateActivePolicies(
       _policyIDs: BigNumberish[],
       overrides?: Overrides
@@ -1719,13 +1601,13 @@ export class CompoundProduct extends Contract {
     ): Promise<PopulatedTransaction>;
 
     appraisePosition(
-      _policyholder: string,
+      _buyer: string,
       _positionContract: string,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
     "appraisePosition(address,address)"(
-      _policyholder: string,
+      _buyer: string,
       _positionContract: string,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
@@ -1760,10 +1642,6 @@ export class CompoundProduct extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    comptroller(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    "comptroller()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
     coveredPlatform(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "coveredPlatform()"(
@@ -1782,6 +1660,26 @@ export class CompoundProduct extends Contract {
       overrides?: PayableOverrides
     ): Promise<PopulatedTransaction>;
 
+    getPolicyExpiration(
+      _policy: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "getPolicyExpiration(address)"(
+      _policy: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    getPolicyLimit(
+      _policy: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "getPolicyLimit(address)"(
+      _policy: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
     getQuote(
       _policyholder: string,
       _positionContract: string,
@@ -1795,6 +1693,12 @@ export class CompoundProduct extends Contract {
       _positionContract: string,
       _coverLimit: BigNumberish,
       _blocks: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    getTotalCovered(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "getTotalCovered()"(
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
@@ -1852,10 +1756,6 @@ export class CompoundProduct extends Contract {
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
-    quoter(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    "quoter()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
     registry(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "registry()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
@@ -1877,26 +1777,6 @@ export class CompoundProduct extends Contract {
 
     "setCancelFee(uint64)"(
       _cancelFee: BigNumberish,
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    setComptroller(
-      _comptroller: string,
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    "setComptroller(address)"(
-      _comptroller: string,
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    setExchangeQuoter(
-      _quoter: string,
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    "setExchangeQuoter(address)"(
-      _quoter: string,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
@@ -1958,28 +1838,6 @@ export class CompoundProduct extends Contract {
     "setPrice(uint24)"(
       _price: BigNumberish,
       overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    submitClaim(
-      policyId: BigNumberish,
-      tokenIn: string,
-      amountIn: BigNumberish,
-      tokenOut: string,
-      amountOut: BigNumberish,
-      deadline: BigNumberish,
-      signature: BytesLike,
-      overrides?: PayableOverrides
-    ): Promise<PopulatedTransaction>;
-
-    "submitClaim(uint256,address,uint256,address,uint256,uint256,bytes)"(
-      policyId: BigNumberish,
-      tokenIn: string,
-      amountIn: BigNumberish,
-      tokenOut: string,
-      amountOut: BigNumberish,
-      deadline: BigNumberish,
-      signature: BytesLike,
-      overrides?: PayableOverrides
     ): Promise<PopulatedTransaction>;
 
     updateActivePolicies(

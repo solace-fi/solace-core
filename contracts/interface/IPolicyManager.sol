@@ -45,6 +45,26 @@ interface IPolicyManager /*is IERC721Enumerable, IERC721Metadata*/ {
      */
     function removeProduct(address _product) external;
 
+    /**
+     * @notice Checks is an address is an active product.
+     * @param _product The product to check.
+     * @return True if the product is active.
+     */
+    function productIsActive(address _product) external view returns (bool);
+
+    /**
+     * @notice Returns the number of products.
+     * @return The number of products.
+     */
+    function numProducts() external view returns (uint256);
+
+    /**
+     * @notice Returns the product at the given index.
+     * @param _productNum The index to query.
+     * @return The address of the product.
+     */
+    function getProduct(uint256 _productNum) external view returns (address);
+
     /*** POLICY VIEW FUNCTIONS
     View functions that give us data about policies
     ****/

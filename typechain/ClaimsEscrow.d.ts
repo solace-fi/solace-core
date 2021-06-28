@@ -23,19 +23,31 @@ import { FunctionFragment, EventFragment, Result } from "@ethersproject/abi";
 
 interface ClaimsEscrowInterface extends ethers.utils.Interface {
   functions: {
+    "ETH_ADDRESS()": FunctionFragment;
     "acceptGovernance()": FunctionFragment;
+    "adjustClaim(uint256,uint256)": FunctionFragment;
     "claims(uint256)": FunctionFragment;
     "governance()": FunctionFragment;
     "newGovernance()": FunctionFragment;
     "receiveClaim(address)": FunctionFragment;
     "registry()": FunctionFragment;
     "setGovernance(address)": FunctionFragment;
+    "sweep(address,uint256,address)": FunctionFragment;
+    "totalClaims()": FunctionFragment;
     "withdrawClaimsPayout(uint256)": FunctionFragment;
   };
 
   encodeFunctionData(
+    functionFragment: "ETH_ADDRESS",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
     functionFragment: "acceptGovernance",
     values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "adjustClaim",
+    values: [BigNumberish, BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "claims",
@@ -59,12 +71,28 @@ interface ClaimsEscrowInterface extends ethers.utils.Interface {
     values: [string]
   ): string;
   encodeFunctionData(
+    functionFragment: "sweep",
+    values: [string, BigNumberish, string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "totalClaims",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
     functionFragment: "withdrawClaimsPayout",
     values: [BigNumberish]
   ): string;
 
   decodeFunctionResult(
+    functionFragment: "ETH_ADDRESS",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "acceptGovernance",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "adjustClaim",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "claims", data: BytesLike): Result;
@@ -80,6 +108,11 @@ interface ClaimsEscrowInterface extends ethers.utils.Interface {
   decodeFunctionResult(functionFragment: "registry", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "setGovernance",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "sweep", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "totalClaims",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -110,9 +143,33 @@ export class ClaimsEscrow extends Contract {
   interface: ClaimsEscrowInterface;
 
   functions: {
+    ETH_ADDRESS(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "ETH_ADDRESS()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
     acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
 
     "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
+
+    adjustClaim(
+      claimId: BigNumberish,
+      value: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "adjustClaim(uint256,uint256)"(
+      claimId: BigNumberish,
+      value: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
 
     claims(
       arg0: BigNumberish,
@@ -194,6 +251,32 @@ export class ClaimsEscrow extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
+    sweep(
+      token: string,
+      amount: BigNumberish,
+      dst: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "sweep(address,uint256,address)"(
+      token: string,
+      amount: BigNumberish,
+      dst: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    totalClaims(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    "totalClaims()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
     withdrawClaimsPayout(
       claimId: BigNumberish,
       overrides?: Overrides
@@ -205,9 +288,25 @@ export class ClaimsEscrow extends Contract {
     ): Promise<ContractTransaction>;
   };
 
+  ETH_ADDRESS(overrides?: CallOverrides): Promise<string>;
+
+  "ETH_ADDRESS()"(overrides?: CallOverrides): Promise<string>;
+
   acceptGovernance(overrides?: Overrides): Promise<ContractTransaction>;
 
   "acceptGovernance()"(overrides?: Overrides): Promise<ContractTransaction>;
+
+  adjustClaim(
+    claimId: BigNumberish,
+    value: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "adjustClaim(uint256,uint256)"(
+    claimId: BigNumberish,
+    value: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
 
   claims(
     arg0: BigNumberish,
@@ -265,6 +364,24 @@ export class ClaimsEscrow extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
+  sweep(
+    token: string,
+    amount: BigNumberish,
+    dst: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "sweep(address,uint256,address)"(
+    token: string,
+    amount: BigNumberish,
+    dst: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  totalClaims(overrides?: CallOverrides): Promise<BigNumber>;
+
+  "totalClaims()"(overrides?: CallOverrides): Promise<BigNumber>;
+
   withdrawClaimsPayout(
     claimId: BigNumberish,
     overrides?: Overrides
@@ -276,9 +393,25 @@ export class ClaimsEscrow extends Contract {
   ): Promise<ContractTransaction>;
 
   callStatic: {
+    ETH_ADDRESS(overrides?: CallOverrides): Promise<string>;
+
+    "ETH_ADDRESS()"(overrides?: CallOverrides): Promise<string>;
+
     acceptGovernance(overrides?: CallOverrides): Promise<void>;
 
     "acceptGovernance()"(overrides?: CallOverrides): Promise<void>;
+
+    adjustClaim(
+      claimId: BigNumberish,
+      value: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "adjustClaim(uint256,uint256)"(
+      claimId: BigNumberish,
+      value: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
 
     claims(
       arg0: BigNumberish,
@@ -336,6 +469,24 @@ export class ClaimsEscrow extends Contract {
       overrides?: CallOverrides
     ): Promise<void>;
 
+    sweep(
+      token: string,
+      amount: BigNumberish,
+      dst: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "sweep(address,uint256,address)"(
+      token: string,
+      amount: BigNumberish,
+      dst: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    totalClaims(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "totalClaims()"(overrides?: CallOverrides): Promise<BigNumber>;
+
     withdrawClaimsPayout(
       claimId: BigNumberish,
       overrides?: CallOverrides
@@ -358,9 +509,25 @@ export class ClaimsEscrow extends Contract {
   };
 
   estimateGas: {
+    ETH_ADDRESS(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "ETH_ADDRESS()"(overrides?: CallOverrides): Promise<BigNumber>;
+
     acceptGovernance(overrides?: Overrides): Promise<BigNumber>;
 
     "acceptGovernance()"(overrides?: Overrides): Promise<BigNumber>;
+
+    adjustClaim(
+      claimId: BigNumberish,
+      value: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "adjustClaim(uint256,uint256)"(
+      claimId: BigNumberish,
+      value: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
 
     claims(arg0: BigNumberish, overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -401,6 +568,24 @@ export class ClaimsEscrow extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
+    sweep(
+      token: string,
+      amount: BigNumberish,
+      dst: string,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "sweep(address,uint256,address)"(
+      token: string,
+      amount: BigNumberish,
+      dst: string,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    totalClaims(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "totalClaims()"(overrides?: CallOverrides): Promise<BigNumber>;
+
     withdrawClaimsPayout(
       claimId: BigNumberish,
       overrides?: Overrides
@@ -413,9 +598,25 @@ export class ClaimsEscrow extends Contract {
   };
 
   populateTransaction: {
+    ETH_ADDRESS(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "ETH_ADDRESS()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
     acceptGovernance(overrides?: Overrides): Promise<PopulatedTransaction>;
 
     "acceptGovernance()"(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    adjustClaim(
+      claimId: BigNumberish,
+      value: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "adjustClaim(uint256,uint256)"(
+      claimId: BigNumberish,
+      value: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
 
     claims(
       arg0: BigNumberish,
@@ -458,6 +659,24 @@ export class ClaimsEscrow extends Contract {
       _governance: string,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
+
+    sweep(
+      token: string,
+      amount: BigNumberish,
+      dst: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "sweep(address,uint256,address)"(
+      token: string,
+      amount: BigNumberish,
+      dst: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    totalClaims(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "totalClaims()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     withdrawClaimsPayout(
       claimId: BigNumberish,

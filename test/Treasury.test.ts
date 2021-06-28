@@ -12,22 +12,25 @@ import { encodePriceSqrt, FeeAmount, TICK_SPACINGS, getMaxTick, getMinTick } fro
 import { encodePath } from "./utilities/path";
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Solace, Treasury, MockErc20, Weth9 } from "../typechain";
+import { Solace, Treasury, MockErc20, Weth9, Registry, PolicyManager } from "../typechain";
 
 describe("Treasury", function () {
   let artifacts: ArtifactImports;
   // users
-  let deployer: any;
-  let governor: any;
-  let liquidityProvider: any;
-  let mockPolicy: any;
-  let user: any;
-  let randAddress: any;
+  let deployer: Wallet;
+  let governor: Wallet;
+  let liquidityProvider: Wallet;
+  let mockPolicy: Wallet;
+  let user: Wallet;
+  let randAddress: Wallet;
+  let mockProduct: Wallet;
 
   // solace contracts
   let solaceToken: Solace;
   let treasury: Treasury;
   let weth: Weth9;
+  let registry: Registry;
+  let policyManager: PolicyManager;
   let mockToken1: MockErc20; // no path
   let mockToken2: MockErc20; // single pool path
   let mockToken3: MockErc20; // multi pool path
@@ -53,8 +56,17 @@ describe("Treasury", function () {
   const ONE_MILLION_ETHER = BN.from("1000000000000000000000000");
 
   before(async function () {
-    [deployer, governor, liquidityProvider, mockPolicy, user, randAddress] = provider.getWallets();
+    [deployer, governor, liquidityProvider, mockPolicy, user, randAddress, mockProduct] = provider.getWallets();
     artifacts = await import_artifacts();
+
+    // deploy registry contract
+    registry = (await deployContract(
+      deployer,
+      artifacts.Registry,
+      [
+        governor.address
+      ]
+    )) as Registry;
 
     // deploy solace token
     solaceToken = (await deployContract(
@@ -148,11 +160,20 @@ describe("Treasury", function () {
       artifacts.Treasury,
       [
         governor.address,
-        solaceToken.address,
         uniswapRouter.address,
-        weth.address
+        weth.address,
+        registry.address
       ]
     )) as Treasury;
+
+    // deploy policy manager
+    policyManager = (await deployContract(
+      deployer,
+      artifacts.PolicyManager,
+      [
+        governor.address
+      ]
+    )) as PolicyManager;
 
     // transfer tokens
     await solaceToken.connect(governor).addMinter(governor.address);
@@ -450,6 +471,49 @@ describe("Treasury", function () {
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       expect(balancesDiff.treasuryEth).to.equal(unwrapAmount)
       expect(balancesDiff.treasuryWeth).to.equal(unwrapAmount.mul(-1))
+    })
+  })
+
+  describe("refund", function () {
+    before(async function() {
+      await registry.connect(governor).setPolicyManager(policyManager.address);
+    })
+
+    it("non product cannot refund", async function () {
+      await expect(treasury.connect(mockProduct).refund(user.address, 1)).to.be.revertedWith("!product");
+    })
+
+    it("product can refund in full", async function () {
+      await policyManager.connect(governor).addProduct(mockProduct.address);
+      let balancesBefore = await getBalances(user);
+      let refundAmount = balancesBefore.treasuryEth.sub(10);
+      await treasury.connect(mockProduct).refund(user.address, refundAmount);
+      let balancesAfter = await getBalances(user);
+      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
+      expect(balancesDiff.treasuryEth).to.equal(refundAmount.mul(-1));
+      expect(balancesDiff.userEth).to.equal(refundAmount);
+    })
+
+    it("product can partially refund", async function () {
+      let balancesBefore = await getBalances(user);
+      let totalEth = balancesBefore.treasuryEth.add(balancesBefore.treasuryWeth);
+      let refundAmount = totalEth.add(10);
+      await treasury.connect(mockProduct).refund(user.address, refundAmount);
+      let balancesAfter = await getBalances(user);
+      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
+      expect(balancesAfter.treasuryEth).to.equal(0);
+      expect(balancesAfter.treasuryWeth).to.equal(0);
+      expect(balancesDiff.userEth).to.equal(totalEth);
+      expect(await treasury.unpaidRewards(user.address)).to.equal(10);
+
+      await treasury.connect(deployer).depositEth({value: 20});
+      let tx = await treasury.connect(user).withdraw()
+      let receipt = await tx.wait();
+      let gasCost = receipt.gasUsed.mul(tx.gasPrice);
+      let balancesAfter2 = await getBalances(user);
+      let balancesDiff2 = getBalancesDiff(balancesAfter2, balancesBefore);
+      expect(balancesDiff2.userEth).to.equal(refundAmount.sub(gasCost));
+      expect(await treasury.unpaidRewards(user.address)).to.equal(0);
     })
   })
 

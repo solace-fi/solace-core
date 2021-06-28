@@ -27,27 +27,33 @@ interface PolicyManagerInterface extends ethers.utils.Interface {
     "approve(address,uint256)": FunctionFragment;
     "balanceOf(address)": FunctionFragment;
     "burn(uint256)": FunctionFragment;
-    "createPolicy(address,address,uint256,uint256,uint256)": FunctionFragment;
+    "createPolicy(address,address,uint256,uint64,uint24)": FunctionFragment;
     "getApproved(uint256)": FunctionFragment;
     "getPolicyCoverAmount(uint256)": FunctionFragment;
     "getPolicyExpirationBlock(uint256)": FunctionFragment;
     "getPolicyInfo(uint256)": FunctionFragment;
+    "getPolicyIsActive(uint256)": FunctionFragment;
     "getPolicyPositionContract(uint256)": FunctionFragment;
     "getPolicyPrice(uint256)": FunctionFragment;
     "getPolicyProduct(uint256)": FunctionFragment;
     "getPolicyholder(uint256)": FunctionFragment;
+    "getProduct(uint256)": FunctionFragment;
     "governance()": FunctionFragment;
     "isApprovedForAll(address,address)": FunctionFragment;
     "listPolicies(address)": FunctionFragment;
     "name()": FunctionFragment;
     "newGovernance()": FunctionFragment;
+    "numProducts()": FunctionFragment;
     "ownerOf(uint256)": FunctionFragment;
+    "policyHasEnded(uint256)": FunctionFragment;
+    "policyInfo(uint256)": FunctionFragment;
+    "policyIsActive(uint256)": FunctionFragment;
     "productIsActive(address)": FunctionFragment;
     "removeProduct(address)": FunctionFragment;
     "safeTransferFrom(address,address,uint256)": FunctionFragment;
     "setApprovalForAll(address,bool)": FunctionFragment;
     "setGovernance(address)": FunctionFragment;
-    "setPolicyInfo(uint256,address,address,uint256,uint256,uint256)": FunctionFragment;
+    "setPolicyInfo(uint256,address,address,uint256,uint64,uint24)": FunctionFragment;
     "supportsInterface(bytes4)": FunctionFragment;
     "symbol()": FunctionFragment;
     "tokenByIndex(uint256)": FunctionFragment;
@@ -90,6 +96,10 @@ interface PolicyManagerInterface extends ethers.utils.Interface {
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
+    functionFragment: "getPolicyIsActive",
+    values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
     functionFragment: "getPolicyPositionContract",
     values: [BigNumberish]
   ): string;
@@ -103,6 +113,10 @@ interface PolicyManagerInterface extends ethers.utils.Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "getPolicyholder",
+    values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "getProduct",
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
@@ -123,7 +137,23 @@ interface PolicyManagerInterface extends ethers.utils.Interface {
     values?: undefined
   ): string;
   encodeFunctionData(
+    functionFragment: "numProducts",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
     functionFragment: "ownerOf",
+    values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "policyHasEnded",
+    values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "policyInfo",
+    values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "policyIsActive",
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
@@ -216,6 +246,10 @@ interface PolicyManagerInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
+    functionFragment: "getPolicyIsActive",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "getPolicyPositionContract",
     data: BytesLike
   ): Result;
@@ -231,6 +265,7 @@ interface PolicyManagerInterface extends ethers.utils.Interface {
     functionFragment: "getPolicyholder",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(functionFragment: "getProduct", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "governance", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "isApprovedForAll",
@@ -245,7 +280,20 @@ interface PolicyManagerInterface extends ethers.utils.Interface {
     functionFragment: "newGovernance",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(
+    functionFragment: "numProducts",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "ownerOf", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "policyHasEnded",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "policyInfo", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "policyIsActive",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "productIsActive",
     data: BytesLike
@@ -373,29 +421,29 @@ export class PolicyManager extends Contract {
     }>;
 
     burn(
-      _tokenId: BigNumberish,
+      _policyId: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
     "burn(uint256)"(
-      _tokenId: BigNumberish,
+      _policyId: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
     createPolicy(
       _policyholder: string,
       _positionContract: string,
-      _expirationBlock: BigNumberish,
       _coverAmount: BigNumberish,
+      _expirationBlock: BigNumberish,
       _price: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    "createPolicy(address,address,uint256,uint256,uint256)"(
+    "createPolicy(address,address,uint256,uint64,uint24)"(
       _policyholder: string,
       _positionContract: string,
-      _expirationBlock: BigNumberish,
       _coverAmount: BigNumberish,
+      _expirationBlock: BigNumberish,
       _price: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
@@ -449,15 +497,15 @@ export class PolicyManager extends Contract {
       policyholder: string;
       product: string;
       positionContract: string;
-      expirationBlock: BigNumber;
       coverAmount: BigNumber;
-      price: BigNumber;
+      expirationBlock: BigNumber;
+      price: number;
       0: string;
       1: string;
       2: string;
       3: BigNumber;
       4: BigNumber;
-      5: BigNumber;
+      5: number;
     }>;
 
     "getPolicyInfo(uint256)"(
@@ -467,15 +515,29 @@ export class PolicyManager extends Contract {
       policyholder: string;
       product: string;
       positionContract: string;
-      expirationBlock: BigNumber;
       coverAmount: BigNumber;
-      price: BigNumber;
+      expirationBlock: BigNumber;
+      price: number;
       0: string;
       1: string;
       2: string;
       3: BigNumber;
       4: BigNumber;
-      5: BigNumber;
+      5: number;
+    }>;
+
+    getPolicyIsActive(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: boolean;
+    }>;
+
+    "getPolicyIsActive(uint256)"(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: boolean;
     }>;
 
     getPolicyPositionContract(
@@ -496,14 +558,14 @@ export class PolicyManager extends Contract {
       _policyID: BigNumberish,
       overrides?: CallOverrides
     ): Promise<{
-      0: BigNumber;
+      0: number;
     }>;
 
     "getPolicyPrice(uint256)"(
       _policyID: BigNumberish,
       overrides?: CallOverrides
     ): Promise<{
-      0: BigNumber;
+      0: number;
     }>;
 
     getPolicyProduct(
@@ -529,6 +591,20 @@ export class PolicyManager extends Contract {
 
     "getPolicyholder(uint256)"(
       _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    getProduct(
+      _productNum: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: string;
+    }>;
+
+    "getProduct(uint256)"(
+      _productNum: BigNumberish,
       overrides?: CallOverrides
     ): Promise<{
       0: string;
@@ -602,6 +678,18 @@ export class PolicyManager extends Contract {
       0: string;
     }>;
 
+    numProducts(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    "numProducts()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
     ownerOf(
       tokenId: BigNumberish,
       overrides?: CallOverrides
@@ -616,15 +704,79 @@ export class PolicyManager extends Contract {
       0: string;
     }>;
 
+    policyHasEnded(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: boolean;
+    }>;
+
+    "policyHasEnded(uint256)"(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: boolean;
+    }>;
+
+    policyInfo(
+      arg0: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      coverAmount: BigNumber;
+      expirationBlock: BigNumber;
+      price: number;
+      policyholder: string;
+      product: string;
+      positionContract: string;
+      0: BigNumber;
+      1: BigNumber;
+      2: number;
+      3: string;
+      4: string;
+      5: string;
+    }>;
+
+    "policyInfo(uint256)"(
+      arg0: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      coverAmount: BigNumber;
+      expirationBlock: BigNumber;
+      price: number;
+      policyholder: string;
+      product: string;
+      positionContract: string;
+      0: BigNumber;
+      1: BigNumber;
+      2: number;
+      3: string;
+      4: string;
+      5: string;
+    }>;
+
+    policyIsActive(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: boolean;
+    }>;
+
+    "policyIsActive(uint256)"(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: boolean;
+    }>;
+
     productIsActive(
-      arg0: string,
+      _product: string,
       overrides?: CallOverrides
     ): Promise<{
       0: boolean;
     }>;
 
     "productIsActive(address)"(
-      arg0: string,
+      _product: string,
       overrides?: CallOverrides
     ): Promise<{
       0: boolean;
@@ -681,18 +833,18 @@ export class PolicyManager extends Contract {
       _policyId: BigNumberish,
       _policyholder: string,
       _positionContract: string,
-      _expirationBlock: BigNumberish,
       _coverAmount: BigNumberish,
+      _expirationBlock: BigNumberish,
       _price: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    "setPolicyInfo(uint256,address,address,uint256,uint256,uint256)"(
+    "setPolicyInfo(uint256,address,address,uint256,uint64,uint24)"(
       _policyId: BigNumberish,
       _policyholder: string,
       _positionContract: string,
-      _expirationBlock: BigNumberish,
       _coverAmount: BigNumberish,
+      _expirationBlock: BigNumberish,
       _price: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
@@ -840,29 +992,29 @@ export class PolicyManager extends Contract {
   ): Promise<BigNumber>;
 
   burn(
-    _tokenId: BigNumberish,
+    _policyId: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
   "burn(uint256)"(
-    _tokenId: BigNumberish,
+    _policyId: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
   createPolicy(
     _policyholder: string,
     _positionContract: string,
-    _expirationBlock: BigNumberish,
     _coverAmount: BigNumberish,
+    _expirationBlock: BigNumberish,
     _price: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  "createPolicy(address,address,uint256,uint256,uint256)"(
+  "createPolicy(address,address,uint256,uint64,uint24)"(
     _policyholder: string,
     _positionContract: string,
-    _expirationBlock: BigNumberish,
     _coverAmount: BigNumberish,
+    _expirationBlock: BigNumberish,
     _price: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
@@ -904,15 +1056,15 @@ export class PolicyManager extends Contract {
     policyholder: string;
     product: string;
     positionContract: string;
-    expirationBlock: BigNumber;
     coverAmount: BigNumber;
-    price: BigNumber;
+    expirationBlock: BigNumber;
+    price: number;
     0: string;
     1: string;
     2: string;
     3: BigNumber;
     4: BigNumber;
-    5: BigNumber;
+    5: number;
   }>;
 
   "getPolicyInfo(uint256)"(
@@ -922,16 +1074,26 @@ export class PolicyManager extends Contract {
     policyholder: string;
     product: string;
     positionContract: string;
-    expirationBlock: BigNumber;
     coverAmount: BigNumber;
-    price: BigNumber;
+    expirationBlock: BigNumber;
+    price: number;
     0: string;
     1: string;
     2: string;
     3: BigNumber;
     4: BigNumber;
-    5: BigNumber;
+    5: number;
   }>;
+
+  getPolicyIsActive(
+    _policyID: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
+
+  "getPolicyIsActive(uint256)"(
+    _policyID: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
 
   getPolicyPositionContract(
     _policyID: BigNumberish,
@@ -946,12 +1108,12 @@ export class PolicyManager extends Contract {
   getPolicyPrice(
     _policyID: BigNumberish,
     overrides?: CallOverrides
-  ): Promise<BigNumber>;
+  ): Promise<number>;
 
   "getPolicyPrice(uint256)"(
     _policyID: BigNumberish,
     overrides?: CallOverrides
-  ): Promise<BigNumber>;
+  ): Promise<number>;
 
   getPolicyProduct(
     _policyID: BigNumberish,
@@ -970,6 +1132,16 @@ export class PolicyManager extends Contract {
 
   "getPolicyholder(uint256)"(
     _policyID: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<string>;
+
+  getProduct(
+    _productNum: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<string>;
+
+  "getProduct(uint256)"(
+    _productNum: BigNumberish,
     overrides?: CallOverrides
   ): Promise<string>;
 
@@ -1007,6 +1179,10 @@ export class PolicyManager extends Contract {
 
   "newGovernance()"(overrides?: CallOverrides): Promise<string>;
 
+  numProducts(overrides?: CallOverrides): Promise<BigNumber>;
+
+  "numProducts()"(overrides?: CallOverrides): Promise<BigNumber>;
+
   ownerOf(tokenId: BigNumberish, overrides?: CallOverrides): Promise<string>;
 
   "ownerOf(uint256)"(
@@ -1014,10 +1190,69 @@ export class PolicyManager extends Contract {
     overrides?: CallOverrides
   ): Promise<string>;
 
-  productIsActive(arg0: string, overrides?: CallOverrides): Promise<boolean>;
+  policyHasEnded(
+    _policyID: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
+
+  "policyHasEnded(uint256)"(
+    _policyID: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
+
+  policyInfo(
+    arg0: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<{
+    coverAmount: BigNumber;
+    expirationBlock: BigNumber;
+    price: number;
+    policyholder: string;
+    product: string;
+    positionContract: string;
+    0: BigNumber;
+    1: BigNumber;
+    2: number;
+    3: string;
+    4: string;
+    5: string;
+  }>;
+
+  "policyInfo(uint256)"(
+    arg0: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<{
+    coverAmount: BigNumber;
+    expirationBlock: BigNumber;
+    price: number;
+    policyholder: string;
+    product: string;
+    positionContract: string;
+    0: BigNumber;
+    1: BigNumber;
+    2: number;
+    3: string;
+    4: string;
+    5: string;
+  }>;
+
+  policyIsActive(
+    _policyID: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
+
+  "policyIsActive(uint256)"(
+    _policyID: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
+
+  productIsActive(
+    _product: string,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
 
   "productIsActive(address)"(
-    arg0: string,
+    _product: string,
     overrides?: CallOverrides
   ): Promise<boolean>;
 
@@ -1072,18 +1307,18 @@ export class PolicyManager extends Contract {
     _policyId: BigNumberish,
     _policyholder: string,
     _positionContract: string,
-    _expirationBlock: BigNumberish,
     _coverAmount: BigNumberish,
+    _expirationBlock: BigNumberish,
     _price: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  "setPolicyInfo(uint256,address,address,uint256,uint256,uint256)"(
+  "setPolicyInfo(uint256,address,address,uint256,uint64,uint24)"(
     _policyId: BigNumberish,
     _policyholder: string,
     _positionContract: string,
-    _expirationBlock: BigNumberish,
     _coverAmount: BigNumberish,
+    _expirationBlock: BigNumberish,
     _price: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
@@ -1184,27 +1419,27 @@ export class PolicyManager extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    burn(_tokenId: BigNumberish, overrides?: CallOverrides): Promise<void>;
+    burn(_policyId: BigNumberish, overrides?: CallOverrides): Promise<void>;
 
     "burn(uint256)"(
-      _tokenId: BigNumberish,
+      _policyId: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
 
     createPolicy(
       _policyholder: string,
       _positionContract: string,
-      _expirationBlock: BigNumberish,
       _coverAmount: BigNumberish,
+      _expirationBlock: BigNumberish,
       _price: BigNumberish,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    "createPolicy(address,address,uint256,uint256,uint256)"(
+    "createPolicy(address,address,uint256,uint64,uint24)"(
       _policyholder: string,
       _positionContract: string,
-      _expirationBlock: BigNumberish,
       _coverAmount: BigNumberish,
+      _expirationBlock: BigNumberish,
       _price: BigNumberish,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
@@ -1246,15 +1481,15 @@ export class PolicyManager extends Contract {
       policyholder: string;
       product: string;
       positionContract: string;
-      expirationBlock: BigNumber;
       coverAmount: BigNumber;
-      price: BigNumber;
+      expirationBlock: BigNumber;
+      price: number;
       0: string;
       1: string;
       2: string;
       3: BigNumber;
       4: BigNumber;
-      5: BigNumber;
+      5: number;
     }>;
 
     "getPolicyInfo(uint256)"(
@@ -1264,16 +1499,26 @@ export class PolicyManager extends Contract {
       policyholder: string;
       product: string;
       positionContract: string;
-      expirationBlock: BigNumber;
       coverAmount: BigNumber;
-      price: BigNumber;
+      expirationBlock: BigNumber;
+      price: number;
       0: string;
       1: string;
       2: string;
       3: BigNumber;
       4: BigNumber;
-      5: BigNumber;
+      5: number;
     }>;
+
+    getPolicyIsActive(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
+
+    "getPolicyIsActive(uint256)"(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
 
     getPolicyPositionContract(
       _policyID: BigNumberish,
@@ -1288,12 +1533,12 @@ export class PolicyManager extends Contract {
     getPolicyPrice(
       _policyID: BigNumberish,
       overrides?: CallOverrides
-    ): Promise<BigNumber>;
+    ): Promise<number>;
 
     "getPolicyPrice(uint256)"(
       _policyID: BigNumberish,
       overrides?: CallOverrides
-    ): Promise<BigNumber>;
+    ): Promise<number>;
 
     getPolicyProduct(
       _policyID: BigNumberish,
@@ -1312,6 +1557,16 @@ export class PolicyManager extends Contract {
 
     "getPolicyholder(uint256)"(
       _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<string>;
+
+    getProduct(
+      _productNum: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<string>;
+
+    "getProduct(uint256)"(
+      _productNum: BigNumberish,
       overrides?: CallOverrides
     ): Promise<string>;
 
@@ -1349,6 +1604,10 @@ export class PolicyManager extends Contract {
 
     "newGovernance()"(overrides?: CallOverrides): Promise<string>;
 
+    numProducts(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "numProducts()"(overrides?: CallOverrides): Promise<BigNumber>;
+
     ownerOf(tokenId: BigNumberish, overrides?: CallOverrides): Promise<string>;
 
     "ownerOf(uint256)"(
@@ -1356,10 +1615,69 @@ export class PolicyManager extends Contract {
       overrides?: CallOverrides
     ): Promise<string>;
 
-    productIsActive(arg0: string, overrides?: CallOverrides): Promise<boolean>;
+    policyHasEnded(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
+
+    "policyHasEnded(uint256)"(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
+
+    policyInfo(
+      arg0: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      coverAmount: BigNumber;
+      expirationBlock: BigNumber;
+      price: number;
+      policyholder: string;
+      product: string;
+      positionContract: string;
+      0: BigNumber;
+      1: BigNumber;
+      2: number;
+      3: string;
+      4: string;
+      5: string;
+    }>;
+
+    "policyInfo(uint256)"(
+      arg0: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<{
+      coverAmount: BigNumber;
+      expirationBlock: BigNumber;
+      price: number;
+      policyholder: string;
+      product: string;
+      positionContract: string;
+      0: BigNumber;
+      1: BigNumber;
+      2: number;
+      3: string;
+      4: string;
+      5: string;
+    }>;
+
+    policyIsActive(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
+
+    "policyIsActive(uint256)"(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
+
+    productIsActive(
+      _product: string,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
 
     "productIsActive(address)"(
-      arg0: string,
+      _product: string,
       overrides?: CallOverrides
     ): Promise<boolean>;
 
@@ -1411,18 +1729,18 @@ export class PolicyManager extends Contract {
       _policyId: BigNumberish,
       _policyholder: string,
       _positionContract: string,
-      _expirationBlock: BigNumberish,
       _coverAmount: BigNumberish,
+      _expirationBlock: BigNumberish,
       _price: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
 
-    "setPolicyInfo(uint256,address,address,uint256,uint256,uint256)"(
+    "setPolicyInfo(uint256,address,address,uint256,uint64,uint24)"(
       _policyId: BigNumberish,
       _policyholder: string,
       _positionContract: string,
-      _expirationBlock: BigNumberish,
       _coverAmount: BigNumberish,
+      _expirationBlock: BigNumberish,
       _price: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
@@ -1554,27 +1872,27 @@ export class PolicyManager extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    burn(_tokenId: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
+    burn(_policyId: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
 
     "burn(uint256)"(
-      _tokenId: BigNumberish,
+      _policyId: BigNumberish,
       overrides?: Overrides
     ): Promise<BigNumber>;
 
     createPolicy(
       _policyholder: string,
       _positionContract: string,
-      _expirationBlock: BigNumberish,
       _coverAmount: BigNumberish,
+      _expirationBlock: BigNumberish,
       _price: BigNumberish,
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    "createPolicy(address,address,uint256,uint256,uint256)"(
+    "createPolicy(address,address,uint256,uint64,uint24)"(
       _policyholder: string,
       _positionContract: string,
-      _expirationBlock: BigNumberish,
       _coverAmount: BigNumberish,
+      _expirationBlock: BigNumberish,
       _price: BigNumberish,
       overrides?: Overrides
     ): Promise<BigNumber>;
@@ -1619,6 +1937,16 @@ export class PolicyManager extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
+    getPolicyIsActive(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "getPolicyIsActive(uint256)"(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     getPolicyPositionContract(
       _policyID: BigNumberish,
       overrides?: CallOverrides
@@ -1659,6 +1987,16 @@ export class PolicyManager extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
+    getProduct(
+      _productNum: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "getProduct(uint256)"(
+      _productNum: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     governance(overrides?: CallOverrides): Promise<BigNumber>;
 
     "governance()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -1693,6 +2031,10 @@ export class PolicyManager extends Contract {
 
     "newGovernance()"(overrides?: CallOverrides): Promise<BigNumber>;
 
+    numProducts(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "numProducts()"(overrides?: CallOverrides): Promise<BigNumber>;
+
     ownerOf(
       tokenId: BigNumberish,
       overrides?: CallOverrides
@@ -1703,13 +2045,43 @@ export class PolicyManager extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
+    policyHasEnded(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "policyHasEnded(uint256)"(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    policyInfo(
+      arg0: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "policyInfo(uint256)"(
+      arg0: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    policyIsActive(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    "policyIsActive(uint256)"(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     productIsActive(
-      arg0: string,
+      _product: string,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
     "productIsActive(address)"(
-      arg0: string,
+      _product: string,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
@@ -1761,18 +2133,18 @@ export class PolicyManager extends Contract {
       _policyId: BigNumberish,
       _policyholder: string,
       _positionContract: string,
-      _expirationBlock: BigNumberish,
       _coverAmount: BigNumberish,
+      _expirationBlock: BigNumberish,
       _price: BigNumberish,
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    "setPolicyInfo(uint256,address,address,uint256,uint256,uint256)"(
+    "setPolicyInfo(uint256,address,address,uint256,uint64,uint24)"(
       _policyId: BigNumberish,
       _policyholder: string,
       _positionContract: string,
-      _expirationBlock: BigNumberish,
       _coverAmount: BigNumberish,
+      _expirationBlock: BigNumberish,
       _price: BigNumberish,
       overrides?: Overrides
     ): Promise<BigNumber>;
@@ -1884,29 +2256,29 @@ export class PolicyManager extends Contract {
     ): Promise<PopulatedTransaction>;
 
     burn(
-      _tokenId: BigNumberish,
+      _policyId: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
     "burn(uint256)"(
-      _tokenId: BigNumberish,
+      _policyId: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
     createPolicy(
       _policyholder: string,
       _positionContract: string,
-      _expirationBlock: BigNumberish,
       _coverAmount: BigNumberish,
+      _expirationBlock: BigNumberish,
       _price: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    "createPolicy(address,address,uint256,uint256,uint256)"(
+    "createPolicy(address,address,uint256,uint64,uint24)"(
       _policyholder: string,
       _positionContract: string,
-      _expirationBlock: BigNumberish,
       _coverAmount: BigNumberish,
+      _expirationBlock: BigNumberish,
       _price: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
@@ -1951,6 +2323,16 @@ export class PolicyManager extends Contract {
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
+    getPolicyIsActive(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "getPolicyIsActive(uint256)"(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
     getPolicyPositionContract(
       _policyID: BigNumberish,
       overrides?: CallOverrides
@@ -1991,6 +2373,16 @@ export class PolicyManager extends Contract {
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
+    getProduct(
+      _productNum: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "getProduct(uint256)"(
+      _productNum: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
     governance(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     "governance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
@@ -2025,6 +2417,10 @@ export class PolicyManager extends Contract {
 
     "newGovernance()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
+    numProducts(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "numProducts()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
     ownerOf(
       tokenId: BigNumberish,
       overrides?: CallOverrides
@@ -2035,13 +2431,43 @@ export class PolicyManager extends Contract {
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
+    policyHasEnded(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "policyHasEnded(uint256)"(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    policyInfo(
+      arg0: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "policyInfo(uint256)"(
+      arg0: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    policyIsActive(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "policyIsActive(uint256)"(
+      _policyID: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
     productIsActive(
-      arg0: string,
+      _product: string,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
     "productIsActive(address)"(
-      arg0: string,
+      _product: string,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
@@ -2096,18 +2522,18 @@ export class PolicyManager extends Contract {
       _policyId: BigNumberish,
       _policyholder: string,
       _positionContract: string,
-      _expirationBlock: BigNumberish,
       _coverAmount: BigNumberish,
+      _expirationBlock: BigNumberish,
       _price: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    "setPolicyInfo(uint256,address,address,uint256,uint256,uint256)"(
+    "setPolicyInfo(uint256,address,address,uint256,uint64,uint24)"(
       _policyId: BigNumberish,
       _policyholder: string,
       _positionContract: string,
-      _expirationBlock: BigNumberish,
       _coverAmount: BigNumberish,
+      _expirationBlock: BigNumberish,
       _price: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
