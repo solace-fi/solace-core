@@ -10,26 +10,20 @@ import { config as dotenv_config } from 'dotenv';
 dotenv_config();
 const USE_PROCESSED_FILES = process.env.USE_PROCESSED_FILES === "true";
 
-const forking = process.env.FORK_NETWORK === "mainnet"
-  ? {
-    url: process.env.MAINNET_URL || '',
-    blockNumber: 12500000
-  }
-  : process.env.FORK_NETWORK === "rinkeby"
-  ? {
-    url: process.env.RINKEBY_URL || '',
-    blockNumber: 8763372
-  }
-  : {
-    url: '',
-    blockNumber: 0
-  }
-const hardhat = process.env.FORK_NETWORK ? {forking} : {};
+const mainnet_fork = { url: process.env.MAINNET_URL || '', blockNumber: 12500000 };
+const rinkeby_fork = { url: process.env.RINKEBY_URL || '', blockNumber: 8763372 };
+const no_fork = { url: '', blockNumber: 0 };
+const forking = (
+    process.env.FORK_NETWORK === "mainnet" ? mainnet_fork
+  : process.env.FORK_NETWORK === "rinkeby" ? rinkeby_fork
+  : no_fork
+);
+const hardhat_network = process.env.FORK_NETWORK ? {forking} : {};
 
 const config: HardhatUserConfig = {
   defaultNetwork: "hardhat",
   networks: {
-    hardhat: hardhat,
+    hardhat: hardhat_network,
     localhost: { url: "http://127.0.0.1:8545" },
     rinkeby: {
       url: process.env.RINKEBY_URL,
