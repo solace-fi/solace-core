@@ -27,7 +27,7 @@ detailed technical documentation is located in docs folder.
 * TypeScript: https://www.typescriptlang.org/
 
 ## Style Guide
-* Solidity: https://docs.soliditylang.org/en/v0.5.3/style-guide.html
+* Solidity: https://docs.soliditylang.org/en/v0.8.0/style-guide.html
 * TypeScript: https://google.github.io/styleguide/tsguide.html
 * Git: https://github.com/kseniya292/standards
 
