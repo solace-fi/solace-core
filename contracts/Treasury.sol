@@ -35,7 +35,7 @@ contract Treasury is ITreasury, ReentrancyGuard {
 
     address public constant ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
-    address[] public premiumRecipients;
+    address payable[] public premiumRecipients;
     uint32[] public recipientWeights;
     uint32 public weightSum;
 
@@ -170,7 +170,7 @@ contract Treasury is ITreasury, ReentrancyGuard {
      * @param _recipients The premium recipients.
      * @param _weights The recipient weights.
      */
-    function setPremiumRecipients(address[] calldata _recipients, uint32[] calldata _weights) external override {
+    function setPremiumRecipients(address payable[] calldata _recipients, uint32[] calldata _weights) external override {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
         // check recipient - weight map
@@ -189,20 +189,13 @@ contract Treasury is ITreasury, ReentrancyGuard {
      */
     function routePremiums() external payable override nonReentrant {
         uint256 div = weightSum;
-        uint256 balance = msg.value;
         uint256 length = premiumRecipients.length;
-        uint256 spent = 0;
         // transfer to all recipients
         for(uint i = 0; i < length; i++) {
-            uint256 amount = balance * recipientWeights[i] / div;
-            if(amount > 0) {
-                payable(premiumRecipients[i]).transfer(amount);
-                spent += amount;
-            }
+            uint256 amount = msg.value * recipientWeights[i] / div;
+            if(amount > 0) premiumRecipients[i].transfer(amount);
         }
-        // hold treasury share as weth
-        balance = msg.value - spent;
-        if(balance > 0) weth.deposit{value: balance}();
+        // hold treasury share as eth
     }
 
     /**

@@ -420,8 +420,7 @@ describe("Treasury", function () {
       await treasury.connect(user).routePremiums({value: depositAmount});
       let balancesAfter = await getBalances(user);
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
-      expect(balancesDiff.treasuryEth).to.equal(0);
-      expect(balancesDiff.treasuryWeth).to.equal(depositAmount);
+      expect(balancesDiff.treasuryEth).to.equal(depositAmount);
     })
 
     it("non governor cannot set recipients", async function () {
@@ -443,9 +442,8 @@ describe("Treasury", function () {
       await treasury.connect(user).routePremiums({value: depositAmount});
       let balancesAfter = await getBalances(deployer);
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
-      expect(balancesDiff.treasuryEth).to.equal(0);
+      expect(balancesDiff.treasuryEth).to.equal(60);
       expect(balancesDiff.userEth).to.equal(40);
-      expect(balancesDiff.treasuryWeth).to.equal(60);
     })
 
     it("non governor cannot wrap eth", async function () {
