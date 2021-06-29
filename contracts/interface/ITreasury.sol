@@ -92,7 +92,7 @@ interface ITreasury {
      * @notice Routes the premiums to the recipients
      * Can only be called by the current governor.
      */
-    function routePremiums() external;
+    function routePremiums() external payable;
 
     /**
      * @notice Wraps some eth into weth.

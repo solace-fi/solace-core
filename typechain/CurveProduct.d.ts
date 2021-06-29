@@ -31,13 +31,13 @@ interface CurveProductInterface extends ethers.utils.Interface {
     "addressProvider()": FunctionFragment;
     "appraisePosition(address,address)": FunctionFragment;
     "buyPolicy(address,address,uint256,uint64)": FunctionFragment;
-    "cancelFee()": FunctionFragment;
     "cancelPolicy(uint256)": FunctionFragment;
     "coveredPlatform()": FunctionFragment;
     "extendPolicy(uint256,uint64)": FunctionFragment;
     "getQuote(address,address,uint256,uint64)": FunctionFragment;
     "governance()": FunctionFragment;
     "isAuthorizedSigner(address)": FunctionFragment;
+    "manageFee()": FunctionFragment;
     "maxCoverAmount()": FunctionFragment;
     "maxCoverPerUser()": FunctionFragment;
     "maxPeriod()": FunctionFragment;
@@ -49,15 +49,16 @@ interface CurveProductInterface extends ethers.utils.Interface {
     "quoter()": FunctionFragment;
     "registry()": FunctionFragment;
     "removeSigner(address)": FunctionFragment;
-    "setCancelFee(uint64)": FunctionFragment;
     "setExchangeQuoter(address)": FunctionFragment;
     "setGovernance(address)": FunctionFragment;
+    "setManageFee(uint64)": FunctionFragment;
     "setMaxCoverAmount(uint256)": FunctionFragment;
     "setMaxCoverPerUser(uint256)": FunctionFragment;
     "setMaxPeriod(uint64)": FunctionFragment;
     "setMinPeriod(uint64)": FunctionFragment;
     "setPrice(uint24)": FunctionFragment;
     "updateActivePolicies(uint256[])": FunctionFragment;
+    "updateCoverLimit(uint256,uint256)": FunctionFragment;
   };
 
   encodeFunctionData(
@@ -89,7 +90,6 @@ interface CurveProductInterface extends ethers.utils.Interface {
     functionFragment: "buyPolicy",
     values: [string, string, BigNumberish, BigNumberish]
   ): string;
-  encodeFunctionData(functionFragment: "cancelFee", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "cancelPolicy",
     values: [BigNumberish]
@@ -114,6 +114,7 @@ interface CurveProductInterface extends ethers.utils.Interface {
     functionFragment: "isAuthorizedSigner",
     values: [string]
   ): string;
+  encodeFunctionData(functionFragment: "manageFee", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "maxCoverAmount",
     values?: undefined
@@ -144,16 +145,16 @@ interface CurveProductInterface extends ethers.utils.Interface {
     values: [string]
   ): string;
   encodeFunctionData(
-    functionFragment: "setCancelFee",
-    values: [BigNumberish]
-  ): string;
-  encodeFunctionData(
     functionFragment: "setExchangeQuoter",
     values: [string]
   ): string;
   encodeFunctionData(
     functionFragment: "setGovernance",
     values: [string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "setManageFee",
+    values: [BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "setMaxCoverAmount",
@@ -178,6 +179,10 @@ interface CurveProductInterface extends ethers.utils.Interface {
   encodeFunctionData(
     functionFragment: "updateActivePolicies",
     values: [BigNumberish[]]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "updateCoverLimit",
+    values: [BigNumberish, BigNumberish]
   ): string;
 
   decodeFunctionResult(
@@ -206,7 +211,6 @@ interface CurveProductInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "buyPolicy", data: BytesLike): Result;
-  decodeFunctionResult(functionFragment: "cancelFee", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "cancelPolicy",
     data: BytesLike
@@ -225,6 +229,7 @@ interface CurveProductInterface extends ethers.utils.Interface {
     functionFragment: "isAuthorizedSigner",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(functionFragment: "manageFee", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "maxCoverAmount",
     data: BytesLike
@@ -255,15 +260,15 @@ interface CurveProductInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "setCancelFee",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
     functionFragment: "setExchangeQuoter",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
     functionFragment: "setGovernance",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "setManageFee",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -287,6 +292,10 @@ interface CurveProductInterface extends ethers.utils.Interface {
     functionFragment: "updateActivePolicies",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(
+    functionFragment: "updateCoverLimit",
+    data: BytesLike
+  ): Result;
 
   events: {
     "ClaimSubmitted(uint256)": EventFragment;
@@ -294,6 +303,7 @@ interface CurveProductInterface extends ethers.utils.Interface {
     "PolicyCanceled(uint256)": EventFragment;
     "PolicyCreated(uint256)": EventFragment;
     "PolicyExtended(uint256)": EventFragment;
+    "PolicyUpdated(uint256)": EventFragment;
     "SignerAdded(address)": EventFragment;
     "SignerRemoved(address)": EventFragment;
   };
@@ -303,6 +313,7 @@ interface CurveProductInterface extends ethers.utils.Interface {
   getEvent(nameOrSignatureOrTopic: "PolicyCanceled"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "PolicyCreated"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "PolicyExtended"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "PolicyUpdated"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "SignerAdded"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "SignerRemoved"): EventFragment;
 }
@@ -419,18 +430,6 @@ export class CurveProduct extends Contract {
       overrides?: PayableOverrides
     ): Promise<ContractTransaction>;
 
-    cancelFee(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: BigNumber;
-    }>;
-
-    "cancelFee()"(
-      overrides?: CallOverrides
-    ): Promise<{
-      0: BigNumber;
-    }>;
-
     cancelPolicy(
       _policyID: BigNumberish,
       overrides?: Overrides
@@ -509,6 +508,18 @@ export class CurveProduct extends Contract {
       overrides?: CallOverrides
     ): Promise<{
       0: boolean;
+    }>;
+
+    manageFee(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    "manageFee()"(
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
     }>;
 
     maxCoverAmount(
@@ -641,16 +652,6 @@ export class CurveProduct extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    setCancelFee(
-      _cancelFee: BigNumberish,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
-    "setCancelFee(uint64)"(
-      _cancelFee: BigNumberish,
-      overrides?: Overrides
-    ): Promise<ContractTransaction>;
-
     setExchangeQuoter(
       _quoter: string,
       overrides?: Overrides
@@ -668,6 +669,16 @@ export class CurveProduct extends Contract {
 
     "setGovernance(address)"(
       _governance: string,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    setManageFee(
+      _manageFee: BigNumberish,
+      overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    "setManageFee(uint64)"(
+      _manageFee: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
@@ -729,6 +740,18 @@ export class CurveProduct extends Contract {
     "updateActivePolicies(uint256[])"(
       _policyIDs: BigNumberish[],
       overrides?: Overrides
+    ): Promise<ContractTransaction>;
+
+    updateCoverLimit(
+      _policyID: BigNumberish,
+      _coverLimit: BigNumberish,
+      overrides?: PayableOverrides
+    ): Promise<ContractTransaction>;
+
+    "updateCoverLimit(uint256,uint256)"(
+      _policyID: BigNumberish,
+      _coverLimit: BigNumberish,
+      overrides?: PayableOverrides
     ): Promise<ContractTransaction>;
   };
 
@@ -796,10 +819,6 @@ export class CurveProduct extends Contract {
     overrides?: PayableOverrides
   ): Promise<ContractTransaction>;
 
-  cancelFee(overrides?: CallOverrides): Promise<BigNumber>;
-
-  "cancelFee()"(overrides?: CallOverrides): Promise<BigNumber>;
-
   cancelPolicy(
     _policyID: BigNumberish,
     overrides?: Overrides
@@ -853,6 +872,10 @@ export class CurveProduct extends Contract {
     overrides?: CallOverrides
   ): Promise<boolean>;
 
+  manageFee(overrides?: CallOverrides): Promise<BigNumber>;
+
+  "manageFee()"(overrides?: CallOverrides): Promise<BigNumber>;
+
   maxCoverAmount(overrides?: CallOverrides): Promise<BigNumber>;
 
   "maxCoverAmount()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -903,16 +926,6 @@ export class CurveProduct extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  setCancelFee(
-    _cancelFee: BigNumberish,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
-  "setCancelFee(uint64)"(
-    _cancelFee: BigNumberish,
-    overrides?: Overrides
-  ): Promise<ContractTransaction>;
-
   setExchangeQuoter(
     _quoter: string,
     overrides?: Overrides
@@ -930,6 +943,16 @@ export class CurveProduct extends Contract {
 
   "setGovernance(address)"(
     _governance: string,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  setManageFee(
+    _manageFee: BigNumberish,
+    overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  "setManageFee(uint64)"(
+    _manageFee: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
@@ -991,6 +1014,18 @@ export class CurveProduct extends Contract {
   "updateActivePolicies(uint256[])"(
     _policyIDs: BigNumberish[],
     overrides?: Overrides
+  ): Promise<ContractTransaction>;
+
+  updateCoverLimit(
+    _policyID: BigNumberish,
+    _coverLimit: BigNumberish,
+    overrides?: PayableOverrides
+  ): Promise<ContractTransaction>;
+
+  "updateCoverLimit(uint256,uint256)"(
+    _policyID: BigNumberish,
+    _coverLimit: BigNumberish,
+    overrides?: PayableOverrides
   ): Promise<ContractTransaction>;
 
   callStatic: {
@@ -1055,10 +1090,6 @@ export class CurveProduct extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    cancelFee(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "cancelFee()"(overrides?: CallOverrides): Promise<BigNumber>;
-
     cancelPolicy(
       _policyID: BigNumberish,
       overrides?: CallOverrides
@@ -1115,6 +1146,10 @@ export class CurveProduct extends Contract {
       overrides?: CallOverrides
     ): Promise<boolean>;
 
+    manageFee(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "manageFee()"(overrides?: CallOverrides): Promise<BigNumber>;
+
     maxCoverAmount(overrides?: CallOverrides): Promise<BigNumber>;
 
     "maxCoverAmount()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -1162,16 +1197,6 @@ export class CurveProduct extends Contract {
       overrides?: CallOverrides
     ): Promise<void>;
 
-    setCancelFee(
-      _cancelFee: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    "setCancelFee(uint64)"(
-      _cancelFee: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
     setExchangeQuoter(
       _quoter: string,
       overrides?: CallOverrides
@@ -1189,6 +1214,16 @@ export class CurveProduct extends Contract {
 
     "setGovernance(address)"(
       _governance: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    setManageFee(
+      _manageFee: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "setManageFee(uint64)"(
+      _manageFee: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -1254,6 +1289,18 @@ export class CurveProduct extends Contract {
       0: BigNumber;
       1: BigNumber;
     }>;
+
+    updateCoverLimit(
+      _policyID: BigNumberish,
+      _coverLimit: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "updateCoverLimit(uint256,uint256)"(
+      _policyID: BigNumberish,
+      _coverLimit: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
   };
 
   filters: {
@@ -1266,6 +1313,8 @@ export class CurveProduct extends Contract {
     PolicyCreated(policyID: null): EventFilter;
 
     PolicyExtended(policyID: null): EventFilter;
+
+    PolicyUpdated(policyID: null): EventFilter;
 
     SignerAdded(_signer: null): EventFilter;
 
@@ -1334,10 +1383,6 @@ export class CurveProduct extends Contract {
       overrides?: PayableOverrides
     ): Promise<BigNumber>;
 
-    cancelFee(overrides?: CallOverrides): Promise<BigNumber>;
-
-    "cancelFee()"(overrides?: CallOverrides): Promise<BigNumber>;
-
     cancelPolicy(
       _policyID: BigNumberish,
       overrides?: Overrides
@@ -1394,6 +1439,10 @@ export class CurveProduct extends Contract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
+    manageFee(overrides?: CallOverrides): Promise<BigNumber>;
+
+    "manageFee()"(overrides?: CallOverrides): Promise<BigNumber>;
+
     maxCoverAmount(overrides?: CallOverrides): Promise<BigNumber>;
 
     "maxCoverAmount()"(overrides?: CallOverrides): Promise<BigNumber>;
@@ -1441,16 +1490,6 @@ export class CurveProduct extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    setCancelFee(
-      _cancelFee: BigNumberish,
-      overrides?: Overrides
-    ): Promise<BigNumber>;
-
-    "setCancelFee(uint64)"(
-      _cancelFee: BigNumberish,
-      overrides?: Overrides
-    ): Promise<BigNumber>;
-
     setExchangeQuoter(
       _quoter: string,
       overrides?: Overrides
@@ -1468,6 +1507,16 @@ export class CurveProduct extends Contract {
 
     "setGovernance(address)"(
       _governance: string,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    setManageFee(
+      _manageFee: BigNumberish,
+      overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    "setManageFee(uint64)"(
+      _manageFee: BigNumberish,
       overrides?: Overrides
     ): Promise<BigNumber>;
 
@@ -1526,6 +1575,18 @@ export class CurveProduct extends Contract {
     "updateActivePolicies(uint256[])"(
       _policyIDs: BigNumberish[],
       overrides?: Overrides
+    ): Promise<BigNumber>;
+
+    updateCoverLimit(
+      _policyID: BigNumberish,
+      _coverLimit: BigNumberish,
+      overrides?: PayableOverrides
+    ): Promise<BigNumber>;
+
+    "updateCoverLimit(uint256,uint256)"(
+      _policyID: BigNumberish,
+      _coverLimit: BigNumberish,
+      overrides?: PayableOverrides
     ): Promise<BigNumber>;
   };
 
@@ -1598,10 +1659,6 @@ export class CurveProduct extends Contract {
       overrides?: PayableOverrides
     ): Promise<PopulatedTransaction>;
 
-    cancelFee(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    "cancelFee()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
     cancelPolicy(
       _policyID: BigNumberish,
       overrides?: Overrides
@@ -1659,6 +1716,10 @@ export class CurveProduct extends Contract {
       arg0: string,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
+
+    manageFee(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    "manageFee()"(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     maxCoverAmount(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
@@ -1718,16 +1779,6 @@ export class CurveProduct extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    setCancelFee(
-      _cancelFee: BigNumberish,
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
-    "setCancelFee(uint64)"(
-      _cancelFee: BigNumberish,
-      overrides?: Overrides
-    ): Promise<PopulatedTransaction>;
-
     setExchangeQuoter(
       _quoter: string,
       overrides?: Overrides
@@ -1745,6 +1796,16 @@ export class CurveProduct extends Contract {
 
     "setGovernance(address)"(
       _governance: string,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    setManageFee(
+      _manageFee: BigNumberish,
+      overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    "setManageFee(uint64)"(
+      _manageFee: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
@@ -1806,6 +1867,18 @@ export class CurveProduct extends Contract {
     "updateActivePolicies(uint256[])"(
       _policyIDs: BigNumberish[],
       overrides?: Overrides
+    ): Promise<PopulatedTransaction>;
+
+    updateCoverLimit(
+      _policyID: BigNumberish,
+      _coverLimit: BigNumberish,
+      overrides?: PayableOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "updateCoverLimit(uint256,uint256)"(
+      _policyID: BigNumberish,
+      _coverLimit: BigNumberish,
+      overrides?: PayableOverrides
     ): Promise<PopulatedTransaction>;
   };
 }
