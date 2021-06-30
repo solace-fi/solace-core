@@ -25,7 +25,6 @@ interface IProduct {
     function coveredPlatform() external view returns (address);
     function productPolicyCount() external view returns (uint256);
     function activeCoverAmount() external view returns (uint256);
-    function activePolicyIDs(uint256 i) external view returns (uint256);
 
     function setGovernance(address _governance) external;
     function acceptGovernance() external;
@@ -49,7 +48,7 @@ interface IProduct {
     /**** MUTATIVE FUNCTIONS
     Functions that deploy and change policy contracts
     ****/
-    function updateActivePolicies(uint256[] calldata _policyIDs) external returns (uint256, uint256);
+    function updateActivePolicies(int256 _coverDiff) external;
     function buyPolicy(address _policyholder, address _positionContract, uint256 _coverLimit, uint64 _blocks) external payable returns (uint256 policyID);
     // function updateCoverLimit(address _policy, uint256 _coverLimit) external payable returns (bool);
     function extendPolicy(uint256 _policyID, uint64 _blocks) external payable;

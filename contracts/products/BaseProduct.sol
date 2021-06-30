@@ -3,6 +3,7 @@ pragma solidity 0.8.0;
 
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "../interface/IExchangeQuoter.sol";
 import "../interface/IPolicyManager.sol";
 import "../interface/ITreasury.sol";
 import "../interface/IVault.sol";
@@ -10,9 +11,6 @@ import "../interface/IRegistry.sol";
 import "../interface/IProduct.sol";
 
 /* TODO
- * - check transfer to treasury when buyPolicy()
- * - optimize _updateActivePolicies(), store in the expiration order (minheap)
- * - implement updateCoverLimit() so user can adjust exposure as their position changes in value
  * - implement transferPolicy() so a user can transfer their LP tokens somewhere else and update that on their policy
  */
 
@@ -48,11 +46,10 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
     // Book-keeping variables
     uint256 public override productPolicyCount; // total policy count this product sold
     uint256 public override activeCoverAmount; // current amount covered (in wei)
-    uint256[] public override activePolicyIDs;
-    mapping(bytes32 => uint256) private policyHashIdMap;
 
     mapping(address => bool) public isAuthorizedSigner;
     address public constant ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+    IExchangeQuoter public quoter;
 
     event SignerAdded(address _signer);
     event SignerRemoved(address _signer);
@@ -67,7 +64,8 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
         uint64 _minPeriod,
         uint64 _maxPeriod,
         uint64 _cancelFee,
-        uint24 _price
+        uint24 _price,
+        address _quoter
     ) {
         governance = msg.sender;
         policyManager = _policyManager;
@@ -79,6 +77,7 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
         maxPeriod = _maxPeriod;
         cancelFee = _cancelFee;
         price = _price;
+        quoter = IExchangeQuoter(_quoter);
         productPolicyCount = 0;
         activeCoverAmount = 0;
     }
@@ -164,6 +163,17 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
         maxCoverPerUser = _maxCoverPerUser;
     }
 
+    /**
+     * @notice Sets a new ExchangeQuoter.
+     * Can only be called by the current governor.
+     * @param _quoter The new quoter address.
+     */
+    function setExchangeQuoter(address _quoter) external {
+        // can only be called by governor
+        require(msg.sender == governance, "!governance");
+        quoter = IExchangeQuoter(_quoter);
+    }
+
     function addSigner(address _signer) external {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
@@ -222,28 +232,14 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
     Functions that change state variables, deploy and change policy contracts
     ****/
 
-    /**
-     * @notice Updates active policy count and active cover amount
-     */
-
-    function _updateActivePolicies(uint256[] calldata _policyIDs) internal {
-        for (uint256 i = 0; i < _policyIDs.length; i++) {
-            if (policyManager.getPolicyExpirationBlock(_policyIDs[i]) < block.number) {
-                activeCoverAmount -= policyManager.getPolicyCoverAmount(_policyIDs[i]);
-                policyManager.burn(activePolicyIDs[i]);
-                delete activePolicyIDs[i]; // todo: need to change to enumerable set or map
-            }
-        }
-    }
 
     /**
      * @notice Updates the product's book-keeping variables,
      * removing expired policies from the policies set and updating active cover amount
-     * @return activeCoverAmount and activePolicyCount active covered amount and active policy count as a tuple
      */
-    function updateActivePolicies(uint256[] calldata _policyIDs) external override returns (uint256, uint256) {
-        _updateActivePolicies(_policyIDs);
-        return (activeCoverAmount, activePolicyIDs.length);
+    function updateActivePolicies(int256 _coverDiff) external override {
+        require(msg.sender == address(policyManager), "!policymanager");
+        activeCoverAmount = add(activeCoverAmount, _coverDiff);
     }
 
     /**
@@ -256,11 +252,6 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
      * @return policyID The contract address of the policy
      */
     function buyPolicy(address _policyholder, address _positionContract, uint256 _coverLimit, uint64 _blocks) external payable override nonReentrant returns (uint256 policyID){
-        // check that the policy holder doesn't already have an identical policy
-        bytes32 policyHash = keccak256(abi.encodePacked(_policyholder, _positionContract));
-        uint256 policyID = policyHashIdMap[policyHash];
-        require(!policyManager.policyIsActive(policyID), "duplicate policy");
-
         // check that the buyer has a position in the covered protocol
         uint256 positionAmount = appraisePosition(_policyholder, _positionContract);
         require(positionAmount != 0, "zero position value");
@@ -288,9 +279,7 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
 
         // update local book-keeping variables
         activeCoverAmount += coverAmount;
-        activePolicyIDs.push(policyID);
         productPolicyCount++;
-        policyHashIdMap[policyHash] = policyID;
 
         emit PolicyCreated(policyID);
 
@@ -375,5 +364,17 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
         policyManager.burn(_policyID);
         ITreasury(payable(registry.treasury())).refund(msg.sender, refundAmount - cancelFee);
         emit PolicyCanceled(_policyID);
+    }
+
+    /**
+     * @notice Adds two numbers.
+     * @param _a The first number as a uint256.
+     * @param _b The second number as an int256.
+     * @return _c The sum as a uint256.
+     */
+    function add(uint256 _a, int256 _b) internal pure returns (uint256 _c) {
+        _c = (_b > 0)
+            ? _a + uint256(_b)
+            : _a - uint256(-_b);
     }
 }

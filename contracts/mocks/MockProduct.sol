@@ -11,6 +11,8 @@ import "../products/BaseProduct.sol";
  */
 contract MockProduct is BaseProduct {
 
+    uint256 public positionValue = 1000000000000000000;
+
     constructor (
         IPolicyManager _policyManager,
         IRegistry _registry,
@@ -31,7 +33,8 @@ contract MockProduct is BaseProduct {
         _minPeriod,
         _maxPeriod,
         _cancelFee,
-        _price
+        _price,
+        _quoter
     ) { }
 
      /**
@@ -47,18 +50,22 @@ contract MockProduct is BaseProduct {
      * @return positionAmount The user's total position in wei in the product's protocol.
      */
     function appraisePosition(address _buyer, address _positionContract) public view override virtual returns (uint256 positionAmount) {
-      return 100; // test for now in production this will be from a pool contract
+        return positionValue; // given value for now in production this will be from a pool contract
+    }
+
+    function setPositionValue(uint256 _value) external {
+        positionValue = _value;
     }
 
     function getPolicyExpiration(address _policy) external view returns (uint256 expirationDate) {
-      return maxPeriod;
+        return maxPeriod;
     }
 
     function getPolicyLimit(address _policy) external view returns (uint256 coverLimit) {
-      return maxCoverAmount;
+        return maxCoverAmount;
     }
 
     function getTotalCovered() external view returns (uint256 coveredAmount) {
-      return activeCoverAmount;
+        return activeCoverAmount;
     }
 }

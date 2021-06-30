@@ -441,6 +441,7 @@ describe("Treasury", function () {
       expect(balancesAfter.treasuryEth).to.equal(0);
       expect(balancesDiff.userEth).to.equal(40);
       expect(balancesDiff.treasuryWeth).to.equal(60);
+      await treasury.connect(governor).routePremiums(); // empty routing
     })
 
     it("non governor cannot wrap eth", async function () {
@@ -495,6 +496,7 @@ describe("Treasury", function () {
     })
 
     it("product can partially refund", async function () {
+      // part 1: partial refund
       let balancesBefore = await getBalances(user);
       let totalEth = balancesBefore.treasuryEth.add(balancesBefore.treasuryWeth);
       let refundAmount = totalEth.add(10);
@@ -505,15 +507,17 @@ describe("Treasury", function () {
       expect(balancesAfter.treasuryWeth).to.equal(0);
       expect(balancesDiff.userEth).to.equal(totalEth);
       expect(await treasury.unpaidRewards(user.address)).to.equal(10);
-
+      // part 2: remainder
       await treasury.connect(deployer).depositEth({value: 20});
-      let tx = await treasury.connect(user).withdraw()
+      let tx = await treasury.connect(user).withdraw();
       let receipt = await tx.wait();
       let gasCost = receipt.gasUsed.mul(tx.gasPrice);
       let balancesAfter2 = await getBalances(user);
       let balancesDiff2 = getBalancesDiff(balancesAfter2, balancesBefore);
       expect(balancesDiff2.userEth).to.equal(refundAmount.sub(gasCost));
       expect(await treasury.unpaidRewards(user.address)).to.equal(0);
+      // part 3: empty withdraw
+      await treasury.connect(user).withdraw();
     })
   })
 
