@@ -233,7 +233,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
     /**
      * @notice Exposes setTokenURI function for products to modify policies
      * The caller must be a product.
-     * @param _policyId aka tokenID
+     * @param _policyID aka tokenID
      * @param _policyholder receiver of new policy token
      * @param _positionContract contract address where the position is covered
      * @param _expirationBlock policy expiration block number
@@ -241,7 +241,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
      * @param _price coverage price
      */
     function setPolicyInfo(
-        uint256 _policyId,
+        uint256 _policyID,
         address _policyholder,     // TODO: should this be changeable?
         address _positionContract, // and this
         uint256 _coverAmount,
@@ -250,8 +250,8 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
         )
         external override
     {
-        require(_exists(_policyId), "query for nonexistent token");
-        require(policyInfo[_policyId].product == msg.sender, "wrong product");
+        require(_exists(_policyID), "query for nonexistent token");
+        require(policyInfo[_policyID].product == msg.sender, "wrong product");
         PolicyInfo memory info = PolicyInfo({
             policyholder: _policyholder,
             product: msg.sender,
@@ -260,20 +260,24 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
             coverAmount: _coverAmount,
             price: _price
         });
-        policyInfo[_policyId] = info;
+        policyInfo[_policyID] = info;
     }
 
     /**
      * @notice Fuction for the product to burn expired or canceled policies
      * The caller must be a product.
-     * @param _policyId policyID aka tokenID
+     * @param _policyID policyID aka tokenID
      */
-    function burn(uint256 _policyId) external override {
-        _burn(_policyId);
-        address policyholder = policyInfo[_policyId].policyholder;
-        address positionContract = policyInfo[_policyId].positionContract;
-        delete policyInfo[_policyId];
-        emit PolicyBurned(_policyId);
+    function burn(uint256 _policyID) external override {
+        require(_exists(_policyID), "query for nonexistent token");
+        require(policyInfo[_policyID].product == msg.sender, "wrong product");
+        _burn(_policyID);
+    }
+
+    function _burn(uint256 _policyID) internal override {
+        super._burn(_policyID);
+        delete policyInfo[_policyID];
+        emit PolicyBurned(_policyID);
     }
 
     function updateActivePolicies(uint256[] calldata _policyIDs) external override {
@@ -284,7 +288,6 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
                 uint256 coverAmount = policyInfo[policyID].coverAmount;
                 IProduct(product).updateActivePolicies(-int256(coverAmount));
                 _burn(policyID);
-                delete policyInfo[policyID];
             }
         }
         // todo: an implementation like this would reduce SSTOREs if updating multiple policies of the same product

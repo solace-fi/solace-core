@@ -414,33 +414,36 @@ describe("Treasury", function () {
   })
 
   describe("route premiums", function () {
+    it("can route premiums with no recipients", async function () {
+      let balancesBefore = await getBalances(user);
+      let depositAmount = 100;
+      await treasury.connect(user).routePremiums({value: depositAmount});
+      let balancesAfter = await getBalances(user);
+      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
+      expect(balancesDiff.treasuryEth).to.equal(depositAmount);
+    })
+
     it("non governor cannot set recipients", async function () {
       await expect(treasury.connect(user).setPremiumRecipients([],[1])).to.be.revertedWith("!governance");
     })
 
-    it("validates recipients", async function () {
+    it("validates recipients and weights", async function () {
       await expect(treasury.connect(governor).setPremiumRecipients([],[1,2])).to.be.revertedWith("length mismatch");
+      await expect(treasury.connect(governor).setPremiumRecipients([deployer.address],[0,0])).to.be.revertedWith("1/0");
     })
 
     it("can set recipients", async function () {
       await treasury.connect(governor).setPremiumRecipients([deployer.address],[2,3]);
     })
 
-    it("non governor cannot route premiums", async function () {
-      await expect(treasury.connect(user).routePremiums()).to.be.revertedWith("!governance");
-    })
-
     it("can route premiums", async function () {
       let balancesBefore = await getBalances(deployer);
-      await treasury.connect(governor).spend(ETH_ADDRESS, balancesBefore.treasuryEth, user.address);
       let depositAmount = 100;
-      await treasury.connect(user).depositEth({value: depositAmount});
-      await treasury.connect(governor).routePremiums();
+      await treasury.connect(user).routePremiums({value: depositAmount});
       let balancesAfter = await getBalances(deployer);
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
-      expect(balancesAfter.treasuryEth).to.equal(0);
+      expect(balancesDiff.treasuryEth).to.equal(60);
       expect(balancesDiff.userEth).to.equal(40);
-      expect(balancesDiff.treasuryWeth).to.equal(60);
       await treasury.connect(governor).routePremiums(); // empty routing
     })
 

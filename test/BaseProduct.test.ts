@@ -348,6 +348,12 @@ describe("BaseProduct", () => {
     it("cannot extend from a different product", async function() {
       await expect(product2.connect(buyer).extendPolicy(policyID, blocks, {value: quote})).to.be.revertedWith("wrong product");
     })
+    it("cannot extend an expired policy", async function () {
+      let expBlock = await policyManager.getPolicyExpirationBlock(policyID);
+      await product.setPolicyExpiration(policyID, 100);
+      await expect(product.connect(buyer).extendPolicy(policyID, blocks, {value: quote})).to.be.revertedWith("policy is expired");
+      await product.setPolicyExpiration(policyID, expBlock);
+    })
     it("cannot extend by zero blocks", async function() {
       await expect(product.connect(buyer).extendPolicy(policyID, 0, {value: quote})).to.be.revertedWith("insufficient payment or premium is zero");
     })
@@ -406,12 +412,11 @@ describe("BaseProduct", () => {
       let gasCost = receipt.gasUsed.mul(tx.gasPrice);
       let balance2 = await buyer.getBalance();
       let actualRefund = balance2.add(gasCost).sub(balance1);
-      // Expected "74191490000000" to be equal 74197012000000
       expect(actualRefund).to.equal(expectedRefund);
     })
   })
 
-  describe("claim signers", function () {
+  describe("paclas signers", function () {
     it("non governance cannot add signers", async function () {
       await expect(product.connect(buyer).addSigner(buyer.address)).to.be.revertedWith("!governance");
     });

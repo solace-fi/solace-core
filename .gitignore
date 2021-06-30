@@ -4,9 +4,12 @@ client
 .env
 contracts_processed
 coverage
+coverage.json
+docs/
 
 #Hardhat files
 cache
 artifacts
+typechain/
 
 *-ignore

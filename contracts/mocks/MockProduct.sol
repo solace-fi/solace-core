@@ -49,7 +49,7 @@ contract MockProduct is BaseProduct {
      * @param _positionContract address of the exact smart contract the buyer has their position in (e.g., for UniswapProduct this would be Pair's address)
      * @return positionAmount The user's total position in wei in the product's protocol.
      */
-    function appraisePosition(address _buyer, address _positionContract) public view override virtual returns (uint256 positionAmount) {
+    function appraisePosition(address _buyer, address _positionContract) public view override returns (uint256 positionAmount) {
         return positionValue; // given value for now in production this will be from a pool contract
     }
 
@@ -57,12 +57,9 @@ contract MockProduct is BaseProduct {
         positionValue = _value;
     }
 
-    function getPolicyExpiration(address _policy) external view returns (uint256 expirationDate) {
-        return maxPeriod;
-    }
-
-    function getPolicyLimit(address _policy) external view returns (uint256 coverLimit) {
-        return maxCoverAmount;
+    function setPolicyExpiration(uint256 _policyID, uint64 _expirationBlock) external {
+        (address policyholder, address product, address positionContract, uint256 coverAmount, uint64 expirationBlock, uint24 price) = policyManager.getPolicyInfo(_policyID);
+        policyManager.setPolicyInfo(_policyID, policyholder, positionContract, coverAmount, _expirationBlock, price);
     }
 
     function getTotalCovered() external view returns (uint256 coveredAmount) {

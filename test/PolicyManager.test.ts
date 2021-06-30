@@ -182,15 +182,18 @@ describe("PolicyManager", function () {
       expect(await policyManager.listPolicies(user.address)).to.deep.equal([BN.from(1),BN.from(2)]);
     })
 
-    it("can burn policy", async function (){
+    it("cannot directly burn policy", async function () {
+      await expect(policyManager.connect(user).burn(1)).to.be.revertedWith("wrong product");
+    })
+
+    it("can burn policy via product", async function (){
       let tokenID = await policyManager.connect(mockProduct2).createPolicy(user.address, positionContract.address, coverAmount, expirationBlock, price);
       let receipt = (await tokenID.wait())
       expect(receipt.logs[0].topics[3]).to.equal("0x0000000000000000000000000000000000000000000000000000000000000003")
 
-
-      await policyManager.connect(governor).burn(1); // burn tokenID 1
+      await policyManager.connect(mockProduct2).burn(1); // burn tokenID 1
       expect(await policyManager.exists(1)).to.equal(false);
-      await policyManager.connect(governor).burn(2); // burn tokenID 2
+      await policyManager.connect(mockProduct2).burn(2); // burn tokenID 2
       expect(await policyManager.exists(2)).to.equal(false);
       let totalPolicyCount = await policyManager.totalPolicyCount();
       expect(totalPolicyCount).to.equal(3);

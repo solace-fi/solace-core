@@ -50,6 +50,7 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
     mapping(address => bool) public isAuthorizedSigner;
     address public constant ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     IExchangeQuoter public quoter;
+    bool public paused; // = false
 
     event SignerAdded(address _signer);
     event SignerRemoved(address _signer);
@@ -188,6 +189,18 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
         emit SignerRemoved(_signer);
     }
 
+    /**
+     * @notice Pauses or unpauses buying and extending policies.
+     * Cancelling policies and submitting claims are unaffected by pause.
+     * Can only be called by the current governor.
+     * @dev Used for security and to gracefully phase out old products.
+     */
+    function setPaused(bool _pause) external {
+        // can only be called by governor
+        require(msg.sender == governance, "!governance");
+        paused = _pause;
+    }
+
 
     /**** UNIMPLEMENTED FUNCTIONS
     Functions that are only implemented by child product contracts
@@ -252,6 +265,7 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
      * @return policyID The contract address of the policy
      */
     function buyPolicy(address _policyholder, address _positionContract, uint256 _coverLimit, uint64 _blocks) external payable override nonReentrant returns (uint256 policyID){
+        require(!paused, "cannot buy when paused");
         // check that the buyer has a position in the covered protocol
         uint256 positionAmount = appraisePosition(_policyholder, _positionContract);
         require(positionAmount != 0, "zero position value");
@@ -297,7 +311,7 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
         // check msg.sender is policyholder, check for correct product, and that the coverageLimit is valid
         require(policyholder == msg.sender, "!policyholder");
         require(product == address(this), "wrong product");
-        require(expirationBlock < block.number, "policy is expired");
+        require(expirationBlock >= block.number, "policy is expired");
         require(_coverLimit > 0 && _coverLimit <= 1e4, "invalid cover limit percentage");
 
         //appraise the position
@@ -338,6 +352,7 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
      * @param _blocks length of extension
      */
     function extendPolicy(uint256 _policyID, uint64 _blocks) external payable override nonReentrant {
+        require(!paused, "cannot extend when paused");
         // check that the msg.sender is the policyholder
         (address policyholder, address product, address positionContract, uint256 coverAmount, uint64 expirationBlock, uint24 price) = policyManager.getPolicyInfo(_policyID);
         require(policyholder == msg.sender,"!policyholder");
