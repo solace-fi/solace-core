@@ -35,7 +35,7 @@ contract Treasury is ITreasury, ReentrancyGuard {
 
     address public constant ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
-    address[] public premiumRecipients;
+    address payable[] public premiumRecipients;
     uint32[] public recipientWeights;
     uint32 public weightSum;
 
@@ -170,7 +170,7 @@ contract Treasury is ITreasury, ReentrancyGuard {
      * @param _recipients The premium recipients.
      * @param _weights The recipient weights.
      */
-    function setPremiumRecipients(address[] calldata _recipients, uint32[] calldata _weights) external override {
+    function setPremiumRecipients(address payable[] calldata _recipients, uint32[] calldata _weights) external override {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
         // check recipient - weight map
@@ -178,6 +178,7 @@ contract Treasury is ITreasury, ReentrancyGuard {
         uint32 sum = 0;
         uint256 length = _weights.length;
         for(uint256 i = 0; i < length; i++) sum += _weights[i];
+        if(length > 0) require(sum > 0, "1/0");
         weightSum = sum;
         premiumRecipients = _recipients;
         recipientWeights = _weights;
@@ -185,23 +186,16 @@ contract Treasury is ITreasury, ReentrancyGuard {
 
     /**
      * @notice Routes the premiums to the recipients
-     * Can only be called by the current governor.
      */
     function routePremiums() external payable override nonReentrant {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
         uint256 div = weightSum;
-        // assumes that premiums and nothing else are stored as eth
-        uint256 balance = address(this).balance;
         uint256 length = premiumRecipients.length;
         // transfer to all recipients
         for(uint i = 0; i < length; i++) {
-            uint256 amount = balance * recipientWeights[i] / div;
-            if(amount > 0) payable(premiumRecipients[i]).transfer(amount);
+            uint256 amount = msg.value * recipientWeights[i] / div;
+            if(amount > 0) premiumRecipients[i].transfer(amount);
         }
-        // hold treasury share as weth
-        balance = address(this).balance;
-        if(balance > 0) weth.deposit{value: balance}();
+        // hold treasury share as eth
     }
 
     /**
