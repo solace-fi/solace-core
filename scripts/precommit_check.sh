@@ -10,8 +10,6 @@ rm -rf contracts_processed
 rm -rf node_modules
 rm -rf coverage
 rm coverage.json
-rm -rf docs/_build/html
-rm -rf docs/_build/md
 
 # install packages. process, compile, and test contracts
 npm install
@@ -35,9 +33,6 @@ mv test/SolaceEthLpFarm.test.ts-ignore test/SolaceEthLpFarm.test.ts
 mv test/LpAppraisor.test.ts-ignore test/LpAppraisor.test.ts
 
 # docs
-cd docs
-make html
-cd ..
 #npx solidity-docgen --solc-module solc-0.8 -o docs/_build/md
 
 # misc

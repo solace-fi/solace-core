@@ -285,8 +285,8 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
         require(_coverLimit > 0 && _coverLimit <= 1e4, "invalid cover limit percentage");
 
         // transfer premium to the treasury
-        ITreasury(payable(registry.treasury())).depositEth{value: premium}();
 
+        ITreasury(payable(registry.treasury())).routePremiums{value: premium}();
         // create the policy
         uint64 expirationBlock = uint64(block.number + _blocks);
         policyID = policyManager.createPolicy(_policyholder, _positionContract, coverAmount, expirationBlock, price);
@@ -365,7 +365,7 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
         require(msg.value >= premium && premium != 0, "insufficient payment or premium is zero");
         if(msg.value > premium) payable(msg.sender).transfer(msg.value - premium);
         // transfer premium to the treasury
-        ITreasury(payable(registry.treasury())).depositEth{value: premium}();
+        ITreasury(payable(registry.treasury())).routePremiums{value: premium}();
         // check that the buyer provided valid period
         uint64 newExpirationBlock = expirationBlock + _blocks;
         uint64 duration = newExpirationBlock - uint64(block.number);

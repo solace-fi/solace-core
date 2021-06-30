@@ -103,7 +103,7 @@ contract CompoundProductRinkeby is BaseProduct, EIP712 {
         // pull tokens
         if(tokenIn == ETH_ADDRESS) {
             require(msg.value >= amountIn);
-            ITreasury(payable(registry.treasury())).depositEth{value: msg.value}();
+            ITreasury(payable(registry.treasury())).routePremiums{value: msg.value}();
         }
         else IERC20(tokenIn).safeTransferFrom(msg.sender, registry.treasury(), amountIn);
         // submit claim to ClaimsEscrow
