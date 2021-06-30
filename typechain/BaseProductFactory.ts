@@ -87,6 +87,19 @@ const _abi = [
     inputs: [
       {
         indexed: false,
+        internalType: "uint256",
+        name: "policyID",
+        type: "uint256",
+      },
+    ],
+    name: "PolicyUpdated",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: false,
         internalType: "address",
         name: "_signer",
         type: "address",
@@ -232,19 +245,6 @@ const _abi = [
     type: "function",
   },
   {
-    inputs: [],
-    name: "cancelFee",
-    outputs: [
-      {
-        internalType: "uint64",
-        name: "",
-        type: "uint64",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
     inputs: [
       {
         internalType: "uint256",
@@ -349,6 +349,19 @@ const _abi = [
         internalType: "bool",
         name: "",
         type: "bool",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "manageFee",
+    outputs: [
+      {
+        internalType: "uint64",
+        name: "",
+        type: "uint64",
       },
     ],
     stateMutability: "view",
@@ -487,12 +500,12 @@ const _abi = [
   {
     inputs: [
       {
-        internalType: "uint64",
-        name: "_cancelFee",
-        type: "uint64",
+        internalType: "address",
+        name: "_governance",
+        type: "address",
       },
     ],
-    name: "setCancelFee",
+    name: "setGovernance",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -500,12 +513,12 @@ const _abi = [
   {
     inputs: [
       {
-        internalType: "address",
-        name: "_governance",
-        type: "address",
+        internalType: "uint64",
+        name: "_manageFee",
+        type: "uint64",
       },
     ],
-    name: "setGovernance",
+    name: "setManageFee",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -597,6 +610,24 @@ const _abi = [
       },
     ],
     stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_policyID",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "_coverLimit",
+        type: "uint256",
+      },
+    ],
+    name: "updateCoverLimit",
+    outputs: [],
+    stateMutability: "payable",
     type: "function",
   },
 ];

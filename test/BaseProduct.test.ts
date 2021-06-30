@@ -32,7 +32,7 @@ describe("BaseProduct", () => {
   const maxPeriod1 = 45150; // this is about 1 week from https://ycharts.c om/indicators/ethereum_blocks_per_day
   const maxCoverAmount1 = BN.from("1000000000000000000"); // 1 Ether in wei
   const maxCoverPerUser1 = BN.from("10000000000000000"); // 0.01 Ether in wei
-  const cancelFee1 = BN.from("100000000000000"); // 0.0001 Ether in wei
+  const manageFee1 = BN.from("100000000000000"); // 0.0001 Ether in wei
   const price1 = 10000;
 
   const threeDays = 19350;
@@ -40,7 +40,7 @@ describe("BaseProduct", () => {
   const maxPeriod2 = 2354250; // one year
   const maxCoverAmount2 = BN.from("1000000000000000000000"); // 1000 Ether in wei
   const maxCoverPerUser2 = BN.from("10000000000000000000"); // 10 Ether in wei
-  const cancelFee2 = BN.from("100000000000000000"); // 0.1 Ether in wei
+  const manageFee2 = BN.from("100000000000000000"); // 0.1 Ether in wei
   const price2 = 11044; // 2.60%/yr
 
   before(async () => {
@@ -130,7 +130,7 @@ describe("BaseProduct", () => {
         maxCoverPerUser1,
         minPeriod1,
         maxPeriod1,
-        cancelFee1,
+        manageFee1,
         price1,
         quoter1.address
       ]
@@ -148,7 +148,7 @@ describe("BaseProduct", () => {
         maxCoverPerUser1,
         minPeriod1,
         maxPeriod1,
-        cancelFee1,
+        manageFee1,
         price1,
         quoter1.address
       ]
@@ -198,15 +198,15 @@ describe("BaseProduct", () => {
     it("should revert setPrice if not called by governance", async function () {
       await expect(product.connect(buyer).setPrice(price1)).to.be.revertedWith("!governance");
     });
-    it("can get cancelFee", async function () {
-      expect(await product.cancelFee()).to.eq(cancelFee1);
+    it("can get manageFee", async function () {
+      expect(await product.manageFee()).to.eq(manageFee1);
     });
-    it("can set cancelFee", async function () {
-      await product.connect(governor).setCancelFee(cancelFee2);
-      expect(await product.cancelFee()).to.equal(cancelFee2);
+    it("can set manageFee", async function () {
+      await product.connect(governor).setManageFee(manageFee2);
+      expect(await product.manageFee()).to.equal(manageFee2);
     })
-    it("should revert setCancelFee if not called by governance", async function () {
-      await expect(product.connect(buyer).setCancelFee(cancelFee1)).to.be.revertedWith("!governance");
+    it("should revert setManageFee if not called by governance", async function () {
+      await expect(product.connect(buyer).setManageFee(manageFee1)).to.be.revertedWith("!governance");
     });
     it("can get minPeriod", async function () {
       expect(await product.minPeriod()).to.eq(minPeriod1);
@@ -396,11 +396,11 @@ describe("BaseProduct", () => {
     })
     it("refunds proper amount", async function () {
       //let quote = BN.from(await product.getQuote(buyer.address, positionContract.address, 1, minPeriod2));
-      await product.connect(governor).setCancelFee(cancelFee1);
+      await product.connect(governor).setManageFee(manageFee1);
       let info = await policyManager.getPolicyInfo(policyID);
       let block = await provider.getBlockNumber();
       let balance1 = await buyer.getBalance();
-      let expectedRefund = info.expirationBlock.sub(block+1).mul(info.price).mul(info.coverAmount).div(1e12).sub(cancelFee1);
+      let expectedRefund = info.expirationBlock.sub(block+1).mul(info.price).mul(info.coverAmount).div(1e12).sub(manageFee1);
       let tx = await product.connect(buyer).cancelPolicy(policyID);
       let receipt = await tx.wait();
       let gasCost = receipt.gasUsed.mul(tx.gasPrice);

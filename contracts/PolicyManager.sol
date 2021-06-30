@@ -225,8 +225,6 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
         });
         policyID = ++totalPolicyCount; // starts at 1
         policyInfo[policyID] = info;
-        //policyHashIdMap[_policyHash] = policyID;
-        //policySearchMap[msg.sender][_policyholder][_positionContract] = tokenID;
         _mint(_policyholder, policyID);
         emit PolicyCreated(policyID);
         return policyID;
@@ -263,7 +261,6 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
             price: _price
         });
         policyInfo[_policyId] = info;
-        //policySearchMap[msg.sender][_policyholder][_positionContract] = tokenID;
     }
 
     /**

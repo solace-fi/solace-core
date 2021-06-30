@@ -187,7 +187,7 @@ contract Treasury is ITreasury, ReentrancyGuard {
      * @notice Routes the premiums to the recipients
      * Can only be called by the current governor.
      */
-    function routePremiums() external override nonReentrant {
+    function routePremiums() external payable override nonReentrant {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
         uint256 div = weightSum;

@@ -34,7 +34,9 @@ interface ITreasuryInterface extends ethers.utils.Interface {
     "setPremiumRecipients(address[],uint32[])": FunctionFragment;
     "spend(address,uint256,address)": FunctionFragment;
     "swap(bytes,uint256,uint256)": FunctionFragment;
+    "unpaidRewards(address)": FunctionFragment;
     "unwrap(uint256)": FunctionFragment;
+    "withdraw()": FunctionFragment;
     "wrap(uint256)": FunctionFragment;
   };
 
@@ -83,9 +85,14 @@ interface ITreasuryInterface extends ethers.utils.Interface {
     values: [BytesLike, BigNumberish, BigNumberish]
   ): string;
   encodeFunctionData(
+    functionFragment: "unpaidRewards",
+    values: [string]
+  ): string;
+  encodeFunctionData(
     functionFragment: "unwrap",
     values: [BigNumberish]
   ): string;
+  encodeFunctionData(functionFragment: "withdraw", values?: undefined): string;
   encodeFunctionData(functionFragment: "wrap", values: [BigNumberish]): string;
 
   decodeFunctionResult(
@@ -117,7 +124,12 @@ interface ITreasuryInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(functionFragment: "spend", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "swap", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "unpaidRewards",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "unwrap", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "withdraw", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "wrap", data: BytesLike): Result;
 
   events: {
@@ -203,9 +215,11 @@ export class ITreasury extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
-    routePremiums(overrides?: Overrides): Promise<ContractTransaction>;
+    routePremiums(overrides?: PayableOverrides): Promise<ContractTransaction>;
 
-    "routePremiums()"(overrides?: Overrides): Promise<ContractTransaction>;
+    "routePremiums()"(
+      overrides?: PayableOverrides
+    ): Promise<ContractTransaction>;
 
     setGovernance(
       _governance: string,
@@ -257,6 +271,20 @@ export class ITreasury extends Contract {
       overrides?: Overrides
     ): Promise<ContractTransaction>;
 
+    unpaidRewards(
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
+    "unpaidRewards(address)"(
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<{
+      0: BigNumber;
+    }>;
+
     unwrap(
       _amount: BigNumberish,
       overrides?: Overrides
@@ -266,6 +294,10 @@ export class ITreasury extends Contract {
       _amount: BigNumberish,
       overrides?: Overrides
     ): Promise<ContractTransaction>;
+
+    withdraw(overrides?: Overrides): Promise<ContractTransaction>;
+
+    "withdraw()"(overrides?: Overrides): Promise<ContractTransaction>;
 
     wrap(
       _amount: BigNumberish,
@@ -318,9 +350,9 @@ export class ITreasury extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
-  routePremiums(overrides?: Overrides): Promise<ContractTransaction>;
+  routePremiums(overrides?: PayableOverrides): Promise<ContractTransaction>;
 
-  "routePremiums()"(overrides?: Overrides): Promise<ContractTransaction>;
+  "routePremiums()"(overrides?: PayableOverrides): Promise<ContractTransaction>;
 
   setGovernance(
     _governance: string,
@@ -372,6 +404,13 @@ export class ITreasury extends Contract {
     overrides?: Overrides
   ): Promise<ContractTransaction>;
 
+  unpaidRewards(_user: string, overrides?: CallOverrides): Promise<BigNumber>;
+
+  "unpaidRewards(address)"(
+    _user: string,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
+
   unwrap(
     _amount: BigNumberish,
     overrides?: Overrides
@@ -381,6 +420,10 @@ export class ITreasury extends Contract {
     _amount: BigNumberish,
     overrides?: Overrides
   ): Promise<ContractTransaction>;
+
+  withdraw(overrides?: Overrides): Promise<ContractTransaction>;
+
+  "withdraw()"(overrides?: Overrides): Promise<ContractTransaction>;
 
   wrap(
     _amount: BigNumberish,
@@ -487,12 +530,23 @@ export class ITreasury extends Contract {
       overrides?: CallOverrides
     ): Promise<void>;
 
+    unpaidRewards(_user: string, overrides?: CallOverrides): Promise<BigNumber>;
+
+    "unpaidRewards(address)"(
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     unwrap(_amount: BigNumberish, overrides?: CallOverrides): Promise<void>;
 
     "unwrap(uint256)"(
       _amount: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
+
+    withdraw(overrides?: CallOverrides): Promise<void>;
+
+    "withdraw()"(overrides?: CallOverrides): Promise<void>;
 
     wrap(_amount: BigNumberish, overrides?: CallOverrides): Promise<void>;
 
@@ -553,9 +607,9 @@ export class ITreasury extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
-    routePremiums(overrides?: Overrides): Promise<BigNumber>;
+    routePremiums(overrides?: PayableOverrides): Promise<BigNumber>;
 
-    "routePremiums()"(overrides?: Overrides): Promise<BigNumber>;
+    "routePremiums()"(overrides?: PayableOverrides): Promise<BigNumber>;
 
     setGovernance(
       _governance: string,
@@ -607,12 +661,23 @@ export class ITreasury extends Contract {
       overrides?: Overrides
     ): Promise<BigNumber>;
 
+    unpaidRewards(_user: string, overrides?: CallOverrides): Promise<BigNumber>;
+
+    "unpaidRewards(address)"(
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     unwrap(_amount: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
 
     "unwrap(uint256)"(
       _amount: BigNumberish,
       overrides?: Overrides
     ): Promise<BigNumber>;
+
+    withdraw(overrides?: Overrides): Promise<BigNumber>;
+
+    "withdraw()"(overrides?: Overrides): Promise<BigNumber>;
 
     wrap(_amount: BigNumberish, overrides?: Overrides): Promise<BigNumber>;
 
@@ -663,9 +728,11 @@ export class ITreasury extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
-    routePremiums(overrides?: Overrides): Promise<PopulatedTransaction>;
+    routePremiums(overrides?: PayableOverrides): Promise<PopulatedTransaction>;
 
-    "routePremiums()"(overrides?: Overrides): Promise<PopulatedTransaction>;
+    "routePremiums()"(
+      overrides?: PayableOverrides
+    ): Promise<PopulatedTransaction>;
 
     setGovernance(
       _governance: string,
@@ -717,6 +784,16 @@ export class ITreasury extends Contract {
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
 
+    unpaidRewards(
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    "unpaidRewards(address)"(
+      _user: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
     unwrap(
       _amount: BigNumberish,
       overrides?: Overrides
@@ -726,6 +803,10 @@ export class ITreasury extends Contract {
       _amount: BigNumberish,
       overrides?: Overrides
     ): Promise<PopulatedTransaction>;
+
+    withdraw(overrides?: Overrides): Promise<PopulatedTransaction>;
+
+    "withdraw()"(overrides?: Overrides): Promise<PopulatedTransaction>;
 
     wrap(
       _amount: BigNumberish,
