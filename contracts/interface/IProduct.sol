@@ -49,7 +49,7 @@ interface IProduct {
     /**** MUTATIVE FUNCTIONS
     Functions that deploy and change policy contracts
     ****/
-    function updateActivePolicies(int256 _coverDiff) external;
+    function updateActiveCoverAmount(int256 _coverDiff) external;
     function buyPolicy(address _policyholder, address _positionContract, uint256 _coverLimit, uint64 _blocks) external payable returns (uint256 policyID);
     function updateCoverLimit(uint256 _policyID, uint256 _coverLimit) external payable;
     function extendPolicy(uint256 _policyID, uint64 _blocks) external payable;

@@ -286,7 +286,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
             if (policyHasEnded(policyID)) {
                 address product = policyInfo[policyID].product;
                 uint256 coverAmount = policyInfo[policyID].coverAmount;
-                IProduct(product).updateActivePolicies(-int256(coverAmount));
+                IProduct(product).updateActiveCoverAmount(-int256(coverAmount));
                 _burn(policyID);
             }
         }
@@ -313,7 +313,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
         //for(uint256 i = 0; i < changedProducts.length(); i++) {
         for(uint256 i = 0; i < productCoverageDiffs.length(); i++) {
             (address product, uint256 diff) = productCoverageDiffs.at(i);
-            IProduct(product).updateActivePolicies(int256(-diff));
+            IProduct(product).updateActiveCoverAmount(int256(-diff));
         }
         */
     }

@@ -247,10 +247,10 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
 
 
     /**
-     * @notice Updates the product's book-keeping variables,
-     * removing expired policies from the policies set and updating active cover amount
+     * @notice Updates the product's book-keeping variables.
+     * @param _coverDiff change in active cover amount
      */
-    function updateActivePolicies(int256 _coverDiff) external override {
+    function updateActiveCoverAmount(int256 _coverDiff) external override {
         require(msg.sender == address(policyManager), "!policymanager");
         activeCoverAmount = add(activeCoverAmount, _coverDiff);
     }
@@ -307,6 +307,7 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
      * @param _coverLimit new cover percentage
      */
     function updateCoverLimit(uint256 _policyID, uint256 _coverLimit) external payable override nonReentrant {
+        require(!paused, "cannot buy when paused");
         (address policyholder, address product, address positionContract, uint256 previousCoverAmount, uint64 expirationBlock, uint24 previousPrice) = policyManager.getPolicyInfo(_policyID);
         // check msg.sender is policyholder, check for correct product, and that the coverageLimit is valid
         require(policyholder == msg.sender, "!policyholder");
