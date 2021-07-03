@@ -86,11 +86,10 @@ interface ITreasury {
      * @param _recipients The premium recipients.
      * @param _weights The recipient weights.
      */
-    function setPremiumRecipients(address[] calldata _recipients, uint32[] calldata _weights) external;
+    function setPremiumRecipients(address payable[] calldata _recipients, uint32[] calldata _weights) external;
 
     /**
      * @notice Routes the premiums to the recipients
-     * Can only be called by the current governor.
      */
     function routePremiums() external payable;
 

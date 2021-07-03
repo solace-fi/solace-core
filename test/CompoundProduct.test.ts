@@ -168,8 +168,8 @@ if(process.env.FORK_NETWORK === "mainnet"){
         [
           deployer.address,
           ZERO_ADDRESS,
-          ZERO_ADDRESS,
-          weth.address
+          weth.address,
+          ZERO_ADDRESS
         ]
       )) as Treasury;
 
@@ -441,8 +441,8 @@ else if(process.env.FORK_NETWORK === "rinkeby"){
         [
           deployer.address,
           ZERO_ADDRESS,
-          ZERO_ADDRESS,
-          weth.address
+          weth.address,
+          ZERO_ADDRESS
         ]
       )) as Treasury;
 
@@ -500,7 +500,7 @@ else if(process.env.FORK_NETWORK === "rinkeby"){
         let price = BN.from(await product.price());
         let coverLimit = 5000 // cover 50% of the position
         let blocks = BN.from(threeDays)
-        let expectedPremium = BN.from("133673718330036");
+        let expectedPremium = BN.from("132130362949693");
         let quote = BN.from(await product.getQuote(USER1, cETH, coverLimit, blocks))
         expect(quote).to.equal(expectedPremium);
       })
