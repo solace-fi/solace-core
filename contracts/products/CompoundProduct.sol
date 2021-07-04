@@ -3,7 +3,6 @@ pragma solidity 0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
-import "../interface/IExchangeQuoter.sol";
 import "./BaseProduct.sol";
 
 
@@ -22,7 +21,6 @@ contract CompoundProduct is BaseProduct, EIP712 {
     using SafeERC20 for IERC20;
 
     IComptroller public comptroller;
-    IExchangeQuoter public quoter;
 
     bytes32 private immutable _EXCHANGE_TYPEHASH = keccak256("CompoundProductExchange(uint256 policyId,address tokenIn,uint256 amountIn,address tokenOut,uint256 amountOut,uint256 deadline)");
 
@@ -46,10 +44,10 @@ contract CompoundProduct is BaseProduct, EIP712 {
         _minPeriod,
         _maxPeriod,
         _cancelFee,
-        _price
+        _price,
+        _quoter
     ) EIP712("Solace.fi-CompoundProduct", "1") {
         comptroller = IComptroller(_coveredPlatform);
-        quoter = IExchangeQuoter(_quoter);
     }
 
     /**
@@ -61,17 +59,6 @@ contract CompoundProduct is BaseProduct, EIP712 {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
         comptroller = IComptroller(_comptroller);
-    }
-
-    /**
-     * @notice Sets a new ExchangeQuoter.
-     * Can only be called by the current governor.
-     * @param _quoter The new quoter address.
-     */
-    function setExchangeQuoter(address _quoter) external {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
-        quoter = IExchangeQuoter(_quoter);
     }
 
     // _positionContract must be a cToken including cETH

@@ -37,7 +37,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
     const ONE_SPLIT_VIEW = "0xC586BeF4a0992C495Cf22e1aeEE4E446CECDee0E";
     const aWETH = "0x030ba81f1c18d280636f32af80b9aad02cf0854e";
     const USER1 = "0xd85e821b874cff4880031b96601dc73bfe92f48c";
-    const BALANCE1 = BN.from("49630710457202614069");
+    const BALANCE1 = BN.from("49630710460431870110");
 
     const aUSDT = "0x3ed3b47dd13ec9a98b44e6204a523e766b225811";
     const USER2 = "0x2edce9a8e7991b9fd6074aece928d5a9040ed98d";
@@ -123,8 +123,8 @@ if(process.env.FORK_NETWORK === "mainnet"){
       })
 
       it("a position should have a value", async function () {
-        expect(await product.appraisePosition(USER1, aWETH)).to.equal(BALANCE1);
-        expect(await product.appraisePosition(USER2, aUSDT)).to.equal(BALANCE2);
+        expectClose(await product.appraisePosition(USER1, aWETH), BALANCE1, BN.from("100000000000"))
+        expectClose(await product.appraisePosition(USER2, aUSDT), BALANCE2, BN.from("100000000000"))
       })
     })
   })

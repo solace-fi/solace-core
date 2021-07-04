@@ -231,6 +231,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
         let quote = BN.from(await product.getQuote(USER1, cETH, coverLimit, blocks))
         expect(quote).to.equal(expectedPremium);
       })
+
       it('can buyPolicy', async function () {
         expect(await policyManager.totalSupply()).to.equal(0);
         expect(await policyManager.balanceOf(USER1)).to.equal(0);
@@ -252,11 +253,12 @@ if(process.env.FORK_NETWORK === "mainnet"){
         expect(await policyManager.totalSupply()).to.equal(1);
         expect(await policyManager.balanceOf(USER1)).to.equal(1);
       })
-      it("cannot buy duplicate policy", async function () {
+
+      it("can buy duplicate policy", async function () {
         let coverLimit = 1 // cover 0.01% of the position
         let blocks = threeDays
         let quote = BN.from(await product.getQuote(USER1, cETH, coverLimit, blocks));
-        await expect(product.buyPolicy(USER1, cETH, coverLimit, blocks, { value: quote })).to.be.revertedWith("duplicate policy");
+        await product.buyPolicy(USER1, cETH, coverLimit, blocks, { value: quote });
       })
     })
 
@@ -279,7 +281,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
         let blocks = threeDays
         let quote = BN.from(await product.getQuote(user.address, cETH, coverLimit, blocks));
         await product.connect(user).buyPolicy(user.address, cETH, coverLimit, blocks, { value: quote });
-        let policyId = 2;
+        let policyId = 3;
 
         let userEth1 = await user.getBalance();
         let userCeth1 = await cEthContract.balanceOf(user.address);

@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
+import "./interface/IProduct.sol";
 import "./interface/IPolicyManager.sol";
 
 
@@ -35,10 +36,10 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
 
     struct PolicyInfo {
         uint256 coverAmount;
-        uint64 expirationBlock;
-        uint24 price;
         address policyholder;
+        uint64 expirationBlock;
         address product;
+        uint24 price;
         address positionContract;
     }
 
@@ -152,12 +153,6 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
         require(_exists(_policyID), "query for nonexistent token");
         return policyInfo[_policyID].expirationBlock;
     }
-
-    function getPolicyIsActive(uint256 _policyID) external view returns (bool) {
-        //require(_exists(_policyID), "query for nonexistent token");
-        return policyInfo[_policyID].expirationBlock >= block.number;
-    }
-
     function getPolicyCoverAmount(uint256 _policyID) external view override returns (uint256) {
         require(_exists(_policyID), "query for nonexistent token");
         return policyInfo[_policyID].coverAmount;
@@ -177,12 +172,33 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
         return tokenIDs;
     }
 
+    /*
+     * These functions can be used to check a policys stage in the lifecycle.
+     * There are three major lifecycle events:
+     *   1 - policy is bought (aka minted)
+     *   2 - policy expires
+     *   3 - policy is burnt (aka deleted)
+     * There are four stages:
+     *   A - pre-mint
+     *   B - pre-expiration
+     *   C - post-expiration
+     *   D - post-burn
+     * Truth table:
+     *               A B C D
+     *   exists      0 1 1 0
+     *   isActive    0 1 0 0
+     *   hasExpired  0 0 1 0
+     */
+
+    function exists(uint256 _policyID) external view override returns (bool) {
+        return _exists(_policyID);
+    }
+
     function policyIsActive(uint256 _policyID) external view override returns (bool) {
         return policyInfo[_policyID].expirationBlock >= block.number;
     }
 
-    // returns false if never existed either
-    function policyHasEnded(uint256 _policyID) external view override returns (bool) {
+    function policyHasExpired(uint256 _policyID) public view override returns (bool) {
         uint64 expBlock = policyInfo[_policyID].expirationBlock;
         return expBlock > 0 && expBlock < block.number;
     }
@@ -209,7 +225,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
         uint64 _expirationBlock,
         uint24 _price
     ) external override returns (uint256 policyID) {
-        require(products.contains(msg.sender), "product !active");
+        require(products.contains(msg.sender), "product inactive");
         PolicyInfo memory info = PolicyInfo({
             policyholder: _policyholder,
             product: msg.sender,
@@ -220,8 +236,6 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
         });
         policyID = ++totalPolicyCount; // starts at 1
         policyInfo[policyID] = info;
-        //policyHashIdMap[_policyHash] = policyID;
-        //policySearchMap[msg.sender][_policyholder][_positionContract] = tokenID;
         _mint(_policyholder, policyID);
         emit PolicyCreated(policyID);
         return policyID;
@@ -230,7 +244,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
     /**
      * @notice Exposes setTokenURI function for products to modify policies
      * The caller must be a product.
-     * @param _policyId aka tokenID
+     * @param _policyID aka tokenID
      * @param _policyholder receiver of new policy token
      * @param _positionContract contract address where the position is covered
      * @param _expirationBlock policy expiration block number
@@ -238,7 +252,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
      * @param _price coverage price
      */
     function setPolicyInfo(
-        uint256 _policyId,
+        uint256 _policyID,
         address _policyholder,     // TODO: should this be changeable?
         address _positionContract, // and this
         uint256 _coverAmount,
@@ -247,8 +261,8 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
         )
         external override
     {
-        require(_exists(_policyId), "query for nonexistent token");
-        require(policyInfo[_policyId].product == msg.sender, "wrong product");
+        require(_exists(_policyID), "query for nonexistent token");
+        require(policyInfo[_policyID].product == msg.sender, "wrong product");
         PolicyInfo memory info = PolicyInfo({
             policyholder: _policyholder,
             product: msg.sender,
@@ -257,25 +271,67 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
             coverAmount: _coverAmount,
             price: _price
         });
-        policyInfo[_policyId] = info;
-        //policySearchMap[msg.sender][_policyholder][_positionContract] = tokenID;
+        policyInfo[_policyID] = info;
     }
 
     /**
      * @notice Fuction for the product to burn expired or canceled policies
      * The caller must be a product.
-     * @param _policyId policyID aka tokenID
+     * @param _policyID policyID aka tokenID
      */
-    function burn(uint256 _policyId) external override {
-        //require(products.contains(msg.sender), "product !active");
-        //require(policyInfo[_policyId].product == msg.sender || policyInfo[_policyId].policyholder == msg.sender, "not owner and not authorized");
-        _burn(_policyId);
-        address policyholder = policyInfo[_policyId].policyholder;
-        address positionContract = policyInfo[_policyId].positionContract;
-        delete policyInfo[_policyId];
-        //delete policySearchMap[msg.sender][policyholder][positionContract];
-        //delete policyHashIdMap ?
-        emit PolicyBurned(_policyId);
+    function burn(uint256 _policyID) external override {
+        require(_exists(_policyID), "query for nonexistent token");
+        require(policyInfo[_policyID].product == msg.sender, "wrong product");
+        _burn(_policyID);
+    }
+
+    function _burn(uint256 _policyID) internal override {
+        super._burn(_policyID);
+        delete policyInfo[_policyID];
+        emit PolicyBurned(_policyID);
+    }
+
+    /**
+     * @notice Burns expired policies.
+     * @param _policyIDs list of expired policies
+     */
+    function updateActivePolicies(uint256[] calldata _policyIDs) external override {
+        for (uint256 i = 0; i < _policyIDs.length; i++) {
+            uint256 policyID = _policyIDs[i];
+            // dont burn active or nonexistent policies
+            if (policyHasExpired(policyID)) {
+                address product = policyInfo[policyID].product;
+                uint256 coverAmount = policyInfo[policyID].coverAmount;
+                IProduct(product).updateActiveCoverAmount(-int256(coverAmount));
+                _burn(policyID);
+            }
+        }
+        // todo: an implementation like this would reduce SSTOREs if updating multiple policies of the same product
+        // solidity doesn't allow memory mappings though
+        /*
+        //mapping(address => int256) memory productCoverageDiffs;
+        uint256[] memory productCoverageDiffs = new uint256[products.length()];
+        //EnumerableSet.AddressSet memory changedProducts;
+        //EnumerableMap.AddressToUintMap memory productCoverageDiffs;
+        // loop through policies
+        for (uint256 i = 0; i < _policyIDs.length; i++) {
+            uint256 policyID = _policyIDs[i];
+            if (policyHasExpired(policyID)) {
+                address product = policyInfo[policyID];
+                //changedProducts.add(product);
+                //productCoverageDiffs[product] -= policyInfo[policyID].coverAmount;
+                productCoverageDiffs.set(product, productCoverageDiffs.get(product) + policyInfo[policyID].coverAmount);
+                _burn(policyID);
+                delete policyInfo[policyID];
+            }
+        }
+        // loop through products
+        //for(uint256 i = 0; i < changedProducts.length(); i++) {
+        for(uint256 i = 0; i < productCoverageDiffs.length(); i++) {
+            (address product, uint256 diff) = productCoverageDiffs.at(i);
+            IProduct(product).updateActiveCoverAmount(int256(-diff));
+        }
+        */
     }
 
     /**

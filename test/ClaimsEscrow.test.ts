@@ -24,6 +24,7 @@ describe("ClaimsEscrow", function () {
   const testClaimAmount2 = BN.from("6");
   const claimId = BN.from("1");
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+  const ETH_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
   const COOLDOWN_PERIOD = 1209600; // 14 days
 
   before(async function () {
@@ -153,6 +154,9 @@ describe("ClaimsEscrow", function () {
     it("should revert if not called by governance", async function () {
       await expect(claimsEscrow.connect(claimant).adjustClaim(claimId, testClaimAmount2)).to.be.revertedWith("!governance");
     });
+    it("should revert if claim doesnt exist", async function () {
+      await expect(claimsEscrow.connect(owner).adjustClaim(999, testClaimAmount2)).to.be.revertedWith("claim dne");
+    });
     it("should update claim object with the right data", async function () {
       await claimsEscrow.connect(owner).adjustClaim(claimId, testClaimAmount2);
       const callClaimant = (await claimsEscrow.claims(claimId)).claimant;
@@ -161,6 +165,37 @@ describe("ClaimsEscrow", function () {
       expect(callAmount).to.equal(testClaimAmount2);
       await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add 14 days
       await expect(() => claimsEscrow.connect(claimant).withdrawClaimsPayout(claimId)).to.changeEtherBalance(claimant, testClaimAmount2);
+    });
+  });
+
+  describe("sweep", function () {
+    it("should revert if not called by governance", async function () {
+      await expect(claimsEscrow.connect(claimant).sweep(weth.address, 0, claimant.address)).to.be.revertedWith("!governance");
+    });
+    it("should sweep eth", async function () {
+      let escrowBalance1 = await provider.getBalance(claimsEscrow.address);
+      let userBalance1 = await claimant.getBalance();
+      await owner.sendTransaction({
+        to: claimsEscrow.address,
+        value: 100,
+        data: "0xabcd"
+      });
+      await claimsEscrow.connect(owner).sweep(ETH_ADDRESS, 20, claimant.address);
+      let escrowBalance2 = await provider.getBalance(claimsEscrow.address);
+      let userBalance2 = await claimant.getBalance();
+      expect(escrowBalance2.sub(escrowBalance1)).to.eq(80);
+      expect(userBalance2.sub(userBalance1)).to.eq(20);
+    });
+    it("should sweep erc20", async function () {
+      let escrowBalance1 = await weth.balanceOf(claimsEscrow.address);
+      let userBalance1 = await weth.balanceOf(claimant.address);
+      await weth.connect(owner).deposit({value: 100});
+      await weth.connect(owner).transfer(claimsEscrow.address, 100);
+      await claimsEscrow.connect(owner).sweep(weth.address, 20, claimant.address);
+      let escrowBalance2 = await weth.balanceOf(claimsEscrow.address);
+      let userBalance2 = await weth.balanceOf(claimant.address);
+      expect(escrowBalance2.sub(escrowBalance1)).to.eq(80);
+      expect(userBalance2.sub(userBalance1)).to.eq(20);
     });
   });
 });

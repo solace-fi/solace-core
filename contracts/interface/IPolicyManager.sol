@@ -76,8 +76,9 @@ interface IPolicyManager /*is IERC721Enumerable, IERC721Metadata*/ {
     function getPolicyCoverAmount(uint256 _policyID) external view returns (uint256);
     function getPolicyPrice(uint256 _policyID) external view returns (uint24);
     function listPolicies(address _policyholder) external view returns (uint256[] memory);
+    function exists(uint256 _policyID) external view returns (bool);
     function policyIsActive(uint256 _policyID) external view returns (bool);
-    function policyHasEnded(uint256 _policyID) external view returns (bool);
+    function policyHasExpired(uint256 _policyID) external view returns (bool);
 
     /*** POLICY MUTATIVE FUNCTIONS
     Functions that create, modify, and destroy policies
@@ -101,4 +102,6 @@ interface IPolicyManager /*is IERC721Enumerable, IERC721Metadata*/ {
     ) external returns (uint256 policyID);
     function setPolicyInfo(uint256 _policyId, address _policyholder, address _positionContract, uint256 _coverAmount, uint64 _expirationBlock, uint24 _price) external;
     function burn(uint256 _tokenId) external;
+
+    function updateActivePolicies(uint256[] calldata _policyIDs) external;
 }

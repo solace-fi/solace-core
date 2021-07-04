@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.0;
 
-import "../interface/IExchangeQuoter.sol";
 import "./BaseProduct.sol";
 
 
@@ -24,7 +23,6 @@ interface IYVault {
 contract YearnV2Product is BaseProduct {
 
     IYRegistry public yregistry;
-    IExchangeQuoter public quoter;
 
     constructor (
         IPolicyManager _policyManager,
@@ -46,21 +44,10 @@ contract YearnV2Product is BaseProduct {
         _minPeriod,
         _maxPeriod,
         _cancelFee,
-        _price
+        _price,
+        _quoter
     ) {
         yregistry = IYRegistry(_coveredPlatform);
-        quoter = IExchangeQuoter(_quoter);
-    }
-
-    /**
-     * @notice Sets a new ExchangeQuoter.
-     * Can only be called by the current governor.
-     * @param _quoter The new quoter address.
-     */
-    function setExchangeQuoter(address _quoter) external {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
-        quoter = IExchangeQuoter(_quoter);
     }
 
     // _positionContract must be a vault
