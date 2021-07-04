@@ -153,12 +153,6 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
         require(_exists(_policyID), "query for nonexistent token");
         return policyInfo[_policyID].expirationBlock;
     }
-
-    function getPolicyIsActive(uint256 _policyID) external view returns (bool) {
-        //require(_exists(_policyID), "query for nonexistent token");
-        return policyInfo[_policyID].expirationBlock >= block.number;
-    }
-
     function getPolicyCoverAmount(uint256 _policyID) external view override returns (uint256) {
         require(_exists(_policyID), "query for nonexistent token");
         return policyInfo[_policyID].coverAmount;
@@ -178,6 +172,24 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
         return tokenIDs;
     }
 
+    /*
+     * These functions can be used to check a policys stage in the lifecycle.
+     * There are three major lifecycle events:
+     *   1 - policy is bought (aka minted)
+     *   2 - policy expires
+     *   3 - policy is burnt (aka deleted)
+     * There are four stages:
+     *   A - pre-mint
+     *   B - pre-expiration
+     *   C - post-expiration
+     *   D - post-burn
+     * Truth table:
+     *               A B C D
+     *   exists      0 1 1 0
+     *   isActive    0 1 0 0
+     *   hasExpired  0 0 1 0
+     */
+
     function exists(uint256 _policyID) external view override returns (bool) {
         return _exists(_policyID);
     }
@@ -186,8 +198,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
         return policyInfo[_policyID].expirationBlock >= block.number;
     }
 
-    // also returns false if policy never existed or has been burnt
-    function policyHasEnded(uint256 _policyID) public view override returns (bool) {
+    function policyHasExpired(uint256 _policyID) public view override returns (bool) {
         uint64 expBlock = policyInfo[_policyID].expirationBlock;
         return expBlock > 0 && expBlock < block.number;
     }
@@ -280,10 +291,15 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
         emit PolicyBurned(_policyID);
     }
 
+    /**
+     * @notice Burns expired policies.
+     * @param _policyIDs list of expired policies
+     */
     function updateActivePolicies(uint256[] calldata _policyIDs) external override {
         for (uint256 i = 0; i < _policyIDs.length; i++) {
             uint256 policyID = _policyIDs[i];
-            if (policyHasEnded(policyID)) {
+            // dont burn active or nonexistent policies
+            if (policyHasExpired(policyID)) {
                 address product = policyInfo[policyID].product;
                 uint256 coverAmount = policyInfo[policyID].coverAmount;
                 IProduct(product).updateActiveCoverAmount(-int256(coverAmount));
@@ -300,7 +316,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
         // loop through policies
         for (uint256 i = 0; i < _policyIDs.length; i++) {
             uint256 policyID = _policyIDs[i];
-            if (policyHasEnded(policyID)) {
+            if (policyHasExpired(policyID)) {
                 address product = policyInfo[policyID];
                 //changedProducts.add(product);
                 //productCoverageDiffs[product] -= policyInfo[policyID].coverAmount;

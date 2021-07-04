@@ -78,7 +78,7 @@ interface IPolicyManager /*is IERC721Enumerable, IERC721Metadata*/ {
     function listPolicies(address _policyholder) external view returns (uint256[] memory);
     function exists(uint256 _policyID) external view returns (bool);
     function policyIsActive(uint256 _policyID) external view returns (bool);
-    function policyHasEnded(uint256 _policyID) external view returns (bool);
+    function policyHasExpired(uint256 _policyID) external view returns (bool);
 
     /*** POLICY MUTATIVE FUNCTIONS
     Functions that create, modify, and destroy policies

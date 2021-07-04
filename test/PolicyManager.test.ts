@@ -8,6 +8,7 @@ const { expect } = chai;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
+import { burnBlocks, burnBlocksUntil } from "./utilities/time";
 import { PolicyManager } from "../typechain";
 
 
@@ -140,7 +141,7 @@ describe("PolicyManager", function () {
       expect(await policyManager.getPolicyProduct(1)).to.equal(mockProduct2.address);
       expect(await policyManager.getPolicyPositionContract(1)).to.equal(positionContract.address);
       expect(await policyManager.getPolicyExpirationBlock(1)).to.equal(expirationBlock);
-      expect(await policyManager.getPolicyIsActive(1)).to.equal(true);
+      expect(await policyManager.policyIsActive(1)).to.equal(true);
       expect(await policyManager.getPolicyCoverAmount(1)).to.equal(coverAmount);
       expect(await policyManager.getPolicyPrice(1)).to.equal(price);
       expect(await policyManager.exists(1)).to.equal(true);
@@ -171,7 +172,7 @@ describe("PolicyManager", function () {
       expect(await policyManager.getPolicyCoverAmount(1)).to.equal(1);
       expect(await policyManager.getPolicyExpirationBlock(1)).to.equal(2);
       expect(await policyManager.getPolicyPrice(1)).to.equal(3);
-      expect(await policyManager.getPolicyIsActive(1)).to.equal(false);
+      expect(await policyManager.policyIsActive(1)).to.equal(false);
       expect(await policyManager.exists(1)).to.equal(true);
     })
 
@@ -200,5 +201,42 @@ describe("PolicyManager", function () {
       let totalSupply = await policyManager.totalSupply();
       expect(totalSupply).to.equal(1);
     })
+  })
+
+  describe("lifecycle", function () {
+    //             A B C D
+    // exists      0 1 1 0
+    // isActive    0 1 0 0
+    // hasExpired  0 0 1 0
+
+    let policyID = 4;
+    let blockNum: BN;
+    let expBlock: BN;
+
+    it("pre-mint", async function () {
+      expect(await policyManager.exists(policyID)).to.be.false;
+      expect(await policyManager.policyIsActive(policyID)).to.be.false;
+      expect(await policyManager.policyHasExpired(policyID)).to.be.false;
+    });
+    it("pre-expiration", async function () {
+      blockNum = BN.from(await provider.getBlockNumber());
+      expBlock = blockNum.add(10);
+      await policyManager.connect(mockProduct2).createPolicy(user.address, positionContract.address, coverAmount, expBlock, price);
+      expect(await policyManager.exists(policyID)).to.be.true;
+      expect(await policyManager.policyIsActive(policyID)).to.be.true;
+      expect(await policyManager.policyHasExpired(policyID)).to.be.false;
+    });
+    it("post-expiration", async function () {
+      await burnBlocks(12);
+      expect(await policyManager.exists(policyID)).to.be.true;
+      expect(await policyManager.policyIsActive(policyID)).to.be.false;
+      expect(await policyManager.policyHasExpired(policyID)).to.be.true;
+    });
+    it("post-burn", async function () {
+      await policyManager.connect(mockProduct2).burn(policyID); // burn tokenID 1
+      expect(await policyManager.exists(policyID)).to.be.false;
+      expect(await policyManager.policyIsActive(policyID)).to.be.false;
+      expect(await policyManager.policyHasExpired(policyID)).to.be.false;
+    });
   })
 });
