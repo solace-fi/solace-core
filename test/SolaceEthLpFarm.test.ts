@@ -343,7 +343,7 @@ describe("SolaceEthLpFarm", function () {
       let balancesAfter = await getBalances(farmer1);
       let balancesDiff = getBalancesDiff(balancesBefore, balancesAfter);
       let receipt = await tx1.wait();
-      let gasCost = receipt.gasUsed.mul(tx1.gasPrice);
+      let gasCost = receipt.gasUsed.mul(tx1.gasPrice || 0);
       expect(balancesDiff.userEth).to.equal(depositAmount5.add(gasCost));
       expect(balancesDiff.userSolace).to.equal(depositAmount5);
       expect(await farm.countDeposited(farmer1.address)).to.equal(4);

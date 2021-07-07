@@ -542,7 +542,7 @@ else if(process.env.FORK_NETWORK === "rinkeby"){
       it("can open a claim", async function () {
         // create a new position
         let cEthContract = await ethers.getContractAt(artifacts.ICETH.abi, cETH);
-        await cEthContract.connect(user).mint({value: 1000000000000000});
+        await cEthContract.connect(user).mint({value: BN.from("1000000000000000")});
         await cEthContract.connect(user).approve(product.address, constants.MaxUint256);
         // buy a policy
         let coverLimit = 10000
@@ -550,7 +550,6 @@ else if(process.env.FORK_NETWORK === "rinkeby"){
         let quote = BN.from(await product.getQuote(user.address, cETH, coverLimit, blocks));
         await product.connect(user).buyPolicy(user.address, cETH, coverLimit, blocks, { value: quote });
         let policyId = 2;
-
         let userEth1 = await user.getBalance();
         let userCeth1 = await cEthContract.balanceOf(user.address);
         let amountIn = 1000;

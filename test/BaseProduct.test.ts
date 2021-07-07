@@ -409,7 +409,7 @@ describe("BaseProduct", () => {
       let expectedRefund = info.expirationBlock.sub(block+1).mul(info.price).mul(info.coverAmount).div(1e12).sub(manageFee1);
       let tx = await product.connect(buyer).cancelPolicy(policyID);
       let receipt = await tx.wait();
-      let gasCost = receipt.gasUsed.mul(tx.gasPrice);
+      let gasCost = receipt.gasUsed.mul(tx.gasPrice || 0);
       let balance2 = await buyer.getBalance();
       let actualRefund = balance2.add(gasCost).sub(balance1);
       expect(actualRefund).to.equal(expectedRefund);

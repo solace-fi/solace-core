@@ -22,7 +22,7 @@ describe("ClaimsEscrow", function () {
   const testDepositAmount = BN.from("10");
   const testClaimAmount = BN.from("8");
   const testClaimAmount2 = BN.from("6");
-  const claimId = BN.from("1");
+  const claimID = BN.from("1");
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
   const ETH_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
   const COOLDOWN_PERIOD = 1209600; // 14 days
@@ -108,8 +108,8 @@ describe("ClaimsEscrow", function () {
     });
     it("should update create a Claim object with the right data", async function () {
       await vault.connect(mockProduct).processClaim(claimant.address, testClaimAmount);
-      const callClaimant = (await claimsEscrow.claims(claimId)).claimant;
-      const callAmount = (await claimsEscrow.claims(claimId)).amount;
+      const callClaimant = (await claimsEscrow.claims(claimID)).claimant;
+      const callAmount = (await claimsEscrow.claims(claimID)).amount;
       expect(callClaimant).to.equal(claimant.address);
       expect(callAmount).to.equal(testClaimAmount);
     });
@@ -121,25 +121,25 @@ describe("ClaimsEscrow", function () {
       await vault.connect(mockProduct).processClaim(claimant.address, testClaimAmount);
     });
     it("should revert if not called by the claimant", async function () {
-      await expect(claimsEscrow.connect(owner).withdrawClaimsPayout(claimId)).to.be.revertedWith("!claimant");
+      await expect(claimsEscrow.connect(owner).withdrawClaimsPayout(claimID)).to.be.revertedWith("!claimant");
     });
     it("should revert if cooldown period has not elapsed", async function () {
-      await expect(claimsEscrow.connect(claimant).withdrawClaimsPayout(claimId)).to.be.revertedWith("cooldown period has not elapsed");
+      await expect(claimsEscrow.connect(claimant).withdrawClaimsPayout(claimID)).to.be.revertedWith("cooldown period has not elapsed");
     });
     it("should transfer claim amount to claimant", async function () {
       await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add 14 days
-      await expect(() => claimsEscrow.connect(claimant).withdrawClaimsPayout(claimId)).to.changeEtherBalance(claimant, testClaimAmount);
+      await expect(() => claimsEscrow.connect(claimant).withdrawClaimsPayout(claimID)).to.changeEtherBalance(claimant, testClaimAmount);
     });
     it("should emit ClaimWithdrawn event after function logic is successful", async function () {
       await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add 14 days
-      expect(await claimsEscrow.connect(claimant).withdrawClaimsPayout(claimId)).to.emit(claimsEscrow, "ClaimWithdrawn").withArgs(claimId, claimant.address, testClaimAmount);
+      expect(await claimsEscrow.connect(claimant).withdrawClaimsPayout(claimID)).to.emit(claimsEscrow, "ClaimWithdrawn").withArgs(claimID, claimant.address, testClaimAmount);
     });
     it("should delete the Claim object after successful withdrawal", async function () {
       await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add 14 days
-      await claimsEscrow.connect(claimant).withdrawClaimsPayout(claimId);
-      const callClaimant = (await claimsEscrow.claims(claimId)).claimant;
-      const callAmount = (await claimsEscrow.claims(claimId)).amount;
-      const callReceivedAt = (await claimsEscrow.claims(claimId)).receivedAt;
+      await claimsEscrow.connect(claimant).withdrawClaimsPayout(claimID);
+      const callClaimant = (await claimsEscrow.claims(claimID)).claimant;
+      const callAmount = (await claimsEscrow.claims(claimID)).amount;
+      const callReceivedAt = (await claimsEscrow.claims(claimID)).receivedAt;
       expect(callClaimant).to.equal(ZERO_ADDRESS);
       expect(callAmount).to.equal(0);
       expect(callReceivedAt).to.equal(0);
@@ -152,19 +152,19 @@ describe("ClaimsEscrow", function () {
       await vault.connect(mockProduct).processClaim(claimant.address, testClaimAmount);
     });
     it("should revert if not called by governance", async function () {
-      await expect(claimsEscrow.connect(claimant).adjustClaim(claimId, testClaimAmount2)).to.be.revertedWith("!governance");
+      await expect(claimsEscrow.connect(claimant).adjustClaim(claimID, testClaimAmount2)).to.be.revertedWith("!governance");
     });
     it("should revert if claim doesnt exist", async function () {
       await expect(claimsEscrow.connect(owner).adjustClaim(999, testClaimAmount2)).to.be.revertedWith("claim dne");
     });
     it("should update claim object with the right data", async function () {
-      await claimsEscrow.connect(owner).adjustClaim(claimId, testClaimAmount2);
-      const callClaimant = (await claimsEscrow.claims(claimId)).claimant;
-      const callAmount = (await claimsEscrow.claims(claimId)).amount;
+      await claimsEscrow.connect(owner).adjustClaim(claimID, testClaimAmount2);
+      const callClaimant = (await claimsEscrow.claims(claimID)).claimant;
+      const callAmount = (await claimsEscrow.claims(claimID)).amount;
       expect(callClaimant).to.equal(claimant.address);
       expect(callAmount).to.equal(testClaimAmount2);
       await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add 14 days
-      await expect(() => claimsEscrow.connect(claimant).withdrawClaimsPayout(claimId)).to.changeEtherBalance(claimant, testClaimAmount2);
+      await expect(() => claimsEscrow.connect(claimant).withdrawClaimsPayout(claimID)).to.changeEtherBalance(claimant, testClaimAmount2);
     });
   });
 

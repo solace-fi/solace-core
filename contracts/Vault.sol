@@ -123,7 +123,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     event UpdateWithdrawalQueue(address[] indexed queue);
     event StrategyRevoked(address strategy);
     event EmergencyShutdown(bool active);
-    event ClaimProcessed(uint256 indexed claimId, address indexed claimant, uint256 indexed amount);
+    event ClaimProcessed(uint256 indexed claimID, address indexed claimant, uint256 indexed amount);
     event StrategyUpdateDebtRatio(address indexed strategy, uint256 indexed newDebtRatio);
     event StrategyUpdateMinDebtPerHarvest(address indexed strategy, uint256 indexed newMinDebtPerHarvest);
     event StrategyUpdateMaxDebtPerHarvest(address indexed strategy, uint256 indexed newMaxDebtPerHarvest);
@@ -361,19 +361,23 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
      * @param amount Amount to pay out
      * Reverts if Vault is in Emergency Shutdown
      */
-    function processClaim(address claimant, uint256 amount) external override {
+    function processClaim(address claimant, uint256 amount) external payable override returns (uint256 claimID) {
         require(!emergencyShutdown, "cannot process claim when vault is in emergency shutdown");
         require(IPolicyManager(registry.policyManager()).productIsActive(msg.sender), "!product");
 
         // unwrap some WETH to make ETH available for claims payout
-        IWETH9 weth = IWETH9(payable(address(token)));
-        uint256 transferAmount = min(weth.balanceOf(address(this)), amount);
-        weth.withdraw(transferAmount);
+        if(amount > address(this).balance) {
+            IWETH9 weth = IWETH9(payable(address(token)));
+            uint256 wanted = amount - address(this).balance;
+            uint256 withdrawAmount = min(weth.balanceOf(address(this)), wanted);
+            weth.withdraw(withdrawAmount);
+        }
+        uint256 transferAmount = min(amount, address(this).balance);
 
         IClaimsEscrow escrow = IClaimsEscrow(payable(registry.claimsEscrow()));
-        uint256 claimId = escrow.receiveClaim{value: transferAmount}(claimant);
-
-        emit ClaimProcessed(claimId, claimant, transferAmount);
+        claimID = escrow.receiveClaim{value: transferAmount}(claimant, amount);
+        emit ClaimProcessed(claimID, claimant, amount);
+        return claimID;
     }
 
     /**
