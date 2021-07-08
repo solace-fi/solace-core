@@ -2,7 +2,7 @@ import { waffle, ethers } from "hardhat";
 const { deployContract, solidity } = waffle;
 import { MockProvider } from "ethereum-waffle";
 const provider: MockProvider = waffle.provider;
-import { BigNumber as BN, BigNumberish, utils, constants } from "ethers";
+import { BigNumber as BN, BigNumberish, utils, constants, Contract } from "ethers";
 import { ECDSASignature, ecsign } from 'ethereumjs-util';
 import { getPermitDigest, sign, getDomainSeparator } from "./utilities/signature";
 import chai from "chai";
@@ -14,7 +14,7 @@ dotenv_config();
 import { expectClose } from "./utilities/chai_extensions";
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { PolicyManager, CompoundProduct, ExchangeQuoter, ExchangeQuoterManual, Treasury, Weth9, ClaimsEscrow, Registry, Vault } from "../typechain";
+import { PolicyManager, CompoundProductRinkeby, ExchangeQuoterManual, Treasury, Weth9, ClaimsEscrow, Registry, Vault } from "../typechain";
 
 const EXCHANGE_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("CompoundProductExchange(uint256 policyID,address tokenIn,uint256 amountIn,address tokenOut,uint256 amountOut,uint256 deadline)"));
 
@@ -54,47 +54,44 @@ function getSubmitClaimDigest(
     )
 }
 
-if(process.env.FORK_NETWORK === "mainnet"){
+if(process.env.FORK_NETWORK === "rinkeby"){
   describe('CompoundProduct', () => {
     const [deployer, user, paclasSigner] = provider.getWallets();
     let artifacts: ArtifactImports;
 
     let policyManager: PolicyManager;
-    let product: CompoundProduct;
-    let quoter: ExchangeQuoter;
+    let product: CompoundProductRinkeby;
     let quoter2: ExchangeQuoterManual;
     let weth: Weth9;
     let treasury: Treasury;
     let claimsEscrow: ClaimsEscrow;
     let vault: Vault;
     let registry: Registry;
+    let comptroller: Contract;
+    let ceth: Contract;
+    let cusdc: Contract;
+    let usdc: Contract;
+    let uniswapRouter: Contract;
 
     const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
     const minPeriod = 6450; // this is about 1 day
-    const maxPeriod = 45150; // this is about 1 week from https://ycharts.c om/indicators/ethereum_blocks_per_day
+    const maxPeriod = 45100; // this is about 1 week from https://ycharts.c om/indicators/ethereum_blocks_per_day
     const threeDays = 19350;
     const maxCoverAmount = BN.from("1000000000000000000000"); // 1000 Ether in wei
     const maxCoverPerUser = BN.from("10000000000000000000"); // 10 Ether in wei
     const cancelFee = BN.from("100000000000000000"); // 0.1 Ether in wei
     const price = 11044; // 2.60%/yr
 
-    const ONE_SPLIT_VIEW = "0xC586BeF4a0992C495Cf22e1aeEE4E446CECDee0E";
-    const COMPTROLLER = "0x3d9819210A31b4961b30EF54bE2aeD79B9c9Cd3B";
+    const COMPTROLLER_ADDRESS = "0x2EAa9D77AE4D8f9cdD9FAAcd44016E746485bddb";
+    const cETH_ADDRESS = "0xd6801a1DfFCd0a410336Ef88DeF4320D6DF1883e";
+    const USER1 = "0x0fb78424e5021404093aA0cFcf50B176B30a3c1d";
+    const BALANCE1 = "1236588650796795918";
 
-    const cETH = "0x4Ddc2D193948926D02f9B1fE9e1daa0718270ED5";
-    const USER1 = "0xa0f75491720835b36edc92d06ddc468d201e9b73";
-    const BALANCE1  = BN.from("16205226886284201139348");
-    const BALANCE11 = BN.from("16205226886284201139348");
+    const USDC_ADDRESS = "0x4DBCdF9B62e891a7cec5A2568C3F4FAF9E8Abe2b";
+    const cUSDC_ADDRESS = "0x5B281A6DdA0B271e91ae35DE655Ad301C976edb1";
+    const WETH_ADDRESS = "0xc778417E063141139Fce010982780140Aa0cD5Ab";
 
-    const cDAI = "0x5d3a536E4D6DbD6114cc1Ead35777bAB948E3643";
-    const USER2 = "0xda3059e065781976845359154cc3aae1d0e99289";
-    const BALANCE2  = BN.from("5225311707193538431924");
-    const BALANCE12 = BN.from("4002346288470480898590");
-
-    const cUSDC = "0x39AA39c021dfbaE8faC545936693aC917d5E7563"
-    const USER3 = "0x416f4d9d9a6c595e24aef284672ef3c98eda6bb0";
-    const BALANCE3  = BN.from("17486774897559620002");
-    const BALANCE13 = BN.from("2271845248250000000");
+    const COOLDOWN_PERIOD = 3600; // one hour
 
     before(async () => {
       artifacts = await import_artifacts();
@@ -108,15 +105,6 @@ if(process.env.FORK_NETWORK === "mainnet"){
         ]
       )) as PolicyManager;
 
-      // deploy exchange quoter
-      quoter = (await deployContract(
-        deployer,
-        artifacts.ExchangeQuoter,
-        [
-          ONE_SPLIT_VIEW
-        ]
-      )) as ExchangeQuoter;
-
       // deploy manual exchange quoter
       quoter2 = (await deployContract(
         deployer,
@@ -126,7 +114,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
         ]
       )) as ExchangeQuoterManual;
       await expect(quoter2.connect(user).setRates([],[])).to.be.revertedWith("!governance");
-      await quoter2.setRates(["0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","0x89d24a6b4ccb1b6faa2625fe562bdd9a23260359","0xc00e94cb662c3520282e6f5717214004a7f26888","0x1f9840a85d5af5bf1d1762f925bdaddc4201f984","0x514910771af9ca656af840dff83e8264ecf986ca","0x2260fac5e5542a773aa44fbcfedf7c193bc2c599","0xdac17f958d2ee523a2206206994597c13d831ec7","0x1985365e9f78359a9b6ad760e32412f4a445e862","0x0d8775f648430679a709e98d2b0cb6250d2887ef","0xe41d2489571d322189246dafa5ebde1f4699f498","0x0000000000085d4780b73119b644ae5ecd22b376","0x6b175474e89094c44da98b954eedeac495271d0f","0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"],["1000000000000000000","5214879005539865","131044789678131649","9259278326749300","9246653217422099","15405738054265288944","420072999319953","12449913804491249","281485209795972","372925580282399","419446558886231","205364954059859","50000000000000"]);
+      await quoter2.setRates(["0xbf7a7169562078c96f0ec1a8afd6ae50f12e5a99","0x5592ec0cfb4dbc12d3ab100b257153436a1f0fea","0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","0x6e894660985207feb7cf89faf048998c71e8ee89","0x4dbcdf9b62e891a7cec5a2568c3f4faf9e8abe2b","0xd9ba894e0097f8cc2bbc9d24d308b98e36dc6d02","0x577d296678535e4903d59a4c929b718e1d575e0a","0xddea378a6ddc8afec82c36e9b0078826bf9e68b6"],["264389616860428","445946382179077","1000000000000000000","10221603363836799","444641132530148","448496810835719","14864363968434576288","334585685516318"]);
 
       // deploy weth
       weth = (await deployContract(
@@ -176,20 +164,27 @@ if(process.env.FORK_NETWORK === "mainnet"){
       // deploy Compound Product
       product = (await deployContract(
         deployer,
-        artifacts.CompoundProduct,
+        artifacts.CompoundProductRinkeby,
         [
           policyManager.address,
           registry.address,
-          COMPTROLLER,
+          COMPTROLLER_ADDRESS,
           maxCoverAmount,
           maxCoverPerUser,
           minPeriod,
           maxPeriod,
           cancelFee,
           price,
-          quoter.address
+          quoter2.address
         ]
-      )) as CompoundProduct;
+      )) as CompoundProductRinkeby;
+
+      // fetch contracts
+      comptroller = await ethers.getContractAt(artifacts.IComptrollerRinkeby.abi, COMPTROLLER_ADDRESS);
+      ceth = await ethers.getContractAt(artifacts.ICETH.abi, cETH_ADDRESS);
+      cusdc = await ethers.getContractAt(artifacts.ICERC20.abi, cUSDC_ADDRESS);
+      usdc = await ethers.getContractAt(artifacts.ERC20.abi, USDC_ADDRESS);
+      uniswapRouter = await ethers.getContractAt(artifacts.SwapRouter.abi, "0xE592427A0AEce92De3Edee1F18E0157C05861564");
 
       await registry.setVault(vault.address);
       await registry.setClaimsEscrow(claimsEscrow.address);
@@ -204,34 +199,23 @@ if(process.env.FORK_NETWORK === "mainnet"){
       })
 
       it("no positions should have no value", async function () {
-        expect(await product.appraisePosition(user.address, cETH)).to.equal(0);
+        expect(await product.appraisePosition(user.address, cETH_ADDRESS)).to.equal(0);
       })
 
       it("a position should have a value", async function () {
-        expect(await product.appraisePosition(USER1, cETH)).to.equal(BALANCE1);
-        expect(await product.appraisePosition(USER2, cDAI)).to.equal(BALANCE2);
-        expect(await product.appraisePosition(USER3, cUSDC)).to.equal(BALANCE3);
-      })
-
-      it("can change quoters", async function () {
-        await expect(product.connect(user).setExchangeQuoter(quoter2.address)).to.be.revertedWith("!governance");
-        await product.setExchangeQuoter(quoter2.address);
-        expect(await product.appraisePosition(USER1, cETH)).to.equal(BALANCE11);
-        expect(await product.appraisePosition(USER2, cDAI)).to.equal(BALANCE12);
-        expect(await product.appraisePosition(USER3, cUSDC)).to.equal(BALANCE13);
+        expect(await product.appraisePosition(USER1, cETH_ADDRESS)).to.equal(BALANCE1);
       })
     })
 
     describe('implementedFunctions', function () {
       it('can getQuote', async function () {
         let price = BN.from(await product.price());
-        let coverLimit = 1 // cover 0.01% of the position
+        let coverLimit = 5000 // cover 50% of the position
         let blocks = BN.from(threeDays)
-        let expectedPremium = BN.from("346307967291657");
-        let quote = BN.from(await product.getQuote(USER1, cETH, coverLimit, blocks))
+        let expectedPremium = BN.from("132130362949693");
+        let quote = BN.from(await product.getQuote(USER1, cETH_ADDRESS, coverLimit, blocks))
         expect(quote).to.equal(expectedPremium);
       })
-
       it('can buyPolicy', async function () {
         expect(await policyManager.totalSupply()).to.equal(0);
         expect(await policyManager.balanceOf(USER1)).to.equal(0);
@@ -239,10 +223,10 @@ if(process.env.FORK_NETWORK === "mainnet"){
         (await policyManager.connect(deployer).addProduct(product.address));
         expect(await policyManager.productIsActive(product.address)).to.equal(true);
 
-        let coverLimit = 1 // cover 0.01% of the position
+        let coverLimit = 5000 // cover 50% of the position
         let blocks = threeDays
-        let quote = BN.from(await product.getQuote(USER1, cETH, coverLimit, blocks));
-        let res = (await product.buyPolicy(USER1, cETH, coverLimit, blocks, { value: quote }));
+        let quote = BN.from(await product.getQuote(USER1, cETH_ADDRESS, coverLimit, blocks));
+        let res = (await product.buyPolicy(USER1, cETH_ADDRESS, coverLimit, blocks, { value: quote }));
         let receipt = await res.wait()
         if(receipt.events) {
           var event = receipt.events.filter(event => event.event == "PolicyCreated")[0]
@@ -252,13 +236,6 @@ if(process.env.FORK_NETWORK === "mainnet"){
         }
         expect(await policyManager.totalSupply()).to.equal(1);
         expect(await policyManager.balanceOf(USER1)).to.equal(1);
-      })
-
-      it("can buy duplicate policy", async function () {
-        let coverLimit = 1 // cover 0.01% of the position
-        let blocks = threeDays
-        let quote = BN.from(await product.getQuote(USER1, cETH, coverLimit, blocks));
-        await product.buyPolicy(USER1, cETH, coverLimit, blocks, { value: quote });
       })
     })
 
@@ -271,29 +248,80 @@ if(process.env.FORK_NETWORK === "mainnet"){
         await product.connect(deployer).addSigner(paclasSigner.address);
       })
 
-      it("can open a claim", async function () {
+      it("can open a claim on a cETH position", async function () {
         // create a new position
-        let cEthContract = await ethers.getContractAt(artifacts.ICETH.abi, cETH);
-        await cEthContract.connect(user).mint({value: 1000000000000000});
-        await cEthContract.connect(user).approve(product.address, constants.MaxUint256);
+        await ceth.connect(user).mint({value: BN.from("1000000000000000")});
+        await ceth.connect(user).approve(product.address, constants.MaxUint256);
         // buy a policy
         let coverLimit = 10000
         let blocks = threeDays
-        let quote = BN.from(await product.getQuote(user.address, cETH, coverLimit, blocks));
-        await product.connect(user).buyPolicy(user.address, cETH, coverLimit, blocks, { value: quote });
-        let policyID = 3;
-
-        let userEth1 = await user.getBalance();
-        let userCeth1 = await cEthContract.balanceOf(user.address);
+        let quote = BN.from(await product.getQuote(user.address, cETH_ADDRESS, coverLimit, blocks));
+        await product.connect(user).buyPolicy(user.address, cETH_ADDRESS, coverLimit, blocks, { value: quote });
+        let policyID = 2;
+        let claimID = 1
+        let userCeth1 = await ceth.balanceOf(user.address);
         let amountIn = 1000;
         let amountOut = 5000;
-        let digest = getSubmitClaimDigest("Solace.fi-CompoundProduct", product.address, chainId, policyID, cETH, amountIn, ETH, amountOut, deadline);
+        let digest = getSubmitClaimDigest("Solace.fi-CompoundProduct", product.address, chainId, policyID, cETH_ADDRESS, amountIn, ETH, amountOut, deadline);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
-        let tx1 = await product.connect(user).submitClaim(policyID, cETH, amountIn, ETH, amountOut, deadline, signature);
+        let tx1 = await product.connect(user).submitClaim(policyID, cETH_ADDRESS, amountIn, ETH, amountOut, deadline, signature);
         expect(tx1).to.emit(product, "ClaimSubmitted").withArgs(policyID);
-        let userEth2 = await user.getBalance();
-        let userCeth2 = await cEthContract.balanceOf(user.address);
+        expect(tx1).to.emit(claimsEscrow, "ClaimReceived").withArgs(claimID, user.address, amountOut);
+        let userCeth2 = await ceth.balanceOf(user.address);
         expect(userCeth1.sub(userCeth2)).to.equal(amountIn);
+        await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add one hour
+        let userEth1 = await user.getBalance();
+        let tx2 = await claimsEscrow.connect(user).withdrawClaimsPayout(claimID);
+        let receipt = await tx2.wait();
+        let gasCost = receipt.gasUsed.mul(tx2.gasPrice || 0);
+        let userEth2 = await user.getBalance();
+        expect(userEth2.sub(userEth1).add(gasCost)).to.equal(amountOut);
+      })
+
+      it("can open a claim on a cERC20 position", async function () {
+        // create a new position
+        var ethIn = "100000000000";
+        await uniswapRouter.connect(user).exactInputSingle({
+          tokenIn: WETH_ADDRESS,
+          tokenOut: USDC_ADDRESS,
+          fee: 3000,
+          recipient: user.address,
+          deadline: deadline,
+          amountIn: ethIn,
+          amountOutMinimum: 0,
+          sqrtPriceLimitX96: 0
+        }, {value: ethIn});
+        let usdcBalance = await usdc.balanceOf(user.address);
+        expect(usdcBalance).to.be.gt(0);
+        await usdc.connect(user).approve(cUSDC_ADDRESS, constants.MaxUint256)
+        await cusdc.connect(user).mint(usdcBalance);
+
+        await cusdc.connect(user).approve(product.address, constants.MaxUint256);
+        // buy a policy
+        let coverLimit = 10000
+        let blocks = threeDays
+        let quote = BN.from(await product.getQuote(user.address, cUSDC_ADDRESS, coverLimit, blocks));
+        await product.connect(user).buyPolicy(user.address, cUSDC_ADDRESS, coverLimit, blocks, { value: quote });
+        let policyID = 3;
+        let claimID = 2;
+        let userCusdc1 = await cusdc.balanceOf(user.address);
+        let amountIn = 10000000;
+        let amountOut = 50000000;
+        let digest = getSubmitClaimDigest("Solace.fi-CompoundProduct", product.address, chainId, policyID, cUSDC_ADDRESS, amountIn, ETH, amountOut, deadline);
+        let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
+        let tx1 = await product.connect(user).submitClaim(policyID, cUSDC_ADDRESS, amountIn, ETH, amountOut, deadline, signature);
+        expect(tx1).to.emit(product, "ClaimSubmitted").withArgs(policyID);
+        expect(tx1).to.emit(claimsEscrow, "ClaimReceived").withArgs(claimID, user.address, amountOut);
+        let userCusdc2 = await cusdc.balanceOf(user.address);
+        expect(userCusdc1.sub(userCusdc2)).to.equal(amountIn);
+        await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add one hour
+        let userEth1 = await user.getBalance();
+        await deployer.sendTransaction({to: claimsEscrow.address, value: amountOut});
+        let tx2 = await claimsEscrow.connect(user).withdrawClaimsPayout(claimID);
+        let receipt = await tx2.wait();
+        let gasCost = receipt.gasUsed.mul(tx2.gasPrice || 0);
+        let userEth2 = await user.getBalance();
+        expect(userEth2.sub(userEth1).add(gasCost)).to.equal(amountOut);
       })
     })
   })

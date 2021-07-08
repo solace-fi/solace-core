@@ -260,6 +260,28 @@ describe("BaseProduct", () => {
     });
   });
 
+  describe("pause", function () {
+    it("starts unpaused", async function () {
+      expect(await product.paused()).to.equal(false);
+    });
+    it("cannot be paused by non governance", async function () {
+      await expect(product.connect(buyer).setPaused(true)).to.be.revertedWith("!governance");
+      expect(await product.paused()).to.equal(false);
+    });
+    it("can be paused", async function () {
+      await product.connect(governor).setPaused(true);
+      expect(await product.paused()).to.equal(true);
+    });
+    it("cannot be unpaused by non governance", async function () {
+      await expect(product.connect(buyer).setPaused(false)).to.be.revertedWith("!governance");
+      expect(await product.paused()).to.equal(true);
+    });
+    it("can be unpaused", async function () {
+      await product.connect(governor).setPaused(false);
+      expect(await product.paused()).to.equal(false);
+    });
+  })
+
   describe("buyPolicy", () => {
     let price = price2;
     let coverLimit = BN.from(5000); // cover 50% of the position
@@ -315,6 +337,12 @@ describe("BaseProduct", () => {
       let quote = BN.from(await product.getQuote(buyer.address, positionContract.address, coverLimit2, blocks))
       await expect(product.connect(buyer).buyPolicy(buyer.address, positionContract.address, coverLimit2, blocks, { value: quote })).to.be.revertedWith("invalid cover limit percentage");
     })
+    it("cannot buy policy while paused", async function () {
+      await product.connect(governor).setPaused(true);
+      let quote = BN.from(await product.getQuote(buyer.address, positionContract.address, coverLimit, blocks));
+      await expect(product.connect(buyer).buyPolicy(buyer.address, positionContract.address, coverLimit, blocks, { value: quote })).to.be.revertedWith("cannot buy when paused");
+      await product.connect(governor).setPaused(false);
+    })
     it("can buyPolicy", async function () {
       let quote = BN.from(await product.getQuote(buyer.address, positionContract.address, coverLimit, blocks));
       let tx = await product.connect(buyer).buyPolicy(buyer.address, positionContract.address, coverLimit, blocks, { value: quote });
@@ -364,6 +392,11 @@ describe("BaseProduct", () => {
     })
     it("cannot extend policy with insufficient payment", async function() {
       await expect(product.connect(buyer).extendPolicy(policyID, blocks, {value: quote.sub(1)})).to.be.revertedWith("insufficient payment or premium is zero");
+    })
+    it("cannot extend policy while paused", async function () {
+      await product.connect(governor).setPaused(true);
+      await expect(product.connect(buyer).extendPolicy(policyID, blocks, {value: quote})).to.be.revertedWith("cannot extend when paused");
+      await product.connect(governor).setPaused(false);
     })
     it("can extend policy", async function() {
       let tx = await product.connect(buyer).extendPolicy(policyID, blocks, {value: quote});

@@ -6,13 +6,17 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "./interface/IRegistry.sol";
+import "./interface/IVault.sol";
+import "./interface/IPolicyManager.sol";
 import "./interface/IClaimsEscrow.sol";
+
 
 contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow {
     using Address for address;
     using SafeERC20 for IERC20;
 
     struct Claim {
+        uint256 policyID;
         uint256 amount;
         uint256 receivedAt; // used to determine withdrawability after cooldown period
     }
@@ -86,18 +90,21 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow {
     }
 
     /**
-     * @notice Receives ETH from the Vault for a claim
-     * Only callable by the Vault contract
+     * @notice Receives a claim.
+     * Only callable by active products.
+     * @param _policyID ID of policy to claim
      * @param _claimant Address of the claimant
      * @param _amount Amount of ETH to claim
      * @return claimID The id of the claim received
      */
-    function receiveClaim(address _claimant, uint256 _amount) external payable override returns (uint256 claimID) {
-        require(msg.sender == registry.vault(), "!vault");
+    function receiveClaim(uint256 _policyID, address _claimant, uint256 _amount) external payable override returns (uint256 claimID) {
+        require(IPolicyManager(registry.policyManager()).productIsActive(msg.sender), "!product");
+        if(address(this).balance < _amount) IVault(registry.vault()).requestEth(_amount - address(this).balance);
 
         claimID = ++totalClaims; // starts at 1, increments
         // Add claim to claims mapping
         claims[claimID] = Claim({
+            policyID: _policyID,
             amount: _amount,
             receivedAt: block.timestamp
         });
@@ -118,13 +125,24 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow {
         require(block.timestamp >= claims[claimID].receivedAt + cooldownPeriod, "cooldown period has not elapsed");
 
         uint256 amount = claims[claimID].amount;
-
-        delete claims[claimID];
-        _burn(claimID);
-
-        payable(msg.sender).transfer(amount);
-
-        emit ClaimWithdrawn(claimID, msg.sender, amount);
+        // if not enough eth, request more
+        if(amount > address(this).balance) {
+            IVault(registry.vault()).requestEth(amount - address(this).balance);
+        }
+        // if still not enough eth, partial withdraw
+        if(amount > address(this).balance) {
+            uint256 balance = address(this).balance;
+            claims[claimID].amount -= balance;
+            payable(msg.sender).transfer(balance);
+            emit ClaimWithdrawn(claimID, msg.sender, balance);
+        }
+        // if enough eth, full withdraw and delete claim
+        else {
+            delete claims[claimID];
+            _burn(claimID);
+            payable(msg.sender).transfer(amount);
+            emit ClaimWithdrawn(claimID, msg.sender, amount);
+        }
     }
 
     /**

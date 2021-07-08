@@ -20,13 +20,14 @@ interface IClaimsEscrow {
     fallback () external payable;
 
     /**
-     * @notice Receives ETH from the Vault for a claim
-     * Only callable by the Vault contract
+     * @notice Receives a claim.
+     * Only callable by active products.
+     * @param _policyID ID of policy to claim
      * @param _claimant Address of the claimant
      * @param _amount Amount of ETH to claim
      * @return claimID The id of the claim received
      */
-    function receiveClaim(address _claimant, uint256 _amount) external payable returns (uint256 claimID);
+    function receiveClaim(uint256 _policyID, address _claimant, uint256 _amount) external payable returns (uint256 claimID);
 
     /**
      * @notice Allows claimants to withdraw their claims payout

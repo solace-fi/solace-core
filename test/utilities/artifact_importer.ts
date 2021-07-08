@@ -17,37 +17,52 @@ export async function import_artifacts() {
 
   // solace imports
   let artifact_dir = process.env.USE_PROCESSED_FILES === "true" ? "../../artifacts/contracts_processed" : "../../artifacts/contracts";
-  artifacts.ClaimsEscrow = await import(`${artifact_dir}/ClaimsEscrow.sol/ClaimsEscrow.json`);
-  artifacts.CpFarm = await import(`${artifact_dir}/CpFarm.sol/CpFarm.json`);
-  artifacts.LpAppraisor = await import(`${artifact_dir}/LpAppraisor.sol/LpAppraisor.json`);
-  artifacts.Master = await import(`${artifact_dir}/Master.sol/Master.json`);
-  artifacts.Registry = await import(`${artifact_dir}/Registry.sol/Registry.json`);
-  artifacts.SOLACE = await import(`${artifact_dir}/SOLACE.sol/SOLACE.json`);
-  artifacts.SolaceEthLpFarm = await import(`${artifact_dir}/SolaceEthLpFarm.sol/SolaceEthLpFarm.json`);
-  artifacts.Treasury = await import (`${artifact_dir}/Treasury.sol/Treasury.json`);
-  artifacts.WETH = await import(`${artifact_dir}/mocks/WETH9.sol/WETH9.json`);
-  artifacts.Vault = await import(`${artifact_dir}/Vault.sol/Vault.json`);
-  artifacts.MockERC20 = await import(`${artifact_dir}/mocks/MockERC20.sol/MockERC20.json`);
-  artifacts.MockStrategy = await import(`${artifact_dir}/mocks/MockStrategy.sol/MockStrategy.json`);
+  artifacts.ClaimsEscrow = await tryImport(`${artifact_dir}/ClaimsEscrow.sol/ClaimsEscrow.json`);
+  artifacts.CpFarm = await tryImport(`${artifact_dir}/CpFarm.sol/CpFarm.json`);
+  artifacts.LpAppraisor = await tryImport(`${artifact_dir}/LpAppraisor.sol/LpAppraisor.json`);
+  artifacts.Master = await tryImport(`${artifact_dir}/Master.sol/Master.json`);
+  artifacts.Registry = await tryImport(`${artifact_dir}/Registry.sol/Registry.json`);
+  artifacts.SOLACE = await tryImport(`${artifact_dir}/SOLACE.sol/SOLACE.json`);
+  artifacts.SolaceEthLpFarm = await tryImport(`${artifact_dir}/SolaceEthLpFarm.sol/SolaceEthLpFarm.json`);
+  artifacts.Treasury = await tryImport (`${artifact_dir}/Treasury.sol/Treasury.json`);
+  artifacts.WETH = await tryImport(`${artifact_dir}/mocks/WETH9.sol/WETH9.json`);
+  artifacts.Vault = await tryImport(`${artifact_dir}/Vault.sol/Vault.json`);
+  artifacts.MockERC20 = await tryImport(`${artifact_dir}/mocks/MockERC20.sol/MockERC20.json`);
+  artifacts.MockStrategy = await tryImport(`${artifact_dir}/mocks/MockStrategy.sol/MockStrategy.json`);
 
-  artifacts.PolicyManager = await import(`${artifact_dir}/PolicyManager.sol/PolicyManager.json`);
-  artifacts.MockProduct = await import(`${artifact_dir}/mocks/MockProduct.sol/MockProduct.json`);
-  artifacts.AaveV2Product = await import(`${artifact_dir}/products/AaveV2Product.sol/AaveV2Product.json`);
-  artifacts.CompoundProduct = await import(`${artifact_dir}/products/CompoundProduct.sol/CompoundProduct.json`);
-  artifacts.CompoundProductRinkeby = await import(`${artifact_dir}/products/CompoundProductRinkeby.sol/CompoundProductRinkeby.json`);
-  artifacts.CurveProduct = await import(`${artifact_dir}/products/CurveProduct.sol/CurveProduct.json`);
-  artifacts.YearnV2Product = await import(`${artifact_dir}/products/YearnV2Product.sol/YearnV2Product.json`);
-  artifacts.ExchangeQuoter = await import(`${artifact_dir}/ExchangeQuoter.sol/ExchangeQuoter.json`);
-  artifacts.ExchangeQuoterManual = await import(`${artifact_dir}/ExchangeQuoterManual.sol/ExchangeQuoterManual.json`);
+  artifacts.PolicyManager = await tryImport(`${artifact_dir}/PolicyManager.sol/PolicyManager.json`);
+  artifacts.MockProduct = await tryImport(`${artifact_dir}/mocks/MockProduct.sol/MockProduct.json`);
+  artifacts.AaveV2Product = await tryImport(`${artifact_dir}/products/AaveV2Product.sol/AaveV2Product.json`);
+  artifacts.CompoundProduct = await tryImport(`${artifact_dir}/products/CompoundProduct.sol/CompoundProduct.json`);
+  artifacts.CompoundProductRinkeby = await tryImport(`${artifact_dir}/products/CompoundProductRinkeby.sol/CompoundProductRinkeby.json`);
+  artifacts.CurveProduct = await tryImport(`${artifact_dir}/products/CurveProduct.sol/CurveProduct.json`);
+  artifacts.YearnV2Product = await tryImport(`${artifact_dir}/products/YearnV2Product.sol/YearnV2Product.json`);
+  artifacts.ExchangeQuoter = await tryImport(`${artifact_dir}/ExchangeQuoter.sol/ExchangeQuoter.json`);
+  artifacts.ExchangeQuoterManual = await tryImport(`${artifact_dir}/ExchangeQuoterManual.sol/ExchangeQuoterManual.json`);
 
   // uniswap imports
-  artifacts.UniswapV3Factory = await import("@uniswap/v3-core/artifacts/contracts/UniswapV3Factory.sol/UniswapV3Factory.json");
-  artifacts.UniswapV3Pool = await import("@uniswap/v3-core/artifacts/contracts/UniswapV3Pool.sol/UniswapV3Pool.json");
-  artifacts.SwapRouter = await import("@uniswap/v3-periphery/artifacts/contracts/SwapRouter.sol/SwapRouter.json");
-  artifacts.NonfungiblePositionManager = await import("@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json");
+  artifacts.UniswapV3Factory = await tryImport("@uniswap/v3-core/artifacts/contracts/UniswapV3Factory.sol/UniswapV3Factory.json");
+  artifacts.UniswapV3Pool = await tryImport("@uniswap/v3-core/artifacts/contracts/UniswapV3Pool.sol/UniswapV3Pool.json");
+  artifacts.SwapRouter = await tryImport("@uniswap/v3-periphery/artifacts/contracts/SwapRouter.sol/SwapRouter.json");
+  artifacts.NonfungiblePositionManager = await tryImport("@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json");
 
   // compound imports
-  artifacts.ICETH = await import(`${artifact_dir}/interface/ICEth.sol/ICEth.json`);
+  artifacts.ICETH = await tryImport(`${artifact_dir}/interface/ICEth.sol/ICEth.json`);
+  artifacts.ICERC20 = await tryImport(`${artifact_dir}/interface/ICErc20.sol/ICErc20.json`);
+  artifacts.IComptroller = await tryImport(`${artifact_dir}/products/CompoundProduct.sol/IComptroller.json`);
+  artifacts.IComptrollerRinkeby = await tryImport(`${artifact_dir}/products/CompoundProductRinkeby.sol/IComptrollerRinkeby.json`);
+
+  // openzeppelin imports
+  artifacts.ERC20 = await tryImport("../../artifacts/@openzeppelin/contracts/token/ERC20/ERC20.sol/ERC20.json");
 
   return artifacts;
+}
+
+async function tryImport(filepath: string) {
+  try {
+    var imp = await import(filepath);
+    return imp;
+  } catch(e) {
+    return undefined;
+  }
 }

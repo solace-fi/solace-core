@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "../interface/IExchangeQuoter.sol";
 import "../interface/IPolicyManager.sol";
 import "../interface/ITreasury.sol";
-import "../interface/IVault.sol";
+import "../interface/IClaimsEscrow.sol";
 import "../interface/IRegistry.sol";
 import "../interface/IProduct.sol";
 
@@ -54,7 +54,7 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
 
     event SignerAdded(address _signer);
     event SignerRemoved(address _signer);
-    event ClaimSubmitted(uint256 indexed policyId);
+    event ClaimSubmitted(uint256 indexed policyID);
 
     constructor (
         IPolicyManager _policyManager,

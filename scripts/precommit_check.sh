@@ -19,7 +19,6 @@ npx hardhat test
 
 # code coverage
 # need to skip stack too deep contracts
-# comment these contracts out from test/utilities/artifact_importer.ts
 mv contracts/SolaceEthLpFarm.sol contracts/SolaceEthLpFarm.sol-ignore
 mv contracts/LpAppraisor.sol contracts/LpAppraisor.sol-ignore
 mv test/Master.test.ts test/Master.test.ts-ignore
