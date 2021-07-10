@@ -55,7 +55,7 @@ function getSubmitClaimDigest(
 }
 
 if(process.env.FORK_NETWORK === "rinkeby"){
-  describe('CompoundProduct', () => {
+  describe('CompoundProductRinkeby', () => {
     const [deployer, user, paclasSigner] = provider.getWallets();
     let artifacts: ArtifactImports;
 
@@ -252,26 +252,28 @@ if(process.env.FORK_NETWORK === "rinkeby"){
         // create a new position
         await ceth.connect(user).mint({value: BN.from("1000000000000000")});
         await ceth.connect(user).approve(product.address, constants.MaxUint256);
+        let userCeth1 = await ceth.balanceOf(user.address);
         // buy a policy
         let coverLimit = 10000
         let blocks = threeDays
         let quote = BN.from(await product.getQuote(user.address, cETH_ADDRESS, coverLimit, blocks));
         await product.connect(user).buyPolicy(user.address, cETH_ADDRESS, coverLimit, blocks, { value: quote });
+        // sign swap
         let policyID = 2;
-        let claimID = 1
-        let userCeth1 = await ceth.balanceOf(user.address);
         let amountIn = 1000;
         let amountOut = 5000;
         let digest = getSubmitClaimDigest("Solace.fi-CompoundProduct", product.address, chainId, policyID, cETH_ADDRESS, amountIn, ETH, amountOut, deadline);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
+        // submit claim
         let tx1 = await product.connect(user).submitClaim(policyID, cETH_ADDRESS, amountIn, ETH, amountOut, deadline, signature);
         expect(tx1).to.emit(product, "ClaimSubmitted").withArgs(policyID);
-        expect(tx1).to.emit(claimsEscrow, "ClaimReceived").withArgs(claimID, user.address, amountOut);
+        expect(tx1).to.emit(claimsEscrow, "ClaimReceived").withArgs(policyID, user.address, amountOut);
+        // verify payout
         let userCeth2 = await ceth.balanceOf(user.address);
         expect(userCeth1.sub(userCeth2)).to.equal(amountIn);
         await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add one hour
         let userEth1 = await user.getBalance();
-        let tx2 = await claimsEscrow.connect(user).withdrawClaimsPayout(claimID);
+        let tx2 = await claimsEscrow.connect(user).withdrawClaimsPayout(policyID);
         let receipt = await tx2.wait();
         let gasCost = receipt.gasUsed.mul(tx2.gasPrice || 0);
         let userEth2 = await user.getBalance();
@@ -295,29 +297,30 @@ if(process.env.FORK_NETWORK === "rinkeby"){
         expect(usdcBalance).to.be.gt(0);
         await usdc.connect(user).approve(cUSDC_ADDRESS, constants.MaxUint256)
         await cusdc.connect(user).mint(usdcBalance);
-
         await cusdc.connect(user).approve(product.address, constants.MaxUint256);
+        let userCusdc1 = await cusdc.balanceOf(user.address);
         // buy a policy
         let coverLimit = 10000
         let blocks = threeDays
         let quote = BN.from(await product.getQuote(user.address, cUSDC_ADDRESS, coverLimit, blocks));
         await product.connect(user).buyPolicy(user.address, cUSDC_ADDRESS, coverLimit, blocks, { value: quote });
+        // sign swap
         let policyID = 3;
-        let claimID = 2;
-        let userCusdc1 = await cusdc.balanceOf(user.address);
         let amountIn = 10000000;
         let amountOut = 50000000;
         let digest = getSubmitClaimDigest("Solace.fi-CompoundProduct", product.address, chainId, policyID, cUSDC_ADDRESS, amountIn, ETH, amountOut, deadline);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
+        // submit claim
         let tx1 = await product.connect(user).submitClaim(policyID, cUSDC_ADDRESS, amountIn, ETH, amountOut, deadline, signature);
         expect(tx1).to.emit(product, "ClaimSubmitted").withArgs(policyID);
-        expect(tx1).to.emit(claimsEscrow, "ClaimReceived").withArgs(claimID, user.address, amountOut);
+        expect(tx1).to.emit(claimsEscrow, "ClaimReceived").withArgs(policyID, user.address, amountOut);
+        // verify payout
         let userCusdc2 = await cusdc.balanceOf(user.address);
         expect(userCusdc1.sub(userCusdc2)).to.equal(amountIn);
         await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add one hour
         let userEth1 = await user.getBalance();
         await deployer.sendTransaction({to: claimsEscrow.address, value: amountOut});
-        let tx2 = await claimsEscrow.connect(user).withdrawClaimsPayout(claimID);
+        let tx2 = await claimsEscrow.connect(user).withdrawClaimsPayout(policyID);
         let receipt = await tx2.wait();
         let gasCost = receipt.gasUsed.mul(tx2.gasPrice || 0);
         let userEth2 = await user.getBalance();

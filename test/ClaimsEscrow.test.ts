@@ -108,11 +108,9 @@ describe("ClaimsEscrow", function () {
       await expect(claimsEscrow.connect(owner).receiveClaim(1, owner.address, 0)).to.be.revertedWith("!product");
     });
     it("should update create a Claim object with the right data", async function () {
-      await claimsEscrow.connect(mockProduct).receiveClaim(1, claimant.address, testClaimAmount);
-      const callPolicyID = (await claimsEscrow.claims(claimID)).policyID;
+      await claimsEscrow.connect(mockProduct).receiveClaim(claimID, claimant.address, testClaimAmount);
       const callClaimant = await claimsEscrow.ownerOf(claimID);
       const callAmount = (await claimsEscrow.claims(claimID)).amount;
-      expect(callPolicyID).to.equal(1);
       expect(callClaimant).to.equal(claimant.address);
       expect(callAmount).to.equal(testClaimAmount);
     });
@@ -121,7 +119,7 @@ describe("ClaimsEscrow", function () {
   describe("withdrawClaimsPayout", function () {
     beforeEach("deposit to vault and approve claim", async function () {
       await vault.connect(depositor1).deposit({ value: testDepositAmount});
-      await claimsEscrow.connect(mockProduct).receiveClaim(1, claimant.address, testClaimAmount);
+      await claimsEscrow.connect(mockProduct).receiveClaim(claimID, claimant.address, testClaimAmount);
     });
     it("should revert if invalid claimID", async function () {
       await expect(claimsEscrow.connect(owner).withdrawClaimsPayout(999)).to.be.revertedWith("query for nonexistent token");
@@ -153,7 +151,7 @@ describe("ClaimsEscrow", function () {
     it("should request more eth if needed", async function () { // and partial payout
       let claimID2 = 2;
       let balance1 = await claimant.getBalance();
-      await claimsEscrow.connect(mockProduct).receiveClaim(1, claimant.address, testClaimAmount3);
+      await claimsEscrow.connect(mockProduct).receiveClaim(claimID2, claimant.address, testClaimAmount3);
       await vault.connect(depositor1).deposit({ value: 4 });
       await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add one hour
       let tx1 = await claimsEscrow.connect(claimant).withdrawClaimsPayout(claimID2);

@@ -15,34 +15,26 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow {
     using Address for address;
     using SafeERC20 for IERC20;
 
-    struct Claim {
-        uint256 policyID;
-        uint256 amount;
-        uint256 receivedAt; // used to determine withdrawability after cooldown period
-    }
-
     /// @notice Governor.
-    address public governance;
+    address public override governance;
 
     /// @notice Governance to take over.
-    address public newGovernance;
+    address public override newGovernance;
 
     uint256 public override cooldownPeriod = 3600; // one hour
-
-    uint256 public totalClaims;
 
     /// Registry of protocol contract addresses
     IRegistry public registry;
 
-    address public constant ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+    address private constant ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+
+    struct Claim {
+        uint256 amount;
+        uint256 receivedAt; // used to determine withdrawability after cooldown period
+    }
 
     /// mapping of claimID to Claim object
     mapping (uint256 => Claim) public claims;
-
-    event ClaimReceived(uint256 indexed claimID, address indexed claimant, uint256 indexed amount);
-    event ClaimWithdrawn(uint256 indexed claimID, address indexed claimant, uint256 indexed amount);
-    // Emitted when Governance is set
-    event GovernanceTransferred(address _newGovernance);
 
     /**
      * @notice Constructs the ClaimsEscrow contract.
@@ -52,7 +44,6 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow {
     constructor(address _governance, address _registry) ERC721("Solace Claim", "SCT"){
         governance = _governance;
         registry = IRegistry(_registry);
-        totalClaims = 0;
     }
 
     /**
@@ -71,7 +62,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow {
      * Can only be called by the current governor.
      * @param _governance The new governor.
      */
-    function setGovernance(address _governance) external {
+    function setGovernance(address _governance) external override {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
         newGovernance = _governance;
@@ -81,7 +72,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow {
      * @notice Accepts the governance role.
      * Can only be called by the new governor.
      */
-    function acceptGovernance() external {
+    function acceptGovernance() external override {
         // can only be called by new governor
         require(msg.sender == newGovernance, "!governance");
         governance = newGovernance;
@@ -92,25 +83,22 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow {
     /**
      * @notice Receives a claim.
      * Only callable by active products.
+     * @dev claimID = policyID
      * @param _policyID ID of policy to claim
      * @param _claimant Address of the claimant
      * @param _amount Amount of ETH to claim
-     * @return claimID The id of the claim received
      */
-    function receiveClaim(uint256 _policyID, address _claimant, uint256 _amount) external payable override returns (uint256 claimID) {
+    function receiveClaim(uint256 _policyID, address _claimant, uint256 _amount) external payable override {
         require(IPolicyManager(registry.policyManager()).productIsActive(msg.sender), "!product");
         if(address(this).balance < _amount) IVault(registry.vault()).requestEth(_amount - address(this).balance);
 
-        claimID = ++totalClaims; // starts at 1, increments
         // Add claim to claims mapping
-        claims[claimID] = Claim({
-            policyID: _policyID,
+        claims[_policyID] = Claim({
             amount: _amount,
             receivedAt: block.timestamp
         });
-        _mint(_claimant, claimID);
-        emit ClaimReceived(claimID, _claimant, _amount);
-        return claimID;
+        _mint(_claimant, _policyID);
+        emit ClaimReceived(_policyID, _claimant, _amount);
     }
 
     /**

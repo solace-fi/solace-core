@@ -81,7 +81,19 @@ contract CompoundProduct is BaseProduct, EIP712 {
         return quoter.tokenToEth(ctoken.underlying(), balance);
     }
 
-    // TODO: allow for multiple tokens in and out
+    /**
+     * @notice Submits a claim.
+     * User will give up some of their cToken position to receive ETH.
+     * Can only submit one claim per policy.
+     * Must be signed by an authorized signer.
+     * @param policyID The policy that suffered a loss.
+     * @param tokenIn The token the user must give up.
+     * @param amountIn The amount the user must give up.
+     * @param tokenOut The token the user will receive.
+     * @param amountOut The amount the user will receive.
+     * @param deadline Transaction must execute before this timestamp.
+     * @param signature Signature from the signer.
+     */
     function submitClaim(
         uint256 policyID,
         address tokenIn,
@@ -90,8 +102,7 @@ contract CompoundProduct is BaseProduct, EIP712 {
         uint256 amountOut,
         uint256 deadline,
         bytes calldata signature
-    ) external payable returns (uint256 claimID) {
-        // TODO: check for duplicate claim
+    ) external payable {
         // validate inputs
         // solhint-disable-next-line not-rely-on-time
         require(block.timestamp <= deadline, "expired deadline");
@@ -105,11 +116,13 @@ contract CompoundProduct is BaseProduct, EIP712 {
         address signer = ECDSA.recover(hash, signature);
         require(isAuthorizedSigner[signer], "invalid signature");
         }
+        // swap tokens
         uint256 ethReceived = pullAndSwap(tokenIn, amountIn);
+        // burn policy
+        policyManager.burn(policyID);
         // submit claim to ClaimsEscrow
-        claimID = IClaimsEscrow(payable(registry.claimsEscrow())).receiveClaim{value: ethReceived}(policyID, policyholder, amountOut);
+        IClaimsEscrow(payable(registry.claimsEscrow())).receiveClaim{value: ethReceived}(policyID, policyholder, amountOut);
         emit ClaimSubmitted(policyID);
-        return claimID;
     }
 
     /**
