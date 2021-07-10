@@ -24,7 +24,7 @@ describe("BaseProduct", () => {
   let claimsEscrow: ClaimsEscrow;
   let vault: Vault;
   let registry: Registry;
-  const [deployer, governor, positionContract, buyer] = provider.getWallets();
+  const [deployer, governor, positionContract, buyer, mockPolicyManager] = provider.getWallets();
 
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
   const ONE_SPLIT_VIEW = "0xC586BeF4a0992C495Cf22e1aeEE4E446CECDee0E";
@@ -470,4 +470,43 @@ describe("BaseProduct", () => {
       await product.connect(governor).addSigner(governor.address);
     });
   });
+
+  describe("active cover amount", function () {
+    let product3: MockProduct
+    before(async function () {
+      product3 = (await deployContract(
+        deployer,
+        artifacts.MockProduct,
+        [
+          mockPolicyManager.address,
+          registry.address,
+          treasury.address, // this is for the coveredPlatform
+          maxCoverAmount1,
+          maxCoverPerUser1,
+          minPeriod1,
+          maxPeriod1,
+          manageFee1,
+          price1,
+          quoter1.address
+        ]
+      )) as MockProduct;
+    })
+    it("starts at zero", async function () {
+      expect(await product3.activeCoverAmount()).to.equal(0);
+    })
+    it("cannot update by non policy manager", async function () {
+      await expect(product3.connect(deployer).updateActiveCoverAmount(1)).to.be.revertedWith("!policymanager");
+    });
+    it("can update", async function () {
+      await product3.connect(mockPolicyManager).updateActiveCoverAmount(3);
+      expect(await product3.activeCoverAmount()).to.equal(3);
+      await product3.connect(mockPolicyManager).updateActiveCoverAmount(5);
+      expect(await product3.activeCoverAmount()).to.equal(8);
+      await product3.connect(mockPolicyManager).updateActiveCoverAmount(-6);
+      expect(await product3.activeCoverAmount()).to.equal(2);
+    });
+    it("cannot be negative", async function () {
+      await expect(product3.connect(mockPolicyManager).updateActiveCoverAmount(-7)).to.be.reverted;
+    })
+  })
 })

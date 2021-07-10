@@ -177,8 +177,8 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow {
     function timeLeft(uint256 claimID) external view returns (uint256) {
         if(!_exists(claimID)) return type(uint256).max;
         uint256 end = claims[claimID].receivedAt + cooldownPeriod;
-        if(block.timestamp <= end) return 0;
-        return block.timestamp - end;
+        if(block.timestamp >= end) return 0;
+        return end - block.timestamp;
     }
 
     function listClaims(address claimant) external view returns (uint256[] memory claimIDs) {

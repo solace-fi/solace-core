@@ -1,10 +1,12 @@
 import chai from "chai";
 import { waffle } from "hardhat";
-import { BigNumber as BN } from "ethers";
+import { BigNumber as BN, constants } from "ethers";
 const { expect } = chai;
 const { deployContract, solidity } = waffle;
 const provider = waffle.provider;
 chai.use(solidity);
+
+import { expectClose } from "./utilities/chai_extensions";
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
 import { Registry, Vault, ClaimsEscrow, Weth9, PolicyManager } from "../typechain";
@@ -220,6 +222,77 @@ describe("ClaimsEscrow", function () {
       let userBalance2 = await weth.balanceOf(claimant.address);
       expect(escrowBalance2.sub(escrowBalance1)).to.eq(80);
       expect(userBalance2.sub(userBalance1)).to.eq(20);
+    });
+  });
+
+  describe("cooldown", function () {
+    it("should start at one hour", async function () {
+      expect(await claimsEscrow.cooldownPeriod()).to.equal(COOLDOWN_PERIOD);
+    });
+    it("should revert setCooldown if called by non governance", async function () {
+      await expect(claimsEscrow.connect(depositor1).setCooldownPeriod(1)).to.be.revertedWith("!governance");
+    });
+    it("should set cooldown", async function () {
+      await claimsEscrow.connect(owner).setCooldownPeriod(1);
+      expect(await claimsEscrow.cooldownPeriod()).to.equal(1);
+    });
+  });
+
+  describe("isWithdrawable", function () {
+    let claimID = 1;
+    beforeEach(async function () {
+      await claimsEscrow.connect(mockProduct).receiveClaim(claimID, claimant.address, testClaimAmount);
+    });
+    it("non existant claim should not be withdrawable", async function () {
+      expect(await claimsEscrow.isWithdrawable(999)).to.be.false;
+    });
+    it("new claim should not be withdrawable", async function () {
+      expect(await claimsEscrow.isWithdrawable(claimID)).to.be.false;
+    });
+    it("claim should become withdrawable", async function () {
+      await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]);
+      await owner.sendTransaction({to: claimsEscrow.address});
+      expect(await claimsEscrow.isWithdrawable(claimID)).to.be.true;
+    });
+  });
+
+  describe("timeLeft", function () {
+    let claimID = 1;
+    beforeEach(async function () {
+      await claimsEscrow.connect(mockProduct).receiveClaim(claimID, claimant.address, testClaimAmount);
+    });
+    it("need to wait indefinitely for non existant claim", async function () {
+      expect(await claimsEscrow.timeLeft(999)).to.equal(constants.MaxUint256);
+    });
+    it("need to wait entire cooldown period for a new claim", async function () {
+      expectClose(await claimsEscrow.timeLeft(claimID), COOLDOWN_PERIOD);
+    });
+    it("counts down", async function () {
+      await provider.send("evm_increaseTime", [1000]);
+      await owner.sendTransaction({to: claimsEscrow.address});
+      expectClose(await claimsEscrow.timeLeft(claimID), COOLDOWN_PERIOD-1000);
+    });
+    it("hits zero", async function () {
+      await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]);
+      await owner.sendTransaction({to: claimsEscrow.address});
+      expect(await claimsEscrow.timeLeft(claimID)).to.equal(0);
+    });
+  });
+
+  describe("listClaims", function () {
+    it("lists claims", async function () {
+      expect(await claimsEscrow.listClaims(claimant.address)).to.deep.equal([]);
+      await claimsEscrow.connect(mockProduct).receiveClaim(2, claimant.address, 0);
+      expect(await claimsEscrow.listClaims(claimant.address)).to.deep.equal([BN.from(2)]);
+      await claimsEscrow.connect(mockProduct).receiveClaim(4, claimant.address, 0);
+      expect(await claimsEscrow.listClaims(claimant.address)).to.deep.equal([BN.from(2),BN.from(4)]);
+      await claimsEscrow.connect(mockProduct).receiveClaim(6, owner.address, 0);
+      expect(await claimsEscrow.listClaims(claimant.address)).to.deep.equal([BN.from(2),BN.from(4)]);
+      await claimsEscrow.connect(mockProduct).receiveClaim(8, claimant.address, 0);
+      expect(await claimsEscrow.listClaims(claimant.address)).to.deep.equal([BN.from(2),BN.from(4),BN.from(8)]);
+      await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]);
+      await claimsEscrow.connect(claimant).withdrawClaimsPayout(4);
+      expect(await claimsEscrow.listClaims(claimant.address)).to.deep.equal([BN.from(2),BN.from(8)]);
     });
   });
 });

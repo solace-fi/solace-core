@@ -388,9 +388,10 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
 
         uint64 blocksLeft = expirationBlock - uint64(block.number);
         uint256 refundAmount = blocksLeft * coverAmount * price / 1e12;
-        require(refundAmount > manageFee, "refund amount less than cancelation fee");
+        require(refundAmount >= manageFee, "refund amount less than cancelation fee");
         policyManager.burn(_policyID);
         ITreasury(payable(registry.treasury())).refund(msg.sender, refundAmount - manageFee);
+        activeCoverAmount -= coverAmount;
         emit PolicyCanceled(_policyID);
     }
 
