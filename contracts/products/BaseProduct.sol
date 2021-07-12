@@ -307,8 +307,44 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
      * @param _coverLimit new cover percentage
      */
     function updateCoverLimit(uint256 _policyID, uint256 _coverLimit) external payable override nonReentrant {
-        require(!paused, "cannot update limit when paused");
-        handleUpdateCoverLimit(_policyID, _coverLimit);
+        require(!paused, "cannot buy when paused");
+        (address policyholder, address product, address positionContract, uint256 previousCoverAmount, uint64 expirationBlock, uint24 previousPrice) = policyManager.getPolicyInfo(_policyID);
+        // check msg.sender is policyholder, check for correct product, and that the coverageLimit is valid
+        require(policyholder == msg.sender, "!policyholder");
+        require(product == address(this), "wrong product");
+        require(expirationBlock >= block.number, "policy is expired");
+        require(_coverLimit > 0 && _coverLimit <= 1e4, "invalid cover limit percentage");
+
+        // appraise the position
+        uint256 positionAmount = appraisePosition(policyholder, positionContract);
+
+        // calculate new coverAmount and check that the product can still provide coverage
+        uint256 newCoverAmount = _coverLimit * positionAmount / 1e4;
+        require(newCoverAmount <= maxCoverPerUser, "over max cover single user");
+        require(activeCoverAmount + newCoverAmount - previousCoverAmount <= maxCoverAmount, "max covered amount is reached");
+
+        // calculate premium needed for new cover amount as if policy is bought now
+        uint256 remainingBlocks = expirationBlock - block.number;
+        uint256 newPremium = newCoverAmount * remainingBlocks * price / 1e12;
+
+        // calculate premium already paid based on current policy
+        uint256 paidPremium = previousCoverAmount * remainingBlocks * previousPrice / 1e12;
+
+        if (newPremium >= paidPremium) {
+            uint256 premium = newPremium - paidPremium;
+            // check that the buyer has paid the correct premium
+            require(msg.value >= premium && premium != 0, "insufficient payment or premium is zero");
+            if(msg.value > premium) payable(msg.sender).transfer(msg.value - premium);
+            // transfer premium to the treasury
+            ITreasury(payable(registry.treasury())).routePremiums{value: premium}();
+        } else {
+            uint256 refundAmount = paidPremium - newPremium;
+            require(refundAmount > manageFee, "refund amount > manage fee");
+            ITreasury(payable(registry.treasury())).refund(msg.sender, refundAmount - manageFee);
+        }
+        // update policy's URI and emit event
+        policyManager.setPolicyInfo(_policyID, policyholder, positionContract, newCoverAmount, expirationBlock, price);
+        emit PolicyUpdated(_policyID);
     }
 
     /**
@@ -319,20 +355,125 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
      */
     function extendPolicy(uint256 _policyID, uint64 _blocks) external payable override nonReentrant {
         require(!paused, "cannot extend when paused");
-        handleExtendPolicy(_policyID, _blocks);
+        // check that the msg.sender is the policyholder
+        (address policyholder, address product, address positionContract, uint256 coverAmount, uint64 expirationBlock, uint24 price) = policyManager.getPolicyInfo(_policyID);
+        require(policyholder == msg.sender,"!policyholder");
+        require(product == address(this), "wrong product");
+        require(expirationBlock >= block.number, "policy is expired");
+        require(_blocks > 0, "invalid block value");
+
+        // compute the premium
+        uint256 premium = coverAmount * _blocks * price / 1e12;
+        // check that the buyer has paid the correct premium
+        require(msg.value >= premium && premium != 0, "insufficient payment or premium is zero");
+        if(msg.value > premium) payable(msg.sender).transfer(msg.value - premium);
+        // transfer premium to the treasury
+        ITreasury(payable(registry.treasury())).routePremiums{value: premium}();
+        // check that the buyer provided valid period
+        uint64 newExpirationBlock = expirationBlock + _blocks;
+        uint64 duration = newExpirationBlock - uint64(block.number);
+        require(duration >= minPeriod && duration <= maxPeriod, "invalid period");
+        // update the policy's URI
+        policyManager.setPolicyInfo(_policyID, policyholder, positionContract, coverAmount, newExpirationBlock, price);
+        emit PolicyExtended(_policyID);
     }
 
     /**
      * @notice
-     *  Extend a policy contract or update cover limit
+     *  Update an existing policy contract
      * @param _policyID id number of the existing policy
      * @param _coverLimit new cover percentage
      * @param _blocks length of extension
      */
     function updatePolicy(uint256 _policyID, uint256 _coverLimit, uint64 _blocks ) external payable override nonReentrant {
-        require(!paused, "cannot update policy when paused");
-        handleUpdateCoverLimit(_policyID, _coverLimit);
-        handleExtendPolicy(_policyID, _blocks);
+        require(!paused, "cannot buy when paused");
+        (address policyholder, address product, address positionContract, uint256 previousCoverAmount, uint64 previousExpirationBlock, uint24 previousPrice) = policyManager.getPolicyInfo(_policyID);
+        require(policyholder == msg.sender,"!policyholder");
+        require(product == address(this), "wrong product");
+        require(previousExpirationBlock >= block.number, "policy is expired");
+        require(_coverLimit >= 0 && _coverLimit <= 1e4, "invalid cover limit percentage");
+        require(_blocks >= 0, "invalid block value");
+
+        // do nothing if both cover limit and blocks are not provided
+        if (_blocks == 0 && _coverLimit == 0) return;
+
+        // add new block extension 
+        uint64 newExpirationBlock = previousExpirationBlock + _blocks;
+
+        // if blocks is provided check that the buyer provided valid period
+        if (_blocks > 0) {
+            uint64 duration = newExpirationBlock - uint64(block.number);
+            require(duration >= minPeriod && duration <= maxPeriod, "invalid period");
+        }
+
+        if (_blocks > 0 && _coverLimit == 0) {
+            // update policy for only extension
+            _calculatePremium(previousCoverAmount, previousPrice, _blocks);
+            policyManager.setPolicyInfo(_policyID, policyholder ,positionContract,  previousCoverAmount, newExpirationBlock, previousPrice);
+            emit PolicyUpdated(_policyID);
+        } else {
+            // update policy with both extension and cover limit or just with for cover limit
+            // appraise the position
+            uint256 positionAmount = appraisePosition(policyholder, positionContract);
+            // calculate new cover amount respect to the cover limit
+            uint256 newCoverAmount = _coverLimit * positionAmount / 1e4; 
+  
+            // check that the product can still provide coverage
+            require(newCoverAmount <= maxCoverPerUser, "over max cover single user");
+            require(activeCoverAmount + newCoverAmount - previousCoverAmount <= maxCoverAmount, "max covered amount is reached");
+
+            _calculatePremium(previousCoverAmount, previousExpirationBlock, previousPrice, newCoverAmount, newExpirationBlock);
+            policyManager.setPolicyInfo(_policyID, policyholder, positionContract, newCoverAmount, newExpirationBlock, price);
+            emit PolicyUpdated(_policyID); 
+        }
+    }
+
+   /**
+     * @notice
+     *  Calculate premium for policy extension
+     * @param _previousCoverAmount previous cover amount of the existing policy
+     * @param _previousPrice previous price of the existing policy
+     * @param _extension length of extension
+     */
+    function _calculatePremium(uint256 _previousCoverAmount, uint24 _previousPrice, uint64 _extension) private {
+        // calculate the premium for only policy extension
+        uint256 premium = _previousCoverAmount * _extension * _previousPrice / 1e12;
+        // check that the buyer has paid the correct premium
+        require(msg.value >= premium && premium != 0, "insufficient payment or premium is zero");
+        if(msg.value > premium) payable(msg.sender).transfer(msg.value - premium);
+        // transfer premium to the treasury
+        ITreasury(payable(registry.treasury())).routePremiums{value: premium}();
+    }
+
+     /**
+     * @notice
+     *  Calculate premium with both extension and cover limit or just with for cover limit
+     * @param _previousCoverAmount previous cover amount of the existing policy
+     * @param _previousExpirationBlock previous expiration block of the existing policy
+     * @param _previousPrice previous price of the existing policy
+     * @param _newCoverAmount new cover amount of the existing policy
+     * @param _newExpirationBlock new expiration block of the existing policy
+     */
+    function _calculatePremium(uint256 _previousCoverAmount, uint64 _previousExpirationBlock, uint24 _previousPrice, uint256 _newCoverAmount, uint64 _newExpirationBlock) private {
+        // calculate premium needed for new cover amount as if policy is bought now
+        uint256 remainingBlocks = _newExpirationBlock - block.number;
+        uint256 newPremium = _newCoverAmount * remainingBlocks * price / 1e12;
+
+        // calculate premium already paid based on current policy
+        uint256 previousRemainingBlocks = _previousExpirationBlock - block.number;
+        uint256 paidPremium = _previousCoverAmount * previousRemainingBlocks * _previousPrice / 1e12;
+
+        if (newPremium >= paidPremium) {
+            uint256 premium = newPremium - paidPremium;
+            require(msg.value >= premium && premium != 0, "insufficient payment or premium is zero");
+            if(msg.value > premium) payable(msg.sender).transfer(msg.value - premium);
+            // transfer premium to the treasury
+            ITreasury(payable(registry.treasury())).routePremiums{value: premium}();
+        } else {
+            uint256 refundAmount = paidPremium - newPremium;
+            require(refundAmount > manageFee, "refund amount > manage fee");
+            ITreasury(payable(registry.treasury())).refund(msg.sender, refundAmount - manageFee);
+        }
     }
 
     /**
@@ -351,92 +492,6 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
         policyManager.burn(_policyID);
         ITreasury(payable(registry.treasury())).refund(msg.sender, refundAmount - manageFee);
         emit PolicyCanceled(_policyID);
-    }
-
-     /**
-     * @notice
-     *  Private helper function to increase or decrease the cover limit for the policy
-     * @param _policyID id number of the existing policy
-     * @param _coverLimit new cover percentage
-     */
-    function handleUpdateCoverLimit(uint256 _policyID, uint256 _coverLimit) private {
-        (address policyholder, address product, address positionContract, uint256 previousCoverAmount, uint64 expirationBlock, uint24 previousPrice) = policyManager.getPolicyInfo(_policyID);
-        // check msg.sender is policyholder, check for correct product, and that the coverageLimit is valid
-        require(policyholder == msg.sender, "!policyholder");
-        require(product == address(this), "wrong product");
-        require(expirationBlock >= block.number, "policy is expired");
-        require(_coverLimit > 0 && _coverLimit <= 1e4, "invalid cover limit percentage");
-
-        //appraise the position
-        uint256 positionAmount = appraisePosition(policyholder, positionContract);
-
-        //calculate new coverAmount and check that the product can still provide coverage
-        uint256 newCoverAmount = _coverLimit * positionAmount / 1e4;
-
-        // do nothing if cover amount is not changed
-        if (newCoverAmount == previousCoverAmount) {
-            return;
-        }
-
-        require(newCoverAmount <= maxCoverPerUser, "over max cover single user");
-        require(activeCoverAmount + newCoverAmount - previousCoverAmount <= maxCoverAmount, "max covered amount is reached");
-
-        //calculate premium needed for new cover amount as if policy is bought now
-        uint256 remainingBlocks = expirationBlock - block.number;
-        uint256 newPremium = newCoverAmount * remainingBlocks * price / 1e12;
-
-        //calculate premium already paid based on current policy
-        uint256 paidPremium = previousCoverAmount * remainingBlocks * previousPrice / 1e12;
-
-        if (newPremium >= paidPremium) {
-            uint256 premium = newPremium - paidPremium;
-            // check that the buyer has paid the correct premium
-            require(msg.value >= premium && premium != 0, "payment does not match the quote");
-            // transfer premium to the treasury
-            ITreasury(payable(registry.treasury())).routePremiums{value: premium}();
-        } else {
-            uint256 refundAmount = paidPremium - newPremium;
-            require(refundAmount > manageFee, "refund amount > manage fee");
-            ITreasury(payable(registry.treasury())).refund(msg.sender, refundAmount - manageFee);
-        }
-        // update policy's URI and emit event
-        policyManager.setPolicyInfo(_policyID, policyholder, positionContract, newCoverAmount, expirationBlock, price);
-        emit PolicyUpdated(_policyID);
-    }
-
-    /**
-     * @notice
-     *  Private helper function to extend a policy contract
-     * @param _policyID id number of the existing policy
-     * @param _blocks length of extension
-     */
-    function handleExtendPolicy(uint256 _policyID, uint64 _blocks) private {
-        // check that the msg.sender is the policyholder
-        (address policyholder, address product, address positionContract, uint256 coverAmount, uint64 expirationBlock, uint24 price) = policyManager.getPolicyInfo(_policyID);
-        require(policyholder == msg.sender,"!policyholder");
-        require(product == address(this), "wrong product");
-        require(expirationBlock >= block.number, "policy is expired");
-
-        uint64 newExpirationBlock = expirationBlock + _blocks;
-
-        // do nothing if current expiration block is not changed
-        if (expirationBlock == newExpirationBlock) {
-            return;
-        }
-
-        // compute the premium
-        uint256 premium = coverAmount * _blocks * price / 1e12;
-        // check that the buyer has paid the correct premium
-        require(msg.value >= premium && premium != 0, "insufficient payment or premium is zero");
-        if(msg.value > premium) payable(msg.sender).transfer(msg.value - premium);
-        // transfer premium to the treasury
-        ITreasury(payable(registry.treasury())).routePremiums{value: premium}();
-        // check that the buyer provided valid period
-        uint64 duration = newExpirationBlock - uint64(block.number);
-        require(duration >= minPeriod && duration <= maxPeriod, "invalid period");
-        // update the policy's URI
-        policyManager.setPolicyInfo(_policyID, policyholder, positionContract, coverAmount, newExpirationBlock, price);
-        emit PolicyExtended(_policyID);
     }
 
     /**
