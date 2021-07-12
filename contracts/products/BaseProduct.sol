@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "../interface/IExchangeQuoter.sol";
 import "../interface/IPolicyManager.sol";
 import "../interface/ITreasury.sol";
-import "../interface/IVault.sol";
+import "../interface/IClaimsEscrow.sol";
 import "../interface/IRegistry.sol";
 import "../interface/IProduct.sol";
 
@@ -54,9 +54,10 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
 
     event SignerAdded(address _signer);
     event SignerRemoved(address _signer);
-    event ClaimSubmitted(uint256 indexed policyId);
+    event ClaimSubmitted(uint256 indexed policyID);
 
     constructor (
+        address _governance,
         IPolicyManager _policyManager,
         IRegistry _registry,
         address _coveredPlatform,
@@ -68,7 +69,7 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
         uint24 _price,
         address _quoter
     ) {
-        governance = msg.sender;
+        governance = _governance;
         policyManager = _policyManager;
         registry = _registry;
         coveredPlatform = _coveredPlatform;
@@ -388,9 +389,10 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
 
         uint64 blocksLeft = expirationBlock - uint64(block.number);
         uint256 refundAmount = blocksLeft * coverAmount * price / 1e12;
-        require(refundAmount > manageFee, "refund amount less than cancelation fee");
+        require(refundAmount >= manageFee, "refund amount less than cancelation fee");
         policyManager.burn(_policyID);
         ITreasury(payable(registry.treasury())).refund(msg.sender, refundAmount - manageFee);
+        activeCoverAmount -= coverAmount;
         emit PolicyCanceled(_policyID);
     }
 

@@ -41,7 +41,7 @@ interface IVault is IERC20, IERC20Permit {
     function debtOutstanding(address) external view returns (uint256);
     function revokeStrategy(address) external;
     function strategies(address) external view returns (StrategyParams memory);
-    function processClaim(address claimant, uint256 amount) external;
+    function requestEth(uint256 amount) external returns (uint256);
     function report(
         uint256 gain,
         uint256 loss,

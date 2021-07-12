@@ -14,6 +14,7 @@ contract MockProduct is BaseProduct {
     uint256 public positionValue = 1000000000000000000;
 
     constructor (
+        address _governance,
         IPolicyManager _policyManager,
         IRegistry _registry,
         address _coveredPlatform,
@@ -25,6 +26,7 @@ contract MockProduct is BaseProduct {
         uint24 _price,
         address _quoter
     ) BaseProduct(
+        _governance,
         _policyManager,
         _registry,
         _coveredPlatform,
@@ -62,7 +64,18 @@ contract MockProduct is BaseProduct {
         policyManager.setPolicyInfo(_policyID, policyholder, positionContract, coverAmount, _expirationBlock, price);
     }
 
-    function getTotalCovered() external view returns (uint256 coveredAmount) {
-        return activeCoverAmount;
+    // buyPolicy() without the checks
+    function _buyPolicy(address _policyholder, address _positionContract, uint256 _coverLimit, uint64 _blocks) external payable nonReentrant returns (uint256 policyID){
+        // create the policy
+        uint64 expirationBlock = uint64(block.number + _blocks);
+        policyID = policyManager.createPolicy(_policyholder, _positionContract, positionValue, expirationBlock, price);
+
+        // update local book-keeping variables
+        activeCoverAmount += positionValue;
+        productPolicyCount++;
+
+        emit PolicyCreated(policyID);
+
+        return policyID;
     }
 }

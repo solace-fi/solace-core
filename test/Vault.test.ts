@@ -23,7 +23,7 @@ describe("Vault", function () {
     let claimsEscrow: ClaimsEscrow;
     let policyManager: PolicyManager;
 
-    const [owner, newOwner, depositor1, depositor2, claimant, mockProduct] = provider.getWallets();
+    const [owner, newOwner, depositor1, depositor2, claimant, mockProduct, mockEscrow] = provider.getWallets();
     const tokenName = "Solace CP Token";
     const tokenSymbol = "SCP";
     const testDepositAmount = BN.from("10");
@@ -837,25 +837,6 @@ describe("Vault", function () {
         });
     });
 
-    describe("processClaim", function () {
-        beforeEach("deposit", async function () {
-            await vault.connect(depositor1).deposit({ value: testDepositAmount});
-        });
-        it("should revert if not called by a product", async function () {
-            await expect(vault.connect(owner).processClaim(claimant.address, testClaimAmount)).to.be.revertedWith("!product");
-        });
-        it("should transfer ETH to the ClaimsEscrow contract", async function () {
-            await expect(() => vault.connect(mockProduct).processClaim(claimant.address, testClaimAmount)).to.changeEtherBalance(claimsEscrow, testClaimAmount);
-        });
-        it("should emit ClaimProcessed event after function logic is successful", async function () {
-            await expect(await vault.connect(mockProduct).processClaim(claimant.address, testClaimAmount)).to.emit(vault, "ClaimProcessed").withArgs(1, claimant.address, testClaimAmount);
-        });
-        it("should revert if vault is in emergency shutdown", async function () {
-            await vault.connect(owner).setEmergencyShutdown(true);
-            await expect(vault.connect(mockProduct).processClaim(claimant.address, testClaimAmount)).to.be.revertedWith("cannot process claim when vault is in emergency shutdown");
-        })
-    });
-
     describe("debtOutstanding", function () {
         it("should return total debt if in emergency shutdown", async function () {
             await vault.connect(owner).addStrategy(strategy.address, debtRatio, minDebtPerHarvest, maxDebtPerHarvest, performanceFee);
@@ -901,5 +882,40 @@ describe("Vault", function () {
             await weth.deposit({value: 0});
             expect((await vault.expectedReturn(strategy.address)).toNumber()).to.be.closeTo(50, 5);
         });
+    })
+
+    describe("requestEth", function () {
+      it("should revert if not called by claims escrow", async function () {
+        await expect(vault.requestEth(0)).to.be.revertedWith("!escrow");
+      })
+
+      it("should send eth", async function () {
+        await registry.setClaimsEscrow(mockEscrow.address);
+        await vault.deposit({value: 20});
+        var balance1 = await mockEscrow.getBalance();
+        let tx = await vault.connect(mockEscrow).requestEth(7);
+        let receipt = await tx.wait();
+        let gasCost = receipt.gasUsed.mul(tx.gasPrice || 0);
+        var balance2 = await mockEscrow.getBalance();
+        expect(balance2.sub(balance1).add(gasCost)).to.equal(7);
+      })
+
+      it("should get available eth", async function () {
+        await registry.setClaimsEscrow(mockEscrow.address);
+        let vaultBalance = await weth.balanceOf(vault.address);
+        let withdrawAmount = vaultBalance.add(100);
+        var balance1 = await mockEscrow.getBalance();
+        let tx = await vault.connect(mockEscrow).requestEth(withdrawAmount);
+        let receipt = await tx.wait();
+        let gasCost = receipt.gasUsed.mul(tx.gasPrice || 0);
+        var balance2 = await mockEscrow.getBalance();
+        expect(balance2.sub(balance1).add(gasCost)).to.equal(vaultBalance);
+      })
+
+      it("can get zero eth", async function () {
+        await registry.setClaimsEscrow(mockEscrow.address);
+        await vault.connect(mockEscrow).requestEth(0);
+      })
+
     })
 });

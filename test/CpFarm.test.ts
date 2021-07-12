@@ -334,7 +334,7 @@ describe("CpFarm", function () {
       balancesAfter = await getBalances(farmer1, farm1);
       balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       let receipt = await tx1.wait();
-      let gasCost = receipt.gasUsed.mul(tx1.gasPrice);
+      let gasCost = receipt.gasUsed.mul(tx1.gasPrice || 0);
       expect(balancesDiff.userEth).to.equal(withdrawAmount1.sub(gasCost));
       expect(balancesDiff.farmStake).to.equal(withdrawAmount1.mul(-1));
       expect(balancesDiff.farmCp).to.equal(withdrawAmount1.mul(-1));
@@ -607,7 +607,7 @@ describe("CpFarm", function () {
       let balancesAfter = await getBalances(mockVault, farm4);
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       let receipt = await tx.wait();
-      let gasCost = receipt.gasUsed.mul(tx.gasPrice);
+      let gasCost = receipt.gasUsed.mul(tx.gasPrice || 0);
       expect(balancesDiff.userEth).to.equal(depositAmount.mul(-1).sub(gasCost));
       expect(balancesDiff.userStake).to.equal(0); // vault gains no stake
     })
@@ -622,7 +622,7 @@ describe("CpFarm", function () {
       let balancesAfter = await getBalances(mockVault, farm4);
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       let receipt = await tx.wait();
-      let gasCost = receipt.gasUsed.mul(tx.gasPrice);
+      let gasCost = receipt.gasUsed.mul(tx.gasPrice || 0);
       expect(balancesDiff.userEth).to.equal(depositAmount.mul(-1).sub(gasCost));
       expect(balancesDiff.userStake).to.equal(0); // vault gains no stake
     })
