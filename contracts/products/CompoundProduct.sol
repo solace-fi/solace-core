@@ -29,6 +29,7 @@ contract CompoundProduct is BaseProduct, EIP712 {
     IWETH9 private weth = IWETH9(payable(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2));
 
     constructor (
+        address _governance,
         IPolicyManager _policyManager,
         IRegistry _registry,
         address _coveredPlatform,
@@ -40,6 +41,7 @@ contract CompoundProduct is BaseProduct, EIP712 {
         uint24 _price,
         address _quoter
     ) BaseProduct(
+        _governance,
         _policyManager,
         _registry,
         _coveredPlatform,

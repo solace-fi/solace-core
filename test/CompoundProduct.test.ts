@@ -187,6 +187,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
         deployer,
         artifacts.CompoundProduct,
         [
+          deployer.address,
           policyManager.address,
           registry.address,
           COMPTROLLER_ADDRESS,

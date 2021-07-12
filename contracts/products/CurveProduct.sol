@@ -25,6 +25,7 @@ contract CurveProduct is BaseProduct {
     ICurveAddressProvider public addressProvider;
 
     constructor (
+        address _governance,
         IPolicyManager _policyManager,
         IRegistry _registry,
         address _coveredPlatform,
@@ -36,6 +37,7 @@ contract CurveProduct is BaseProduct {
         uint24 _price,
         address _quoter
     ) BaseProduct(
+        _governance,
         _policyManager,
         _registry,
         _coveredPlatform,

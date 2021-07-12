@@ -57,6 +57,7 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
     event ClaimSubmitted(uint256 indexed policyID);
 
     constructor (
+        address _governance,
         IPolicyManager _policyManager,
         IRegistry _registry,
         address _coveredPlatform,
@@ -68,7 +69,7 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
         uint24 _price,
         address _quoter
     ) {
-        governance = msg.sender;
+        governance = _governance;
         policyManager = _policyManager;
         registry = _registry;
         coveredPlatform = _coveredPlatform;

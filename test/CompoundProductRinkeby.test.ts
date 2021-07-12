@@ -166,6 +166,7 @@ if(process.env.FORK_NETWORK === "rinkeby"){
         deployer,
         artifacts.CompoundProductRinkeby,
         [
+          deployer.address,
           policyManager.address,
           registry.address,
           COMPTROLLER_ADDRESS,

@@ -94,6 +94,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
         deployer,
         artifacts.YearnV2Product,
         [
+          deployer.address,
           policyManager.address,
           treasury.address,
           IYREGISTRY,

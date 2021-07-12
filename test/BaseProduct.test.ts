@@ -123,6 +123,7 @@ describe("BaseProduct", () => {
       deployer,
       artifacts.MockProduct,
       [
+        deployer.address,
         policyManager.address,
         registry.address,
         treasury.address, // this is for the coveredPlatform

@@ -14,6 +14,7 @@ contract MockProduct is BaseProduct {
     uint256 public positionValue = 1000000000000000000;
 
     constructor (
+        address _governance,
         IPolicyManager _policyManager,
         IRegistry _registry,
         address _coveredPlatform,
@@ -25,6 +26,7 @@ contract MockProduct is BaseProduct {
         uint24 _price,
         address _quoter
     ) BaseProduct(
+        _governance,
         _policyManager,
         _registry,
         _coveredPlatform,
