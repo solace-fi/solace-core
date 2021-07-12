@@ -100,7 +100,7 @@ interface IPolicyManager /*is IERC721Enumerable, IERC721Metadata*/ {
         uint64 _expirationBlock,
         uint24 _price
     ) external returns (uint256 policyID);
-    function setPolicyInfo(uint256 _policyId, address _policyholder, address _positionContract, uint256 _coverAmount, uint64 _expirationBlock, uint24 _price) external;
+    function setPolicyInfo(uint256 _policyID, address _policyholder, address _positionContract, uint256 _coverAmount, uint64 _expirationBlock, uint24 _price) external;
     function burn(uint256 _tokenId) external;
 
     function updateActivePolicies(uint256[] calldata _policyIDs) external;

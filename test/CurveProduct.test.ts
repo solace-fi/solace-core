@@ -95,6 +95,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
         deployer,
         artifacts.CurveProduct,
         [
+          deployer.address,
           policyManager.address,
           treasury.address,
           ADDRESS_PROVIDER,

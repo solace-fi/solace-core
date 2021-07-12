@@ -98,6 +98,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
         deployer,
         artifacts.AaveV2Product,
         [
+          deployer.address,
           policyManager.address,
           treasury.address,
           AAVE_DATA_PROVIDER,

@@ -9,7 +9,6 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./interface/IStrategy.sol";
 import "./interface/IWETH9.sol";
 import "./interface/IRegistry.sol";
-import "./interface/IClaimsEscrow.sol";
 import "./interface/IPolicyManager.sol";
 import "./interface/IVault.sol";
 
@@ -123,7 +122,6 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     event UpdateWithdrawalQueue(address[] indexed queue);
     event StrategyRevoked(address strategy);
     event EmergencyShutdown(bool active);
-    event ClaimProcessed(uint256 indexed claimId, address indexed claimant, uint256 indexed amount);
     event StrategyUpdateDebtRatio(address indexed strategy, uint256 indexed newDebtRatio);
     event StrategyUpdateMinDebtPerHarvest(address indexed strategy, uint256 indexed newMinDebtPerHarvest);
     event StrategyUpdateMaxDebtPerHarvest(address indexed strategy, uint256 indexed newMaxDebtPerHarvest);
@@ -354,26 +352,24 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     }
 
     /**
-     * @notice Allows product contracts to process a claim
-     * Only callable by active products
-     * Sends claimed `amount` to Escrow, where it is withdrawable by the claimant after a cooldown period
-     * @param claimant Address of the claimant
-     * @param amount Amount to pay out
-     * Reverts if Vault is in Emergency Shutdown
+     * @notice Sends ETH to ClaimsEscrow to pay out claims.
+     * Can only be called by ClaimsEscrow.
+     * @param amount Amount of ETH wanted
+     * @return Amount of ETH sent
      */
-    function processClaim(address claimant, uint256 amount) external override {
-        require(!emergencyShutdown, "cannot process claim when vault is in emergency shutdown");
-        require(IPolicyManager(registry.policyManager()).productIsActive(msg.sender), "!product");
-
+    function requestEth(uint256 amount) external override nonReentrant returns (uint256) {
+        address escrow = registry.claimsEscrow();
+        require(msg.sender == escrow, "!escrow");
         // unwrap some WETH to make ETH available for claims payout
-        IWETH9 weth = IWETH9(payable(address(token)));
-        uint256 transferAmount = min(weth.balanceOf(address(this)), amount);
-        weth.withdraw(transferAmount);
-
-        IClaimsEscrow escrow = IClaimsEscrow(payable(registry.claimsEscrow()));
-        uint256 claimId = escrow.receiveClaim{value: transferAmount}(claimant);
-
-        emit ClaimProcessed(claimId, claimant, transferAmount);
+        if(amount > address(this).balance) {
+            IWETH9 weth = IWETH9(payable(address(token)));
+            uint256 wanted = amount - address(this).balance;
+            uint256 withdrawAmount = min(weth.balanceOf(address(this)), wanted);
+            weth.withdraw(withdrawAmount);
+        }
+        uint256 transferAmount = min(amount, address(this).balance);
+        payable(escrow).transfer(transferAmount);
+        return transferAmount;
     }
 
     /**
@@ -459,12 +455,9 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     function deposit() public payable override nonReentrant {
         require(!emergencyShutdown, "cannot deposit when vault is in emergency shutdown");
         uint256 amount = msg.value;
-        uint256 shares;
-        if (totalSupply() == 0) {
-            shares = amount;
-        } else {
-            shares = (amount * totalSupply()) / _totalAssets();
-        }
+        uint256 shares = totalSupply() == 0 || _totalAssets() == 0
+          ? amount
+          : amount * totalSupply() / _totalAssets();
 
         // Issuance of shares needs to be done before taking the deposit
         _mint(msg.sender, shares);
@@ -483,7 +476,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
      */
     function depositWeth(uint256 amount) external override nonReentrant {
         require(!emergencyShutdown, "cannot deposit when vault is in emergency shutdown");
-        uint256 shares = totalSupply() == 0
+        uint256 shares = totalSupply() == 0 || _totalAssets() == 0
             ? amount
             : (amount * totalSupply()) / _totalAssets();
         // Issuance of shares needs to be done before taking the deposit
