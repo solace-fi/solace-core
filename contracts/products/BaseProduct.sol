@@ -383,48 +383,42 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
      * @notice
      *  Update an existing policy contract
      * @param _policyID id number of the existing policy
-     * @param _coverLimit new cover percentage
-     * @param _blocks length of extension
+     * @param _newCoverAmount new cover amount of position
+     * @param _newExtension length of block extension
      */
-    function updatePolicy(uint256 _policyID, uint256 _coverLimit, uint64 _blocks ) external payable override nonReentrant {
+    function updatePolicy(uint256 _policyID, uint256 _newCoverAmount, uint64 _newExtension ) external payable override nonReentrant {
         require(!paused, "cannot buy when paused");
         (address policyholder, address product, address positionContract, uint256 previousCoverAmount, uint64 previousExpirationBlock, uint24 previousPrice) = policyManager.getPolicyInfo(_policyID);
         require(policyholder == msg.sender,"!policyholder");
         require(product == address(this), "wrong product");
         require(previousExpirationBlock >= block.number, "policy is expired");
-        require(_coverLimit >= 0 && _coverLimit <= 1e4, "invalid cover limit percentage");
-        require(_blocks >= 0, "invalid block value");
+        require(_newCoverAmount > 0, "invalid cover amount");
 
-        // do nothing if both cover limit and blocks are not provided
-        if (_blocks == 0 && _coverLimit == 0) return;
-
+        // appraise the position
+        uint256 positionAmount = appraisePosition(policyholder, positionContract);
+        // check that the product can still provide coverage
+        require(_newCoverAmount <= positionAmount, "cover amount is exceeded the position amount");
+        require(_newCoverAmount <= maxCoverPerUser, "over max cover single user");
+        require(activeCoverAmount + _newCoverAmount - previousCoverAmount <= maxCoverAmount, "max covered amount is reached");
+       
         // add new block extension 
-        uint64 newExpirationBlock = previousExpirationBlock + _blocks;
+        uint64 newExpirationBlock = previousExpirationBlock + _newExtension;
+        uint64 duration = newExpirationBlock - uint64(block.number);
+        // check if duration is valid 
+        require(duration >= minPeriod && duration <= maxPeriod, "invalid period");
 
-        // if blocks is provided check that the buyer provided valid period
-        if (_blocks > 0) {
-            uint64 duration = newExpirationBlock - uint64(block.number);
-            require(duration >= minPeriod && duration <= maxPeriod, "invalid period");
-        }
+        // do nothing if both cover amount and expiration block is not changed
+        if (_newCoverAmount == previousCoverAmount && newExpirationBlock == previousExpirationBlock) return;
 
-        if (_blocks > 0 && _coverLimit == 0) {
-            // update policy for only extension
-            _calculatePremium(previousCoverAmount, previousPrice, _blocks);
-            policyManager.setPolicyInfo(_policyID, policyholder ,positionContract,  previousCoverAmount, newExpirationBlock, previousPrice);
+        if (newExpirationBlock > previousExpirationBlock && _newCoverAmount == previousCoverAmount) {
+            // update policy with only new extension
+            _calculatePremium(previousCoverAmount, previousPrice, _newExtension);
+            policyManager.setPolicyInfo(_policyID, policyholder, positionContract,  previousCoverAmount, newExpirationBlock, previousPrice);
             emit PolicyUpdated(_policyID);
         } else {
-            // update policy with both extension and cover limit or just with for cover limit
-            // appraise the position
-            uint256 positionAmount = appraisePosition(policyholder, positionContract);
-            // calculate new cover amount respect to the cover limit
-            uint256 newCoverAmount = _coverLimit * positionAmount / 1e4; 
-  
-            // check that the product can still provide coverage
-            require(newCoverAmount <= maxCoverPerUser, "over max cover single user");
-            require(activeCoverAmount + newCoverAmount - previousCoverAmount <= maxCoverAmount, "max covered amount is reached");
-
-            _calculatePremium(previousCoverAmount, previousExpirationBlock, previousPrice, newCoverAmount, newExpirationBlock);
-            policyManager.setPolicyInfo(_policyID, policyholder, positionContract, newCoverAmount, newExpirationBlock, price);
+            // update policy with both new extension and new cover amount or just with new cover amount
+            _calculatePremium(previousCoverAmount, previousExpirationBlock, previousPrice, _newCoverAmount, newExpirationBlock);
+            policyManager.setPolicyInfo(_policyID, policyholder, positionContract, _newCoverAmount, newExpirationBlock, price);
             emit PolicyUpdated(_policyID); 
         }
     }
