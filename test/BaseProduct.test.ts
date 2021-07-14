@@ -126,7 +126,7 @@ describe("BaseProduct", () => {
         deployer.address,
         policyManager.address,
         registry.address,
-        treasury.address, // this is for the coveredPlatform
+        ONE_SPLIT_VIEW, // this is for the coveredPlatform
         maxCoverAmount1,
         maxCoverPerUser1,
         minPeriod1,
@@ -142,9 +142,10 @@ describe("BaseProduct", () => {
       deployer,
       artifacts.MockProduct,
       [
+        deployer.address,
         policyManager.address,
         registry.address,
-        treasury.address, // this is for the coveredPlatform
+        ONE_SPLIT_VIEW, // this is for the coveredPlatform
         maxCoverAmount1,
         maxCoverPerUser1,
         minPeriod1,
@@ -258,6 +259,28 @@ describe("BaseProduct", () => {
     })
     it("should revert setExchangeQuoter if not called by governance", async function () {
       await expect(product.connect(buyer).setExchangeQuoter(quoter1.address)).to.be.revertedWith("!governance");
+    });
+    it("can get covered platform", async function () {
+      expect(await product.coveredPlatform()).to.equal(ONE_SPLIT_VIEW);
+    });
+    it("can set covered platform", async function () {
+      await product.connect(governor).setCoveredPlatform(treasury.address);
+      expect(await product.coveredPlatform()).to.equal(treasury.address);
+      await product.connect(governor).setCoveredPlatform(ONE_SPLIT_VIEW);
+    });
+    it("should revert setCoveredPlatform if not called by governance", async function () {
+      await expect(product.connect(buyer).setCoveredPlatform(buyer.address)).to.be.revertedWith("!governance");
+    });
+    it("can get policy manager", async function () {
+      expect(await product.policyManager()).to.equal(policyManager.address);
+    });
+    it("can set policy manager", async function () {
+      await product.connect(governor).setPolicyManager(treasury.address);
+      expect(await product.policyManager()).to.equal(treasury.address);
+      await product.connect(governor).setPolicyManager(policyManager.address);
+    });
+    it("should revert setPolicyManager if not called by governance", async function () {
+      await expect(product.connect(buyer).setPolicyManager(buyer.address)).to.be.revertedWith("!governance");
     });
   });
 
@@ -479,9 +502,10 @@ describe("BaseProduct", () => {
         deployer,
         artifacts.MockProduct,
         [
+          deployer.address,
           mockPolicyManager.address,
           registry.address,
-          treasury.address, // this is for the coveredPlatform
+          ONE_SPLIT_VIEW, // this is for the coveredPlatform
           maxCoverAmount1,
           maxCoverPerUser1,
           minPeriod1,
