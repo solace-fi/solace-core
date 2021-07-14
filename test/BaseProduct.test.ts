@@ -142,6 +142,7 @@ describe("BaseProduct", () => {
       deployer,
       artifacts.MockProduct,
       [
+        deployer.address,
         policyManager.address,
         registry.address,
         treasury.address, // this is for the coveredPlatform
@@ -479,6 +480,7 @@ describe("BaseProduct", () => {
         deployer,
         artifacts.MockProduct,
         [
+          deployer.address,
           mockPolicyManager.address,
           registry.address,
           treasury.address, // this is for the coveredPlatform

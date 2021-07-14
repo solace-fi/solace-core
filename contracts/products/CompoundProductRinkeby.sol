@@ -134,22 +134,17 @@ contract CompoundProductRinkeby is BaseProduct, EIP712 {
      * @return amount of ETH received either from pull or swap
      */
     function pullAndSwap(address token, uint256 amount) internal returns (uint256) {
-        // case 1: pull eth
-        if(token == ETH_ADDRESS) {
-            require(msg.value >= amount);
-            return msg.value;
-        }
-        // case 2: pull ctoken
+        // pull ctoken
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
         ICToken ctoken = ICToken(token);
-        // case 2.1: pull cETH
+        // case 1: cETH
         if(compareStrings(ctoken.symbol(), "cETH")) {
             uint256 received = address(this).balance;
             require(ctoken.redeem(amount) == 0, "Compound error");
             received = address(this).balance - received;
             return received;
         }
-        // case 2.2: pull cErc20
+        // case 2: cErc20
         IERC20 underlying = IERC20(ctoken.underlying());
         uint256 received = underlying.balanceOf(address(this));
         require(ctoken.redeem(amount) == 0, "Compund error");
@@ -172,6 +167,7 @@ contract CompoundProductRinkeby is BaseProduct, EIP712 {
         return received;
     }
 
+    // receives ETH from cETH or WETH
     receive () external payable {}
 
     /**
