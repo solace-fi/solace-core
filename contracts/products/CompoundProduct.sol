@@ -3,8 +3,6 @@ pragma solidity 0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
-import "./../interface/ISwapRouter.sol";
-import "./../interface/IWETH9.sol";
 import "./BaseProduct.sol";
 
 
@@ -25,8 +23,6 @@ contract CompoundProduct is BaseProduct, EIP712 {
 
     IComptroller public comptroller;
     bytes32 private immutable _EXCHANGE_TYPEHASH = keccak256("CompoundProductExchange(uint256 policyID,address tokenIn,uint256 amountIn,address tokenOut,uint256 amountOut,uint256 deadline)");
-    ISwapRouter private swapRouter = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
-    IWETH9 private weth = IWETH9(payable(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2));
 
     constructor (
         address _governance,
@@ -104,7 +100,7 @@ contract CompoundProduct is BaseProduct, EIP712 {
         uint256 amountOut,
         uint256 deadline,
         bytes calldata signature
-    ) external payable {
+    ) external nonReentrant {
         // validate inputs
         // solhint-disable-next-line not-rely-on-time
         require(block.timestamp <= deadline, "expired deadline");
@@ -118,56 +114,41 @@ contract CompoundProduct is BaseProduct, EIP712 {
         address signer = ECDSA.recover(hash, signature);
         require(isAuthorizedSigner[signer], "invalid signature");
         }
-        // swap tokens
-        uint256 ethReceived = pullAndSwap(tokenIn, amountIn);
+        // redeem tokens
+        pullAndRedeem(tokenIn, amountIn);
         // burn policy
         policyManager.burn(policyID);
         // submit claim to ClaimsEscrow
-        IClaimsEscrow(payable(registry.claimsEscrow())).receiveClaim{value: ethReceived}(policyID, policyholder, amountOut);
+        IClaimsEscrow(payable(registry.claimsEscrow())).receiveClaim(policyID, policyholder, amountOut);
         emit ClaimSubmitted(policyID);
     }
 
     /**
-    * @notice Safely pulls a token from msg.sender and if necessary swaps for ETH.
-    * @param token token to pull
-    * @param amount amount of token to pull
-    * @return amount of ETH received either from pull or swap
-    */
-    function pullAndSwap(address token, uint256 amount) internal returns (uint256) {
+     * @notice Safely pulls a token from msg.sender and if necessary swaps for ETH.
+     * @param token token to pull
+     * @param amount amount of token to pull
+     */
+    function pullAndRedeem(address token, uint256 amount) internal {
         // pull ctoken
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
         ICToken ctoken = ICToken(token);
-        // case 1: cETH
         if(compareStrings(ctoken.symbol(), "cETH")) {
-            uint256 received = address(this).balance;
+            // case 1: cETH
+            uint256 redeemed = address(this).balance;
             require(ctoken.redeem(amount) == 0, "Compound error");
-            received = address(this).balance - received;
-            return received;
+            redeemed = address(this).balance - redeemed;
+            payable(msg.sender).transfer(redeemed);
+        } else {
+            // case 2: cErc20
+            IERC20 underlying = IERC20(ctoken.underlying());
+            uint256 redeemed = underlying.balanceOf(address(this));
+            require(ctoken.redeem(amount) == 0, "Compund error");
+            redeemed = underlying.balanceOf(address(this)) - redeemed;
+            underlying.safeTransfer(msg.sender, redeemed);
         }
-        // case 2: cErc20
-        IERC20 underlying = IERC20(ctoken.underlying());
-        uint256 received = underlying.balanceOf(address(this));
-        require(ctoken.redeem(amount) == 0, "Compund error");
-        received = underlying.balanceOf(address(this)) - received;
-        if(received > 0) {
-            // uniswap underlying for ETH
-            if(underlying.allowance(address(this), address(swapRouter)) < received) underlying.approve(address(swapRouter), type(uint256).max);
-            received = swapRouter.exactInputSingle(ISwapRouter.ExactInputSingleParams({
-                tokenIn: address(underlying),
-                tokenOut: address(weth),
-                fee: 3000,
-                recipient: address(this),
-                deadline: block.timestamp,
-                amountIn: received,
-                amountOutMinimum: 0,
-                sqrtPriceLimitX96: 0
-            }));
-            weth.withdraw(received);
-        }
-        return received;
     }
 
-    // receives ETH from cETH or WETH
+    // receives ETH from cETH
     receive () external payable {}
 
     /**
