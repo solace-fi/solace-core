@@ -396,8 +396,12 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
 
         // appraise the position
         uint256 positionAmount = appraisePosition(policyholder, positionContract);
+        // check if the new cover amount is exceeded the position amount
+        if (_newCoverAmount > positionAmount) {
+            _newCoverAmount = positionAmount;
+        }
+
         // check that the product can still provide coverage
-        require(_newCoverAmount <= positionAmount, "cover amount is exceeded the position amount");
         require(_newCoverAmount <= maxCoverPerUser, "over max cover single user");
         require(activeCoverAmount + _newCoverAmount - previousCoverAmount <= maxCoverAmount, "max covered amount is reached");
        
