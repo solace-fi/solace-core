@@ -128,5 +128,21 @@ if(process.env.FORK_NETWORK === "mainnet"){
         expectClose(await product.appraisePosition(USER2, aUSDT), BALANCE2, BN.from("100000000000"))
       })
     })
+
+    describe("covered platform", function () {
+      it("starts as aave data provider", async function () {
+        expect(await product.coveredPlatform()).to.equal(AAVE_DATA_PROVIDER);
+        expect(await product.aaveDataProvider()).to.equal(AAVE_DATA_PROVIDER);
+      });
+      it("cannot be set by non governor", async function () {
+        await expect(product.connect(user).setCoveredPlatform(user.address)).to.be.revertedWith("!governance");
+      });
+      it("can be set", async function () {
+        await product.connect(deployer).setCoveredPlatform(treasury.address);
+        expect(await product.coveredPlatform()).to.equal(treasury.address);
+        expect(await product.aaveDataProvider()).to.equal(treasury.address);
+        await product.connect(deployer).setCoveredPlatform(AAVE_DATA_PROVIDER);
+      });
+    });
   })
 }

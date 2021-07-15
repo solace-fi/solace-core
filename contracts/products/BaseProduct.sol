@@ -48,7 +48,7 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
     uint256 public override activeCoverAmount; // current amount covered (in wei)
 
     mapping(address => bool) public isAuthorizedSigner;
-    address public constant ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+    address internal constant ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     IExchangeQuoter public quoter;
     bool public paused; // = false
 
@@ -176,6 +176,11 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
         quoter = IExchangeQuoter(_quoter);
     }
 
+    /**
+     * @notice Adds a new signer that can authorize claims.
+     * Can only be called by the current governor.
+     * @param _signer The signer to add.
+     */
     function addSigner(address _signer) external {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
@@ -183,6 +188,11 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
         emit SignerAdded(_signer);
     }
 
+    /**
+     * @notice Removes a signer.
+     * Can only be called by the current governor.
+     * @param _signer The signer to remove.
+     */
     function removeSigner(address _signer) external {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
@@ -200,6 +210,30 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
         paused = _pause;
+    }
+
+    /**
+     * @notice Changes the covered platform.
+     * Use this if the the protocol changes their registry but keeps the children contracts.
+     * A new version of the protocol will likely require a new Product.
+     * Can only be called by the current governor.
+     * @param _coveredPlatform The platform to cover.
+     */
+    function setCoveredPlatform(address _coveredPlatform) public virtual override {
+        // can only be called by governor
+        require(msg.sender == governance, "!governance");
+        coveredPlatform = _coveredPlatform;
+    }
+
+    /**
+     * @notice Changes the policy manager.
+     * Can only be called by the current governor.
+     * @param _policyManager The new policy manager.
+     */
+    function setPolicyManager(address _policyManager) external override {
+        // can only be called by governor
+        require(msg.sender == governance, "!governance");
+        policyManager = IPolicyManager(_policyManager);
     }
 
 

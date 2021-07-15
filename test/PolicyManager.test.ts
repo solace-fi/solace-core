@@ -283,6 +283,7 @@ describe("PolicyManager", function () {
         deployer,
         artifacts.MockProduct,
         [
+          deployer.address,
           policyManager.address,
           registry.address,
           treasury.address,
