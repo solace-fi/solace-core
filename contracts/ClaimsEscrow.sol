@@ -36,6 +36,9 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow {
     /// mapping of claimID to Claim object
     mapping (uint256 => Claim) public claims;
 
+    // tracks how much is required to payout all claims
+    uint256 public totalClaimsOutstanding;
+
     /**
      * @notice Constructs the ClaimsEscrow contract.
      * @param _governance Address of the governor.
@@ -90,7 +93,9 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow {
      */
     function receiveClaim(uint256 _policyID, address _claimant, uint256 _amount) external payable override {
         require(IPolicyManager(registry.policyManager()).productIsActive(msg.sender), "!product");
-        if(address(this).balance < _amount) IVault(registry.vault()).requestEth(_amount - address(this).balance);
+        totalClaimsOutstanding += _amount;
+        uint256 tco = totalClaimsOutstanding;
+        if(address(this).balance < tco) IVault(registry.vault()).requestEth(tco - address(this).balance);
 
         // Add claim to claims mapping
         claims[_policyID] = Claim({
@@ -120,12 +125,14 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow {
         // if still not enough eth, partial withdraw
         if(amount > address(this).balance) {
             uint256 balance = address(this).balance;
+            totalClaimsOutstanding -= balance;
             claims[claimID].amount -= balance;
             payable(msg.sender).transfer(balance);
             emit ClaimWithdrawn(claimID, msg.sender, balance);
         }
         // if enough eth, full withdraw and delete claim
         else {
+            totalClaimsOutstanding -= amount;
             delete claims[claimID];
             _burn(claimID);
             payable(msg.sender).transfer(amount);
@@ -143,6 +150,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
         require(_exists(claimID), "query for nonexistent token");
+        totalClaimsOutstanding = totalClaimsOutstanding - claims[claimID].amount + value;
         claims[claimID].amount = value;
     }
 

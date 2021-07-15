@@ -15,7 +15,7 @@ interface IAToken {
 
 contract AaveV2Product is BaseProduct {
 
-    IAaveProtocolDataProvider public provider;
+    IAaveProtocolDataProvider public aaveDataProvider;
 
     constructor (
         address _governance,
@@ -42,7 +42,7 @@ contract AaveV2Product is BaseProduct {
         _price,
         _quoter
     ) {
-        provider = IAaveProtocolDataProvider(_coveredPlatform);
+        aaveDataProvider = IAaveProtocolDataProvider(_coveredPlatform);
     }
 
     // _positionContract must be an aToken
@@ -51,10 +51,22 @@ contract AaveV2Product is BaseProduct {
         // verify _positionContract
         IAToken token = IAToken(_positionContract);
         address underlying = token.UNDERLYING_ASSET_ADDRESS();
-        ( address aTokenAddress, , ) = provider.getReserveTokensAddresses(underlying);
+        ( address aTokenAddress, , ) = aaveDataProvider.getReserveTokensAddresses(underlying);
         require(_positionContract == aTokenAddress, "Invalid position contract");
         // swap math
         uint256 balance = token.balanceOf(_policyholder);
         return quoter.tokenToEth(underlying, balance);
+    }
+
+    /**
+     * @notice Changes the covered platform.
+     * Use this if the the protocol changes their registry but keeps the children contracts.
+     * A new version of the protocol will likely require a new Product.
+     * Can only be called by the current governor.
+     * @param _coveredPlatform The platform to cover.
+     */
+    function setCoveredPlatform(address _coveredPlatform) public override {
+        super.setCoveredPlatform(_coveredPlatform);
+        aaveDataProvider = IAaveProtocolDataProvider(_coveredPlatform);
     }
 }
