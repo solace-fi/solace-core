@@ -1,16 +1,16 @@
-import { waffle, upgrades, ethers } from 'hardhat';
+import { waffle, upgrades, ethers } from "hardhat";
 const { deployContract, solidity } = waffle;
-import { MockProvider } from 'ethereum-waffle';
+import { MockProvider } from "ethereum-waffle";
 const provider: MockProvider = waffle.provider;
-import { Wallet } from 'ethers';
-import chai from 'chai';
+import { Wallet } from "ethers";
+import chai from "chai";
 const { expect } = chai;
 chai.use(solidity);
 
-import { import_artifacts, ArtifactImports } from './utilities/artifact_importer';
-import { Registry, Solace, Master, Vault, Treasury, ClaimsEscrow, Weth9, PolicyManager } from '../typechain';
+import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
+import { Registry, Solace, Master, Vault, Treasury, ClaimsEscrow, Weth9, PolicyManager } from "../typechain";
 
-describe('Registry', function() {
+describe("Registry", function() {
   let artifacts: ArtifactImports;
   // users
   let deployer: Wallet;
@@ -33,7 +33,7 @@ describe('Registry', function() {
   let mockContract2: Wallet;
   let mockContract3: Wallet;
 
-  const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+  const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
   before(async function() {
     [deployer, governor, user, locker, mockContract1, mockContract2, mockContract3] = provider.getWallets();
@@ -49,8 +49,8 @@ describe('Registry', function() {
     //     governor.address
     //   ]
     // )) as Registry;
-    let registryContract = await ethers.getContractFactory('Registry');
-    registry = (await upgrades.deployProxy(registryContract, [governor.address], { kind: 'uups' })) as Registry;
+    let registryContract = await ethers.getContractFactory("Registry");
+    registry = (await upgrades.deployProxy(registryContract, [governor.address], { kind: "uups" })) as Registry;
 
     // deploy solace token
     solaceToken = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
@@ -73,46 +73,46 @@ describe('Registry', function() {
     policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
   });
 
-  describe('proxy', function() {
-    it('starts with the correct governor', async function() {
+  describe("proxy", function() {
+    it("starts with the correct governor", async function() {
       expect(await registry.governance()).to.equal(governor.address);
     });
 
-    it('rejects upgrading proxy by non governor', async function() {
-      await expect(registry.connect(user).upgradeTo(ZERO_ADDRESS)).to.be.revertedWith('!governance');
+    it("rejects upgrading proxy by non governor", async function() {
+      await expect(registry.connect(user).upgradeTo(ZERO_ADDRESS)).to.be.revertedWith("!governance");
     });
 
-    it('governor can upgrade proxy', async function() {
-      let registry2Contract = await ethers.getContractFactory('MockRegistryV2');
+    it("governor can upgrade proxy", async function() {
+      let registry2Contract = await ethers.getContractFactory("MockRegistryV2");
       let registry2 = await registry2Contract.deploy();
       await registry.connect(governor).upgradeTo(registry2.address);
-      expect(await registry2.connect(user).version()).to.equal('V2');
+      expect(await registry2.connect(user).version()).to.equal("V2");
     });
   });
 
-  describe('governance', function() {
-    it('starts with the correct governor', async function() {
+  describe("governance", function() {
+    it("starts with the correct governor", async function() {
       expect(await registry.governance()).to.equal(governor.address);
     });
 
-    it('rejects setting new governance by non governor', async function() {
-      await expect(registry.connect(user).setGovernance(user.address)).to.be.revertedWith('!governance');
+    it("rejects setting new governance by non governor", async function() {
+      await expect(registry.connect(user).setGovernance(user.address)).to.be.revertedWith("!governance");
     });
 
-    it('can set new governance', async function() {
+    it("can set new governance", async function() {
       await registry.connect(governor).setGovernance(deployer.address);
       expect(await registry.governance()).to.equal(governor.address);
       expect(await registry.newGovernance()).to.equal(deployer.address);
     });
 
-    it('rejects governance transfer by non governor', async function() {
-      await expect(registry.connect(user).acceptGovernance()).to.be.revertedWith('!governance');
+    it("rejects governance transfer by non governor", async function() {
+      await expect(registry.connect(user).acceptGovernance()).to.be.revertedWith("!governance");
     });
 
-    it('can transfer governance', async function() {
+    it("can transfer governance", async function() {
       let tx = await registry.connect(deployer).acceptGovernance();
       await expect(tx)
-        .to.emit(registry, 'GovernanceTransferred')
+        .to.emit(registry, "GovernanceTransferred")
         .withArgs(deployer.address);
       expect(await registry.governance()).to.equal(deployer.address);
       expect(await registry.newGovernance()).to.equal(ZERO_ADDRESS);
@@ -122,129 +122,129 @@ describe('Registry', function() {
     });
   });
 
-  describe('solace token', function() {
-    it('starts as the zero address', async function() {
+  describe("solace token", function() {
+    it("starts as the zero address", async function() {
       expect(await registry.solace()).to.equal(ZERO_ADDRESS);
     });
 
-    it('can be set', async function() {
+    it("can be set", async function() {
       let tx = await registry.connect(governor).setSolace(solaceToken.address);
       expect(await registry.solace()).to.equal(solaceToken.address);
       await expect(tx)
-        .to.emit(registry, 'SolaceSet')
+        .to.emit(registry, "SolaceSet")
         .withArgs(solaceToken.address);
     });
 
-    it('cannot be set by non governor', async function() {
-      await expect(registry.connect(user).setSolace(solaceToken.address)).to.be.revertedWith('!governance');
+    it("cannot be set by non governor", async function() {
+      await expect(registry.connect(user).setSolace(solaceToken.address)).to.be.revertedWith("!governance");
     });
   });
 
-  describe('master', function() {
-    it('starts as the zero address', async function() {
+  describe("master", function() {
+    it("starts as the zero address", async function() {
       expect(await registry.master()).to.equal(ZERO_ADDRESS);
     });
 
-    it('can be set', async function() {
+    it("can be set", async function() {
       let tx = await registry.connect(governor).setMaster(master.address);
       expect(await registry.master()).to.equal(master.address);
       await expect(tx)
-        .to.emit(registry, 'MasterSet')
+        .to.emit(registry, "MasterSet")
         .withArgs(master.address);
     });
 
-    it('cannot be set by non governor', async function() {
-      await expect(registry.connect(user).setMaster(master.address)).to.be.revertedWith('!governance');
+    it("cannot be set by non governor", async function() {
+      await expect(registry.connect(user).setMaster(master.address)).to.be.revertedWith("!governance");
     });
   });
 
-  describe('vault', function() {
-    it('starts as the zero address', async function() {
+  describe("vault", function() {
+    it("starts as the zero address", async function() {
       expect(await registry.vault()).to.equal(ZERO_ADDRESS);
     });
 
-    it('can be set', async function() {
+    it("can be set", async function() {
       let tx = await registry.connect(governor).setVault(vault.address);
       expect(await registry.vault()).to.equal(vault.address);
       await expect(tx)
-        .to.emit(registry, 'VaultSet')
+        .to.emit(registry, "VaultSet")
         .withArgs(vault.address);
     });
 
-    it('cannot be set by non governor', async function() {
-      await expect(registry.connect(user).setVault(vault.address)).to.be.revertedWith('!governance');
+    it("cannot be set by non governor", async function() {
+      await expect(registry.connect(user).setVault(vault.address)).to.be.revertedWith("!governance");
     });
   });
 
-  describe('treasury', function() {
-    it('starts as the zero address', async function() {
+  describe("treasury", function() {
+    it("starts as the zero address", async function() {
       expect(await registry.treasury()).to.equal(ZERO_ADDRESS);
     });
 
-    it('can be set', async function() {
+    it("can be set", async function() {
       let tx = await registry.connect(governor).setTreasury(treasury.address);
       expect(await registry.treasury()).to.equal(treasury.address);
       await expect(tx)
-        .to.emit(registry, 'TreasurySet')
+        .to.emit(registry, "TreasurySet")
         .withArgs(treasury.address);
     });
 
-    it('cannot be set by non governor', async function() {
-      await expect(registry.connect(user).setTreasury(treasury.address)).to.be.revertedWith('!governance');
+    it("cannot be set by non governor", async function() {
+      await expect(registry.connect(user).setTreasury(treasury.address)).to.be.revertedWith("!governance");
     });
   });
 
-  describe('locker', function() {
-    it('starts as the zero address', async function() {
+  describe("locker", function() {
+    it("starts as the zero address", async function() {
       expect(await registry.locker()).to.equal(ZERO_ADDRESS);
     });
 
-    it('can be set', async function() {
+    it("can be set", async function() {
       let tx = await registry.connect(governor).setLocker(locker.address);
       expect(await registry.locker()).to.equal(locker.address);
       await expect(tx)
-        .to.emit(registry, 'LockerSet')
+        .to.emit(registry, "LockerSet")
         .withArgs(locker.address);
     });
 
-    it('cannot be set by non governor', async function() {
-      await expect(registry.connect(user).setLocker(locker.address)).to.be.revertedWith('!governance');
+    it("cannot be set by non governor", async function() {
+      await expect(registry.connect(user).setLocker(locker.address)).to.be.revertedWith("!governance");
     });
   });
 
-  describe('claimsEscrow', function() {
-    it('starts as the zero address', async function() {
+  describe("claimsEscrow", function() {
+    it("starts as the zero address", async function() {
       expect(await registry.claimsEscrow()).to.equal(ZERO_ADDRESS);
     });
 
-    it('can be set', async function() {
+    it("can be set", async function() {
       let tx = await registry.connect(governor).setClaimsEscrow(claimsEscrow.address);
       expect(await registry.claimsEscrow()).to.equal(claimsEscrow.address);
       await expect(tx)
-        .to.emit(registry, 'ClaimsEscrowSet')
+        .to.emit(registry, "ClaimsEscrowSet")
         .withArgs(claimsEscrow.address);
     });
 
-    it('cannot be set by non governor', async function() {
-      await expect(registry.connect(user).setClaimsEscrow(claimsEscrow.address)).to.be.revertedWith('!governance');
+    it("cannot be set by non governor", async function() {
+      await expect(registry.connect(user).setClaimsEscrow(claimsEscrow.address)).to.be.revertedWith("!governance");
     });
   });
 
-  describe('policyManager', function() {
-    it('starts as the zero address', async function() {
+  describe("policyManager", function() {
+    it("starts as the zero address", async function() {
       expect(await registry.policyManager()).to.equal(ZERO_ADDRESS);
     });
 
-    it('can be set', async function() {
+    it("can be set", async function() {
       let tx = await registry.connect(governor).setPolicyManager(policyManager.address);
       expect(await registry.policyManager()).to.equal(policyManager.address);
       await expect(tx)
-        .to.emit(registry, 'PolicyManagerSet')
+        .to.emit(registry, "PolicyManagerSet")
         .withArgs(policyManager.address);
     });
 
-    it('cannot be set by non governor', async function() {
-      await expect(registry.connect(user).setPolicyManager(policyManager.address)).to.be.revertedWith('!governance');
+    it("cannot be set by non governor", async function() {
+      await expect(registry.connect(user).setPolicyManager(policyManager.address)).to.be.revertedWith("!governance");
     });
   });
 });
