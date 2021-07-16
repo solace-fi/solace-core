@@ -192,14 +192,15 @@ if(process.env.FORK_NETWORK === "mainnet"){
           deployer.address,
           policyManager.address,
           registry.address,
-          AAVE_DATA_PROVIDER,
+          LENDING_POOL_ADDRESS,
           maxCoverAmount,
           maxCoverPerUser,
           minPeriod,
           maxPeriod,
           cancelFee,
           price,
-          quoter.address
+          quoter.address,
+          AAVE_DATA_PROVIDER
         ]
       )) as unknown as AaveV2Product;
 
@@ -210,14 +211,15 @@ if(process.env.FORK_NETWORK === "mainnet"){
           deployer.address,
           policyManager.address,
           treasury.address,
-          AAVE_DATA_PROVIDER,
+          LENDING_POOL_ADDRESS,
           maxCoverAmount,
           maxCoverPerUser,
           minPeriod,
           maxPeriod,
           cancelFee,
           price,
-          quoter.address
+          quoter.address,
+          AAVE_DATA_PROVIDER
         ]
       )) as unknown as AaveV2Product;
 
@@ -346,7 +348,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
         await expect(product.connect(user).submitClaim(policyID1, aLINK_ADDRESS, amountIn1, ETH, "100000000000", deadline, signature)).to.be.revertedWith("invalid signature");
         await expect(product.connect(user).submitClaim(policyID1, aLINK_ADDRESS, amountIn1, ETH, amountOut1, deadline.sub(1), signature)).to.be.revertedWith("invalid signature");
       });
-      it("can open a claim on a cERC20 position", async function () {
+      it("can open a claim", async function () {
         // sign swap
         let digest = getSubmitClaimDigest("Solace.fi-AaveV2Product", product.address, chainId, policyID1, aLINK_ADDRESS, amountIn1, ETH, amountOut1, deadline);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));

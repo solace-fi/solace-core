@@ -12,10 +12,12 @@ const USE_PROCESSED_FILES = process.env.USE_PROCESSED_FILES === "true";
 
 const mainnet_fork = { url: process.env.MAINNET_URL || '', blockNumber: 12500000 };
 const rinkeby_fork = { url: process.env.RINKEBY_URL || '', blockNumber: 8763372 };
+const kovan_fork = { url: process.env.KOVAN_URL || '', blockNumber: 26000000 };
 const no_fork = { url: '', blockNumber: 0 };
 const forking = (
     process.env.FORK_NETWORK === "mainnet" ? mainnet_fork
   : process.env.FORK_NETWORK === "rinkeby" ? rinkeby_fork
+  : process.env.FORK_NETWORK === "kovan"   ? kovan_fork
   : no_fork
 );
 const hardhat_network = process.env.FORK_NETWORK ? {forking} : {};
@@ -29,6 +31,11 @@ const config: HardhatUserConfig = {
       url: process.env.RINKEBY_URL,
       chainId: 4,
       accounts: JSON.parse(process.env.RINKEBY_ACCOUNTS || '[]')
+    },
+    kovan: {
+      url: process.env.KOVAN_URL,
+      chainId: 42,
+      accounts: JSON.parse(process.env.KOVAN_ACCOUNTS || '[]')
     }
   },
   solidity: {

@@ -202,6 +202,19 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
         paused = _pause;
     }
 
+    /**
+     * @notice Changes the covered platform.
+     * Use this if the the protocol changes their registry but keeps the children contracts.
+     * A new version of the protocol will likely require a new Product.
+     * Can only be called by the current governor.
+     * @param _coveredPlatform The platform to cover.
+     */
+    function setCoveredPlatform(address _coveredPlatform) public virtual override {
+        // can only be called by governor
+        require(msg.sender == governance, "!governance");
+        coveredPlatform = _coveredPlatform;
+    }
+
 
     /**** UNIMPLEMENTED FUNCTIONS
     Functions that are only implemented by child product contracts

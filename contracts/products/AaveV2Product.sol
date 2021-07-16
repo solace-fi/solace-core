@@ -22,27 +22,28 @@ interface ILendingPool {
 contract AaveV2Product is BaseProduct, EIP712 {
     using SafeERC20 for IAToken;
 
-    IAaveProtocolDataProvider public provider;
-    ILendingPool public lendingPool = ILendingPool(0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9);
+    ILendingPool public lendingPool;
+    IAaveProtocolDataProvider public aaveDataProvider;
     bytes32 private immutable _EXCHANGE_TYPEHASH = keccak256("AaveV2ProductExchange(uint256 policyID,address tokenIn,uint256 amountIn,address tokenOut,uint256 amountOut,uint256 deadline)");
 
     constructor (
         address _governance,
         IPolicyManager _policyManager,
         IRegistry _registry,
-        address _coveredPlatform,
+        address _lendingPool,
         uint256 _maxCoverAmount,
         uint256 _maxCoverPerUser,
         uint64 _minPeriod,
         uint64 _maxPeriod,
         uint64 _cancelFee,
         uint24 _price,
-        address _quoter
+        address _quoter,
+        address _dataProvider
     ) BaseProduct(
         _governance,
         _policyManager,
         _registry,
-        _coveredPlatform,
+        _lendingPool,
         _maxCoverAmount,
         _maxCoverPerUser,
         _minPeriod,
@@ -51,7 +52,8 @@ contract AaveV2Product is BaseProduct, EIP712 {
         _price,
         _quoter
     ) EIP712("Solace.fi-AaveV2Product", "1") {
-        provider = IAaveProtocolDataProvider(_coveredPlatform);
+        lendingPool = ILendingPool(_lendingPool);
+        aaveDataProvider = IAaveProtocolDataProvider(_dataProvider);
     }
 
     // _positionContract must be an aToken
@@ -60,7 +62,7 @@ contract AaveV2Product is BaseProduct, EIP712 {
         // verify _positionContract
         IAToken token = IAToken(_positionContract);
         address underlying = token.UNDERLYING_ASSET_ADDRESS();
-        ( address aTokenAddress, , ) = provider.getReserveTokensAddresses(underlying);
+        ( address aTokenAddress, , ) = aaveDataProvider.getReserveTokensAddresses(underlying);
         require(_positionContract == aTokenAddress, "Invalid position contract");
         // swap math
         uint256 balance = token.balanceOf(_policyholder);
@@ -120,5 +122,19 @@ contract AaveV2Product is BaseProduct, EIP712 {
         IAToken atoken = IAToken(token);
         atoken.safeTransferFrom(msg.sender, address(this), amount);
         lendingPool.withdraw(atoken.UNDERLYING_ASSET_ADDRESS(), amount, msg.sender);
+    }
+
+    /**
+     * @notice Changes the covered platform.
+     * Use this if the the protocol changes their registry but keeps the children contracts.
+     * A new version of the protocol will likely require a new Product.
+     * Can only be called by the current governor.
+     * @param _lendingPool The Aave Lending Pool.
+     * @param _dataProvider The Aave Data Provider.
+     */
+    function setCoveredPlatform(address _lendingPool, address _dataProvider) public {
+        super.setCoveredPlatform(_lendingPool);
+        lendingPool = ILendingPool(_lendingPool);
+        aaveDataProvider = IAaveProtocolDataProvider(_dataProvider);
     }
 }
