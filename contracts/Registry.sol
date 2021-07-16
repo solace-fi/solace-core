@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity 0.8.0;
+pragma solidity ^0.8.0;
 
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./interface/IRegistry.sol";
 
 
@@ -9,7 +12,7 @@ import "./interface/IRegistry.sol";
  * @author solace.fi
  * @notice Tracks the contracts in the Solaverse.
  */
-contract Registry is IRegistry {
+contract Registry is IRegistry, Initializable, UUPSUpgradeable {
 
     /// @notice Governor.
     address public override governance;
@@ -30,11 +33,12 @@ contract Registry is IRegistry {
     /// @notice Policy Manager contract.
     address public override policyManager;
 
-    /**
-     * @notice Constructs the registry contract.
-     * @param _governance Address of the governor.
-     */
-    constructor(address _governance) {
+    modifier onlyGovernor() {
+        require(governance == msg.sender, "!governance");
+        _;
+    }
+
+    function initialize(address _governance) public initializer {
         governance = _governance;
     }
 
@@ -144,4 +148,6 @@ contract Registry is IRegistry {
         policyManager = _policyManager;
         emit PolicyManagerSet(_policyManager);
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyGovernor {}
 }

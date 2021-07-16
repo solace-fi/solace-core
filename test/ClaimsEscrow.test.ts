@@ -1,5 +1,5 @@
 import chai from "chai";
-import { waffle } from "hardhat";
+import { waffle, upgrades, ethers} from "hardhat";
 import { BigNumber as BN, constants } from "ethers";
 const { expect } = chai;
 const { deployContract, solidity } = waffle;
@@ -40,11 +40,13 @@ describe("ClaimsEscrow", function () {
       artifacts.WETH
     )) as Weth9;
 
-    registry = (await deployContract(
-      owner,
-      artifacts.Registry,
-      [owner.address]
-    )) as Registry;
+    // registry = (await deployContract(
+    //   owner,
+    //   artifacts.Registry,
+    //   [owner.address]
+    // )) as Registry;
+    let registryContract = await ethers.getContractFactory('Registry');
+    registry = (await upgrades.deployProxy(registryContract, [owner.address], { kind: 'uups' })) as Registry;
 
     claimsEscrow = (await deployContract(
       owner,

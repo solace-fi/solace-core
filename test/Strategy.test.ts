@@ -1,5 +1,5 @@
 import chai from "chai";
-import { waffle } from "hardhat";
+import { waffle, ethers, upgrades} from "hardhat";
 import { BigNumber as BN } from "ethers";
 const { expect } = chai;
 const { deployContract, solidity } = waffle;
@@ -33,11 +33,14 @@ describe("Strategy", function () {
     })
 
     beforeEach(async () => {
-        registry = (await deployContract(
-            owner,
-            artifacts.Registry,
-            [owner.address,]
-        )) as Registry;
+        // registry = (await deployContract(
+        //     owner,
+        //     artifacts.Registry,
+        //     [owner.address,]
+        // )) as Registry;
+
+        let registryContract = await ethers.getContractFactory('Registry');
+        registry = (await upgrades.deployProxy(registryContract, [owner.address], { kind: 'uups' })) as Registry;
 
         weth = (await deployContract(
             owner,
