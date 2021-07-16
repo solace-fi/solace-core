@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.0;
 
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 import "./BaseProduct.sol";
 
 
@@ -8,14 +10,21 @@ interface IAaveProtocolDataProvider {
     function getReserveTokensAddresses(address asset) external view returns (address aTokenAddress, address stableDebtTokenAddress, address variableDebtTokenAddress);
 }
 
-interface IAToken {
-    function balanceOf(address owner) external view returns (uint256);
+interface IAToken is IERC20 {
     function UNDERLYING_ASSET_ADDRESS() external view returns (address);
 }
 
-contract AaveV2Product is BaseProduct {
+interface ILendingPool {
+    function deposit(address asset, uint256 amount, address onBehalfOf, uint16 referralCode) external;
+    function withdraw(address asset, uint256 amount, address to) external returns (uint256);
+}
+
+contract AaveV2Product is BaseProduct, EIP712 {
+    using SafeERC20 for IAToken;
 
     IAaveProtocolDataProvider public provider;
+    ILendingPool public lendingPool = ILendingPool(0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9);
+    bytes32 private immutable _EXCHANGE_TYPEHASH = keccak256("AaveV2ProductExchange(uint256 policyID,address tokenIn,uint256 amountIn,address tokenOut,uint256 amountOut,uint256 deadline)");
 
     constructor (
         address _governance,
@@ -41,7 +50,7 @@ contract AaveV2Product is BaseProduct {
         _cancelFee,
         _price,
         _quoter
-    ) {
+    ) EIP712("Solace.fi-AaveV2Product", "1") {
         provider = IAaveProtocolDataProvider(_coveredPlatform);
     }
 
@@ -56,5 +65,60 @@ contract AaveV2Product is BaseProduct {
         // swap math
         uint256 balance = token.balanceOf(_policyholder);
         return quoter.tokenToEth(underlying, balance);
+    }
+
+    /**
+     * @notice Submits a claim.
+     * User will give up some of their cToken position to receive ETH.
+     * Can only submit one claim per policy.
+     * Must be signed by an authorized signer.
+     * @param policyID The policy that suffered a loss.
+     * @param tokenIn The token the user must give up.
+     * @param amountIn The amount the user must give up.
+     * @param tokenOut The token the user will receive.
+     * @param amountOut The amount the user will receive.
+     * @param deadline Transaction must execute before this timestamp.
+     * @param signature Signature from the signer.
+     */
+    function submitClaim(
+        uint256 policyID,
+        address tokenIn,
+        uint256 amountIn,
+        address tokenOut,
+        uint256 amountOut,
+        uint256 deadline,
+        bytes calldata signature
+    ) external payable {
+        // validate inputs
+        // solhint-disable-next-line not-rely-on-time
+        require(block.timestamp <= deadline, "expired deadline");
+        (address policyholder, address product, , , , ) = policyManager.getPolicyInfo(policyID);
+        require(policyholder == msg.sender, "!policyholder");
+        require(product == address(this), "wrong product");
+        // verify signature
+        {
+        bytes32 structHash = keccak256(abi.encode(_EXCHANGE_TYPEHASH, policyID, tokenIn, amountIn, tokenOut, amountOut, deadline));
+        bytes32 hash = _hashTypedDataV4(structHash);
+        address signer = ECDSA.recover(hash, signature);
+        require(isAuthorizedSigner[signer], "invalid signature");
+        }
+        // swap tokens
+        pullAndSwap(tokenIn, amountIn);
+        // burn policy
+        policyManager.burn(policyID);
+        // submit claim to ClaimsEscrow
+        IClaimsEscrow(payable(registry.claimsEscrow())).receiveClaim(policyID, policyholder, amountOut);
+        emit ClaimSubmitted(policyID);
+    }
+
+    /**
+    * @notice Safely pulls a token from msg.sender and if necessary swaps for underlying.
+    * @param token token to pull
+    * @param amount amount of token to pull
+    */
+    function pullAndSwap(address token, uint256 amount) internal {
+        IAToken atoken = IAToken(token);
+        atoken.safeTransferFrom(msg.sender, address(this), amount);
+        lendingPool.withdraw(atoken.UNDERLYING_ASSET_ADDRESS(), amount, msg.sender);
     }
 }
