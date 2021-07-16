@@ -259,19 +259,23 @@ describe('PolicyManager', function() {
       // redeploy policy manager
       policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
       // add products
-      mockProduct = (await deployContract(deployer, artifacts.MockProduct, [
-        deployer.address,
-        policyManager.address,
-        registry.address,
-        treasury.address,
-        100000000000,
-        100000000000,
-        0,
-        100000000000,
-        0,
-        16777215,
-        ZERO_ADDRESS,
-      ])) as MockProduct;
+      mockProduct = (await deployContract(
+        deployer,
+        artifacts.MockProduct,
+        [
+          deployer.address,
+          policyManager.address,
+          registry.address,
+          treasury.address,
+          100000000000,
+          100000000000,
+          0,
+          100000000000,
+          0,
+          16777215,
+          ZERO_ADDRESS
+        ]
+      )) as MockProduct;
       await policyManager.connect(governor).addProduct(mockProduct.address);
       await registry.setPolicyManager(policyManager.address);
     });

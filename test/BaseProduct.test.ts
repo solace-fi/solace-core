@@ -102,34 +102,42 @@ describe('BaseProduct', () => {
     treasury = (await deployContract(deployer, artifacts.Treasury, [deployer.address, ZERO_ADDRESS, weth.address, registry.address])) as Treasury;
 
     // deploy BaseProduct
-    product = (await deployContract(deployer, artifacts.MockProduct, [
-      deployer.address,
-      policyManager.address,
-      registry.address,
-      treasury.address, // this is for the coveredPlatform
-      maxCoverAmount1,
-      maxCoverPerUser1,
-      minPeriod1,
-      maxPeriod1,
-      manageFee1,
-      price1,
-      quoter1.address,
-    ])) as MockProduct;
+    product = (await deployContract(
+      deployer,
+      artifacts.MockProduct,
+      [
+        deployer.address,
+        policyManager.address,
+        registry.address,
+        ONE_SPLIT_VIEW, // this is for the coveredPlatform
+        maxCoverAmount1,
+        maxCoverPerUser1,
+        minPeriod1,
+        maxPeriod1,
+        manageFee1,
+        price1,
+        quoter1.address
+      ]
+    )) as MockProduct;
 
     // deploy second BaseProduct
-    product2 = (await deployContract(deployer, artifacts.MockProduct, [
-      deployer.address,
-      policyManager.address,
-      registry.address,
-      treasury.address, // this is for the coveredPlatform
-      maxCoverAmount1,
-      maxCoverPerUser1,
-      minPeriod1,
-      maxPeriod1,
-      manageFee1,
-      price1,
-      quoter1.address,
-    ])) as MockProduct;
+    product2 = (await deployContract(
+      deployer,
+      artifacts.MockProduct,
+      [
+        deployer.address,
+        policyManager.address,
+        registry.address,
+        ONE_SPLIT_VIEW, // this is for the coveredPlatform
+        maxCoverAmount1,
+        maxCoverPerUser1,
+        minPeriod1,
+        maxPeriod1,
+        manageFee1,
+        price1,
+        quoter1.address
+      ]
+    )) as MockProduct;
 
     await registry.setVault(vault.address);
     await registry.setClaimsEscrow(claimsEscrow.address);
@@ -236,6 +244,28 @@ describe('BaseProduct', () => {
     });
     it('should revert setExchangeQuoter if not called by governance', async function() {
       await expect(product.connect(buyer).setExchangeQuoter(quoter1.address)).to.be.revertedWith('!governance');
+    });
+    it("can get covered platform", async function () {
+      expect(await product.coveredPlatform()).to.equal(ONE_SPLIT_VIEW);
+    });
+    it("can set covered platform", async function () {
+      await product.connect(governor).setCoveredPlatform(treasury.address);
+      expect(await product.coveredPlatform()).to.equal(treasury.address);
+      await product.connect(governor).setCoveredPlatform(ONE_SPLIT_VIEW);
+    });
+    it("should revert setCoveredPlatform if not called by governance", async function () {
+      await expect(product.connect(buyer).setCoveredPlatform(buyer.address)).to.be.revertedWith("!governance");
+    });
+    it("can get policy manager", async function () {
+      expect(await product.policyManager()).to.equal(policyManager.address);
+    });
+    it("can set policy manager", async function () {
+      await product.connect(governor).setPolicyManager(treasury.address);
+      expect(await product.policyManager()).to.equal(treasury.address);
+      await product.connect(governor).setPolicyManager(policyManager.address);
+    });
+    it("should revert setPolicyManager if not called by governance", async function () {
+      await expect(product.connect(buyer).setPolicyManager(buyer.address)).to.be.revertedWith("!governance");
     });
   });
 
@@ -641,24 +671,28 @@ describe('BaseProduct', () => {
     });
   });
 
-  describe('active cover amount', function() {
-    let product3: MockProduct;
-    before(async function() {
-      product3 = (await deployContract(deployer, artifacts.MockProduct, [
-        deployer.address,
-        mockPolicyManager.address,
-        registry.address,
-        treasury.address, // this is for the coveredPlatform
-        maxCoverAmount1,
-        maxCoverPerUser1,
-        minPeriod1,
-        maxPeriod1,
-        manageFee1,
-        price1,
-        quoter1.address,
-      ])) as MockProduct;
-    });
-    it('starts at zero', async function() {
+  describe("active cover amount", function () {
+    let product3: MockProduct
+    before(async function () {
+      product3 = (await deployContract(
+        deployer,
+        artifacts.MockProduct,
+        [
+          deployer.address,
+          mockPolicyManager.address,
+          registry.address,
+          ONE_SPLIT_VIEW, // this is for the coveredPlatform
+          maxCoverAmount1,
+          maxCoverPerUser1,
+          minPeriod1,
+          maxPeriod1,
+          manageFee1,
+          price1,
+          quoter1.address
+        ]
+      )) as MockProduct;
+    })
+    it("starts at zero", async function () {
       expect(await product3.activeCoverAmount()).to.equal(0);
     });
     it('cannot update by non policy manager', async function() {

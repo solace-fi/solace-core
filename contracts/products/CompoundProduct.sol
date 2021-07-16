@@ -56,17 +56,6 @@ contract CompoundProduct is BaseProduct, EIP712 {
         comptroller = IComptroller(_coveredPlatform);
     }
 
-    /**
-     * @notice Sets a new Comptroller.
-     * Can only be called by the current governor.
-     * @param _comptroller The new comptroller address.
-     */
-    function setComptroller(address _comptroller) external {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
-        comptroller = IComptroller(_comptroller);
-    }
-
     // _positionContract must be a cToken including cETH
     // see https://compound.finance/markets
     // and https://etherscan.io/accounts/label/compound
@@ -173,6 +162,18 @@ contract CompoundProduct is BaseProduct, EIP712 {
     }
 
     receive () external payable {}
+
+    /**
+     * @notice Changes the covered platform.
+     * Use this if the the protocol changes their registry but keeps the children contracts.
+     * A new version of the protocol will likely require a new Product.
+     * Can only be called by the current governor.
+     * @param _coveredPlatform The platform to cover.
+     */
+    function setCoveredPlatform(address _coveredPlatform) public override {
+        super.setCoveredPlatform(_coveredPlatform);
+        comptroller = IComptroller(_coveredPlatform);
+    }
 
     /**
      * @notice String equality.
