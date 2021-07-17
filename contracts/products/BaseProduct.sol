@@ -427,7 +427,6 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
         require(policyholder == msg.sender,"!policyholder");
         require(product == address(this), "wrong product");
         require(previousExpirationBlock >= block.number, "policy is expired");
-        require(_newCoverAmount > 0, "invalid cover amount");
         require(_newExtension > 0, "invalid block value");
 
         // appraise the position
@@ -436,6 +435,7 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
         if (_newCoverAmount > positionAmount) {
             _newCoverAmount = positionAmount;
         }
+        require(_newCoverAmount > 0, "invalid cover amount");
 
         // check that the product can still provide coverage
         require(_newCoverAmount <= maxCoverPerUser, "over max cover single user");

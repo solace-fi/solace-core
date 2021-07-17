@@ -517,6 +517,11 @@ describe("BaseProduct", () => {
     it("cannot update policy with invalid extension", async function() {
       await expect(product.connect(buyer).updatePolicy(policyID, coverAmount, 0, { value: quote })).to.be.revertedWith("invalid block value");
     });
+    it("cannot update policy for zero position amount", async function() {
+      await product.setPositionValue(BN.from(0));
+      await expect(product.connect(buyer).updatePolicy(policyID, coverAmount, blocks, { value: quote })).to.be.revertedWith("invalid cover amount");
+      await product.setPositionValue(positionAmount);
+    });
     it("cannot update policy with refund amount > manage fee", async function() {
       let newCoverLimit = BN.from(1000);
       let newCoverAmount = newCoverLimit.mul(positionAmount).div(1e4);
