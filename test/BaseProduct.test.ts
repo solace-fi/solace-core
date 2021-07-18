@@ -509,13 +509,10 @@ describe("BaseProduct", () => {
       await expect(product.connect(buyer).updatePolicy(policyID, coverAmount, blocks2, { value: quote2 })).to.be.revertedWith("invalid period");
     });
     it("cannot update policy with insufficient payment", async function() {
-      await expect(product.connect(buyer).updatePolicy(policyID, coverAmount, blocks, { value: BN.from(0) })).to.be.revertedWith("insufficient payment or premium is zero");
+      await expect(product.connect(buyer).updatePolicy(policyID, coverAmount, blocks, { value: BN.from(0) })).to.be.revertedWith("insufficient payment");
     });
     it("cannot update policy with invalid cover amount", async function() {
       await expect(product.connect(buyer).updatePolicy(policyID, 0, blocks, { value: quote })).to.be.revertedWith("invalid cover amount");
-    });
-    it("cannot update policy with invalid extension", async function() {
-      await expect(product.connect(buyer).updatePolicy(policyID, coverAmount, 0, { value: quote })).to.be.revertedWith("invalid block value");
     });
     it("cannot update policy for zero position amount", async function() {
       await product.setPositionValue(BN.from(0));

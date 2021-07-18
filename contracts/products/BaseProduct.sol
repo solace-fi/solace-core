@@ -427,7 +427,6 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
         require(policyholder == msg.sender,"!policyholder");
         require(product == address(this), "wrong product");
         require(previousExpirationBlock >= block.number, "policy is expired");
-        require(_newExtension > 0, "invalid block value");
 
         // appraise the position
         uint256 positionAmount = appraisePosition(policyholder, positionContract);
@@ -452,14 +451,14 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
         policyManager.setPolicyInfo(_policyID, policyholder, positionContract, _newCoverAmount, newExpirationBlock, price);
 
         // calculate premium needed for new cover amount as if policy is bought now
-        uint256 newPremium = _newCoverAmount * (newExpirationBlock - uint64(block.number)) * price / 1e12;
+        uint256 newPremium = _newCoverAmount * duration * price / 1e12;
 
         // calculate premium already paid based on current policy
         uint256 paidPremium = previousCoverAmount * (previousExpirationBlock - uint64(block.number)) * previousPrice / 1e12;
 
         if (newPremium >= paidPremium) {
            uint256 premium = newPremium - paidPremium;
-           require(msg.value >= premium && premium != 0, "insufficient payment or premium is zero");
+           require(msg.value >= premium, "insufficient payment");
            if(msg.value > premium) payable(msg.sender).transfer(msg.value - premium);
            ITreasury(payable(registry.treasury())).routePremiums{value: premium}();
         } else {
