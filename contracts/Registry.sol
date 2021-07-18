@@ -3,9 +3,7 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./interface/IRegistry.sol";
-
 
 /**
  * @title Registry
@@ -14,6 +12,8 @@ import "./interface/IRegistry.sol";
  */
 contract Registry is IRegistry, Initializable, UUPSUpgradeable {
 
+    /// @notice Admin to upgrade contract
+    address public admin;
     /// @notice Governor.
     address public override governance;
     /// @notice Governance to take over.
@@ -33,13 +33,14 @@ contract Registry is IRegistry, Initializable, UUPSUpgradeable {
     /// @notice Policy Manager contract.
     address public override policyManager;
 
-    modifier onlyGovernor() {
-        require(governance == msg.sender, "!governance");
-        _;
-    }
-
+    /**
+     * @notice initialize function for the registry contract.
+     * Only called once in contract deployment to initialize governor and admin. 
+     * @param _governance Address of the governor.
+     */
     function initialize(address _governance) public initializer {
         governance = _governance;
+        admin = msg.sender;
     }
 
     /**
@@ -149,5 +150,10 @@ contract Registry is IRegistry, Initializable, UUPSUpgradeable {
         emit PolicyManagerSet(_policyManager);
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyGovernor {}
+    /**
+    * @notice To authorize the admin to upgrade the contract.
+    */
+    function _authorizeUpgrade(address) internal override {
+        require(admin == msg.sender, "!admin");
+    }
 }

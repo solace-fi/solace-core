@@ -59,15 +59,6 @@ describe("Treasury", function() {
     [deployer, governor, liquidityProvider, mockPolicy, user, randAddress, mockProduct] = provider.getWallets();
     artifacts = await import_artifacts();
 
-    // deploy registry contract
-    // registry = (await deployContract(
-    //   deployer,
-    //   artifacts.Registry,
-    //   [
-    //     governor.address
-    //   ]
-    // )) as Registry;
-
     let registryContract = await ethers.getContractFactory("Registry");
     registry = (await upgrades.deployProxy(registryContract, [governor.address], { kind: "uups" })) as Registry;
 

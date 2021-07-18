@@ -34,14 +34,6 @@ describe("PolicyManager", function() {
     // deploy policy manager
     policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
 
-    // deploy registry contract
-    // registry = (await deployContract(
-    //   deployer,
-    //   artifacts.Registry,
-    //   [
-    //     deployer.address
-    //   ]
-    // )) as Registry;
     let registryContract = await ethers.getContractFactory("Registry");
     registry = (await upgrades.deployProxy(registryContract, [deployer.address], { kind: "uups" })) as Registry;
 
