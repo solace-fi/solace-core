@@ -33,7 +33,7 @@ const TREASURY_ADDRESS         = "0xbB16ebD85b0D0e752F34CAb7763D6Ee14264bAD8";
 
 const POLICY_MANAGER_ADDRESS   = "0x1d3397Ba5Dfd05b7c220A0f69B425a8c15d8De4b";
 const QUOTER_MANUAL_ADDRESS    = "0x9Fb3B6b3CC825c01DD1853745E8c2b747c46Ea37";
-const AAVE_PRODUCT_ADDRESS     = "0x999083fe30fa6eB975d2b24AeF4751a0012173e4";
+const AAVE_PRODUCT_ADDRESS     = "0x5D4cd8B8929D58315aB8A994e255cA61Cb6d638F";
 
 const UNISWAP_FACTORY_ADDRESS  = "0x1F98431c8aD98523631AE4a59f267346ea31F984";
 const UNISWAP_ROUTER_ADDRESS   = "0xE592427A0AEce92De3Edee1F18E0157C05861564";
@@ -41,7 +41,6 @@ const UNISWAP_LPTOKEN_ADDRESS  = "0xC36442b4a4522E871399CD717aBDD847Ab11FE88";
 const UNISWAP_POOL_ADDRESS     = "0x2da3C98C158Ae16274Ad04bbc2EF114F167C5AAF";
 
 const AAVE_DATA_PROVIDER       = "0x3c73A5E5785cAC854D468F727c606C07488a29D6";
-const AAVE_LENDING_POOL        = "0xE0fBa4Fc209b4948668006B2bE61711b7f465bAe";
 
 // farm params
 const START_BLOCK = BN.from(26000000); // July 2021 on Rinkeby
@@ -52,7 +51,7 @@ const minPeriod = 6450; // this is about 1 day
 const maxPeriod = 2354250; // this is about 1 year from https://ycharts.com/indicators/ethereum_blocks_per_day
 const maxCoverAmount = BN.from("1000000000000000000000"); // 1000 Ether in wei
 const maxCoverPerUser = BN.from("10000000000000000000"); // 10 Ether in wei
-const cancelFee = BN.from("1000000000000000"); // 0.001 Ether in wei
+const cancelFee = BN.from("0"); // no fee
 const price = 11044; // 2.60%/yr
 
 let artifacts: ArtifactImports;
@@ -317,7 +316,7 @@ async function deployAaveProduct() {
     aaveProduct = (new ethers.Contract(AAVE_PRODUCT_ADDRESS, artifacts.AaveV2Product.abi, provider)) as unknown as AaveV2Product;
   } else {
     console.log("Deploying AaveV2Product");
-    aaveProduct = (await deployContract(deployer,artifacts.AaveV2Product,[signerAddress,policyManager.address,registry.address,AAVE_LENDING_POOL,maxCoverAmount,maxCoverPerUser,minPeriod,maxPeriod,cancelFee,price,quoterManual.address,AAVE_DATA_PROVIDER])) as unknown as AaveV2Product;
+    aaveProduct = (await deployContract(deployer,artifacts.AaveV2Product,[signerAddress,policyManager.address,registry.address,AAVE_DATA_PROVIDER,maxCoverAmount,maxCoverPerUser,minPeriod,maxPeriod,cancelFee,price,quoterManual.address])) as unknown as AaveV2Product;
     console.log(`Deployed AaveV2Product to ${aaveProduct.address}`);
   }
   if(await policyManager.governance() == signerAddress && !(await aaveProduct.isAuthorizedSigner(PACLAS_SIGNER))){

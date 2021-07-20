@@ -16,11 +16,10 @@ import { PolicyManager, AaveV2Product, ExchangeQuoter, ExchangeQuoterManual, Tre
 import { getDomainSeparator, sign } from "./utilities/signature";
 import { ECDSASignature } from "ethereumjs-util";
 
-const EXCHANGE_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("AaveV2ProductExchange(uint256 policyID,address tokenIn,uint256 amountIn,address tokenOut,uint256 amountOut,uint256 deadline)"));
+const EXCHANGE_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("AaveV2ProductExchange(uint256 policyID,uint256 amountOut,uint256 deadline)"));
 
 const chainId = 31337;
 const deadline = constants.MaxUint256;
-const ETH = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 
 const toBytes32 = (bn: BN) => {
   return ethers.utils.hexlify(ethers.utils.zeroPad(bn.toHexString(), 32));
@@ -38,9 +37,6 @@ function getSubmitClaimDigest(
     address: string,
     chainId: number,
     policyID: BigNumberish,
-    tokenIn: string,
-    amountIn: BigNumberish,
-    tokenOut: string,
     amountOut: BigNumberish,
     deadline: BigNumberish
     ) {
@@ -54,8 +50,8 @@ function getSubmitClaimDigest(
             DOMAIN_SEPARATOR,
             utils.keccak256(
             utils.defaultAbiCoder.encode(
-                ['bytes32', 'uint256', 'address', 'uint256', 'address', 'uint256','uint256'],
-                [EXCHANGE_TYPEHASH, policyID, tokenIn, amountIn, tokenOut, amountOut, deadline]
+                ['bytes32', 'uint256', 'uint256','uint256'],
+                [EXCHANGE_TYPEHASH, policyID, amountOut, deadline]
             )
             ),
         ]
@@ -102,8 +98,6 @@ if(process.env.FORK_NETWORK === "mainnet"){
     const BALANCE2 = BN.from("159423625168150219");
 
     const aLINK_ADDRESS = "0xa06bC25B5805d5F8d82847D191Cb4Af5A3e873E0"; // proxy
-    //const aLINK_PROXY_ADDRESS = "0xa06bC25B5805d5F8d82847D191Cb4Af5A3e873E0"; // proxy
-    //const aLINK_IMPL_ADDRESS = "0x37Fe4e17A70945b42D1753690b698C3f22B48C87"; // implementation
     const LINK_ADDRESS = "0x514910771AF9Ca656af840dff83E8264EcF986CA";
     const LENDING_POOL_ADDRESS = "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9";
 
@@ -300,7 +294,6 @@ if(process.env.FORK_NETWORK === "mainnet"){
         await lendingPool.connect(user).deposit(LINK_ADDRESS, amountIn1, user.address, 0);
         expect(await link.balanceOf(user.address)).to.be.equal(0);
         expect(await alink.balanceOf(user.address)).to.be.gte(amountIn1);
-        await alink.connect(user).approve(product.address, constants.MaxUint256);
         let coverLimit = 10000;
         let blocks = threeDays;
         let quote = BN.from(await product.getQuote(user.address, aLINK_ADDRESS, coverLimit, blocks));
@@ -315,56 +308,47 @@ if(process.env.FORK_NETWORK === "mainnet"){
         await product.connect(user2).buyPolicy(user2.address, aLINK_ADDRESS, coverLimit, blocks, { value: quote });
       });
       it("cannot submit claim with expired signature", async function () {
-        let digest = getSubmitClaimDigest("Solace.fi-AaveV2Product", product.address, chainId, policyID1, aLINK_ADDRESS, amountIn1, ETH, amountOut1, 0);
+        let digest = getSubmitClaimDigest("Solace.fi-AaveV2Product", product.address, chainId, policyID1, amountOut1, 0);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
-        await expect(product.connect(user).submitClaim(policyID1, aLINK_ADDRESS, amountIn1, ETH, amountOut1, 0, signature)).to.be.revertedWith("expired deadline");
+        await expect(product.connect(user).submitClaim(policyID1, amountOut1, 0, signature)).to.be.revertedWith("expired deadline");
       });
       it("cannot submit claim on someone elses policy", async function () {
-        let digest = getSubmitClaimDigest("Solace.fi-AaveV2Product", product.address, chainId, policyID2, aLINK_ADDRESS, amountIn1, ETH, amountOut1, deadline);
+        let digest = getSubmitClaimDigest("Solace.fi-AaveV2Product", product.address, chainId, policyID2, amountOut1, deadline);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
-        await expect(product.connect(deployer).submitClaim(policyID2, aLINK_ADDRESS, amountIn1, ETH, amountOut1, deadline, signature)).to.be.revertedWith("!policyholder");
+        await expect(product.connect(deployer).submitClaim(policyID2, amountOut1, deadline, signature)).to.be.revertedWith("!policyholder");
       });
       it("cannot submit claim from wrong product", async function () {
-        let digest = getSubmitClaimDigest("Solace.fi-AaveV2Product", product.address, chainId, policyID1, aLINK_ADDRESS, amountIn1, ETH, amountOut1, deadline);
+        let digest = getSubmitClaimDigest("Solace.fi-AaveV2Product", product.address, chainId, policyID1, amountOut1, deadline);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
-        await expect(product2.connect(user).submitClaim(policyID1, aLINK_ADDRESS, amountIn1, ETH, amountOut1, deadline, signature)).to.be.revertedWith("wrong product");
+        await expect(product2.connect(user).submitClaim(policyID1, amountOut1, deadline, signature)).to.be.revertedWith("wrong product");
       });
       it("cannot submit claim with forged signature", async function () {
-        await expect(product.connect(user).submitClaim(policyID1, aLINK_ADDRESS, amountIn1, ETH, amountOut1, deadline, "0x")).to.be.revertedWith("invalid signature");
-        await expect(product.connect(user).submitClaim(policyID1, aLINK_ADDRESS, amountIn1, ETH, amountOut1, deadline, "0xabcd")).to.be.revertedWith("invalid signature");
-        await expect(product.connect(user).submitClaim(policyID1, aLINK_ADDRESS, amountIn1, ETH, amountOut1, deadline, "0x1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890")).to.be.revertedWith("invalid signature");
+        await expect(product.connect(user).submitClaim(policyID1, amountOut1, deadline, "0x")).to.be.revertedWith("invalid signature");
+        await expect(product.connect(user).submitClaim(policyID1, amountOut1, deadline, "0xabcd")).to.be.revertedWith("invalid signature");
+        await expect(product.connect(user).submitClaim(policyID1, amountOut1, deadline, "0x1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890")).to.be.revertedWith("invalid signature");
       });
       it("cannot submit claim from unauthorized signer", async function () {
-        let digest = getSubmitClaimDigest("Solace.fi-AaveV2Product", product.address, chainId, policyID1, aLINK_ADDRESS, amountIn1, ETH, amountOut1, deadline);
+        let digest = getSubmitClaimDigest("Solace.fi-AaveV2Product", product.address, chainId, policyID1, amountOut1, deadline);
         let signature = assembleSignature(sign(digest, Buffer.from(deployer.privateKey.slice(2), "hex")));
-        await expect(product.connect(user).submitClaim(policyID1, aLINK_ADDRESS, amountIn1, ETH, amountOut1, deadline, signature)).to.be.revertedWith("invalid signature");
+        await expect(product.connect(user).submitClaim(policyID1, amountOut1, deadline, signature)).to.be.revertedWith("invalid signature");
       });
       it("cannot submit claim with changed arguments", async function () {
-        let digest = getSubmitClaimDigest("Solace.fi-AaveV2Product", product.address, chainId, policyID1, aLINK_ADDRESS, amountIn1, ETH, amountOut1, deadline);
+        let digest = getSubmitClaimDigest("Solace.fi-AaveV2Product", product.address, chainId, policyID1, amountOut1, deadline);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
-        await expect(product.connect(user).submitClaim(policyID1, aUSDT_ADDRESS, amountIn1, ETH, amountOut1, deadline, signature)).to.be.revertedWith("invalid signature");
-        await expect(product.connect(user).submitClaim(policyID1, aLINK_ADDRESS, 0, ETH, amountOut1, deadline, signature)).to.be.revertedWith("invalid signature");
-        await expect(product.connect(user).submitClaim(policyID1, aLINK_ADDRESS, amountIn1, LINK_ADDRESS, amountOut1, deadline, signature)).to.be.revertedWith("invalid signature");
-        await expect(product.connect(user).submitClaim(policyID1, aLINK_ADDRESS, amountIn1, ETH, "100000000000", deadline, signature)).to.be.revertedWith("invalid signature");
-        await expect(product.connect(user).submitClaim(policyID1, aLINK_ADDRESS, amountIn1, ETH, amountOut1, deadline.sub(1), signature)).to.be.revertedWith("invalid signature");
+        await expect(product.connect(user).submitClaim(policyID1, "100000000000", deadline, signature)).to.be.revertedWith("invalid signature");
+        await expect(product.connect(user).submitClaim(policyID1, amountOut1, deadline.sub(1), signature)).to.be.revertedWith("invalid signature");
       });
       it("can open a claim", async function () {
         // sign swap
-        let digest = getSubmitClaimDigest("Solace.fi-AaveV2Product", product.address, chainId, policyID1, aLINK_ADDRESS, amountIn1, ETH, amountOut1, deadline);
+        let digest = getSubmitClaimDigest("Solace.fi-AaveV2Product", product.address, chainId, policyID1, amountOut1, deadline);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
         // submit claim
-        let userAlink1 = await alink.balanceOf(user.address);
-        let userLink1 = await link.balanceOf(user.address);
-        let tx1 = await product.connect(user).submitClaim(policyID1, aLINK_ADDRESS, amountIn1, ETH, amountOut1, deadline, signature);
+        let tx1 = await product.connect(user).submitClaim(policyID1, amountOut1, deadline, signature);
         expect(tx1).to.emit(product, "ClaimSubmitted").withArgs(policyID1);
         expect(tx1).to.emit(claimsEscrow, "ClaimReceived").withArgs(policyID1, user.address, amountOut1);
         expect(await policyManager.exists(policyID1)).to.be.false;
         // verify payout
         expect((await claimsEscrow.claims(policyID1)).amount).to.equal(amountOut1);
-        let userAlink2 = await alink.balanceOf(user.address);
-        expect(userAlink1.sub(userAlink2)).to.equal(amountIn1);
-        let userLink2 = await link.balanceOf(user.address);
-        expect(userLink2.sub(userLink1)).to.equal(amountIn1); // redeem value
         await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add one hour
         let userEth1 = await user.getBalance();
         let tx2 = await claimsEscrow.connect(user).withdrawClaimsPayout(policyID1);
@@ -381,7 +365,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
         });
         await deployer.sendTransaction({to: user3Address, value: BN.from("1000000000000000000")});
         const user3 = await ethers.getSigner(user3Address);
-        var atokens = [{"symbol":"aUSDT","address":"0x3Ed3B47Dd13EC9a98b44e6204A523E766B225811"},{"symbol":"aWBTC","address":"0x9ff58f4fFB29fA2266Ab25e75e2A8b3503311656"},{"symbol":"aWETH","address":"0x030bA81f1c18d280636F32af80b9AAd02Cf0854e"},{"symbol":"aYFI","address":"0x5165d24277cD063F5ac44Efd447B27025e888f37"},{"symbol":"aZRX","address":"0xDf7FF54aAcAcbFf42dfe29DD6144A69b629f8C9e"},{"symbol":"aUNI","address":"0xB9D7CB55f463405CDfBe4E90a6D2Df01C2B92BF1"},{"symbol":"aAAVE","address":"0xFFC97d72E13E01096502Cb8Eb52dEe56f74DAD7B"},{"symbol":"aBAT","address":"0x05Ec93c0365baAeAbF7AefFb0972ea7ECdD39CF1"},{"symbol":"aBUSD","address":"0xA361718326c15715591c299427c62086F69923D9"},{"symbol":"aDAI","address":"0x028171bCA77440897B824Ca71D1c56caC55b68A3"},{"symbol":"aENJ","address":"0xaC6Df26a590F08dcC95D5a4705ae8abbc88509Ef"},{"symbol":"aKNC","address":"0x39C6b3e42d6A679d7D776778Fe880BC9487C2EDA"},{"symbol":"aLINK","address":"0xa06bC25B5805d5F8d82847D191Cb4Af5A3e873E0"},{"symbol":"aMANA","address":"0xa685a61171bb30d4072B338c80Cb7b2c865c873E"},{"symbol":"aMKR","address":"0xc713e5E149D5D0715DcD1c156a020976e7E56B88"},{"symbol":"aREN","address":"0xCC12AbE4ff81c9378D670De1b57F8e0Dd228D77a"},{"symbol":"aSNX","address":"0x35f6B052C598d933D69A4EEC4D04c73A191fE6c2","uimpl":"0x5b1b5fEa1b99D83aD479dF0C222F0492385381dD"},{"symbol":"aSUSD","address":"0x6C5024Cd4F8A59110119C56f8933403A539555EB","uimpl":"0x05a9CBe762B36632b3594DA4F082340E0e5343e8"},{"symbol":"aTUSD","address":"0x101cc05f4A51C0319f570d5E146a8C625198e636","uimpl":"0xffc40F39806F1400d8278BfD33823705b5a4c196"},{"symbol":"aUSDC","address":"0xBcca60bB61934080951369a648Fb03DF4F96263C"},{"symbol":"aCRV","address":"0x8dAE6Cb04688C62d939ed9B68d32Bc62e49970b1"},{"symbol":"aGUSD","address":"0xD37EE7e4f452C6638c96536e68090De8cBcdb583","uimpl":"0xc42B14e49744538e3C239f8ae48A1Eaaf35e68a0"},{"symbol":"aBAL","address":"0x272F97b7a56a387aE942350bBC7Df5700f8a4576"},/*{"symbol":"aXSUSHI","address":"0xF256CC7847E919FAc9B808cC216cAc87CCF2f47a"},oracle*//*{"symbol":"aRENFIL","address":"0x514cd6756CCBe28772d4Cb81bC3156BA9d1744aa","uimpl":"0xa074139a4975318E7c011783031504D1C177F8cA"}storage slot*/];
+        var atokens = [{"symbol":"aUSDT","address":"0x3Ed3B47Dd13EC9a98b44e6204A523E766B225811"},{"symbol":"aWBTC","address":"0x9ff58f4fFB29fA2266Ab25e75e2A8b3503311656"},{"symbol":"aWETH","address":"0x030bA81f1c18d280636F32af80b9AAd02Cf0854e"},{"symbol":"aYFI","address":"0x5165d24277cD063F5ac44Efd447B27025e888f37"},{"symbol":"aZRX","address":"0xDf7FF54aAcAcbFf42dfe29DD6144A69b629f8C9e"},{"symbol":"aUNI","address":"0xB9D7CB55f463405CDfBe4E90a6D2Df01C2B92BF1"},{"symbol":"aAAVE","address":"0xFFC97d72E13E01096502Cb8Eb52dEe56f74DAD7B"},{"symbol":"aBAT","address":"0x05Ec93c0365baAeAbF7AefFb0972ea7ECdD39CF1"},{"symbol":"aBUSD","address":"0xA361718326c15715591c299427c62086F69923D9"},{"symbol":"aDAI","address":"0x028171bCA77440897B824Ca71D1c56caC55b68A3"},{"symbol":"aENJ","address":"0xaC6Df26a590F08dcC95D5a4705ae8abbc88509Ef"},{"symbol":"aKNC","address":"0x39C6b3e42d6A679d7D776778Fe880BC9487C2EDA"},{"symbol":"aLINK","address":"0xa06bC25B5805d5F8d82847D191Cb4Af5A3e873E0"},{"symbol":"aMANA","address":"0xa685a61171bb30d4072B338c80Cb7b2c865c873E"},{"symbol":"aMKR","address":"0xc713e5E149D5D0715DcD1c156a020976e7E56B88"},{"symbol":"aREN","address":"0xCC12AbE4ff81c9378D670De1b57F8e0Dd228D77a"},{"symbol":"aSNX","address":"0x35f6B052C598d933D69A4EEC4D04c73A191fE6c2","uimpl":"0x5b1b5fEa1b99D83aD479dF0C222F0492385381dD"},{"symbol":"aSUSD","address":"0x6C5024Cd4F8A59110119C56f8933403A539555EB","uimpl":"0x05a9CBe762B36632b3594DA4F082340E0e5343e8"},/*{"symbol":"aTUSD","address":"0x101cc05f4A51C0319f570d5E146a8C625198e636","uimpl":"0xffc40F39806F1400d8278BfD33823705b5a4c196"}, storage slot*//*{"symbol":"aUSDC","address":"0xBcca60bB61934080951369a648Fb03DF4F96263C"}, blacklisted*/{"symbol":"aCRV","address":"0x8dAE6Cb04688C62d939ed9B68d32Bc62e49970b1"},{"symbol":"aGUSD","address":"0xD37EE7e4f452C6638c96536e68090De8cBcdb583","uimpl":"0xc42B14e49744538e3C239f8ae48A1Eaaf35e68a0"},{"symbol":"aBAL","address":"0x272F97b7a56a387aE942350bBC7Df5700f8a4576"},/*{"symbol":"aXSUSHI","address":"0xF256CC7847E919FAc9B808cC216cAc87CCF2f47a"},oracle*//*{"symbol":"aRENFIL","address":"0x514cd6756CCBe28772d4Cb81bC3156BA9d1744aa","uimpl":"0xa074139a4975318E7c011783031504D1C177F8cA"}storage slot*/];
         for(var i = 0; i < atokens.length; ++i){
           // fetch contracts
           const aAddress = atokens[i].address;
@@ -416,7 +400,6 @@ if(process.env.FORK_NETWORK === "mainnet"){
           expect(await uToken.balanceOf(user3.address)).to.be.equal(0);
           const aAmount = await aToken.balanceOf(user3.address);
           expect(aAmount).to.be.gte(uAmount);
-          await aToken.connect(user3).approve(product.address, constants.MaxUint256);
           // create policy
           let coverLimit = 10000;
           let blocks = threeDays;
@@ -426,21 +409,15 @@ if(process.env.FORK_NETWORK === "mainnet"){
           let policyID = 5 + i;
           // sign swap
           let amountOut = 10000;
-          let digest = getSubmitClaimDigest("Solace.fi-AaveV2Product", product.address, chainId, policyID, aAddress, aAmount, ETH, amountOut, deadline);
+          let digest = getSubmitClaimDigest("Solace.fi-AaveV2Product", product.address, chainId, policyID, amountOut, deadline);
           let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
           // submit claim
-          let userABalance1 = await aToken.balanceOf(user3.address);
-          let userUBalance1 = await uToken.balanceOf(user3.address);
-          let tx1 = await product.connect(user3).submitClaim(policyID, aAddress, aAmount, ETH, amountOut, deadline, signature);
+          let tx1 = await product.connect(user3).submitClaim(policyID, amountOut, deadline, signature);
           expect(tx1).to.emit(product, "ClaimSubmitted").withArgs(policyID);
           expect(tx1).to.emit(claimsEscrow, "ClaimReceived").withArgs(policyID, user3.address, amountOut);
           expect(await policyManager.exists(policyID)).to.be.false;
           // verify payout
           expect((await claimsEscrow.claims(policyID)).amount).to.equal(amountOut);
-          let userABalance2 = await aToken.balanceOf(user3.address);
-          expectClose(userABalance1.sub(userABalance2), aAmount, oneToken(decimals-6));
-          let userUBalance2 = await uToken.balanceOf(user3.address);
-          expectClose(userUBalance2.sub(userUBalance1), uAmount, oneToken(decimals-6)); // redeem value
           await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add one hour
           let userEth1 = await user3.getBalance();
           let tx2 = await claimsEscrow.connect(user3).withdrawClaimsPayout(policyID);

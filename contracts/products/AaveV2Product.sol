@@ -24,7 +24,7 @@ contract AaveV2Product is BaseProduct, EIP712 {
     using SafeERC20 for IAToken;
 
     IAaveProtocolDataProvider public aaveDataProvider;
-    bytes32 private immutable _EXCHANGE_TYPEHASH = keccak256("AaveV2ProductExchange(uint256 policyID,address tokenIn,uint256 amountIn,address tokenOut,uint256 amountOut,uint256 deadline)");
+    bytes32 private immutable _EXCHANGE_TYPEHASH = keccak256("AaveV2ProductExchange(uint256 policyID,uint256 amountOut,uint256 deadline)");
 
     constructor (
         address _governance,
@@ -73,22 +73,16 @@ contract AaveV2Product is BaseProduct, EIP712 {
      * Can only submit one claim per policy.
      * Must be signed by an authorized signer.
      * @param policyID The policy that suffered a loss.
-     * @param tokenIn The token the user must give up.
-     * @param amountIn The amount the user must give up.
-     * @param tokenOut The token the user will receive.
-     * @param amountOut The amount the user will receive.
+     * @param amountOut The amount the user will receive in ETH.
      * @param deadline Transaction must execute before this timestamp.
      * @param signature Signature from the signer.
      */
     function submitClaim(
         uint256 policyID,
-        address tokenIn,
-        uint256 amountIn,
-        address tokenOut,
         uint256 amountOut,
         uint256 deadline,
         bytes calldata signature
-    ) external payable {
+    ) external {
         // validate inputs
         // solhint-disable-next-line not-rely-on-time
         require(block.timestamp <= deadline, "expired deadline");
@@ -97,29 +91,16 @@ contract AaveV2Product is BaseProduct, EIP712 {
         require(product == address(this), "wrong product");
         // verify signature
         {
-        bytes32 structHash = keccak256(abi.encode(_EXCHANGE_TYPEHASH, policyID, tokenIn, amountIn, tokenOut, amountOut, deadline));
+        bytes32 structHash = keccak256(abi.encode(_EXCHANGE_TYPEHASH, policyID, amountOut, deadline));
         bytes32 hash = _hashTypedDataV4(structHash);
         address signer = ECDSA.recover(hash, signature);
         require(isAuthorizedSigner[signer], "invalid signature");
         }
-        // swap tokens
-        pullAndSwap(tokenIn, amountIn);
         // burn policy
         policyManager.burn(policyID);
         // submit claim to ClaimsEscrow
         IClaimsEscrow(payable(registry.claimsEscrow())).receiveClaim(policyID, policyholder, amountOut);
         emit ClaimSubmitted(policyID);
-    }
-
-    /**
-    * @notice Safely pulls a token from msg.sender and if necessary swaps for underlying.
-    * @param token token to pull
-    * @param amount amount of token to pull
-    */
-    function pullAndSwap(address token, uint256 amount) internal {
-        IAToken atoken = IAToken(token);
-        atoken.safeTransferFrom(msg.sender, address(this), amount);
-        ILendingPool(atoken.POOL()).withdraw(atoken.UNDERLYING_ASSET_ADDRESS(), amount, msg.sender);
     }
 
     /**
