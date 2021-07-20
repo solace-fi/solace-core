@@ -12,6 +12,7 @@ interface IAaveProtocolDataProvider {
 
 interface IAToken is IERC20 {
     function UNDERLYING_ASSET_ADDRESS() external view returns (address);
+    function POOL() external view returns (address);
 }
 
 interface ILendingPool {
@@ -22,7 +23,6 @@ interface ILendingPool {
 contract AaveV2Product is BaseProduct, EIP712 {
     using SafeERC20 for IAToken;
 
-    ILendingPool public lendingPool;
     IAaveProtocolDataProvider public aaveDataProvider;
     bytes32 private immutable _EXCHANGE_TYPEHASH = keccak256("AaveV2ProductExchange(uint256 policyID,address tokenIn,uint256 amountIn,address tokenOut,uint256 amountOut,uint256 deadline)");
 
@@ -30,20 +30,19 @@ contract AaveV2Product is BaseProduct, EIP712 {
         address _governance,
         IPolicyManager _policyManager,
         IRegistry _registry,
-        address _lendingPool,
+        address _dataProvider,
         uint256 _maxCoverAmount,
         uint256 _maxCoverPerUser,
         uint64 _minPeriod,
         uint64 _maxPeriod,
         uint64 _cancelFee,
         uint24 _price,
-        address _quoter,
-        address _dataProvider
+        address _quoter
     ) BaseProduct(
         _governance,
         _policyManager,
         _registry,
-        _lendingPool,
+        _dataProvider,
         _maxCoverAmount,
         _maxCoverPerUser,
         _minPeriod,
@@ -52,7 +51,6 @@ contract AaveV2Product is BaseProduct, EIP712 {
         _price,
         _quoter
     ) EIP712("Solace.fi-AaveV2Product", "1") {
-        lendingPool = ILendingPool(_lendingPool);
         aaveDataProvider = IAaveProtocolDataProvider(_dataProvider);
     }
 
@@ -121,7 +119,7 @@ contract AaveV2Product is BaseProduct, EIP712 {
     function pullAndSwap(address token, uint256 amount) internal {
         IAToken atoken = IAToken(token);
         atoken.safeTransferFrom(msg.sender, address(this), amount);
-        lendingPool.withdraw(atoken.UNDERLYING_ASSET_ADDRESS(), amount, msg.sender);
+        ILendingPool(atoken.POOL()).withdraw(atoken.UNDERLYING_ASSET_ADDRESS(), amount, msg.sender);
     }
 
     /**
@@ -129,12 +127,10 @@ contract AaveV2Product is BaseProduct, EIP712 {
      * Use this if the the protocol changes their registry but keeps the children contracts.
      * A new version of the protocol will likely require a new Product.
      * Can only be called by the current governor.
-     * @param _lendingPool The Aave Lending Pool.
      * @param _dataProvider The Aave Data Provider.
      */
-    function setCoveredPlatform(address _lendingPool, address _dataProvider) public {
-        super.setCoveredPlatform(_lendingPool);
-        lendingPool = ILendingPool(_lendingPool);
+    function setCoveredPlatform(address _dataProvider) public override {
+        super.setCoveredPlatform(_dataProvider);
         aaveDataProvider = IAaveProtocolDataProvider(_dataProvider);
     }
 }

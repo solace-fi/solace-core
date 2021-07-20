@@ -54,6 +54,7 @@ export async function import_artifacts() {
 
   // aave imports
   artifacts.LendingPool = await tryImport(`${artifact_dir}/products/AaveV2Product.sol/ILendingPool.json`);
+  artifacts.AToken = await tryImport(`${artifact_dir}/products/AaveV2Product.sol/IAToken.json`);
 
   // generic imports
   artifacts.ERC20 = await tryImport(`${artifact_dir}/SOLACE.sol/ERC20.json`);
