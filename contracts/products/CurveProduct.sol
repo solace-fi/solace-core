@@ -65,6 +65,18 @@ contract CurveProduct is BaseProduct {
     }
 
     /**
+     * @notice Changes the covered platform.
+     * Use this if the the protocol changes their registry but keeps the children contracts.
+     * A new version of the protocol will likely require a new Product.
+     * Can only be called by the current governor.
+     * @param _coveredPlatform The platform to cover.
+     */
+    function setCoveredPlatform(address _coveredPlatform) public override {
+        super.setCoveredPlatform(_coveredPlatform);
+        addressProvider = ICurveAddressProvider(_coveredPlatform);
+    }
+
+    /**
      * @notice Given the address of either the pool or the token, returns the token and the pool.
      * Throws if not a valid pool or token.
      * @param _poolOrToken Address of either the pool or lp token.

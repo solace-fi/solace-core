@@ -60,4 +60,16 @@ contract YearnV2Product is BaseProduct {
         uint256 balance = vault.balanceOf(_policyholder) * vault.getPricePerFullShare() / 1e18;
         return quoter.tokenToEth(token, balance);
     }
+
+    /**
+     * @notice Changes the covered platform.
+     * Use this if the the protocol changes their registry but keeps the children contracts.
+     * A new version of the protocol will likely require a new Product.
+     * Can only be called by the current governor.
+     * @param _coveredPlatform The platform to cover.
+     */
+    function setCoveredPlatform(address _coveredPlatform) public override {
+        super.setCoveredPlatform(_coveredPlatform);
+        yregistry = IYRegistry(_coveredPlatform);
+    }
 }
