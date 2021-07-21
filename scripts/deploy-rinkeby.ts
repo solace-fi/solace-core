@@ -1,5 +1,5 @@
 import hardhat from "hardhat";
-const { waffle, ethers } = hardhat;
+const { waffle, ethers, upgrades } = hardhat;
 const { deployContract, provider } = waffle;
 import { BigNumber as BN, Contract, constants } from "ethers";
 import { config as dotenv_config } from "dotenv";
@@ -55,6 +55,10 @@ const maxCoverPerUser = BN.from("10000000000000000000"); // 10 Ether in wei
 const cancelFee = BN.from("100000000000000000"); // 0.1 Ether in wei
 const price = 11044; // 2.60%/yr
 
+// ugprade registry
+const UPGRADE_REGISTRY = false;
+const UPGRADED_REGISTRY_NAME = ""; // name of the new version of registry contract
+
 let artifacts: ArtifactImports;
 let registry: Registry;
 let solace: Solace;
@@ -81,7 +85,7 @@ async function main() {
   artifacts = await import_artifacts();
   signerAddress = await deployer.getAddress();
 
-  await deployRegistry();
+  UPGRADE_REGISTRY == false ? await deployRegistry() : await upgradeRegistry(REGISTRY_ADDRESS, UPGRADED_REGISTRY_NAME);
   await deploySolace();
   await deployWeth();
   await deployUniswapFactory();
@@ -107,9 +111,23 @@ async function deployRegistry() {
   if(!!REGISTRY_ADDRESS) {
     registry = (await ethers.getContractAt(artifacts.Registry.abi, REGISTRY_ADDRESS)) as Registry;
   } else {
+    let registryContract = await ethers.getContractFactory('Registry');
     console.log("Deploying Registry");
-    registry = (await deployContract(deployer,artifacts.Registry, [signerAddress])) as Registry;
-    console.log(`Deployed Registry to ${registry.address}`);
+    registry = (await upgrades.deployProxy(registryContract, [signerAddress])) as Registry;
+    console.log(`Deploying Registry to ${registry.address}`);
+    await registry.deployed();
+    console.log("Deployment confirmed");
+  }
+}
+
+async function upgradeRegistry(proxyAddress: string, upgradeContractName: string) {
+  if(!!proxyAddress && !!upgradeContractName) {
+    console.log("Upgrading Registry");
+    let registryContract = await ethers.getContractFactory(upgradeContractName);
+    registry = (await upgrades.upgradeProxy(proxyAddress, registryContract)) as Registry;
+    console.log(`Upgrading Registry to ${registry.address}`);
+  } else {
+    console.log("Proxy registry address or upgraded registry contract name is not provided!");
   }
 }
 
