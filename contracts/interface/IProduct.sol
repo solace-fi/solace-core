@@ -56,4 +56,6 @@ interface IProduct {
     function updateCoverLimit(uint256 _policyID, uint256 _coverLimit) external payable;
     function extendPolicy(uint256 _policyID, uint64 _blocks) external payable;
     function cancelPolicy(uint256 _policyID) external;
+    function updatePolicy(uint256 _policyID, uint256 _coverLimit, uint64 _blocks ) external payable;
+
 }

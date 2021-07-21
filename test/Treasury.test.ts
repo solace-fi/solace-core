@@ -1,18 +1,18 @@
 import { waffle, ethers, upgrades } from "hardhat";
 const { deployContract, solidity } = waffle;
-import { MockProvider } from "ethereum-waffle";
+import { MockProvider } from 'ethereum-waffle';
 const provider: MockProvider = waffle.provider;
-import { BigNumber as BN, BigNumberish, constants, Wallet } from "ethers";
-import { Contract } from "@ethersproject/contracts";
-import chai from "chai";
+import { BigNumber as BN, BigNumberish, constants, Wallet } from 'ethers';
+import { Contract } from '@ethersproject/contracts';
+import chai from 'chai';
 const { expect } = chai;
 chai.use(solidity);
 
-import { encodePriceSqrt, FeeAmount, TICK_SPACINGS, getMaxTick, getMinTick } from "./utilities/uniswap";
-import { encodePath } from "./utilities/path";
+import { encodePriceSqrt, FeeAmount, TICK_SPACINGS, getMaxTick, getMinTick } from './utilities/uniswap';
+import { encodePath } from './utilities/path';
 
-import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Solace, Treasury, MockErc20, Weth9, Registry, PolicyManager } from "../typechain";
+import { import_artifacts, ArtifactImports } from './utilities/artifact_importer';
+import { Solace, Treasury, MockErc20, Weth9, Registry, PolicyManager } from '../typechain';
 
 describe("Treasury", function() {
   let artifacts: ArtifactImports;
@@ -40,7 +40,7 @@ describe("Treasury", function() {
   let mockToken2Path: string;
   let mockToken3Path: string;
   let mockToken4Path: string;
-  let defaultPath: string = "0x";
+  let defaultPath: string = '0x';
 
   // uniswap contracts
   let uniswapFactory: Contract;
@@ -48,12 +48,12 @@ describe("Treasury", function() {
   let uniswapPositionManager: Contract;
 
   // vars
-  const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-  const ETH_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
-  const ONE_HUNDRED = BN.from("100");
-  const ONE_ETHER = BN.from("1000000000000000000");
-  const TEN_ETHER = BN.from("10000000000000000000");
-  const ONE_MILLION_ETHER = BN.from("1000000000000000000000000");
+  const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+  const ETH_ADDRESS = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
+  const ONE_HUNDRED = BN.from('100');
+  const ONE_ETHER = BN.from('1000000000000000000');
+  const TEN_ETHER = BN.from('10000000000000000000');
+  const ONE_MILLION_ETHER = BN.from('1000000000000000000000000');
 
   before(async function() {
     [deployer, governor, liquidityProvider, mockPolicy, user, randAddress, mockProduct] = provider.getWallets();

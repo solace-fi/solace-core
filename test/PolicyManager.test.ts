@@ -1,17 +1,17 @@
 import { waffle, ethers, upgrades } from "hardhat";
 const { deployContract, solidity } = waffle;
-import { MockProvider } from "ethereum-waffle";
+import { MockProvider } from 'ethereum-waffle';
 const provider: MockProvider = waffle.provider;
-import { Wallet, BigNumber as BN } from "ethers";
-import chai from "chai";
+import { Wallet, BigNumber as BN } from 'ethers';
+import chai from 'chai';
 const { expect } = chai;
 chai.use(solidity);
 
-import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { burnBlocks, burnBlocksUntil } from "./utilities/time";
-import { PolicyManager, MockProduct, Treasury, Registry } from "../typechain";
+import { import_artifacts, ArtifactImports } from './utilities/artifact_importer';
+import { burnBlocks, burnBlocksUntil } from './utilities/time';
+import { PolicyManager, MockProduct, Treasury, Registry } from '../typechain';
 
-describe("PolicyManager", function() {
+describe('PolicyManager', function() {
   let artifacts: ArtifactImports;
   const [deployer, governor, user, walletProduct1, walletProduct2, walletProduct3, positionContract] = provider.getWallets();
 
@@ -21,11 +21,11 @@ describe("PolicyManager", function() {
   let treasury: Treasury;
   let registry: Registry;
 
-  const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-  const name = "Solace Policy";
-  const symbol = "SPT";
+  const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+  const name = 'Solace Policy';
+  const symbol = 'SPT';
   const expirationBlock = 20000000;
-  const coverAmount = BN.from("100000000000000"); // 10 Ether in wei
+  const coverAmount = BN.from('100000000000000'); // 10 Ether in wei
   const price = 11044; // price in wei for block/wei
 
   before(async function() {
@@ -159,13 +159,13 @@ describe("PolicyManager", function() {
       expect(await policyManager.getPolicyPrice(1)).to.equal(price);
       expect(await policyManager.exists(1)).to.equal(true);
 
-      await expect(policyManager.getPolicyInfo(2)).to.be.revertedWith("query for nonexistent token");
-      await expect(policyManager.getPolicyholder(2)).to.be.revertedWith("query for nonexistent token");
-      await expect(policyManager.getPolicyProduct(2)).to.be.revertedWith("query for nonexistent token");
-      await expect(policyManager.getPolicyPositionContract(2)).to.be.revertedWith("query for nonexistent token");
-      await expect(policyManager.getPolicyExpirationBlock(2)).to.be.revertedWith("query for nonexistent token");
-      await expect(policyManager.getPolicyCoverAmount(2)).to.be.revertedWith("query for nonexistent token");
-      await expect(policyManager.getPolicyPrice(2)).to.be.revertedWith("query for nonexistent token");
+      await expect(policyManager.getPolicyInfo(2)).to.be.revertedWith('query for nonexistent token');
+      await expect(policyManager.getPolicyholder(2)).to.be.revertedWith('query for nonexistent token');
+      await expect(policyManager.getPolicyProduct(2)).to.be.revertedWith('query for nonexistent token');
+      await expect(policyManager.getPolicyPositionContract(2)).to.be.revertedWith('query for nonexistent token');
+      await expect(policyManager.getPolicyExpirationBlock(2)).to.be.revertedWith('query for nonexistent token');
+      await expect(policyManager.getPolicyCoverAmount(2)).to.be.revertedWith('query for nonexistent token');
+      await expect(policyManager.getPolicyPrice(2)).to.be.revertedWith('query for nonexistent token');
       expect(await policyManager.exists(2)).to.equal(false);
     });
 
