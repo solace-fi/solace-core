@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.0;
 
+import "../interface/IExchangeQuoter.sol";
 import "./BaseProduct.sol";
 
 
@@ -23,6 +24,7 @@ interface IYVault {
 contract YearnV2Product is BaseProduct {
 
     IYRegistry public yregistry;
+    IExchangeQuoter public quoter;
 
     constructor (
         address _governance,
@@ -46,10 +48,10 @@ contract YearnV2Product is BaseProduct {
         _minPeriod,
         _maxPeriod,
         _cancelFee,
-        _price,
-        _quoter
+        _price
     ) {
         yregistry = IYRegistry(_coveredPlatform);
+        quoter = IExchangeQuoter(_quoter);
     }
 
     // _positionContract must be a vault

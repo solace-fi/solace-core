@@ -52,6 +52,10 @@ export async function import_artifacts() {
   artifacts.IComptroller = await tryImport(`${artifact_dir}/products/CompoundProduct.sol/IComptroller.json`);
   artifacts.IComptrollerRinkeby = await tryImport(`${artifact_dir}/products/CompoundProductRinkeby.sol/IComptrollerRinkeby.json`);
 
+  // aave imports
+  artifacts.LendingPool = await tryImport(`${artifact_dir}/products/AaveV2Product.sol/ILendingPool.json`);
+  artifacts.AToken = await tryImport(`${artifact_dir}/products/AaveV2Product.sol/IAToken.json`);
+
   // generic imports
   artifacts.ERC20 = await tryImport(`${artifact_dir}/SOLACE.sol/ERC20.json`);
   if(!artifacts.ERC20) artifacts.ERC20 = await tryImport(`../../artifacts/@openzeppelin/contracts/token/ERC20/ERC20.sol/ERC20.json`);

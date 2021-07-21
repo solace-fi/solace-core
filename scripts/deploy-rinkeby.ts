@@ -243,7 +243,7 @@ async function deployTreasury() {
     treasury = (await ethers.getContractAt(artifacts.Treasury.abi, TREASURY_ADDRESS)) as Treasury;
   } else {
     console.log("Deploying Treasury");
-    treasury = (await deployContract(deployer,artifacts.Treasury,[governorAddress,solace.address,uniswapRouter.address,weth.address])) as Treasury;
+    treasury = (await deployContract(deployer,artifacts.Treasury,[signerAddress,uniswapRouter.address,weth.address,registry.address])) as Treasury;
     console.log(`Deployed Treasury to ${treasury.address}`);
   }
   if(await registry.treasury() != treasury.address && await registry.governance() == signerAddress) {
@@ -328,20 +328,20 @@ async function logAddresses() {
   console.log(``);
   console.log(`Copy and paste this into the .env file in the frontend client.`)
   console.log(``);
-  console.log(`REACT_APP_REGISTRY_CONTRACT_ADDRESS=${registry.address}`);
-  console.log(`REACT_APP_SOLACE_CONTRACT_ADDRESS=${solace.address}`);
-  console.log(`REACT_APP_WETH_CONTRACT_ADDRESS=${weth.address}`);
-  console.log(`REACT_APP_MASTER_CONTRACT_ADDRESS=${master.address}`);
-  console.log(`REACT_APP_CPFARM_CONTRACT_ADDRESS=${cpFarm.address}`);
-  console.log(`REACT_APP_VAULT_CONTRACT_ADDRESS=${vault.address}`);
-  console.log(`REACT_APP_LPFARM_CONTRACT_ADDRESS=${lpFarm.address}`);
-  console.log(`REACT_APP_TREASURY_CONTRACT_ADDRESS=${treasury.address}`);
-  console.log(`REACT_APP_POLICY_MANAGER_CONTRACT_ADDRESS=${policyManager.address}`);
-  console.log(`REACT_APP_COMPOUND_PRODUCT_CONTRACT_ADDRESS=${compoundProduct.address}`);
-  console.log(`REACT_APP_UNISWAP_FACTORY_CONTRACT_ADDRESS=${uniswapFactory.address}`);
-  console.log(`REACT_APP_UNISWAP_ROUTER_CONTRACT_ADDRESS=${uniswapRouter.address}`);
-  console.log(`REACT_APP_UNISWAP_LPTOKEN_CONTRACT_ADDRESS=${lpToken.address}`);
-  console.log(`REACT_APP_UNISWAP_POOL_CONTRACT_ADDRESS=${pool.address}`);
+  console.log(`REACT_APP_RINKEBY_REGISTRY_CONTRACT_ADDRESS=${registry.address}`);
+  console.log(`REACT_APP_RINKEBY_SOLACE_CONTRACT_ADDRESS=${solace.address}`);
+  console.log(`REACT_APP_RINKEBY_WETH_CONTRACT_ADDRESS=${weth.address}`);
+  console.log(`REACT_APP_RINKEBY_MASTER_CONTRACT_ADDRESS=${master.address}`);
+  console.log(`REACT_APP_RINKEBY_CPFARM_CONTRACT_ADDRESS=${cpFarm.address}`);
+  console.log(`REACT_APP_RINKEBY_VAULT_CONTRACT_ADDRESS=${vault.address}`);
+  console.log(`REACT_APP_RINKEBY_LPFARM_CONTRACT_ADDRESS=${lpFarm.address}`);
+  console.log(`REACT_APP_RINKEBY_TREASURY_CONTRACT_ADDRESS=${treasury.address}`);
+  console.log(`REACT_APP_RINKEBY_POLICY_MANAGER_CONTRACT_ADDRESS=${policyManager.address}`);
+  console.log(`REACT_APP_RINKEBY_COMPOUND_PRODUCT_CONTRACT_ADDRESS=${compoundProduct.address}`);
+  console.log(`REACT_APP_RINKEBY_UNISWAP_FACTORY_CONTRACT_ADDRESS=${uniswapFactory.address}`);
+  console.log(`REACT_APP_RINKEBY_UNISWAP_ROUTER_CONTRACT_ADDRESS=${uniswapRouter.address}`);
+  console.log(`REACT_APP_RINKEBY_UNISWAP_LPTOKEN_CONTRACT_ADDRESS=${lpToken.address}`);
+  console.log(`REACT_APP_RINKEBY_UNISWAP_POOL_CONTRACT_ADDRESS=${pool.address}`);
   console.log("")
 }
 

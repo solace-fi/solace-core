@@ -23,8 +23,7 @@ contract MockProduct is BaseProduct {
         uint64 _minPeriod,
         uint64 _maxPeriod,
         uint64 _cancelFee,
-        uint24 _price,
-        address _quoter
+        uint24 _price
     ) BaseProduct(
         _governance,
         _policyManager,
@@ -35,8 +34,7 @@ contract MockProduct is BaseProduct {
         _minPeriod,
         _maxPeriod,
         _cancelFee,
-        _price,
-        _quoter
+        _price
     ) { }
 
      /**

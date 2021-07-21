@@ -10,15 +10,13 @@ import { config as dotenv_config } from "dotenv";
 dotenv_config();
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { PolicyManager, MockProduct, Treasury, Weth9, ClaimsEscrow, Registry, Vault, ExchangeQuoter, ExchangeQuoterManual } from "../typechain";
+import { PolicyManager, MockProduct, Treasury, Weth9, ClaimsEscrow, Registry, Vault } from "../typechain";
 
 describe("BaseProduct", () => {
   let artifacts: ArtifactImports;
   let policyManager: PolicyManager;
   let product: MockProduct;
   let product2: MockProduct;
-  let quoter1: ExchangeQuoter;
-  let quoter2: ExchangeQuoterManual;
   let weth: Weth9;
   let treasury: Treasury;
   let claimsEscrow: ClaimsEscrow;
@@ -46,46 +44,14 @@ describe("BaseProduct", () => {
   before(async () => {
     artifacts = await import_artifacts();
     // deploy policy manager
-    policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
-
-    // deploy exchange quoter
-    quoter1 = (await deployContract(deployer, artifacts.ExchangeQuoter, [ONE_SPLIT_VIEW])) as ExchangeQuoter;
-
-    // deploy manual exchange quoter
-    quoter2 = (await deployContract(deployer, artifacts.ExchangeQuoterManual, [deployer.address])) as ExchangeQuoterManual;
-    await quoter2.setRates(
+    policyManager = (await deployContract(
+      deployer,
+      artifacts.PolicyManager,
       [
-        "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-        "0x89d24a6b4ccb1b6faa2625fe562bdd9a23260359",
-        "0xc00e94cb662c3520282e6f5717214004a7f26888",
-        "0x1f9840a85d5af5bf1d1762f925bdaddc4201f984",
-        "0x514910771af9ca656af840dff83e8264ecf986ca",
-        "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
-        "0xdac17f958d2ee523a2206206994597c13d831ec7",
-        "0x1985365e9f78359a9b6ad760e32412f4a445e862",
-        "0x0d8775f648430679a709e98d2b0cb6250d2887ef",
-        "0xe41d2489571d322189246dafa5ebde1f4699f498",
-        "0x0000000000085d4780b73119b644ae5ecd22b376",
-        "0x6b175474e89094c44da98b954eedeac495271d0f",
-        "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
-      ],
-      [
-        "1000000000000000000",
-        "5214879005539865",
-        "131044789678131649",
-        "9259278326749300",
-        "9246653217422099",
-        "15405738054265288944",
-        "420072999319953",
-        "12449913804491249",
-        "281485209795972",
-        "372925580282399",
-        "419446558886231",
-        "205364954059859",
-        "50000000000000",
+        governor.address
       ]
-    );
-
+    )) as PolicyManager;
+    
     // deploy weth
     weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
 
@@ -102,19 +68,22 @@ describe("BaseProduct", () => {
     treasury = (await deployContract(deployer, artifacts.Treasury, [deployer.address, ZERO_ADDRESS, weth.address, registry.address])) as Treasury;
 
     // deploy BaseProduct
-    product = (await deployContract(deployer, artifacts.MockProduct, [
-      deployer.address,
-      policyManager.address,
-      registry.address,
-      ONE_SPLIT_VIEW, // this is for the coveredPlatform
-      maxCoverAmount1,
-      maxCoverPerUser1,
-      minPeriod1,
-      maxPeriod1,
-      manageFee1,
-      price1,
-      quoter1.address,
-    ])) as MockProduct;
+    product = (await deployContract(
+      deployer,
+      artifacts.MockProduct,
+      [
+        deployer.address,
+        policyManager.address,
+        registry.address,
+        ONE_SPLIT_VIEW, // this is for the coveredPlatform
+        maxCoverAmount1,
+        maxCoverPerUser1,
+        minPeriod1,
+        maxPeriod1,
+        manageFee1,
+        price1
+      ]
+    )) as MockProduct;
 
     // deploy second BaseProduct
     product2 = (await deployContract(
@@ -130,8 +99,7 @@ describe("BaseProduct", () => {
         minPeriod1,
         maxPeriod1,
         manageFee1,
-        price1,
-        quoter1.address
+        price1
       ]
     )) as MockProduct;
 
@@ -231,17 +199,7 @@ describe("BaseProduct", () => {
     it("should revert setmaxCoverPerUser if not called by governance", async function() {
       await expect(product.connect(buyer).setMaxCoverPerUser(maxCoverPerUser1)).to.be.revertedWith("!governance");
     });
-    it("can get exchangeQuoter", async function() {
-      expect(await product.quoter()).to.eq(quoter1.address);
-    });
-    it("can set exchangeQuoter", async function() {
-      await product.connect(governor).setExchangeQuoter(quoter2.address);
-      expect(await product.quoter()).to.equal(quoter2.address);
-    });
-    it("should revert setExchangeQuoter if not called by governance", async function() {
-      await expect(product.connect(buyer).setExchangeQuoter(quoter1.address)).to.be.revertedWith("!governance");
-    });
-    it("can get covered platform", async function() {
+    it("can get covered platform", async function () {
       expect(await product.coveredPlatform()).to.equal(ONE_SPLIT_VIEW);
     });
     it("can set covered platform", async function() {
@@ -663,8 +621,7 @@ describe("BaseProduct", () => {
           minPeriod1,
           maxPeriod1,
           manageFee1,
-          price1,
-          quoter1.address
+          price1
         ]
       )) as MockProduct;
     })

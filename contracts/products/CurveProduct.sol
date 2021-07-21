@@ -2,6 +2,7 @@
 pragma solidity 0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "../interface/IExchangeQuoter.sol";
 import "./BaseProduct.sol";
 
 
@@ -23,6 +24,7 @@ interface ICurvePool {
 contract CurveProduct is BaseProduct {
 
     ICurveAddressProvider public addressProvider;
+    IExchangeQuoter public quoter;
 
     constructor (
         address _governance,
@@ -46,10 +48,10 @@ contract CurveProduct is BaseProduct {
         _minPeriod,
         _maxPeriod,
         _cancelFee,
-        _price,
-        _quoter
+        _price
     ) {
         addressProvider = ICurveAddressProvider(_coveredPlatform);
+        quoter = IExchangeQuoter(_quoter);
     }
 
     // _positionContract must be a curve.fi pool or token
