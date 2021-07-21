@@ -3,7 +3,6 @@ pragma solidity 0.8.0;
 
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "../interface/IExchangeQuoter.sol";
 import "../interface/IPolicyManager.sol";
 import "../interface/ITreasury.sol";
 import "../interface/IClaimsEscrow.sol";
@@ -49,7 +48,6 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
 
     mapping(address => bool) public isAuthorizedSigner;
     address internal constant ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
-    IExchangeQuoter public quoter;
     bool public paused; // = false
 
     event SignerAdded(address _signer);
@@ -66,8 +64,7 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
         uint64 _minPeriod,
         uint64 _maxPeriod,
         uint64 _manageFee,
-        uint24 _price,
-        address _quoter
+        uint24 _price
     ) {
         governance = _governance;
         policyManager = _policyManager;
@@ -79,7 +76,6 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
         maxPeriod = _maxPeriod;
         manageFee = _manageFee;
         price = _price;
-        quoter = IExchangeQuoter(_quoter);
         productPolicyCount = 0;
         activeCoverAmount = 0;
     }
@@ -165,16 +161,6 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
         maxCoverPerUser = _maxCoverPerUser;
     }
 
-    /**
-     * @notice Sets a new ExchangeQuoter.
-     * Can only be called by the current governor.
-     * @param _quoter The new quoter address.
-     */
-    function setExchangeQuoter(address _quoter) external {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
-        quoter = IExchangeQuoter(_quoter);
-    }
 
     /**
      * @notice Adds a new signer that can authorize claims.

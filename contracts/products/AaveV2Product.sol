@@ -1,16 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.0;
 
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 import "./BaseProduct.sol";
 
 
 interface IAaveProtocolDataProvider {
     function getReserveTokensAddresses(address asset) external view returns (address aTokenAddress, address stableDebtTokenAddress, address variableDebtTokenAddress);
+    function ADDRESSES_PROVIDER() external view returns (address);
 }
 
-interface IAToken is IERC20 {
+interface IAToken {
+    function balanceOf(address user) external view returns (uint256);
+    function decimals() external view returns (uint8);
     function UNDERLYING_ASSET_ADDRESS() external view returns (address);
     function POOL() external view returns (address);
 }
@@ -20,9 +22,16 @@ interface ILendingPool {
     function withdraw(address asset, uint256 amount, address to) external returns (uint256);
 }
 
-contract AaveV2Product is BaseProduct, EIP712 {
-    using SafeERC20 for IAToken;
+interface ILendingPoolAddressesProvider {
+    function getPriceOracle() external view returns (address);
+}
 
+interface IAavePriceOracle {
+    function getAssetPrice(address asset) external view returns (uint256);
+}
+
+contract AaveV2Product is BaseProduct, EIP712 {
+    
     IAaveProtocolDataProvider public aaveDataProvider;
     bytes32 private immutable _EXCHANGE_TYPEHASH = keccak256("AaveV2ProductExchange(uint256 policyID,uint256 amountOut,uint256 deadline)");
 
@@ -36,8 +45,7 @@ contract AaveV2Product is BaseProduct, EIP712 {
         uint64 _minPeriod,
         uint64 _maxPeriod,
         uint64 _cancelFee,
-        uint24 _price,
-        address _quoter
+        uint24 _price
     ) BaseProduct(
         _governance,
         _policyManager,
@@ -48,8 +56,7 @@ contract AaveV2Product is BaseProduct, EIP712 {
         _minPeriod,
         _maxPeriod,
         _cancelFee,
-        _price,
-        _quoter
+        _price
     ) EIP712("Solace.fi-AaveV2Product", "1") {
         aaveDataProvider = IAaveProtocolDataProvider(_dataProvider);
     }
@@ -62,9 +69,14 @@ contract AaveV2Product is BaseProduct, EIP712 {
         address underlying = token.UNDERLYING_ASSET_ADDRESS();
         ( address aTokenAddress, , ) = aaveDataProvider.getReserveTokensAddresses(underlying);
         require(_positionContract == aTokenAddress, "Invalid position contract");
+        // get price oracle
+        ILendingPoolAddressesProvider addressProvider = ILendingPoolAddressesProvider(aaveDataProvider.ADDRESSES_PROVIDER());
+        IAavePriceOracle oracle = IAavePriceOracle(addressProvider.getPriceOracle());
         // swap math
         uint256 balance = token.balanceOf(_policyholder);
-        return quoter.tokenToEth(underlying, balance);
+        uint256 price = oracle.getAssetPrice(underlying);
+        uint8 decimals = token.decimals();
+        return balance * price / 10**decimals;
     }
 
     /**

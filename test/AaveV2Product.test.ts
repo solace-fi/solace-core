@@ -12,7 +12,7 @@ chai.use(solidity);
 import { expectClose } from "./utilities/chai_extensions";
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { PolicyManager, AaveV2Product, ExchangeQuoter, ExchangeQuoterManual, Treasury, Weth9, ClaimsEscrow, Registry, Vault } from "../typechain";
+import { PolicyManager, AaveV2Product, Treasury, Weth9, ClaimsEscrow, Registry, Vault } from "../typechain";
 import { getDomainSeparator, sign } from "./utilities/signature";
 import { ECDSASignature } from "ethereumjs-util";
 
@@ -25,7 +25,8 @@ const toBytes32 = (bn: BN) => {
   return ethers.utils.hexlify(ethers.utils.zeroPad(bn.toHexString(), 32));
 };
 
-const setStorageAt = async (address: string, index: BigNumberish, value: string) => {
+const setStorageAt = async (address: string, index: string, value: string) => {
+  index = ethers.utils.hexStripZeros(index);
   await ethers.provider.send("hardhat_setStorageAt", [address, index, value]);
   await ethers.provider.send("evm_mine", []); // Just mines to the next block
 };
@@ -67,8 +68,6 @@ if(process.env.FORK_NETWORK === "mainnet"){
     let policyManager: PolicyManager;
     let product: AaveV2Product;
     let product2: AaveV2Product;
-    let quoter: ExchangeQuoter;
-    let quoter2: ExchangeQuoterManual;
     let weth: Weth9;
     let treasury: Treasury;
     let claimsEscrow: ClaimsEscrow;
@@ -95,7 +94,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
 
     const aUSDT_ADDRESS = "0x3ed3b47dd13ec9a98b44e6204a523e766b225811";
     const USER2 = "0x2edce9a8e7991b9fd6074aece928d5a9040ed98d";
-    const BALANCE2 = BN.from("159423625168150219");
+    const BALANCE2 = BN.from("158414918763560000");
 
     const aLINK_ADDRESS = "0xa06bC25B5805d5F8d82847D191Cb4Af5A3e873E0"; // proxy
     const LINK_ADDRESS = "0x514910771AF9Ca656af840dff83E8264EcF986CA";
@@ -114,26 +113,6 @@ if(process.env.FORK_NETWORK === "mainnet"){
           deployer.address
         ]
       )) as PolicyManager;
-
-      // deploy exchange quoter
-      quoter = (await deployContract(
-        deployer,
-        artifacts.ExchangeQuoter,
-        [
-          ONE_SPLIT_VIEW
-        ]
-      )) as ExchangeQuoter;
-
-      // deploy manual exchange quoter
-      quoter2 = (await deployContract(
-        deployer,
-        artifacts.ExchangeQuoterManual,
-        [
-          deployer.address
-        ]
-      )) as ExchangeQuoterManual;
-      await expect(quoter2.connect(user).setRates([],[])).to.be.revertedWith("!governance");
-      await quoter2.setRates(["0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","0x89d24a6b4ccb1b6faa2625fe562bdd9a23260359","0xc00e94cb662c3520282e6f5717214004a7f26888","0x1f9840a85d5af5bf1d1762f925bdaddc4201f984","0x514910771af9ca656af840dff83e8264ecf986ca","0x2260fac5e5542a773aa44fbcfedf7c193bc2c599","0xdac17f958d2ee523a2206206994597c13d831ec7","0x1985365e9f78359a9b6ad760e32412f4a445e862","0x0d8775f648430679a709e98d2b0cb6250d2887ef","0xe41d2489571d322189246dafa5ebde1f4699f498","0x0000000000085d4780b73119b644ae5ecd22b376","0x6b175474e89094c44da98b954eedeac495271d0f","0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"],["1000000000000000000","5214879005539865","131044789678131649","9259278326749300","9246653217422099","15405738054265288944","420072999319953","12449913804491249","281485209795972","372925580282399","419446558886231","205364954059859","50000000000000"]);
 
       // deploy weth
       weth = (await deployContract(
@@ -194,8 +173,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
           minPeriod,
           maxPeriod,
           cancelFee,
-          price,
-          quoter.address
+          price
         ]
       )) as unknown as AaveV2Product;
 
@@ -212,8 +190,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
           minPeriod,
           maxPeriod,
           cancelFee,
-          price,
-          quoter.address
+          price
         ]
       )) as unknown as AaveV2Product;
 
@@ -242,7 +219,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
         expectClose(await product.appraisePosition(USER2, aUSDT_ADDRESS), BALANCE2, BN.from("100000000000"))
       });
     });
-    
+
     describe("covered platform", function () {
       it("starts as aave data provider", async function () {
         expect(await product.coveredPlatform()).to.equal(AAVE_DATA_PROVIDER);
@@ -381,7 +358,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
         });
         await deployer.sendTransaction({to: user3Address, value: BN.from("1000000000000000000")});
         const user3 = await ethers.getSigner(user3Address);
-        var atokens = [{"symbol":"aUSDT","address":"0x3Ed3B47Dd13EC9a98b44e6204A523E766B225811"},{"symbol":"aWBTC","address":"0x9ff58f4fFB29fA2266Ab25e75e2A8b3503311656"},{"symbol":"aWETH","address":"0x030bA81f1c18d280636F32af80b9AAd02Cf0854e"},{"symbol":"aYFI","address":"0x5165d24277cD063F5ac44Efd447B27025e888f37"},{"symbol":"aZRX","address":"0xDf7FF54aAcAcbFf42dfe29DD6144A69b629f8C9e"},{"symbol":"aUNI","address":"0xB9D7CB55f463405CDfBe4E90a6D2Df01C2B92BF1"},{"symbol":"aAAVE","address":"0xFFC97d72E13E01096502Cb8Eb52dEe56f74DAD7B"},{"symbol":"aBAT","address":"0x05Ec93c0365baAeAbF7AefFb0972ea7ECdD39CF1"},{"symbol":"aBUSD","address":"0xA361718326c15715591c299427c62086F69923D9"},{"symbol":"aDAI","address":"0x028171bCA77440897B824Ca71D1c56caC55b68A3"},{"symbol":"aENJ","address":"0xaC6Df26a590F08dcC95D5a4705ae8abbc88509Ef"},{"symbol":"aKNC","address":"0x39C6b3e42d6A679d7D776778Fe880BC9487C2EDA"},{"symbol":"aLINK","address":"0xa06bC25B5805d5F8d82847D191Cb4Af5A3e873E0"},{"symbol":"aMANA","address":"0xa685a61171bb30d4072B338c80Cb7b2c865c873E"},{"symbol":"aMKR","address":"0xc713e5E149D5D0715DcD1c156a020976e7E56B88"},{"symbol":"aREN","address":"0xCC12AbE4ff81c9378D670De1b57F8e0Dd228D77a"},{"symbol":"aSNX","address":"0x35f6B052C598d933D69A4EEC4D04c73A191fE6c2","uimpl":"0x5b1b5fEa1b99D83aD479dF0C222F0492385381dD"},{"symbol":"aSUSD","address":"0x6C5024Cd4F8A59110119C56f8933403A539555EB","uimpl":"0x05a9CBe762B36632b3594DA4F082340E0e5343e8"},/*{"symbol":"aTUSD","address":"0x101cc05f4A51C0319f570d5E146a8C625198e636","uimpl":"0xffc40F39806F1400d8278BfD33823705b5a4c196"}, storage slot*//*{"symbol":"aUSDC","address":"0xBcca60bB61934080951369a648Fb03DF4F96263C"}, blacklisted*/{"symbol":"aCRV","address":"0x8dAE6Cb04688C62d939ed9B68d32Bc62e49970b1"},{"symbol":"aGUSD","address":"0xD37EE7e4f452C6638c96536e68090De8cBcdb583","uimpl":"0xc42B14e49744538e3C239f8ae48A1Eaaf35e68a0"},{"symbol":"aBAL","address":"0x272F97b7a56a387aE942350bBC7Df5700f8a4576"},/*{"symbol":"aXSUSHI","address":"0xF256CC7847E919FAc9B808cC216cAc87CCF2f47a"},oracle*//*{"symbol":"aRENFIL","address":"0x514cd6756CCBe28772d4Cb81bC3156BA9d1744aa","uimpl":"0xa074139a4975318E7c011783031504D1C177F8cA"}storage slot*/];
+        var atokens = [{"symbol":"aUSDT","address":"0x3Ed3B47Dd13EC9a98b44e6204A523E766B225811"},{"symbol":"aWBTC","address":"0x9ff58f4fFB29fA2266Ab25e75e2A8b3503311656"},{"symbol":"aWETH","address":"0x030bA81f1c18d280636F32af80b9AAd02Cf0854e"},{"symbol":"aYFI","address":"0x5165d24277cD063F5ac44Efd447B27025e888f37"},{"symbol":"aZRX","address":"0xDf7FF54aAcAcbFf42dfe29DD6144A69b629f8C9e"},{"symbol":"aUNI","address":"0xB9D7CB55f463405CDfBe4E90a6D2Df01C2B92BF1"},{"symbol":"aAAVE","address":"0xFFC97d72E13E01096502Cb8Eb52dEe56f74DAD7B"},{"symbol":"aBAT","address":"0x05Ec93c0365baAeAbF7AefFb0972ea7ECdD39CF1"},{"symbol":"aBUSD","address":"0xA361718326c15715591c299427c62086F69923D9"},{"symbol":"aDAI","address":"0x028171bCA77440897B824Ca71D1c56caC55b68A3"},{"symbol":"aENJ","address":"0xaC6Df26a590F08dcC95D5a4705ae8abbc88509Ef"},{"symbol":"aKNC","address":"0x39C6b3e42d6A679d7D776778Fe880BC9487C2EDA"},{"symbol":"aLINK","address":"0xa06bC25B5805d5F8d82847D191Cb4Af5A3e873E0"},{"symbol":"aMANA","address":"0xa685a61171bb30d4072B338c80Cb7b2c865c873E"},{"symbol":"aMKR","address":"0xc713e5E149D5D0715DcD1c156a020976e7E56B88"},{"symbol":"aREN","address":"0xCC12AbE4ff81c9378D670De1b57F8e0Dd228D77a"},{"symbol":"aSNX","address":"0x35f6B052C598d933D69A4EEC4D04c73A191fE6c2","uimpl":"0x5b1b5fEa1b99D83aD479dF0C222F0492385381dD"},{"symbol":"aSUSD","address":"0x6C5024Cd4F8A59110119C56f8933403A539555EB","uimpl":"0x05a9CBe762B36632b3594DA4F082340E0e5343e8"},{"symbol":"aTUSD","address":"0x101cc05f4A51C0319f570d5E146a8C625198e636"},/*{"symbol":"aUSDC","address":"0xBcca60bB61934080951369a648Fb03DF4F96263C"}, blacklisted*/{"symbol":"aCRV","address":"0x8dAE6Cb04688C62d939ed9B68d32Bc62e49970b1"},{"symbol":"aGUSD","address":"0xD37EE7e4f452C6638c96536e68090De8cBcdb583","uimpl":"0xc42B14e49744538e3C239f8ae48A1Eaaf35e68a0"},{"symbol":"aBAL","address":"0x272F97b7a56a387aE942350bBC7Df5700f8a4576"},{"symbol":"aXSUSHI","address":"0xF256CC7847E919FAc9B808cC216cAc87CCF2f47a"},{"symbol":"aRENFIL","address":"0x514cd6756CCBe28772d4Cb81bC3156BA9d1744aa"}];
         for(var i = 0; i < atokens.length; ++i){
           // fetch contracts
           const aAddress = atokens[i].address;
@@ -416,6 +393,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
           expect(await uToken.balanceOf(user3.address)).to.be.equal(0);
           const aAmount = await aToken.balanceOf(user3.address);
           expect(aAmount).to.be.gte(uAmount);
+          expectClose(aAmount, uAmount, 100);
           // create policy
           let coverLimit = 10000;
           let blocks = threeDays;

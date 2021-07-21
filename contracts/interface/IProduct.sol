@@ -23,7 +23,6 @@ interface IProduct {
     function manageFee() external view returns (uint64);
     function maxCoverAmount() external view returns (uint256);
     function maxCoverPerUser() external view returns (uint256);
-    function setCoveredPlatform(address _coveredPlatform) external;
     function coveredPlatform() external view returns (address);
     function productPolicyCount() external view returns (uint256);
     function activeCoverAmount() external view returns (uint256);

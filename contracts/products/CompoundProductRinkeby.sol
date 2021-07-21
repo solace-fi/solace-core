@@ -3,6 +3,7 @@ pragma solidity 0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
+import "../interface/IExchangeQuoter.sol";
 import "./../interface/ISwapRouter.sol";
 import "./../interface/IWETH9.sol";
 import "./BaseProduct.sol";
@@ -27,6 +28,7 @@ contract CompoundProductRinkeby is BaseProduct, EIP712 {
     bytes32 private immutable _EXCHANGE_TYPEHASH = keccak256("CompoundProductExchange(uint256 policyID,address tokenIn,uint256 amountIn,address tokenOut,uint256 amountOut,uint256 deadline)");
     ISwapRouter private swapRouter = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
     IWETH9 private weth = IWETH9(payable(0xc778417E063141139Fce010982780140Aa0cD5Ab));
+    IExchangeQuoter public quoter;
 
     constructor (
         address _governance,
@@ -50,10 +52,10 @@ contract CompoundProductRinkeby is BaseProduct, EIP712 {
         _minPeriod,
         _maxPeriod,
         _cancelFee,
-        _price,
-        _quoter
+        _price
     ) EIP712("Solace.fi-CompoundProduct", "1") {
         comptroller = IComptrollerRinkeby(_coveredPlatform);
+        quoter = IExchangeQuoter(_quoter);
     }
 
     // _positionContract must be a cToken including cETH
@@ -173,6 +175,17 @@ contract CompoundProductRinkeby is BaseProduct, EIP712 {
     function setCoveredPlatform(address _coveredPlatform) public override {
         super.setCoveredPlatform(_coveredPlatform);
         comptroller = IComptrollerRinkeby(_coveredPlatform);
+    }
+
+    /**
+     * @notice Sets a new ExchangeQuoter.
+     * Can only be called by the current governor.
+     * @param _quoter The new quoter address.
+     */
+    function setExchangeQuoter(address _quoter) external {
+        // can only be called by governor
+        require(msg.sender == governance, "!governance");
+        quoter = IExchangeQuoter(_quoter);
     }
 
     /**
