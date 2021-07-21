@@ -35,6 +35,8 @@ interface IProduct {
     function setMaxPeriod(uint64 _maxPeriod) external;
     function setMaxCoverAmount(uint256 _maxCoverAmount) external;
     function setMaxCoverPerUser(uint256 _maxCoverPerUser) external;
+    function setCoveredPlatform(address _coveredPlatform) external;
+    function setPolicyManager(address _policyManager) external;
 
     /**** UNIMPLEMENTED FUNCTIONS
     Functions that are only implemented by child product contracts
@@ -54,4 +56,6 @@ interface IProduct {
     function updateCoverLimit(uint256 _policyID, uint256 _coverLimit) external payable;
     function extendPolicy(uint256 _policyID, uint64 _blocks) external payable;
     function cancelPolicy(uint256 _policyID) external;
+    function updatePolicy(uint256 _policyID, uint256 _coverLimit, uint64 _blocks ) external payable;
+
 }

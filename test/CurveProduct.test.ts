@@ -126,5 +126,21 @@ if(process.env.FORK_NETWORK === "mainnet"){
         expect(await product.appraisePosition(WHALE, THREEPOOL_POOL)).to.equal(WHALE_VALUE);
       })
     })
+
+    describe("covered platform", function () {
+      it("starts as curve address provider", async function () {
+        expect(await product.coveredPlatform()).to.equal(ADDRESS_PROVIDER);
+        expect(await product.addressProvider()).to.equal(ADDRESS_PROVIDER);
+      });
+      it("cannot be set by non governor", async function () {
+        await expect(product.connect(user).setCoveredPlatform(user.address)).to.be.revertedWith("!governance");
+      });
+      it("can be set", async function () {
+        await product.connect(deployer).setCoveredPlatform(treasury.address);
+        expect(await product.coveredPlatform()).to.equal(treasury.address);
+        expect(await product.addressProvider()).to.equal(treasury.address);
+        await product.connect(deployer).setCoveredPlatform(ADDRESS_PROVIDER);
+      });
+    });
   })
 }

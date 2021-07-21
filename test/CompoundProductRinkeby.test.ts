@@ -469,6 +469,22 @@ if(process.env.FORK_NETWORK === "rinkeby"){
         expect(userEth2.sub(userEth1).add(gasCost)).to.equal(amountOut3);
       });
     })
+
+    describe("covered platform", function () {
+      it("starts as comptroller", async function () {
+        expect(await product.coveredPlatform()).to.equal(COMPTROLLER_ADDRESS);
+        expect(await product.comptroller()).to.equal(COMPTROLLER_ADDRESS);
+      });
+      it("cannot be set by non governor", async function () {
+        await expect(product.connect(user).setCoveredPlatform(user.address)).to.be.revertedWith("!governance");
+      });
+      it("can be set", async function () {
+        await product.connect(deployer).setCoveredPlatform(treasury.address);
+        expect(await product.coveredPlatform()).to.equal(treasury.address);
+        expect(await product.comptroller()).to.equal(treasury.address);
+        await product.connect(deployer).setCoveredPlatform(COMPTROLLER_ADDRESS);
+      });
+    });
   })
 }
 

@@ -123,5 +123,21 @@ if(process.env.FORK_NETWORK === "mainnet"){
         expect(await product.appraisePosition(WHALE, DAI_VAULT)).to.equal(WHALE_VALUE);
       })
     })
+
+    describe("covered platform", function () {
+      it("starts as yearn registry", async function () {
+        expect(await product.coveredPlatform()).to.equal(IYREGISTRY);
+        expect(await product.yregistry()).to.equal(IYREGISTRY);
+      });
+      it("cannot be set by non governor", async function () {
+        await expect(product.connect(user).setCoveredPlatform(user.address)).to.be.revertedWith("!governance");
+      });
+      it("can be set", async function () {
+        await product.connect(deployer).setCoveredPlatform(treasury.address);
+        expect(await product.coveredPlatform()).to.equal(treasury.address);
+        expect(await product.yregistry()).to.equal(treasury.address);
+        await product.connect(deployer).setCoveredPlatform(IYREGISTRY);
+      });
+    });
   })
 }
