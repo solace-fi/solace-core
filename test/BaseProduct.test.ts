@@ -117,19 +117,23 @@ describe("BaseProduct", () => {
     ])) as MockProduct;
 
     // deploy second BaseProduct
-    product2 = (await deployContract(deployer, artifacts.MockProduct, [
-      deployer.address,
-      policyManager.address,
-      registry.address,
-      ONE_SPLIT_VIEW, // this is for the coveredPlatform
-      maxCoverAmount1,
-      maxCoverPerUser1,
-      minPeriod1,
-      maxPeriod1,
-      manageFee1,
-      price1,
-      quoter1.address,
-    ])) as MockProduct;
+    product2 = (await deployContract(
+      deployer,
+      artifacts.MockProduct,
+      [
+        deployer.address,
+        policyManager.address,
+        registry.address,
+        treasury.address, // this is for the coveredPlatform
+        maxCoverAmount1,
+        maxCoverPerUser1,
+        minPeriod1,
+        maxPeriod1,
+        manageFee1,
+        price1,
+        quoter1.address
+      ]
+    )) as MockProduct;
 
     await registry.setVault(vault.address);
     await registry.setClaimsEscrow(claimsEscrow.address);
@@ -643,24 +647,28 @@ describe("BaseProduct", () => {
     });
   });
 
-  describe("active cover amount", function() {
-    let product3: MockProduct;
-    before(async function() {
-      product3 = (await deployContract(deployer, artifacts.MockProduct, [
-        deployer.address,
-        mockPolicyManager.address,
-        registry.address,
-        ONE_SPLIT_VIEW, // this is for the coveredPlatform
-        maxCoverAmount1,
-        maxCoverPerUser1,
-        minPeriod1,
-        maxPeriod1,
-        manageFee1,
-        price1,
-        quoter1.address,
-      ])) as MockProduct;
-    });
-    it("starts at zero", async function() {
+  describe("active cover amount", function () {
+    let product3: MockProduct
+    before(async function () {
+      product3 = (await deployContract(
+        deployer,
+        artifacts.MockProduct,
+        [
+          deployer.address,
+          mockPolicyManager.address,
+          registry.address,
+          treasury.address, // this is for the coveredPlatform
+          maxCoverAmount1,
+          maxCoverPerUser1,
+          minPeriod1,
+          maxPeriod1,
+          manageFee1,
+          price1,
+          quoter1.address
+        ]
+      )) as MockProduct;
+    })
+    it("starts at zero", async function () {
       expect(await product3.activeCoverAmount()).to.equal(0);
     });
     it("cannot update by non policy manager", async function() {
