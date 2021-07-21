@@ -60,8 +60,8 @@ function getSubmitClaimDigest(
     )
 }
 
-if(process.env.FORK_NETWORK === "mainnet"){
-  describe('AaveV2Product', () => {
+if(process.env.FORK_NETWORK === "kovan"){
+  describe('AaveV2ProductKovan', () => {
     const [deployer, user, user2, paclasSigner] = provider.getWallets();
     let artifacts: ArtifactImports;
 
@@ -78,7 +78,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
     let lendingPool: Contract;
 
     const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-    const AAVE_DATA_PROVIDER = "0x057835Ad21a177dbdd3090bB1CAE03EaCF78Fc6d";
+    const AAVE_DATA_PROVIDER = "0x3c73A5E5785cAC854D468F727c606C07488a29D6";
     const minPeriod = 6450; // this is about 1 day
     const maxPeriod = 45150; // this is about 1 week from https://ycharts.c om/indicators/ethereum_blocks_per_day
     const threeDays = 19350;
@@ -87,17 +87,17 @@ if(process.env.FORK_NETWORK === "mainnet"){
     const cancelFee = BN.from("100000000000000000"); // 0.1 Ether in wei
     const price = 11044; // 2.60%/yr
 
-    const aWETH_ADDRESS = "0x030ba81f1c18d280636f32af80b9aad02cf0854e";
-    const USER1 = "0xd85e821b874cff4880031b96601dc73bfe92f48c";
-    const BALANCE1 = BN.from("49630710460431870110");
+    const aWETH_ADDRESS = "0x87b1f4cf9BD63f7BBD3eE1aD04E8F52540349347";
+    const USER1 = "0xc2b74b547d02bafc93feb34bd964d42312ae70c3";
+    const BALANCE1 = BN.from("608218702433845134");
 
-    const aUSDT_ADDRESS = "0x3ed3b47dd13ec9a98b44e6204a523e766b225811";
-    const USER2 = "0x2edce9a8e7991b9fd6074aece928d5a9040ed98d";
-    const BALANCE2 = BN.from("158414918763560000");
+    const aUSDT_ADDRESS = "0xFF3c8bc103682FA918c954E84F5056aB4DD5189d";
+    const USER2 = "0xde6663fbb083c1bd0f2303f68276e2df2deb0a9d";
+    const BALANCE2 = BN.from("4741389687192200000");
 
-    const aLINK_ADDRESS = "0xa06bC25B5805d5F8d82847D191Cb4Af5A3e873E0"; // proxy
-    const LINK_ADDRESS = "0x514910771AF9Ca656af840dff83E8264EcF986CA";
-    const LENDING_POOL_ADDRESS = "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9";
+    const aLINK_ADDRESS = "0xeD9044cA8F7caCe8eACcD40367cF2bee39eD1b04";
+    const LINK_ADDRESS = "0xad5ce863ae3e4e9394ab43d4ba0d80f419f61789";
+    const LENDING_POOL_ADDRESS = "0xE0fBa4Fc209b4948668006B2bE61711b7f465bAe";
 
     const COOLDOWN_PERIOD = 3600; // one hour
 
@@ -240,7 +240,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
         let price = BN.from(await product.price());
         let coverLimit = 5000 // cover 50% of the position
         let blocks = BN.from(threeDays)
-        let expectedPremium = BN.from("5303076154194467");
+        let expectedPremium = BN.from("64988622087944");
         let quote = BN.from(await product.getQuote(USER1, aWETH_ADDRESS, coverLimit, blocks));
         expectClose(quote, expectedPremium, BN.from("1000000000"))
       })
@@ -278,7 +278,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
       before(async function () {
         await deployer.sendTransaction({to: claimsEscrow.address, value: BN.from("1000000000000000000")});
         // create an aLink position and policy
-        let index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[user.address,1]);
+        let index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[user.address,0]);
         await setStorageAt(LINK_ADDRESS,index,toBytes32(amountIn1.mul(2)).toString());
         await link.connect(user).transfer(user2.address, amountIn1);
         expect(await link.balanceOf(user.address)).to.equal(amountIn1);
@@ -357,7 +357,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
         });
         await deployer.sendTransaction({to: user3Address, value: BN.from("1000000000000000000")});
         const user3 = await ethers.getSigner(user3Address);
-        var atokens = [{"symbol":"aUSDT","address":"0x3Ed3B47Dd13EC9a98b44e6204A523E766B225811"},{"symbol":"aWBTC","address":"0x9ff58f4fFB29fA2266Ab25e75e2A8b3503311656"},{"symbol":"aWETH","address":"0x030bA81f1c18d280636F32af80b9AAd02Cf0854e"},{"symbol":"aYFI","address":"0x5165d24277cD063F5ac44Efd447B27025e888f37"},{"symbol":"aZRX","address":"0xDf7FF54aAcAcbFf42dfe29DD6144A69b629f8C9e"},{"symbol":"aUNI","address":"0xB9D7CB55f463405CDfBe4E90a6D2Df01C2B92BF1"},{"symbol":"aAAVE","address":"0xFFC97d72E13E01096502Cb8Eb52dEe56f74DAD7B"},{"symbol":"aBAT","address":"0x05Ec93c0365baAeAbF7AefFb0972ea7ECdD39CF1"},{"symbol":"aBUSD","address":"0xA361718326c15715591c299427c62086F69923D9"},{"symbol":"aDAI","address":"0x028171bCA77440897B824Ca71D1c56caC55b68A3"},{"symbol":"aENJ","address":"0xaC6Df26a590F08dcC95D5a4705ae8abbc88509Ef"},{"symbol":"aKNC","address":"0x39C6b3e42d6A679d7D776778Fe880BC9487C2EDA"},{"symbol":"aLINK","address":"0xa06bC25B5805d5F8d82847D191Cb4Af5A3e873E0"},{"symbol":"aMANA","address":"0xa685a61171bb30d4072B338c80Cb7b2c865c873E"},{"symbol":"aMKR","address":"0xc713e5E149D5D0715DcD1c156a020976e7E56B88"},{"symbol":"aREN","address":"0xCC12AbE4ff81c9378D670De1b57F8e0Dd228D77a"},{"symbol":"aSNX","address":"0x35f6B052C598d933D69A4EEC4D04c73A191fE6c2","uimpl":"0x5b1b5fEa1b99D83aD479dF0C222F0492385381dD"},{"symbol":"aSUSD","address":"0x6C5024Cd4F8A59110119C56f8933403A539555EB","uimpl":"0x05a9CBe762B36632b3594DA4F082340E0e5343e8"},{"symbol":"aTUSD","address":"0x101cc05f4A51C0319f570d5E146a8C625198e636"},/*{"symbol":"aUSDC","address":"0xBcca60bB61934080951369a648Fb03DF4F96263C"}, blacklisted*/{"symbol":"aCRV","address":"0x8dAE6Cb04688C62d939ed9B68d32Bc62e49970b1"},{"symbol":"aGUSD","address":"0xD37EE7e4f452C6638c96536e68090De8cBcdb583","uimpl":"0xc42B14e49744538e3C239f8ae48A1Eaaf35e68a0"},{"symbol":"aBAL","address":"0x272F97b7a56a387aE942350bBC7Df5700f8a4576"},{"symbol":"aXSUSHI","address":"0xF256CC7847E919FAc9B808cC216cAc87CCF2f47a"},{"symbol":"aRENFIL","address":"0x514cd6756CCBe28772d4Cb81bC3156BA9d1744aa"}];
+        var atokens = [{"symbol":"aAAVE","address":"0x6d93ef8093F067f19d33C2360cE17b20a8c45CD7"},{"symbol":"aBAT","address":"0x28f92b4c8Bdab37AF6C4422927158560b4bB446e"},{"symbol":"aBUSD","address":"0xfe3E41Db9071458e39104711eF1Fa668bae44e85"},{"symbol":"aDAI","address":"0xdCf0aF9e59C002FA3AA091a46196b37530FD48a8"},{"symbol":"aENJ","address":"0x1d1F2Cb9ED46A8d5bf0254E5CE400514D62d55F0"},{"symbol":"aKNC","address":"0xdDdEC78e29f3b579402C42ca1fd633DE00D23940"},{"symbol":"aLINK","address":"0xeD9044cA8F7caCe8eACcD40367cF2bee39eD1b04"},{"symbol":"aMANA","address":"0xA288B1767C91Aa9d8A14a65dC6B2E7ce68c02DFd"},{"symbol":"aMKR","address":"0x9d9DaBEae6BcBa881404A9e499B13B2B3C1F329E"},{"symbol":"aREN","address":"0x01875ee883B32f5f961A92eC597DcEe2dB7589c1"},{"symbol":"aSNX","address":"0xAA74AdA92dE4AbC0371b75eeA7b1bd790a69C9e1"},{"symbol":"aSUSD","address":"0x9488fF6F29ff75bfdF8cd5a95C6aa679bc7Cd65c"},{"symbol":"aTUSD","address":"0x39914AdBe5fDbC2b9ADeedE8Bcd444b20B039204"},{"symbol":"aUSDC","address":"0xe12AFeC5aa12Cf614678f9bFeeB98cA9Bb95b5B0"},{"symbol":"aUSDT","address":"0xFF3c8bc103682FA918c954E84F5056aB4DD5189d"},{"symbol":"aWBTC","address":"0x62538022242513971478fcC7Fb27ae304AB5C29F"},{"symbol":"aWETH","address":"0x87b1f4cf9BD63f7BBD3eE1aD04E8F52540349347"},{"symbol":"aYFI","address":"0xF6c7282943Beac96f6C70252EF35501a6c1148Fe"},{"symbol":"aZRX","address":"0xf02D7C23948c9178C68f5294748EB778Ab5e5D9c","uimpl":""}/*{"symbol":"aUNI","address":"0x601FFc9b7309bdb0132a02a569FBd57d6D1740f2"},*//*{"symbol":"aAMPL","address":"0xb8a16bbab34FA7A5C09Ec7679EAfb8fEC06897bc"}*/];
         for(var i = 0; i < atokens.length; ++i){
           // fetch contracts
           const aAddress = atokens[i].address;
