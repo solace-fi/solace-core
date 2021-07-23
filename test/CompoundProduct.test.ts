@@ -303,7 +303,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
       let policyID1 = 3;
       let policyID2 = 4;
       let policyID3 = 5;
-      let amountIn1 = 4989293;
+      let amountIn1 = 4989290;
       let amountOut1 = 5000000;
       let amountIn2 = 10000000;
       let amountOut2 = 50000000;
@@ -314,7 +314,6 @@ if(process.env.FORK_NETWORK === "mainnet"){
         await deployer.sendTransaction({to: claimsEscrow.address, value: BN.from("1000000000000000000")});
         // create a cETH position and policy
         await ceth.connect(user).mint({value: BN.from("1000000000000000")});
-        expect(await ceth.balanceOf(user.address)).to.be.gte(amountIn1);
         await ceth.connect(user).approve(product.address, constants.MaxUint256);
         let coverLimit = 10000
         let blocks = threeDays
