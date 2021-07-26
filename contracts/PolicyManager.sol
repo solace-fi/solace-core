@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "./interface/IProduct.sol";
 import "./interface/IPolicyManager.sol";
+import "./interface/INonfungibleTokenPositionDescriptor.sol";
 
 
 /* TODO
@@ -27,6 +28,9 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
 
     /// @notice Governance to take over.
     address public override newGovernance;
+
+     /// @notice The address of the token descriptor contract, which handles generating token URIs for position tokens
+    address public tokenDescriptor;
 
     // Set of products.
     EnumerableSet.AddressSet private products;
@@ -96,6 +100,17 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
         require(msg.sender == governance, "!governance");
         products.remove(_product);
         emit ProductRemoved(_product);
+    }
+
+    /**
+     * @notice Allows governance to set token descriptor.
+     * Can only be called by the current governor.
+     * @param _tokenDescriptor The new token descriptor address.
+     */
+    function setTokenDescriptor(address _tokenDescriptor) external override {
+        // can only be called by governor
+        require(msg.sender == governance, "!governance");
+        tokenDescriptor = _tokenDescriptor;
     }
 
     /**
@@ -360,7 +375,8 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
     ****/
 
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
-        return _encodeTokenURI(policyInfo[tokenId]);
+        require(_exists(tokenId), "query for nonexistent token");
+        return INonfungibleTokenPositionDescriptor(tokenDescriptor).tokenURI(this, tokenId);
     }
 
 }
