@@ -374,7 +374,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
     Overrides that properly set functionality through parent contracts
     ****/
 
-    function tokenURI(uint256 tokenId) public view override returns (string memory) {
+    function tokenURI(uint256 tokenId) public view override(ERC721) returns (string memory) {
         require(_exists(tokenId), "query for nonexistent token");
         return INonfungibleTokenPositionDescriptor(tokenDescriptor).tokenURI(this, tokenId);
     }

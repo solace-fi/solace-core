@@ -13,13 +13,25 @@ contract NonfungibleTokenPositionDescriptor is INonfungibleTokenPositionDescript
 
   struct TokenURI {
     uint256 policyId;
+    uint256 coverAmount;
+    address policyholder;
+    uint64 expirationBlock;
     address product;
+    uint24 price;
     address positionContract;
   }
 
   function tokenURI(IPolicyManager _policyManager, uint256 _policyID) external view override returns (string memory) {
-    (, address product, address positionContract, , , ) = _policyManager.getPolicyInfo(_policyID);
-    TokenURI memory tokenUri = TokenURI({policyId: _policyID, product: product, positionContract: positionContract});
+    (address policyholder, address product, address positionContract, uint256 coverAmount, uint64 expirationBlock, uint24 price) = _policyManager.getPolicyInfo(_policyID);
+    TokenURI memory tokenUri = TokenURI({
+        policyId: _policyID,
+        coverAmount: coverAmount,
+        policyholder: policyholder,
+        expirationBlock: expirationBlock,
+        product: product,
+        price: price,
+        positionContract: positionContract
+    });
     return string(abi.encode(tokenUri));
   }
   
