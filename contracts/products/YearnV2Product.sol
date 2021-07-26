@@ -20,7 +20,7 @@ interface IYVault {
     function token() external view returns (address);
     function balanceOf(address user) external view returns (uint256);
     function getPricePerFullShare() external view returns (uint256);
-    function depositAll() external;
+    function deposit(uint256 amount) external;
 }
 
 contract YearnV2Product is BaseProduct, EIP712 {

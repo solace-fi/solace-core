@@ -364,16 +364,13 @@ if(process.env.FORK_NETWORK === "mainnet"){
       });
       it("should support all yearn vaults", async function () {
         const user3Address = "0x688514032e2cD27fbCEc700E2b10aa8D34741956";
-        await hre.network.provider.request({
-          method: "hardhat_impersonateAccount",
-          params: [user3Address],
-        });
+        await hre.network.provider.request({method: "hardhat_impersonateAccount", params: [user3Address]});
         await deployer.sendTransaction({to: user3Address, value: BN.from("1000000000000000000")});
         const user3 = await ethers.getSigner(user3Address);
         var yvaults = [
           {"symbol":"yaLINK","address":"0x29e240cfd7946ba20895a7a02edb25c210f9f324"}, // safeerc20
           {"symbol":"yLINK","address":"0x881b06da56bb5675c54e4ed311c21e54c5025298","uimpl":""},
-          {"symbol":"yUSDC","address":"0x597ad1e0c13bfe8025993d9e79c69e1c0233522e"}, // black listed
+          {"symbol":"yUSDC","address":"0x597ad1e0c13bfe8025993d9e79c69e1c0233522e","blacklist":"0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"}, // black listed
           {"symbol":"yyDAI+yUSDC+yUSDT+yTUSD","address":"0x5dbcf33d8c2e976c6b560249878e6f1491bca25c"}, // no reason
           {"symbol":"yTUSD","address":"0x37d19d1c4e1fa9dc47bd1ea12f742a0887eda74a"},
           {"symbol":"yDAI","address":"0xacd43e627e64355f1861cec6d3a6688b31a6f952"},
@@ -383,7 +380,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
           {"symbol":"ycrvRenWSBTC","address":"0x7ff566e1d69deff32a7b244ae7276b9f90e9d0f6"}, // zero position value
           {"symbol":"yWETH","address":"0xe1237aa7f535b0cc33fd973d66cbf830354d16c7"},
           {"symbol":"y3Crv","address":"0x9ca85572e6a3ebf24dedd195623f188735a5179f"},
-          {"symbol":"yGUSD","address":"0xec0d8d3ed5477106c6d4ea27d90a60e594693c90"}, // gusd is proxy
+          {"symbol":"yGUSD","address":"0xec0d8d3ed5477106c6d4ea27d90a60e594693c90","uimpl":"0xc42B14e49744538e3C239f8ae48A1Eaaf35e68a0"}, // gusd is proxy
           {"symbol":"yvcDAI+cUSDC","address":"0x629c759d1e83efbf63d84eb3868b564d9521c129"}, // zero position value
           {"symbol":"yvmusd3CRV","address":"0x0fcdaedfb8a7dfda2e9838564c5a1665d856afdf"}, // zero position value
           {"symbol":"yvgusd3CRV","address":"0xcc7e70a958917cce67b4b87a8c30e6297451ae98"}, // zero position value
@@ -407,9 +404,10 @@ if(process.env.FORK_NETWORK === "mainnet"){
           {"symbol":"yvlinkCRV","address":"0x96ea6af74af09522fcb4c28c269c26f59a31ced6","uimpl":""} // zero position value
         ];
         var success = 0;
-        var fail = 0;
+        var successList = [];
+        var failList = [];
         for(var i = 0; i < yvaults.length; ++i){
-          try{
+          try {
             // fetch contracts
             const yAddress = yvaults[i].address;
             const symbol = yvaults[i].symbol;
@@ -420,24 +418,40 @@ if(process.env.FORK_NETWORK === "mainnet"){
             const decimals = await uToken.decimals();
             const uAmount = oneToken(decimals);
             const uimpl = ((yvaults[i].uimpl || "") != "") ? yvaults[i].uimpl : uAddress;
+            const blacklistAddress = yvaults[i].blacklist || ZERO_ADDRESS;
+            const isBlacklistable = blacklistAddress != ZERO_ADDRESS;
             // create position
+            var value = toBytes32(uAmount).toString();
             for(var j = 0; j < 200; ++j) {
               try { // solidity rigged balanceOf
                 var index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[user3.address,j]);
-                await setStorageAt(uimpl, index, toBytes32(uAmount).toString());
+                await setStorageAt(uimpl, index, value);
                 var uBalance = await uToken.balanceOf(user3.address);
                 if(uBalance.eq(uAmount)) break;
               } catch(e) { }
               try { // vyper rigged balanceOf
                 var index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[j,user3.address]);
-                await setStorageAt(uimpl, index, toBytes32(uAmount).toString());
+                await setStorageAt(uimpl, index, value);
                 var uBalance = await uToken.balanceOf(user3.address);
                 if(uBalance.eq(uAmount)) break;
               } catch(e) { }
             }
             expect(await uToken.balanceOf(user3.address)).to.equal(uAmount);
+            if(isBlacklistable) {
+              const blacklistContract = await ethers.getContractAt(artifacts.Blacklist.abi, blacklistAddress);
+              var value = toBytes32(BN.from(0)).toString();
+              for(var j = 0; j < 200; ++j) {
+                try {
+                  var index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[user3.address,j]);
+                  await setStorageAt(uimpl, index, value);
+                  var blacklisted = await blacklistContract.isBlacklisted(user3.address);
+                  if(!blacklisted) break;
+                } catch(e) { }
+              }
+              expect(await blacklistContract.isBlacklisted(user3.address)).to.be.false;
+            }
             await uToken.connect(user3).approve(yvault.address, constants.MaxUint256);
-            await yvault.connect(user3).depositAll();
+            await yvault.connect(user3).deposit(uAmount);
             expect(await uToken.balanceOf(user3.address)).to.be.equal(0);
             const aAmount = await yvault.balanceOf(user3.address);
             expect(aAmount).to.be.gt(0);
@@ -447,7 +461,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
             let quote = BN.from(await product.getQuote(user3.address, yAddress, coverLimit, blocks));
             quote = quote.mul(10001).div(10000);
             await product.connect(user3).buyPolicy(user3.address, yAddress, coverLimit, blocks, { value: quote });
-            let policyID = 5 + success;
+            let policyID = (await policyManager.totalPolicyCount()).toNumber();
             // sign swap
             let amountOut = 10000;
             let digest = getSubmitClaimDigest("Solace.fi-YearnV2Product", product.address, chainId, policyID, amountOut, deadline);
@@ -467,16 +481,18 @@ if(process.env.FORK_NETWORK === "mainnet"){
             let userEth2 = await user3.getBalance();
             expectClose(userEth2.sub(userEth1).add(gasCost), amountOut);
             ++success;
+            successList.push(symbol);
           } catch(e) {
             console.log(e);
-            ++fail;
+            failList.push(yvaults[i].symbol);
           }
         }
-        await hre.network.provider.request({
-          method: "hardhat_stopImpersonatingAccount",
-          params: [user3Address],
-        });
-        expect(fail).to.equal(0);
+        await hre.network.provider.request({method: "hardhat_stopImpersonatingAccount",params: [user3Address]});
+        if(failList.length != 0) {
+          console.log("supported vaults:", successList);
+          console.log("unsupported vaults:", failList);
+        }
+        expect(`${success}/${yvaults.length} supported vaults`).to.equal(`${yvaults.length}/${yvaults.length} supported vaults`);
       });
     });
   })
