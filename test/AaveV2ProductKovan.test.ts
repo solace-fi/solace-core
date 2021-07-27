@@ -351,77 +351,109 @@ if(process.env.FORK_NETWORK === "kovan"){
       });
       it("should support all atokens", async function () {
         const user3Address = "0x688514032e2cD27fbCEc700E2b10aa8D34741956";
-        await hre.network.provider.request({
-          method: "hardhat_impersonateAccount",
-          params: [user3Address],
-        });
+        await hre.network.provider.request({method: "hardhat_impersonateAccount", params: [user3Address]});
         await deployer.sendTransaction({to: user3Address, value: BN.from("1000000000000000000")});
         const user3 = await ethers.getSigner(user3Address);
-        var atokens = [{"symbol":"aAAVE","address":"0x6d93ef8093F067f19d33C2360cE17b20a8c45CD7"},{"symbol":"aBAT","address":"0x28f92b4c8Bdab37AF6C4422927158560b4bB446e"},{"symbol":"aBUSD","address":"0xfe3E41Db9071458e39104711eF1Fa668bae44e85"},{"symbol":"aDAI","address":"0xdCf0aF9e59C002FA3AA091a46196b37530FD48a8"},{"symbol":"aENJ","address":"0x1d1F2Cb9ED46A8d5bf0254E5CE400514D62d55F0"},{"symbol":"aKNC","address":"0xdDdEC78e29f3b579402C42ca1fd633DE00D23940"},{"symbol":"aLINK","address":"0xeD9044cA8F7caCe8eACcD40367cF2bee39eD1b04"},{"symbol":"aMANA","address":"0xA288B1767C91Aa9d8A14a65dC6B2E7ce68c02DFd"},{"symbol":"aMKR","address":"0x9d9DaBEae6BcBa881404A9e499B13B2B3C1F329E"},{"symbol":"aREN","address":"0x01875ee883B32f5f961A92eC597DcEe2dB7589c1"},{"symbol":"aSNX","address":"0xAA74AdA92dE4AbC0371b75eeA7b1bd790a69C9e1"},{"symbol":"aSUSD","address":"0x9488fF6F29ff75bfdF8cd5a95C6aa679bc7Cd65c"},{"symbol":"aTUSD","address":"0x39914AdBe5fDbC2b9ADeedE8Bcd444b20B039204"},{"symbol":"aUSDC","address":"0xe12AFeC5aa12Cf614678f9bFeeB98cA9Bb95b5B0"},{"symbol":"aUSDT","address":"0xFF3c8bc103682FA918c954E84F5056aB4DD5189d"},{"symbol":"aWBTC","address":"0x62538022242513971478fcC7Fb27ae304AB5C29F"},{"symbol":"aWETH","address":"0x87b1f4cf9BD63f7BBD3eE1aD04E8F52540349347"},{"symbol":"aYFI","address":"0xF6c7282943Beac96f6C70252EF35501a6c1148Fe"},{"symbol":"aZRX","address":"0xf02D7C23948c9178C68f5294748EB778Ab5e5D9c","uimpl":""}/*{"symbol":"aUNI","address":"0x601FFc9b7309bdb0132a02a569FBd57d6D1740f2"},*//*{"symbol":"aAMPL","address":"0xb8a16bbab34FA7A5C09Ec7679EAfb8fEC06897bc"}*/];
+        var atokens = [
+          {"symbol":"aAAVE","address":"0x6d93ef8093F067f19d33C2360cE17b20a8c45CD7"},
+          {"symbol":"aBAT","address":"0x28f92b4c8Bdab37AF6C4422927158560b4bB446e"},
+          {"symbol":"aBUSD","address":"0xfe3E41Db9071458e39104711eF1Fa668bae44e85"},
+          {"symbol":"aDAI","address":"0xdCf0aF9e59C002FA3AA091a46196b37530FD48a8"},
+          {"symbol":"aENJ","address":"0x1d1F2Cb9ED46A8d5bf0254E5CE400514D62d55F0"},
+          {"symbol":"aKNC","address":"0xdDdEC78e29f3b579402C42ca1fd633DE00D23940"},
+          {"symbol":"aLINK","address":"0xeD9044cA8F7caCe8eACcD40367cF2bee39eD1b04"},
+          {"symbol":"aMANA","address":"0xA288B1767C91Aa9d8A14a65dC6B2E7ce68c02DFd"},
+          {"symbol":"aMKR","address":"0x9d9DaBEae6BcBa881404A9e499B13B2B3C1F329E"},
+          {"symbol":"aREN","address":"0x01875ee883B32f5f961A92eC597DcEe2dB7589c1"},
+          {"symbol":"aSNX","address":"0xAA74AdA92dE4AbC0371b75eeA7b1bd790a69C9e1"},
+          {"symbol":"aSUSD","address":"0x9488fF6F29ff75bfdF8cd5a95C6aa679bc7Cd65c"},
+          {"symbol":"aTUSD","address":"0x39914AdBe5fDbC2b9ADeedE8Bcd444b20B039204"},
+          {"symbol":"aUSDC","address":"0xe12AFeC5aa12Cf614678f9bFeeB98cA9Bb95b5B0"},
+          {"symbol":"aUSDT","address":"0xFF3c8bc103682FA918c954E84F5056aB4DD5189d"},
+          {"symbol":"aWBTC","address":"0x62538022242513971478fcC7Fb27ae304AB5C29F"},
+          {"symbol":"aWETH","address":"0x87b1f4cf9BD63f7BBD3eE1aD04E8F52540349347"},
+          {"symbol":"aYFI","address":"0xF6c7282943Beac96f6C70252EF35501a6c1148Fe"},
+          {"symbol":"aZRX","address":"0xf02D7C23948c9178C68f5294748EB778Ab5e5D9c","uimpl":""},
+          {"symbol":"aUNI","address":"0x601FFc9b7309bdb0132a02a569FBd57d6D1740f2"},
+          {"symbol":"aAMPL","address":"0xb8a16bbab34FA7A5C09Ec7679EAfb8fEC06897bc","uimpl":"0xcea5Db2E865213CDa8C0EAaD2e68Ccc54Dd88d27"}
+        ];
+        var success = 0;
+        var successList = [];
+        var failList = [];
         for(var i = 0; i < atokens.length; ++i){
-          // fetch contracts
-          const aAddress = atokens[i].address;
-          const symbol = atokens[i].symbol;
-          console.log(`        ${symbol}`);
-          const aToken = await ethers.getContractAt(artifacts.AToken.abi, aAddress);
-          const uAddress = await aToken.UNDERLYING_ASSET_ADDRESS();
-          const uToken = await ethers.getContractAt(artifacts.ERC20.abi, uAddress);
-          const decimals = await uToken.decimals();
-          const uAmount = oneToken(decimals);
-          const poolAddress = await aToken.POOL();
-          const pool = await ethers.getContractAt(artifacts.LendingPool.abi, poolAddress);
-          const uimpl = ((atokens[i].uimpl || "") != "") ? atokens[i].uimpl : uAddress;
-          // create position
-          for(var j = 0; j < 200; ++j) {
-            try { // solidity rigged balanceOf
-              var index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[user3.address,j]);
-              await setStorageAt(uimpl, index, toBytes32(uAmount).toString());
-              var uBalance = await uToken.balanceOf(user3.address);
-              if(uBalance.eq(uAmount)) break;
-            } catch(e) { }
-            try { // vyper rigged balanceOf
-              var index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[j,user3.address]);
-              await setStorageAt(uimpl, index, toBytes32(uAmount).toString());
-              var uBalance = await uToken.balanceOf(user3.address);
-              if(uBalance.eq(uAmount)) break;
-            } catch(e) { }
+          try {
+            // fetch contracts
+            const aAddress = atokens[i].address;
+            const symbol = atokens[i].symbol;
+            console.log(`        ${symbol}`);
+            const aToken = await ethers.getContractAt(artifacts.AToken.abi, aAddress);
+            const uAddress = await aToken.UNDERLYING_ASSET_ADDRESS();
+            const uToken = await ethers.getContractAt(artifacts.ERC20.abi, uAddress);
+            const decimals = await uToken.decimals();
+            const uAmount = oneToken(decimals);
+            const poolAddress = await aToken.POOL();
+            const pool = await ethers.getContractAt(artifacts.LendingPool.abi, poolAddress);
+            const uimpl = ((atokens[i].uimpl || "") != "") ? atokens[i].uimpl : uAddress;
+            // create position
+
+            for(var j = 0; j < 200; ++j) {
+              try { // solidity rigged balanceOf
+                var index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[user3.address,j]);
+                await setStorageAt(uimpl, index, toBytes32(uAmount).toString());
+                var uBalance = await uToken.balanceOf(user3.address);
+                if(uBalance.eq(uAmount)) break;
+              } catch(e) { }
+              try { // vyper rigged balanceOf
+                var index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[j,user3.address]);
+                await setStorageAt(uimpl, index, toBytes32(uAmount).toString());
+                var uBalance = await uToken.balanceOf(user3.address);
+                if(uBalance.eq(uAmount)) break;
+              } catch(e) { }
+            }
+            expect(await uToken.balanceOf(user3.address)).to.equal(uAmount);
+            await uToken.connect(user3).approve(poolAddress, constants.MaxUint256);
+            await pool.connect(user3).deposit(uAddress, uAmount, user3.address, 0);
+            expect(await uToken.balanceOf(user3.address)).to.be.equal(0);
+            const aAmount = await aToken.balanceOf(user3.address);
+            expectClose(aAmount, uAmount, 100);
+            // create policy
+            let coverLimit = 10000;
+            let blocks = threeDays;
+            let quote = BN.from(await product.getQuote(user3.address, aAddress, coverLimit, blocks));
+            quote = quote.mul(10001).div(10000);
+            await product.connect(user3).buyPolicy(user3.address, aAddress, coverLimit, blocks, { value: quote });
+            let policyID = (await policyManager.totalPolicyCount()).toNumber();
+            // sign swap
+            let amountOut = 10000;
+            let digest = getSubmitClaimDigest("Solace.fi-AaveV2Product", product.address, chainId, policyID, amountOut, deadline);
+            let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
+            // submit claim
+            let tx1 = await product.connect(user3).submitClaim(policyID, amountOut, deadline, signature);
+            expect(tx1).to.emit(product, "ClaimSubmitted").withArgs(policyID);
+            expect(tx1).to.emit(claimsEscrow, "ClaimReceived").withArgs(policyID, user3.address, amountOut);
+            expect(await policyManager.exists(policyID)).to.be.false;
+            // verify payout
+            expect((await claimsEscrow.claims(policyID)).amount).to.equal(amountOut);
+            await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add one hour
+            let userEth1 = await user3.getBalance();
+            let tx2 = await claimsEscrow.connect(user3).withdrawClaimsPayout(policyID);
+            let receipt = await tx2.wait();
+            let gasCost = receipt.gasUsed.mul(tx2.gasPrice || 0);
+            let userEth2 = await user3.getBalance();
+            expectClose(userEth2.sub(userEth1).add(gasCost), amountOut);
+            ++success;
+            successList.push(symbol);
+          } catch(e) {
+            console.error(e);
+            failList.push(atokens[i].symbol);
           }
-          expect(await uToken.balanceOf(user3.address)).to.equal(uAmount);
-          await uToken.connect(user3).approve(poolAddress, constants.MaxUint256);
-          await pool.connect(user3).deposit(uAddress, uAmount, user3.address, 0);
-          expect(await uToken.balanceOf(user3.address)).to.be.equal(0);
-          const aAmount = await aToken.balanceOf(user3.address);
-          expectClose(aAmount, uAmount, 100);
-          // create policy
-          let coverLimit = 10000;
-          let blocks = threeDays;
-          let quote = BN.from(await product.getQuote(user3.address, aAddress, coverLimit, blocks));
-          quote = quote.mul(10001).div(10000);
-          await product.connect(user3).buyPolicy(user3.address, aAddress, coverLimit, blocks, { value: quote });
-          let policyID = 5 + i;
-          // sign swap
-          let amountOut = 10000;
-          let digest = getSubmitClaimDigest("Solace.fi-AaveV2Product", product.address, chainId, policyID, amountOut, deadline);
-          let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
-          // submit claim
-          let tx1 = await product.connect(user3).submitClaim(policyID, amountOut, deadline, signature);
-          expect(tx1).to.emit(product, "ClaimSubmitted").withArgs(policyID);
-          expect(tx1).to.emit(claimsEscrow, "ClaimReceived").withArgs(policyID, user3.address, amountOut);
-          expect(await policyManager.exists(policyID)).to.be.false;
-          // verify payout
-          expect((await claimsEscrow.claims(policyID)).amount).to.equal(amountOut);
-          await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add one hour
-          let userEth1 = await user3.getBalance();
-          let tx2 = await claimsEscrow.connect(user3).withdrawClaimsPayout(policyID);
-          let receipt = await tx2.wait();
-          let gasCost = receipt.gasUsed.mul(tx2.gasPrice || 0);
-          let userEth2 = await user3.getBalance();
-          expectClose(userEth2.sub(userEth1).add(gasCost), amountOut);
         }
-        await hre.network.provider.request({
-          method: "hardhat_stopImpersonatingAccount",
-          params: [user3Address],
-        });
+        await hre.network.provider.request({method: "hardhat_stopImpersonatingAccount",params: [user3Address]});
+        if(failList.length != 0) {
+          console.log("supported vaults:", successList);
+          console.log("unsupported vaults:", failList);
+        }
+        expect(`${success}/${atokens.length} supported atokens`).to.equal(`${atokens.length}/${atokens.length} supported atokens`);
       });
     });
   });

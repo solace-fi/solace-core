@@ -61,6 +61,9 @@ export async function import_artifacts() {
   artifacts.LendingPool = await tryImport(`${artifact_dir}/products/AaveV2Product.sol/ILendingPool.json`);
   artifacts.AToken = await tryImport(`${artifact_dir}/products/AaveV2Product.sol/IAToken.json`);
 
+  // yearn imports
+  artifacts.YVault = await tryImport(`${artifact_dir}/products/YearnV2Product.sol/IYVault.json`);
+
   return artifacts;
 }
 
