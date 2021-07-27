@@ -20,9 +20,9 @@ interface IProduct {
     function price() external view returns (uint24);
     function minPeriod() external view returns (uint64);
     function maxPeriod() external view returns (uint64);
-    function manageFee() external view returns (uint64);
     function maxCoverAmount() external view returns (uint256);
     function maxCoverPerUser() external view returns (uint256);
+    function maxCoverPerUserDivisor() external view returns (uint32);
     function coveredPlatform() external view returns (address);
     function productPolicyCount() external view returns (uint256);
     function activeCoverAmount() external view returns (uint256);
@@ -30,11 +30,9 @@ interface IProduct {
     function setGovernance(address _governance) external;
     function acceptGovernance() external;
     function setPrice(uint24 _price) external;
-    function setManageFee(uint64 _manageFee) external;
     function setMinPeriod(uint64 _minPeriod) external;
     function setMaxPeriod(uint64 _maxPeriod) external;
-    function setMaxCoverAmount(uint256 _maxCoverAmount) external;
-    function setMaxCoverPerUser(uint256 _maxCoverPerUser) external;
+    //function setMaxCoverPerUserDivisor(uint32 _maxCoverPerUserDivisor) external;
     function setCoveredPlatform(address _coveredPlatform) external;
     function setPolicyManager(address _policyManager) external;
 

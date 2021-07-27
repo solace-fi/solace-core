@@ -14,7 +14,7 @@ dotenv_config();
 import { expectClose } from "./utilities/chai_extensions";
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { PolicyManager, CompoundProductRinkeby, ExchangeQuoterManual, Treasury, Weth9, ClaimsEscrow, Registry, Vault } from "../typechain";
+import { PolicyManager, CompoundProductRinkeby, ExchangeQuoterManual, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
 
 const EXCHANGE_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("CompoundProductExchange(uint256 policyID,address tokenIn,uint256 amountIn,address tokenOut,uint256 amountOut,uint256 deadline)"));
 
@@ -77,6 +77,8 @@ if(process.env.FORK_NETWORK === "rinkeby"){
     let claimsEscrow: ClaimsEscrow;
     let vault: Vault;
     let registry: Registry;
+    let riskManager: RiskManager;
+
     let comptroller: Contract;
     let ceth: Contract;
     let cusdc: Contract;
@@ -90,8 +92,6 @@ if(process.env.FORK_NETWORK === "rinkeby"){
     const maxPeriod = 45100; // this is about 1 week from https://ycharts.c om/indicators/ethereum_blocks_per_day
     const threeDays = 19350;
     const maxCoverAmount = BN.from("1000000000000000000000"); // 1000 Ether in wei
-    const maxCoverPerUser = BN.from("10000000000000000000"); // 10 Ether in wei
-    const cancelFee = BN.from("100000000000000000"); // 0.1 Ether in wei
     const price = 11044; // 2.60%/yr
 
     const COMPTROLLER_ADDRESS = "0x2EAa9D77AE4D8f9cdD9FAAcd44016E746485bddb";
@@ -176,6 +176,9 @@ if(process.env.FORK_NETWORK === "rinkeby"){
         ]
       )) as Treasury;
 
+      // deploy risk manager contract
+      riskManager = (await deployContract(deployer, artifacts.RiskManager, [deployer.address, registry.address])) as RiskManager;
+
       // deploy Compound Product
       product = (await deployContract(
         deployer,
@@ -185,12 +188,10 @@ if(process.env.FORK_NETWORK === "rinkeby"){
           policyManager.address,
           registry.address,
           COMPTROLLER_ADDRESS,
-          maxCoverAmount,
-          maxCoverPerUser,
           minPeriod,
           maxPeriod,
-          cancelFee,
           price,
+          1,
           quoter2.address
         ]
       )) as CompoundProductRinkeby;
@@ -203,12 +204,10 @@ if(process.env.FORK_NETWORK === "rinkeby"){
           policyManager.address,
           registry.address,
           COMPTROLLER_ADDRESS,
-          maxCoverAmount,
-          maxCoverPerUser,
           minPeriod,
           maxPeriod,
-          cancelFee,
           price,
+          1,
           quoter2.address
         ]
       )) as CompoundProductRinkeby;
@@ -223,10 +222,13 @@ if(process.env.FORK_NETWORK === "rinkeby"){
       uniswapRouter = await ethers.getContractAt(artifacts.SwapRouter.abi, "0xE592427A0AEce92De3Edee1F18E0157C05861564");
 
       await registry.setVault(vault.address);
+      await deployer.sendTransaction({to:vault.address,value:maxCoverAmount});
       await registry.setClaimsEscrow(claimsEscrow.address);
       await registry.setTreasury(treasury.address);
       await registry.setPolicyManager(policyManager.address);
-      await product.connect(deployer).addSigner(paclasSigner.address);
+      await registry.setRiskManager(riskManager.address);
+      await riskManager.setProductWeights([product.address],[1]);
+      await product.addSigner(paclasSigner.address);
     })
 
     describe("appraisePosition", function () {
@@ -287,7 +289,7 @@ if(process.env.FORK_NETWORK === "rinkeby"){
       let policyID2 = 4;
       let policyID3 = 5;
       let policyID4 = 6;
-      let amountIn1 = 3511922;
+      let amountIn1 = 3511921;
       let amountOut1 = 5000000000;
       let amountIn2 = 10000000;
       let amountOut2 = 50000000;
@@ -403,7 +405,7 @@ if(process.env.FORK_NETWORK === "rinkeby"){
         let receipt1 = await tx1.wait();
         let gasCost1 = receipt1.gasUsed.mul(tx1.gasPrice || 0);
         let userEth1 = await user.getBalance();
-        expect(userEth1.sub(userEth0).add(gasCost1)).to.equal(1000001535949598); // redeem value
+        expect(userEth1.sub(userEth0).add(gasCost1)).to.equal(1000001631227728); // redeem value
         expect(tx1).to.emit(product, "ClaimSubmitted").withArgs(policyID1);
         expect(tx1).to.emit(claimsEscrow, "ClaimReceived").withArgs(policyID1, user.address, amountOut1);
         expect(await policyManager.exists(policyID1)).to.be.false;

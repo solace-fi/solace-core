@@ -14,7 +14,7 @@ dotenv_config();
 import { expectClose } from "./utilities/chai_extensions";
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { PolicyManager, CompoundProduct, ExchangeQuoter, ExchangeQuoterManual, Treasury, Weth9, ClaimsEscrow, Registry, Vault } from "../typechain";
+import { PolicyManager, CompoundProduct, ExchangeQuoter, ExchangeQuoterManual, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
 
 const EXCHANGE_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("CompoundProductExchange(uint256 policyID,address tokenIn,uint256 amountIn,address tokenOut,uint256 amountOut,uint256 deadline)"));
 
@@ -69,6 +69,8 @@ if(process.env.FORK_NETWORK === "mainnet"){
     let claimsEscrow: ClaimsEscrow;
     let vault: Vault;
     let registry: Registry;
+    let riskManager: RiskManager;
+
     let comptroller: Contract;
     let ceth: Contract;
     let cusdc: Contract;
@@ -81,7 +83,6 @@ if(process.env.FORK_NETWORK === "mainnet"){
     const threeDays = 19350;
     const maxCoverAmount = BN.from("1000000000000000000000"); // 1000 Ether in wei
     const maxCoverPerUser = BN.from("10000000000000000000"); // 10 Ether in wei
-    const cancelFee = BN.from("100000000000000000"); // 0.1 Ether in wei
     const price = 11044; // 2.60%/yr
 
     const ONE_SPLIT_VIEW = "0xC586BeF4a0992C495Cf22e1aeEE4E446CECDee0E";
@@ -183,6 +184,9 @@ if(process.env.FORK_NETWORK === "mainnet"){
         ]
       )) as Treasury;
 
+      // deploy risk manager contract
+      riskManager = (await deployContract(deployer, artifacts.RiskManager, [deployer.address, registry.address])) as RiskManager;
+
       // deploy Compound Product
       product = (await deployContract(
         deployer,
@@ -192,12 +196,10 @@ if(process.env.FORK_NETWORK === "mainnet"){
           policyManager.address,
           registry.address,
           COMPTROLLER_ADDRESS,
-          maxCoverAmount,
-          maxCoverPerUser,
           minPeriod,
           maxPeriod,
-          cancelFee,
           price,
+          1,
           quoter.address
         ]
       )) as CompoundProduct;
@@ -210,12 +212,10 @@ if(process.env.FORK_NETWORK === "mainnet"){
           policyManager.address,
           registry.address,
           COMPTROLLER_ADDRESS,
-          maxCoverAmount,
-          maxCoverPerUser,
           minPeriod,
           maxPeriod,
-          cancelFee,
           price,
+          1,
           quoter.address
         ]
       )) as CompoundProduct;
@@ -228,10 +228,13 @@ if(process.env.FORK_NETWORK === "mainnet"){
       uniswapRouter = await ethers.getContractAt(artifacts.SwapRouter.abi, "0xE592427A0AEce92De3Edee1F18E0157C05861564");
 
       await registry.setVault(vault.address);
+      await deployer.sendTransaction({to:vault.address,value:maxCoverAmount});
       await registry.setClaimsEscrow(claimsEscrow.address);
       await registry.setTreasury(treasury.address);
       await registry.setPolicyManager(policyManager.address);
-      await product.connect(deployer).addSigner(paclasSigner.address);
+      await registry.setRiskManager(riskManager.address);
+      await riskManager.setProductWeights([product.address],[1]);
+      await product.addSigner(paclasSigner.address);
     })
 
     describe("appraisePosition", function () {
@@ -407,7 +410,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
         let receipt1 = await tx1.wait();
         let gasCost1 = receipt1.gasUsed.mul(tx1.gasPrice || 0);
         let userEth1 = await user.getBalance();
-        expect(userEth1.sub(userEth0).add(gasCost1)).to.equal(999999896791746); // redeem value
+        expect(userEth1.sub(userEth0).add(gasCost1)).to.equal(999999898316190); // redeem value
         expect(tx1).to.emit(product, "ClaimSubmitted").withArgs(policyID1);
         expect(tx1).to.emit(claimsEscrow, "ClaimReceived").withArgs(policyID1, user.address, amountOut1);
         expect(await policyManager.exists(policyID1)).to.be.false;
