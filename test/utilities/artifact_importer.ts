@@ -39,6 +39,7 @@ export async function import_artifacts() {
   artifacts.YearnV2Product = await tryImport(`${artifact_dir}/products/YearnV2Product.sol/YearnV2Product.json`);
   artifacts.ExchangeQuoter = await tryImport(`${artifact_dir}/ExchangeQuoter.sol/ExchangeQuoter.json`);
   artifacts.ExchangeQuoterManual = await tryImport(`${artifact_dir}/ExchangeQuoterManual.sol/ExchangeQuoterManual.json`);
+  artifacts.NonfungibleTokenPositionDescriptor = await tryImport(`${artifact_dir}/NonfungibleTokenPositionDescriptor.sol/NonfungibleTokenPositionDescriptor.json`);
 
   // uniswap imports
   artifacts.UniswapV3Factory = await tryImport("@uniswap/v3-core/artifacts/contracts/UniswapV3Factory.sol/UniswapV3Factory.json");

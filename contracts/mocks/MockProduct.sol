@@ -76,4 +76,12 @@ contract MockProduct is BaseProduct {
 
         return policyID;
     }
+
+    /**
+     * @notice Returns the name of the product.
+     * @return Mock
+     */
+    function name() public pure override returns (string memory) {
+        return "Mock";
+    }
 }

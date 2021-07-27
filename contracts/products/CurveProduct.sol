@@ -92,4 +92,13 @@ contract CurveProduct is BaseProduct {
         if(token != address(0x0)) return (IERC20(token), ICurvePool(_poolOrToken));
         revert("Not a valid pool or token.");
     }
+
+    /**
+     * @notice Returns the name of the product.
+     * @return Curve
+     */
+    function name() public pure override returns (string memory) {
+        return "Curve";
+    }
+    
 }

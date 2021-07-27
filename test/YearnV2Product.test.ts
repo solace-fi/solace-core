@@ -139,5 +139,11 @@ if(process.env.FORK_NETWORK === "mainnet"){
         await product.connect(deployer).setCoveredPlatform(IYREGISTRY);
       });
     });
+
+    describe("implementedFunctions", function() {
+      it("can get product name", async function () {
+        expect(await product.name()).to.equal("YearnV2");
+      });
+    });
   })
 }

@@ -142,5 +142,11 @@ if(process.env.FORK_NETWORK === "mainnet"){
         await product.connect(deployer).setCoveredPlatform(ADDRESS_PROVIDER);
       });
     });
+
+    describe("implementedFunctions", function() {
+      it("can get product name", async function () {
+        expect(await product.name()).to.equal("Curve");
+      });
+    });
   })
 }

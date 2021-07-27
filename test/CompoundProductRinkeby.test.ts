@@ -280,6 +280,9 @@ if(process.env.FORK_NETWORK === "rinkeby"){
         let quote = BN.from(await product.getQuote(USER1, cETH_ADDRESS, coverLimit, blocks));
         await product.buyPolicy(USER1, cETH_ADDRESS, coverLimit, blocks, { value: quote });
       })
+      it("can get product name", async function () {
+        expect(await product.name()).to.equal("CompoundRinkeby");
+      })
     })
 
     describe("submitClaim", function () {

@@ -42,6 +42,7 @@ interface IProduct {
     Functions that are only implemented by child product contracts
     ****/
     function appraisePosition(address _policyholder, address _positionContract) external view returns (uint256 positionAmount);
+    function name() external pure returns (string memory);
 
     /**** QUOTE VIEW FUNCTIONS
     View functions that give us quotes regarding a policy
@@ -56,6 +57,6 @@ interface IProduct {
     function updateCoverLimit(uint256 _policyID, uint256 _coverLimit) external payable;
     function extendPolicy(uint256 _policyID, uint64 _blocks) external payable;
     function cancelPolicy(uint256 _policyID) external;
-    function updatePolicy(uint256 _policyID, uint256 _coverLimit, uint64 _blocks ) external payable;
+    function updatePolicy(uint256 _policyID, uint256 _coverAmount, uint64 _blocks ) external payable;
 
 }

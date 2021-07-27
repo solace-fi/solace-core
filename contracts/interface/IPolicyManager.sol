@@ -45,6 +45,7 @@ interface IPolicyManager /*is IERC721Enumerable, IERC721Metadata*/ {
      */
     function removeProduct(address _product) external;
 
+
     /**
      * @notice Allows governance to set token descriptor.
      * Can only be called by the current governor.

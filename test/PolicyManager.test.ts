@@ -9,7 +9,7 @@ chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from './utilities/artifact_importer';
 import { burnBlocks, burnBlocksUntil } from './utilities/time';
-import { PolicyManager, MockProduct, Treasury, Registry } from '../typechain';
+import { PolicyManager, MockProduct, Treasury, Registry, NonfungibleTokenPositionDescriptor } from '../typechain';
 
 describe('PolicyManager', function() {
   let artifacts: ArtifactImports;
@@ -20,6 +20,7 @@ describe('PolicyManager', function() {
   let mockProduct: MockProduct;
   let treasury: Treasury;
   let registry: Registry;
+  let nftTokenDescriptor: NonfungibleTokenPositionDescriptor;
 
   const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
   const name = 'Solace Policy';
@@ -40,6 +41,9 @@ describe('PolicyManager', function() {
     // deploy treasury contract
     treasury = (await deployContract(deployer, artifacts.Treasury, [deployer.address, ZERO_ADDRESS, ZERO_ADDRESS, registry.address])) as Treasury;
 
+    // deploy nft descriptor
+    nftTokenDescriptor = (await deployContract(deployer, artifacts.NonfungibleTokenPositionDescriptor)) as NonfungibleTokenPositionDescriptor;
+
     await registry.setTreasury(treasury.address);
     await deployer.sendTransaction({ to: treasury.address, value: BN.from('10000000000000000') });
   });
@@ -54,6 +58,10 @@ describe('PolicyManager', function() {
 
   it('has no policies', async function() {
     expect(await policyManager.totalPolicyCount()).to.equal(0);
+  });
+
+  it('has no nft token descriptor', async function() {
+    expect(await policyManager.tokenDescriptor()).to.equal(ZERO_ADDRESS);
   });
 
   describe('governance', function() {
@@ -86,6 +94,16 @@ describe('PolicyManager', function() {
       await policyManager.connect(deployer).setGovernance(governor.address);
       await policyManager.connect(governor).acceptGovernance();
     });
+
+    it('rejects setting new nft token descriptor by non governor', async function() {
+      await expect(policyManager.connect(user).setTokenDescriptor(nftTokenDescriptor.address)).to.be.revertedWith('!governance');
+    });
+
+    it('can set new nft token descriptor', async function() {
+      await policyManager.connect(governor).setTokenDescriptor(nftTokenDescriptor.address);
+      expect(await policyManager.connect(governor).tokenDescriptor()).to.equal(nftTokenDescriptor.address);
+    });
+
   });
 
   describe('products', function() {
@@ -215,6 +233,7 @@ describe('PolicyManager', function() {
       let totalSupply = await policyManager.totalSupply();
       expect(totalSupply).to.equal(1);
     });
+
   });
 
   describe('lifecycle', function() {
@@ -307,6 +326,49 @@ describe('PolicyManager', function() {
       expect(await policyManager.exists(4)).to.be.true;
       expect(await policyManager.exists(5)).to.be.false;
       expect(await mockProduct.activeCoverAmount()).to.equal(0b01100);
+    });
+  });
+
+  describe('tokenURI', function() {
+    let policyId:BN;
+    let productName:string;
+    before(async function(){
+        // redeploy policy manager
+        policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
+        // add products
+        mockProduct = (await deployContract(
+          deployer,
+          artifacts.MockProduct,
+          [
+            deployer.address,
+            policyManager.address,
+            registry.address,
+            treasury.address,
+            100000000000,
+            100000000000,
+            0,
+            100000000000,
+            0,
+            16777215
+          ]
+        )) as MockProduct;
+        await mockProduct.setPositionValue(0b10000);
+        await policyManager.connect(governor).addProduct(mockProduct.address);
+        await policyManager.connect(governor).setTokenDescriptor(nftTokenDescriptor.address);
+        await registry.setPolicyManager(policyManager.address);
+        let tx = await mockProduct.connect(user)._buyPolicy(user.address, positionContract.address, 5000, 110);
+        let receipt = await tx.wait();
+        policyId = BN.from(receipt.logs[0].topics[3]);
+        productName = await mockProduct.name();
+    });
+    
+    it('can get tokenURI', async function() {
+        let tokenURI = `This is solace.fi policy with policy id ${policyId} for product ${productName}`;
+        expect(await policyManager.tokenURI(policyId)).to.equal(tokenURI);
+    });
+
+    it('cannot get tokenURI for nonexistence policy id', async function() {
+      await expect(policyManager.tokenURI(1000)).to.be.revertedWith("query for nonexistent token");
     });
   });
 });
