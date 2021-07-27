@@ -31,7 +31,7 @@ interface IAavePriceOracle {
 }
 
 contract AaveV2Product is BaseProduct, EIP712 {
-    
+
     IAaveProtocolDataProvider public aaveDataProvider;
     bytes32 private immutable _EXCHANGE_TYPEHASH = keccak256("AaveV2ProductExchange(uint256 policyID,uint256 amountOut,uint256 deadline)");
 
@@ -81,7 +81,6 @@ contract AaveV2Product is BaseProduct, EIP712 {
 
     /**
      * @notice Submits a claim.
-     * User will give up some of their cToken position to receive ETH.
      * Can only submit one claim per policy.
      * Must be signed by an authorized signer.
      * @param policyID The policy that suffered a loss.
