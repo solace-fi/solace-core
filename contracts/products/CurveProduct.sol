@@ -31,24 +31,20 @@ contract CurveProduct is BaseProduct {
         IPolicyManager _policyManager,
         IRegistry _registry,
         address _coveredPlatform,
-        uint256 _maxCoverAmount,
-        uint256 _maxCoverPerUser,
         uint64 _minPeriod,
         uint64 _maxPeriod,
-        uint64 _cancelFee,
         uint24 _price,
+        uint32 _maxCoverPerUserDivisor,
         address _quoter
     ) BaseProduct(
         _governance,
         _policyManager,
         _registry,
         _coveredPlatform,
-        _maxCoverAmount,
-        _maxCoverPerUser,
         _minPeriod,
         _maxPeriod,
-        _cancelFee,
-        _price
+        _price,
+        _maxCoverPerUserDivisor
     ) {
         addressProvider = ICurveAddressProvider(_coveredPlatform);
         quoter = IExchangeQuoter(_quoter);

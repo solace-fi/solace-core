@@ -12,7 +12,7 @@ chai.use(solidity);
 import { expectClose } from "./utilities/chai_extensions";
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { PolicyManager, AaveV2Product, Treasury, Weth9, ClaimsEscrow, Registry, Vault } from "../typechain";
+import { PolicyManager, AaveV2Product, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
 import { getDomainSeparator, sign } from "./utilities/signature";
 import { ECDSASignature } from "ethereumjs-util";
 
@@ -73,6 +73,8 @@ if(process.env.FORK_NETWORK === "mainnet"){
     let claimsEscrow: ClaimsEscrow;
     let vault: Vault;
     let registry: Registry;
+    let riskManager: RiskManager;
+
     let alink: Contract;
     let link: Contract;
     let lendingPool: Contract;
@@ -83,8 +85,6 @@ if(process.env.FORK_NETWORK === "mainnet"){
     const maxPeriod = 45150; // this is about 1 week from https://ycharts.c om/indicators/ethereum_blocks_per_day
     const threeDays = 19350;
     const maxCoverAmount = BN.from("1000000000000000000000"); // 1000 Ether in wei
-    const maxCoverPerUser = BN.from("1000000000000000000000"); // 1000 Ether in wei
-    const cancelFee = BN.from("100000000000000000"); // 0.1 Ether in wei
     const price = 11044; // 2.60%/yr
 
     const aWETH_ADDRESS = "0x030ba81f1c18d280636f32af80b9aad02cf0854e";
@@ -158,6 +158,9 @@ if(process.env.FORK_NETWORK === "mainnet"){
         ]
       )) as Treasury;
 
+      // deploy risk manager contract
+      riskManager = (await deployContract(deployer, artifacts.RiskManager, [deployer.address, registry.address])) as RiskManager;
+
       // deploy Aave V2 Product
       product = (await deployContract(
         deployer,
@@ -167,12 +170,10 @@ if(process.env.FORK_NETWORK === "mainnet"){
           policyManager.address,
           registry.address,
           AAVE_DATA_PROVIDER,
-          maxCoverAmount,
-          maxCoverPerUser,
           minPeriod,
           maxPeriod,
-          cancelFee,
-          price
+          price,
+          1
         ]
       )) as unknown as AaveV2Product;
 
@@ -184,12 +185,10 @@ if(process.env.FORK_NETWORK === "mainnet"){
           policyManager.address,
           registry.address,
           AAVE_DATA_PROVIDER,
-          maxCoverAmount,
-          maxCoverPerUser,
           minPeriod,
           maxPeriod,
-          cancelFee,
-          price
+          price,
+          1
         ]
       )) as unknown as AaveV2Product;
 
@@ -199,10 +198,13 @@ if(process.env.FORK_NETWORK === "mainnet"){
       lendingPool = await ethers.getContractAt(artifacts.LendingPool.abi, LENDING_POOL_ADDRESS);
 
       await registry.setVault(vault.address);
+      await deployer.sendTransaction({to:vault.address,value:maxCoverAmount});
       await registry.setClaimsEscrow(claimsEscrow.address);
       await registry.setTreasury(treasury.address);
       await registry.setPolicyManager(policyManager.address);
-      await product.connect(deployer).addSigner(paclasSigner.address);
+      await registry.setRiskManager(riskManager.address);
+      await riskManager.setProductWeights([product.address],[1]);
+      await product.addSigner(paclasSigner.address);
     })
 
     describe("appraisePosition", function () {

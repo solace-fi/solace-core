@@ -8,15 +8,12 @@ const { expect } = chai;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Registry, Solace, Master, Vault, Treasury, ClaimsEscrow, Weth9, PolicyManager } from "../typechain";
+import { Registry, Solace, Master, Vault, Treasury, ClaimsEscrow, Weth9, PolicyManager, RiskManager } from "../typechain";
 
 
 describe("Registry", function () {
   let artifacts: ArtifactImports;
-  // users
-  let deployer: Wallet;
-  let governor: Wallet;
-  let user: Wallet;
+  const [deployer, governor, user, locker] = provider.getWallets();
 
   // contracts
   let registry: Registry;
@@ -26,18 +23,15 @@ describe("Registry", function () {
   let treasury: Treasury;
   let claimsEscrow: ClaimsEscrow;
   let policyManager: PolicyManager;
+  let riskManager: RiskManager;
   let weth: Weth9;
   // mock contracts
   // TODO: switch from mocks and wallets to actual contracts after implementation
-  let locker: Wallet;
-  let mockContract1: Wallet;
-  let mockContract2: Wallet;
-  let mockContract3: Wallet;
+  //let locker: Locker;
 
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
   before(async function () {
-    [deployer, governor, user, locker, mockContract1, mockContract2, mockContract3] = provider.getWallets();
     artifacts = await import_artifacts();
 
     weth = (await deployContract(
@@ -111,6 +105,15 @@ describe("Registry", function () {
       ]
     )) as PolicyManager;
 
+    // deploy policy manager
+    riskManager = (await deployContract(
+      deployer,
+      artifacts.RiskManager,
+      [
+        governor.address,
+        registry.address
+      ]
+    )) as RiskManager;
   })
 
   describe("governance", function () {
@@ -252,6 +255,22 @@ describe("Registry", function () {
 
     it("cannot be set by non governor", async function () {
       await expect(registry.connect(user).setPolicyManager(policyManager.address)).to.be.revertedWith("!governance");
+    })
+  })
+
+  describe("riskManager", function () {
+    it("starts as the zero address", async function () {
+      expect(await registry.riskManager()).to.equal(ZERO_ADDRESS);
+    })
+
+    it("can be set", async function () {
+      let tx = await registry.connect(governor).setRiskManager(riskManager.address);
+      expect(await registry.riskManager()).to.equal(riskManager.address);
+      await expect(tx).to.emit(registry, "RiskManagerSet").withArgs(riskManager.address);
+    })
+
+    it("cannot be set by non governor", async function () {
+      await expect(registry.connect(user).setRiskManager(riskManager.address)).to.be.revertedWith("!governance");
     })
   })
 });

@@ -12,7 +12,7 @@ chai.use(solidity);
 import { expectClose } from "./utilities/chai_extensions";
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { PolicyManager, YearnV2Product, ExchangeQuoter, ExchangeQuoterManual, Treasury, Weth9, ClaimsEscrow, Registry, Vault } from "../typechain";
+import { PolicyManager, YearnV2Product, ExchangeQuoter, ExchangeQuoterManual, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
 import { getDomainSeparator, sign } from "./utilities/signature";
 import { ECDSASignature } from "ethereumjs-util";
 
@@ -75,6 +75,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
     let claimsEscrow: ClaimsEscrow;
     let vault: Vault;
     let registry: Registry;
+    let riskManager: RiskManager;
     let dai: Contract;
     let ydai: Contract;
 
@@ -168,10 +169,13 @@ if(process.env.FORK_NETWORK === "mainnet"){
         [
           deployer.address,
           ZERO_ADDRESS,
-          ZERO_ADDRESS,
-          weth.address
+          weth.address,
+          ZERO_ADDRESS
         ]
       )) as Treasury;
+
+      // deploy risk manager contract
+      riskManager = (await deployContract(deployer, artifacts.RiskManager, [deployer.address, registry.address])) as RiskManager;
 
       // deploy YearnV2 Product
       product = (await deployContract(
@@ -182,12 +186,10 @@ if(process.env.FORK_NETWORK === "mainnet"){
           policyManager.address,
           registry.address,
           IYREGISTRY,
-          maxCoverAmount,
-          maxCoverPerUser,
           minPeriod,
           maxPeriod,
-          cancelFee,
           price,
+          1,
           quoter.address
         ]
       )) as YearnV2Product;
@@ -216,10 +218,13 @@ if(process.env.FORK_NETWORK === "mainnet"){
       ydai = await ethers.getContractAt(artifacts.YVault.abi, YDAI_ADDRESS);
 
       await registry.setVault(vault.address);
+      await deployer.sendTransaction({to:vault.address,value:maxCoverAmount});
       await registry.setClaimsEscrow(claimsEscrow.address);
       await registry.setTreasury(treasury.address);
       await registry.setPolicyManager(policyManager.address);
-      await product.connect(deployer).addSigner(paclasSigner.address);
+      await registry.setRiskManager(riskManager.address);
+      await riskManager.setProductWeights([product.address],[1]);
+      await product.addSigner(paclasSigner.address);
     })
 
     describe("appraisePosition", function () {

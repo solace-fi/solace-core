@@ -39,6 +39,7 @@ interface IVault is IERC20, IERC20Permit {
     function withdraw(uint256 _amount, uint256 _maxLoss) external returns (uint256);
     function token() external view returns (IERC20);
     function debtOutstanding(address) external view returns (uint256);
+    function totalAssets() external view returns (uint256);
     function revokeStrategy(address) external;
     function strategies(address) external view returns (StrategyParams memory);
     function requestEth(uint256 amount) external returns (uint256);

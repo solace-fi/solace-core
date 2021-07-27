@@ -40,23 +40,19 @@ contract AaveV2Product is BaseProduct, EIP712 {
         IPolicyManager _policyManager,
         IRegistry _registry,
         address _dataProvider,
-        uint256 _maxCoverAmount,
-        uint256 _maxCoverPerUser,
         uint64 _minPeriod,
         uint64 _maxPeriod,
-        uint64 _cancelFee,
-        uint24 _price
+        uint24 _price,
+        uint32 _maxCoverPerUserDivisor
     ) BaseProduct(
         _governance,
         _policyManager,
         _registry,
         _dataProvider,
-        _maxCoverAmount,
-        _maxCoverPerUser,
         _minPeriod,
         _maxPeriod,
-        _cancelFee,
-        _price
+        _price,
+        _maxCoverPerUserDivisor
     ) EIP712("Solace.fi-AaveV2Product", "1") {
         aaveDataProvider = IAaveProtocolDataProvider(_dataProvider);
     }
