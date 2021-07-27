@@ -77,7 +77,6 @@ contract AaveV2Product is BaseProduct, EIP712 {
 
     /**
      * @notice Submits a claim.
-     * User will give up some of their cToken position to receive ETH.
      * Can only submit one claim per policy.
      * Must be signed by an authorized signer.
      * @param policyID The policy that suffered a loss.

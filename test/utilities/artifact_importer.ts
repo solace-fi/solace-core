@@ -41,6 +41,11 @@ export async function import_artifacts() {
   artifacts.ExchangeQuoter = await tryImport(`${artifact_dir}/ExchangeQuoter.sol/ExchangeQuoter.json`);
   artifacts.ExchangeQuoterManual = await tryImport(`${artifact_dir}/ExchangeQuoterManual.sol/ExchangeQuoterManual.json`);
 
+  // generic imports
+  artifacts.ERC20 = await tryImport(`${artifact_dir}/SOLACE.sol/ERC20.json`);
+  if(!artifacts.ERC20) artifacts.ERC20 = await tryImport(`../../artifacts/@openzeppelin/contracts/token/ERC20/ERC20.sol/ERC20.json`);
+  artifacts.Blacklist = await tryImport(`${artifact_dir}/interface/IBlacklist.sol/IBlacklist.json`);
+
   // uniswap imports
   artifacts.UniswapV3Factory = await tryImport("@uniswap/v3-core/artifacts/contracts/UniswapV3Factory.sol/UniswapV3Factory.json");
   artifacts.UniswapV3Pool = await tryImport("@uniswap/v3-core/artifacts/contracts/UniswapV3Pool.sol/UniswapV3Pool.json");
@@ -57,9 +62,8 @@ export async function import_artifacts() {
   artifacts.LendingPool = await tryImport(`${artifact_dir}/products/AaveV2Product.sol/ILendingPool.json`);
   artifacts.AToken = await tryImport(`${artifact_dir}/products/AaveV2Product.sol/IAToken.json`);
 
-  // generic imports
-  artifacts.ERC20 = await tryImport(`${artifact_dir}/SOLACE.sol/ERC20.json`);
-  if(!artifacts.ERC20) artifacts.ERC20 = await tryImport(`../../artifacts/@openzeppelin/contracts/token/ERC20/ERC20.sol/ERC20.json`);
+  // yearn imports
+  artifacts.YVault = await tryImport(`${artifact_dir}/products/YearnV2Product.sol/IYVault.json`);
 
   return artifacts;
 }
