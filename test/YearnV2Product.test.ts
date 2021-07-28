@@ -203,12 +203,10 @@ if(process.env.FORK_NETWORK === "mainnet"){
           policyManager.address,
           registry.address,
           IYREGISTRY,
-          maxCoverAmount,
-          maxCoverPerUser,
           minPeriod,
           maxPeriod,
-          cancelFee,
           price,
+          1,
           quoter.address
         ]
       )) as YearnV2Product;
@@ -412,11 +410,10 @@ if(process.env.FORK_NETWORK === "mainnet"){
         var successList = [];
         var failList = [];
         for(var i = 0; i < yvaults.length; ++i){
+          const yAddress = yvaults[i].address;
+          const symbol = yvaults[i].symbol;
           try {
             // fetch contracts
-            const yAddress = yvaults[i].address;
-            const symbol = yvaults[i].symbol;
-            console.log(`        ${symbol}`);
             const yvault = await ethers.getContractAt(artifacts.YVault.abi, yAddress);
             const uAddress = await yvault.token();
             const uToken = await ethers.getContractAt(artifacts.ERC20.abi, uAddress);
@@ -487,15 +484,20 @@ if(process.env.FORK_NETWORK === "mainnet"){
             expectClose(userEth2.sub(userEth1).add(gasCost), amountOut);
             ++success;
             successList.push(symbol);
-          } catch(e) {
-            console.log(e);
-            failList.push(yvaults[i].symbol);
+            console.log(`\x1b[38;5;239m        ✓ ${symbol}\x1b[0m`);
+          } catch (e) {
+            console.log(`\x1b[31m        ✘ ${symbol}`);
+            console.log('          '+e.stack.replace(/\n/g, '\n      '));
+            console.log('\x1b[0m');
+            failList.push(symbol);
           }
         }
         await hre.network.provider.request({method: "hardhat_stopImpersonatingAccount",params: [user3Address]});
         if(failList.length != 0) {
-          console.log("supported vaults:", successList);
-          console.log("unsupported vaults:", failList);
+          console.log("supported vaults:");
+          console.log(successList.reduce((acc,val)=>`${acc}  - ${val}\n`,''));
+          console.log("unsupported vaults:");
+          console.log(failList.reduce((acc,val)=>`${acc}  - ${val}\n`,''));
         }
         expect(`${success}/${yvaults.length} supported vaults`).to.equal(`${yvaults.length}/${yvaults.length} supported vaults`);
       });

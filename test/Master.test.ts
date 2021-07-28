@@ -499,14 +499,14 @@ describe("Master", function () {
 
     it("allows farmers to cash out", async function () {
       // validate farmer 1 rewards
-      await cpFarm.connect(farmer1).withdrawEth(depositAmount1,0);
+      await cpFarm.connect(farmer1).withdrawEth(depositAmount1);
       pendingReward1 = BN.from(await solaceToken.balanceOf(farmer1.address));
       expectedReward1 = expectedReward1.add(
         (solacePerBlock2.mul(1).div(5)) // 20% ownership of cp farm for 1 block at 100% allocation points
       );
       expectClose(pendingReward1, expectedReward1);
       // validate farmer 2 rewards
-      await cpFarm.connect(farmer2).withdrawEth(depositAmount2,0);
+      await cpFarm.connect(farmer2).withdrawEth(depositAmount2);
       pendingReward2 = BN.from(await solaceToken.balanceOf(farmer2.address));
       expectedReward2 = expectedReward2.add(
         (solacePerBlock2.mul(1).mul(4).div(5)).add // 80% ownership of cp farm for 1 block at 100% allocation points

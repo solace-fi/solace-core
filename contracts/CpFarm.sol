@@ -273,9 +273,8 @@ contract CpFarm is ICpFarm, ReentrancyGuard {
      * `_amount` is denominated in CP tokens, which are converted to eth then returned to the user.
      * User will receive _amount of deposited tokens converted to eth and accumulated rewards.
      * @param _amount The withdraw amount.
-     * @param _maxLoss The acceptable amount of loss.
      */
-    function withdrawEth(uint256 _amount, uint256 _maxLoss) external override nonReentrant {
+    function withdrawEth(uint256 _amount) external override nonReentrant {
         // harvest and update farm
         _harvest(msg.sender);
         // get farmer information
@@ -284,7 +283,7 @@ contract CpFarm is ICpFarm, ReentrancyGuard {
         valueStaked -= _amount;
         user.value -= _amount; // also reverts overwithdraw
         user.rewardDebt = user.value * accRewardPerShare / 1e12;
-        uint256 ethAmount = vault.withdraw(_amount, _maxLoss);
+        uint256 ethAmount = vault.withdraw(_amount);
         // return eth
         payable(msg.sender).transfer(ethAmount);
         emit EthWithdrawn(msg.sender, _amount);

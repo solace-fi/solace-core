@@ -492,11 +492,10 @@ if(process.env.FORK_NETWORK === "mainnet"){
         var successList = [];
         var failList = [];
         for(var i = 0; i < ctokens.length; ++i){
+          const symbol = ctokens[i].symbol;
+          const ctokenAddress = ctokens[i].address;
           try {
             // fetch contracts
-            const ctokenAddress = ctokens[i].address;
-            const symbol = ctokens[i].symbol;
-            console.log(`        ${symbol}`);
             const cToken = await ethers.getContractAt(artifacts.ICERC20.abi, ctokenAddress);
             if(symbol == 'cETH') {
               await ceth.connect(user3).mint({value: BN.from("1000000000000000000")});
@@ -572,14 +571,19 @@ if(process.env.FORK_NETWORK === "mainnet"){
             expectClose(userEth2.sub(userEth1).add(gasCost), amountOut);
             ++success;
             successList.push(symbol);
+            console.log(`\x1b[38;5;239m        ✓ ${symbol}\x1b[0m`);
           } catch (e) {
-            console.log(e);
-            failList.push(ctokens[i].symbol);
+            console.log(`\x1b[31m        ✘ ${symbol}`);
+            console.log('          '+e.stack.replace(/\n/g, '\n      '));
+            console.log('\x1b[0m');
+            failList.push(symbol);
           }
         }
         if(failList.length != 0) {
-          console.log("supported tokens:", successList);
-          console.log("unsupported tokens:", failList);
+          console.log("supported ctokens:");
+          console.log(successList.reduce((acc,val)=>`${acc}  - ${val}\n`,''));
+          console.log("unsupported ctokens:");
+          console.log(failList.reduce((acc,val)=>`${acc}  - ${val}\n`,''));
         }
         expect(`${success}/${ctokens.length} supported ctokens`).to.equal(`${ctokens.length}/${ctokens.length} supported ctokens`);
       });
