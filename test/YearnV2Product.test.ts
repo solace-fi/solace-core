@@ -259,6 +259,9 @@ if(process.env.FORK_NETWORK === "mainnet"){
     });
 
     describe('implementedFunctions', function () {
+      it("can get product name", async function () {
+        expect(await product.name()).to.equal("YearnV2");
+      });
       it('can getQuote', async function () {
         let coverLimit = 5000 // cover 50% of the position
         let blocks = BN.from(threeDays)

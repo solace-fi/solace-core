@@ -270,6 +270,9 @@ if(process.env.FORK_NETWORK === "mainnet"){
         let tx = await product.buyPolicy(USER1, aWETH_ADDRESS, coverLimit, blocks, { value: quote });
         expect(tx).to.emit(product, "PolicyCreated").withArgs(2);
       });
+      it("can get product name", async function () {
+        expect(await product.name()).to.equal("AaveV2");
+      });
     })
 
     describe("submitClaim", async function () {

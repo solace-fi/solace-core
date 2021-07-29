@@ -121,4 +121,12 @@ contract AaveV2Product is BaseProduct, EIP712 {
         super.setCoveredPlatform(_dataProvider);
         aaveDataProvider = IAaveProtocolDataProvider(_dataProvider);
     }
+
+    /**
+     * @notice Returns the name of the product.
+     * @return AaveV2
+     */
+    function name() public pure override returns (string memory) {
+        return "AaveV2";
+    }
 }

@@ -6,6 +6,9 @@ contracts_processed
 coverage
 coverage.json
 docs/
+.openzeppelin/
+.vscode/
+gas_reports.txt
 
 #Hardhat files
 cache

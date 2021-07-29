@@ -306,6 +306,10 @@ if(process.env.FORK_NETWORK === "mainnet"){
         let quote = BN.from(await product.getQuote(USER1, cETH_ADDRESS, coverLimit, blocks));
         await product.buyPolicy(USER1, cETH_ADDRESS, coverLimit, blocks, { value: quote });
       })
+
+      it("can get product name", async function () {
+        expect(await product.name()).to.equal("Compound");
+      });
     })
 
     describe("submitClaim", function () {

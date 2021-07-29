@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "./interface/IProduct.sol";
 import "./interface/IPolicyManager.sol";
+import "./interface/INonfungibleTokenPolicyDescriptor.sol";
 
 
 /* TODO
@@ -27,6 +28,9 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
 
     /// @notice Governance to take over.
     address public override newGovernance;
+
+     /// @notice The address of the token descriptor contract, which handles generating token URIs for position tokens
+    address public tokenDescriptor;
 
     // Set of products.
     EnumerableSet.AddressSet private products;
@@ -96,6 +100,17 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
         require(msg.sender == governance, "!governance");
         products.remove(_product);
         emit ProductRemoved(_product);
+    }
+
+    /**
+     * @notice Allows governance to set token descriptor.
+     * Can only be called by the current governor.
+     * @param _tokenDescriptor The new token descriptor address.
+     */
+    function setTokenDescriptor(address _tokenDescriptor) external override {
+        // can only be called by governor
+        require(msg.sender == governance, "!governance");
+        tokenDescriptor = _tokenDescriptor;
     }
 
     /**
@@ -334,33 +349,13 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
         */
     }
 
-    /**
-     * @notice Encodes `tokenURI`
-     * @param _params policy tokenURI parameteres passed as PolicyInfo struct
-     * @return uri
-     */
-    function _encodeTokenURI(PolicyInfo memory _params) internal pure returns (string memory uri) {
-        uri = string(abi.encode(_params));
-        return uri;
-    }
-
-    /**
-     * @notice Decodes `tokenURI`
-     * @param _tokenURI policy tokenURI passed as a string
-     * @return struct `params`
-     */
-    function _decodeTokenURI(string memory _tokenURI) internal pure returns (PolicyInfo memory) {
-        PolicyInfo memory params = abi.decode(bytes(_tokenURI), (PolicyInfo));
-        return params;
-    }
-
-
     /*** ERC721 INHERITANCE FUNCTIONS
     Overrides that properly set functionality through parent contracts
     ****/
 
-    function tokenURI(uint256 tokenId) public view override returns (string memory) {
-        return _encodeTokenURI(policyInfo[tokenId]);
+    function tokenURI(uint256 tokenId) public view override(ERC721) returns (string memory) {
+        require(_exists(tokenId), "query for nonexistent token");
+        return INonfungibleTokenPolicyDescriptor(tokenDescriptor).tokenURI(this, tokenId);
     }
 
 }

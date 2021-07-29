@@ -135,4 +135,12 @@ contract CompoundProduct is BaseProduct, EIP712 {
     function compareStrings(string memory a, string memory b) internal pure returns (bool) {
         return (keccak256(abi.encodePacked((a))) == keccak256(abi.encodePacked((b))));
     }
+
+    /**
+     * @notice Returns the name of the product.
+     * @return Compound
+     */
+    function name() public pure override returns (string memory) {
+        return "Compound";
+    }
 }
