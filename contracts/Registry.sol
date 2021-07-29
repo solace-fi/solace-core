@@ -32,6 +32,8 @@ contract Registry is IRegistry, Initializable, UUPSUpgradeable {
     address public override claimsEscrow;
     /// @notice Policy Manager contract.
     address public override policyManager;
+    /// @notice Risk Manager contract.
+    address public override riskManager;
 
     /**
      * @notice initialize function for the registry contract.
@@ -148,6 +150,18 @@ contract Registry is IRegistry, Initializable, UUPSUpgradeable {
         require(msg.sender == governance, "!governance");
         policyManager = _policyManager;
         emit PolicyManagerSet(_policyManager);
+    }
+
+    /** 
+     * @notice Sets the RiskManager contract.
+     * Can only be called by the current governor.
+     * @param _riskManager The risk manager address.
+     */
+    function setRiskManager(address _riskManager) external override {
+        // can only be called by governor
+        require(msg.sender == governance, "!governance");
+        riskManager = _riskManager;
+        emit RiskManagerSet(_riskManager);
     }
 
     /**

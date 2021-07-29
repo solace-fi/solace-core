@@ -22,6 +22,7 @@ interface IRegistry {
     function locker() external view returns (address);
     function claimsEscrow() external view returns (address);
     function policyManager() external view returns (address);
+    function riskManager() external view returns (address);
 
     // events
     // Emitted when Governance is set
@@ -40,6 +41,8 @@ interface IRegistry {
     event ClaimsEscrowSet(address _claimsEscrow);
     // Emitted when PolicyManager is set
     event PolicyManagerSet(address _policyManager);
+    // Emitted when RiskManager is set
+    event RiskManagerSet(address _riskManager);
 
     /**
      * @notice Transfers the governance role to a new governor.
@@ -102,4 +105,11 @@ interface IRegistry {
      * @param _policyManager The PolicyManager address.
      */
     function setPolicyManager(address _policyManager) external;
+
+    /**
+     * @notice Sets the RiskManager contract.
+     * Can only be called by the current governor.
+     * @param _riskManager The RiskManager address.
+     */
+    function setRiskManager(address _riskManager) external;
 }

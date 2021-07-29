@@ -34,24 +34,20 @@ contract YearnV2Product is BaseProduct, EIP712 {
         IPolicyManager _policyManager,
         IRegistry _registry,
         address _coveredPlatform,
-        uint256 _maxCoverAmount,
-        uint256 _maxCoverPerUser,
         uint64 _minPeriod,
         uint64 _maxPeriod,
-        uint64 _cancelFee,
         uint24 _price,
+        uint32 _maxCoverPerUserDivisor,
         address _quoter
     ) BaseProduct(
         _governance,
         _policyManager,
         _registry,
         _coveredPlatform,
-        _maxCoverAmount,
-        _maxCoverPerUser,
         _minPeriod,
         _maxPeriod,
-        _cancelFee,
-        _price
+        _price,
+        _maxCoverPerUserDivisor
     ) EIP712("Solace.fi-YearnV2Product", "1") {
         yregistry = IYRegistry(_coveredPlatform);
         quoter = IExchangeQuoter(_quoter);
@@ -112,4 +108,13 @@ contract YearnV2Product is BaseProduct, EIP712 {
         super.setCoveredPlatform(_coveredPlatform);
         yregistry = IYRegistry(_coveredPlatform);
     }
+
+    /**
+     * @notice Returns the name of the product.
+     * @return YearnV2
+     */
+    function name() public pure override returns (string memory) {
+        return "YearnV2";
+    }
+    
 }

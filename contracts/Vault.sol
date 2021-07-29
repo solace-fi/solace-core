@@ -714,7 +714,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
         held in the Vault.
      * @return The total assets under control of this vault.
     */
-    function totalAssets() external view returns (uint256) {
+    function totalAssets() external view override returns (uint256) {
         return _totalAssets();
     }
 

@@ -10,11 +10,11 @@ chai.use(solidity);
 import { expectClose } from "./utilities/chai_extensions";
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { PolicyManager, CurveProduct, ExchangeQuoter, ExchangeQuoterManual, Treasury, Weth9 } from "../typechain";
+import { PolicyManager, CurveProduct, ExchangeQuoter, ExchangeQuoterManual, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
 
 if(process.env.FORK_NETWORK === "mainnet"){
   describe('CurveProduct', () => {
-    const [deployer, user] = provider.getWallets();
+    const [deployer, user, paclasSigner] = provider.getWallets();
     let artifacts: ArtifactImports;
 
     let policyManager: PolicyManager;
@@ -23,6 +23,10 @@ if(process.env.FORK_NETWORK === "mainnet"){
     let quoter2: ExchangeQuoterManual;
     let weth: Weth9;
     let treasury: Treasury;
+    let claimsEscrow: ClaimsEscrow;
+    let vault: Vault;
+    let registry: Registry;
+    let riskManager: RiskManager;
 
     const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
     const minPeriod = 6450; // this is about 1 day
@@ -78,6 +82,33 @@ if(process.env.FORK_NETWORK === "mainnet"){
           artifacts.WETH
       )) as Weth9;
 
+      // deploy registry contract
+      registry = (await deployContract(
+        deployer,
+        artifacts.Registry,
+        [
+          deployer.address
+        ]
+      )) as Registry;
+
+      // deploy vault
+      vault = (await deployContract(
+        deployer,
+        artifacts.Vault,
+        [
+          deployer.address,
+          registry.address,
+          weth.address
+        ]
+      )) as Vault;
+
+      // deploy claims escrow
+      claimsEscrow = (await deployContract(
+          deployer,
+          artifacts.ClaimsEscrow,
+          [deployer.address, registry.address]
+      )) as ClaimsEscrow;
+
       // deploy treasury contract
       treasury = (await deployContract(
         deployer,
@@ -85,10 +116,13 @@ if(process.env.FORK_NETWORK === "mainnet"){
         [
           deployer.address,
           ZERO_ADDRESS,
-          ZERO_ADDRESS,
-          weth.address
+          weth.address,
+          ZERO_ADDRESS
         ]
       )) as Treasury;
+
+      // deploy risk manager contract
+      riskManager = (await deployContract(deployer, artifacts.RiskManager, [deployer.address, registry.address])) as RiskManager;
 
       // deploy Curve Product
       product = (await deployContract(
@@ -99,15 +133,22 @@ if(process.env.FORK_NETWORK === "mainnet"){
           policyManager.address,
           treasury.address,
           ADDRESS_PROVIDER,
-          maxCoverAmount,
-          maxCoverPerUser,
           minPeriod,
           maxPeriod,
-          cancelFee,
           price,
+          1,
           quoter.address
         ]
       )) as CurveProduct;
+
+      await registry.setVault(vault.address);
+      await deployer.sendTransaction({to:vault.address,value:maxCoverAmount});
+      await registry.setClaimsEscrow(claimsEscrow.address);
+      await registry.setTreasury(treasury.address);
+      await registry.setPolicyManager(policyManager.address);
+      await registry.setRiskManager(riskManager.address);
+      await riskManager.setProductWeights([product.address],[1]);
+      await product.addSigner(paclasSigner.address);
     })
 
     describe("appraisePosition", function () {
@@ -140,6 +181,12 @@ if(process.env.FORK_NETWORK === "mainnet"){
         expect(await product.coveredPlatform()).to.equal(treasury.address);
         expect(await product.addressProvider()).to.equal(treasury.address);
         await product.connect(deployer).setCoveredPlatform(ADDRESS_PROVIDER);
+      });
+    });
+
+    describe("implementedFunctions", function() {
+      it("can get product name", async function () {
+        expect(await product.name()).to.equal("Curve");
       });
     });
   })

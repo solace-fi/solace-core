@@ -31,6 +31,7 @@ export async function import_artifacts() {
   artifacts.MockStrategy = await tryImport(`${artifact_dir}/mocks/MockStrategy.sol/MockStrategy.json`);
 
   artifacts.PolicyManager = await tryImport(`${artifact_dir}/PolicyManager.sol/PolicyManager.json`);
+  artifacts.RiskManager = await tryImport(`${artifact_dir}/RiskManager.sol/RiskManager.json`);
   artifacts.MockProduct = await tryImport(`${artifact_dir}/mocks/MockProduct.sol/MockProduct.json`);
   artifacts.AaveV2Product = await tryImport(`${artifact_dir}/products/AaveV2Product.sol/AaveV2Product.json`);
   artifacts.CompoundProduct = await tryImport(`${artifact_dir}/products/CompoundProduct.sol/CompoundProduct.json`);
@@ -39,6 +40,7 @@ export async function import_artifacts() {
   artifacts.YearnV2Product = await tryImport(`${artifact_dir}/products/YearnV2Product.sol/YearnV2Product.json`);
   artifacts.ExchangeQuoter = await tryImport(`${artifact_dir}/ExchangeQuoter.sol/ExchangeQuoter.json`);
   artifacts.ExchangeQuoterManual = await tryImport(`${artifact_dir}/ExchangeQuoterManual.sol/ExchangeQuoterManual.json`);
+  artifacts.NonfungibleTokenPolicyDescriptor = await tryImport(`${artifact_dir}/NonfungibleTokenPolicyDescriptor.sol/NonfungibleTokenPolicyDescriptor.json`);
 
   // generic imports
   artifacts.ERC20 = await tryImport(`${artifact_dir}/SOLACE.sol/ERC20.json`);

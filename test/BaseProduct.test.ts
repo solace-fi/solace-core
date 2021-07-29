@@ -10,7 +10,7 @@ import { config as dotenv_config } from "dotenv";
 dotenv_config();
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { PolicyManager, MockProduct, Treasury, Weth9, ClaimsEscrow, Registry, Vault } from "../typechain";
+import { PolicyManager, MockProduct, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
 
 describe("BaseProduct", () => {
   let artifacts: ArtifactImports;
@@ -22,6 +22,7 @@ describe("BaseProduct", () => {
   let claimsEscrow: ClaimsEscrow;
   let vault: Vault;
   let registry: Registry;
+  let riskManager: RiskManager;
   const [deployer, governor, positionContract, buyer, mockPolicyManager] = provider.getWallets();
 
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
@@ -30,15 +31,13 @@ describe("BaseProduct", () => {
   const maxPeriod1 = 45150; // this is about 1 week from https://ycharts.c om/indicators/ethereum_blocks_per_day
   const maxCoverAmount1 = BN.from("1000000000000000000"); // 1 Ether in wei
   const maxCoverPerUser1 = BN.from("10000000000000000"); // 0.01 Ether in wei
-  const manageFee1 = BN.from("100000000000000"); // 0.0001 Ether in wei
+  const coverDivisor = 100;
   const price1 = 10000;
 
   const threeDays = 19350;
   const minPeriod2 = threeDays;
   const maxPeriod2 = 2354250; // one year
   const maxCoverAmount2 = BN.from("1000000000000000000000"); // 1000 Ether in wei
-  const maxCoverPerUser2 = BN.from("10000000000000000000"); // 10 Ether in wei
-  const manageFee2 = BN.from("100000000000000000"); // 0.1 Ether in wei
   const price2 = 11044; // 2.60%/yr
 
   before(async () => {
@@ -51,7 +50,7 @@ describe("BaseProduct", () => {
         governor.address
       ]
     )) as PolicyManager;
-    
+
     // deploy weth
     weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
 
@@ -67,6 +66,9 @@ describe("BaseProduct", () => {
     // deploy treasury contract
     treasury = (await deployContract(deployer, artifacts.Treasury, [deployer.address, ZERO_ADDRESS, weth.address, registry.address])) as Treasury;
 
+    // deploy risk manager contract
+    riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
+
     // deploy BaseProduct
     product = (await deployContract(
       deployer,
@@ -76,12 +78,10 @@ describe("BaseProduct", () => {
         policyManager.address,
         registry.address,
         ONE_SPLIT_VIEW, // this is for the coveredPlatform
-        maxCoverAmount1,
-        maxCoverPerUser1,
         minPeriod1,
         maxPeriod1,
-        manageFee1,
-        price1
+        price1,
+        coverDivisor
       ]
     )) as MockProduct;
 
@@ -94,12 +94,10 @@ describe("BaseProduct", () => {
         policyManager.address,
         registry.address,
         treasury.address, // this is for the coveredPlatform
-        maxCoverAmount1,
-        maxCoverPerUser1,
         minPeriod1,
         maxPeriod1,
-        manageFee1,
-        price1
+        price1,
+        coverDivisor
       ]
     )) as MockProduct;
 
@@ -107,6 +105,7 @@ describe("BaseProduct", () => {
     await registry.setClaimsEscrow(claimsEscrow.address);
     await registry.setTreasury(treasury.address);
     await registry.setPolicyManager(policyManager.address);
+    await registry.setRiskManager(riskManager.address);
   });
 
   describe("governance", function() {
@@ -139,6 +138,10 @@ describe("BaseProduct", () => {
   });
 
   describe("productParameters", () => {
+    before(async function () {
+      await deployer.sendTransaction({to:vault.address,value:maxCoverAmount1.mul(3)});
+      await riskManager.connect(governor).setProductWeights([product.address,product2.address],[1,2]);
+    });
     it("can get price", async function() {
       expect(await product.price()).to.eq(price1);
     });
@@ -148,16 +151,6 @@ describe("BaseProduct", () => {
     });
     it("should revert setPrice if not called by governance", async function() {
       await expect(product.connect(buyer).setPrice(price1)).to.be.revertedWith("!governance");
-    });
-    it("can get manageFee", async function() {
-      expect(await product.manageFee()).to.eq(manageFee1);
-    });
-    it("can set manageFee", async function() {
-      await product.connect(governor).setManageFee(manageFee2);
-      expect(await product.manageFee()).to.equal(manageFee2);
-    });
-    it("should revert setManageFee if not called by governance", async function() {
-      await expect(product.connect(buyer).setManageFee(manageFee1)).to.be.revertedWith("!governance");
     });
     it("can get minPeriod", async function() {
       expect(await product.minPeriod()).to.eq(minPeriod1);
@@ -182,22 +175,8 @@ describe("BaseProduct", () => {
     it("can get maxCoverAmount", async function() {
       expect(await product.maxCoverAmount()).to.eq(maxCoverAmount1);
     });
-    it("can set maxCoverAmount", async function() {
-      await product.connect(governor).setMaxCoverAmount(maxCoverAmount2);
-      expect(await product.maxCoverAmount()).to.equal(maxCoverAmount2);
-    });
-    it("should revert setMaxCoverAmount if not called by governance", async function() {
-      await expect(product.connect(buyer).setMaxCoverAmount(maxCoverAmount1)).to.be.revertedWith("!governance");
-    });
     it("can get maxCoverPerUser", async function() {
       expect(await product.maxCoverPerUser()).to.eq(maxCoverPerUser1);
-    });
-    it("can set maxCoverPerUser", async function() {
-      await product.connect(governor).setMaxCoverPerUser(maxCoverPerUser2);
-      expect(await product.maxCoverPerUser()).to.equal(maxCoverPerUser2);
-    });
-    it("should revert setmaxCoverPerUser if not called by governance", async function() {
-      await expect(product.connect(buyer).setMaxCoverPerUser(maxCoverPerUser1)).to.be.revertedWith("!governance");
     });
     it("can get covered platform", async function () {
       expect(await product.coveredPlatform()).to.equal(ONE_SPLIT_VIEW);
@@ -253,6 +232,8 @@ describe("BaseProduct", () => {
     let divisor = BN.from("10000000000000000");
 
     before(async function() {
+      var depositAmount = maxCoverAmount2.sub(maxCoverAmount1.mul(3));
+      await deployer.sendTransaction({to:vault.address,value:depositAmount});
       await policyManager.connect(governor).addProduct(product.address);
       expect(await policyManager.productIsActive(product.address)).to.equal(true);
     });
@@ -481,11 +462,6 @@ describe("BaseProduct", () => {
       await expect(product.connect(buyer).updatePolicy(policyID, coverAmount, blocks, { value: quote })).to.be.revertedWith("invalid cover amount");
       await product.setPositionValue(positionAmount);
     });
-    it("cannot update policy with refund amount > manage fee", async function() {
-      let newCoverLimit = BN.from(1000);
-      let newCoverAmount = newCoverLimit.mul(positionAmount).div(1e4);
-      await expect(product.connect(buyer).updatePolicy(policyID, newCoverAmount, blocks, { value: quote })).to.be.revertedWith("refund amount > manage fee");
-    });
     it("can update policy with both new cover amount and extension", async function() {
       await product.setPositionValue(positionAmount);
       let newCoverLimit = BN.from(6000);
@@ -555,12 +531,8 @@ describe("BaseProduct", () => {
     it("cannot cancel from a different product", async function() {
       await expect(product2.connect(buyer).cancelPolicy(policyID)).to.be.revertedWith("wrong product");
     });
-    it("cannot refund negative amount", async function() {
-      await expect(product.connect(buyer).cancelPolicy(policyID)).to.be.revertedWith("refund amount less than cancelation fee");
-    });
     it("refunds proper amount", async function() {
       //let quote = BN.from(await product.getQuote(buyer.address, positionContract.address, 1, minPeriod2));
-      await product.connect(governor).setManageFee(manageFee1);
       let info = await policyManager.getPolicyInfo(policyID);
       let block = await provider.getBlockNumber();
       let balance1 = await buyer.getBalance();
@@ -568,8 +540,7 @@ describe("BaseProduct", () => {
         .sub(block + 1)
         .mul(info.price)
         .mul(info.coverAmount)
-        .div(1e12)
-        .sub(manageFee1);
+        .div(1e12);
       let tx = await product.connect(buyer).cancelPolicy(policyID);
       let receipt = await tx.wait();
       let gasCost = receipt.gasUsed.mul(tx.gasPrice || 0);
@@ -616,12 +587,10 @@ describe("BaseProduct", () => {
           mockPolicyManager.address,
           registry.address,
           treasury.address, // this is for the coveredPlatform
-          maxCoverAmount1,
-          maxCoverPerUser1,
           minPeriod1,
           maxPeriod1,
-          manageFee1,
-          price1
+          price1,
+          coverDivisor
         ]
       )) as MockProduct;
     })
