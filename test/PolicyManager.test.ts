@@ -1,4 +1,4 @@
-import { waffle } from 'hardhat';
+import { waffle, ethers, upgrades } from "hardhat";
 const { deployContract, solidity } = waffle;
 import { MockProvider } from 'ethereum-waffle';
 const provider: MockProvider = waffle.provider;
@@ -35,8 +35,8 @@ describe('PolicyManager', function() {
     // deploy policy manager
     policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
 
-    // deploy registry contract
-    registry = (await deployContract(deployer, artifacts.Registry, [deployer.address])) as Registry;
+    let registryContract = await ethers.getContractFactory("Registry");
+    registry = (await upgrades.deployProxy(registryContract, [deployer.address], { kind: "uups" })) as Registry;
 
     // deploy treasury contract
     treasury = (await deployContract(deployer, artifacts.Treasury, [deployer.address, ZERO_ADDRESS, ZERO_ADDRESS, registry.address])) as Treasury;
@@ -45,18 +45,18 @@ describe('PolicyManager', function() {
     nftTokenDescriptor = (await deployContract(deployer, artifacts.NonfungibleTokenPolicyDescriptor)) as NonfungibleTokenPolicyDescriptor;
 
     await registry.setTreasury(treasury.address);
-    await deployer.sendTransaction({ to: treasury.address, value: BN.from('10000000000000000') });
+    await deployer.sendTransaction({ to: treasury.address, value: BN.from("10000000000000000") });
   });
 
-  it('has a correct name', async function() {
+  it("has a correct name", async function() {
     expect(await policyManager.name()).to.equal(name);
   });
 
-  it('has a correct symbol', async function() {
+  it("has a correct symbol", async function() {
     expect(await policyManager.symbol()).to.equal(symbol);
   });
 
-  it('has no policies', async function() {
+  it("has no policies", async function() {
     expect(await policyManager.totalPolicyCount()).to.equal(0);
   });
 
@@ -69,24 +69,24 @@ describe('PolicyManager', function() {
       expect(await policyManager.governance()).to.equal(governor.address);
     });
 
-    it('rejects setting new governance by non governor', async function() {
-      await expect(policyManager.connect(user).setGovernance(user.address)).to.be.revertedWith('!governance');
+    it("rejects setting new governance by non governor", async function() {
+      await expect(policyManager.connect(user).setGovernance(user.address)).to.be.revertedWith("!governance");
     });
 
-    it('can set new governance', async function() {
+    it("can set new governance", async function() {
       await policyManager.connect(governor).setGovernance(deployer.address);
       expect(await policyManager.governance()).to.equal(governor.address);
       expect(await policyManager.newGovernance()).to.equal(deployer.address);
     });
 
-    it('rejects governance transfer by non governor', async function() {
-      await expect(policyManager.connect(user).acceptGovernance()).to.be.revertedWith('!governance');
+    it("rejects governance transfer by non governor", async function() {
+      await expect(policyManager.connect(user).acceptGovernance()).to.be.revertedWith("!governance");
     });
 
-    it('can transfer governance', async function() {
+    it("can transfer governance", async function() {
       let tx = await policyManager.connect(deployer).acceptGovernance();
       await expect(tx)
-        .to.emit(policyManager, 'GovernanceTransferred')
+        .to.emit(policyManager, "GovernanceTransferred")
         .withArgs(deployer.address);
       expect(await policyManager.governance()).to.equal(deployer.address);
       expect(await policyManager.newGovernance()).to.equal(ZERO_ADDRESS);
@@ -106,25 +106,25 @@ describe('PolicyManager', function() {
 
   });
 
-  describe('products', function() {
-    it('starts with no products', async function() {
+  describe("products", function() {
+    it("starts with no products", async function() {
       expect(await policyManager.numProducts()).to.equal(0);
     });
 
-    it('can add products', async function() {
+    it("can add products", async function() {
       let tx1 = await policyManager.connect(governor).addProduct(walletProduct1.address);
       expect(await policyManager.numProducts()).to.equal(1);
       await expect(tx1)
-        .to.emit(policyManager, 'ProductAdded')
+        .to.emit(policyManager, "ProductAdded")
         .withArgs(walletProduct1.address);
       let tx2 = await policyManager.connect(governor).addProduct(walletProduct2.address);
       expect(await policyManager.numProducts()).to.equal(2);
       await expect(tx2)
-        .to.emit(policyManager, 'ProductAdded')
+        .to.emit(policyManager, "ProductAdded")
         .withArgs(walletProduct2.address);
     });
 
-    it('returns products', async function() {
+    it("returns products", async function() {
       expect(await policyManager.numProducts()).to.equal(2);
       expect(await policyManager.getProduct(0)).to.equal(walletProduct1.address);
       expect(await policyManager.getProduct(1)).to.equal(walletProduct2.address);
@@ -133,34 +133,34 @@ describe('PolicyManager', function() {
       expect(await policyManager.productIsActive(walletProduct3.address)).to.equal(false);
     });
 
-    it('rejects adds and removes by non governor', async function() {
-      await expect(policyManager.connect(user).addProduct(walletProduct3.address)).to.be.revertedWith('!governance');
-      await expect(policyManager.connect(user).removeProduct(walletProduct1.address)).to.be.revertedWith('!governance');
+    it("rejects adds and removes by non governor", async function() {
+      await expect(policyManager.connect(user).addProduct(walletProduct3.address)).to.be.revertedWith("!governance");
+      await expect(policyManager.connect(user).removeProduct(walletProduct1.address)).to.be.revertedWith("!governance");
     });
 
-    it('can remove products', async function() {
+    it("can remove products", async function() {
       let tx1 = await policyManager.connect(governor).removeProduct(walletProduct1.address);
       expect(await policyManager.numProducts()).to.equal(1);
       expect(await policyManager.productIsActive(walletProduct1.address)).to.equal(false);
       await expect(tx1)
-        .to.emit(policyManager, 'ProductRemoved')
+        .to.emit(policyManager, "ProductRemoved")
         .withArgs(walletProduct1.address);
       expect(await policyManager.getProduct(0)).to.equal(walletProduct2.address);
     });
   });
 
-  describe('policies', function() {
-    it('non product cannot create policy', async function() {
-      await expect(policyManager.connect(user).createPolicy(user.address, positionContract.address, coverAmount, expirationBlock, price)).to.be.revertedWith('product inactive');
+  describe("policies", function() {
+    it("non product cannot create policy", async function() {
+      await expect(policyManager.connect(user).createPolicy(user.address, positionContract.address, coverAmount, expirationBlock, price)).to.be.revertedWith("product inactive");
     });
 
-    it('can create policy', async function() {
+    it("can create policy", async function() {
       let tx = await policyManager.connect(walletProduct2).createPolicy(user.address, positionContract.address, coverAmount, expirationBlock, price);
       let receipt = await tx.wait();
-      expect(receipt.logs[0].topics[3]).to.equal('0x0000000000000000000000000000000000000000000000000000000000000001');
+      expect(receipt.logs[0].topics[3]).to.equal("0x0000000000000000000000000000000000000000000000000000000000000001");
     });
 
-    it('can get policy info', async function() {
+    it("can get policy info", async function() {
       let policyInfo = await policyManager.getPolicyInfo(1);
       expect(policyInfo.policyholder).to.equal(user.address);
       expect(policyInfo.product).to.equal(walletProduct2.address);
@@ -187,15 +187,15 @@ describe('PolicyManager', function() {
       expect(await policyManager.exists(2)).to.equal(false);
     });
 
-    it('cannot update nonexistent policy', async function() {
-      await expect(policyManager.setPolicyInfo(2, user.address, positionContract.address, coverAmount, expirationBlock, price)).to.be.revertedWith('query for nonexistent token');
+    it("cannot update nonexistent policy", async function() {
+      await expect(policyManager.setPolicyInfo(2, user.address, positionContract.address, coverAmount, expirationBlock, price)).to.be.revertedWith("query for nonexistent token");
     });
 
-    it('product cannot update other products policy', async function() {
-      await expect(policyManager.setPolicyInfo(1, user.address, positionContract.address, coverAmount, expirationBlock, price)).to.be.revertedWith('wrong product');
+    it("product cannot update other products policy", async function() {
+      await expect(policyManager.setPolicyInfo(1, user.address, positionContract.address, coverAmount, expirationBlock, price)).to.be.revertedWith("wrong product");
     });
 
-    it('can set policy info', async function() {
+    it("can set policy info", async function() {
       await policyManager.connect(walletProduct2).setPolicyInfo(1, deployer.address, governor.address, 1, 2, 3);
       expect(await policyManager.getPolicyholder(1)).to.equal(deployer.address);
       expect(await policyManager.getPolicyProduct(1)).to.equal(walletProduct2.address);
@@ -207,22 +207,22 @@ describe('PolicyManager', function() {
       expect(await policyManager.exists(1)).to.equal(true);
     });
 
-    it('can list my policies', async function() {
+    it("can list my policies", async function() {
       expect(await policyManager.listPolicies(deployer.address)).to.deep.equal([]);
       expect(await policyManager.listPolicies(user.address)).to.deep.equal([BN.from(1)]);
       await policyManager.connect(walletProduct2).createPolicy(user.address, positionContract.address, coverAmount, expirationBlock, price);
       expect(await policyManager.listPolicies(user.address)).to.deep.equal([BN.from(1), BN.from(2)]);
     });
 
-    it('cannot directly burn policy', async function() {
-      await expect(policyManager.connect(user).burn(1)).to.be.revertedWith('wrong product');
-      await expect(policyManager.connect(user).burn(999)).to.be.revertedWith('query for nonexistent token');
+    it("cannot directly burn policy", async function() {
+      await expect(policyManager.connect(user).burn(1)).to.be.revertedWith("wrong product");
+      await expect(policyManager.connect(user).burn(999)).to.be.revertedWith("query for nonexistent token");
     });
 
-    it('can burn policy via product', async function() {
+    it("can burn policy via product", async function() {
       let tokenID = await policyManager.connect(walletProduct2).createPolicy(user.address, positionContract.address, coverAmount, expirationBlock, price);
       let receipt = await tokenID.wait();
-      expect(receipt.logs[0].topics[3]).to.equal('0x0000000000000000000000000000000000000000000000000000000000000003');
+      expect(receipt.logs[0].topics[3]).to.equal("0x0000000000000000000000000000000000000000000000000000000000000003");
 
       await policyManager.connect(walletProduct2).burn(1); // burn tokenID 1
       expect(await policyManager.exists(1)).to.equal(false);
@@ -236,7 +236,7 @@ describe('PolicyManager', function() {
 
   });
 
-  describe('lifecycle', function() {
+  describe("lifecycle", function() {
     //             A B C D
     // exists      0 1 1 0
     // isActive    0 1 0 0
@@ -246,12 +246,12 @@ describe('PolicyManager', function() {
     let blockNum: BN;
     let expBlock: BN;
 
-    it('pre-mint', async function() {
+    it("pre-mint", async function() {
       expect(await policyManager.exists(policyID)).to.be.false;
       expect(await policyManager.policyIsActive(policyID)).to.be.false;
       expect(await policyManager.policyHasExpired(policyID)).to.be.false;
     });
-    it('pre-expiration', async function() {
+    it("pre-expiration", async function() {
       blockNum = BN.from(await provider.getBlockNumber());
       expBlock = blockNum.add(10);
       await policyManager.connect(walletProduct2).createPolicy(user.address, positionContract.address, coverAmount, expBlock, price);
@@ -259,13 +259,13 @@ describe('PolicyManager', function() {
       expect(await policyManager.policyIsActive(policyID)).to.be.true;
       expect(await policyManager.policyHasExpired(policyID)).to.be.false;
     });
-    it('post-expiration', async function() {
+    it("post-expiration", async function() {
       await burnBlocks(12);
       expect(await policyManager.exists(policyID)).to.be.true;
       expect(await policyManager.policyIsActive(policyID)).to.be.false;
       expect(await policyManager.policyHasExpired(policyID)).to.be.true;
     });
-    it('post-burn', async function() {
+    it("post-burn", async function() {
       await policyManager.connect(walletProduct2).burn(policyID); // burn tokenID 1
       expect(await policyManager.exists(policyID)).to.be.false;
       expect(await policyManager.policyIsActive(policyID)).to.be.false;
@@ -273,7 +273,7 @@ describe('PolicyManager', function() {
     });
   });
 
-  describe('updateActivePolicies', async function() {
+  describe("updateActivePolicies", async function() {
     before(async function() {
       // redeploy policy manager
       policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
@@ -297,7 +297,7 @@ describe('PolicyManager', function() {
       await policyManager.connect(governor).addProduct(mockProduct.address);
       await registry.setPolicyManager(policyManager.address);
     });
-    it('can update active policies', async function() {
+    it("can update active policies", async function() {
       // create policies
       let coverLimit = 10000;
       // policy 1 expires
