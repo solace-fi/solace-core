@@ -9,7 +9,7 @@ chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from './utilities/artifact_importer';
 import { burnBlocks, burnBlocksUntil } from './utilities/time';
-import { PolicyManager, MockProduct, Treasury, Registry, NonfungibleTokenPositionDescriptor } from '../typechain';
+import { PolicyManager, MockProduct, Treasury, Registry, NonfungibleTokenPolicyDescriptor } from '../typechain';
 
 describe('PolicyManager', function() {
   let artifacts: ArtifactImports;
@@ -20,7 +20,7 @@ describe('PolicyManager', function() {
   let mockProduct: MockProduct;
   let treasury: Treasury;
   let registry: Registry;
-  let nftTokenDescriptor: NonfungibleTokenPositionDescriptor;
+  let nftTokenDescriptor: NonfungibleTokenPolicyDescriptor;
 
   const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
   const name = 'Solace Policy';
@@ -42,7 +42,7 @@ describe('PolicyManager', function() {
     treasury = (await deployContract(deployer, artifacts.Treasury, [deployer.address, ZERO_ADDRESS, ZERO_ADDRESS, registry.address])) as Treasury;
 
     // deploy nft descriptor
-    nftTokenDescriptor = (await deployContract(deployer, artifacts.NonfungibleTokenPositionDescriptor)) as NonfungibleTokenPositionDescriptor;
+    nftTokenDescriptor = (await deployContract(deployer, artifacts.NonfungibleTokenPolicyDescriptor)) as NonfungibleTokenPolicyDescriptor;
 
     await registry.setTreasury(treasury.address);
     await deployer.sendTransaction({ to: treasury.address, value: BN.from('10000000000000000') });
@@ -363,7 +363,7 @@ describe('PolicyManager', function() {
     });
     
     it('can get tokenURI', async function() {
-        let tokenURI = `This is solace.fi policy with policy id ${policyId} for product ${productName}`;
+        let tokenURI = `This is a Solace Finance policy that covers a ${productName} position`;
         expect(await policyManager.tokenURI(policyId)).to.equal(tokenURI);
     });
 

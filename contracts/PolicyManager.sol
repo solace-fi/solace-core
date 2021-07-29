@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "./interface/IProduct.sol";
 import "./interface/IPolicyManager.sol";
-import "./interface/INonfungibleTokenPositionDescriptor.sol";
+import "./interface/INonfungibleTokenPolicyDescriptor.sol";
 
 
 /* TODO
@@ -349,34 +349,13 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
         */
     }
 
-    /**
-     * @notice Encodes `tokenURI`
-     * @param _params policy tokenURI parameteres passed as PolicyInfo struct
-     * @return uri
-     */
-    function _encodeTokenURI(PolicyInfo memory _params) internal pure returns (string memory uri) {
-        uri = string(abi.encode(_params));
-        return uri;
-    }
-
-    /**
-     * @notice Decodes `tokenURI`
-     * @param _tokenURI policy tokenURI passed as a string
-     * @return struct `params`
-     */
-    function _decodeTokenURI(string memory _tokenURI) internal pure returns (PolicyInfo memory) {
-        PolicyInfo memory params = abi.decode(bytes(_tokenURI), (PolicyInfo));
-        return params;
-    }
-
-
     /*** ERC721 INHERITANCE FUNCTIONS
     Overrides that properly set functionality through parent contracts
     ****/
 
     function tokenURI(uint256 tokenId) public view override(ERC721) returns (string memory) {
         require(_exists(tokenId), "query for nonexistent token");
-        return INonfungibleTokenPositionDescriptor(tokenDescriptor).tokenURI(this, tokenId);
+        return INonfungibleTokenPolicyDescriptor(tokenDescriptor).tokenURI(this, tokenId);
     }
 
 }

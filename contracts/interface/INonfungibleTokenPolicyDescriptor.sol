@@ -3,7 +3,7 @@ pragma solidity 0.8.0;
 
 import "./IPolicyManager.sol";
 
-interface INonfungibleTokenPositionDescriptor {
+interface INonfungibleTokenPolicyDescriptor {
 
   function tokenURI(IPolicyManager policyManager, uint256 policyID) external view returns (string memory);
 

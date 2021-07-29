@@ -184,6 +184,6 @@ contract CompoundProductRinkeby is BaseProduct, EIP712 {
      * @return CompoundRinkeby
      */
     function name() public pure override returns (string memory) {
-        return "CompoundRinkeby";
+        return "Compound";
     }
 }
