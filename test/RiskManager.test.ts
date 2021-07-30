@@ -1,4 +1,4 @@
-import { waffle, ethers } from "hardhat";
+import { waffle, upgrades, ethers } from "hardhat";
 const { deployContract, solidity } = waffle;
 import { MockProvider } from "ethereum-waffle";
 const provider: MockProvider = waffle.provider;
@@ -29,7 +29,8 @@ describe("RiskManager", function () {
     artifacts = await import_artifacts();
 
     // deploy registry contract
-    registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
+    let registryContract = await ethers.getContractFactory("Registry");
+    registry = (await upgrades.deployProxy(registryContract, [governor.address], { kind: "uups" })) as Registry;
 
     // deploy weth
     weth = (await deployContract(deployer,artifacts.WETH)) as Weth9;
@@ -112,6 +113,8 @@ describe("RiskManager", function () {
       expect(await riskManager.maxCoverAmount(product2.address)).to.equal(depositAmount.mul(7).div(16));
       expect(await riskManager.maxCoverAmount(product3.address)).to.equal(depositAmount.mul(9).div(16));
     });
-    //it("", async function () {});
   });
+
+  // bundled in with policy manager test
+  // describe("minCapitalRequirement", function () {})
 });

@@ -46,4 +46,9 @@ interface IRiskManager {
      * @return The max amount of cover in wei.
      */
     function maxCoverAmount(address _product) external view returns (uint256);
+
+    /**
+     * @notice The minimum amount of capital required to safely cover all policies.
+     */
+    function minCapitalRequirement() external view returns (uint256);
 }

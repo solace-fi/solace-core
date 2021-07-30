@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./interface/IWETH9.sol";
 import "./interface/IRegistry.sol";
 import "./interface/IPolicyManager.sol";
+import "./interface/IRiskManager.sol";
 import "./interface/IVault.sol";
 
 
@@ -21,8 +22,11 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using Address for address;
 
-    // minimum amount of capital required
-    uint256 public minCapitalRequirement;
+    /// @notice Governor.
+    address public override governance;
+
+    /// @notice Governance to take over.
+    address public override newGovernance;
 
     // pauses deposits
     bool public emergencyShutdown;
@@ -30,22 +34,17 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     /// WETH
     IERC20 public override token;
 
-    /// @notice Governor.
-    address public override governance;
-
-    /// @notice Governance to take over.
-    address public override newGovernance;
-
     /// Registry of protocol contract addresses
     IRegistry public registry;
 
-    /*************
-    EVENTS
-    *************/
-
-    event DepositMade(address indexed depositor, uint256 indexed amount, uint256 indexed shares);
-    event WithdrawalMade(address indexed withdrawer, uint256 indexed value);
-    event EmergencyShutdown(bool active);
+    // capital providers must wait some time in this range in order to withdraw
+    // used to prevent withdraw before claim payout
+    /// @notice The minimum amount of time a user must wait to withdraw funds.
+    uint64 public override cooldownMin = 604800;  // 7 days
+    /// @notice The maximum amount of time a user must wait to withdraw funds.
+    uint64 public override cooldownMax = 3024000; // 35 days
+    // The timestamp that a depositor's cooldown started.
+    mapping(address => uint64) public override cooldownStart;
 
     constructor (address _governance, address _registry, address _token) ERC20("Solace CP Token", "SCP") ERC20Permit("Solace CP Token") {
         governance = _governance;
@@ -54,7 +53,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     }
 
     /*************
-    EXTERNAL FUNCTIONS
+    GOVERNANCE FUNCTIONS
     *************/
 
     /**
@@ -81,53 +80,37 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     }
 
     /**
-     * @notice Changes the minimum capital requirement of the vault
-     * Can only be called by the current governor.
-     * During withdrawals, withdrawals are possible down to the Vault's MCR.
-     * @param newMCR The new minimum capital requirement.
-     */
-    function setMinCapitalRequirement(uint256 newMCR) external {
-        require(msg.sender == governance, "!governance");
-        minCapitalRequirement = newMCR;
-    }
-
-    /**
-     * @notice Activates or deactivates Vault mode where all Strategies go into full withdrawal.
+     * @notice Activates or deactivates emergency shutdown.
      * Can only be called by the current governor.
      * During Emergency Shutdown:
-     * 1. No Users may deposit into the Vault (but may withdraw as usual.)
-     * 2. Governance may not add new Strategies.
-     * 3. Each Strategy must pay back their debt as quickly as reasonable to minimally affect their position.
-     * 4. Only Governance may undo Emergency Shutdown.
+     * 1. No users may deposit into the Vault.
+     * 2. Withdrawls can bypass cooldown.
+     * 3. Only Governance may undo Emergency Shutdown.
      * @param active If true, the Vault goes into Emergency Shutdown.
      * If false, the Vault goes back into Normal Operation.
     */
-    function setEmergencyShutdown(bool active) external {
+    function setEmergencyShutdown(bool active) external override {
         require(msg.sender == governance, "!governance");
         emergencyShutdown = active;
         emit EmergencyShutdown(active);
     }
 
     /**
-     * @notice Sends ETH to ClaimsEscrow to pay out claims.
-     * Can only be called by ClaimsEscrow.
-     * @param amount Amount of ETH wanted
-     * @return Amount of ETH sent
+     * @notice Sets the minimum and maximum amount of time a user must wait to withdraw funds.
+     * Can only be called by the current governor.
+     * @param _min Minimum time in seconds.
+     * @param _max Maximum time in seconds.
      */
-    function requestEth(uint256 amount) external override nonReentrant returns (uint256) {
-        address escrow = registry.claimsEscrow();
-        require(msg.sender == escrow, "!escrow");
-        // unwrap some WETH to make ETH available for claims payout
-        if(amount > address(this).balance) {
-            IWETH9 weth = IWETH9(payable(address(token)));
-            uint256 wanted = amount - address(this).balance;
-            uint256 withdrawAmount = min(weth.balanceOf(address(this)), wanted);
-            weth.withdraw(withdrawAmount);
-        }
-        uint256 transferAmount = min(amount, address(this).balance);
-        payable(escrow).transfer(transferAmount);
-        return transferAmount;
+    function setCooldownWindow(uint64 _min, uint64 _max) external override {
+        require(msg.sender == governance, "!governance");
+        require(_min < _max, "invalid window");
+        cooldownMin = _min;
+        cooldownMax = _max;
     }
+
+    /*************
+    EXTERNAL FUNCTIONS
+    *************/
 
     /**
      * @notice Allows a user to deposit ETH into the Vault (becoming a Capital Provider)
@@ -157,6 +140,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
      * Shares of the Vault (CP tokens) are minted to caller
      * Deposits `_amount` `token`, issuing shares to `recipient`.
      * Reverts if Vault is in Emergency Shutdown
+     * @param amount Amount of weth to deposit.
      */
     function depositWeth(uint256 amount) external override nonReentrant {
         require(!emergencyShutdown, "cannot deposit when vault is in emergency shutdown");
@@ -170,22 +154,61 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     }
 
     /**
+     * @notice Starts the cooldown.
+     */
+    function startCooldown() external override {
+        cooldownStart[msg.sender] = uint64(block.timestamp);
+    }
+
+    /**
      * @notice Allows a user to redeem shares for ETH
      * Burns CP tokens and transfers ETH to the CP
      * @param shares amount of shares to redeem
      * @return value in ETH that the shares where redeemed for
      */
     function withdraw(uint256 shares) external override nonReentrant returns (uint256) {
+        // validate shares to withdraw
         require(shares <= balanceOf(msg.sender), "cannot redeem more shares than you own");
         uint256 value = _shareValue(shares);
-        // Stop withdrawal if process brings the Vault's `totalAssets` value below minimum capital requirement
-        require(_totalAssets() - value >= minCapitalRequirement, "withdrawal brings Vault assets below MCR");
+        // bypass some checks in emergency shutdown
+        if(!emergencyShutdown) {
+            // Stop withdrawal if process brings the Vault's `totalAssets` value below minimum capital requirement
+            uint256 mcr = IRiskManager(registry.riskManager()).minCapitalRequirement();
+            require(_totalAssets() - value >= mcr, "withdrawal brings Vault assets below MCR");
+            // validate cooldown
+            uint64 elapsed = uint64(block.timestamp) - cooldownStart[msg.sender];
+            require(cooldownMin <= elapsed && elapsed <= cooldownMax, "not in cooldown window");
+        }
+        cooldownStart[msg.sender] = 0;
         // burn shares and transfer ETH to withdrawer
         _burn(msg.sender, shares);
         IWETH9(payable(address(token))).withdraw(value);
         payable(msg.sender).transfer(value);
         emit WithdrawalMade(msg.sender, value);
         return value;
+    }
+
+    /**
+     * @notice Sends ETH to ClaimsEscrow to pay out claims.
+     * Can only be called by ClaimsEscrow.
+     * @param amount Amount of ETH wanted
+     * @return Amount of ETH sent
+     */
+    function requestEth(uint256 amount) external override nonReentrant returns (uint256) {
+        address escrow = registry.claimsEscrow();
+        require(msg.sender == escrow, "!escrow");
+        // unwrap some WETH to make ETH available for claims payout
+        if(amount > address(this).balance) {
+            IWETH9 weth = IWETH9(payable(address(token)));
+            uint256 wanted = amount - address(this).balance;
+            uint256 withdrawAmount = min(weth.balanceOf(address(this)), wanted);
+            weth.withdraw(withdrawAmount);
+        }
+        // transfer funds
+        uint256 transferAmount = min(amount, address(this).balance);
+        payable(escrow).transfer(transferAmount);
+        emit FundsSent(transferAmount);
+        return transferAmount;
     }
 
     /*************
@@ -197,14 +220,15 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     * @param user Address of user to check
     * @return Max redeemable shares by the user
     */
-    function maxRedeemableShares(address user) external view returns (uint256) {
+    function maxRedeemableShares(address user) external view override returns (uint256) {
         uint256 userBalance = balanceOf(user);
         uint256 vaultBalanceAfterWithdraw = _totalAssets() - _shareValue(userBalance);
 
-        // if user's CP token balance takes Vault `totalAssets` below MCP,
-        //... return the difference between totalAsset and MCP (in # shares)
-        if (vaultBalanceAfterWithdraw < minCapitalRequirement) {
-            uint256 diff = _totalAssets() - minCapitalRequirement;
+        // if user's CP token balance takes Vault `totalAssets` below MCR,
+        //... return the difference between totalAsset and MCR (in # shares)
+        uint256 mcr = IRiskManager(registry.riskManager()).minCapitalRequirement();
+        if (vaultBalanceAfterWithdraw < mcr) {
+            uint256 diff = _totalAssets() - mcr;
             return _sharesForAmount(_shareValue(diff));
         } else {
             // else, user can withdraw up to their balance of CP tokens
@@ -280,5 +304,4 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
             deposit();
         }
     }
-
 }
