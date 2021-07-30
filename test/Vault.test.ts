@@ -1,5 +1,5 @@
 import chai from "chai";
-import { ethers, waffle } from "hardhat";
+import { ethers, waffle, upgrades } from "hardhat";
 import { BigNumber as BN, constants } from "ethers";
 import { getPermitDigest, sign, getDomainSeparator } from "./utilities/signature";
 const { expect } = chai;

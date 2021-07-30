@@ -1,6 +1,6 @@
-import { waffle, ethers } from "hardhat";
+import { waffle, ethers, upgrades } from "hardhat";
 const { deployContract } = waffle;
-import { BigNumber as BN, Contract, Signer, Wallet } from "ethers";
+import { BigNumber as BN, Contract, ContractFactory, Signer, Wallet } from "ethers";
 const fs = require("fs");
 import { logContractAddress, createPool } from "./utils";
 import { FeeAmount } from "../test/utilities/uniswap";
@@ -35,6 +35,10 @@ const START_BLOCK = BN.from(0);
 const END_BLOCK = BN.from(2102400); // one year
 const BLOCK_REWARD = BN.from("60000000000000000000"); // 60 SOLACE
 
+// ugprade registry
+const UPGRADE_REGISTRY = false;
+const UPGRADED_REGISTRY_NAME = ""; // name of the new version of registry contract
+
 let artifacts: ArtifactImports;
 let registry: Registry;
 let solace: Solace;
@@ -63,7 +67,7 @@ async function main() {
   signerAddress = await deployer.getAddress();
   governorAddress = await governor.getAddress();
 
-  await deployRegistry();
+  UPGRADE_REGISTRY == false ? await deployRegistry() : await upgradeRegistry(REGISTRY_ADDRESS, UPGRADED_REGISTRY_NAME);
   await deploySolace();
   await deployWeth();
   await deployUniswapFactory();
@@ -87,11 +91,23 @@ async function deployRegistry() {
   if(!!REGISTRY_ADDRESS) {
     registry = (await ethers.getContractAt(artifacts.Registry.abi, REGISTRY_ADDRESS)) as Registry;
   } else {
+    let registryContract = await ethers.getContractFactory('Registry');
     console.log("Deploying Registry");
-    registry = (await deployContract(deployer, artifacts.Registry, [signerAddress])) as Registry;
+    registry = (await upgrades.deployProxy(registryContract, [signerAddress])) as Registry;
     console.log(`Deploying Registry to ${registry.address}`);
     await registry.deployed();
     console.log("Deployment confirmed");
+  }
+}
+
+async function upgradeRegistry(proxyAddress: string, upgradeContractName: string) {
+  if(!!proxyAddress && !!upgradeContractName) {
+    console.log("Upgrading Registry");
+    let registryContract = await ethers.getContractFactory(upgradeContractName);
+    registry = (await upgrades.upgradeProxy(proxyAddress, registryContract)) as Registry;
+    console.log(`Upgrading Registry to ${registry.address}`);
+  } else {
+    console.log("Proxy registry address or upgraded registry contract name is not provided!");
   }
 }
 
