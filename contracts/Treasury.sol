@@ -55,6 +55,9 @@ contract Treasury is ITreasury, ReentrancyGuard {
         swapRouter = ISwapRouter(_swapRouter);
         weth = WETH9(payable(_weth));
         registry = IRegistry(_registry);
+        premiumRecipients = [registry.vault()];
+        recipientWeights = [1,0];
+        weightSum = 1;
     }
 
     /**
@@ -189,8 +192,14 @@ contract Treasury is ITreasury, ReentrancyGuard {
      * @notice Routes the premiums to the recipients
      */
     function routePremiums() external payable override nonReentrant {
-        address payable vault = registry.vault();
-        vault.transfer(msg.value);
+        uint256 div = weightSum;
+        uint256 length = premiumRecipients.length;
+        // transfer to all recipients
+        for(uint i = 0; i < length; i++) {
+            uint256 amount = msg.value * recipientWeights[i] / div;
+            if(amount > 0) premiumRecipients[i].transfer(amount);
+        }
+        // hold treasury share as eth
     }
 
     /**
@@ -219,7 +228,6 @@ contract Treasury is ITreasury, ReentrancyGuard {
     function refund(address _user, uint256 _amount) external override nonReentrant {
         // check if from active product
         require(IPolicyManager(registry.policyManager()).productIsActive(msg.sender), "!product");
-        uint256 transferAmount = IVault(registry.vault()).requestEth(_amount);
         transferEth(_user, transferAmount);
     }
 
@@ -239,6 +247,8 @@ contract Treasury is ITreasury, ReentrancyGuard {
     function transferEth(address _user, uint256 _amount) internal {
         // account for unpaid rewards
         _amount += unpaidRewards[_user];
+        IVault(registry.vault()).requestEth(_amount);
+
         if(_amount == 0) return;
         // unwrap weth if necessary
         if(address(this).balance < _amount) {

@@ -109,8 +109,8 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     }
 
     /**
-     * @notice Sends ETH to ClaimsEscrow to pay out claims.
-     * Can only be called by ClaimsEscrow.
+     * @notice Sends ETH to ClaimsEscrow or Treasury to pay out claims.
+     * Can only be called by ClaimsEscrow or Treasury
      * @param amount Amount of ETH wanted
      * @return Amount of ETH sent
      */
@@ -126,12 +126,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
             weth.withdraw(withdrawAmount);
         }
         uint256 transferAmount = min(amount, address(this).balance);
-
-        if (msg.sender == treasury) {
-            payable(treasury).transfer(transferAmount);
-        } else {
-            payable(escrow).transfer(transferAmount);
-        }
+        payable(msg.sender).transfer(transferAmount);
         return transferAmount;
     }
 
