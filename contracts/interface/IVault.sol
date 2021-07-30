@@ -56,14 +56,6 @@ interface IVault is IERC20, IERC20Permit {
     function acceptGovernance() external;
 
     /**
-     * @notice Changes the minimum capital requirement of the vault
-     * Can only be called by the current governor.
-     * During withdrawals, withdrawals are possible down to the Vault's MCR.
-     * @param newMCR The new minimum capital requirement.
-     */
-    function setMinCapitalRequirement(uint256 newMCR) external;
-
-    /**
      * @notice Activates or deactivates emergency shutdown.
      * Can only be called by the current governor.
      * During Emergency Shutdown:

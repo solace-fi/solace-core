@@ -112,6 +112,8 @@ describe("RiskManager", function () {
       expect(await riskManager.maxCoverAmount(product2.address)).to.equal(depositAmount.mul(7).div(16));
       expect(await riskManager.maxCoverAmount(product3.address)).to.equal(depositAmount.mul(9).div(16));
     });
-    //it("", async function () {});
   });
+
+  // bundled in with policy manager test
+  // describe("minCapitalRequirement", function () {})
 });

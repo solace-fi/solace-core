@@ -104,4 +104,8 @@ interface IPolicyManager /*is IERC721Enumerable, IERC721Metadata*/ {
     function burn(uint256 _tokenId) external;
 
     function updateActivePolicies(uint256[] calldata _policyIDs) external;
+
+    // other view functions
+
+    function activeCoverAmount() external view returns (uint256);
 }

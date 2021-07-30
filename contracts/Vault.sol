@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./interface/IWETH9.sol";
 import "./interface/IRegistry.sol";
 import "./interface/IPolicyManager.sol";
+import "./interface/IRiskManager.sol";
 import "./interface/IVault.sol";
 
 
@@ -20,9 +21,6 @@ import "./interface/IVault.sol";
 contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using Address for address;
-
-    // minimum amount of capital required
-    uint256 public minCapitalRequirement;
 
     /// @notice Governor.
     address public override governance;
@@ -79,17 +77,6 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
         governance = newGovernance;
         newGovernance = address(0x0);
         emit GovernanceTransferred(msg.sender);
-    }
-
-    /**
-     * @notice Changes the minimum capital requirement of the vault
-     * Can only be called by the current governor.
-     * During withdrawals, withdrawals are possible down to the Vault's MCR.
-     * @param newMCR The new minimum capital requirement.
-     */
-    function setMinCapitalRequirement(uint256 newMCR) external override {
-        require(msg.sender == governance, "!governance");
-        minCapitalRequirement = newMCR;
     }
 
     /**
@@ -186,7 +173,8 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
         // bypass some checks in emergency shutdown
         if(!emergencyShutdown) {
             // Stop withdrawal if process brings the Vault's `totalAssets` value below minimum capital requirement
-            require(_totalAssets() - value >= minCapitalRequirement, "withdrawal brings Vault assets below MCR");
+            uint256 mcr = IRiskManager(registry.riskManager()).minCapitalRequirement();
+            require(_totalAssets() - value >= mcr, "withdrawal brings Vault assets below MCR");
             // validate cooldown
             uint64 elapsed = uint64(block.timestamp) - cooldownStart[msg.sender];
             require(cooldownMin <= elapsed && elapsed <= cooldownMax, "not in cooldown window");
@@ -236,10 +224,11 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
         uint256 userBalance = balanceOf(user);
         uint256 vaultBalanceAfterWithdraw = _totalAssets() - _shareValue(userBalance);
 
-        // if user's CP token balance takes Vault `totalAssets` below MCP,
-        //... return the difference between totalAsset and MCP (in # shares)
-        if (vaultBalanceAfterWithdraw < minCapitalRequirement) {
-            uint256 diff = _totalAssets() - minCapitalRequirement;
+        // if user's CP token balance takes Vault `totalAssets` below MCR,
+        //... return the difference between totalAsset and MCR (in # shares)
+        uint256 mcr = IRiskManager(registry.riskManager()).minCapitalRequirement();
+        if (vaultBalanceAfterWithdraw < mcr) {
+            uint256 diff = _totalAssets() - mcr;
             return _sharesForAmount(_shareValue(diff));
         } else {
             // else, user can withdraw up to their balance of CP tokens

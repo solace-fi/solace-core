@@ -8,7 +8,7 @@ const provider = waffle.provider;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Vault, Weth9, Registry, Solace, ClaimsEscrow, PolicyManager } from "../typechain";
+import { Vault, Weth9, Registry, Solace, ClaimsEscrow, PolicyManager, RiskManager, MockProduct } from "../typechain";
 
 describe("Vault", function () {
     let artifacts: ArtifactImports;
@@ -18,8 +18,10 @@ describe("Vault", function () {
     let solace: Solace;
     let claimsEscrow: ClaimsEscrow;
     let policyManager: PolicyManager;
+    let mockProduct: MockProduct;
+    let riskManager: RiskManager;
 
-    const [owner, newOwner, depositor1, depositor2, claimant, mockProduct, mockEscrow] = provider.getWallets();
+    const [owner, newOwner, depositor1, depositor2, claimant, mockEscrow] = provider.getWallets();
     const tokenName = "Solace CP Token";
     const tokenSymbol = "SCP";
     const testDepositAmount = BN.from("10");
@@ -44,10 +46,13 @@ describe("Vault", function () {
       vault = (await deployContract(owner,artifacts.Vault,[owner.address,registry.address,weth.address])) as Vault;
       claimsEscrow = (await deployContract(owner,artifacts.ClaimsEscrow,[owner.address,registry.address])) as ClaimsEscrow;
       policyManager = (await deployContract(owner,artifacts.PolicyManager,[owner.address])) as PolicyManager;
+      riskManager = (await deployContract(owner, artifacts.RiskManager, [owner.address, registry.address])) as RiskManager;
+      mockProduct = (await deployContract(owner,artifacts.MockProduct,[owner.address,policyManager.address,registry.address,ZERO_ADDRESS,0,100000000000,1,16777215])) as MockProduct;
 
       await registry.setVault(vault.address);
       await registry.setClaimsEscrow(claimsEscrow.address);
       await registry.setPolicyManager(policyManager.address);
+      await registry.setRiskManager(riskManager.address);
       await policyManager.addProduct(mockProduct.address);
     });
 
@@ -79,17 +84,6 @@ describe("Vault", function () {
         await expect(vault.connect(depositor1).setGovernance(depositor1.address)).to.be.revertedWith("!governance");
         await vault.connect(owner).setGovernance(newOwner.address);
         await expect(vault.connect(depositor1).acceptGovernance()).to.be.revertedWith("!governance");
-      });
-    });
-
-    describe("setMinCapitalRequirement", function () {
-      it("should revert if not called by governance", async function () {
-        await expect(vault.connect(depositor1).setMinCapitalRequirement(newMinCapitalRequirement)).to.be.revertedWith("!governance");
-      });
-      it("should successfully set the new lockedProfitDegation", async function () {
-        await vault.connect(owner).setMinCapitalRequirement(newMinCapitalRequirement);
-        const callMCR = await vault.minCapitalRequirement();
-        expect(callMCR).to.equal(newMinCapitalRequirement);
       });
     });
 
@@ -131,7 +125,9 @@ describe("Vault", function () {
       it("should return the correct maxRedeemableShares - user can withdraw entire CP token balance", async function () {
         // set the MCR to be 10
         let newMCR = BN.from("10");
-        await vault.connect(owner).setMinCapitalRequirement(newMCR);
+        await mockProduct.setPositionValue(newMCR);
+        await mockProduct.connect(depositor1)._buyPolicy(depositor1.address, ZERO_ADDRESS, 10000, 100);
+        expect(await riskManager.minCapitalRequirement()).to.equal(newMCR);
         // bring Vault assets to 20
         await vault.connect(depositor1).deposit({ value: testDepositAmount});
         await vault.connect(depositor2).deposit({ value: testDepositAmount.mul(10)});
@@ -141,7 +137,9 @@ describe("Vault", function () {
       });
       it("should return the correct maxRedeemableShares - user can withdraw up to a portion of their CP token balance", async function () {
         let newMCR = BN.from("2");
-        await vault.connect(owner).setMinCapitalRequirement(newMCR);
+        await mockProduct.setPositionValue(newMCR);
+        await mockProduct.connect(depositor1)._buyPolicy(depositor1.address, ZERO_ADDRESS, 10000, 100);
+        expect(await riskManager.minCapitalRequirement()).to.equal(newMCR);
         await vault.connect(depositor1).deposit({ value: testDepositAmount});
         const callBalance = await vault.balanceOf(depositor1.address);
         expect(await vault.maxRedeemableShares(depositor1.address)).to.equal(callBalance.sub(newMCR));
@@ -276,7 +274,9 @@ describe("Vault", function () {
       it("should revert if withdrawal brings Vault's totalAssets below the minimum capital requirement", async function () {
         let cpBalance = await vault.balanceOf(depositor1.address);
         let newMCR = cpBalance.toString();
-        await vault.connect(owner).setMinCapitalRequirement(newMCR);
+        await mockProduct.setPositionValue(newMCR);
+        await mockProduct.connect(depositor1)._buyPolicy(depositor1.address, ZERO_ADDRESS, 10000, 100);
+        expect(await riskManager.minCapitalRequirement()).to.equal(newMCR);
         await expect(vault.connect(depositor1).withdraw(cpBalance)).to.be.revertedWith("withdrawal brings Vault assets below MCR");
       });
       it("should revert if cooldown not started", async function () {
@@ -342,7 +342,9 @@ describe("Vault", function () {
         it("does not care about mcr", async function () {
           let cpBalance = await vault.balanceOf(depositor1.address);
           let newMCR = cpBalance.toString();
-          await vault.connect(owner).setMinCapitalRequirement(newMCR);
+          await mockProduct.setPositionValue(newMCR);
+          await mockProduct.connect(depositor1)._buyPolicy(depositor1.address, ZERO_ADDRESS, 10000, 100);
+          expect(await riskManager.minCapitalRequirement()).to.equal(newMCR);
           await expect(vault.connect(depositor1).withdraw(cpBalance)).to.emit(vault, "WithdrawalMade").withArgs(depositor1.address, cpBalance);
         });
         it("does not care about cooldown period", async function () {
