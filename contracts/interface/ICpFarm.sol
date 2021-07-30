@@ -82,9 +82,8 @@ interface ICpFarm is IFarm {
      * `_amount` is denominated in CP tokens, which are converted to eth then returned to the user.
      * User will receive _amount of deposited tokens converted to eth and accumulated rewards.
      * @param _amount The withdraw amount.
-     * @param _maxLoss The acceptable amount of loss.
      */
-    function withdrawEth(uint256 _amount, uint256 _maxLoss) external;
+    function withdrawEth(uint256 _amount) external;
 
     function vault() external view returns (IVault);
     function solace() external view returns (SOLACE);

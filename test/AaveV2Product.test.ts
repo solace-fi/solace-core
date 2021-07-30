@@ -390,11 +390,10 @@ if(process.env.FORK_NETWORK === "mainnet"){
         var successList = [];
         var failList = [];
         for(var i = 0; i < atokens.length; ++i){
+          const aAddress = atokens[i].address;
+          const symbol = atokens[i].symbol;
           try {
             // fetch contracts
-            const aAddress = atokens[i].address;
-            const symbol = atokens[i].symbol;
-            console.log(`        ${symbol}`);
             const aToken = await ethers.getContractAt(artifacts.AToken.abi, aAddress);
             const uAddress = await aToken.UNDERLYING_ASSET_ADDRESS();
             const uToken = await ethers.getContractAt(artifacts.ERC20.abi, uAddress);
@@ -467,15 +466,20 @@ if(process.env.FORK_NETWORK === "mainnet"){
             expectClose(userEth2.sub(userEth1).add(gasCost), amountOut);
             ++success;
             successList.push(symbol);
+            console.log(`\x1b[38;5;239m        ✓ ${symbol}\x1b[0m`);
           } catch (e) {
-            console.log(e);
-            failList.push(atokens[i].symbol);
+            console.log(`\x1b[31m        ✘ ${symbol}`);
+            console.log('          '+e.stack.replace(/\n/g, '\n      '));
+            console.log('\x1b[0m');
+            failList.push(symbol);
           }
         }
         await hre.network.provider.request({method: "hardhat_stopImpersonatingAccount",params: [user3Address]});
         if(failList.length != 0) {
-          console.log("supported vaults:", successList);
-          console.log("unsupported vaults:", failList);
+          console.log("supported atokens:");
+          console.log(successList.reduce((acc,val)=>`${acc}  - ${val}\n`,''));
+          console.log("unsupported atokens:");
+          console.log(failList.reduce((acc,val)=>`${acc}  - ${val}\n`,''));
         }
         expect(`${success}/${atokens.length} supported atokens`).to.equal(`${atokens.length}/${atokens.length} supported atokens`);
       });

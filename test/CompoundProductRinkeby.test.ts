@@ -376,6 +376,7 @@ if(process.env.FORK_NETWORK === "rinkeby"){
         let tx1 = await product.connect(user).submitClaim(policyID1, amountOut1, deadline, signature);
         let receipt1 = await tx1.wait();
         let gasCost1 = receipt1.gasUsed.mul(tx1.gasPrice || 0);
+        let userEth1 = await user.getBalance();
         expect(userEth1.sub(userEth0).add(gasCost1)).to.equal(0);
         expect(tx1).to.emit(product, "ClaimSubmitted").withArgs(policyID1);
         expect(tx1).to.emit(claimsEscrow, "ClaimReceived").withArgs(policyID1, user.address, amountOut1);
@@ -447,18 +448,17 @@ if(process.env.FORK_NETWORK === "rinkeby"){
           {"symbol":"cDAI","address":"0x6D7F0754FFeb405d23C51CE938289d4835bE3b14"},
           {"symbol":"cETH","address":"0xd6801a1DfFCd0a410336Ef88DeF4320D6DF1883e"},
           {"symbol":"cUSDC","address":"0x5B281A6DdA0B271e91ae35DE655Ad301C976edb1"},
-          {"symbol":"cUSDT","address":"0x2fB298BDbeF468638AD6653FF8376575ea41e768"/*,"uimpl":"0x98394a121D26F90F4841e7BFE9dD4Aba05E666E4"*/},
+          {"symbol":"cUSDT","address":"0x2fB298BDbeF468638AD6653FF8376575ea41e768"},
           {"symbol":"cZRX","address":"0x52201ff1720134bBbBB2f6BC97Bf3715490EC19B","uimpl":"","blacklist":""}
         ];
         var success = 0;
         var successList = [];
         var failList = [];
         for(var i = 0; i < ctokens.length; ++i){
+          const ctokenAddress = ctokens[i].address;
+          const symbol = ctokens[i].symbol;
           try {
             // fetch contracts
-            const ctokenAddress = ctokens[i].address;
-            const symbol = ctokens[i].symbol;
-            console.log(`        ${symbol}`);
             const cToken = await ethers.getContractAt(artifacts.ICERC20.abi, ctokenAddress);
             if(symbol == 'cETH') {
               await ceth.connect(user3).mint({value: BN.from("1000000000000000000")});
@@ -534,14 +534,19 @@ if(process.env.FORK_NETWORK === "rinkeby"){
             expectClose(userEth2.sub(userEth1).add(gasCost), amountOut);
             ++success;
             successList.push(symbol);
+            console.log(`\x1b[38;5;239m        ✓ ${symbol}\x1b[0m`);
           } catch (e) {
-            console.log(e);
-            failList.push(ctokens[i].symbol);
+            console.log(`\x1b[31m        ✘ ${symbol}`);
+            console.log('          '+e.stack.replace(/\n/g, '\n      '));
+            console.log('\x1b[0m');
+            failList.push(symbol);
           }
         }
         if(failList.length != 0) {
-          console.log("supported tokens:", successList);
-          console.log("unsupported tokens:", failList);
+          console.log("supported ctokens:");
+          console.log(successList.reduce((acc,val)=>`${acc}  - ${val}\n`,''));
+          console.log("unsupported ctokens:");
+          console.log(failList.reduce((acc,val)=>`${acc}  - ${val}\n`,''));
         }
         expect(`${success}/${ctokens.length} supported ctokens`).to.equal(`${ctokens.length}/${ctokens.length} supported ctokens`);
       });

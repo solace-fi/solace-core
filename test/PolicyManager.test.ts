@@ -286,11 +286,9 @@ describe('PolicyManager', function() {
           policyManager.address,
           registry.address,
           treasury.address,
-          100000000000,
-          100000000000,
           0,
           100000000000,
-          0,
+          1,
           16777215
         ]
       )) as MockProduct;
