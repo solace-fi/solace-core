@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // code borrowed from @uniswap/v3-periphery
-pragma solidity 0.8.0;
+pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
