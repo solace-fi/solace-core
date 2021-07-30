@@ -1,5 +1,5 @@
 import chai from "chai";
-import { ethers, waffle } from "hardhat";
+import { ethers, waffle, upgrades } from "hardhat";
 import { BigNumber as BN, constants } from "ethers";
 import { getPermitDigest, sign, getDomainSeparator } from "./utilities/signature";
 const { expect } = chai;
@@ -42,7 +42,8 @@ describe("Vault", function () {
     beforeEach(async function () {
       weth = (await deployContract(owner,artifacts.WETH)) as Weth9;
       solace = (await deployContract(owner,artifacts.SOLACE,[newOwner.address])) as Solace;
-      registry = (await deployContract(owner,artifacts.Registry,[owner.address])) as Registry;
+      let registryContract = await ethers.getContractFactory("Registry");
+      registry = (await upgrades.deployProxy(registryContract, [owner.address], { kind: "uups" })) as Registry;
       vault = (await deployContract(owner,artifacts.Vault,[owner.address,registry.address,weth.address])) as Vault;
       claimsEscrow = (await deployContract(owner,artifacts.ClaimsEscrow,[owner.address,registry.address])) as ClaimsEscrow;
       policyManager = (await deployContract(owner,artifacts.PolicyManager,[owner.address])) as PolicyManager;

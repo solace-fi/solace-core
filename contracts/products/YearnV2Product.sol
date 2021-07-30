@@ -108,4 +108,13 @@ contract YearnV2Product is BaseProduct, EIP712 {
         super.setCoveredPlatform(_coveredPlatform);
         yregistry = IYRegistry(_coveredPlatform);
     }
+
+    /**
+     * @notice Returns the name of the product.
+     * @return YearnV2
+     */
+    function name() public pure override returns (string memory) {
+        return "YearnV2";
+    }
+    
 }

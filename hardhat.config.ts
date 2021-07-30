@@ -6,7 +6,9 @@ import "hardhat-typechain";
 import "hardhat-abi-exporter";
 import "solidity-coverage";
 import "hardhat-gas-reporter";
-import { config as dotenv_config } from 'dotenv';
+import "@nomiclabs/hardhat-ethers";
+import "@openzeppelin/hardhat-upgrades";
+import { config as dotenv_config } from "dotenv";
 dotenv_config();
 const USE_PROCESSED_FILES = process.env.USE_PROCESSED_FILES === "true";
 
@@ -39,38 +41,49 @@ const config: HardhatUserConfig = {
     }
   },
   solidity: {
-    compilers: [{
-      version: "0.8.0",
-      settings: {
-        optimizer: {
-          enabled: true,
-          runs: 800
-        }
-      }
-    }],
+    compilers: [
+      {
+        version: "0.8.0",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 800,
+          },
+        },
+      },
+      {
+        version: "0.8.2",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 800,
+          },
+        },
+      },
+    ],
   },
   paths: {
     sources: USE_PROCESSED_FILES ? "./contracts_processed" : "./contracts",
     tests: "./test",
     cache: "./cache",
-    artifacts: "./artifacts"
+    artifacts: "./artifacts",
   },
   abiExporter: {
-    path: './client/src/constants/abi',
+    path: "./client/src/constants/abi",
     clear: true,
     flat: false,
     only: [],
-    spacing: 2
+    spacing: 2,
   },
   mocha: {
-    timeout: 3600000 // one hour
+    timeout: 3600000, // one hour
   },
   gasReporter: {
     enabled: true,
-    currency: 'USD',
+    currency: "USD",
     gasPrice: 20,
-    coinmarketcap: process.env.CMC_API_KEY
-  }
+    coinmarketcap: process.env.CMC_API_KEY || "",
+  },
 };
 
 // If you are defining tasks, they need to access the Hardhat Runtime Environment (hre) explicitly, as a parameter.
@@ -81,6 +94,5 @@ task("accounts", "Prints the list of accounts", async (args, hre) => {
     console.log(account.address);
   }
 });
-
 
 export default config;

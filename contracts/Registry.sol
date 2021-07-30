@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity 0.8.0;
+pragma solidity ^0.8.0;
 
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "./interface/IRegistry.sol";
-
 
 /**
  * @title Registry
  * @author solace.fi
  * @notice Tracks the contracts in the Solaverse.
  */
-contract Registry is IRegistry {
+contract Registry is IRegistry, Initializable, UUPSUpgradeable {
 
+    /// @notice Admin to upgrade contract
+    address public admin;
     /// @notice Governor.
     address public override governance;
     /// @notice Governance to take over.
@@ -33,11 +36,13 @@ contract Registry is IRegistry {
     address public override riskManager;
 
     /**
-     * @notice Constructs the registry contract.
+     * @notice initialize function for the registry contract.
+     * Only called once in contract deployment to initialize governor and admin. 
      * @param _governance Address of the governor.
      */
-    constructor(address _governance) {
+    function initialize(address _governance) public initializer {
         governance = _governance;
+        admin = msg.sender;
     }
 
     /**
@@ -147,7 +152,7 @@ contract Registry is IRegistry {
         emit PolicyManagerSet(_policyManager);
     }
 
-    /**
+    /** 
      * @notice Sets the RiskManager contract.
      * Can only be called by the current governor.
      * @param _riskManager The risk manager address.
@@ -157,5 +162,12 @@ contract Registry is IRegistry {
         require(msg.sender == governance, "!governance");
         riskManager = _riskManager;
         emit RiskManagerSet(_riskManager);
+    }
+
+    /**
+    * @notice To authorize the admin to upgrade the contract.
+    */
+    function _authorizeUpgrade(address) internal override {
+        require(admin == msg.sender, "!admin");
     }
 }

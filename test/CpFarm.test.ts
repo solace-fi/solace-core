@@ -1,4 +1,4 @@
-import { waffle, ethers } from 'hardhat';
+import { ethers, waffle, upgrades } from "hardhat";
 const { deployContract, solidity } = waffle;
 import { MockProvider } from 'ethereum-waffle';
 const provider: MockProvider = waffle.provider;
@@ -14,7 +14,7 @@ import { bnAddSub, bnMulDiv } from './utilities/math';
 import { getPermitDigest, sign, getDomainSeparator } from './utilities/signature';
 
 import { import_artifacts, ArtifactImports } from './utilities/artifact_importer';
-import { Solace, Vault, Master, Weth9, CpFarm } from '../typechain';
+import { Solace, Vault, Master, Weth9, CpFarm, PolicyManager, RiskManager, Registry } from '../typechain';
 
 // contracts
 let solaceToken: Solace;
@@ -22,6 +22,9 @@ let master: Master;
 let vault: Vault;
 let farm1: CpFarm;
 let weth: Weth9;
+let registry: Registry;
+let policyManager: PolicyManager;
+let riskManager: RiskManager;
 
 // uniswap contracts
 let uniswapFactory: Contract;
@@ -49,6 +52,16 @@ describe('CpFarm', function () {
   before(async function () {
     artifacts = await import_artifacts();
 
+    // deploy registry
+    let registryContract = await ethers.getContractFactory("Registry");
+    registry = (await upgrades.deployProxy(registryContract, [governor.address], { kind: "uups" })) as Registry;
+
+    // deploy policy manager
+    policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
+
+    // deploy risk manager
+    riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
+
     // deploy solace token
     solaceToken = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
 
@@ -59,7 +72,7 @@ describe('CpFarm', function () {
     master = (await deployContract(deployer, artifacts.Master, [governor.address, solaceToken.address, solacePerBlock])) as Master;
 
     // deploy vault / cp token
-    vault = (await deployContract(deployer, artifacts.Vault, [governor.address, ZERO_ADDRESS, weth.address])) as Vault;
+    vault = (await deployContract(deployer, artifacts.Vault, [governor.address, registry.address, weth.address])) as Vault;
 
     // deploy uniswap factory
     uniswapFactory = (await deployContract(deployer, artifacts.UniswapV3Factory)) as Contract;
@@ -69,6 +82,9 @@ describe('CpFarm', function () {
 
     // deploy uniswap position manager
     uniswapPositionManager = (await deployContract(deployer, artifacts.NonfungiblePositionManager, [uniswapFactory.address, weth.address, ZERO_ADDRESS])) as Contract;
+
+    await registry.connect(governor).setPolicyManager(policyManager.address);
+    await registry.connect(governor).setRiskManager(riskManager.address);
 
     // transfer tokens
     await solaceToken.connect(governor).addMinter(governor.address);

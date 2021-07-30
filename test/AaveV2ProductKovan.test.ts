@@ -1,6 +1,6 @@
 import hardhat from "hardhat";
 const hre = hardhat;
-import { waffle, ethers } from "hardhat";
+import { waffle, upgrades, ethers } from "hardhat";
 const { deployContract, solidity } = waffle;
 import { MockProvider } from "ethereum-waffle";
 const provider: MockProvider = waffle.provider;
@@ -121,13 +121,8 @@ if(process.env.FORK_NETWORK === "kovan"){
       )) as Weth9;
 
       // deploy registry contract
-      registry = (await deployContract(
-        deployer,
-        artifacts.Registry,
-        [
-          deployer.address
-        ]
-      )) as Registry;
+      let registryContract = await ethers.getContractFactory("Registry");
+      registry = (await upgrades.deployProxy(registryContract, [deployer.address], { kind: "uups" })) as Registry;
 
       // deploy vault
       vault = (await deployContract(
@@ -270,6 +265,9 @@ if(process.env.FORK_NETWORK === "kovan"){
         quote = quote.mul(10001).div(10000);
         let tx = await product.buyPolicy(USER1, aWETH_ADDRESS, coverLimit, blocks, { value: quote });
         expect(tx).to.emit(product, "PolicyCreated").withArgs(2);
+      });
+      it("can get product name", async function () {
+        expect(await product.name()).to.equal("AaveV2");
       });
     })
 
