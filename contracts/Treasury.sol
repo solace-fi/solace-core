@@ -8,6 +8,7 @@ import "contracts/mocks/WETH9.sol";
 import "./interface/IRegistry.sol";
 import "./interface/IPolicyManager.sol";
 import "./interface/ITreasury.sol";
+import "./interface/IVault.sol";
 
 
 /**
@@ -188,14 +189,8 @@ contract Treasury is ITreasury, ReentrancyGuard {
      * @notice Routes the premiums to the recipients
      */
     function routePremiums() external payable override nonReentrant {
-        uint256 div = weightSum;
-        uint256 length = premiumRecipients.length;
-        // transfer to all recipients
-        for(uint i = 0; i < length; i++) {
-            uint256 amount = msg.value * recipientWeights[i] / div;
-            if(amount > 0) premiumRecipients[i].transfer(amount);
-        }
-        // hold treasury share as eth
+        address payable vault = registry.vault();
+        vault.transfer(msg.value);
     }
 
     /**
@@ -224,7 +219,8 @@ contract Treasury is ITreasury, ReentrancyGuard {
     function refund(address _user, uint256 _amount) external override nonReentrant {
         // check if from active product
         require(IPolicyManager(registry.policyManager()).productIsActive(msg.sender), "!product");
-        transferEth(_user, _amount);
+        uint256 transferAmount = IVault(registry.vault()).requestEth(_amount);
+        transferEth(_user, transferAmount);
     }
 
     /**

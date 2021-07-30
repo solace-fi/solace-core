@@ -116,7 +116,8 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
      */
     function requestEth(uint256 amount) external override nonReentrant returns (uint256) {
         address escrow = registry.claimsEscrow();
-        require(msg.sender == escrow, "!escrow");
+        address treasury = registry.treasury();
+        require(msg.sender == escrow || msg.sender == treasury, "!escrow or !treasury");
         // unwrap some WETH to make ETH available for claims payout
         if(amount > address(this).balance) {
             IWETH9 weth = IWETH9(payable(address(token)));
@@ -125,7 +126,12 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
             weth.withdraw(withdrawAmount);
         }
         uint256 transferAmount = min(amount, address(this).balance);
-        payable(escrow).transfer(transferAmount);
+
+        if (msg.sender == treasury) {
+            payable(treasury).transfer(transferAmount);
+        } else {
+            payable(escrow).transfer(transferAmount);
+        }
         return transferAmount;
     }
 
