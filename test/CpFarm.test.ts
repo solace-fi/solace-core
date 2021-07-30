@@ -297,22 +297,6 @@ describe('CpFarm', function () {
       await farm1.connect(farmer1).withdrawRewardsForUser(farmer1.address); // value checked in later tests
     });
 
-    it('can withdraw eth', async function () {
-      // farmer 1, partial withdraw
-      let withdrawAmount1 = BN.from(99);
-      balancesBefore = await getBalances(farmer1, farm1);
-      let tx1 = await farm1.connect(farmer1).withdrawEth(withdrawAmount1, { gasLimit: 200000 }); // TODO: make gas more predictable?
-      await expect(tx1).to.emit(farm1, 'EthWithdrawn').withArgs(farmer1.address, withdrawAmount1);
-      balancesAfter = await getBalances(farmer1, farm1);
-      balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
-      let receipt = await tx1.wait();
-      let gasCost = receipt.gasUsed.mul(tx1.gasPrice || 0);
-      expect(balancesDiff.userEth).to.equal(withdrawAmount1.sub(gasCost));
-      expect(balancesDiff.farmStake).to.equal(withdrawAmount1.mul(-1));
-      expect(balancesDiff.farmCp).to.equal(withdrawAmount1.mul(-1));
-      expect(balancesDiff.userStake).to.equal(withdrawAmount1.mul(-1));
-    });
-
     it('can withdraw cp', async function () {
       // farmer 1, partial withdraw
       let withdrawAmount2 = BN.from(20);
@@ -329,7 +313,6 @@ describe('CpFarm', function () {
 
     it('cannot overwithdraw', async function () {
       let withdrawAmount = (await farm1.userInfo(farmer1.address)).value.add(1);
-      await expect(farm1.connect(farmer1).withdrawEth(withdrawAmount)).to.be.reverted;
       await expect(farm1.connect(farmer1).withdrawCp(withdrawAmount)).to.be.reverted;
     });
   });
@@ -416,7 +399,7 @@ describe('CpFarm', function () {
       expectedReward1 = solacePerBlock.mul(waitBlocks);
       expectClose(pendingReward1, expectedReward1);
       // actual withdraw
-      await farm.connect(farmer1).withdrawEth(depositAmount1);
+      await farm.connect(farmer1).withdrawCp(depositAmount1);
       pendingReward1 = await solaceToken.balanceOf(farmer1.address);
       expectedReward1 = solacePerBlock.mul(waitBlocks.add(1));
       expectClose(pendingReward1, expectedReward1);
@@ -487,7 +470,7 @@ describe('CpFarm', function () {
       await burnBlocks(waitBlocks4);
 
       // farmer 1 withdraw stake
-      await farm.connect(farmer1).withdrawEth(depositAmount1);
+      await farm.connect(farmer1).withdrawCp(depositAmount1);
       pendingReward1 = BN.from(await solaceToken.balanceOf(farmer1.address));
       expectedReward1 = expectedReward1.add(
         solacePerBlock.mul(42).mul(1).div(20) // 5% ownership for 42 blocks
@@ -495,7 +478,7 @@ describe('CpFarm', function () {
       expectClose(pendingReward1, expectedReward1);
       await burnBlocks(waitBlocks5);
       // farmer 2 withdraw stake
-      await farm.connect(farmer2).withdrawEth(depositAmount2.add(depositAmount3));
+      await farm.connect(farmer2).withdrawCp(depositAmount2.add(depositAmount3));
       pendingReward2 = BN.from(await solaceToken.balanceOf(farmer2.address));
       expectedReward2 = expectedReward2.add(
         solacePerBlock.mul(41).mul(19).div(20).add(
