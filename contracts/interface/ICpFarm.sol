@@ -20,8 +20,6 @@ interface ICpFarm is IFarm {
     event RewardsCompounded(address indexed _user);
     // Emitted when CP tokens are withdrawn from the farm.
     event CpWithdrawn(address indexed _user, uint256 _amount);
-    // Emitted when ETH is withdrawn from the farm.
-    event EthWithdrawn(address indexed _user, uint256 _amount);
     // Emitted when a user is rewarded.
     event UserRewarded(address indexed _user, uint256 _amount);
     // Emitted when block reward is changed.
@@ -76,14 +74,6 @@ interface ICpFarm is IFarm {
      * @param _amount The withdraw amount.
      */
     function withdrawCp(uint256 _amount) external;
-
-    /**
-     * @notice Withdraw some Eth.
-     * `_amount` is denominated in CP tokens, which are converted to eth then returned to the user.
-     * User will receive _amount of deposited tokens converted to eth and accumulated rewards.
-     * @param _amount The withdraw amount.
-     */
-    function withdrawEth(uint256 _amount) external;
 
     function vault() external view returns (IVault);
     function solace() external view returns (SOLACE);
