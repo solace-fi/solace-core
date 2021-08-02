@@ -1,4 +1,4 @@
-import { waffle, ethers } from "hardhat";
+import { ethers, waffle, upgrades } from "hardhat";
 const { deployContract, solidity } = waffle;
 import { MockProvider } from "ethereum-waffle";
 const provider: MockProvider = waffle.provider;
@@ -11,7 +11,7 @@ import { burnBlocks, burnBlocksUntil } from "./utilities/time";
 import { encodePriceSqrt, FeeAmount, TICK_SPACINGS, getMaxTick, getMinTick } from "./utilities/uniswap";
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Solace, Vault, Master, CpFarm, SolaceEthLpFarm, Weth9, LpAppraisor } from "../typechain";
+import { Solace, Vault, Master, CpFarm, SolaceEthLpFarm, Weth9, LpAppraisor, PolicyManager, RiskManager, Registry } from "../typechain";
 
 chai.use(solidity);
 
@@ -21,6 +21,9 @@ let master: Master;
 let vault: Vault;
 let weth: Weth9;
 let lpTokenAppraisor: LpAppraisor;
+let registry: Registry;
+let policyManager: PolicyManager;
+let riskManager: RiskManager;
 
 // uniswap contracts
 let uniswapFactory: Contract;
@@ -46,6 +49,16 @@ describe("Master", function () {
 
   before(async function () {
     artifacts = await import_artifacts();
+
+    // deploy registry
+    let registryContract = await ethers.getContractFactory("Registry");
+    registry = (await upgrades.deployProxy(registryContract, [governor.address], { kind: "uups" })) as Registry;
+
+    // deploy policy manager
+    policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
+
+    // deploy risk manager
+    riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
 
     // deploy solace token
     solaceToken = (await deployContract(
@@ -79,7 +92,7 @@ describe("Master", function () {
         artifacts.Vault,
         [
           governor.address,
-          ZERO_ADDRESS,
+          registry.address,
           weth.address
         ]
     )) as Vault;
@@ -122,6 +135,9 @@ describe("Master", function () {
         40000
       ]
     )) as LpAppraisor;
+
+    await registry.connect(governor).setPolicyManager(policyManager.address);
+    await registry.connect(governor).setRiskManager(riskManager.address);
 
     // transfer tokens
     await solaceToken.connect(governor).addMinter(governor.address);

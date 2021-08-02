@@ -1,4 +1,4 @@
-import { waffle, ethers, upgrades } from "hardhat";
+import { waffle, upgrades, ethers } from "hardhat";
 const { deployContract, solidity } = waffle;
 import { MockProvider } from "ethereum-waffle";
 const provider: MockProvider = waffle.provider;
@@ -133,8 +133,9 @@ if(process.env.FORK_NETWORK === "rinkeby"){
           artifacts.WETH
       )) as Weth9;
 
-      let registryContract = await ethers.getContractFactory('Registry');
-      registry = (await upgrades.deployProxy(registryContract, [deployer.address], { kind: 'uups' })) as Registry;
+      // deploy registry contract
+      let registryContract = await ethers.getContractFactory("Registry");
+      registry = (await upgrades.deployProxy(registryContract, [deployer.address], { kind: "uups" })) as Registry;
 
       // deploy vault
       vault = (await deployContract(

@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity 0.8.0;
+pragma solidity 0.8.6;
 
 import "./interface/IVault.sol";
 import "./interface/IRegistry.sol";
+import "./interface/IPolicyManager.sol";
 import "./interface/IRiskManager.sol";
 
 
@@ -99,4 +100,10 @@ contract RiskManager is IRiskManager {
         return IVault(registry.vault()).totalAssets() * weights[_product] / weightSum;
     }
 
+    /**
+     * @notice The minimum amount of capital required to safely cover all policies.
+     */
+    function minCapitalRequirement() external view override returns (uint256) {
+        return IPolicyManager(registry.policyManager()).activeCoverAmount();
+    }
 }

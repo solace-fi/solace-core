@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity 0.8.0;
+pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
@@ -34,6 +34,8 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
 
     // Set of products.
     EnumerableSet.AddressSet private products;
+
+    uint256 public override activeCoverAmount; // current amount covered (in wei)
 
     /// @notice total policy count
     uint256 public totalPolicyCount = 0;
@@ -250,6 +252,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
             price: _price
         });
         policyID = ++totalPolicyCount; // starts at 1
+        activeCoverAmount += _coverAmount;
         policyInfo[policyID] = info;
         _mint(_policyholder, policyID);
         emit PolicyCreated(policyID);
@@ -278,6 +281,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
     {
         require(_exists(_policyID), "query for nonexistent token");
         require(policyInfo[_policyID].product == msg.sender, "wrong product");
+        activeCoverAmount = activeCoverAmount - policyInfo[_policyID].coverAmount + _coverAmount;
         PolicyInfo memory info = PolicyInfo({
             policyholder: _policyholder,
             product: msg.sender,
@@ -302,6 +306,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
 
     function _burn(uint256 _policyID) internal override {
         super._burn(_policyID);
+        activeCoverAmount -= policyInfo[_policyID].coverAmount;
         delete policyInfo[_policyID];
         emit PolicyBurned(_policyID);
     }
@@ -311,42 +316,19 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
      * @param _policyIDs list of expired policies
      */
     function updateActivePolicies(uint256[] calldata _policyIDs) external override {
+        uint256 activeCover = activeCoverAmount;
         for (uint256 i = 0; i < _policyIDs.length; i++) {
             uint256 policyID = _policyIDs[i];
             // dont burn active or nonexistent policies
             if (policyHasExpired(policyID)) {
                 address product = policyInfo[policyID].product;
                 uint256 coverAmount = policyInfo[policyID].coverAmount;
+                activeCover -= coverAmount;
                 IProduct(product).updateActiveCoverAmount(-int256(coverAmount));
                 _burn(policyID);
             }
         }
-        // todo: an implementation like this would reduce SSTOREs if updating multiple policies of the same product
-        // solidity doesn't allow memory mappings though
-        /*
-        //mapping(address => int256) memory productCoverageDiffs;
-        uint256[] memory productCoverageDiffs = new uint256[products.length()];
-        //EnumerableSet.AddressSet memory changedProducts;
-        //EnumerableMap.AddressToUintMap memory productCoverageDiffs;
-        // loop through policies
-        for (uint256 i = 0; i < _policyIDs.length; i++) {
-            uint256 policyID = _policyIDs[i];
-            if (policyHasExpired(policyID)) {
-                address product = policyInfo[policyID];
-                //changedProducts.add(product);
-                //productCoverageDiffs[product] -= policyInfo[policyID].coverAmount;
-                productCoverageDiffs.set(product, productCoverageDiffs.get(product) + policyInfo[policyID].coverAmount);
-                _burn(policyID);
-                delete policyInfo[policyID];
-            }
-        }
-        // loop through products
-        //for(uint256 i = 0; i < changedProducts.length(); i++) {
-        for(uint256 i = 0; i < productCoverageDiffs.length(); i++) {
-            (address product, uint256 diff) = productCoverageDiffs.at(i);
-            IProduct(product).updateActiveCoverAmount(int256(-diff));
-        }
-        */
+        activeCoverAmount = activeCover;
     }
 
     /*** ERC721 INHERITANCE FUNCTIONS

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // code borrowed from @uniswap/v3-core
-pragma solidity 0.8.0;
+pragma solidity 0.8.6;
 
 /// @title The interface for the Uniswap V3 Factory
 /// @notice The Uniswap V3 Factory facilitates creation of Uniswap V3 pools and control over the protocol fees

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity 0.8.0;
+pragma solidity 0.8.6;
 
 
 /**
@@ -115,7 +115,7 @@ interface ITreasury {
      * @param _user The user.
      * @return The amount.
      */
-    function unpaidRewards(address _user) external view returns (uint256);
+    function unpaidRefunds(address _user) external view returns (uint256);
 
     /**
      * @notice Pull any unpaid rewards.
