@@ -55,7 +55,7 @@ contract Treasury is ITreasury, ReentrancyGuard {
         swapRouter = ISwapRouter(_swapRouter);
         weth = WETH9(payable(_weth));
         registry = IRegistry(_registry);
-        premiumRecipients = [registry.vault()];
+        premiumRecipients = [payable(registry.vault())];
         recipientWeights = [1,0];
         weightSum = 1;
     }
@@ -228,7 +228,7 @@ contract Treasury is ITreasury, ReentrancyGuard {
     function refund(address _user, uint256 _amount) external override nonReentrant {
         // check if from active product
         require(IPolicyManager(registry.policyManager()).productIsActive(msg.sender), "!product");
-        transferEth(_user, transferAmount);
+        transferEth(_user, _amount);
     }
 
     /**
