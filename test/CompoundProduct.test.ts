@@ -266,10 +266,11 @@ if(process.env.FORK_NETWORK === "mainnet"){
     describe('implementedFunctions', function () {
       it('can getQuote', async function () {
         let price = BN.from(await product.price());
-        let coverLimit = 1 // cover 0.01% of the position
+        let positionAmount = await product.appraisePosition(USER1, cETH_ADDRESS);
+        let coverAmount = positionAmount.mul(1).div(10000);
         let blocks = BN.from(threeDays)
         let expectedPremium = BN.from("346307967291657");
-        let quote = BN.from(await product.getQuote(USER1, cETH_ADDRESS, coverLimit, blocks))
+        let quote = BN.from(await product.getQuote(USER1, cETH_ADDRESS, coverAmount, blocks))
         expect(quote).to.equal(expectedPremium);
       })
 
@@ -280,10 +281,11 @@ if(process.env.FORK_NETWORK === "mainnet"){
         (await policyManager.connect(deployer).addProduct(product.address));
         expect(await policyManager.productIsActive(product.address)).to.equal(true);
 
-        let coverLimit = 1 // cover 0.01% of the position
+        let positionAmount = await product.appraisePosition(USER1, cETH_ADDRESS);
+        let coverAmount = positionAmount.mul(1).div(10000);
         let blocks = threeDays
-        let quote = BN.from(await product.getQuote(USER1, cETH_ADDRESS, coverLimit, blocks));
-        let res = (await product.buyPolicy(USER1, cETH_ADDRESS, coverLimit, blocks, { value: quote }));
+        let quote = BN.from(await product.getQuote(USER1, cETH_ADDRESS, coverAmount, blocks));
+        let res = (await product.buyPolicy(USER1, cETH_ADDRESS, coverAmount, blocks, { value: quote }));
         let receipt = await res.wait()
         if(receipt.events) {
           var event = receipt.events.filter(event => event.event == "PolicyCreated")[0]
@@ -296,10 +298,11 @@ if(process.env.FORK_NETWORK === "mainnet"){
       })
 
       it("can buy duplicate policy", async function () {
-        let coverLimit = 1 // cover 0.01% of the position
+        let positionAmount = await product.appraisePosition(USER1, cETH_ADDRESS);
+        let coverAmount = positionAmount.mul(1).div(10000);
         let blocks = threeDays
-        let quote = BN.from(await product.getQuote(USER1, cETH_ADDRESS, coverLimit, blocks));
-        await product.buyPolicy(USER1, cETH_ADDRESS, coverLimit, blocks, { value: quote });
+        let quote = BN.from(await product.getQuote(USER1, cETH_ADDRESS, coverAmount, blocks));
+        await product.buyPolicy(USER1, cETH_ADDRESS, coverAmount, blocks, { value: quote });
       })
 
       it("can get product name", async function () {
@@ -319,10 +322,11 @@ if(process.env.FORK_NETWORK === "mainnet"){
         await deployer.sendTransaction({to: claimsEscrow.address, value: BN.from("1000000000000000000")});
         // create a cETH position and policy
         await ceth.connect(user).mint({value: BN.from("1000000000000000")});
-        let coverLimit = 10000
+        let positionAmount = await product.appraisePosition(user.address, cETH_ADDRESS);
+        let coverAmount = positionAmount;
         let blocks = threeDays
-        let quote = BN.from(await product.getQuote(user.address, cETH_ADDRESS, coverLimit, blocks));
-        await product.connect(user).buyPolicy(user.address, cETH_ADDRESS, coverLimit, blocks, { value: quote });
+        let quote = BN.from(await product.getQuote(user.address, cETH_ADDRESS, coverAmount, blocks));
+        await product.connect(user).buyPolicy(user.address, cETH_ADDRESS, coverAmount, blocks, { value: quote });
         // create a cUSDC position and policy
         var ethIn = "1000000000000000000";
         await uniswapRouter.connect(user).exactInputSingle({
@@ -339,8 +343,8 @@ if(process.env.FORK_NETWORK === "mainnet"){
         expect(usdcBalance).to.be.gt(0);
         await usdc.connect(user).approve(cUSDC_ADDRESS, constants.MaxUint256)
         await cusdc.connect(user).mint(usdcBalance);
-        quote = BN.from(await product.getQuote(user.address, cUSDC_ADDRESS, coverLimit, blocks));
-        await product.connect(user).buyPolicy(user.address, cUSDC_ADDRESS, coverLimit, blocks, { value: quote });
+        quote = BN.from(await product.getQuote(user.address, cUSDC_ADDRESS, coverAmount, blocks));
+        await product.connect(user).buyPolicy(user.address, cUSDC_ADDRESS, coverAmount, blocks, { value: quote });
         // create another cUSDC position and policy
         var ethIn = "100000000000";
         await uniswapRouter.connect(user2).exactInputSingle({
@@ -357,8 +361,8 @@ if(process.env.FORK_NETWORK === "mainnet"){
         expect(usdcBalance).to.be.gt(0);
         await usdc.connect(user2).approve(cUSDC_ADDRESS, constants.MaxUint256)
         await cusdc.connect(user2).mint(usdcBalance);
-        quote = BN.from(await product.getQuote(user2.address, cUSDC_ADDRESS, coverLimit, blocks));
-        await product.connect(user2).buyPolicy(user2.address, cUSDC_ADDRESS, coverLimit, blocks, { value: quote });
+        quote = BN.from(await product.getQuote(user2.address, cUSDC_ADDRESS, coverAmount, blocks));
+        await product.connect(user2).buyPolicy(user2.address, cUSDC_ADDRESS, coverAmount, blocks, { value: quote });
       });
       it("cannot submit claim with expired signature", async function () {
         let digest = getSubmitClaimDigest("Solace.fi-CompoundProduct", product.address, chainId, policyID1, amountOut1, 0);
@@ -544,11 +548,12 @@ if(process.env.FORK_NETWORK === "mainnet"){
             const cAmount = await cToken.balanceOf(user3.address);
             expect(cAmount).to.be.gt(0);
             // create policy
-            let coverLimit = 10000;
+            let positionAmount = await product.appraisePosition(user3.address, ctokenAddress);
+            let coverAmount = positionAmount;
             let blocks = threeDays;
-            let quote = BN.from(await product.getQuote(user3.address, ctokenAddress, coverLimit, blocks));
+            let quote = BN.from(await product.getQuote(user3.address, ctokenAddress, coverAmount, blocks));
             quote = quote.mul(10001).div(10000);
-            await product.connect(user3).buyPolicy(user3.address, ctokenAddress, coverLimit, blocks, { value: quote });
+            await product.connect(user3).buyPolicy(user3.address, ctokenAddress, coverAmount, blocks, { value: quote });
             let policyID = (await policyManager.totalPolicyCount()).toNumber();
             // sign swap
             let amountOut = 10000;

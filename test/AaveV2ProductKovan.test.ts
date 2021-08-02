@@ -90,7 +90,7 @@ if(process.env.FORK_NETWORK === "kovan"){
 
     const aWETH_ADDRESS = "0x87b1f4cf9BD63f7BBD3eE1aD04E8F52540349347";
     const USER1 = "0xc2b74b547d02bafc93feb34bd964d42312ae70c3";
-    const BALANCE1 = BN.from("608218702433845134");
+    const BALANCE1 = BN.from("608218814659045357");
 
     const aUSDT_ADDRESS = "0xFF3c8bc103682FA918c954E84F5056aB4DD5189d";
     const USER2 = "0xde6663fbb083c1bd0f2303f68276e2df2deb0a9d";
@@ -236,10 +236,11 @@ if(process.env.FORK_NETWORK === "kovan"){
     describe('implementedFunctions', function () {
       it('can getQuote', async function () {
         let price = BN.from(await product.price());
-        let coverLimit = 5000 // cover 50% of the position
+        let positionAmount = await product.appraisePosition(USER1, aWETH_ADDRESS);
+        let coverAmount = positionAmount.mul(5000).div(10000);
         let blocks = BN.from(threeDays)
         let expectedPremium = BN.from("64988622087944");
-        let quote = BN.from(await product.getQuote(USER1, aWETH_ADDRESS, coverLimit, blocks));
+        let quote = BN.from(await product.getQuote(USER1, aWETH_ADDRESS, coverAmount, blocks));
         expectClose(quote, expectedPremium, BN.from("1000000000"))
       })
       it('can buyPolicy', async function () {
@@ -249,21 +250,23 @@ if(process.env.FORK_NETWORK === "kovan"){
         (await policyManager.connect(deployer).addProduct(product.address));
         expect(await policyManager.productIsActive(product.address)).to.equal(true);
 
-        let coverLimit = 500 // cover 5% of the position
+        let positionAmount = await product.appraisePosition(USER1, aWETH_ADDRESS);
+        let coverAmount = positionAmount.mul(500).div(10000);
         let blocks = threeDays
-        let quote = BN.from(await product.getQuote(USER1, aWETH_ADDRESS, coverLimit, blocks));
+        let quote = BN.from(await product.getQuote(USER1, aWETH_ADDRESS, coverAmount, blocks));
         quote = quote.mul(10001).div(10000);
-        let tx = await product.buyPolicy(USER1, aWETH_ADDRESS, coverLimit, blocks, { value: quote });
+        let tx = await product.buyPolicy(USER1, aWETH_ADDRESS, coverAmount, blocks, { value: quote });
         expect(tx).to.emit(product, "PolicyCreated").withArgs(1);
         expect(await policyManager.totalSupply()).to.equal(1);
         expect(await policyManager.balanceOf(USER1)).to.equal(1);
       });
       it("can buy duplicate policy", async function () {
-        let coverLimit = 500 // cover 5% of the position
+        let positionAmount = await product.appraisePosition(USER1, aWETH_ADDRESS);
+        let coverAmount = positionAmount.mul(500).div(10000);
         let blocks = threeDays
-        let quote = BN.from(await product.getQuote(USER1, aWETH_ADDRESS, coverLimit, blocks));
+        let quote = BN.from(await product.getQuote(USER1, aWETH_ADDRESS, coverAmount, blocks));
         quote = quote.mul(10001).div(10000);
-        let tx = await product.buyPolicy(USER1, aWETH_ADDRESS, coverLimit, blocks, { value: quote });
+        let tx = await product.buyPolicy(USER1, aWETH_ADDRESS, coverAmount, blocks, { value: quote });
         expect(tx).to.emit(product, "PolicyCreated").withArgs(2);
       });
       it("can get product name", async function () {
@@ -287,18 +290,19 @@ if(process.env.FORK_NETWORK === "kovan"){
         await lendingPool.connect(user).deposit(LINK_ADDRESS, amountIn1, user.address, 0);
         expect(await link.balanceOf(user.address)).to.be.equal(0);
         expect(await alink.balanceOf(user.address)).to.be.gte(amountIn1);
-        let coverLimit = 10000;
+        let positionAmount = await product.appraisePosition(user.address, aLINK_ADDRESS);
+        let coverAmount = positionAmount;
         let blocks = threeDays;
-        let quote = BN.from(await product.getQuote(user.address, aLINK_ADDRESS, coverLimit, blocks));
+        let quote = BN.from(await product.getQuote(user.address, aLINK_ADDRESS, coverAmount, blocks));
         quote = quote.mul(10001).div(10000);
-        await product.connect(user).buyPolicy(user.address, aLINK_ADDRESS, coverLimit, blocks, { value: quote });
+        await product.connect(user).buyPolicy(user.address, aLINK_ADDRESS, coverAmount, blocks, { value: quote });
         // create another aLink position and policy
         expect(await link.balanceOf(user2.address)).to.equal(amountIn1);
         await link.connect(user2).approve(lendingPool.address, constants.MaxUint256);
         await lendingPool.connect(user2).deposit(LINK_ADDRESS, amountIn1, user2.address, 0);
         expect(await link.balanceOf(user2.address)).to.be.equal(0);
         expect(await alink.balanceOf(user2.address)).to.be.gte(amountIn1);
-        await product.connect(user2).buyPolicy(user2.address, aLINK_ADDRESS, coverLimit, blocks, { value: quote });
+        await product.connect(user2).buyPolicy(user2.address, aLINK_ADDRESS, coverAmount, blocks, { value: quote });
       });
       it("cannot submit claim with expired signature", async function () {
         let digest = getSubmitClaimDigest("Solace.fi-AaveV2Product", product.address, chainId, policyID1, amountOut1, 0);
@@ -417,11 +421,12 @@ if(process.env.FORK_NETWORK === "kovan"){
             const aAmount = await aToken.balanceOf(user3.address);
             expectClose(aAmount, uAmount, 100);
             // create policy
-            let coverLimit = 10000;
+            let positionAmount = await product.appraisePosition(user3.address, aAddress);
+            let coverAmount = positionAmount;
             let blocks = threeDays;
-            let quote = BN.from(await product.getQuote(user3.address, aAddress, coverLimit, blocks));
+            let quote = BN.from(await product.getQuote(user3.address, aAddress, coverAmount, blocks));
             quote = quote.mul(10001).div(10000);
-            await product.connect(user3).buyPolicy(user3.address, aAddress, coverLimit, blocks, { value: quote });
+            await product.connect(user3).buyPolicy(user3.address, aAddress, coverAmount, blocks, { value: quote });
             let policyID = (await policyManager.totalPolicyCount()).toNumber();
             // sign swap
             let amountOut = 10000;

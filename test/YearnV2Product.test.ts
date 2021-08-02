@@ -256,10 +256,11 @@ if(process.env.FORK_NETWORK === "mainnet"){
         expect(await product.name()).to.equal("YearnV2");
       });
       it('can getQuote', async function () {
-        let coverLimit = 5000 // cover 50% of the position
+        let positionAmount = await product.appraisePosition(WHALE, YDAI_ADDRESS);
+        let coverAmount = positionAmount.mul(5000).div(10000);
         let blocks = BN.from(threeDays)
         let expectedPremium = BN.from("2185288300549535");
-        let quote = BN.from(await product.getQuote(WHALE, YDAI_ADDRESS, coverLimit, blocks));
+        let quote = BN.from(await product.getQuote(WHALE, YDAI_ADDRESS, coverAmount, blocks));
         expectClose(quote, expectedPremium, BN.from("1000000000"))
       })
       it('can buyPolicy', async function () {
@@ -269,21 +270,23 @@ if(process.env.FORK_NETWORK === "mainnet"){
         (await policyManager.connect(deployer).addProduct(product.address));
         expect(await policyManager.productIsActive(product.address)).to.equal(true);
 
-        let coverLimit = 500 // cover 5% of the position
+        let positionAmount = await product.appraisePosition(WHALE, YDAI_ADDRESS);
+        let coverAmount = positionAmount.mul(500).div(10000);
         let blocks = threeDays
-        let quote = BN.from(await product.getQuote(WHALE, YDAI_ADDRESS, coverLimit, blocks));
+        let quote = BN.from(await product.getQuote(WHALE, YDAI_ADDRESS, coverAmount, blocks));
         quote = quote.mul(10001).div(10000);
-        let tx = await product.buyPolicy(WHALE, YDAI_ADDRESS, coverLimit, blocks, { value: quote });
+        let tx = await product.buyPolicy(WHALE, YDAI_ADDRESS, coverAmount, blocks, { value: quote });
         expect(tx).to.emit(product, "PolicyCreated").withArgs(1);
         expect(await policyManager.totalSupply()).to.equal(1);
         expect(await policyManager.balanceOf(WHALE)).to.equal(1);
       });
       it("can buy duplicate policy", async function () {
-        let coverLimit = 500 // cover 5% of the position
+        let positionAmount = await product.appraisePosition(WHALE, YDAI_ADDRESS);
+        let coverAmount = positionAmount.mul(500).div(10000);
         let blocks = threeDays
-        let quote = BN.from(await product.getQuote(WHALE, YDAI_ADDRESS, coverLimit, blocks));
+        let quote = BN.from(await product.getQuote(WHALE, YDAI_ADDRESS, coverAmount, blocks));
         quote = quote.mul(10001).div(10000);
-        let tx = await product.buyPolicy(WHALE, YDAI_ADDRESS, coverLimit, blocks, { value: quote });
+        let tx = await product.buyPolicy(WHALE, YDAI_ADDRESS, coverAmount, blocks, { value: quote });
         expect(tx).to.emit(product, "PolicyCreated").withArgs(2);
       });
     })
@@ -302,16 +305,17 @@ if(process.env.FORK_NETWORK === "mainnet"){
         expect(await dai.balanceOf(user.address)).to.equal(daiAmount);
         await dai.connect(user).approve(ydai.address, constants.MaxUint256);
         await ydai.connect(user).deposit(daiAmount);
-        let coverLimit = 10000;
+        let positionAmount = await product.appraisePosition(user.address, YDAI_ADDRESS);
+        let coverAmount = positionAmount;
         let blocks = threeDays;
-        let quote = BN.from(await product.getQuote(user.address, YDAI_ADDRESS, coverLimit, blocks));
+        let quote = BN.from(await product.getQuote(user.address, YDAI_ADDRESS, coverAmount, blocks));
         quote = quote.mul(10001).div(10000);
-        await product.connect(user).buyPolicy(user.address, YDAI_ADDRESS, coverLimit, blocks, { value: quote });
+        await product.connect(user).buyPolicy(user.address, YDAI_ADDRESS, coverAmount, blocks, { value: quote });
         // create another dai position and policy
         expect(await dai.balanceOf(user2.address)).to.equal(daiAmount);
         await dai.connect(user2).approve(ydai.address, constants.MaxUint256);
         await ydai.connect(user2).deposit(daiAmount);
-        await product.connect(user2).buyPolicy(user2.address, YDAI_ADDRESS, coverLimit, blocks, { value: quote });
+        await product.connect(user2).buyPolicy(user2.address, YDAI_ADDRESS, coverAmount, blocks, { value: quote });
       });
       it("cannot submit claim with expired signature", async function () {
         let digest = getSubmitClaimDigest("Solace.fi-YearnV2Product", product.address, chainId, policyID1, amountOut1, 0);
@@ -456,11 +460,12 @@ if(process.env.FORK_NETWORK === "mainnet"){
             const aAmount = await yvault.balanceOf(user3.address);
             expect(aAmount).to.be.gt(0);
             // create policy
-            let coverLimit = 10000;
+            let positionAmount = await product.appraisePosition(user3.address, yAddress);
+            let coverAmount = positionAmount;
             let blocks = threeDays;
-            let quote = BN.from(await product.getQuote(user3.address, yAddress, coverLimit, blocks));
+            let quote = BN.from(await product.getQuote(user3.address, yAddress, coverAmount, blocks));
             quote = quote.mul(10001).div(10000);
-            await product.connect(user3).buyPolicy(user3.address, yAddress, coverLimit, blocks, { value: quote });
+            await product.connect(user3).buyPolicy(user3.address, yAddress, coverAmount, blocks, { value: quote });
             let policyID = (await policyManager.totalPolicyCount()).toNumber();
             // sign swap
             let amountOut = 10000;
