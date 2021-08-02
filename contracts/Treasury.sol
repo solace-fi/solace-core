@@ -41,7 +41,7 @@ contract Treasury is ITreasury, ReentrancyGuard {
     uint32 public weightSum;
 
     /// @notice The amount of eth that a user is owed if any.
-    mapping(address => uint256) public override unpaidRewards;
+    mapping(address => uint256) public override unpaidRefunds;
 
     /**
      * @notice Constructs the treasury contract.
@@ -246,7 +246,7 @@ contract Treasury is ITreasury, ReentrancyGuard {
      */
     function transferEth(address _user, uint256 _amount) internal {
         // account for unpaid rewards
-        _amount += unpaidRewards[_user];
+        _amount += unpaidRefunds[_user];
         IVault(registry.vault()).requestEth(_amount);
 
         if(_amount == 0) return;
@@ -257,7 +257,7 @@ contract Treasury is ITreasury, ReentrancyGuard {
         }
         // send eth
         uint256 transferAmount = min(address(this).balance, _amount);
-        unpaidRewards[_user] = _amount - transferAmount;
+        unpaidRefunds[_user] = _amount - transferAmount;
         payable(_user).transfer(transferAmount);
     }
 
