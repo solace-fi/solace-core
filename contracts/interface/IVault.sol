@@ -76,6 +76,14 @@ interface IVault is IERC20, IERC20Permit {
     function setCooldownWindow(uint64 _min, uint64 _max) external;
 
     /**
+     * @notice Adds or removes requesting rights.
+     * Can only be called by the current governor.
+     * @param _dst The requestor.
+     * @param _status True to add or false to remove rights.
+     */
+    function setRequestor(address _dst, bool _status) external;
+
+    /**
      * @notice Allows a user to deposit ETH into the Vault (becoming a Capital Provider)
      * Shares of the Vault (CP tokens) are minted to caller
      * Called when Vault receives ETH
@@ -107,12 +115,12 @@ interface IVault is IERC20, IERC20Permit {
     function withdraw(uint256 shares) external returns (uint256);
 
     /**
-     * @notice Sends ETH to ClaimsEscrow to pay out claims.
-     * Can only be called by ClaimsEscrow.
-     * @param amount Amount of ETH wanted
-     * @return Amount of ETH sent
+     * @notice Sends ETH to other users or contracts.
+     * Can only be called by authorized requestors.
+     * @param _amount Amount of ETH wanted.
+     * @return Amount of ETH sent.
      */
-    function requestEth(uint256 amount) external returns (uint256);
+    function requestEth(uint256 _amount) external returns (uint256);
 
     // weth
     function token() external view returns (IERC20);
@@ -144,4 +152,9 @@ interface IVault is IERC20, IERC20Permit {
      * @return The timestamp in seconds.
      */
     function cooldownStart(address _user) external view returns (uint64);
+
+    /**
+     * @notice Returns true if the destination is authorized to request ETH.
+     */
+    function isRequestor(address _dst) external view returns (bool);
 }

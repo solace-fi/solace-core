@@ -46,6 +46,9 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     // The timestamp that a depositor's cooldown started.
     mapping(address => uint64) public override cooldownStart;
 
+    // Returns true if the destination is authorized to request ETH.
+    mapping(address => bool) public override isRequestor;
+
     constructor (address _governance, address _registry, address _token) ERC20("Solace CP Token", "SCP") ERC20Permit("Solace CP Token") {
         governance = _governance;
         registry = IRegistry(_registry);
@@ -106,6 +109,17 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
         require(_min < _max, "invalid window");
         cooldownMin = _min;
         cooldownMax = _max;
+    }
+
+    /**
+     * @notice Adds or removes requesting rights.
+     * Can only be called by the current governor.
+     * @param _dst The requestor.
+     * @param _status True to add or false to remove rights.
+     */
+    function setRequestor(address _dst, bool _status) external override {
+        require(msg.sender == governance, "!governance");
+        isRequestor[_dst] = _status;
     }
 
     /*************
@@ -189,24 +203,23 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     }
 
     /**
-     * @notice Sends ETH to ClaimsEscrow to pay out claims.
-     * Can only be called by ClaimsEscrow.
-     * @param amount Amount of ETH wanted
-     * @return Amount of ETH sent
+     * @notice Sends ETH to other users or contracts.
+     * Can only be called by authorized requestors.
+     * @param _amount Amount of ETH wanted.
+     * @return Amount of ETH sent.
      */
-    function requestEth(uint256 amount) external override nonReentrant returns (uint256) {
-        address escrow = registry.claimsEscrow();
-        require(msg.sender == escrow, "!escrow");
+    function requestEth(uint256 _amount) external override nonReentrant returns (uint256) {
+        require(isRequestor[msg.sender], "!requestor");
         // unwrap some WETH to make ETH available for claims payout
-        if(amount > address(this).balance) {
+        if(_amount > address(this).balance) {
             IWETH9 weth = IWETH9(payable(address(token)));
-            uint256 wanted = amount - address(this).balance;
+            uint256 wanted = _amount - address(this).balance;
             uint256 withdrawAmount = min(weth.balanceOf(address(this)), wanted);
             weth.withdraw(withdrawAmount);
         }
         // transfer funds
-        uint256 transferAmount = min(amount, address(this).balance);
-        payable(escrow).transfer(transferAmount);
+        uint256 transferAmount = min(_amount, address(this).balance);
+        payable(msg.sender).transfer(transferAmount);
         emit FundsSent(transferAmount);
         return transferAmount;
     }

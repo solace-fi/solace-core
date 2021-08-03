@@ -359,13 +359,31 @@ describe("Vault", function () {
           await provider.send("evm_increaseTime", [60*60*24*50]);
           await expect(await vault.connect(depositor1).withdraw(0)).to.emit(vault, "WithdrawalMade").withArgs(depositor1.address, 0);
         });
-        //it("", async function () {});
       });
     });
 
+    describe("requestors", async function () {
+      it("should start with no authorized requestors", async function () {
+        expect(await vault.isRequestor(claimsEscrow.address)).to.equal(false);
+      });
+      it("should revert add and remove requestors by non governance", async function () {
+        await expect(vault.connect(depositor1).setRequestor(depositor1.address, true)).to.be.revertedWith("!governance");
+        await expect(vault.connect(depositor1).setRequestor(depositor1.address, false)).to.be.revertedWith("!governance");
+      });
+      it("should add and remove requestors", async function () {
+        await vault.connect(owner).setRequestor(claimsEscrow.address, true);
+        expect(await vault.isRequestor(claimsEscrow.address)).to.equal(true);
+        await vault.connect(owner).setRequestor(claimsEscrow.address, false);
+        expect(await vault.isRequestor(claimsEscrow.address)).to.equal(false);
+      });
+    })
+
     describe("requestEth", function () {
-      it("should revert if not called by claims escrow", async function () {
-        await expect(vault.requestEth(0)).to.be.revertedWith("!escrow");
+      beforeEach(async function () {
+        await vault.connect(owner).setRequestor(mockEscrow.address, true);
+      })
+      it("should revert if not called by a requestor", async function () {
+        await expect(vault.requestEth(0)).to.be.revertedWith("!requestor");
       });
       it("should send eth", async function () {
         await registry.setClaimsEscrow(mockEscrow.address);
