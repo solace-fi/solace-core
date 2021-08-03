@@ -20,12 +20,15 @@ contract RiskManager is IRiskManager {
     /// @notice Governance to take over.
     address public override newGovernance;
 
-    /// @notice Registry
-    IRegistry public registry;
+    /// @notice Multiplier for minimum capital requirement in BPS.
+    uint16 public override partialReservesFactor;
 
+    uint32 public weightSum;
     address[] public products;
     mapping(address => uint32) public weights;
-    uint32 public weightSum;
+
+    /// @notice Registry
+    IRegistry public registry;
 
     /**
      * @notice Constructs the risk manager contract.
@@ -36,6 +39,7 @@ contract RiskManager is IRiskManager {
         governance = _governance;
         registry = IRegistry(_registry);
         weightSum = type(uint32).max; // no div by zero
+        partialReservesFactor = 10000;
     }
 
     /**
@@ -92,6 +96,17 @@ contract RiskManager is IRiskManager {
     }
 
     /**
+     * @notice Sets the partial reserves factor.
+     * Can only be called by the current governor.
+     * @param _factor New partial reserves factor in BPS.
+     */
+    function setPartialReservesFactor(uint16 _factor) external override {
+        // can only be called by governor
+        require(msg.sender == governance, "!governance");
+        partialReservesFactor = _factor;
+    }
+
+    /**
      * @notice The maximum amount of cover that a product can sell.
      * @param _product The product that wants to sell cover.
      * @return The max amount of cover in wei.
@@ -104,6 +119,6 @@ contract RiskManager is IRiskManager {
      * @notice The minimum amount of capital required to safely cover all policies.
      */
     function minCapitalRequirement() external view override returns (uint256) {
-        return IPolicyManager(registry.policyManager()).activeCoverAmount();
+        return IPolicyManager(registry.policyManager()).activeCoverAmount() * partialReservesFactor / 10000;
     }
 }
