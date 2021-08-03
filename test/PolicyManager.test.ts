@@ -322,30 +322,29 @@ describe('PolicyManager', function() {
     });
     it("can update active policies", async function() {
       // create policies
-      let coverLimit = 10000;
       // policy 1 expires
       await mockProduct.setPositionValue(0b00001);
-      await mockProduct.connect(user)._buyPolicy(user.address, positionContract.address, coverLimit, 110);
+      await mockProduct.connect(user)._buyPolicy(user.address, positionContract.address, 0b00001, 110);
       expect(await policyManager.activeCoverAmount()).to.equal(0b00001);
       expect(await riskManager.minCapitalRequirement()).to.equal(0b00001);
       // policy 2 expires
       await mockProduct.setPositionValue(0b00010);
-      await mockProduct.connect(user)._buyPolicy(user.address, positionContract.address, coverLimit, 120);
+      await mockProduct.connect(user)._buyPolicy(user.address, positionContract.address, 0b00010, 120);
       expect(await policyManager.activeCoverAmount()).to.equal(0b00011);
       expect(await riskManager.minCapitalRequirement()).to.equal(0b00011);
       // policy 3 expires but is not updated
       await mockProduct.setPositionValue(0b00100);
-      await mockProduct.connect(user)._buyPolicy(user.address, positionContract.address, coverLimit, 130);
+      await mockProduct.connect(user)._buyPolicy(user.address, positionContract.address, 0b00100, 130);
       expect(await policyManager.activeCoverAmount()).to.equal(0b00111);
       expect(await riskManager.minCapitalRequirement()).to.equal(0b00111);
       // policy 4 does not expire
       await mockProduct.setPositionValue(0b01000);
-      await mockProduct.connect(user)._buyPolicy(user.address, positionContract.address, coverLimit, 200);
+      await mockProduct.connect(user)._buyPolicy(user.address, positionContract.address, 0b01000, 200);
       expect(await policyManager.activeCoverAmount()).to.equal(0b01111);
       expect(await riskManager.minCapitalRequirement()).to.equal(0b01111);
       // policy 5 is canceled
       await mockProduct.setPositionValue(0b10000);
-      await mockProduct.connect(user)._buyPolicy(user.address, positionContract.address, coverLimit, 300);
+      await mockProduct.connect(user)._buyPolicy(user.address, positionContract.address, 0b10000, 300);
       expect(await policyManager.activeCoverAmount()).to.equal(0b11111);
       expect(await riskManager.minCapitalRequirement()).to.equal(0b11111);
       // pass time
