@@ -6,6 +6,7 @@ contracts_processed
 coverage
 coverage.json
 docs/
+docgen/
 .openzeppelin/
 .vscode/
 gas_reports.txt

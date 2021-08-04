@@ -22,6 +22,7 @@
     "hardhat": "^2.5.0",
     "hardhat-abi-exporter": "^2.2.1",
     "hardhat-contract-sizer": "^2.0.3",
+    "hardhat-docgen": "^1.1.1",
     "hardhat-gas-reporter": "^1.0.4",
     "hardhat-typechain": "^0.3.5",
     "solhint": "^3.3.6",
