@@ -298,7 +298,7 @@ describe("BaseProduct", () => {
         .withArgs(1);
     });
     it("returns overpayment from buy policy", async function() {
-      let treasuryBalance1 = await provider.getBalance(treasury.address)
+      let treasuryBalance1 = await provider.getBalance(treasury.address);
       let quote = BN.from(await product.getQuote(buyer.address, positionContract.address, coverAmount, blocks));
       let tx = await product.connect(buyer).buyPolicy(buyer.address, positionContract.address, coverAmount, blocks, { value: quote.add(100) });
       await expect(tx)

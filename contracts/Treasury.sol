@@ -55,7 +55,7 @@ contract Treasury is ITreasury, ReentrancyGuard {
         weth = WETH9(payable(_weth));
         registry = IRegistry(_registry);
 
-        if (registry.vault() != address(0)) {
+        if (_registry != address(0) && registry.vault() != address(0)) {
             premiumRecipients = [payable(registry.vault())];
             recipientWeights = [1,0];
             weightSum = 1;
