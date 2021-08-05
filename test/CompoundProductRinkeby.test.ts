@@ -163,7 +163,7 @@ if(process.env.FORK_NETWORK === "rinkeby"){
           deployer.address,
           ZERO_ADDRESS,
           weth.address,
-          ZERO_ADDRESS
+          registry.address
         ]
       )) as Treasury;
 

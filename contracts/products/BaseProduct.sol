@@ -268,7 +268,6 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
         require(_blocks >= minPeriod && _blocks <= maxPeriod, "invalid period");
 
         // transfer premium to the treasury
-
         ITreasury(payable(registry.treasury())).routePremiums{value: premium}();
         // create the policy
         uint64 expirationBlock = uint64(block.number + _blocks);

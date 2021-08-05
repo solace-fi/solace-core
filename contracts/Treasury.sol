@@ -10,7 +10,6 @@ import "./interface/IPolicyManager.sol";
 import "./interface/ITreasury.sol";
 import "./interface/IVault.sol";
 
-
 /**
  * @title Treasury
  * @author solace.fi
@@ -55,9 +54,12 @@ contract Treasury is ITreasury, ReentrancyGuard {
         swapRouter = ISwapRouter(_swapRouter);
         weth = WETH9(payable(_weth));
         registry = IRegistry(_registry);
-        premiumRecipients = [payable(registry.vault())];
-        recipientWeights = [1,0];
-        weightSum = 1;
+
+        if (registry.vault() != address(0)) {
+            premiumRecipients = [payable(registry.vault())];
+            recipientWeights = [1,0];
+            weightSum = 1;
+        }
     }
 
     /**
@@ -197,7 +199,10 @@ contract Treasury is ITreasury, ReentrancyGuard {
         // transfer to all recipients
         for(uint i = 0; i < length; i++) {
             uint256 amount = msg.value * recipientWeights[i] / div;
-            if(amount > 0) premiumRecipients[i].transfer(amount);
+            if (amount > 0) {
+                (bool success,) = premiumRecipients[i].call{value: amount}("");
+                require(success, "failed to route premium");
+            } 
         }
         // hold treasury share as eth
     }
@@ -247,7 +252,8 @@ contract Treasury is ITreasury, ReentrancyGuard {
     function transferEth(address _user, uint256 _amount) internal {
         // account for unpaid rewards
         _amount += unpaidRefunds[_user];
-        IVault(registry.vault()).requestEth(_amount);
+        // transfer amount from vault
+        if (registry.vault() != address(0)) IVault(registry.vault()).requestEth(_amount);
 
         if(_amount == 0) return;
         // unwrap weth if necessary

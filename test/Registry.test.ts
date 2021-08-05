@@ -47,13 +47,11 @@ describe("Registry", function() {
     // deploy claims escrow contract
     claimsEscrow = (await deployContract(deployer, artifacts.ClaimsEscrow, [governor.address, registry.address])) as ClaimsEscrow;
 
-    // deploy claims escrow contract
-
     // deploy vault contract
     vault = (await deployContract(deployer, artifacts.Vault, [governor.address, registry.address, weth.address])) as Vault;
 
     // deploy treasury contract
-    treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS])) as Treasury;
+    treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, ZERO_ADDRESS, ZERO_ADDRESS, registry.address])) as Treasury;
 
     // deploy policy manager
     policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;

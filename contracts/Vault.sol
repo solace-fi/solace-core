@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-
 pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
@@ -11,7 +10,6 @@ import "./interface/IRegistry.sol";
 import "./interface/IPolicyManager.sol";
 import "./interface/IRiskManager.sol";
 import "./interface/IVault.sol";
-
 
 /**
  * @title Vault
@@ -147,7 +145,6 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
         uint256 shares = totalSupply() == 0 || _totalAssets() == 0
           ? amount
           : amount * totalSupply() / _totalAssets();
-
         // Issuance of shares needs to be done before taking the deposit
         _mint(msg.sender, shares);
 
@@ -286,20 +283,20 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
 
     /**
      * @notice Fallback function to allow contract to receive ETH
-     * Mints CP tokens to caller if caller is not Vault or WETH
+     * Mints CP tokens to caller if caller is not Vault or WETH or Treasury
      */
     receive() external payable {
-        if (msg.sender != address(token)) {
+        if (msg.sender != address(token) && msg.sender != registry.treasury()) {
             deposit();
         }
     }
 
     /**
      * @notice Fallback function to allow contract to receive ETH
-     * Mints CP tokens to caller if caller is not Vault or WETH
+     * Mints CP tokens to caller if caller is not Vault or WETH or Treasury
      */
     fallback() external payable {
-        if (msg.sender != address(token)) {
+        if (msg.sender != address(token) && msg.sender != registry.treasury()) {
             deposit();
         }
     }
