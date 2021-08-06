@@ -7,6 +7,7 @@ import "hardhat-abi-exporter";
 import "solidity-coverage";
 import "hardhat-gas-reporter";
 import "@nomiclabs/hardhat-ethers";
+import "hardhat-docgen";
 import "@openzeppelin/hardhat-upgrades";
 import { config as dotenv_config } from "dotenv";
 dotenv_config();
