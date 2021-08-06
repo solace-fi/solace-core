@@ -21,7 +21,7 @@ describe("Vault", function () {
     let mockProduct: MockProduct;
     let riskManager: RiskManager;
 
-    const [owner, newOwner, depositor1, depositor2, claimant, mockEscrow] = provider.getWallets();
+    const [owner, newOwner, depositor1, depositor2, claimant, mockEscrow, mockTreasury] = provider.getWallets();
     const tokenName = "Solace CP Token";
     const tokenSymbol = "SCP";
     const testDepositAmount = BN.from("10");
@@ -222,6 +222,50 @@ describe("Vault", function () {
           data: "0xabcd"
         });
         expect(await mockVault.balanceOf(depositor1.address)).to.equal(0);
+      });
+      it("should hold if receive() sent by treasury", async function () {
+        await registry.setTreasury(mockTreasury.address);
+        let mockVault = (await deployContract(
+          owner,
+          artifacts.Vault,
+          [owner.address, registry.address, mockTreasury.address]
+        )) as Vault;
+        await mockTreasury.sendTransaction({
+          to: mockVault.address,
+          value: testDepositAmount,
+          data: "0x"
+        });
+        expect(await mockVault.balanceOf(mockTreasury.address)).to.equal(0);
+      });
+      it("should hold if fallback() sent by treasury", async function () {
+        await registry.setTreasury(mockTreasury.address);
+        let mockVault = (await deployContract(
+          owner,
+          artifacts.Vault,
+          [owner.address, registry.address, mockTreasury.address]
+        )) as Vault;
+        await mockTreasury.sendTransaction({
+          to: mockVault.address,
+          value: testDepositAmount,
+          data: "0xabcd"
+        });
+        expect(await mockVault.balanceOf(mockTreasury.address)).to.equal(0);
+      });
+      it("should get eth from treasury", async function () {
+        await registry.setTreasury(mockTreasury.address);
+        let mockVault = (await deployContract(
+          owner,
+          artifacts.Vault,
+          [owner.address, registry.address, mockTreasury.address]
+        )) as Vault;
+        let ethAmount1 = await provider.getBalance(mockVault.address);
+        await mockTreasury.sendTransaction({
+          to: mockVault.address,
+          value: testDepositAmount,
+          data: "0x"
+        });
+        let ethAmount2 = await provider.getBalance(mockVault.address);
+        expect(ethAmount2.sub(testDepositAmount)).to.equal(ethAmount1);
       });
     });
 

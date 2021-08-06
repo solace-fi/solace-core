@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-
 pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
@@ -11,7 +10,6 @@ import "./interface/IRegistry.sol";
 import "./interface/IPolicyManager.sol";
 import "./interface/IRiskManager.sol";
 import "./interface/IVault.sol";
-
 
 /**
  * @title Vault
@@ -96,6 +94,28 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     }
 
     /**
+     * @notice Sends ETH to ClaimsEscrow or Treasury to pay out claims.
+     * Can only be called by ClaimsEscrow or Treasury
+     * @param amount Amount of ETH wanted
+     * @return Amount of ETH sent
+     */
+    function requestEth(uint256 amount) external override nonReentrant returns (uint256) {
+        address escrow = registry.claimsEscrow();
+        address treasury = registry.treasury();
+        require(msg.sender == escrow || msg.sender == treasury, "!escrow or !treasury");
+        // unwrap some WETH to make ETH available for claims payout
+        if(amount > address(this).balance) {
+            IWETH9 weth = IWETH9(payable(address(token)));
+            uint256 wanted = amount - address(this).balance;
+            uint256 withdrawAmount = min(weth.balanceOf(address(this)), wanted);
+            weth.withdraw(withdrawAmount);
+        }
+        uint256 transferAmount = min(amount, address(this).balance);
+        payable(msg.sender).transfer(transferAmount);
+        return transferAmount;
+    }
+    
+    /** 
      * @notice Sets the minimum and maximum amount of time a user must wait to withdraw funds.
      * Can only be called by the current governor.
      * @param _min Minimum time in seconds.
@@ -125,7 +145,6 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
         uint256 shares = totalSupply() == 0 || _totalAssets() == 0
           ? amount
           : amount * totalSupply() / _totalAssets();
-
         // Issuance of shares needs to be done before taking the deposit
         _mint(msg.sender, shares);
 
@@ -186,29 +205,6 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
         payable(msg.sender).transfer(value);
         emit WithdrawalMade(msg.sender, value);
         return value;
-    }
-
-    /**
-     * @notice Sends ETH to ClaimsEscrow to pay out claims.
-     * Can only be called by ClaimsEscrow.
-     * @param amount Amount of ETH wanted
-     * @return Amount of ETH sent
-     */
-    function requestEth(uint256 amount) external override nonReentrant returns (uint256) {
-        address escrow = registry.claimsEscrow();
-        require(msg.sender == escrow, "!escrow");
-        // unwrap some WETH to make ETH available for claims payout
-        if(amount > address(this).balance) {
-            IWETH9 weth = IWETH9(payable(address(token)));
-            uint256 wanted = amount - address(this).balance;
-            uint256 withdrawAmount = min(weth.balanceOf(address(this)), wanted);
-            weth.withdraw(withdrawAmount);
-        }
-        // transfer funds
-        uint256 transferAmount = min(amount, address(this).balance);
-        payable(escrow).transfer(transferAmount);
-        emit FundsSent(transferAmount);
-        return transferAmount;
     }
 
     /*************
@@ -287,20 +283,20 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
 
     /**
      * @notice Fallback function to allow contract to receive ETH
-     * Mints CP tokens to caller if caller is not Vault or WETH
+     * Mints CP tokens to caller if caller is not Vault or WETH or Treasury
      */
     receive() external payable {
-        if (msg.sender != address(token)) {
+        if (msg.sender != address(token) && msg.sender != registry.treasury()) {
             deposit();
         }
     }
 
     /**
      * @notice Fallback function to allow contract to receive ETH
-     * Mints CP tokens to caller if caller is not Vault or WETH
+     * Mints CP tokens to caller if caller is not Vault or WETH or Treasury
      */
     fallback() external payable {
-        if (msg.sender != address(token)) {
+        if (msg.sender != address(token) && msg.sender != registry.treasury()) {
             deposit();
         }
     }

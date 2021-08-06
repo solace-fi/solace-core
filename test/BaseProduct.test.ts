@@ -54,6 +54,7 @@ describe("BaseProduct", () => {
     // deploy weth
     weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
 
+    // deploy registry
     let registryContract = await ethers.getContractFactory("Registry");
     registry = (await upgrades.deployProxy(registryContract, [deployer.address], { kind: "uups" })) as Registry;
 
