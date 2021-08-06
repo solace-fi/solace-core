@@ -41,6 +41,13 @@ interface IRiskManager {
     function setProductWeights(address[] calldata _products, uint32[] calldata _weights) external;
 
     /**
+     * @notice Sets the partial reserves factor.
+     * Can only be called by the current governor.
+     * @param _factor New partial reserves factor in BPS.
+     */
+    function setPartialReservesFactor(uint16 _factor) external;
+
+    /**
      * @notice The maximum amount of cover that a product can sell.
      * @param _product The product that wants to sell cover.
      * @return The max amount of cover in wei.
@@ -51,4 +58,7 @@ interface IRiskManager {
      * @notice The minimum amount of capital required to safely cover all policies.
      */
     function minCapitalRequirement() external view returns (uint256);
+
+    /// @notice Multiplier for minimum capital requirement in BPS.
+    function partialReservesFactor() external view returns (uint16);
 }

@@ -115,7 +115,7 @@ interface ITreasury {
      * @param _user The user.
      * @return The amount.
      */
-    function unpaidRewards(address _user) external view returns (uint256);
+    function unpaidRefunds(address _user) external view returns (uint256);
 
     /**
      * @notice Pull any unpaid rewards.
