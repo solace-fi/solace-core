@@ -9,7 +9,7 @@ const { expect } = chai;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { RiskManager, Registry, Vault, Weth9 } from "../typechain";
+import { RiskManager, Registry, Vault, Weth9, PolicyManager } from "../typechain";
 
 describe("RiskManager", function () {
   let artifacts: ArtifactImports;
@@ -18,6 +18,7 @@ describe("RiskManager", function () {
   // solace contracts
   let registry: Registry;
   let vault: Vault;
+  let policyManager: PolicyManager;
   let riskManager: RiskManager;
 
   let weth: Weth9;
@@ -38,10 +39,18 @@ describe("RiskManager", function () {
     // deploy vault
     vault = (await deployContract(deployer,artifacts.Vault,[deployer.address,registry.address,weth.address])) as Vault;
 
+    // deploy policy manager
+    policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
+
     // deploy risk manager contract
     riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
 
+    await policyManager.connect(governor).addProduct(product1.address);
+    await policyManager.connect(governor).addProduct(product2.address);
+    await policyManager.connect(governor).addProduct(product3.address);
     await registry.connect(governor).setVault(vault.address);
+    await registry.connect(governor).setPolicyManager(policyManager.address);
+    await registry.connect(governor).setRiskManager(riskManager.address);
   });
 
   describe("governance", function () {
@@ -115,6 +124,41 @@ describe("RiskManager", function () {
     });
   });
 
-  // bundled in with policy manager test
-  // describe("minCapitalRequirement", function () {})
+  describe("partialReservesFactor", function () {
+    it("starts at 10000 bps", async function () {
+      expect(await riskManager.partialReservesFactor()).to.equal(10000);
+    });
+    it("cannot be set by non governance", async function () {
+      await expect(riskManager.connect(user).setPartialReservesFactor(1)).to.be.revertedWith("!governance");
+    });
+    it("can be set", async function () {
+      await riskManager.connect(governor).setPartialReservesFactor(5000);
+      expect(await riskManager.partialReservesFactor()).to.equal(5000);
+      await riskManager.connect(governor).setPartialReservesFactor(10000);
+    });
+  });
+
+  describe("minCapitalRequirement", function () {
+    it("should start at zero", async function () {
+      expect(await riskManager.minCapitalRequirement()).to.equal(0);
+    });
+    it("should track policy cover amount", async function () {
+      await policyManager.connect(product2).createPolicy(user.address, ZERO_ADDRESS, 1, 0, 0);
+      expect(await riskManager.minCapitalRequirement()).to.equal(1);
+      await policyManager.connect(product3).createPolicy(user.address, ZERO_ADDRESS, 2, 0, 0);
+      expect(await riskManager.minCapitalRequirement()).to.equal(3);
+      await policyManager.connect(product3).setPolicyInfo(2, user.address, ZERO_ADDRESS, 4, 0, 0);
+      expect(await riskManager.minCapitalRequirement()).to.equal(5);
+      await policyManager.connect(product2).burn(1);
+      expect(await riskManager.minCapitalRequirement()).to.equal(4);
+    });
+    it("should leverage", async function () {
+      await riskManager.connect(governor).setPartialReservesFactor(5000);
+      expect(await riskManager.minCapitalRequirement()).to.equal(2);
+      await policyManager.connect(product3).createPolicy(user.address, ZERO_ADDRESS, 9, 0, 0);
+      expect(await riskManager.minCapitalRequirement()).to.equal(6);
+      await riskManager.connect(governor).setPartialReservesFactor(7500);
+      expect(await riskManager.minCapitalRequirement()).to.equal(9);
+    });
+  });
 });

@@ -10,7 +10,7 @@ chai.use(solidity);
 import { import_artifacts, ArtifactImports } from './utilities/artifact_importer';
 import { burnBlocks, burnBlocksUntil } from './utilities/time';
 
-import { PolicyManager, MockProduct, Treasury, Registry, RiskManager, NonfungibleTokenPolicyDescriptor } from '../typechain';
+import { PolicyManager, MockProduct, Treasury, Registry, RiskManager, NonfungibleTokenPolicyDescriptor, Vault } from '../typechain';
 
 describe('PolicyManager', function() {
   let artifacts: ArtifactImports;
@@ -20,6 +20,7 @@ describe('PolicyManager', function() {
   let policyManager: PolicyManager;
   let mockProduct: MockProduct;
   let treasury: Treasury;
+  let vault: Vault;
   let registry: Registry;
   let riskManager: RiskManager;
   let nftTokenDescriptor: NonfungibleTokenPolicyDescriptor;
@@ -43,6 +44,9 @@ describe('PolicyManager', function() {
     // deploy treasury contract
     treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, ZERO_ADDRESS, ZERO_ADDRESS, registry.address])) as Treasury;
 
+    // deploy vault contract
+    vault = (await deployContract(deployer,artifacts.Vault,[governor.address,registry.address, ZERO_ADDRESS])) as Vault;
+
     // deploy risk manager contract
     riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
 
@@ -50,6 +54,7 @@ describe('PolicyManager', function() {
     nftTokenDescriptor = (await deployContract(deployer, artifacts.NonfungibleTokenPolicyDescriptor)) as NonfungibleTokenPolicyDescriptor;
 
     await registry.connect(governor).setTreasury(treasury.address);
+    await registry.connect(governor).setVault(vault.address);
     await registry.connect(governor).setPolicyManager(policyManager.address);
     await registry.connect(governor).setRiskManager(riskManager.address);
     await deployer.sendTransaction({ to: treasury.address, value: BN.from('10000000000000000') });

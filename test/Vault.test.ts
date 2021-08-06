@@ -21,7 +21,7 @@ describe("Vault", function () {
     let mockProduct: MockProduct;
     let riskManager: RiskManager;
 
-    const [owner, newOwner, depositor1, depositor2, claimant, mockEscrow] = provider.getWallets();
+    const [owner, newOwner, depositor1, depositor2, claimant, mockEscrow, mockTreasury] = provider.getWallets();
     const tokenName = "Solace CP Token";
     const tokenSymbol = "SCP";
     const testDepositAmount = BN.from("10");
@@ -223,6 +223,50 @@ describe("Vault", function () {
         });
         expect(await mockVault.balanceOf(depositor1.address)).to.equal(0);
       });
+      it("should hold if receive() sent by treasury", async function () {
+        await registry.setTreasury(mockTreasury.address);
+        let mockVault = (await deployContract(
+          owner,
+          artifacts.Vault,
+          [owner.address, registry.address, mockTreasury.address]
+        )) as Vault;
+        await mockTreasury.sendTransaction({
+          to: mockVault.address,
+          value: testDepositAmount,
+          data: "0x"
+        });
+        expect(await mockVault.balanceOf(mockTreasury.address)).to.equal(0);
+      });
+      it("should hold if fallback() sent by treasury", async function () {
+        await registry.setTreasury(mockTreasury.address);
+        let mockVault = (await deployContract(
+          owner,
+          artifacts.Vault,
+          [owner.address, registry.address, mockTreasury.address]
+        )) as Vault;
+        await mockTreasury.sendTransaction({
+          to: mockVault.address,
+          value: testDepositAmount,
+          data: "0xabcd"
+        });
+        expect(await mockVault.balanceOf(mockTreasury.address)).to.equal(0);
+      });
+      it("should get eth from treasury", async function () {
+        await registry.setTreasury(mockTreasury.address);
+        let mockVault = (await deployContract(
+          owner,
+          artifacts.Vault,
+          [owner.address, registry.address, mockTreasury.address]
+        )) as Vault;
+        let ethAmount1 = await provider.getBalance(mockVault.address);
+        await mockTreasury.sendTransaction({
+          to: mockVault.address,
+          value: testDepositAmount,
+          data: "0x"
+        });
+        let ethAmount2 = await provider.getBalance(mockVault.address);
+        expect(ethAmount2.sub(testDepositAmount)).to.equal(ethAmount1);
+      });
     });
 
     describe("deposit weth", function () {
@@ -359,13 +403,31 @@ describe("Vault", function () {
           await provider.send("evm_increaseTime", [60*60*24*50]);
           await expect(await vault.connect(depositor1).withdraw(0)).to.emit(vault, "WithdrawalMade").withArgs(depositor1.address, 0);
         });
-        //it("", async function () {});
       });
     });
 
+    describe("requestors", async function () {
+      it("should start with no authorized requestors", async function () {
+        expect(await vault.isRequestor(claimsEscrow.address)).to.equal(false);
+      });
+      it("should revert add and remove requestors by non governance", async function () {
+        await expect(vault.connect(depositor1).setRequestor(depositor1.address, true)).to.be.revertedWith("!governance");
+        await expect(vault.connect(depositor1).setRequestor(depositor1.address, false)).to.be.revertedWith("!governance");
+      });
+      it("should add and remove requestors", async function () {
+        await vault.connect(owner).setRequestor(claimsEscrow.address, true);
+        expect(await vault.isRequestor(claimsEscrow.address)).to.equal(true);
+        await vault.connect(owner).setRequestor(claimsEscrow.address, false);
+        expect(await vault.isRequestor(claimsEscrow.address)).to.equal(false);
+      });
+    })
+
     describe("requestEth", function () {
-      it("should revert if not called by claims escrow", async function () {
-        await expect(vault.requestEth(0)).to.be.revertedWith("!escrow");
+      beforeEach(async function () {
+        await vault.connect(owner).setRequestor(mockEscrow.address, true);
+      })
+      it("should revert if not called by a requestor", async function () {
+        await expect(vault.requestEth(0)).to.be.revertedWith("!requestor");
       });
       it("should send eth", async function () {
         await registry.setClaimsEscrow(mockEscrow.address);
