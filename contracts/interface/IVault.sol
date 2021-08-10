@@ -73,7 +73,7 @@ interface IVault is IERC20, IERC20Permit {
      * @param _min Minimum time in seconds.
      * @param _max Maximum time in seconds.
      */
-    function setCooldownWindow(uint64 _min, uint64 _max) external;
+    function setCooldownWindow(uint40 _min, uint40 _max) external;
 
     /**
      * @notice Adds or removes requesting rights.
@@ -90,7 +90,7 @@ interface IVault is IERC20, IERC20Permit {
      * Deposits `_amount` `token`, issuing shares to `recipient`.
      * Reverts if Vault is in Emergency Shutdown
      */
-    function deposit() external payable;
+    function depositEth() external payable;
 
     /**
      * @notice Allows a user to deposit WETH into the Vault (becoming a Capital Provider)
@@ -105,6 +105,11 @@ interface IVault is IERC20, IERC20Permit {
      * @notice Starts the cooldown.
      */
     function startCooldown() external;
+
+    /**
+     * @notice Stops the cooldown.
+     */
+    function stopCooldown() external;
 
     /**
      * @notice Allows a user to redeem shares for ETH
@@ -141,17 +146,17 @@ interface IVault is IERC20, IERC20Permit {
     function totalAssets() external view returns (uint256);
 
     /// @notice The minimum amount of time a user must wait to withdraw funds.
-    function cooldownMin() external view returns (uint64);
+    function cooldownMin() external view returns (uint40);
 
     /// @notice The maximum amount of time a user must wait to withdraw funds.
-    function cooldownMax() external view returns (uint64);
+    function cooldownMax() external view returns (uint40);
 
     /**
      * @notice The timestamp that a depositor's cooldown started.
      * @param _user The depositor.
      * @return The timestamp in seconds.
      */
-    function cooldownStart(address _user) external view returns (uint64);
+    function cooldownStart(address _user) external view returns (uint40);
 
     /**
      * @notice Returns true if the destination is authorized to request ETH.

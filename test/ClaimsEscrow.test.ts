@@ -73,6 +73,7 @@ describe("ClaimsEscrow", function () {
     await registry.setClaimsEscrow(claimsEscrow.address);
     await registry.setPolicyManager(policyManager.address);
     await policyManager.addProduct(mockProduct.address);
+    await vault.setRequestor(claimsEscrow.address, true);
   });
 
   describe("deployment", function () {
@@ -101,7 +102,7 @@ describe("ClaimsEscrow", function () {
 
   describe("receiveClaim", function () {
     beforeEach("deposit", async function () {
-      await vault.connect(depositor1).deposit({ value: testDepositAmount});
+      await vault.connect(depositor1).depositEth({ value: testDepositAmount});
     });
     it("should revert if not called by the vault", async function () {
       await expect(claimsEscrow.connect(owner).receiveClaim(1, owner.address, 0)).to.be.revertedWith("!product");
@@ -119,7 +120,7 @@ describe("ClaimsEscrow", function () {
 
   describe("withdrawClaimsPayout", function () {
     beforeEach("deposit to vault and approve claim", async function () {
-      await vault.connect(depositor1).deposit({ value: testDepositAmount});
+      await vault.connect(depositor1).depositEth({ value: testDepositAmount});
       await claimsEscrow.connect(mockProduct).receiveClaim(claimID, claimant.address, testClaimAmount);
     });
     it("should revert if invalid claimID", async function () {
@@ -155,7 +156,7 @@ describe("ClaimsEscrow", function () {
       let balance1 = await claimant.getBalance();
       await claimsEscrow.connect(mockProduct).receiveClaim(claimID2, claimant.address, testClaimAmount3);
       expect(await claimsEscrow.totalClaimsOutstanding()).to.equal(testClaimAmount.add(testClaimAmount3));
-      await vault.connect(depositor1).deposit({ value: 4 });
+      await vault.connect(depositor1).depositEth({ value: 4 });
       await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add one hour
       let tx1 = await claimsEscrow.connect(claimant).withdrawClaimsPayout(claimID2);
       let receipt1 = await tx1.wait();
@@ -164,7 +165,7 @@ describe("ClaimsEscrow", function () {
       expect(balance2.sub(balance1).add(gasCost1)).to.equal(testDepositAmount.add(4));
       expect(await claimsEscrow.totalClaimsOutstanding()).to.equal(testClaimAmount.add(testClaimAmount3).sub(testDepositAmount.add(4)));
       expect(await claimsEscrow.exists(claimID2)).to.be.true;
-      await vault.connect(depositor1).deposit({ value: 10 });
+      await vault.connect(depositor1).depositEth({ value: 10 });
       let tx2 = await claimsEscrow.connect(claimant).withdrawClaimsPayout(claimID2);
       let receipt2 = await tx2.wait();
       let gasCost2 = receipt2.gasUsed.mul(tx2.gasPrice || 0);
@@ -177,7 +178,7 @@ describe("ClaimsEscrow", function () {
 
   describe("adjustClaim", function () {
     beforeEach("deposit to vault and approve claim", async function () {
-      await vault.connect(depositor1).deposit({ value: testDepositAmount});
+      await vault.connect(depositor1).depositEth({ value: testDepositAmount});
       await claimsEscrow.connect(mockProduct).receiveClaim(3, claimant.address, 3);
       await claimsEscrow.connect(mockProduct).receiveClaim(1, claimant.address, testClaimAmount);
     });

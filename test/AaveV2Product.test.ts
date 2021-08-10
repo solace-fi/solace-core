@@ -148,8 +148,8 @@ if(process.env.FORK_NETWORK === "mainnet"){
         [
           deployer.address,
           ZERO_ADDRESS,
-          ZERO_ADDRESS,
-          weth.address
+          weth.address,
+          registry.address
         ]
       )) as Treasury;
 
@@ -193,7 +193,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
       lendingPool = await ethers.getContractAt(artifacts.LendingPool.abi, LENDING_POOL_ADDRESS);
 
       await registry.setVault(vault.address);
-      await deployer.sendTransaction({to:vault.address,value:maxCoverAmount});
+      await vault.connect(deployer).depositEth({value:maxCoverAmount});
       await registry.setClaimsEscrow(claimsEscrow.address);
       await registry.setTreasury(treasury.address);
       await registry.setPolicyManager(policyManager.address);

@@ -43,7 +43,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
     struct PolicyInfo {
         uint256 coverAmount;
         address policyholder;
-        uint64 expirationBlock;
+        uint40 expirationBlock;
         address product;
         uint24 price;
         address positionContract;
@@ -145,7 +145,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
     View functions that give us data about policies
     ****/
 
-    function getPolicyInfo(uint256 _policyID) external view override returns (address policyholder, address product, address positionContract, uint256 coverAmount, uint64 expirationBlock, uint24 price){
+    function getPolicyInfo(uint256 _policyID) external view override returns (address policyholder, address product, address positionContract, uint256 coverAmount, uint40 expirationBlock, uint24 price){
         require(_exists(_policyID), "query for nonexistent token");
         PolicyInfo memory info = policyInfo[_policyID];
         return (info.policyholder, info.product, info.positionContract, info.coverAmount, info.expirationBlock, info.price);
@@ -166,7 +166,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
         return policyInfo[_policyID].positionContract;
     }
 
-    function getPolicyExpirationBlock(uint256 _policyID) external view override returns (uint64) {
+    function getPolicyExpirationBlock(uint256 _policyID) external view override returns (uint40) {
         require(_exists(_policyID), "query for nonexistent token");
         return policyInfo[_policyID].expirationBlock;
     }
@@ -216,7 +216,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
     }
 
     function policyHasExpired(uint256 _policyID) public view override returns (bool) {
-        uint64 expBlock = policyInfo[_policyID].expirationBlock;
+        uint40 expBlock = policyInfo[_policyID].expirationBlock;
         return expBlock > 0 && expBlock < block.number;
     }
 
@@ -239,7 +239,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
         address _policyholder,
         address _positionContract,
         uint256 _coverAmount,
-        uint64 _expirationBlock,
+        uint40 _expirationBlock,
         uint24 _price
     ) external override returns (uint256 policyID) {
         require(products.contains(msg.sender), "product inactive");
@@ -274,7 +274,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
         address _policyholder,     // TODO: should this be changeable?
         address _positionContract, // and this
         uint256 _coverAmount,
-        uint64 _expirationBlock,
+        uint40 _expirationBlock,
         uint24 _price
         )
         external override

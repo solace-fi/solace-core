@@ -232,7 +232,7 @@ describe('CpFarm', function () {
       // farmer 1, deposit 13 cp
       let depositAmount6 = BN.from(13);
       balancesBefore = await getBalances(farmer1, farm1);
-      await vault.connect(farmer1).deposit({ value: depositAmount6 });
+      await vault.connect(farmer1).depositEth({ value: depositAmount6 });
       await vault.connect(farmer1).increaseAllowance(farm1.address, depositAmount6);
       let tx1 = await farm1.connect(farmer1).depositCp(depositAmount6);
       await expect(tx1).to.emit(farm1, 'CpDeposited').withArgs(farmer1.address, depositAmount6);
@@ -244,7 +244,7 @@ describe('CpFarm', function () {
       // farmer 2, deposit 25
       let depositAmount7 = BN.from(25);
       balancesBefore = await getBalances(farmer2, farm1);
-      await vault.connect(farmer2).deposit({ value: depositAmount7 });
+      await vault.connect(farmer2).depositEth({ value: depositAmount7 });
       await vault.connect(farmer2).increaseAllowance(farm1.address, depositAmount7);
       let tx2 = await farm1.connect(farmer2).depositCp(depositAmount7);
       await expect(tx2).to.emit(farm1, 'CpDeposited').withArgs(farmer2.address, depositAmount7);
@@ -259,7 +259,7 @@ describe('CpFarm', function () {
       // farmer 1, deposit 111 cp
       let depositAmount8 = BN.from(111);
       balancesBefore = await getBalances(farmer1, farm1);
-      await vault.connect(farmer1).deposit({ value: depositAmount8 });
+      await vault.connect(farmer1).depositEth({ value: depositAmount8 });
       let nonce = await vault.nonces(farmer1.address);
       let approve = {
         owner: farmer1.address,
@@ -281,7 +281,7 @@ describe('CpFarm', function () {
       // no funds and no allowance
       await expect(farm1.connect(farmer1).depositCp(1)).to.be.reverted;
       // yes funds and no allowance
-      await vault.connect(farmer1).deposit({ value: 1 });
+      await vault.connect(farmer1).depositEth({ value: 1 });
       await expect(farm1.connect(farmer1).depositCp(1)).to.be.reverted;
       // no funds and yes allowance
       await vault.connect(farmer2).increaseAllowance(farm1.address, 1);

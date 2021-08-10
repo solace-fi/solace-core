@@ -40,8 +40,8 @@ contract AaveV2Product is BaseProduct, EIP712 {
         IPolicyManager _policyManager,
         IRegistry _registry,
         address _dataProvider,
-        uint64 _minPeriod,
-        uint64 _maxPeriod,
+        uint40 _minPeriod,
+        uint40 _maxPeriod,
         uint24 _price,
         uint32 _maxCoverPerUserDivisor
     ) BaseProduct(

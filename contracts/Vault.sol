@@ -38,11 +38,11 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     // capital providers must wait some time in this range in order to withdraw
     // used to prevent withdraw before claim payout
     /// @notice The minimum amount of time a user must wait to withdraw funds.
-    uint64 public override cooldownMin = 604800;  // 7 days
+    uint40 public override cooldownMin = 604800;  // 7 days
     /// @notice The maximum amount of time a user must wait to withdraw funds.
-    uint64 public override cooldownMax = 3024000; // 35 days
+    uint40 public override cooldownMax = 3024000; // 35 days
     // The timestamp that a depositor's cooldown started.
-    mapping(address => uint64) public override cooldownStart;
+    mapping(address => uint40) public override cooldownStart;
 
     // Returns true if the destination is authorized to request ETH.
     mapping(address => bool) public override isRequestor;
@@ -97,34 +97,12 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     }
 
     /**
-     * @notice Sends ETH to ClaimsEscrow or Treasury to pay out claims.
-     * Can only be called by ClaimsEscrow or Treasury
-     * @param amount Amount of ETH wanted
-     * @return Amount of ETH sent
-     */
-    function requestEth(uint256 amount) external override nonReentrant returns (uint256) {
-        address escrow = registry.claimsEscrow();
-        address treasury = registry.treasury();
-        require(msg.sender == escrow || msg.sender == treasury, "!escrow or !treasury");
-        // unwrap some WETH to make ETH available for claims payout
-        if(amount > address(this).balance) {
-            IWETH9 weth = IWETH9(payable(address(token)));
-            uint256 wanted = amount - address(this).balance;
-            uint256 withdrawAmount = min(weth.balanceOf(address(this)), wanted);
-            weth.withdraw(withdrawAmount);
-        }
-        uint256 transferAmount = min(amount, address(this).balance);
-        payable(msg.sender).transfer(transferAmount);
-        return transferAmount;
-    }
-    
-    /** 
      * @notice Sets the minimum and maximum amount of time a user must wait to withdraw funds.
      * Can only be called by the current governor.
      * @param _min Minimum time in seconds.
      * @param _max Maximum time in seconds.
      */
-    function setCooldownWindow(uint64 _min, uint64 _max) external override {
+    function setCooldownWindow(uint40 _min, uint40 _max) external override {
         require(msg.sender == governance, "!governance");
         require(_min < _max, "invalid window");
         cooldownMin = _min;
@@ -153,18 +131,19 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
      * Deposits `_amount` `token`, issuing shares to `recipient`.
      * Reverts if Vault is in Emergency Shutdown
      */
-    function deposit() public payable override nonReentrant {
+    function depositEth() public payable override nonReentrant {
         require(!emergencyShutdown, "cannot deposit when vault is in emergency shutdown");
+        // stop cooldown
+        if(cooldownStart[msg.sender] != 0) cooldownStart[msg.sender] = 0;
+        // pull eth
         uint256 amount = msg.value;
-        uint256 shares = totalSupply() == 0 || _totalAssets() == 0
+        // calculate and mint shares
+        uint256 ts = totalSupply();
+        uint256 ta = _totalAssets() - amount;
+        uint256 shares = (ts == 0 || ta == 0)
           ? amount
-          : amount * totalSupply() / _totalAssets();
-        // Issuance of shares needs to be done before taking the deposit
+          : (amount * ts / ta);
         _mint(msg.sender, shares);
-
-        // Wrap the depositor's ETH to add WETH to the vault
-        IWETH9(payable(address(token))).deposit{value: amount}();
-
         emit DepositMade(msg.sender, amount, shares);
     }
 
@@ -177,12 +156,17 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
      */
     function depositWeth(uint256 amount) external override nonReentrant {
         require(!emergencyShutdown, "cannot deposit when vault is in emergency shutdown");
-        uint256 shares = totalSupply() == 0 || _totalAssets() == 0
-            ? amount
-            : (amount * totalSupply()) / _totalAssets();
-        // Issuance of shares needs to be done before taking the deposit
-        _mint(msg.sender, shares);
+        // stop cooldown
+        if(cooldownStart[msg.sender] != 0) cooldownStart[msg.sender] = 0;
+        // pull weth
         SafeERC20.safeTransferFrom(token, msg.sender, address(this), amount);
+        // calculate and mint shares
+        uint256 ts = totalSupply();
+        uint256 ta = _totalAssets() - amount;
+        uint256 shares = (ts == 0 || ta == 0)
+          ? amount
+          : (amount * ts / ta);
+        _mint(msg.sender, shares);
         emit DepositMade(msg.sender, amount, shares);
     }
 
@@ -190,7 +174,14 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
      * @notice Starts the cooldown.
      */
     function startCooldown() external override {
-        cooldownStart[msg.sender] = uint64(block.timestamp);
+        cooldownStart[msg.sender] = uint40(block.timestamp);
+    }
+
+    /**
+     * @notice Stops the cooldown.
+     */
+    function stopCooldown() external override {
+        cooldownStart[msg.sender] = 0;
     }
 
     /**
@@ -209,13 +200,15 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
             uint256 mcr = IRiskManager(registry.riskManager()).minCapitalRequirement();
             require(_totalAssets() - value >= mcr, "withdrawal brings Vault assets below MCR");
             // validate cooldown
-            uint64 elapsed = uint64(block.timestamp) - cooldownStart[msg.sender];
+            uint40 elapsed = uint40(block.timestamp) - cooldownStart[msg.sender];
             require(cooldownMin <= elapsed && elapsed <= cooldownMax, "not in cooldown window");
         }
-        cooldownStart[msg.sender] = 0;
         // burn shares and transfer ETH to withdrawer
         _burn(msg.sender, shares);
-        IWETH9(payable(address(token))).withdraw(value);
+        // unwrap weth
+        if(value > address(this).balance) {
+            IWETH9(payable(address(token))).withdraw(value - address(this).balance);
+        }
         payable(msg.sender).transfer(value);
         emit WithdrawalMade(msg.sender, value);
         return value;
@@ -288,7 +281,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
      * @notice Quantity of all assets under control of this Vault, including those loaned out to Strategies
      */
     function _totalAssets() internal view returns (uint256) {
-        return token.balanceOf(address(this));
+        return token.balanceOf(address(this)) + address(this).balance;
     }
 
     /**
@@ -296,7 +289,6 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
      * @param shares amount of shares to calculate value for.
      */
     function _shareValue(uint256 shares) internal view returns (uint256) {
-
         // using 1e3 for extra precision here when decimals is low
         return totalSupply() == 0
             ? 0
@@ -318,23 +310,37 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
         return a < b ? a : b;
     }
 
-    /**
-     * @notice Fallback function to allow contract to receive ETH
-     * Mints CP tokens to caller if caller is not Vault or WETH or Treasury
-     */
-    receive() external payable {
-        if (msg.sender != address(token) && msg.sender != registry.treasury()) {
-            deposit();
+    function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual override {
+        // only care about user->user transfers
+        // mint and burn are validated in deposit and withdraw
+        if(from != address(0x0) && to != address(0x0)) {
+            // bypass check in emergency shutdown
+            if(!emergencyShutdown) {
+                uint40 cdm = cooldownMax;
+                uint40 start1 = cooldownStart[from];
+                uint40 start2 = cooldownStart[to];
+                uint40 timestamp = uint40(block.timestamp);
+                uint40 elapsed1 = timestamp - start1;
+                uint40 elapsed2 = timestamp - start2;
+                require(
+                    (start1 == 0 || elapsed1 >= cdm) &&
+                    (start2 == 0 || elapsed2 >= cdm),
+                    "cannot transfer during cooldown"
+                );
+            }
         }
+        super._beforeTokenTransfer(from, to, amount);
     }
 
     /**
      * @notice Fallback function to allow contract to receive ETH
      * Mints CP tokens to caller if caller is not Vault or WETH or Treasury
      */
-    fallback() external payable {
-        if (msg.sender != address(token) && msg.sender != registry.treasury()) {
-            deposit();
-        }
-    }
+    receive() external payable { }
+
+    /**
+     * @notice Fallback function to allow contract to receive ETH
+     * Mints CP tokens to caller if caller is not Vault or WETH or Treasury
+     */
+    fallback() external payable { }
 }

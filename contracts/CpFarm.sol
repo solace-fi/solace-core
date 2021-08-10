@@ -352,7 +352,7 @@ contract CpFarm is ICpFarm, ReentrancyGuard {
         UserInfo storage user = userInfo[msg.sender];
         // exchange eth for cp
         uint256 balanceBefore = vault.balanceOf(address(this));
-        vault.deposit{value:msg.value}();
+        vault.depositEth{value:msg.value}();
         uint256 cpAmount = vault.balanceOf(address(this)) - balanceBefore;
         // accounting
         valueStaked += cpAmount;
