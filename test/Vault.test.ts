@@ -377,13 +377,13 @@ describe("Vault", function () {
       });
     });
 
-    describe("withdraw", function () {
+    describe("withdraw eth", function () {
       beforeEach("deposit", async function () {
         await vault.connect(depositor1).depositEth({ value: testDepositAmount });
       });
       it("should revert if withdrawer tries to redeem more shares than they own", async function () {
         let cpBalance = await vault.balanceOf(depositor1.address);
-        await expect(vault.connect(depositor1).withdraw(cpBalance.add(1))).to.be.revertedWith("cannot redeem more shares than you own");
+        await expect(vault.connect(depositor1).withdrawEth(cpBalance.add(1))).to.be.revertedWith("cannot redeem more shares than you own");
       });
       it("should revert if withdrawal brings Vault's totalAssets below the minimum capital requirement", async function () {
         let cpBalance = await vault.balanceOf(depositor1.address);
@@ -391,20 +391,20 @@ describe("Vault", function () {
         await mockProduct.setPositionValue(newMCR);
         await mockProduct.connect(depositor1)._buyPolicy(depositor1.address, ZERO_ADDRESS, 10000, 100);
         expect(await riskManager.minCapitalRequirement()).to.equal(newMCR);
-        await expect(vault.connect(depositor1).withdraw(cpBalance)).to.be.revertedWith("withdrawal brings Vault assets below MCR");
+        await expect(vault.connect(depositor1).withdrawEth(cpBalance)).to.be.revertedWith("withdrawal brings Vault assets below MCR");
       });
       it("should revert if cooldown not started", async function () {
-        await expect(vault.connect(depositor1).withdraw(0)).to.be.revertedWith("not in cooldown window");
+        await expect(vault.connect(depositor1).withdrawEth(0)).to.be.revertedWith("not in cooldown window");
       });
       it("should revert if not enough time passed", async function () {
         await vault.connect(depositor1).startCooldown();
         await provider.send("evm_increaseTime", [60*60*24*6]);
-        await expect(vault.connect(depositor1).withdraw(0)).to.be.revertedWith("not in cooldown window");
+        await expect(vault.connect(depositor1).withdrawEth(0)).to.be.revertedWith("not in cooldown window");
       });
       it("should revert if too much time passed", async function () {
         await vault.connect(depositor1).startCooldown();
         await provider.send("evm_increaseTime", [60*60*24*36]);
-        await expect(vault.connect(depositor1).withdraw(0)).to.be.revertedWith("not in cooldown window");
+        await expect(vault.connect(depositor1).withdrawEth(0)).to.be.revertedWith("not in cooldown window");
       });
       it("should withdraw if correct time passed", async function () {
         await vault.connect(depositor1).startCooldown();
@@ -412,7 +412,7 @@ describe("Vault", function () {
         const ub1 = await depositor1.getBalance();
         const vb1 = await vault.totalAssets();
         const shares = await vault.balanceOf(depositor1.address);
-        let tx = await vault.connect(depositor1).withdraw(shares);
+        let tx = await vault.connect(depositor1).withdrawEth(shares);
         await expect(tx).to.emit(vault, "WithdrawalMade").withArgs(depositor1.address, testDepositAmount);
         let receipt = await tx.wait();
         let gasCost = receipt.gasUsed.mul(tx.gasPrice || 0);
@@ -420,6 +420,24 @@ describe("Vault", function () {
         const vb2 = await vault.totalAssets();
         expect(ub2.sub(ub1).add(gasCost)).to.equal(testDepositAmount);
         expect(vb1.sub(vb2)).to.equal(testDepositAmount);
+      });
+      it("should unwrap weth if necessary", async function () {
+        await weth.connect(depositor1).deposit({value:testDepositAmount});
+        await weth.connect(depositor1).approve(vault.address, testDepositAmount);
+        await vault.connect(depositor1).depositWeth(testDepositAmount);
+        await vault.connect(depositor1).startCooldown();
+        await provider.send("evm_increaseTime", [60*60*24*8]);
+        const ub1 = await depositor1.getBalance();
+        const vb1 = await vault.totalAssets();
+        const shares = await vault.balanceOf(depositor1.address);
+        let tx = await vault.connect(depositor1).withdrawEth(shares);
+        await expect(tx).to.emit(vault, "WithdrawalMade").withArgs(depositor1.address, testDepositAmount.mul(2));
+        let receipt = await tx.wait();
+        let gasCost = receipt.gasUsed.mul(tx.gasPrice || 0);
+        const ub2 = await depositor1.getBalance();
+        const vb2 = await vault.totalAssets();
+        expect(ub2.sub(ub1).add(gasCost)).to.equal(testDepositAmount.mul(2));
+        expect(vb1.sub(vb2)).to.equal(testDepositAmount.mul(2));
       });
       context("while vault is in emergency shutdown", function () {
         beforeEach(async function () {
@@ -431,18 +449,102 @@ describe("Vault", function () {
           await mockProduct.setPositionValue(newMCR);
           await mockProduct.connect(depositor1)._buyPolicy(depositor1.address, ZERO_ADDRESS, 10000, 100);
           expect(await riskManager.minCapitalRequirement()).to.equal(newMCR);
-          await expect(vault.connect(depositor1).withdraw(cpBalance)).to.emit(vault, "WithdrawalMade").withArgs(depositor1.address, cpBalance);
+          await expect(vault.connect(depositor1).withdrawEth(cpBalance)).to.emit(vault, "WithdrawalMade").withArgs(depositor1.address, cpBalance);
         });
         it("does not care about cooldown period", async function () {
-          await expect(await vault.connect(depositor1).withdraw(0)).to.emit(vault, "WithdrawalMade").withArgs(depositor1.address, 0);
+          await expect(await vault.connect(depositor1).withdrawEth(0)).to.emit(vault, "WithdrawalMade").withArgs(depositor1.address, 0);
           await vault.connect(depositor1).startCooldown();
-          await expect(await vault.connect(depositor1).withdraw(0)).to.emit(vault, "WithdrawalMade").withArgs(depositor1.address, 0);
+          await expect(await vault.connect(depositor1).withdrawEth(0)).to.emit(vault, "WithdrawalMade").withArgs(depositor1.address, 0);
           await provider.send("evm_increaseTime", [60*60*24*3]);
-          await expect(await vault.connect(depositor1).withdraw(0)).to.emit(vault, "WithdrawalMade").withArgs(depositor1.address, 0);
+          await expect(await vault.connect(depositor1).withdrawEth(0)).to.emit(vault, "WithdrawalMade").withArgs(depositor1.address, 0);
           await provider.send("evm_increaseTime", [60*60*24*5]);
-          await expect(await vault.connect(depositor1).withdraw(0)).to.emit(vault, "WithdrawalMade").withArgs(depositor1.address, 0);
+          await expect(await vault.connect(depositor1).withdrawEth(0)).to.emit(vault, "WithdrawalMade").withArgs(depositor1.address, 0);
           await provider.send("evm_increaseTime", [60*60*24*50]);
-          await expect(await vault.connect(depositor1).withdraw(0)).to.emit(vault, "WithdrawalMade").withArgs(depositor1.address, 0);
+          await expect(await vault.connect(depositor1).withdrawEth(0)).to.emit(vault, "WithdrawalMade").withArgs(depositor1.address, 0);
+        });
+      });
+    });
+
+    describe("withdraw weth", function () {
+      beforeEach("deposit", async function () {
+        await weth.connect(depositor1).deposit({value:testDepositAmount});
+        await weth.connect(depositor1).approve(vault.address, testDepositAmount);
+        await vault.connect(depositor1).depositWeth(testDepositAmount);
+      });
+      it("should revert if withdrawer tries to redeem more shares than they own", async function () {
+        let cpBalance = await vault.balanceOf(depositor1.address);
+        await expect(vault.connect(depositor1).withdrawWeth(cpBalance.add(1))).to.be.revertedWith("cannot redeem more shares than you own");
+      });
+      it("should revert if withdrawal brings Vault's totalAssets below the minimum capital requirement", async function () {
+        let cpBalance = await vault.balanceOf(depositor1.address);
+        let newMCR = cpBalance.toString();
+        await mockProduct.setPositionValue(newMCR);
+        await mockProduct.connect(depositor1)._buyPolicy(depositor1.address, ZERO_ADDRESS, 10000, 100);
+        expect(await riskManager.minCapitalRequirement()).to.equal(newMCR);
+        await expect(vault.connect(depositor1).withdrawWeth(cpBalance)).to.be.revertedWith("withdrawal brings Vault assets below MCR");
+      });
+      it("should revert if cooldown not started", async function () {
+        await expect(vault.connect(depositor1).withdrawWeth(0)).to.be.revertedWith("not in cooldown window");
+      });
+      it("should revert if not enough time passed", async function () {
+        await vault.connect(depositor1).startCooldown();
+        await provider.send("evm_increaseTime", [60*60*24*6]);
+        await expect(vault.connect(depositor1).withdrawWeth(0)).to.be.revertedWith("not in cooldown window");
+      });
+      it("should revert if too much time passed", async function () {
+        await vault.connect(depositor1).startCooldown();
+        await provider.send("evm_increaseTime", [60*60*24*36]);
+        await expect(vault.connect(depositor1).withdrawWeth(0)).to.be.revertedWith("not in cooldown window");
+      });
+      it("should withdraw if correct time passed", async function () {
+        await vault.connect(depositor1).startCooldown();
+        await provider.send("evm_increaseTime", [60*60*24*8]);
+        const ub1 = await weth.balanceOf(depositor1.address);
+        const vb1 = await vault.totalAssets();
+        const shares = await vault.balanceOf(depositor1.address);
+        let tx = await vault.connect(depositor1).withdrawWeth(shares);
+        await expect(tx).to.emit(vault, "WithdrawalMade").withArgs(depositor1.address, testDepositAmount);
+        const ub2 = await weth.balanceOf(depositor1.address);
+        const vb2 = await vault.totalAssets();
+        expect(ub2.sub(ub1)).to.equal(testDepositAmount);
+        expect(vb1.sub(vb2)).to.equal(testDepositAmount);
+      });
+      it("should wrap eth if necessary", async function () {
+        await vault.connect(depositor1).depositEth({ value: testDepositAmount });
+        await vault.connect(depositor1).startCooldown();
+        await provider.send("evm_increaseTime", [60*60*24*8]);
+        const ub1 = await weth.balanceOf(depositor1.address);
+        const vb1 = await vault.totalAssets();
+        const shares = await vault.balanceOf(depositor1.address);
+        let tx = await vault.connect(depositor1).withdrawWeth(shares);
+        await expect(tx).to.emit(vault, "WithdrawalMade").withArgs(depositor1.address, testDepositAmount.mul(2));
+        const ub2 = await weth.balanceOf(depositor1.address);
+        const vb2 = await vault.totalAssets();
+        expect(ub2.sub(ub1)).to.equal(testDepositAmount.mul(2));
+        expect(vb1.sub(vb2)).to.equal(testDepositAmount.mul(2));
+      });
+      context("while vault is in emergency shutdown", function () {
+        beforeEach(async function () {
+          await vault.connect(owner).setEmergencyShutdown(true);
+        });
+        it("does not care about mcr", async function () {
+          let cpBalance = await vault.balanceOf(depositor1.address);
+          let newMCR = cpBalance.toString();
+          await mockProduct.setPositionValue(newMCR);
+          await mockProduct.connect(depositor1)._buyPolicy(depositor1.address, ZERO_ADDRESS, 10000, 100);
+          expect(await riskManager.minCapitalRequirement()).to.equal(newMCR);
+          await expect(vault.connect(depositor1).withdrawWeth(cpBalance)).to.emit(vault, "WithdrawalMade").withArgs(depositor1.address, cpBalance);
+        });
+        it("does not care about cooldown period", async function () {
+          await expect(await vault.connect(depositor1).withdrawWeth(0)).to.emit(vault, "WithdrawalMade").withArgs(depositor1.address, 0);
+          await vault.connect(depositor1).startCooldown();
+          await expect(await vault.connect(depositor1).withdrawWeth(0)).to.emit(vault, "WithdrawalMade").withArgs(depositor1.address, 0);
+          await provider.send("evm_increaseTime", [60*60*24*3]);
+          await expect(await vault.connect(depositor1).withdrawWeth(0)).to.emit(vault, "WithdrawalMade").withArgs(depositor1.address, 0);
+          await provider.send("evm_increaseTime", [60*60*24*5]);
+          await expect(await vault.connect(depositor1).withdrawWeth(0)).to.emit(vault, "WithdrawalMade").withArgs(depositor1.address, 0);
+          await provider.send("evm_increaseTime", [60*60*24*50]);
+          await expect(await vault.connect(depositor1).withdrawWeth(0)).to.emit(vault, "WithdrawalMade").withArgs(depositor1.address, 0);
         });
       });
     });

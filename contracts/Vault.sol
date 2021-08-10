@@ -130,21 +130,11 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
      * Called when Vault receives ETH
      * Deposits `_amount` `token`, issuing shares to `recipient`.
      * Reverts if Vault is in Emergency Shutdown
+     * @return Number of shares minted.
      */
-    function depositEth() public payable override nonReentrant {
-        require(!emergencyShutdown, "cannot deposit when vault is in emergency shutdown");
-        // stop cooldown
-        if(cooldownStart[msg.sender] != 0) cooldownStart[msg.sender] = 0;
-        // pull eth
-        uint256 amount = msg.value;
-        // calculate and mint shares
-        uint256 ts = totalSupply();
-        uint256 ta = _totalAssets() - amount;
-        uint256 shares = (ts == 0 || ta == 0)
-          ? amount
-          : (amount * ts / ta);
-        _mint(msg.sender, shares);
-        emit DepositMade(msg.sender, amount, shares);
+    function depositEth() public payable override nonReentrant returns (uint256) {
+        // mint
+        return _deposit(msg.value);
     }
 
     /**
@@ -152,22 +142,34 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
      * Shares of the Vault (CP tokens) are minted to caller
      * Deposits `_amount` `token`, issuing shares to `recipient`.
      * Reverts if Vault is in Emergency Shutdown
-     * @param amount Amount of weth to deposit.
+     * @param _amount Amount of weth to deposit.
+     * @return Number of shares minted.
      */
-    function depositWeth(uint256 amount) external override nonReentrant {
+    function depositWeth(uint256 _amount) external override nonReentrant returns (uint256) {
+        // pull weth
+        SafeERC20.safeTransferFrom(token, msg.sender, address(this), _amount);
+        // mint
+        return _deposit(_amount);
+    }
+
+    /**
+     * @notice Handles minting of tokens during deposit.
+     * @param _amount Amount of ETH or WETH deposited.
+     * @return Number of shares minted.
+     */
+    function _deposit(uint256 _amount) internal returns (uint256) {
         require(!emergencyShutdown, "cannot deposit when vault is in emergency shutdown");
         // stop cooldown
         if(cooldownStart[msg.sender] != 0) cooldownStart[msg.sender] = 0;
-        // pull weth
-        SafeERC20.safeTransferFrom(token, msg.sender, address(this), amount);
         // calculate and mint shares
         uint256 ts = totalSupply();
-        uint256 ta = _totalAssets() - amount;
+        uint256 ta = _totalAssets() - _amount;
         uint256 shares = (ts == 0 || ta == 0)
-          ? amount
-          : (amount * ts / ta);
+          ? _amount
+          : (_amount * ts / ta);
         _mint(msg.sender, shares);
-        emit DepositMade(msg.sender, amount, shares);
+        emit DepositMade(msg.sender, _amount, shares);
+        return shares;
     }
 
     /**
@@ -187,13 +189,50 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     /**
      * @notice Allows a user to redeem shares for ETH
      * Burns CP tokens and transfers ETH to the CP
-     * @param shares amount of shares to redeem
+     * @param _shares amount of shares to redeem
      * @return value in ETH that the shares where redeemed for
      */
-    function withdraw(uint256 shares) external override nonReentrant returns (uint256) {
+    function withdrawEth(uint256 _shares) external override nonReentrant returns (uint256) {
+        uint256 value = _withdraw(_shares);
+        // unwrap weth
+        if(value > address(this).balance) {
+            IWETH9(payable(address(token))).withdraw(value - address(this).balance);
+        }
+        // transfer eth
+        payable(msg.sender).transfer(value);
+        emit WithdrawalMade(msg.sender, value);
+        return value;
+    }
+
+    /**
+     * @notice Allows a user to redeem shares for WETH
+     * Burns CP tokens and transfers WETH to the CP
+     * @param _shares amount of shares to redeem
+     * @return value in WETH that the shares where redeemed for
+     */
+    function withdrawWeth(uint256 _shares) external override nonReentrant returns (uint256) {
+        uint256 value = _withdraw(_shares);
+        // wrap eth
+        IWETH9 weth = IWETH9(payable(address(token)));
+        uint256 balance = weth.balanceOf(address(this));
+        if(value > balance) {
+            weth.deposit{value: value - balance}();
+        }
+        // transfer weth
+        SafeERC20.safeTransfer(token, msg.sender, value);
+        emit WithdrawalMade(msg.sender, value);
+        return value;
+    }
+
+    /**
+     * @notice Handles burning of tokens during withdraw.
+     * @param _shares amount of shares to redeem
+     * @return value in ETH that the shares where redeemed for
+     */
+    function _withdraw(uint256 _shares) internal returns (uint256) {
         // validate shares to withdraw
-        require(shares <= balanceOf(msg.sender), "cannot redeem more shares than you own");
-        uint256 value = _shareValue(shares);
+        require(_shares <= balanceOf(msg.sender), "cannot redeem more shares than you own");
+        uint256 value = _shareValue(_shares);
         // bypass some checks in emergency shutdown
         if(!emergencyShutdown) {
             // Stop withdrawal if process brings the Vault's `totalAssets` value below minimum capital requirement
@@ -203,14 +242,8 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
             uint40 elapsed = uint40(block.timestamp) - cooldownStart[msg.sender];
             require(cooldownMin <= elapsed && elapsed <= cooldownMax, "not in cooldown window");
         }
-        // burn shares and transfer ETH to withdrawer
-        _burn(msg.sender, shares);
-        // unwrap weth
-        if(value > address(this).balance) {
-            IWETH9(payable(address(token))).withdraw(value - address(this).balance);
-        }
-        payable(msg.sender).transfer(value);
-        emit WithdrawalMade(msg.sender, value);
+        // burn shares
+        _burn(msg.sender, _shares);
         return value;
     }
 
