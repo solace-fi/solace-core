@@ -36,8 +36,8 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
     address public override coveredPlatform; // a platform contract which locates contracts that are covered by this product
                                     // (e.g., UniswapProduct will have Factory as coveredPlatform contract, because
                                     // every Pair address can be located through getPool() function)
-    uint64 public override minPeriod; // minimum policy period in blocks
-    uint64 public override maxPeriod; // maximum policy period in blocks
+    uint40 public override minPeriod; // minimum policy period in blocks
+    uint40 public override maxPeriod; // maximum policy period in blocks
     uint24 public override price; // cover price (in wei) per block per wei (multiplied by 1e12 to avoid underflow upon construction or setter)
     uint32 public override maxCoverPerUserDivisor; // maxCover / divisor = maxCoverPerUser
 
@@ -58,8 +58,8 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
         IPolicyManager _policyManager,
         IRegistry _registry,
         address _coveredPlatform,
-        uint64 _minPeriod,
-        uint64 _maxPeriod,
+        uint40 _minPeriod,
+        uint40 _maxPeriod,
         uint24 _price,
         uint32 _maxCoverPerUserDivisor
     ) {
@@ -115,7 +115,7 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
      * @notice Sets the minimum number of blocks a policy can be purchased for
      * @param _minPeriod minimum number of blocks
      */
-    function setMinPeriod(uint64 _minPeriod) external override {
+    function setMinPeriod(uint40 _minPeriod) external override {
         require(msg.sender == governance, "!governance");
         minPeriod = _minPeriod;
     }
@@ -124,7 +124,7 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
      * @notice Sets the maximum number of blocks a policy can be purchased for
      * @param _maxPeriod maximum number of blocks
      */
-    function setMaxPeriod(uint64 _maxPeriod) external override {
+    function setMaxPeriod(uint40 _maxPeriod) external override {
         require(msg.sender == governance, "!governance");
         maxPeriod = _maxPeriod;
     }
@@ -218,7 +218,7 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
      * @param _blocks Length for policy
      * @return premium The quote for their policy in wei.
      */
-    function getQuote(address _policyholder, address _positionContract, uint256 _coverAmount, uint64 _blocks) external view override returns (uint256){
+    function getQuote(address _policyholder, address _positionContract, uint256 _coverAmount, uint40 _blocks) external view override returns (uint256){
         return _coverAmount * _blocks * price / 1e12;
     }
 
@@ -245,7 +245,7 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
      * @param _positionContract contract address where the policyholder has a position to be covered
      * @return policyID The contract address of the policy
      */
-    function buyPolicy(address _policyholder, address _positionContract, uint256 _coverAmount, uint64 _blocks) external payable override nonReentrant returns (uint256 policyID){
+    function buyPolicy(address _policyholder, address _positionContract, uint256 _coverAmount, uint40 _blocks) external payable override nonReentrant returns (uint256 policyID){
         require(!paused, "cannot buy when paused");
         // check that the buyer has a position in the covered protocol
         uint256 positionAmount = appraisePosition(_policyholder, _positionContract);
@@ -270,7 +270,7 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
         // transfer premium to the treasury
         ITreasury(payable(registry.treasury())).routePremiums{value: premium}();
         // create the policy
-        uint64 expirationBlock = uint64(block.number + _blocks);
+        uint40 expirationBlock = uint40(block.number + _blocks);
         policyID = policyManager.createPolicy(_policyholder, _positionContract, _coverAmount, expirationBlock, price);
 
         // update local book-keeping variables
@@ -290,7 +290,7 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
      */
     function updateCoverAmount(uint256 _policyID, uint256 _coverAmount) external payable override nonReentrant {
         require(!paused, "cannot buy when paused");
-        (address policyholder, address product, address positionContract, uint256 previousCoverAmount, uint64 expirationBlock, uint24 previousPrice) = policyManager.getPolicyInfo(_policyID);
+        (address policyholder, address product, address positionContract, uint256 previousCoverAmount, uint40 expirationBlock, uint24 previousPrice) = policyManager.getPolicyInfo(_policyID);
         // check msg.sender is policyholder
         require(policyholder == msg.sender, "!policyholder");
         // check for correct product
@@ -338,10 +338,10 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
      * @param _policyID id number of the existing policy
      * @param _blocks length of extension
      */
-    function extendPolicy(uint256 _policyID, uint64 _blocks) external payable override nonReentrant {
+    function extendPolicy(uint256 _policyID, uint40 _blocks) external payable override nonReentrant {
         require(!paused, "cannot extend when paused");
         // check that the msg.sender is the policyholder
-        (address policyholder, address product, address positionContract, uint256 coverAmount, uint64 expirationBlock, uint24 price) = policyManager.getPolicyInfo(_policyID);
+        (address policyholder, address product, address positionContract, uint256 coverAmount, uint40 expirationBlock, uint24 price) = policyManager.getPolicyInfo(_policyID);
         require(policyholder == msg.sender,"!policyholder");
         require(product == address(this), "wrong product");
         require(expirationBlock >= block.number, "policy is expired");
@@ -354,8 +354,8 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
         // transfer premium to the treasury
         ITreasury(payable(registry.treasury())).routePremiums{value: premium}();
         // check that the buyer provided valid period
-        uint64 newExpirationBlock = expirationBlock + _blocks;
-        uint64 duration = newExpirationBlock - uint64(block.number);
+        uint40 newExpirationBlock = expirationBlock + _blocks;
+        uint40 duration = newExpirationBlock - uint40(block.number);
         require(duration >= minPeriod && duration <= maxPeriod, "invalid period");
         // update the policy's URI
         policyManager.setPolicyInfo(_policyID, policyholder, positionContract, coverAmount, newExpirationBlock, price);
@@ -370,9 +370,9 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
      * @param _newCoverAmount new cover amount of position
      * @param _newExtension length of block extension
      */
-    function updatePolicy(uint256 _policyID, uint256 _newCoverAmount, uint64 _newExtension) external payable override nonReentrant {
+    function updatePolicy(uint256 _policyID, uint256 _newCoverAmount, uint40 _newExtension) external payable override nonReentrant {
         require(!paused, "cannot buy when paused");
-        (address policyholder, address product, address positionContract, uint256 previousCoverAmount, uint64 previousExpirationBlock, uint24 previousPrice) = policyManager.getPolicyInfo(_policyID);
+        (address policyholder, address product, address positionContract, uint256 previousCoverAmount, uint40 previousExpirationBlock, uint24 previousPrice) = policyManager.getPolicyInfo(_policyID);
         require(policyholder == msg.sender,"!policyholder");
         require(product == address(this), "wrong product");
         require(previousExpirationBlock >= block.number, "policy is expired");
@@ -390,10 +390,10 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
         require(_newCoverAmount <= maxUserCover, "over max cover single user");
         }
         // add new block extension
-        uint64 newExpirationBlock = previousExpirationBlock + _newExtension;
+        uint40 newExpirationBlock = previousExpirationBlock + _newExtension;
 
         // check if duration is valid
-        uint64 duration = newExpirationBlock - uint64(block.number);
+        uint40 duration = newExpirationBlock - uint40(block.number);
         require(duration >= minPeriod && duration <= maxPeriod, "invalid period");
 
         // update policy info
@@ -403,7 +403,7 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
         uint256 newPremium = _newCoverAmount * duration * price / 1e12;
 
         // calculate premium already paid based on current policy
-        uint256 paidPremium = previousCoverAmount * (previousExpirationBlock - uint64(block.number)) * previousPrice / 1e12;
+        uint256 paidPremium = previousCoverAmount * (previousExpirationBlock - uint40(block.number)) * previousPrice / 1e12;
 
         if (newPremium >= paidPremium) {
            uint256 premium = newPremium - paidPremium;
@@ -423,11 +423,11 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard {
      * @param _policyID id number of the existing policy
      */
     function cancelPolicy(uint256 _policyID) external override nonReentrant {
-        (address policyholder, address product, , uint256 coverAmount, uint64 expirationBlock, uint24 price) = policyManager.getPolicyInfo(_policyID);
+        (address policyholder, address product, , uint256 coverAmount, uint40 expirationBlock, uint24 price) = policyManager.getPolicyInfo(_policyID);
         require(policyholder == msg.sender,"!policyholder");
         require(product == address(this), "wrong product");
 
-        uint64 blocksLeft = expirationBlock - uint64(block.number);
+        uint40 blocksLeft = expirationBlock - uint40(block.number);
         uint256 refundAmount = blocksLeft * coverAmount * price / 1e12;
         policyManager.burn(_policyID);
         ITreasury(payable(registry.treasury())).refund(msg.sender, refundAmount);

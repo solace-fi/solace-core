@@ -58,6 +58,7 @@ describe('PolicyManager', function() {
     await registry.connect(governor).setPolicyManager(policyManager.address);
     await registry.connect(governor).setRiskManager(riskManager.address);
     await deployer.sendTransaction({ to: treasury.address, value: BN.from('10000000000000000') });
+    await vault.connect(governor).setRequestor(treasury.address, true);
   });
 
   it("has a correct name", async function() {

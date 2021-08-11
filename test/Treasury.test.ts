@@ -466,7 +466,7 @@ describe("Treasury", function() {
   });
 
   describe("treasury with vault as a premium recipient", function () {
-      let vaultAddress:any;
+      let vaultAddress: string;
       let vault: Vault;
       let mockTreasury: Treasury;
       before(async function() {
@@ -475,7 +475,7 @@ describe("Treasury", function() {
         await registry.connect(governor).setVault(vaultAddress);
         mockTreasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, uniswapRouter.address, weth.address, registry.address])) as Treasury;
         await registry.connect(governor).setTreasury(mockTreasury.address);
-
+        await vault.connect(governor).setRequestor(mockTreasury.address, true);
       });
 
       it("vault is a premium recipient", async function() {
@@ -485,7 +485,6 @@ describe("Treasury", function() {
       it("can route premiums to vault", async function() {
         let vaultAmountBefore = await provider.getBalance(vaultAddress);
         let depositAmount = 100;
-        console.log("Vault address", vaultAddress);
         await mockTreasury.connect(user).routePremiums({ value: depositAmount });
         let vaultAmountAfter = await provider.getBalance(vaultAddress);
         expect(vaultAmountAfter.sub(depositAmount)).to.equal(vaultAmountBefore);

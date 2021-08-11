@@ -73,7 +73,7 @@ interface IVault is IERC20, IERC20Permit {
      * @param _min Minimum time in seconds.
      * @param _max Maximum time in seconds.
      */
-    function setCooldownWindow(uint64 _min, uint64 _max) external;
+    function setCooldownWindow(uint40 _min, uint40 _max) external;
 
     /**
      * @notice Adds or removes requesting rights.
@@ -89,17 +89,19 @@ interface IVault is IERC20, IERC20Permit {
      * Called when Vault receives ETH
      * Deposits `_amount` `token`, issuing shares to `recipient`.
      * Reverts if Vault is in Emergency Shutdown
+     * @return Number of shares minted.
      */
-    function deposit() external payable;
+    function depositEth() external payable returns (uint256);
 
     /**
      * @notice Allows a user to deposit WETH into the Vault (becoming a Capital Provider)
      * Shares of the Vault (CP tokens) are minted to caller
      * Deposits `_amount` `token`, issuing shares to `recipient`.
      * Reverts if Vault is in Emergency Shutdown
-     * @param amount Amount of weth to deposit.
+     * @param _amount Amount of weth to deposit.
+     * @return Number of shares minted.
      */
-    function depositWeth(uint256 amount) external;
+    function depositWeth(uint256 _amount) external returns (uint256);
 
     /**
      * @notice Starts the cooldown.
@@ -107,12 +109,25 @@ interface IVault is IERC20, IERC20Permit {
     function startCooldown() external;
 
     /**
+     * @notice Stops the cooldown.
+     */
+    function stopCooldown() external;
+
+    /**
      * @notice Allows a user to redeem shares for ETH
      * Burns CP tokens and transfers ETH to the CP
-     * @param shares amount of shares to redeem
+     * @param _shares amount of shares to redeem
      * @return value in ETH that the shares where redeemed for
      */
-    function withdraw(uint256 shares) external returns (uint256);
+    function withdrawEth(uint256 _shares) external returns (uint256);
+
+    /**
+     * @notice Allows a user to redeem shares for ETH
+     * Burns CP tokens and transfers WETH to the CP
+     * @param _shares amount of shares to redeem
+     * @return value in WETH that the shares where redeemed for
+     */
+    function withdrawWeth(uint256 _shares) external returns (uint256);
 
     /**
      * @notice Sends ETH to other users or contracts.
@@ -141,17 +156,17 @@ interface IVault is IERC20, IERC20Permit {
     function totalAssets() external view returns (uint256);
 
     /// @notice The minimum amount of time a user must wait to withdraw funds.
-    function cooldownMin() external view returns (uint64);
+    function cooldownMin() external view returns (uint40);
 
     /// @notice The maximum amount of time a user must wait to withdraw funds.
-    function cooldownMax() external view returns (uint64);
+    function cooldownMax() external view returns (uint40);
 
     /**
      * @notice The timestamp that a depositor's cooldown started.
      * @param _user The depositor.
      * @return The timestamp in seconds.
      */
-    function cooldownStart(address _user) external view returns (uint64);
+    function cooldownStart(address _user) external view returns (uint40);
 
     /**
      * @notice Returns true if the destination is authorized to request ETH.

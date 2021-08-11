@@ -107,6 +107,8 @@ describe("BaseProduct", () => {
     await registry.setTreasury(treasury.address);
     await registry.setPolicyManager(policyManager.address);
     await registry.setRiskManager(riskManager.address);
+    await vault.setRequestor(claimsEscrow.address, true);
+    await vault.setRequestor(treasury.address, true);
   });
 
   describe("governance", function() {
@@ -140,7 +142,7 @@ describe("BaseProduct", () => {
 
   describe("productParameters", () => {
     before(async function () {
-      await deployer.sendTransaction({to:vault.address,value:maxCoverAmount1.mul(3)});
+      await vault.connect(deployer).depositEth({value:maxCoverAmount1.mul(3)});
       await riskManager.connect(governor).setProductWeights([product.address,product2.address],[1,2]);
     });
     it("can get price", async function() {
@@ -234,7 +236,7 @@ describe("BaseProduct", () => {
 
     before(async function() {
       var depositAmount = maxCoverAmount2.sub(maxCoverAmount1.mul(3));
-      await deployer.sendTransaction({to:vault.address,value:depositAmount});
+      await vault.connect(deployer).depositEth({value:depositAmount});
       await policyManager.connect(governor).addProduct(product.address);
       expect(await policyManager.productIsActive(product.address)).to.equal(true);
     });
@@ -450,7 +452,7 @@ describe("BaseProduct", () => {
     });
     it("can update policy with both new cover amount and extension", async function() {
       await product.setPositionValue(positionAmount);
-      let prevExpirationBlock = await policyManager.getPolicyExpirationBlock(policyID);
+      let prevExpirationBlock = BN.from(await policyManager.getPolicyExpirationBlock(policyID));
       //let quote2 = await product.getQuote(buyer.address, positionContract.address, coverAmount, threeDays);
       //quote2 = quote2.mul(10001).div(10000);
       let blockNumber = BN.from(await provider.getBlockNumber()).add(1);
@@ -485,7 +487,7 @@ describe("BaseProduct", () => {
       let policyID2 = BN.from(2);
       let newCoverAmount = BN.from("600000000000000000"); // 6/10 of one eth
       let blockNumber = BN.from(await provider.getBlockNumber()).add(1);
-      let prevExpirationBlock = await policyManager.getPolicyExpirationBlock(policyID2);
+      let prevExpirationBlock = BN.from(await policyManager.getPolicyExpirationBlock(policyID2));
       let prevCoverAmount = await policyManager.getPolicyCoverAmount(policyID2);
       let prevPrice = await policyManager.getPolicyPrice(policyID2);
 
@@ -531,7 +533,7 @@ describe("BaseProduct", () => {
       let info = await policyManager.getPolicyInfo(policyID);
       let block = await provider.getBlockNumber();
       let balance1 = await buyer.getBalance();
-      let expectedRefund = info.expirationBlock
+      let expectedRefund = BN.from(info.expirationBlock)
         .sub(block + 1)
         .mul(info.price)
         .mul(info.coverAmount)

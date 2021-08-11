@@ -18,8 +18,8 @@ contract MockProduct is BaseProduct {
         IPolicyManager _policyManager,
         IRegistry _registry,
         address _coveredPlatform,
-        uint64 _minPeriod,
-        uint64 _maxPeriod,
+        uint40 _minPeriod,
+        uint40 _maxPeriod,
         uint24 _price,
         uint32 _maxCoverPerUserDivisor
     ) BaseProduct(
@@ -53,15 +53,15 @@ contract MockProduct is BaseProduct {
         positionValue = _value;
     }
 
-    function setPolicyExpiration(uint256 _policyID, uint64 _expirationBlock) external {
-        (address policyholder, address product, address positionContract, uint256 coverAmount, uint64 expirationBlock, uint24 price) = policyManager.getPolicyInfo(_policyID);
+    function setPolicyExpiration(uint256 _policyID, uint40 _expirationBlock) external {
+        (address policyholder, address product, address positionContract, uint256 coverAmount, uint40 expirationBlock, uint24 price) = policyManager.getPolicyInfo(_policyID);
         policyManager.setPolicyInfo(_policyID, policyholder, positionContract, coverAmount, _expirationBlock, price);
     }
 
     // buyPolicy() without the checks
-    function _buyPolicy(address _policyholder, address _positionContract, uint256 _coverAmount, uint64 _blocks) external payable nonReentrant returns (uint256 policyID){
+    function _buyPolicy(address _policyholder, address _positionContract, uint256 _coverAmount, uint40 _blocks) external payable nonReentrant returns (uint256 policyID){
         // create the policy
-        uint64 expirationBlock = uint64(block.number + _blocks);
+        uint40 expirationBlock = uint40(block.number + _blocks);
         policyID = policyManager.createPolicy(_policyholder, _positionContract, positionValue, expirationBlock, price);
 
         // update local book-keeping variables

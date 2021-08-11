@@ -137,7 +137,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
       )) as CurveProduct;
 
       await registry.setVault(vault.address);
-      await deployer.sendTransaction({to:vault.address,value:maxCoverAmount});
+      await vault.connect(deployer).depositEth({value:maxCoverAmount});
       await registry.setClaimsEscrow(claimsEscrow.address);
       await registry.setTreasury(treasury.address);
       await registry.setPolicyManager(policyManager.address);

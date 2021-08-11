@@ -34,8 +34,8 @@ contract YearnV2Product is BaseProduct, EIP712 {
         IPolicyManager _policyManager,
         IRegistry _registry,
         address _coveredPlatform,
-        uint64 _minPeriod,
-        uint64 _maxPeriod,
+        uint40 _minPeriod,
+        uint40 _maxPeriod,
         uint24 _price,
         uint32 _maxCoverPerUserDivisor,
         address _quoter
@@ -116,5 +116,5 @@ contract YearnV2Product is BaseProduct, EIP712 {
     function name() public pure override returns (string memory) {
         return "YearnV2";
     }
-    
+
 }

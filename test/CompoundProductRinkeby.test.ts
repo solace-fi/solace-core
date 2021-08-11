@@ -213,7 +213,7 @@ if(process.env.FORK_NETWORK === "rinkeby"){
       uniswapRouter = await ethers.getContractAt(artifacts.SwapRouter.abi, "0xE592427A0AEce92De3Edee1F18E0157C05861564");
 
       await registry.setVault(vault.address);
-      await deployer.sendTransaction({to:vault.address,value:maxCoverAmount});
+      await vault.connect(deployer).depositEth({value:maxCoverAmount});
       await registry.setClaimsEscrow(claimsEscrow.address);
       await registry.setTreasury(treasury.address);
       await registry.setPolicyManager(policyManager.address);

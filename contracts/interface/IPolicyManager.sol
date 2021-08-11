@@ -76,11 +76,11 @@ interface IPolicyManager /*is IERC721Enumerable, IERC721Metadata*/ {
     /*** POLICY VIEW FUNCTIONS
     View functions that give us data about policies
     ****/
-    function getPolicyInfo(uint256 _policyID) external view returns (address policyholder, address product, address positionContract, uint256 coverAmount, uint64 expirationBlock, uint24 price);
+    function getPolicyInfo(uint256 _policyID) external view returns (address policyholder, address product, address positionContract, uint256 coverAmount, uint40 expirationBlock, uint24 price);
     function getPolicyholder(uint256 _policyID) external view returns (address);
     function getPolicyProduct(uint256 _policyID) external view returns (address);
     function getPolicyPositionContract(uint256 _policyID) external view returns (address);
-    function getPolicyExpirationBlock(uint256 _policyID) external view returns (uint64);
+    function getPolicyExpirationBlock(uint256 _policyID) external view returns (uint40);
     function getPolicyCoverAmount(uint256 _policyID) external view returns (uint256);
     function getPolicyPrice(uint256 _policyID) external view returns (uint24);
     function listPolicies(address _policyholder) external view returns (uint256[] memory);
@@ -105,10 +105,10 @@ interface IPolicyManager /*is IERC721Enumerable, IERC721Metadata*/ {
         address _policyholder,
         address _positionContract,
         uint256 _coverAmount,
-        uint64 _expirationBlock,
+        uint40 _expirationBlock,
         uint24 _price
     ) external returns (uint256 policyID);
-    function setPolicyInfo(uint256 _policyID, address _policyholder, address _positionContract, uint256 _coverAmount, uint64 _expirationBlock, uint24 _price) external;
+    function setPolicyInfo(uint256 _policyID, address _policyholder, address _positionContract, uint256 _coverAmount, uint40 _expirationBlock, uint24 _price) external;
     function burn(uint256 _tokenId) external;
 
     function updateActivePolicies(uint256[] calldata _policyIDs) external;

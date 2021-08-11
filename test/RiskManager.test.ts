@@ -116,7 +116,7 @@ describe("RiskManager", function () {
     });
     it("can cover", async function () {
       let depositAmount = BN.from("1000000000000000000");
-      await user.sendTransaction({to:vault.address,value:depositAmount});
+      await vault.connect(user).depositEth({value:depositAmount});
       expect(await vault.totalAssets()).to.equal(depositAmount);
       expect(await riskManager.maxCoverAmount(product1.address)).to.equal(0);
       expect(await riskManager.maxCoverAmount(product2.address)).to.equal(depositAmount.mul(7).div(16));
