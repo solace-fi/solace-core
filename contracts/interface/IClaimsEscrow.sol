@@ -3,9 +3,9 @@ pragma solidity 0.8.6;
 
 
 /**
- * @title IClaimsEscrow: Escrow Contract for solace.fi claims
+ * @title IClaimsEscrow
  * @author solace.fi
- * @notice The interface for the Claims Escrow contract.
+ * @notice The holder of claims. Policy holders can submit claims through their policy's product contract, in the process burning the policy and converting it to a claim. The policy holder will then need to wait for a cooldown period after which they can withdraw the payout.
  */
 interface IClaimsEscrow {
 
@@ -35,10 +35,10 @@ interface IClaimsEscrow {
     function receiveClaim(uint256 _policyID, address _claimant, uint256 _amount) external payable;
 
     /**
-     * @notice Allows claimants to withdraw their claims payout
-     * Only callable by the claimant
-     * Only callable after the cooldown period has elapsed (from the time the claim was approved and processed)
-     * @param claimID The id of the claim to withdraw payout for
+     * @notice Allows claimants to withdraw their claims payout.
+     * Only callable by the claimant.
+     * Only callable after the cooldown period has elapsed (from the time the claim was approved and processed).
+     * @param claimID The id of the claim to withdraw payout for.
      */
     function withdrawClaimsPayout(uint256 claimID) external;
 
@@ -59,8 +59,14 @@ interface IClaimsEscrow {
      */
     function sweep(address token, uint256 amount, address dst) external;
 
+    /// @notice The duration of time in seconds the user must wait between submitting a claim and withdrawing the payout.
     function cooldownPeriod() external view returns (uint256);
 
+    /**
+     * @notice Set the cooldown duration.
+     * Can only be called by the current governor.
+     * @param _period New cooldown duration in seconds
+     */
     function setCooldownPeriod(uint256 _period) external;
 
     /// @notice Governance.
@@ -81,4 +87,32 @@ interface IClaimsEscrow {
      * Can only be called by the new governor.
      */
     function acceptGovernance() external;
+
+    /**
+     * @notice Returns true if the claim exists.
+     * @param claimID The id to check.
+     * @return status True if it exists, false if not.
+     */
+    function exists(uint256 claimID) external view returns (bool status);
+
+    /**
+     * @notice Returns true if the payout of the claim can be withdrawn.
+     * @param claimID The id to check.
+     * @return status True if it is withdrawable, false if not.
+     */
+    function isWithdrawable(uint256 claimID) external view returns (bool status);
+
+    /**
+     * @notice The amount of time left until the payout is withdrawable.
+     * @param claimID The id to check.
+     * @return time The duration in seconds.
+     */
+    function timeLeft(uint256 claimID) external view returns (uint256 time);
+
+    /**
+     * @notice List a user's claims.
+     * @param claimant User to check.
+     * @return claimIDs List of claimIDs.
+     */
+    function listClaims(address claimant) external view returns (uint256[] memory claimIDs);
 }

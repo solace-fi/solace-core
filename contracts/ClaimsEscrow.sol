@@ -10,7 +10,11 @@ import "./interface/IVault.sol";
 import "./interface/IPolicyManager.sol";
 import "./interface/IClaimsEscrow.sol";
 
-
+/**
+ * @title ClaimsEscrow
+ * @author solace.fi
+ * @notice The holder of claims. Policy holders can submit claims through their policy's product contract, in the process burning the policy and converting it to a claim. The policy holder will then need to wait for a cooldown period after which they can withdraw the payout.
+ */
 contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow {
     using Address for address;
     using SafeERC20 for IERC20;
@@ -21,9 +25,10 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow {
     /// @notice Governance to take over.
     address public override newGovernance;
 
+    /// @notice The duration of time in seconds the user must wait between submitting a claim and withdrawing the payout.
     uint256 public override cooldownPeriod = 3600; // one hour
 
-    /// Registry of protocol contract addresses
+    /// @notice Registry of protocol contract addresses.
     IRegistry public registry;
 
     address private constant ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
@@ -93,10 +98,10 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow {
      */
     function receiveClaim(uint256 _policyID, address _claimant, uint256 _amount) external payable override {
         require(IPolicyManager(registry.policyManager()).productIsActive(msg.sender), "!product");
-        totalClaimsOutstanding += _amount;
-        uint256 tco = totalClaimsOutstanding;
-        if(address(this).balance < tco) IVault(registry.vault()).requestEth(tco - address(this).balance);
-
+        uint256 tco = totalClaimsOutstanding + _amount;
+        totalClaimsOutstanding = tco;
+        uint256 bal = address(this).balance;
+        if(bal < tco) IVault(registry.vault()).requestEth(tco - bal);
         // Add claim to claims mapping
         claims[_policyID] = Claim({
             amount: _amount,
@@ -107,10 +112,10 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow {
     }
 
     /**
-     * @notice Allows claimants to withdraw their claims payout
-     * Only callable by the claimant
-     * Only callable after the cooldown period has elapsed (from the time the claim was approved and processed)
-     * @param claimID The id of the claim to withdraw payout for
+     * @notice Allows claimants to withdraw their claims payout.
+     * Only callable by the claimant.
+     * Only callable after the cooldown period has elapsed (from the time the claim was approved and processed).
+     * @param claimID The id of the claim to withdraw payout for.
      */
     function withdrawClaimsPayout(uint256 claimID) external override {
         require(_exists(claimID), "query for nonexistent token");
@@ -168,28 +173,53 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow {
         else IERC20(token).safeTransfer(dst, amount);
     }
 
-    function setCooldownPeriod(uint256 period) external override {
+    /**
+     * @notice Set the cooldown duration.
+     * Can only be called by the current governor.
+     * @param _period New cooldown duration in seconds
+     */
+    function setCooldownPeriod(uint256 _period) external override {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
-        cooldownPeriod = period;
+        cooldownPeriod = _period;
     }
 
-    function exists(uint256 claimID) external view returns (bool) {
+    /**
+     * @notice Returns true if the claim exists.
+     * @param claimID The id to check.
+     * @return status True if it exists, false if not.
+     */
+    function exists(uint256 claimID) external view override returns (bool status) {
         return _exists(claimID);
     }
 
-    function isWithdrawable(uint256 claimID) external view returns (bool) {
+    /**
+     * @notice Returns true if the payout of the claim can be withdrawn.
+     * @param claimID The id to check.
+     * @return status True if it is withdrawable, false if not.
+     */
+    function isWithdrawable(uint256 claimID) external view override returns (bool status) {
         return _exists(claimID) && block.timestamp >= claims[claimID].receivedAt + cooldownPeriod;
     }
 
-    function timeLeft(uint256 claimID) external view returns (uint256) {
+    /**
+     * @notice The amount of time left until the payout is withdrawable.
+     * @param claimID The id to check.
+     * @return time The duration in seconds.
+     */
+    function timeLeft(uint256 claimID) external view override returns (uint256 time) {
         if(!_exists(claimID)) return type(uint256).max;
         uint256 end = claims[claimID].receivedAt + cooldownPeriod;
         if(block.timestamp >= end) return 0;
         return end - block.timestamp;
     }
 
-    function listClaims(address claimant) external view returns (uint256[] memory claimIDs) {
+    /**
+     * @notice List a user's claims.
+     * @param claimant User to check.
+     * @return claimIDs List of claimIDs.
+     */
+    function listClaims(address claimant) external view override returns (uint256[] memory claimIDs) {
         uint256 tokenCount = balanceOf(claimant);
         claimIDs = new uint256[](tokenCount);
         for (uint256 index = 0; index < tokenCount; index++) {
