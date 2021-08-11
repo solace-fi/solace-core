@@ -17,3 +17,4 @@ artifacts
 typechain/
 
 *-ignore
+*.hbs
