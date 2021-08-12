@@ -895,7 +895,7 @@ describe("Vault", function () {
         var balance1 = await mockEscrow.getBalance();
         let tx = await vault.connect(mockEscrow).requestEth(7);
         let receipt = await tx.wait();
-        let gasCost = receipt.gasUsed.mul(tx.gasPrice || 0);
+        let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
         var balance2 = await mockEscrow.getBalance();
         expect(balance2.sub(balance1).add(gasCost)).to.equal(7);
       })
@@ -907,7 +907,7 @@ describe("Vault", function () {
         var balance1 = await mockEscrow.getBalance();
         let tx = await vault.connect(mockEscrow).requestEth(withdrawAmount);
         let receipt = await tx.wait();
-        let gasCost = receipt.gasUsed.mul(tx.gasPrice || 0);
+        let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
         var balance2 = await mockEscrow.getBalance();
         expect(balance2.sub(balance1).add(gasCost)).to.equal(vaultBalance);
       })

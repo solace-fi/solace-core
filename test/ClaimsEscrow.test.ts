@@ -6,8 +6,6 @@ const { deployContract, solidity } = waffle;
 const provider = waffle.provider;
 chai.use(solidity);
 
-import { expectClose } from "./utilities/chai_extensions";
-
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
 import { Registry, Vault, ClaimsEscrow, Weth9, PolicyManager } from "../typechain";
 
@@ -107,7 +105,7 @@ describe("ClaimsEscrow", function () {
     it("should revert if not called by the vault", async function () {
       await expect(claimsEscrow.connect(owner).receiveClaim(1, owner.address, 0)).to.be.revertedWith("!product");
     });
-    it("should update create a Claim object with the right data", async function () {
+    it("should create a Claim object with the right data", async function () {
       expect(await claimsEscrow.totalClaimsOutstanding()).to.equal(0);
       await claimsEscrow.connect(mockProduct).receiveClaim(claimID, claimant.address, testClaimAmount);
       const callClaimant = await claimsEscrow.ownerOf(claimID);
@@ -134,7 +132,12 @@ describe("ClaimsEscrow", function () {
     });
     it("should transfer claim amount to claimant", async function () {
       await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add one hour
-      await expect(() => claimsEscrow.connect(claimant).withdrawClaimsPayout(claimID)).to.changeEtherBalance(claimant, testClaimAmount);
+      let bal1 = await claimant.getBalance();
+      let tx = await claimsEscrow.connect(claimant).withdrawClaimsPayout(claimID);
+      let receipt = await tx.wait();
+      let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
+      let bal2 = await claimant.getBalance();
+      expect(bal2.sub(bal1).add(gasCost)).to.equal(testClaimAmount);
       expect(await claimsEscrow.totalClaimsOutstanding()).to.equal(0);
     });
     it("should emit ClaimWithdrawn event after function logic is successful", async function () {
@@ -160,7 +163,7 @@ describe("ClaimsEscrow", function () {
       await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add one hour
       let tx1 = await claimsEscrow.connect(claimant).withdrawClaimsPayout(claimID2);
       let receipt1 = await tx1.wait();
-      let gasCost1 = receipt1.gasUsed.mul(tx1.gasPrice || 0);
+      let gasCost1 = receipt1.gasUsed.mul(receipt1.effectiveGasPrice);
       let balance2 = await claimant.getBalance();
       expect(balance2.sub(balance1).add(gasCost1)).to.equal(testDepositAmount.add(4));
       expect(await claimsEscrow.totalClaimsOutstanding()).to.equal(testClaimAmount.add(testClaimAmount3).sub(testDepositAmount.add(4)));
@@ -168,7 +171,7 @@ describe("ClaimsEscrow", function () {
       await vault.connect(depositor1).depositEth({ value: 10 });
       let tx2 = await claimsEscrow.connect(claimant).withdrawClaimsPayout(claimID2);
       let receipt2 = await tx2.wait();
-      let gasCost2 = receipt2.gasUsed.mul(tx2.gasPrice || 0);
+      let gasCost2 = receipt2.gasUsed.mul(receipt2.effectiveGasPrice);
       let balance3 = await claimant.getBalance();
       expect(balance3.sub(balance1).add(gasCost1).add(gasCost2)).to.equal(testClaimAmount3);
       expect(await claimsEscrow.totalClaimsOutstanding()).to.equal(testClaimAmount);
@@ -197,7 +200,12 @@ describe("ClaimsEscrow", function () {
       expect(callClaimant).to.equal(claimant.address);
       expect(callAmount).to.equal(testClaimAmount2);
       await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add one hour
-      await expect(() => claimsEscrow.connect(claimant).withdrawClaimsPayout(claimID)).to.changeEtherBalance(claimant, testClaimAmount2);
+      let bal1 = await claimant.getBalance();
+      let tx = await claimsEscrow.connect(claimant).withdrawClaimsPayout(claimID);
+      let receipt = await tx.wait();
+      let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
+      let bal2 = await claimant.getBalance();
+      expect(bal2.sub(bal1).add(gasCost)).to.equal(testClaimAmount2);
     });
   });
 
@@ -272,12 +280,12 @@ describe("ClaimsEscrow", function () {
       expect(await claimsEscrow.timeLeft(999)).to.equal(constants.MaxUint256);
     });
     it("need to wait entire cooldown period for a new claim", async function () {
-      expectClose(await claimsEscrow.timeLeft(claimID), COOLDOWN_PERIOD);
+      expect(await claimsEscrow.timeLeft(claimID)).to.be.closeTo(BN.from(COOLDOWN_PERIOD), 10);
     });
     it("counts down", async function () {
       await provider.send("evm_increaseTime", [1000]);
       await owner.sendTransaction({to: claimsEscrow.address});
-      expectClose(await claimsEscrow.timeLeft(claimID), COOLDOWN_PERIOD-1000);
+      expect(await claimsEscrow.timeLeft(claimID)).to.be.closeTo(BN.from(COOLDOWN_PERIOD-1000), 10);
     });
     it("hits zero", async function () {
       await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]);

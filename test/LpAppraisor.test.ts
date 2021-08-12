@@ -7,13 +7,7 @@ import chai from "chai";
 const { expect } = chai;
 chai.use(solidity);
 
-import { expectClose } from "./utilities/chai_extensions";
-import { burnBlocks, burnBlocksUntil } from "./utilities/time";
 import { encodePriceSqrt, FeeAmount, TICK_SPACINGS, getMaxTick, getMinTick } from "./utilities/uniswap";
-import { encodePath } from "./utilities/path";
-import { bnAddSub, bnMulDiv } from "./utilities/math";
-import { getPermitDigest, sign, getDomainSeparator } from "./utilities/signature";
-import getPermitNFTSignature from "./utilities/getPermitNFTSignature";
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
 import { Solace, Master, Weth9, MockErc20, SolaceEthLpFarm, LpAppraisor } from "../typechain";

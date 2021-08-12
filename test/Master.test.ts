@@ -6,7 +6,6 @@ import { Transaction, BigNumber as BN, Contract, constants, BigNumberish, Wallet
 import chai from "chai";
 const { expect } = chai;
 
-import { expectClose } from "./utilities/chai_extensions";
 import { burnBlocks, burnBlocksUntil } from "./utilities/time";
 import { encodePriceSqrt, FeeAmount, TICK_SPACINGS, getMaxTick, getMinTick } from "./utilities/uniswap";
 
@@ -367,11 +366,11 @@ describe("Master", function () {
       // validate farmer 1 rewards
       pendingReward1 = BN.from(await cpFarm.pendingRewards(farmer1.address));
       expectedReward1 = solacePerBlock.mul(31).mul(4).div(5); // 100% ownership of cp farm for 31 blocks at 80% allocation points
-      expectClose(pendingReward1, expectedReward1);
+      expect(pendingReward1).to.be.closeTo(expectedReward1, 10);
       // validate farmer 3 rewards
       pendingReward3 = BN.from(await lpFarm.pendingRewards(farmer3.address));
       expectedReward3 = solacePerBlock.mul(13).mul(1).div(5); // 100% ownership of lp farm for 13 blocks at 20% allocation points
-      expectClose(pendingReward3, expectedReward3);
+      expect(pendingReward3).to.be.closeTo(expectedReward3, 10);
       // add farmer 2 to cp farm
       await cpFarm.connect(farmer2).depositEth({value:depositAmount2});
       // wait 30 blocks
@@ -386,22 +385,22 @@ describe("Master", function () {
         (solacePerBlock.mul(1).mul(4).div(5)).add // 100% ownership of cp farm for 1 block at 80% allocation points
         (solacePerBlock.mul(71).mul(4).div(5).div(5)) // 20% ownership of cp farm for 71 blocks at 80% allocation points
       );
-      expectClose(pendingReward1, expectedReward1);
+      expect(pendingReward1).to.be.closeTo(expectedReward1, 10);
       // validate farmer 2 rewards
       pendingReward2 = BN.from(await cpFarm.pendingRewards(farmer2.address));
       expectedReward2 = solacePerBlock.mul(71).mul(16).div(25); // 80% ownership of cp farm for 71 blocks at 80% allocation points
-      expectClose(pendingReward2, expectedReward2);
+      expect(pendingReward2).to.be.closeTo(expectedReward2, 10);
       // validate farmer 3 rewards
       pendingReward3 = BN.from(await lpFarm.pendingRewards(farmer3.address));
       expectedReward3 = expectedReward3.add(
         (solacePerBlock.mul(32).mul(1).div(5)).add // 100% ownership of lp farm for 32 blocks at 20% allocation points
         (solacePerBlock.mul(40).mul(tokenValue3).div(tokenValue34).mul(20).div(100)) // ?% ownership of lp farm for 40 blocks at 20% allocation points
       );
-      expectClose(pendingReward3, expectedReward3);
+      expect(pendingReward3).to.be.closeTo(expectedReward3, 10);
       // validate farmer 4 rewards
       pendingReward4 = BN.from(await lpFarm.pendingRewards(farmer4.address));
       expectedReward4 = solacePerBlock.mul(40).mul(tokenValue4).div(tokenValue34).mul(20).div(100); // ?% ownership of lp farm for 40 blocks at 20% allocation points
-      expectClose(pendingReward4, expectedReward4);
+      expect(pendingReward4).to.be.closeTo(expectedReward4, 10);
     })
 
     it("can change allocation points of farms", async function () {
@@ -415,28 +414,28 @@ describe("Master", function () {
         (solacePerBlock.mul(1).mul(4).div(5).div(5)).add // 20% ownership of cp farm for 1 block at 80% allocation points
         (solacePerBlock.mul(50).mul(9).div(10).div(5)) // 20% ownership of cp farm for 50 blocks at 90% allocation points
       );
-      expectClose(pendingReward1, expectedReward1);
+      expect(pendingReward1).to.be.closeTo(expectedReward1, 10);
       // validate farmer 2 rewards
       pendingReward2 = BN.from(await cpFarm.pendingRewards(farmer2.address));
       expectedReward2 = expectedReward2.add(
         (solacePerBlock.mul(1).mul(4).div(5).mul(4).div(5)).add // 80% ownership of cp farm for 1 block at 80% allocation points
         (solacePerBlock.mul(50).mul(4).div(5).mul(9).div(10)) // 80% ownership of cp farm for 50 blocks at 90% allocation points
       );
-      expectClose(pendingReward2, expectedReward2);
+      expect(pendingReward2).to.be.closeTo(expectedReward2, 10);
       // validate farmer 3 rewards
       pendingReward3 = BN.from(await lpFarm.pendingRewards(farmer3.address));
       expectedReward3 = expectedReward3.add(
         (solacePerBlock.mul(1).mul(tokenValue3).div(tokenValue34).mul(20).div(100)).add // ?% ownership of lp farm for 1 block at 20% allocation points
         (solacePerBlock.mul(50).mul(tokenValue3).div(tokenValue34).mul(10).div(100)) // ?% ownership of lp farm for 50 blocks at 10% allocation points
       );
-      expectClose(pendingReward3, expectedReward3);
+      expect(pendingReward3).to.be.closeTo(expectedReward3, 10);
       // validate farmer 4 rewards
       pendingReward4 = BN.from(await lpFarm.pendingRewards(farmer4.address));
       expectedReward4 = expectedReward4.add(
         (solacePerBlock.mul(1).mul(tokenValue4).div(tokenValue34).mul(20).div(100)).add // 35% ownership of lp farm for 1 block at 20% allocation points
         (solacePerBlock.mul(50).mul(tokenValue4).div(tokenValue34).mul(10).div(100)) // 35% ownership of lp farm for 50 blocks at 10% allocation points
       );
-      expectClose(pendingReward4, expectedReward4);
+      expect(pendingReward4).to.be.closeTo(expectedReward4, 10);
     })
 
     it("can change solace per block", async function () {
@@ -449,28 +448,28 @@ describe("Master", function () {
         (solacePerBlock.mul(1).mul(9).div(10).div(5)).add // 20% ownership of cp farm for 1 block at 90% allocation points
         (solacePerBlock2.mul(10).mul(9).div(10).div(5)) // 20% ownership of cp farm for 10 blocks at 90% allocation points with new reward rate
       );
-      expectClose(pendingReward1, expectedReward1);
+      expect(pendingReward1).to.be.closeTo(expectedReward1, 10);
       // validate farmer 2 rewards
       pendingReward2 = BN.from(await cpFarm.pendingRewards(farmer2.address));
       expectedReward2 = expectedReward2.add(
         (solacePerBlock.mul(1).mul(4).div(5).mul(9).div(10)).add // 80% ownership of cp farm for 1 block at 90% allocation points
         (solacePerBlock2.mul(10).mul(4).div(5).mul(9).div(10)) // 80% ownership of cp farm for 10 blocks at 90% allocation points with new reward rate
       );
-      expectClose(pendingReward2, expectedReward2);
+      expect(pendingReward2).to.be.closeTo(expectedReward2, 10);
       // validate farmer 3 rewards
       pendingReward3 = BN.from(await lpFarm.pendingRewards(farmer3.address));
       expectedReward3 = expectedReward3.add(
         (solacePerBlock.mul(1).mul(tokenValue3).div(tokenValue34).mul(10).div(100)).add // ?% ownership of lp farm for 1 block at 10% allocation points
         (solacePerBlock2.mul(10).mul(tokenValue3).div(tokenValue34).mul(10).div(100)) // ?% ownership of lp farm for 10 blocks at 10% allocation points with new reward rate
       );
-      expectClose(pendingReward3, expectedReward3);
+      expect(pendingReward3).to.be.closeTo(expectedReward3, 10);
       // validate farmer 4 rewards
       pendingReward4 = BN.from(await lpFarm.pendingRewards(farmer4.address));
       expectedReward4 = expectedReward4.add(
         (solacePerBlock.mul(1).mul(tokenValue4).div(tokenValue34).mul(10).div(100)).add // ?% ownership of lp farm for 1 block at 10% allocation points
         (solacePerBlock2.mul(10).mul(tokenValue4).div(tokenValue34).mul(10).div(100)) // ?% ownership of lp farm for 50 blocks at 10% allocation points with new reward rate
       );
-      expectClose(pendingReward4, expectedReward4);
+      expect(pendingReward4).to.be.closeTo(expectedReward4, 10);
     })
 
     it("can extend farms", async function () {
@@ -491,26 +490,26 @@ describe("Master", function () {
         (solacePerBlock2.mul(burnedBlocks.add(2)).mul(9).div(10).div(5)).add // 20% ownership of cp farm for unknown blocks at 90% allocation points
         (solacePerBlock2.mul(60).div(5)) // 20% ownership of cp farm for 60 blocks at 100% allocation points
       );
-      expectClose(pendingReward1, expectedReward1);
+      expect(pendingReward1).to.be.closeTo(expectedReward1, 10);
       // validate farmer 2 rewards
       pendingReward2 = BN.from(await cpFarm.pendingRewards(farmer2.address));
       expectedReward2 = expectedReward2.add(
         (solacePerBlock2.mul(burnedBlocks.add(2)).mul(9).div(10).mul(4).div(5)).add // 80% ownership of cp farm for unknown blocks at 90% allocation points
         (solacePerBlock2.mul(60).mul(4).div(5)) // 80% ownership of cp farm for 60 blocks at 100% allocation points
       );
-      expectClose(pendingReward2, expectedReward2);
+      expect(pendingReward2).to.be.closeTo(expectedReward2, 10);
       // validate farmer 3 rewards
       pendingReward3 = BN.from(await lpFarm.pendingRewards(farmer3.address));
       expectedReward3 = expectedReward3.add(
         (solacePerBlock2.mul(burnedBlocks.add(1)).mul(tokenValue3).div(tokenValue34).mul(10).div(100)) // ?% ownership of lp farm for unknown blocks at 10% allocation points
       );
-      expectClose(pendingReward3, expectedReward3);
+      expect(pendingReward3).to.be.closeTo(expectedReward3, 10);
       // validate farmer 4 rewards
       pendingReward4 = BN.from(await lpFarm.pendingRewards(farmer4.address));
       expectedReward4 = expectedReward4.add(
         (solacePerBlock2.mul(burnedBlocks.add(1)).mul(tokenValue4).div(tokenValue34).mul(10).div(100)) // ?% ownership of lp farm for unknown blocks at 10% allocation points
       );
-      expectClose(pendingReward4, expectedReward4);
+      expect(pendingReward4).to.be.closeTo(expectedReward4, 10);
     })
 
     it("allows farmers to cash out", async function () {
@@ -520,7 +519,7 @@ describe("Master", function () {
       expectedReward1 = expectedReward1.add(
         (solacePerBlock2.mul(1).div(5)) // 20% ownership of cp farm for 1 block at 100% allocation points
       );
-      expectClose(pendingReward1, expectedReward1);
+      expect(pendingReward1).to.be.closeTo(expectedReward1, 10);
       // validate farmer 2 rewards
       await cpFarm.connect(farmer2).withdrawCp(depositAmount2);
       pendingReward2 = BN.from(await solaceToken.balanceOf(farmer2.address));
@@ -528,19 +527,19 @@ describe("Master", function () {
         (solacePerBlock2.mul(1).mul(4).div(5)).add // 80% ownership of cp farm for 1 block at 100% allocation points
         (solacePerBlock2) // 100% ownership of cp farm for 1 block at 100% allocation points
       );
-      expectClose(pendingReward2, expectedReward2);
+      expect(pendingReward2).to.be.closeTo(expectedReward2, 10);
       // validate farmer 3 rewards
       await lpFarm.connect(farmer3).withdraw(tokenId3);
       expect(await lpToken.balanceOf(farmer3.address)).to.equal(1);
       pendingReward3 = BN.from(await solaceToken.balanceOf(farmer3.address));
       expectedReward3 = expectedReward3;
-      expectClose(pendingReward3, expectedReward3);
+      expect(pendingReward3).to.be.closeTo(expectedReward3, 10);
       // validate farmer 4 rewards
       await lpFarm.connect(farmer4).withdraw(tokenId4);
       expect(await lpToken.balanceOf(farmer4.address)).to.equal(1);
       pendingReward4 = BN.from(await solaceToken.balanceOf(farmer4.address));
       expectedReward4 = expectedReward4;
-      expectClose(pendingReward4, expectedReward4);
+      expect(pendingReward4).to.be.closeTo(expectedReward4, 10);
     })
 
     it("allows farmers to withdraw rewards from multiple farms", async function () {

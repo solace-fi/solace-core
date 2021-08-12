@@ -7,7 +7,6 @@ import chai from 'chai';
 const { expect } = chai;
 chai.use(solidity);
 
-import { expectClose } from './utilities/chai_extensions';
 import { burnBlocks, burnBlocksUntil } from './utilities/time';
 import { encodePriceSqrt, FeeAmount, TICK_SPACINGS, getMaxTick, getMinTick } from './utilities/uniswap';
 import { encodePath } from './utilities/path';
@@ -300,7 +299,7 @@ describe('SolaceEthLpFarm', function () {
       let balancesAfter = await getBalances(farmer1);
       let balancesDiff = getBalancesDiff(balancesBefore, balancesAfter);
       let receipt = await tx1.wait();
-      let gasCost = receipt.gasUsed.mul(tx1.gasPrice || 0);
+      let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
       expect(balancesDiff.userEth).to.equal(depositAmount5.add(gasCost));
       expect(balancesDiff.userSolace).to.equal(depositAmount5);
       expect(await farm.countDeposited(farmer1.address)).to.equal(4);
@@ -540,11 +539,11 @@ describe('SolaceEthLpFarm', function () {
       // check farmer 1 rewards
       pendingReward1 = await farm.pendingRewards(farmer1.address);
       expectedPendingReward1 = bnMulDiv([solacePerBlock, 10, tokenValue1], [tokenValue12]); // ?% ownership for 10 blocks
-      expectClose(pendingReward1, expectedPendingReward1);
+      expect(pendingReward1).to.be.closeTo(expectedPendingReward1, 10);
       // check farmer 2 rewards
       pendingReward2 = await farm.pendingRewards(farmer2.address);
       expectedPendingReward2 = bnMulDiv([solacePerBlock, 10, tokenValue2], [tokenValue12]); // ?% ownership for 10 blocks
-      expectClose(pendingReward2, expectedPendingReward2);
+      expect(pendingReward2).to.be.closeTo(expectedPendingReward2, 10);
     });
 
     it('may lag behind pool swap left', async function () {
@@ -573,14 +572,14 @@ describe('SolaceEthLpFarm', function () {
         expectedPendingReward1,
         bnMulDiv([solacePerBlock, 21, tokenValue1], [tokenValue12]), // ?% ownership for 21 blocks
       ]);
-      expectClose(pendingReward1, expectedPendingReward1);
+      expect(pendingReward1).to.be.closeTo(expectedPendingReward1, 10);
       // check farmer 2 rewards
       pendingReward2 = await farm.pendingRewards(farmer2.address);
       expectedPendingReward2 = bnAddSub([
         expectedPendingReward2,
         bnMulDiv([solacePerBlock, 21, tokenValue2], [tokenValue12]), // ?% ownership for 21 blocks
       ]);
-      expectClose(pendingReward2, expectedPendingReward2);
+      expect(pendingReward2).to.be.closeTo(expectedPendingReward2, 10);
     });
 
     it('catches up to pool swap left after update', async function () {
@@ -597,14 +596,14 @@ describe('SolaceEthLpFarm', function () {
         bnMulDiv([solacePerBlock, 1, tokenValue1], [tokenValue12]), // ?% ownership for 1 block
         bnMulDiv([solacePerBlock, 30]), // 100% ownership for 30 blocks
       ]);
-      expectClose(pendingReward1, expectedPendingReward1);
+      expect(pendingReward1).to.be.closeTo(expectedPendingReward1, 10);
       // check farmer 2 rewards
       pendingReward2 = await farm.pendingRewards(farmer2.address);
       expectedPendingReward2 = bnAddSub([
         expectedPendingReward2,
         bnMulDiv([solacePerBlock, 1, tokenValue2], [tokenValue12]), // ?% ownership for 1 block
       ]);
-      expectClose(pendingReward2, expectedPendingReward2);
+      expect(pendingReward2).to.be.closeTo(expectedPendingReward2, 10);
     });
 
     it('may lag behind pool swap right', async function () {
@@ -633,11 +632,11 @@ describe('SolaceEthLpFarm', function () {
         expectedPendingReward1,
         bnMulDiv([solacePerBlock, 41]), // 100% ownership for 41 blocks
       ]);
-      expectClose(pendingReward1, expectedPendingReward1);
+      expect(pendingReward1).to.be.closeTo(expectedPendingReward1, 10);
       // check farmer 2 rewards
       pendingReward2 = await farm.pendingRewards(farmer2.address);
       expectedPendingReward2 = expectedPendingReward2;
-      expectClose(pendingReward2, expectedPendingReward2);
+      expect(pendingReward2).to.be.closeTo(expectedPendingReward2, 10);
     });
 
     it('catches up to pool swap right after update', async function () {
@@ -654,14 +653,14 @@ describe('SolaceEthLpFarm', function () {
         bnMulDiv([solacePerBlock, 1]), // 100% ownership for 1 block
         bnMulDiv([solacePerBlock, 50, tokenValue1], [tokenValue13]), // ?% ownership for 50 blocks
       ]);
-      expectClose(pendingReward1, expectedPendingReward1);
+      expect(pendingReward1).to.be.closeTo(expectedPendingReward1, 10);
       // check farmer 2 rewards
       pendingReward2 = await farm.pendingRewards(farmer2.address);
       expectedPendingReward2 = bnAddSub([
         expectedPendingReward2,
         bnMulDiv([solacePerBlock, 50, tokenValue3], [tokenValue13]), // ?% ownership for 50 blocks
       ]);
-      expectClose(pendingReward2, expectedPendingReward2);
+      expect(pendingReward2).to.be.closeTo(expectedPendingReward2, 10);
     });
 
     it('can withdraw rewards', async function () {
@@ -673,7 +672,7 @@ describe('SolaceEthLpFarm', function () {
         bnMulDiv([solacePerBlock, 1, tokenValue1], [tokenValue13]), // ?% ownership for 1 blocks
       ]);
       receivedReward1 = balanceAfter1.sub(balanceBefore1);
-      expectClose(receivedReward1, expectedReceivedReward1);
+      expect(receivedReward1).to.be.closeTo(expectedReceivedReward1, 10);
       // farmer 2 withdraw rewards
       await farm.connect(farmer2).withdrawRewards();
       balanceAfter2 = await solaceToken.balanceOf(farmer2.address);
@@ -682,7 +681,7 @@ describe('SolaceEthLpFarm', function () {
         bnMulDiv([solacePerBlock, 2, tokenValue3], [tokenValue13]), // ?% ownership for 2 blocks
       ]);
       receivedReward2 = balanceAfter2.sub(balanceBefore2);
-      expectClose(receivedReward2, expectedReceivedReward2);
+      expect(receivedReward2).to.be.closeTo(expectedReceivedReward2, 10);
     });
 
     it('can withdraw stake', async function () {
@@ -694,7 +693,7 @@ describe('SolaceEthLpFarm', function () {
       // check farmer 1 rewards
       pendingReward1 = await farm.pendingRewards(farmer1.address);
       expectedPendingReward1 = bnMulDiv([solacePerBlock, 62, tokenValue1], [tokenValue13]); // ?% ownership for 62 blocks
-      expectClose(pendingReward1, expectedPendingReward1);
+      expect(pendingReward1).to.be.closeTo(expectedPendingReward1, 10);
       // check farmer 2 rewards
       balanceAfter2 = await solaceToken.balanceOf(farmer2.address);
       expectedReceivedReward2 = bnAddSub([
@@ -702,10 +701,10 @@ describe('SolaceEthLpFarm', function () {
         bnMulDiv([solacePerBlock, 1, tokenValue3], [tokenValue13]), // ?% ownership for 1 blocks
       ]);
       receivedReward2 = balanceAfter2.sub(balanceBefore2);
-      expectClose(receivedReward2, expectedReceivedReward2);
+      expect(receivedReward2).to.be.closeTo(expectedReceivedReward2, 10);
       pendingReward2 = await farm.pendingRewards(farmer2.address);
       expectedPendingReward2 = bnMulDiv([solacePerBlock, 60, tokenValue3], [tokenValue13]); // ?% ownership for 60 block
-      expectClose(pendingReward2, expectedPendingReward2);
+      expect(pendingReward2).to.be.closeTo(expectedPendingReward2, 10);
       // farmer 1 withdraw token 1
       await farm.connect(farmer1).withdraw(tokenId1);
       expect((await farm.userInfo(farmer1.address)).value).to.equal(0);
@@ -719,7 +718,7 @@ describe('SolaceEthLpFarm', function () {
         bnMulDiv([solacePerBlock, 1, tokenValue1], [tokenValue13]), // ?% ownership for 1 block
       ]);
       receivedReward1 = balanceAfter1.sub(balanceBefore1);
-      expectClose(receivedReward1, expectedReceivedReward1);
+      expect(receivedReward1).to.be.closeTo(expectedReceivedReward1, 10);
       pendingReward1 = await farm.pendingRewards(farmer1.address);
       expect(pendingReward1).to.equal(0);
       // check farmer 2 rewards
@@ -729,7 +728,7 @@ describe('SolaceEthLpFarm', function () {
         bnMulDiv([solacePerBlock, 1, tokenValue3], [tokenValue13]), // ?% ownership for 1 block
         bnMulDiv([solacePerBlock, 70]), // 100% ownership for 70 blocks
       ]);
-      expectClose(pendingReward2, expectedPendingReward2);
+      expect(pendingReward2).to.be.closeTo(expectedPendingReward2, 10);
       // farmer 2 withdraw token 3
       await farm.connect(farmer2).withdraw(tokenId3);
       expect((await farm.userInfo(farmer2.address)).value).to.equal(0);
@@ -742,7 +741,7 @@ describe('SolaceEthLpFarm', function () {
         bnMulDiv([solacePerBlock, 1]), // 100% ownership for 1 block
       ]);
       receivedReward2 = balanceAfter2.sub(balanceBefore2);
-      expectClose(receivedReward2, expectedReceivedReward2);
+      expect(receivedReward2).to.be.closeTo(expectedReceivedReward2, 10);
       pendingReward2 = await farm.pendingRewards(farmer2.address);
       expect(pendingReward2).to.equal(0);
     });

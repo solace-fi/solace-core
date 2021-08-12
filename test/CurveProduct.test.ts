@@ -7,8 +7,6 @@ import chai from "chai";
 const { expect } = chai;
 chai.use(solidity);
 
-import { expectClose } from "./utilities/chai_extensions";
-
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
 import { PolicyManager, CurveProduct, ExchangeQuoter, ExchangeQuoterManual, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
 

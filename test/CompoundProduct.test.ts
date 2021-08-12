@@ -11,8 +11,6 @@ chai.use(solidity);
 import { config as dotenv_config } from 'dotenv';
 dotenv_config();
 
-import { expectClose } from "./utilities/chai_extensions";
-
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
 import { PolicyManager, CompoundProduct, ExchangeQuoter, ExchangeQuoterManual, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
 
@@ -404,7 +402,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
         let userEth0 = await user.getBalance();
         let tx1 = await product.connect(user).submitClaim(policyID1, amountOut1, deadline, signature);
         let receipt1 = await tx1.wait();
-        let gasCost1 = receipt1.gasUsed.mul(tx1.gasPrice || 0);
+        let gasCost1 = receipt1.gasUsed.mul(receipt1.effectiveGasPrice);
         let userEth1 = await user.getBalance();
         expect(userEth1.sub(userEth0).add(gasCost1)).to.equal(0);
         expect(tx1).to.emit(product, "ClaimSubmitted").withArgs(policyID1);
@@ -418,7 +416,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
         let tx2 = await claimsEscrow.connect(user).withdrawClaimsPayout(policyID1);
         expect(await claimsEscrow.exists(policyID1)).to.be.false;
         let receipt = await tx2.wait();
-        let gasCost = receipt.gasUsed.mul(tx2.gasPrice || 0);
+        let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
         let userEth2 = await user.getBalance();
         expect(userEth2.sub(userEth1).add(gasCost)).to.equal(amountOut1);
       });
@@ -444,7 +442,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
         let tx2 = await claimsEscrow.connect(user).withdrawClaimsPayout(policyID2);
         expect(await claimsEscrow.exists(policyID2)).to.be.false;
         let receipt = await tx2.wait();
-        let gasCost = receipt.gasUsed.mul(tx2.gasPrice || 0);
+        let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
         let userEth2 = await user.getBalance();
         expect(userEth2.sub(userEth1).add(gasCost)).to.equal(amountOut2);
       });
@@ -470,7 +468,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
         let tx2 = await claimsEscrow.connect(user2).withdrawClaimsPayout(policyID3);
         expect(await claimsEscrow.exists(policyID3)).to.be.false;
         let receipt = await tx2.wait();
-        let gasCost = receipt.gasUsed.mul(tx2.gasPrice || 0);
+        let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
         let userEth2 = await user2.getBalance();
         expect(userEth2.sub(userEth1).add(gasCost)).to.equal(amountOut3);
       });
@@ -570,9 +568,9 @@ if(process.env.FORK_NETWORK === "mainnet"){
             let userEth1 = await user3.getBalance();
             let tx2 = await claimsEscrow.connect(user3).withdrawClaimsPayout(policyID);
             let receipt = await tx2.wait();
-            let gasCost = receipt.gasUsed.mul(tx2.gasPrice || 0);
+            let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
             let userEth2 = await user3.getBalance();
-            expectClose(userEth2.sub(userEth1).add(gasCost), amountOut);
+            expect(userEth2.sub(userEth1).add(gasCost)).to.equal(amountOut);
             ++success;
             successList.push(symbol);
             console.log(`\x1b[38;5;239m        ✓ ${symbol}\x1b[0m`);
