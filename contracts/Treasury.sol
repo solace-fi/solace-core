@@ -270,9 +270,9 @@ contract Treasury is ITreasury, ReentrancyGuard {
 
     /** 
      * @notice Internal function that returns the minimum value between two values.
-     * @param a  The first value.
-     * @param b  The second value.
-     * @return minValue The minimum value.
+     * @param _a  The first value.
+     * @param _b  The second value.
+     * @return _c The minimum value.
      */
     function min(uint256 _a, uint256 _b) internal pure returns (uint256 _c) {
         return _a <= _b ? _a : _b;
