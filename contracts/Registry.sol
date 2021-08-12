@@ -8,7 +8,8 @@ import "./interface/IRegistry.sol";
 /**
  * @title Registry
  * @author solace.fi
- * @notice Tracks the contracts in the Solaverse.
+ * @notice The `Registry` is an  upgradeable proxy contract that tracks the contracts in the Solaverse. 
+ * It inherits from `UUPSUpgradeable` contract. Please refer  [**OpenZeppelin Docs**](https://docs.openzeppelin.com/contracts/4.x/api/proxy#UUPSUpgradeable) to learn more about upgradeable proxies.
  */
 contract Registry is IRegistry, Initializable, UUPSUpgradeable {
 
@@ -36,8 +37,8 @@ contract Registry is IRegistry, Initializable, UUPSUpgradeable {
     address public override riskManager;
 
     /**
-     * @notice initialize function for the registry contract.
-     * Only called once in contract deployment to initialize governor and admin. 
+     * @notice Initialize function for the registry contract.
+     * Only called once in contract deployment to initialize `governor` and `admin`. 
      * @param _governance Address of the governor.
      */
     function initialize(address _governance) public initializer {
@@ -46,8 +47,8 @@ contract Registry is IRegistry, Initializable, UUPSUpgradeable {
     }
 
     /**
-     * @notice Allows governance to be transferred to a new governor.
-     * Can only be called by the current governor.
+     * @notice Allows governance to be transferred to a new `governor`.
+     * Can only be called by the current `governor`.
      * @param _governance The new governor.
      */
     function setGovernance(address _governance) external override {
@@ -58,7 +59,7 @@ contract Registry is IRegistry, Initializable, UUPSUpgradeable {
 
     /**
      * @notice Accepts the governance role.
-     * Can only be called by the new governor.
+     * Can only be called by the new `governor`.
      */
     function acceptGovernance() external override {
         // can only be called by new governor
@@ -69,9 +70,9 @@ contract Registry is IRegistry, Initializable, UUPSUpgradeable {
     }
 
     /**
-     * @notice Sets the solace token contract.
-     * Can only be called by the current governor.
-     * @param _solace The solace token address.
+     * @notice Sets the [`Solace Token`](./SOLACE.md) contract.
+     * Can only be called by the current `governor`.
+     * @param _solace The `SOLACE` token address.
      */
     function setSolace(address _solace) external override {
         // can only be called by governor
@@ -81,9 +82,9 @@ contract Registry is IRegistry, Initializable, UUPSUpgradeable {
     }
 
     /**
-     * @notice Sets the master contract.
-     * Can only be called by the current governor.
-     * @param _master The master contract address.
+     * @notice Sets the [`Master`](./Master.md) contract.
+     * Can only be called by the current `governor`.
+     * @param _master The contract address of the `Master` contract.
      */
     function setMaster(address _master) external override {
         // can only be called by governor
@@ -93,9 +94,9 @@ contract Registry is IRegistry, Initializable, UUPSUpgradeable {
     }
 
     /**
-     * @notice Sets the Claims Escrow contract.
-     * Can only be called by the current governor.
-     * @param _claimsEscrow The sClaims Escrow address.
+     * @notice Sets the [`Claims Escrow`](./ClaimsEscrow.md) contract.
+     * Can only be called by the current `governor`.
+     * @param _claimsEscrow The contract address of the `ClaimsEscrow` contract.
      */
     function setClaimsEscrow(address _claimsEscrow) external override {
         // can only be called by governor
@@ -105,9 +106,9 @@ contract Registry is IRegistry, Initializable, UUPSUpgradeable {
     }
 
     /**
-     * @notice Sets the vault contract.
-     * Can only be called by the current governor.
-     * @param _vault The vault contract address.
+     * @notice Sets the [`Vault`](./Vault.md) contract.
+     * Can only be called by the current `governor`.
+     * @param _vault The contract address of the `Vault` contract.
      */
     function setVault(address _vault) external override {
         // can only be called by governor
@@ -117,9 +118,9 @@ contract Registry is IRegistry, Initializable, UUPSUpgradeable {
     }
 
     /**
-     * @notice Sets the treasury contract.
-     * Can only be called by the current governor.
-     * @param _treasury The treasury contract address.
+     * @notice Sets the [`Treasury`](./Treasury.md) contract.
+     * Can only be called by the current `governor`.
+     * @param _treasury The contract address of the `Treasury` contract.
      */
     function setTreasury(address _treasury) external override {
         // can only be called by governor
@@ -129,9 +130,9 @@ contract Registry is IRegistry, Initializable, UUPSUpgradeable {
     }
 
     /**
-     * @notice Sets the locker contract.
-     * Can only be called by the current governor.
-     * @param _locker The locker address.
+     * @notice Sets the [`Locker`](./Locker.md) contract.
+     * Can only be called by the current `governor`.
+     * @param _locker The contract address of the `Locker` contract.
      */
     function setLocker(address _locker) external override {
         // can only be called by governor
@@ -141,9 +142,9 @@ contract Registry is IRegistry, Initializable, UUPSUpgradeable {
     }
 
     /**
-     * @notice Sets the PolicyManager contract.
-     * Can only be called by the current governor.
-     * @param _policyManager The policy manager address.
+     * @notice Sets the [`Policy Manager`](./PolicyManager.md) contract.
+     * Can only be called by the current `governor`.
+     * @param _policyManager The contract address of the `PolicyManager` contract.
      */
     function setPolicyManager(address _policyManager) external override {
         // can only be called by governor
@@ -153,9 +154,9 @@ contract Registry is IRegistry, Initializable, UUPSUpgradeable {
     }
 
     /** 
-     * @notice Sets the RiskManager contract.
-     * Can only be called by the current governor.
-     * @param _riskManager The risk manager address.
+     * @notice Sets the [`Risk Manager`](./RiskManager.md) contract.
+     * Can only be called by the current `governor`.
+     * @param _riskManager The contract address of the `RiskManager` contract.
      */
     function setRiskManager(address _riskManager) external override {
         // can only be called by governor
@@ -165,7 +166,8 @@ contract Registry is IRegistry, Initializable, UUPSUpgradeable {
     }
 
     /**
-    * @notice To authorize the admin to upgrade the contract.
+    * @notice To authorize the `admin` to upgrade the `Registry` contract.
+    * It is called when upgrading the `Registry` contract to security check.
     */
     function _authorizeUpgrade(address) internal override {
         require(admin == msg.sender, "!admin");

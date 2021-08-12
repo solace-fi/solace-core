@@ -13,7 +13,7 @@ import "./interface/IVault.sol";
 /**
  * @title Treasury
  * @author solace.fi
- * @notice The war chest of Castle Solace.
+ * @notice The `Treasury` smart contract governs the finance related operations.
  */
 contract Treasury is ITreasury, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -63,7 +63,7 @@ contract Treasury is ITreasury, ReentrancyGuard {
     }
 
     /**
-     * Receive function. Deposits eth.
+     * Fallback function to allow contract to receive **ETH**.
      */
     receive () external payable override {
         emit EthDeposited(msg.value);
@@ -71,16 +71,16 @@ contract Treasury is ITreasury, ReentrancyGuard {
 
 
     /**
-     * Fallback function. Deposits eth.
+     * Fallback function to allow contract to receive **ETH**.
      */
     fallback () external payable override {
         emit EthDeposited(msg.value);
     }
 
     /**
-     * @notice Allows governance to be transferred to a new governor.
-     * Can only be called by the current governor.
-     * @param _governance The new governor.
+     * @notice Allows governance to be transferred to a new `governor`.
+     * Can only be called by the current `governor`.
+     * @param _governance The new `governor`.
      */
     function setGovernance(address _governance) external override {
         // can only be called by governor
@@ -89,8 +89,8 @@ contract Treasury is ITreasury, ReentrancyGuard {
     }
 
     /**
-     * @notice Accepts the governance role.
-     * Can only be called by the new governor.
+     * @notice Accepts the `governance` role.
+     * Can only be called by the new `governor`.
      */
     function acceptGovernance() external override {
         // can only be called by new governor
@@ -101,7 +101,7 @@ contract Treasury is ITreasury, ReentrancyGuard {
     }
 
     /**
-     * @notice Deposits some ether.
+     * @notice Deposits **ETH**. The amount is given by `msg.value`.
      */
     function depositEth() external override payable {
         // emit event
@@ -109,7 +109,7 @@ contract Treasury is ITreasury, ReentrancyGuard {
     }
 
     /**
-     * @notice Deposit some ERC20 token.
+     * @notice Deposits `ERC20` token.
      * @param _token The address of the token to deposit.
      * @param _amount The amount of the token to deposit.
      */
@@ -121,8 +121,7 @@ contract Treasury is ITreasury, ReentrancyGuard {
     }
 
     /**
-     * @notice Spends some tokens.
-     * Can only be called by the current governor.
+     * @notice Spends `ERC20` token or `ETH`. Can only be called by the current `governor`.
      * @param _token The address of the token to spend.
      * @param _amount The amount of the token to spend.
      * @param _recipient The address of the token receiver.
@@ -139,10 +138,8 @@ contract Treasury is ITreasury, ReentrancyGuard {
     }
 
     /**
-     * @notice Manually swaps a token.
-     * Can only be called by the current governor.
-     * @dev Swaps the entire balance in case some tokens were unknowingly received.
-     * Reverts if the swap was unsuccessful.
+     * @notice Manually swaps a token. Can only be called by the current `governor`. 
+     * It swaps the entire balance in case some tokens were unknowingly received. Reverts if the swap was unsuccessful.
      * @param _path The path of pools to take.
      * @param _amountIn The amount to swap.
      * @param _amountOutMinimum The minimum about to receive.
@@ -172,7 +169,7 @@ contract Treasury is ITreasury, ReentrancyGuard {
 
     /**
      * @notice Sets the premium recipients and their weights.
-     * Can only be called by the current governor.
+     * Can only be called by the current `governor`.
      * @param _recipients The premium recipients.
      * @param _weights The recipient weights.
      */
@@ -191,7 +188,7 @@ contract Treasury is ITreasury, ReentrancyGuard {
     }
 
     /**
-     * @notice Routes the premiums to the recipients
+     * @notice Routes the **premiums** to the `recipients`.
      */
     function routePremiums() external payable override nonReentrant {
         uint256 div = weightSum;
@@ -208,8 +205,8 @@ contract Treasury is ITreasury, ReentrancyGuard {
     }
 
     /**
-     * @notice Wraps some eth into weth.
-     * Can only be called by the current governor.
+     * @notice Wraps some **ETH** into **WETH**.
+     * Can only be called by the current `governor`.
      * @param _amount The amount to wrap.
      */
     function wrap(uint256 _amount) external override {
@@ -219,8 +216,8 @@ contract Treasury is ITreasury, ReentrancyGuard {
     }
 
     /**
-     * @notice Unwraps some weth into eth.
-     * Can only be called by the current governor.
+     * @notice Unwraps some **WETH** into **ETH**.
+     * Can only be called by the current `governor`.
      * @param _amount The amount to unwrap.
      */
     function unwrap(uint256 _amount) external override {
@@ -229,7 +226,11 @@ contract Treasury is ITreasury, ReentrancyGuard {
         weth.withdraw(_amount);
     }
 
-    // used in Product
+    /**
+     * @notice The function refunds the given amount to the user. It is called by `products` in **Solace Protocol**.
+     * @param _user The user address to send refund amount.
+     * @param _amount The amount to send the user. 
+     */
     function refund(address _user, uint256 _amount) external override nonReentrant {
         // check if from active product
         require(IPolicyManager(registry.policyManager()).productIsActive(msg.sender), "!product");
@@ -237,17 +238,17 @@ contract Treasury is ITreasury, ReentrancyGuard {
     }
 
     /**
-     * @notice Pull any unpaid rewards.
+     * @notice The function transfers the unpaid refunds to the user. It is called by `products` in **Solace Protocol**.
      */
     function withdraw() external override nonReentrant {
         transferEth(msg.sender, 0);
     }
 
     /**
-     * @notice Transfers a user some eth.
-     * Also adds on their unpaid rewards, and stores new unpaid rewards.
+     * @notice The internal function transfers **ETH** to the user. It's called by **refund()** and **withdraw()** functions in the contract.
+     * Also adds on their unpaid refunds, and stores new unpaid refunds if necessary.
      * @param _user The user to pay.
-     * @param _amount The amount to pay _before_ unpaid rewards.
+     * @param _amount The amount to pay **before** unpaid funds.
      */
     function transferEth(address _user, uint256 _amount) internal {
         // account for unpaid rewards
@@ -267,6 +268,12 @@ contract Treasury is ITreasury, ReentrancyGuard {
         payable(_user).transfer(transferAmount);
     }
 
+    /** 
+     * @notice Internal function that returns the minimum value between two values.
+     * @param a  The first value.
+     * @param b  The second value.
+     * @return minValue The minimum value.
+     */
     function min(uint256 _a, uint256 _b) internal pure returns (uint256 _c) {
         return _a <= _b ? _a : _b;
     }
