@@ -14,7 +14,7 @@ import "./interface/IVault.sol";
 /**
  * @title Vault
  * @author solace.fi
- * @notice Capital Providers can deposit ETH to mint shares of the Vault (CP tokens)
+ * @notice The `Vault` smart contract enables that `Capital Providers` can deposit **ETH** to mint shares of the `Vault`(CP tokens).
  */
 contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -39,8 +39,10 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     // used to prevent withdraw before claim payout
     /// @notice The minimum amount of time a user must wait to withdraw funds.
     uint40 public override cooldownMin = 604800;  // 7 days
+
     /// @notice The maximum amount of time a user must wait to withdraw funds.
     uint40 public override cooldownMax = 3024000; // 35 days
+
     // The timestamp that a depositor's cooldown started.
     mapping(address => uint40) public override cooldownStart;
 
@@ -58,8 +60,8 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     *************/
 
     /**
-     * @notice Allows governance to be transferred to a new governor.
-     * Can only be called by the current governor.
+     * @notice Allows `governance` to be transferred to a new `governor`.
+     * Can only be called by the current `governor`.
      * @param _governance The new governor.
      */
     function setGovernance(address _governance) external override {
@@ -69,8 +71,8 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     }
 
     /**
-     * @notice Accepts the governance role.
-     * Can only be called by the new governor.
+     * @notice Accepts the `governance` role.
+     * Can only be called by the new `governor`.
      */
     function acceptGovernance() external override {
         // can only be called by new governor
@@ -82,13 +84,13 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
 
     /**
      * @notice Activates or deactivates emergency shutdown.
-     * Can only be called by the current governor.
+     * Can only be called by the current `governor`.
      * During Emergency Shutdown:
-     * 1. No users may deposit into the Vault.
-     * 2. Withdrawls can bypass cooldown.
-     * 3. Only Governance may undo Emergency Shutdown.
-     * @param active If true, the Vault goes into Emergency Shutdown.
-     * If false, the Vault goes back into Normal Operation.
+     * 1. No users may deposit into the `Vault`.
+     * 2. Withdraws can bypass cooldown.
+     * 3. Only `governance` may undo Emergency Shutdown.
+     * @param active If true, the `Vault` goes into Emergency Shutdown.
+     * If false, the `Vault` goes back into Normal Operation.
     */
     function setEmergencyShutdown(bool active) external override {
         require(msg.sender == governance, "!governance");
@@ -97,8 +99,8 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     }
 
     /**
-     * @notice Sets the minimum and maximum amount of time a user must wait to withdraw funds.
-     * Can only be called by the current governor.
+     * @notice Sets the `minimum` and `maximum` amount of time in seconds that a user must wait to withdraw funds.
+     * Can only be called by the current `governor`.
      * @param _min Minimum time in seconds.
      * @param _max Maximum time in seconds.
      */
@@ -110,9 +112,9 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     }
 
     /**
-     * @notice Adds or removes requesting rights.
-     * Can only be called by the current governor.
-     * @param _dst The requestor.
+     * @notice Adds or removes requesting rights. The `requestor` can be user account or smart contract.
+     * Can only be called by the current `governor`.
+     * @param _dst The requestor address.
      * @param _status True to add or false to remove rights.
      */
     function setRequestor(address _dst, bool _status) external override {
@@ -125,12 +127,12 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     *************/
 
     /**
-     * @notice Allows a user to deposit ETH into the Vault (becoming a Capital Provider)
-     * Shares of the Vault (CP tokens) are minted to caller
-     * Called when Vault receives ETH
-     * Deposits `_amount` `token`, issuing shares to `recipient`.
-     * Reverts if Vault is in Emergency Shutdown
-     * @return Number of shares minted.
+     * @notice Allows a user to deposit **ETH** into the `Vault`(becoming a **Capital Provider**).
+     * Shares of the `Vault` (CP tokens) are minted to caller.
+     * It is called when `Vault` receives **ETH**.
+     * It issues the amount of token share respected to the deposit to the `recipient`.
+     * Reverts if `Vault` is in **Emergency Shutdown**
+     * @return tokens The number of shares minted.
      */
     function depositEth() public payable override nonReentrant returns (uint256) {
         // mint
@@ -138,12 +140,12 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     }
 
     /**
-     * @notice Allows a user to deposit WETH into the Vault (becoming a Capital Provider)
-     * Shares of the Vault (CP tokens) are minted to caller
-     * Deposits `_amount` `token`, issuing shares to `recipient`.
-     * Reverts if Vault is in Emergency Shutdown
+     * @notice Allows a user to deposit **WETH** into the `Vault`(becoming a **Capital Provider**).
+     * Shares of the Vault (CP tokens) are minted to caller.
+     * It issues the amount of token share respected to the deposit to the `recipient`.
+     * Reverts if `Vault` is in Emergency Shutdown
      * @param _amount Amount of weth to deposit.
-     * @return Number of shares minted.
+     * @return tokens The number of shares minted.
      */
     function depositWeth(uint256 _amount) external override nonReentrant returns (uint256) {
         // pull weth
@@ -153,9 +155,9 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     }
 
     /**
-     * @notice Handles minting of tokens during deposit.
-     * @param _amount Amount of ETH or WETH deposited.
-     * @return Number of shares minted.
+     * @notice Handles minting of tokens during deposit. It is called by **depositEth()** or **depositWeth()**.
+     * @param _amount Amount of **ETH** or **WETH** deposited.
+     * @return tokens The number of shares minted.
      */
     function _deposit(uint256 _amount) internal returns (uint256) {
         require(!emergencyShutdown, "cannot deposit when vault is in emergency shutdown");
@@ -173,24 +175,24 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     }
 
     /**
-     * @notice Starts the cooldown.
+     * @notice Starts the **cooldown** period for the user.
      */
     function startCooldown() external override {
         cooldownStart[msg.sender] = uint40(block.timestamp);
     }
 
     /**
-     * @notice Stops the cooldown.
+     * @notice Stops the **cooldown** period for the user.
      */
     function stopCooldown() external override {
         cooldownStart[msg.sender] = 0;
     }
 
     /**
-     * @notice Allows a user to redeem shares for ETH
-     * Burns CP tokens and transfers ETH to the CP
-     * @param _shares amount of shares to redeem
-     * @return value in ETH that the shares where redeemed for
+     * @notice Allows a user to redeem shares for **ETH**.
+     * Burns **CP**(Capital Provider) tokens and transfers **ETH** to the **Capital Provider**.
+     * @param _shares amount of shares to redeem.
+     * @return value The amount in **ETH** that the shares where redeemed for.
      */
     function withdrawEth(uint256 _shares) external override nonReentrant returns (uint256) {
         uint256 value = _withdraw(_shares);
@@ -205,10 +207,10 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     }
 
     /**
-     * @notice Allows a user to redeem shares for WETH
-     * Burns CP tokens and transfers WETH to the CP
-     * @param _shares amount of shares to redeem
-     * @return value in WETH that the shares where redeemed for
+     * @notice Allows a user to redeem shares for **WETH**.
+     * Burns **CP**(Capital Provider) tokens and transfers **WETH** to the **Capital Provider**.
+     * @param _shares amount of shares to redeem.
+     * @return value The amount in **WETH** that the shares where redeemed for.
      */
     function withdrawWeth(uint256 _shares) external override nonReentrant returns (uint256) {
         uint256 value = _withdraw(_shares);
@@ -226,8 +228,8 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
 
     /**
      * @notice Handles burning of tokens during withdraw.
-     * @param _shares amount of shares to redeem
-     * @return value in ETH that the shares where redeemed for
+     * @param _shares amount of shares to redeem.
+     * @return value The amount in **ETH** that the shares where redeemed for.
      */
     function _withdraw(uint256 _shares) internal returns (uint256) {
         // validate shares to withdraw
@@ -248,10 +250,10 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     }
 
     /**
-     * @notice Sends ETH to other users or contracts.
-     * Can only be called by authorized requestors.
-     * @param _amount Amount of ETH wanted.
-     * @return Amount of ETH sent.
+     * @notice Sends **ETH** to other users or contracts. The users or contracts should be authorized requestors.
+     * Can only be called by authorized `requestors`.
+     * @param _amount The amount of **ETH** wanted.
+     * @return amount The amount of **ETH** sent.
      */
     function requestEth(uint256 _amount) external override nonReentrant returns (uint256) {
         require(isRequestor[msg.sender], "!requestor");
@@ -275,9 +277,9 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     *************/
 
     /**
-    * @notice Returns the maximum redeemable shares by the `user` such that Vault does not go under MCR
-    * @param user Address of user to check
-    * @return Max redeemable shares by the user
+    * @notice Returns the maximum redeemable shares by the `user` such that `Vault` does not go under **MCR**(Minimum Capital Requirement).
+    * @param user The adddress of user to check.
+    * @return balance The max redeemable shares by the user.
     */
     function maxRedeemableShares(address user) external view override returns (uint256) {
         uint256 userBalance = balanceOf(user);
@@ -297,9 +299,9 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
 
     /**
      * @notice Returns the total quantity of all assets under control of this
-        Vault, including those loaned out to a Strategy as well as those currently
-        held in the Vault.
-     * @return The total assets under control of this vault.
+        `Vault`, including those loaned out to a `Strategy` as well as those currently
+        held in the `Vault`.
+     * @return totalAssets The total assets under control of this vault.
     */
     function totalAssets() external view override returns (uint256) {
         return _totalAssets();
@@ -311,15 +313,18 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     *************/
 
     /**
-     * @notice Quantity of all assets under control of this Vault, including those loaned out to Strategies
+     * @notice Internal function that returns quantity of all assets under control of this `Vault`, including those loaned out to `Strategies`. 
+     * Called by **totalAssets()** function.
+     * @return totalAssets The total assets under control of this vault.
      */
     function _totalAssets() internal view returns (uint256) {
         return token.balanceOf(address(this)) + address(this).balance;
     }
 
     /**
-     * @notice Determines the current value of `shares`
-     * @param shares amount of shares to calculate value for.
+     * @notice Internal function that determines the current value of given shares.
+     * @param shares The amount of shares to calculate value for.
+     * @return value The amount of value for given shares.
      */
     function _shareValue(uint256 shares) internal view returns (uint256) {
         // using 1e3 for extra precision here when decimals is low
@@ -329,8 +334,9 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     }
 
     /**
-     * @notice Determines how many shares `amount` of token would receive.
-     * @param amount of tokens to calculate number of shares for
+     * @notice Internal function that determines how many shares for given amount of token would receive.
+     * @param amount of tokens to calculate number of shares for.
+     * @return shares The amount of shares(tokens) for given amount. 
      */
     function _sharesForAmount(uint256 amount) internal view returns (uint256) {
         // NOTE: if sqrt(token.totalSupply()) > 1e37, this could potentially revert
@@ -339,10 +345,19 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
             : 0;
     }
 
+    /** 
+     * @notice Internal function that returns the minimum value between two values.
+     * @param a  The first value.
+     * @param b  The second value.
+     * @return minValue The minimum value.
+     */
     function min(uint256 a, uint256 b) internal pure returns (uint256) {
         return a < b ? a : b;
     }
 
+    /**
+     * @notice Internal function that is called before token transfer in order to apply some security check.
+     */
     function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual override {
         // only care about user->user transfers
         // mint and burn are validated in deposit and withdraw
@@ -366,14 +381,14 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     }
 
     /**
-     * @notice Fallback function to allow contract to receive ETH
-     * Mints CP tokens to caller if caller is not Vault or WETH or Treasury
+     * @notice Fallback function to allow contract to receive *ETH*.
+     * Mints **CP** tokens to `caller` if `caller` is not `Vault` or `WETH` or `Treasury`.
      */
     receive() external payable { }
 
     /**
-     * @notice Fallback function to allow contract to receive ETH
-     * Mints CP tokens to caller if caller is not Vault or WETH or Treasury
+     * @notice Fallback function to allow contract to receive **ETH**.
+     * Mints **CP** tokens to `caller` if `caller` is not `Vault` or `WETH` or `Treasury`.
      */
     fallback() external payable { }
 }
