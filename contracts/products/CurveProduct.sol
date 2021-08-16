@@ -21,11 +21,28 @@ interface ICurvePool {
     function calc_withdraw_one_coin(uint256 token_amount, int128 i) external view returns (uint256);
 }
 
+/**
+ * @title  CurveProduct
+ * @author solace.fi
+ * @notice The **Curve** product that is users can buy policy for **Curve**. It is a concrete smart contract that inherits from abstract [`BaseProduct`](./BaseProduct.md).
+ */
 contract CurveProduct is BaseProduct {
 
     ICurveAddressProvider public addressProvider;
     IExchangeQuoter public quoter;
 
+    /**
+      * @notice The constructor.
+      * @param _governance The governor.
+      * @param _policyManager The IPolicyManager contract.
+      * @param _registry The IRegistry contract.
+      * @param _coveredPlatform A platform contract which locates contracts that are covered by this product.
+      * @param _minPeriod The minimum policy period in blocks to purchase a **policy**.
+      * @param _maxPeriod The maximum policy period in blocks to purchase a **policy**.
+      * @param _price The cover price for the **Product**.
+      * @param _maxCoverPerUserDivisor The max cover amount divisor for per user. (maxCover / divisor = maxCoverPerUser).
+      * @param _quoter The exchange quoter address.
+     */
     constructor (
         address _governance,
         IPolicyManager _policyManager,
@@ -50,8 +67,13 @@ contract CurveProduct is BaseProduct {
         quoter = IExchangeQuoter(_quoter);
     }
 
-    // _positionContract must be a curve.fi pool or token
-    // see https://curve.fi/pools
+    /**
+     * @notice It gives the user's total position in the product's protocol.
+     * The `_positionContract` must be a **curve.fi pool** or **token**.
+     * @param _policyholder The `buyer` who is requesting the coverage quote (Please see https://curve.fi/pools).
+     * @param _positionContract The address of the exact smart contract the `buyer` has their position in (e.g., for UniswapProduct this would be Pair's address).
+     * @return positionAmount The user's total position in **Wei** in the product's protocol.
+     */
     function appraisePosition(address _policyholder, address _positionContract) public view override returns (uint256 positionAmount) {
         (IERC20 lpToken, ICurvePool pool) = verifyPool(_positionContract);
         uint256 lpBalance = lpToken.balanceOf(_policyholder);
@@ -64,9 +86,9 @@ contract CurveProduct is BaseProduct {
 
     /**
      * @notice Changes the covered platform.
-     * Use this if the the protocol changes their registry but keeps the children contracts.
+     * The function is used for if the the protocol changes their registry but keeps the children contracts.
      * A new version of the protocol will likely require a new Product.
-     * Can only be called by the current governor.
+     * Can only be called by the current `governor`.
      * @param _coveredPlatform The platform to cover.
      */
     function setCoveredPlatform(address _coveredPlatform) public override {
@@ -91,10 +113,9 @@ contract CurveProduct is BaseProduct {
 
     /**
      * @notice Returns the name of the product.
-     * @return Curve
+     * @return Curve The name of the product.
      */
     function name() public pure override returns (string memory) {
         return "Curve";
     }
-
 }

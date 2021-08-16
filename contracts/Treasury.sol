@@ -63,15 +63,14 @@ contract Treasury is ITreasury, ReentrancyGuard {
     }
 
     /**
-     * Fallback function to allow contract to receive **ETH**.
+     * @notice Fallback function to allow contract to receive **ETH**.
      */
     receive () external payable override {
         emit EthDeposited(msg.value);
     }
 
-
     /**
-     * Fallback function to allow contract to receive **ETH**.
+     * @notice Fallback function to allow contract to receive **ETH**.
      */
     fallback () external payable override {
         emit EthDeposited(msg.value);

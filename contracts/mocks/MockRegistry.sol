@@ -7,7 +7,7 @@ import "../Registry.sol";
 /**
  * @title MockRegistry
  * @author solace.fi
- * @notice Mock registry for testing purposes
+ * @notice Mock registry for the upgradeable `Registry` testing purposes.
  */
 contract MockRegistry is Registry {
     string internal name;

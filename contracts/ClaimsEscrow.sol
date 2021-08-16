@@ -13,7 +13,8 @@ import "./interface/IClaimsEscrow.sol";
 /**
  * @title ClaimsEscrow
  * @author solace.fi
- * @notice The holder of claims. Policy holders can submit claims through their policy's product contract, in the process burning the policy and converting it to a claim. The policy holder will then need to wait for a cooldown period after which they can withdraw the payout.
+ * @notice The holder of claims. Policy holders can submit claims through their policy's product contract, in the process burning the policy and converting it to a claim.
+ * The policy holder will then need to wait for a cooldown period after which they can withdraw the payout.
  */
 contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow {
     using Address for address;
@@ -31,23 +32,25 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow {
     /// @notice Registry of protocol contract addresses.
     IRegistry public registry;
 
+    /// @notice ETH_ADDRESS.
     address private constant ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
+    /// @notice Claim struct.
     struct Claim {
         uint256 amount;
         uint256 receivedAt; // used to determine withdrawability after cooldown period
     }
 
-    /// mapping of claimID to Claim object
+    /// @notice mapping of claimID to Claim object
     mapping (uint256 => Claim) public claims;
 
-    // tracks how much is required to payout all claims
+    /// @notice tracks how much is required to payout all claims
     uint256 public totalClaimsOutstanding;
 
     /**
-     * @notice Constructs the ClaimsEscrow contract.
-     * @param _governance Address of the governor.
-     * @param _registry Address of the registry.
+     * @notice The constructor. It constructs the ClaimsEscrow contract.
+     * @param _governance The address of the governor.
+     * @param _registry The address of the registry.
      */
     constructor(address _governance, address _registry) ERC721("Solace Claim", "SCT"){
         governance = _governance;
@@ -55,19 +58,19 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow {
     }
 
     /**
-     * Receive function. Deposits eth.
+     * @notice Fallback function to allow contract to receive **ETH**.
      */
     receive () external payable override {}
 
 
     /**
-     * Fallback function. Deposits eth.
+     * @notice Fallback function to allow contract to receive **ETH**.
      */
     fallback () external payable override {}
 
     /**
      * @notice Allows governance to be transferred to a new governor.
-     * Can only be called by the current governor.
+     * Can only be called by the current `governor`.
      * @param _governance The new governor.
      */
     function setGovernance(address _governance) external override {
@@ -78,7 +81,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow {
 
     /**
      * @notice Accepts the governance role.
-     * Can only be called by the new governor.
+     * Can only be called by the new `governor`.
      */
     function acceptGovernance() external override {
         // can only be called by new governor
@@ -92,9 +95,9 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow {
      * @notice Receives a claim.
      * Only callable by active products.
      * @dev claimID = policyID
-     * @param _policyID ID of policy to claim
-     * @param _claimant Address of the claimant
-     * @param _amount Amount of ETH to claim
+     * @param _policyID The id of policy to claim.
+     * @param _claimant The address of the claimant.
+     * @param _amount The amount of **ETH** to claim.
      */
     function receiveClaim(uint256 _policyID, address _claimant, uint256 _amount) external payable override {
         require(IPolicyManager(registry.policyManager()).productIsActive(msg.sender), "!product");
@@ -113,7 +116,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow {
 
     /**
      * @notice Allows claimants to withdraw their claims payout.
-     * Only callable by the claimant.
+     * Only callable by the `claimant`.
      * Only callable after the cooldown period has elapsed (from the time the claim was approved and processed).
      * @param claimID The id of the claim to withdraw payout for.
      */
@@ -147,7 +150,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow {
 
     /**
      * @notice Adjusts the value of a claim.
-     * Can only be called by the current governor.
+     * Can only be called by the current `governor`.
      * @param claimID The claim to adjust.
      * @param value The new payout of the claim.
      */
@@ -161,10 +164,10 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow {
 
     /**
      * @notice Rescues misplaced tokens.
-     * Can only be called by the current governor.
-     * @param token Token to pull.
-     * @param amount Amount to pull.
-     * @param dst Destination for tokens.
+     * Can only be called by the current `governor`.
+     * @param token The token to pull.
+     * @param amount The amount to pull.
+     * @param dst The destination for tokens.
      */
     function sweep(address token, uint256 amount, address dst) external override {
         // can only be called by governor
@@ -175,8 +178,8 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow {
 
     /**
      * @notice Set the cooldown duration.
-     * Can only be called by the current governor.
-     * @param _period New cooldown duration in seconds
+     * Can only be called by the current `governor`.
+     * @param _period The new cooldown duration in seconds.
      */
     function setCooldownPeriod(uint256 _period) external override {
         // can only be called by governor
