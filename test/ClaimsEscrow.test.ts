@@ -38,8 +38,8 @@ describe("ClaimsEscrow", function () {
       artifacts.WETH
     )) as Weth9;
 
-    let registryContract = await ethers.getContractFactory('Registry');
-    registry = (await upgrades.deployProxy(registryContract, [owner.address], { kind: 'uups' })) as Registry;
+    // deploy registry contract
+    registry = (await deployContract(owner, artifacts.Registry, [owner.address])) as Registry;
 
     claimsEscrow = (await deployContract(
       owner,

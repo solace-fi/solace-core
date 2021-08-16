@@ -51,9 +51,8 @@ describe('CpFarm', function () {
   before(async function () {
     artifacts = await import_artifacts();
 
-    // deploy registry
-    let registryContract = await ethers.getContractFactory("Registry");
-    registry = (await upgrades.deployProxy(registryContract, [governor.address], { kind: "uups" })) as Registry;
+    // deploy registry contract
+    registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
 
     // deploy policy manager
     policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;

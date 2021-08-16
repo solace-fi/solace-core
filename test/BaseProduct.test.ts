@@ -54,18 +54,17 @@ describe("BaseProduct", () => {
     // deploy weth
     weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
 
-    // deploy registry
-    let registryContract = await ethers.getContractFactory("Registry");
-    registry = (await upgrades.deployProxy(registryContract, [deployer.address], { kind: "uups" })) as Registry;
+    // deploy registry contract
+    registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
 
     // deploy vault
-    vault = (await deployContract(deployer, artifacts.Vault, [deployer.address, registry.address, weth.address])) as Vault;
+    vault = (await deployContract(deployer, artifacts.Vault, [governor.address, registry.address, weth.address])) as Vault;
 
     // deploy claims escrow
-    claimsEscrow = (await deployContract(deployer, artifacts.ClaimsEscrow, [deployer.address, registry.address])) as ClaimsEscrow;
+    claimsEscrow = (await deployContract(deployer, artifacts.ClaimsEscrow, [governor.address, registry.address])) as ClaimsEscrow;
 
     // deploy treasury contract
-    treasury = (await deployContract(deployer, artifacts.Treasury, [deployer.address, ZERO_ADDRESS, weth.address, registry.address])) as Treasury;
+    treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, ZERO_ADDRESS, weth.address, registry.address])) as Treasury;
 
     // deploy risk manager contract
     riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
@@ -75,7 +74,7 @@ describe("BaseProduct", () => {
       deployer,
       artifacts.MockProduct,
       [
-        deployer.address,
+        governor.address,
         policyManager.address,
         registry.address,
         ONE_SPLIT_VIEW, // this is for the coveredPlatform
@@ -91,7 +90,7 @@ describe("BaseProduct", () => {
       deployer,
       artifacts.MockProduct,
       [
-        deployer.address,
+        governor.address,
         policyManager.address,
         registry.address,
         treasury.address, // this is for the coveredPlatform
@@ -102,18 +101,18 @@ describe("BaseProduct", () => {
       ]
     )) as MockProduct;
 
-    await registry.setVault(vault.address);
-    await registry.setClaimsEscrow(claimsEscrow.address);
-    await registry.setTreasury(treasury.address);
-    await registry.setPolicyManager(policyManager.address);
-    await registry.setRiskManager(riskManager.address);
-    await vault.setRequestor(claimsEscrow.address, true);
-    await vault.setRequestor(treasury.address, true);
+    await registry.connect(governor).setVault(vault.address);
+    await registry.connect(governor).setClaimsEscrow(claimsEscrow.address);
+    await registry.connect(governor).setTreasury(treasury.address);
+    await registry.connect(governor).setPolicyManager(policyManager.address);
+    await registry.connect(governor).setRiskManager(riskManager.address);
+    await vault.connect(governor).setRequestor(claimsEscrow.address, true);
+    await vault.connect(governor).setRequestor(treasury.address, true);
   });
 
   describe("governance", function() {
     it("starts with the correct governor", async function() {
-      expect(await product.governance()).to.equal(deployer.address);
+      expect(await product.governance()).to.equal(governor.address);
     });
 
     it("rejects setting new governance by non governor", async function() {
@@ -121,9 +120,9 @@ describe("BaseProduct", () => {
     });
 
     it("can set new governance", async function() {
-      await product.connect(deployer).setGovernance(governor.address);
-      expect(await product.governance()).to.equal(deployer.address);
-      expect(await product.newGovernance()).to.equal(governor.address);
+      await product.connect(governor).setGovernance(deployer.address);
+      expect(await product.governance()).to.equal(governor.address);
+      expect(await product.newGovernance()).to.equal(deployer.address);
     });
 
     it("rejects governance transfer by non governor", async function() {
@@ -131,12 +130,14 @@ describe("BaseProduct", () => {
     });
 
     it("can transfer governance", async function() {
-      let tx = await product.connect(governor).acceptGovernance();
+      let tx = await product.connect(deployer).acceptGovernance();
       await expect(tx)
         .to.emit(product, "GovernanceTransferred")
-        .withArgs(governor.address);
-      expect(await product.governance()).to.equal(governor.address);
+        .withArgs(deployer.address);
+      expect(await product.governance()).to.equal(deployer.address);
       expect(await product.newGovernance()).to.equal(ZERO_ADDRESS);
+      await product.connect(deployer).setGovernance(governor.address);
+      await product.connect(governor).acceptGovernance();
     });
   });
 
@@ -580,7 +581,7 @@ describe("BaseProduct", () => {
         deployer,
         artifacts.MockProduct,
         [
-          deployer.address,
+          governor.address,
           mockPolicyManager.address,
           registry.address,
           treasury.address, // this is for the coveredPlatform

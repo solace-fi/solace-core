@@ -38,8 +38,8 @@ describe('PolicyManager', function() {
     // deploy policy manager
     policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
 
-    let registryContract = await ethers.getContractFactory("Registry");
-    registry = (await upgrades.deployProxy(registryContract, [governor.address], { kind: "uups" })) as Registry;
+    // deploy registry contract
+    registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
 
     // deploy treasury contract
     treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, ZERO_ADDRESS, ZERO_ADDRESS, registry.address])) as Treasury;

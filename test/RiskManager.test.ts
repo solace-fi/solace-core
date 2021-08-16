@@ -30,8 +30,7 @@ describe("RiskManager", function () {
     artifacts = await import_artifacts();
 
     // deploy registry contract
-    let registryContract = await ethers.getContractFactory("Registry");
-    registry = (await upgrades.deployProxy(registryContract, [governor.address], { kind: "uups" })) as Registry;
+    registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
 
     // deploy weth
     weth = (await deployContract(deployer,artifacts.WETH)) as Weth9;

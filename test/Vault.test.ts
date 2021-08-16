@@ -43,7 +43,7 @@ describe("Vault", function () {
       weth = (await deployContract(owner,artifacts.WETH)) as Weth9;
       solace = (await deployContract(owner,artifacts.SOLACE,[newOwner.address])) as Solace;
       let registryContract = await ethers.getContractFactory("Registry");
-      registry = (await upgrades.deployProxy(registryContract, [owner.address], { kind: "uups" })) as Registry;
+      registry = (await deployContract(owner, artifacts.Registry, [owner.address])) as Registry;
       vault = (await deployContract(owner,artifacts.Vault,[owner.address,registry.address,weth.address])) as Vault;
       claimsEscrow = (await deployContract(owner,artifacts.ClaimsEscrow,[owner.address,registry.address])) as ClaimsEscrow;
       policyManager = (await deployContract(owner,artifacts.PolicyManager,[owner.address])) as PolicyManager;
