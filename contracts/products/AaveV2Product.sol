@@ -30,11 +30,29 @@ interface IAavePriceOracle {
     function getAssetPrice(address asset) external view returns (uint256);
 }
 
+/**
+ * @title AaveV2Product
+ * @author solace.fi
+ * @notice The **Aave(V2)** product that is users can buy policy for **Aave(V2)**. It is a concrete smart contract that inherits from abstract [`BaseProduct`](./BaseProduct.md).
+ * The contract also inherits from [`EIP712`](https://docs.openzeppelin.com/contracts/3.x/api/drafts#EIP712).
+ */
 contract AaveV2Product is BaseProduct, EIP712 {
-
+    /// @notice IAaveProtocolDataProvider.
     IAaveProtocolDataProvider public aaveDataProvider;
+    /// @notice _EXCHANGE_TYPEHASH.
     bytes32 private immutable _EXCHANGE_TYPEHASH = keccak256("AaveV2ProductExchange(uint256 policyID,uint256 amountOut,uint256 deadline)");
 
+    /**
+      * @notice The constructor.
+      * @param _governance The governor.
+      * @param _policyManager The IPolicyManager contract.
+      * @param _registry The IRegistry contract.
+      * @param _dataProvider Aave protocol data provider address.
+      * @param _minPeriod The minimum policy period in blocks to purchase a **policy**.
+      * @param _maxPeriod The maximum policy period in blocks to purchase a **policy**.
+      * @param _price The cover price for the **Product**.
+      * @param _maxCoverPerUserDivisor The max cover amount divisor for per user. (maxCover / divisor = maxCoverPerUser).
+     */
     constructor (
         address _governance,
         IPolicyManager _policyManager,
@@ -57,8 +75,13 @@ contract AaveV2Product is BaseProduct, EIP712 {
         aaveDataProvider = IAaveProtocolDataProvider(_dataProvider);
     }
 
-    // _positionContract must be an aToken
-    // see https://etherscan.io/tokens/label/aave-v2
+    /**
+     * @notice It gives the user's total position in the product's protocol.
+     * The `_positionContract` must be a **aToken** (Please see https://etherscan.io/tokens/label/aave-v2 for more information).
+     * @param _policyholder The `buyer` who is requesting the coverage quote.
+     * @param _positionContract The address of the exact smart contract the `buyer` has their position in (e.g., for UniswapProduct this would be Pair's address).
+     * @return positionAmount The user's total position in **Wei** in the product's protocol.
+     */
     function appraisePosition(address _policyholder, address _positionContract) public view override returns (uint256 positionAmount) {
         // verify _positionContract
         IAToken token = IAToken(_positionContract);
@@ -76,11 +99,11 @@ contract AaveV2Product is BaseProduct, EIP712 {
     }
 
     /**
-     * @notice Submits a claim.
-     * Can only submit one claim per policy.
-     * Must be signed by an authorized signer.
+     * @notice The function is used to submit a claim.
+     * The user can only submit one claim per policy and the claim must be signed by an authorized signer.
+     * The policy is burn when the claim submission is successful and new claim is created.
      * @param policyID The policy that suffered a loss.
-     * @param amountOut The amount the user will receive in ETH.
+     * @param amountOut The amount the user will receive.
      * @param deadline Transaction must execute before this timestamp.
      * @param signature Signature from the signer.
      */
@@ -112,10 +135,10 @@ contract AaveV2Product is BaseProduct, EIP712 {
 
     /**
      * @notice Changes the covered platform.
-     * Use this if the the protocol changes their registry but keeps the children contracts.
+     * The function is used for if the the protocol changes their registry but keeps the children contracts.
      * A new version of the protocol will likely require a new Product.
-     * Can only be called by the current governor.
-     * @param _dataProvider The Aave Data Provider.
+     * Can only be called by the current `governor`.
+     * @param _dataProvider The platform to cover.
      */
     function setCoveredPlatform(address _dataProvider) public override {
         super.setCoveredPlatform(_dataProvider);
@@ -124,7 +147,7 @@ contract AaveV2Product is BaseProduct, EIP712 {
 
     /**
      * @notice Returns the name of the product.
-     * @return AaveV2
+     * @return AaveV2 The name of the product.
      */
     function name() public pure override returns (string memory) {
         return "AaveV2";

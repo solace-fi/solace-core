@@ -8,8 +8,8 @@ import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 /**
  * @title Solace Token (SOLACE)
  * @author solace.fi
- * @notice Solace tokens can be earned by depositing Capital Provider or Liquidity Provider tokens to the Master contract.
- *         SOLACE can also be locked for a preset time in the Locker contract to recieve veSOLACE tokens.
+ * @notice **Solace** tokens can be earned by depositing **Capital Provider** or **Liquidity Provider** tokens to the [`Master`](./Master.md) contract.
+ * **SOLACE** can also be locked for a preset time in the `Locker` contract to recieve `veSOLACE` tokens.
  */
 contract SOLACE is ERC20Permit {
     using SafeERC20 for IERC20;
@@ -21,15 +21,15 @@ contract SOLACE is ERC20Permit {
     /// @notice Governance to take over.
     address public newGovernance;
 
-    // Emitted when Governance is set
+    /// @notice Emitted when Governance is set
     event GovernanceTransferred(address _newGovernance);
 
-    /// @notice minters
+    /// @notice Minters
     mapping (address => bool) public minters;
 
     /**
      * @notice Constructs the Solace Token contract.
-     * @param _governance Address of the governor.
+     * @param _governance The address of the governor.
      */
     constructor(address _governance) ERC20("solace", "SOLACE") ERC20Permit("solace"){
         governance = _governance;
@@ -37,10 +37,10 @@ contract SOLACE is ERC20Permit {
     }
 
     /**
-     * @notice Creates `amount` new tokens for `to`.
-     * The caller must be a minter.
-     * @param account receiver of new tokens
-     * @param amount number of new tokens
+     * @notice The function creates new tokens and mints them to the receiver account.
+     * The caller must be a `minter`.
+     * @param account The receiver of new tokens.
+     * @param amount The number of new tokens.
      */
     function mint(address account, uint256 amount) public {
         require(minters[msg.sender], "!minter");
@@ -49,7 +49,7 @@ contract SOLACE is ERC20Permit {
 
     /**
      * @notice Allows governance to be transferred to a new governor.
-     * Can only be called by the current governor.
+     * Can only be called by the current `governor`.
      * @param _governance The new governor.
      */
     function setGovernance(address _governance) external {
@@ -60,7 +60,7 @@ contract SOLACE is ERC20Permit {
 
     /**
      * @notice Accepts the governance role.
-     * Can only be called by the new governor.
+     * Can only be called by the new `governor`.
      */
     function acceptGovernance() external {
         // can only be called by new governor
@@ -72,8 +72,8 @@ contract SOLACE is ERC20Permit {
 
     /**
      * @notice Adds a new minter.
-     * Can only be called by the current governor.
-     * @param _minter the new minter
+     * Can only be called by the current `governor`.
+     * @param _minter The new minter.
      */
     function addMinter(address _minter) public {
         require(msg.sender == governance, "!governance");
@@ -82,8 +82,8 @@ contract SOLACE is ERC20Permit {
 
     /**
      * @notice Removes a minter.
-     * Can only be called by the current governor.
-     * @param _minter the minter to remove
+     * Can only be called by the current `governor`.
+     * @param _minter The minter to remove.
      */
     function removeMinter(address _minter) public {
         require(msg.sender == governance, "!governance");

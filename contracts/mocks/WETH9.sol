@@ -19,6 +19,11 @@ pragma solidity 0.8.6;
 
 import "../interface/IWETH9.sol";
 
+/**
+ * @title WETH9
+ * @author solace.fi
+ * @notice Wrapped Ether smart contract.
+ */
 contract WETH9 is IWETH9 {
     string public override name     = "Wrapped Ether";
     string public override symbol   = "WETH";

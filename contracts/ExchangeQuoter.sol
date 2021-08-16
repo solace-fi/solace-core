@@ -7,27 +7,28 @@ import "./interface/IExchangeQuoter.sol";
 
 /**
  * @title ExchangeQuoter
- * @author solace.
+ * @author solace.fi
  * @notice Calculates exchange rates for trades between ERC20 tokens.
  */
 contract ExchangeQuoter is IExchangeQuoter {
-
+    /// @notice IOneSplitView
     IOneSplitView public oneSplitView;
+    /// @notice ETH_ADDRESS
     address public constant ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
     /**
      * @notice Constructs the ExchangeQuoter contract.
-     * @param _oneSplitView Address of the 1inch router.
+     * @param _oneSplitView The address of the 1inch router.
      */
     constructor(address _oneSplitView) {
         oneSplitView = IOneSplitView(_oneSplitView);
     }
 
     /**
-     * @notice Calculates the exchange rate for an _amount of _token to eth.
+     * @notice Calculates the exchange rate for an `_amount` of `_token` to **ETH**.
      * @param _token The token to give.
      * @param _amount The amount to give.
-     * @return The amount of eth received.
+     * @return amount The amount of **ETH** received.
      */
     function tokenToEth(address _token, uint256 _amount) public view override returns (uint256) {
         // call one inch
