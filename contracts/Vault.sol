@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "./Governable.sol";
 import "./interface/IWETH9.sol";
 import "./interface/IRegistry.sol";
 import "./interface/IPolicyManager.sol";
@@ -16,15 +17,9 @@ import "./interface/IVault.sol";
  * @author solace.fi
  * @notice The `Vault` smart contract enables that `Capital Providers` can deposit **ETH** to mint shares of the `Vault`(CP tokens).
  */
-contract Vault is ERC20Permit, IVault, ReentrancyGuard {
+contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
     using SafeERC20 for IERC20;
     using Address for address;
-
-    /// @notice Governor.
-    address public override governance;
-
-    /// @notice Governance to take over.
-    address public override newGovernance;
 
     // pauses deposits
     bool public emergencyShutdown;
@@ -49,8 +44,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     // Returns true if the destination is authorized to request ETH.
     mapping(address => bool) public override isRequestor;
 
-    constructor (address _governance, address _registry, address _token) ERC20("Solace CP Token", "SCP") ERC20Permit("Solace CP Token") {
-        governance = _governance;
+    constructor (address _governance, address _registry, address _token) ERC20("Solace CP Token", "SCP") ERC20Permit("Solace CP Token") Governable(_governance) {
         registry = IRegistry(_registry);
         token = IERC20(_token);
     }
@@ -58,29 +52,6 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     /*************
     GOVERNANCE FUNCTIONS
     *************/
-
-    /**
-     * @notice Allows `governance` to be transferred to a new `governor`.
-     * Can only be called by the current `governor`.
-     * @param _governance The new governor.
-     */
-    function setGovernance(address _governance) external override {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
-        newGovernance = _governance;
-    }
-
-    /**
-     * @notice Accepts the `governance` role.
-     * Can only be called by the new `governor`.
-     */
-    function acceptGovernance() external override {
-        // can only be called by new governor
-        require(msg.sender == newGovernance, "!governance");
-        governance = newGovernance;
-        newGovernance = address(0x0);
-        emit GovernanceTransferred(msg.sender);
-    }
 
     /**
      * @notice Activates or deactivates emergency shutdown.
@@ -92,8 +63,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
      * @param active If true, the `Vault` goes into Emergency Shutdown.
      * If false, the `Vault` goes back into Normal Operation.
     */
-    function setEmergencyShutdown(bool active) external override {
-        require(msg.sender == governance, "!governance");
+    function setEmergencyShutdown(bool active) external override onlyGovernance {
         emergencyShutdown = active;
         emit EmergencyShutdown(active);
     }
@@ -104,8 +74,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
      * @param _min Minimum time in seconds.
      * @param _max Maximum time in seconds.
      */
-    function setCooldownWindow(uint40 _min, uint40 _max) external override {
-        require(msg.sender == governance, "!governance");
+    function setCooldownWindow(uint40 _min, uint40 _max) external override onlyGovernance {
         require(_min < _max, "invalid window");
         cooldownMin = _min;
         cooldownMax = _max;
@@ -117,8 +86,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
      * @param _dst The requestor address.
      * @param _status True to add or false to remove rights.
      */
-    function setRequestor(address _dst, bool _status) external override {
-        require(msg.sender == governance, "!governance");
+    function setRequestor(address _dst, bool _status) external override onlyGovernance {
         isRequestor[_dst] = _status;
     }
 
@@ -313,7 +281,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     *************/
 
     /**
-     * @notice Internal function that returns quantity of all assets under control of this `Vault`, including those loaned out to `Strategies`. 
+     * @notice Internal function that returns quantity of all assets under control of this `Vault`, including those loaned out to `Strategies`.
      * Called by **totalAssets()** function.
      * @return totalAssets The total assets under control of this vault.
      */
@@ -336,7 +304,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     /**
      * @notice Internal function that determines how many shares for given amount of token would receive.
      * @param amount of tokens to calculate number of shares for.
-     * @return shares The amount of shares(tokens) for given amount. 
+     * @return shares The amount of shares(tokens) for given amount.
      */
     function _sharesForAmount(uint256 amount) internal view returns (uint256) {
         // NOTE: if sqrt(token.totalSupply()) > 1e37, this could potentially revert
@@ -345,7 +313,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
             : 0;
     }
 
-    /** 
+    /**
      * @notice Internal function that returns the minimum value between two values.
      * @param a  The first value.
      * @param b  The second value.

@@ -5,6 +5,7 @@ pragma solidity 0.8.6;
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
+import "./Governable.sol";
 import "./interface/IRegistry.sol";
 import "./interface/IVault.sol";
 import "./interface/IPolicyManager.sol";
@@ -16,15 +17,9 @@ import "./interface/IClaimsEscrow.sol";
  * @notice The holder of claims. Policy holders can submit claims through their policy's product contract, in the process burning the policy and converting it to a claim.
  * The policy holder will then need to wait for a cooldown period after which they can withdraw the payout.
  */
-contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow {
+contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, Governable {
     using Address for address;
     using SafeERC20 for IERC20;
-
-    /// @notice Governor.
-    address public override governance;
-
-    /// @notice Governance to take over.
-    address public override newGovernance;
 
     /// @notice The duration of time in seconds the user must wait between submitting a claim and withdrawing the payout.
     uint256 public override cooldownPeriod = 3600; // one hour
@@ -52,8 +47,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow {
      * @param _governance The address of the governor.
      * @param _registry The address of the registry.
      */
-    constructor(address _governance, address _registry) ERC721("Solace Claim", "SCT"){
-        governance = _governance;
+    constructor(address _governance, address _registry) ERC721("Solace Claim", "SCT") Governable(_governance) {
         registry = IRegistry(_registry);
     }
 
@@ -67,29 +61,6 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow {
      * @notice Fallback function to allow contract to receive **ETH**.
      */
     fallback () external payable override {}
-
-    /**
-     * @notice Allows governance to be transferred to a new governor.
-     * Can only be called by the current `governor`.
-     * @param _governance The new governor.
-     */
-    function setGovernance(address _governance) external override {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
-        newGovernance = _governance;
-    }
-
-    /**
-     * @notice Accepts the governance role.
-     * Can only be called by the new `governor`.
-     */
-    function acceptGovernance() external override {
-        // can only be called by new governor
-        require(msg.sender == newGovernance, "!governance");
-        governance = newGovernance;
-        newGovernance = address(0x0);
-        emit GovernanceTransferred(msg.sender);
-    }
 
     /**
      * @notice Receives a claim.
@@ -154,9 +125,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow {
      * @param claimID The claim to adjust.
      * @param value The new payout of the claim.
      */
-    function adjustClaim(uint256 claimID, uint256 value) external override {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
+    function adjustClaim(uint256 claimID, uint256 value) external override onlyGovernance {
         require(_exists(claimID), "query for nonexistent token");
         totalClaimsOutstanding = totalClaimsOutstanding - claims[claimID].amount + value;
         claims[claimID].amount = value;
@@ -169,9 +138,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow {
      * @param amount The amount to pull.
      * @param dst The destination for tokens.
      */
-    function sweep(address token, uint256 amount, address dst) external override {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
+    function sweep(address token, uint256 amount, address dst) external override onlyGovernance {
         if(token == ETH_ADDRESS) payable(dst).transfer(amount);
         else IERC20(token).safeTransfer(dst, amount);
     }
@@ -181,9 +148,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow {
      * Can only be called by the current `governor`.
      * @param _period The new cooldown duration in seconds.
      */
-    function setCooldownPeriod(uint256 _period) external override {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
+    function setCooldownPeriod(uint256 _period) external override onlyGovernance {
         cooldownPeriod = _period;
     }
 

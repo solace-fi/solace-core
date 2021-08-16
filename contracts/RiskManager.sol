@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
+import "./Governable.sol";
 import "./interface/IVault.sol";
 import "./interface/IRegistry.sol";
 import "./interface/IPolicyManager.sol";
@@ -12,13 +13,7 @@ import "./interface/IRiskManager.sol";
  * @author solace.fi
  * @notice
  */
-contract RiskManager is IRiskManager {
-
-    /// @notice Governor.
-    address public override governance;
-
-    /// @notice Governance to take over.
-    address public override newGovernance;
+contract RiskManager is IRiskManager, Governable {
 
     /// @notice Multiplier for minimum capital requirement in BPS.
     uint16 public override partialReservesFactor;
@@ -35,34 +30,10 @@ contract RiskManager is IRiskManager {
      * @param _governance Address of the governor.
      * @param _registry Address of registry.
      */
-    constructor(address _governance, address _registry) public {
-        governance = _governance;
+    constructor(address _governance, address _registry) Governable(_governance) {
         registry = IRegistry(_registry);
         weightSum = type(uint32).max; // no div by zero
         partialReservesFactor = 10000;
-    }
-
-    /**
-     * @notice Allows governance to be transferred to a new governor.
-     * Can only be called by the current governor.
-     * @param _governance The new governor.
-     */
-    function setGovernance(address _governance) external override {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
-        newGovernance = _governance;
-    }
-
-    /**
-     * @notice Accepts the governance role.
-     * Can only be called by the new governor.
-     */
-    function acceptGovernance() external override {
-        // can only be called by new governor
-        require(msg.sender == newGovernance, "!governance");
-        governance = newGovernance;
-        newGovernance = address(0x0);
-        emit GovernanceTransferred(msg.sender);
     }
 
     /**
@@ -71,9 +42,7 @@ contract RiskManager is IRiskManager {
      * @param _products The products.
      * @param _weights The product weights.
      */
-    function setProductWeights(address[] calldata _products, uint32[] calldata _weights) external override {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
+    function setProductWeights(address[] calldata _products, uint32[] calldata _weights) external override onlyGovernance {
         // check recipient - weight map
         require(_products.length == _weights.length, "length mismatch");
         // delete old products
@@ -100,9 +69,7 @@ contract RiskManager is IRiskManager {
      * Can only be called by the current governor.
      * @param _factor New partial reserves factor in BPS.
      */
-    function setPartialReservesFactor(uint16 _factor) external override {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
+    function setPartialReservesFactor(uint16 _factor) external override onlyGovernance {
         partialReservesFactor = _factor;
     }
 

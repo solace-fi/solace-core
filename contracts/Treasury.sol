@@ -3,8 +3,9 @@ pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "./interface/ISwapRouter.sol";
+import "./Governable.sol";
 import "contracts/mocks/WETH9.sol";
+import "./interface/ISwapRouter.sol";
 import "./interface/IRegistry.sol";
 import "./interface/IPolicyManager.sol";
 import "./interface/ITreasury.sol";
@@ -15,14 +16,8 @@ import "./interface/IVault.sol";
  * @author solace.fi
  * @notice The `Treasury` smart contract governs the finance related operations.
  */
-contract Treasury is ITreasury, ReentrancyGuard {
+contract Treasury is ITreasury, ReentrancyGuard, Governable {
     using SafeERC20 for IERC20;
-
-    /// @notice Governor.
-    address public override governance;
-
-    /// @notice Governance to take over.
-    address public override newGovernance;
 
     /// @notice Registry
     IRegistry public registry;
@@ -49,8 +44,7 @@ contract Treasury is ITreasury, ReentrancyGuard {
      * @param _weth Address of wrapped ether.
      * @param _registry Address of registry.
      */
-    constructor(address _governance, address _swapRouter, address _weth, address _registry) public {
-        governance = _governance;
+    constructor(address _governance, address _swapRouter, address _weth, address _registry) Governable(_governance) {
         swapRouter = ISwapRouter(_swapRouter);
         weth = WETH9(payable(_weth));
         registry = IRegistry(_registry);
@@ -74,29 +68,6 @@ contract Treasury is ITreasury, ReentrancyGuard {
      */
     fallback () external payable override {
         emit EthDeposited(msg.value);
-    }
-
-    /**
-     * @notice Allows governance to be transferred to a new `governor`.
-     * Can only be called by the current `governor`.
-     * @param _governance The new `governor`.
-     */
-    function setGovernance(address _governance) external override {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
-        newGovernance = _governance;
-    }
-
-    /**
-     * @notice Accepts the `governance` role.
-     * Can only be called by the new `governor`.
-     */
-    function acceptGovernance() external override {
-        // can only be called by new governor
-        require(msg.sender == newGovernance, "!governance");
-        governance = newGovernance;
-        newGovernance = address(0x0);
-        emit GovernanceTransferred(msg.sender);
     }
 
     /**
@@ -125,9 +96,7 @@ contract Treasury is ITreasury, ReentrancyGuard {
      * @param _amount The amount of the token to spend.
      * @param _recipient The address of the token receiver.
      */
-    function spend(address _token, uint256 _amount, address _recipient) external override nonReentrant {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
+    function spend(address _token, uint256 _amount, address _recipient) external override nonReentrant onlyGovernance {
         // transfer eth
         if(_token == ETH_ADDRESS) payable(_recipient).transfer(_amount);
         // transfer token
@@ -137,15 +106,13 @@ contract Treasury is ITreasury, ReentrancyGuard {
     }
 
     /**
-     * @notice Manually swaps a token. Can only be called by the current `governor`. 
+     * @notice Manually swaps a token. Can only be called by the current `governor`.
      * It swaps the entire balance in case some tokens were unknowingly received. Reverts if the swap was unsuccessful.
      * @param _path The path of pools to take.
      * @param _amountIn The amount to swap.
      * @param _amountOutMinimum The minimum about to receive.
      */
-    function swap(bytes memory _path, uint256 _amountIn, uint256 _amountOutMinimum) external override {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
+    function swap(bytes memory _path, uint256 _amountIn, uint256 _amountOutMinimum) external override onlyGovernance {
         // check allowance
         address tokenAddr;
         assembly {
@@ -172,9 +139,7 @@ contract Treasury is ITreasury, ReentrancyGuard {
      * @param _recipients The premium recipients.
      * @param _weights The recipient weights.
      */
-    function setPremiumRecipients(address payable[] calldata _recipients, uint32[] calldata _weights) external override {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
+    function setPremiumRecipients(address payable[] calldata _recipients, uint32[] calldata _weights) external override onlyGovernance {
         // check recipient - weight map
         require(_recipients.length + 1 == _weights.length, "length mismatch");
         uint32 sum = 0;
@@ -198,7 +163,7 @@ contract Treasury is ITreasury, ReentrancyGuard {
             if (amount > 0) {
                 (bool success,) = premiumRecipients[i].call{value: amount}("");
                 require(success, "failed to route premium");
-            } 
+            }
         }
         // hold treasury share as eth
     }
@@ -208,9 +173,7 @@ contract Treasury is ITreasury, ReentrancyGuard {
      * Can only be called by the current `governor`.
      * @param _amount The amount to wrap.
      */
-    function wrap(uint256 _amount) external override {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
+    function wrap(uint256 _amount) external override onlyGovernance {
         weth.deposit{value: _amount}();
     }
 
@@ -219,16 +182,14 @@ contract Treasury is ITreasury, ReentrancyGuard {
      * Can only be called by the current `governor`.
      * @param _amount The amount to unwrap.
      */
-    function unwrap(uint256 _amount) external override {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
+    function unwrap(uint256 _amount) external override onlyGovernance {
         weth.withdraw(_amount);
     }
 
     /**
      * @notice The function refunds the given amount to the user. It is called by `products` in **Solace Protocol**.
      * @param _user The user address to send refund amount.
-     * @param _amount The amount to send the user. 
+     * @param _amount The amount to send the user.
      */
     function refund(address _user, uint256 _amount) external override nonReentrant {
         // check if from active product
@@ -267,7 +228,7 @@ contract Treasury is ITreasury, ReentrancyGuard {
         payable(_user).transfer(transferAmount);
     }
 
-    /** 
+    /**
      * @notice Internal function that returns the minimum value between two values.
      * @param _a  The first value.
      * @param _b  The second value.

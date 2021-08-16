@@ -8,12 +8,6 @@ pragma solidity 0.8.6;
  */
 interface IFarm {
 
-    /// @notice Governance.
-    function governance() external view returns (address);
-
-    /// @notice Governance to take over.
-    function newGovernance() external view returns (address);
-
     /// @notice Master contract.
     function master() external view returns (address);
 
@@ -23,22 +17,6 @@ interface IFarm {
     function blockReward() external view returns (uint256);       // Amount of rewardToken distributed per block.
     function startBlock() external view returns (uint256);        // When the farm will start.
     function endBlock() external view returns (uint256);          // When the farm will end.
-
-    // Emitted when Governance is set
-    event GovernanceTransferred(address _newGovernance);
-
-    /**
-     * @notice Transfers the governance role to a new governor.
-     * Can only be called by the current governor.
-     * @param _governance The new governor.
-     */
-    function setGovernance(address _governance) external;
-
-    /**
-     * @notice Accepts the governance role.
-     * Can only be called by the new governor.
-     */
-    function acceptGovernance() external;
 
     /**
      * @notice Sets the amount of reward token to distribute per block.

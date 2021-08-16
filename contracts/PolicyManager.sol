@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
+import "./Governable.sol";
 import "./interface/IProduct.sol";
 import "./interface/IPolicyManager.sol";
 import "./interface/INonfungibleTokenPolicyDescriptor.sol";
@@ -15,15 +16,9 @@ import "./interface/INonfungibleTokenPolicyDescriptor.sol";
  * @author solace.fi
  * @notice The **Policy Manager** manages the creating new policies or modifying the existing policies. The policy is an [**ERC721**](https://docs.openzeppelin.com/contracts/2.x/erc721) token.
  */
-contract PolicyManager is ERC721Enumerable, IPolicyManager {
+contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
     using Address for address;
     using EnumerableSet for EnumerableSet.AddressSet;
-
-    /// @notice Governor.
-    address public override governance;
-
-    /// @notice Governance to take over.
-    address public override newGovernance;
 
      /// @notice The address of the token descriptor contract, which handles generating token URIs for position tokens
     address public tokenDescriptor;
@@ -32,7 +27,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
     EnumerableSet.AddressSet private products;
 
     /// @notice The current amount covered (in wei)
-    uint256 public override activeCoverAmount; 
+    uint256 public override activeCoverAmount;
 
     /// @notice Total policy count.
     uint256 public totalPolicyCount = 0;
@@ -54,40 +49,14 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
      * @notice The constructor. It constructs the Policy Deployer **ERC721 Token** contract.
      * @param _governance The address of the governor.
      */
-    constructor(address _governance) ERC721("Solace Policy", "SPT") {
-        governance = _governance;
-    }
-
-    /**
-     * @notice Allows governance to be transferred to a new governor.
-     * Can only be called by the current `governor`.
-     * @param _governance The new governor.
-     */
-    function setGovernance(address _governance) external override {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
-        newGovernance = _governance;
-    }
-
-    /**
-     * @notice Accepts the governance role.
-     * Can only be called by the new `governor`.
-     */
-    function acceptGovernance() external override {
-        // can only be called by new governor
-        require(msg.sender == newGovernance, "!governance");
-        governance = newGovernance;
-        newGovernance = address(0x0);
-        emit GovernanceTransferred(msg.sender);
-    }
+    constructor(address _governance) ERC721("Solace Policy", "SPT") Governable(_governance) { }
 
     /**
      * @notice Adds a new product. The new product must be implemented in **Solace Protocol**.
      * Can only be called by the current `governor`.
      * @param _product the new product
      */
-    function addProduct(address _product) external override {
-        require(msg.sender == governance, "!governance");
+    function addProduct(address _product) external override onlyGovernance {
         products.add(_product);
         emit ProductAdded(_product);
     }
@@ -97,8 +66,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
      * Can only be called by the current `governor`.
      * @param _product the product to remove
      */
-    function removeProduct(address _product) external override {
-        require(msg.sender == governance, "!governance");
+    function removeProduct(address _product) external override onlyGovernance {
         products.remove(_product);
         emit ProductRemoved(_product);
     }
@@ -108,9 +76,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
      * Can only be called by the current `governor`.
      * @param _tokenDescriptor The new policy token descriptor address.
      */
-    function setTokenDescriptor(address _tokenDescriptor) external override {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
+    function setTokenDescriptor(address _tokenDescriptor) external override onlyGovernance {
         tokenDescriptor = _tokenDescriptor;
     }
 
@@ -143,12 +109,12 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
     /*** POLICY VIEW FUNCTIONS
     View functions that give us data about policies
     ****/
-    
+
     /**
      * @notice The function returns the policy details.
      * @param _policyID The policy id to return info.
      * @return policyholder The address of the policy holder.
-     * @return product The product of the policy. 
+     * @return product The product of the policy.
      * @return positionContract The covered contract for the policy.
      * @return coverAmount The amount covered for the policy.
      * @return expirationBlock The expiration block of the policy.
@@ -173,7 +139,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
     /**
      * @notice The function returns the policy product of the policy.
      * @param _policyID The policy id.
-     * @return product The product of the policy. 
+     * @return product The product of the policy.
      */
     function getPolicyProduct(uint256 _policyID) external view override returns (address){
         require(_exists(_policyID), "query for nonexistent token");
@@ -183,7 +149,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
     /**
      * @notice The function returns the position contract of the policy.
      * @param _policyID The policy id.
-     * @return positionContract The position contract of the policy. 
+     * @return positionContract The position contract of the policy.
      */
     function getPolicyPositionContract(uint256 _policyID) external view override returns (address){
         require(_exists(_policyID), "query for nonexistent token");
@@ -193,7 +159,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
     /**
      * @notice The function returns the expiration block of the policy.
      * @param _policyID The policy id.
-     * @return expirationBlock The expiration block of the policy. 
+     * @return expirationBlock The expiration block of the policy.
      */
     function getPolicyExpirationBlock(uint256 _policyID) external view override returns (uint40) {
         require(_exists(_policyID), "query for nonexistent token");
@@ -203,7 +169,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
     /**
      * @notice The function returns the cover amount of the policy.
      * @param _policyID The policy id.
-     * @return coverAmount The cover amount of the policy. 
+     * @return coverAmount The cover amount of the policy.
      */
     function getPolicyCoverAmount(uint256 _policyID) external view override returns (uint256) {
         require(_exists(_policyID), "query for nonexistent token");
@@ -213,7 +179,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager {
     /**
      * @notice The function returns the price of the policy.
      * @param _policyID The policy id.
-     * @return price The price of the policy. 
+     * @return price The price of the policy.
      */
     function getPolicyPrice(uint256 _policyID) external view override returns (uint24){
         require(_exists(_policyID), "query for nonexistent token");

@@ -10,13 +10,10 @@ interface IProduct {
     event PolicyExtended(uint256 policyID);
     event PolicyCanceled(uint256 policyID);
     event PolicyUpdated(uint256 policyID);
-    event GovernanceTransferred(address _newGovernance);
 
     /**** GETTERS + SETTERS
     Functions which get and set important product state variables
     ****/
-    function governance() external view returns (address);
-    function newGovernance() external view returns (address);
     function price() external view returns (uint24);
     function minPeriod() external view returns (uint40);
     function maxPeriod() external view returns (uint40);
@@ -27,8 +24,6 @@ interface IProduct {
     function productPolicyCount() external view returns (uint256);
     function activeCoverAmount() external view returns (uint256);
 
-    function setGovernance(address _governance) external;
-    function acceptGovernance() external;
     function setPrice(uint24 _price) external;
     function setMinPeriod(uint40 _minPeriod) external;
     function setMaxPeriod(uint40 _maxPeriod) external;

@@ -8,12 +8,6 @@ pragma solidity 0.8.6;
  */
 interface IRegistry {
 
-    /// @notice Governance.
-    function governance() external view returns (address);
-
-    /// @notice Governance to take over.
-    function newGovernance() external view returns (address);
-
     /// Protocol contract address getters
     function master() external view returns (address);
     function vault() external view returns (address);
@@ -25,8 +19,6 @@ interface IRegistry {
     function riskManager() external view returns (address);
 
     // events
-    // Emitted when Governance is set
-    event GovernanceTransferred(address _newGovernance);
     // Emitted when Solace Token is set
     event SolaceSet(address _solace);
     // Emitted when Master is set
@@ -43,19 +35,6 @@ interface IRegistry {
     event PolicyManagerSet(address _policyManager);
     // Emitted when RiskManager is set
     event RiskManagerSet(address _riskManager);
-
-    /**
-     * @notice Transfers the governance role to a new governor.
-     * Can only be called by the current governor.
-     * @param _governance The new governor.
-     */
-    function setGovernance(address _governance) external;
-
-    /**
-     * @notice Accepts the governance role.
-     * Can only be called by the new governor.
-     */
-    function acceptGovernance() external;
 
     /**
      * @notice Sets the solace token contract.
