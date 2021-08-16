@@ -9,8 +9,6 @@ import chai from "chai";
 const { expect } = chai;
 chai.use(solidity);
 
-import { expectClose } from "./utilities/chai_extensions";
-
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
 import { PolicyManager, AaveV2Product, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
 import { getDomainSeparator, sign } from "./utilities/signature";
@@ -211,8 +209,8 @@ if(process.env.FORK_NETWORK === "mainnet"){
         expect(await product.appraisePosition(user.address, aWETH_ADDRESS)).to.equal(0);
       });
       it("a position should have a value", async function () {
-        expectClose(await product.appraisePosition(USER1, aWETH_ADDRESS), BALANCE1, BN.from("100000000000"))
-        expectClose(await product.appraisePosition(USER2, aUSDT_ADDRESS), BALANCE2, BN.from("100000000000"))
+        expect(await product.appraisePosition(USER1, aWETH_ADDRESS)).to.be.closeTo(BALANCE1, 100000000000)
+        expect(await product.appraisePosition(USER2, aUSDT_ADDRESS)).to.be.closeTo(BALANCE2, 100000000000)
       });
     });
 
@@ -240,7 +238,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
         let blocks = BN.from(threeDays)
         let expectedPremium = BN.from("5303076154194467");
         let quote = BN.from(await product.getQuote(USER1, aWETH_ADDRESS, coverAmount, blocks));
-        expectClose(quote, expectedPremium, BN.from("1000000000"))
+        expect(quote).to.be.closeTo(expectedPremium, 1000000000)
       })
       it('can buyPolicy', async function () {
         expect(await policyManager.totalSupply()).to.equal(0);
@@ -349,9 +347,9 @@ if(process.env.FORK_NETWORK === "mainnet"){
         let userEth1 = await user.getBalance();
         let tx2 = await claimsEscrow.connect(user).withdrawClaimsPayout(policyID1);
         let receipt = await tx2.wait();
-        let gasCost = receipt.gasUsed.mul(tx2.gasPrice || 0);
+        let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
         let userEth2 = await user.getBalance();
-        expectClose(userEth2.sub(userEth1).add(gasCost), amountOut1);
+        expect(userEth2.sub(userEth1).add(gasCost).toNumber()).to.equal(amountOut1);
       });
       it("should support all atokens", async function () {
         const user3Address = "0x688514032e2cD27fbCEc700E2b10aa8D34741956";
@@ -437,7 +435,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
             await pool.connect(user3).deposit(uAddress, uAmount, user3.address, 0);
             expect(await uToken.balanceOf(user3.address)).to.be.equal(0);
             const aAmount = await aToken.balanceOf(user3.address);
-            expectClose(aAmount, uAmount, 100);
+            expect(aAmount).to.be.closeTo(uAmount, 100);
             // create policy
             let positionAmount = await product.appraisePosition(USER1, aWETH_ADDRESS);
             let coverAmount = positionAmount;
@@ -461,9 +459,9 @@ if(process.env.FORK_NETWORK === "mainnet"){
             let userEth1 = await user3.getBalance();
             let tx2 = await claimsEscrow.connect(user3).withdrawClaimsPayout(policyID);
             let receipt = await tx2.wait();
-            let gasCost = receipt.gasUsed.mul(tx2.gasPrice || 0);
+            let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
             let userEth2 = await user3.getBalance();
-            expectClose(userEth2.sub(userEth1).add(gasCost), amountOut);
+            expect(userEth2.sub(userEth1).add(gasCost).toNumber()).to.equal(amountOut);
             ++success;
             successList.push(symbol);
             console.log(`\x1b[38;5;239m        ✓ ${symbol}\x1b[0m`);

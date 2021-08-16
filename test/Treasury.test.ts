@@ -455,7 +455,7 @@ describe("Treasury", function() {
       await treasury.connect(deployer).depositEth({ value: 20 });
       let tx = await treasury.connect(user).withdraw();
       let receipt = await tx.wait();
-      let gasCost = receipt.gasUsed.mul(tx.gasPrice || 0);
+      let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
       let balancesAfter2 = await getBalances(user);
       let balancesDiff2 = getBalancesDiff(balancesAfter2, balancesBefore);
       expect(balancesDiff2.userEth).to.equal(refundAmount.sub(gasCost));

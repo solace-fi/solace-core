@@ -7,7 +7,6 @@ import chai from 'chai';
 const { expect } = chai;
 chai.use(solidity);
 
-import { expectClose } from './utilities/chai_extensions';
 import { encodePriceSqrt, FeeAmount, TICK_SPACINGS, getMaxTick, getMinTick } from './utilities/uniswap';
 import { burnBlocks, burnBlocksUntil } from './utilities/time';
 import { bnAddSub, bnMulDiv } from './utilities/math';
@@ -397,12 +396,12 @@ describe('CpFarm', function () {
       // potential withdraw
       pendingReward1 = await farm.pendingRewards(farmer1.address);
       expectedReward1 = solacePerBlock.mul(waitBlocks);
-      expectClose(pendingReward1, expectedReward1);
+      expect(pendingReward1).to.be.closeTo(expectedReward1, 10);
       // actual withdraw
       await farm.connect(farmer1).withdrawCp(depositAmount1);
       pendingReward1 = await solaceToken.balanceOf(farmer1.address);
       expectedReward1 = solacePerBlock.mul(waitBlocks.add(1));
-      expectClose(pendingReward1, expectedReward1);
+      expect(pendingReward1).to.be.closeTo(expectedReward1, 10);
     });
 
     it('fairly provides rewards to all farmers', async function () {
@@ -423,11 +422,11 @@ describe('CpFarm', function () {
         // 100% ownership for 11 blocks
         solacePerBlock.mul(20).mul(1).div(5)
       ); // 20% ownership for 20 blocks
-      expectClose(pendingReward1, expectedReward1);
+      expect(pendingReward1).to.be.closeTo(expectedReward1, 10);
       // check farmer 2 rewards
       pendingReward2 = BN.from(await farm.pendingRewards(farmer2.address));
       expectedReward2 = solacePerBlock.mul(20).mul(4).div(5); // 80% ownership for 20 blocks
-      expectClose(pendingReward2, expectedReward2);
+      expect(pendingReward2).to.be.closeTo(expectedReward2, 10);
       // farmer 2 deposit more
       await farm.connect(farmer2).depositEth({ value: depositAmount3 });
       await burnBlocks(waitBlocks3);
@@ -439,7 +438,7 @@ describe('CpFarm', function () {
           solacePerBlock.mul(30).mul(1).div(20)
         ) // 5% ownership for 30 blocks
       );
-      expectClose(pendingReward1, expectedReward1);
+      expect(pendingReward1).to.be.closeTo(expectedReward1, 10);
       // check farmer 2 rewards
       pendingReward2 = BN.from(await farm.pendingRewards(farmer2.address));
       receivedReward2 = BN.from(await solaceToken.balanceOf(farmer2.address));
@@ -449,7 +448,7 @@ describe('CpFarm', function () {
           solacePerBlock.mul(30).mul(19).div(20)
         ) // 95% ownership for 30 blocks
       );
-      expectClose(pendingReward2.add(receivedReward2), expectedReward2);
+      expect(pendingReward2.add(receivedReward2)).to.be.closeTo(expectedReward2, 10);
 
       // farmer 1 withdraw rewards
       await farm.connect(farmer1).withdrawRewards();
@@ -458,7 +457,7 @@ describe('CpFarm', function () {
       expectedReward1 = expectedReward1.add(
         solacePerBlock.mul(1).mul(1).div(20) // 5% ownership for 1 blocks
       );
-      expectClose(pendingReward1, expectedReward1);
+      expect(pendingReward1).to.be.closeTo(expectedReward1, 10);
       // farmer 2 withdraw rewards
       await farm.connect(farmer2).withdrawRewards();
       expect(await vault.balanceOf(farmer2.address)).to.equal(0);
@@ -466,7 +465,7 @@ describe('CpFarm', function () {
       expectedReward2 = expectedReward2.add(
         solacePerBlock.mul(2).mul(19).div(20) // 95% ownership for 2 blocks
       );
-      expectClose(pendingReward2, expectedReward2);
+      expect(pendingReward2).to.be.closeTo(expectedReward2, 10);
       await burnBlocks(waitBlocks4);
 
       // farmer 1 withdraw stake
@@ -475,7 +474,7 @@ describe('CpFarm', function () {
       expectedReward1 = expectedReward1.add(
         solacePerBlock.mul(42).mul(1).div(20) // 5% ownership for 42 blocks
       );
-      expectClose(pendingReward1, expectedReward1);
+      expect(pendingReward1).to.be.closeTo(expectedReward1, 10);
       await burnBlocks(waitBlocks5);
       // farmer 2 withdraw stake
       await farm.connect(farmer2).withdrawCp(depositAmount2.add(depositAmount3));
@@ -486,7 +485,7 @@ describe('CpFarm', function () {
           solacePerBlock.mul(51)
         ) // 100% ownership for 51 blocks
       );
-      expectClose(pendingReward2, expectedReward2);
+      expect(pendingReward2).to.be.closeTo(expectedReward2, 10);
     });
 
     it('does not distribute rewards before farm start', async function () {
@@ -501,7 +500,7 @@ describe('CpFarm', function () {
       let pendingReward1 = await farm.pendingRewards(farmer1.address);
       await burnBlocks(BN.from(10));
       let pendingReward2 = await farm.pendingRewards(farmer1.address);
-      expectClose(pendingReward2, pendingReward1);
+      expect(pendingReward2).to.be.closeTo(pendingReward1, 10);
     });
   });
 
@@ -568,7 +567,7 @@ describe('CpFarm', function () {
       let balancesAfter = await getBalances(mockVault, farm4);
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       let receipt = await tx.wait();
-      let gasCost = receipt.gasUsed.mul(tx.gasPrice || 0);
+      let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
       expect(balancesDiff.userEth).to.equal(depositAmount.mul(-1).sub(gasCost));
       expect(balancesDiff.userStake).to.equal(0); // vault gains no stake
     });
@@ -583,7 +582,7 @@ describe('CpFarm', function () {
       let balancesAfter = await getBalances(mockVault, farm4);
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       let receipt = await tx.wait();
-      let gasCost = receipt.gasUsed.mul(tx.gasPrice || 0);
+      let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
       expect(balancesDiff.userEth).to.equal(depositAmount.mul(-1).sub(gasCost));
       expect(balancesDiff.userStake).to.equal(0); // vault gains no stake
     });

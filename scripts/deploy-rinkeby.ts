@@ -21,7 +21,7 @@ const PACLAS_SIGNER = "0x5b9Fa5eF9D366d7cB5296E1f3F4013D55EBdf4A4";
 // Fill them in as they are deployed.
 // In case of failure during deployment, simply rerun the script.
 // Contracts that have already been deployed will not be redeployed.
-const REGISTRY_ADDRESS         = "0x218EEa1517F9CCc0f115fea6cd48f55afD49a3f8";
+const REGISTRY_ADDRESS         = "";
 const SOLACE_ADDRESS           = "0x44B843794416911630e74bAB05021458122c40A0";
 const WETH_ADDRESS             = "0xc778417E063141139Fce010982780140Aa0cD5Ab"
 const MASTER_ADDRESS           = "0xE458cd47D29E06CCe18a1D95AD2712F223d3a6DC";
@@ -31,10 +31,8 @@ const LPFARM_ADDRESS           = "0xC6cdf0093981f52991b8aaCe63800eAC9f2c96E9";
 const LPAPPRAISOR_ADDRESS      = "0x5c764BE8890fA09A71122342D53cCbdc748da39C";
 const TREASURY_ADDRESS         = "0xBE89BC18af93Cb31c020a826C10B90b8BdcDC483";
 
-//const POLICY_MANAGER_ADDRESS   = "0x0B27dD1660406e170ff4c4315D65Bd085F31a07a";
 const POLICY_MANAGER_ADDRESS   = "0x5682b79F24e999576Ab8A9C9C0E81Bfc168B960F";
 const QUOTER_MANUAL_ADDRESS    = "0xAC162c43D533CE1fd732bcE94894e7EF212A77a1";
-//const COMPOUND_PRODUCT_ADDRESS = "0x660985613a2257107C9aE41EfBd9074932609893";
 const COMPOUND_PRODUCT_ADDRESS = "0xB08807D96dC2bF753Cee983353aF57d7cA530173";
 
 const UNISWAP_FACTORY_ADDRESS  = "0x1F98431c8aD98523631AE4a59f267346ea31F984";
@@ -50,9 +48,6 @@ const BLOCK_REWARD = BN.from("60000000000000000000"); // 60 SOLACE
 
 const minPeriod = 6450; // this is about 1 day
 const maxPeriod = 2354250; // this is about 1 year from https://ycharts.com/indicators/ethereum_blocks_per_day
-const maxCoverAmount = BN.from("1000000000000000000000"); // 1000 Ether in wei
-const maxCoverPerUser = BN.from("10000000000000000000"); // 10 Ether in wei
-const cancelFee = BN.from("100000000000000000"); // 0.1 Ether in wei
 const price = 11044; // 2.60%/yr
 
 // ugprade registry
@@ -98,7 +93,7 @@ async function main() {
   await deployLpTokenAppraisor();
   await deployLpFarm();
   await deployTreasury();
-  await transferRegistry();
+  //await transferRegistry();
 
   await deployPolicyManager();
   await deployQuoterManual();
@@ -111,7 +106,7 @@ async function deployRegistry() {
   if(!!REGISTRY_ADDRESS) {
     registry = (await ethers.getContractAt(artifacts.Registry.abi, REGISTRY_ADDRESS)) as Registry;
   } else {
-    let registryContract = await ethers.getContractFactory('Registry');
+    let registryContract = await ethers.getContractFactory("contracts_processed/Registry.sol:Registry");
     console.log("Deploying Registry");
     registry = (await upgrades.deployProxy(registryContract, [signerAddress])) as Registry;
     console.log(`Deploying Registry to ${registry.address}`);
@@ -160,7 +155,7 @@ async function deployMaster() {
     master = (await ethers.getContractAt(artifacts.Master.abi, MASTER_ADDRESS)) as Master;
   } else {
     console.log("Deploying Master");
-    master = (await deployContract(deployer,artifacts.Master,[governorAddress,solace.address,BLOCK_REWARD])) as Master;
+    master = (await deployContract(deployer,artifacts.Master,[signerAddress,solace.address,BLOCK_REWARD])) as Master;
     console.log(`Deployed Master to ${master.address}`);
   }
   if(await registry.master() != master.address && await registry.governance() == signerAddress) {
@@ -174,7 +169,7 @@ async function deployVault() {
     vault = (await ethers.getContractAt(artifacts.Vault.abi, VAULT_ADDRESS)) as Vault;
   } else {
     console.log("Deploying Vault");
-    vault = (await deployContract(deployer,artifacts.Vault,[governorAddress,registry.address,weth.address])) as Vault;
+    vault = (await deployContract(deployer,artifacts.Vault,[signerAddress,registry.address,weth.address])) as Vault;
     console.log(`Deployed Vault to ${vault.address}`);
   }
   if(await registry.vault() != vault.address && await registry.governance() == signerAddress) {
@@ -188,7 +183,7 @@ async function deployCpFarm() {
     cpFarm = (await ethers.getContractAt(artifacts.CpFarm.abi, CPFARM_ADDRESS)) as CpFarm;
   } else {
     console.log("Deploying CP Farm");
-    cpFarm = (await deployContract(deployer,artifacts.CpFarm,[governorAddress,master.address,vault.address,solace.address,START_BLOCK,END_BLOCK,uniswapRouter.address,weth.address])) as CpFarm;
+    cpFarm = (await deployContract(deployer,artifacts.CpFarm,[signerAddress,master.address,vault.address,solace.address,START_BLOCK,END_BLOCK,uniswapRouter.address,weth.address])) as CpFarm;
     console.log(`Deployed CP Farm to ${cpFarm.address}`);
   }
 }
@@ -238,7 +233,7 @@ async function deployLpTokenAppraisor() {
     lpTokenAppraisor = (await ethers.getContractAt(artifacts.LpAppraisor.abi, LPAPPRAISOR_ADDRESS)) as LpAppraisor;
   } else {
     console.log("Deploying LP Token Appraisor");
-    lpTokenAppraisor = (await deployContract(deployer,artifacts.LpAppraisor,[governorAddress,lpToken.address,20000,40000])) as LpAppraisor;
+    lpTokenAppraisor = (await deployContract(deployer,artifacts.LpAppraisor,[signerAddress,lpToken.address,20000,40000])) as LpAppraisor;
     console.log(`Deploying LP Token Appraisor to ${lpTokenAppraisor.address}`);
     await lpTokenAppraisor.deployed();
     console.log("Deployment confirmed");
@@ -250,7 +245,7 @@ async function deployLpFarm() {
     lpFarm = (await ethers.getContractAt(artifacts.SolaceEthLpFarm.abi, LPFARM_ADDRESS)) as SolaceEthLpFarm;
   } else {
     console.log("Deploying LP Farm");
-    lpFarm = (await deployContract(deployer,artifacts.SolaceEthLpFarm,[governorAddress,master.address,lpToken.address,solace.address,START_BLOCK,END_BLOCK,pool.address,weth.address,lpTokenAppraisor.address])) as SolaceEthLpFarm;
+    lpFarm = (await deployContract(deployer,artifacts.SolaceEthLpFarm,[signerAddress,master.address,lpToken.address,solace.address,START_BLOCK,END_BLOCK,pool.address,weth.address,lpTokenAppraisor.address])) as SolaceEthLpFarm;
 
     console.log(`Deployed LP Farm to ${lpFarm.address}`);
   }
@@ -275,7 +270,7 @@ async function deployPolicyManager() {
     policyManager = (await ethers.getContractAt(artifacts.PolicyManager.abi, POLICY_MANAGER_ADDRESS)) as PolicyManager;
   } else {
     console.log("Deploying PolicyManager");
-    policyManager = (await deployContract(deployer,artifacts.PolicyManager)) as PolicyManager;
+    policyManager = (await deployContract(deployer,artifacts.PolicyManager,[signerAddress])) as PolicyManager;
     console.log(`Deployed PolicyManager to ${policyManager.address}`);
   }
 }
@@ -295,7 +290,7 @@ async function deployCompoundProduct() {
     compoundProduct = (await ethers.getContractAt(artifacts.CompoundProductRinkeby.abi, COMPOUND_PRODUCT_ADDRESS)) as CompoundProductRinkeby;
   } else {
     console.log("Deploying CompoundProduct");
-    compoundProduct = (await deployContract(deployer,artifacts.CompoundProductRinkeby,[policyManager.address,treasury.address,COMPTROLLER_ADDRESS,ZERO_ADDRESS,price,cancelFee,minPeriod,maxPeriod,maxCoverAmount,maxCoverPerUser,quoterManual.address])) as CompoundProductRinkeby;
+    compoundProduct = (await deployContract(deployer,artifacts.CompoundProductRinkeby,[signerAddress,policyManager.address,registry.address,COMPTROLLER_ADDRESS,minPeriod,maxPeriod,price,10,quoterManual.address])) as CompoundProductRinkeby;
     console.log(`Deployed CompoundProduct to ${compoundProduct.address}`);
   }
   if(await policyManager.governance() == signerAddress && !(await compoundProduct.isAuthorizedSigner(PACLAS_SIGNER))){

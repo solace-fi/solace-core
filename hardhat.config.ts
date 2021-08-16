@@ -7,6 +7,7 @@ import "hardhat-abi-exporter";
 import "solidity-coverage";
 import "hardhat-gas-reporter";
 import "@nomiclabs/hardhat-ethers";
+import "@nomiclabs/hardhat-etherscan";
 import "@openzeppelin/hardhat-upgrades";
 import { config as dotenv_config } from "dotenv";
 dotenv_config();
@@ -75,6 +76,9 @@ const config: HardhatUserConfig = {
     gasPrice: 20,
     coinmarketcap: process.env.CMC_API_KEY || "",
   },
+  etherscan: {
+    apiKey: process.env.ETHERSCAN_API_KEY || ""
+  }
 };
 
 // If you are defining tasks, they need to access the Hardhat Runtime Environment (hre) explicitly, as a parameter.

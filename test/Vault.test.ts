@@ -415,7 +415,7 @@ describe("Vault", function () {
         let tx = await vault.connect(depositor1).withdrawEth(shares);
         await expect(tx).to.emit(vault, "WithdrawalMade").withArgs(depositor1.address, testDepositAmount);
         let receipt = await tx.wait();
-        let gasCost = receipt.gasUsed.mul(tx.gasPrice || 0);
+        let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
         const ub2 = await depositor1.getBalance();
         const vb2 = await vault.totalAssets();
         expect(ub2.sub(ub1).add(gasCost)).to.equal(testDepositAmount);
@@ -433,7 +433,7 @@ describe("Vault", function () {
         let tx = await vault.connect(depositor1).withdrawEth(shares);
         await expect(tx).to.emit(vault, "WithdrawalMade").withArgs(depositor1.address, testDepositAmount.mul(2));
         let receipt = await tx.wait();
-        let gasCost = receipt.gasUsed.mul(tx.gasPrice || 0);
+        let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
         const ub2 = await depositor1.getBalance();
         const vb2 = await vault.totalAssets();
         expect(ub2.sub(ub1).add(gasCost)).to.equal(testDepositAmount.mul(2));
@@ -579,7 +579,7 @@ describe("Vault", function () {
         let tx = await vault.connect(mockEscrow).requestEth(7);
         expect(tx).to.emit(vault, "FundsSent").withArgs(7);
         let receipt = await tx.wait();
-        let gasCost = receipt.gasUsed.mul(tx.gasPrice || 0);
+        let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
         var balance2 = await mockEscrow.getBalance();
         expect(balance2.sub(balance1).add(gasCost)).to.equal(7);
       });
@@ -591,7 +591,7 @@ describe("Vault", function () {
         let tx = await vault.connect(mockEscrow).requestEth(withdrawAmount);
         expect(tx).to.emit(vault, "FundsSent").withArgs(vaultBalance);
         let receipt = await tx.wait();
-        let gasCost = receipt.gasUsed.mul(tx.gasPrice || 0);
+        let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
         var balance2 = await mockEscrow.getBalance();
         expect(balance2.sub(balance1).add(gasCost)).to.equal(vaultBalance);
       });
@@ -601,7 +601,7 @@ describe("Vault", function () {
         let tx = await vault.connect(mockEscrow).requestEth(0);
         expect(tx).to.emit(vault, "FundsSent").withArgs(0);
         let receipt = await tx.wait();
-        let gasCost = receipt.gasUsed.mul(tx.gasPrice || 0);
+        let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
         var balance2 = await mockEscrow.getBalance();
         expect(balance2.sub(balance1).add(gasCost)).to.equal(0);
       });

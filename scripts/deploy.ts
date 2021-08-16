@@ -91,7 +91,7 @@ async function deployRegistry() {
   if(!!REGISTRY_ADDRESS) {
     registry = (await ethers.getContractAt(artifacts.Registry.abi, REGISTRY_ADDRESS)) as Registry;
   } else {
-    let registryContract = await ethers.getContractFactory('Registry');
+    let registryContract = await ethers.getContractFactory("contracts_processed/Registry.sol:Registry");
     console.log("Deploying Registry");
     registry = (await upgrades.deployProxy(registryContract, [signerAddress])) as Registry;
     console.log(`Deploying Registry to ${registry.address}`);

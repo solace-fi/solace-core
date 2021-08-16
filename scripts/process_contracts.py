@@ -15,9 +15,9 @@ license = '// SPDX-License-Identifier: GPL-3.0-or-later'
 # licenses to remove
 license_pattern = re.compile('//\ SPDX.*', re.IGNORECASE)
 # pragma to use
-pragma = 'pragma solidity 0.8.0';
+pragma = 'pragma solidity 0.8.6';
 # no floating pragmas
-pragma_pattern = re.compile('pragma\\ solidity\\ \\^0\\.8\\.0')
+pragma_pattern = re.compile('pragma\\ solidity\\ \\^?0\\.8\\.\d')
 # get files
 filenames = sorted(glob('contracts/**/*', recursive=True))
 # if not just specific files
