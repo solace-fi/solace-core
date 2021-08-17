@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
-import "./interface/INonfungibleTokenPolicyDescriptor.sol";
+import "./interface/IPolicyDescriptor.sol";
 import "./interface/IPolicyManager.sol";
 import "./interface/IProduct.sol";
 
 /**
- * @title NonfungibleTokenPositionDescriptor
+ * @title PolicyDescriptor
  * @author solace.fi
- * @notice Describes NFT token policy product descriptor. 
+ * @notice Produces a string containing the data URI for a JSON metadata string of a policy.
  * It is inspired from Uniswap(V3)[`NonfungibleTokenPositionDescriptor`](https://docs.uniswap.org/protocol/reference/periphery/NonfungibleTokenPositionDescriptor).
  */
-contract NonfungibleTokenPolicyDescriptor is INonfungibleTokenPolicyDescriptor {
+contract PolicyDescriptor is IPolicyDescriptor {
 
   /**
     @notice Produces the URI describing a particular policy `product` for a given `policy id`.
@@ -24,5 +24,5 @@ contract NonfungibleTokenPolicyDescriptor is INonfungibleTokenPolicyDescriptor {
     string memory productName = IProduct(product).name();
     return string(abi.encodePacked("This is a Solace Finance policy that covers a ", productName, " position"));
   }
-  
+
 }

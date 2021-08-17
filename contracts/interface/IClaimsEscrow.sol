@@ -57,6 +57,27 @@ interface IClaimsEscrow {
      */
     function sweep(address token, uint256 amount, address dst) external;
 
+    /// @notice Claim struct.
+    struct Claim {
+        uint256 amount;
+        uint256 receivedAt; // used to determine withdrawability after cooldown period
+    }
+
+    /**
+     * @notice Gets information about a claim.
+     * @param _claimID Claim to query.
+     * @return info Claim info as struct.
+     */
+    function claims(uint256 _claimID) external view returns (Claim memory info);
+
+    /**
+     * @notice Gets information about a claim.
+     * @param _claimID Claim to query.
+     * @return amount Claim amount in ETH.
+     * @return receivedAt Time claim was received at.
+     */
+    function getClaims(uint256 _claimID) external view returns (uint256 amount, uint256 receivedAt);
+
     /// @notice The duration of time in seconds the user must wait between submitting a claim and withdrawing the payout.
     function cooldownPeriod() external view returns (uint256);
 

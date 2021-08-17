@@ -84,7 +84,7 @@ contract MockProduct is BaseProduct {
     function _buyPolicy(address _policyholder, address _positionContract, uint256 _coverAmount, uint40 _blocks) external payable nonReentrant returns (uint256 policyID){
         // create the policy
         uint40 expirationBlock = uint40(block.number + _blocks);
-        policyID = policyManager.createPolicy(_policyholder, _positionContract, positionValue, expirationBlock, price);
+        policyID = policyManager.createPolicy(_policyholder, _positionContract, _coverAmount, expirationBlock, price);
 
         // update local book-keeping variables
         activeCoverAmount += positionValue;

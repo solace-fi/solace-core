@@ -209,8 +209,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
             uint256 mcr = IRiskManager(registry.riskManager()).minCapitalRequirement();
             require(_totalAssets() - value >= mcr, "withdrawal brings Vault assets below MCR");
             // validate cooldown
-            uint40 elapsed = uint40(block.timestamp) - cooldownStart[msg.sender];
-            require(cooldownMin <= elapsed && elapsed <= cooldownMax, "not in cooldown window");
+            require(canWithdraw(msg.sender), "not in cooldown window");
         }
         // burn shares
         _burn(msg.sender, _shares);
@@ -273,6 +272,32 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
     */
     function totalAssets() external view override returns (uint256) {
         return _totalAssets();
+    }
+
+    /**
+     * @notice Returns true if the user is allowed to receive or send vault shares.
+     * @param _user User to query.
+     * return status True if can transfer.
+     */
+    function canTransfer(address _user) external view override returns (bool status) {
+        uint40 start = cooldownStart[_user];
+        uint40 timestamp = uint40(block.timestamp);
+        uint40 elapsed = timestamp - start;
+        // cooldown timer not started or
+        // past withdrawable period
+        return start == 0 || elapsed >= cooldownMax;
+    }
+
+    /**
+     * @notice Returns true if the user is allowed to withdraw vault shares.
+     * @param _user User to query.
+     * return status True if can withdraw.
+     */
+    function canWithdraw(address _user) public view override returns (bool status) {
+        // validate cooldown
+        uint40 elapsed = uint40(block.timestamp) - cooldownStart[_user];
+        // cooldownMin <= elapsed <= cooldownMax
+        return cooldownMin <= elapsed && elapsed <= cooldownMax;
     }
 
 

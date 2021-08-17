@@ -30,6 +30,10 @@ describe("ClaimsEscrow", function () {
 
   before(async function () {
     artifacts = await import_artifacts();
+    // forking uses old timestamp, need to force update
+    const timestamp = Math.floor(Date.now()/1000);
+    await provider.send("evm_setNextBlockTimestamp", [timestamp]);
+    await provider.send("evm_mine", []);
   })
 
   beforeEach(async () => {
@@ -108,11 +112,16 @@ describe("ClaimsEscrow", function () {
     it("should create a Claim object with the right data", async function () {
       expect(await claimsEscrow.totalClaimsOutstanding()).to.equal(0);
       await claimsEscrow.connect(mockProduct).receiveClaim(claimID, claimant.address, testClaimAmount);
-      const callClaimant = await claimsEscrow.ownerOf(claimID);
-      const callAmount = (await claimsEscrow.claims(claimID)).amount;
-      expect(callClaimant).to.equal(claimant.address);
-      expect(callAmount).to.equal(testClaimAmount);
       expect(await claimsEscrow.totalClaimsOutstanding()).to.equal(testClaimAmount);
+      const callClaimant = await claimsEscrow.ownerOf(claimID);
+      expect(callClaimant).to.equal(claimant.address);
+      const timestamp = BN.from(Math.floor(Date.now()/1000));
+      const claim1 = await claimsEscrow.claims(claimID);
+      expect(claim1.amount).to.equal(testClaimAmount);
+      expect(claim1.receivedAt).to.be.closeTo(timestamp, 900);
+      const claim2 = await claimsEscrow.getClaims(claimID);
+      expect(claim2.amount).to.equal(testClaimAmount);
+      expect(claim2.receivedAt).to.be.closeTo(timestamp, 900);
     });
   });
 
@@ -149,10 +158,8 @@ describe("ClaimsEscrow", function () {
       await claimsEscrow.connect(claimant).withdrawClaimsPayout(claimID);
       expect(await claimsEscrow.exists(claimID)).to.be.false;
       await expect(claimsEscrow.ownerOf(claimID)).to.be.reverted;
-      const callAmount = (await claimsEscrow.claims(claimID)).amount;
-      const callReceivedAt = (await claimsEscrow.claims(claimID)).receivedAt;
-      expect(callAmount).to.equal(0);
-      expect(callReceivedAt).to.equal(0);
+      await expect(claimsEscrow.claims(claimID)).to.be.reverted;
+      await expect(claimsEscrow.getClaims(claimID)).to.be.reverted;
     });
     it("should request more eth if needed", async function () { // and partial payout
       let claimID2 = 2;

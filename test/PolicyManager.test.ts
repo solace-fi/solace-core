@@ -10,7 +10,7 @@ chai.use(solidity);
 import { import_artifacts, ArtifactImports } from './utilities/artifact_importer';
 import { burnBlocks, burnBlocksUntil } from './utilities/time';
 
-import { PolicyManager, MockProduct, Treasury, Registry, RiskManager, NonfungibleTokenPolicyDescriptor, Vault } from '../typechain';
+import { PolicyManager, MockProduct, Treasury, Registry, RiskManager, PolicyDescriptor, Vault } from '../typechain';
 
 describe('PolicyManager', function() {
   let artifacts: ArtifactImports;
@@ -23,7 +23,7 @@ describe('PolicyManager', function() {
   let vault: Vault;
   let registry: Registry;
   let riskManager: RiskManager;
-  let nftTokenDescriptor: NonfungibleTokenPolicyDescriptor;
+  let policyDescriptor: PolicyDescriptor;
 
   const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
   const name = 'Solace Policy';
@@ -51,7 +51,7 @@ describe('PolicyManager', function() {
     riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
 
     // deploy nft descriptor
-    nftTokenDescriptor = (await deployContract(deployer, artifacts.NonfungibleTokenPolicyDescriptor)) as NonfungibleTokenPolicyDescriptor;
+    policyDescriptor = (await deployContract(deployer, artifacts.PolicyDescriptor)) as PolicyDescriptor;
 
     await registry.connect(governor).setTreasury(treasury.address);
     await registry.connect(governor).setVault(vault.address);
@@ -74,7 +74,7 @@ describe('PolicyManager', function() {
   });
 
   it('has no nft token descriptor', async function() {
-    expect(await policyManager.tokenDescriptor()).to.equal(ZERO_ADDRESS);
+    expect(await policyManager.policyDescriptor()).to.equal(ZERO_ADDRESS);
   });
 
   describe('governance', function() {
@@ -109,12 +109,12 @@ describe('PolicyManager', function() {
     });
 
     it('rejects setting new nft token descriptor by non governor', async function() {
-      await expect(policyManager.connect(user).setTokenDescriptor(nftTokenDescriptor.address)).to.be.revertedWith('!governance');
+      await expect(policyManager.connect(user).setPolicyDescriptor(policyDescriptor.address)).to.be.revertedWith('!governance');
     });
 
     it('can set new nft token descriptor', async function() {
-      await policyManager.connect(governor).setTokenDescriptor(nftTokenDescriptor.address);
-      expect(await policyManager.connect(governor).tokenDescriptor()).to.equal(nftTokenDescriptor.address);
+      await policyManager.connect(governor).setPolicyDescriptor(policyDescriptor.address);
+      expect(await policyManager.connect(governor).policyDescriptor()).to.equal(policyDescriptor.address);
     });
 
   });
@@ -176,13 +176,22 @@ describe('PolicyManager', function() {
     });
 
     it("can get policy info", async function() {
-      let policyInfo = await policyManager.getPolicyInfo(1);
-      expect(policyInfo.policyholder).to.equal(user.address);
-      expect(policyInfo.product).to.equal(walletProduct2.address);
-      expect(policyInfo.positionContract).to.equal(positionContract.address);
-      expect(policyInfo.coverAmount).to.equal(coverAmount);
-      expect(policyInfo.expirationBlock).to.equal(expirationBlock);
-      expect(policyInfo.price).to.equal(price);
+      let policyInfo1 = await policyManager.policyInfo(1);
+      expect(policyInfo1.policyholder).to.equal(user.address);
+      expect(policyInfo1.product).to.equal(walletProduct2.address);
+      expect(policyInfo1.positionContract).to.equal(positionContract.address);
+      expect(policyInfo1.coverAmount).to.equal(coverAmount);
+      expect(policyInfo1.expirationBlock).to.equal(expirationBlock);
+      expect(policyInfo1.price).to.equal(price);
+
+      let policyInfo2 = await policyManager.getPolicyInfo(1);
+      expect(policyInfo2.policyholder).to.equal(user.address);
+      expect(policyInfo2.product).to.equal(walletProduct2.address);
+      expect(policyInfo2.positionContract).to.equal(positionContract.address);
+      expect(policyInfo2.coverAmount).to.equal(coverAmount);
+      expect(policyInfo2.expirationBlock).to.equal(expirationBlock);
+      expect(policyInfo2.price).to.equal(price);
+
       expect(await policyManager.getPolicyholder(1)).to.equal(user.address);
       expect(await policyManager.getPolicyProduct(1)).to.equal(walletProduct2.address);
       expect(await policyManager.getPolicyPositionContract(1)).to.equal(positionContract.address);
@@ -192,6 +201,7 @@ describe('PolicyManager', function() {
       expect(await policyManager.getPolicyPrice(1)).to.equal(price);
       expect(await policyManager.exists(1)).to.equal(true);
 
+      await expect(policyManager.policyInfo(2)).to.be.revertedWith('query for nonexistent token');
       await expect(policyManager.getPolicyInfo(2)).to.be.revertedWith('query for nonexistent token');
       await expect(policyManager.getPolicyholder(2)).to.be.revertedWith('query for nonexistent token');
       await expect(policyManager.getPolicyProduct(2)).to.be.revertedWith('query for nonexistent token');
@@ -394,7 +404,7 @@ describe('PolicyManager', function() {
         )) as MockProduct;
         await mockProduct.setPositionValue(0b10000);
         await policyManager.connect(governor).addProduct(mockProduct.address);
-        await policyManager.connect(governor).setTokenDescriptor(nftTokenDescriptor.address);
+        await policyManager.connect(governor).setPolicyDescriptor(policyDescriptor.address);
         await registry.connect(governor).setPolicyManager(policyManager.address);
         let tx = await mockProduct.connect(user)._buyPolicy(user.address, positionContract.address, 5000, 110);
         let receipt = await tx.wait();

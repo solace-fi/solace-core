@@ -5,11 +5,11 @@ import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Enumerable.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
 
 interface IPolicyManager /*is IERC721Enumerable, IERC721Metadata*/ {
-    event ProductAdded(address product);
-    event ProductRemoved(address product);
-    event PolicyCreated(uint256 tokenID);
-    event PolicyBurned(uint256 tokenID);
-    
+    event ProductAdded(address _product);
+    event ProductRemoved(address _product);
+    event PolicyCreated(uint256 _tokenID);
+    event PolicyBurned(uint256 _tokenID);
+
     /**
      * @notice Adds a new product.
      * Can only be called by the current governor.
@@ -28,9 +28,12 @@ interface IPolicyManager /*is IERC721Enumerable, IERC721Metadata*/ {
     /**
      * @notice Allows governance to set token descriptor.
      * Can only be called by the current governor.
-     * @param _tokenDescriptor The new token descriptor address.
+     * @param _policyDescriptor The new token descriptor address.
      */
-    function setTokenDescriptor(address _tokenDescriptor) external;
+    function setPolicyDescriptor(address _policyDescriptor) external;
+
+    /// @notice The address of the policy descriptor contract, which handles generating token URIs for policies
+    function policyDescriptor() external view returns (address);
 
     /**
      * @notice Checks is an address is an active product.
@@ -55,6 +58,18 @@ interface IPolicyManager /*is IERC721Enumerable, IERC721Metadata*/ {
     /*** POLICY VIEW FUNCTIONS
     View functions that give us data about policies
     ****/
+
+    /// @notice PolicyInfo struct.
+    struct PolicyInfo {
+        uint256 coverAmount;
+        address policyholder;
+        uint40 expirationBlock;
+        address product;
+        uint24 price;
+        address positionContract;
+    }
+
+    function policyInfo(uint256 _policyID) external view returns (PolicyInfo memory);
     function getPolicyInfo(uint256 _policyID) external view returns (address policyholder, address product, address positionContract, uint256 coverAmount, uint40 expirationBlock, uint24 price);
     function getPolicyholder(uint256 _policyID) external view returns (address);
     function getPolicyProduct(uint256 _policyID) external view returns (address);

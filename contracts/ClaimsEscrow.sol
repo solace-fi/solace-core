@@ -30,14 +30,8 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, Governable {
     /// @notice ETH_ADDRESS.
     address private constant ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
-    /// @notice Claim struct.
-    struct Claim {
-        uint256 amount;
-        uint256 receivedAt; // used to determine withdrawability after cooldown period
-    }
-
     /// @notice mapping of claimID to Claim object
-    mapping (uint256 => Claim) public claims;
+    mapping (uint256 => Claim) internal _claims;
 
     /// @notice tracks how much is required to payout all claims
     uint256 public totalClaimsOutstanding;
@@ -77,7 +71,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, Governable {
         uint256 bal = address(this).balance;
         if(bal < tco) IVault(registry.vault()).requestEth(tco - bal);
         // Add claim to claims mapping
-        claims[_policyID] = Claim({
+        _claims[_policyID] = Claim({
             amount: _amount,
             receivedAt: block.timestamp
         });
@@ -94,9 +88,9 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, Governable {
     function withdrawClaimsPayout(uint256 claimID) external override {
         require(_exists(claimID), "query for nonexistent token");
         require(msg.sender == ownerOf(claimID), "!claimant");
-        require(block.timestamp >= claims[claimID].receivedAt + cooldownPeriod, "cooldown period has not elapsed");
+        require(block.timestamp >= _claims[claimID].receivedAt + cooldownPeriod, "cooldown period has not elapsed");
 
-        uint256 amount = claims[claimID].amount;
+        uint256 amount = _claims[claimID].amount;
         // if not enough eth, request more
         if(amount > address(this).balance) {
             IVault(registry.vault()).requestEth(amount - address(this).balance);
@@ -105,14 +99,14 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, Governable {
         if(amount > address(this).balance) {
             uint256 balance = address(this).balance;
             totalClaimsOutstanding -= balance;
-            claims[claimID].amount -= balance;
+            _claims[claimID].amount -= balance;
             payable(msg.sender).transfer(balance);
             emit ClaimWithdrawn(claimID, msg.sender, balance);
         }
         // if enough eth, full withdraw and delete claim
         else {
             totalClaimsOutstanding -= amount;
-            delete claims[claimID];
+            delete _claims[claimID];
             _burn(claimID);
             payable(msg.sender).transfer(amount);
             emit ClaimWithdrawn(claimID, msg.sender, amount);
@@ -127,8 +121,8 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, Governable {
      */
     function adjustClaim(uint256 claimID, uint256 value) external override onlyGovernance {
         require(_exists(claimID), "query for nonexistent token");
-        totalClaimsOutstanding = totalClaimsOutstanding - claims[claimID].amount + value;
-        claims[claimID].amount = value;
+        totalClaimsOutstanding = totalClaimsOutstanding - _claims[claimID].amount + value;
+        _claims[claimID].amount = value;
     }
 
     /**
@@ -153,6 +147,29 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, Governable {
     }
 
     /**
+     * @notice Gets information about a claim.
+     * @param _claimID Claim to query.
+     * @return info Claim info as struct.
+     */
+    function claims(uint256 _claimID) external view override returns (Claim memory info) {
+        require(_exists(_claimID), "query for nonexistent token");
+        info = _claims[_claimID];
+        return info;
+    }
+
+    /**
+     * @notice Gets information about a claim.
+     * @param _claimID Claim to query.
+     * @return amount Claim amount in ETH.
+     * @return receivedAt Time claim was received at.
+     */
+    function getClaims(uint256 _claimID) external view override returns (uint256 amount, uint256 receivedAt) {
+        require(_exists(_claimID), "query for nonexistent token");
+        Claim memory info = _claims[_claimID];
+        return (info.amount, info.receivedAt);
+    }
+
+    /**
      * @notice Returns true if the claim exists.
      * @param claimID The id to check.
      * @return status True if it exists, false if not.
@@ -167,7 +184,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, Governable {
      * @return status True if it is withdrawable, false if not.
      */
     function isWithdrawable(uint256 claimID) external view override returns (bool status) {
-        return _exists(claimID) && block.timestamp >= claims[claimID].receivedAt + cooldownPeriod;
+        return _exists(claimID) && block.timestamp >= _claims[claimID].receivedAt + cooldownPeriod;
     }
 
     /**
@@ -177,7 +194,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, Governable {
      */
     function timeLeft(uint256 claimID) external view override returns (uint256 time) {
         if(!_exists(claimID)) return type(uint256).max;
-        uint256 end = claims[claimID].receivedAt + cooldownPeriod;
+        uint256 end = _claims[claimID].receivedAt + cooldownPeriod;
         if(block.timestamp >= end) return 0;
         return end - block.timestamp;
     }

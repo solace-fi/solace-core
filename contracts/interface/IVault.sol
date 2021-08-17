@@ -148,6 +148,20 @@ interface IVault is IERC20, IERC20Permit {
     function cooldownStart(address _user) external view returns (uint40);
 
     /**
+     * @notice Returns true if the user is allowed to receive or send vault shares.
+     * @param _user User to query.
+     * return status True if can transfer.
+     */
+    function canTransfer(address _user) external view returns (bool status);
+
+    /**
+     * @notice Returns true if the user is allowed to withdraw vault shares.
+     * @param _user User to query.
+     * return status True if can withdraw.
+     */
+    function canWithdraw(address _user) external view returns (bool status);
+
+    /**
      * @notice Returns true if the destination is authorized to request ETH.
      */
     function isRequestor(address _dst) external view returns (bool);
