@@ -6,7 +6,6 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./Governable.sol";
-import "./interface/IWETH9.sol";
 import "./interface/IRegistry.sol";
 import "./interface/IPolicyManager.sol";
 import "./interface/IRiskManager.sol";
@@ -25,7 +24,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
     bool public emergencyShutdown;
 
     /// WETH
-    IERC20 public override token;
+    IWETH9 public override weth;
 
     /// Registry of protocol contract addresses
     IRegistry public registry;
@@ -44,9 +43,9 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
     // Returns true if the destination is authorized to request ETH.
     mapping(address => bool) public override isRequestor;
 
-    constructor (address _governance, address _registry, address _token) ERC20("Solace CP Token", "SCP") ERC20Permit("Solace CP Token") Governable(_governance) {
+    constructor (address _governance, address _registry, address _weth) ERC20("Solace CP Token", "SCP") ERC20Permit("Solace CP Token") Governable(_governance) {
         registry = IRegistry(_registry);
-        token = IERC20(_token);
+        weth = IWETH9(payable(_weth));
     }
 
     /*************
@@ -117,7 +116,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      */
     function depositWeth(uint256 _amount) external override nonReentrant returns (uint256) {
         // pull weth
-        SafeERC20.safeTransferFrom(token, msg.sender, address(this), _amount);
+        SafeERC20.safeTransferFrom(weth, msg.sender, address(this), _amount);
         // mint
         return _deposit(_amount);
     }
@@ -166,7 +165,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
         uint256 value = _withdraw(_shares);
         // unwrap weth
         if(value > address(this).balance) {
-            IWETH9(payable(address(token))).withdraw(value - address(this).balance);
+            weth.withdraw(value - address(this).balance);
         }
         // transfer eth
         payable(msg.sender).transfer(value);
@@ -183,13 +182,12 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
     function withdrawWeth(uint256 _shares) external override nonReentrant returns (uint256) {
         uint256 value = _withdraw(_shares);
         // wrap eth
-        IWETH9 weth = IWETH9(payable(address(token)));
         uint256 balance = weth.balanceOf(address(this));
         if(value > balance) {
             weth.deposit{value: value - balance}();
         }
         // transfer weth
-        SafeERC20.safeTransfer(token, msg.sender, value);
+        SafeERC20.safeTransfer(weth, msg.sender, value);
         emit WithdrawalMade(msg.sender, value);
         return value;
     }
@@ -226,7 +224,6 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
         require(isRequestor[msg.sender], "!requestor");
         // unwrap some WETH to make ETH available for claims payout
         if(_amount > address(this).balance) {
-            IWETH9 weth = IWETH9(payable(address(token)));
             uint256 wanted = _amount - address(this).balance;
             uint256 withdrawAmount = min(weth.balanceOf(address(this)), wanted);
             weth.withdraw(withdrawAmount);
@@ -311,7 +308,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      * @return totalAssets The total assets under control of this vault.
      */
     function _totalAssets() internal view returns (uint256) {
-        return token.balanceOf(address(this)) + address(this).balance;
+        return weth.balanceOf(address(this)) + address(this).balance;
     }
 
     /**
@@ -321,9 +318,9 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      */
     function _shareValue(uint256 shares) internal view returns (uint256) {
         // using 1e3 for extra precision here when decimals is low
-        return totalSupply() == 0
+        return (totalSupply() == 0)
             ? 0
-            : ((10 ** 3 * (shares * _totalAssets())) / totalSupply()) / 10 ** 3;
+            : (((10 ** 3 * (shares * _totalAssets())) / totalSupply()) / 10 ** 3);
     }
 
     /**
@@ -333,8 +330,8 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      */
     function _sharesForAmount(uint256 amount) internal view returns (uint256) {
         // NOTE: if sqrt(token.totalSupply()) > 1e37, this could potentially revert
-        return _totalAssets() > 0
-            ? ((10 ** 3 * (amount * totalSupply())) / _totalAssets()) / 10 ** 3
+        return (_totalAssets() > 0)
+            ? (((10 ** 3 * (amount * totalSupply())) / _totalAssets()) / 10 ** 3)
             : 0;
     }
 
@@ -375,13 +372,13 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
 
     /**
      * @notice Fallback function to allow contract to receive *ETH*.
-     * Mints **CP** tokens to `caller` if `caller` is not `Vault` or `WETH` or `Treasury`.
+     * Does not mint **CP** tokens.
      */
     receive() external payable { }
 
     /**
      * @notice Fallback function to allow contract to receive **ETH**.
-     * Mints **CP** tokens to `caller` if `caller` is not `Vault` or `WETH` or `Treasury`.
+     * Does not mint **CP** tokens.
      */
     fallback() external payable { }
 }

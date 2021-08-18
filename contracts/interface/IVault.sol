@@ -2,7 +2,8 @@
 
 pragma solidity 0.8.6;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./IWETH9.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol";
 
 /**
@@ -23,7 +24,7 @@ struct StrategyParams {
     uint256 totalLoss;
 }
 
-interface IVault is IERC20, IERC20Permit {
+interface IVault is IERC20Metadata, IERC20Permit {
 
     // Emitted when a user deposits funds.
     event DepositMade(address indexed depositor, uint256 indexed amount, uint256 indexed shares);
@@ -117,7 +118,7 @@ interface IVault is IERC20, IERC20Permit {
     function requestEth(uint256 _amount) external returns (uint256);
 
     // weth
-    function token() external view returns (IERC20);
+    function weth() external view returns (IWETH9);
 
     /**
     * @notice Returns the maximum redeemable shares by the `user` such that Vault does not go under MCR

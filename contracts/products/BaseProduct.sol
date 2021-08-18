@@ -304,6 +304,7 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard, Governable {
             // transfer premium to the treasury
             ITreasury(payable(registry.treasury())).routePremiums{value: premium}();
         } else {
+            if(msg.value > 0) payable(msg.sender).transfer(msg.value);
             uint256 refundAmount = paidPremium - newPremium;
             ITreasury(payable(registry.treasury())).refund(msg.sender, refundAmount);
         }
@@ -320,13 +321,13 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard, Governable {
     function extendPolicy(uint256 _policyID, uint40 _blocks) external payable override nonReentrant {
         require(!paused, "cannot extend when paused");
         // check that the msg.sender is the policyholder
-        (address policyholder, address product, address positionContract, uint256 coverAmount, uint40 expirationBlock, uint24 price) = policyManager.getPolicyInfo(_policyID);
+        (address policyholder, address product, address positionContract, uint256 coverAmount, uint40 expirationBlock, uint24 purchasePrice) = policyManager.getPolicyInfo(_policyID);
         require(policyholder == msg.sender,"!policyholder");
         require(product == address(this), "wrong product");
         require(expirationBlock >= block.number, "policy is expired");
 
         // compute the premium
-        uint256 premium = coverAmount * _blocks * price / 1e12;
+        uint256 premium = coverAmount * _blocks * purchasePrice / 1e12;
         // check that the buyer has paid the correct premium
         require(msg.value >= premium, "insufficient payment");
         if(msg.value > premium) payable(msg.sender).transfer(msg.value - premium);
@@ -337,7 +338,7 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard, Governable {
         uint40 duration = newExpirationBlock - uint40(block.number);
         require(duration >= minPeriod && duration <= maxPeriod, "invalid period");
         // update the policy's URI
-        policyManager.setPolicyInfo(_policyID, policyholder, positionContract, coverAmount, newExpirationBlock, price);
+        policyManager.setPolicyInfo(_policyID, policyholder, positionContract, coverAmount, newExpirationBlock, purchasePrice);
         emit PolicyExtended(_policyID);
     }
 
@@ -383,13 +384,14 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard, Governable {
         uint256 paidPremium = previousCoverAmount * (previousExpirationBlock - uint40(block.number)) * previousPrice / 1e12;
 
         if (newPremium >= paidPremium) {
-           uint256 premium = newPremium - paidPremium;
-           require(msg.value >= premium, "insufficient payment");
-           if(msg.value > premium) payable(msg.sender).transfer(msg.value - premium);
-           ITreasury(payable(registry.treasury())).routePremiums{value: premium}();
+            uint256 premium = newPremium - paidPremium;
+            require(msg.value >= premium, "insufficient payment");
+            if(msg.value > premium) payable(msg.sender).transfer(msg.value - premium);
+            ITreasury(payable(registry.treasury())).routePremiums{value: premium}();
         } else {
-           uint256 refund = paidPremium - newPremium;
-           ITreasury(payable(registry.treasury())).refund(msg.sender, refund);
+            if(msg.value > 0) payable(msg.sender).transfer(msg.value);
+            uint256 refund = paidPremium - newPremium;
+            ITreasury(payable(registry.treasury())).refund(msg.sender, refund);
         }
         emit PolicyUpdated(_policyID);
     }
@@ -399,12 +401,12 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard, Governable {
      * @param _policyID The id number of the existing policy.
      */
     function cancelPolicy(uint256 _policyID) external override nonReentrant {
-        (address policyholder, address product, , uint256 coverAmount, uint40 expirationBlock, uint24 price) = policyManager.getPolicyInfo(_policyID);
+        (address policyholder, address product, , uint256 coverAmount, uint40 expirationBlock, uint24 purchasePrice) = policyManager.getPolicyInfo(_policyID);
         require(policyholder == msg.sender,"!policyholder");
         require(product == address(this), "wrong product");
 
         uint40 blocksLeft = expirationBlock - uint40(block.number);
-        uint256 refundAmount = blocksLeft * coverAmount * price / 1e12;
+        uint256 refundAmount = blocksLeft * coverAmount * purchasePrice / 1e12;
         policyManager.burn(_policyID);
         ITreasury(payable(registry.treasury())).refund(msg.sender, refundAmount);
         activeCoverAmount -= coverAmount;

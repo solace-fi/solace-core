@@ -373,6 +373,7 @@ describe("Treasury", function() {
     });
 
     it("can set recipients", async function() {
+      await treasury.connect(governor).setPremiumRecipients([], [0]);
       await treasury.connect(governor).setPremiumRecipients([deployer.address], [2, 3]);
     });
 

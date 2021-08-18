@@ -17,18 +17,13 @@
 
 pragma solidity 0.8.6;
 
-interface IWETH9 {
-    function name() external view returns (string memory);
-    function symbol() external view returns (string memory);
-    function decimals() external view returns (uint8);
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-    event  Approval(address indexed src, address indexed guy, uint wad);
-    event  Transfer(address indexed src, address indexed dst, uint wad);
+
+interface IWETH9 is IERC20Metadata {
+
     event  Deposit(address indexed dst, uint wad);
     event  Withdrawal(address indexed src, uint wad);
-
-    function balanceOf(address src) external view returns (uint);
-    function allowance(address src, address guy) external view returns (uint);
 
     /**
      * Receive function. Deposits eth.
@@ -43,14 +38,6 @@ interface IWETH9 {
     function deposit() external payable;
 
     function withdraw(uint wad) external;
-
-    function totalSupply() external view returns (uint);
-
-    function approve(address guy, uint wad) external returns (bool);
-
-    function transfer(address dst, uint wad) external returns (bool);
-
-    function transferFrom(address src, address dst, uint wad) external returns (bool);
 }
 
 

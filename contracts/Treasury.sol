@@ -4,7 +4,7 @@ pragma solidity 0.8.6;
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./Governable.sol";
-import "contracts/mocks/WETH9.sol";
+import "./interface/IWETH9.sol";
 import "./interface/ISwapRouter.sol";
 import "./interface/IRegistry.sol";
 import "./interface/IPolicyManager.sol";
@@ -26,7 +26,7 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
     ISwapRouter public swapRouter;
 
     /// @notice Wrapped ether.
-    WETH9 public weth;
+    IWETH9 public weth;
 
     address public constant ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
@@ -46,7 +46,7 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
      */
     constructor(address _governance, address _swapRouter, address _weth, address _registry) Governable(_governance) {
         swapRouter = ISwapRouter(_swapRouter);
-        weth = WETH9(payable(_weth));
+        weth = IWETH9(payable(_weth));
         registry = IRegistry(_registry);
 
         if (_registry != address(0) && registry.vault() != address(0)) {
@@ -136,7 +136,7 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
     /**
      * @notice Sets the premium recipients and their weights.
      * Can only be called by the current `governor`.
-     * @param _recipients The premium recipients.
+     * @param _recipients The premium recipients, plus an implicit `address(this)` at the end.
      * @param _weights The recipient weights.
      */
     function setPremiumRecipients(address payable[] calldata _recipients, uint32[] calldata _weights) external override onlyGovernance {
@@ -145,7 +145,7 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
         uint32 sum = 0;
         uint256 length = _weights.length;
         for(uint256 i = 0; i < length; i++) sum += _weights[i];
-        if(length > 0) require(sum > 0, "1/0");
+        if(length > 1) require(sum > 0, "1/0");
         weightSum = sum;
         premiumRecipients = _recipients;
         recipientWeights = _weights;
@@ -161,8 +161,7 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
         for(uint i = 0; i < length; i++) {
             uint256 amount = msg.value * recipientWeights[i] / div;
             if (amount > 0) {
-                (bool success,) = premiumRecipients[i].call{value: amount}("");
-                require(success, "failed to route premium");
+                premiumRecipients[i].call{value: amount}(""); // call may fail, let it
             }
         }
         // hold treasury share as eth
