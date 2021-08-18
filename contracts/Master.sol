@@ -3,6 +3,7 @@ pragma solidity 0.8.6;
 
 import "./libraries/Math.sol";
 import "./SOLACE.sol";
+import "./Governable.sol";
 import "./interface/IMaster.sol";
 import "./interface/IFarm.sol";
 
@@ -12,13 +13,7 @@ import "./interface/IFarm.sol";
  * @author solace.fi
  * @notice This contract is the SOLACE token distributor.
  */
-contract Master is IMaster {
-
-    /// @notice Governor.
-    address public override governance;
-
-    /// @notice Governance to take over.
-    address public override newGovernance;
+contract Master is IMaster, Governable {
 
     /// @notice Native SOLACE Token.
     SOLACE public override solace;
@@ -49,33 +44,9 @@ contract Master is IMaster {
      * @param _solace Address of the solace token.
      * @param _solacePerBlock Amount of solace to distribute per block.
      */
-    constructor(address _governance, SOLACE _solace, uint256 _solacePerBlock) {
-        governance = _governance;
+    constructor(address _governance, SOLACE _solace, uint256 _solacePerBlock) Governable(_governance) {
         solace = _solace;
         solacePerBlock = _solacePerBlock;
-    }
-
-    /**
-     * @notice Allows governance to be transferred to a new governor.
-     * Can only be called by the current governor.
-     * @param _governance The new governor.
-     */
-    function setGovernance(address _governance) external override {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
-        newGovernance = _governance;
-    }
-
-    /**
-     * @notice Accepts the governance role.
-     * Can only be called by the new governor.
-     */
-    function acceptGovernance() external override {
-        // can only be called by new governor
-        require(msg.sender == newGovernance, "!governance");
-        governance = newGovernance;
-        newGovernance = address(0x0);
-        emit GovernanceTransferred(msg.sender);
     }
 
     /**
@@ -86,9 +57,7 @@ contract Master is IMaster {
      * @param _allocPoints How many points to allocate this farm.
      * @return farmId The farm id.
      */
-    function registerFarm(address _farmAddress, uint256 _allocPoints) external override returns (uint256 farmId) {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
+    function registerFarm(address _farmAddress, uint256 _allocPoints) external override onlyGovernance returns (uint256 farmId) {
         require(farmIndices[_farmAddress] == 0, "already registered");
         farmId = ++numFarms; // starts at 1
         farmAddresses[farmId] = _farmAddress;
@@ -104,9 +73,7 @@ contract Master is IMaster {
      * @param _farmId The farm to set allocation points.
      * @param _allocPoints How many points to allocate this farm.
      */
-    function setAllocPoints(uint256 _farmId, uint256 _allocPoints) external override {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
+    function setAllocPoints(uint256 _farmId, uint256 _allocPoints) external override onlyGovernance {
         require(_farmId != 0 && _farmId <= numFarms, "farm does not exist");
         _setAllocPoints(_farmId, _allocPoints);
     }
@@ -116,9 +83,7 @@ contract Master is IMaster {
      * Optionally updates all farms.
      * @param _solacePerBlock Amount of solace to distribute per block.
      */
-    function setSolacePerBlock(uint256 _solacePerBlock) external override {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
+    function setSolacePerBlock(uint256 _solacePerBlock) external override onlyGovernance {
         // accounting
         solacePerBlock = _solacePerBlock;
         _updateRewards();

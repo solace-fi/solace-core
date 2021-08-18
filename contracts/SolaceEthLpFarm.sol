@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./libraries/TickBitmap.sol";
+import "./Governable.sol";
 import "./interface/IUniswapLpToken.sol";
 import "./interface/IUniswapV3Pool.sol";
 import "./interface/ILpAppraisor.sol";
@@ -16,7 +17,7 @@ import "./interface/ISolaceEthLpFarm.sol";
  * @title SolaceEthLpFarm: A farm that allows for the staking of Uniswap LP tokens in SOLACE-ETH pools.
  * @author solace.fi
  */
-contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard {
+contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard, Governable {
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.UintSet;
     using TickBitmap for mapping(int16 => uint256);
@@ -83,12 +84,6 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard {
 
     mapping(uint256 => TokenInfo) public tokenInfo;
 
-    /// @notice Governor.
-    address public override governance;
-
-    /// @notice Governance to take over.
-    address public override newGovernance;
-
     /// @notice Master contract.
     address public override master;
 
@@ -127,9 +122,8 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard {
         address _pool,
         address _weth,
         address _appraisor
-    ) {
+    ) Governable(_governance) {
         // copy params
-        governance = _governance;
         master = _master;
         lpToken = IUniswapLpToken(_lpToken);
         solace = _solace;
@@ -155,29 +149,6 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard {
     fallback () external payable {}
 
     /**
-     * @notice Allows governance to be transferred to a new governor.
-     * Can only be called by the current governor.
-     * @param _governance The new governor.
-     */
-    function setGovernance(address _governance) external override {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
-        newGovernance = _governance;
-    }
-
-    /**
-     * @notice Accepts the governance role.
-     * Can only be called by the new governor.
-     */
-    function acceptGovernance() external override {
-        // can only be called by new governor
-        require(msg.sender == newGovernance, "!governance");
-        governance = newGovernance;
-        newGovernance = address(0x0);
-        emit GovernanceTransferred(msg.sender);
-    }
-
-    /**
      * @notice Sets the amount of reward token to distribute per block.
      * Only affects future rewards.
      * Can only be called by Master.
@@ -198,9 +169,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard {
      * Can only be called by the current governor.
      * @param _endBlock The new end block.
      */
-    function setEnd(uint256 _endBlock) external override {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
+    function setEnd(uint256 _endBlock) external override onlyGovernance {
         // accounting
         endBlock = _endBlock;
         // update
@@ -213,9 +182,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard {
      * Can only be called by the current governor.
      * @param _appraisor The new appraisor.
      */
-    function setAppraisor(address _appraisor) external override {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
+    function setAppraisor(address _appraisor) external override onlyGovernance {
         appraisor = ILpAppraisor(_appraisor);
     }
 

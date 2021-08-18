@@ -16,8 +16,6 @@ interface ITreasury {
     event TokenDeposited(address _token, uint256 _amount);
     // Emitted when a token is spent
     event FundsSpent(address _token, uint256 _amount, address _recipient);
-    // Emitted when Governance is set
-    event GovernanceTransferred(address _newGovernance);
 
     /**
      * Receive function. Deposits eth.
@@ -28,25 +26,6 @@ interface ITreasury {
      * Fallback function. Deposits eth.
      */
     fallback () external payable;
-
-    /// @notice Governance.
-    function governance() external view returns (address);
-
-    /// @notice Governance to take over.
-    function newGovernance() external view returns (address);
-
-    /**
-     * @notice Transfers the governance role to a new governor.
-     * Can only be called by the current governor.
-     * @param _governance The new governor.
-     */
-    function setGovernance(address _governance) external;
-
-    /**
-     * @notice Accepts the governance role.
-     * Can only be called by the new governor.
-     */
-    function acceptGovernance() external;
 
     /**
      * @notice Deposits some ether.

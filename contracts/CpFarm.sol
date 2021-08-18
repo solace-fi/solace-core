@@ -4,6 +4,7 @@ pragma solidity 0.8.6;
 import "./libraries/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "./Governable.sol";
 import "./interface/IVault.sol";
 import "./interface/ICpFarm.sol";
 import "./interface/ISwapRouter.sol";
@@ -12,7 +13,7 @@ import "./interface/ISwapRouter.sol";
  * @title CpFarm: A farm that allows for the staking of CP tokens.
  * @author solace.fi
  */
-contract CpFarm is ICpFarm, ReentrancyGuard {
+contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
     using SafeERC20 for IERC20;
     using SafeERC20 for SOLACE;
 
@@ -52,12 +53,6 @@ contract CpFarm is ICpFarm, ReentrancyGuard {
     /// @dev user address => user info
     mapping(address => UserInfo) public userInfo;
 
-    /// @notice Governor.
-    address public override governance;
-
-    /// @notice Governance to take over.
-    address public override newGovernance;
-
     /// @notice Master contract.
     address public override master;
 
@@ -87,8 +82,7 @@ contract CpFarm is ICpFarm, ReentrancyGuard {
         uint256 _endBlock,
         address _swapRouter,
         address _weth
-    ) {
-        governance = _governance;
+    ) Governable(_governance) {
         master = _master;
         vault = IVault(_vault);
         solace = _solace;
@@ -116,29 +110,6 @@ contract CpFarm is ICpFarm, ReentrancyGuard {
     }
 
     /**
-     * @notice Allows governance to be transferred to a new governor.
-     * Can only be called by the current governor.
-     * @param _governance The new governor.
-     */
-    function setGovernance(address _governance) external override {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
-        newGovernance = _governance;
-    }
-
-    /**
-     * @notice Accepts the governance role.
-     * Can only be called by the new governor.
-     */
-    function acceptGovernance() external override {
-        // can only be called by new governor
-        require(msg.sender == newGovernance, "!governance");
-        governance = newGovernance;
-        newGovernance = address(0x0);
-        emit GovernanceTransferred(msg.sender);
-    }
-
-    /**
      * @notice Sets the amount of reward token to distribute per block.
      * Only affects future rewards.
      * Can only be called by Master.
@@ -159,9 +130,7 @@ contract CpFarm is ICpFarm, ReentrancyGuard {
      * Can only be called by the current governor.
      * @param _endBlock The new end block.
      */
-    function setEnd(uint256 _endBlock) external override {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
+    function setEnd(uint256 _endBlock) external override onlyGovernance {
         // accounting
         endBlock = _endBlock;
         // update

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Unlicense
 pragma solidity 0.8.6;
 
+import "./Governable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
@@ -11,18 +12,9 @@ import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
  * @notice **Solace** tokens can be earned by depositing **Capital Provider** or **Liquidity Provider** tokens to the [`Master`](./Master.md) contract.
  * **SOLACE** can also be locked for a preset time in the `Locker` contract to recieve `veSOLACE` tokens.
  */
-contract SOLACE is ERC20Permit {
+contract SOLACE is ERC20Permit, Governable {
     using SafeERC20 for IERC20;
     using Address for address;
-
-    /// @notice Governor.
-    address public governance;
-
-    /// @notice Governance to take over.
-    address public newGovernance;
-
-    /// @notice Emitted when Governance is set
-    event GovernanceTransferred(address _newGovernance);
 
     /// @notice Minters
     mapping (address => bool) public minters;
@@ -31,8 +23,7 @@ contract SOLACE is ERC20Permit {
      * @notice Constructs the Solace Token contract.
      * @param _governance The address of the governor.
      */
-    constructor(address _governance) ERC20("solace", "SOLACE") ERC20Permit("solace"){
-        governance = _governance;
+    constructor(address _governance) ERC20("solace", "SOLACE") ERC20Permit("solace") Governable(_governance) {
         minters[_governance] = true;
     }
 
@@ -48,35 +39,11 @@ contract SOLACE is ERC20Permit {
     }
 
     /**
-     * @notice Allows governance to be transferred to a new governor.
-     * Can only be called by the current `governor`.
-     * @param _governance The new governor.
-     */
-    function setGovernance(address _governance) external {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
-        newGovernance = _governance;
-    }
-
-    /**
-     * @notice Accepts the governance role.
-     * Can only be called by the new `governor`.
-     */
-    function acceptGovernance() external {
-        // can only be called by new governor
-        require(msg.sender == newGovernance, "!governance");
-        governance = newGovernance;
-        newGovernance = address(0x0);
-        emit GovernanceTransferred(msg.sender);
-    }
-
-    /**
      * @notice Adds a new minter.
      * Can only be called by the current `governor`.
      * @param _minter The new minter.
      */
-    function addMinter(address _minter) public {
-        require(msg.sender == governance, "!governance");
+    function addMinter(address _minter) public onlyGovernance {
         minters[_minter] = true;
     }
 
@@ -85,8 +52,7 @@ contract SOLACE is ERC20Permit {
      * Can only be called by the current `governor`.
      * @param _minter The minter to remove.
      */
-    function removeMinter(address _minter) public {
-        require(msg.sender == governance, "!governance");
+    function removeMinter(address _minter) public onlyGovernance {
         minters[_minter] = false;
     }
 }

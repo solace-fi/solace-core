@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
+import "./Governable.sol";
 import "./interface/IRegistry.sol";
 
 /**
@@ -8,12 +9,8 @@ import "./interface/IRegistry.sol";
  * @author solace.fi
  * @notice The `Registry` tracks the contracts in the Solaverse.
  */
-contract Registry is IRegistry {
+contract Registry is IRegistry, Governable {
 
-    /// @notice Governor.
-    address public override governance;
-    /// @notice Governance to take over.
-    address public override newGovernance;
     /// @notice Solace Token.
     address public override solace;
     /// @notice Master contract.
@@ -35,41 +32,14 @@ contract Registry is IRegistry {
      * @notice Constructs the registry contract.
      * @param _governance Address of the governor.
      */
-    constructor(address _governance) {
-        governance = _governance;
-    }
-
-    /**
-     * @notice Allows governance to be transferred to a new `governor`.
-     * Can only be called by the current `governor`.
-     * @param _governance The new governor.
-     */
-    function setGovernance(address _governance) external override {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
-        newGovernance = _governance;
-    }
-
-    /**
-     * @notice Accepts the governance role.
-     * Can only be called by the new `governor`.
-     */
-    function acceptGovernance() external override {
-        // can only be called by new governor
-        require(msg.sender == newGovernance, "!governance");
-        governance = newGovernance;
-        newGovernance = address(0x0);
-        emit GovernanceTransferred(msg.sender);
-    }
+    constructor(address _governance) Governable(_governance) { }
 
     /**
      * @notice Sets the [`Solace Token`](./SOLACE.md) contract.
      * Can only be called by the current `governor`.
      * @param _solace The `SOLACE` token address.
      */
-    function setSolace(address _solace) external override {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
+    function setSolace(address _solace) external override onlyGovernance {
         solace = _solace;
         emit SolaceSet(_solace);
     }
@@ -79,9 +49,7 @@ contract Registry is IRegistry {
      * Can only be called by the current `governor`.
      * @param _master The contract address of the `Master` contract.
      */
-    function setMaster(address _master) external override {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
+    function setMaster(address _master) external override onlyGovernance {
         master = _master;
         emit MasterSet(_master);
     }
@@ -91,9 +59,7 @@ contract Registry is IRegistry {
      * Can only be called by the current `governor`.
      * @param _claimsEscrow The contract address of the `ClaimsEscrow` contract.
      */
-    function setClaimsEscrow(address _claimsEscrow) external override {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
+    function setClaimsEscrow(address _claimsEscrow) external override onlyGovernance {
         claimsEscrow = _claimsEscrow;
         emit ClaimsEscrowSet(_claimsEscrow);
     }
@@ -103,9 +69,7 @@ contract Registry is IRegistry {
      * Can only be called by the current `governor`.
      * @param _vault The contract address of the `Vault` contract.
      */
-    function setVault(address _vault) external override {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
+    function setVault(address _vault) external override onlyGovernance {
         vault = _vault;
         emit VaultSet(_vault);
     }
@@ -115,9 +79,7 @@ contract Registry is IRegistry {
      * Can only be called by the current `governor`.
      * @param _treasury The contract address of the `Treasury` contract.
      */
-    function setTreasury(address _treasury) external override {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
+    function setTreasury(address _treasury) external override onlyGovernance {
         treasury = _treasury;
         emit TreasurySet(_treasury);
     }
@@ -127,9 +89,7 @@ contract Registry is IRegistry {
      * Can only be called by the current `governor`.
      * @param _locker The contract address of the `Locker` contract.
      */
-    function setLocker(address _locker) external override {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
+    function setLocker(address _locker) external override onlyGovernance {
         locker = _locker;
         emit LockerSet(_locker);
     }
@@ -139,9 +99,7 @@ contract Registry is IRegistry {
      * Can only be called by the current `governor`.
      * @param _policyManager The contract address of the `PolicyManager` contract.
      */
-    function setPolicyManager(address _policyManager) external override {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
+    function setPolicyManager(address _policyManager) external override onlyGovernance {
         policyManager = _policyManager;
         emit PolicyManagerSet(_policyManager);
     }
@@ -151,9 +109,7 @@ contract Registry is IRegistry {
      * Can only be called by the current `governor`.
      * @param _riskManager The contract address of the `RiskManager` contract.
      */
-    function setRiskManager(address _riskManager) external override {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
+    function setRiskManager(address _riskManager) external override onlyGovernance {
         riskManager = _riskManager;
         emit RiskManagerSet(_riskManager);
     }

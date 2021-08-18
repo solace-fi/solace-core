@@ -11,8 +11,6 @@ interface IClaimsEscrow {
 
     event ClaimReceived(uint256 indexed claimID, address indexed claimant, uint256 indexed amount);
     event ClaimWithdrawn(uint256 indexed claimID, address indexed claimant, uint256 indexed amount);
-    // Emitted when Governance is set
-    event GovernanceTransferred(address _newGovernance);
 
     /**
      * Receive function. Deposits eth.
@@ -68,25 +66,6 @@ interface IClaimsEscrow {
      * @param _period New cooldown duration in seconds
      */
     function setCooldownPeriod(uint256 _period) external;
-
-    /// @notice Governance.
-    function governance() external view returns (address);
-
-    /// @notice Governance to take over.
-    function newGovernance() external view returns (address);
-
-    /**
-     * @notice Transfers the governance role to a new governor.
-     * Can only be called by the current governor.
-     * @param _governance The new governor.
-     */
-    function setGovernance(address _governance) external;
-
-    /**
-     * @notice Accepts the governance role.
-     * Can only be called by the new governor.
-     */
-    function acceptGovernance() external;
 
     /**
      * @notice Returns true if the claim exists.

@@ -1,16 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
+import "./Governable.sol";
 import "./interface/IUniswapLpToken.sol";
 import "./interface/ILpAppraisor.sol";
 
-contract LpAppraisor is ILpAppraisor {
-
-    /// @notice Governor.
-    address public governance;
-
-    /// @notice Governance to take over.
-    address public newGovernance;
+contract LpAppraisor is ILpAppraisor, Governable {
 
     IUniswapLpToken public lpToken;
 
@@ -22,16 +17,12 @@ contract LpAppraisor is ILpAppraisor {
     //uint256 public curve_B; // default 40000
     uint256 public curve_B2;
 
-    // Emitted when Governance is set
-    event GovernanceTransferred(address _newGovernance);
-
     constructor(
         address _governance,
         address _lpToken,
         uint256 _curve_A,
         uint256 _curve_B
-    ) {
-        governance = _governance;
+    ) Governable(_governance) {
         lpToken = IUniswapLpToken(_lpToken);
         curve_A = _curve_A;
         //curve_B = _curve_B;
@@ -39,35 +30,11 @@ contract LpAppraisor is ILpAppraisor {
     }
 
     /**
-     * @notice Allows governance to be transferred to a new governor.
-     * Can only be called by the current governor.
-     * @param _governance The new governor.
-     */
-    function setGovernance(address _governance) external {
-        // can only be called by governor
-        require(msg.sender == governance, "!governance");
-        newGovernance = _governance;
-    }
-
-    /**
-     * @notice Accepts the governance role.
-     * Can only be called by the new governor.
-     */
-    function acceptGovernance() external {
-        // can only be called by new governor
-        require(msg.sender == newGovernance, "!governance");
-        governance = newGovernance;
-        newGovernance = address(0x0);
-        emit GovernanceTransferred(msg.sender);
-    }
-
-    /**
      * @notice Modifies the appraisal curve, and with it the incentive structure.
      * @param _curve_A The curve parameter A.
      * @param _curve_B The curve parameter B.
      */
-    function setCurve(uint256 _curve_A, uint256 _curve_B) external {
-        require(msg.sender == governance, "!governance");
+    function setCurve(uint256 _curve_A, uint256 _curve_B) external onlyGovernance {
         curve_A = _curve_A;
         //curve_B = _curve_B;
         curve_B2 = _curve_B**2;

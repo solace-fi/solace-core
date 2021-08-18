@@ -11,12 +11,6 @@ import "./../SOLACE.sol";
  */
 interface IMaster {
 
-    /// @notice Governor.
-    function governance() external view returns (address);
-
-    /// @notice Governance to take over.
-    function newGovernance() external view returns (address);
-
     /// @notice Native SOLACE Token.
     function solace() external view returns (SOLACE);
 
@@ -43,21 +37,6 @@ interface IMaster {
     // events
     event FarmCreated(uint256 indexed _farmId, address indexed _farmAddress);
     event RewardsSet(uint256 _solacePerBlock);
-    // Emitted when Governance is set
-    event GovernanceTransferred(address _newGovernance);
-
-    /**
-     * @notice Transfers the governance role to a new governor.
-     * Can only be called by the current governor.
-     * @param _governance The new governor.
-     */
-    function setGovernance(address _governance) external;
-
-    /**
-     * @notice Accepts the governance role.
-     * Can only be called by the new governor.
-     */
-    function acceptGovernance() external;
 
     /**
      * @notice Registers a farm.
