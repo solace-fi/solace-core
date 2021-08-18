@@ -59,9 +59,8 @@ describe("Treasury", function() {
     [deployer, governor, liquidityProvider, mockPolicy, user, randAddress, mockProduct] = provider.getWallets();
     artifacts = await import_artifacts();
 
-    // deploy proxy registry
-    let registryContract = await ethers.getContractFactory("Registry");
-    registry = (await upgrades.deployProxy(registryContract, [governor.address], { kind: "uups" })) as Registry;
+    // deploy registry contract
+    registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
 
     // deploy solace token
     solaceToken = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;

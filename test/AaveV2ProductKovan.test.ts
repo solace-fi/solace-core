@@ -119,8 +119,7 @@ if(process.env.FORK_NETWORK === "kovan"){
       )) as Weth9;
 
       // deploy registry contract
-      let registryContract = await ethers.getContractFactory("Registry");
-      registry = (await upgrades.deployProxy(registryContract, [deployer.address], { kind: "uups" })) as Registry;
+      registry = (await deployContract(deployer, artifacts.Registry, [deployer.address])) as Registry;
 
       // deploy vault
       vault = (await deployContract(

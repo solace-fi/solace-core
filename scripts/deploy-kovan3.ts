@@ -90,7 +90,7 @@ async function main() {
   signerAddress = await deployer.getAddress();
 
   // pre-dao
-  UPGRADE_REGISTRY == false ? await deployRegistry() : await upgradeRegistry(REGISTRY_ADDRESS, UPGRADED_REGISTRY_NAME);
+  await deployRegistry();
   await deployWeth();
   await deployVault();
   await deployClaimsEscrow();
@@ -118,23 +118,10 @@ async function deployRegistry() {
   if(!!REGISTRY_ADDRESS) {
     registry = (await hardhat.ethers.getContractAt(artifacts.Registry.abi, REGISTRY_ADDRESS)) as Registry;
   } else {
-    let registryContract = await hardhat.ethers.getContractFactory("contracts/Registry.sol:Registry");
     console.log("Deploying Registry");
-    registry = (await upgrades.deployProxy(registryContract, [signerAddress])) as Registry;
-    console.log(`Deploying Registry to ${registry.address}`);
-    await registry.deployed();
-    console.log("Deployment confirmed");
-  }
-}
-
-async function upgradeRegistry(proxyAddress: string, upgradeContractName: string) {
-  if(!!proxyAddress && !!upgradeContractName) {
-    console.log("Upgrading Registry");
-    let registryContract = await hardhat.ethers.getContractFactory(upgradeContractName);
-    registry = (await upgrades.upgradeProxy(proxyAddress, registryContract)) as Registry;
-    console.log(`Upgrading Registry to ${registry.address}`);
-  } else {
-    console.log("Proxy registry address or upgraded registry contract name is not provided!");
+    var addr = await create2Contract(deployer,artifacts.Registry,[signerAddress]);
+    registry = (new ethers.Contract(addr, artifacts.Registry.abi, provider)) as Registry;
+    console.log(`Deployed Registry to ${registry.address}`);
   }
 }
 
