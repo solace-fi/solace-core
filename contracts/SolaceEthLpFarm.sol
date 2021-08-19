@@ -14,8 +14,9 @@ import "./interface/ISolaceEthLpFarm.sol";
 
 
 /**
- * @title SolaceEthLpFarm: A farm that allows for the staking of Uniswap LP tokens in SOLACE-ETH pools.
+ * @title SolaceEthLpFarm
  * @author solace.fi
+ * @notice A farm that allows for the staking of Uniswap V3 LP tokens in SOLACE-ETH pools.
  */
 contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard, Governable {
     using SafeERC20 for IERC20;
@@ -25,16 +26,23 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard, Governable {
     /// @notice A unique enumerator that identifies the farm type.
     uint256 public override farmType = 3;
 
-    IUniswapLpToken public override lpToken;   // LP Token interface.
+    /// @notice Uniswap V3 LP Token interface.
+    IUniswapLpToken public override lpToken;
     /// @notice Native SOLACE Token.
     SOLACE public override solace;
     IWETH9 public override weth;
-    uint256 public override blockReward;       // Amount of rewardToken distributed per block.
-    uint256 public override startBlock;        // When the farm will start.
-    uint256 public override endBlock;          // When the farm will end.
-    uint256 public override lastRewardBlock;   // Last time rewards were distributed or farm was updated.
-    uint256 public override accRewardPerShare; // Accumulated rewards per share, times 1e12.
-    uint256 public override valueStaked;       // Value of tokens currently in range.
+    /// @notice Amount of rewardToken distributed per block.
+    uint256 public override blockReward;
+    /// @notice When the farm will start.
+    uint256 public override startBlock;
+    /// @notice When the farm will end.
+    uint256 public override endBlock;
+    /// @notice Last time rewards were distributed or farm was updated.
+    uint256 public override lastRewardBlock;
+    /// @notice Accumulated rewards per share, times 1e12.
+    uint256 public override accRewardPerShare;
+    /// @notice Value of tokens currently in range.
+    uint256 public override valueStaked;
 
     // Info of each user.
     struct UserInfo {

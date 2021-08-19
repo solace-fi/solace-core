@@ -22,13 +22,15 @@ interface ICToken {
 /**
  * @title CompoundProduct
  * @author solace.fi
- * @notice The **Compound** product that is users can buy policy for **Compound**. It is a concrete smart contract that inherits from abstract [`BaseProduct`](./BaseProduct.md).
+ * @notice The **Compound** product that is users can buy policy for **Compound**. It is a concrete smart contract that inherits from abstract [`BaseProduct`](./BaseProduct).
  * The contract also inherits from [`EIP712`](https://docs.openzeppelin.com/contracts/3.x/api/drafts#EIP712).
  */
 contract CompoundProduct is BaseProduct, EIP712 {
+
     /// @notice IComptroller.
     IComptroller public comptroller;
     /// @notice _EXCHANGE_TYPEHASH.
+    // solhint-disable-next-line var-name-mixedcase
     bytes32 private immutable _EXCHANGE_TYPEHASH = keccak256("CompoundProductExchange(uint256 policyID,uint256 amountOut,uint256 deadline)");
     /// @notice IExchangeQuoter.
     IExchangeQuoter public quoter;
@@ -123,11 +125,6 @@ contract CompoundProduct is BaseProduct, EIP712 {
         IClaimsEscrow(payable(registry.claimsEscrow())).receiveClaim(policyID, policyholder, amountOut);
         emit ClaimSubmitted(policyID);
     }
-
-    /**
-     * @notice Fallback function to allow contract to receive **ETH** from **cETH**.
-     */
-    receive () external payable {}
 
     /**
      * @notice Changes the covered platform.

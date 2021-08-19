@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 /**
  * @title Solace Token (SOLACE)
  * @author solace.fi
- * @notice **Solace** tokens can be earned by depositing **Capital Provider** or **Liquidity Provider** tokens to the [`Master`](./Master.md) contract.
+ * @notice **Solace** tokens can be earned by depositing **Capital Provider** or **Liquidity Provider** tokens to the [`Master`](./Master) contract.
  * **SOLACE** can also be locked for a preset time in the `Locker` contract to recieve `veSOLACE` tokens.
  */
 contract SOLACE is ERC20Permit, Governable {

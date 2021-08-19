@@ -14,7 +14,7 @@ import "./interface/IVault.sol";
 /**
  * @title Vault
  * @author solace.fi
- * @notice The `Vault` smart contract enables that `Capital Providers` can deposit **ETH** to mint shares of the `Vault`(CP tokens).
+ * @notice The `Vault` smart contract enables `Capital Providers` to deposit **ETH** to mint shares of the `Vault`. Shares are represented as `CP Tokens` and extend ERC20.
  */
 contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
     using SafeERC20 for IERC20;

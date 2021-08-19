@@ -7,33 +7,34 @@ import "./IFarm.sol";
 
 
 /**
- * @title ICpFarm: The base type of Master Capital Provider farms.
+ * @title ICpFarm
  * @author solace.fi
+ * @notice The base type of Master Capital Provider farms.
  */
 interface ICpFarm is IFarm {
 
-    // Emitted when CP tokens are deposited onto the farm.
+    /// @notice Emitted when CP tokens are deposited onto the farm.
     event CpDeposited(address indexed _user, uint256 _amount);
-    // Emitted when ETH is deposited onto the farm.
+    /// @notice Emitted when ETH is deposited onto the farm.
     event EthDeposited(address indexed _user, uint256 _amount);
-    // Emitted when a user compounds their rewards.
+    /// @notice Emitted when a user compounds their rewards.
     event RewardsCompounded(address indexed _user);
-    // Emitted when CP tokens are withdrawn from the farm.
+    /// @notice Emitted when CP tokens are withdrawn from the farm.
     event CpWithdrawn(address indexed _user, uint256 _amount);
-    // Emitted when a user is rewarded.
+    /// @notice Emitted when a user is rewarded.
     event UserRewarded(address indexed _user, uint256 _amount);
-    // Emitted when block reward is changed.
+    /// @notice Emitted when block reward is changed.
     event RewardsSet(uint256 _blockReward);
-    // Emitted when the end block is changed.
+    /// @notice Emitted when the end block is changed.
     event FarmEndSet(uint256 _endBlock);
 
     /**
-     * Receive function. Deposits eth.
+     * Receive function. Deposits eth. User will receive accumulated rewards if any.
      */
     receive () external payable;
 
     /**
-     * Fallback function. Deposits eth.
+     * Fallback function. Deposits eth. User will receive accumulated rewards if any.
      */
     fallback () external payable;
 
@@ -75,10 +76,15 @@ interface ICpFarm is IFarm {
      */
     function withdrawCp(uint256 _amount) external;
 
+    /// @notice Vault contract.
     function vault() external view returns (IVault);
-    function solace() external view returns (SOLACE);
 
-    function lastRewardBlock() external view returns (uint256);   // Last time rewards were distributed or farm was updated.
-    function accRewardPerShare() external view returns (uint256); // Accumulated rewards per share, times 1e12.
-    function valueStaked() external view returns (uint256);       // Value of tokens staked by all farmers.
+    /// @notice Last time rewards were distributed or farm was updated.
+    function lastRewardBlock() external view returns (uint256);
+
+    /// @notice Accumulated rewards per share, times 1e12.
+    function accRewardPerShare() external view returns (uint256);
+
+    /// @notice Value of tokens staked by all farmers.
+    function valueStaked() external view returns (uint256);
 }

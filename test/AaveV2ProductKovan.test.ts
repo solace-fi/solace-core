@@ -342,7 +342,7 @@ if(process.env.FORK_NETWORK === "kovan"){
         expect(tx1).to.emit(claimsEscrow, "ClaimReceived").withArgs(policyID1, user.address, amountOut1);
         expect(await policyManager.exists(policyID1)).to.be.false;
         // verify payout
-        expect((await claimsEscrow.claims(policyID1)).amount).to.equal(amountOut1);
+        expect((await claimsEscrow.claim(policyID1)).amount).to.equal(amountOut1);
         await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add one hour
         let userEth1 = await user.getBalance();
         let tx2 = await claimsEscrow.connect(user).withdrawClaimsPayout(policyID1);
@@ -435,7 +435,7 @@ if(process.env.FORK_NETWORK === "kovan"){
             expect(tx1).to.emit(claimsEscrow, "ClaimReceived").withArgs(policyID, user3.address, amountOut);
             expect(await policyManager.exists(policyID)).to.be.false;
             // verify payout
-            expect((await claimsEscrow.claims(policyID)).amount).to.equal(amountOut);
+            expect((await claimsEscrow.claim(policyID)).amount).to.equal(amountOut);
             await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add one hour
             let userEth1 = await user3.getBalance();
             let tx2 = await claimsEscrow.connect(user3).withdrawClaimsPayout(policyID);

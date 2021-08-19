@@ -1,22 +1,33 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
+import "../SOLACE.sol";
+
 
 /**
- * @title IFarm: The base type of Master farms.
+ * @title IFarm
  * @author solace.fi
+ * @notice The base type of Master farms.
  */
 interface IFarm {
 
     /// @notice Master contract.
     function master() external view returns (address);
 
+    /// @notice Native SOLACE Token.
+    function solace() external view returns (SOLACE);
+
     /// @notice A unique enumerator that identifies the farm type.
     function farmType() external view returns (uint256);
 
-    function blockReward() external view returns (uint256);       // Amount of rewardToken distributed per block.
-    function startBlock() external view returns (uint256);        // When the farm will start.
-    function endBlock() external view returns (uint256);          // When the farm will end.
+    /// @notice Amount of rewardToken distributed per block.
+    function blockReward() external view returns (uint256);
+
+    /// @notice When the farm will start.
+    function startBlock() external view returns (uint256);
+
+    /// @notice When the farm will end.
+    function endBlock() external view returns (uint256);
 
     /**
      * @notice Sets the amount of reward token to distribute per block.

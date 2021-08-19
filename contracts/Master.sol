@@ -9,9 +9,9 @@ import "./interface/IFarm.sol";
 
 
 /**
- * @title Master: Distributor of solace.fi
+ * @title Master
  * @author solace.fi
- * @notice This contract is the SOLACE token distributor.
+ * @notice The distributor of [**SOLACE** token](./SOLACE).
  */
 contract Master is IMaster, Governable {
 

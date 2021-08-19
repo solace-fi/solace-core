@@ -1,4 +1,5 @@
-// Code borrowed from https://etherscan.io/address/0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2#code
+// SPDX-License-Identifier: NONE
+// code borrowed from https://etherscan.io/address/0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2#code
 
 // Copyright (C) 2015, 2016, 2017 Dapphub
 
@@ -17,20 +18,20 @@
 
 pragma solidity 0.8.6;
 
-import "../interface/IWETH9.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "./interface/IWETH9.sol";
 
 /**
  * @title WETH9
- * @author solace.fi
- * @notice Wrapped Ether smart contract.
+ * @author Dapphub
+ * @notice [Wrapped Ether](https://weth.io/) smart contract. Extends ERC20.
  */
-contract WETH9 is IWETH9 {
-    string public override name     = "Wrapped Ether";
-    string public override symbol   = "WETH";
-    uint8  public override decimals = 18;
+contract WETH9 is IWETH9, ERC20 {
 
-    mapping (address => uint)                       public override balanceOf;
-    mapping (address => mapping (address => uint))  public override allowance;
+    /**
+     * @notice Constructs the WETH contract.
+     */
+    constructor() ERC20("Wrapped Ether", "WETH") {}
 
     /**
      * Receive function. Deposits eth.
@@ -46,50 +47,22 @@ contract WETH9 is IWETH9 {
         deposit();
     }
 
+    /**
+     * @notice Wraps Ether. WETH will be minted to the sender at 1 ETH : 1 WETH.
+     */
     function deposit() public payable override {
-        balanceOf[msg.sender] += msg.value;
+        _mint(msg.sender, msg.value);
         emit Deposit(msg.sender, msg.value);
     }
+
+    /**
+     * @notice Unwraps Ether. ETH will be returned to the sender at 1 ETH : 1 WETH.
+     * @param wad Amount to unwrap.
+     */
     function withdraw(uint wad) public override {
-        require(balanceOf[msg.sender] >= wad);
-        balanceOf[msg.sender] -= wad;
+        _burn(msg.sender, wad);
         payable(msg.sender).transfer(wad);
         emit Withdrawal(msg.sender, wad);
-    }
-
-    function totalSupply() public view override returns (uint) {
-        return address(this).balance;
-    }
-
-    function approve(address guy, uint wad) public override returns (bool) {
-        allowance[msg.sender][guy] = wad;
-        emit Approval(msg.sender, guy, wad);
-        return true;
-    }
-
-    function transfer(address dst, uint wad) public override returns (bool) {
-        return transferFrom(msg.sender, dst, wad);
-    }
-
-    function transferFrom(address src, address dst, uint wad)
-        public
-        override
-        returns (bool)
-    {
-        require(balanceOf[src] >= wad);
-
-        //if (src != msg.sender && allowance[src][msg.sender] != uint(-1)) {
-        if (src != msg.sender && allowance[src][msg.sender] != type(uint).max) {
-            require(allowance[src][msg.sender] >= wad);
-            allowance[src][msg.sender] -= wad;
-        }
-
-        balanceOf[src] -= wad;
-        balanceOf[dst] += wad;
-
-        emit Transfer(src, dst, wad);
-
-        return true;
     }
 }
 

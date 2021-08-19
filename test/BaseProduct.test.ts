@@ -268,9 +268,7 @@ describe("BaseProduct", () => {
     it("cannot buy policy with insufficient payment", async function() {
       await product.setPositionValue(positionAmount);
       let quote = BN.from(await product.getQuote(buyer.address, positionContract.address, coverAmount, blocks));
-      await expect(product.connect(buyer).buyPolicy(buyer.address, positionContract.address, coverAmount, blocks, { value: quote.sub(1) })).to.be.revertedWith(
-        "insufficient payment or premium is zero"
-      );
+      await expect(product.connect(buyer).buyPolicy(buyer.address, positionContract.address, coverAmount, blocks, { value: quote.sub(1) })).to.be.revertedWith("insufficient payment");
     });
     it("cannot buy policy under min period", async function() {
       let blocks2 = minPeriod2 - 1;
@@ -805,7 +803,7 @@ describe("BaseProduct", () => {
     });
     it("refunds proper amount", async function() {
       //let quote = BN.from(await product.getQuote(buyer.address, positionContract.address, 1, minPeriod2));
-      let info = await policyManager.getPolicyInfo(policyID);
+      let info = await policyManager.policyInfo(policyID);
       let block = await provider.getBlockNumber();
       let balance1 = await buyer.getBalance();
       let expectedRefund = BN.from(info.expirationBlock)

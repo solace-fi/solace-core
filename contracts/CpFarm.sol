@@ -19,16 +19,24 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
 
     /// @notice A unique enumerator that identifies the farm type.
     uint256 public constant override farmType = 1;
-
+    /// @notice Vault contract.
     IVault public override vault;
     /// @notice Native SOLACE Token.
     SOLACE public override solace;
-    uint256 public override blockReward;       // Amount of rewardToken distributed per block.
-    uint256 public override startBlock;        // When the farm will start.
-    uint256 public override endBlock;          // When the farm will end.
-    uint256 public override lastRewardBlock;   // Last time rewards were distributed or farm was updated.
-    uint256 public override accRewardPerShare; // Accumulated rewards per share, times 1e12.
-    uint256 public override valueStaked;       // Value of tokens staked by all farmers.
+    /// @notice Master contract.
+    address public override master;
+    /// @notice Amount of rewardToken distributed per block.
+    uint256 public override blockReward;
+    /// @notice When the farm will start.
+    uint256 public override startBlock;
+    /// @notice When the farm will end.
+    uint256 public override endBlock;
+    /// @notice Last time rewards were distributed or farm was updated.
+    uint256 public override lastRewardBlock;
+    /// @notice Accumulated rewards per share, times 1e12.
+    uint256 public override accRewardPerShare;
+    /// @notice Value of tokens staked by all farmers.
+    uint256 public override valueStaked;
 
     // Info of each user.
     struct UserInfo {
@@ -52,9 +60,6 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
     /// @notice Information about each farmer.
     /// @dev user address => user info
     mapping(address => UserInfo) public userInfo;
-
-    /// @notice Master contract.
-    address public override master;
 
     /// @notice Address of Uniswap router.
     ISwapRouter public swapRouter;
@@ -96,14 +101,14 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
     }
 
     /**
-     * Receive function. Deposits eth.
+     * Receive function. Deposits eth. User will receive accumulated rewards if any.
      */
     receive () external payable override {
         if (msg.sender != address(vault)) _depositEth();
     }
 
     /**
-     * Fallback function. Deposits eth.
+     * Fallback function. Deposits eth. User will receive accumulated rewards if any.
      */
     fallback () external payable override {
         if (msg.sender != address(vault)) _depositEth();

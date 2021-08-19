@@ -35,7 +35,7 @@ contract Registry is IRegistry, Governable {
     constructor(address _governance) Governable(_governance) { }
 
     /**
-     * @notice Sets the [`Solace Token`](./SOLACE.md) contract.
+     * @notice Sets the [`Solace Token`](./SOLACE) contract.
      * Can only be called by the current `governor`.
      * @param _solace The `SOLACE` token address.
      */
@@ -45,7 +45,7 @@ contract Registry is IRegistry, Governable {
     }
 
     /**
-     * @notice Sets the [`Master`](./Master.md) contract.
+     * @notice Sets the [`Master`](./Master) contract.
      * Can only be called by the current `governor`.
      * @param _master The contract address of the `Master` contract.
      */
@@ -55,7 +55,7 @@ contract Registry is IRegistry, Governable {
     }
 
     /**
-     * @notice Sets the [`Claims Escrow`](./ClaimsEscrow.md) contract.
+     * @notice Sets the [`Claims Escrow`](./ClaimsEscrow) contract.
      * Can only be called by the current `governor`.
      * @param _claimsEscrow The contract address of the `ClaimsEscrow` contract.
      */
@@ -65,7 +65,7 @@ contract Registry is IRegistry, Governable {
     }
 
     /**
-     * @notice Sets the [`Vault`](./Vault.md) contract.
+     * @notice Sets the [`Vault`](./Vault) contract.
      * Can only be called by the current `governor`.
      * @param _vault The contract address of the `Vault` contract.
      */
@@ -75,7 +75,7 @@ contract Registry is IRegistry, Governable {
     }
 
     /**
-     * @notice Sets the [`Treasury`](./Treasury.md) contract.
+     * @notice Sets the [`Treasury`](./Treasury) contract.
      * Can only be called by the current `governor`.
      * @param _treasury The contract address of the `Treasury` contract.
      */
@@ -85,7 +85,7 @@ contract Registry is IRegistry, Governable {
     }
 
     /**
-     * @notice Sets the [`Locker`](./Locker.md) contract.
+     * @notice Sets the [`Locker`](./Locker) contract.
      * Can only be called by the current `governor`.
      * @param _locker The contract address of the `Locker` contract.
      */
@@ -95,7 +95,7 @@ contract Registry is IRegistry, Governable {
     }
 
     /**
-     * @notice Sets the [`Policy Manager`](./PolicyManager.md) contract.
+     * @notice Sets the [`Policy Manager`](./PolicyManager) contract.
      * Can only be called by the current `governor`.
      * @param _policyManager The contract address of the `PolicyManager` contract.
      */
@@ -105,7 +105,7 @@ contract Registry is IRegistry, Governable {
     }
 
     /**
-     * @notice Sets the [`Risk Manager`](./RiskManager.md) contract.
+     * @notice Sets the [`Risk Manager`](./RiskManager) contract.
      * Can only be called by the current `governor`.
      * @param _riskManager The contract address of the `RiskManager` contract.
      */

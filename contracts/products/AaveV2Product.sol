@@ -7,13 +7,16 @@ import "./BaseProduct.sol";
 
 interface IAaveProtocolDataProvider {
     function getReserveTokensAddresses(address asset) external view returns (address aTokenAddress, address stableDebtTokenAddress, address variableDebtTokenAddress);
+    // solhint-disable-next-line func-name-mixedcase
     function ADDRESSES_PROVIDER() external view returns (address);
 }
 
 interface IAToken {
     function balanceOf(address user) external view returns (uint256);
     function decimals() external view returns (uint8);
+    // solhint-disable-next-line func-name-mixedcase
     function UNDERLYING_ASSET_ADDRESS() external view returns (address);
+    // solhint-disable-next-line func-name-mixedcase
     function POOL() external view returns (address);
 }
 
@@ -33,13 +36,14 @@ interface IAavePriceOracle {
 /**
  * @title AaveV2Product
  * @author solace.fi
- * @notice The **Aave(V2)** product that is users can buy policy for **Aave(V2)**. It is a concrete smart contract that inherits from abstract [`BaseProduct`](./BaseProduct.md).
+ * @notice The **Aave(V2)** product that is users can buy policy for **Aave(V2)**. It is a concrete smart contract that inherits from abstract [`BaseProduct`](./BaseProduct).
  * The contract also inherits from [`EIP712`](https://docs.openzeppelin.com/contracts/3.x/api/drafts#EIP712).
  */
 contract AaveV2Product is BaseProduct, EIP712 {
     /// @notice IAaveProtocolDataProvider.
     IAaveProtocolDataProvider public aaveDataProvider;
     /// @notice _EXCHANGE_TYPEHASH.
+    // solhint-disable-next-line var-name-mixedcase
     bytes32 private immutable _EXCHANGE_TYPEHASH = keccak256("AaveV2ProductExchange(uint256 policyID,uint256 amountOut,uint256 deadline)");
 
     /**

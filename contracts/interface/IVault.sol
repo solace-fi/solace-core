@@ -7,9 +7,9 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol";
 
 /**
- * @title Vault interface
+ * @title IVault
  * @author solace.fi
- * @notice Interface for Vault contract
+ * @notice The `Vault` smart contract enables `Capital Providers` to deposit **ETH** to mint shares of the `Vault`. Shares are represented as `CP Tokens` and extend ERC20.
  */
 
 struct StrategyParams {
@@ -117,7 +117,7 @@ interface IVault is IERC20Metadata, IERC20Permit {
      */
     function requestEth(uint256 _amount) external returns (uint256);
 
-    // weth
+    /// @notice WETH contract.
     function weth() external view returns (IWETH9);
 
     /**

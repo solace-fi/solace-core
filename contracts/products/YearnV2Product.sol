@@ -26,7 +26,7 @@ interface IYVault {
 /**
  * @title YearnV2Product
  * @author solace.fi
- * @notice The **Yearn(V2)** product that is users can buy policy for **Yearn(V2)**. It is a concrete smart contract that inherits from abstract [`BaseProduct`](./BaseProduct.md).
+ * @notice The **Yearn(V2)** product that is users can buy policy for **Yearn(V2)**. It is a concrete smart contract that inherits from abstract [`BaseProduct`](./BaseProduct).
  * The contract also inherits from [`EIP712`](https://docs.openzeppelin.com/contracts/3.x/api/drafts#EIP712).
  */
 contract YearnV2Product is BaseProduct, EIP712 {
@@ -35,6 +35,7 @@ contract YearnV2Product is BaseProduct, EIP712 {
     /// @notice IExchangeQuoter.
     IExchangeQuoter public quoter;
     /// @notice _EXCHANGE_TYPEHASH.
+    // solhint-disable-next-line var-name-mixedcase
     bytes32 private immutable _EXCHANGE_TYPEHASH = keccak256("YearnV2ProductExchange(uint256 policyID,uint256 amountOut,uint256 deadline)");
 
     /**

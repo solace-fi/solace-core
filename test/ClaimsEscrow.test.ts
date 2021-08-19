@@ -116,12 +116,12 @@ describe("ClaimsEscrow", function () {
       const callClaimant = await claimsEscrow.ownerOf(claimID);
       expect(callClaimant).to.equal(claimant.address);
       const timestamp = BN.from(Math.floor(Date.now()/1000));
-      const claim1 = await claimsEscrow.claims(claimID);
+      const claim1 = await claimsEscrow.claim(claimID);
       expect(claim1.amount).to.equal(testClaimAmount);
       expect(claim1.receivedAt).to.be.closeTo(timestamp, 900);
-      const claim2 = await claimsEscrow.getClaims(claimID);
-      expect(claim2.amount).to.equal(testClaimAmount);
-      expect(claim2.receivedAt).to.be.closeTo(timestamp, 900);
+      const claim2 = await claimsEscrow.getClaim(claimID);
+      expect(claim2._amount).to.equal(testClaimAmount);
+      expect(claim2._receivedAt).to.be.closeTo(timestamp, 900);
     });
   });
 
@@ -158,8 +158,8 @@ describe("ClaimsEscrow", function () {
       await claimsEscrow.connect(claimant).withdrawClaimsPayout(claimID);
       expect(await claimsEscrow.exists(claimID)).to.be.false;
       await expect(claimsEscrow.ownerOf(claimID)).to.be.reverted;
-      await expect(claimsEscrow.claims(claimID)).to.be.reverted;
-      await expect(claimsEscrow.getClaims(claimID)).to.be.reverted;
+      await expect(claimsEscrow.claim(claimID)).to.be.reverted;
+      await expect(claimsEscrow.getClaim(claimID)).to.be.reverted;
     });
     it("should request more eth if needed", async function () { // and partial payout
       let claimID2 = 2;
@@ -203,7 +203,7 @@ describe("ClaimsEscrow", function () {
       await claimsEscrow.connect(owner).adjustClaim(claimID, testClaimAmount2);
       expect(await claimsEscrow.totalClaimsOutstanding()).to.equal(testClaimAmount2.add(3));
       const callClaimant = await claimsEscrow.ownerOf(claimID);
-      const callAmount = (await claimsEscrow.claims(claimID)).amount;
+      const callAmount = (await claimsEscrow.claim(claimID)).amount;
       expect(callClaimant).to.equal(claimant.address);
       expect(callAmount).to.equal(testClaimAmount2);
       await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add one hour
@@ -283,8 +283,8 @@ describe("ClaimsEscrow", function () {
     beforeEach(async function () {
       await claimsEscrow.connect(mockProduct).receiveClaim(claimID, claimant.address, testClaimAmount);
     });
-    it("need to wait indefinitely for non existant claim", async function () {
-      expect(await claimsEscrow.timeLeft(999)).to.equal(constants.MaxUint256);
+    it("reverts non existant claim", async function () {
+      await expect(claimsEscrow.timeLeft(999)).to.be.revertedWith("query for nonexistent token");
     });
     it("need to wait entire cooldown period for a new claim", async function () {
       expect(await claimsEscrow.timeLeft(claimID)).to.be.closeTo(BN.from(COOLDOWN_PERIOD), 10);

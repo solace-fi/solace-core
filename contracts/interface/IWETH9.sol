@@ -1,4 +1,5 @@
-// Code borrowed from https://etherscan.io/address/0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2#code
+// SPDX-License-Identifier: NONE
+// code borrowed from https://etherscan.io/address/0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2#code
 
 // Copyright (C) 2015, 2016, 2017 Dapphub
 
@@ -20,10 +21,17 @@ pragma solidity 0.8.6;
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 
+/**
+ * @title IWETH9
+ * @author Dapphub
+ * @notice [Wrapped Ether](https://weth.io/) smart contract. Extends ERC20.
+ */
 interface IWETH9 is IERC20Metadata {
 
-    event  Deposit(address indexed dst, uint wad);
-    event  Withdrawal(address indexed src, uint wad);
+    /// @notice Emitted when ETH is wrapped.
+    event Deposit(address indexed dst, uint wad);
+    /// @notice Emitted when ETH is unwrapped.
+    event Withdrawal(address indexed src, uint wad);
 
     /**
      * Receive function. Deposits eth.
@@ -35,8 +43,15 @@ interface IWETH9 is IERC20Metadata {
      */
     fallback () external payable;
 
+    /**
+     * @notice Wraps Ether. WETH will be minted to the sender at 1 ETH : 1 WETH.
+     */
     function deposit() external payable;
 
+    /**
+     * @notice Unwraps Ether. ETH will be returned to the sender at 1 ETH : 1 WETH.
+     * @param wad Amount to unwrap.
+     */
     function withdraw(uint wad) external;
 }
 

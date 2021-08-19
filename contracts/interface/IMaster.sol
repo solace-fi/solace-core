@@ -5,9 +5,9 @@ import "./../SOLACE.sol";
 
 
 /**
- * @title IMaster: Distributor of solace.fi
+ * @title Master
  * @author solace.fi
- * @notice The interface for the SOLACE token distributor.
+ * @notice The distributor of [**SOLACE** token](../SOLACE).
  */
 interface IMaster {
 
@@ -35,7 +35,9 @@ interface IMaster {
     function allocPoints(uint256) external view returns (uint256);
 
     // events
+    /// @notice Emitted when a farm is created.
     event FarmCreated(uint256 indexed _farmId, address indexed _farmAddress);
+    /// @notice Emitted when SOLACE per block is changed.
     event RewardsSet(uint256 _solacePerBlock);
 
     /**
@@ -44,9 +46,9 @@ interface IMaster {
      * Cannot register a farm more than once.
      * @param _farmAddress The farm's address.
      * @param _allocPoints How many points to allocate this farm.
-     * @return farmId The farm id.
+     * @return _farmId The farm id.
      */
-    function registerFarm(address _farmAddress, uint256 _allocPoints) external returns (uint256 farmId);
+    function registerFarm(address _farmAddress, uint256 _allocPoints) external returns (uint256 _farmId);
 
     /**
      * @notice Sets a farm's allocation points.

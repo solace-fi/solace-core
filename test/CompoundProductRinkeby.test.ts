@@ -384,7 +384,7 @@ if(process.env.FORK_NETWORK === "rinkeby"){
         expect(tx1).to.emit(claimsEscrow, "ClaimReceived").withArgs(policyID1, user.address, amountOut1);
         expect(await policyManager.exists(policyID1)).to.be.false;
         // verify payout
-        expect((await claimsEscrow.claims(policyID1)).amount).to.equal(amountOut1);
+        expect((await claimsEscrow.claim(policyID1)).amount).to.equal(amountOut1);
         let userCeth2 = await ceth.balanceOf(user.address);
         expect(userCeth1.sub(userCeth2)).to.equal(0);
         await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add one hour
@@ -406,7 +406,7 @@ if(process.env.FORK_NETWORK === "rinkeby"){
         expect(tx1).to.emit(claimsEscrow, "ClaimReceived").withArgs(policyID2, user.address, amountOut2);
         expect(await policyManager.exists(policyID2)).to.be.false;
         // verify payout
-        expect((await claimsEscrow.claims(policyID2)).amount).to.equal(amountOut2);
+        expect((await claimsEscrow.claim(policyID2)).amount).to.equal(amountOut2);
         let userCusdc2 = await cusdc.balanceOf(user.address);
         expect(userCusdc1.sub(userCusdc2)).to.equal(0);
         let userUsdc2 = await usdc.balanceOf(user.address);
@@ -431,7 +431,7 @@ if(process.env.FORK_NETWORK === "rinkeby"){
         expect(tx1).to.emit(claimsEscrow, "ClaimReceived").withArgs(policyID3, user2.address, amountOut3);
         expect(await policyManager.exists(policyID3)).to.be.false;
         // verify payout
-        expect((await claimsEscrow.claims(policyID3)).amount).to.equal(amountOut3);
+        expect((await claimsEscrow.claim(policyID3)).amount).to.equal(amountOut3);
         let userCusdc2 = await cusdc.balanceOf(user2.address);
         expect(userCusdc1.sub(userCusdc2)).to.equal(0);
         let userUsdc2 = await usdc.balanceOf(user2.address);
@@ -527,7 +527,7 @@ if(process.env.FORK_NETWORK === "rinkeby"){
             expect(tx1).to.emit(claimsEscrow, "ClaimReceived").withArgs(policyID, user3.address, amountOut);
             expect(await policyManager.exists(policyID)).to.be.false;
             // verify payout
-            expect((await claimsEscrow.claims(policyID)).amount).to.equal(amountOut);
+            expect((await claimsEscrow.claim(policyID)).amount).to.equal(amountOut);
             await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add one hour
             let userEth1 = await user3.getBalance();
             let tx2 = await claimsEscrow.connect(user3).withdrawClaimsPayout(policyID);

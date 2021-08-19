@@ -14,13 +14,17 @@ import "./interface/IPolicyDescriptor.sol";
 /**
  * @title PolicyManager
  * @author solace.fi
- * @notice The **Policy Manager** manages the creating new policies or modifying the existing policies. The policy is an [**ERC721**](https://docs.openzeppelin.com/contracts/2.x/erc721) token.
+ * @notice The **PolicyManager** manages the creation of new policies and modification of existing policies.
+ *
+ * Most users will not interact with **PolicyManager** directly. To buy, modify, or cancel policies, users should use the respective [**product**](./products/BaseProduct) for the position they would like to cover. Use **PolicyManager** to view policies.
+ *
+ * Policies are [**ERC721s**](https://docs.openzeppelin.com/contracts/4.x/api/token/erc721#ERC721).
  */
 contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
     using Address for address;
     using EnumerableSet for EnumerableSet.AddressSet;
 
-    /// @notice The address of the policy descriptor contract, which handles generating token URIs for policies
+    /// @notice The address of the policy descriptor contract, which handles generating token URIs for policies.
     address public override policyDescriptor;
 
     /// @notice Set of products.
@@ -62,9 +66,9 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
     }
 
     /**
-     * @notice Allows governance to set policy descriptor.
-     * Can only be called by the current `governor`.
-     * @param _policyDescriptor The new policy token descriptor address.
+     * @notice Set the token descriptor.
+     * Can only be called by the current governor.
+     * @param _policyDescriptor The new token descriptor address.
      */
     function setPolicyDescriptor(address _policyDescriptor) external override onlyGovernance {
         policyDescriptor = _policyDescriptor;
@@ -73,26 +77,26 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
     /**
      * @notice Checks is an address is an active product.
      * @param _product The product to check.
-     * @return bool Returns true if the product is active.
+     * @return _status Returns true if the product is active.
      */
-    function productIsActive(address _product) external view override returns (bool) {
+    function productIsActive(address _product) external view override returns (bool _status) {
         return products.contains(_product);
     }
 
     /**
      * @notice Returns the number of products.
-     * @return value The number of products.
+     * @return _count The number of products.
      */
-    function numProducts() external override view returns (uint256) {
+    function numProducts() external override view returns (uint256 _count) {
         return products.length();
     }
 
     /**
      * @notice Returns the product at the given index.
      * @param _productNum The index to query.
-     * @return productAddress The address of the product.
+     * @return _product The address of the product.
      */
-    function getProduct(uint256 _productNum) external override view returns (address) {
+    function getProduct(uint256 _productNum) external override view returns (address _product) {
         return products.at(_productNum);
     }
 
@@ -101,104 +105,104 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
     ****/
 
     /**
-     * @notice The function returns the policy details.
+     * @notice Information about a policy.
      * @param _policyID The policy id to return info.
-     * @return info in a struct
+     * @return _info info in a struct.
      */
-    function policyInfo(uint256 _policyID) external view override returns (PolicyInfo memory){
+    function policyInfo(uint256 _policyID) external view override returns (PolicyInfo memory _info) {
         require(_exists(_policyID), "query for nonexistent token");
-        PolicyInfo memory info = _policyInfo[_policyID];
-        return info;
+        _info = _policyInfo[_policyID];
+        return _info;
     }
 
     /**
-     * @notice The function returns the policy details.
+     * @notice Information about a policy.
      * @param _policyID The policy id to return info.
-     * @return policyholder The address of the policy holder.
-     * @return product The product of the policy.
-     * @return positionContract The covered contract for the policy.
-     * @return coverAmount The amount covered for the policy.
-     * @return expirationBlock The expiration block of the policy.
-     * @return price The price of the policy.
+     * @return _policyholder The address of the policy holder.
+     * @return _product The product of the policy.
+     * @return _positionContract The covered contract for the policy.
+     * @return _coverAmount The amount covered for the policy.
+     * @return _expirationBlock The expiration block of the policy.
+     * @return _price The price of the policy.
      */
-    function getPolicyInfo(uint256 _policyID) external view override returns (address policyholder, address product, address positionContract, uint256 coverAmount, uint40 expirationBlock, uint24 price){
+    function getPolicyInfo(uint256 _policyID) external view override returns (address _policyholder, address _product, address _positionContract, uint256 _coverAmount, uint40 _expirationBlock, uint24 _price) {
         require(_exists(_policyID), "query for nonexistent token");
         PolicyInfo memory info = _policyInfo[_policyID];
         return (info.policyholder, info.product, info.positionContract, info.coverAmount, info.expirationBlock, info.price);
     }
 
     /**
-     * @notice The function returns the policy holder of the policy.
+     * @notice The holder of the policy.
      * @param _policyID The policy id.
-     * @return policyholder The address of the policy holder.
+     * @return _policyholder The address of the policy holder.
      */
-    function getPolicyholder(uint256 _policyID) external view override returns (address){
+    function getPolicyholder(uint256 _policyID) external view override returns (address _policyholder) {
         require(_exists(_policyID), "query for nonexistent token");
         return _policyInfo[_policyID].policyholder;
     }
 
     /**
-     * @notice The function returns the policy product of the policy.
+     * @notice The product used to purchase the policy.
      * @param _policyID The policy id.
-     * @return product The product of the policy.
+     * @return _product The product of the policy.
      */
-    function getPolicyProduct(uint256 _policyID) external view override returns (address){
+    function getPolicyProduct(uint256 _policyID) external view override returns (address _product) {
         require(_exists(_policyID), "query for nonexistent token");
         return _policyInfo[_policyID].product;
     }
 
     /**
-     * @notice The function returns the position contract of the policy.
+     * @notice The position contract the policy covers.
      * @param _policyID The policy id.
-     * @return positionContract The position contract of the policy.
+     * @return _positionContract The position contract of the policy.
      */
-    function getPolicyPositionContract(uint256 _policyID) external view override returns (address){
+    function getPolicyPositionContract(uint256 _policyID) external view override returns (address _positionContract) {
         require(_exists(_policyID), "query for nonexistent token");
         return _policyInfo[_policyID].positionContract;
     }
 
     /**
-     * @notice The function returns the expiration block of the policy.
+     * @notice The expiration block of the policy.
      * @param _policyID The policy id.
-     * @return expirationBlock The expiration block of the policy.
+     * @return _expirationBlock The expiration block of the policy.
      */
-    function getPolicyExpirationBlock(uint256 _policyID) external view override returns (uint40) {
+    function getPolicyExpirationBlock(uint256 _policyID) external view override returns (uint40 _expirationBlock) {
         require(_exists(_policyID), "query for nonexistent token");
         return _policyInfo[_policyID].expirationBlock;
     }
 
     /**
-     * @notice The function returns the cover amount of the policy.
+     * @notice The cover amount of the policy.
      * @param _policyID The policy id.
-     * @return coverAmount The cover amount of the policy.
+     * @return _coverAmount The cover amount of the policy.
      */
-    function getPolicyCoverAmount(uint256 _policyID) external view override returns (uint256) {
+    function getPolicyCoverAmount(uint256 _policyID) external view override returns (uint256 _coverAmount) {
         require(_exists(_policyID), "query for nonexistent token");
         return _policyInfo[_policyID].coverAmount;
     }
 
     /**
-     * @notice The function returns the price of the policy.
+     * @notice The cover price in wei per block per wei multiplied by 1e12.
      * @param _policyID The policy id.
-     * @return price The price of the policy.
+     * @return _price The price of the policy.
      */
-    function getPolicyPrice(uint256 _policyID) external view override returns (uint24){
+    function getPolicyPrice(uint256 _policyID) external view override returns (uint24 _price) {
         require(_exists(_policyID), "query for nonexistent token");
         return _policyInfo[_policyID].price;
     }
 
     /**
-     * @notice The function lists all policies for a given policy holder.
+     * @notice Lists all policies for a given policy holder.
      * @param _policyholder The address of the policy holder.
-     * @return tokenIDs The list of token ids(policy ids) that the policy holder have.
+     * @return _policyIDs The list of policy IDs that the policy holder has in any order.
      */
-    function listPolicies(address _policyholder) external view override returns (uint256[] memory tokenIDs) {
+    function listPolicies(address _policyholder) external view override returns (uint256[] memory _policyIDs) {
         uint256 tokenCount = balanceOf(_policyholder);
-        tokenIDs = new uint256[](tokenCount);
+        _policyIDs = new uint256[](tokenCount);
         for (uint256 index=0; index < tokenCount; index++) {
-            tokenIDs[index] = tokenOfOwnerByIndex(_policyholder, index);
+            _policyIDs[index] = tokenOfOwnerByIndex(_policyholder, index);
         }
-        return tokenIDs;
+        return _policyIDs;
     }
 
     /**

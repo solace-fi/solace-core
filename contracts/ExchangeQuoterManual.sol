@@ -9,11 +9,11 @@ import "./interface/IExchangeQuoter.sol";
 /**
  * @title ExchangeQuoterManual
  * @author solace.
- * @notice Calculates exchange rates for trades between ERC20 tokens.
+ * @notice Calculates exchange rates for trades between ERC20 tokens and Ether. This version uses rates set by governance.
  */
 contract ExchangeQuoterManual is IExchangeQuoter, Governable {
 
-    // given a token, how much eth could one token buy (respecting decimals)
+    /// @notice given a token, how much eth could one token buy (respecting decimals)
     mapping(address => uint256) public rates;
 
     /**
@@ -40,9 +40,9 @@ contract ExchangeQuoterManual is IExchangeQuoter, Governable {
      * @notice Calculates the exchange rate for an _amount of _token to eth.
      * @param _token The token to give.
      * @param _amount The amount to give.
-     * @return The amount of eth received.
+     * @return _amountOut The amount of eth received.
      */
-    function tokenToEth(address _token, uint256 _amount) external view override returns (uint256) {
+    function tokenToEth(address _token, uint256 _amount) external view override returns (uint256 _amountOut) {
         return _amount * rates[_token] / (10 ** IERC20Metadata(_token).decimals());
     }
 }

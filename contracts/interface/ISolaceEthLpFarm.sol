@@ -111,9 +111,10 @@ interface ISolaceEthLpFarm is IFarm {
      */
     function appraise(uint256 _tokenId) external view returns (uint256 _value);
 
-    // LP Token interface.
+    /// @notice Uniswap V3 LP Token interface.
     function lpToken() external view returns (IUniswapLpToken);
-    function solace() external view returns (SOLACE);
+    /// @notice Native SOLACE Token
+    function solace() external view override returns (SOLACE);
     function weth() external view returns (IWETH9);
     function lastRewardBlock() external view returns (uint256);   // Last time rewards were distributed or farm was updated.
     function accRewardPerShare() external view returns (uint256); // Accumulated rewards per share, times 1e12.

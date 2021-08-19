@@ -7,28 +7,34 @@ import "./BaseProduct.sol";
 
 
 interface ICurveAddressProvider {
+    // solhint-disable-next-line func-name-mixedcase
     function get_registry() external view returns (address);
 }
 
 interface ICurveRegistry {
+    // solhint-disable-next-line func-name-mixedcase
     function get_pool_from_lp_token(address token) external view returns (address pool);
+    // solhint-disable-next-line func-name-mixedcase
     function get_lp_token(address pool) external view returns (address token);
+    // solhint-disable-next-line func-name-mixedcase, var-name-mixedcase
     function get_n_coins(address pool) external view returns (uint256 n_coins);
 }
 
 interface ICurvePool {
     function coins(uint256 arg0) external view returns (address);
+    // solhint-disable-next-line func-name-mixedcase, var-name-mixedcase
     function calc_withdraw_one_coin(uint256 token_amount, int128 i) external view returns (uint256);
 }
 
 /**
  * @title  CurveProduct
  * @author solace.fi
- * @notice The **Curve** product that is users can buy policy for **Curve**. It is a concrete smart contract that inherits from abstract [`BaseProduct`](./BaseProduct.md).
+ * @notice The **Curve** product that is users can buy policy for **Curve**. It is a concrete smart contract that inherits from abstract [`BaseProduct`](./BaseProduct).
  */
 contract CurveProduct is BaseProduct {
 
     ICurveAddressProvider public addressProvider;
+    /// @notice IExchangeQuoter.
     IExchangeQuoter public quoter;
 
     /**

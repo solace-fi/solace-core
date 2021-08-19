@@ -2,21 +2,31 @@
 pragma solidity 0.8.6;
 
 import "./Governable.sol";
-import "./interface/IUniswapLpToken.sol";
 import "./interface/ILpAppraisor.sol";
 
+/**
+ * @title LpAppraisor
+ * @author solace.fi
+ * @notice Determines the relative value of a Uniswap V3 LP token. Used in [SolaceEthLpFarm](./SolaceEthLpFarm).
+ */
 contract LpAppraisor is ILpAppraisor, Governable {
 
-    IUniswapLpToken public lpToken;
+    /// @notice The address of the Uniswap V3 NFT.
+    IUniswapLpToken public override lpToken;
 
-    /*
-    * The following variables can be used to tune the appraisal curve.
-    * See the Solace.fi UniswapLpFarm paper for more info.
-    */
+    // The following variables can be used to tune the appraisal curve.
+    // See the Solace.fi UniswapLpFarm paper for more info.
     uint256 public curve_A; // default 20000
     //uint256 public curve_B; // default 40000
-    uint256 public curve_B2;
+    uint256 public curve_B2; // square of B
 
+    /**
+     * @notice Constructs the LP Appraisor contract.
+     * @param _governance Address of the governor.
+     * @param _lpToken Address of the LP token.
+     * @param _curve_A Appraisal curve value A.
+     * @param _curve_B Appraisal curve value B.
+     */
     constructor(
         address _governance,
         address _lpToken,
@@ -25,18 +35,17 @@ contract LpAppraisor is ILpAppraisor, Governable {
     ) Governable(_governance) {
         lpToken = IUniswapLpToken(_lpToken);
         curve_A = _curve_A;
-        //curve_B = _curve_B;
         curve_B2 = _curve_B**2;
     }
 
     /**
      * @notice Modifies the appraisal curve, and with it the incentive structure.
+     * Can only be called by the current governor.
      * @param _curve_A The curve parameter A.
      * @param _curve_B The curve parameter B.
      */
     function setCurve(uint256 _curve_A, uint256 _curve_B) external onlyGovernance {
         curve_A = _curve_A;
-        //curve_B = _curve_B;
         curve_B2 = _curve_B**2;
     }
 
@@ -56,5 +65,6 @@ contract LpAppraisor is ILpAppraisor, Governable {
         if (width > curve_A) {
             _value = _value * curve_B2 / ( (width-curve_A)**2 + curve_B2);
         }
+        return _value;
     }
 }

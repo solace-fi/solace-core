@@ -42,7 +42,9 @@ contract MockProduct is BaseProduct {
         _maxPeriod,
         _price,
         _maxCoverPerUserDivisor
-    ) { }
+    )
+    // solhint-disable-next-line no-empty-blocks
+    { }
 
     /**
      * @notice It gives the user's total position in the product's protocol.
@@ -51,6 +53,7 @@ contract MockProduct is BaseProduct {
      * @param _positionContract The address of the exact smart contract the `buyer` has their position in (e.g., for UniswapProduct this would be Pair's address).
      * @return positionAmount The user's total position in **Wei** in the product's protocol.
      */
+    // solhint-disable-next-line no-unused-vars
     function appraisePosition(address _buyer, address _positionContract) public view override returns (uint256 positionAmount) {
         return positionValue; // given value for now in production this will be from a pool contract
     }
