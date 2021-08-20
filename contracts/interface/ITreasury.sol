@@ -11,93 +11,98 @@ interface ITreasury {
 
     // events
     // Emitted when eth is deposited
-    event EthDeposited(uint256 _amount);
+    event EthDeposited(uint256 amount);
     // Emitted when a token is deposited
-    event TokenDeposited(address _token, uint256 _amount);
+    event TokenDeposited(address token, uint256 amount);
     // Emitted when a token is spent
-    event FundsSpent(address _token, uint256 _amount, address _recipient);
+    event FundsSpent(address token, uint256 amount, address recipient);
 
     /**
-     * Receive function. Deposits eth.
+     * @notice Fallback function to allow contract to receive **ETH**.
      */
     receive() external payable;
 
     /**
-     * Fallback function. Deposits eth.
+     * @notice Fallback function to allow contract to receive **ETH**.
      */
     fallback () external payable;
 
     /**
-     * @notice Deposits some ether.
+     * @notice Deposits **ETH**.
      */
     function depositEth() external payable;
 
     /**
-     * @notice Deposit some ERC20 token.
-     * @param _token The address of the token to deposit.
-     * @param _amount The amount of the token to deposit.
+     * @notice Deposits an **ERC20** token.
+     * @param token The address of the token to deposit.
+     * @param amount The amount of the token to deposit.
      */
-    function depositToken(address _token, uint256 _amount) external;
+    function depositToken(address token, uint256 amount) external;
 
     /**
-     * @notice Spends some tokens.
-     * Can only be called by the current governor.
-     * @param _token The address of the token to spend.
-     * @param _amount The amount of the token to spend.
-     * @param _recipient The address of the token receiver.
+     * @notice Spends an **ERC20** token or **ETH**.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param token The address of the token to spend.
+     * @param amount The amount of the token to spend.
+     * @param recipient The address of the token receiver.
      */
-    function spend(address _token, uint256 _amount, address _recipient) external;
+    function spend(address token, uint256 amount, address recipient) external;
 
     /**
      * @notice Manually swaps a token.
-     * Can only be called by the current governor.
-     * @dev Swaps the entire balance in case some tokens were unknowingly received.
-     * Reverts if the swap was unsuccessful.
-     * @param _path The path of pools to take.
-     * @param _amountIn The amount to swap.
-     * @param _amountOutMinimum The minimum about to receive.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param path The path of pools to take.
+     * @param amountIn The amount to swap.
+     * @param amountOutMinimum The minimum about to receive.
      */
-    function swap(bytes memory _path, uint256 _amountIn, uint256 _amountOutMinimum) external;
+    function swap(bytes memory path, uint256 amountIn, uint256 amountOutMinimum) external;
 
     /**
      * @notice Sets the premium recipients and their weights.
-     * Can only be called by the current governor.
-     * @param _recipients The premium recipients.
-     * @param _weights The recipient weights.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param recipients The premium recipients, plus an implicit `address(this)` at the end.
+     * @param weights The recipient weights.
      */
-    function setPremiumRecipients(address payable[] calldata _recipients, uint32[] calldata _weights) external;
+    function setPremiumRecipients(address payable[] calldata recipients, uint32[] calldata weights) external;
 
     /**
-     * @notice Routes the premiums to the recipients
+     * @notice Routes the **premiums** to the `recipients`.
      */
     function routePremiums() external payable;
 
     /**
-     * @notice Wraps some eth into weth.
-     * Can only be called by the current governor.
-     * @param _amount The amount to wrap.
+     * @notice Wraps some **ETH** into **WETH**.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param amount The amount to wrap.
      */
-    function wrap(uint256 _amount) external;
+    function wrap(uint256 amount) external;
 
     /**
-     * @notice Unwraps some weth into eth.
-     * Can only be called by the current governor.
-     * @param _amount The amount to unwrap.
+     * @notice Unwraps some **WETH** into **ETH**.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param amount The amount to unwrap.
      */
-    function unwrap(uint256 _amount) external;
-
-    // used in Product
-    function refund(address _user, uint256 _amount) external;
+    function unwrap(uint256 amount) external;
 
     /**
-     * @notice The amount of eth that a user is owed if any.
-     * @param _user The user.
+     * @notice Refunds some **ETH** to the user.
+     * Will attempt to send the entire `amount` to the `user`.
+     * If there is not enough available at the moment, it is recorded and can be pulled later via [`withdraw()`](#withdraw).
+     * Can only be called by active products.
+     * @param user The user address to send refund amount.
+     * @param amount The amount to send the user.
+     */
+    function refund(address user, uint256 amount) external;
+
+    /**
+     * @notice The amount of **ETH** that a user is owed if any.
+     * @param user The user.
      * @return The amount.
      */
-    function unpaidRefunds(address _user) external view returns (uint256);
+    function unpaidRefunds(address user) external view returns (uint256);
 
     /**
-     * @notice Pull any unpaid rewards.
+     * @notice Transfers the unpaid refunds to the user.
      */
     function withdraw() external;
 }

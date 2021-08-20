@@ -47,13 +47,13 @@ abstract contract BaseStrategy is IStrategy {
 
     /**
      * @notice Allows governance to be transferred to a new governor.
-     * Can only be called by the current governor.
-     * @param _governance The new governor.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param governance_ The new governor.
      */
-    function setGovernance(address _governance) external {
+    function setGovernance(address governance_) external {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
-        newGovernance = _governance;
+        newGovernance = governance_;
     }
 
     /**
@@ -70,7 +70,7 @@ abstract contract BaseStrategy is IStrategy {
 
     /**
      * @notice Allows governance to set address for a new Vault contract
-     * Can only be called by the current governor.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
      * @param _vault address of the Vault contract
      */
     function setVault(address _vault) external {
@@ -82,7 +82,7 @@ abstract contract BaseStrategy is IStrategy {
      * @notice Activates emergency exit. Once activated, the Strategy will exit its
      *  position upon the next harvest, depositing all funds into the Vault as
      *  quickly as is reasonable given on-chain conditions.
-     *  Can only be called by the current governor.
+     *  Can only be called by the current [**governor**](/docs/user-docs/Governance).
      * @dev See `vault.setEmergencyShutdown()` and `harvest()` for further details.
      */
     function setEmergencyExit() external {

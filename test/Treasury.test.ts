@@ -373,6 +373,7 @@ describe("Treasury", function() {
     });
 
     it("can set recipients", async function() {
+      await treasury.connect(governor).setPremiumRecipients([], [0]);
       await treasury.connect(governor).setPremiumRecipients([deployer.address], [2, 3]);
     });
 
@@ -410,7 +411,7 @@ describe("Treasury", function() {
     it("can unwrap eth", async function() {
       let unwrapAmount = BN.from(50);
       let balancesBefore = await getBalances(user);
-      await treasury.connect(governor).unwrap(unwrapAmount, { gasLimit: 50000 });
+      await treasury.connect(governor).unwrap(unwrapAmount, { gasLimit: 60000 });
       let balancesAfter = await getBalances(user);
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       expect(balancesDiff.treasuryEth).to.equal(unwrapAmount);

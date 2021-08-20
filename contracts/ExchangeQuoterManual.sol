@@ -9,40 +9,40 @@ import "./interface/IExchangeQuoter.sol";
 /**
  * @title ExchangeQuoterManual
  * @author solace.
- * @notice Calculates exchange rates for trades between ERC20 tokens.
+ * @notice Calculates exchange rates for trades between ERC20 tokens and Ether. This version uses rates set by governance.
  */
 contract ExchangeQuoterManual is IExchangeQuoter, Governable {
 
-    // given a token, how much eth could one token buy (respecting decimals)
+    /// @notice given a token, how much eth could one token buy (respecting decimals)
     mapping(address => uint256) public rates;
 
     /**
      * @notice Constructs the ExchangeQuoter contract.
-     * @param _governance Address of the governor.
+     * @param governance_ The address of the [governor](/docs/user-docs/Governance).
      */
-    constructor(address _governance) Governable(_governance) { }
+    constructor(address governance_) Governable(governance_) { }
 
     /**
      * @notice Sets the exchange rates.
-     * Can only be called by the current governor.
-     * @param _tokens The tokens to set.
-     * @param _rates The rates to set.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param tokens The tokens to set.
+     * @param newRates The rates to set.
      */
-    function setRates(address[] calldata _tokens, uint256[] calldata _rates) external onlyGovernance {
-        uint256 length = _tokens.length;
-        require(length == _rates.length, "unequal lengths");
+    function setRates(address[] calldata tokens, uint256[] calldata newRates) external onlyGovernance {
+        uint256 length = tokens.length;
+        require(length == newRates.length, "unequal lengths");
         for(uint256 i = 0; i < length; ++i) {
-            rates[_tokens[i]] = _rates[i];
+            rates[tokens[i]] = newRates[i];
         }
     }
 
     /**
-     * @notice Calculates the exchange rate for an _amount of _token to eth.
-     * @param _token The token to give.
-     * @param _amount The amount to give.
-     * @return The amount of eth received.
+     * @notice Calculates the exchange rate for an amount of token to eth.
+     * @param token The token to give.
+     * @param amount The amount to give.
+     * @return amountOut The amount of eth received.
      */
-    function tokenToEth(address _token, uint256 _amount) external view override returns (uint256) {
-        return _amount * rates[_token] / (10 ** IERC20Metadata(_token).decimals());
+    function tokenToEth(address token, uint256 amount) external view override returns (uint256 amountOut) {
+        return amount * rates[token] / (10 ** IERC20Metadata(token).decimals());
     }
 }

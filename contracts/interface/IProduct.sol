@@ -2,54 +2,173 @@
 pragma solidity 0.8.6;
 
 /**
- * @title Interface for product contracts
+ * @title IProduct
  * @author solace.fi
+ * @notice Interface for product contracts
  */
 interface IProduct {
-    event PolicyCreated(uint256 policyID);
-    event PolicyExtended(uint256 policyID);
-    event PolicyCanceled(uint256 policyID);
-    event PolicyUpdated(uint256 policyID);
+    /// @notice Emitted when a policy is created.
+    event PolicyCreated(uint256 indexed policyID);
+    /// @notice Emitted when a policy is extended.
+    event PolicyExtended(uint256 indexed policyID);
+    /// @notice Emitted when a policy is canceled.
+    event PolicyCanceled(uint256 indexed policyID);
+    /// @notice Emitted when a policy is updated.
+    event PolicyUpdated(uint256 indexed policyID);
+    /// @notice Emitted when a claim is submitted.
+    event ClaimSubmitted(uint256 indexed policyID);
 
     /**** GETTERS + SETTERS
     Functions which get and set important product state variables
     ****/
+    /// @notice The cover price (in wei) per block per wei (multiplied by 1e12 to avoid underflow upon construction or setter).
     function price() external view returns (uint24);
+    /// @notice The minimum policy period in blocks.
     function minPeriod() external view returns (uint40);
+    /// @notice The maximum policy period in blocks.
     function maxPeriod() external view returns (uint40);
-    function maxCoverAmount() external view returns (uint256);
-    function maxCoverPerUser() external view returns (uint256);
+    /**
+     * @notice The maximum sum of position values that can be covered by this product.
+     * @return maxCoverAmount The max cover amount.
+     */
+    function maxCoverAmount() external view returns (uint256 maxCoverAmount);
+    /**
+     * @notice The maximum cover amount for a single policy.
+     * @return maxCoverAmountPerUser The max cover amount per user.
+     */
+    function maxCoverPerUser() external view returns (uint256 maxCoverAmountPerUser);
+    /// @notice The max cover amount divisor for per user (maxCover / divisor = maxCoverPerUser).
     function maxCoverPerUserDivisor() external view returns (uint32);
+    /// @notice Covered platform.
+    /// A platform contract which locates contracts that are covered by this product.
+    /// (e.g., UniswapProduct will have Factory as coveredPlatform contract, because every Pair address can be located through getPool() function).
     function coveredPlatform() external view returns (address);
+    /// @notice The total policy count this product sold.
     function productPolicyCount() external view returns (uint256);
+    /// @notice The current amount covered (in wei).
     function activeCoverAmount() external view returns (uint256);
 
-    function setPrice(uint24 _price) external;
-    function setMinPeriod(uint40 _minPeriod) external;
-    function setMaxPeriod(uint40 _maxPeriod) external;
-    //function setMaxCoverPerUserDivisor(uint32 _maxCoverPerUserDivisor) external;
-    function setCoveredPlatform(address _coveredPlatform) external;
-    function setPolicyManager(address _policyManager) external;
+    /**
+     * @notice Sets the price for this product.
+     * @param newPrice Cover price (in wei) per ether per block.
+     */
+    function setPrice(uint24 newPrice) external;
+
+    /**
+     * @notice Sets the minimum number of blocks a policy can be purchased for.
+     * @param newMinPeriod The minimum number of blocks.
+     */
+    function setMinPeriod(uint40 newMinPeriod) external;
+
+    /**
+     * @notice Sets the maximum number of blocks a policy can be purchased for.
+     * @param newMaxPeriod The maximum number of blocks
+     */
+    function setMaxPeriod(uint40 newMaxPeriod) external;
+
+    // TODO
+    //function setMaxCoverPerUserDivisor(uint32 maxCoverPerUserDivisor) external;
+
+    /**
+     * @notice Changes the covered platform.
+     * This function is used if the the protocol changes their registry but keeps the children contracts.
+     * A new version of the protocol will likely require a new **Product**.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param newCoveredPlatform The platform to cover.
+     */
+    function setCoveredPlatform(address newCoveredPlatform) external;
+
+    /**
+     * @notice Changes the policy manager.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param newPolicyManager The new policy manager.
+     */
+    function setPolicyManager(address newPolicyManager) external;
 
     /**** UNIMPLEMENTED FUNCTIONS
     Functions that are only implemented by child product contracts
     ****/
-    function appraisePosition(address _policyholder, address _positionContract) external view returns (uint256 positionAmount);
+    /**
+     * @notice This function will only be implemented in the inheriting product contracts. It provides the user's total position in the product's protocol.
+     * This total should be denominated in **ETH**. Every product will have a different mechanism to read and determine a user's total position in that product's protocol.
+     * @dev It should validate that the `positionContract` belongs to the protocol and revert if it doesn't.
+     * @param policyholder The `buyer` requesting the coverage quote.
+     * @param positionContract The address of the exact smart contract the `buyer` has their position in (e.g., for UniswapProduct this would be Pair's address).
+     * @return positionAmount The user's total position in **Wei** in the product's protocol.
+     */
+    function appraisePosition(address policyholder, address positionContract) external view returns (uint256 positionAmount);
+
+    /// @notice Returns the name of the product.
     function name() external pure returns (string memory);
 
     /**** QUOTE VIEW FUNCTIONS
     View functions that give us quotes regarding a policy
     ****/
-    function getQuote(address _policyholder, address _positionContract, uint256 _coverAmount, uint40 _blocks) external view returns (uint256);
+    /**
+     * @notice Calculate a premium quote for a policy.
+     * @param policyholder The holder of the position to cover.
+     * @param positionContract The address of the exact smart contract the policyholder has their position in (e.g., for UniswapProduct this would be Pair's address).
+     * @param coverAmount The value to cover in **ETH**.
+     * @param blocks The length for policy.
+     * @return premium The quote for their policy in **Wei**.
+     */
+    function getQuote(address policyholder, address positionContract, uint256 coverAmount, uint40 blocks) external view returns (uint256 premium);
 
     /**** MUTATIVE FUNCTIONS
-    Functions that deploy and change policy contracts
+    Functions that mint or modify policy contracts
     ****/
-    function updateActiveCoverAmount(int256 _coverDiff) external;
-    function buyPolicy(address _policyholder, address _positionContract, uint256 _coverAmount, uint40 _blocks) external payable returns (uint256 policyID);
-    function updateCoverAmount(uint256 _policyID, uint256 _coverAmount) external payable;
-    function extendPolicy(uint256 _policyID, uint40 _blocks) external payable;
-    function cancelPolicy(uint256 _policyID) external;
-    function updatePolicy(uint256 _policyID, uint256 _coverAmount, uint40 _blocks ) external payable;
 
+    /**
+     * @notice Updates the product's book-keeping variables.
+     * Can only be called by the **PolicyManager**
+     * @param coverDiff The change in active cover amount.
+     */
+    function updateActiveCoverAmount(int256 coverDiff) external;
+
+    /**
+     * @notice Purchases and mints a policy on the behalf of the policyholder.
+     * User will need to pay **ETH**.
+     * @param policyholder Holder of the position to cover.
+     * @param positionContract The contract address where the policyholder has a position to be covered.
+     * @param coverAmount The value to cover in **ETH**. Will only cover up to the appraised value.
+     * @param blocks The length (in blocks) for policy.
+     * @return policyID The ID of newly created policy.
+     */
+    function buyPolicy(address policyholder, address positionContract, uint256 coverAmount, uint40 blocks) external payable returns (uint256 policyID);
+
+    /**
+     * @notice Increase or decrease the cover amount for the policy.
+     * User may need to pay **ETH** for increased cover amount or receive a refund for decreased cover amount.
+     * Can only be called by the policyholder.
+     * @param policyID The ID of the policy.
+     * @param newCoverAmount The new value to cover in **ETH**. Will only cover up to the appraised value.
+     */
+    function updateCoverAmount(uint256 policyID, uint256 newCoverAmount) external payable;
+
+    /**
+     * @notice Extend a policy.
+     * User will need to pay **ETH**.
+     * Can only be called by the policyholder.
+     * @param policyID The ID of the policy.
+     * @param extension The length of extension in blocks.
+     */
+    function extendPolicy(uint256 policyID, uint40 extension) external payable;
+
+    /**
+     * @notice Extend a policy and update its cover amount.
+     * User may need to pay **ETH** for increased cover amount or receive a refund for decreased cover amount.
+     * Can only be called by the policyholder.
+     * @param policyID The ID of the policy.
+     * @param newCoverAmount The new value to cover in **ETH**. Will only cover up to the appraised value.
+     * @param extension The length of extension in blocks.
+     */
+    function updatePolicy(uint256 policyID, uint256 newCoverAmount, uint40 extension) external payable;
+
+    /**
+     * @notice Cancel and burn a policy.
+     * User will receive a refund for the remaining blocks.
+     * Can only be called by the policyholder.
+     * @param policyID The ID of the policy.
+     */
+    function cancelPolicy(uint256 policyID) external;
 }

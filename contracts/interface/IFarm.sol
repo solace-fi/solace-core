@@ -1,36 +1,48 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
+import "../SOLACE.sol";
+
 
 /**
- * @title IFarm: The base type of Master farms.
+ * @title IFarm
  * @author solace.fi
+ * @notice Rewards investors in [`SOLACE`](../SOLACE).
  */
 interface IFarm {
 
-    /// @notice Master contract.
+    /// @notice [`Master`](../Master) contract.
     function master() external view returns (address);
+
+    /// @notice Native [`SOLACE`](../SOLACE) Token.
+    function solace() external view returns (SOLACE);
 
     /// @notice A unique enumerator that identifies the farm type.
     function farmType() external view returns (uint256);
 
-    function blockReward() external view returns (uint256);       // Amount of rewardToken distributed per block.
-    function startBlock() external view returns (uint256);        // When the farm will start.
-    function endBlock() external view returns (uint256);          // When the farm will end.
+    /// @notice Amount of [`SOLACE`](../SOLACE) distributed per block.
+    function blockReward() external view returns (uint256);
+
+    /// @notice When the farm will start.
+    function startBlock() external view returns (uint256);
+
+    /// @notice When the farm will end.
+    function endBlock() external view returns (uint256);
 
     /**
-     * @notice Sets the amount of reward token to distribute per block.
-     * Can only be called by Master.
-     * @param _blockReward Amount to distribute per block.
+     * @notice Sets the amount of [`SOLACE`](../SOLACE) to distribute per block.
+     * Only affects future rewards.
+     * Can only be called by [`Master`](../Master).
+     * @param newBlockReward Amount to distribute per block.
      */
-    function setRewards(uint256 _blockReward) external;
+    function setRewards(uint256 newBlockReward) external;
 
     /**
      * @notice Sets the farm's end block. Used to extend the duration.
-     * Can only be called by the current governor.
-     * @param _endBlock The new end block.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param newEndBlock The new end block.
      */
-    function setEnd(uint256 _endBlock) external;
+    function setEnd(uint256 newEndBlock) external;
 
     /**
      * @notice Withdraw your rewards without unstaking your tokens.
@@ -39,16 +51,17 @@ interface IFarm {
 
     /**
      * @notice Withdraw a users rewards without unstaking their tokens.
-     * Can only be called by Master.
+     * Can only be called by ['Master`](../Master) or the user.
+     * @param user User to withdraw rewards for.
      */
-    function withdrawRewardsForUser(address _user) external;
+    function withdrawRewardsForUser(address user) external;
 
     /**
-     * @notice Calculates the accumulated balance of reward token for specified user.
-     * @param _user The user for whom unclaimed tokens will be shown.
-     * @return Total amount of withdrawable reward tokens.
+     * @notice Calculates the accumulated balance of [`SOLACE`](../SOLACE) for specified user.
+     * @param user The user for whom unclaimed tokens will be shown.
+     * @return reward Total amount of withdrawable SOLACE.
      */
-    function pendingRewards(address _user) external view returns (uint256);
+    function pendingRewards(address user) external view returns (uint256 reward);
 
     /**
      * @notice Updates farm information to be up to date to the current block.
@@ -56,10 +69,10 @@ interface IFarm {
     function updateFarm() external;
 
     /**
-     * @notice Calculates the reward multiplier over the given _from until _to block.
-     * @param _from The start of the period to measure rewards for.
-     * @param _to The end of the period to measure rewards for.
-     * @return The weighted multiplier for the given period.
+     * @notice Calculates the reward multiplier over the given `from` until `to` block.
+     * @param from The start of the period to measure rewards for.
+     * @param to The end of the period to measure rewards for.
+     * @return multiplier The weighted multiplier for the given period.
      */
-    function getMultiplier(uint256 _from, uint256 _to) external view returns (uint256);
+    function getMultiplier(uint256 from, uint256 to) external view returns (uint256 multiplier);
 }

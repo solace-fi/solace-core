@@ -7,7 +7,7 @@ import "./BaseProduct.sol";
 
 
 interface IYRegistry {
-    function getVaultInfo(address _vault) external view returns (
+    function getVaultInfo(address vault) external view returns (
         address controller,
         address token,
         address strategy,
@@ -26,7 +26,7 @@ interface IYVault {
 /**
  * @title YearnV2Product
  * @author solace.fi
- * @notice The **Yearn(V2)** product that is users can buy policy for **Yearn(V2)**. It is a concrete smart contract that inherits from abstract [`BaseProduct`](./BaseProduct.md).
+ * @notice The **Yearn(V2)** product that is users can buy policy for **Yearn(V2)**. It is a concrete smart contract that inherits from abstract [`BaseProduct`](./BaseProduct).
  * The contract also inherits from [`EIP712`](https://docs.openzeppelin.com/contracts/3.x/api/drafts#EIP712).
  */
 contract YearnV2Product is BaseProduct, EIP712 {
@@ -35,56 +35,57 @@ contract YearnV2Product is BaseProduct, EIP712 {
     /// @notice IExchangeQuoter.
     IExchangeQuoter public quoter;
     /// @notice _EXCHANGE_TYPEHASH.
+    // solhint-disable-next-line var-name-mixedcase
     bytes32 private immutable _EXCHANGE_TYPEHASH = keccak256("YearnV2ProductExchange(uint256 policyID,uint256 amountOut,uint256 deadline)");
 
     /**
       * @notice The constructor.
-      * @param _governance The governor.
-      * @param _policyManager The IPolicyManager contract.
-      * @param _registry The IRegistry contract.
-      * @param _coveredPlatform A platform contract which locates contracts that are covered by this product.
-      * @param _minPeriod The minimum policy period in blocks to purchase a **policy**.
-      * @param _maxPeriod The maximum policy period in blocks to purchase a **policy**.
-      * @param _price The cover price for the **Product**.
-      * @param _maxCoverPerUserDivisor The max cover amount divisor for per user. (maxCover / divisor = maxCoverPerUser).
-      * @param _quoter The exchange quoter address.
+      * @param governance_ The governor.
+      * @param policyManager_ The IPolicyManager contract.
+      * @param registry_ The IRegistry contract.
+      * @param coveredPlatform_ A platform contract which locates contracts that are covered by this product.
+      * @param minPeriod_ The minimum policy period in blocks to purchase a **policy**.
+      * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
+      * @param price_ The cover price for the **Product**.
+      * @param maxCoverPerUserDivisor_ The max cover amount divisor for per user. (maxCover / divisor = maxCoverPerUser).
+      * @param quoter_ The exchange quoter address.
      */
     constructor (
-        address _governance,
-        IPolicyManager _policyManager,
-        IRegistry _registry,
-        address _coveredPlatform,
-        uint40 _minPeriod,
-        uint40 _maxPeriod,
-        uint24 _price,
-        uint32 _maxCoverPerUserDivisor,
-        address _quoter
+        address governance_,
+        IPolicyManager policyManager_,
+        IRegistry registry_,
+        address coveredPlatform_,
+        uint40 minPeriod_,
+        uint40 maxPeriod_,
+        uint24 price_,
+        uint32 maxCoverPerUserDivisor_,
+        address quoter_
     ) BaseProduct(
-        _governance,
-        _policyManager,
-        _registry,
-        _coveredPlatform,
-        _minPeriod,
-        _maxPeriod,
-        _price,
-        _maxCoverPerUserDivisor
+        governance_,
+        policyManager_,
+        registry_,
+        coveredPlatform_,
+        minPeriod_,
+        maxPeriod_,
+        price_,
+        maxCoverPerUserDivisor_
     ) EIP712("Solace.fi-YearnV2Product", "1") {
-        yregistry = IYRegistry(_coveredPlatform);
-        quoter = IExchangeQuoter(_quoter);
+        yregistry = IYRegistry(coveredPlatform_);
+        quoter = IExchangeQuoter(quoter_);
     }
 
     /**
      * @notice It gives the user's total position in the product's protocol.
-     * The `_positionContract` must be a **vault**.
-     * @param _policyholder The `buyer` who is requesting the coverage quote.
-     * @param _positionContract The address of the exact smart contract the `buyer` has their position in (e.g., for UniswapProduct this would be Pair's address).
+     * The `positionContract` must be a **vault**.
+     * @param policyholder The `buyer` who is requesting the coverage quote.
+     * @param positionContract The address of the exact smart contract the `buyer` has their position in (e.g., for UniswapProduct this would be Pair's address).
      * @return positionAmount The user's total position in **Wei** in the product's protocol.
      */
-    function appraisePosition(address _policyholder, address _positionContract) public view override returns (uint256 positionAmount) {
-        ( , address token, , , ) = yregistry.getVaultInfo(_positionContract);
+    function appraisePosition(address policyholder, address positionContract) public view override returns (uint256 positionAmount) {
+        ( , address token, , , ) = yregistry.getVaultInfo(positionContract);
         require(token != address(0x0), "Invalid position contract");
-        IYVault vault = IYVault(_positionContract);
-        uint256 balance = vault.balanceOf(_policyholder) * vault.getPricePerFullShare() / 1e18;
+        IYVault vault = IYVault(positionContract);
+        uint256 balance = vault.balanceOf(policyholder) * vault.getPricePerFullShare() / 1e18;
         return quoter.tokenToEth(token, balance);
     }
 
@@ -127,12 +128,12 @@ contract YearnV2Product is BaseProduct, EIP712 {
      * @notice Changes the covered platform.
      * The function is used for if the the protocol changes their registry but keeps the children contracts.
      * A new version of the protocol will likely require a new Product.
-     * Can only be called by the current `governor`.
-     * @param _coveredPlatform The platform to cover.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param coveredPlatform_ The platform to cover.
      */
-    function setCoveredPlatform(address _coveredPlatform) public override {
-        super.setCoveredPlatform(_coveredPlatform);
-        yregistry = IYRegistry(_coveredPlatform);
+    function setCoveredPlatform(address coveredPlatform_) public override {
+        super.setCoveredPlatform(coveredPlatform_);
+        yregistry = IYRegistry(coveredPlatform_);
     }
 
     /**

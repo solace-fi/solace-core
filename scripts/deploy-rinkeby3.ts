@@ -15,7 +15,7 @@ import { logContractAddress, createPool } from "./utils";
 import { FeeAmount } from "../test/utilities/uniswap";
 
 import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_importer";
-import { Solace, Weth9, Vault, Master, CpFarm, SolaceEthLpFarm, Treasury, Registry, LpAppraisor, PolicyManager, RiskManager, ExchangeQuoterManual, CompoundProductRinkeby, ClaimsEscrow } from "../typechain";
+import { Solace, Weth9, Vault, Master, CpFarm, SolaceEthLpFarm, Treasury, Registry, LpAppraisor, PolicyManager, PolicyDescriptor, RiskManager, ExchangeQuoterManual, CompoundProductRinkeby, ClaimsEscrow } from "../typechain";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const MULTI_SIG_ADDRESS = "0xB0bcf50b18f0DCa889EdC4a299aF4cEd7cB4cb17";
@@ -31,6 +31,7 @@ const VAULT_ADDRESS            = "0x501aCE301e253B3934846A3e1479C6752dACB900";
 const CLAIMS_ESCROW_ADDRESS    = "0x501ACE805732cd237994cC6370112dCE0631178f";
 const TREASURY_ADDRESS         = "0x501acEA27bd7421B5121a4eD9e6F87a51965239a";
 const POLICY_MANAGER_ADDRESS   = "0x501aCeFC7BBEec76a50D634F53128e55C785eAE5";
+const POLICY_DESCR_ADDRESS     = "0x501ace9B0f66D550159A0853464f191Aa1C5dF3F";
 const RISK_MANAGER_ADDRESS     = "0x501Ace5a7B09DEaa568E643AbF3bF79A36d94CeA";
 const QUOTER_MANUAL_ADDRESS    = "0x501ACeEaa408F9bd4dda57c481bF95f03E22bdB0";
 const COMPOUND_PRODUCT_ADDRESS = "0x501ace9EAE9F8fdBbF666EEAAE439d27DBeCb002";
@@ -78,6 +79,7 @@ let lpTokenAppraisor: LpAppraisor;
 let claimsEscrow: ClaimsEscrow;
 
 let policyManager: PolicyManager;
+let policyDescriptor: PolicyDescriptor;
 let riskManager: RiskManager;
 let quoterManual: ExchangeQuoterManual;
 let compoundProduct: CompoundProductRinkeby;
@@ -97,6 +99,7 @@ async function main() {
   await deployUniswapRouter();
   await deployTreasury();
   await deployPolicyManager();
+  await deployPolicyDescriptor();
   await deployRiskManager();
   await deployQuoterManual();
   await deployCompoundProduct();
@@ -205,6 +208,22 @@ async function deployPolicyManager() {
   if(await registry.policyManager() != policyManager.address && await registry.governance() == signerAddress) {
     console.log("Registering PolicyManager");
     let tx = await registry.connect(deployer).setPolicyManager(policyManager.address);
+    await tx.wait();
+  }
+}
+
+async function deployPolicyDescriptor() {
+  if(!!POLICY_DESCR_ADDRESS) {
+    policyDescriptor = (new ethers.Contract(POLICY_DESCR_ADDRESS, artifacts.PolicyDescriptor.abi, provider)) as PolicyDescriptor;
+  } else {
+    console.log("Deploying PolicyDescriptor");
+    var addr = await create2Contract(deployer,artifacts.PolicyDescriptor);
+    policyDescriptor = (new ethers.Contract(addr, artifacts.PolicyDescriptor.abi, provider)) as PolicyDescriptor;
+    console.log(`Deployed PolicyDescriptor to ${policyDescriptor.address}`);
+  }
+  if(await policyManager.policyDescriptor() != policyDescriptor.address && await policyManager.governance() == signerAddress) {
+    console.log("Registering PolicyDescriptor");
+    let tx = await policyManager.connect(deployer).setPolicyDescriptor(policyDescriptor.address);
     await tx.wait();
   }
 }

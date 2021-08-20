@@ -14,8 +14,9 @@ import "./interface/ISolaceEthLpFarm.sol";
 
 
 /**
- * @title SolaceEthLpFarm: A farm that allows for the staking of Uniswap LP tokens in SOLACE-ETH pools.
+ * @title SolaceEthLpFarm
  * @author solace.fi
+ * @notice A farm that allows for the staking of Uniswap V3 LP tokens in SOLACE-ETH pools.
  */
 contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard, Governable {
     using SafeERC20 for IERC20;
@@ -25,16 +26,24 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard, Governable {
     /// @notice A unique enumerator that identifies the farm type.
     uint256 public override farmType = 3;
 
-    IUniswapLpToken public override lpToken;   // LP Token interface.
-    /// @notice Native SOLACE Token.
+    /// @notice [**Uniswap V3 LP Token**](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager).
+    IUniswapLpToken public override lpToken;
+    /// @notice Native [`SOLACE`](./SOLACE) Token.
     SOLACE public override solace;
+    /// @notice WETH.
     IWETH9 public override weth;
-    uint256 public override blockReward;       // Amount of rewardToken distributed per block.
-    uint256 public override startBlock;        // When the farm will start.
-    uint256 public override endBlock;          // When the farm will end.
-    uint256 public override lastRewardBlock;   // Last time rewards were distributed or farm was updated.
-    uint256 public override accRewardPerShare; // Accumulated rewards per share, times 1e12.
-    uint256 public override valueStaked;       // Value of tokens currently in range.
+    /// @notice Amount of rewardToken distributed per block.
+    uint256 public override blockReward;
+    /// @notice When the farm will start.
+    uint256 public override startBlock;
+    /// @notice When the farm will end.
+    uint256 public override endBlock;
+    /// @notice Last time rewards were distributed or farm was updated.
+    uint256 public override lastRewardBlock;
+    /// @notice Accumulated rewards per share, times 1e12.
+    uint256 public override accRewardPerShare;
+    /// @notice Value of tokens currently in range.
+    uint256 public override valueStaked;
 
     // Info of each user.
     struct UserInfo {
@@ -94,7 +103,6 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard, Governable {
     uint24 public fee;
     int24 public tickSpacing;
     int24 public lastTick;
-    bool solaceIsToken0;
 
     // list of tokens deposited by user
     mapping(address => EnumerableSet.UintSet) private userDeposited;
@@ -104,44 +112,44 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard, Governable {
 
     /**
      * @notice Constructs the farm.
-     * @param _governance Address of the governor.
-     * @param _master Address of the Master contract.
-     * @param _lpToken Address of the Uniswap NonFungiblePositionManager contract.
-     * @param _solace Address of the SOLACE token contract.
-     * @param _startBlock When farming will begin.
-     * @param _endBlock When farming will end.
-     * @param _pool Address of the UniswapV3Pool.
+     * @param governance_ The address of the [governor](/docs/user-docs/Governance).
+     * @param master_ Address of the [`Master`](./Master) contract.
+     * @param lpToken_ Address of the [**Uniswap NonFungiblePositionManager**](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager) contract.
+     * @param solace_ Address of the [`SOLACE'](./SOLACE) token contract.
+     * @param startBlock_ When farming will begin.
+     * @param endBlock_ When farming will end.
+     * @param pool_ Address of the UniswapV3Pool.
      */
     constructor(
-        address _governance,
-        address _master,
-        address _lpToken,
-        SOLACE _solace,
-        uint256 _startBlock,
-        uint256 _endBlock,
-        address _pool,
-        address _weth,
-        address _appraisor
-    ) Governable(_governance) {
+        address governance_,
+        address master_,
+        address lpToken_,
+        SOLACE solace_,
+        uint256 startBlock_,
+        uint256 endBlock_,
+        address pool_,
+        address weth_,
+        address appraisor_
+    ) Governable(governance_) {
         // copy params
-        master = _master;
-        lpToken = IUniswapLpToken(_lpToken);
-        solace = _solace;
-        startBlock = _startBlock;
-        endBlock = _endBlock;
-        lastRewardBlock = Math.max(block.number, _startBlock);
-        weth = IWETH9(payable(_weth));
-        appraisor = ILpAppraisor(_appraisor);
+        master = master_;
+        lpToken = IUniswapLpToken(lpToken_);
+        solace = solace_;
+        startBlock = startBlock_;
+        endBlock = endBlock_;
+        lastRewardBlock = Math.max(block.number, startBlock_);
+        weth = IWETH9(payable(weth_));
+        appraisor = ILpAppraisor(appraisor_);
         // get pool data
-        pool = IUniswapV3Pool(_pool);
+        pool = IUniswapV3Pool(pool_);
         token0 = pool.token0();
         token1 = pool.token1();
         fee = pool.fee();
         tickSpacing = pool.tickSpacing();
         ( , lastTick, , , , , ) = pool.slot0();
         // inf allowance to nft manager
-        solace.approve(_lpToken, type(uint256).max);
-        weth.approve(_lpToken, type(uint256).max);
+        solace.approve(lpToken_, type(uint256).max);
+        weth.approve(lpToken_, type(uint256).max);
     }
 
     receive () external payable {}
@@ -149,81 +157,82 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard, Governable {
     fallback () external payable {}
 
     /**
-     * @notice Sets the amount of reward token to distribute per block.
+     * @notice Sets the amount of [`SOLACE`](./SOLACE) to distribute per block.
      * Only affects future rewards.
-     * Can only be called by Master.
-     * @param _blockReward Amount to distribute per block.
+     * Can only be called by [`Master`](./Master).
+     * @param newBlockReward Amount to distribute per block.
      */
-    function setRewards(uint256 _blockReward) external override {
+    function setRewards(uint256 newBlockReward) external override {
         // can only be called by master contract
         require(msg.sender == master, "!master");
         // update
         updateFarm();
         // accounting
-        blockReward = _blockReward;
-        emit RewardsSet(_blockReward);
+        blockReward = newBlockReward;
+        emit RewardsSet(newBlockReward);
     }
 
     /**
      * @notice Sets the farm's end block. Used to extend the duration.
-     * Can only be called by the current governor.
-     * @param _endBlock The new end block.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param newEndBlock The new end block.
      */
-    function setEnd(uint256 _endBlock) external override onlyGovernance {
+    function setEnd(uint256 newEndBlock) external override onlyGovernance {
         // accounting
-        endBlock = _endBlock;
+        endBlock = newEndBlock;
         // update
         updateFarm();
-        emit FarmEndSet(_endBlock);
+        emit FarmEndSet(newEndBlock);
     }
 
     /**
      * @notice Sets the appraisal function.
-     * Can only be called by the current governor.
-     * @param _appraisor The new appraisor.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param newAppraisor The new appraisor.
      */
-    function setAppraisor(address _appraisor) external override onlyGovernance {
-        appraisor = ILpAppraisor(_appraisor);
+    function setAppraisor(address newAppraisor) external override onlyGovernance {
+        appraisor = ILpAppraisor(newAppraisor);
     }
 
     /**
-     * @notice Deposit a Uniswap LP token.
-     * User will receive accumulated Solace rewards if any.
-     * @param _tokenId The id of the token to deposit.
+     * @notice Deposit a [**Uniswap LP token**](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager).
+     * User will receive accumulated [`SOLACE`](./SOLACE) rewards if any.
+     * User must `ERC721.approve()` or `ERC721.setApprovalForAll()` first.
+     * @param tokenID The ID of the token to deposit.
      */
-    function deposit(uint256 _tokenId) external override nonReentrant {
+    function deposit(uint256 tokenID) external override nonReentrant {
         // pull token
-        lpToken.transferFrom(msg.sender, address(this), _tokenId);
+        lpToken.transferFrom(msg.sender, address(this), tokenID);
         // accounting
-        _deposit(msg.sender, _tokenId);
+        _deposit(msg.sender, tokenID);
     }
 
     /**
-     * @notice Deposit a Uniswap LP token using permit.
-     * User will receive accumulated Solace rewards if any.
-     * @param _depositor The depositing user.
-     * @param _tokenId The id of the token to deposit.
-     * @param _deadline Time the transaction must go through before.
+     * @notice Deposit a [**Uniswap LP token**](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager) using permit.
+     * User will receive accumulated [`SOLACE`](./SOLACE) rewards if any.
+     * @param depositor The depositing user.
+     * @param tokenID The ID of the token to deposit.
+     * @param deadline Time the transaction must go through before.
      * @param v secp256k1 signature
      * @param r secp256k1 signature
      * @param s secp256k1 signature
      */
-    function depositSigned(address _depositor, uint256 _tokenId, uint256 _deadline, uint8 v, bytes32 r, bytes32 s) external override nonReentrant {
+    function depositSigned(address depositor, uint256 tokenID, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external override nonReentrant {
         // permit
-        lpToken.permit(address(this), _tokenId, _deadline, v, r, s);
+        lpToken.permit(address(this), tokenID, deadline, v, r, s);
         // pull token
-        lpToken.transferFrom(_depositor, address(this), _tokenId);
+        lpToken.transferFrom(depositor, address(this), tokenID);
         // accounting
-        _deposit(_depositor, _tokenId);
+        _deposit(depositor, tokenID);
     }
 
     /**
-     * @notice Mint a new Uniswap LP token then deposit it.
-     * User will receive accumulated Solace rewards if any.
+     * @notice Mint a new [**Uniswap**](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager) LP token then deposit it.
+     * User will receive accumulated [`SOLACE`](./SOLACE) rewards if any.
      * @param params parameters
-     * @return tokenId The newly minted token id.
+     * @return tokenID The newly minted token ID.
      */
-    function mintAndDeposit(MintAndDepositParams calldata params) external payable override nonReentrant returns (uint256 tokenId) {
+    function mintAndDeposit(MintAndDepositParams calldata params) external payable override nonReentrant returns (uint256 tokenID) {
         // permit solace
         solace.permit(params.depositor, address(this), params.amountSolace, params.deadline, params.v, params.r, params.s);
         // pull solace
@@ -234,7 +243,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard, Governable {
         uint128 liquidity;
         uint256 amount0;
         uint256 amount1;
-        ( tokenId, liquidity, amount0, amount1 ) = lpToken.mint(IUniswapLpToken.MintParams({
+        ( tokenID, liquidity, amount0, amount1 ) = lpToken.mint(IUniswapLpToken.MintParams({
             token0: token0,
             token1: token1,
             fee: fee,
@@ -261,45 +270,46 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard, Governable {
           payable(msg.sender).transfer(ethReturnAmount);
         }
         // accounting
-        _deposit(params.depositor, tokenId);
+        _deposit(params.depositor, tokenID);
     }
 
     /**
-     * @notice Withdraw a Uniswap LP token.
-     * User will receive _tokenId and accumulated rewards.
-     * @param _tokenId The id of the token to withdraw.
+     * @notice Withdraw a [**Uniswap LP token**](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager).
+     * User will receive `tokenID` and accumulated rewards.
+     * Can only withdraw tokens you deposited.
+     * @param tokenID The ID of the token to withdraw.
      */
-    function withdraw(uint256 _tokenId) external override nonReentrant {
+    function withdraw(uint256 tokenID) external override nonReentrant {
         // harvest and update farm
         _harvest(msg.sender);
         // get farmer information
         UserInfo storage user = userInfo[msg.sender];
         // get token info
-        TokenInfo memory _tokenInfo = tokenInfo[_tokenId];
+        TokenInfo memory tokenInfo_ = tokenInfo[tokenID];
         // cannot withdraw a token you didnt deposit
-        require(_tokenInfo.depositor == msg.sender, "not your token");
+        require(tokenInfo_.depositor == msg.sender, "not your token");
         // accounting
-        if (_tokenInfo.tickLower <= lastTick && lastTick < _tokenInfo.tickUpper) {
+        if (tokenInfo_.tickLower <= lastTick && lastTick < tokenInfo_.tickUpper) {
           // remove if in range
-          user.value -= _tokenInfo.value;
-          valueStaked -= _tokenInfo.value;
+          user.value -= tokenInfo_.value;
+          valueStaked -= tokenInfo_.value;
         }
         user.rewardDebt = user.value * accRewardPerShare / 1e12;
-        userDeposited[msg.sender].remove(_tokenId);
+        userDeposited[msg.sender].remove(tokenID);
         // remove position from tick lower
-        ticks[_tokenInfo.tickLower].tokens.remove(_tokenId);
-        ticks[_tokenInfo.tickLower].valueNet -= int256(_tokenInfo.value);
-        if (ticks[_tokenInfo.tickLower].tokens.length() == 0) tickBitmap.flipTick(_tokenInfo.tickLower, tickSpacing);
+        ticks[tokenInfo_.tickLower].tokens.remove(tokenID);
+        ticks[tokenInfo_.tickLower].valueNet -= int256(tokenInfo_.value);
+        if (ticks[tokenInfo_.tickLower].tokens.length() == 0) tickBitmap.flipTick(tokenInfo_.tickLower, tickSpacing);
         // remove position from tick upper
-        ticks[_tokenInfo.tickUpper].tokens.remove(_tokenId);
-        ticks[_tokenInfo.tickUpper].valueNet += int256(_tokenInfo.value);
-        if (ticks[_tokenInfo.tickUpper].tokens.length() == 0) tickBitmap.flipTick(_tokenInfo.tickUpper, tickSpacing);
+        ticks[tokenInfo_.tickUpper].tokens.remove(tokenID);
+        ticks[tokenInfo_.tickUpper].valueNet += int256(tokenInfo_.value);
+        if (ticks[tokenInfo_.tickUpper].tokens.length() == 0) tickBitmap.flipTick(tokenInfo_.tickUpper, tickSpacing);
         // delete token info
-        delete tokenInfo[_tokenId];
+        delete tokenInfo[tokenID];
         // return staked token
-        lpToken.safeTransferFrom(address(this), msg.sender, _tokenId);
+        lpToken.safeTransferFrom(address(this), msg.sender, tokenID);
         // emit event
-        emit TokenWithdrawn(msg.sender, _tokenId);
+        emit TokenWithdrawn(msg.sender, tokenID);
     }
 
     /**
@@ -316,16 +326,17 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard, Governable {
 
     /**
      * @notice Withdraw a users rewards without unstaking their tokens.
-     * Can only be called by Master.
+     * Can only be called by ['Master`](./Master) or the user.
+     * @param user User to withdraw rewards for.
      */
-    function withdrawRewardsForUser(address _user) external override nonReentrant {
-        require(msg.sender == master || msg.sender == _user, "!master");
+    function withdrawRewardsForUser(address user) external override nonReentrant {
+        require(msg.sender == master || msg.sender == user, "!master");
         // harvest and update farm
-        _harvest(_user);
+        _harvest(user);
         // get farmer information
-        UserInfo storage user = userInfo[_user];
+        UserInfo storage userInfo_ = userInfo[user];
         // accounting
-        user.rewardDebt = user.value * accRewardPerShare / 1e12;
+        userInfo_.rewardDebt = userInfo_.value * accRewardPerShare / 1e12;
     }
 
     /**
@@ -357,18 +368,18 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard, Governable {
             EnumerableSet.UintSet storage tokens = ticks[nextTick].tokens;
             uint256 length = tokens.length();
             for (uint256 i = 0; i < length; ++i) {
-                uint256 tokenId = tokens.at(i);
+                uint256 tokenID = tokens.at(i);
                 // get position
-                TokenInfo memory _tokenInfo = tokenInfo[tokenId];
+                TokenInfo memory tokenInfo_ = tokenInfo[tokenID];
                 // if tickLower, adding liquidity
-                if (nextTick == _tokenInfo.tickLower) {
-                    userInfo[_tokenInfo.depositor].value += _tokenInfo.value;
-                    userInfo[_tokenInfo.depositor].unpaidRewards -= int256(_tokenInfo.value * accRewardPerShare / 1e12);
+                if (nextTick == tokenInfo_.tickLower) {
+                    userInfo[tokenInfo_.depositor].value += tokenInfo_.value;
+                    userInfo[tokenInfo_.depositor].unpaidRewards -= int256(tokenInfo_.value * accRewardPerShare / 1e12);
                 }
                 // if tickUpper, removing liquidity
-                if (nextTick == _tokenInfo.tickUpper) {
-                    userInfo[_tokenInfo.depositor].value -= _tokenInfo.value;
-                    userInfo[_tokenInfo.depositor].unpaidRewards += int256(_tokenInfo.value * accRewardPerShare / 1e12);
+                if (nextTick == tokenInfo_.tickUpper) {
+                    userInfo[tokenInfo_.depositor].value -= tokenInfo_.value;
+                    userInfo[tokenInfo_.depositor].unpaidRewards += int256(tokenInfo_.value * accRewardPerShare / 1e12);
                 }
             }
             curTick = nextTick;
@@ -390,18 +401,18 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard, Governable {
             EnumerableSet.UintSet storage tokens = ticks[nextTick].tokens;
             uint256 length = tokens.length();
             for (uint256 i = 0; i < length; ++i) {
-                uint256 tokenId = tokens.at(i);
+                uint256 tokenID = tokens.at(i);
                 // get position
-                TokenInfo memory _tokenInfo = tokenInfo[tokenId];
+                TokenInfo memory tokenInfo_ = tokenInfo[tokenID];
                 // if tickUpper, adding liquidity
-                if (nextTick == _tokenInfo.tickUpper) {
-                    userInfo[_tokenInfo.depositor].value += _tokenInfo.value;
-                    userInfo[_tokenInfo.depositor].unpaidRewards -= int256(_tokenInfo.value * accRewardPerShare / 1e12);
+                if (nextTick == tokenInfo_.tickUpper) {
+                    userInfo[tokenInfo_.depositor].value += tokenInfo_.value;
+                    userInfo[tokenInfo_.depositor].unpaidRewards -= int256(tokenInfo_.value * accRewardPerShare / 1e12);
                 }
                 // if tickLower, removing liquidity
-                if (nextTick == _tokenInfo.tickLower) {
-                    userInfo[_tokenInfo.depositor].value -= _tokenInfo.value;
-                    userInfo[_tokenInfo.depositor].unpaidRewards += int256(_tokenInfo.value * accRewardPerShare / 1e12);
+                if (nextTick == tokenInfo_.tickLower) {
+                    userInfo[tokenInfo_.depositor].value -= tokenInfo_.value;
+                    userInfo[tokenInfo_.depositor].unpaidRewards += int256(tokenInfo_.value * accRewardPerShare / 1e12);
                 }
             }
             curTick = nextTick;
@@ -411,161 +422,159 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard, Governable {
     }
 
     /**
-     * @notice Calculates the accumulated balance of reward token for specified user.
-     * @param _user The user for whom unclaimed tokens will be shown.
-     * @return Total amount of withdrawable reward tokens.
+     * @notice Calculates the accumulated balance of [`SOLACE`](./SOLACE) for specified user.
+     * @param user The user for whom unclaimed tokens will be shown.
+     * @return reward Total amount of withdrawable reward tokens.
      */
-    function pendingRewards(address _user) external view override returns (uint256) {
+    function pendingRewards(address user) external view override returns (uint256 reward) {
         // get farmer information
-        UserInfo storage user = userInfo[_user];
+        UserInfo storage userInfo_ = userInfo[user];
         // math
-        uint256 _accRewardPerShare = accRewardPerShare;
+        uint256 accRewardPerShare_ = accRewardPerShare;
         if (block.number > lastRewardBlock && valueStaked != 0) {
             uint256 tokenReward = getMultiplier(lastRewardBlock, block.number);
-            _accRewardPerShare += tokenReward * 1e12 / valueStaked;
+            accRewardPerShare_ += tokenReward * 1e12 / valueStaked;
         }
-        return uint256(int256(user.value * _accRewardPerShare / 1e12 - user.rewardDebt) + user.unpaidRewards);
+        return uint256(int256(userInfo_.value * accRewardPerShare_ / 1e12 - userInfo_.rewardDebt) + userInfo_.unpaidRewards);
     }
 
     /**
-     * @notice Calculates the reward multiplier over the given _from until _to block.
-     * @param _from The start of the period to measure rewards for.
-     * @param _to The end of the period to measure rewards for.
-     * @return The weighted multiplier for the given period.
+     * @notice Calculates the reward multiplier over the given `from` until `to` block.
+     * @param from The start of the period to measure rewards for.
+     * @param to The end of the period to measure rewards for.
+     * @return multiplier The weighted multiplier for the given period.
      */
-    function getMultiplier(uint256 _from, uint256 _to) public view override returns (uint256) {
+    function getMultiplier(uint256 from, uint256 to) public view override returns (uint256 multiplier) {
         // validate window
-        uint256 from = Math.max(_from, startBlock);
-        uint256 to = Math.min(_to, endBlock);
+        from = Math.max(from, startBlock);
+        to = Math.min(to, endBlock);
         // no reward for negative window
         if (from > to) return 0;
         return (to - from) * blockReward;
     }
 
     /**
-     * @notice Returns the count of Uniswap LP tokens that a user has deposited onto a farm.
-     * @param _user The user to check count for.
-     * @return The count of deposited Uniswap LP tokens.
+     * @notice Returns the count of [**Uniswap LP tokens**](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager) that a user has deposited onto the farm.
+     * @param user The user to check count for.
+     * @return count The count of deposited Uniswap LP tokens.
      */
-    function countDeposited(address _user) external view override returns (uint256) {
-        return userDeposited[_user].length();
+    function countDeposited(address user) external view override returns (uint256 count) {
+        return userDeposited[user].length();
     }
 
     /**
-     * @notice Returns the list of Uniswap LP tokens that a user has deposited onto a farm and their values.
-     * @param _user The user to list Uniswap LP tokens.
-     * @return The list of deposited Uniswap LP tokens.
-     * @return The values of the tokens.
+     * @notice Returns the list of [**Uniswap LP tokens**](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager) that a user has deposited onto the farm and their values.
+     * @param user The user to list Uniswap LP tokens.
+     * @return tokenIDs The list of deposited Uniswap LP tokens.
+     * @return tokenValues The values of the tokens.
      */
-    function listDeposited(address _user) external view override returns (uint256[] memory, uint256[] memory) {
-        //uint256 length = depositedErc721sAndValues[_user].length();
-        uint256 length = userDeposited[_user].length();
-        uint256[] memory tokens = new uint256[](length);
-        uint256[] memory values = new uint256[](length);
+    function listDeposited(address user) external view override returns (uint256[] memory tokenIDs, uint256[] memory tokenValues) {
+        uint256 length = userDeposited[user].length();
+        tokenIDs = new uint256[](length);
+        tokenValues = new uint256[](length);
         for(uint256 i = 0; i < length; ++i) {
-            uint256 tokenId = userDeposited[_user].at(i);
-            uint256 tokenValue = tokenInfo[tokenId].value;
-            tokens[i] = tokenId;
-            values[i] = tokenValue;
+            uint256 tokenID = userDeposited[user].at(i);
+            tokenIDs[i] = tokenID;
+            tokenValues[i] = tokenInfo[tokenID].value;
         }
-        return (tokens, values);
+        return (tokenIDs, tokenValues);
     }
 
     /**
-     * @notice Returns the id of a Uniswap LP that a user has deposited onto a farm and its value.
-     * @param _user The user to get token id for.
-     * @param _index The farm-based index of the token.
-     * @return The id of the deposited Uniswap LP token.
-     * @return The value of the token.
+     * @notice Returns the ID of a [**Uniswap LP token**](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager) that a user has deposited onto a farm and its value.
+     * @param user The user to get token ID for.
+     * @param index The farm-based index of the token.
+     * @return tokenID The ID of the deposited [**Uniswap LP token**](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager).
+     * @return tokenValue The value of the token.
      */
-    function getDeposited(address _user, uint256 _index) external view override returns (uint256, uint256) {
-        uint256 tokenId = userDeposited[_user].at(_index);
-        uint256 tokenValue = tokenInfo[tokenId].value;
-        return (tokenId, tokenValue);
+    function getDeposited(address user, uint256 index) external view override returns (uint256 tokenID, uint256 tokenValue) {
+        tokenID = userDeposited[user].at(index);
+        tokenValue = tokenInfo[tokenID].value;
+        return (tokenID, tokenValue);
     }
 
     /**
-     * @notice Appraise a Uniswap LP Token.
+     * @notice Appraise a [**Uniswap LP token**](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager).
      * Token must exist and must exist in the correct pool.
-     * @param _token The id of the token to appraise.
-     * @return _value The token's value.
+     * @param tokenID The ID of the token to appraise.
+     * @return tokenValue The token's value.
      */
-    function appraise(uint256 _token) external view override returns (uint256 _value) {
-        return appraisor.appraise(_token);
+    function appraise(uint256 tokenID) external view override returns (uint256 tokenValue) {
+        return appraisor.appraise(tokenID);
     }
 
     /**
     * @notice Calculate and transfer a user's rewards.
     */
-    function _harvest(address _user) internal {
+    function _harvest(address user) internal {
         // update farm
         updateFarm();
         // get farmer information
-        UserInfo storage user = userInfo[_user];
+        UserInfo storage userInfo_ = userInfo[user];
         // transfer users pending rewards if nonzero
-        uint256 pending = uint256(int256(user.value * accRewardPerShare / 1e12 - user.rewardDebt) + user.unpaidRewards);
+        uint256 pending = uint256(int256(userInfo_.value * accRewardPerShare / 1e12 - userInfo_.rewardDebt) + userInfo_.unpaidRewards);
         // safe transfer rewards
         if (pending == 0) return;
         uint256 balance = solace.balanceOf(master);
         uint256 transferAmount = Math.min(pending, balance);
-        user.unpaidRewards = int256(pending - transferAmount);
-        IERC20(solace).safeTransferFrom(master, _user, transferAmount);
-        emit UserRewarded(_user, transferAmount);
+        userInfo_.unpaidRewards = int256(pending - transferAmount);
+        IERC20(solace).safeTransferFrom(master, user, transferAmount);
+        emit UserRewarded(user, transferAmount);
     }
 
     /**
      * @notice Performs the internal accounting for a deposit.
-     * @param _depositor The depositing user.
-     * @param _tokenId The id of the token to deposit.
+     * @param depositor The depositing user.
+     * @param tokenID The ID of the token to deposit.
      */
-    function _deposit(address _depositor, uint256 _tokenId) internal {
+    function _deposit(address depositor, uint256 tokenID) internal {
         // get position
-        ( , , address _token0, address _token1, uint24 _fee, int24 tickLower, int24 tickUpper, uint128 liquidity, , , , )
-        = lpToken.positions(_tokenId);
+        ( , , address token0_, address token1_, uint24 fee_, int24 tickLower, int24 tickUpper, uint128 liquidity, , , , )
+        = lpToken.positions(tokenID);
         // check if correct pool
-        require((fee == _fee) && (token0 == _token0) && (token1 == _token1), "wrong pool");
+        require((fee == fee_) && (token0 == token0_) && (token1 == token1_), "wrong pool");
         // harvest and update farm
-        _harvest(_depositor);
+        _harvest(depositor);
         // get farmer information
-        UserInfo storage user = userInfo[_depositor];
+        UserInfo storage user = userInfo[depositor];
         // record position
-        TokenInfo memory _tokenInfo = TokenInfo({
-            depositor: _depositor,
+        TokenInfo memory tokenInfo_ = TokenInfo({
+            depositor: depositor,
             tickLower: tickLower,
             tickUpper: tickUpper,
             liquidity: liquidity,
-            value: appraisor.appraise(_tokenId)
+            value: appraisor.appraise(tokenID)
         });
-        tokenInfo[_tokenId] = _tokenInfo;
+        tokenInfo[tokenID] = tokenInfo_;
         // accounting
-        if (_tokenInfo.tickLower <= lastTick && lastTick < _tokenInfo.tickUpper) {
+        if (tokenInfo_.tickLower <= lastTick && lastTick < tokenInfo_.tickUpper) {
             // add if in range
-            user.value += _tokenInfo.value;
-            valueStaked += _tokenInfo.value;
+            user.value += tokenInfo_.value;
+            valueStaked += tokenInfo_.value;
         }
         user.rewardDebt = user.value * accRewardPerShare / 1e12;
-        userDeposited[_depositor].add(_tokenId);
+        userDeposited[depositor].add(tokenID);
         // add position to tick lower
-        if (ticks[_tokenInfo.tickLower].tokens.length() == 0) tickBitmap.flipTick(_tokenInfo.tickLower, tickSpacing);
-        ticks[_tokenInfo.tickLower].tokens.add(_tokenId);
-        ticks[_tokenInfo.tickLower].valueNet += int256(_tokenInfo.value);
+        if (ticks[tokenInfo_.tickLower].tokens.length() == 0) tickBitmap.flipTick(tokenInfo_.tickLower, tickSpacing);
+        ticks[tokenInfo_.tickLower].tokens.add(tokenID);
+        ticks[tokenInfo_.tickLower].valueNet += int256(tokenInfo_.value);
         // add position to tick upper
-        if (ticks[_tokenInfo.tickUpper].tokens.length() == 0) tickBitmap.flipTick(_tokenInfo.tickUpper, tickSpacing);
-        ticks[_tokenInfo.tickUpper].tokens.add(_tokenId);
-        ticks[_tokenInfo.tickUpper].valueNet -= int256(_tokenInfo.value);
+        if (ticks[tokenInfo_.tickUpper].tokens.length() == 0) tickBitmap.flipTick(tokenInfo_.tickUpper, tickSpacing);
+        ticks[tokenInfo_.tickUpper].tokens.add(tokenID);
+        ticks[tokenInfo_.tickUpper].valueNet -= int256(tokenInfo_.value);
         // emit event
-        emit TokenDeposited(_depositor, _tokenId);
+        emit TokenDeposited(depositor, tokenID);
     }
 
     /**
      * @notice Adds two numbers.
-     * @param _a The first number as a uint256.
-     * @param _b The second number as an int256.
-     * @return _c The sum as a uint256.
+     * @param a The first number as a uint256.
+     * @param b The second number as an int256.
+     * @return c The sum as a uint256.
      */
-    function _add(uint256 _a, int256 _b) internal pure returns (uint256 _c) {
-        _c = (_b > 0)
-            ? _a + uint256(_b)
-            : _a - uint256(-_b);
+    function _add(uint256 a, int256 b) internal pure returns (uint256 c) {
+        return (b > 0)
+            ? (a + uint256(b))
+            : (a - uint256(-b));
     }
 }

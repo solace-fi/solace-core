@@ -11,25 +11,25 @@ interface IRiskManager {
 
     /**
      * @notice Sets the products and their weights.
-     * Can only be called by the current governor.
-     * @param _products The products.
-     * @param _weights The product weights.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param products_ The products.
+     * @param weights_ The product weights.
      */
-    function setProductWeights(address[] calldata _products, uint32[] calldata _weights) external;
+    function setProductWeights(address[] calldata products_, uint32[] calldata weights_) external;
 
     /**
      * @notice Sets the partial reserves factor.
-     * Can only be called by the current governor.
-     * @param _factor New partial reserves factor in BPS.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param factor New partial reserves factor in BPS.
      */
-    function setPartialReservesFactor(uint16 _factor) external;
+    function setPartialReservesFactor(uint16 factor) external;
 
     /**
      * @notice The maximum amount of cover that a product can sell.
-     * @param _product The product that wants to sell cover.
+     * @param product The product that wants to sell cover.
      * @return The max amount of cover in wei.
      */
-    function maxCoverAmount(address _product) external view returns (uint256);
+    function maxCoverAmount(address product) external view returns (uint256);
 
     /**
      * @notice The minimum amount of capital required to safely cover all policies.

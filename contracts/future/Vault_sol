@@ -127,11 +127,11 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     event StrategyUpdateMaxDebtPerHarvest(address indexed strategy, uint256 indexed newMaxDebtPerHarvest);
     event StrategyUpdatePerformanceFee(address indexed strategy, uint256 indexed newPerformanceFee);
 
-    constructor (address _governance, address _registry, address _token) ERC20("Solace CP Token", "SCP") ERC20Permit("Solace CP Token") {
-        governance = _governance;
+    constructor (address governance_, address registry_, address _token) ERC20("Solace CP Token", "SCP") ERC20Permit("Solace CP Token") {
+        governance = governance_;
         rewards = msg.sender; // set governance address as rewards destination for now
 
-        registry = IRegistry(_registry);
+        registry = IRegistry(registry_);
 
         token = IERC20(_token);
 
@@ -147,13 +147,13 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
 
     /**
      * @notice Allows governance to be transferred to a new governor.
-     * Can only be called by the current governor.
-     * @param _governance The new governor.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param governance_ The new governor.
      */
-    function setGovernance(address _governance) external override {
+    function setGovernance(address governance_) external override {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
-        newGovernance = _governance;
+        newGovernance = governance_;
     }
 
     /**
@@ -170,7 +170,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
 
     /**
      * @notice Changes the locked profit degration.
-     * Can only be called by the current governor.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
      * @param degration rate of degration in percent per second scaled to 1e18.
      */
     function setLockedProfitDegration(uint256 degration) external {
@@ -180,7 +180,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
 
     /**
      * @notice Changes the minimum capital requirement of the vault
-     * Can only be called by the current governor.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
      * During withdrawals, withdrawals are possible down to the Vault's MCR.
      * @param newMCR The new minimum capital requirement.
      */
@@ -191,7 +191,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
 
     /**
      * @notice Changes the performanceFee of the Vault.
-     * Can only be called by the current governor.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
      * @param fee New performanceFee to use
      */
     function setPerformanceFee(uint256 fee) external {
@@ -202,7 +202,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
 
     /**
      * @notice Activates or deactivates Vault mode where all Strategies go into full withdrawal.
-     * Can only be called by the current governor.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
      * During Emergency Shutdown:
      * 1. No Users may deposit into the Vault (but may withdraw as usual.)
      * 2. Governance may not add new Strategies.
@@ -239,7 +239,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
 
     /**
      * @notice Allows governance to approve a new Strategy
-     * Can only be called by the current governor.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
      * @param _strategy The address of Strategy contract to add
      * @param _debtRatio The share of the total assets in the `vault that the `strategy` has access to.
      * @param _minDebtPerHarvest Lower limit on the increase of debt since last harvest
@@ -283,7 +283,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
 
     /**
      * @notice Adds `_strategy` to `withdrawalQueue`
-     * Can only be called by the current governor.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
      * @param _strategy address of the strategy to add
      */
     function addStrategyToQueue(address _strategy) external {
@@ -304,7 +304,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
 
     /**
      * @notice Remove `_strategy` from `withdrawalQueue`
-     * Can only be called by the current governor.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
      * Can only be called on an active strategy, added using `addStrategy()`
      * @param _strategy address of the strategy to remove
      */
@@ -374,7 +374,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
 
     /**
      * @notice Change the quantity of assets `strategy` may manage.
-     * Can only be called by the current governor.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
      * Can only be called on an active strategy (added using addStrategy)
      * @param _strategy address of the strategy to update
      * @param _debtRatio The new `debtRatio` of Strategy (quantity of assets it can manage)
@@ -395,7 +395,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     /**
      * @notice Change the quantity assets per block this Vault may deposit to or
      * withdraw from `strategy`.
-     * Can only be called by the current governor.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
      * Can only be called on an active strategy (added using addStrategy)
      * @param _strategy Address of the strategy to update
      * @param _minDebtPerHarvest New lower limit on the increase of debt since last harvest
@@ -413,7 +413,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
     /**
      * @notice Change the quantity assets per block this Vault may deposit to or
      * withdraw from `strategy`.
-     * Can only be called by the current governor.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
      * Can only be called on an active strategy (added using addStrategy)
      * @param _strategy Address of the strategy to update
      * @param _maxDebtPerHarvest New upper limit on the increase of debt since last harvest
@@ -430,7 +430,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
 
     /**
      * @notice Change the fee the strategist will receive based on this Vault's performance
-     * Can only be called by the current governor.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
      * Can only be called on an active strategy (added using addStrategy)
      * @param _strategy Address of the strategy to update
      * @param _performanceFee The new fee the strategist will receive.

@@ -30,87 +30,87 @@ contract Registry is IRegistry, Governable {
 
     /**
      * @notice Constructs the registry contract.
-     * @param _governance Address of the governor.
+     * @param governance_ The address of the [governor](/docs/user-docs/Governance).
      */
-    constructor(address _governance) Governable(_governance) { }
+    constructor(address governance_) Governable(governance_) { }
 
     /**
-     * @notice Sets the [`Solace Token`](./SOLACE.md) contract.
-     * Can only be called by the current `governor`.
-     * @param _solace The `SOLACE` token address.
+     * @notice Sets the [`Solace Token`](./SOLACE) contract.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param solace_ The `SOLACE` token address.
      */
-    function setSolace(address _solace) external override onlyGovernance {
-        solace = _solace;
-        emit SolaceSet(_solace);
+    function setSolace(address solace_) external override onlyGovernance {
+        solace = solace_;
+        emit SolaceSet(solace_);
     }
 
     /**
-     * @notice Sets the [`Master`](./Master.md) contract.
-     * Can only be called by the current `governor`.
-     * @param _master The contract address of the `Master` contract.
+     * @notice Sets the [`Master`](./Master) contract.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param master_ The contract address of the `Master` contract.
      */
-    function setMaster(address _master) external override onlyGovernance {
-        master = _master;
-        emit MasterSet(_master);
+    function setMaster(address master_) external override onlyGovernance {
+        master = master_;
+        emit MasterSet(master_);
     }
 
     /**
-     * @notice Sets the [`Claims Escrow`](./ClaimsEscrow.md) contract.
-     * Can only be called by the current `governor`.
-     * @param _claimsEscrow The contract address of the `ClaimsEscrow` contract.
+     * @notice Sets the [`Claims Escrow`](./ClaimsEscrow) contract.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param claimsEscrow_ The contract address of the `ClaimsEscrow` contract.
      */
-    function setClaimsEscrow(address _claimsEscrow) external override onlyGovernance {
-        claimsEscrow = _claimsEscrow;
-        emit ClaimsEscrowSet(_claimsEscrow);
+    function setClaimsEscrow(address claimsEscrow_) external override onlyGovernance {
+        claimsEscrow = claimsEscrow_;
+        emit ClaimsEscrowSet(claimsEscrow_);
     }
 
     /**
-     * @notice Sets the [`Vault`](./Vault.md) contract.
-     * Can only be called by the current `governor`.
-     * @param _vault The contract address of the `Vault` contract.
+     * @notice Sets the [`Vault`](./Vault) contract.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param vault_ The contract address of the `Vault` contract.
      */
-    function setVault(address _vault) external override onlyGovernance {
-        vault = _vault;
-        emit VaultSet(_vault);
+    function setVault(address vault_) external override onlyGovernance {
+        vault = vault_;
+        emit VaultSet(vault_);
     }
 
     /**
-     * @notice Sets the [`Treasury`](./Treasury.md) contract.
-     * Can only be called by the current `governor`.
-     * @param _treasury The contract address of the `Treasury` contract.
+     * @notice Sets the [`Treasury`](./Treasury) contract.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param treasury_ The contract address of the `Treasury` contract.
      */
-    function setTreasury(address _treasury) external override onlyGovernance {
-        treasury = _treasury;
-        emit TreasurySet(_treasury);
+    function setTreasury(address treasury_) external override onlyGovernance {
+        treasury = treasury_;
+        emit TreasurySet(treasury_);
     }
 
     /**
-     * @notice Sets the [`Locker`](./Locker.md) contract.
-     * Can only be called by the current `governor`.
-     * @param _locker The contract address of the `Locker` contract.
+     * @notice Sets the [`Locker`](./Locker) contract.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param locker_ The contract address of the `Locker` contract.
      */
-    function setLocker(address _locker) external override onlyGovernance {
-        locker = _locker;
-        emit LockerSet(_locker);
+    function setLocker(address locker_) external override onlyGovernance {
+        locker = locker_;
+        emit LockerSet(locker_);
     }
 
     /**
-     * @notice Sets the [`Policy Manager`](./PolicyManager.md) contract.
-     * Can only be called by the current `governor`.
-     * @param _policyManager The contract address of the `PolicyManager` contract.
+     * @notice Sets the [`Policy Manager`](./PolicyManager) contract.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param policyManager_ The contract address of the `PolicyManager` contract.
      */
-    function setPolicyManager(address _policyManager) external override onlyGovernance {
-        policyManager = _policyManager;
-        emit PolicyManagerSet(_policyManager);
+    function setPolicyManager(address policyManager_) external override onlyGovernance {
+        policyManager = policyManager_;
+        emit PolicyManagerSet(policyManager_);
     }
 
     /**
-     * @notice Sets the [`Risk Manager`](./RiskManager.md) contract.
-     * Can only be called by the current `governor`.
-     * @param _riskManager The contract address of the `RiskManager` contract.
+     * @notice Sets the [`Risk Manager`](./RiskManager) contract.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param riskManager_ The contract address of the `RiskManager` contract.
      */
-    function setRiskManager(address _riskManager) external override onlyGovernance {
-        riskManager = _riskManager;
-        emit RiskManagerSet(_riskManager);
+    function setRiskManager(address riskManager_) external override onlyGovernance {
+        riskManager = riskManager_;
+        emit RiskManagerSet(riskManager_);
     }
 }

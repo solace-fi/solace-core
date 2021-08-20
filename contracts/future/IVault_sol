@@ -51,10 +51,10 @@ interface IVault is IERC20, IERC20Permit {
 
     /**
      * @notice Transfers the governance role to a new governor.
-     * Can only be called by the current governor.
-     * @param _governance The new governor.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param governance_ The new governor.
      */
-    function setGovernance(address _governance) external;
+    function setGovernance(address governance_) external;
 
     /**
      * @notice Accepts the governance role.
