@@ -9,10 +9,10 @@ pragma solidity 0.8.6;
  */
 interface IExchangeQuoter {
     /**
-     * @notice Calculates the exchange rate for an _amount of _token to eth.
-     * @param _token The token to give.
-     * @param _amount The amount to give.
-     * @return _amountOut The amount of eth received.
+     * @notice Calculates the exchange rate for an amount of token to eth.
+     * @param token The token to give.
+     * @param amount The amount to give.
+     * @return amountOut The amount of eth received.
      */
-    function tokenToEth(address _token, uint256 _amount) external view returns (uint256 _amountOut);
+    function tokenToEth(address token, uint256 amount) external view returns (uint256 amountOut);
 }

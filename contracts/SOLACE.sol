@@ -21,10 +21,10 @@ contract SOLACE is ERC20Permit, Governable {
 
     /**
      * @notice Constructs the Solace Token contract.
-     * @param _governance The address of the governor.
+     * @param governance_ The address of the [governor](/docs/user-docs/Governance).
      */
-    constructor(address _governance) ERC20("solace", "SOLACE") ERC20Permit("solace") Governable(_governance) {
-        minters[_governance] = true;
+    constructor(address governance_) ERC20("solace", "SOLACE") ERC20Permit("solace") Governable(governance_) {
+        minters[governance_] = true;
     }
 
     /**
@@ -40,7 +40,7 @@ contract SOLACE is ERC20Permit, Governable {
 
     /**
      * @notice Adds a new minter.
-     * Can only be called by the current `governor`.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
      * @param _minter The new minter.
      */
     function addMinter(address _minter) public onlyGovernance {
@@ -49,7 +49,7 @@ contract SOLACE is ERC20Permit, Governable {
 
     /**
      * @notice Removes a minter.
-     * Can only be called by the current `governor`.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
      * @param _minter The minter to remove.
      */
     function removeMinter(address _minter) public onlyGovernance {

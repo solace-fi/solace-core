@@ -12,9 +12,9 @@ import "./IPolicyManager.sol";
 interface IPolicyDescriptor {
     /**
      * @notice Produces the URI describing a particular policy `product` for a given `policy id`.
-     * @param _policyManager The policy manager to retrieve policy info to produce URI descriptor.
-     * @param _policyID The id of the policy for which to produce a description.
-     * @return _descriptor The URI of the ERC721-compliant metadata.
+     * @param policyManager The policy manager to retrieve policy info to produce URI descriptor.
+     * @param policyID The ID of the policy for which to produce a description.
+     * @return description The URI of the ERC721-compliant metadata.
      */
-    function tokenURI(IPolicyManager _policyManager, uint256 _policyID) external view returns (string memory _descriptor);
+    function tokenURI(IPolicyManager policyManager, uint256 policyID) external view returns (string memory description);
 }

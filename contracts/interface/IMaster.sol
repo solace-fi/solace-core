@@ -23,47 +23,47 @@ interface IMaster {
     /// @notice The number of farms that have been created.
     function numFarms() external view returns (uint256);
 
-    /// @notice Given a farm id, return its address.
+    /// @notice Given a farm ID, return its address.
     /// @dev Indexable 1-numFarms, 0 is null farm.
     function farmAddresses(uint256) external view returns (address);
 
-    /// @notice Given a farm address, returns its id.
+    /// @notice Given a farm address, returns its ID.
     /// @dev Returns 0 for not farms and unregistered farms.
     function farmIndices(address) external view returns (uint256);
 
-    /// @notice Given a farm id, how many points the farm was allocated.
+    /// @notice Given a farm ID, how many points the farm was allocated.
     function allocPoints(uint256) external view returns (uint256);
 
     // events
     /// @notice Emitted when a farm is created.
-    event FarmCreated(uint256 indexed _farmId, address indexed _farmAddress);
+    event FarmCreated(uint256 indexed farmID, address indexed farmAddress);
     /// @notice Emitted when SOLACE per block is changed.
-    event RewardsSet(uint256 _solacePerBlock);
+    event RewardsSet(uint256 solacePerBlock);
 
     /**
      * @notice Registers a farm.
-     * Can only be called by the current governor.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
      * Cannot register a farm more than once.
-     * @param _farmAddress The farm's address.
-     * @param _allocPoints How many points to allocate this farm.
-     * @return _farmId The farm id.
+     * @param farmAddress The farm's address.
+     * @param allocPoints How many points to allocate this farm.
+     * @return farmID The farm ID.
      */
-    function registerFarm(address _farmAddress, uint256 _allocPoints) external returns (uint256 _farmId);
+    function registerFarm(address farmAddress, uint256 allocPoints) external returns (uint256 farmID);
 
     /**
      * @notice Sets a farm's allocation points.
-     * Can only be called by the current governor.
-     * @param _farmId The farm to set allocation points.
-     * @param _allocPoints How many points to allocate this farm.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param farmID The farm to set allocation points.
+     * @param allocPoints How many points to allocate this farm.
      */
-    function setAllocPoints(uint256 _farmId, uint256 _allocPoints) external;
+    function setAllocPoints(uint256 farmID, uint256 allocPoints) external;
 
     /**
      * @notice Sets the Solace reward distribution across all farms.
      * Optionally updates all farms.
-     * @param _solacePerBlock Amount of solace to distribute per block.
+     * @param solacePerBlock Amount of solace to distribute per block.
      */
-    function setSolacePerBlock(uint256 _solacePerBlock) external;
+    function setSolacePerBlock(uint256 solacePerBlock) external;
 
     /**
      * @notice Updates all farms to be up to date to the current block.

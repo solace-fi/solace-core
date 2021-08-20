@@ -37,7 +37,7 @@ interface IVault is IERC20Metadata, IERC20Permit {
 
     /**
      * @notice Activates or deactivates emergency shutdown.
-     * Can only be called by the current governor.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
      * During Emergency Shutdown:
      * 1. No users may deposit into the Vault.
      * 2. Withdrawls can bypass cooldown.
@@ -49,39 +49,39 @@ interface IVault is IERC20Metadata, IERC20Permit {
 
     /**
      * @notice Sets the minimum and maximum amount of time a user must wait to withdraw funds.
-     * Can only be called by the current governor.
-     * @param _min Minimum time in seconds.
-     * @param _max Maximum time in seconds.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param minTime Minimum time in seconds.
+     * @param maxTime Maximum time in seconds.
      */
-    function setCooldownWindow(uint40 _min, uint40 _max) external;
+    function setCooldownWindow(uint40 minTime, uint40 maxTime) external;
 
     /**
      * @notice Adds or removes requesting rights.
-     * Can only be called by the current governor.
-     * @param _dst The requestor.
-     * @param _status True to add or false to remove rights.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param dst The requestor.
+     * @param status True to add or false to remove rights.
      */
-    function setRequestor(address _dst, bool _status) external;
+    function setRequestor(address dst, bool status) external;
 
     /**
-     * @notice Allows a user to deposit ETH into the Vault (becoming a Capital Provider)
-     * Shares of the Vault (CP tokens) are minted to caller
-     * Called when Vault receives ETH
-     * Deposits `_amount` `token`, issuing shares to `recipient`.
-     * Reverts if Vault is in Emergency Shutdown
-     * @return Number of shares minted.
+     * @notice Allows a user to deposit **ETH** into the `Vault`(becoming a **Capital Provider**).
+     * Shares of the `Vault` (CP tokens) are minted to caller.
+     * It is called when `Vault` receives **ETH**.
+     * It issues the amount of token share respected to the deposit to the `recipient`.
+     * Reverts if `Vault` is in **Emergency Shutdown**
+     * @return shares The number of shares minted.
      */
-    function depositEth() external payable returns (uint256);
+    function depositEth() external payable returns (uint256 shares);
 
     /**
-     * @notice Allows a user to deposit WETH into the Vault (becoming a Capital Provider)
-     * Shares of the Vault (CP tokens) are minted to caller
-     * Deposits `_amount` `token`, issuing shares to `recipient`.
-     * Reverts if Vault is in Emergency Shutdown
-     * @param _amount Amount of weth to deposit.
-     * @return Number of shares minted.
+     * @notice Allows a user to deposit **WETH** into the `Vault`(becoming a **Capital Provider**).
+     * Shares of the Vault (CP tokens) are minted to caller.
+     * It issues the amount of token share respected to the deposit to the `recipient`.
+     * Reverts if `Vault` is in Emergency Shutdown
+     * @param amount Amount of weth to deposit.
+     * @return shares The number of shares minted.
      */
-    function depositWeth(uint256 _amount) external returns (uint256);
+    function depositWeth(uint256 amount) external returns (uint256);
 
     /**
      * @notice Starts the cooldown.
@@ -96,26 +96,26 @@ interface IVault is IERC20Metadata, IERC20Permit {
     /**
      * @notice Allows a user to redeem shares for ETH
      * Burns CP tokens and transfers ETH to the CP
-     * @param _shares amount of shares to redeem
+     * @param shares amount of shares to redeem
      * @return value in ETH that the shares where redeemed for
      */
-    function withdrawEth(uint256 _shares) external returns (uint256);
+    function withdrawEth(uint256 shares) external returns (uint256);
 
     /**
      * @notice Allows a user to redeem shares for ETH
      * Burns CP tokens and transfers WETH to the CP
-     * @param _shares amount of shares to redeem
+     * @param shares amount of shares to redeem
      * @return value in WETH that the shares where redeemed for
      */
-    function withdrawWeth(uint256 _shares) external returns (uint256);
+    function withdrawWeth(uint256 shares) external returns (uint256);
 
     /**
      * @notice Sends ETH to other users or contracts.
      * Can only be called by authorized requestors.
-     * @param _amount Amount of ETH wanted.
+     * @param amount Amount of ETH wanted.
      * @return Amount of ETH sent.
      */
-    function requestEth(uint256 _amount) external returns (uint256);
+    function requestEth(uint256 amount) external returns (uint256);
 
     /// @notice WETH contract.
     function weth() external view returns (IWETH9);
@@ -143,27 +143,27 @@ interface IVault is IERC20Metadata, IERC20Permit {
 
     /**
      * @notice The timestamp that a depositor's cooldown started.
-     * @param _user The depositor.
+     * @param user The depositor.
      * @return The timestamp in seconds.
      */
-    function cooldownStart(address _user) external view returns (uint40);
+    function cooldownStart(address user) external view returns (uint40);
 
     /**
      * @notice Returns true if the user is allowed to receive or send vault shares.
-     * @param _user User to query.
+     * @param user User to query.
      * return status True if can transfer.
      */
-    function canTransfer(address _user) external view returns (bool status);
+    function canTransfer(address user) external view returns (bool status);
 
     /**
      * @notice Returns true if the user is allowed to withdraw vault shares.
-     * @param _user User to query.
+     * @param user User to query.
      * return status True if can withdraw.
      */
-    function canWithdraw(address _user) external view returns (bool status);
+    function canWithdraw(address user) external view returns (bool status);
 
     /**
      * @notice Returns true if the destination is authorized to request ETH.
      */
-    function isRequestor(address _dst) external view returns (bool);
+    function isRequestor(address dst) external view returns (bool);
 }

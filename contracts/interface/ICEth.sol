@@ -23,7 +23,7 @@ interface ICEth is IERC20Metadata {
      * @param borrowAmount The amount of the underlying asset to borrow.
      * @return error 0=success, otherwise a failure (see ErrorReporter.sol for details).
      */
-    function borrow(uint256 borrowAmount) external returns (uint256);
+    function borrow(uint256 borrowAmount) external returns (uint256 error);
 
     /**
      * @notice Sender redeems cTokens in exchange for the underlying asset.
@@ -31,12 +31,12 @@ interface ICEth is IERC20Metadata {
      * @param redeemTokens The number of cTokens to redeem into underlying.
      * @return error 0=success, otherwise a failure (see ErrorReporter.sol for details).
      */
-    function redeem(uint redeemTokens) external returns (uint256);
+    function redeem(uint redeemTokens) external returns (uint256 error);
 
     /**
      * @notice Calculates the exchange rate from the underlying to the CToken.
      * @dev This function does not accrue interest before calculating the exchange rate.
      * @return rate Calculated exchange rate scaled by 1e18.
      */
-    function exchangeRateStored() external view returns (uint256);
+    function exchangeRateStored() external view returns (uint256 rate);
 }

@@ -18,21 +18,21 @@ contract ExchangeQuoter is IExchangeQuoter {
 
     /**
      * @notice Constructs the ExchangeQuoter contract.
-     * @param _oneSplitView The address of the 1inch router.
+     * @param oneSplitView_ The address of the 1inch router.
      */
-    constructor(address _oneSplitView) {
-        oneSplitView = IOneSplitView(_oneSplitView);
+    constructor(address oneSplitView_) {
+        oneSplitView = IOneSplitView(oneSplitView_);
     }
 
     /**
-     * @notice Calculates the exchange rate for an `_amount` of `_token` to **ETH**.
-     * @param _token The token to give.
-     * @param _amount The amount to give.
-     * @return _amountOut The amount of **ETH** received.
+     * @notice Calculates the exchange rate for an `amount` of `token` to **ETH**.
+     * @param token The token to give.
+     * @param amount The amount to give.
+     * @return amountOut The amount of **ETH** received.
      */
-    function tokenToEth(address _token, uint256 _amount) public view override returns (uint256 _amountOut) {
+    function tokenToEth(address token, uint256 amount) public view override returns (uint256 amountOut) {
         // call one inch
-        (_amountOut, ) = oneSplitView.getExpectedReturn(_token, ETH_ADDRESS, _amount, 1, 0);
-        return _amountOut;
+        (amountOut, ) = oneSplitView.getExpectedReturn(token, ETH_ADDRESS, amount, 1, 0);
+        return amountOut;
     }
 }

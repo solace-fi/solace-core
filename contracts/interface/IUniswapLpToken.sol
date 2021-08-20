@@ -15,10 +15,10 @@ interface IUniswapLpToken is IERC721Enumerable, IERC721Permit {
 
     /**
      * @notice Returns the position information associated with a given token ID.
-     * @param tokenId The ID of the token that represents the position
+     * @param tokenID The ID of the token that represents the position
      * @dev Throws if the token ID is not valid.
      */
-    function positions(uint256 tokenId) external view returns (
+    function positions(uint256 tokenID) external view returns (
         uint96 nonce,
         address operator,
         address token0,
@@ -51,7 +51,7 @@ interface IUniswapLpToken is IERC721Enumerable, IERC721Permit {
     /// @dev Call this when the pool does exist and is initialized. Note that if the pool is created but not initialized
     /// a method does not exist, i.e. the pool is assumed to be initialized.
     /// @param params The params necessary to mint a position, encoded as `MintParams` in calldata
-    /// @return tokenId The ID of the token that represents the minted position
+    /// @return tokenID The ID of the token that represents the minted position
     /// @return liquidity The amount of liquidity for this position
     /// @return amount0 The amount of token0
     /// @return amount1 The amount of token1
@@ -59,7 +59,7 @@ interface IUniswapLpToken is IERC721Enumerable, IERC721Permit {
         external
         payable
         returns (
-            uint256 tokenId,
+            uint256 tokenID,
             uint128 liquidity,
             uint256 amount0,
             uint256 amount1

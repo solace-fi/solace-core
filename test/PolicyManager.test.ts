@@ -185,12 +185,12 @@ describe('PolicyManager', function() {
       expect(policyInfo1.price).to.equal(price);
 
       let policyInfo2 = await policyManager.getPolicyInfo(1);
-      expect(policyInfo2._policyholder).to.equal(user.address);
-      expect(policyInfo2._product).to.equal(walletProduct2.address);
-      expect(policyInfo2._positionContract).to.equal(positionContract.address);
-      expect(policyInfo2._coverAmount).to.equal(coverAmount);
-      expect(policyInfo2._expirationBlock).to.equal(expirationBlock);
-      expect(policyInfo2._price).to.equal(price);
+      expect(policyInfo2.policyholder).to.equal(user.address);
+      expect(policyInfo2.product).to.equal(walletProduct2.address);
+      expect(policyInfo2.positionContract).to.equal(positionContract.address);
+      expect(policyInfo2.coverAmount).to.equal(coverAmount);
+      expect(policyInfo2.expirationBlock).to.equal(expirationBlock);
+      expect(policyInfo2.price).to.equal(price);
 
       expect(await policyManager.getPolicyholder(1)).to.equal(user.address);
       expect(await policyManager.getPolicyProduct(1)).to.equal(walletProduct2.address);

@@ -27,76 +27,76 @@ contract Master is IMaster, Governable {
     /// @notice The number of farms that have been created.
     uint256 public override numFarms;
 
-    /// @notice Given a farm id, return its address.
+    /// @notice Given a farm ID, return its address.
     /// @dev Indexable 1-numFarms, 0 is null farm
     mapping(uint256 => address) public override farmAddresses;
 
-    /// @notice Given a farm address, returns its id.
+    /// @notice Given a farm address, returns its ID.
     /// @dev Returns 0 for not farms and unregistered farms.
     mapping(address => uint256) public override farmIndices;
 
-    /// @notice Given a farm id, how many points the farm was allocated.
+    /// @notice Given a farm ID, how many points the farm was allocated.
     mapping(uint256 => uint256) public override allocPoints;
 
     /**
      * @notice Constructs the master contract.
-     * @param _governance Address of the governor.
-     * @param _solace Address of the solace token.
-     * @param _solacePerBlock Amount of solace to distribute per block.
+     * @param governance_ The address of the [governor](/docs/user-docs/Governance).
+     * @param solace_ Address of the solace token.
+     * @param solacePerBlock_ Amount of solace to distribute per block.
      */
-    constructor(address _governance, SOLACE _solace, uint256 _solacePerBlock) Governable(_governance) {
-        solace = _solace;
-        solacePerBlock = _solacePerBlock;
+    constructor(address governance_, SOLACE solace_, uint256 solacePerBlock_) Governable(governance_) {
+        solace = solace_;
+        solacePerBlock = solacePerBlock_;
     }
 
     /**
      * @notice Registers a farm.
-     * Can only be called by the current governor.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
      * Cannot register a farm more than once.
-     * @param _farmAddress The farm's address.
-     * @param _allocPoints How many points to allocate this farm.
-     * @return farmId The farm id.
+     * @param farmAddress The farm's address.
+     * @param allocPoints_ How many points to allocate this farm.
+     * @return farmID The farm ID.
      */
-    function registerFarm(address _farmAddress, uint256 _allocPoints) external override onlyGovernance returns (uint256 farmId) {
-        require(farmIndices[_farmAddress] == 0, "already registered");
-        farmId = ++numFarms; // starts at 1
-        farmAddresses[farmId] = _farmAddress;
-        farmIndices[_farmAddress] = farmId;
-        solace.approve(_farmAddress, type(uint256).max);
-        _setAllocPoints(farmId, _allocPoints);
-        emit FarmCreated(farmId, _farmAddress);
+    function registerFarm(address farmAddress, uint256 allocPoints_) external override onlyGovernance returns (uint256 farmID) {
+        require(farmIndices[farmAddress] == 0, "already registered");
+        farmID = ++numFarms; // starts at 1
+        farmAddresses[farmID] = farmAddress;
+        farmIndices[farmAddress] = farmID;
+        solace.approve(farmAddress, type(uint256).max);
+        _setAllocPoints(farmID, allocPoints_);
+        emit FarmCreated(farmID, farmAddress);
     }
 
     /**
      * @notice Sets a farm's allocation points.
-     * Can only be called by the current governor.
-     * @param _farmId The farm to set allocation points.
-     * @param _allocPoints How many points to allocate this farm.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param farmID The farm to set allocation points.
+     * @param allocPoints_ How many points to allocate this farm.
      */
-    function setAllocPoints(uint256 _farmId, uint256 _allocPoints) external override onlyGovernance {
-        require(_farmId != 0 && _farmId <= numFarms, "farm does not exist");
-        _setAllocPoints(_farmId, _allocPoints);
+    function setAllocPoints(uint256 farmID, uint256 allocPoints_) external override onlyGovernance {
+        require(farmID != 0 && farmID <= numFarms, "farm does not exist");
+        _setAllocPoints(farmID, allocPoints_);
     }
 
     /**
      * @notice Sets the Solace reward distribution across all farms.
      * Optionally updates all farms.
-     * @param _solacePerBlock Amount of solace to distribute per block.
+     * @param newSolacePerBlock Amount of solace to distribute per block.
      */
-    function setSolacePerBlock(uint256 _solacePerBlock) external override onlyGovernance {
+    function setSolacePerBlock(uint256 newSolacePerBlock) external override onlyGovernance {
         // accounting
-        solacePerBlock = _solacePerBlock;
+        solacePerBlock = newSolacePerBlock;
         _updateRewards();
-        emit RewardsSet(_solacePerBlock);
+        emit RewardsSet(newSolacePerBlock);
     }
 
     /**
      * @notice Updates all farms to be up to date to the current block.
      */
     function massUpdateFarms() public override {
-        uint256 _numFarms = numFarms; // copy to memory to save gas
-        for (uint256 farmId = 1; farmId <= _numFarms; ++farmId) {
-            IFarm(farmAddresses[farmId]).updateFarm();
+        uint256 numFarms_ = numFarms; // copy to memory to save gas
+        for (uint256 farmID = 1; farmID <= numFarms_; ++farmID) {
+            IFarm(farmAddresses[farmID]).updateFarm();
         }
     }
 
@@ -104,9 +104,9 @@ contract Master is IMaster, Governable {
      * @notice Withdraw your rewards from all farms.
      */
     function withdrawRewards() external override {
-        uint256 _numFarms = numFarms; // copy to memory to save gas
-        for (uint256 farmId = 1; farmId <= _numFarms; ++farmId) {
-            IFarm farm = IFarm(farmAddresses[farmId]);
+        uint256 numFarms_ = numFarms; // copy to memory to save gas
+        for (uint256 farmID = 1; farmID <= numFarms_; ++farmID) {
+            IFarm farm = IFarm(farmAddresses[farmID]);
             if(farm.pendingRewards(msg.sender) > 0) {
                 farm.withdrawRewardsForUser(msg.sender);
             }
@@ -115,12 +115,12 @@ contract Master is IMaster, Governable {
 
     /**
     * @notice Sets a farm's allocation points.
-    * @param _farmId The farm to set allocation points.
-    * @param _allocPoints How many points to allocate this farm.
+    * @param farmID The farm to set allocation points.
+    * @param newAllocPoints How many points to allocate this farm.
     */
-    function _setAllocPoints(uint256 _farmId, uint256 _allocPoints) internal {
-      totalAllocPoints = totalAllocPoints - allocPoints[_farmId] + _allocPoints;
-      allocPoints[_farmId] = _allocPoints;
+    function _setAllocPoints(uint256 farmID, uint256 newAllocPoints) internal {
+      totalAllocPoints = totalAllocPoints - allocPoints[farmID] + newAllocPoints;
+      allocPoints[farmID] = newAllocPoints;
       _updateRewards();
     }
 
@@ -128,12 +128,12 @@ contract Master is IMaster, Governable {
      * @notice Updates each farm's block rewards.
      */
     function _updateRewards() internal {
-        uint256 _numFarms = numFarms; // copy to memory to save gas
-        uint256 _solacePerBlock = solacePerBlock;
-        uint256 _totalAllocPoints = totalAllocPoints;
-        for (uint256 farmId = 1; farmId <= _numFarms; ++farmId) {
-            uint256 blockReward = _totalAllocPoints == 0 ? 0 : _solacePerBlock * allocPoints[farmId] / _totalAllocPoints;
-            IFarm(farmAddresses[farmId]).setRewards(blockReward);
+        uint256 numFarms_ = numFarms; // copy to memory to save gas
+        uint256 solacePerBlock_ = solacePerBlock;
+        uint256 totalAllocPoints_ = totalAllocPoints;
+        for (uint256 farmID = 1; farmID <= numFarms_; ++farmID) {
+            uint256 blockReward = totalAllocPoints_ == 0 ? 0 : solacePerBlock_ * allocPoints[farmID] / totalAllocPoints_;
+            IFarm(farmAddresses[farmID]).setRewards(blockReward);
         }
     }
 }

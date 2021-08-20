@@ -20,75 +20,75 @@ interface IRegistry {
 
     // events
     // Emitted when Solace Token is set
-    event SolaceSet(address _solace);
+    event SolaceSet(address solace);
     // Emitted when Master is set
-    event MasterSet(address _master);
+    event MasterSet(address master);
     // Emitted when Vault is set
-    event VaultSet(address _vault);
+    event VaultSet(address vault);
     // Emitted when Treasury is set
-    event TreasurySet(address _treasury);
+    event TreasurySet(address treasury);
     // Emitted when Locker is set
-    event LockerSet(address _locker);
+    event LockerSet(address locker);
     // Emitted when ClaimsEscrow is set
-    event ClaimsEscrowSet(address _claimsEscrow);
+    event ClaimsEscrowSet(address claimsEscrow);
     // Emitted when PolicyManager is set
-    event PolicyManagerSet(address _policyManager);
+    event PolicyManagerSet(address policyManager);
     // Emitted when RiskManager is set
-    event RiskManagerSet(address _riskManager);
+    event RiskManagerSet(address riskManager);
 
     /**
      * @notice Sets the solace token contract.
-     * Can only be called by the current governor.
-     * @param _solace The solace token address.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param solace_ The solace token address.
      */
-    function setSolace(address _solace) external;
+    function setSolace(address solace_) external;
 
     /**
      * @notice Sets the master contract.
-     * Can only be called by the current governor.
-     * @param _master The master contract address.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param master_ The master contract address.
      */
-    function setMaster(address _master) external;
+    function setMaster(address master_) external;
 
     /**
      * @notice Sets the vault contract.
-     * Can only be called by the current governor.
-     * @param _vault The vault contract address.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param vault_ The vault contract address.
      */
-    function setVault(address _vault) external;
+    function setVault(address vault_) external;
 
     /**
      * @notice Sets the treasury contract.
-     * Can only be called by the current governor.
-     * @param _treasury The treasury contract address.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param treasury_ The treasury contract address.
      */
-    function setTreasury(address _treasury) external;
+    function setTreasury(address treasury_) external;
 
     /**
      * @notice Sets the locker contract.
-     * Can only be called by the current governor.
-     * @param _locker The locker address.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param locker_ The locker address.
      */
-    function setLocker(address _locker) external;
+    function setLocker(address locker_) external;
 
     /**
      * @notice Sets the Claims Escrow contract.
-     * Can only be called by the current governor.
-     * @param _claimsEscrow The Claims Escrow address.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param claimsEscrow_ The Claims Escrow address.
      */
-    function setClaimsEscrow(address _claimsEscrow) external;
+    function setClaimsEscrow(address claimsEscrow_) external;
 
     /**
      * @notice Sets the PolicyManager contract.
-     * Can only be called by the current governor.
-     * @param _policyManager The PolicyManager address.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param policyManager_ The PolicyManager address.
      */
-    function setPolicyManager(address _policyManager) external;
+    function setPolicyManager(address policyManager_) external;
 
     /**
      * @notice Sets the RiskManager contract.
-     * Can only be called by the current governor.
-     * @param _riskManager The RiskManager address.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param riskManager_ The RiskManager address.
      */
-    function setRiskManager(address _riskManager) external;
+    function setRiskManager(address riskManager_) external;
 }

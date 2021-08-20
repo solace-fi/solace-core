@@ -7,7 +7,7 @@ import "./interface/IGovernable.sol";
  * @title Governable
  * @author solace.fi
  * @notice Many contracts contain functionality that should only be accessible to a privileged user. The most common access control pattern is OpenZeppelin's [`Ownable`](https://docs.openzeppelin.com/contracts/4.x/access-control#ownership-and-ownable). We instead use `Governable` with a few key differences:
- * - Transferring the governance role is a two step process. The current governance must `setGovernance(_newGovernance)` then the new governance must `acceptGovernance()`. This is to safeguard against accidentally setting ownership to the wrong address and locking yourself out of your contract.
+ * - Transferring the governance role is a two step process. The current governance must `setGovernance(newGovernance)` then the new governance must `acceptGovernance()`. This is to safeguard against accidentally setting ownership to the wrong address and locking yourself out of your contract.
  * - `governance` is a constructor argument instead of `msg.sender`.
  */
 contract Governable is IGovernable {
@@ -19,10 +19,10 @@ contract Governable is IGovernable {
 
     /**
      * @notice Constructs the governable contract.
-     * @param _governance Address of the governor.
+     * @param governance_ The address of the [governor](/docs/user-docs/Governance).
      */
-    constructor(address _governance) {
-        governance = _governance;
+    constructor(address governance_) {
+        governance = governance_;
     }
 
     modifier onlyGovernance() {
@@ -40,11 +40,11 @@ contract Governable is IGovernable {
     /**
      * @notice Initiates transfer of the governance role to a new governor.
      * Transfer is not complete until the new governor accepts the role.
-     * Can only be called by the current governor.
-     * @param _newGovernance The new governor.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param newGovernance_ The new governor.
      */
-    function setGovernance(address _newGovernance) external override onlyGovernance {
-        newGovernance = _newGovernance;
+    function setGovernance(address newGovernance_) external override onlyGovernance {
+        newGovernance = newGovernance_;
     }
 
     /**

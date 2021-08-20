@@ -13,41 +13,42 @@ import "./IFarm.sol";
  */
 interface ISolaceEthLpFarm is IFarm {
     // Emitted when a token is deposited onto the farm.
-    event TokenDeposited(address indexed _user, uint256 _token);
+    event TokenDeposited(address indexed user, uint256 token);
     // Emitted when a token is withdrawn from the farm.
-    event TokenWithdrawn(address indexed _user, uint256 _token);
+    event TokenWithdrawn(address indexed user, uint256 token);
     // Emitted when a user is rewarded.
-    event UserRewarded(address indexed _user, uint256 _amount);
+    event UserRewarded(address indexed user, uint256 amount);
     // Emitted when block reward is changed.
-    event RewardsSet(uint256 _blockReward);
+    event RewardsSet(uint256 blockReward);
     // Emitted when the end block is changed.
-    event FarmEndSet(uint256 _endBlock);
+    event FarmEndSet(uint256 endBlock);
 
     /**
      * @notice Sets the appraisal function.
-     * Can only be called by the current governor.
-     * @param _appraisor The new appraisor.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param newAppraisor The new appraisor.
      */
-    function setAppraisor(address _appraisor) external;
+    function setAppraisor(address newAppraisor) external;
 
     /**
-     * @notice Deposit a token.
-     * User will receive accumulated rewards if any.
-     * @param _tokenId The id of the token to deposit.
+     * @notice Deposit a [**Uniswap LP token**](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager).
+     * User will receive accumulated [`SOLACE`](../SOLACE) rewards if any.
+     * User must `ERC721.approve()` or `ERC721.setApprovalForAll()` first.
+     * @param tokenID The ID of the token to deposit.
      */
-    function deposit(uint256 _tokenId) external;
+    function deposit(uint256 tokenID) external;
 
     /**
-     * @notice Deposit a Uniswap LP token using permit.
-     * User will receive accumulated Solace rewards if any.
-     * @param _depositor The depositing user.
-     * @param _tokenId The id of the token to deposit.
-     * @param _deadline Time the transaction must go through before.
+     * @notice Deposit a [**Uniswap LP token**](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager) using permit.
+     * User will receive accumulated [`SOLACE`](../SOLACE) rewards if any.
+     * @param depositor The depositing user.
+     * @param tokenID The ID of the token to deposit.
+     * @param deadline Time the transaction must go through before.
      * @param v secp256k1 signature
      * @param r secp256k1 signature
      * @param s secp256k1 signature
      */
-    function depositSigned(address _depositor, uint256 _tokenId, uint256 _deadline, uint8 v, bytes32 r, bytes32 s) external;
+    function depositSigned(address depositor, uint256 tokenID, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external;
 
     struct MintAndDepositParams {
         address depositor;
@@ -68,55 +69,60 @@ interface ISolaceEthLpFarm is IFarm {
      * @notice Mint a new Uniswap LP token then deposit it.
      * User will receive accumulated Solace rewards if any.
      * @param params parameters
-     * @return tokenId The newly minted token id.
+     * @return tokenID The newly minted token ID.
      */
-    function mintAndDeposit(MintAndDepositParams calldata params) external payable returns (uint256 tokenId);
+    function mintAndDeposit(MintAndDepositParams calldata params) external payable returns (uint256 tokenID);
 
     /**
-     * @notice Withdraw a token.
-     * User will receive _tokenId and accumulated rewards.
-     * @param _tokenId The id of the token to withdraw.
+     * @notice Withdraw a [**Uniswap LP token**](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager).
+     * User will receive `tokenID` and accumulated rewards.
+     * Can only withdraw tokens you deposited.
+     * @param tokenID The ID of the token to withdraw.
      */
-    function withdraw(uint256 _tokenId) external;
+    function withdraw(uint256 tokenID) external;
 
     /**
-     * @notice Returns the count of ERC721s that a user has deposited onto a farm.
-     * @param _user The user to check count for.
-     * @return The count of deposited ERC721s.
+     * @notice Returns the count of [**Uniswap LP tokens**](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager) that a user has deposited onto the farm.
+     * @param user The user to check count for.
+     * @return count The count of deposited Uniswap LP tokens.
      */
-    function countDeposited(address _user) external view returns (uint256);
+    function countDeposited(address user) external view returns (uint256 count);
 
     /**
-     * @notice Returns the list of ERC721s that a user has deposited onto a farm and their values.
-     * @param _user The user to list ERC721s.
-     * @return The list of deposited ERC721s.
-     * @return The values of the tokens.
+     * @notice Returns the list of [**Uniswap LP tokens**](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager) that a user has deposited onto the farm and their values.
+     * @param user The user to list Uniswap LP tokens.
+     * @return tokenIDs The list of deposited Uniswap LP tokens.
+     * @return tokenValues The values of the tokens.
      */
-    function listDeposited(address _user) external view returns (uint256[] memory, uint256[] memory);
+    function listDeposited(address user) external view returns (uint256[] memory tokenIDs, uint256[] memory tokenValues);
 
     /**
-     * @notice Returns the id of an ERC721 that a user has deposited onto a farm and its value.
-     * @param _user The user to get token id for.
-     * @param _index The farm-based index of the token.
-     * @return The id of the deposited ERC721.
-     * @return The value of the token.
+     * @notice Returns the ID of a [**Uniswap LP token**](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager) that a user has deposited onto a farm and its value.
+     * @param user The user to get token ID for.
+     * @param index The farm-based index of the token.
+     * @return tokenID The ID of the deposited [**Uniswap LP token**](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager).
+     * @return tokenValue The value of the token.
      */
-    function getDeposited(address _user, uint256 _index) external view returns (uint256, uint256);
+    function getDeposited(address user, uint256 index) external view returns (uint256, uint256);
 
     /**
-     * @notice Appraise a Uniswap LP Token.
+     * @notice Appraise a [**Uniswap LP token**](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager).
      * Token must exist and must exist in the correct pool.
-     * @param _tokenId The id of the token to appraise.
-     * @return _value The token's value.
+     * @param tokenID The ID of the token to appraise.
+     * @return tokenValue The token's value.
      */
-    function appraise(uint256 _tokenId) external view returns (uint256 _value);
+    function appraise(uint256 tokenID) external view returns (uint256 tokenValue);
 
-    /// @notice Uniswap V3 LP Token interface.
+    /// @notice [`Uniswap V3 LP Token`](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager).
     function lpToken() external view returns (IUniswapLpToken);
-    /// @notice Native SOLACE Token
+    /// @notice Native [`SOLACE`](../SOLACE) Token.
     function solace() external view override returns (SOLACE);
+    /// @notice WETH.
     function weth() external view returns (IWETH9);
-    function lastRewardBlock() external view returns (uint256);   // Last time rewards were distributed or farm was updated.
-    function accRewardPerShare() external view returns (uint256); // Accumulated rewards per share, times 1e12.
-    function valueStaked() external view returns (uint256);       // Value of tokens staked by all farmers.
+    /// @notice Last time rewards were distributed or farm was updated.
+    function lastRewardBlock() external view returns (uint256);
+    /// @notice Accumulated rewards per share, times 1e12.
+    function accRewardPerShare() external view returns (uint256);
+    /// @notice Value of tokens staked by all farmers.
+    function valueStaked() external view returns (uint256);
 }

@@ -16,8 +16,8 @@ interface ILpAppraisor {
 
     /**
      * @notice Appraise a Uniswap LP Token.
-     * @param _tokenId The id of the token to appraise.
-     * @return _value The token's value.
+     * @param tokenID The ID of the token to appraise.
+     * @return value The token's value.
      */
-    function appraise(uint256 _tokenId) external view returns (uint256 _value);
+    function appraise(uint256 tokenID) external view returns (uint256 value);
 }

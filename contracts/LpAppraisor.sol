@@ -22,49 +22,49 @@ contract LpAppraisor is ILpAppraisor, Governable {
 
     /**
      * @notice Constructs the LP Appraisor contract.
-     * @param _governance Address of the governor.
-     * @param _lpToken Address of the LP token.
-     * @param _curve_A Appraisal curve value A.
-     * @param _curve_B Appraisal curve value B.
+     * @param governance_ The address of the [governor](/docs/user-docs/Governance).
+     * @param lpToken_ Address of the LP token.
+     * @param curve_A_ Appraisal curve value A.
+     * @param curve_B_ Appraisal curve value B.
      */
     constructor(
-        address _governance,
-        address _lpToken,
-        uint256 _curve_A,
-        uint256 _curve_B
-    ) Governable(_governance) {
-        lpToken = IUniswapLpToken(_lpToken);
-        curve_A = _curve_A;
-        curve_B2 = _curve_B**2;
+        address governance_,
+        address lpToken_,
+        uint256 curve_A_,
+        uint256 curve_B_
+    ) Governable(governance_) {
+        lpToken = IUniswapLpToken(lpToken_);
+        curve_A = curve_A_;
+        curve_B2 = curve_B_**2;
     }
 
     /**
      * @notice Modifies the appraisal curve, and with it the incentive structure.
-     * Can only be called by the current governor.
-     * @param _curve_A The curve parameter A.
-     * @param _curve_B The curve parameter B.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param curve_A_ The curve parameter A.
+     * @param curve_B_ The curve parameter B.
      */
-    function setCurve(uint256 _curve_A, uint256 _curve_B) external onlyGovernance {
-        curve_A = _curve_A;
-        curve_B2 = _curve_B**2;
+    function setCurve(uint256 curve_A_, uint256 curve_B_) external onlyGovernance {
+        curve_A = curve_A_;
+        curve_B2 = curve_B_**2;
     }
 
     /**
      * @notice Appraise a Uniswap LP Token.
      * Token must exist and must exist in the correct pool.
-     * @param _tokenId The id of the token to appraise.
-     * @return _value The token's value.
+     * @param tokenID The ID of the token to appraise.
+     * @return value The token's value.
      */
-    function appraise(uint256 _tokenId) external view override returns (uint256 _value) {
+    function appraise(uint256 tokenID) external view override returns (uint256 value) {
         // get position
         ( , , , , , int24 tickLower, int24 tickUpper, uint128 liquidity, , , , )
-        = lpToken.positions(_tokenId);
+        = lpToken.positions(tokenID);
         // appraise
         uint256 width = (uint256(int256(tickUpper - tickLower)));
-        _value = liquidity * width;
+        value = liquidity * width;
         if (width > curve_A) {
-            _value = _value * curve_B2 / ( (width-curve_A)**2 + curve_B2);
+            value = value * curve_B2 / ( (width-curve_A)**2 + curve_B2);
         }
-        return _value;
+        return value;
     }
 }

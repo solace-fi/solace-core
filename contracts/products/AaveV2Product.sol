@@ -48,55 +48,55 @@ contract AaveV2Product is BaseProduct, EIP712 {
 
     /**
       * @notice The constructor.
-      * @param _governance The governor.
-      * @param _policyManager The IPolicyManager contract.
-      * @param _registry The IRegistry contract.
-      * @param _dataProvider Aave protocol data provider address.
-      * @param _minPeriod The minimum policy period in blocks to purchase a **policy**.
-      * @param _maxPeriod The maximum policy period in blocks to purchase a **policy**.
-      * @param _price The cover price for the **Product**.
-      * @param _maxCoverPerUserDivisor The max cover amount divisor for per user. (maxCover / divisor = maxCoverPerUser).
+      * @param governance_ The governor.
+      * @param policyManager_ The IPolicyManager contract.
+      * @param registry_ The IRegistry contract.
+      * @param dataProvider_ Aave protocol data provider address.
+      * @param minPeriod_ The minimum policy period in blocks to purchase a **policy**.
+      * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
+      * @param price_ The cover price for the **Product**.
+      * @param maxCoverPerUserDivisor_ The max cover amount divisor for per user. (maxCover / divisor = maxCoverPerUser).
      */
     constructor (
-        address _governance,
-        IPolicyManager _policyManager,
-        IRegistry _registry,
-        address _dataProvider,
-        uint40 _minPeriod,
-        uint40 _maxPeriod,
-        uint24 _price,
-        uint32 _maxCoverPerUserDivisor
+        address governance_,
+        IPolicyManager policyManager_,
+        IRegistry registry_,
+        address dataProvider_,
+        uint40 minPeriod_,
+        uint40 maxPeriod_,
+        uint24 price_,
+        uint32 maxCoverPerUserDivisor_
     ) BaseProduct(
-        _governance,
-        _policyManager,
-        _registry,
-        _dataProvider,
-        _minPeriod,
-        _maxPeriod,
-        _price,
-        _maxCoverPerUserDivisor
+        governance_,
+        policyManager_,
+        registry_,
+        dataProvider_,
+        minPeriod_,
+        maxPeriod_,
+        price_,
+        maxCoverPerUserDivisor_
     ) EIP712("Solace.fi-AaveV2Product", "1") {
-        aaveDataProvider = IAaveProtocolDataProvider(_dataProvider);
+        aaveDataProvider = IAaveProtocolDataProvider(dataProvider_);
     }
 
     /**
      * @notice It gives the user's total position in the product's protocol.
-     * The `_positionContract` must be a **aToken** (Please see https://etherscan.io/tokens/label/aave-v2 for more information).
-     * @param _policyholder The `buyer` who is requesting the coverage quote.
-     * @param _positionContract The address of the exact smart contract the `buyer` has their position in (e.g., for UniswapProduct this would be Pair's address).
+     * The `positionContract` must be a **aToken** (Please see https://etherscan.io/tokens/label/aave-v2 for more information).
+     * @param policyholder The `buyer` who is requesting the coverage quote.
+     * @param positionContract The address of the exact smart contract the `buyer` has their position in (e.g., for UniswapProduct this would be Pair's address).
      * @return positionAmount The user's total position in **Wei** in the product's protocol.
      */
-    function appraisePosition(address _policyholder, address _positionContract) public view override returns (uint256 positionAmount) {
-        // verify _positionContract
-        IAToken token = IAToken(_positionContract);
+    function appraisePosition(address policyholder, address positionContract) public view override returns (uint256 positionAmount) {
+        // verify positionContract
+        IAToken token = IAToken(positionContract);
         address underlying = token.UNDERLYING_ASSET_ADDRESS();
         ( address aTokenAddress, , ) = aaveDataProvider.getReserveTokensAddresses(underlying);
-        require(_positionContract == aTokenAddress, "Invalid position contract");
+        require(positionContract == aTokenAddress, "Invalid position contract");
         // get price oracle
         ILendingPoolAddressesProvider addressProvider = ILendingPoolAddressesProvider(aaveDataProvider.ADDRESSES_PROVIDER());
         IAavePriceOracle oracle = IAavePriceOracle(addressProvider.getPriceOracle());
         // swap math
-        uint256 balance = token.balanceOf(_policyholder);
+        uint256 balance = token.balanceOf(policyholder);
         uint256 price = oracle.getAssetPrice(underlying);
         uint8 decimals = token.decimals();
         return balance * price / 10**decimals;
@@ -141,12 +141,12 @@ contract AaveV2Product is BaseProduct, EIP712 {
      * @notice Changes the covered platform.
      * The function is used for if the the protocol changes their registry but keeps the children contracts.
      * A new version of the protocol will likely require a new Product.
-     * Can only be called by the current `governor`.
-     * @param _dataProvider The platform to cover.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param dataProvider The platform to cover.
      */
-    function setCoveredPlatform(address _dataProvider) public override {
-        super.setCoveredPlatform(_dataProvider);
-        aaveDataProvider = IAaveProtocolDataProvider(_dataProvider);
+    function setCoveredPlatform(address dataProvider) public override {
+        super.setCoveredPlatform(dataProvider);
+        aaveDataProvider = IAaveProtocolDataProvider(dataProvider);
     }
 
     /**

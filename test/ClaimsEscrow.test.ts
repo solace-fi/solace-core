@@ -120,8 +120,8 @@ describe("ClaimsEscrow", function () {
       expect(claim1.amount).to.equal(testClaimAmount);
       expect(claim1.receivedAt).to.be.closeTo(timestamp, 900);
       const claim2 = await claimsEscrow.getClaim(claimID);
-      expect(claim2._amount).to.equal(testClaimAmount);
-      expect(claim2._receivedAt).to.be.closeTo(timestamp, 900);
+      expect(claim2.amount).to.equal(testClaimAmount);
+      expect(claim2.receivedAt).to.be.closeTo(timestamp, 900);
     });
   });
 

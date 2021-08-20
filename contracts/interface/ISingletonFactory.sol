@@ -9,10 +9,10 @@ pragma solidity 0.8.6;
  */
 interface ISingletonFactory {
     /**
-     * @notice Deploys `_initCode` using `_salt` for defining the deterministic address.
-     * @param _initCode Initialization code.
-     * @param _salt Arbitrary value to modify resulting address.
+     * @notice Deploys `initCode` using `salt` for defining the deterministic address.
+     * @param initCode Initialization code.
+     * @param salt Arbitrary value to modify resulting address.
      * @return createdContract Created contract address.
      */
-    function deploy(bytes memory _initCode, bytes32 _salt) external returns (address payable createdContract);
+    function deploy(bytes memory initCode, bytes32 salt) external returns (address payable createdContract);
 }

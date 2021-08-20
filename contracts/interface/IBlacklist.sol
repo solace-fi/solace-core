@@ -10,8 +10,8 @@ pragma solidity 0.8.6;
 interface IBlacklist {
     /**
      * @notice Checks if account is blacklisted.
-     * @param _account The address to check.
+     * @param account The address to check.
      * @return status True if the account is blacklisted.
      */
-    function isBlacklisted(address _account) external view returns (bool status);
+    function isBlacklisted(address account) external view returns (bool status);
 }

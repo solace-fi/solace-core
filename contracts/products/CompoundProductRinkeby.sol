@@ -36,54 +36,54 @@ contract CompoundProductRinkeby is BaseProduct, EIP712 {
 
     /**
       * @notice The constructor.
-      * @param _governance The governor.
-      * @param _policyManager The IPolicyManager contract.
-      * @param _registry The IRegistry contract.
-      * @param _coveredPlatform A platform contract which locates contracts that are covered by this product.
-      * @param _minPeriod The minimum policy period in blocks to purchase a **policy**.
-      * @param _maxPeriod The maximum policy period in blocks to purchase a **policy**.
-      * @param _price The cover price for the **Product**.
-      * @param _maxCoverPerUserDivisor The max cover amount divisor for per user. (maxCover / divisor = maxCoverPerUser).
-      * @param _quoter The exchange quoter address.
+      * @param governance_ The governor.
+      * @param policyManager_ The IPolicyManager contract.
+      * @param registry_ The IRegistry contract.
+      * @param coveredPlatform_ A platform contract which locates contracts that are covered by this product.
+      * @param minPeriod_ The minimum policy period in blocks to purchase a **policy**.
+      * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
+      * @param price_ The cover price for the **Product**.
+      * @param maxCoverPerUserDivisor_ The max cover amount divisor for per user. (maxCover / divisor = maxCoverPerUser).
+      * @param quoter_ The exchange quoter address.
      */
     constructor (
-        address _governance,
-        IPolicyManager _policyManager,
-        IRegistry _registry,
-        address _coveredPlatform,
-        uint40 _minPeriod,
-        uint40 _maxPeriod,
-        uint24 _price,
-        uint32 _maxCoverPerUserDivisor,
-        address _quoter
+        address governance_,
+        IPolicyManager policyManager_,
+        IRegistry registry_,
+        address coveredPlatform_,
+        uint40 minPeriod_,
+        uint40 maxPeriod_,
+        uint24 price_,
+        uint32 maxCoverPerUserDivisor_,
+        address quoter_
     ) BaseProduct(
-        _governance,
-        _policyManager,
-        _registry,
-        _coveredPlatform,
-        _minPeriod,
-        _maxPeriod,
-        _price,
-        _maxCoverPerUserDivisor
+        governance_,
+        policyManager_,
+        registry_,
+        coveredPlatform_,
+        minPeriod_,
+        maxPeriod_,
+        price_,
+        maxCoverPerUserDivisor_
     ) EIP712("Solace.fi-CompoundProduct", "1") {
-        comptroller = IComptrollerRinkeby(_coveredPlatform);
-        quoter = IExchangeQuoter(_quoter);
+        comptroller = IComptrollerRinkeby(coveredPlatform_);
+        quoter = IExchangeQuoter(quoter_);
     }
 
     /**
      * @notice It gives the user's total position in the product's protocol.
-     * The `_positionContract` must be a **cToken** including **cETH** (Please refer to https://compound.finance/markets and https://etherscan.io/accounts/label/compound for more information).
-     * @param _policyholder The `buyer` who is requesting the coverage quote.
-     * @param _positionContract The address of the exact smart contract the `buyer` has their position in (e.g., for UniswapProduct this would be Pair's address).
+     * The `positionContract` must be a **cToken** including **cETH** (Please refer to https://compound.finance/markets and https://etherscan.io/accounts/label/compound for more information).
+     * @param policyholder The `buyer` who is requesting the coverage quote.
+     * @param positionContract The address of the exact smart contract the `buyer` has their position in (e.g., for UniswapProduct this would be Pair's address).
      * @return positionAmount The user's total position in **Wei** in the product's protocol.
      */
-    function appraisePosition(address _policyholder, address _positionContract) public view override returns (uint256 positionAmount) {
-        // verify _positionContract
-        (bool isListed, ) = comptroller.markets(_positionContract);
+    function appraisePosition(address policyholder, address positionContract) public view override returns (uint256 positionAmount) {
+        // verify positionContract
+        (bool isListed, ) = comptroller.markets(positionContract);
         require(isListed, "Invalid position contract");
         // swap math
-        ICToken token = ICToken(_positionContract);
-        uint256 balance = token.balanceOf(_policyholder);
+        ICToken token = ICToken(positionContract);
+        uint256 balance = token.balanceOf(policyholder);
         uint256 exchangeRate = token.exchangeRateStored();
         balance = balance * exchangeRate / 1e18;
         if(compareStrings(token.symbol(), "cETH")) return balance;
@@ -129,23 +129,23 @@ contract CompoundProductRinkeby is BaseProduct, EIP712 {
      * @notice Changes the covered platform.
      * The function is used for if the the protocol changes their registry but keeps the children contracts.
      * A new version of the protocol will likely require a new Product.
-     * Can only be called by the current `governor`.
-     * @param _coveredPlatform The platform to cover.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param coveredPlatform_ The platform to cover.
      */
-    function setCoveredPlatform(address _coveredPlatform) public override {
-        super.setCoveredPlatform(_coveredPlatform);
-        comptroller = IComptrollerRinkeby(_coveredPlatform);
+    function setCoveredPlatform(address coveredPlatform_) public override {
+        super.setCoveredPlatform(coveredPlatform_);
+        comptroller = IComptrollerRinkeby(coveredPlatform_);
     }
 
     /**
      * @notice Sets a new ExchangeQuoter.
-     * Can only be called by the current `governor`.
-     * @param _quoter The new quoter address.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param quoter_ The new quoter address.
      */
-    function setExchangeQuoter(address _quoter) external {
+    function setExchangeQuoter(address quoter_) external {
         // can only be called by governor
         require(msg.sender == governance, "!governance");
-        quoter = IExchangeQuoter(_quoter);
+        quoter = IExchangeQuoter(quoter_);
     }
 
     /**
