@@ -160,38 +160,38 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard, Governable {
      * @notice Sets the amount of [`SOLACE`](./SOLACE) to distribute per block.
      * Only affects future rewards.
      * Can only be called by [`Master`](./Master).
-     * @param newBlockReward Amount to distribute per block.
+     * @param blockReward_ Amount to distribute per block.
      */
-    function setRewards(uint256 newBlockReward) external override {
+    function setRewards(uint256 blockReward_) external override {
         // can only be called by master contract
         require(msg.sender == master, "!master");
         // update
         updateFarm();
         // accounting
-        blockReward = newBlockReward;
-        emit RewardsSet(newBlockReward);
+        blockReward = blockReward_;
+        emit RewardsSet(blockReward_);
     }
 
     /**
      * @notice Sets the farm's end block. Used to extend the duration.
      * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param newEndBlock The new end block.
+     * @param endBlock_ The new end block.
      */
-    function setEnd(uint256 newEndBlock) external override onlyGovernance {
+    function setEnd(uint256 endBlock_) external override onlyGovernance {
         // accounting
-        endBlock = newEndBlock;
+        endBlock = endBlock_;
         // update
         updateFarm();
-        emit FarmEndSet(newEndBlock);
+        emit FarmEndSet(endBlock_);
     }
 
     /**
      * @notice Sets the appraisal function.
      * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param newAppraisor The new appraisor.
+     * @param appraisor_ The new appraisor.
      */
-    function setAppraisor(address newAppraisor) external override onlyGovernance {
-        appraisor = ILpAppraisor(newAppraisor);
+    function setAppraisor(address appraisor_) external override onlyGovernance {
+        appraisor = ILpAppraisor(appraisor_);
     }
 
     /**
@@ -200,7 +200,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard, Governable {
      * User must `ERC721.approve()` or `ERC721.setApprovalForAll()` first.
      * @param tokenID The ID of the token to deposit.
      */
-    function deposit(uint256 tokenID) external override nonReentrant {
+    function depositLp(uint256 tokenID) external override nonReentrant {
         // pull token
         lpToken.transferFrom(msg.sender, address(this), tokenID);
         // accounting
@@ -217,7 +217,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard, Governable {
      * @param r secp256k1 signature
      * @param s secp256k1 signature
      */
-    function depositSigned(address depositor, uint256 tokenID, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external override nonReentrant {
+    function depositLpSigned(address depositor, uint256 tokenID, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external override nonReentrant {
         // permit
         lpToken.permit(address(this), tokenID, deadline, v, r, s);
         // pull token
@@ -279,7 +279,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard, Governable {
      * Can only withdraw tokens you deposited.
      * @param tokenID The ID of the token to withdraw.
      */
-    function withdraw(uint256 tokenID) external override nonReentrant {
+    function withdrawLp(uint256 tokenID) external override nonReentrant {
         // harvest and update farm
         _harvest(msg.sender);
         // get farmer information

@@ -20,13 +20,13 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
     using SafeERC20 for IERC20;
 
     /// @notice Registry
-    IRegistry public registry;
+    IRegistry public _registry;
 
     /// @notice Address of Uniswap router.
-    ISwapRouter public swapRouter;
+    ISwapRouter public _swapRouter;
 
     /// @notice Wrapped ether.
-    IWETH9 public weth;
+    IWETH9 public _weth;
 
     address public constant ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
@@ -41,33 +41,19 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
      * @notice Constructs the treasury contract.
      * @param governance_ The address of the [governor](/docs/user-docs/Governance).
      * @param swapRouter_ Address of uniswap router.
-     * @param weth_ Address of wrapped ether.
      * @param registry_ Address of registry.
      */
-    constructor(address governance_, address swapRouter_, address weth_, address registry_) Governable(governance_) {
-        swapRouter = ISwapRouter(swapRouter_);
-        weth = IWETH9(payable(weth_));
-        registry = IRegistry(registry_);
+    constructor(address governance_, address swapRouter_, address registry_) Governable(governance_) {
+        _swapRouter = ISwapRouter(swapRouter_);
+        _registry = IRegistry(registry_);
+        _weth = IWETH9(payable(_registry.weth()));
 
-        if (registry_ != address(0) && registry.vault() != address(0)) {
-            premiumRecipients = [payable(registry.vault())];
+        // if vault is deployed, route 100% of the premiums to it
+        if (registry_ != address(0) && _registry.vault() != address(0)) {
+            premiumRecipients = [payable(_registry.vault())];
             recipientWeights = [1,0];
             weightSum = 1;
-        }
-    }
-
-    /**
-     * @notice Fallback function to allow contract to receive **ETH**.
-     */
-    receive () external payable override {
-        emit EthDeposited(msg.value);
-    }
-
-    /**
-     * @notice Fallback function to allow contract to receive **ETH**.
-     */
-    fallback () external payable override {
-        emit EthDeposited(msg.value);
+        } // if vault is not deployed, hold 100% of the premiums in the treasury
     }
 
     /**
@@ -120,11 +106,11 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
             tokenAddr := div(mload(add(add(path, 0x20), 0)), 0x1000000000000000000000000)
         }
         IERC20 token = IERC20(tokenAddr);
-        if(token.allowance(address(this), address(swapRouter)) < amountIn) {
-            token.approve(address(swapRouter), type(uint256).max);
+        if(token.allowance(address(this), address(_swapRouter)) < amountIn) {
+            token.approve(address(_swapRouter), type(uint256).max);
         }
         // swap
-        swapRouter.exactInput(ISwapRouter.ExactInputParams({
+        _swapRouter.exactInput(ISwapRouter.ExactInputParams({
             path: path,
             recipient: address(this),
             // solhint-disable-next-line not-rely-on-time
@@ -176,7 +162,7 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
      * @param amount The amount to wrap.
      */
     function wrap(uint256 amount) external override onlyGovernance {
-        weth.deposit{value: amount}();
+        _weth.deposit{value: amount}();
     }
 
     /**
@@ -185,7 +171,7 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
      * @param amount The amount to unwrap.
      */
     function unwrap(uint256 amount) external override onlyGovernance {
-        weth.withdraw(amount);
+        _weth.withdraw(amount);
     }
 
     /**
@@ -198,7 +184,7 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
      */
     function refund(address user, uint256 amount) external override nonReentrant {
         // check if from active product
-        require(IPolicyManager(registry.policyManager()).productIsActive(msg.sender), "!product");
+        require(IPolicyManager(_registry.policyManager()).productIsActive(msg.sender), "!product");
         _transferEth(user, amount);
     }
 
@@ -221,11 +207,11 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
         amount += unpaidRefunds1;
         if(amount == 0) return;
         // transfer amount from vault
-        if (registry.vault() != address(0)) IVault(registry.vault()).requestEth(amount);
+        if (_registry.vault() != address(0)) IVault(payable(_registry.vault())).requestEth(amount);
         // unwrap weth if necessary
         if(address(this).balance < amount) {
             uint256 diff = amount - address(this).balance;
-            weth.withdraw(min(weth.balanceOf(address(this)), diff));
+            _weth.withdraw(min(_weth.balanceOf(address(this)), diff));
         }
         // send eth
         uint256 transferAmount = min(address(this).balance, amount);
@@ -242,5 +228,23 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
      */
     function min(uint256 a, uint256 b) internal pure returns (uint256 c) {
         return a <= b ? a : b;
+    }
+
+    /***************************************
+    FALLBACK FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Fallback function to allow contract to receive **ETH**.
+     */
+    receive () external payable override {
+        emit EthDeposited(msg.value);
+    }
+
+    /**
+     * @notice Fallback function to allow contract to receive **ETH**.
+     */
+    fallback () external payable override {
+        emit EthDeposited(msg.value);
     }
 }

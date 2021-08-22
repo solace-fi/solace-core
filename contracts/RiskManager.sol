@@ -13,29 +13,146 @@ import "./interface/IRiskManager.sol";
  * @author solace.fi
  * @notice Calculates the acceptable risk, sellable cover, and capital requirements of Solace products and capital pool.
  *
- * Governance can reallocate capital towards different products and change the partial reserves factor for leverage.
+ * The total amount of sellable coverage is proportional to the assets in the [**risk backing capital pool**](./Vault). The max cover is split amongst products in a weighting system. Governance can change these weights and with it each product's sellable cover.
+ *
+ * The minimum capital requirement is proportional to the amount of cover sold to [active policies](./PolicyManager).
+ *
+ * Solace can use leverage to sell more cover than the available capital. The amount of leverage is stored as [`partialReservesFactor`](#partialreservesfactor) and is settable by governance.
  */
 contract RiskManager is IRiskManager, Governable {
 
-    /// @notice Multiplier for minimum capital requirement in BPS.
-    uint16 public override partialReservesFactor;
+    /***************************************
+    GLOBAL VARIABLES
+    ***************************************/
 
-    uint32 public weightSum;
-    address[] public products;
-    mapping(address => uint32) public weights;
+    // max cover variables
+    address[] internal _products;
+    mapping(address => uint32) internal _weights;
+    uint32 internal _weightSum;
 
-    /// @notice Registry
-    IRegistry public registry;
+    // Multiplier for minimum capital requirement in BPS.
+    uint16 internal _partialReservesFactor;
+
+    // Registry
+    IRegistry internal _registry;
 
     /**
-     * @notice Constructs the risk manager contract.
+     * @notice Constructs the RiskManager contract.
      * @param governance_ The address of the [governor](/docs/user-docs/Governance).
      * @param registry_ Address of registry.
      */
     constructor(address governance_, address registry_) Governable(governance_) {
-        registry = IRegistry(registry_);
-        weightSum = type(uint32).max; // no div by zero
-        partialReservesFactor = 10000;
+        _registry = IRegistry(registry_);
+        _weightSum = type(uint32).max; // no div by zero
+        _partialReservesFactor = 10000;
+    }
+
+    /***************************************
+    MAX COVER VIEW FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice The maximum amount of cover that Solace as a whole can sell.
+     * @return cover The max amount of cover in wei.
+     */
+    function maxCover() public view override returns (uint256 cover) {
+        return IVault(payable(_registry.vault())).totalAssets() * 10000 / _partialReservesFactor;
+    }
+
+    /**
+     * @notice The maximum amount of cover that a product can sell.
+     * @param product The product that wants to sell cover.
+     * @return cover The max amount of cover in wei.
+     */
+    function maxCoverAmount(address product) external view override returns (uint256 cover) {
+        return maxCover() * _weights[product] / _weightSum;
+    }
+
+    /**
+     * @notice Return the number of registered products.
+     * @return count Number of products.
+     */
+    function numProducts() external view override returns (uint256 count) {
+        return _products.length;
+    }
+
+    /**
+     * @notice Return the product at an index.
+     * @dev Enumerable [0,numProducts-1].
+     * @param index Index to query.
+     * @return prod The product address.
+     */
+    function product(uint256 index) external view override returns (address prod) {
+        require(index < _products.length, "out of bounds");
+        return _products[index];
+    }
+
+    /**
+     * @notice Returns the weight of a product.
+     * @param product Product to query.
+     * @return mass The product's weight.
+     */
+    function weight(address product) external view override returns (uint32 mass) {
+        return _weights[product];
+    }
+
+    /**
+     * @notice Returns the sum of weights.
+     * @return sum WeightSum.
+     */
+    function weightSum() external view override returns (uint32 sum) {
+        return _weightSum;
+    }
+
+    /***************************************
+    MIN CAPITAL VIEW FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice The minimum amount of capital required to safely cover all policies.
+     * @return mcr The minimum capital requirement.
+     */
+    function minCapitalRequirement() external view override returns (uint256 mcr) {
+        return IPolicyManager(_registry.policyManager()).activeCoverAmount() * _partialReservesFactor / 10000;
+    }
+
+    /**
+     * @notice Multiplier for minimum capital requirement.
+     * @return factor Partial reserves factor in BPS.
+     */
+    function partialReservesFactor() external view override returns (uint16 factor) {
+        return _partialReservesFactor;
+    }
+
+    /***************************************
+    GOVERNANCE FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Adds a new product and sets its weight.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param product Address of new product.
+     * @param weight The products weight.
+     */
+    function addProduct(address product, uint32 weight) external override onlyGovernance {
+        // or changes an existing product's weight
+        // don't keep endlessly changing weights like this, use setProductWeights instead
+
+        if(_products.length == 0) {
+            // add the first product
+            require(weight > 0, "1/0");
+            _weights[product] = weight;
+            _products.push(product);
+            _weightSum = weight;
+        } else {
+            // add another product
+            uint32 prevWeight = _weights[product];
+            _weights[product] = weight;
+            _products.push(product);
+            uint32 weightSum_ = _weightSum - prevWeight + weight;
+            require(weightSum_ > 0, "1/0");
+            _weightSum = weightSum_;
+        }
     }
 
     /**
@@ -48,46 +165,30 @@ contract RiskManager is IRiskManager, Governable {
         // check recipient - weight map
         require(products_.length == weights_.length, "length mismatch");
         // delete old products
-        while(products.length > 0) {
-            address product = products[products.length-1];
-            delete weights[product];
-            products.pop();
+        while(_products.length > 0) {
+            address product = _products[_products.length-1];
+            delete _weights[product];
+            _products.pop();
         }
         // add new products
-        uint32 sum = 0;
+        uint32 weightSum_ = 0;
         uint256 length = products_.length;
         for(uint256 i = 0; i < length; i++) {
-            require(weights[products_[i]] == 0, "duplicate product");
-            weights[products_[i]] = weights_[i];
-            sum += weights_[i];
+            require(_weights[products_[i]] == 0, "duplicate product");
+            _weights[products_[i]] = weights_[i];
+            weightSum_ += weights_[i];
         }
-        require(sum > 0, "1/0");
-        weightSum = sum;
-        products = products_;
+        require(weightSum_ > 0, "1/0");
+        _weightSum = weightSum_;
+        _products = products_;
     }
 
     /**
      * @notice Sets the partial reserves factor.
      * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param factor New partial reserves factor in BPS.
+     * @param partialReservesFactor_ New partial reserves factor in BPS.
      */
-    function setPartialReservesFactor(uint16 factor) external override onlyGovernance {
-        partialReservesFactor = factor;
-    }
-
-    /**
-     * @notice The maximum amount of cover that a product can sell.
-     * @param product The product that wants to sell cover.
-     * @return The max amount of cover in wei.
-     */
-    function maxCoverAmount(address product) external view override returns (uint256) {
-        return IVault(registry.vault()).totalAssets() * weights[product] / weightSum;
-    }
-
-    /**
-     * @notice The minimum amount of capital required to safely cover all policies.
-     */
-    function minCapitalRequirement() external view override returns (uint256) {
-        return IPolicyManager(registry.policyManager()).activeCoverAmount() * partialReservesFactor / 10000;
+    function setPartialReservesFactor(uint16 partialReservesFactor_) external override onlyGovernance {
+        _partialReservesFactor = partialReservesFactor_;
     }
 }

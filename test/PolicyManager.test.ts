@@ -42,10 +42,10 @@ describe('PolicyManager', function() {
     registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
 
     // deploy treasury contract
-    treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, ZERO_ADDRESS, ZERO_ADDRESS, registry.address])) as Treasury;
+    treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, ZERO_ADDRESS, registry.address])) as Treasury;
 
     // deploy vault contract
-    vault = (await deployContract(deployer,artifacts.Vault,[governor.address,registry.address, ZERO_ADDRESS])) as Vault;
+    vault = (await deployContract(deployer,artifacts.Vault,[governor.address,registry.address])) as Vault;
 
     // deploy risk manager contract
     riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;

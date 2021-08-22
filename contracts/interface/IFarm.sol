@@ -33,16 +33,16 @@ interface IFarm {
      * @notice Sets the amount of [`SOLACE`](../SOLACE) to distribute per block.
      * Only affects future rewards.
      * Can only be called by [`Master`](../Master).
-     * @param newBlockReward Amount to distribute per block.
+     * @param blockReward_ Amount to distribute per block.
      */
-    function setRewards(uint256 newBlockReward) external;
+    function setRewards(uint256 blockReward_) external;
 
     /**
      * @notice Sets the farm's end block. Used to extend the duration.
      * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param newEndBlock The new end block.
+     * @param endBlock_ The new end block.
      */
-    function setEnd(uint256 newEndBlock) external;
+    function setEnd(uint256 endBlock_) external;
 
     /**
      * @notice Withdraw your rewards without unstaking your tokens.

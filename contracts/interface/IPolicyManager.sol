@@ -13,33 +13,19 @@ import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
  *
  * Policies are [**ERC721s**](https://docs.openzeppelin.com/contracts/4.x/api/token/erc721#ERC721).
  */
-interface IPolicyManager /*is IERC721Enumerable, IERC721Metadata*/ {
+interface IPolicyManager is IERC721Enumerable /*, IERC721Metadata*/ {
+
+    /***************************************
+    EVENTS
+    ***************************************/
+    /// @notice Emitted when a new product is added.
     event ProductAdded(address product);
+    /// @notice Emitted when a new product is removed.
     event ProductRemoved(address product);
+    /// @notice Emitted when a policy is created.
     event PolicyCreated(uint256 tokenID);
+    /// @notice Emitted when a policy is created.
     event PolicyBurned(uint256 tokenID);
-
-    /**
-     * @notice Adds a new product.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param product the new product
-     */
-    function addProduct(address product) external;
-
-    /**
-     * @notice Removes a product.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param product the product to remove
-     */
-    function removeProduct(address product) external;
-
-
-    /**
-     * @notice Set the token descriptor.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param policyDescriptor The new token descriptor address.
-     */
-    function setPolicyDescriptor(address policyDescriptor) external;
 
     /// @notice The address of the policy descriptor contract, which handles generating token URIs for policies.
     function policyDescriptor() external view returns (address);
@@ -177,4 +163,30 @@ interface IPolicyManager /*is IERC721Enumerable, IERC721Metadata*/ {
     // other view functions
 
     function activeCoverAmount() external view returns (uint256);
+
+    /***************************************
+    GOVERNANCE FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Adds a new product.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param product the new product
+     */
+    function addProduct(address product) external;
+
+    /**
+     * @notice Removes a product.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param product the product to remove
+     */
+    function removeProduct(address product) external;
+
+
+    /**
+     * @notice Set the token descriptor.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param policyDescriptor The new token descriptor address.
+     */
+    function setPolicyDescriptor(address policyDescriptor) external;
 }

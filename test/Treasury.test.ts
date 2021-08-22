@@ -26,7 +26,7 @@ describe("Treasury", function() {
   let mockProduct: Wallet;
 
   // solace contracts
-  let solaceToken: Solace;
+  let solace: Solace;
   let treasury: Treasury;
   let weth: Weth9;
   let registry: Registry;
@@ -59,14 +59,13 @@ describe("Treasury", function() {
     [deployer, governor, liquidityProvider, mockPolicy, user, randAddress, mockProduct] = provider.getWallets();
     artifacts = await import_artifacts();
 
-    // deploy registry contract
     registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
-
-    // deploy solace token
-    solaceToken = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
-
-    // deploy weth
     weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
+    await registry.connect(governor).setWeth(weth.address);
+
+    // deploy solace
+    solace = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
+
 
     // deploy mock token 1
     mockToken1 = (await deployContract(deployer, artifacts.MockERC20, ["Mock Token 1", "MKT1", ONE_MILLION_ETHER])) as MockErc20;
@@ -90,41 +89,43 @@ describe("Treasury", function() {
     uniswapPositionManager = (await deployContract(deployer, artifacts.NonfungiblePositionManager, [uniswapFactory.address, weth.address, ZERO_ADDRESS])) as Contract;
 
     // deploy treasury contract
-    treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, uniswapRouter.address, weth.address, registry.address])) as Treasury;
+    treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, uniswapRouter.address, registry.address])) as Treasury;
+    await registry.connect(governor).setTreasury(treasury.address);
 
     // deploy policy manager
     policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
+    await registry.connect(governor).setPolicyManager(policyManager.address);
 
     // transfer tokens
-    await solaceToken.connect(governor).addMinter(governor.address);
-    await solaceToken.connect(governor).mint(governor.address, ONE_MILLION_ETHER);
+    await solace.connect(governor).addMinter(governor.address);
+    await solace.connect(governor).mint(governor.address, ONE_MILLION_ETHER);
     await weth.connect(liquidityProvider).deposit({ value: TEN_ETHER });
-    await solaceToken.connect(governor).transfer(liquidityProvider.address, TEN_ETHER);
+    await solace.connect(governor).transfer(liquidityProvider.address, TEN_ETHER);
     await mockToken1.transfer(liquidityProvider.address, TEN_ETHER);
     await mockToken2.transfer(liquidityProvider.address, TEN_ETHER);
     await mockToken3.transfer(liquidityProvider.address, TEN_ETHER);
     await mockToken4.transfer(liquidityProvider.address, TEN_ETHER);
     await weth.connect(mockPolicy).deposit({ value: ONE_ETHER });
-    await solaceToken.connect(governor).transfer(mockPolicy.address, ONE_ETHER);
+    await solace.connect(governor).transfer(mockPolicy.address, ONE_ETHER);
     await mockToken1.transfer(mockPolicy.address, ONE_ETHER);
     await mockToken2.transfer(mockPolicy.address, ONE_ETHER);
     await mockToken3.transfer(mockPolicy.address, ONE_ETHER);
     await mockToken4.transfer(mockPolicy.address, ONE_ETHER);
 
     // create pools
-    await createPool(weth, solaceToken, FeeAmount.MEDIUM);
-    await createPool(mockToken2, solaceToken, FeeAmount.LOW);
+    await createPool(weth, solace, FeeAmount.MEDIUM);
+    await createPool(mockToken2, solace, FeeAmount.LOW);
     await createPool(mockToken3, weth, FeeAmount.HIGH);
 
     // add liquidity
-    await addLiquidity(liquidityProvider, weth, solaceToken, FeeAmount.MEDIUM, ONE_ETHER);
-    await addLiquidity(liquidityProvider, mockToken2, solaceToken, FeeAmount.LOW, ONE_ETHER);
+    await addLiquidity(liquidityProvider, weth, solace, FeeAmount.MEDIUM, ONE_ETHER);
+    await addLiquidity(liquidityProvider, mockToken2, solace, FeeAmount.LOW, ONE_ETHER);
     await addLiquidity(liquidityProvider, mockToken3, weth, FeeAmount.HIGH, ONE_ETHER);
 
     // encode paths
-    wethPath = encodePath([weth.address, solaceToken.address], [FeeAmount.MEDIUM]);
-    mockToken2Path = encodePath([mockToken2.address, solaceToken.address], [FeeAmount.LOW]);
-    mockToken3Path = encodePath([mockToken3.address, weth.address, solaceToken.address], [FeeAmount.HIGH, FeeAmount.MEDIUM]);
+    wethPath = encodePath([weth.address, solace.address], [FeeAmount.MEDIUM]);
+    mockToken2Path = encodePath([mockToken2.address, solace.address], [FeeAmount.LOW]);
+    mockToken3Path = encodePath([mockToken3.address, weth.address, solace.address], [FeeAmount.HIGH, FeeAmount.MEDIUM]);
     mockToken4Path = encodePath([randAddress.address, randAddress.address], [FeeAmount.MEDIUM]);
   });
 
@@ -164,14 +165,14 @@ describe("Treasury", function() {
     it("can deposit solace", async function() {
       let depositAmount = ONE_HUNDRED;
       let balancesBefore = await getBalances(mockPolicy);
-      await solaceToken.connect(mockPolicy).increaseAllowance(treasury.address, depositAmount);
-      let tx = await treasury.connect(mockPolicy).depositToken(solaceToken.address, depositAmount);
+      await solace.connect(mockPolicy).increaseAllowance(treasury.address, depositAmount);
+      let tx = await treasury.connect(mockPolicy).depositToken(solace.address, depositAmount);
       let balancesAfter = await getBalances(mockPolicy);
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       expect(balancesDiff.treasurySolace).to.equal(depositAmount); // solace should increase
       await expect(tx)
         .to.emit(treasury, "TokenDeposited")
-        .withArgs(solaceToken.address, depositAmount);
+        .withArgs(solace.address, depositAmount);
     });
 
     it("can deposit eth via depositEth", async function() {
@@ -310,20 +311,20 @@ describe("Treasury", function() {
 
   describe("spend", function() {
     it("non governor cannot spend", async function() {
-      await expect(treasury.connect(user).spend(solaceToken.address, 100, governor.address)).to.be.revertedWith("!governance");
+      await expect(treasury.connect(user).spend(solace.address, 100, governor.address)).to.be.revertedWith("!governance");
     });
 
     it("can spend solace", async function() {
       let spendAmount = BN.from("5");
       let balancesBefore = await getBalances(user);
-      let tx = await treasury.connect(governor).spend(solaceToken.address, spendAmount, user.address);
+      let tx = await treasury.connect(governor).spend(solace.address, spendAmount, user.address);
       let balancesAfter = await getBalances(user);
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       expect(balancesDiff.treasurySolace).to.equal(spendAmount.mul(-1));
       expect(balancesDiff.userSolace).to.equal(spendAmount);
       await expect(tx)
         .to.emit(treasury, "FundsSpent")
-        .withArgs(solaceToken.address, spendAmount, user.address);
+        .withArgs(solace.address, spendAmount, user.address);
     });
 
     it("can spend unswapped token", async function() {
@@ -470,10 +471,10 @@ describe("Treasury", function() {
       let vault: Vault;
       let mockTreasury: Treasury;
       before(async function() {
-        vault = (await deployContract(deployer,artifacts.Vault,[governor.address,registry.address,weth.address])) as Vault;
+        vault = (await deployContract(deployer,artifacts.Vault,[governor.address,registry.address])) as Vault;
         vaultAddress = vault.address;
         await registry.connect(governor).setVault(vaultAddress);
-        mockTreasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, uniswapRouter.address, weth.address, registry.address])) as Treasury;
+        mockTreasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, uniswapRouter.address, registry.address])) as Treasury;
         await registry.connect(governor).setTreasury(mockTreasury.address);
         await vault.connect(governor).setRequestor(mockTreasury.address, true);
       });
@@ -573,14 +574,14 @@ describe("Treasury", function() {
 
   async function getBalances(user: Wallet): Promise<Balances> {
     return {
-      userSolace: await solaceToken.balanceOf(user.address),
+      userSolace: await solace.balanceOf(user.address),
       userEth: await user.getBalance(),
       userWeth: await weth.balanceOf(user.address),
       userMock1: await mockToken1.balanceOf(user.address),
       userMock2: await mockToken2.balanceOf(user.address),
       userMock3: await mockToken3.balanceOf(user.address),
       userMock4: await mockToken4.balanceOf(user.address),
-      treasurySolace: await solaceToken.balanceOf(treasury.address),
+      treasurySolace: await solace.balanceOf(treasury.address),
       treasuryEth: await provider.getBalance(treasury.address),
       treasuryWeth: await weth.balanceOf(treasury.address),
       treasuryMock1: await mockToken1.balanceOf(treasury.address),

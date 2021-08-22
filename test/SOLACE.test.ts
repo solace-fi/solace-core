@@ -8,7 +8,7 @@ chai.use(solidity);
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
 import { Solace } from "../typechain";
 
-describe("SolaceToken", () => {
+describe("SOLACE", () => {
   let solace: Solace;
   const [owner, governor, minter, receiver1, receiver2] = provider.getWallets();
   const name = "solace";

@@ -16,7 +16,7 @@ import { import_artifacts, ArtifactImports } from './utilities/artifact_importer
 import { Solace, Vault, Master, Weth9, CpFarm, PolicyManager, RiskManager, Registry } from '../typechain';
 
 // contracts
-let solaceToken: Solace;
+let solace: Solace;
 let master: Master;
 let vault: Vault;
 let farm1: CpFarm;
@@ -28,7 +28,7 @@ let riskManager: RiskManager;
 // uniswap contracts
 let uniswapFactory: Contract;
 let uniswapRouter: Contract;
-let uniswapPositionManager: Contract;
+let lpToken: Contract;
 
 // vars
 let solacePerBlock = BN.from('100000000000000000000'); // 100 e18
@@ -51,50 +51,37 @@ describe('CpFarm', function () {
   before(async function () {
     artifacts = await import_artifacts();
 
-    // deploy registry contract
-    registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
-
-    // deploy policy manager
-    policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
-
-    // deploy risk manager
-    riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
-
-    // deploy solace token
-    solaceToken = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
-
-    // deploy weth
     weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
 
-    // deploy master contract
-    master = (await deployContract(deployer, artifacts.Master, [governor.address, solaceToken.address, solacePerBlock])) as Master;
-
-    // deploy vault / cp token
-    vault = (await deployContract(deployer, artifacts.Vault, [governor.address, registry.address, weth.address])) as Vault;
-
-    // deploy uniswap factory
+    // deploy uniswap contracts
     uniswapFactory = (await deployContract(deployer, artifacts.UniswapV3Factory)) as Contract;
-
-    // deploy uniswap router
+    lpToken = (await deployContract(deployer, artifacts.NonfungiblePositionManager, [uniswapFactory.address, weth.address, ZERO_ADDRESS])) as Contract;
     uniswapRouter = (await deployContract(deployer, artifacts.SwapRouter, [uniswapFactory.address, weth.address])) as Contract;
 
-    // deploy uniswap position manager
-    uniswapPositionManager = (await deployContract(deployer, artifacts.NonfungiblePositionManager, [uniswapFactory.address, weth.address, ZERO_ADDRESS])) as Contract;
-
+    // deploy solace contracts
+    registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
+    await registry.connect(governor).setWeth(weth.address);
+    vault = (await deployContract(deployer, artifacts.Vault, [governor.address, registry.address])) as Vault;
+    await registry.connect(governor).setVault(vault.address);
+    policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
     await registry.connect(governor).setPolicyManager(policyManager.address);
+    riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
     await registry.connect(governor).setRiskManager(riskManager.address);
-
+    solace = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
+    await registry.connect(governor).setSolace(solace.address);
+    master = (await deployContract(deployer, artifacts.Master, [governor.address, solace.address, solacePerBlock])) as Master;
+    await registry.connect(governor).setMaster(master.address);
     // transfer tokens
-    await solaceToken.connect(governor).addMinter(governor.address);
-    await solaceToken.connect(governor).mint(master.address, ONE_MILLION_ETHER);
-    await solaceToken.connect(governor).mint(governor.address, ONE_MILLION_ETHER);
-    await solaceToken.connect(governor).mint(liquidityProvider.address, TEN_ETHER);
+    await solace.connect(governor).addMinter(governor.address);
+    await solace.connect(governor).mint(master.address, ONE_MILLION_ETHER);
+    await solace.connect(governor).mint(governor.address, ONE_MILLION_ETHER);
+    await solace.connect(governor).mint(liquidityProvider.address, TEN_ETHER);
     await weth.connect(liquidityProvider).deposit({ value: TEN_ETHER });
 
     // create pool
-    await createPool(weth, solaceToken, FeeAmount.MEDIUM);
+    await createPool(weth, solace, FeeAmount.MEDIUM);
     // add liquidity
-    await addLiquidity(liquidityProvider, weth, solaceToken, FeeAmount.MEDIUM, TEN_ETHER);
+    await addLiquidity(liquidityProvider, weth, solace, FeeAmount.MEDIUM, TEN_ETHER);
   });
 
   describe('farm creation', function () {
@@ -107,7 +94,7 @@ describe('CpFarm', function () {
     it('returns farm information', async function () {
       expect(await farm1.master()).to.equal(master.address);
       expect(await farm1.vault()).to.equal(vault.address);
-      expect(await farm1.solace()).to.equal(solaceToken.address);
+      expect(await farm1.solace()).to.equal(solace.address);
       expect(await farm1.blockReward()).to.equal(0);
       expect(await farm1.startBlock()).to.equal(startBlock);
       expect(await farm1.endBlock()).to.equal(endBlock);
@@ -372,8 +359,8 @@ describe('CpFarm', function () {
     beforeEach(async function () {
       await vault.connect(farmer1).transfer(governor.address, await vault.balanceOf(farmer1.address));
       await vault.connect(farmer2).transfer(governor.address, await vault.balanceOf(farmer2.address));
-      await solaceToken.connect(farmer1).transfer(governor.address, await solaceToken.balanceOf(farmer1.address));
-      await solaceToken.connect(farmer2).transfer(governor.address, await solaceToken.balanceOf(farmer2.address));
+      await solace.connect(farmer1).transfer(governor.address, await solace.balanceOf(farmer1.address));
+      await solace.connect(farmer2).transfer(governor.address, await solace.balanceOf(farmer2.address));
       blockNum = BN.from(await provider.getBlockNumber());
       startBlock = blockNum.add(20);
       endBlock = blockNum.add(200);
@@ -390,7 +377,7 @@ describe('CpFarm', function () {
     it('provides rewards to only farmer', async function () {
       let waitBlocks = BN.from('10');
       await farm.connect(farmer1).depositEth({ value: depositAmount1 });
-      expect(await solaceToken.balanceOf(farmer1.address)).to.equal(0);
+      expect(await solace.balanceOf(farmer1.address)).to.equal(0);
       await burnBlocksUntil(startBlock.add(waitBlocks));
       // potential withdraw
       pendingReward1 = await farm.pendingRewards(farmer1.address);
@@ -398,7 +385,7 @@ describe('CpFarm', function () {
       expect(pendingReward1).to.be.closeTo(expectedReward1, 10);
       // actual withdraw
       await farm.connect(farmer1).withdrawCp(depositAmount1);
-      pendingReward1 = await solaceToken.balanceOf(farmer1.address);
+      pendingReward1 = await solace.balanceOf(farmer1.address);
       expectedReward1 = solacePerBlock.mul(waitBlocks.add(1));
       expect(pendingReward1).to.be.closeTo(expectedReward1, 10);
     });
@@ -440,7 +427,7 @@ describe('CpFarm', function () {
       expect(pendingReward1).to.be.closeTo(expectedReward1, 10);
       // check farmer 2 rewards
       pendingReward2 = BN.from(await farm.pendingRewards(farmer2.address));
-      receivedReward2 = BN.from(await solaceToken.balanceOf(farmer2.address));
+      receivedReward2 = BN.from(await solace.balanceOf(farmer2.address));
       expectedReward2 = expectedReward2.add(
         solacePerBlock.mul(1).mul(4).div(5).add(
           // 80% ownership for 1 blocks
@@ -452,7 +439,7 @@ describe('CpFarm', function () {
       // farmer 1 withdraw rewards
       await farm.connect(farmer1).withdrawRewards();
       expect(await vault.balanceOf(farmer1.address)).to.equal(0);
-      pendingReward1 = BN.from(await solaceToken.balanceOf(farmer1.address));
+      pendingReward1 = BN.from(await solace.balanceOf(farmer1.address));
       expectedReward1 = expectedReward1.add(
         solacePerBlock.mul(1).mul(1).div(20) // 5% ownership for 1 blocks
       );
@@ -460,7 +447,7 @@ describe('CpFarm', function () {
       // farmer 2 withdraw rewards
       await farm.connect(farmer2).withdrawRewards();
       expect(await vault.balanceOf(farmer2.address)).to.equal(0);
-      pendingReward2 = BN.from(await solaceToken.balanceOf(farmer2.address));
+      pendingReward2 = BN.from(await solace.balanceOf(farmer2.address));
       expectedReward2 = expectedReward2.add(
         solacePerBlock.mul(2).mul(19).div(20) // 95% ownership for 2 blocks
       );
@@ -469,7 +456,7 @@ describe('CpFarm', function () {
 
       // farmer 1 withdraw stake
       await farm.connect(farmer1).withdrawCp(depositAmount1);
-      pendingReward1 = BN.from(await solaceToken.balanceOf(farmer1.address));
+      pendingReward1 = BN.from(await solace.balanceOf(farmer1.address));
       expectedReward1 = expectedReward1.add(
         solacePerBlock.mul(42).mul(1).div(20) // 5% ownership for 42 blocks
       );
@@ -477,7 +464,7 @@ describe('CpFarm', function () {
       await burnBlocks(waitBlocks5);
       // farmer 2 withdraw stake
       await farm.connect(farmer2).withdrawCp(depositAmount2.add(depositAmount3));
-      pendingReward2 = BN.from(await solaceToken.balanceOf(farmer2.address));
+      pendingReward2 = BN.from(await solace.balanceOf(farmer2.address));
       expectedReward2 = expectedReward2.add(
         solacePerBlock.mul(41).mul(19).div(20).add(
           // 95% ownership for 41 blocks
@@ -513,7 +500,7 @@ describe('CpFarm', function () {
       farm3 = await createCpFarm(startBlock, endBlock);
       await master.connect(governor).registerFarm(farm3.address, 100);
       // increase solace distribution
-      await master.connect(governor).setSolacePerBlock(await solaceToken.balanceOf(master.address));
+      await master.connect(governor).setSolacePerBlock(await solace.balanceOf(master.address));
       // deposit tokens
       await farm3.connect(farmer1).depositEth({ value: 1 });
       await burnBlocksUntil(endBlock);
@@ -522,13 +509,13 @@ describe('CpFarm', function () {
     it('tracks unpaid rewards', async function () {
       expect((await farm3.userInfo(farmer1.address)).unpaidRewards).to.equal(0);
       let pendingReward1 = await farm3.pendingRewards(farmer1.address);
-      let masterBalance = await solaceToken.balanceOf(master.address);
+      let masterBalance = await solace.balanceOf(master.address);
       expect(pendingReward1).to.be.gt(masterBalance);
-      let farmerBalanceBefore = await solaceToken.balanceOf(farmer1.address);
+      let farmerBalanceBefore = await solace.balanceOf(farmer1.address);
       await farm3.connect(farmer1).withdrawRewards();
-      let farmerBalanceAfter = await solaceToken.balanceOf(farmer1.address);
+      let farmerBalanceAfter = await solace.balanceOf(farmer1.address);
       expect(farmerBalanceAfter.sub(farmerBalanceBefore)).to.equal(masterBalance);
-      expect(await solaceToken.balanceOf(master.address)).to.equal(0);
+      expect(await solace.balanceOf(master.address)).to.equal(0);
       let expectedUnpaid = pendingReward1.sub(masterBalance);
       expect((await farm3.userInfo(farmer1.address)).unpaidRewards).to.equal(expectedUnpaid);
       let pendingReward2 = await farm3.pendingRewards(farmer1.address);
@@ -537,10 +524,10 @@ describe('CpFarm', function () {
 
     it('pays when funds are available', async function () {
       let unpaidRewards = (await farm3.userInfo(farmer1.address)).unpaidRewards;
-      await solaceToken.connect(governor).mint(master.address, unpaidRewards);
-      let farmerBalanceBefore = await solaceToken.balanceOf(farmer1.address);
+      await solace.connect(governor).mint(master.address, unpaidRewards);
+      let farmerBalanceBefore = await solace.balanceOf(farmer1.address);
       await farm3.connect(farmer1).withdrawRewards();
-      let farmerBalanceAfter = await solaceToken.balanceOf(farmer1.address);
+      let farmerBalanceAfter = await solace.balanceOf(farmer1.address);
       expect(farmerBalanceAfter.sub(farmerBalanceBefore)).to.equal(unpaidRewards);
       expect((await farm3.userInfo(farmer1.address)).unpaidRewards).to.equal(0);
       expect(await farm3.pendingRewards(farmer1.address)).to.equal(0);
@@ -609,7 +596,7 @@ describe('CpFarm', function () {
         await master.connect(governor).setAllocPoints(farmNum, 0);
       }
       await master.connect(governor).setSolacePerBlock(solacePerBlock);
-      await solaceToken.connect(governor).mint(master.address, ONE_MILLION_ETHER);
+      await solace.connect(governor).mint(master.address, ONE_MILLION_ETHER);
       blockNum = BN.from(await provider.getBlockNumber());
       startBlock = blockNum.add(20);
       endBlock = blockNum.add(30);
@@ -649,7 +636,7 @@ describe('CpFarm', function () {
       governor.address,
       master.address,
       vaultAddress,
-      solaceToken.address,
+      solace.address,
       startBlock,
       endBlock,
       uniswapRouter.address,
@@ -676,7 +663,7 @@ describe('CpFarm', function () {
       userPendingRewards: await farm.pendingRewards(user.address),
       farmCp: await vault.balanceOf(farm.address),
       farmStake: await farm.valueStaked(),
-      masterSolace: await solaceToken.balanceOf(master.address),
+      masterSolace: await solace.balanceOf(master.address),
     };
   }
 
@@ -721,10 +708,10 @@ describe('CpFarm', function () {
 
   // adds liquidity to a pool
   async function addLiquidity(liquidityProvider: Wallet, tokenA: Contract, tokenB: Contract, fee: FeeAmount, amount: BigNumberish) {
-    await tokenA.connect(liquidityProvider).approve(uniswapPositionManager.address, amount);
-    await tokenB.connect(liquidityProvider).approve(uniswapPositionManager.address, amount);
+    await tokenA.connect(liquidityProvider).approve(lpToken.address, amount);
+    await tokenB.connect(liquidityProvider).approve(lpToken.address, amount);
     let [token0, token1] = sortTokens(tokenA.address, tokenB.address);
-    await uniswapPositionManager.connect(liquidityProvider).mint({
+    await lpToken.connect(liquidityProvider).mint({
       token0: token0,
       token1: token1,
       tickLower: getMinTick(TICK_SPACINGS[fee]),

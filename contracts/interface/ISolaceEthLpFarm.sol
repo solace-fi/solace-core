@@ -26,9 +26,9 @@ interface ISolaceEthLpFarm is IFarm {
     /**
      * @notice Sets the appraisal function.
      * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param newAppraisor The new appraisor.
+     * @param appraisor_ The new appraisor.
      */
-    function setAppraisor(address newAppraisor) external;
+    function setAppraisor(address appraisor_) external;
 
     /**
      * @notice Deposit a [**Uniswap LP token**](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager).
@@ -36,7 +36,7 @@ interface ISolaceEthLpFarm is IFarm {
      * User must `ERC721.approve()` or `ERC721.setApprovalForAll()` first.
      * @param tokenID The ID of the token to deposit.
      */
-    function deposit(uint256 tokenID) external;
+    function depositLp(uint256 tokenID) external;
 
     /**
      * @notice Deposit a [**Uniswap LP token**](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager) using permit.
@@ -48,7 +48,7 @@ interface ISolaceEthLpFarm is IFarm {
      * @param r secp256k1 signature
      * @param s secp256k1 signature
      */
-    function depositSigned(address depositor, uint256 tokenID, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external;
+    function depositLpSigned(address depositor, uint256 tokenID, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external;
 
     struct MintAndDepositParams {
         address depositor;
@@ -79,7 +79,7 @@ interface ISolaceEthLpFarm is IFarm {
      * Can only withdraw tokens you deposited.
      * @param tokenID The ID of the token to withdraw.
      */
-    function withdraw(uint256 tokenID) external;
+    function withdrawLp(uint256 tokenID) external;
 
     /**
      * @notice Returns the count of [**Uniswap LP tokens**](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager) that a user has deposited onto the farm.

@@ -54,16 +54,16 @@ interface IMaster {
      * @notice Sets a farm's allocation points.
      * Can only be called by the current [**governor**](/docs/user-docs/Governance).
      * @param farmID The farm to set allocation points.
-     * @param allocPoints How many points to allocate this farm.
+     * @param allocPoints_ How many points to allocate this farm.
      */
-    function setAllocPoints(uint256 farmID, uint256 allocPoints) external;
+    function setAllocPoints(uint256 farmID, uint256 allocPoints_) external;
 
     /**
      * @notice Sets the Solace reward distribution across all farms.
      * Optionally updates all farms.
-     * @param solacePerBlock Amount of solace to distribute per block.
+     * @param solacePerBlock_ Amount of solace to distribute per block.
      */
-    function setSolacePerBlock(uint256 solacePerBlock) external;
+    function setSolacePerBlock(uint256 solacePerBlock_) external;
 
     /**
      * @notice Updates all farms to be up to date to the current block.

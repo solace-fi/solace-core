@@ -125,6 +125,14 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard, Governable {
     }
 
     /**
+     * @notice Sets the max cover amount divisor per user (maxCover / divisor = maxCoverPerUser).
+     * @param maxCoverPerUserDivisor_ The new divisor.
+     */
+    function setMaxCoverPerUserDivisor(uint32 maxCoverPerUserDivisor_) external override onlyGovernance {
+        maxCoverPerUserDivisor = maxCoverPerUserDivisor_;
+    }
+
+    /**
      * @notice Adds a new signer that can authorize claims.
      * Can only be called by the current [**governor**](/docs/user-docs/Governance).
      * @param signer The signer to add.
@@ -149,10 +157,10 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard, Governable {
      * Cancelling policies and submitting claims are unaffected by pause.
      * Can only be called by the current [**governor**](/docs/user-docs/Governance).
      * @dev Used for security and to gracefully phase out old products.
-     * @param pause True to pause, false to unpause.
+     * @param paused_ True to pause, false to unpause.
      */
-    function setPaused(bool pause) external onlyGovernance {
-        paused = pause;
+    function setPaused(bool paused_) external onlyGovernance {
+        paused = paused_;
     }
 
     /**

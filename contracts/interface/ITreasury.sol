@@ -9,7 +9,9 @@ pragma solidity 0.8.6;
  */
 interface ITreasury {
 
-    // events
+    /***************************************
+    EVENTS
+    ***************************************/
     // Emitted when eth is deposited
     event EthDeposited(uint256 amount);
     // Emitted when a token is deposited
@@ -17,15 +19,7 @@ interface ITreasury {
     // Emitted when a token is spent
     event FundsSpent(address token, uint256 amount, address recipient);
 
-    /**
-     * @notice Fallback function to allow contract to receive **ETH**.
-     */
-    receive() external payable;
 
-    /**
-     * @notice Fallback function to allow contract to receive **ETH**.
-     */
-    fallback () external payable;
 
     /**
      * @notice Deposits **ETH**.
@@ -105,4 +99,18 @@ interface ITreasury {
      * @notice Transfers the unpaid refunds to the user.
      */
     function withdraw() external;
+
+    /***************************************
+    FALLBACK FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Fallback function to allow contract to receive **ETH**.
+     */
+    receive() external payable;
+
+    /**
+     * @notice Fallback function to allow contract to receive **ETH**.
+     */
+    fallback () external payable;
 }

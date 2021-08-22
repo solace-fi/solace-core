@@ -46,35 +46,6 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
     constructor(address governance_) ERC721("Solace Policy", "SPT") Governable(governance_) { }
 
     /**
-     * @notice Adds a new product. The new product must be implemented in **Solace Protocol**.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param product the new product
-     */
-    function addProduct(address product) external override onlyGovernance {
-        products.add(product);
-        emit ProductAdded(product);
-    }
-
-    /**
-     * @notice Removes a product.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param product the product to remove
-     */
-    function removeProduct(address product) external override onlyGovernance {
-        products.remove(product);
-        emit ProductRemoved(product);
-    }
-
-    /**
-     * @notice Set the token descriptor.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param policyDescriptor_ The new token descriptor address.
-     */
-    function setPolicyDescriptor(address policyDescriptor_) external override onlyGovernance {
-        policyDescriptor = policyDescriptor_;
-    }
-
-    /**
      * @notice Checks is an address is an active product.
      * @param product The product to check.
      * @return status Returns true if the product is active.
@@ -298,8 +269,8 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
      */
     function setPolicyInfo(
         uint256 policyID,
-        address policyholder,     // TODO: should this be changeable?
-        address positionContract, // and this
+        address policyholder,
+        address positionContract,
         uint256 coverAmount,
         uint40 expirationBlock,
         uint24 price
@@ -362,9 +333,42 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
         activeCoverAmount = activeCover;
     }
 
-    /*** ERC721 INHERITANCE FUNCTIONS
-    Overrides that properly set functionality through parent contracts
-    ****/
+    /***************************************
+    GOVERNANCE FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Adds a new product.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param product the new product
+     */
+    function addProduct(address product) external override onlyGovernance {
+        products.add(product);
+        emit ProductAdded(product);
+    }
+
+    /**
+     * @notice Removes a product.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param product the product to remove
+     */
+    function removeProduct(address product) external override onlyGovernance {
+        products.remove(product);
+        emit ProductRemoved(product);
+    }
+
+    /**
+     * @notice Set the token descriptor.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param policyDescriptor_ The new token descriptor address.
+     */
+    function setPolicyDescriptor(address policyDescriptor_) external override onlyGovernance {
+        policyDescriptor = policyDescriptor_;
+    }
+
+    /***************************************
+    ERC721 INHERITANCE FUNCTIONS
+    ***************************************/
 
     /**
      * @notice The function returns a human readable descriptor for the policy.

@@ -12,7 +12,7 @@ import { PolicyManager, CurveProduct, ExchangeQuoter, ExchangeQuoterManual, Trea
 
 if(process.env.FORK_NETWORK === "mainnet"){
   describe('CurveProduct', () => {
-    const [deployer, user, paclasSigner] = provider.getWallets();
+    const [deployer, governor, user, paclasSigner] = provider.getWallets();
     let artifacts: ArtifactImports;
 
     let policyManager: PolicyManager;
@@ -45,14 +45,19 @@ if(process.env.FORK_NETWORK === "mainnet"){
     before(async () => {
       artifacts = await import_artifacts();
 
-      // deploy policy manager
-      policyManager = (await deployContract(
-        deployer,
-        artifacts.PolicyManager,
-        [
-          deployer.address
-        ]
-      )) as PolicyManager;
+      registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
+      weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
+      await registry.connect(governor).setWeth(weth.address);
+      vault = (await deployContract(deployer, artifacts.Vault, [governor.address, registry.address])) as Vault;
+      await registry.connect(governor).setVault(vault.address);
+      claimsEscrow = (await deployContract(deployer, artifacts.ClaimsEscrow, [governor.address, registry.address])) as ClaimsEscrow;
+      await registry.connect(governor).setClaimsEscrow(claimsEscrow.address);
+      treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, ZERO_ADDRESS, registry.address])) as Treasury;
+      await registry.connect(governor).setTreasury(treasury.address);
+      policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
+      await registry.connect(governor).setPolicyManager(policyManager.address);
+      riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
+      await registry.connect(governor).setRiskManager(riskManager.address);
 
       // deploy exchange quoter
       quoter = (await deployContract(
@@ -68,60 +73,18 @@ if(process.env.FORK_NETWORK === "mainnet"){
         deployer,
         artifacts.ExchangeQuoterManual,
         [
-          deployer.address
+          governor.address
         ]
       )) as ExchangeQuoterManual;
       await expect(quoter2.connect(user).setRates([],[])).to.be.revertedWith("!governance");
-      await quoter2.setRates(["0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","0x89d24a6b4ccb1b6faa2625fe562bdd9a23260359","0xc00e94cb662c3520282e6f5717214004a7f26888","0x1f9840a85d5af5bf1d1762f925bdaddc4201f984","0x514910771af9ca656af840dff83e8264ecf986ca","0x2260fac5e5542a773aa44fbcfedf7c193bc2c599","0xdac17f958d2ee523a2206206994597c13d831ec7","0x1985365e9f78359a9b6ad760e32412f4a445e862","0x0d8775f648430679a709e98d2b0cb6250d2887ef","0xe41d2489571d322189246dafa5ebde1f4699f498","0x0000000000085d4780b73119b644ae5ecd22b376","0x6b175474e89094c44da98b954eedeac495271d0f","0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"],["1000000000000000000","5214879005539865","131044789678131649","9259278326749300","9246653217422099","15405738054265288944","420072999319953","12449913804491249","281485209795972","372925580282399","419446558886231","205364954059859","50000000000000"]);
-
-      // deploy weth
-      weth = (await deployContract(
-          deployer,
-          artifacts.WETH
-      )) as Weth9;
-
-      // deploy registry contract
-      registry = (await deployContract(deployer, artifacts.Registry, [deployer.address])) as Registry;
-
-      // deploy vault
-      vault = (await deployContract(
-        deployer,
-        artifacts.Vault,
-        [
-          deployer.address,
-          registry.address,
-          weth.address
-        ]
-      )) as Vault;
-
-      // deploy claims escrow
-      claimsEscrow = (await deployContract(
-          deployer,
-          artifacts.ClaimsEscrow,
-          [deployer.address, registry.address]
-      )) as ClaimsEscrow;
-
-      // deploy treasury contract
-      treasury = (await deployContract(
-        deployer,
-        artifacts.Treasury,
-        [
-          deployer.address,
-          ZERO_ADDRESS,
-          weth.address,
-          ZERO_ADDRESS
-        ]
-      )) as Treasury;
-
-      // deploy risk manager contract
-      riskManager = (await deployContract(deployer, artifacts.RiskManager, [deployer.address, registry.address])) as RiskManager;
+      await quoter2.connect(governor).setRates(["0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","0x89d24a6b4ccb1b6faa2625fe562bdd9a23260359","0xc00e94cb662c3520282e6f5717214004a7f26888","0x1f9840a85d5af5bf1d1762f925bdaddc4201f984","0x514910771af9ca656af840dff83e8264ecf986ca","0x2260fac5e5542a773aa44fbcfedf7c193bc2c599","0xdac17f958d2ee523a2206206994597c13d831ec7","0x1985365e9f78359a9b6ad760e32412f4a445e862","0x0d8775f648430679a709e98d2b0cb6250d2887ef","0xe41d2489571d322189246dafa5ebde1f4699f498","0x0000000000085d4780b73119b644ae5ecd22b376","0x6b175474e89094c44da98b954eedeac495271d0f","0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"],["1000000000000000000","5214879005539865","131044789678131649","9259278326749300","9246653217422099","15405738054265288944","420072999319953","12449913804491249","281485209795972","372925580282399","419446558886231","205364954059859","50000000000000"]);
 
       // deploy Curve Product
       product = (await deployContract(
         deployer,
         artifacts.CurveProduct,
         [
-          deployer.address,
+          governor.address,
           policyManager.address,
           treasury.address,
           ADDRESS_PROVIDER,
@@ -133,14 +96,9 @@ if(process.env.FORK_NETWORK === "mainnet"){
         ]
       )) as CurveProduct;
 
-      await registry.setVault(vault.address);
       await vault.connect(deployer).depositEth({value:maxCoverAmount});
-      await registry.setClaimsEscrow(claimsEscrow.address);
-      await registry.setTreasury(treasury.address);
-      await registry.setPolicyManager(policyManager.address);
-      await registry.setRiskManager(riskManager.address);
-      await riskManager.setProductWeights([product.address],[1]);
-      await product.addSigner(paclasSigner.address);
+      await riskManager.connect(governor).addProduct(product.address, 1);
+      await product.connect(governor).addSigner(paclasSigner.address);
     })
 
     describe("appraisePosition", function () {
@@ -169,10 +127,10 @@ if(process.env.FORK_NETWORK === "mainnet"){
         await expect(product.connect(user).setCoveredPlatform(user.address)).to.be.revertedWith("!governance");
       });
       it("can be set", async function () {
-        await product.connect(deployer).setCoveredPlatform(treasury.address);
+        await product.connect(governor).setCoveredPlatform(treasury.address);
         expect(await product.coveredPlatform()).to.equal(treasury.address);
         expect(await product.addressProvider()).to.equal(treasury.address);
-        await product.connect(deployer).setCoveredPlatform(ADDRESS_PROVIDER);
+        await product.connect(governor).setCoveredPlatform(ADDRESS_PROVIDER);
       });
     });
 

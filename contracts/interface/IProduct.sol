@@ -41,7 +41,7 @@ interface IProduct {
     function maxCoverPerUserDivisor() external view returns (uint32);
     /// @notice Covered platform.
     /// A platform contract which locates contracts that are covered by this product.
-    /// (e.g., UniswapProduct will have Factory as coveredPlatform contract, because every Pair address can be located through getPool() function).
+    /// (e.g., `UniswapProduct` will have `Factory` as `coveredPlatform` contract, because every `Pair` address can be located through `getPool()` function).
     function coveredPlatform() external view returns (address);
     /// @notice The total policy count this product sold.
     function productPolicyCount() external view returns (uint256);
@@ -50,40 +50,43 @@ interface IProduct {
 
     /**
      * @notice Sets the price for this product.
-     * @param newPrice Cover price (in wei) per ether per block.
+     * @param price_ Cover price (in wei) per ether per block.
      */
-    function setPrice(uint24 newPrice) external;
+    function setPrice(uint24 price_) external;
 
     /**
      * @notice Sets the minimum number of blocks a policy can be purchased for.
-     * @param newMinPeriod The minimum number of blocks.
+     * @param minPeriod_ The minimum number of blocks.
      */
-    function setMinPeriod(uint40 newMinPeriod) external;
+    function setMinPeriod(uint40 minPeriod_) external;
 
     /**
      * @notice Sets the maximum number of blocks a policy can be purchased for.
-     * @param newMaxPeriod The maximum number of blocks
+     * @param maxPeriod_ The maximum number of blocks
      */
-    function setMaxPeriod(uint40 newMaxPeriod) external;
+    function setMaxPeriod(uint40 maxPeriod_) external;
 
-    // TODO
-    //function setMaxCoverPerUserDivisor(uint32 maxCoverPerUserDivisor) external;
+    /**
+     * @notice Sets the max cover amount divisor per user (maxCover / divisor = maxCoverPerUser).
+     * @param maxCoverPerUserDivisor_ The new divisor.
+     */
+    function setMaxCoverPerUserDivisor(uint32 maxCoverPerUserDivisor_) external;
 
     /**
      * @notice Changes the covered platform.
      * This function is used if the the protocol changes their registry but keeps the children contracts.
      * A new version of the protocol will likely require a new **Product**.
      * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param newCoveredPlatform The platform to cover.
+     * @param coveredPlatform_ The platform to cover.
      */
-    function setCoveredPlatform(address newCoveredPlatform) external;
+    function setCoveredPlatform(address coveredPlatform_) external;
 
     /**
      * @notice Changes the policy manager.
      * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param newPolicyManager The new policy manager.
+     * @param policyManager_ The new policy manager.
      */
-    function setPolicyManager(address newPolicyManager) external;
+    function setPolicyManager(address policyManager_) external;
 
     /**** UNIMPLEMENTED FUNCTIONS
     Functions that are only implemented by child product contracts

@@ -38,18 +38,18 @@ describe("Vault", function () {
   })
 
   beforeEach(async function () {
-    weth = (await deployContract(owner,artifacts.WETH)) as Weth9;
     registry = (await deployContract(owner, artifacts.Registry, [owner.address])) as Registry;
-    vault = (await deployContract(owner,artifacts.Vault,[owner.address,registry.address,weth.address])) as Vault;
-    claimsEscrow = (await deployContract(owner,artifacts.ClaimsEscrow,[owner.address,registry.address])) as ClaimsEscrow;
-    policyManager = (await deployContract(owner,artifacts.PolicyManager,[owner.address])) as PolicyManager;
-    riskManager = (await deployContract(owner, artifacts.RiskManager, [owner.address, registry.address])) as RiskManager;
-    mockProduct = (await deployContract(owner,artifacts.MockProduct,[owner.address,policyManager.address,registry.address,ZERO_ADDRESS,0,100000000000,1,16777215])) as MockProduct;
-
+    weth = (await deployContract(owner,artifacts.WETH)) as Weth9;
+    await registry.setWeth(weth.address);
+    vault = (await deployContract(owner,artifacts.Vault,[owner.address,registry.address])) as Vault;
     await registry.setVault(vault.address);
+    claimsEscrow = (await deployContract(owner,artifacts.ClaimsEscrow,[owner.address,registry.address])) as ClaimsEscrow;
     await registry.setClaimsEscrow(claimsEscrow.address);
+    policyManager = (await deployContract(owner,artifacts.PolicyManager,[owner.address])) as PolicyManager;
     await registry.setPolicyManager(policyManager.address);
+    riskManager = (await deployContract(owner, artifacts.RiskManager, [owner.address, registry.address])) as RiskManager;
     await registry.setRiskManager(riskManager.address);
+    mockProduct = (await deployContract(owner,artifacts.MockProduct,[owner.address,policyManager.address,registry.address,ZERO_ADDRESS,0,100000000000,1,16777215])) as MockProduct;
     await policyManager.addProduct(mockProduct.address);
   });
 
@@ -215,22 +215,6 @@ describe("Vault", function () {
         data: "0xabcd"
       });
       expect(await vault.balanceOf(depositor1.address)).to.equal(0);
-    });
-    it("should get eth from treasury", async function () {
-      await registry.setTreasury(mockTreasury.address);
-      let mockVault = (await deployContract(
-        owner,
-        artifacts.Vault,
-        [owner.address, registry.address, mockTreasury.address]
-      )) as Vault;
-      let ethAmount1 = await provider.getBalance(mockVault.address);
-      await mockTreasury.sendTransaction({
-        to: mockVault.address,
-        value: testDepositAmount1,
-        data: "0x"
-      });
-      let ethAmount2 = await provider.getBalance(mockVault.address);
-      expect(ethAmount2.sub(testDepositAmount1)).to.equal(ethAmount1);
     });
   });
 

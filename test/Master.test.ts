@@ -15,7 +15,7 @@ import { Solace, Vault, Master, CpFarm, SolaceEthLpFarm, Weth9, LpAppraisor, Pol
 chai.use(solidity);
 
 // contracts
-let solaceToken: Solace;
+let solace: Solace;
 let master: Master;
 let vault: Vault;
 let weth: Weth9;
@@ -49,120 +49,54 @@ describe("Master", function () {
   before(async function () {
     artifacts = await import_artifacts();
 
-    // deploy registry contract
+    weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
+
+    // deploy uniswap contracts
+    uniswapFactory = (await deployContract(deployer, artifacts.UniswapV3Factory)) as Contract;
+    lpToken = (await deployContract(deployer, artifacts.NonfungiblePositionManager, [uniswapFactory.address, weth.address, ZERO_ADDRESS])) as Contract;
+    uniswapRouter = (await deployContract(deployer, artifacts.SwapRouter, [uniswapFactory.address, weth.address])) as Contract;
+
+    // deploy solace contracts
     registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
-
-    // deploy policy manager
+    await registry.connect(governor).setWeth(weth.address);
+    vault = (await deployContract(deployer, artifacts.Vault, [governor.address, registry.address])) as Vault;
+    await registry.connect(governor).setVault(vault.address);
     policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
-
-    // deploy risk manager
-    riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
-
-    // deploy solace token
-    solaceToken = (await deployContract(
-      deployer,
-      artifacts.SOLACE,
-      [
-        governor.address
-      ]
-    )) as Solace;
-
-    // deploy weth
-    weth = (await deployContract(
-        deployer,
-        artifacts.WETH
-    )) as Weth9;
-
-    // deploy master contract
-    master = (await deployContract(
-      deployer,
-      artifacts.Master,
-      [
-        governor.address,
-        solaceToken.address,
-        solacePerBlock
-      ]
-    )) as Master;
-
-    // deploy vault / cp token
-    vault = (await deployContract(
-        deployer,
-        artifacts.Vault,
-        [
-          governor.address,
-          registry.address,
-          weth.address
-        ]
-    )) as Vault;
-
-    // deploy uniswap factory
-    uniswapFactory = (await deployContract(
-      deployer,
-      artifacts.UniswapV3Factory
-    )) as Contract;
-
-    // deploy uniswap nft / lp token
-    lpToken = (await deployContract(
-      deployer,
-      artifacts.NonfungiblePositionManager,
-      [
-        uniswapFactory.address,
-        weth.address,
-        ZERO_ADDRESS
-      ]
-    )) as Contract;
-
-    // deploy uniswap router
-    uniswapRouter = (await deployContract(
-      deployer,
-      artifacts.SwapRouter,
-      [
-        uniswapFactory.address,
-        weth.address
-      ]
-    )) as Contract;
-
-    // deploy uniswap lp token appraisor
-    lpTokenAppraisor = (await deployContract(
-      deployer,
-      artifacts.LpAppraisor,
-      [
-        governor.address,
-        lpToken.address,
-        20000,
-        40000
-      ]
-    )) as LpAppraisor;
-
     await registry.connect(governor).setPolicyManager(policyManager.address);
+    riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
     await registry.connect(governor).setRiskManager(riskManager.address);
+    solace = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
+    await registry.connect(governor).setSolace(solace.address);
+    master = (await deployContract(deployer, artifacts.Master, [governor.address, solace.address, solacePerBlock])) as Master;
+    await registry.connect(governor).setMaster(master.address);
+    lpTokenAppraisor = (await deployContract(deployer, artifacts.LpAppraisor, [governor.address, lpToken.address, 20000, 40000])) as LpAppraisor;
 
     // transfer tokens
-    await solaceToken.connect(governor).addMinter(governor.address);
-    await solaceToken.connect(governor).mint(master.address, ONE_MILLION_ETHER);
-    await solaceToken.connect(governor).mint(governor.address, ONE_MILLION_ETHER);
-    await solaceToken.connect(governor).transfer(farmer1.address, TEN_ETHER);
-    await solaceToken.connect(governor).transfer(farmer2.address, TEN_ETHER);
-    await solaceToken.connect(governor).transfer(farmer3.address, TEN_ETHER);
-    await solaceToken.connect(governor).transfer(farmer4.address, TEN_ETHER);
+    await solace.connect(governor).addMinter(governor.address);
+    await solace.connect(governor).mint(master.address, ONE_MILLION_ETHER);
+    await solace.connect(governor).mint(governor.address, ONE_MILLION_ETHER);
+    await solace.connect(governor).transfer(farmer1.address, TEN_ETHER);
+    await solace.connect(governor).transfer(farmer2.address, TEN_ETHER);
+    await solace.connect(governor).transfer(farmer3.address, TEN_ETHER);
+    await solace.connect(governor).transfer(farmer4.address, TEN_ETHER);
     await weth.connect(farmer1).deposit({value: TEN_ETHER});
     await weth.connect(farmer2).deposit({value: TEN_ETHER});
     await weth.connect(farmer3).deposit({value: TEN_ETHER});
     await weth.connect(farmer4).deposit({value: TEN_ETHER});
 
     // approve tokens
-    await solaceToken.connect(farmer1).approve(lpToken.address, constants.MaxUint256);
-    await solaceToken.connect(farmer2).approve(lpToken.address, constants.MaxUint256);
-    await solaceToken.connect(farmer3).approve(lpToken.address, constants.MaxUint256);
-    await solaceToken.connect(farmer4).approve(lpToken.address, constants.MaxUint256);
+    await solace.connect(farmer1).approve(lpToken.address, constants.MaxUint256);
+    await solace.connect(farmer2).approve(lpToken.address, constants.MaxUint256);
+    await solace.connect(farmer3).approve(lpToken.address, constants.MaxUint256);
+    await solace.connect(farmer4).approve(lpToken.address, constants.MaxUint256);
     await weth.connect(farmer1).approve(lpToken.address, constants.MaxUint256);
     await weth.connect(farmer2).approve(lpToken.address, constants.MaxUint256);
     await weth.connect(farmer3).approve(lpToken.address, constants.MaxUint256);
     await weth.connect(farmer4).approve(lpToken.address, constants.MaxUint256);
 
     // create pools
-    mediumPool = await createPool(weth, solaceToken, FeeAmount.MEDIUM);
-    await createPool(weth, solaceToken, FeeAmount.HIGH);
+    mediumPool = await createPool(weth, solace, FeeAmount.MEDIUM);
+    await createPool(weth, solace, FeeAmount.HIGH);
   })
 
   describe("governance", function () {
@@ -321,16 +255,16 @@ describe("Master", function () {
       // farmer 2 tokens
       await vault.connect(farmer2).transfer(governor.address, await vault.balanceOf(farmer2.address));
       // farmer 3 token
-      await solaceToken.connect(governor).transfer(farmer3.address, 10000);
-      tokenId3 = await mintLpToken(farmer3, weth, solaceToken, FeeAmount.MEDIUM, depositAmount3);
+      await solace.connect(governor).transfer(farmer3.address, 10000);
+      tokenId3 = await mintLpToken(farmer3, weth, solace, FeeAmount.MEDIUM, depositAmount3);
       // farmer 4 token
-      await solaceToken.connect(governor).transfer(farmer4.address, 10000);
-      tokenId4 = await mintLpToken(farmer4, weth, solaceToken, FeeAmount.MEDIUM, depositAmount4);
+      await solace.connect(governor).transfer(farmer4.address, 10000);
+      tokenId4 = await mintLpToken(farmer4, weth, solace, FeeAmount.MEDIUM, depositAmount4);
       // zero out solace balances
-      await solaceToken.connect(farmer1).transfer(governor.address, await solaceToken.balanceOf(farmer1.address));
-      await solaceToken.connect(farmer2).transfer(governor.address, await solaceToken.balanceOf(farmer2.address));
-      await solaceToken.connect(farmer3).transfer(governor.address, await solaceToken.balanceOf(farmer3.address));
-      await solaceToken.connect(farmer4).transfer(governor.address, await solaceToken.balanceOf(farmer4.address));
+      await solace.connect(farmer1).transfer(governor.address, await solace.balanceOf(farmer1.address));
+      await solace.connect(farmer2).transfer(governor.address, await solace.balanceOf(farmer2.address));
+      await solace.connect(farmer3).transfer(governor.address, await solace.balanceOf(farmer3.address));
+      await solace.connect(farmer4).transfer(governor.address, await solace.balanceOf(farmer4.address));
     })
 
     it("creates multiple farms", async function () {
@@ -359,7 +293,7 @@ describe("Master", function () {
       // wait 10 blocks
       await burnBlocks(BN.from(10));
       // add farmer 3 to lp farm
-      await lpFarm.connect(farmer3).deposit(tokenId3);
+      await lpFarm.connect(farmer3).depositLp(tokenId3);
       // wait 20 blocks
       await burnBlocks(BN.from(20));
       // validate farmer 1 rewards
@@ -375,7 +309,7 @@ describe("Master", function () {
       // wait 30 blocks
       await burnBlocks(BN.from(30));
       // add farmer 4 to lp farm
-      await lpFarm.connect(farmer4).deposit(tokenId4);
+      await lpFarm.connect(farmer4).depositLp(tokenId4);
       // wait 40 blocks
       await burnBlocks(BN.from(40));
       // validate farmer 1 rewards
@@ -514,36 +448,36 @@ describe("Master", function () {
     it("allows farmers to cash out", async function () {
       // validate farmer 1 rewards
       await cpFarm.connect(farmer1).withdrawCp(depositAmount1);
-      pendingReward1 = BN.from(await solaceToken.balanceOf(farmer1.address));
+      pendingReward1 = BN.from(await solace.balanceOf(farmer1.address));
       expectedReward1 = expectedReward1.add(
         (solacePerBlock2.mul(1).div(5)) // 20% ownership of cp farm for 1 block at 100% allocation points
       );
       expect(pendingReward1).to.be.closeTo(expectedReward1, 10);
       // validate farmer 2 rewards
       await cpFarm.connect(farmer2).withdrawCp(depositAmount2);
-      pendingReward2 = BN.from(await solaceToken.balanceOf(farmer2.address));
+      pendingReward2 = BN.from(await solace.balanceOf(farmer2.address));
       expectedReward2 = expectedReward2.add(
         (solacePerBlock2.mul(1).mul(4).div(5)).add // 80% ownership of cp farm for 1 block at 100% allocation points
         (solacePerBlock2) // 100% ownership of cp farm for 1 block at 100% allocation points
       );
       expect(pendingReward2).to.be.closeTo(expectedReward2, 10);
       // validate farmer 3 rewards
-      await lpFarm.connect(farmer3).withdraw(tokenId3);
+      await lpFarm.connect(farmer3).withdrawLp(tokenId3);
       expect(await lpToken.balanceOf(farmer3.address)).to.equal(1);
-      pendingReward3 = BN.from(await solaceToken.balanceOf(farmer3.address));
+      pendingReward3 = BN.from(await solace.balanceOf(farmer3.address));
       expectedReward3 = expectedReward3;
       expect(pendingReward3).to.be.closeTo(expectedReward3, 10);
       // validate farmer 4 rewards
-      await lpFarm.connect(farmer4).withdraw(tokenId4);
+      await lpFarm.connect(farmer4).withdrawLp(tokenId4);
       expect(await lpToken.balanceOf(farmer4.address)).to.equal(1);
-      pendingReward4 = BN.from(await solaceToken.balanceOf(farmer4.address));
+      pendingReward4 = BN.from(await solace.balanceOf(farmer4.address));
       expectedReward4 = expectedReward4;
       expect(pendingReward4).to.be.closeTo(expectedReward4, 10);
     })
 
     it("allows farmers to withdraw rewards from multiple farms", async function () {
       await master.connect(governor).setSolacePerBlock(solacePerBlock);
-      await solaceToken.connect(governor).mint(master.address, ONE_MILLION_ETHER);
+      await solace.connect(governor).mint(master.address, ONE_MILLION_ETHER);
       let numFarms = (await master.numFarms()).toNumber();
       for(var farmId = 1; farmId <= numFarms; ++farmId) {
         await master.connect(governor).setAllocPoints(farmId, 0);
@@ -560,7 +494,7 @@ describe("Master", function () {
       // user in all farms
       await cpFarm2.connect(farmer3).depositEth({value: 2000});
       await lpToken.connect(farmer3).approve(lpFarm2.address, tokenId3);
-      await lpFarm2.connect(farmer3).deposit(tokenId3);
+      await lpFarm2.connect(farmer3).depositLp(tokenId3);
       await burnBlocksUntil(blockNum.add(25), true);
       await master.massUpdateFarms();
 
@@ -569,9 +503,9 @@ describe("Master", function () {
       let pendingRewardsLp = await lpFarm2.pendingRewards(farmer3.address);
       expect(pendingRewardsLp).to.be.gt(0);
 
-      let balanceBefore = await solaceToken.balanceOf(farmer3.address);
+      let balanceBefore = await solace.balanceOf(farmer3.address);
       let tx1 = await master.connect(farmer3).withdrawRewards();
-      let rewards = (await solaceToken.balanceOf(farmer3.address)).sub(balanceBefore);
+      let rewards = (await solace.balanceOf(farmer3.address)).sub(balanceBefore);
       expect(rewards).to.be.gte(pendingRewardsCp.add(pendingRewardsLp));
       await expect(tx1).to.emit(cpFarm2, "UserRewarded");
       await expect(tx1).to.emit(lpFarm2, "UserRewarded");
@@ -581,9 +515,9 @@ describe("Master", function () {
       expect(pendingRewardsCp).to.be.eq(0);
       pendingRewardsLp = await lpFarm2.pendingRewards(farmer4.address);
       expect(pendingRewardsLp).to.be.eq(0);
-      balanceBefore = await solaceToken.balanceOf(farmer4.address);
+      balanceBefore = await solace.balanceOf(farmer4.address);
       let tx2 = await master.connect(farmer4).withdrawRewards();
-      rewards = (await solaceToken.balanceOf(farmer4.address)).sub(balanceBefore);
+      rewards = (await solace.balanceOf(farmer4.address)).sub(balanceBefore);
       await expect(tx2).to.not.emit(cpFarm2, "UserRewarded");
       await expect(tx2).to.not.emit(lpFarm2, "UserRewarded");
       expect(rewards).to.be.eq(0);
@@ -630,7 +564,7 @@ describe("Master", function () {
         governor.address,
         master.address,
         vault.address,
-        solaceToken.address,
+        solace.address,
         startBlock,
         endBlock,
         uniswapRouter.address,
@@ -653,7 +587,7 @@ describe("Master", function () {
         governor.address,
         master.address,
         stakeToken.address,
-        solaceToken.address,
+        solace.address,
         startBlock,
         endBlock,
         pool.address,

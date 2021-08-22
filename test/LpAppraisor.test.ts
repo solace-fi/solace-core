@@ -21,7 +21,7 @@ describe("LpAppraisor", function () {
   let farmer1: Wallet;
 
   // contracts
-  let solaceToken: Solace;
+  let solace: Solace;
   let master: Master;
   let weth: Weth9;
   let farm: SolaceEthLpFarm;
@@ -46,7 +46,7 @@ describe("LpAppraisor", function () {
   let endBlock: BN;
   let solaceEthLpFarmType = 3;
 
-  const solaceTokenName = "solace";
+  const solaceName = "solace";
   const lpTokenName = "Uniswap V3 Positions NFT-V1";
   const chainId = 31337;
   const deadline = constants.MaxUint256;
@@ -57,8 +57,8 @@ describe("LpAppraisor", function () {
     [deployer, governor, farmer1, ] = provider.getWallets();
     artifacts = await import_artifacts();
 
-    // deploy solace token
-    solaceToken = (await deployContract(
+    // deploy solace
+    solace = (await deployContract(
       deployer,
       artifacts.SOLACE,
       [
@@ -78,7 +78,7 @@ describe("LpAppraisor", function () {
       artifacts.Master,
       [
         governor.address,
-        solaceToken.address,
+        solace.address,
         solacePerBlock
       ]
     )) as Master;
@@ -112,18 +112,18 @@ describe("LpAppraisor", function () {
 
 
     // transfer tokens
-    await solaceToken.connect(governor).addMinter(governor.address);
-    await solaceToken.connect(governor).mint(master.address, ONE_MILLION_ETHER);
-    await solaceToken.connect(governor).mint(governor.address, ONE_MILLION_ETHER);
-    await solaceToken.connect(governor).transfer(farmer1.address, TEN_ETHER);
+    await solace.connect(governor).addMinter(governor.address);
+    await solace.connect(governor).mint(master.address, ONE_MILLION_ETHER);
+    await solace.connect(governor).mint(governor.address, ONE_MILLION_ETHER);
+    await solace.connect(governor).transfer(farmer1.address, TEN_ETHER);
     await weth.connect(farmer1).deposit({value: TEN_ETHER});
 
     // approve tokens
-    await solaceToken.connect(farmer1).approve(lpToken.address, constants.MaxUint256);
+    await solace.connect(farmer1).approve(lpToken.address, constants.MaxUint256);
     await weth.connect(farmer1).approve(lpToken.address, constants.MaxUint256);
 
     // create pools
-    mediumPool = await createPool(weth, solaceToken, FeeAmount.MEDIUM);
+    mediumPool = await createPool(weth, solace, FeeAmount.MEDIUM);
   })
 
   describe("governance", function () {
@@ -168,7 +168,7 @@ describe("LpAppraisor", function () {
     })
 
     it("appraises tokens", async function () {
-      token1 = await mintLpToken(farmer1, solaceToken, weth, FeeAmount.MEDIUM, 10000);
+      token1 = await mintLpToken(farmer1, solace, weth, FeeAmount.MEDIUM, 10000);
       let value1 = await lpTokenAppraisor1.appraise(token1);
       expect(value1).to.be.gt(0); // TODO: test values
       let value2 = await farm.appraise(token1);
@@ -243,7 +243,7 @@ describe("LpAppraisor", function () {
         governor.address,
         master.address,
         stakeToken.address,
-        solaceToken.address,
+        solace.address,
         startBlock,
         endBlock,
         pool.address,

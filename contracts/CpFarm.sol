@@ -79,7 +79,7 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
     IERC20 public weth;
 
     /**
-     * @notice Constructs the farm.
+     * @notice Constructs the CpFarm.
      * @param governance_ The address of the [governor](/docs/user-docs/Governance).
      * @param master_ Address of the [`Master`](./Master) contract.
      * @param vault_ Address of the [`Vault`](./Vault) contract.
@@ -100,7 +100,7 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
         address weth_
     ) Governable(governance_) {
         master = master_;
-        vault = IVault(vault_);
+        vault = IVault(payable(vault_));
         solace = solace_;
         startBlock = startBlock_;
         endBlock = endBlock_;
@@ -129,29 +129,29 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
      * @notice Sets the amount of [`SOLACE`](./SOLACE) to distribute per block.
      * Only affects future rewards.
      * Can only be called by [`Master`](./Master).
-     * @param newBlockReward Amount to distribute per block.
+     * @param blockReward_ Amount to distribute per block.
      */
-    function setRewards(uint256 newBlockReward) external override {
+    function setRewards(uint256 blockReward_) external override {
         // can only be called by master contract
         require(msg.sender == master, "!master");
         // update
         updateFarm();
         // accounting
-        blockReward = newBlockReward;
-        emit RewardsSet(newBlockReward);
+        blockReward = blockReward_;
+        emit RewardsSet(blockReward_);
     }
 
     /**
      * @notice Sets the farm's end block. Used to extend the duration.
      * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param newEndBlock The new end block.
+     * @param endBlock_ The new end block.
      */
-    function setEnd(uint256 newEndBlock) external override onlyGovernance {
+    function setEnd(uint256 endBlock_) external override onlyGovernance {
         // accounting
-        endBlock = newEndBlock;
+        endBlock = endBlock_;
         // update
         updateFarm();
-        emit FarmEndSet(newEndBlock);
+        emit FarmEndSet(endBlock_);
     }
 
     /**

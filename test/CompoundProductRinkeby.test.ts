@@ -59,7 +59,7 @@ function getSubmitClaimDigest(
 
 if(process.env.FORK_NETWORK === "rinkeby"){
   describe('CompoundProductRinkeby', () => {
-    const [deployer, user, user2, user3, paclasSigner] = provider.getWallets();
+    const [deployer, governor, user, user2, user3, paclasSigner] = provider.getWallets();
     let artifacts: ArtifactImports;
 
     let policyManager: PolicyManager;
@@ -105,14 +105,19 @@ if(process.env.FORK_NETWORK === "rinkeby"){
     before(async () => {
       artifacts = await import_artifacts();
 
-      // deploy policy manager
-      policyManager = (await deployContract(
-        deployer,
-        artifacts.PolicyManager,
-        [
-          deployer.address
-        ]
-      )) as PolicyManager;
+      registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
+      weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
+      await registry.connect(governor).setWeth(weth.address);
+      vault = (await deployContract(deployer, artifacts.Vault, [governor.address, registry.address])) as Vault;
+      await registry.connect(governor).setVault(vault.address);
+      claimsEscrow = (await deployContract(deployer, artifacts.ClaimsEscrow, [governor.address, registry.address])) as ClaimsEscrow;
+      await registry.connect(governor).setClaimsEscrow(claimsEscrow.address);
+      treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, ZERO_ADDRESS, registry.address])) as Treasury;
+      await registry.connect(governor).setTreasury(treasury.address);
+      policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
+      await registry.connect(governor).setPolicyManager(policyManager.address);
+      riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
+      await registry.connect(governor).setRiskManager(riskManager.address);
 
       // deploy manual exchange quoter
       quoter2 = (await deployContract(
@@ -124,48 +129,6 @@ if(process.env.FORK_NETWORK === "rinkeby"){
       )) as ExchangeQuoterManual;
       await expect(quoter2.connect(user).setRates([],[])).to.be.revertedWith("!governance");
       await quoter2.setRates(["0xbf7a7169562078c96f0ec1a8afd6ae50f12e5a99","0x5592ec0cfb4dbc12d3ab100b257153436a1f0fea","0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","0x6e894660985207feb7cf89faf048998c71e8ee89","0x4dbcdf9b62e891a7cec5a2568c3f4faf9e8abe2b","0xd9ba894e0097f8cc2bbc9d24d308b98e36dc6d02","0x577d296678535e4903d59a4c929b718e1d575e0a","0xddea378a6ddc8afec82c36e9b0078826bf9e68b6"],["264389616860428","445946382179077","1000000000000000000","10221603363836799","444641132530148","448496810835719","14864363968434576288","334585685516318"]);
-
-      // deploy weth
-      weth = (await deployContract(
-          deployer,
-          artifacts.WETH
-      )) as Weth9;
-
-      // deploy registry contract
-      registry = (await deployContract(deployer, artifacts.Registry, [deployer.address])) as Registry;
-
-      // deploy vault
-      vault = (await deployContract(
-        deployer,
-        artifacts.Vault,
-        [
-          deployer.address,
-          registry.address,
-          weth.address
-        ]
-      )) as Vault;
-
-      // deploy claims escrow
-      claimsEscrow = (await deployContract(
-          deployer,
-          artifacts.ClaimsEscrow,
-          [deployer.address, registry.address]
-      )) as ClaimsEscrow;
-
-      // deploy treasury contract
-      treasury = (await deployContract(
-        deployer,
-        artifacts.Treasury,
-        [
-          deployer.address,
-          ZERO_ADDRESS,
-          weth.address,
-          ZERO_ADDRESS
-        ]
-      )) as Treasury;
-
-      // deploy risk manager contract
-      riskManager = (await deployContract(deployer, artifacts.RiskManager, [deployer.address, registry.address])) as RiskManager;
 
       // deploy Compound Product
       product = (await deployContract(
@@ -209,14 +172,9 @@ if(process.env.FORK_NETWORK === "rinkeby"){
       dai = await ethers.getContractAt(artifacts.ERC20.abi, DAI_ADDRESS);
       uniswapRouter = await ethers.getContractAt(artifacts.SwapRouter.abi, "0xE592427A0AEce92De3Edee1F18E0157C05861564");
 
-      await registry.setVault(vault.address);
       await vault.connect(deployer).depositEth({value:maxCoverAmount});
-      await registry.setClaimsEscrow(claimsEscrow.address);
-      await registry.setTreasury(treasury.address);
-      await registry.setPolicyManager(policyManager.address);
-      await registry.setRiskManager(riskManager.address);
-      await riskManager.setProductWeights([product.address],[1]);
-      await product.addSigner(paclasSigner.address);
+      await riskManager.connect(governor).addProduct(product.address, 1);
+      await product.connect(governor).addSigner(paclasSigner.address);
     })
 
     describe("appraisePosition", function () {
