@@ -12,14 +12,26 @@ pragma solidity 0.8.6;
  */
 interface IGovernable {
 
+    /***************************************
+    EVENTS
+    ***************************************/
+
     /// @notice Emitted when Governance is set.
     event GovernanceTransferred(address newGovernance);
+
+    /***************************************
+    VIEW FUNCTIONS
+    ***************************************/
 
     /// @notice Address of the current governor.
     function governance() external view returns (address);
 
     /// @notice Address of the governor to take over.
     function newGovernance() external view returns (address);
+
+    /***************************************
+    MUTATORS
+    ***************************************/
 
     /**
      * @notice Initiates transfer of the governance role to a new governor.

@@ -20,7 +20,7 @@ import "./interface/IVault.sol";
  *
  * As [**Policy Holders**](/docs/user-docs/Policy%20Holders) purchase coverage, premiums will flow into the capital pool and are split amongst the [**Capital Providers**](/docs/user-docs/Capital%20Providers). If a loss event occurs in an active policy, some funds will be used to payout the claim. These events will affect the price per share but not the number or distribution of shares.
  *
- * By minting shares of the `Vault`, [**Capital Providers**](/docs/user-docs/Capital%20Providers) willingly accept the risk that the whole or a part of their funds may be used payout claims. A malicious [**Capital Providers**](/docs/user-docs/Capital%20Providers) could detect a loss event and try to withdraw their funds before claims are paid out. To prevent this, the `Vault` uses a cooldown mechanic such that while the [**capital provider**](/docs/user-docs/Capital%20Providers) is not in cooldown mode (default) they can mint, send, and receive `SCP` but not withdraw **ETH**. To withdraw their **ETH**, the [**capital provider**](/docs/user-docs/Capital%20Providers) must `startCooldown()`(#startcooldown), wait no less than `cooldownMin()`(#cooldownmin) and no more than `cooldownMax()`(#cooldownmax), then call `withdrawEth()`(#withdraweth) or `withdrawWeth()`(#withdrawweth). While in cooldown mode users cannot send or receive `SCP` and minting shares will take them out of cooldown.
+ * By minting shares of the `Vault`, [**Capital Providers**](/docs/user-docs/Capital%20Providers) willingly accept the risk that the whole or a part of their funds may be used payout claims. A malicious [**capital provider**](/docs/user-docs/Capital%20Providers) could detect a loss event and try to withdraw their funds before claims are paid out. To prevent this, the `Vault` uses a cooldown mechanic such that while the [**capital provider**](/docs/user-docs/Capital%20Providers) is not in cooldown mode (default) they can mint, send, and receive `SCP` but not withdraw **ETH**. To withdraw their **ETH**, the [**capital provider**](/docs/user-docs/Capital%20Providers) must [`startCooldown()`](#startcooldown), wait no less than [`cooldownMin()`](#cooldownmin) and no more than [`cooldownMax()`](#cooldownmax), then call [`withdrawEth()`](#withdraweth) or [`withdrawWeth()`](#withdrawweth). While in cooldown mode users cannot send or receive `SCP` and minting shares will take them out of cooldown.
  */
 contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
     using SafeERC20 for IERC20;
@@ -68,11 +68,11 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
     ***************************************/
 
     /**
-     * @notice Allows a user to deposit **ETH** into the `Vault`(becoming a **Capital Provider**).
+     * @notice Allows a user to deposit **ETH** into the `Vault`(becoming a [**Capital Provider**](/docs/user-docs/Capital%20Providers)).
      * Shares of the `Vault` (CP tokens) are minted to caller.
      * It is called when `Vault` receives **ETH**.
      * It issues the amount of token share respected to the deposit to the `recipient`.
-     * Reverts if `Vault` is in **Emergency Shutdown**
+     * Reverts if `Vault` is in **Emergency Shutdown**.
      * @return shares The number of shares minted.
      */
     function depositEth() public payable override nonReentrant returns (uint256 shares) {
@@ -81,10 +81,10 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
     }
 
     /**
-     * @notice Allows a user to deposit **WETH** into the `Vault`(becoming a **Capital Provider**).
+     * @notice Allows a user to deposit **WETH** into the `Vault`(becoming a [**Capital Provider**](/docs/user-docs/Capital%20Providers)).
      * Shares of the Vault (CP tokens) are minted to caller.
      * It issues the amount of token share respected to the deposit to the `recipient`.
-     * Reverts if `Vault` is in Emergency Shutdown
+     * Reverts if `Vault` is in **Emergency Shutdown**.
      * @param amount Amount of weth to deposit.
      * @return shares The number of shares minted.
      */
@@ -111,7 +111,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
 
     /**
      * @notice Allows a user to redeem shares for **ETH**.
-     * Burns **CP**(Capital Provider) tokens and transfers **ETH** to the **Capital Provider**.
+     * Burns **CP**(Capital Provider) tokens and transfers **ETH** to the [**Capital Provider**](/docs/user-docs/Capital%20Providers).
      * @param shares amount of shares to redeem.
      * @return value The amount in **ETH** that the shares where redeemed for.
      */
@@ -129,7 +129,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
 
     /**
      * @notice Allows a user to redeem shares for **WETH**.
-     * Burns **CP**(Capital Provider) tokens and transfers **WETH** to the **Capital Provider**.
+     * Burns **CP**(Capital Provider) tokens and transfers **WETH** to the [**Capital Provider**](/docs/user-docs/Capital%20Providers).
      * @param shares amount of shares to redeem.
      * @return value The amount in **WETH** that the shares where redeemed for.
      */
@@ -149,6 +149,16 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
     /***************************************
     CAPITAL PROVIDER VIEW FUNCTIONS
     ***************************************/
+
+    /**
+     * @notice The price of one `SCP`.
+     * @return price The price in **ETH**.
+     */
+    function pricePerShare() external view override returns (uint256 price) {
+        return (totalSupply() == 0 || _totalAssets() == 0)
+            ? 1000000000000000000 // 1 eth in wei
+            : ((1000000000000000000 * _totalAssets()) / totalSupply());
+    }
 
     /**
      * @notice Returns the maximum redeemable shares by the `user` such that `Vault` does not go under **MCR**(Minimum Capital Requirement). May be less than their balance.
@@ -368,11 +378,10 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      * @param shares The amount of shares to calculate value for.
      * @return value The amount of value for given shares.
      */
-    function _shareValue(uint256 shares) internal view returns (uint256) {
-        // using 1e3 for extra precision here when decimals is low
+      function _shareValue(uint256 shares) internal view returns (uint256) {
         return (totalSupply() == 0)
             ? 0
-            : (((10 ** 3 * (shares * _totalAssets())) / totalSupply()) / 10 ** 3);
+            : ((shares * _totalAssets()) / totalSupply());
     }
 
     /**
@@ -383,7 +392,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
     function _sharesForAmount(uint256 amount) internal view returns (uint256) {
         // NOTE: if sqrt(token.totalSupply()) > 1e37, this could potentially revert
         return (_totalAssets() > 0)
-            ? (((10 ** 3 * (amount * totalSupply())) / _totalAssets()) / 10 ** 3)
+            ? ((amount * totalSupply()) / _totalAssets())
             : 0;
     }
 

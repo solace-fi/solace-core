@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./Governable.sol";
 import "./interface/IVault.sol";
 import "./interface/ICpFarm.sol";
-import "./interface/ISwapRouter.sol";
+import "./interface/UniswapV3/ISwapRouter.sol";
 
 /**
  * @title CpFarm

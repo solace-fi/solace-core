@@ -34,14 +34,14 @@ contract WETH9 is IWETH9, ERC20 {
     constructor() ERC20("Wrapped Ether", "WETH") {}
 
     /**
-     * Receive function. Deposits eth.
+     * @notice Wraps Ether. WETH will be minted to the sender at 1 ETH : 1 WETH.
      */
     receive() external payable override {
         deposit();
     }
 
     /**
-     * Fallback function. Deposits eth.
+     * @notice Wraps Ether. WETH will be minted to the sender at 1 ETH : 1 WETH.
      */
     fallback () external payable override {
         deposit();

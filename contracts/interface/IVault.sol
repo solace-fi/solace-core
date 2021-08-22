@@ -87,6 +87,12 @@ interface IVault is IERC20Metadata, IERC20Permit {
     ***************************************/
 
     /**
+     * @notice The price of one `SCP`.
+     * @return price The price in **ETH**.
+     */
+    function pricePerShare() external view returns (uint256 price);
+
+    /**
      * @notice Returns the maximum redeemable shares by the `user` such that `Vault` does not go under **MCR**(Minimum Capital Requirement). May be less than their balance.
      * @param user The address of user to check.
      * @return shares The max redeemable shares by the user.

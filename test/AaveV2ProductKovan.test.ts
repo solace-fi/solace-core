@@ -10,11 +10,11 @@ const { expect } = chai;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { PolicyManager, AaveV2Product, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
+import { PolicyManager, AaveV2Product, ExchangeQuoterAaveV2, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
 import { getDomainSeparator, sign } from "./utilities/signature";
 import { ECDSASignature } from "ethereumjs-util";
 
-const EXCHANGE_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("AaveV2ProductExchange(uint256 policyID,uint256 amountOut,uint256 deadline)"));
+const SUBMIT_CLAIM_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("AaveV2ProductSubmitClaim(uint256 policyID,uint256 amountOut,uint256 deadline)"));
 
 const chainId = 31337;
 const deadline = constants.MaxUint256;
@@ -50,7 +50,7 @@ function getSubmitClaimDigest(
             utils.keccak256(
             utils.defaultAbiCoder.encode(
                 ['bytes32', 'uint256', 'uint256','uint256'],
-                [EXCHANGE_TYPEHASH, policyID, amountOut, deadline]
+                [SUBMIT_CLAIM_TYPEHASH, policyID, amountOut, deadline]
             )
             ),
         ]
@@ -66,6 +66,7 @@ if(process.env.FORK_NETWORK === "kovan"){
     let policyManager: PolicyManager;
     let product: AaveV2Product;
     let product2: AaveV2Product;
+    let quoter: ExchangeQuoterAaveV2;
     let weth: Weth9;
     let treasury: Treasury;
     let claimsEscrow: ClaimsEscrow;
@@ -117,6 +118,9 @@ if(process.env.FORK_NETWORK === "kovan"){
       riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
       await registry.connect(governor).setRiskManager(riskManager.address);
 
+      // deploy exchange quoter
+      quoter = (await deployContract(deployer, artifacts.ExchangeQuoterAaveV2, [AAVE_DATA_PROVIDER])) as ExchangeQuoterAaveV2;
+
       // deploy Aave V2 Product
       product = (await deployContract(
         deployer,
@@ -129,7 +133,8 @@ if(process.env.FORK_NETWORK === "kovan"){
           minPeriod,
           maxPeriod,
           price,
-          1
+          1,
+          quoter.address
         ]
       )) as unknown as AaveV2Product;
 
@@ -144,7 +149,8 @@ if(process.env.FORK_NETWORK === "kovan"){
           minPeriod,
           maxPeriod,
           price,
-          1
+          1,
+          quoter.address
         ]
       )) as unknown as AaveV2Product;
 

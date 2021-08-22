@@ -13,31 +13,58 @@ import "./interface/IGovernable.sol";
  * - `governance` is a constructor argument instead of `msg.sender`. This is especially useful when deploying contracts via a [`SingletonFactory`](./interface/ISingletonFactory)
  */
 contract Governable is IGovernable {
-    /// @notice Governor.
-    address public override governance;
 
-    /// @notice Governance to take over.
-    address public override newGovernance;
+    /***************************************
+    GLOBAL VARIABLES
+    ***************************************/
+
+    // Governor.
+    address private _governance;
+
+    // governance to take over.
+    address private _newGovernance;
 
     /**
      * @notice Constructs the governable contract.
      * @param governance_ The address of the [governor](/docs/user-docs/Governance).
      */
     constructor(address governance_) {
-        governance = governance_;
+        _governance = governance_;
     }
+
+    /***************************************
+    MODIFIERS
+    ***************************************/
 
     // can only be called by governor
     modifier onlyGovernance() {
-        require(msg.sender == governance, "!governance");
+        require(msg.sender == _governance, "!governance");
         _;
     }
 
     // can only be called by new governor
     modifier onlyNewGovernance() {
-        require(msg.sender == newGovernance, "!governance");
+        require(msg.sender == _newGovernance, "!governance");
         _;
     }
+
+    /***************************************
+    VIEW FUNCTIONS
+    ***************************************/
+
+    /// @notice Address of the current governor.
+    function governance() public view override returns (address) {
+        return _governance;
+    }
+
+    /// @notice Address of the governor to take over.
+    function newGovernance() public view override returns (address) {
+        return _newGovernance;
+    }
+
+    /***************************************
+    MUTATOR FUNCTIONS
+    ***************************************/
 
     /**
      * @notice Initiates transfer of the governance role to a new governor.
@@ -46,7 +73,7 @@ contract Governable is IGovernable {
      * @param newGovernance_ The new governor.
      */
     function setGovernance(address newGovernance_) external override onlyGovernance {
-        newGovernance = newGovernance_;
+        _newGovernance = newGovernance_;
     }
 
     /**
@@ -54,8 +81,8 @@ contract Governable is IGovernable {
      * Can only be called by the new governor.
      */
     function acceptGovernance() external override onlyNewGovernance {
-        governance = newGovernance;
-        newGovernance = address(0x0);
-        emit GovernanceTransferred(msg.sender);
+        _governance = _newGovernance;
+        _newGovernance = address(0x0);
+        emit GovernanceTransferred(_governance);
     }
 }

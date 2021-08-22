@@ -189,34 +189,23 @@ describe("ClaimsEscrow", function () {
     });
   });
 
-  describe("sweep", function () {
+  describe("returnEth", function () {
     it("should revert if not called by governance", async function () {
-      await expect(claimsEscrow.connect(claimant).sweep(weth.address, 0, claimant.address)).to.be.revertedWith("!governance");
+      await expect(claimsEscrow.connect(claimant).returnEth(0)).to.be.revertedWith("!governance");
     });
-    it("should sweep eth", async function () {
+    it("should returnEth", async function () {
       let escrowBalance1 = await provider.getBalance(claimsEscrow.address);
-      let userBalance1 = await claimant.getBalance();
+      let vaultBalance1 = await vault.totalAssets();
       await deployer.sendTransaction({
         to: claimsEscrow.address,
         value: 100,
         data: "0xabcd"
       });
-      await claimsEscrow.connect(governor).sweep(ETH_ADDRESS, 20, claimant.address);
+      await claimsEscrow.connect(governor).returnEth(20);
       let escrowBalance2 = await provider.getBalance(claimsEscrow.address);
-      let userBalance2 = await claimant.getBalance();
+      let vaultBalance2 = await vault.totalAssets();
       expect(escrowBalance2.sub(escrowBalance1)).to.eq(80);
-      expect(userBalance2.sub(userBalance1)).to.eq(20);
-    });
-    it("should sweep erc20", async function () {
-      let escrowBalance1 = await weth.balanceOf(claimsEscrow.address);
-      let userBalance1 = await weth.balanceOf(claimant.address);
-      await weth.connect(deployer).deposit({value: 100});
-      await weth.connect(deployer).transfer(claimsEscrow.address, 100);
-      await claimsEscrow.connect(governor).sweep(weth.address, 20, claimant.address);
-      let escrowBalance2 = await weth.balanceOf(claimsEscrow.address);
-      let userBalance2 = await weth.balanceOf(claimant.address);
-      expect(escrowBalance2.sub(escrowBalance1)).to.eq(80);
-      expect(userBalance2.sub(userBalance1)).to.eq(20);
+      expect(vaultBalance2.sub(vaultBalance1)).to.eq(20);
     });
   });
 

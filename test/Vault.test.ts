@@ -116,6 +116,59 @@ describe("Vault", function () {
       expect(await vault.cooldownMin()).to.equal(3);
       expect(await vault.cooldownMax()).to.equal(4);
     });
+  });
+
+  describe("pricePerShare", function () {
+    it("should initially return 1:1 ETH-SCP", async function () {
+      expect(await vault.pricePerShare()).to.equal(BN.from("1000000000000000000"));
+    });
+    it("should stay at 1:1 on first deposit", async function () {
+      await vault.connect(depositor1).depositEth({value: "500000000000000000"});
+      expect(await vault.pricePerShare()).to.equal(BN.from("1000000000000000000"));
+    });
+    it("should appreciate on sale of coverage", async function () {
+      await vault.connect(depositor1).depositEth({value: "500000000000000000"});
+      await depositor1.sendTransaction({to: vault.address, value: "250000000000000000"});
+      expect(await vault.pricePerShare()).to.equal(BN.from("1500000000000000000"));
+    });
+    it("should stay the same on deposit", async function () {
+      await vault.connect(depositor1).depositEth({value: "500000000000000000"});
+      await depositor1.sendTransaction({to: vault.address, value: "250000000000000000"});
+      expect(await vault.pricePerShare()).to.equal(BN.from("1500000000000000000"));
+      await vault.connect(depositor2).depositEth({value: "250000000000000000"});
+      expect(await vault.pricePerShare()).to.be.closeTo("1500000000000000000", 10);
+    });
+    it("should stay the same on withdraw", async function () {
+      await vault.connect(depositor1).depositEth({value: "500000000000000000"});
+      await depositor1.sendTransaction({to: vault.address, value: "250000000000000000"});
+      expect(await vault.pricePerShare()).to.equal(BN.from("1500000000000000000"));
+      await vault.connect(owner).setCooldownWindow(0, "1099511627775"); // min, max uint40
+      await vault.connect(depositor1).withdrawEth("250000000000000000");
+      expect(await vault.pricePerShare()).to.equal(BN.from("1500000000000000000"));
+    });
+    it("should depreciate on payout of claims", async function () {
+      await vault.connect(depositor1).depositEth({value: "500000000000000000"});
+      await vault.connect(owner).setRequestor(depositor1.address, true);
+      await vault.connect(depositor1).requestEth("250000000000000000");
+      expect(await vault.pricePerShare()).to.equal(BN.from("500000000000000000"));
+    });
+    it("should stay the same on deposit", async function () {
+      await vault.connect(depositor1).depositEth({value: "500000000000000000"});
+      await vault.connect(owner).setRequestor(depositor1.address, true);
+      await vault.connect(depositor1).requestEth("250000000000000000");
+      expect(await vault.pricePerShare()).to.equal(BN.from("500000000000000000"));
+      await vault.connect(depositor2).depositEth({value: "250000000000000000"});
+      expect(await vault.pricePerShare()).to.equal(BN.from("500000000000000000"));
+    });
+    it("should stay the same on withdraw", async function () {
+      await vault.connect(depositor1).depositEth({value: "500000000000000000"});
+      await vault.connect(owner).setRequestor(depositor1.address, true);
+      await vault.connect(depositor1).requestEth("250000000000000000");
+      expect(await vault.pricePerShare()).to.equal(BN.from("500000000000000000"));
+      await vault.connect(owner).setCooldownWindow(0, "1099511627775"); // min, max uint40
+      await vault.connect(depositor1).withdrawEth("250000000000000000");
+      expect(await vault.pricePerShare()).to.equal(BN.from("500000000000000000"));
+    });
   })
 
   describe("maxRedeemableShares", function () {

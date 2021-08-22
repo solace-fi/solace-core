@@ -34,12 +34,12 @@ interface IWETH9 is IERC20Metadata {
     event Withdrawal(address indexed src, uint wad);
 
     /**
-     * Receive function. Deposits eth.
+     * @notice Wraps Ether. WETH will be minted to the sender at 1 ETH : 1 WETH.
      */
     receive() external payable;
 
     /**
-     * Fallback function. Deposits eth.
+     * @notice Wraps Ether. WETH will be minted to the sender at 1 ETH : 1 WETH.
      */
     fallback () external payable;
 

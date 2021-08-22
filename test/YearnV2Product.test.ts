@@ -10,12 +10,12 @@ const { expect } = chai;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { PolicyManager, YearnV2Product, ExchangeQuoter, ExchangeQuoterManual, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
+import { PolicyManager, YearnV2Product, ExchangeQuoter1InchV1, ExchangeQuoterManual, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
 import { getDomainSeparator, sign } from "./utilities/signature";
 import { toBytes32, setStorageAt } from "./utilities/setStorage";
 import { ECDSASignature } from "ethereumjs-util";
 
-const EXCHANGE_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("YearnV2ProductExchange(uint256 policyID,uint256 amountOut,uint256 deadline)"));
+const SUBMIT_CLAIM_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("YearnV2ProductSubmitClaim(uint256 policyID,uint256 amountOut,uint256 deadline)"));
 
 const chainId = 31337;
 const deadline = constants.MaxUint256;
@@ -41,7 +41,7 @@ function getSubmitClaimDigest(
             utils.keccak256(
             utils.defaultAbiCoder.encode(
                 ['bytes32', 'uint256', 'uint256','uint256'],
-                [EXCHANGE_TYPEHASH, policyID, amountOut, deadline]
+                [SUBMIT_CLAIM_TYPEHASH, policyID, amountOut, deadline]
             )
             ),
         ]
@@ -57,7 +57,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
     let policyManager: PolicyManager;
     let product: YearnV2Product;
     let product2: YearnV2Product;
-    let quoter: ExchangeQuoter;
+    let quoter: ExchangeQuoter1InchV1;
     let quoter2: ExchangeQuoterManual;
     let weth: Weth9;
     let treasury: Treasury;
@@ -102,7 +102,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
       await registry.connect(governor).setRiskManager(riskManager.address);
 
       // deploy exchange quoter
-      quoter = (await deployContract(deployer, artifacts.ExchangeQuoter, [ONE_SPLIT_VIEW] )) as ExchangeQuoter;
+      quoter = (await deployContract(deployer, artifacts.ExchangeQuoter1InchV1, [ONE_SPLIT_VIEW] )) as ExchangeQuoter1InchV1;
 
       // deploy manual exchange quoter
       quoter2 = (await deployContract(deployer, artifacts.ExchangeQuoterManual, [governor.address])) as ExchangeQuoterManual;

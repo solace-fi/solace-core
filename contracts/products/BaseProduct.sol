@@ -3,12 +3,14 @@ pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 import "../Governable.sol";
 import "../interface/IPolicyManager.sol";
 import "../interface/IRiskManager.sol";
 import "../interface/ITreasury.sol";
 import "../interface/IClaimsEscrow.sol";
 import "../interface/IRegistry.sol";
+import "../interface/IExchangeQuoter.sol";
 import "../interface/IProduct.sol";
 
 
@@ -16,54 +18,73 @@ import "../interface/IProduct.sol";
  * @title BaseProduct
  * @author solace.fi
  * @notice The abstract smart contract that is inherited by every concrete individual **Product** contract.
+ *
+ * It is required to extend [`IProduct`](../interface/IProduct) and recommended to extend `BaseProduct`. `BaseProduct` extends [`IProduct`](../interface/IProduct) and takes care of the heavy lifting; new products simply need to implement [`appraisePosition()`](#appraiseposition). It has some helpful functionality not included in [`IProduct`](../interface/IProduct) including [`ExchangeQuoter` price oracles](../interface/IExchangeQuoter) and claim signers.
  */
-abstract contract BaseProduct is IProduct, ReentrancyGuard, Governable {
+abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
     using Address for address;
 
+    /***************************************
+    GLOBAL VARIABLES
+    ***************************************/
+
     /// @notice Policy Manager.
-    IPolicyManager public policyManager; // Policy manager ERC721 contract
+    IPolicyManager internal _policyManager; // Policy manager ERC721 contract
 
-    /// @notice Registry.
-    IRegistry public registry;
+    // Registry.
+    IRegistry internal _registry;
 
-    /****
-       Product Variables
-    ****/
+    /// @notice The minimum policy period in blocks.
+    uint40 internal _minPeriod;
+    /// @notice The maximum policy period in blocks.
+    uint40 internal _maxPeriod;
     /// @notice Covered platform.
     /// A platform contract which locates contracts that are covered by this product.
     /// (e.g., UniswapProduct will have Factory as coveredPlatform contract, because every Pair address can be located through getPool() function).
-    address public override coveredPlatform;
-    /// @notice The minimum policy period in blocks.
-    uint40 public override minPeriod;
-    /// @notice The maximum policy period in blocks.
-    uint40 public override maxPeriod;
-    /// @notice The cover price (in wei) per block per wei (multiplied by 1e12 to avoid underflow upon construction or setter).
-    uint24 public override price;
+    address internal _coveredPlatform;
+    /// @notice Price in wei per 1e12 wei of coverage per block.
+    uint24 internal _price;
     /// @notice The max cover amount divisor for per user (maxCover / divisor = maxCoverPerUser).
-    uint32 public override maxCoverPerUserDivisor;
+    uint32 internal _maxCoverPerUserDivisor;
+    /// @notice Cannot buy new policies while paused. (Default is False)
+    bool internal _paused;
 
     /****
         Book-Keeping Variables
     ****/
     /// @notice The total policy count this product sold.
-    uint256 public override productPolicyCount;
+    uint256 internal _productPolicyCount;
     /// @notice The current amount covered (in wei).
-    uint256 public override activeCoverAmount;
+    uint256 internal _activeCoverAmount;
     /// @notice The authorized signers.
-    mapping(address => bool) public isAuthorizedSigner;
-    /// @notice The ETH address.
-    address internal constant ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
-    /// @notice Cannot buy new policies while paused. (Default is False)
-    bool public paused;
+    mapping(address => bool) internal _isAuthorizedSigner;
 
-    /****
-    Events
-    ****/
+    // IExchangeQuoter.
+    IExchangeQuoter internal _quoter;
+
+    // Typehash for claim submissions.
+    // Must be unique for all products.
+    // solhint-disable-next-line var-name-mixedcase
+    bytes32 internal _SUBMIT_CLAIM_TYPEHASH;
+
+    // The name of the product.
+    string internal _productName;
+
+    /***************************************
+    EVENTS
+    ***************************************/
+
     /// @notice Emitted when a claim signer is added.
     event SignerAdded(address indexed signer);
     /// @notice Emitted when a claim signer is removed.
     event SignerRemoved(address indexed signer);
+    /// @notice Emitted when the exchange quoter is set.
+    event QuoterSet(address indexed quoter);
 
+    modifier whileUnpaused() {
+        require(!_paused, "cannot buy when paused");
+        _;
+    }
 
     /**
      * @notice Constructs the product. `BaseProduct` by itself is not deployable, only its subclasses.
@@ -75,6 +96,9 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard, Governable {
      * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
      * @param price_ The cover price for the **Product**.
      * @param maxCoverPerUserDivisor_ The max cover amount divisor for per user. (maxCover / divisor = maxCoverPerUser).
+     * @param quoter_ The exchange quoter address.
+     * @param domain_ The user readable name of the EIP712 signing domain.
+     * @param version_ The current major version of the signing domain.
      */
     constructor (
         address governance_,
@@ -84,147 +108,24 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard, Governable {
         uint40 minPeriod_,
         uint40 maxPeriod_,
         uint24 price_,
-        uint32 maxCoverPerUserDivisor_
-    ) Governable(governance_) {
-        policyManager = policyManager_;
-        registry = registry_;
-        coveredPlatform = coveredPlatform_;
-        minPeriod = minPeriod_;
-        maxPeriod = maxPeriod_;
-        price = price_;
-        maxCoverPerUserDivisor = maxCoverPerUserDivisor_;
+        uint32 maxCoverPerUserDivisor_,
+        address quoter_,
+        string memory domain_,
+        string memory version_
+    ) EIP712(domain_, version_) Governable(governance_) {
+        _policyManager = policyManager_;
+        _registry = registry_;
+        _coveredPlatform = coveredPlatform_;
+        _minPeriod = minPeriod_;
+        _maxPeriod = maxPeriod_;
+        _price = price_;
+        _maxCoverPerUserDivisor = maxCoverPerUserDivisor_;
+        _quoter = IExchangeQuoter(quoter_);
     }
 
-    /****
-    GETTERS + SETTERS
-    Functions which get and set important product state variables
-    ****/
-
-    /**
-     * @notice Sets the price for this product.
-     * @param price_ Cover price (in wei) per ether per block.
-     */
-    function setPrice(uint24 price_) external override onlyGovernance {
-        price = price_;
-    }
-
-    /**
-     * @notice Sets the minimum number of blocks a policy can be purchased for.
-     * @param minPeriod_ The minimum number of blocks.
-     */
-    function setMinPeriod(uint40 minPeriod_) external override onlyGovernance {
-        minPeriod = minPeriod_;
-    }
-
-    /**
-     * @notice Sets the maximum number of blocks a policy can be purchased for.
-     * @param maxPeriod_ The maximum number of blocks
-     */
-    function setMaxPeriod(uint40 maxPeriod_) external override onlyGovernance {
-        maxPeriod = maxPeriod_;
-    }
-
-    /**
-     * @notice Sets the max cover amount divisor per user (maxCover / divisor = maxCoverPerUser).
-     * @param maxCoverPerUserDivisor_ The new divisor.
-     */
-    function setMaxCoverPerUserDivisor(uint32 maxCoverPerUserDivisor_) external override onlyGovernance {
-        maxCoverPerUserDivisor = maxCoverPerUserDivisor_;
-    }
-
-    /**
-     * @notice Adds a new signer that can authorize claims.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param signer The signer to add.
-     */
-    function addSigner(address signer) external onlyGovernance {
-        isAuthorizedSigner[signer] = true;
-        emit SignerAdded(signer);
-    }
-
-    /**
-     * @notice Removes a signer.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param signer The signer to remove.
-     */
-    function removeSigner(address signer) external onlyGovernance {
-        isAuthorizedSigner[signer] = false;
-        emit SignerRemoved(signer);
-    }
-
-    /**
-     * @notice Pauses or unpauses buying and extending policies.
-     * Cancelling policies and submitting claims are unaffected by pause.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @dev Used for security and to gracefully phase out old products.
-     * @param paused_ True to pause, false to unpause.
-     */
-    function setPaused(bool paused_) external onlyGovernance {
-        paused = paused_;
-    }
-
-    /**
-     * @notice Changes the covered platform.
-     * This function is used if the the protocol changes their registry but keeps the children contracts.
-     * A new version of the protocol will likely require a new **Product**.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param coveredPlatform_ The platform to cover.
-     */
-    function setCoveredPlatform(address coveredPlatform_) public virtual override onlyGovernance {
-        coveredPlatform = coveredPlatform_;
-    }
-
-    /**
-     * @notice Changes the policy manager.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param policyManager_ The new policy manager.
-     */
-    function setPolicyManager(address policyManager_) external override onlyGovernance {
-        policyManager = IPolicyManager(policyManager_);
-    }
-
-    /****
-    QUOTE VIEW FUNCTIONS
-    View functions that give us quotes regarding a policy purchase
-    ****/
-
-    /**
-     * @notice This function will only be implemented in the inheriting product contracts. It provides the user's total position in the product's protocol.
-     * This total should be denominated in **ETH**. Every product will have a different mechanism to read and determine a user's total position in that product's protocol.
-     * @dev It should validate that the `positionContract` belongs to the protocol and revert if it doesn't.
-     * @param policyholder The `buyer` requesting the coverage quote.
-     * @param positionContract The address of the exact smart contract the `buyer` has their position in (e.g., for UniswapProduct this would be Pair's address).
-     * @return positionAmount The user's total position in **Wei** in the product's protocol.
-     */
-    function appraisePosition(address policyholder, address positionContract) public view override virtual returns (uint256 positionAmount);
-
-    /**
-     * @notice Calculate a premium quote for a policy.
-     * @param policyholder The holder of the position to cover.
-     * @param positionContract The address of the exact smart contract the policyholder has their position in (e.g., for UniswapProduct this would be Pair's address).
-     * @param coverAmount The value to cover in **ETH**.
-     * @param blocks The length for policy.
-     * @return premium The quote for their policy in **Wei**.
-     */
-    // solhint-disable-next-line no-unused-vars
-    function getQuote(address policyholder, address positionContract, uint256 coverAmount, uint40 blocks) external view override returns (uint256 premium){
-        return coverAmount * blocks * price / 1e12;
-    }
-
-    /****
-    MUTATIVE FUNCTIONS
-    Functions that change state variables, mint or modify policy contracts
-    ****/
-
-    /**
-     * @notice Updates the product's book-keeping variables.
-     * Can only be called by the **PolicyManager**
-     * @param coverDiff The change in active cover amount.
-     */
-    function updateActiveCoverAmount(int256 coverDiff) external override {
-        require(msg.sender == address(policyManager), "!policymanager");
-        activeCoverAmount = add(activeCoverAmount, coverDiff);
-    }
+    /***************************************
+    POLICYHOLDER FUNCTIONS
+    ***************************************/
 
     /**
      * @notice Purchases and mints a policy on the behalf of the policyholder.
@@ -235,8 +136,7 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard, Governable {
      * @param blocks The length (in blocks) for policy.
      * @return policyID The ID of newly created policy.
      */
-    function buyPolicy(address policyholder, address positionContract, uint256 coverAmount, uint40 blocks) external payable override nonReentrant returns (uint256 policyID){
-        require(!paused, "cannot buy when paused");
+    function buyPolicy(address policyholder, address positionContract, uint256 coverAmount, uint40 blocks) external payable override nonReentrant whileUnpaused returns (uint256 policyID){
         // check that the buyer has a position in the covered protocol
         uint256 positionAmount = appraisePosition(policyholder, positionContract);
         coverAmount = min(positionAmount, coverAmount);
@@ -245,29 +145,29 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard, Governable {
         // check that the product can provide coverage for this policy
         {
         uint256 maxCover = maxCoverAmount();
-        uint256 maxUserCover = maxCover / maxCoverPerUserDivisor;
-        require(activeCoverAmount + coverAmount <= maxCover, "max covered amount is reached");
+        uint256 maxUserCover = maxCover / _maxCoverPerUserDivisor;
+        require(_activeCoverAmount + coverAmount <= maxCover, "max covered amount is reached");
         require(coverAmount <= maxUserCover, "over max cover single user");
         }
         // check that the buyer has paid the correct premium
-        uint256 premium = coverAmount * blocks * price / 1e12;
+        uint256 premium = coverAmount * blocks * _price / 1e12;
         require(msg.value >= premium && premium != 0, "insufficient payment");
 
         // check that the buyer provided valid period
-        require(blocks >= minPeriod && blocks <= maxPeriod, "invalid period");
+        require(blocks >= _minPeriod && blocks <= _maxPeriod, "invalid period");
 
         // create the policy
         uint40 expirationBlock = uint40(block.number + blocks);
-        policyID = policyManager.createPolicy(policyholder, positionContract, coverAmount, expirationBlock, price);
+        policyID = _policyManager.createPolicy(policyholder, positionContract, coverAmount, expirationBlock, _price);
 
         // update local book-keeping variables
-        activeCoverAmount += coverAmount;
-        productPolicyCount++;
+        _activeCoverAmount += coverAmount;
+        _productPolicyCount++;
 
         // return excess payment
         if(msg.value > premium) payable(msg.sender).transfer(msg.value - premium);
         // transfer premium to the treasury
-        ITreasury(payable(registry.treasury())).routePremiums{value: premium}();
+        ITreasury(payable(_registry.treasury())).routePremiums{value: premium}();
 
         emit PolicyCreated(policyID);
 
@@ -281,9 +181,8 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard, Governable {
      * @param policyID The ID of the policy.
      * @param coverAmount The new value to cover in **ETH**. Will only cover up to the appraised value.
      */
-    function updateCoverAmount(uint256 policyID, uint256 coverAmount) external payable override nonReentrant {
-        require(!paused, "cannot buy when paused");
-        (address policyholder, address product, address positionContract, uint256 previousCoverAmount, uint40 expirationBlock, uint24 previousPrice) = policyManager.getPolicyInfo(policyID);
+    function updateCoverAmount(uint256 policyID, uint256 coverAmount) external payable override nonReentrant whileUnpaused {
+        (address policyholder, address product, address positionContract, uint256 previousCoverAmount, uint40 expirationBlock, uint24 purchasePrice) = _policyManager.getPolicyInfo(policyID);
         // check msg.sender is policyholder
         require(policyholder == msg.sender, "!policyholder");
         // check for correct product
@@ -298,16 +197,16 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard, Governable {
         // check that the product can provide coverage for this policy
         {
         uint256 maxCover = maxCoverAmount();
-        uint256 maxUserCover = maxCover / maxCoverPerUserDivisor;
-        require(activeCoverAmount + coverAmount - previousCoverAmount <= maxCover, "max covered amount is reached");
+        uint256 maxUserCover = maxCover / _maxCoverPerUserDivisor;
+        require(_activeCoverAmount + coverAmount - previousCoverAmount <= maxCover, "max covered amount is reached");
         require(coverAmount <= maxUserCover, "over max cover single user");
         }
         // calculate premium needed for new cover amount as if policy is bought now
         uint256 remainingBlocks = expirationBlock - block.number;
-        uint256 newPremium = coverAmount * remainingBlocks * price / 1e12;
+        uint256 newPremium = coverAmount * remainingBlocks * _price / 1e12;
 
         // calculate premium already paid based on current policy
-        uint256 paidPremium = previousCoverAmount * remainingBlocks * previousPrice / 1e12;
+        uint256 paidPremium = previousCoverAmount * remainingBlocks * purchasePrice / 1e12;
 
         if (newPremium >= paidPremium) {
             uint256 premium = newPremium - paidPremium;
@@ -315,14 +214,14 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard, Governable {
             require(msg.value >= premium, "insufficient payment");
             if(msg.value > premium) payable(msg.sender).transfer(msg.value - premium);
             // transfer premium to the treasury
-            ITreasury(payable(registry.treasury())).routePremiums{value: premium}();
+            ITreasury(payable(_registry.treasury())).routePremiums{value: premium}();
         } else {
             if(msg.value > 0) payable(msg.sender).transfer(msg.value);
             uint256 refundAmount = paidPremium - newPremium;
-            ITreasury(payable(registry.treasury())).refund(msg.sender, refundAmount);
+            ITreasury(payable(_registry.treasury())).refund(msg.sender, refundAmount);
         }
         // update policy's URI and emit event
-        policyManager.setPolicyInfo(policyID, policyholder, positionContract, coverAmount, expirationBlock, price);
+        _policyManager.setPolicyInfo(policyID, policyholder, positionContract, coverAmount, expirationBlock, _price);
         emit PolicyUpdated(policyID);
     }
 
@@ -333,10 +232,9 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard, Governable {
      * @param policyID The ID of the policy.
      * @param extension The length of extension in blocks.
      */
-    function extendPolicy(uint256 policyID, uint40 extension) external payable override nonReentrant {
-        require(!paused, "cannot extend when paused");
+    function extendPolicy(uint256 policyID, uint40 extension) external payable override nonReentrant whileUnpaused {
         // check that the msg.sender is the policyholder
-        (address policyholder, address product, address positionContract, uint256 coverAmount, uint40 expirationBlock, uint24 purchasePrice) = policyManager.getPolicyInfo(policyID);
+        (address policyholder, address product, address positionContract, uint256 coverAmount, uint40 expirationBlock, uint24 purchasePrice) = _policyManager.getPolicyInfo(policyID);
         require(policyholder == msg.sender,"!policyholder");
         require(product == address(this), "wrong product");
         require(expirationBlock >= block.number, "policy is expired");
@@ -347,13 +245,13 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard, Governable {
         require(msg.value >= premium, "insufficient payment");
         if(msg.value > premium) payable(msg.sender).transfer(msg.value - premium);
         // transfer premium to the treasury
-        ITreasury(payable(registry.treasury())).routePremiums{value: premium}();
+        ITreasury(payable(_registry.treasury())).routePremiums{value: premium}();
         // check that the buyer provided valid period
         uint40 newExpirationBlock = expirationBlock + extension;
         uint40 duration = newExpirationBlock - uint40(block.number);
-        require(duration >= minPeriod && duration <= maxPeriod, "invalid period");
+        require(duration >= _minPeriod && duration <= _maxPeriod, "invalid period");
         // update the policy's URI
-        policyManager.setPolicyInfo(policyID, policyholder, positionContract, coverAmount, newExpirationBlock, purchasePrice);
+        _policyManager.setPolicyInfo(policyID, policyholder, positionContract, coverAmount, newExpirationBlock, purchasePrice);
         emit PolicyExtended(policyID);
     }
 
@@ -365,9 +263,8 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard, Governable {
      * @param coverAmount The new value to cover in **ETH**. Will only cover up to the appraised value.
      * @param extension The length of extension in blocks.
      */
-    function updatePolicy(uint256 policyID, uint256 coverAmount, uint40 extension) external payable override nonReentrant {
-        require(!paused, "cannot buy when paused");
-        (address policyholder, address product, address positionContract, uint256 previousCoverAmount, uint40 previousExpirationBlock, uint24 previousPrice) = policyManager.getPolicyInfo(policyID);
+    function updatePolicy(uint256 policyID, uint256 coverAmount, uint40 extension) external payable override nonReentrant whileUnpaused {
+        (address policyholder, address product, address positionContract, uint256 previousCoverAmount, uint40 previousExpirationBlock, uint24 purchasePrice) = _policyManager.getPolicyInfo(policyID);
         require(policyholder == msg.sender,"!policyholder");
         require(product == address(this), "wrong product");
         require(previousExpirationBlock >= block.number, "policy is expired");
@@ -380,8 +277,8 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard, Governable {
         // check that the product can still provide coverage
         {
         uint256 maxCover = maxCoverAmount();
-        uint256 maxUserCover = maxCover / maxCoverPerUserDivisor;
-        require(activeCoverAmount + coverAmount - previousCoverAmount <= maxCover, "max covered amount is reached");
+        uint256 maxUserCover = maxCover / _maxCoverPerUserDivisor;
+        require(_activeCoverAmount + coverAmount - previousCoverAmount <= maxCover, "max covered amount is reached");
         require(coverAmount <= maxUserCover, "over max cover single user");
         }
         // add new block extension
@@ -389,26 +286,26 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard, Governable {
 
         // check if duration is valid
         uint40 duration = newExpirationBlock - uint40(block.number);
-        require(duration >= minPeriod && duration <= maxPeriod, "invalid period");
+        require(duration >= _minPeriod && duration <= _maxPeriod, "invalid period");
 
         // update policy info
-        policyManager.setPolicyInfo(policyID, policyholder, positionContract, coverAmount, newExpirationBlock, price);
+        _policyManager.setPolicyInfo(policyID, policyholder, positionContract, coverAmount, newExpirationBlock, _price);
 
         // calculate premium needed for new cover amount as if policy is bought now
-        uint256 newPremium = coverAmount * duration * price / 1e12;
+        uint256 newPremium = coverAmount * duration * _price / 1e12;
 
         // calculate premium already paid based on current policy
-        uint256 paidPremium = previousCoverAmount * (previousExpirationBlock - uint40(block.number)) * previousPrice / 1e12;
+        uint256 paidPremium = previousCoverAmount * (previousExpirationBlock - uint40(block.number)) * purchasePrice / 1e12;
 
         if (newPremium >= paidPremium) {
             uint256 premium = newPremium - paidPremium;
             require(msg.value >= premium, "insufficient payment");
             if(msg.value > premium) payable(msg.sender).transfer(msg.value - premium);
-            ITreasury(payable(registry.treasury())).routePremiums{value: premium}();
+            ITreasury(payable(_registry.treasury())).routePremiums{value: premium}();
         } else {
             if(msg.value > 0) payable(msg.sender).transfer(msg.value);
             uint256 refund = paidPremium - newPremium;
-            ITreasury(payable(registry.treasury())).refund(msg.sender, refund);
+            ITreasury(payable(_registry.treasury())).refund(msg.sender, refund);
         }
         emit PolicyUpdated(policyID);
     }
@@ -420,29 +317,105 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard, Governable {
      * @param policyID The ID of the policy.
      */
     function cancelPolicy(uint256 policyID) external override nonReentrant {
-        (address policyholder, address product, , uint256 coverAmount, uint40 expirationBlock, uint24 purchasePrice) = policyManager.getPolicyInfo(policyID);
+        (address policyholder, address product, , uint256 coverAmount, uint40 expirationBlock, uint24 purchasePrice) = _policyManager.getPolicyInfo(policyID);
         require(policyholder == msg.sender,"!policyholder");
         require(product == address(this), "wrong product");
 
         uint40 blocksLeft = expirationBlock - uint40(block.number);
         uint256 refundAmount = blocksLeft * coverAmount * purchasePrice / 1e12;
-        policyManager.burn(policyID);
-        ITreasury(payable(registry.treasury())).refund(msg.sender, refundAmount);
-        activeCoverAmount -= coverAmount;
+        _policyManager.burn(policyID);
+        ITreasury(payable(_registry.treasury())).refund(msg.sender, refundAmount);
+        _activeCoverAmount -= coverAmount;
         emit PolicyCanceled(policyID);
     }
 
-    /****
-    View Functions
-    The functions do not mutate the state variables.
-    ****/
+    /**
+     * @notice The function is used to submit a claim.
+     * The user can only submit one claim per policy and the claim must be signed by an authorized signer.
+     * The policy is burn when the claim submission is successful and new claim is created.
+     * @param policyID The policy that suffered a loss.
+     * @param amountOut The amount the user will receive.
+     * @param deadline Transaction must execute before this timestamp.
+     * @param signature Signature from the signer.
+     */
+    function submitClaim(
+        uint256 policyID,
+        uint256 amountOut,
+        uint256 deadline,
+        bytes calldata signature
+    ) external nonReentrant {
+        // validate inputs
+        // solhint-disable-next-line not-rely-on-time
+        require(block.timestamp <= deadline, "expired deadline");
+        (address policyholder, address product, , , , ) = _policyManager.getPolicyInfo(policyID);
+        require(policyholder == msg.sender, "!policyholder");
+        require(product == address(this), "wrong product");
+        // verify signature
+        {
+        bytes32 structHash = keccak256(abi.encode(_SUBMIT_CLAIM_TYPEHASH, policyID, amountOut, deadline));
+        bytes32 hash = _hashTypedDataV4(structHash);
+        address signer = ECDSA.recover(hash, signature);
+        require(_isAuthorizedSigner[signer], "invalid signature");
+        }
+        // burn policy
+        _policyManager.burn(policyID);
+        // submit claim to ClaimsEscrow
+        IClaimsEscrow(payable(_registry.claimsEscrow())).receiveClaim(policyID, policyholder, amountOut);
+        emit ClaimSubmitted(policyID);
+    }
+
+    /***************************************
+    QUOTE VIEW FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice This function will only be implemented in the inheriting product contracts. It provides the user's total position in the product's protocol.
+     * This total should be denominated in **ETH**. Every product will have a different mechanism to read and determine a user's total position in that product's protocol.
+     * @dev It should validate that the `positionContract` belongs to the protocol and revert if it doesn't.
+     * @param policyholder The `buyer` requesting the coverage quote.
+     * @param positionContract The address of the exact smart contract the `buyer` has their position in (e.g., for UniswapProduct this would be Pair's address).
+     * @return positionAmount The user's total position in **Wei** in the product's protocol.
+     */
+    function appraisePosition(address policyholder, address positionContract) public view virtual override returns (uint256 positionAmount);
+
+    /**
+     * @notice Calculate a premium quote for a policy.
+     * @param policyholder The holder of the position to cover.
+     * @param positionContract The address of the exact smart contract the policyholder has their position in (e.g., for UniswapProduct this would be Pair's address).
+     * @param coverAmount The value to cover in **ETH**.
+     * @param blocks The length for policy.
+     * @return premium The quote for their policy in **Wei**.
+     */
+    // solhint-disable-next-line no-unused-vars
+    function getQuote(address policyholder, address positionContract, uint256 coverAmount, uint40 blocks) external view override returns (uint256 premium){
+        return coverAmount * blocks * _price / 1e12;
+    }
+
+    /***************************************
+    GLOBAL VIEW FUNCTIONS
+    ***************************************/
+
+    /// @notice Price in wei per 1e12 wei of coverage per block.
+    function price() external view override returns (uint24) {
+        return _price;
+    }
+
+    /// @notice The minimum policy period in blocks.
+    function minPeriod() external view override returns (uint40) {
+        return _minPeriod;
+    }
+
+    /// @notice The maximum policy period in blocks.
+    function maxPeriod() external view override returns (uint40) {
+        return _maxPeriod;
+    }
 
     /**
      * @notice The maximum sum of position values that can be covered by this product.
      * @return maxCover The max cover amount.
      */
     function maxCoverAmount() public view override returns (uint256 maxCover) {
-        return IRiskManager(registry.riskManager()).maxCoverAmount(address(this));
+        return IRiskManager(_registry.riskManager()).maxCoverAmount(address(this));
     }
 
     /**
@@ -450,8 +423,168 @@ abstract contract BaseProduct is IProduct, ReentrancyGuard, Governable {
      * @return maxCover The max cover amount per user.
      */
     function maxCoverPerUser() external view override returns (uint256 maxCover) {
-        return maxCoverAmount() / maxCoverPerUserDivisor;
+        return maxCoverAmount() / _maxCoverPerUserDivisor;
     }
+
+    /// @notice The max cover amount divisor for per user (maxCover / divisor = maxCoverPerUser).
+    function maxCoverPerUserDivisor() external view override returns (uint32) {
+        return _maxCoverPerUserDivisor;
+    }
+    /// @notice Covered platform.
+    /// A platform contract which locates contracts that are covered by this product.
+    /// (e.g., `UniswapProduct` will have `Factory` as `coveredPlatform` contract, because every `Pair` address can be located through `getPool()` function).
+    function coveredPlatform() external view override returns (address) {
+        return _coveredPlatform;
+    }
+    /// @notice The total policy count this product sold.
+    function productPolicyCount() external view override returns (uint256) {
+        return _productPolicyCount;
+    }
+    /// @notice The current amount covered (in wei).
+    function activeCoverAmount() external view override returns (uint256) {
+        return _activeCoverAmount;
+    }
+
+    /**
+     * @notice Returns the name of the product.
+     * @return productName The name of the product.
+     */
+    function name() external view virtual override returns (string memory productName) {
+        return _productName;
+    }
+
+    /// @notice Cannot buy new policies while paused. (Default is False)
+    function paused() external view override returns (bool) {
+        return _paused;
+    }
+
+    /// @notice Address of the [`PolicyManager`](../PolicyManager).
+    function policyManager() external view override returns (address) {
+        return address(_policyManager);
+    }
+
+    /**
+     * @notice Returns true if the given account is authorized to sign claims.
+     * @param account Potential signer to query.
+     * @return status True if is authorized signer.
+     */
+     function isAuthorizedSigner(address account) external view override returns (bool status) {
+        return _isAuthorizedSigner[account];
+     }
+
+    /***************************************
+    MUTATOR FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Updates the product's book-keeping variables.
+     * Can only be called by the [`PolicyManager`](../PolicyManager).
+     * @param coverDiff The change in active cover amount.
+     */
+    function updateActiveCoverAmount(int256 coverDiff) external override {
+        require(msg.sender == address(_policyManager), "!policymanager");
+        _activeCoverAmount = add(_activeCoverAmount, coverDiff);
+    }
+
+    /***************************************
+    GOVERNANCE FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Sets the price for this product.
+     * @param price_ Price in wei per 1e12 wei of coverage per block.
+     */
+    function setPrice(uint24 price_) external override onlyGovernance {
+        _price = price_;
+    }
+
+    /**
+     * @notice Sets the minimum number of blocks a policy can be purchased for.
+     * @param minPeriod_ The minimum number of blocks.
+     */
+    function setMinPeriod(uint40 minPeriod_) external override onlyGovernance {
+        _minPeriod = minPeriod_;
+    }
+
+    /**
+     * @notice Sets the maximum number of blocks a policy can be purchased for.
+     * @param maxPeriod_ The maximum number of blocks
+     */
+    function setMaxPeriod(uint40 maxPeriod_) external override onlyGovernance {
+        _maxPeriod = maxPeriod_;
+    }
+
+    /**
+     * @notice Sets the max cover amount divisor per user (maxCover / divisor = maxCoverPerUser).
+     * @param maxCoverPerUserDivisor_ The new divisor.
+     */
+    function setMaxCoverPerUserDivisor(uint32 maxCoverPerUserDivisor_) external override onlyGovernance {
+        _maxCoverPerUserDivisor = maxCoverPerUserDivisor_;
+    }
+
+    /**
+     * @notice Sets a new ExchangeQuoter.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param quoter_ The new quoter address.
+     */
+    function setExchangeQuoter(address quoter_) external onlyGovernance {
+        _quoter = IExchangeQuoter(quoter_);
+    }
+
+    /**
+     * @notice Adds a new signer that can authorize claims.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param signer The signer to add.
+     */
+    function addSigner(address signer) external onlyGovernance {
+        _isAuthorizedSigner[signer] = true;
+        emit SignerAdded(signer);
+    }
+
+    /**
+     * @notice Removes a signer.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param signer The signer to remove.
+     */
+    function removeSigner(address signer) external onlyGovernance {
+        _isAuthorizedSigner[signer] = false;
+        emit SignerRemoved(signer);
+    }
+
+    /**
+     * @notice Pauses or unpauses buying and extending policies.
+     * Cancelling policies and submitting claims are unaffected by pause.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @dev Used for security and to gracefully phase out old products.
+     * @param paused_ True to pause, false to unpause.
+     */
+    function setPaused(bool paused_) external onlyGovernance {
+        _paused = paused_;
+    }
+
+    /**
+     * @notice Changes the covered platform.
+     * The function should be used if the the protocol changes their registry but keeps the children contracts.
+     * A new version of the protocol will likely require a new Product.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param coveredPlatform_ The platform to cover.
+     */
+    function setCoveredPlatform(address coveredPlatform_) public virtual override onlyGovernance {
+        _coveredPlatform = coveredPlatform_;
+    }
+
+    /**
+     * @notice Changes the policy manager.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param policyManager_ The new policy manager.
+     */
+    function setPolicyManager(address policyManager_) external override onlyGovernance {
+        _policyManager = IPolicyManager(policyManager_);
+    }
+
+    /***************************************
+    HELPER FUNCTIONS
+    ***************************************/
 
     /**
      * @notice The function is used to add two numbers.

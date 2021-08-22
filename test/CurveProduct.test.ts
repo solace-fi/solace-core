@@ -8,7 +8,7 @@ const { expect } = chai;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { PolicyManager, CurveProduct, ExchangeQuoter, ExchangeQuoterManual, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
+import { PolicyManager, CurveProduct, ExchangeQuoter1InchV1, ExchangeQuoterManual, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
 
 if(process.env.FORK_NETWORK === "mainnet"){
   describe('CurveProduct', () => {
@@ -17,7 +17,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
 
     let policyManager: PolicyManager;
     let product: CurveProduct;
-    let quoter: ExchangeQuoter;
+    let quoter: ExchangeQuoter1InchV1;
     let quoter2: ExchangeQuoterManual;
     let weth: Weth9;
     let treasury: Treasury;
@@ -62,11 +62,11 @@ if(process.env.FORK_NETWORK === "mainnet"){
       // deploy exchange quoter
       quoter = (await deployContract(
         deployer,
-        artifacts.ExchangeQuoter,
+        artifacts.ExchangeQuoter1InchV1,
         [
           ONE_SPLIT_VIEW
         ]
-      )) as ExchangeQuoter;
+      )) as ExchangeQuoter1InchV1;
 
       // deploy manual exchange quoter
       quoter2 = (await deployContract(

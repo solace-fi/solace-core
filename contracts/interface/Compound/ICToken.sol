@@ -1,28 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// code borrowed from https://etherscan.io/address/0x4ddc2d193948926d02f9b1fe9e1daa0718270ed5#code
+// code borrowed from https://etherscan.io/address/0xa035b9e130f2b1aedc733eefb1c67ba4c503491f#code
 
 pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 /**
- * @title Compound's CEther Contract
+ * @title Compound's CToken Contract
  * @author Compound
- * @notice [Compound Finance](https://compound.finance/) CToken which wraps Ether.
+ * @notice Abstract base for CTokens
  */
-interface ICEth is IERC20Metadata {
-
+interface ICToken is IERC20Metadata {
     /**
-     * @notice Sender supplies assets into the market and receives cTokens in exchange.
-     * @dev Reverts upon any failure.
-     */
-    function mint() external payable;
-
-    /**
-     * @notice Sender borrows assets from the protocol to their own address.
-     * @param borrowAmount The amount of the underlying asset to borrow.
-     * @return error 0=success, otherwise a failure (see ErrorReporter.sol for details).
-     */
+      * @notice Sender borrows assets from the protocol to their own address.
+      * @param borrowAmount The amount of the underlying asset to borrow.
+      * @return error 0=success, otherwise a failure (see ErrorReporter.sol for details).
+      */
     function borrow(uint256 borrowAmount) external returns (uint256 error);
 
     /**
@@ -39,4 +32,10 @@ interface ICEth is IERC20Metadata {
      * @return rate Calculated exchange rate scaled by 1e18.
      */
     function exchangeRateStored() external view returns (uint256 rate);
+
+    /**
+     * @notice Underlying asset for this CToken.
+     * Does not exist on CETH.
+     */
+    function underlying() external view returns (address);
 }

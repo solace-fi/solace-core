@@ -121,13 +121,11 @@ interface IClaimsEscrow {
     function adjustClaim(uint256 claimID, uint256 value) external;
 
     /**
-     * @notice Rescues misplaced tokens.
+     * @notice Returns **ETH** to the [`Vault`](../Vault).
      * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param token Token to pull.
      * @param amount Amount to pull.
-     * @param dst Destination for tokens.
      */
-    function sweep(address token, uint256 amount, address dst) external;
+    function returnEth(uint256 amount) external;
 
     /**
      * @notice Set the cooldown duration.

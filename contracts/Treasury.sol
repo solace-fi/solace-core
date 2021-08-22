@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./Governable.sol";
 import "./interface/IWETH9.sol";
-import "./interface/ISwapRouter.sol";
+import "./interface/UniswapV3/ISwapRouter.sol";
 import "./interface/IRegistry.sol";
 import "./interface/IPolicyManager.sol";
 import "./interface/ITreasury.sol";

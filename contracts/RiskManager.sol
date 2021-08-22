@@ -131,25 +131,25 @@ contract RiskManager is IRiskManager, Governable {
     /**
      * @notice Adds a new product and sets its weight.
      * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param product Address of new product.
-     * @param weight The products weight.
+     * @param product_ Address of new product.
+     * @param weight_ The products weight.
      */
-    function addProduct(address product, uint32 weight) external override onlyGovernance {
+    function addProduct(address product_, uint32 weight_) external override onlyGovernance {
         // or changes an existing product's weight
         // don't keep endlessly changing weights like this, use setProductWeights instead
 
         if(_products.length == 0) {
             // add the first product
-            require(weight > 0, "1/0");
-            _weights[product] = weight;
-            _products.push(product);
-            _weightSum = weight;
+            require(weight_ > 0, "1/0");
+            _weights[product_] = weight_;
+            _products.push(product_);
+            _weightSum = weight_;
         } else {
             // add another product
-            uint32 prevWeight = _weights[product];
-            _weights[product] = weight;
-            _products.push(product);
-            uint32 weightSum_ = _weightSum - prevWeight + weight;
+            uint32 prevWeight = _weights[product_];
+            _weights[product_] = weight_;
+            _products.push(product_);
+            uint32 weightSum_ = _weightSum - prevWeight + weight_;
             require(weightSum_ > 0, "1/0");
             _weightSum = weightSum_;
         }

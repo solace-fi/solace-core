@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
-import "./Governable.sol";
+import "../Governable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import "./interface/IExchangeQuoter.sol";
+import "../interface/IExchangeQuoter.sol";
 
 
 /**
@@ -17,7 +17,7 @@ contract ExchangeQuoterManual is IExchangeQuoter, Governable {
     mapping(address => uint256) public rates;
 
     /**
-     * @notice Constructs the ExchangeQuoter contract.
+     * @notice Constructs the ExchangeQuoterManual contract.
      * @param governance_ The address of the [governor](/docs/user-docs/Governance).
      */
     constructor(address governance_) Governable(governance_) { }

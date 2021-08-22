@@ -7,8 +7,8 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./libraries/TickBitmap.sol";
 import "./Governable.sol";
-import "./interface/IUniswapLpToken.sol";
-import "./interface/IUniswapV3Pool.sol";
+import "./interface/UniswapV3/IUniswapLpToken.sol";
+import "./interface/UniswapV3/IUniswapV3Pool.sol";
 import "./interface/ILpAppraisor.sol";
 import "./interface/ISolaceEthLpFarm.sol";
 

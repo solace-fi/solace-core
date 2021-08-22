@@ -82,10 +82,10 @@ interface IRiskManager {
     /**
      * @notice Adds a new product and sets its weight.
      * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param product Address of new product.
-     * @param weight The products weight.
+     * @param product_ Address of new product.
+     * @param weight_ The products weight.
      */
-    function addProduct(address product, uint32 weight) external;
+    function addProduct(address product_, uint32 weight_) external;
 
     /**
      * @notice Sets the products and their weights.

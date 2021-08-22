@@ -87,17 +87,17 @@ describe("SOLACE", () => {
 
   describe('minters', function () {
     it('owner is minter', async function () {
-      expect(await solace.minters(owner.address)).to.be.true;
+      expect(await solace.isMinter(owner.address)).to.be.true;
     })
 
     it('can add minters', async function (){
       await solace.connect(owner).addMinter(minter.address);
-      expect(await solace.minters(minter.address)).to.equal(true);
+      expect(await solace.isMinter(minter.address)).to.equal(true);
     })
 
     it("can remove minters", async function () {
       await solace.connect(owner).removeMinter(minter.address);
-      expect(await solace.minters(minter.address)).to.equal(false);
+      expect(await solace.isMinter(minter.address)).to.equal(false);
     })
 
     it("reverts when !governance adds / removes minters", async function () {

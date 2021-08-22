@@ -14,7 +14,7 @@ dotenv_config();
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
 import { PolicyManager, CompoundProductRinkeby, ExchangeQuoterManual, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
 
-const EXCHANGE_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("CompoundProductExchange(uint256 policyID,uint256 amountOut,uint256 deadline)"));
+const SUBMIT_CLAIM_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("CompoundProductSubmitClaim(uint256 policyID,uint256 amountOut,uint256 deadline)"));
 
 const chainId = 31337;
 const deadline = constants.MaxUint256;
@@ -49,7 +49,7 @@ function getSubmitClaimDigest(
             utils.keccak256(
             utils.defaultAbiCoder.encode(
                 ['bytes32', 'uint256', 'uint256','uint256'],
-                [EXCHANGE_TYPEHASH, policyID, amountOut, deadline]
+                [SUBMIT_CLAIM_TYPEHASH, policyID, amountOut, deadline]
             )
             ),
         ]

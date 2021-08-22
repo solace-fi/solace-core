@@ -13,8 +13,8 @@ import "./interface/IProduct.sol";
  */
 contract PolicyDescriptor is IPolicyDescriptor {
     /**
-     * @notice Produces the URI describing a particular policy `product` for a given `policy ID`.
-     * @param policyManager The policy manager to retrieve policy info to produce URI descriptor.
+     * @notice Describes a policy.
+     * @param policyManager The policy manager to retrieve policy info to produce URI description.
      * @param policyID The ID of the policy for which to produce a description.
      * @return description The URI of the ERC721-compliant metadata.
      */

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
-import "./IUniswapLpToken.sol";
+import "./UniswapV3/IUniswapLpToken.sol";
 import "./../SOLACE.sol";
 import "./IWETH9.sol";
 import "./IFarm.sol";

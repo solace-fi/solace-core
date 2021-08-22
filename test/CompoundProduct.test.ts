@@ -13,9 +13,9 @@ import { config as dotenv_config } from 'dotenv';
 dotenv_config();
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { PolicyManager, CompoundProduct, ExchangeQuoter, ExchangeQuoterManual, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
+import { PolicyManager, CompoundProduct, ExchangeQuoter1InchV1, ExchangeQuoterManual, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
 
-const EXCHANGE_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("CompoundProductExchange(uint256 policyID,uint256 amountOut,uint256 deadline)"));
+const SUBMIT_CLAIM_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("CompoundProductSubmitClaim(uint256 policyID,uint256 amountOut,uint256 deadline)"));
 
 const chainId = 31337;
 const deadline = constants.MaxUint256;
@@ -41,7 +41,7 @@ function getSubmitClaimDigest(
             utils.keccak256(
             utils.defaultAbiCoder.encode(
                 ['bytes32', 'uint256', 'uint256','uint256'],
-                [EXCHANGE_TYPEHASH, policyID, amountOut, deadline]
+                [SUBMIT_CLAIM_TYPEHASH, policyID, amountOut, deadline]
             )
             ),
         ]
@@ -57,7 +57,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
     let policyManager: PolicyManager;
     let product: CompoundProduct;
     let product2: CompoundProduct;
-    let quoter: ExchangeQuoter;
+    let quoter: ExchangeQuoter1InchV1;
     let quoter2: ExchangeQuoterManual;
     let weth: Weth9;
     let treasury: Treasury;
@@ -122,11 +122,11 @@ if(process.env.FORK_NETWORK === "mainnet"){
       // deploy exchange quoter
       quoter = (await deployContract(
         deployer,
-        artifacts.ExchangeQuoter,
+        artifacts.ExchangeQuoter1InchV1,
         [
           ONE_SPLIT_VIEW
         ]
-      )) as ExchangeQuoter;
+      )) as ExchangeQuoter1InchV1;
 
       // deploy manual exchange quoter
       quoter2 = (await deployContract(

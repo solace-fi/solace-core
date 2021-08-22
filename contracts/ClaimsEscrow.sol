@@ -214,15 +214,12 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
     }
 
     /**
-     * @notice Rescues misplaced tokens.
+     * @notice Returns **ETH** to the [`Vault`](../Vault).
      * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param token Token to pull.
      * @param amount Amount to pull.
-     * @param dst Destination for tokens.
      */
-    function sweep(address token, uint256 amount, address dst) external override onlyGovernance nonReentrant {
-        if(token == ETH_ADDRESS) payable(dst).transfer(amount);
-        else IERC20(token).safeTransfer(dst, amount);
+    function returnEth(uint256 amount) external override onlyGovernance nonReentrant {
+        payable(_registry.vault()).transfer(amount);
     }
 
     /**

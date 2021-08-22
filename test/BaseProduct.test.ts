@@ -338,7 +338,7 @@ describe("BaseProduct", () => {
     });
     it("cannot extend policy while paused", async function() {
       await product.connect(governor).setPaused(true);
-      await expect(product.connect(policyholder).extendPolicy(policyID, blocks, { value: quote })).to.be.revertedWith("cannot extend when paused");
+      await expect(product.connect(policyholder).extendPolicy(policyID, blocks, { value: quote })).to.be.revertedWith("cannot buy when paused");
       await product.connect(governor).setPaused(false);
     });
     it("can extend policy", async function() {
