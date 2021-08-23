@@ -41,10 +41,14 @@ contract MockProduct is BaseProduct {
         minPeriod_,
         maxPeriod_,
         price_,
-        maxCoverPerUserDivisor_
-    )
-    // solhint-disable-next-line no-empty-blocks
-    { }
+        maxCoverPerUserDivisor_,
+        address(0x0),
+        "Solace.fi-MockProduct",
+        "1"
+    ) {
+        _SUBMIT_CLAIM_TYPEHASH = keccak256("MockProductExchange(uint256 policyID,uint256 amountOut,uint256 deadline)");
+        _productName = "Mock";
+    }
 
     /**
      * @notice It gives the user's total position in the product's protocol.
@@ -72,8 +76,8 @@ contract MockProduct is BaseProduct {
      * @param expirationBlock The new expiration block for the policy.
      */
     function setPolicyExpiration(uint256 policyID, uint40 expirationBlock) external {
-        (address policyholder, , address positionContract, uint256 coverAmount, , uint24 price) = policyManager.getPolicyInfo(policyID);
-        policyManager.setPolicyInfo(policyID, policyholder, positionContract, coverAmount, expirationBlock, price);
+        (address policyholder, , address positionContract, uint256 coverAmount, , uint24 purchasePrice) = _policyManager.getPolicyInfo(policyID);
+        _policyManager.setPolicyInfo(policyID, policyholder, positionContract, coverAmount, expirationBlock, purchasePrice);
     }
 
     /**
@@ -87,22 +91,14 @@ contract MockProduct is BaseProduct {
     function _buyPolicy(address policyholder, address positionContract, uint256 coverAmount, uint40 blocks) external payable nonReentrant returns (uint256 policyID){
         // create the policy
         uint40 expirationBlock = uint40(block.number + blocks);
-        policyID = policyManager.createPolicy(policyholder, positionContract, coverAmount, expirationBlock, price);
+        policyID = _policyManager.createPolicy(policyholder, positionContract, coverAmount, expirationBlock, _price);
 
         // update local book-keeping variables
-        activeCoverAmount += positionValue;
-        productPolicyCount++;
+        _activeCoverAmount += positionValue;
+        _productPolicyCount++;
 
         emit PolicyCreated(policyID);
 
         return policyID;
-    }
-
-    /**
-     * @notice Returns the name of the product.
-     * @return Mock The name of the product.
-     */
-    function name() public pure override returns (string memory) {
-        return "Mock";
     }
 }

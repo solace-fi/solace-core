@@ -29,27 +29,19 @@ describe("RiskManager", function () {
   before(async function () {
     artifacts = await import_artifacts();
 
-    // deploy registry contract
     registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
-
-    // deploy weth
     weth = (await deployContract(deployer,artifacts.WETH)) as Weth9;
-
-    // deploy vault
-    vault = (await deployContract(deployer,artifacts.Vault,[deployer.address,registry.address,weth.address])) as Vault;
-
-    // deploy policy manager
+    await registry.connect(governor).setWeth(weth.address);
+    vault = (await deployContract(deployer,artifacts.Vault,[deployer.address,registry.address])) as Vault;
+    await registry.connect(governor).setVault(vault.address);
     policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
-
-    // deploy risk manager contract
+    await registry.connect(governor).setPolicyManager(policyManager.address);
     riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
+    await registry.connect(governor).setRiskManager(riskManager.address);
 
     await policyManager.connect(governor).addProduct(product1.address);
     await policyManager.connect(governor).addProduct(product2.address);
     await policyManager.connect(governor).addProduct(product3.address);
-    await registry.connect(governor).setVault(vault.address);
-    await registry.connect(governor).setPolicyManager(policyManager.address);
-    await registry.connect(governor).setRiskManager(riskManager.address);
   });
 
   describe("governance", function () {
@@ -79,12 +71,16 @@ describe("RiskManager", function () {
 
   describe("product weights", function () {
     it("should start zero", async function () {
-      expect(await riskManager.weights(product1.address)).to.equal(0);
+      expect(await riskManager.numProducts()).to.equal(0);
+      expect(await riskManager.weight(product1.address)).to.equal(0);
+      expect(await riskManager.weightSum()).to.equal(BN.from("4294967295")); // max uint32
     });
     it("should reject change by non governor", async function () {
+      await expect(riskManager.connect(user).addProduct(product1.address, 1)).to.be.revertedWith("!governance");
       await expect(riskManager.connect(user).setProductWeights([product1.address],[1])).to.be.revertedWith("!governance");
     });
     it("should reject invalid inputs", async function () {
+      await expect(riskManager.connect(governor).addProduct(product1.address, 0)).to.be.revertedWith("1/0");
       await expect(riskManager.connect(governor).setProductWeights([product1.address],[1,2])).to.be.revertedWith("length mismatch");
       await expect(riskManager.connect(governor).setProductWeights([product1.address,product1.address],[1,2])).to.be.revertedWith("duplicate product");
       await expect(riskManager.connect(governor).setProductWeights([],[])).to.be.revertedWith("1/0");
@@ -93,16 +89,40 @@ describe("RiskManager", function () {
     });
     it("should be set", async function () {
       await riskManager.connect(governor).setProductWeights([product1.address,product2.address],[3,5]);
-      expect(await riskManager.weights(product1.address)).to.equal(3);
-      expect(await riskManager.weights(product2.address)).to.equal(5);
+      expect(await riskManager.numProducts()).to.equal(2);
+      expect(await riskManager.product(0)).to.equal(product1.address);
+      expect(await riskManager.product(1)).to.equal(product2.address);
+      expect(await riskManager.weight(product1.address)).to.equal(3);
+      expect(await riskManager.weight(product2.address)).to.equal(5);
       expect(await riskManager.weightSum()).to.equal(8);
+
+      await riskManager.connect(governor).addProduct(product3.address, 21);
+      expect(await riskManager.numProducts()).to.equal(3);
+      expect(await riskManager.product(2)).to.equal(product3.address);
+      expect(await riskManager.weight(product3.address)).to.equal(21);
+      expect(await riskManager.weightSum()).to.equal(29);
     });
     it("should delete old products", async function () {
-      await riskManager.connect(governor).setProductWeights([product2.address,product3.address],[7,9]);
-      expect(await riskManager.weights(product1.address)).to.equal(0);
-      expect(await riskManager.weights(product2.address)).to.equal(7);
-      expect(await riskManager.weights(product3.address)).to.equal(9);
+      await riskManager.connect(governor).setProductWeights([product2.address,product3.address],[7,3]);
+      expect(await riskManager.numProducts()).to.equal(2);
+      expect(await riskManager.product(0)).to.equal(product2.address);
+      expect(await riskManager.product(1)).to.equal(product3.address);
+      expect(await riskManager.weight(product1.address)).to.equal(0);
+      expect(await riskManager.weight(product2.address)).to.equal(7);
+      expect(await riskManager.weight(product3.address)).to.equal(3);
+      expect(await riskManager.weightSum()).to.equal(10);
+
+      // it would be a good idea to fix this double add
+      await riskManager.connect(governor).addProduct(product3.address, 9);
+      expect(await riskManager.numProducts()).to.equal(3);
+      expect(await riskManager.product(2)).to.equal(product3.address);
+      expect(await riskManager.weight(product3.address)).to.equal(9);
       expect(await riskManager.weightSum()).to.equal(16);
+    });
+    it("should reject invalid inputs pt 2", async function () {
+      await riskManager.connect(governor).addProduct(product2.address, 0);
+      await expect(riskManager.connect(governor).addProduct(product3.address, 0)).to.be.revertedWith("1/0");
+      await riskManager.connect(governor).setProductWeights([product2.address,product3.address],[7,9]);
     });
   });
 

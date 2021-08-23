@@ -7,20 +7,20 @@ import "../SOLACE.sol";
 /**
  * @title IFarm
  * @author solace.fi
- * @notice Rewards investors in [`SOLACE`](../SOLACE).
+ * @notice Rewards investors in [**SOLACE**](../SOLACE).
  */
 interface IFarm {
 
     /// @notice [`Master`](../Master) contract.
     function master() external view returns (address);
 
-    /// @notice Native [`SOLACE`](../SOLACE) Token.
+    /// @notice Native [**SOLACE**](../SOLACE) Token.
     function solace() external view returns (SOLACE);
 
     /// @notice A unique enumerator that identifies the farm type.
     function farmType() external view returns (uint256);
 
-    /// @notice Amount of [`SOLACE`](../SOLACE) distributed per block.
+    /// @notice Amount of [**SOLACE**](../SOLACE) distributed per block.
     function blockReward() external view returns (uint256);
 
     /// @notice When the farm will start.
@@ -30,19 +30,19 @@ interface IFarm {
     function endBlock() external view returns (uint256);
 
     /**
-     * @notice Sets the amount of [`SOLACE`](../SOLACE) to distribute per block.
+     * @notice Sets the amount of [**SOLACE**](../SOLACE) to distribute per block.
      * Only affects future rewards.
      * Can only be called by [`Master`](../Master).
-     * @param newBlockReward Amount to distribute per block.
+     * @param blockReward_ Amount to distribute per block.
      */
-    function setRewards(uint256 newBlockReward) external;
+    function setRewards(uint256 blockReward_) external;
 
     /**
      * @notice Sets the farm's end block. Used to extend the duration.
      * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param newEndBlock The new end block.
+     * @param endBlock_ The new end block.
      */
-    function setEnd(uint256 newEndBlock) external;
+    function setEnd(uint256 endBlock_) external;
 
     /**
      * @notice Withdraw your rewards without unstaking your tokens.
@@ -57,7 +57,7 @@ interface IFarm {
     function withdrawRewardsForUser(address user) external;
 
     /**
-     * @notice Calculates the accumulated balance of [`SOLACE`](../SOLACE) for specified user.
+     * @notice Calculates the accumulated balance of [**SOLACE**](../SOLACE) for specified user.
      * @param user The user for whom unclaimed tokens will be shown.
      * @return reward Total amount of withdrawable SOLACE.
      */

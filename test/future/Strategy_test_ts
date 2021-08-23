@@ -32,7 +32,7 @@ describe("Strategy", function () {
       artifacts = await import_artifacts();
     })
 
-    beforeEach(async () => {
+    beforeEach(async function () {
         registry = (await deployContract(
             owner,
             artifacts.Registry,

@@ -9,59 +9,32 @@ import "@openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol";
 /**
  * @title IVault
  * @author solace.fi
- * @notice The `Vault` smart contract enables `Capital Providers` to deposit **ETH** to mint shares of the `Vault`. Shares are represented as `CP Tokens` and extend ERC20.
+ * @notice The risk-backing capital pool.
+ *
+ * [**Capital Providers**](/docs/user-docs/Capital%20Providers) can deposit **ETH** or **WETH** into the `Vault` to mint shares. Shares are represented as **CP tokens** aka **SCP** and extend `ERC20`. [**Capital Providers**](/docs/user-docs/Capital%20Providers) should use [`depositEth()`](#depositeth) or [`depositWeth()`](#depositweth), not regular **ETH** or **WETH** transfer.
+ *
+ * As [**Policyholders**](/docs/user-docs/Policy%20Holders) purchase coverage, premiums will flow into the capital pool and are split amongst the [**Capital Providers**](/docs/user-docs/Capital%20Providers). If a loss event occurs in an active policy, some funds will be used to payout the claim. These events will affect the price per share but not the number or distribution of shares.
+ *
+ * By minting shares of the `Vault`, [**Capital Providers**](/docs/user-docs/Capital%20Providers) willingly accept the risk that the whole or a part of their funds may be used payout claims. A malicious [**Capital Providers**](/docs/user-docs/Capital%20Providers) could detect a loss event and try to withdraw their funds before claims are paid out. To prevent this, the `Vault` uses a cooldown mechanic such that while the [**capital provider**](/docs/user-docs/Capital%20Providers) is not in cooldown mode (default) they can mint, send, and receive **SCP** but not withdraw **ETH**. To withdraw their **ETH**, the [**capital provider**](/docs/user-docs/Capital%20Providers) must `startCooldown()`(#startcooldown), wait no less than `cooldownMin()`(#cooldownmin) and no more than `cooldownMax()`(#cooldownmax), then call `withdrawEth()`(#withdraweth) or `withdrawWeth()`(#withdrawweth). While in cooldown mode users cannot send or receive **SCP** and minting shares will take them out of cooldown.
  */
-
-struct StrategyParams {
-    uint256 performanceFee;
-    uint256 activation;
-    uint256 debtRatio;
-    uint256 minDebtPerHarvest;
-    uint256 maxDebtPerHarvest;
-    uint256 lastReport;
-    uint256 totalDebt;
-    uint256 totalGain;
-    uint256 totalLoss;
-}
-
 interface IVault is IERC20Metadata, IERC20Permit {
 
-    // Emitted when a user deposits funds.
+    /***************************************
+    EVENTS
+    ***************************************/
+
+    /// @notice Emitted when a user deposits funds.
     event DepositMade(address indexed depositor, uint256 indexed amount, uint256 indexed shares);
-    // Emitted when a user withdraws funds.
+    /// @notice Emitted when a user withdraws funds.
     event WithdrawalMade(address indexed withdrawer, uint256 indexed value);
-    // Emitted when funds are sent to escrow.
+    /// @notice Emitted when funds are sent to a requestor.
     event FundsSent(uint256 value);
-    // Emitted when emergency shutdown mode is toggled.
+    /// @notice Emitted when emergency shutdown mode is toggled.
     event EmergencyShutdown(bool active);
 
-    /**
-     * @notice Activates or deactivates emergency shutdown.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * During Emergency Shutdown:
-     * 1. No users may deposit into the Vault.
-     * 2. Withdrawls can bypass cooldown.
-     * 3. Only Governance may undo Emergency Shutdown.
-     * @param active If true, the Vault goes into Emergency Shutdown.
-     * If false, the Vault goes back into Normal Operation.
-    */
-    function setEmergencyShutdown(bool active) external;
-
-    /**
-     * @notice Sets the minimum and maximum amount of time a user must wait to withdraw funds.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param minTime Minimum time in seconds.
-     * @param maxTime Maximum time in seconds.
-     */
-    function setCooldownWindow(uint40 minTime, uint40 maxTime) external;
-
-    /**
-     * @notice Adds or removes requesting rights.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param dst The requestor.
-     * @param status True to add or false to remove rights.
-     */
-    function setRequestor(address dst, bool status) external;
+    /***************************************
+    CAPITAL PROVIDER FUNCTIONS
+    ***************************************/
 
     /**
      * @notice Allows a user to deposit **ETH** into the `Vault`(becoming a **Capital Provider**).
@@ -94,46 +67,43 @@ interface IVault is IERC20Metadata, IERC20Permit {
     function stopCooldown() external;
 
     /**
-     * @notice Allows a user to redeem shares for ETH
-     * Burns CP tokens and transfers ETH to the CP
-     * @param shares amount of shares to redeem
-     * @return value in ETH that the shares where redeemed for
+     * @notice Allows a user to redeem shares for **ETH**.
+     * Burns **SCP** and transfers **ETH** to the [**Capital Provider**](/docs/user-docs/Capital%20Providers).
+     * @param shares Amount of shares to redeem.
+     * @return value The amount in **ETH** that the shares where redeemed for.
      */
-    function withdrawEth(uint256 shares) external returns (uint256);
+    function withdrawEth(uint256 shares) external returns (uint256 value);
 
     /**
-     * @notice Allows a user to redeem shares for ETH
-     * Burns CP tokens and transfers WETH to the CP
-     * @param shares amount of shares to redeem
-     * @return value in WETH that the shares where redeemed for
+     * @notice Allows a user to redeem shares for **WETH**.
+     * Burns **SCP** tokens and transfers **WETH** to the [**Capital Provider**](/docs/user-docs/Capital%20Providers).
+     * @param shares amount of shares to redeem.
+     * @return value The amount in **WETH** that the shares where redeemed for.
      */
-    function withdrawWeth(uint256 shares) external returns (uint256);
+    function withdrawWeth(uint256 shares) external returns (uint256 value);
+
+    /***************************************
+    CAPITAL PROVIDER VIEW FUNCTIONS
+    ***************************************/
 
     /**
-     * @notice Sends ETH to other users or contracts.
-     * Can only be called by authorized requestors.
-     * @param amount Amount of ETH wanted.
-     * @return Amount of ETH sent.
+     * @notice The price of one **SCP**.
+     * @return price The price in **ETH**.
      */
-    function requestEth(uint256 amount) external returns (uint256);
-
-    /// @notice WETH contract.
-    function weth() external view returns (IWETH9);
+    function pricePerShare() external view returns (uint256 price);
 
     /**
-    * @notice Returns the maximum redeemable shares by the `user` such that Vault does not go under MCR
-    * @param user Address of user to check
-    * @return Max redeemable shares by the user
+     * @notice Returns the maximum redeemable shares by the `user` such that `Vault` does not go under **MCR**(Minimum Capital Requirement). May be less than their balance.
+     * @param user The address of user to check.
+     * @return shares The max redeemable shares by the user.
+     */
+    function maxRedeemableShares(address user) external view returns (uint256 shares);
+
+    /**
+     * @notice Returns the total quantity of all assets held by the `Vault`.
+     * @return assets The total assets under control of this vault.
     */
-    function maxRedeemableShares(address user) external view returns (uint256);
-
-    /**
-     * @notice Returns the total quantity of all assets under control of this
-        Vault, including those loaned out to a Strategy as well as those currently
-        held in the Vault.
-     * @return The total assets under control of this vault.
-    */
-    function totalAssets() external view returns (uint256);
+    function totalAssets() external view returns (uint256 assets);
 
     /// @notice The minimum amount of time a user must wait to withdraw funds.
     function cooldownMin() external view returns (uint40);
@@ -144,9 +114,9 @@ interface IVault is IERC20Metadata, IERC20Permit {
     /**
      * @notice The timestamp that a depositor's cooldown started.
      * @param user The depositor.
-     * @return The timestamp in seconds.
+     * @return start The timestamp in seconds.
      */
-    function cooldownStart(address user) external view returns (uint40);
+    function cooldownStart(address user) external view returns (uint40 start);
 
     /**
      * @notice Returns true if the user is allowed to receive or send vault shares.
@@ -162,8 +132,73 @@ interface IVault is IERC20Metadata, IERC20Permit {
      */
     function canWithdraw(address user) external view returns (bool status);
 
+    /// @notice Returns true if the vault is in shutdown.
+    function emergencyShutdown() external view returns (bool status);
+
+    /***************************************
+    REQUESTOR FUNCTIONS
+    ***************************************/
+
     /**
-     * @notice Returns true if the destination is authorized to request ETH.
+     * @notice Sends **ETH** to other users or contracts.
+     * Can only be called by authorized requestors.
+     * @param amount Amount of **ETH** wanted.
+     * @return Amount of **ETH** sent.
      */
-    function isRequestor(address dst) external view returns (bool);
+    function requestEth(uint256 amount) external returns (uint256);
+
+    /**
+     * @notice Returns true if the destination is authorized to request **ETH**.
+     * @param dst Account to check requestability.
+     * @return status True if requestor, false if not.
+     */
+    function isRequestor(address dst) external view returns (bool status);
+
+    /***************************************
+    GOVERNANCE FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Activates or deactivates emergency shutdown.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * During Emergency Shutdown:
+     * 1. No users may deposit into the Vault.
+     * 2. Withdrawls can bypass cooldown.
+     * 3. Only Governance may undo Emergency Shutdown.
+     * @param emergencyShutdown_ If true, the Vault goes into Emergency Shutdown.
+     * If false, the Vault goes back into Normal Operation.
+    */
+    function setEmergencyShutdown(bool emergencyShutdown_) external;
+
+    /**
+     * @notice Sets the `minimum` and `maximum` amount of time in seconds that a user must wait to withdraw funds.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param cooldownMin_ Minimum time in seconds.
+     * @param cooldownMax_ Maximum time in seconds.
+     */
+    function setCooldownWindow(uint40 cooldownMin_, uint40 cooldownMax_) external;
+
+    /**
+     * @notice Adds or removes requesting rights.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param dst The requestor.
+     * @param status True to add or false to remove rights.
+     */
+    function setRequestor(address dst, bool status) external;
+
+    /***************************************
+    FALLBACK FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Fallback function to allow contract to receive *ETH*.
+     * Does _not_ mint shares.
+     */
+    receive () external payable;
+
+    /**
+     * @notice Fallback function to allow contract to receive **ETH**.
+     * Does _not_ mint shares.
+     */
+    fallback () external payable;
 }

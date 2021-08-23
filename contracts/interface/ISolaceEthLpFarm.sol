@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
-import "./IUniswapLpToken.sol";
+import "./UniswapV3/IUniswapLpToken.sol";
 import "./../SOLACE.sol";
 import "./IWETH9.sol";
 import "./IFarm.sol";
@@ -10,6 +10,9 @@ import "./IFarm.sol";
 /**
  * @title ISolaceEthLpFarm: The base type of Master Uniswap LP farms.
  * @author solace.fi
+ * @notice Rewards [**Liquidity Providers**](/docs/user-docs/Liquidity%20Providers) in [**SOLACE**](./SOLACE) for providing liquidity in the [**SOLACE**](./SOLACE)-**ETH** [**Uniswap V3 Pool**](https://docs.uniswap.org/protocol/reference/core/UniswapV3Pool).
+ *
+ * Over the course of `startBlock` to `endBlock`, the farm distributes `blockReward` [**SOLACE**](./SOLACE) per block to all farmers split relative to the value of their deposited tokens.
  */
 interface ISolaceEthLpFarm is IFarm {
     // Emitted when a token is deposited onto the farm.
@@ -26,21 +29,21 @@ interface ISolaceEthLpFarm is IFarm {
     /**
      * @notice Sets the appraisal function.
      * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param newAppraisor The new appraisor.
+     * @param appraisor_ The new appraisor.
      */
-    function setAppraisor(address newAppraisor) external;
+    function setAppraisor(address appraisor_) external;
 
     /**
      * @notice Deposit a [**Uniswap LP token**](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager).
-     * User will receive accumulated [`SOLACE`](../SOLACE) rewards if any.
+     * User will receive accumulated [**SOLACE**](../SOLACE) rewards if any.
      * User must `ERC721.approve()` or `ERC721.setApprovalForAll()` first.
      * @param tokenID The ID of the token to deposit.
      */
-    function deposit(uint256 tokenID) external;
+    function depositLp(uint256 tokenID) external;
 
     /**
      * @notice Deposit a [**Uniswap LP token**](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager) using permit.
-     * User will receive accumulated [`SOLACE`](../SOLACE) rewards if any.
+     * User will receive accumulated [**SOLACE**](../SOLACE) rewards if any.
      * @param depositor The depositing user.
      * @param tokenID The ID of the token to deposit.
      * @param deadline Time the transaction must go through before.
@@ -48,7 +51,7 @@ interface ISolaceEthLpFarm is IFarm {
      * @param r secp256k1 signature
      * @param s secp256k1 signature
      */
-    function depositSigned(address depositor, uint256 tokenID, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external;
+    function depositLpSigned(address depositor, uint256 tokenID, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external;
 
     struct MintAndDepositParams {
         address depositor;
@@ -66,8 +69,8 @@ interface ISolaceEthLpFarm is IFarm {
     }
 
     /**
-     * @notice Mint a new Uniswap LP token then deposit it.
-     * User will receive accumulated Solace rewards if any.
+     * @notice Mint a new [**Uniswap LP token**](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager) then deposit it.
+     * User will receive accumulated [**SOLACE**](./SOLACE) rewards if any.
      * @param params parameters
      * @return tokenID The newly minted token ID.
      */
@@ -79,7 +82,7 @@ interface ISolaceEthLpFarm is IFarm {
      * Can only withdraw tokens you deposited.
      * @param tokenID The ID of the token to withdraw.
      */
-    function withdraw(uint256 tokenID) external;
+    function withdrawLp(uint256 tokenID) external;
 
     /**
      * @notice Returns the count of [**Uniswap LP tokens**](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager) that a user has deposited onto the farm.
@@ -115,7 +118,7 @@ interface ISolaceEthLpFarm is IFarm {
 
     /// @notice [`Uniswap V3 LP Token`](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager).
     function lpToken() external view returns (IUniswapLpToken);
-    /// @notice Native [`SOLACE`](../SOLACE) Token.
+    /// @notice Native [**SOLACE**](../SOLACE) Token.
     function solace() external view override returns (SOLACE);
     /// @notice WETH.
     function weth() external view returns (IWETH9);

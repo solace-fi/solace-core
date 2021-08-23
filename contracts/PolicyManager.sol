@@ -24,55 +24,314 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
     using Address for address;
     using EnumerableSet for EnumerableSet.AddressSet;
 
+    /***************************************
+    GLOBAL VARIABLES
+    ***************************************/
+
     /// @notice The address of the policy descriptor contract, which handles generating token URIs for policies.
-    address public override policyDescriptor;
+    address internal _policyDescriptor;
 
     /// @notice Set of products.
-    EnumerableSet.AddressSet private products;
+    EnumerableSet.AddressSet internal products;
 
-    /// @notice The current amount covered (in wei)
-    uint256 public override activeCoverAmount;
+    // The current amount covered (in wei).
+    uint256 internal _activeCoverAmount;
 
     /// @notice Total policy count.
-    uint256 public totalPolicyCount = 0;
+    uint256 internal _totalPolicyCount = 0;
 
     /// @notice Policy info (policy ID => policy info).
     mapping(uint256 => PolicyInfo) internal _policyInfo;
 
+    // Call will revert if the policy does not exist.
+    modifier policyMustExist(uint256 policyID) {
+        require(_exists(policyID), "query for nonexistent token");
+        _;
+    }
+
     /**
-     * @notice The constructor. It constructs the Policy Deployer **ERC721 Token** contract.
+     * @notice Constructs the `PolicyManager`.
      * @param governance_ The address of the [governor](/docs/user-docs/Governance).
      */
     constructor(address governance_) ERC721("Solace Policy", "SPT") Governable(governance_) { }
 
+    /***************************************
+    POLICY VIEW FUNCTIONS
+    ***************************************/
+
     /**
-     * @notice Adds a new product. The new product must be implemented in **Solace Protocol**.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param product the new product
+     * @notice Information about a policy.
+     * @param policyID The policy ID to return info.
+     * @return info info in a struct.
      */
-    function addProduct(address product) external override onlyGovernance {
-        products.add(product);
-        emit ProductAdded(product);
+    function policyInfo(uint256 policyID) external view override policyMustExist(policyID) returns (PolicyInfo memory info) {
+        info = _policyInfo[policyID];
+        return info;
     }
 
     /**
-     * @notice Removes a product.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param product the product to remove
+     * @notice Information about a policy.
+     * @param policyID The policy ID to return info.
+     * @return policyholder The address of the policy holder.
+     * @return product The product of the policy.
+     * @return positionContract The covered contract for the policy.
+     * @return coverAmount The amount covered for the policy.
+     * @return expirationBlock The expiration block of the policy.
+     * @return price The price of the policy.
      */
-    function removeProduct(address product) external override onlyGovernance {
-        products.remove(product);
-        emit ProductRemoved(product);
+    function getPolicyInfo(uint256 policyID) external view override policyMustExist(policyID) returns (address policyholder, address product, address positionContract, uint256 coverAmount, uint40 expirationBlock, uint24 price) {
+        PolicyInfo memory info = _policyInfo[policyID];
+        return (info.policyholder, info.product, info.positionContract, info.coverAmount, info.expirationBlock, info.price);
     }
 
     /**
-     * @notice Set the token descriptor.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param policyDescriptor_ The new token descriptor address.
+     * @notice The holder of the policy.
+     * @param policyID The policy ID.
+     * @return policyholder The address of the policy holder.
      */
-    function setPolicyDescriptor(address policyDescriptor_) external override onlyGovernance {
-        policyDescriptor = policyDescriptor_;
+    function getPolicyholder(uint256 policyID) external view override policyMustExist(policyID) returns (address policyholder) {
+        return _policyInfo[policyID].policyholder;
     }
+
+    /**
+     * @notice The product used to purchase the policy.
+     * @param policyID The policy ID.
+     * @return product The product of the policy.
+     */
+    function getPolicyProduct(uint256 policyID) external view override policyMustExist(policyID) returns (address product) {
+        return _policyInfo[policyID].product;
+    }
+
+    /**
+     * @notice The position contract the policy covers.
+     * @param policyID The policy ID.
+     * @return positionContract The position contract of the policy.
+     */
+    function getPolicyPositionContract(uint256 policyID) external view override policyMustExist(policyID) returns (address positionContract) {
+        return _policyInfo[policyID].positionContract;
+    }
+
+    /**
+     * @notice The expiration block of the policy.
+     * @param policyID The policy ID.
+     * @return expirationBlock The expiration block of the policy.
+     */
+    function getPolicyExpirationBlock(uint256 policyID) external view override policyMustExist(policyID) returns (uint40 expirationBlock) {
+        return _policyInfo[policyID].expirationBlock;
+    }
+
+    /**
+     * @notice The cover amount of the policy.
+     * @param policyID The policy ID.
+     * @return coverAmount The cover amount of the policy.
+     */
+    function getPolicyCoverAmount(uint256 policyID) external view override policyMustExist(policyID) returns (uint256 coverAmount) {
+        return _policyInfo[policyID].coverAmount;
+    }
+
+    /**
+     * @notice The cover price in wei per block per wei multiplied by 1e12.
+     * @param policyID The policy ID.
+     * @return price The price of the policy.
+     */
+    function getPolicyPrice(uint256 policyID) external view override policyMustExist(policyID) returns (uint24 price) {
+        return _policyInfo[policyID].price;
+    }
+
+    /**
+     * @notice Lists all policies for a given policy holder.
+     * @param policyholder The address of the policy holder.
+     * @return policyIDs The list of policy IDs that the policy holder has in any order.
+     */
+    function listPolicies(address policyholder) external view override returns (uint256[] memory policyIDs) {
+        uint256 tokenCount = balanceOf(policyholder);
+        policyIDs = new uint256[](tokenCount);
+        for (uint256 index=0; index < tokenCount; index++) {
+            policyIDs[index] = tokenOfOwnerByIndex(policyholder, index);
+        }
+        return policyIDs;
+    }
+
+    /*
+     * @notice These functions can be used to check a policys stage in the lifecycle.
+     * There are three major lifecycle events:
+     *   1 - policy is bought (aka minted)
+     *   2 - policy expires
+     *   3 - policy is burnt (aka deleted)
+     * There are four stages:
+     *   A - pre-mint
+     *   B - pre-expiration
+     *   C - post-expiration
+     *   D - post-burn
+     * Truth table:
+     *               A B C D
+     *   exists      0 1 1 0
+     *   isActive    0 1 0 0
+     *   hasExpired  0 0 1 0
+    */
+
+    /**
+     * @notice Checks if a policy exists.
+     * @param policyID The policy ID.
+     * @return status True if the policy exists.
+     */
+    function exists(uint256 policyID) external view override returns (bool status) {
+        return _exists(policyID);
+    }
+
+    /**
+     * @notice Checks if a policy is active.
+     * @param policyID The policy ID.
+     * @return status True if the policy is active.
+     */
+    function policyIsActive(uint256 policyID) external view override returns (bool status) {
+        return _policyInfo[policyID].expirationBlock >= block.number;
+    }
+
+    /**
+     * @notice Checks whether a given policy is expired.
+     * @param policyID The policy ID.
+     * @return status True if the policy is expired.
+     */
+    function policyHasExpired(uint256 policyID) public view override returns (bool status) {
+        uint40 expBlock = _policyInfo[policyID].expirationBlock;
+        return expBlock > 0 && expBlock < block.number;
+    }
+
+    /// @notice The total number of policies ever created.
+    function totalPolicyCount() external view override returns (uint256 count) {
+        return _totalPolicyCount;
+    }
+
+    /// @notice The address of the [`PolicyDescriptor`](./PolicyDescriptor) contract.
+    function policyDescriptor() external view override returns (address descriptor) {
+        return _policyDescriptor;
+    }
+
+    /**
+     * @notice Describes the policy.
+     * @param policyID The policy ID.
+     * @return description The human readable description of the policy.
+     */
+    function tokenURI(uint256 policyID) public view override(ERC721) policyMustExist(policyID) returns (string memory description) {
+        return IPolicyDescriptor(_policyDescriptor).tokenURI(this, policyID);
+    }
+
+    /***************************************
+    POLICY MUTATIVE FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Creates a new policy.
+     * Can only be called by **products**.
+     * @param policyholder The receiver of new policy token.
+     * @param positionContract The contract address of the position.
+     * @param expirationBlock The policy expiration block number.
+     * @param coverAmount The policy coverage amount (in wei).
+     * @param price The coverage price.
+     * @return policyID The policy ID.
+     */
+    function createPolicy(
+        address policyholder,
+        address positionContract,
+        uint256 coverAmount,
+        uint40 expirationBlock,
+        uint24 price
+    ) external override returns (uint256 policyID) {
+        require(products.contains(msg.sender), "product inactive");
+        PolicyInfo memory info = PolicyInfo({
+            policyholder: policyholder,
+            product: msg.sender,
+            positionContract: positionContract,
+            expirationBlock: expirationBlock,
+            coverAmount: coverAmount,
+            price: price
+        });
+        policyID = ++_totalPolicyCount; // starts at 1
+        _activeCoverAmount += coverAmount;
+        _policyInfo[policyID] = info;
+        _mint(policyholder, policyID);
+        emit PolicyCreated(policyID);
+        return policyID;
+    }
+
+    /**
+     * @notice Modifies a policy.
+     * Can only be called by **products**.
+     * @param policyID The policy ID.
+     * @param policyholder The receiver of new policy token.
+     * @param positionContract The contract address where the position is covered.
+     * @param expirationBlock The policy expiration block number.
+     * @param coverAmount The policy coverage amount (in wei).
+     * @param price The coverage price.
+     */
+    function setPolicyInfo(
+        uint256 policyID,
+        address policyholder,
+        address positionContract,
+        uint256 coverAmount,
+        uint40 expirationBlock,
+        uint24 price
+        )
+        external override policyMustExist(policyID)
+    {
+        require(_policyInfo[policyID].product == msg.sender, "wrong product");
+        _activeCoverAmount = _activeCoverAmount - _policyInfo[policyID].coverAmount + coverAmount;
+        PolicyInfo memory info = PolicyInfo({
+            policyholder: policyholder,
+            product: msg.sender,
+            positionContract: positionContract,
+            expirationBlock: expirationBlock,
+            coverAmount: coverAmount,
+            price: price
+        });
+        _policyInfo[policyID] = info;
+    }
+
+    /**
+     * @notice Burns expired or cancelled policies.
+     * Can only be called by **products**.
+     * @param policyID The ID of the policy to burn.
+     */
+    function burn(uint256 policyID) external override policyMustExist(policyID) {
+        require(_policyInfo[policyID].product == msg.sender, "wrong product");
+        _burn(policyID);
+    }
+
+    /**
+     * @notice Burns policies.
+     * @param policyID The policy ID.
+     */
+    function _burn(uint256 policyID) internal override {
+        super._burn(policyID);
+        _activeCoverAmount -= _policyInfo[policyID].coverAmount;
+        delete _policyInfo[policyID];
+        emit PolicyBurned(policyID);
+    }
+
+    /**
+     * @notice Burns expired policies.
+     * @param policyIDs The list of expired policies.
+     */
+    function updateActivePolicies(uint256[] calldata policyIDs) external override {
+        uint256 activeCover = _activeCoverAmount;
+        for (uint256 i = 0; i < policyIDs.length; i++) {
+            uint256 policyID = policyIDs[i];
+            // dont burn active or nonexistent policies
+            if (policyHasExpired(policyID)) {
+                address product = _policyInfo[policyID].product;
+                uint256 coverAmount = _policyInfo[policyID].coverAmount;
+                activeCover -= coverAmount;
+                IProduct(product).updateActiveCoverAmount(-int256(coverAmount));
+                _burn(policyID);
+            }
+        }
+        _activeCoverAmount = activeCover;
+    }
+
+    /***************************************
+    PRODUCT VIEW FUNCTIONS
+    ***************************************/
 
     /**
      * @notice Checks is an address is an active product.
@@ -100,280 +359,46 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
         return products.at(productNum);
     }
 
-    /*** POLICY VIEW FUNCTIONS
-    View functions that give us data about policies
-    ****/
+    /***************************************
+    OTHER VIEW FUNCTIONS
+    ***************************************/
+
+    /// @notice The current amount covered (in wei).
+    function activeCoverAmount() external view override returns (uint256) {
+        return _activeCoverAmount;
+    }
+
+    /***************************************
+    GOVERNANCE FUNCTIONS
+    ***************************************/
 
     /**
-     * @notice Information about a policy.
-     * @param policyID The policy ID to return info.
-     * @return info info in a struct.
+     * @notice Adds a new product.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param product the new product
      */
-    function policyInfo(uint256 policyID) external view override returns (PolicyInfo memory info) {
-        require(_exists(policyID), "query for nonexistent token");
-        info = _policyInfo[policyID];
-        return info;
+    function addProduct(address product) external override onlyGovernance {
+        products.add(product);
+        emit ProductAdded(product);
     }
 
     /**
-     * @notice Information about a policy.
-     * @param policyID The policy ID to return info.
-     * @return policyholder The address of the policy holder.
-     * @return product The product of the policy.
-     * @return positionContract The covered contract for the policy.
-     * @return coverAmount The amount covered for the policy.
-     * @return expirationBlock The expiration block of the policy.
-     * @return price The price of the policy.
+     * @notice Removes a product.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param product the product to remove
      */
-    function getPolicyInfo(uint256 policyID) external view override returns (address policyholder, address product, address positionContract, uint256 coverAmount, uint40 expirationBlock, uint24 price) {
-        require(_exists(policyID), "query for nonexistent token");
-        PolicyInfo memory info = _policyInfo[policyID];
-        return (info.policyholder, info.product, info.positionContract, info.coverAmount, info.expirationBlock, info.price);
+    function removeProduct(address product) external override onlyGovernance {
+        products.remove(product);
+        emit ProductRemoved(product);
     }
 
     /**
-     * @notice The holder of the policy.
-     * @param policyID The policy ID.
-     * @return policyholder The address of the policy holder.
+     * @notice Set the token descriptor.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param policyDescriptor_ The new token descriptor address.
      */
-    function getPolicyholder(uint256 policyID) external view override returns (address policyholder) {
-        require(_exists(policyID), "query for nonexistent token");
-        return _policyInfo[policyID].policyholder;
-    }
-
-    /**
-     * @notice The product used to purchase the policy.
-     * @param policyID The policy ID.
-     * @return product The product of the policy.
-     */
-    function getPolicyProduct(uint256 policyID) external view override returns (address product) {
-        require(_exists(policyID), "query for nonexistent token");
-        return _policyInfo[policyID].product;
-    }
-
-    /**
-     * @notice The position contract the policy covers.
-     * @param policyID The policy ID.
-     * @return positionContract The position contract of the policy.
-     */
-    function getPolicyPositionContract(uint256 policyID) external view override returns (address positionContract) {
-        require(_exists(policyID), "query for nonexistent token");
-        return _policyInfo[policyID].positionContract;
-    }
-
-    /**
-     * @notice The expiration block of the policy.
-     * @param policyID The policy ID.
-     * @return expirationBlock The expiration block of the policy.
-     */
-    function getPolicyExpirationBlock(uint256 policyID) external view override returns (uint40 expirationBlock) {
-        require(_exists(policyID), "query for nonexistent token");
-        return _policyInfo[policyID].expirationBlock;
-    }
-
-    /**
-     * @notice The cover amount of the policy.
-     * @param policyID The policy ID.
-     * @return coverAmount The cover amount of the policy.
-     */
-    function getPolicyCoverAmount(uint256 policyID) external view override returns (uint256 coverAmount) {
-        require(_exists(policyID), "query for nonexistent token");
-        return _policyInfo[policyID].coverAmount;
-    }
-
-    /**
-     * @notice The cover price in wei per block per wei multiplied by 1e12.
-     * @param policyID The policy ID.
-     * @return price The price of the policy.
-     */
-    function getPolicyPrice(uint256 policyID) external view override returns (uint24 price) {
-        require(_exists(policyID), "query for nonexistent token");
-        return _policyInfo[policyID].price;
-    }
-
-    /**
-     * @notice Lists all policies for a given policy holder.
-     * @param policyholder The address of the policy holder.
-     * @return policyIDs The list of policy IDs that the policy holder has in any order.
-     */
-    function listPolicies(address policyholder) external view override returns (uint256[] memory policyIDs) {
-        uint256 tokenCount = balanceOf(policyholder);
-        policyIDs = new uint256[](tokenCount);
-        for (uint256 index=0; index < tokenCount; index++) {
-            policyIDs[index] = tokenOfOwnerByIndex(policyholder, index);
-        }
-        return policyIDs;
-    }
-
-    /**
-     * @notice These functions can be used to check a policys stage in the lifecycle.
-     * There are three major lifecycle events:
-     *   1 - policy is bought (aka minted)
-     *   2 - policy expires
-     *   3 - policy is burnt (aka deleted)
-     * There are four stages:
-     *   A - pre-mint
-     *   B - pre-expiration
-     *   C - post-expiration
-     *   D - post-burn
-     * Truth table:
-     *               A B C D
-     *   exists      0 1 1 0
-     *   isActive    0 1 0 0
-     *   hasExpired  0 0 1 0
-     * @param policyID The policy ID.
-     * @return bool Returns true if the policy exists.
-     */
-    function exists(uint256 policyID) external view override returns (bool) {
-        return _exists(policyID);
-    }
-
-    /**
-     * @notice The function checks whether a given policy is active.
-     * @param policyID The policy ID.
-     * @return bool Returns true if the policy is active.
-     */
-    function policyIsActive(uint256 policyID) external view override returns (bool) {
-        return _policyInfo[policyID].expirationBlock >= block.number;
-    }
-
-    /**
-     * @notice The function checks whether a given policy is expired.
-     * @param policyID The policy ID.
-     * @return bool Returns true if the policy is expired.
-     */
-    function policyHasExpired(uint256 policyID) public view override returns (bool) {
-        uint40 expBlock = _policyInfo[policyID].expirationBlock;
-        return expBlock > 0 && expBlock < block.number;
-    }
-
-
-    /*** POLICY MUTATIVE FUNCTIONS
-    Functions that create, modify, and destroy policies
-    ****/
-
-    /**
-     * @notice The function creates new **ERC721** policy. The function is called by product contracts.
-     * The caller must be a **product**.
-     * @param policyholder The receiver of new policy token.
-     * @param positionContract The contract address where the position is covered.
-     * @param expirationBlock The policy expiration block number.
-     * @param coverAmount The policy coverage amount (in wei).
-     * @param price The coverage price
-     * @return policyID The policy ID(aka tokenID).
-     */
-    function createPolicy(
-        address policyholder,
-        address positionContract,
-        uint256 coverAmount,
-        uint40 expirationBlock,
-        uint24 price
-    ) external override returns (uint256 policyID) {
-        require(products.contains(msg.sender), "product inactive");
-        PolicyInfo memory info = PolicyInfo({
-            policyholder: policyholder,
-            product: msg.sender,
-            positionContract: positionContract,
-            expirationBlock: expirationBlock,
-            coverAmount: coverAmount,
-            price: price
-        });
-        policyID = ++totalPolicyCount; // starts at 1
-        activeCoverAmount += coverAmount;
-        _policyInfo[policyID] = info;
-        _mint(policyholder, policyID);
-        emit PolicyCreated(policyID);
-        return policyID;
-    }
-
-    /**
-     * @notice Allows for products to modify policies.
-     * The caller must be a **product**.
-     * @param policyID The policy ID (aka tokenID).
-     * @param policyholder The receiver of new policy token.
-     * @param positionContract The contract address where the position is covered.
-     * @param expirationBlock The policy expiration block number.
-     * @param coverAmount The policy coverage amount (in wei).
-     * @param price The coverage price.
-     */
-    function setPolicyInfo(
-        uint256 policyID,
-        address policyholder,     // TODO: should this be changeable?
-        address positionContract, // and this
-        uint256 coverAmount,
-        uint40 expirationBlock,
-        uint24 price
-        )
-        external override
-    {
-        require(_exists(policyID), "query for nonexistent token");
-        require(_policyInfo[policyID].product == msg.sender, "wrong product");
-        activeCoverAmount = activeCoverAmount - _policyInfo[policyID].coverAmount + coverAmount;
-        PolicyInfo memory info = PolicyInfo({
-            policyholder: policyholder,
-            product: msg.sender,
-            positionContract: positionContract,
-            expirationBlock: expirationBlock,
-            coverAmount: coverAmount,
-            price: price
-        });
-        _policyInfo[policyID] = info;
-    }
-
-    /**
-     * @notice The fuction burns expired or canceled policies. It is called by product contracts.
-     * The caller must be a product.
-     * @param policyID policyID aka tokenID
-     */
-    function burn(uint256 policyID) external override {
-        require(_exists(policyID), "query for nonexistent token");
-        require(_policyInfo[policyID].product == msg.sender, "wrong product");
-        _burn(policyID);
-    }
-
-    /**
-     * @notice Internal private function that is used in contract.
-     * @param policyID The policy ID.
-     */
-    function _burn(uint256 policyID) internal override {
-        super._burn(policyID);
-        activeCoverAmount -= _policyInfo[policyID].coverAmount;
-        delete _policyInfo[policyID];
-        emit PolicyBurned(policyID);
-    }
-
-    /**
-     * @notice Burns expired policies.
-     * @param policyIDs The list of expired policies.
-     */
-    function updateActivePolicies(uint256[] calldata policyIDs) external override {
-        uint256 activeCover = activeCoverAmount;
-        for (uint256 i = 0; i < policyIDs.length; i++) {
-            uint256 policyID = policyIDs[i];
-            // dont burn active or nonexistent policies
-            if (policyHasExpired(policyID)) {
-                address product = _policyInfo[policyID].product;
-                uint256 coverAmount = _policyInfo[policyID].coverAmount;
-                activeCover -= coverAmount;
-                IProduct(product).updateActiveCoverAmount(-int256(coverAmount));
-                _burn(policyID);
-            }
-        }
-        activeCoverAmount = activeCover;
-    }
-
-    /*** ERC721 INHERITANCE FUNCTIONS
-    Overrides that properly set functionality through parent contracts
-    ****/
-
-    /**
-     * @notice The function returns a human readable descriptor for the policy.
-     * @param tokenID The token ID(aka policy ID).
-     * @return description The human readable description of the policy.
-     */
-    function tokenURI(uint256 tokenID) public view override(ERC721) returns (string memory) {
-        require(_exists(tokenID), "query for nonexistent token");
-        return IPolicyDescriptor(policyDescriptor).tokenURI(this, tokenID);
+    function setPolicyDescriptor(address policyDescriptor_) external override onlyGovernance {
+        _policyDescriptor = policyDescriptor_;
     }
 
 }

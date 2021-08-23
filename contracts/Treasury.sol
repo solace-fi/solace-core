@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./Governable.sol";
 import "./interface/IWETH9.sol";
-import "./interface/ISwapRouter.sol";
+import "./interface/UniswapV3/ISwapRouter.sol";
 import "./interface/IRegistry.sol";
 import "./interface/IPolicyManager.sol";
 import "./interface/ITreasury.sol";
@@ -14,80 +14,196 @@ import "./interface/IVault.sol";
 /**
  * @title Treasury
  * @author solace.fi
- * @notice The `Treasury` smart contract governs the finance related operations.
+ * @notice The war chest of Castle Solace.
+ *
+ * As policies are purchased, premiums will flow from [**policyholders**](/docs/user-docs/Policy%20Holders) to the `Treasury`. By default `Treasury` reroutes 100% of the premiums into the [`Vault`](./Vault) where it is split amongst the [**capital providers**](/docs/user-docs/Capital%20Providers).
+ *
+ * If a [**policyholder**](/docs/user-docs/Policy%20Holders) updates or cancels a policy they may receive a refund. Refunds will be paid out from the [`Vault`](./Vault). If there are not enough funds to pay out the refund in whole, the [`unpaidRefunds()`](#unpaidrefunds) will be tracked and can be retrieved later via [`withdraw()`](#withdraw).
+ *
+ * [**Governance**](/docs/user-docs/Governance) can change the premium recipients via [`setPremiumRecipients()`](#setpremiumrecipients). This can be used to add new building blocks to Castle Solace or enact a protocol fee. Premiums can be stored in the `Treasury` and managed with a number of functions.
  */
 contract Treasury is ITreasury, ReentrancyGuard, Governable {
     using SafeERC20 for IERC20;
 
-    /// @notice Registry
-    IRegistry public registry;
+    // Registry
+    IRegistry internal _registry;
 
-    /// @notice Address of Uniswap router.
-    ISwapRouter public swapRouter;
+    // Address of Uniswap router.
+    ISwapRouter internal _swapRouter;
 
-    /// @notice Wrapped ether.
-    IWETH9 public weth;
+    // Wrapped ether.
+    IWETH9 internal _weth;
 
-    address public constant ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+    address internal constant _ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
-    address payable[] public premiumRecipients;
-    uint32[] public recipientWeights;
-    uint32 public weightSum;
+    address payable[] internal _premiumRecipients;
+    uint32[] internal _recipientWeights;
+    uint32 internal _weightSum;
 
-    /// @notice The amount of **ETH** that a user is owed if any.
-    mapping(address => uint256) public override unpaidRefunds;
+    // The amount of **ETH** that a user is owed if any.
+    mapping(address => uint256) internal _unpaidRefunds;
 
     /**
-     * @notice Constructs the treasury contract.
+     * @notice Constructs the Treasury contract.
      * @param governance_ The address of the [governor](/docs/user-docs/Governance).
      * @param swapRouter_ Address of uniswap router.
-     * @param weth_ Address of wrapped ether.
      * @param registry_ Address of registry.
      */
-    constructor(address governance_, address swapRouter_, address weth_, address registry_) Governable(governance_) {
-        swapRouter = ISwapRouter(swapRouter_);
-        weth = IWETH9(payable(weth_));
-        registry = IRegistry(registry_);
+    constructor(address governance_, address swapRouter_, address registry_) Governable(governance_) {
+        _swapRouter = ISwapRouter(swapRouter_);
+        _registry = IRegistry(registry_);
+        _weth = IWETH9(payable(_registry.weth()));
 
-        if (registry_ != address(0) && registry.vault() != address(0)) {
-            premiumRecipients = [payable(registry.vault())];
-            recipientWeights = [1,0];
-            weightSum = 1;
+        // if vault is deployed, route 100% of the premiums to it
+        if (registry_ != address(0) && _registry.vault() != address(0)) {
+            _premiumRecipients = [payable(_registry.vault())];
+            _recipientWeights = [1,0];
+            _weightSum = 1;
+        } // if vault is not deployed, hold 100% of the premiums in the treasury
+    }
+
+    /***************************************
+    FUNDS IN
+    ***************************************/
+
+    /**
+     * @notice Routes the **premiums** to the `recipients`.
+     * Each recipient will receive a `recipientWeight / weightSum` portion of the premiums.
+     * Will be called by products with `msg.value = premium`.
+     */
+    function routePremiums() external payable override nonReentrant {
+        uint256 div = _weightSum;
+        uint256 length = _premiumRecipients.length;
+        // transfer to all recipients
+        for(uint i = 0; i < length; i++) {
+            uint256 amount = msg.value * _recipientWeights[i] / div;
+            if (amount > 0) {
+                // this call may fail. let it
+                // funds will be safely stored in treasury
+                _premiumRecipients[i].call{value: amount}("");
+            }
         }
+        // hold treasury share as eth
     }
 
     /**
-     * @notice Fallback function to allow contract to receive **ETH**.
+     * @notice Number of premium recipients.
+     * @return count The number of premium recipients.
      */
-    receive () external payable override {
-        emit EthDeposited(msg.value);
+    function numPremiumRecipients() external view override returns (uint256 count) {
+        return _premiumRecipients.length;
     }
 
     /**
-     * @notice Fallback function to allow contract to receive **ETH**.
+     * @notice Gets the premium recipient at `index`.
+     * @param index Index to query, enumerable `[0, numPremiumRecipients()-1]`.
+     * @return recipient The receipient address.
      */
-    fallback () external payable override {
-        emit EthDeposited(msg.value);
+    function premiumRecipient(uint256 index) external view override returns (address recipient) {
+        return _premiumRecipients[index];
     }
 
     /**
-     * @notice Deposits **ETH**.
+     * @notice Gets the weight of the recipient.
+     * @param index Index to query, enumerable `[0, numPremiumRecipients()]`.
+     * @return weight The recipient weight.
      */
-    function depositEth() external override payable {
-        // emit event
-        emit EthDeposited(msg.value);
+    function recipientWeight(uint256 index) external view override returns (uint32 weight) {
+        return _recipientWeights[index];
     }
 
     /**
-     * @notice Deposits an **ERC20** token.
-     * @param token The address of the token to deposit.
-     * @param amount The amount of the token to deposit.
+     * @notice Gets the sum of all premium recipient weights.
+     * @return weight The sum of weights.
      */
-    function depositToken(address token, uint256 amount) external override nonReentrant {
-        // receive token
-        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
-        // emit event
-        emit TokenDeposited(token, amount);
+    function weightSum() external view override returns (uint32 weight) {
+        return _weightSum;
+    }
+
+    /***************************************
+    FUNDS OUT
+    ***************************************/
+
+    /**
+     * @notice Refunds some **ETH** to the user.
+     * Will attempt to send the entire `amount` to the `user`.
+     * If there is not enough available at the moment, it is recorded and can be pulled later via [`withdraw()`](#withdraw).
+     * Can only be called by active products.
+     * @param user The user address to send refund amount.
+     * @param amount The amount to send the user.
+     */
+    function refund(address user, uint256 amount) external override nonReentrant {
+        // check if from active product
+        require(IPolicyManager(_registry.policyManager()).productIsActive(msg.sender), "!product");
+        _transferEth(user, amount);
+    }
+
+    /**
+     * @notice The amount of **ETH** that a user is owed if any.
+     * @param user The user.
+     * @return amount The amount.
+     */
+    function unpaidRefunds(address user) external view override returns (uint256 amount) {
+        return _unpaidRefunds[user];
+    }
+
+    /**
+     * @notice Transfers the unpaid refunds to the user.
+     */
+    function withdraw() external override nonReentrant {
+        _transferEth(msg.sender, 0);
+    }
+
+    /**
+     * @notice Transfers **ETH** to the user. It's called by [`refund()`](#refund) and [`withdraw()`](#withdraw) functions in the contract.
+     * Also adds on their unpaid refunds, and stores new unpaid refunds if necessary.
+     * @param user The user to pay.
+     * @param amount The amount to pay _before_ unpaid funds.
+     */
+    function _transferEth(address user, uint256 amount) internal {
+        // account for unpaid rewards
+        uint256 unpaidRefunds1 = _unpaidRefunds[user];
+        amount += unpaidRefunds1;
+        if(amount == 0) return;
+        // transfer amount from vault
+        if (_registry.vault() != address(0)) IVault(payable(_registry.vault())).requestEth(amount);
+        // unwrap weth if necessary
+        if(address(this).balance < amount) {
+            uint256 diff = amount - address(this).balance;
+            _weth.withdraw(min(_weth.balanceOf(address(this)), diff));
+        }
+        // send eth
+        uint256 transferAmount = min(address(this).balance, amount);
+        uint256 unpaidRefunds2 = amount - transferAmount;
+        if(unpaidRefunds2 != unpaidRefunds1) _unpaidRefunds[user] = unpaidRefunds2;
+        payable(user).transfer(transferAmount);
+    }
+
+    /***************************************
+    FUND MANAGEMENT
+    ***************************************/
+
+    /**
+     * @notice Sets the premium recipients and their weights.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param recipients The premium recipients, plus an implicit `address(treasury)` at the end.
+     * @param weights The recipient weights.
+     */
+    function setPremiumRecipients(address payable[] calldata recipients, uint32[] calldata weights) external override onlyGovernance {
+        // check recipient - weight map
+        require(recipients.length + 1 == weights.length, "length mismatch");
+        uint32 sum = 0;
+        uint256 length = weights.length;
+        for(uint256 i = 0; i < length; i++) sum += weights[i];
+        if(length > 1) require(sum > 0, "1/0");
+        // delete old recipients
+        delete _premiumRecipients;
+        delete _recipientWeights;
+        // set new recipients
+        _weightSum = sum;
+        _premiumRecipients = recipients;
+        _recipientWeights = weights;
+        emit RecipientsSet();
     }
 
     /**
@@ -99,7 +215,7 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
      */
     function spend(address token, uint256 amount, address recipient) external override nonReentrant onlyGovernance {
         // transfer eth
-        if(token == ETH_ADDRESS) payable(recipient).transfer(amount);
+        if(token == _ETH_ADDRESS) payable(recipient).transfer(amount);
         // transfer token
         else IERC20(token).safeTransfer(recipient, amount);
         // emit event
@@ -120,11 +236,11 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
             tokenAddr := div(mload(add(add(path, 0x20), 0)), 0x1000000000000000000000000)
         }
         IERC20 token = IERC20(tokenAddr);
-        if(token.allowance(address(this), address(swapRouter)) < amountIn) {
-            token.approve(address(swapRouter), type(uint256).max);
+        if(token.allowance(address(this), address(_swapRouter)) < amountIn) {
+            token.approve(address(_swapRouter), type(uint256).max);
         }
         // swap
-        swapRouter.exactInput(ISwapRouter.ExactInputParams({
+        _swapRouter.exactInput(ISwapRouter.ExactInputParams({
             path: path,
             recipient: address(this),
             // solhint-disable-next-line not-rely-on-time
@@ -135,48 +251,12 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
     }
 
     /**
-     * @notice Sets the premium recipients and their weights.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param recipients The premium recipients, plus an implicit `address(this)` at the end.
-     * @param weights The recipient weights.
-     */
-    function setPremiumRecipients(address payable[] calldata recipients, uint32[] calldata weights) external override onlyGovernance {
-        // check recipient - weight map
-        require(recipients.length + 1 == weights.length, "length mismatch");
-        uint32 sum = 0;
-        uint256 length = weights.length;
-        for(uint256 i = 0; i < length; i++) sum += weights[i];
-        if(length > 1) require(sum > 0, "1/0");
-        weightSum = sum;
-        premiumRecipients = recipients;
-        recipientWeights = weights;
-    }
-
-    /**
-     * @notice Routes the **premiums** to the `recipients`.
-     */
-    function routePremiums() external payable override nonReentrant {
-        uint256 div = weightSum;
-        uint256 length = premiumRecipients.length;
-        // transfer to all recipients
-        for(uint i = 0; i < length; i++) {
-            uint256 amount = msg.value * recipientWeights[i] / div;
-            if (amount > 0) {
-                // this call may fail. let it
-                // funds will be safely stored in treasury
-                premiumRecipients[i].call{value: amount}("");
-            }
-        }
-        // hold treasury share as eth
-    }
-
-    /**
      * @notice Wraps some **ETH** into **WETH**.
      * Can only be called by the current [**governor**](/docs/user-docs/Governance).
      * @param amount The amount to wrap.
      */
     function wrap(uint256 amount) external override onlyGovernance {
-        weth.deposit{value: amount}();
+        _weth.deposit{value: amount}();
     }
 
     /**
@@ -185,54 +265,12 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
      * @param amount The amount to unwrap.
      */
     function unwrap(uint256 amount) external override onlyGovernance {
-        weth.withdraw(amount);
+        _weth.withdraw(amount);
     }
 
-    /**
-     * @notice Refunds some **ETH** to the user.
-     * Will attempt to send the entire `amount` to the `user`.
-     * If there is not enough available at the moment, it is recorded and can be pulled later via [`withdraw()`](#withdraw).
-     * Can only be called by active products.
-     * @param user The user address to send refund amount.
-     * @param amount The amount to send the user.
-     */
-    function refund(address user, uint256 amount) external override nonReentrant {
-        // check if from active product
-        require(IPolicyManager(registry.policyManager()).productIsActive(msg.sender), "!product");
-        _transferEth(user, amount);
-    }
-
-    /**
-     * @notice Transfers the unpaid refunds to the user.
-     */
-    function withdraw() external override nonReentrant {
-        _transferEth(msg.sender, 0);
-    }
-
-    /**
-     * @notice Transfers **ETH** to the user. It's called by [`refund()`](#refund) and [`withdraw()`](#withdraw) functions in the contract.
-     * Also adds on their unpaid refunds, and stores new unpaid refunds if necessary.
-     * @param user The user to pay.
-     * @param amount The amount to pay _before_ unpaid funds.
-     */
-    function _transferEth(address user, uint256 amount) internal {
-        // account for unpaid rewards
-        uint256 unpaidRefunds1 = unpaidRefunds[user];
-        amount += unpaidRefunds1;
-        if(amount == 0) return;
-        // transfer amount from vault
-        if (registry.vault() != address(0)) IVault(registry.vault()).requestEth(amount);
-        // unwrap weth if necessary
-        if(address(this).balance < amount) {
-            uint256 diff = amount - address(this).balance;
-            weth.withdraw(min(weth.balanceOf(address(this)), diff));
-        }
-        // send eth
-        uint256 transferAmount = min(address(this).balance, amount);
-        uint256 unpaidRefunds2 = amount - transferAmount;
-        if(unpaidRefunds2 != unpaidRefunds1) unpaidRefunds[user] = unpaidRefunds2;
-        payable(user).transfer(transferAmount);
-    }
+    /***************************************
+    HELPER FUNCTIONS
+    ***************************************/
 
     /**
      * @notice Internal function that returns the minimum value between two values.
@@ -243,4 +281,18 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
     function min(uint256 a, uint256 b) internal pure returns (uint256 c) {
         return a <= b ? a : b;
     }
+
+    /***************************************
+    FALLBACK FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Fallback function to allow contract to receive **ETH**.
+     */
+    receive () external payable override { }
+
+    /**
+     * @notice Fallback function to allow contract to receive **ETH**.
+     */
+    fallback () external payable override { }
 }

@@ -8,7 +8,7 @@ chai.use(solidity);
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
 import { Solace } from "../typechain";
 
-describe("SolaceToken", () => {
+describe("SOLACE", function () {
   let solace: Solace;
   const [owner, governor, minter, receiver1, receiver2] = provider.getWallets();
   const name = "solace";
@@ -21,7 +21,7 @@ describe("SolaceToken", () => {
     artifacts = await import_artifacts();
   })
 
-  beforeEach(async () => {
+  beforeEach(async function () {
     solace = (await deployContract(
       owner,
       artifacts.SOLACE,
@@ -85,19 +85,19 @@ describe("SolaceToken", () => {
     })
   })
 
-  describe('minters', function () {
-    it('owner is minter', async function () {
-      expect(await solace.minters(owner.address)).to.be.true;
+  describe("minters", function () {
+    it("owner is minter", async function () {
+      expect(await solace.isMinter(owner.address)).to.be.true;
     })
 
-    it('can add minters', async function (){
+    it("can add minters", async function (){
       await solace.connect(owner).addMinter(minter.address);
-      expect(await solace.minters(minter.address)).to.equal(true);
+      expect(await solace.isMinter(minter.address)).to.equal(true);
     })
 
     it("can remove minters", async function () {
       await solace.connect(owner).removeMinter(minter.address);
-      expect(await solace.minters(minter.address)).to.equal(false);
+      expect(await solace.isMinter(minter.address)).to.equal(false);
     })
 
     it("reverts when !governance adds / removes minters", async function () {

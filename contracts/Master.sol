@@ -81,13 +81,13 @@ contract Master is IMaster, Governable {
     /**
      * @notice Sets the Solace reward distribution across all farms.
      * Optionally updates all farms.
-     * @param newSolacePerBlock Amount of solace to distribute per block.
+     * @param solacePerBlock_ Amount of solace to distribute per block.
      */
-    function setSolacePerBlock(uint256 newSolacePerBlock) external override onlyGovernance {
+    function setSolacePerBlock(uint256 solacePerBlock_) external override onlyGovernance {
         // accounting
-        solacePerBlock = newSolacePerBlock;
+        solacePerBlock = solacePerBlock_;
         _updateRewards();
-        emit RewardsSet(newSolacePerBlock);
+        emit RewardsSet(solacePerBlock_);
     }
 
     /**
@@ -116,11 +116,11 @@ contract Master is IMaster, Governable {
     /**
     * @notice Sets a farm's allocation points.
     * @param farmID The farm to set allocation points.
-    * @param newAllocPoints How many points to allocate this farm.
+    * @param allocPoints_ How many points to allocate this farm.
     */
-    function _setAllocPoints(uint256 farmID, uint256 newAllocPoints) internal {
-      totalAllocPoints = totalAllocPoints - allocPoints[farmID] + newAllocPoints;
-      allocPoints[farmID] = newAllocPoints;
+    function _setAllocPoints(uint256 farmID, uint256 allocPoints_) internal {
+      totalAllocPoints = totalAllocPoints - allocPoints[farmID] + allocPoints_;
+      allocPoints[farmID] = allocPoints_;
       _updateRewards();
     }
 

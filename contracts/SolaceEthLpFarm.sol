@@ -7,8 +7,8 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./libraries/TickBitmap.sol";
 import "./Governable.sol";
-import "./interface/IUniswapLpToken.sol";
-import "./interface/IUniswapV3Pool.sol";
+import "./interface/UniswapV3/IUniswapLpToken.sol";
+import "./interface/UniswapV3/IUniswapV3Pool.sol";
 import "./interface/ILpAppraisor.sol";
 import "./interface/ISolaceEthLpFarm.sol";
 
@@ -16,7 +16,9 @@ import "./interface/ISolaceEthLpFarm.sol";
 /**
  * @title SolaceEthLpFarm
  * @author solace.fi
- * @notice A farm that allows for the staking of Uniswap V3 LP tokens in SOLACE-ETH pools.
+ * @notice Rewards [**Liquidity Providers**](/docs/user-docs/Liquidity%20Providers) in [**SOLACE**](./SOLACE) for providing liquidity in the [**SOLACE**](./SOLACE)-**ETH** [**Uniswap V3 Pool**](https://docs.uniswap.org/protocol/reference/core/UniswapV3Pool).
+ *
+ * Over the course of `startBlock` to `endBlock`, the farm distributes `blockReward` [**SOLACE**](./SOLACE) per block to all farmers split relative to the value of their deposited tokens.
  */
 contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard, Governable {
     using SafeERC20 for IERC20;
@@ -28,7 +30,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard, Governable {
 
     /// @notice [**Uniswap V3 LP Token**](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager).
     IUniswapLpToken public override lpToken;
-    /// @notice Native [`SOLACE`](./SOLACE) Token.
+    /// @notice Native [**SOLACE**](./SOLACE) Token.
     SOLACE public override solace;
     /// @notice WETH.
     IWETH9 public override weth;
@@ -115,10 +117,10 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard, Governable {
      * @param governance_ The address of the [governor](/docs/user-docs/Governance).
      * @param master_ Address of the [`Master`](./Master) contract.
      * @param lpToken_ Address of the [**Uniswap NonFungiblePositionManager**](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager) contract.
-     * @param solace_ Address of the [`SOLACE'](./SOLACE) token contract.
+     * @param solace_ Address of the [**SOLACE**](./SOLACE) token contract.
      * @param startBlock_ When farming will begin.
      * @param endBlock_ When farming will end.
-     * @param pool_ Address of the UniswapV3Pool.
+     * @param pool_ Address of the [**Uniswap V3 Pool**](https://docs.uniswap.org/protocol/reference/core/UniswapV3Pool).
      */
     constructor(
         address governance_,
@@ -157,50 +159,50 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard, Governable {
     fallback () external payable {}
 
     /**
-     * @notice Sets the amount of [`SOLACE`](./SOLACE) to distribute per block.
+     * @notice Sets the amount of [**SOLACE**](./SOLACE) to distribute per block.
      * Only affects future rewards.
      * Can only be called by [`Master`](./Master).
-     * @param newBlockReward Amount to distribute per block.
+     * @param blockReward_ Amount to distribute per block.
      */
-    function setRewards(uint256 newBlockReward) external override {
+    function setRewards(uint256 blockReward_) external override {
         // can only be called by master contract
         require(msg.sender == master, "!master");
         // update
         updateFarm();
         // accounting
-        blockReward = newBlockReward;
-        emit RewardsSet(newBlockReward);
+        blockReward = blockReward_;
+        emit RewardsSet(blockReward_);
     }
 
     /**
      * @notice Sets the farm's end block. Used to extend the duration.
      * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param newEndBlock The new end block.
+     * @param endBlock_ The new end block.
      */
-    function setEnd(uint256 newEndBlock) external override onlyGovernance {
+    function setEnd(uint256 endBlock_) external override onlyGovernance {
         // accounting
-        endBlock = newEndBlock;
+        endBlock = endBlock_;
         // update
         updateFarm();
-        emit FarmEndSet(newEndBlock);
+        emit FarmEndSet(endBlock_);
     }
 
     /**
      * @notice Sets the appraisal function.
      * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param newAppraisor The new appraisor.
+     * @param appraisor_ The new appraisor.
      */
-    function setAppraisor(address newAppraisor) external override onlyGovernance {
-        appraisor = ILpAppraisor(newAppraisor);
+    function setAppraisor(address appraisor_) external override onlyGovernance {
+        appraisor = ILpAppraisor(appraisor_);
     }
 
     /**
      * @notice Deposit a [**Uniswap LP token**](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager).
-     * User will receive accumulated [`SOLACE`](./SOLACE) rewards if any.
+     * User will receive accumulated [**SOLACE**](./SOLACE) rewards if any.
      * User must `ERC721.approve()` or `ERC721.setApprovalForAll()` first.
      * @param tokenID The ID of the token to deposit.
      */
-    function deposit(uint256 tokenID) external override nonReentrant {
+    function depositLp(uint256 tokenID) external override nonReentrant {
         // pull token
         lpToken.transferFrom(msg.sender, address(this), tokenID);
         // accounting
@@ -209,7 +211,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard, Governable {
 
     /**
      * @notice Deposit a [**Uniswap LP token**](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager) using permit.
-     * User will receive accumulated [`SOLACE`](./SOLACE) rewards if any.
+     * User will receive accumulated [**SOLACE**](./SOLACE) rewards if any.
      * @param depositor The depositing user.
      * @param tokenID The ID of the token to deposit.
      * @param deadline Time the transaction must go through before.
@@ -217,7 +219,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard, Governable {
      * @param r secp256k1 signature
      * @param s secp256k1 signature
      */
-    function depositSigned(address depositor, uint256 tokenID, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external override nonReentrant {
+    function depositLpSigned(address depositor, uint256 tokenID, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external override nonReentrant {
         // permit
         lpToken.permit(address(this), tokenID, deadline, v, r, s);
         // pull token
@@ -227,8 +229,8 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard, Governable {
     }
 
     /**
-     * @notice Mint a new [**Uniswap**](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager) LP token then deposit it.
-     * User will receive accumulated [`SOLACE`](./SOLACE) rewards if any.
+     * @notice Mint a new [**Uniswap LP token**](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager) then deposit it.
+     * User will receive accumulated [**SOLACE**](./SOLACE) rewards if any.
      * @param params parameters
      * @return tokenID The newly minted token ID.
      */
@@ -279,7 +281,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard, Governable {
      * Can only withdraw tokens you deposited.
      * @param tokenID The ID of the token to withdraw.
      */
-    function withdraw(uint256 tokenID) external override nonReentrant {
+    function withdrawLp(uint256 tokenID) external override nonReentrant {
         // harvest and update farm
         _harvest(msg.sender);
         // get farmer information
@@ -422,7 +424,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard, Governable {
     }
 
     /**
-     * @notice Calculates the accumulated balance of [`SOLACE`](./SOLACE) for specified user.
+     * @notice Calculates the accumulated balance of [**SOLACE**](./SOLACE) for specified user.
      * @param user The user for whom unclaimed tokens will be shown.
      * @return reward Total amount of withdrawable reward tokens.
      */

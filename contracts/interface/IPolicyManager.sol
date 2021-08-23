@@ -13,60 +13,24 @@ import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
  *
  * Policies are [**ERC721s**](https://docs.openzeppelin.com/contracts/4.x/api/token/erc721#ERC721).
  */
-interface IPolicyManager /*is IERC721Enumerable, IERC721Metadata*/ {
+interface IPolicyManager is IERC721Enumerable /*, IERC721Metadata*/ {
+
+    /***************************************
+    EVENTS
+    ***************************************/
+
+    /// @notice Emitted when a policy is created.
+    event PolicyCreated(uint256 policyID);
+    /// @notice Emitted when a policy is burned.
+    event PolicyBurned(uint256 policyID);
+    /// @notice Emitted when a new product is added.
     event ProductAdded(address product);
+    /// @notice Emitted when a new product is removed.
     event ProductRemoved(address product);
-    event PolicyCreated(uint256 tokenID);
-    event PolicyBurned(uint256 tokenID);
 
-    /**
-     * @notice Adds a new product.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param product the new product
-     */
-    function addProduct(address product) external;
-
-    /**
-     * @notice Removes a product.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param product the product to remove
-     */
-    function removeProduct(address product) external;
-
-
-    /**
-     * @notice Set the token descriptor.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param policyDescriptor The new token descriptor address.
-     */
-    function setPolicyDescriptor(address policyDescriptor) external;
-
-    /// @notice The address of the policy descriptor contract, which handles generating token URIs for policies.
-    function policyDescriptor() external view returns (address);
-
-    /**
-     * @notice Checks is an address is an active product.
-     * @param product The product to check.
-     * @return status True if the product is active.
-     */
-    function productIsActive(address product) external view returns (bool status);
-
-    /**
-     * @notice Returns the number of products.
-     * @return count The number of products.
-     */
-    function numProducts() external view returns (uint256 count);
-
-    /**
-     * @notice Returns the product at the given index.
-     * @param productNum The index to query.
-     * @return product The address of the product.
-     */
-    function getProduct(uint256 productNum) external view returns (address product);
-
-    /*** POLICY VIEW FUNCTIONS
-    View functions that give us data about policies
-    ****/
+    /***************************************
+    POLICY VIEW FUNCTIONS
+    ***************************************/
 
     /// @notice PolicyInfo struct.
     struct PolicyInfo {
@@ -145,22 +109,64 @@ interface IPolicyManager /*is IERC721Enumerable, IERC721Metadata*/ {
      * @return policyIDs The list of policy IDs that the policy holder has in any order.
      */
     function listPolicies(address policyholder) external view returns (uint256[] memory policyIDs);
-    function exists(uint256 policyID) external view returns (bool);
+
+    /*
+     * @notice These functions can be used to check a policys stage in the lifecycle.
+     * There are three major lifecycle events:
+     *   1 - policy is bought (aka minted)
+     *   2 - policy expires
+     *   3 - policy is burnt (aka deleted)
+     * There are four stages:
+     *   A - pre-mint
+     *   B - pre-expiration
+     *   C - post-expiration
+     *   D - post-burn
+     * Truth table:
+     *               A B C D
+     *   exists      0 1 1 0
+     *   isActive    0 1 0 0
+     *   hasExpired  0 0 1 0
+
+    /**
+     * @notice Checks if a policy exists.
+     * @param policyID The policy ID.
+     * @return status True if the policy exists.
+     */
+    function exists(uint256 policyID) external view returns (bool status);
+
+    /**
+     * @notice Checks if a policy is active.
+     * @param policyID The policy ID.
+     * @return status True if the policy is active.
+     */
     function policyIsActive(uint256 policyID) external view returns (bool);
+
+    /**
+     * @notice Checks whether a given policy is expired.
+     * @param policyID The policy ID.
+     * @return status True if the policy is expired.
+     */
     function policyHasExpired(uint256 policyID) external view returns (bool);
 
-    /*** POLICY MUTATIVE FUNCTIONS
-    Functions that create, modify, and destroy policies
-    ****/
+    /// @notice The total number of policies ever created.
+    function totalPolicyCount() external view returns (uint256 count);
+
+    /// @notice The address of the [`PolicyDescriptor`](./PolicyDescriptor) contract.
+    function policyDescriptor() external view returns (address);
+
+    /***************************************
+    POLICY MUTATIVE FUNCTIONS
+    ***************************************/
+
     /**
-     * @notice Creates new ERC721 policy `tokenID` for `to`.
-     * The caller must be a product.
-     * @param policyholder receiver of new policy token
-     * @param positionContract contract address where the position is covered
-     * @param expirationBlock policy expiration block number
-     * @param coverAmount policy coverage amount (in wei)
-     * @param price coverage price
-     * @return policyID (aka tokenID)
+     * @notice Creates a new policy.
+     * Can only be called by **products**.
+     * @param policyholder The receiver of new policy token.
+     * @param positionContract The contract address of the position.
+     * @param expirationBlock The policy expiration block number.
+     * @param coverAmount The policy coverage amount (in wei).
+     * @param price The coverage price.
+     * @return policyID The policy ID.
      */
     function createPolicy(
         address policyholder,
@@ -169,12 +175,85 @@ interface IPolicyManager /*is IERC721Enumerable, IERC721Metadata*/ {
         uint40 expirationBlock,
         uint24 price
     ) external returns (uint256 policyID);
-    function setPolicyInfo(uint256 policyID, address policyholder, address positionContract, uint256 coverAmount, uint40 expirationBlock, uint24 price) external;
-    function burn(uint256 tokenID) external;
 
+    /**
+     * @notice Modifies a policy.
+     * Can only be called by **products**.
+     * @param policyID The policy ID.
+     * @param policyholder The receiver of new policy token.
+     * @param positionContract The contract address where the position is covered.
+     * @param expirationBlock The policy expiration block number.
+     * @param coverAmount The policy coverage amount (in wei).
+     * @param price The coverage price.
+     */
+    function setPolicyInfo(uint256 policyID, address policyholder, address positionContract, uint256 coverAmount, uint40 expirationBlock, uint24 price) external;
+
+    /**
+     * @notice Burns expired or cancelled policies.
+     * Can only be called by **products**.
+     * @param policyID The ID of the policy to burn.
+     */
+    function burn(uint256 policyID) external;
+
+    /**
+     * @notice Burns expired policies.
+     * @param policyIDs The list of expired policies.
+     */
     function updateActivePolicies(uint256[] calldata policyIDs) external;
 
-    // other view functions
+    /***************************************
+    PRODUCT VIEW FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Checks is an address is an active product.
+     * @param product The product to check.
+     * @return status True if the product is active.
+     */
+    function productIsActive(address product) external view returns (bool status);
+
+    /**
+     * @notice Returns the number of products.
+     * @return count The number of products.
+     */
+    function numProducts() external view returns (uint256 count);
+
+    /**
+     * @notice Returns the product at the given index.
+     * @param productNum The index to query.
+     * @return product The address of the product.
+     */
+    function getProduct(uint256 productNum) external view returns (address product);
+
+    /***************************************
+    OTHER VIEW FUNCTIONS
+    ***************************************/
 
     function activeCoverAmount() external view returns (uint256);
+
+    /***************************************
+    GOVERNANCE FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Adds a new product.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param product the new product
+     */
+    function addProduct(address product) external;
+
+    /**
+     * @notice Removes a product.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param product the product to remove
+     */
+    function removeProduct(address product) external;
+
+
+    /**
+     * @notice Set the token descriptor.
+     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * @param policyDescriptor The new token descriptor address.
+     */
+    function setPolicyDescriptor(address policyDescriptor) external;
 }

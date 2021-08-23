@@ -1,6 +1,5 @@
-import { BigNumber, BigNumberish, constants, Signature, Wallet, Contract } from 'ethers'
-import { splitSignature } from 'ethers/lib/utils'
-//import { NonfungiblePositionManager } from '../../typechain'
+import { BigNumber, BigNumberish, constants, Signature, Wallet, Contract } from "ethers"
+import { splitSignature } from "ethers/lib/utils"
 
 export default async function getPermitNFTSignature(
   wallet: Wallet,
@@ -14,12 +13,12 @@ export default async function getPermitNFTSignature(
     /*
     permitConfig?.nonce ?? positionManager.positions(tokenId).then((p:any) => p.nonce),
     permitConfig?.name ?? positionManager.name(),
-    permitConfig?.version ?? '1',
+    permitConfig?.version ?? "1",
     permitConfig?.chainId ?? wallet.getChainId(),
     */
     positionManager.positions(tokenId).then((p:any) => p.nonce),
     positionManager.name(),
-    '1',
+    "1",
     wallet.getChainId(),
   ])
 
@@ -34,20 +33,20 @@ export default async function getPermitNFTSignature(
       {
         Permit: [
           {
-            name: 'spender',
-            type: 'address',
+            name: "spender",
+            type: "address",
           },
           {
-            name: 'tokenId',
-            type: 'uint256',
+            name: "tokenId",
+            type: "uint256",
           },
           {
-            name: 'nonce',
-            type: 'uint256',
+            name: "nonce",
+            type: "uint256",
           },
           {
-            name: 'deadline',
-            type: 'uint256',
+            name: "deadline",
+            type: "uint256",
           },
         ],
       },

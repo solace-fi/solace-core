@@ -38,18 +38,18 @@ describe("Vault", function () {
   })
 
   beforeEach(async function () {
-    weth = (await deployContract(owner,artifacts.WETH)) as Weth9;
     registry = (await deployContract(owner, artifacts.Registry, [owner.address])) as Registry;
-    vault = (await deployContract(owner,artifacts.Vault,[owner.address,registry.address,weth.address])) as Vault;
-    claimsEscrow = (await deployContract(owner,artifacts.ClaimsEscrow,[owner.address,registry.address])) as ClaimsEscrow;
-    policyManager = (await deployContract(owner,artifacts.PolicyManager,[owner.address])) as PolicyManager;
-    riskManager = (await deployContract(owner, artifacts.RiskManager, [owner.address, registry.address])) as RiskManager;
-    mockProduct = (await deployContract(owner,artifacts.MockProduct,[owner.address,policyManager.address,registry.address,ZERO_ADDRESS,0,100000000000,1,16777215])) as MockProduct;
-
+    weth = (await deployContract(owner,artifacts.WETH)) as Weth9;
+    await registry.setWeth(weth.address);
+    vault = (await deployContract(owner,artifacts.Vault,[owner.address,registry.address])) as Vault;
     await registry.setVault(vault.address);
+    claimsEscrow = (await deployContract(owner,artifacts.ClaimsEscrow,[owner.address,registry.address])) as ClaimsEscrow;
     await registry.setClaimsEscrow(claimsEscrow.address);
+    policyManager = (await deployContract(owner,artifacts.PolicyManager,[owner.address])) as PolicyManager;
     await registry.setPolicyManager(policyManager.address);
+    riskManager = (await deployContract(owner, artifacts.RiskManager, [owner.address, registry.address])) as RiskManager;
     await registry.setRiskManager(riskManager.address);
+    mockProduct = (await deployContract(owner,artifacts.MockProduct,[owner.address,policyManager.address,registry.address,ZERO_ADDRESS,0,100000000000,1,16777215])) as MockProduct;
     await policyManager.addProduct(mockProduct.address);
   });
 
@@ -61,7 +61,7 @@ describe("Vault", function () {
     it("should set the governance address", async function () {
       expect(await vault.governance()).to.equal(owner.address);
     });
-    it("should initialize DOMAIN_SEPARATOR correctly", async () => {
+    it("should initialize DOMAIN_SEPARATOR correctly", async function () {
       expect(await vault.DOMAIN_SEPARATOR()).to.equal(getDomainSeparator(tokenName, vault.address, chainId));
     });
   });
@@ -115,6 +115,59 @@ describe("Vault", function () {
       await vault.connect(owner).setCooldownWindow(3,4);
       expect(await vault.cooldownMin()).to.equal(3);
       expect(await vault.cooldownMax()).to.equal(4);
+    });
+  });
+
+  describe("pricePerShare", function () {
+    it("should initially return 1:1 ETH-SCP", async function () {
+      expect(await vault.pricePerShare()).to.equal(BN.from("1000000000000000000"));
+    });
+    it("should stay at 1:1 on first deposit", async function () {
+      await vault.connect(depositor1).depositEth({value: "500000000000000000"});
+      expect(await vault.pricePerShare()).to.equal(BN.from("1000000000000000000"));
+    });
+    it("should appreciate on sale of coverage", async function () {
+      await vault.connect(depositor1).depositEth({value: "500000000000000000"});
+      await depositor1.sendTransaction({to: vault.address, value: "250000000000000000"});
+      expect(await vault.pricePerShare()).to.equal(BN.from("1500000000000000000"));
+    });
+    it("should stay the same on deposit", async function () {
+      await vault.connect(depositor1).depositEth({value: "500000000000000000"});
+      await depositor1.sendTransaction({to: vault.address, value: "250000000000000000"});
+      expect(await vault.pricePerShare()).to.equal(BN.from("1500000000000000000"));
+      await vault.connect(depositor2).depositEth({value: "250000000000000000"});
+      expect(await vault.pricePerShare()).to.be.closeTo("1500000000000000000", 10);
+    });
+    it("should stay the same on withdraw", async function () {
+      await vault.connect(depositor1).depositEth({value: "500000000000000000"});
+      await depositor1.sendTransaction({to: vault.address, value: "250000000000000000"});
+      expect(await vault.pricePerShare()).to.equal(BN.from("1500000000000000000"));
+      await vault.connect(owner).setCooldownWindow(0, "1099511627775"); // min, max uint40
+      await vault.connect(depositor1).withdrawEth("250000000000000000");
+      expect(await vault.pricePerShare()).to.equal(BN.from("1500000000000000000"));
+    });
+    it("should depreciate on payout of claims", async function () {
+      await vault.connect(depositor1).depositEth({value: "500000000000000000"});
+      await vault.connect(owner).setRequestor(depositor1.address, true);
+      await vault.connect(depositor1).requestEth("250000000000000000");
+      expect(await vault.pricePerShare()).to.equal(BN.from("500000000000000000"));
+    });
+    it("should stay the same on deposit", async function () {
+      await vault.connect(depositor1).depositEth({value: "500000000000000000"});
+      await vault.connect(owner).setRequestor(depositor1.address, true);
+      await vault.connect(depositor1).requestEth("250000000000000000");
+      expect(await vault.pricePerShare()).to.equal(BN.from("500000000000000000"));
+      await vault.connect(depositor2).depositEth({value: "250000000000000000"});
+      expect(await vault.pricePerShare()).to.equal(BN.from("500000000000000000"));
+    });
+    it("should stay the same on withdraw", async function () {
+      await vault.connect(depositor1).depositEth({value: "500000000000000000"});
+      await vault.connect(owner).setRequestor(depositor1.address, true);
+      await vault.connect(depositor1).requestEth("250000000000000000");
+      expect(await vault.pricePerShare()).to.equal(BN.from("500000000000000000"));
+      await vault.connect(owner).setCooldownWindow(0, "1099511627775"); // min, max uint40
+      await vault.connect(depositor1).withdrawEth("250000000000000000");
+      expect(await vault.pricePerShare()).to.equal(BN.from("500000000000000000"));
     });
   })
 
@@ -215,22 +268,6 @@ describe("Vault", function () {
         data: "0xabcd"
       });
       expect(await vault.balanceOf(depositor1.address)).to.equal(0);
-    });
-    it("should get eth from treasury", async function () {
-      await registry.setTreasury(mockTreasury.address);
-      let mockVault = (await deployContract(
-        owner,
-        artifacts.Vault,
-        [owner.address, registry.address, mockTreasury.address]
-      )) as Vault;
-      let ethAmount1 = await provider.getBalance(mockVault.address);
-      await mockTreasury.sendTransaction({
-        to: mockVault.address,
-        value: testDepositAmount1,
-        data: "0x"
-      });
-      let ethAmount2 = await provider.getBalance(mockVault.address);
-      expect(ethAmount2.sub(testDepositAmount1)).to.equal(ethAmount1);
     });
   });
 
@@ -656,11 +693,11 @@ describe("Vault", function () {
         let bal2 = await depositor1.getBalance();
         let withdrawAmount = bal2.sub(bal1).add(gasCost);
         if(withdrawAmount.gt(flashloanAmount)) {
-          console.log('flashloan attack detected');
-          console.log('initial supply  :', ts.toString());
-          console.log('initial assets  :', ta.toString());
-          console.log('deposit amount  :', depositAmount.toString());
-          console.log('transfer amount :', transferAmount.toString());
+          console.log("flashloan attack detected");
+          console.log("initial supply  :", ts.toString());
+          console.log("initial assets  :", ta.toString());
+          console.log("deposit amount  :", depositAmount.toString());
+          console.log("transfer amount :", transferAmount.toString());
         }
         expect(withdrawAmount).to.be.lte(flashloanAmount);
         // reset state

@@ -54,7 +54,7 @@ describe("Vault", function () {
       artifacts = await import_artifacts();
     })
 
-    beforeEach(async () => {
+    beforeEach(async function () {
         weth = (await deployContract(
             owner,
             artifacts.WETH
@@ -140,7 +140,7 @@ describe("Vault", function () {
         it("should set the governance address", async function () {
             expect(await vault.governance()).to.equal(owner.address);
         });
-        it("should initialize DOMAIN_SEPARATOR correctly", async () => {
+        it("should initialize DOMAIN_SEPARATOR correctly", async function () {
             expect(await vault.DOMAIN_SEPARATOR()).to.equal(getDomainSeparator(tokenName, vault.address, chainId));
         })
     });
@@ -594,7 +594,7 @@ describe("Vault", function () {
 
             // report profits through the vault through `strategy.harvest()`
             // Vault should take the profit
-            await expect(() => strategy.connect(owner).harvest()).to.changeTokenBalance(weth, strategy, mockProfit * - 1);
+            await expect(function () strategy.connect(owner).harvest()).to.changeTokenBalance(weth, strategy, mockProfit * - 1);
 
             // creditAvailable = strategyDebtLimit (52) - strategyTotalDebt (50)
             expect(await vault.creditAvailable(strategy.address)).to.equal(2);
@@ -784,12 +784,12 @@ describe("Vault", function () {
         context("when there is enough WETH in the Vault", function () {
             it("should alter WETH balance of Vault contract by amountNeeded", async function () {
                 let cpBalance = await vault.balanceOf(depositor1.address);
-                await expect(() => vault.connect(depositor1).withdraw(cpBalance, maxLoss)).to.changeTokenBalance(weth, vault, testDepositAmount.mul(-1));
+                await expect(function () vault.connect(depositor1).withdraw(cpBalance, maxLoss)).to.changeTokenBalance(weth, vault, testDepositAmount.mul(-1));
             });
             it("should only use WETH from Vault if Vault balance is sufficient", async function () {
                 let cpBalance = await vault.balanceOf(depositor1.address);
 
-                await expect(() => vault.connect(depositor1).withdraw(cpBalance, maxLoss)).to.changeEtherBalance(depositor1, testDepositAmount);
+                await expect(function () vault.connect(depositor1).withdraw(cpBalance, maxLoss)).to.changeEtherBalance(depositor1, testDepositAmount);
 
                 expect(await vault.balanceOf(depositor1.address)).to.equal(0);
                 expect(await weth.balanceOf(vault.address)).to.equal(0);
@@ -807,12 +807,12 @@ describe("Vault", function () {
             })
             it("should alter WETH balance of Strategy contract by amountNeeded", async function () {
                 let cpBalance = await vault.balanceOf(depositor1.address);
-                await expect(() => vault.connect(depositor1).withdraw(cpBalance, maxLoss)).to.changeTokenBalance(weth, strategy,  testDepositAmount.div(MAX_BPS / debtRatio).mul( -1));
+                await expect(function () vault.connect(depositor1).withdraw(cpBalance, maxLoss)).to.changeTokenBalance(weth, strategy,  testDepositAmount.div(MAX_BPS / debtRatio).mul( -1));
             });
             it("should withdraw difference from Investment contract, burn user's vault shares and transfer ETH back to user", async function () {
                 let cpBalance = await vault.balanceOf(depositor1.address);
                 let vaultDepositorSigner = vault.connect(depositor1);
-                await expect(() => vaultDepositorSigner.withdraw(cpBalance, maxLoss)).to.changeEtherBalance(depositor1, testDepositAmount);
+                await expect(function () vaultDepositorSigner.withdraw(cpBalance, maxLoss)).to.changeEtherBalance(depositor1, testDepositAmount);
                 expect(await vault.balanceOf(depositor1.address)).to.equal(0);
             });
             it("should emit WithdrawalMade event after function logic is successful", async function () {
