@@ -228,8 +228,8 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
      * @param positionContract The contract address of the position.
      * @param expirationBlock The policy expiration block number.
      * @param coverAmount The policy coverage amount (in wei).
-     * @param price The coverage price
-     * @return policyID The policy ID(aka tokenID).
+     * @param price The coverage price.
+     * @return policyID The policy ID.
      */
     function createPolicy(
         address policyholder,
@@ -258,7 +258,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
     /**
      * @notice Modifies a policy.
      * Can only be called by **products**.
-     * @param policyID The policy ID (aka tokenID).
+     * @param policyID The policy ID.
      * @param policyholder The receiver of new policy token.
      * @param positionContract The contract address where the position is covered.
      * @param expirationBlock The policy expiration block number.
@@ -291,7 +291,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
     /**
      * @notice Burns expired or cancelled policies.
      * Can only be called by **products**.
-     * @param policyID policyID aka tokenID
+     * @param policyID The ID of the policy to burn.
      */
     function burn(uint256 policyID) external override policyMustExist(policyID) {
         require(_policyInfo[policyID].product == msg.sender, "wrong product");

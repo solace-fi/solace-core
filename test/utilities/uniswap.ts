@@ -1,7 +1,7 @@
 // borrowed from uniswap v3
 
-import bn from 'bignumber.js';
-import { BigNumber as BN, BigNumberish, constants, Contract, ContractTransaction, utils, Wallet } from 'ethers';
+import bn from "bignumber.js";
+import { BigNumber as BN, BigNumberish, constants, Contract, ContractTransaction, utils, Wallet } from "ethers";
 
 export const MaxUint128 = BN.from(2).pow(128).sub(1)
 

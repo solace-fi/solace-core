@@ -13,11 +13,11 @@ import "./interface/IRiskManager.sol";
  * @author solace.fi
  * @notice Calculates the acceptable risk, sellable cover, and capital requirements of Solace products and capital pool.
  *
- * The total amount of sellable coverage is proportional to the assets in the [**risk backing capital pool**](./Vault). The max cover is split amongst products in a weighting system. Governance can change these weights and with it each product's sellable cover.
+ * The total amount of sellable coverage is proportional to the assets in the [**risk backing capital pool**](./Vault). The max cover is split amongst products in a weighting system. [**Governance**](/docs/user-docs/Governance). can change these weights and with it each product's sellable cover.
  *
  * The minimum capital requirement is proportional to the amount of cover sold to [active policies](./PolicyManager).
  *
- * Solace can use leverage to sell more cover than the available capital. The amount of leverage is stored as [`partialReservesFactor`](#partialreservesfactor) and is settable by governance.
+ * Solace can use leverage to sell more cover than the available capital. The amount of leverage is stored as [`partialReservesFactor`](#partialreservesfactor) and is settable by [**governance**](/docs/user-docs/Governance).
  */
 contract RiskManager is IRiskManager, Governable {
 
@@ -61,11 +61,11 @@ contract RiskManager is IRiskManager, Governable {
 
     /**
      * @notice The maximum amount of cover that a product can sell.
-     * @param product The product that wants to sell cover.
+     * @param prod The product that wants to sell cover.
      * @return cover The max amount of cover in wei.
      */
-    function maxCoverAmount(address product) external view override returns (uint256 cover) {
-        return maxCover() * _weights[product] / _weightSum;
+    function maxCoverAmount(address prod) external view override returns (uint256 cover) {
+        return maxCover() * _weights[prod] / _weightSum;
     }
 
     /**
@@ -78,22 +78,21 @@ contract RiskManager is IRiskManager, Governable {
 
     /**
      * @notice Return the product at an index.
-     * @dev Enumerable [0,numProducts-1].
+     * @dev Enumerable `[0, numProducts-1]`.
      * @param index Index to query.
      * @return prod The product address.
      */
     function product(uint256 index) external view override returns (address prod) {
-        require(index < _products.length, "out of bounds");
         return _products[index];
     }
 
     /**
      * @notice Returns the weight of a product.
-     * @param product Product to query.
+     * @param prod Product to query.
      * @return mass The product's weight.
      */
-    function weight(address product) external view override returns (uint32 mass) {
-        return _weights[product];
+    function weight(address prod) external view override returns (uint32 mass) {
+        return _weights[prod];
     }
 
     /**
@@ -166,8 +165,8 @@ contract RiskManager is IRiskManager, Governable {
         require(products_.length == weights_.length, "length mismatch");
         // delete old products
         while(_products.length > 0) {
-            address product = _products[_products.length-1];
-            delete _weights[product];
+            address prod = _products[_products.length-1];
+            delete _weights[prod];
             _products.pop();
         }
         // add new products

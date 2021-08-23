@@ -61,7 +61,7 @@ describe("Vault", function () {
     it("should set the governance address", async function () {
       expect(await vault.governance()).to.equal(owner.address);
     });
-    it("should initialize DOMAIN_SEPARATOR correctly", async () => {
+    it("should initialize DOMAIN_SEPARATOR correctly", async function () {
       expect(await vault.DOMAIN_SEPARATOR()).to.equal(getDomainSeparator(tokenName, vault.address, chainId));
     });
   });
@@ -693,11 +693,11 @@ describe("Vault", function () {
         let bal2 = await depositor1.getBalance();
         let withdrawAmount = bal2.sub(bal1).add(gasCost);
         if(withdrawAmount.gt(flashloanAmount)) {
-          console.log('flashloan attack detected');
-          console.log('initial supply  :', ts.toString());
-          console.log('initial assets  :', ta.toString());
-          console.log('deposit amount  :', depositAmount.toString());
-          console.log('transfer amount :', transferAmount.toString());
+          console.log("flashloan attack detected");
+          console.log("initial supply  :", ts.toString());
+          console.log("initial assets  :", ta.toString());
+          console.log("deposit amount  :", depositAmount.toString());
+          console.log("transfer amount :", transferAmount.toString());
         }
         expect(withdrawAmount).to.be.lte(flashloanAmount);
         // reset state

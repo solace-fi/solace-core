@@ -70,9 +70,9 @@ contract Registry is IRegistry, Initializable, UUPSUpgradeable {
     }
 
     /**
-     * @notice Sets the [`SOLACE`](./SOLACE) contract.
+     * @notice Sets the [**SOLACE**](./SOLACE) contract.
      * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param _solace The `SOLACE` token address.
+     * @param _solace The **SOLACE** token address.
      */
     function setSolace(address _solace) external override {
         // can only be called by governor

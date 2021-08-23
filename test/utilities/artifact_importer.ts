@@ -4,9 +4,9 @@
  * It also removes repetitive code from the tests.
  */
 
-import { config as dotenv_config } from 'dotenv';
+import { config as dotenv_config } from "dotenv";
 dotenv_config();
-import { ContractJSON } from 'ethereum-waffle/dist/esm/ContractJSON';
+import { ContractJSON } from "ethereum-waffle/dist/esm/ContractJSON";
 
 export interface ArtifactImports { [contract_name: string]: ContractJSON };
 

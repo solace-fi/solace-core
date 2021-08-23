@@ -36,7 +36,7 @@ describe("ClaimsEscrow", function () {
     await provider.send("evm_mine", []);
   })
 
-  beforeEach(async () => {
+  beforeEach(async function () {
     registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
     weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
     await registry.connect(governor).setWeth(weth.address);

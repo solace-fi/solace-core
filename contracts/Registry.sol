@@ -49,8 +49,8 @@ contract Registry is IRegistry, Governable {
     ***************************************/
 
     /**
-     * @notice Gets the [`WETH`](./WETH9) contract.
-     * @return weth_ The address of the [`WETH`](./WETH9) contract.
+     * @notice Gets the [**WETH**](./WETH9) contract.
+     * @return weth_ The address of the [**WETH**](./WETH9) contract.
      */
     function weth() external view override returns (address weth_) { return _weth; }
 
@@ -85,8 +85,8 @@ contract Registry is IRegistry, Governable {
     function riskManager() external view override returns (address) { return _riskManager; }
 
     /**
-     * @notice Gets the [`SOLACE`](./SOLACE) contract.
-     * @return solace_ The address of the [`SOLACE`](./SOLACE) contract.
+     * @notice Gets the [**SOLACE**](./SOLACE) contract.
+     * @return solace_ The address of the [**SOLACE**](./SOLACE) contract.
      */
     function solace() external view override returns (address) { return _solace; }
 
@@ -107,9 +107,9 @@ contract Registry is IRegistry, Governable {
     ***************************************/
 
     /**
-     * @notice Sets the [`WETH`](./WETH9) contract.
+     * @notice Sets the [**WETH**](./WETH9) contract.
      * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param weth_ The address of the [`WETH`](./WETH9) contract.
+     * @param weth_ The address of the [**WETH**](./WETH9) contract.
      */
     function setWeth(address weth_) external override onlyGovernance {
       _weth = weth_;
@@ -167,9 +167,9 @@ contract Registry is IRegistry, Governable {
     }
 
     /**
-     * @notice Sets the [`SOLACE`](./SOLACE) contract.
+     * @notice Sets the [**SOLACE**](./SOLACE) contract.
      * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param solace_ The address of the [`SOLACE`](./SOLACE) contract.
+     * @param solace_ The address of the [**SOLACE**](./SOLACE) contract.
      */
     function setSolace(address solace_) external override onlyGovernance {
         _solace = solace_;

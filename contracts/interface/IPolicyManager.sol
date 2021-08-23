@@ -165,8 +165,8 @@ interface IPolicyManager is IERC721Enumerable /*, IERC721Metadata*/ {
      * @param positionContract The contract address of the position.
      * @param expirationBlock The policy expiration block number.
      * @param coverAmount The policy coverage amount (in wei).
-     * @param price The coverage price
-     * @return policyID The policy ID(aka tokenID).
+     * @param price The coverage price.
+     * @return policyID The policy ID.
      */
     function createPolicy(
         address policyholder,
@@ -179,7 +179,7 @@ interface IPolicyManager is IERC721Enumerable /*, IERC721Metadata*/ {
     /**
      * @notice Modifies a policy.
      * Can only be called by **products**.
-     * @param policyID The policy ID (aka tokenID).
+     * @param policyID The policy ID.
      * @param policyholder The receiver of new policy token.
      * @param positionContract The contract address where the position is covered.
      * @param expirationBlock The policy expiration block number.
@@ -191,7 +191,7 @@ interface IPolicyManager is IERC721Enumerable /*, IERC721Metadata*/ {
     /**
      * @notice Burns expired or cancelled policies.
      * Can only be called by **products**.
-     * @param policyID policyID aka tokenID
+     * @param policyID The ID of the policy to burn.
      */
     function burn(uint256 policyID) external;
 

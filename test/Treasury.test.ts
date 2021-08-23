@@ -1,18 +1,18 @@
 import { waffle, ethers, upgrades } from "hardhat";
 const { deployContract, solidity } = waffle;
-import { MockProvider } from 'ethereum-waffle';
+import { MockProvider } from "ethereum-waffle";
 const provider: MockProvider = waffle.provider;
-import { BigNumber as BN, BigNumberish, constants, Wallet } from 'ethers';
-import { Contract } from '@ethersproject/contracts';
-import chai from 'chai';
+import { BigNumber as BN, BigNumberish, constants, Wallet } from "ethers";
+import { Contract } from "@ethersproject/contracts";
+import chai from "chai";
 const { expect } = chai;
 chai.use(solidity);
 
-import { encodePriceSqrt, FeeAmount, TICK_SPACINGS, getMaxTick, getMinTick } from './utilities/uniswap';
-import { encodePath } from './utilities/path';
+import { encodePriceSqrt, FeeAmount, TICK_SPACINGS, getMaxTick, getMinTick } from "./utilities/uniswap";
+import { encodePath } from "./utilities/path";
 
-import { import_artifacts, ArtifactImports } from './utilities/artifact_importer';
-import { Solace, Treasury, MockErc20, Weth9, Registry, PolicyManager, Vault } from '../typechain';
+import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
+import { Solace, Treasury, MockErc20, Weth9, Registry, PolicyManager, Vault } from "../typechain";
 
 describe("Treasury", function() {
   let artifacts: ArtifactImports;
@@ -40,7 +40,7 @@ describe("Treasury", function() {
   let mockToken2Path: string;
   let mockToken3Path: string;
   let mockToken4Path: string;
-  let defaultPath: string = '0x';
+  let defaultPath: string = "0x";
 
   // uniswap contracts
   let uniswapFactory: Contract;
@@ -48,12 +48,12 @@ describe("Treasury", function() {
   let uniswapPositionManager: Contract;
 
   // vars
-  const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
-  const ETH_ADDRESS = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
-  const ONE_HUNDRED = BN.from('100');
-  const ONE_ETHER = BN.from('1000000000000000000');
-  const TEN_ETHER = BN.from('10000000000000000000');
-  const ONE_MILLION_ETHER = BN.from('1000000000000000000000000');
+  const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+  const ETH_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
+  const ONE_HUNDRED = BN.from("100");
+  const ONE_ETHER = BN.from("1000000000000000000");
+  const TEN_ETHER = BN.from("10000000000000000000");
+  const ONE_MILLION_ETHER = BN.from("1000000000000000000000000");
 
   before(async function() {
     [deployer, governor, liquidityProvider, mockPolicy, user, randAddress, mockProduct] = provider.getWallets();
@@ -165,33 +165,16 @@ describe("Treasury", function() {
     it("can deposit solace", async function() {
       let depositAmount = ONE_HUNDRED;
       let balancesBefore = await getBalances(mockPolicy);
-      await solace.connect(mockPolicy).increaseAllowance(treasury.address, depositAmount);
-      let tx = await treasury.connect(mockPolicy).depositToken(solace.address, depositAmount);
+      await solace.connect(mockPolicy).transfer(treasury.address, depositAmount);
       let balancesAfter = await getBalances(mockPolicy);
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       expect(balancesDiff.treasurySolace).to.equal(depositAmount); // solace should increase
-      await expect(tx)
-        .to.emit(treasury, "TokenDeposited")
-        .withArgs(solace.address, depositAmount);
-    });
-
-    it("can deposit eth via depositEth", async function() {
-      let depositAmount = ONE_HUNDRED;
-      let balancesBefore = await getBalances(mockPolicy);
-      let tx = await treasury.connect(mockPolicy).depositEth({ value: depositAmount });
-      let balancesAfter = await getBalances(mockPolicy);
-      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
-      expect(balancesDiff.treasurySolace).to.equal(0); // shouldnt swap
-      expect(balancesDiff.treasuryEth).to.equal(depositAmount); // should hold eth
-      await expect(tx)
-        .to.emit(treasury, "EthDeposited")
-        .withArgs(depositAmount);
     });
 
     it("can deposit eth via receive", async function() {
       let depositAmount = ONE_HUNDRED;
       let balancesBefore = await getBalances(mockPolicy);
-      let tx = await mockPolicy.sendTransaction({
+      await mockPolicy.sendTransaction({
         to: treasury.address,
         value: depositAmount,
         data: "0x",
@@ -200,15 +183,12 @@ describe("Treasury", function() {
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       expect(balancesDiff.treasurySolace).to.equal(0); // shouldnt swap
       expect(balancesDiff.treasuryEth).to.equal(depositAmount); // should hold eth
-      await expect(tx)
-        .to.emit(treasury, "EthDeposited")
-        .withArgs(depositAmount);
     });
 
     it("can deposit eth via fallback", async function() {
       let depositAmount = ONE_HUNDRED;
       let balancesBefore = await getBalances(mockPolicy);
-      let tx = await mockPolicy.sendTransaction({
+      await mockPolicy.sendTransaction({
         to: treasury.address,
         value: depositAmount,
         data: "0xabcd",
@@ -217,38 +197,27 @@ describe("Treasury", function() {
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       expect(balancesDiff.treasurySolace).to.equal(0); // shouldnt swap
       expect(balancesDiff.treasuryEth).to.equal(depositAmount); // should hold eth
-      await expect(tx)
-        .to.emit(treasury, "EthDeposited")
-        .withArgs(depositAmount);
     });
 
     it("can deposit weth", async function() {
       let depositAmount = ONE_HUNDRED;
       await weth.connect(mockPolicy).deposit({ value: depositAmount });
-      await weth.connect(mockPolicy).approve(treasury.address, depositAmount);
       let balancesBefore = await getBalances(mockPolicy);
-      let tx = await treasury.connect(mockPolicy).depositToken(weth.address, depositAmount);
+      await weth.connect(mockPolicy).transfer(treasury.address, depositAmount);
       let balancesAfter = await getBalances(mockPolicy);
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       expect(balancesDiff.treasurySolace).to.equal(0); // shouldnt swap
       expect(balancesDiff.treasuryWeth).to.equal(depositAmount); // should hold weth
-      await expect(tx)
-        .to.emit(treasury, "TokenDeposited")
-        .withArgs(weth.address, depositAmount);
     });
 
     it("can deposit other token", async function() {
       let depositAmount = ONE_HUNDRED;
       let balancesBefore = await getBalances(mockPolicy);
-      await mockToken1.connect(mockPolicy).increaseAllowance(treasury.address, depositAmount);
-      let tx = await treasury.connect(mockPolicy).depositToken(mockToken1.address, depositAmount);
+      await mockToken1.connect(mockPolicy).transfer(treasury.address, depositAmount);
       let balancesAfter = await getBalances(mockPolicy);
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       expect(balancesDiff.treasurySolace).to.equal(0); // solace should not increase
       expect(balancesDiff.treasuryMock1).to.equal(depositAmount); // should hold other token
-      await expect(tx)
-        .to.emit(treasury, "TokenDeposited")
-        .withArgs(mockToken1.address, depositAmount);
     });
   });
 
@@ -256,7 +225,6 @@ describe("Treasury", function() {
     it("non governor cannot swap", async function() {
       await expect(treasury.connect(user).swap(wethPath, 100, 0)).to.be.revertedWith("!governance");
     });
-
     it("cannot swap token with no path", async function() {
       let depositAmount = ONE_HUNDRED;
       let balancesBefore = await getBalances(mockPolicy);
@@ -267,7 +235,6 @@ describe("Treasury", function() {
       expect(balancesDiff.treasurySolace).to.equal(0); // solace should not increase
       expect(balancesDiff.treasuryMock1).to.equal(depositAmount); // should hold other token
     });
-
     it("can swap token with a swap path", async function() {
       let depositAmount = ONE_HUNDRED;
       let balancesBefore = await getBalances(mockPolicy);
@@ -278,7 +245,6 @@ describe("Treasury", function() {
       expect(balancesDiff.treasurySolace).to.be.gt(0); // solace should increase
       expect(balancesAfter.treasuryMock2).to.equal(0); // should swap mock
     });
-
     it("can swap token with a multi pool swap path", async function() {
       let depositAmount = ONE_HUNDRED;
       let balancesBefore = await getBalances(mockPolicy);
@@ -289,7 +255,6 @@ describe("Treasury", function() {
       expect(balancesDiff.treasurySolace).to.be.gt(0); // solace should increase
       expect(balancesAfter.treasuryMock3).to.equal(0); // should swap mock
     });
-
     it("cannot swap token with uniswap errors", async function() {
       let depositAmount = ONE_HUNDRED;
       let balancesBefore = await getBalances(mockPolicy);
@@ -300,7 +265,6 @@ describe("Treasury", function() {
       expect(balancesDiff.treasurySolace).to.equal(0); // solace should not increase
       expect(balancesDiff.treasuryMock4).to.equal(depositAmount); // should hold mock
     });
-
     it("reverts if not enough received", async function() {
       let amountIn = ONE_HUNDRED;
       await mockToken2.transfer(treasury.address, amountIn);
@@ -309,11 +273,39 @@ describe("Treasury", function() {
     });
   });
 
+  describe("wrap", function () {
+    it("non governor cannot wrap eth", async function() {
+      await expect(treasury.connect(user).wrap(1)).to.be.revertedWith("!governance");
+    });
+    it("can wrap eth", async function() {
+      let depositAmount = BN.from(100);
+      await user.sendTransaction({to: treasury.address, value: depositAmount});
+      let wrapAmount = BN.from(50);
+      let balancesBefore = await getBalances(user);
+      await treasury.connect(governor).wrap(wrapAmount);
+      let balancesAfter = await getBalances(user);
+      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
+      expect(balancesDiff.treasuryEth).to.equal(wrapAmount.mul(-1));
+      expect(balancesDiff.treasuryWeth).to.equal(wrapAmount);
+    });
+    it("non governor cannot unwrap eth", async function() {
+      await expect(treasury.connect(user).unwrap(1)).to.be.revertedWith("!governance");
+    });
+    it("can unwrap eth", async function() {
+      let unwrapAmount = BN.from(50);
+      let balancesBefore = await getBalances(user);
+      await treasury.connect(governor).unwrap(unwrapAmount, { gasLimit: 60000 });
+      let balancesAfter = await getBalances(user);
+      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
+      expect(balancesDiff.treasuryEth).to.equal(unwrapAmount);
+      expect(balancesDiff.treasuryWeth).to.equal(unwrapAmount.mul(-1));
+    });
+  });
+
   describe("spend", function() {
     it("non governor cannot spend", async function() {
       await expect(treasury.connect(user).spend(solace.address, 100, governor.address)).to.be.revertedWith("!governance");
     });
-
     it("can spend solace", async function() {
       let spendAmount = BN.from("5");
       let balancesBefore = await getBalances(user);
@@ -326,7 +318,6 @@ describe("Treasury", function() {
         .to.emit(treasury, "FundsSpent")
         .withArgs(solace.address, spendAmount, user.address);
     });
-
     it("can spend unswapped token", async function() {
       let spendAmount = BN.from("5");
       let balancesBefore = await getBalances(user);
@@ -339,7 +330,6 @@ describe("Treasury", function() {
         .to.emit(treasury, "FundsSpent")
         .withArgs(mockToken1.address, spendAmount, user.address);
     });
-
     it("can spend eth", async function() {
       let spendAmount = BN.from("5");
       let balancesBefore = await getBalances(user);
@@ -355,6 +345,10 @@ describe("Treasury", function() {
   });
 
   describe("route premiums", function() {
+    it("with no recipients", async function () {
+      expect(await treasury.numPremiumRecipients()).to.equal(0);
+      expect(await treasury.weightSum()).to.equal(0);
+    });
     it("can route premiums with no recipients", async function() {
       let balancesBefore = await getBalances(user);
       let depositAmount = 100;
@@ -363,21 +357,19 @@ describe("Treasury", function() {
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       expect(balancesDiff.treasuryEth).to.equal(depositAmount);
     });
-
     it("non governor cannot set recipients", async function() {
       await expect(treasury.connect(user).setPremiumRecipients([], [1])).to.be.revertedWith("!governance");
     });
-
     it("validates recipients and weights", async function() {
       await expect(treasury.connect(governor).setPremiumRecipients([], [1, 2])).to.be.revertedWith("length mismatch");
       await expect(treasury.connect(governor).setPremiumRecipients([deployer.address], [0, 0])).to.be.revertedWith("1/0");
     });
-
     it("can set recipients", async function() {
-      await treasury.connect(governor).setPremiumRecipients([], [0]);
-      await treasury.connect(governor).setPremiumRecipients([deployer.address], [2, 3]);
+      let tx1 = await treasury.connect(governor).setPremiumRecipients([], [0]);
+      expect(tx1).to.emit(treasury, "RecipientsSet");
+      let tx2 = await treasury.connect(governor).setPremiumRecipients([deployer.address], [2, 3]);
+      expect(tx2).to.emit(treasury, "RecipientsSet");
     });
-
     it("can route premiums", async function() {
       let balancesBefore = await getBalances(deployer);
       let depositAmount = 100;
@@ -387,36 +379,6 @@ describe("Treasury", function() {
       expect(balancesDiff.treasuryEth).to.equal(60);
       expect(balancesDiff.userEth).to.equal(40);
       await treasury.connect(governor).routePremiums(); // empty routing
-    });
-
-    it("non governor cannot wrap eth", async function() {
-      await expect(treasury.connect(user).wrap(1)).to.be.revertedWith("!governance");
-    });
-
-    it("can wrap eth", async function() {
-      let depositAmount = BN.from(100);
-      await treasury.connect(user).depositEth({ value: depositAmount });
-      let wrapAmount = BN.from(50);
-      let balancesBefore = await getBalances(user);
-      await treasury.connect(governor).wrap(wrapAmount);
-      let balancesAfter = await getBalances(user);
-      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
-      expect(balancesDiff.treasuryEth).to.equal(wrapAmount.mul(-1));
-      expect(balancesDiff.treasuryWeth).to.equal(wrapAmount);
-    });
-
-    it("non governor cannot unwrap eth", async function() {
-      await expect(treasury.connect(user).unwrap(1)).to.be.revertedWith("!governance");
-    });
-
-    it("can unwrap eth", async function() {
-      let unwrapAmount = BN.from(50);
-      let balancesBefore = await getBalances(user);
-      await treasury.connect(governor).unwrap(unwrapAmount, { gasLimit: 60000 });
-      let balancesAfter = await getBalances(user);
-      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
-      expect(balancesDiff.treasuryEth).to.equal(unwrapAmount);
-      expect(balancesDiff.treasuryWeth).to.equal(unwrapAmount.mul(-1));
     });
   });
 
@@ -453,13 +415,13 @@ describe("Treasury", function() {
       expect(balancesDiff.userEth).to.equal(totalEth);
       expect(await treasury.unpaidRefunds(user.address)).to.equal(10);
       // part 2: remainder
-      await treasury.connect(deployer).depositEth({ value: 20 });
+      await deployer.sendTransaction({to: treasury.address, value: 20});
       let tx = await treasury.connect(user).withdraw();
       let receipt = await tx.wait();
       let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
       let balancesAfter2 = await getBalances(user);
       let balancesDiff2 = getBalancesDiff(balancesAfter2, balancesBefore);
-      expect(balancesDiff2.userEth).to.equal(refundAmount.sub(gasCost));
+      expect(balancesDiff2.userEth.add(gasCost)).to.equal(refundAmount);
       expect(await treasury.unpaidRefunds(user.address)).to.equal(0);
       // part 3: empty withdraw
       await treasury.connect(user).withdraw();
@@ -467,43 +429,72 @@ describe("Treasury", function() {
   });
 
   describe("treasury with vault as a premium recipient", function () {
-      let vaultAddress: string;
       let vault: Vault;
-      let mockTreasury: Treasury;
+
       before(async function() {
         vault = (await deployContract(deployer,artifacts.Vault,[governor.address,registry.address])) as Vault;
-        vaultAddress = vault.address;
-        await registry.connect(governor).setVault(vaultAddress);
-        mockTreasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, uniswapRouter.address, registry.address])) as Treasury;
-        await registry.connect(governor).setTreasury(mockTreasury.address);
-        await vault.connect(governor).setRequestor(mockTreasury.address, true);
+        await registry.connect(governor).setVault(vault.address);
+        treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, uniswapRouter.address, registry.address])) as Treasury;
+        await registry.connect(governor).setTreasury(treasury.address);
+        await vault.connect(governor).setRequestor(treasury.address, true);
       });
 
       it("vault is a premium recipient", async function() {
-        expect(await mockTreasury.premiumRecipients(0)).to.equal(vaultAddress);
+        expect(await treasury.premiumRecipient(0)).to.equal(vault.address);
+        expect(await treasury.numPremiumRecipients()).to.equal(1);
+        expect(await treasury.recipientWeight(0)).to.equal(1);
+        expect(await treasury.recipientWeight(1)).to.equal(0);
+        expect(await treasury.weightSum()).to.equal(1);
       });
 
       it("can route premiums to vault", async function() {
-        let vaultAmountBefore = await provider.getBalance(vaultAddress);
+        let vaultAmountBefore = await provider.getBalance(vault.address);
         let depositAmount = 100;
-        await mockTreasury.connect(user).routePremiums({ value: depositAmount });
-        let vaultAmountAfter = await provider.getBalance(vaultAddress);
+        await treasury.connect(user).routePremiums({ value: depositAmount });
+        let vaultAmountAfter = await provider.getBalance(vault.address);
         expect(vaultAmountAfter.sub(depositAmount)).to.equal(vaultAmountBefore);
       });
 
       it("can refund from vault", async function() {
         await policyManager.connect(governor).addProduct(mockProduct.address);
-        let vaultAmountBefore = await provider.getBalance(vaultAddress);
+        let vaultAmountBefore = await provider.getBalance(vault.address);
         let userBalanceBefore = await provider.getBalance(user.address);
 
         let refundAmount = 100;
-        await mockTreasury.connect(mockProduct).refund(user.address, refundAmount);
-        let vaultAmountAfter = await provider.getBalance(vaultAddress);
+        await treasury.connect(mockProduct).refund(user.address, refundAmount);
+        let vaultAmountAfter = await provider.getBalance(vault.address);
         expect(vaultAmountBefore.sub(refundAmount)).to.equal(vaultAmountAfter);
 
         let userBalanceAfter = await provider.getBalance(user.address);
         expect(userBalanceAfter.sub(refundAmount)).to.equal(userBalanceBefore);
       });
+  });
+
+  describe("weth", function () {
+    it("can mint via receive", async function () {
+      let bal1 = await weth.balanceOf(user.address);
+      await user.sendTransaction({to: weth.address, value: 10});
+      let bal2 = await weth.balanceOf(user.address);
+      expect(bal2.sub(bal1)).to.equal(10);
+    });
+    it("can mint via fallback", async function () {
+      let bal1 = await weth.balanceOf(user.address);
+      await user.sendTransaction({to: weth.address, value: 10, data: "0xabcd"});
+      let bal2 = await weth.balanceOf(user.address);
+      expect(bal2.sub(bal1)).to.equal(10);
+    });
+    it("can mint via deposit", async function () {
+      let bal1 = await weth.balanceOf(user.address);
+      await weth.connect(user).deposit({value: 10});
+      let bal2 = await weth.balanceOf(user.address);
+      expect(bal2.sub(bal1)).to.equal(10);
+    });
+    it("can withdraw", async function () {
+      let bal1 = await weth.balanceOf(user.address);
+      await weth.connect(user).withdraw(10);
+      let bal2 = await weth.balanceOf(user.address);
+      expect(bal1.sub(bal2)).to.equal(10);
+    });
   });
 
   // helper functions

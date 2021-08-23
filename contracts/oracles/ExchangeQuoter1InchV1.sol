@@ -13,7 +13,8 @@ import "../interface/IExchangeQuoter.sol";
 contract ExchangeQuoter1InchV1 is IExchangeQuoter {
     /// @notice IOneSplitView
     IOneSplitView public oneSplitView;
-    /// @notice ETH_ADDRESS
+    // ETH_ADDRESS
+    // solhint-disable-next-line var-name-mixedcase
     address internal _ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
     /**
@@ -31,6 +32,7 @@ contract ExchangeQuoter1InchV1 is IExchangeQuoter {
      * @return amountOut The amount of **ETH** received.
      */
     function tokenToEth(address token, uint256 amount) public view override returns (uint256 amountOut) {
+        if(token == _ETH_ADDRESS) return amount;
         // call one inch
         (amountOut, ) = oneSplitView.getExpectedReturn(token, _ETH_ADDRESS, amount, 1, 0);
         return amountOut;

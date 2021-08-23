@@ -39,7 +39,7 @@ interface IProduct {
     function buyPolicy(address policyholder, address positionContract, uint256 coverAmount, uint40 blocks) external payable returns (uint256 policyID);
 
     /**
-     * @notice Increase or decrease the cover amount for the policy.
+     * @notice Increase or decrease the cover amount of the policy.
      * User may need to pay **ETH** for increased cover amount or receive a refund for decreased cover amount.
      * Can only be called by the policyholder.
      * @param policyID The ID of the policy.
@@ -79,12 +79,12 @@ interface IProduct {
     ***************************************/
 
     /**
-     * @notice This function will only be implemented in the inheriting product contracts. It provides the user's total position in the product's protocol.
-     * This total should be denominated in **ETH**. Every product will have a different mechanism to read and determine a user's total position in that product's protocol.
+     * @notice Calculate the value of a user's position in **ETH**.
+     * Every product will have a different mechanism to determine a user's total position in that product's protocol.
      * @dev It should validate that the `positionContract` belongs to the protocol and revert if it doesn't.
-     * @param policyholder The `buyer` requesting the coverage quote.
-     * @param positionContract The address of the exact smart contract the `buyer` has their position in (e.g., for UniswapProduct this would be Pair's address).
-     * @return positionAmount The user's total position in **Wei** in the product's protocol.
+     * @param policyholder The owner of the position.
+     * @param positionContract The address of the smart contract the `policyholder` has their position in (e.g., for `UniswapV2Product` this would be the Pair's address).
+     * @return positionAmount The value of the position.
      */
     function appraisePosition(address policyholder, address positionContract) external view returns (uint256 positionAmount);
 

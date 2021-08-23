@@ -12,7 +12,7 @@ dotenv_config();
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
 import { PolicyManager, MockProduct, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
 
-describe("BaseProduct", () => {
+describe("BaseProduct", function () {
   let artifacts: ArtifactImports;
   let policyManager: PolicyManager;
   let product: MockProduct;
@@ -41,7 +41,7 @@ describe("BaseProduct", () => {
   const maxCoverAmount2 = BN.from("1000000000000000000000"); // 1000 Ether in wei
   const price2 = 11044; // 2.60%/yr
 
-  before(async () => {
+  before(async function () {
     artifacts = await import_artifacts();
 
     registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
@@ -125,7 +125,7 @@ describe("BaseProduct", () => {
     });
   });
 
-  describe("productParameters", () => {
+  describe("productParameters", function () {
     before(async function () {
       await vault.connect(deployer).depositEth({value:maxCoverAmount1.mul(3)});
       await riskManager.connect(governor).setProductWeights([product.address,product2.address],[1,2]);
@@ -222,7 +222,7 @@ describe("BaseProduct", () => {
     });
   });
 
-  describe("buyPolicy", () => {
+  describe("buyPolicy", function () {
     let price = price2;
     let blocks = BN.from(25100); // less than the max
     let positionAmount = BN.from("1000000000000000000"); // one eth
@@ -235,6 +235,9 @@ describe("BaseProduct", () => {
       await policyManager.connect(governor).addProduct(product.address);
       expect(await policyManager.productIsActive(product.address)).to.equal(true);
     });
+    it("starts with zero policies sold", async function () {
+      expect(await product.productPolicyCount()).to.equal(0);
+    })
     it("can getQuote", async function() {
       let expectedPremium = coverAmount
         .mul(blocks)
@@ -291,6 +294,7 @@ describe("BaseProduct", () => {
       await expect(tx)
         .to.emit(product, "PolicyCreated")
         .withArgs(1);
+      expect(await product.productPolicyCount()).to.equal(1);
     });
     it("returns overpayment from buy policy", async function() {
       let vaultBalance1 = await provider.getBalance(vault.address);
@@ -301,6 +305,7 @@ describe("BaseProduct", () => {
         .withArgs(2);
       let vaultBalance2 = await provider.getBalance(vault.address);
       expect(vaultBalance2.sub(vaultBalance1)).to.equal(quote);
+      expect(await product.productPolicyCount()).to.equal(2);
     });
   });
 

@@ -16,10 +16,10 @@ contract AaveV2Product is BaseProduct {
     IAaveProtocolDataProvider internal _aaveDataProvider;
 
     /**
-      * @notice The constructor.
-      * @param governance_ The governor.
-      * @param policyManager_ The IPolicyManager contract.
-      * @param registry_ The IRegistry contract.
+      * @notice Constructs the AaveV2Product.
+      * @param governance_ The address of the [governor](/docs/user-docs/Governance).
+      * @param policyManager_ The [`PolicyManager`](../PolicyManager) contract.
+      * @param registry_ The [`Registry`](../Registry) contract.
       * @param dataProvider_ Aave protocol data provider address.
       * @param minPeriod_ The minimum policy period in blocks to purchase a **policy**.
       * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
@@ -54,13 +54,12 @@ contract AaveV2Product is BaseProduct {
         _SUBMIT_CLAIM_TYPEHASH = keccak256("AaveV2ProductSubmitClaim(uint256 policyID,uint256 amountOut,uint256 deadline)");
         _productName = "AaveV2";
     }
-
     /**
-     * @notice It gives the user's total position in the product's protocol.
-     * The `positionContract` must be a **aToken** (Please see https://etherscan.io/tokens/label/aave-v2 for more information).
-     * @param policyholder The `buyer` who is requesting the coverage quote.
-     * @param positionContract The address of the exact smart contract the `buyer` has their position in (e.g., for UniswapProduct this would be Pair's address).
-     * @return positionAmount The user's total position in **Wei** in the product's protocol.
+     * @notice Calculate the value of a user's Aave V2 position in **ETH**.
+     * The `positionContract` must be an [**aToken**](https://etherscan.io/tokens/label/aave-v2).
+     * @param policyholder The owner of the position.
+     * @param positionContract The address of the **aToken**.
+     * @return positionAmount The value of the position.
      */
     function appraisePosition(address policyholder, address positionContract) public view override returns (uint256 positionAmount) {
         // verify positionContract
@@ -73,7 +72,10 @@ contract AaveV2Product is BaseProduct {
         return _quoter.tokenToEth(underlying, balance);
     }
 
-    /// @notice IAaveProtocolDataProvider.
+    /**
+     * @notice Aave's Data Provider.
+     * @return dataProvider_ The data provider.
+     */
     function aaveDataProvider() external view returns (address dataProvider_) {
         return address(_aaveDataProvider);
     }
@@ -87,7 +89,7 @@ contract AaveV2Product is BaseProduct {
      * The function should be used if the the protocol changes their registry but keeps the children contracts.
      * A new version of the protocol will likely require a new Product.
      * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param dataProvider_ The platform to cover.
+     * @param dataProvider_ The new Data Provider.
      */
     function setCoveredPlatform(address dataProvider_) public override {
         super.setCoveredPlatform(dataProvider_);

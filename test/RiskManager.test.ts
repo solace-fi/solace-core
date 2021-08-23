@@ -71,6 +71,7 @@ describe("RiskManager", function () {
 
   describe("product weights", function () {
     it("should start zero", async function () {
+      expect(await riskManager.numProducts()).to.equal(0);
       expect(await riskManager.weight(product1.address)).to.equal(0);
       expect(await riskManager.weightSum()).to.equal(BN.from("4294967295")); // max uint32
     });
@@ -88,24 +89,40 @@ describe("RiskManager", function () {
     });
     it("should be set", async function () {
       await riskManager.connect(governor).setProductWeights([product1.address,product2.address],[3,5]);
+      expect(await riskManager.numProducts()).to.equal(2);
+      expect(await riskManager.product(0)).to.equal(product1.address);
+      expect(await riskManager.product(1)).to.equal(product2.address);
       expect(await riskManager.weight(product1.address)).to.equal(3);
       expect(await riskManager.weight(product2.address)).to.equal(5);
       expect(await riskManager.weightSum()).to.equal(8);
 
       await riskManager.connect(governor).addProduct(product3.address, 21);
+      expect(await riskManager.numProducts()).to.equal(3);
+      expect(await riskManager.product(2)).to.equal(product3.address);
       expect(await riskManager.weight(product3.address)).to.equal(21);
       expect(await riskManager.weightSum()).to.equal(29);
     });
     it("should delete old products", async function () {
       await riskManager.connect(governor).setProductWeights([product2.address,product3.address],[7,3]);
+      expect(await riskManager.numProducts()).to.equal(2);
+      expect(await riskManager.product(0)).to.equal(product2.address);
+      expect(await riskManager.product(1)).to.equal(product3.address);
       expect(await riskManager.weight(product1.address)).to.equal(0);
       expect(await riskManager.weight(product2.address)).to.equal(7);
       expect(await riskManager.weight(product3.address)).to.equal(3);
       expect(await riskManager.weightSum()).to.equal(10);
 
+      // it would be a good idea to fix this double add
       await riskManager.connect(governor).addProduct(product3.address, 9);
+      expect(await riskManager.numProducts()).to.equal(3);
+      expect(await riskManager.product(2)).to.equal(product3.address);
       expect(await riskManager.weight(product3.address)).to.equal(9);
       expect(await riskManager.weightSum()).to.equal(16);
+    });
+    it("should reject invalid inputs pt 2", async function () {
+      await riskManager.connect(governor).addProduct(product2.address, 0);
+      await expect(riskManager.connect(governor).addProduct(product3.address, 0)).to.be.revertedWith("1/0");
+      await riskManager.connect(governor).setProductWeights([product2.address,product3.address],[7,9]);
     });
   });
 

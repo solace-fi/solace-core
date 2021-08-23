@@ -24,31 +24,31 @@ import "./interface/IWETH9.sol";
 /**
  * @title WETH9
  * @author Dapphub
- * @notice [Wrapped Ether](https://weth.io/) smart contract. Extends ERC20.
+ * @notice [Wrapped Ether](https://weth.io/) smart contract. Extends **ERC20**.
  */
 contract WETH9 is IWETH9, ERC20 {
 
     /**
-     * @notice Constructs the WETH contract.
+     * @notice Constructs the **WETH** contract.
      */
     constructor() ERC20("Wrapped Ether", "WETH") {}
 
     /**
-     * @notice Wraps Ether. WETH will be minted to the sender at 1 ETH : 1 WETH.
+     * @notice Wraps Ether. **WETH** will be minted to the sender at 1 **ETH** : 1 **WETH**.
      */
     receive() external payable override {
         deposit();
     }
 
     /**
-     * @notice Wraps Ether. WETH will be minted to the sender at 1 ETH : 1 WETH.
+     * @notice Wraps Ether. **WETH** will be minted to the sender at 1 **ETH** : 1 **WETH**.
      */
     fallback () external payable override {
         deposit();
     }
 
     /**
-     * @notice Wraps Ether. WETH will be minted to the sender at 1 ETH : 1 WETH.
+     * @notice Wraps Ether. **WETH** will be minted to the sender at 1 **ETH** : 1 **WETH**.
      */
     function deposit() public payable override {
         _mint(msg.sender, msg.value);
@@ -56,7 +56,7 @@ contract WETH9 is IWETH9, ERC20 {
     }
 
     /**
-     * @notice Unwraps Ether. ETH will be returned to the sender at 1 ETH : 1 WETH.
+     * @notice Unwraps Ether. **ETH** will be returned to the sender at 1 **ETH** : 1 **WETH**.
      * @param wad Amount to unwrap.
      */
     function withdraw(uint wad) public override {

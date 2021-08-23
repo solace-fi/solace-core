@@ -19,11 +19,11 @@ contract CurveProduct is BaseProduct {
     ICurveAddressProvider internal _addressProvider;
 
     /**
-      * @notice The constructor.
-      * @param governance_ The governor.
-      * @param policyManager_ The IPolicyManager contract.
-      * @param registry_ The IRegistry contract.
-      * @param coveredPlatform_ A platform contract which locates contracts that are covered by this product.
+      * @notice Constructs the CurveProduct.
+      * @param governance_ The address of the [governor](/docs/user-docs/Governance).
+      * @param policyManager_ The [`PolicyManager`](../PolicyManager) contract.
+      * @param registry_ The [`Registry`](../Registry) contract.
+      * @param addressProvider_ The Curve Address Provider.
       * @param minPeriod_ The minimum policy period in blocks to purchase a **policy**.
       * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
       * @param price_ The cover price for the **Product**.
@@ -34,7 +34,7 @@ contract CurveProduct is BaseProduct {
         address governance_,
         IPolicyManager policyManager_,
         IRegistry registry_,
-        address coveredPlatform_,
+        address addressProvider_,
         uint40 minPeriod_,
         uint40 maxPeriod_,
         uint24 price_,
@@ -44,7 +44,7 @@ contract CurveProduct is BaseProduct {
         governance_,
         policyManager_,
         registry_,
-        coveredPlatform_,
+        addressProvider_,
         minPeriod_,
         maxPeriod_,
         price_,
@@ -53,17 +53,17 @@ contract CurveProduct is BaseProduct {
         "Solace.fi-CurveProduct",
         "1"
     ) {
-        _addressProvider = ICurveAddressProvider(coveredPlatform_);
+        _addressProvider = ICurveAddressProvider(addressProvider_);
         _SUBMIT_CLAIM_TYPEHASH = keccak256("CurveProductSubmitClaim(uint256 policyID,uint256 amountOut,uint256 deadline)");
         _productName = "Curve";
     }
 
     /**
-     * @notice It gives the user's total position in the product's protocol.
-     * The `positionContract` must be a **curve.fi pool** or **token**.
-     * @param policyholder The `buyer` who is requesting the coverage quote (Please see https://curve.fi/pools).
-     * @param positionContract The address of the exact smart contract the `buyer` has their position in (e.g., for UniswapProduct this would be Pair's address).
-     * @return positionAmount The user's total position in **Wei** in the product's protocol.
+     * @notice Calculate the value of a user's position in **ETH**.
+     * The `positionContract` must be a [**curve.fi lp token**](https://curve.fi/pools).
+     * @param policyholder The owner of the position.
+     * @param positionContract The address of the **lp token**.
+     * @return positionAmount The value of the position.
      */
     function appraisePosition(address policyholder, address positionContract) public view override returns (uint256 positionAmount) {
         (IERC20 lpToken, ICurvePool pool) = verifyPool(positionContract);
@@ -75,6 +75,10 @@ contract CurveProduct is BaseProduct {
         return _quoter.tokenToEth(coin, balance);
     }
 
+    /**
+     * @notice Curve's Address Provider.
+     * @return addressProvider_ The address provider.
+     */
     function addressProvider() external view returns (address addressProvider_) {
         return address(_addressProvider);
     }
@@ -88,7 +92,7 @@ contract CurveProduct is BaseProduct {
      * The function should be used if the the protocol changes their registry but keeps the children contracts.
      * A new version of the protocol will likely require a new Product.
      * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param addressProvider_ The platform to cover.
+     * @param addressProvider_ The new Address Provider.
      */
     function setCoveredPlatform(address addressProvider_) public override {
         super.setCoveredPlatform(addressProvider_);

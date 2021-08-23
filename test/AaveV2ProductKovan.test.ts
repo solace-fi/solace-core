@@ -42,14 +42,14 @@ function getSubmitClaimDigest(
     const DOMAIN_SEPARATOR = getDomainSeparator(name, address, chainId)
     return utils.keccak256(
         utils.solidityPack(
-        ['bytes1', 'bytes1', 'bytes32', 'bytes32'],
+        ["bytes1", "bytes1", "bytes32", "bytes32"],
         [
-            '0x19',
-            '0x01',
+            "0x19",
+            "0x01",
             DOMAIN_SEPARATOR,
             utils.keccak256(
             utils.defaultAbiCoder.encode(
-                ['bytes32', 'uint256', 'uint256','uint256'],
+                ["bytes32", "uint256", "uint256","uint256"],
                 [SUBMIT_CLAIM_TYPEHASH, policyID, amountOut, deadline]
             )
             ),
@@ -59,7 +59,7 @@ function getSubmitClaimDigest(
 }
 
 if(process.env.FORK_NETWORK === "kovan"){
-  describe('AaveV2ProductKovan', () => {
+  describe("AaveV2ProductKovan", function () {
     const [deployer, governor, policyholder, policyholder2, depositor, paclasSigner] = provider.getWallets();
     let artifacts: ArtifactImports;
 
@@ -101,7 +101,7 @@ if(process.env.FORK_NETWORK === "kovan"){
 
     const COOLDOWN_PERIOD = 3600; // one hour
 
-    before(async () => {
+    before(async function () {
       artifacts = await import_artifacts();
 
       registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
@@ -194,8 +194,8 @@ if(process.env.FORK_NETWORK === "kovan"){
       });
     });
 
-    describe('implementedFunctions', function () {
-      it('can getQuote', async function () {
+    describe("implementedFunctions", function () {
+      it("can getQuote", async function () {
         let price = BN.from(await product.price());
         let positionAmount = await product.appraisePosition(REAL_USER1, aWETH_ADDRESS);
         let coverAmount = positionAmount.mul(5000).div(10000);
@@ -204,7 +204,7 @@ if(process.env.FORK_NETWORK === "kovan"){
         let quote = BN.from(await product.getQuote(REAL_USER1, aWETH_ADDRESS, coverAmount, blocks));
         expect(quote).to.be.closeTo(expectedPremium, 1000000000);
       })
-      it('can buyPolicy', async function () {
+      it("can buyPolicy", async function () {
         expect(await policyManager.totalSupply()).to.equal(0);
         expect(await policyManager.balanceOf(REAL_USER1)).to.equal(0);
         // adding the owner product to the ProductManager
@@ -412,17 +412,17 @@ if(process.env.FORK_NETWORK === "kovan"){
             console.log(`\x1b[38;5;239m        ✓ ${symbol}\x1b[0m`);
           } catch (e) {
             console.log(`\x1b[31m        ✘ ${symbol}`);
-            console.log('          '+e.stack.replace(/\n/g, '\n      '));
-            console.log('\x1b[0m');
+            console.log("          "+e.stack.replace(/\n/g, "\n      "));
+            console.log("\x1b[0m");
             failList.push(atokens[i].symbol);
           }
         }
         await hre.network.provider.request({method: "hardhat_stopImpersonatingAccount",params: [policyholder3Address]});
         if(failList.length != 0) {
           console.log("supported atokens:");
-          console.log(successList.reduce((acc,val)=>`${acc}  - ${val}\n`,''));
+          console.log(successList.reduce((acc,val)=>`${acc}  - ${val}\n`,""));
           console.log("unsupported atokens:");
-          console.log(failList.reduce((acc,val)=>`${acc}  - ${val}\n`,''));
+          console.log(failList.reduce((acc,val)=>`${acc}  - ${val}\n`,""));
         }
         expect(`${success}/${atokens.length} supported atokens`).to.equal(`${atokens.length}/${atokens.length} supported atokens`);
       });
@@ -431,7 +431,7 @@ if(process.env.FORK_NETWORK === "kovan"){
 }
 
 function buf2hex(buffer: Buffer) { // buffer is an ArrayBuffer
-  return [...new Uint8Array(buffer)].map(x => x.toString(16).padStart(2, '0')).join('');
+  return [...new Uint8Array(buffer)].map(x => x.toString(16).padStart(2, "0")).join("");
 }
 
 function assembleSignature(parts: ECDSASignature) {

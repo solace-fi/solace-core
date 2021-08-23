@@ -5,7 +5,15 @@ pragma solidity 0.8.6;
 /**
  * @title IClaimsEscrow
  * @author solace.fi
- * @notice The holder of claims. Policy holders can submit claims through their policy's product contract, in the process burning the policy and converting it to a claim. The policy holder will then need to wait for a cooldown period after which they can withdraw the payout.
+ * @notice The payer of claims.
+ *
+ * [**Policyholders**](/docs/user-docs/Policy%20Holders) can submit claims through their policy's product contract, in the process burning the policy and converting it to a claim.
+ *
+ * The [**policyholder**](/docs/user-docs/Policy%20Holders) will then need to wait for a [`cooldownPeriod()`](#cooldownperiod) after which they can [`withdrawClaimsPayout()`](#withdrawclaimspayout).
+ *
+ * To pay the claims funds are taken from the [`Vault`](../Vault) and deducted from [**capital provider**](/docs/user-docs/Capital%20Providers) earnings.
+ *
+ * Claims are **ERC721**s and abbreviated as **SCT**.
  */
 interface IClaimsEscrow {
 
@@ -102,7 +110,7 @@ interface IClaimsEscrow {
     GLOBAL VIEWS
     ***************************************/
 
-    /// @notice Tracks how much **ETH** is required to payout all claims
+    /// @notice Tracks how much **ETH** is required to payout all claims.
     function totalClaimsOutstanding() external view returns (uint256);
 
     /// @notice The duration of time in seconds the user must wait between submitting a claim and withdrawing the payout.

@@ -1,18 +1,18 @@
 import { waffle, ethers, upgrades } from "hardhat";
 const { deployContract, solidity } = waffle;
-import { MockProvider } from 'ethereum-waffle';
+import { MockProvider } from "ethereum-waffle";
 const provider: MockProvider = waffle.provider;
-import { Wallet, BigNumber as BN } from 'ethers';
-import chai from 'chai';
+import { Wallet, BigNumber as BN } from "ethers";
+import chai from "chai";
 const { expect } = chai;
 chai.use(solidity);
 
-import { import_artifacts, ArtifactImports } from './utilities/artifact_importer';
-import { burnBlocks, burnBlocksUntil } from './utilities/time';
+import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
+import { burnBlocks, burnBlocksUntil } from "./utilities/time";
 
-import { PolicyManager, MockProduct, Treasury, Registry, RiskManager, PolicyDescriptor, Vault } from '../typechain';
+import { PolicyManager, MockProduct, Treasury, Registry, RiskManager, PolicyDescriptor, Vault } from "../typechain";
 
-describe('PolicyManager', function() {
+describe("PolicyManager", function() {
   let artifacts: ArtifactImports;
   const [deployer, governor, user, walletProduct1, walletProduct2, walletProduct3, positionContract] = provider.getWallets();
 
@@ -25,11 +25,11 @@ describe('PolicyManager', function() {
   let riskManager: RiskManager;
   let policyDescriptor: PolicyDescriptor;
 
-  const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
-  const name = 'Solace Policy';
-  const symbol = 'SPT';
+  const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+  const name = "Solace Policy";
+  const symbol = "SPT";
   const expirationBlock = 20000000;
-  const coverAmount = BN.from('100000000000000'); // 10 Ether in wei
+  const coverAmount = BN.from("100000000000000"); // 10 Ether in wei
   const price = 11044; // price in wei for block/wei
 
   before(async function() {
@@ -57,7 +57,7 @@ describe('PolicyManager', function() {
     await registry.connect(governor).setVault(vault.address);
     await registry.connect(governor).setPolicyManager(policyManager.address);
     await registry.connect(governor).setRiskManager(riskManager.address);
-    await deployer.sendTransaction({ to: treasury.address, value: BN.from('10000000000000000') });
+    await deployer.sendTransaction({ to: treasury.address, value: BN.from("10000000000000000") });
     await vault.connect(governor).setRequestor(treasury.address, true);
   });
 
@@ -73,12 +73,12 @@ describe('PolicyManager', function() {
     expect(await policyManager.totalPolicyCount()).to.equal(0);
   });
 
-  it('has no nft token descriptor', async function() {
+  it("has no nft token descriptor", async function() {
     expect(await policyManager.policyDescriptor()).to.equal(ZERO_ADDRESS);
   });
 
-  describe('governance', function() {
-    it('starts with the correct governor', async function() {
+  describe("governance", function() {
+    it("starts with the correct governor", async function() {
       expect(await policyManager.governance()).to.equal(governor.address);
     });
 
@@ -108,11 +108,11 @@ describe('PolicyManager', function() {
       await policyManager.connect(governor).acceptGovernance();
     });
 
-    it('rejects setting new nft token descriptor by non governor', async function() {
-      await expect(policyManager.connect(user).setPolicyDescriptor(policyDescriptor.address)).to.be.revertedWith('!governance');
+    it("rejects setting new nft token descriptor by non governor", async function() {
+      await expect(policyManager.connect(user).setPolicyDescriptor(policyDescriptor.address)).to.be.revertedWith("!governance");
     });
 
-    it('can set new nft token descriptor', async function() {
+    it("can set new nft token descriptor", async function() {
       await policyManager.connect(governor).setPolicyDescriptor(policyDescriptor.address);
       expect(await policyManager.connect(governor).policyDescriptor()).to.equal(policyDescriptor.address);
     });
@@ -201,14 +201,14 @@ describe('PolicyManager', function() {
       expect(await policyManager.getPolicyPrice(1)).to.equal(price);
       expect(await policyManager.exists(1)).to.equal(true);
 
-      await expect(policyManager.policyInfo(2)).to.be.revertedWith('query for nonexistent token');
-      await expect(policyManager.getPolicyInfo(2)).to.be.revertedWith('query for nonexistent token');
-      await expect(policyManager.getPolicyholder(2)).to.be.revertedWith('query for nonexistent token');
-      await expect(policyManager.getPolicyProduct(2)).to.be.revertedWith('query for nonexistent token');
-      await expect(policyManager.getPolicyPositionContract(2)).to.be.revertedWith('query for nonexistent token');
-      await expect(policyManager.getPolicyExpirationBlock(2)).to.be.revertedWith('query for nonexistent token');
-      await expect(policyManager.getPolicyCoverAmount(2)).to.be.revertedWith('query for nonexistent token');
-      await expect(policyManager.getPolicyPrice(2)).to.be.revertedWith('query for nonexistent token');
+      await expect(policyManager.policyInfo(2)).to.be.revertedWith("query for nonexistent token");
+      await expect(policyManager.getPolicyInfo(2)).to.be.revertedWith("query for nonexistent token");
+      await expect(policyManager.getPolicyholder(2)).to.be.revertedWith("query for nonexistent token");
+      await expect(policyManager.getPolicyProduct(2)).to.be.revertedWith("query for nonexistent token");
+      await expect(policyManager.getPolicyPositionContract(2)).to.be.revertedWith("query for nonexistent token");
+      await expect(policyManager.getPolicyExpirationBlock(2)).to.be.revertedWith("query for nonexistent token");
+      await expect(policyManager.getPolicyCoverAmount(2)).to.be.revertedWith("query for nonexistent token");
+      await expect(policyManager.getPolicyPrice(2)).to.be.revertedWith("query for nonexistent token");
       expect(await policyManager.exists(2)).to.equal(false);
     });
 
@@ -381,7 +381,7 @@ describe('PolicyManager', function() {
     });
   });
 
-  describe('tokenURI', function() {
+  describe("tokenURI", function() {
     let policyId:BN;
     let productName:string;
     before(async function(){
@@ -412,12 +412,12 @@ describe('PolicyManager', function() {
         productName = await mockProduct.name();
     });
 
-    it('can get tokenURI', async function() {
+    it("can get tokenURI", async function() {
         let tokenURI = `This is a Solace Finance policy that covers a ${productName} position`;
         expect(await policyManager.tokenURI(policyId)).to.equal(tokenURI);
     });
 
-    it('cannot get tokenURI for nonexistant policy id', async function() {
+    it("cannot get tokenURI for nonexistant policy id", async function() {
       await expect(policyManager.tokenURI(1000)).to.be.revertedWith("query for nonexistent token");
     });
   });

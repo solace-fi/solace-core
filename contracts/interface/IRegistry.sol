@@ -40,8 +40,8 @@ interface IRegistry {
     ***************************************/
 
     /**
-     * @notice Gets the [`WETH`](../WETH9) contract.
-     * @return weth_ The address of the [`WETH`](../WETH9) contract.
+     * @notice Gets the [**WETH**](../WETH9) contract.
+     * @return weth_ The address of the [**WETH**](../WETH9) contract.
      */
     function weth() external view returns (address);
 
@@ -76,8 +76,8 @@ interface IRegistry {
     function riskManager() external view returns (address);
 
     /**
-     * @notice Gets the [`SOLACE`](../SOLACE) contract.
-     * @return solace_ The address of the [`SOLACE`](../SOLACE) contract.
+     * @notice Gets the [**SOLACE**](../SOLACE) contract.
+     * @return solace_ The address of the [**SOLACE**](../SOLACE) contract.
      */
     function solace() external view returns (address);
 
@@ -98,9 +98,9 @@ interface IRegistry {
     ***************************************/
 
     /**
-     * @notice Sets the [`WETH`](../WETH9) contract.
+     * @notice Sets the [**WETH**](../WETH9) contract.
      * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param weth_ The address of the [`WETH`](../WETH9) contract.
+     * @param weth_ The address of the [**WETH**](../WETH9) contract.
      */
     function setWeth(address weth_) external;
 
@@ -140,9 +140,9 @@ interface IRegistry {
     function setRiskManager(address riskManager_) external;
 
     /**
-     * @notice Sets the [`SOLACE`](../SOLACE) contract.
+     * @notice Sets the [**SOLACE**](../SOLACE) contract.
      * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param solace_ The address of the [`SOLACE`](../SOLACE) contract.
+     * @param solace_ The address of the [**SOLACE**](../SOLACE) contract.
      */
     function setSolace(address solace_) external;
 

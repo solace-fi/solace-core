@@ -378,7 +378,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
      * @param positionContract The address of the smart contract the `policyholder` has their position in (e.g., for `UniswapV2Product` this would be the Pair's address).
      * @return positionAmount The value of the position.
      */
-    function appraisePosition(address policyholder, address positionContract) public view virtual override returns (uint256 positionAmount);
+    function appraisePosition(address policyholder, address positionContract) public view virtual override returns (uint256 positionAmount) { return 0; }
 
     /**
      * @notice Calculate a premium quote for a policy.

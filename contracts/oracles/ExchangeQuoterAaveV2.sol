@@ -16,7 +16,8 @@ import "../interface/IExchangeQuoter.sol";
 contract ExchangeQuoterAaveV2 is IExchangeQuoter {
     /// @notice IAaveProtocolDataProvider.
     IAaveProtocolDataProvider public aaveDataProvider;
-    /// @notice ETH_ADDRESS
+    // ETH_ADDRESS
+    // solhint-disable-next-line var-name-mixedcase
     address internal _ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
     /**
@@ -34,6 +35,7 @@ contract ExchangeQuoterAaveV2 is IExchangeQuoter {
      * @return amountOut The amount of **ETH** received.
      */
     function tokenToEth(address token, uint256 amount) public view override returns (uint256 amountOut) {
+        if(token == _ETH_ADDRESS) return amount;
         // get price oracle
         ILendingPoolAddressesProvider addressProvider = ILendingPoolAddressesProvider(aaveDataProvider.ADDRESSES_PROVIDER());
         IAavePriceOracle oracle = IAavePriceOracle(addressProvider.getPriceOracle());
