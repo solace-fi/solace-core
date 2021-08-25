@@ -12,7 +12,7 @@ import { create2Contract } from "./create2Contract";
 import { logContractAddress } from "./utils";
 
 import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_importer";
-import { Registry, Weth9, Vault, ClaimsEscrow, Treasury, PolicyManager, PolicyDescriptor, RiskManager, ExchangeQuoterManual, CompoundProductRinkeby } from "../typechain";
+import { Registry, Weth9, Vault, ClaimsEscrow, Treasury, PolicyManager, PolicyDescriptor, RiskManager, ExchangeQuoterAaveV2, AaveV2Product } from "../typechain";
 
 const REGISTRY_ADDRESS          = "0x501ACEe6AAf57d5e37488145844f47c079a8F253";
 const VAULT_ADDRESS             = "0x501AcebC38338bC8c18843dc14fD4345f4DecF33";
@@ -22,11 +22,11 @@ const POLICY_MANAGER_ADDRESS    = "0x501AceBAEA90ebE43BCD649922EdFa8ce3Cd4bc9";
 const POLICY_DESCR_ADDRESS      = "0x501ACEA6EA69f4a4B68c8496243D3614256AC242";
 const RISK_MANAGER_ADDRESS      = "0x501acE40A875726DA80b9e34937A508bDf2C5560";
 
-const QUOTER_MANUAL_ADDRESS     = "0x501Ace288Bc04Dd86CEC06A56168F2abFaacA8Af";
-const COMPOUND_PRODUCT_ADDRESS  = "0x501aCE222905a3790373C89ff099C1BaB5C37185";
+const QUOTER_AAVE_ADDRESS       = "0x501acEa4f056b74DCD2e9c473e3F28dB89044cfA";
+const AAVE_PRODUCT_ADDRESS      = "0x501ACeEE321A6B99750a33Bd6F6C35E917AC3ba9";
 
-const WETH_ADDRESS              = "0xc778417E063141139Fce010982780140Aa0cD5Ab";
-const COMPTROLLER_ADDRESS       = "0x2EAa9D77AE4D8f9cdD9FAAcd44016E746485bddb";
+const WETH_ADDRESS              = "0xd0A1E359811322d97991E03f863a0C30C2cF029C";
+const AAVE_DATA_PROVIDER        = "0x3c73A5E5785cAC854D468F727c606C07488a29D6";
 const UNISWAP_ROUTER_ADDRESS    = "0xE592427A0AEce92De3Edee1F18E0157C05861564";
 const SINGLETON_FACTORY_ADDRESS = "0xce0042B868300000d44A59004Da54A005ffdcf9f";
 
@@ -45,9 +45,9 @@ let policyManager: PolicyManager;
 let policyDescriptor: PolicyDescriptor;
 let riskManager: RiskManager;
 
-let quoterManual: ExchangeQuoterManual;
+let quoterAave: ExchangeQuoterAaveV2
 
-let compoundProduct: CompoundProductRinkeby;
+let aaveProduct: AaveV2Product;
 
 let signerAddress: string;
 
@@ -75,11 +75,11 @@ async function main() {
   await deployPolicyDescriptor();
   await deployRiskManager();
   // quoters
-  await deployQuoterManual();
+  await deployQuoterAaveV2();
   // products
-  await deployCompoundProduct();
+  await deployAaveV2Product();
 
-  writeFileSync("stash/transactions/deployTransactionsRinkeby.json", JSON.stringify(transactions, undefined, '  '));
+  writeFileSync("stash/transactions/deployTransactionsKovan.json", JSON.stringify(transactions, undefined, '  '));
   await logAddresses();
 }
 
@@ -225,39 +225,39 @@ async function deployRiskManager() {
   }
 }
 
-async function deployQuoterManual() {
-  if(!!QUOTER_MANUAL_ADDRESS) {
-    quoterManual = (await ethers.getContractAt(artifacts.ExchangeQuoterManual.abi, QUOTER_MANUAL_ADDRESS)) as ExchangeQuoterManual;
+async function deployQuoterAaveV2() {
+  if(!!QUOTER_AAVE_ADDRESS) {
+    quoterAave = (await ethers.getContractAt(artifacts.ExchangeQuoterAaveV2.abi, QUOTER_AAVE_ADDRESS)) as ExchangeQuoterAaveV2;
   } else {
-    console.log("Deploying ExchangeQuoterManual");
-    var res = await create2Contract(deployer,artifacts.ExchangeQuoterManual,[signerAddress]);
-    quoterManual = (await ethers.getContractAt(artifacts.ExchangeQuoterManual.abi, res.address)) as ExchangeQuoterManual;
-    transactions.push({"description": "Deploy ExchangeQuoterManual", "to": SINGLETON_FACTORY_ADDRESS, "gasLimit": res.gasUsed});
-    console.log(`Deployed ExchangeQuoterManual to ${quoterManual.address}`);
+    console.log("Deploying ExchangeQuoterAaveV2");
+    var res = await create2Contract(deployer,artifacts.ExchangeQuoterAaveV2,[AAVE_DATA_PROVIDER]);
+    quoterAave = (await ethers.getContractAt(artifacts.ExchangeQuoterAaveV2.abi, res.address)) as ExchangeQuoterAaveV2;
+    transactions.push({"description": "Deploy ExchangeQuoterAaveV2", "to": SINGLETON_FACTORY_ADDRESS, "gasLimit": res.gasUsed});
+    console.log(`Deployed ExchangeQuoterAaveV2 to ${quoterAave.address}`);
   }
 }
 
-async function deployCompoundProduct() {
-  if(!!COMPOUND_PRODUCT_ADDRESS) {
-    compoundProduct = (await ethers.getContractAt(artifacts.CompoundProductRinkeby.abi, COMPOUND_PRODUCT_ADDRESS)) as CompoundProductRinkeby;
+async function deployAaveV2Product() {
+  if(!!AAVE_PRODUCT_ADDRESS) {
+    aaveProduct = (await ethers.getContractAt(artifacts.AaveV2Product.abi, AAVE_PRODUCT_ADDRESS)) as AaveV2Product;
   } else {
-    console.log("Deploying CompoundProduct");
-    var res = await create2Contract(deployer,artifacts.CompoundProductRinkeby,[signerAddress,policyManager.address,registry.address,COMPTROLLER_ADDRESS,minPeriod,maxPeriod,price,10,quoterManual.address]);
-    compoundProduct = (await ethers.getContractAt(artifacts.CompoundProductRinkeby.abi, res.address)) as CompoundProductRinkeby;
-    transactions.push({"description": "Deploy CompoundProduct", "to": SINGLETON_FACTORY_ADDRESS, "gasLimit": res.gasUsed});
-    console.log(`Deployed CompoundProduct to ${compoundProduct.address}`);
+    console.log("Deploying AaveV2Product");
+    var res = await create2Contract(deployer,artifacts.AaveV2Product,[signerAddress,policyManager.address,registry.address,AAVE_DATA_PROVIDER,minPeriod,maxPeriod,price,10,quoterAave.address]);
+    aaveProduct = (await ethers.getContractAt(artifacts.AaveV2Product.abi, res.address)) as AaveV2Product;
+    transactions.push({"description": "Deploy AaveV2Product", "to": SINGLETON_FACTORY_ADDRESS, "gasLimit": res.gasUsed});
+    console.log(`Deployed AaveV2Product to ${aaveProduct.address}`);
   }
-  if(await policyManager.governance() == signerAddress && !(await policyManager.productIsActive(compoundProduct.address))) {
-    console.log("Registering CompoundProduct in PolicyManager");
-    let tx = await policyManager.connect(deployer).addProduct(compoundProduct.address);
+  if(await policyManager.governance() == signerAddress && !(await policyManager.productIsActive(aaveProduct.address))) {
+    console.log("Registering AaveV2Product in PolicyManager");
+    let tx = await policyManager.connect(deployer).addProduct(aaveProduct.address);
     let receipt = await tx.wait();
-    transactions.push({"description": "Register CompoundProduct in PolicyManager", "to": policyManager.address, "gasLimit": receipt.gasUsed.toString()});
+    transactions.push({"description": "Register AaveV2Product in PolicyManager", "to": policyManager.address, "gasLimit": receipt.gasUsed.toString()});
   }
-  if(await riskManager.governance() == signerAddress && (await riskManager.weight(compoundProduct.address) == 0)) {
-    console.log("Registering CompoundProduct in RiskManager");
-    let tx = await riskManager.connect(deployer).addProduct(compoundProduct.address,10000);
+  if(await riskManager.governance() == signerAddress && (await riskManager.weight(aaveProduct.address) == 0)) {
+    console.log("Registering AaveV2Product in RiskManager");
+    let tx = await riskManager.connect(deployer).addProduct(aaveProduct.address,10000);
     let receipt = await tx.wait();
-    transactions.push({"description": "Register CompoundProduct in RiskManager", "to": riskManager.address, "gasLimit": receipt.gasUsed.toString()});
+    transactions.push({"description": "Register AaveV2Product in RiskManager", "to": riskManager.address, "gasLimit": receipt.gasUsed.toString()});
   }
 }
 
@@ -274,21 +274,22 @@ async function logAddresses() {
   logContractAddress("PolicyDescriptor", policyDescriptor.address);
   logContractAddress("RiskManager", riskManager.address);
 
-  logContractAddress("QuoterManual", quoterManual.address);
-  logContractAddress("CompoundProduct", compoundProduct.address);
+  logContractAddress("QuoterAave", quoterAave.address);
+
+  logContractAddress("AaveV2Product", aaveProduct.address);
 
   console.log(``);
   console.log(`Copy and paste this into the .env file in the frontend client.`)
   console.log(``);
-  console.log(`REACT_APP_RINKEBY_REGISTRY_CONTRACT_ADDRESS=${registry.address}`);
-  console.log(`REACT_APP_RINKEBY_WETH_CONTRACT_ADDRESS=${weth.address}`);
-  console.log(`REACT_APP_RINKEBY_VAULT_CONTRACT_ADDRESS=${vault.address}`);
-  console.log(`REACT_APP_RINKEBY_CLAIMS_ESCROW_CONTRACT_ADDRESS=${claimsEscrow.address}`);
-  console.log(`REACT_APP_RINKEBY_TREASURY_CONTRACT_ADDRESS=${treasury.address}`);
-  console.log(`REACT_APP_RINKEBY_POLICY_MANAGER_CONTRACT_ADDRESS=${policyManager.address}`);
-  console.log(`REACT_APP_RINKEBY_POLICY_DESCRIPTOR_CONTRACT_ADDRESS=${policyDescriptor.address}`);
-  console.log(`REACT_APP_RINKEBY_RISK_MANAGER_CONTRACT_ADDRESS=${riskManager.address}`);
-  console.log(`REACT_APP_RINKEBY_COMPOUND_PRODUCT_CONTRACT_ADDRESS=${compoundProduct.address}`);
+  console.log(`REACT_APP_KOVAN_REGISTRY_CONTRACT_ADDRESS=${registry.address}`);
+  console.log(`REACT_APP_KOVAN_WETH_CONTRACT_ADDRESS=${weth.address}`);
+  console.log(`REACT_APP_KOVAN_VAULT_CONTRACT_ADDRESS=${vault.address}`);
+  console.log(`REACT_APP_KOVAN_CLAIMS_ESCROW_CONTRACT_ADDRESS=${claimsEscrow.address}`);
+  console.log(`REACT_APP_KOVAN_TREASURY_CONTRACT_ADDRESS=${treasury.address}`);
+  console.log(`REACT_APP_KOVAN_POLICY_MANAGER_CONTRACT_ADDRESS=${policyManager.address}`);
+  console.log(`REACT_APP_KOVAN_POLICY_DESCRIPTOR_CONTRACT_ADDRESS=${policyDescriptor.address}`);
+  console.log(`REACT_APP_KOVAN_RISK_MANAGER_CONTRACT_ADDRESS=${riskManager.address}`);
+  console.log(`REACT_APP_KOVAN_AAVE_PRODUCT_CONTRACT_ADDRESS=${aaveProduct.address}`);
   console.log("")
 }
 
