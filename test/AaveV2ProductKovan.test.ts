@@ -89,11 +89,11 @@ if(process.env.FORK_NETWORK === "kovan"){
 
     const aWETH_ADDRESS = "0x87b1f4cf9BD63f7BBD3eE1aD04E8F52540349347";
     const REAL_USER1 = "0xc2b74b547d02bafc93feb34bd964d42312ae70c3";
-    const BALANCE1 = BN.from("608218814659045357");
+    const BALANCE1 = BN.from("689713795702756155");
 
     const aUSDT_ADDRESS = "0xFF3c8bc103682FA918c954E84F5056aB4DD5189d";
     const REAL_USER2 = "0xde6663fbb083c1bd0f2303f68276e2df2deb0a9d";
-    const BALANCE2 = BN.from("4741389687192200000");
+    const BALANCE2 = BN.from("3120873596044892954");
 
     const aLINK_ADDRESS = "0xeD9044cA8F7caCe8eACcD40367cF2bee39eD1b04";
     const LINK_ADDRESS = "0xad5ce863ae3e4e9394ab43d4ba0d80f419f61789";
@@ -200,7 +200,7 @@ if(process.env.FORK_NETWORK === "kovan"){
         let positionAmount = await product.appraisePosition(REAL_USER1, aWETH_ADDRESS);
         let coverAmount = positionAmount.mul(5000).div(10000);
         let blocks = BN.from(threeDays)
-        let expectedPremium = BN.from("64988622087944");
+        let expectedPremium = BN.from("73696438160454");
         let quote = BN.from(await product.getQuote(REAL_USER1, aWETH_ADDRESS, coverAmount, blocks));
         expect(quote).to.be.closeTo(expectedPremium, 1000000000);
       })
@@ -215,7 +215,6 @@ if(process.env.FORK_NETWORK === "kovan"){
         let coverAmount = positionAmount.mul(500).div(10000);
         let blocks = threeDays
         let quote = BN.from(await product.getQuote(REAL_USER1, aWETH_ADDRESS, coverAmount, blocks));
-        quote = quote.mul(10001).div(10000);
         let tx = await product.buyPolicy(REAL_USER1, aWETH_ADDRESS, coverAmount, blocks, { value: quote });
         expect(tx).to.emit(product, "PolicyCreated").withArgs(1);
         expect(await policyManager.totalSupply()).to.equal(1);
@@ -226,7 +225,6 @@ if(process.env.FORK_NETWORK === "kovan"){
         let coverAmount = positionAmount.mul(500).div(10000);
         let blocks = threeDays
         let quote = BN.from(await product.getQuote(REAL_USER1, aWETH_ADDRESS, coverAmount, blocks));
-        quote = quote.mul(10001).div(10000);
         let tx = await product.buyPolicy(REAL_USER1, aWETH_ADDRESS, coverAmount, blocks, { value: quote });
         expect(tx).to.emit(product, "PolicyCreated").withArgs(2);
       });
@@ -255,7 +253,6 @@ if(process.env.FORK_NETWORK === "kovan"){
         let coverAmount = positionAmount;
         let blocks = threeDays;
         let quote = BN.from(await product.getQuote(policyholder.address, aLINK_ADDRESS, coverAmount, blocks));
-        quote = quote.mul(10001).div(10000);
         await product.connect(policyholder).buyPolicy(policyholder.address, aLINK_ADDRESS, coverAmount, blocks, { value: quote });
         // create another aLink position and policy
         expect(await link.balanceOf(policyholder2.address)).to.equal(amountIn1);
@@ -386,7 +383,6 @@ if(process.env.FORK_NETWORK === "kovan"){
             let coverAmount = positionAmount;
             let blocks = threeDays;
             let quote = BN.from(await product.getQuote(policyholder3.address, aAddress, coverAmount, blocks));
-            quote = quote.mul(10001).div(10000);
             await product.connect(policyholder3).buyPolicy(policyholder3.address, aAddress, coverAmount, blocks, { value: quote });
             let policyID = (await policyManager.totalPolicyCount()).toNumber();
             // sign swap

@@ -12,7 +12,7 @@ import { create2Contract } from "./create2Contract";
 import { logContractAddress } from "./utils";
 
 import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_importer";
-import { Registry, Weth9, Vault, ClaimsEscrow, Treasury, PolicyManager, PolicyDescriptor, RiskManager, ExchangeQuoterAaveV2, AaveV2Product } from "../typechain";
+import { Registry, Weth9, Vault, ClaimsEscrow, Treasury, PolicyManager, PolicyDescriptor, RiskManager, ExchangeQuoterAaveV2, AaveV2Product, WaaveProduct } from "../typechain";
 
 const REGISTRY_ADDRESS          = "0x501ACEe6AAf57d5e37488145844f47c079a8F253";
 const VAULT_ADDRESS             = "0x501AcebC38338bC8c18843dc14fD4345f4DecF33";
@@ -24,10 +24,12 @@ const RISK_MANAGER_ADDRESS      = "0x501acE40A875726DA80b9e34937A508bDf2C5560";
 
 const QUOTER_AAVE_ADDRESS       = "0x501acEa4f056b74DCD2e9c473e3F28dB89044cfA";
 const AAVE_PRODUCT_ADDRESS      = "0x501ACeEE321A6B99750a33Bd6F6C35E917AC3ba9";
+const WAAVE_PRODUCT_ADDRESS     = "0x501aCe2b051B8304d49C4a8f3988A26f44169070";
 
 const WETH_ADDRESS              = "0xd0A1E359811322d97991E03f863a0C30C2cF029C";
 const AAVE_DATA_PROVIDER        = "0x3c73A5E5785cAC854D468F727c606C07488a29D6";
 const UNISWAP_ROUTER_ADDRESS    = "0xE592427A0AEce92De3Edee1F18E0157C05861564";
+const WAAVE_REGISTRY_ADDRESS    = "0x166956c3A96c875610DCfb80F228Da0f4e92B73B";
 const SINGLETON_FACTORY_ADDRESS = "0xce0042B868300000d44A59004Da54A005ffdcf9f";
 
 // product params
@@ -48,6 +50,7 @@ let riskManager: RiskManager;
 let quoterAave: ExchangeQuoterAaveV2
 
 let aaveProduct: AaveV2Product;
+let waaveProduct: WaaveProduct;
 
 let signerAddress: string;
 
@@ -78,6 +81,7 @@ async function main() {
   await deployQuoterAaveV2();
   // products
   await deployAaveV2Product();
+  await deployWaaveProduct();
 
   writeFileSync("stash/transactions/deployTransactionsKovan.json", JSON.stringify(transactions, undefined, '  '));
   await logAddresses();
@@ -261,6 +265,30 @@ async function deployAaveV2Product() {
   }
 }
 
+async function deployWaaveProduct() {
+  if(!!WAAVE_PRODUCT_ADDRESS) {
+    waaveProduct = (await ethers.getContractAt(artifacts.WaaveProduct.abi, WAAVE_PRODUCT_ADDRESS)) as WaaveProduct;
+  } else {
+    console.log("Deploying WaaveProduct");
+    var res = await create2Contract(deployer,artifacts.WaaveProduct,[signerAddress,policyManager.address,registry.address,WAAVE_REGISTRY_ADDRESS,minPeriod,maxPeriod,price,10,quoterAave.address]);
+    waaveProduct = (await ethers.getContractAt(artifacts.WaaveProduct.abi, res.address)) as WaaveProduct;
+    transactions.push({"description": "Deploy WaaveProduct", "to": SINGLETON_FACTORY_ADDRESS, "gasLimit": res.gasUsed});
+    console.log(`Deployed WaaveProduct to ${waaveProduct.address}`);
+  }
+  if(await policyManager.governance() == signerAddress && !(await policyManager.productIsActive(waaveProduct.address))) {
+    console.log("Registering WaaveProduct in PolicyManager");
+    let tx = await policyManager.connect(deployer).addProduct(waaveProduct.address);
+    let receipt = await tx.wait();
+    transactions.push({"description": "Register WaaveProduct in PolicyManager", "to": policyManager.address, "gasLimit": receipt.gasUsed.toString()});
+  }
+  if(await riskManager.governance() == signerAddress && (await riskManager.weight(waaveProduct.address) == 0)) {
+    console.log("Registering WaaveProduct in RiskManager");
+    let tx = await riskManager.connect(deployer).addProduct(waaveProduct.address,10000);
+    let receipt = await tx.wait();
+    transactions.push({"description": "Register WaaveProduct in RiskManager", "to": riskManager.address, "gasLimit": receipt.gasUsed.toString()});
+  }
+}
+
 async function logAddresses() {
   console.log("")
   logContractAddress("Contract Name", "Address")
@@ -275,8 +303,8 @@ async function logAddresses() {
   logContractAddress("RiskManager", riskManager.address);
 
   logContractAddress("QuoterAave", quoterAave.address);
-
   logContractAddress("AaveV2Product", aaveProduct.address);
+  logContractAddress("WaaveProduct", waaveProduct.address);
 
   console.log(``);
   console.log(`Copy and paste this into the .env file in the frontend client.`)
@@ -290,6 +318,7 @@ async function logAddresses() {
   console.log(`REACT_APP_KOVAN_POLICY_DESCRIPTOR_CONTRACT_ADDRESS=${policyDescriptor.address}`);
   console.log(`REACT_APP_KOVAN_RISK_MANAGER_CONTRACT_ADDRESS=${riskManager.address}`);
   console.log(`REACT_APP_KOVAN_AAVE_PRODUCT_CONTRACT_ADDRESS=${aaveProduct.address}`);
+  console.log(`REACT_APP_KOVAN_WAAVE_PRODUCT_CONTRACT_ADDRESS=${waaveProduct.address}`);
   console.log("")
 }
 

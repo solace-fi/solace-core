@@ -205,7 +205,6 @@ if(process.env.FORK_NETWORK === "mainnet"){
         let coverAmount = positionAmount.mul(500).div(10000);
         let blocks = threeDays
         let quote = BN.from(await product.getQuote(REAL_USER1, aWETH_ADDRESS, coverAmount, blocks));
-        quote = quote.mul(10001).div(10000);
         let tx = await product.buyPolicy(REAL_USER1, aWETH_ADDRESS, coverAmount, blocks, { value: quote });
         expect(tx).to.emit(product, "PolicyCreated").withArgs(1);
         expect(await policyManager.totalSupply()).to.equal(1);
@@ -216,7 +215,6 @@ if(process.env.FORK_NETWORK === "mainnet"){
         let coverAmount = positionAmount.mul(500).div(10000);
         let blocks = threeDays
         let quote = BN.from(await product.getQuote(REAL_USER1, aWETH_ADDRESS, coverAmount, blocks));
-        quote = quote.mul(10001).div(10000);
         let tx = await product.buyPolicy(REAL_USER1, aWETH_ADDRESS, coverAmount, blocks, { value: quote });
         expect(tx).to.emit(product, "PolicyCreated").withArgs(2);
       });
@@ -245,7 +243,6 @@ if(process.env.FORK_NETWORK === "mainnet"){
         let coverAmount = positionAmount;
         let blocks = threeDays;
         let quote = BN.from(await product.getQuote(policyholder.address, aLINK_ADDRESS, coverAmount, blocks));
-        quote = quote.mul(10001).div(10000);
         await product.connect(policyholder).buyPolicy(policyholder.address, aLINK_ADDRESS, coverAmount, blocks, { value: quote });
         // create another aLink position and policy
         expect(await link.balanceOf(policyholder2.address)).to.equal(amountIn1);
@@ -395,7 +392,6 @@ if(process.env.FORK_NETWORK === "mainnet"){
             let coverAmount = positionAmount;
             let blocks = threeDays;
             let quote = BN.from(await product.getQuote(policyholder3.address, aAddress, coverAmount, blocks));
-            quote = quote.mul(10001).div(10000);
             await product.connect(policyholder3).buyPolicy(policyholder3.address, aAddress, coverAmount, blocks, { value: quote });
             let policyID = (await policyManager.totalPolicyCount()).toNumber();
             // sign swap

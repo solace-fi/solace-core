@@ -1,27 +1,28 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
-import "../interface/Yearn/IYRegistry.sol";
-import "../interface/Yearn/IYVault.sol";
-import "../interface/IExchangeQuoter.sol";
+import "../interface/Waave/IWaRegistry.sol";
+import "../interface/Waave/IWaToken.sol";
 import "./BaseProduct.sol";
 
 /**
- * @title YearnV2Product
+ * @title WaaveProduct
  * @author solace.fi
- * @notice The **YearnV2Product** can be used to purchase coverage for **YearnV2** positions.
+ * @notice The **WaaveProduct** can be used to purchase coverage for **Waave** positions.
+ *
+ * Note that the Waave Protocol is exploitable by design. Use this product or the Waave Protocol at your own risk.
  */
-contract YearnV2Product is BaseProduct {
+contract WaaveProduct is BaseProduct {
 
-    // IYRegistry.
-    IYRegistry internal _yregistry;
+    // IWaRegistry.
+    IWaRegistry internal _waRegistry;
 
     /**
-      * @notice Constructs the YearnV2Product.
+      * @notice Constructs the WaaveProduct.
       * @param governance_ The address of the [governor](/docs/user-docs/Governance).
       * @param policyManager_ The [`PolicyManager`](../PolicyManager) contract.
       * @param registry_ The [`Registry`](../Registry) contract.
-      * @param yregistry_ The Yearn YRegistry.
+      * @param waRegistry_ The Waave Registry.
       * @param minPeriod_ The minimum policy period in blocks to purchase a **policy**.
       * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
       * @param price_ The cover price for the **Product**.
@@ -32,7 +33,7 @@ contract YearnV2Product is BaseProduct {
         address governance_,
         IPolicyManager policyManager_,
         IRegistry registry_,
-        address yregistry_,
+        address waRegistry_,
         uint40 minPeriod_,
         uint40 maxPeriod_,
         uint24 price_,
@@ -42,41 +43,45 @@ contract YearnV2Product is BaseProduct {
         governance_,
         policyManager_,
         registry_,
-        yregistry_,
+        waRegistry_,
         minPeriod_,
         maxPeriod_,
         price_,
         maxCoverPerUserDivisor_,
         quoter_,
-        "Solace.fi-YearnV2Product",
+        "Solace.fi-WaaveProduct",
         "1"
     ) {
-        _yregistry = IYRegistry(yregistry_);
-        _SUBMIT_CLAIM_TYPEHASH = keccak256("YearnV2ProductSubmitClaim(uint256 policyID,uint256 amountOut,uint256 deadline)");
-        _productName = "YearnV2";
+        _waRegistry = IWaRegistry(waRegistry_);
+        _SUBMIT_CLAIM_TYPEHASH = keccak256("WaaveProductSubmitClaim(uint256 policyID,uint256 amountOut,uint256 deadline)");
+        _productName = "Waave";
     }
 
     /**
      * @notice Calculate the value of a user's position in **ETH**.
-     * The `positionContract` must be a **yearn.fi vault**.
+     * The `positionContract` must be a **waToken**.
      * @param policyholder The owner of the position.
-     * @param positionContract The address of the **vault**.
+     * @param positionContract The address of the **waToken**.
      * @return positionAmount The value of the position.
      */
     function appraisePosition(address policyholder, address positionContract) public view override returns (uint256 positionAmount) {
-        ( , address token, , , ) = _yregistry.getVaultInfo(positionContract);
-        require(token != address(0x0), "Invalid position contract");
-        IYVault vault = IYVault(positionContract);
-        uint256 balance = vault.balanceOf(policyholder) * vault.getPricePerFullShare() / 1e18;
-        return _quoter.tokenToEth(token, balance);
+        // verify positionContract
+        require(_waRegistry.isWaToken(positionContract), "Invalid position contract");
+        // swap math
+        IWaToken waToken = IWaToken(positionContract);
+        uint256 balance = waToken.balanceOf(policyholder);
+        uint256 exchangeRate = waToken.pricePerShare();
+        uint8 decimals = waToken.decimals();
+        balance = balance * exchangeRate / (10 ** decimals);
+        return _quoter.tokenToEth(waToken.underlying(), balance);
     }
 
     /**
-     * @notice Yearn's YRegistry.
-     * @return yregistry_ The YRegistry.
+     * @notice Waave's Registry.
+     * @return waRegistry_ The waRegistry.
      */
-    function yregistry() external view returns (address yregistry_) {
-        return address(_yregistry);
+    function waRegistry() external view returns (address waRegistry_) {
+        return address(_waRegistry);
     }
 
     /***************************************
@@ -88,10 +93,10 @@ contract YearnV2Product is BaseProduct {
      * The function should be used if the the protocol changes their registry but keeps the children contracts.
      * A new version of the protocol will likely require a new Product.
      * Can only be called by the current [**governor**](/docs/user-docs/Governance).
-     * @param yregistry_ The new YRegistry.
+     * @param waRegistry_ The new waRegistry.
      */
-    function setCoveredPlatform(address yregistry_) public override {
-        super.setCoveredPlatform(yregistry_);
-        _yregistry = IYRegistry(yregistry_);
+    function setCoveredPlatform(address waRegistry_) public override {
+        super.setCoveredPlatform(waRegistry_);
+        _waRegistry = IWaRegistry(waRegistry_);
     }
 }

@@ -37,6 +37,7 @@ export async function import_artifacts() {
   artifacts.CompoundProduct = await tryImport(`${artifact_dir}/products/CompoundProduct.sol/CompoundProduct.json`);
   artifacts.CompoundProductRinkeby = await tryImport(`${artifact_dir}/products/CompoundProductRinkeby.sol/CompoundProductRinkeby.json`);
   artifacts.CurveProduct = await tryImport(`${artifact_dir}/products/CurveProduct.sol/CurveProduct.json`);
+  artifacts.WaaveProduct = await tryImport(`${artifact_dir}/products/WaaveProduct.sol/WaaveProduct.json`);
   artifacts.YearnV2Product = await tryImport(`${artifact_dir}/products/YearnV2Product.sol/YearnV2Product.json`);
   // oracles
   artifacts.ExchangeQuoter1InchV1 = await tryImport(`${artifact_dir}/oracles/ExchangeQuoter1InchV1.sol/ExchangeQuoter1InchV1.json`);
@@ -50,11 +51,9 @@ export async function import_artifacts() {
   artifacts.Blacklist = await tryImport(`${artifact_dir}/interface/IBlacklist.sol/IBlacklist.json`);
   artifacts.SingletonFactory = await tryImport(`${artifact_dir}/interface/ISingletonFactory.sol/ISingletonFactory.json`);
 
-  // uniswap imports
-  artifacts.UniswapV3Factory = await tryImport("@uniswap/v3-core/artifacts/contracts/UniswapV3Factory.sol/UniswapV3Factory.json");
-  artifacts.UniswapV3Pool = await tryImport("@uniswap/v3-core/artifacts/contracts/UniswapV3Pool.sol/UniswapV3Pool.json");
-  artifacts.SwapRouter = await tryImport("@uniswap/v3-periphery/artifacts/contracts/SwapRouter.sol/SwapRouter.json");
-  artifacts.NonfungiblePositionManager = await tryImport("@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json");
+  // aave imports
+  artifacts.LendingPool = await tryImport(`${artifact_dir}/interface/AaveV2/ILendingPool.sol/ILendingPool.json`);
+  artifacts.AToken = await tryImport(`${artifact_dir}/interface/AaveV2/IAToken.sol/IAToken.json`);
 
   // compound imports
   artifacts.ICETH = await tryImport(`${artifact_dir}/interface/Compound/ICEth.sol/ICEth.json`);
@@ -62,9 +61,15 @@ export async function import_artifacts() {
   artifacts.IComptroller = await tryImport(`${artifact_dir}/interface/Compound/IComptroller.sol/IComptroller.json`);
   artifacts.IComptrollerRinkeby = await tryImport(`${artifact_dir}/interface/Compound/IComptrollerRinkeby.sol/IComptrollerRinkeby.json`);
 
-  // aave imports
-  artifacts.LendingPool = await tryImport(`${artifact_dir}/interface/AaveV2/ILendingPool.sol/ILendingPool.json`);
-  artifacts.AToken = await tryImport(`${artifact_dir}/interface/AaveV2/IAToken.sol/IAToken.json`);
+  // uniswap imports
+  artifacts.UniswapV3Factory = await tryImport("@uniswap/v3-core/artifacts/contracts/UniswapV3Factory.sol/UniswapV3Factory.json");
+  artifacts.UniswapV3Pool = await tryImport("@uniswap/v3-core/artifacts/contracts/UniswapV3Pool.sol/UniswapV3Pool.json");
+  artifacts.SwapRouter = await tryImport("@uniswap/v3-periphery/artifacts/contracts/SwapRouter.sol/SwapRouter.json");
+  artifacts.NonfungiblePositionManager = await tryImport("@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json");
+
+  // waave imports
+  artifacts.IWaToken = await tryImport(`${artifact_dir}/interface/Waave/IWaToken.sol/IWaToken.json`);
+  artifacts.IWaRegistry = await tryImport(`${artifact_dir}/interface/Waave/IWaRegistry.sol/IWaRegistry.json`);
 
   // yearn imports
   artifacts.YVault = await tryImport(`${artifact_dir}/interface/Yearn/IYVault.sol/IYVault.json`);

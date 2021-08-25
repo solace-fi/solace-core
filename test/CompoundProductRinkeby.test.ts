@@ -59,7 +59,7 @@ function getSubmitClaimDigest(
 
 if(process.env.FORK_NETWORK === "rinkeby"){
   describe("CompoundProductRinkeby", function () {
-    const [deployer, governor, user, user2, user3, paclasSigner] = provider.getWallets();
+    const [deployer, governor, user, policyholder3, paclasSigner] = provider.getWallets();
     let artifacts: ArtifactImports;
 
     let policyManager: PolicyManager;
@@ -73,13 +73,9 @@ if(process.env.FORK_NETWORK === "rinkeby"){
     let registry: Registry;
     let riskManager: RiskManager;
 
-    let comptroller: Contract;
     let ceth: Contract;
     let cusdc: Contract;
     let usdc: Contract;
-    let cdai: Contract;
-    let dai: Contract;
-    let uniswapRouter: Contract;
 
     const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
     const minPeriod = 6450; // this is about 1 day
@@ -91,13 +87,12 @@ if(process.env.FORK_NETWORK === "rinkeby"){
     const COMPTROLLER_ADDRESS = "0x2EAa9D77AE4D8f9cdD9FAAcd44016E746485bddb";
     const cETH_ADDRESS = "0xd6801a1DfFCd0a410336Ef88DeF4320D6DF1883e";
     const USER1 = "0x0fb78424e5021404093aA0cFcf50B176B30a3c1d";
-    const BALANCE1 = "1236588650796795918";
+    const BALANCE1 = "1006239030286184920";
 
     const USDC_ADDRESS = "0x4DBCdF9B62e891a7cec5A2568C3F4FAF9E8Abe2b";
     const cUSDC_ADDRESS = "0x5B281A6DdA0B271e91ae35DE655Ad301C976edb1";
     const DAI_ADDRESS = "0x5592EC0cfb4dbc12D3aB100b257153436a1f0FEa";
     const cDAI_ADDRESS = "0x6D7F0754FFeb405d23C51CE938289d4835bE3b14";
-    const WETH_ADDRESS = "0xc778417E063141139Fce010982780140Aa0cD5Ab";
 
 
     const COOLDOWN_PERIOD = 3600; // one hour
@@ -164,13 +159,9 @@ if(process.env.FORK_NETWORK === "rinkeby"){
       )) as CompoundProductRinkeby;
 
       // fetch contracts
-      comptroller = await ethers.getContractAt(artifacts.IComptrollerRinkeby.abi, COMPTROLLER_ADDRESS);
       ceth = await ethers.getContractAt(artifacts.ICETH.abi, cETH_ADDRESS);
       cusdc = await ethers.getContractAt(artifacts.ICERC20.abi, cUSDC_ADDRESS);
       usdc = await ethers.getContractAt(artifacts.ERC20.abi, USDC_ADDRESS);
-      cdai = await ethers.getContractAt(artifacts.ICERC20.abi, cDAI_ADDRESS);
-      dai = await ethers.getContractAt(artifacts.ERC20.abi, DAI_ADDRESS);
-      uniswapRouter = await ethers.getContractAt(artifacts.SwapRouter.abi, "0xE592427A0AEce92De3Edee1F18E0157C05861564");
 
       await vault.connect(deployer).depositEth({value:maxCoverAmount});
       await riskManager.connect(governor).addProduct(product.address, 1);
@@ -198,7 +189,7 @@ if(process.env.FORK_NETWORK === "rinkeby"){
         let positionAmount = await product.appraisePosition(USER1, cETH_ADDRESS);
         let coverAmount = positionAmount.mul(5000).div(10000);
         let blocks = BN.from(threeDays)
-        let expectedPremium = BN.from("132130362949693");
+        let expectedPremium = BN.from("107517344753400");
         let quote = BN.from(await product.getQuote(USER1, cETH_ADDRESS, coverAmount, blocks))
         expect(quote).to.equal(expectedPremium);
       })
@@ -256,44 +247,17 @@ if(process.env.FORK_NETWORK === "rinkeby"){
         let quote = BN.from(await product.getQuote(user.address, cETH_ADDRESS, coverAmount, blocks));
         await product.connect(user).buyPolicy(user.address, cETH_ADDRESS, coverAmount, blocks, { value: quote });
         // create a cUSDC position and policy
-        var ethIn = "100000";
-        await uniswapRouter.connect(user).exactInputSingle({
-          tokenIn: WETH_ADDRESS,
-          tokenOut: USDC_ADDRESS,
-          fee: 3000,
-          recipient: user.address,
-          deadline: deadline,
-          amountIn: ethIn,
-          amountOutMinimum: 1,
-          sqrtPriceLimitX96: 0
-        }, {value: ethIn});
+        let uAmount = BN.from("1000000");
+        let index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[user.address,0]);
+        await setStorageAt(USDC_ADDRESS,index,toBytes32(uAmount).toString());
         let usdcBalance = await usdc.balanceOf(user.address);
-        expect(usdcBalance).to.be.gt(0);
+        expect(usdcBalance).to.equal(uAmount);
         await usdc.connect(user).approve(cUSDC_ADDRESS, constants.MaxUint256)
         await cusdc.connect(user).mint(usdcBalance);
         await cusdc.connect(user).approve(product.address, constants.MaxUint256);
         quote = BN.from(await product.getQuote(user.address, cUSDC_ADDRESS, coverAmount, blocks));
         await product.connect(user).buyPolicy(user.address, cUSDC_ADDRESS, coverAmount, blocks, { value: quote });
-        // create another cUSDC position and policy
-        var ethIn = "100000000000";
-        await uniswapRouter.connect(user2).exactInputSingle({
-          tokenIn: WETH_ADDRESS,
-          tokenOut: USDC_ADDRESS,
-          fee: 3000,
-          recipient: user2.address,
-          deadline: deadline,
-          amountIn: ethIn,
-          amountOutMinimum: 1,
-          sqrtPriceLimitX96: 0
-        }, {value: ethIn});
-        usdcBalance = await usdc.balanceOf(user2.address);
-        expect(usdcBalance).to.be.gt(0);
-        await usdc.connect(user2).approve(cUSDC_ADDRESS, constants.MaxUint256)
-        await cusdc.connect(user2).mint(usdcBalance);
-        let cusdcBalance = await cusdc.balanceOf(user2.address);
-        await cusdc.connect(user2).approve(product.address, constants.MaxUint256);
-        quote = BN.from(await product.getQuote(user2.address, cUSDC_ADDRESS, coverAmount, blocks));
-        await product.connect(user2).buyPolicy(user2.address, cUSDC_ADDRESS, coverAmount, blocks, { value: quote });
+
       });
       it("cannot submit claim with expired signature", async function () {
         let digest = getSubmitClaimDigest("Solace.fi-CompoundProduct", product.address, chainId, policyID1, amountOut1, 0);
@@ -377,38 +341,13 @@ if(process.env.FORK_NETWORK === "rinkeby"){
         let userEth2 = await user.getBalance();
         expect(userEth2.sub(userEth1).add(gasCost)).to.equal(amountOut2);
       });
-      it("can open another claim on a cERC20 position", async function () {
-        // sign swap
-        let digest = getSubmitClaimDigest("Solace.fi-CompoundProduct", product.address, chainId, policyID3, amountOut3, deadline);
-        let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
-        // submit claim
-        let userCusdc1 = await cusdc.balanceOf(user2.address);
-        let userUsdc1 = await usdc.balanceOf(user2.address);
-        let tx1 = await product.connect(user2).submitClaim(policyID3, amountOut3, deadline, signature);
-        expect(tx1).to.emit(product, "ClaimSubmitted").withArgs(policyID3);
-        expect(tx1).to.emit(claimsEscrow, "ClaimReceived").withArgs(policyID3, user2.address, amountOut3);
-        expect(await policyManager.exists(policyID3)).to.be.false;
-        // verify payout
-        expect((await claimsEscrow.claim(policyID3)).amount).to.equal(amountOut3);
-        let userCusdc2 = await cusdc.balanceOf(user2.address);
-        expect(userCusdc1.sub(userCusdc2)).to.equal(0);
-        let userUsdc2 = await usdc.balanceOf(user2.address);
-        expect(userUsdc2.sub(userUsdc1)).to.equal(0);
-        await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add one hour
-        let userEth1 = await user2.getBalance();
-        let tx2 = await claimsEscrow.connect(user2).withdrawClaimsPayout(policyID3);
-        let receipt = await tx2.wait();
-        let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
-        let userEth2 = await user2.getBalance();
-        expect(userEth2.sub(userEth1).add(gasCost)).to.equal(amountOut3);
-      });
       it("should support all ctokens", async function () {
         var ctokens = [
           {"symbol":"cBAT","address":"0xEBf1A11532b93a529b5bC942B4bAA98647913002"},
           {"symbol":"cDAI","address":"0x6D7F0754FFeb405d23C51CE938289d4835bE3b14"},
           {"symbol":"cETH","address":"0xd6801a1DfFCd0a410336Ef88DeF4320D6DF1883e"},
           {"symbol":"cUSDC","address":"0x5B281A6DdA0B271e91ae35DE655Ad301C976edb1"},
-          {"symbol":"cUSDT","address":"0x2fB298BDbeF468638AD6653FF8376575ea41e768"},
+          {"symbol":"cUSDT","address":"0x2fB298BDbeF468638AD6653FF8376575ea41e768","uimpl":"0x98394a121D26F90F4841e7BFE9dD4Aba05E666E4"},
           {"symbol":"cZRX","address":"0x52201ff1720134bBbBB2f6BC97Bf3715490EC19B","uimpl":"","blacklist":""}
         ];
         var success = 0;
@@ -421,8 +360,8 @@ if(process.env.FORK_NETWORK === "rinkeby"){
             // fetch contracts
             const cToken = await ethers.getContractAt(artifacts.ICERC20.abi, ctokenAddress);
             if(symbol == "cETH") {
-              await ceth.connect(user3).mint({value: BN.from("1000000000000000000")});
-              expect(await cToken.balanceOf(user3.address)).to.be.gt(0);
+              await ceth.connect(policyholder3).mint({value: BN.from("1000000000000000000")});
+              expect(await cToken.balanceOf(policyholder3.address)).to.be.gt(0);
             } else {
               const uAddress = await cToken.underlying();
               const uToken = await ethers.getContractAt(artifacts.ERC20.abi, uAddress);
@@ -435,63 +374,62 @@ if(process.env.FORK_NETWORK === "rinkeby"){
               var value = toBytes32(uAmount).toString();
               for(var j = 0; j < 200; ++j) {
                 try { // solidity rigged balanceOf
-                  var index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[user3.address,j]);
+                  var index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[policyholder3.address,j]);
                   await setStorageAt(uimpl, index, value);
-                  var uBalance = await uToken.balanceOf(user3.address);
+                  var uBalance = await uToken.balanceOf(policyholder3.address);
                   if(uBalance.eq(uAmount)) break;
                 } catch(e) { }
                 try { // vyper rigged balanceOf
-                  var index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[j,user3.address]);
+                  var index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[j,policyholder3.address]);
                   await setStorageAt(uimpl, index, value);
-                  var uBalance = await uToken.balanceOf(user3.address);
+                  var uBalance = await uToken.balanceOf(policyholder3.address);
                   if(uBalance.eq(uAmount)) break;
                 } catch(e) { }
               }
-              expect(await uToken.balanceOf(user3.address)).to.equal(uAmount);
+              expect(await uToken.balanceOf(policyholder3.address)).to.equal(uAmount);
               if(isBlacklistable) {
                 const blacklistContract = await ethers.getContractAt(artifacts.Blacklist.abi, blacklistAddress);
                 var value = toBytes32(BN.from(0)).toString();
                 for(var j = 0; j < 200; ++j) {
                   try {
-                    var index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[user3.address,j]);
+                    var index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[policyholder3.address,j]);
                     await setStorageAt(uimpl, index, value);
-                    var blacklisted = await blacklistContract.isBlacklisted(user3.address);
+                    var blacklisted = await blacklistContract.isBlacklisted(policyholder3.address);
                     if(!blacklisted) break;
                   } catch(e) { }
                 }
-                expect(await blacklistContract.isBlacklisted(user3.address)).to.be.false;
+                expect(await blacklistContract.isBlacklisted(policyholder3.address)).to.be.false;
               }
-              await uToken.connect(user3).approve(ctokenAddress, constants.MaxUint256);
-              await cToken.connect(user3).mint(uAmount);
-              expect(await uToken.balanceOf(user3.address)).to.be.equal(0);
+              await uToken.connect(policyholder3).approve(ctokenAddress, constants.MaxUint256);
+              await cToken.connect(policyholder3).mint(uAmount);
+              expect(await uToken.balanceOf(policyholder3.address)).to.be.equal(0);
             }
-            const cAmount = await cToken.balanceOf(user3.address);
+            const cAmount = await cToken.balanceOf(policyholder3.address);
             expect(cAmount).to.be.gt(0);
             // create policy
-            let positionAmount = await product.appraisePosition(user3.address, ctokenAddress);
+            let positionAmount = await product.appraisePosition(policyholder3.address, ctokenAddress);
             let coverAmount = positionAmount;
             let blocks = threeDays;
-            let quote = BN.from(await product.getQuote(user3.address, ctokenAddress, coverAmount, blocks));
-            quote = quote.mul(10001).div(10000);
-            await product.connect(user3).buyPolicy(user3.address, ctokenAddress, coverAmount, blocks, { value: quote });
+            let quote = BN.from(await product.getQuote(policyholder3.address, ctokenAddress, coverAmount, blocks));
+            await product.connect(policyholder3).buyPolicy(policyholder3.address, ctokenAddress, coverAmount, blocks, { value: quote });
             let policyID = (await policyManager.totalPolicyCount()).toNumber();
             // sign swap
             let amountOut = 10000;
             let digest = getSubmitClaimDigest("Solace.fi-CompoundProduct", product.address, chainId, policyID, amountOut, deadline);
             let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
             // submit claim
-            let tx1 = await product.connect(user3).submitClaim(policyID, amountOut, deadline, signature);
+            let tx1 = await product.connect(policyholder3).submitClaim(policyID, amountOut, deadline, signature);
             expect(tx1).to.emit(product, "ClaimSubmitted").withArgs(policyID);
-            expect(tx1).to.emit(claimsEscrow, "ClaimReceived").withArgs(policyID, user3.address, amountOut);
+            expect(tx1).to.emit(claimsEscrow, "ClaimReceived").withArgs(policyID, policyholder3.address, amountOut);
             expect(await policyManager.exists(policyID)).to.be.false;
             // verify payout
             expect((await claimsEscrow.claim(policyID)).amount).to.equal(amountOut);
             await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add one hour
-            let userEth1 = await user3.getBalance();
-            let tx2 = await claimsEscrow.connect(user3).withdrawClaimsPayout(policyID);
+            let userEth1 = await policyholder3.getBalance();
+            let tx2 = await claimsEscrow.connect(policyholder3).withdrawClaimsPayout(policyID);
             let receipt = await tx2.wait();
             let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
-            let userEth2 = await user3.getBalance();
+            let userEth2 = await policyholder3.getBalance();
             expect(userEth2.sub(userEth1).add(gasCost)).to.equal(amountOut);
             ++success;
             successList.push(symbol);
