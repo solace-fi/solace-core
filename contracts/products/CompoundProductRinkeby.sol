@@ -3,14 +3,15 @@ pragma solidity 0.8.6;
 
 import "../interface/Compound/IComptrollerRinkeby.sol";
 import "../interface/Compound/ICToken.sol";
-import "../interface/IExchangeQuoter.sol";
 import "./BaseProduct.sol";
 
 
 /**
  * @title CompoundProductRinkeby
  * @author solace.fi
- * @notice The **Compound** product that is users can buy policy for **Compound**. It is a concrete smart contract that inherits from abstract [`BaseProduct`](./BaseProduct).
+ * @notice The **CompoundProduct** can be used to purchase coverage for **Compound** positions.
+ *
+ * Note that **CompoundProductRinkeby** was created because the Comptroller implementation differs between Mainnet and Rinkeby. Use this version to cover positions on Rinkeby or [**CompoundProduct**](./CompoundProduct) to cover positions on Mainnet.
  */
 contract CompoundProductRinkeby is BaseProduct {
 

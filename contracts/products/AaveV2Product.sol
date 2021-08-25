@@ -5,10 +5,11 @@ import "../interface/AaveV2/IAaveProtocolDataProvider.sol";
 import "../interface/AaveV2/IAToken.sol";
 import "./BaseProduct.sol";
 
+
 /**
  * @title AaveV2Product
  * @author solace.fi
- * @notice The **Aave(V2)** product that is users can buy policy for **Aave(V2)**. It is a concrete smart contract that inherits from abstract [`BaseProduct`](./BaseProduct).
+ * @notice The **AaveV2** product can be used to purchase coverage for **AaveV2** positions.
  */
 contract AaveV2Product is BaseProduct {
 

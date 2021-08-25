@@ -5,14 +5,13 @@ import "../interface/Curve/ICurveAddressProvider.sol";
 import "../interface/Curve/ICurveRegistry.sol";
 import "../interface/Curve/ICurvePool.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "../interface/IExchangeQuoter.sol";
 import "./BaseProduct.sol";
 
 
 /**
- * @title  CurveProduct
+ * @title CurveProduct
  * @author solace.fi
- * @notice The **Curve** product that is users can buy policy for **Curve**. It is a concrete smart contract that inherits from abstract [`BaseProduct`](./BaseProduct).
+ * @notice The **CurveProduct** can be used to purchase coverage for **Curve** positions.
  */
 contract CurveProduct is BaseProduct {
 

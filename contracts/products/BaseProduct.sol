@@ -393,6 +393,13 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         return coverAmount * blocks * _price / 1e12;
     }
 
+    /**
+     * The address of the current [`ExchangeQuoter`](../interface/IExchangeQuoter).
+     * @return quoter_ Address of the quoter.
+     */
+    function quoter() external view returns (address quoter_) {
+        return address(_quoter);
+    }
     /***************************************
     GLOBAL VIEW FUNCTIONS
     ***************************************/

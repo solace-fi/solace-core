@@ -3,13 +3,13 @@ pragma solidity 0.8.6;
 
 import "../interface/Compound/IComptroller.sol";
 import "../interface/Compound/ICToken.sol";
-import "../interface/IExchangeQuoter.sol";
 import "./BaseProduct.sol";
+
 
 /**
  * @title CompoundProduct
  * @author solace.fi
- * @notice The **Compound** product that is users can buy policy for **Compound**. It is a concrete smart contract that inherits from abstract [`BaseProduct`](./BaseProduct).
+ * @notice The **CompoundProduct** can be used to purchase coverage for **Compound** positions.
  */
 contract CompoundProduct is BaseProduct {
 
