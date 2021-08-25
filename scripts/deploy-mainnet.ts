@@ -12,21 +12,25 @@ import { create2Contract } from "./create2Contract";
 import { logContractAddress } from "./utils";
 
 import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_importer";
-import { Registry, Weth9, Vault, ClaimsEscrow, Treasury, PolicyManager, PolicyDescriptor, RiskManager, ExchangeQuoterManual, CompoundProductRinkeby } from "../typechain";
+import { Registry, Weth9, Vault, ClaimsEscrow, Treasury, PolicyManager, PolicyDescriptor, RiskManager, ExchangeQuoter1InchV1, ExchangeQuoterAaveV2, CompoundProduct, AaveV2Product } from "../typechain";
 
-const REGISTRY_ADDRESS          = "0x501ACEe6AAf57d5e37488145844f47c079a8F253";
-const VAULT_ADDRESS             = "0x501AcebC38338bC8c18843dc14fD4345f4DecF33";
-const CLAIMS_ESCROW_ADDRESS     = "0x501AcEF30A053765B83f34d38B0aD54bFE8D95Ae";
-const TREASURY_ADDRESS          = "0x501acE64D1B4dddAD50a579d28e8F9805651307D";
-const POLICY_MANAGER_ADDRESS    = "0x501AceBAEA90ebE43BCD649922EdFa8ce3Cd4bc9";
-const POLICY_DESCR_ADDRESS      = "0x501ACEA6EA69f4a4B68c8496243D3614256AC242";
-const RISK_MANAGER_ADDRESS      = "0x501acE40A875726DA80b9e34937A508bDf2C5560";
+const REGISTRY_ADDRESS          = "";
+const VAULT_ADDRESS             = "";
+const CLAIMS_ESCROW_ADDRESS     = "";
+const TREASURY_ADDRESS          = "";
+const POLICY_MANAGER_ADDRESS    = "";
+const POLICY_DESCR_ADDRESS      = "";
+const RISK_MANAGER_ADDRESS      = "";
 
-const QUOTER_MANUAL_ADDRESS     = "0x501Ace288Bc04Dd86CEC06A56168F2abFaacA8Af";
-const COMPOUND_PRODUCT_ADDRESS  = "0x501aCE222905a3790373C89ff099C1BaB5C37185";
+const QUOTER_1INCH_ADDRESS      = "";
+const QUOTER_AAVE_ADDRESS       = "";
+const COMPOUND_PRODUCT_ADDRESS  = "";
+const AAVE_PRODUCT_ADDRESS      = "";
 
-const WETH_ADDRESS              = "0xc778417E063141139Fce010982780140Aa0cD5Ab";
-const COMPTROLLER_ADDRESS       = "0x2EAa9D77AE4D8f9cdD9FAAcd44016E746485bddb";
+const WETH_ADDRESS              = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
+const ONE_SPLIT_VIEW            = "0xC586BeF4a0992C495Cf22e1aeEE4E446CECDee0E";
+const COMPTROLLER_ADDRESS       = "0x3d9819210A31b4961b30EF54bE2aeD79B9c9Cd3B";
+const AAVE_DATA_PROVIDER        = "0x057835Ad21a177dbdd3090bB1CAE03EaCF78Fc6d";
 const UNISWAP_ROUTER_ADDRESS    = "0xE592427A0AEce92De3Edee1F18E0157C05861564";
 const SINGLETON_FACTORY_ADDRESS = "0xce0042B868300000d44A59004Da54A005ffdcf9f";
 
@@ -45,9 +49,11 @@ let policyManager: PolicyManager;
 let policyDescriptor: PolicyDescriptor;
 let riskManager: RiskManager;
 
-let quoterManual: ExchangeQuoterManual;
+let quoter1inch: ExchangeQuoter1InchV1;
+let quoterAave: ExchangeQuoterAaveV2
 
-let compoundProduct: CompoundProductRinkeby;
+let compoundProduct: CompoundProduct;
+let aaveProduct: AaveV2Product;
 
 let signerAddress: string;
 
@@ -75,11 +81,13 @@ async function main() {
   await deployPolicyDescriptor();
   await deployRiskManager();
   // quoters
-  await deployQuoterManual();
+  await deployQuoter1inchV1();
+  await deployQuoterAaveV2();
   // products
   await deployCompoundProduct();
+  await deployAaveV2Product();
 
-  writeFileSync("stash/transactions/deployTransactionsRinkeby.json", JSON.stringify(transactions, undefined, '  '));
+  writeFileSync("stash/transactions/deployTransactionsMainnet.json", JSON.stringify(transactions, undefined, '  '));
   await logAddresses();
 }
 
@@ -225,25 +233,37 @@ async function deployRiskManager() {
   }
 }
 
-async function deployQuoterManual() {
-  if(!!QUOTER_MANUAL_ADDRESS) {
-    quoterManual = (await ethers.getContractAt(artifacts.ExchangeQuoterManual.abi, QUOTER_MANUAL_ADDRESS)) as ExchangeQuoterManual;
+async function deployQuoter1inchV1() {
+  if(!!QUOTER_1INCH_ADDRESS) {
+    quoter1inch = (await ethers.getContractAt(artifacts.ExchangeQuoter1InchV1.abi, QUOTER_1INCH_ADDRESS)) as ExchangeQuoter1InchV1;
   } else {
-    console.log("Deploying ExchangeQuoterManual");
-    var res = await create2Contract(deployer,artifacts.ExchangeQuoterManual,[signerAddress]);
-    quoterManual = (await ethers.getContractAt(artifacts.ExchangeQuoterManual.abi, res.address)) as ExchangeQuoterManual;
-    transactions.push({"description": "Deploy ExchangeQuoterManual", "to": SINGLETON_FACTORY_ADDRESS, "gasLimit": res.gasUsed});
-    console.log(`Deployed ExchangeQuoterManual to ${quoterManual.address}`);
+    console.log("Deploying ExchangeQuoter1InchV1");
+    var res = await create2Contract(deployer,artifacts.ExchangeQuoter1InchV1,[ONE_SPLIT_VIEW]);
+    quoter1inch = (await ethers.getContractAt(artifacts.ExchangeQuoter1InchV1.abi, res.address)) as ExchangeQuoter1InchV1;
+    transactions.push({"description": "Deploy ExchangeQuoter1InchV1", "to": SINGLETON_FACTORY_ADDRESS, "gasLimit": res.gasUsed});
+    console.log(`Deployed ExchangeQuoter1InchV1 to ${quoter1inch.address}`);
+  }
+}
+
+async function deployQuoterAaveV2() {
+  if(!!QUOTER_AAVE_ADDRESS) {
+    quoterAave = (await ethers.getContractAt(artifacts.ExchangeQuoterAaveV2.abi, QUOTER_AAVE_ADDRESS)) as ExchangeQuoterAaveV2;
+  } else {
+    console.log("Deploying ExchangeQuoterAaveV2");
+    var res = await create2Contract(deployer,artifacts.ExchangeQuoterAaveV2,[AAVE_DATA_PROVIDER]);
+    quoterAave = (await ethers.getContractAt(artifacts.ExchangeQuoterAaveV2.abi, res.address)) as ExchangeQuoterAaveV2;
+    transactions.push({"description": "Deploy ExchangeQuoterAaveV2", "to": SINGLETON_FACTORY_ADDRESS, "gasLimit": res.gasUsed});
+    console.log(`Deployed ExchangeQuoterAaveV2 to ${quoterAave.address}`);
   }
 }
 
 async function deployCompoundProduct() {
   if(!!COMPOUND_PRODUCT_ADDRESS) {
-    compoundProduct = (await ethers.getContractAt(artifacts.CompoundProductRinkeby.abi, COMPOUND_PRODUCT_ADDRESS)) as CompoundProductRinkeby;
+    compoundProduct = (await ethers.getContractAt(artifacts.CompoundProduct.abi, COMPOUND_PRODUCT_ADDRESS)) as CompoundProduct;
   } else {
     console.log("Deploying CompoundProduct");
-    var res = await create2Contract(deployer,artifacts.CompoundProductRinkeby,[signerAddress,policyManager.address,registry.address,COMPTROLLER_ADDRESS,minPeriod,maxPeriod,price,10,quoterManual.address]);
-    compoundProduct = (await ethers.getContractAt(artifacts.CompoundProductRinkeby.abi, res.address)) as CompoundProductRinkeby;
+    var res = await create2Contract(deployer,artifacts.CompoundProduct,[signerAddress,policyManager.address,registry.address,COMPTROLLER_ADDRESS,minPeriod,maxPeriod,price,10,quoter1inch.address]);
+    compoundProduct = (await ethers.getContractAt(artifacts.CompoundProduct.abi, res.address)) as CompoundProduct;
     transactions.push({"description": "Deploy CompoundProduct", "to": SINGLETON_FACTORY_ADDRESS, "gasLimit": res.gasUsed});
     console.log(`Deployed CompoundProduct to ${compoundProduct.address}`);
   }
@@ -261,6 +281,30 @@ async function deployCompoundProduct() {
   }
 }
 
+async function deployAaveV2Product() {
+  if(!!AAVE_PRODUCT_ADDRESS) {
+    aaveProduct = (await ethers.getContractAt(artifacts.AaveV2Product.abi, AAVE_PRODUCT_ADDRESS)) as AaveV2Product;
+  } else {
+    console.log("Deploying AaveV2Product");
+    var res = await create2Contract(deployer,artifacts.AaveV2Product,[signerAddress,policyManager.address,registry.address,AAVE_DATA_PROVIDER,minPeriod,maxPeriod,price,10,quoterAave.address]);
+    aaveProduct = (await ethers.getContractAt(artifacts.AaveV2Product.abi, res.address)) as AaveV2Product;
+    transactions.push({"description": "Deploy AaveV2Product", "to": SINGLETON_FACTORY_ADDRESS, "gasLimit": res.gasUsed});
+    console.log(`Deployed AaveV2Product to ${aaveProduct.address}`);
+  }
+  if(await policyManager.governance() == signerAddress && !(await policyManager.productIsActive(aaveProduct.address))) {
+    console.log("Registering AaveV2Product in PolicyManager");
+    let tx = await policyManager.connect(deployer).addProduct(aaveProduct.address);
+    let receipt = await tx.wait();
+    transactions.push({"description": "Register AaveV2Product in PolicyManager", "to": policyManager.address, "gasLimit": receipt.gasUsed.toString()});
+  }
+  if(await riskManager.governance() == signerAddress && (await riskManager.weight(aaveProduct.address) == 0)) {
+    console.log("Registering AaveV2Product in RiskManager");
+    let tx = await riskManager.connect(deployer).addProduct(aaveProduct.address,10000);
+    let receipt = await tx.wait();
+    transactions.push({"description": "Register AaveV2Product in RiskManager", "to": riskManager.address, "gasLimit": receipt.gasUsed.toString()});
+  }
+}
+
 async function logAddresses() {
   console.log("")
   logContractAddress("Contract Name", "Address")
@@ -274,21 +318,25 @@ async function logAddresses() {
   logContractAddress("PolicyDescriptor", policyDescriptor.address);
   logContractAddress("RiskManager", riskManager.address);
 
-  logContractAddress("QuoterManual", quoterManual.address);
+  logContractAddress("Quoter1Inch", quoter1inch.address);
+  logContractAddress("QuoterAave", quoterAave.address);
+
   logContractAddress("CompoundProduct", compoundProduct.address);
+  logContractAddress("AaveV2Product", aaveProduct.address);
 
   console.log(``);
   console.log(`Copy and paste this into the .env file in the frontend client.`)
   console.log(``);
-  console.log(`REACT_APP_RINKEBY_REGISTRY_CONTRACT_ADDRESS=${registry.address}`);
-  console.log(`REACT_APP_RINKEBY_WETH_CONTRACT_ADDRESS=${weth.address}`);
-  console.log(`REACT_APP_RINKEBY_VAULT_CONTRACT_ADDRESS=${vault.address}`);
-  console.log(`REACT_APP_RINKEBY_CLAIMS_ESCROW_CONTRACT_ADDRESS=${claimsEscrow.address}`);
-  console.log(`REACT_APP_RINKEBY_TREASURY_CONTRACT_ADDRESS=${treasury.address}`);
-  console.log(`REACT_APP_RINKEBY_POLICY_MANAGER_CONTRACT_ADDRESS=${policyManager.address}`);
-  console.log(`REACT_APP_RINKEBY_POLICY_DESCRIPTOR_CONTRACT_ADDRESS=${policyDescriptor.address}`);
-  console.log(`REACT_APP_RINKEBY_RISK_MANAGER_CONTRACT_ADDRESS=${riskManager.address}`);
-  console.log(`REACT_APP_RINKEBY_COMPOUND_PRODUCT_CONTRACT_ADDRESS=${compoundProduct.address}`);
+  console.log(`REACT_APP_MAINNET_REGISTRY_CONTRACT_ADDRESS=${registry.address}`);
+  console.log(`REACT_APP_MAINNET_WETH_CONTRACT_ADDRESS=${weth.address}`);
+  console.log(`REACT_APP_MAINNET_VAULT_CONTRACT_ADDRESS=${vault.address}`);
+  console.log(`REACT_APP_MAINNET_CLAIMS_ESCROW_CONTRACT_ADDRESS=${claimsEscrow.address}`);
+  console.log(`REACT_APP_MAINNET_TREASURY_CONTRACT_ADDRESS=${treasury.address}`);
+  console.log(`REACT_APP_MAINNET_POLICY_MANAGER_CONTRACT_ADDRESS=${policyManager.address}`);
+  console.log(`REACT_APP_MAINNET_POLICY_DESCRIPTOR_CONTRACT_ADDRESS=${policyDescriptor.address}`);
+  console.log(`REACT_APP_MAINNET_RISK_MANAGER_CONTRACT_ADDRESS=${riskManager.address}`);
+  console.log(`REACT_APP_MAINNET_COMPOUND_PRODUCT_CONTRACT_ADDRESS=${compoundProduct.address}`);
+  console.log(`REACT_APP_MAINNET_AAVE_PRODUCT_CONTRACT_ADDRESS=${aaveProduct.address}`);
   console.log("")
 }
 

@@ -378,7 +378,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      * @param shares The amount of shares to calculate value for.
      * @return value The amount of value for given shares.
      */
-      function _shareValue(uint256 shares) internal view returns (uint256) {
+    function _shareValue(uint256 shares) internal view returns (uint256) {
         return (totalSupply() == 0)
             ? 0
             : ((shares * _totalAssets()) / totalSupply());

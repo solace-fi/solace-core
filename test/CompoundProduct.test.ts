@@ -198,8 +198,10 @@ if(process.env.FORK_NETWORK === "mainnet"){
         expect(await product.appraisePosition(REAL_USER3, cUSDC_ADDRESS)).to.equal(BALANCE3);
       });
       it("can change quoters", async function () {
+        expect(await product.quoter()).to.equal(quoter.address);
         await expect(product.connect(policyholder).setExchangeQuoter(quoter2.address)).to.be.revertedWith("!governance");
         await product.connect(governor).setExchangeQuoter(quoter2.address);
+        expect(await product.quoter()).to.equal(quoter2.address);
         expect(await product.appraisePosition(REAL_USER1, cETH_ADDRESS)).to.equal(BALANCE11);
         expect(await product.appraisePosition(REAL_USER2, cDAI_ADDRESS)).to.equal(BALANCE12);
         expect(await product.appraisePosition(REAL_USER3, cUSDC_ADDRESS)).to.equal(BALANCE13);
