@@ -1,9 +1,9 @@
 import hardhat from "hardhat";
 const { waffle, ethers } = hardhat;
-const {  provider } = waffle;
+const { provider } = waffle;
 import { config as dotenv_config } from "dotenv";
-dotenv_config();
 const BN = ethers.BigNumber;
+dotenv_config();
 const deployer = new ethers.Wallet(JSON.parse(process.env.RINKEBY_ACCOUNTS || '[]')[0], provider);
 
 import { writeFileSync } from "fs";

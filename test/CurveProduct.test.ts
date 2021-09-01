@@ -39,8 +39,8 @@ if(process.env.FORK_NETWORK === "mainnet"){
     const ADDRESS_PROVIDER = "0x0000000022D53366457F9d5E68Ec105046FC4383";
     const THREEPOOL_TOKEN = "0x6c3F90f043a72FA612cbac8115EE7e52BDe6E490";
     const THREEPOOL_POOL = "0xbEbc44782C7dB0a1A60Cb6fe97d0b483032FF1C7";
-    const WHALE = "0x89515406c15a277f8906090553366219b3639834"; // random whale
-    const WHALE_VALUE = BN.from("123224920644258147209");
+    const REAL_USER = "0x5dcd83cf2dd90a4c7e1c189e74ec7dc072ad78e1";
+    const BALANCE = BN.from("72907407389975430");
 
     before(async function () {
       artifacts = await import_artifacts();
@@ -113,8 +113,8 @@ if(process.env.FORK_NETWORK === "mainnet"){
       })
 
       it("a position should have a value", async function () {
-        expect(await product.appraisePosition(WHALE, THREEPOOL_TOKEN)).to.equal(WHALE_VALUE);
-        expect(await product.appraisePosition(WHALE, THREEPOOL_POOL)).to.equal(WHALE_VALUE);
+        expect(await product.appraisePosition(REAL_USER, THREEPOOL_TOKEN)).to.equal(BALANCE);
+        expect(await product.appraisePosition(REAL_USER, THREEPOOL_POOL)).to.equal(BALANCE);
       })
     })
 

@@ -78,12 +78,12 @@ if(process.env.FORK_NETWORK === "mainnet"){
     const price = 11044; // 2.60%/yr
 
     const aWETH_ADDRESS = "0x030ba81f1c18d280636f32af80b9aad02cf0854e";
-    const REAL_USER1 = "0xd85e821b874cff4880031b96601dc73bfe92f48c";
-    const BALANCE1 = BN.from("49630710460431870110");
+    const REAL_USER1 = "0xce8acd3266067397dda0f713ba8eb9a9b9ed405c";
+    const BALANCE1 = BN.from("60003747763072951831");
 
     const aUSDT_ADDRESS = "0x3ed3b47dd13ec9a98b44e6204a523e766b225811";
-    const REAL_USER2 = "0x2edce9a8e7991b9fd6074aece928d5a9040ed98d";
-    const BALANCE2 = BN.from("158414918763560000");
+    const REAL_USER2 = "0xa05f390ac4d9ee653cddcce1b9b64ae63e325552";
+    const BALANCE2 = BN.from("282852235939297307");
 
     const aLINK_ADDRESS = "0xa06bC25B5805d5F8d82847D191Cb4Af5A3e873E0"; // proxy
     const LINK_ADDRESS = "0x514910771AF9Ca656af840dff83E8264EcF986CA";
@@ -190,7 +190,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
         let positionAmount = await product.appraisePosition(REAL_USER1, aWETH_ADDRESS);
         let coverAmount = positionAmount.mul(5000).div(10000);
         let blocks = BN.from(threeDays)
-        let expectedPremium = BN.from("5303076154194467");
+        let expectedPremium = BN.from("6411442451210867");
         let quote = BN.from(await product.getQuote(REAL_USER1, aWETH_ADDRESS, coverAmount, blocks));
         expect(quote).to.be.closeTo(expectedPremium, 1000000000)
       })

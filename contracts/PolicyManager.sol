@@ -286,6 +286,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
             price: price
         });
         _policyInfo[policyID] = info;
+        emit PolicyUpdated(policyID);
     }
 
     /**

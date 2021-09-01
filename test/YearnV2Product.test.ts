@@ -79,8 +79,8 @@ if(process.env.FORK_NETWORK === "mainnet"){
     const IYREGISTRY = "0x3eE41C098f9666ed2eA246f4D2558010e59d63A0";
     const DAI_ADDRESS = "0x6B175474E89094C44Da98b954EedeAC495271d0F";
     const YDAI_ADDRESS = "0xacd43e627e64355f1861cec6d3a6688b31a6f952";
-    const WHALE = "0xb7a9ee05c43bd4027ea34ca125d8c06618f8331a"; // random whale
-    const WHALE_VALUE = BN.from("20451792085120037125");
+    const REAL_USER = "0x452269ae20f7df9fc93f2f92d1c5351b895a39b3";
+    const BALANCE = BN.from("7207201633777852");
 
     const COOLDOWN_PERIOD = 3600; // one hour
 
@@ -163,7 +163,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
       })
 
       it("a position should have a value", async function () {
-        expect(await product.appraisePosition(WHALE, YDAI_ADDRESS)).to.equal(WHALE_VALUE);
+        expect(await product.appraisePosition(REAL_USER, YDAI_ADDRESS)).to.equal(BALANCE);
       })
     })
 
@@ -188,37 +188,37 @@ if(process.env.FORK_NETWORK === "mainnet"){
         expect(await product.name()).to.equal("YearnV2");
       });
       it("can getQuote", async function () {
-        let positionAmount = await product.appraisePosition(WHALE, YDAI_ADDRESS);
+        let positionAmount = await product.appraisePosition(REAL_USER, YDAI_ADDRESS);
         let coverAmount = positionAmount.mul(5000).div(10000);
         let blocks = BN.from(threeDays)
-        let expectedPremium = BN.from("2185288300549535");
-        let quote = BN.from(await product.getQuote(WHALE, YDAI_ADDRESS, coverAmount, blocks));
+        let expectedPremium = BN.from("770094539610");
+        let quote = BN.from(await product.getQuote(REAL_USER, YDAI_ADDRESS, coverAmount, blocks));
         expect(quote).to.be.closeTo(expectedPremium, 1000000000)
       })
       it("can buyPolicy", async function () {
         expect(await policyManager.totalSupply()).to.equal(0);
-        expect(await policyManager.balanceOf(WHALE)).to.equal(0);
+        expect(await policyManager.balanceOf(REAL_USER)).to.equal(0);
         // adding the owner product to the ProductManager
         (await policyManager.connect(governor).addProduct(product.address));
         expect(await policyManager.productIsActive(product.address)).to.equal(true);
 
-        let positionAmount = await product.appraisePosition(WHALE, YDAI_ADDRESS);
+        let positionAmount = await product.appraisePosition(REAL_USER, YDAI_ADDRESS);
         let coverAmount = positionAmount.mul(500).div(10000);
         let blocks = threeDays
-        let quote = BN.from(await product.getQuote(WHALE, YDAI_ADDRESS, coverAmount, blocks));
+        let quote = BN.from(await product.getQuote(REAL_USER, YDAI_ADDRESS, coverAmount, blocks));
         quote = quote.mul(10001).div(10000);
-        let tx = await product.buyPolicy(WHALE, YDAI_ADDRESS, coverAmount, blocks, { value: quote });
+        let tx = await product.buyPolicy(REAL_USER, YDAI_ADDRESS, coverAmount, blocks, { value: quote });
         expect(tx).to.emit(product, "PolicyCreated").withArgs(1);
         expect(await policyManager.totalSupply()).to.equal(1);
-        expect(await policyManager.balanceOf(WHALE)).to.equal(1);
+        expect(await policyManager.balanceOf(REAL_USER)).to.equal(1);
       });
       it("can buy duplicate policy", async function () {
-        let positionAmount = await product.appraisePosition(WHALE, YDAI_ADDRESS);
+        let positionAmount = await product.appraisePosition(REAL_USER, YDAI_ADDRESS);
         let coverAmount = positionAmount.mul(500).div(10000);
         let blocks = threeDays
-        let quote = BN.from(await product.getQuote(WHALE, YDAI_ADDRESS, coverAmount, blocks));
+        let quote = BN.from(await product.getQuote(REAL_USER, YDAI_ADDRESS, coverAmount, blocks));
         quote = quote.mul(10001).div(10000);
-        let tx = await product.buyPolicy(WHALE, YDAI_ADDRESS, coverAmount, blocks, { value: quote });
+        let tx = await product.buyPolicy(REAL_USER, YDAI_ADDRESS, coverAmount, blocks, { value: quote });
         expect(tx).to.emit(product, "PolicyCreated").withArgs(2);
       });
     })

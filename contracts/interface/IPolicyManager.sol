@@ -21,6 +21,8 @@ interface IPolicyManager is IERC721Enumerable /*, IERC721Metadata*/ {
 
     /// @notice Emitted when a policy is created.
     event PolicyCreated(uint256 policyID);
+    /// @notice Emitted when a policy is updated.
+    event PolicyUpdated(uint256 indexed policyID);
     /// @notice Emitted when a policy is burned.
     event PolicyBurned(uint256 policyID);
     /// @notice Emitted when a new product is added.

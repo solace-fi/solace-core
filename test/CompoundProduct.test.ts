@@ -82,18 +82,18 @@ if(process.env.FORK_NETWORK === "mainnet"){
 
     const cETH_ADDRESS = "0x4Ddc2D193948926D02f9B1fE9e1daa0718270ED5";
     const REAL_USER1 = "0xa0f75491720835b36edc92d06ddc468d201e9b73";
-    const BALANCE1  = BN.from("16205226886284201139348");
-    const BALANCE11 = BN.from("16205226886284201139348");
+    const BALANCE1  = BN.from("12010752049567712323060");
+    const BALANCE11 = BN.from("12010752049567712323060");
 
     const cDAI_ADDRESS = "0x5d3a536E4D6DbD6114cc1Ead35777bAB948E3643";
     const REAL_USER2 = "0xda3059e065781976845359154cc3aae1d0e99289";
-    const BALANCE2  = BN.from("5225311707193538431924");
-    const BALANCE12 = BN.from("4002346288470480898590");
+    const BALANCE2  = BN.from("4088791470421633888366");
+    const BALANCE12 = BN.from("4027473651811652543692");
 
     const cUSDC_ADDRESS = "0x39AA39c021dfbaE8faC545936693aC917d5E7563"
     const REAL_USER3 = "0x416f4d9d9a6c595e24aef284672ef3c98eda6bb0";
-    const BALANCE3  = BN.from("17486774897559620002");
-    const BALANCE13 = BN.from("2271845248250000000");
+    const BALANCE3  = BN.from("14139034817159767211");
+    const BALANCE13 = BN.from("2283188801550000000");
     const USDC_ADDRESS = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
 
     const COOLDOWN_PERIOD = 3600; // one hour
@@ -186,6 +186,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
         expect(await product.appraisePosition(REAL_USER1, cETH_ADDRESS)).to.equal(BALANCE11);
         expect(await product.appraisePosition(REAL_USER2, cDAI_ADDRESS)).to.equal(BALANCE12);
         expect(await product.appraisePosition(REAL_USER3, cUSDC_ADDRESS)).to.equal(BALANCE13);
+        await product.connect(governor).setExchangeQuoter(quoter.address);
       });
     })
 
@@ -195,7 +196,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
         let positionAmount = await product.appraisePosition(REAL_USER1, cETH_ADDRESS);
         let coverAmount = positionAmount.mul(1).div(10000);
         let blocks = BN.from(threeDays)
-        let expectedPremium = BN.from("346307967291657");
+        let expectedPremium = BN.from("256671452804548");
         let quote = BN.from(await product.getQuote(REAL_USER1, cETH_ADDRESS, coverAmount, blocks))
         expect(quote).to.equal(expectedPremium);
       })
@@ -365,7 +366,11 @@ if(process.env.FORK_NETWORK === "mainnet"){
           {"symbol":"cCOMP","address":"0x70e36f6BF80a52b3B46b3aF8e106CC0ed743E8e4"},
           {"symbol":"cWBTC","address":"0xccF4429DB6322D5C611ee964527D42E5d685DD6a"},
           {"symbol":"cTUSD","address":"0x12392F67bdf24faE0AF363c24aC620a2f67DAd86"},
-          {"symbol":"cLINK","address":"0xFAce851a4921ce59e912d19329929CE6da6EB0c7","uimpl":"","blacklist":""}
+          {"symbol":"cLINK","address":"0xFAce851a4921ce59e912d19329929CE6da6EB0c7","uimpl":"","blacklist":""},
+          {"symbol":"cMKR","address":"0x95b4eF2869eBD94BEb4eEE400a99824BF5DC325b"},
+          {"symbol":"cSUSHI","address":"0x4B0181102A0112A2ef11AbEE5563bb4a3176c9d7"},
+          {"symbol":"cAAVE","address":"0xe65cdB6479BaC1e22340E4E755fAE7E509EcD06c"},
+          {"symbol":"cYFI","address":"0x80a2AE356fc9ef4305676f7a3E2Ed04e12C33946"}
         ];
         var success = 0;
         var successList = [];
