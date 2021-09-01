@@ -1,9 +1,9 @@
 import hardhat from "hardhat";
 const { waffle, ethers } = hardhat;
-const {  provider } = waffle;
+const { provider } = waffle;
 import { config as dotenv_config } from "dotenv";
-dotenv_config();
 const BN = ethers.BigNumber;
+dotenv_config();
 const deployer = new ethers.Wallet(JSON.parse(process.env.RINKEBY_ACCOUNTS || '[]')[0], provider);
 
 import { writeFileSync } from "fs";
@@ -18,7 +18,7 @@ const REGISTRY_ADDRESS          = "0x501ACEe6AAf57d5e37488145844f47c079a8F253";
 const VAULT_ADDRESS             = "0x501AcebC38338bC8c18843dc14fD4345f4DecF33";
 const CLAIMS_ESCROW_ADDRESS     = "0x501AcEF30A053765B83f34d38B0aD54bFE8D95Ae";
 const TREASURY_ADDRESS          = "0x501acE64D1B4dddAD50a579d28e8F9805651307D";
-const POLICY_MANAGER_ADDRESS    = "0x501AceBAEA90ebE43BCD649922EdFa8ce3Cd4bc9";
+const POLICY_MANAGER_ADDRESS    = "0x501aCE9a5cC1D39951691718D7EC583fB326c71b";
 const POLICY_DESCR_ADDRESS      = "0x501ACEA6EA69f4a4B68c8496243D3614256AC242";
 const RISK_MANAGER_ADDRESS      = "0x501acE40A875726DA80b9e34937A508bDf2C5560";
 
