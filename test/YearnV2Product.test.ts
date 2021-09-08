@@ -86,7 +86,8 @@ if(process.env.FORK_NETWORK === "mainnet"){
 
     before(async function () {
       artifacts = await import_artifacts();
-
+      await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
+      
       registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
       weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
       await registry.connect(governor).setWeth(weth.address);
@@ -227,7 +228,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
       let policyID1 = 3;
       let policyID2 = 4;
       let daiAmount = BN.from(100000000000);
-      let amountOut1 = 5000000000;
+      let amountOut1 = 500000;
       before(async function () {
         await dai.connect(policyholder2).transfer(depositor.address, await dai.balanceOf(policyholder2.address));
         await depositor.sendTransaction({to: claimsEscrow.address, value: BN.from("1000000000000000000")});
@@ -265,6 +266,12 @@ if(process.env.FORK_NETWORK === "mainnet"){
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
         await expect(product2.connect(policyholder).submitClaim(policyID1, amountOut1, deadline, signature)).to.be.revertedWith("wrong product");
       });
+      it("cannot submit claim with excessive payout", async function () {
+        let coverAmount = (await policyManager.getPolicyInfo(policyID1)).coverAmount;
+        let digest = getSubmitClaimDigest("Solace.fi-AaveV2Product", product.address, chainId, policyID1, coverAmount.add(1), deadline);
+        let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
+        await expect(product.connect(policyholder).submitClaim(policyID1, coverAmount.add(1), deadline, signature)).to.be.revertedWith("excessive amount out");
+      });
       it("cannot submit claim with forged signature", async function () {
         await expect(product.connect(policyholder).submitClaim(policyID1, amountOut1, deadline, "0x")).to.be.revertedWith("invalid signature");
         await expect(product.connect(policyholder).submitClaim(policyID1, amountOut1, deadline, "0xabcd")).to.be.revertedWith("invalid signature");
@@ -278,7 +285,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
       it("cannot submit claim with changed arguments", async function () {
         let digest = getSubmitClaimDigest("Solace.fi-YearnV2Product", product.address, chainId, policyID1, amountOut1, deadline);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
-        await expect(product.connect(policyholder).submitClaim(policyID1, "100000000000", deadline, signature)).to.be.revertedWith("invalid signature");
+        await expect(product.connect(policyholder).submitClaim(policyID1, "700000", deadline, signature)).to.be.revertedWith("invalid signature");
         await expect(product.connect(policyholder).submitClaim(policyID1, amountOut1, deadline.sub(1), signature)).to.be.revertedWith("invalid signature");
       });
       it("can open a claim", async function () {

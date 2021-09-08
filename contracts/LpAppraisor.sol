@@ -22,7 +22,7 @@ contract LpAppraisor is ILpAppraisor, Governable {
 
     /**
      * @notice Constructs the LP Appraisor contract.
-     * @param governance_ The address of the [governor](/docs/user-docs/Governance).
+     * @param governance_ The address of the [governor](/docs/protocol/governance).
      * @param lpToken_ Address of the LP token.
      * @param curve_A_ Appraisal curve value A.
      * @param curve_B_ Appraisal curve value B.
@@ -40,7 +40,7 @@ contract LpAppraisor is ILpAppraisor, Governable {
 
     /**
      * @notice Modifies the appraisal curve, and with it the incentive structure.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param curve_A_ The curve parameter A.
      * @param curve_B_ The curve parameter B.
      */

@@ -32,7 +32,7 @@ describe("Registry", function() {
 
   before(async function () {
     artifacts = await import_artifacts();
-
+    await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
     registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
   });
 

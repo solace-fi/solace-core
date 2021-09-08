@@ -18,7 +18,7 @@ contract AaveV2Product is BaseProduct {
 
     /**
       * @notice Constructs the AaveV2Product.
-      * @param governance_ The address of the [governor](/docs/user-docs/Governance).
+      * @param governance_ The address of the [governor](/docs/protocol/governance).
       * @param policyManager_ The [`PolicyManager`](../PolicyManager) contract.
       * @param registry_ The [`Registry`](../Registry) contract.
       * @param dataProvider_ Aave protocol data provider address.
@@ -87,9 +87,9 @@ contract AaveV2Product is BaseProduct {
 
     /**
      * @notice Changes the covered platform.
-     * The function should be used if the the protocol changes their registry but keeps the children contracts.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @dev Use this if the the protocol changes their registry but keeps the children contracts.
      * A new version of the protocol will likely require a new Product.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
      * @param dataProvider_ The new Data Provider.
      */
     function setCoveredPlatform(address dataProvider_) public override {

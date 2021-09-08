@@ -38,4 +38,12 @@ interface ICToken is IERC20Metadata {
      * Does not exist on CETH.
      */
     function underlying() external view returns (address);
+
+    /**
+     * @notice Get the underlying balance of the `owner`.
+     * @dev This also accrues interest in a transaction.
+     * @param owner The address of the account to query.
+     * @return ubalance The amount of underlying owned by `owner`.
+     */
+    function balanceOfUnderlying(address owner) external returns (uint256 ubalance);
 }

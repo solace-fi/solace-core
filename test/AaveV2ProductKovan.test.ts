@@ -84,7 +84,6 @@ if(process.env.FORK_NETWORK === "kovan"){
     const maxPeriod = 45150; // this is about 1 week from https://ycharts.c om/indicators/ethereum_blocks_per_day
     const threeDays = 19350;
     const maxCoverAmount = BN.from("1000000000000000000000"); // 1000 Ether in wei
-    const maxCoverPerUser = BN.from("1000000000000000000000"); // 1000 Ether in wei
     const price = 11044; // 2.60%/yr
 
     const aWETH_ADDRESS = "0x87b1f4cf9BD63f7BBD3eE1aD04E8F52540349347";
@@ -103,7 +102,8 @@ if(process.env.FORK_NETWORK === "kovan"){
 
     before(async function () {
       artifacts = await import_artifacts();
-
+      await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
+      
       registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
       weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
       await registry.connect(governor).setWeth(weth.address);
@@ -237,7 +237,7 @@ if(process.env.FORK_NETWORK === "kovan"){
       let policyID1 = 3;
       let policyID2 = 4;
       let amountIn1 = BN.from(100000000000);
-      let amountOut1 = 5000000000;
+      let amountOut1 = 500000;
       before(async function () {
         await depositor.sendTransaction({to: claimsEscrow.address, value: BN.from("1000000000000000000")});
         // create an aLink position and policy
@@ -277,6 +277,12 @@ if(process.env.FORK_NETWORK === "kovan"){
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
         await expect(product2.connect(policyholder).submitClaim(policyID1, amountOut1, deadline, signature)).to.be.revertedWith("wrong product");
       });
+      it("cannot submit claim with excessive payout", async function () {
+        let coverAmount = (await policyManager.getPolicyInfo(policyID1)).coverAmount;
+        let digest = getSubmitClaimDigest("Solace.fi-AaveV2Product", product.address, chainId, policyID1, coverAmount.add(1), deadline);
+        let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
+        await expect(product.connect(policyholder).submitClaim(policyID1, coverAmount.add(1), deadline, signature)).to.be.revertedWith("excessive amount out");
+      });
       it("cannot submit claim with forged signature", async function () {
         await expect(product.connect(policyholder).submitClaim(policyID1, amountOut1, deadline, "0x")).to.be.revertedWith("invalid signature");
         await expect(product.connect(policyholder).submitClaim(policyID1, amountOut1, deadline, "0xabcd")).to.be.revertedWith("invalid signature");
@@ -290,7 +296,7 @@ if(process.env.FORK_NETWORK === "kovan"){
       it("cannot submit claim with changed arguments", async function () {
         let digest = getSubmitClaimDigest("Solace.fi-AaveV2Product", product.address, chainId, policyID1, amountOut1, deadline);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
-        await expect(product.connect(policyholder).submitClaim(policyID1, "100000000000", deadline, signature)).to.be.revertedWith("invalid signature");
+        await expect(product.connect(policyholder).submitClaim(policyID1, "700000", deadline, signature)).to.be.revertedWith("invalid signature");
         await expect(product.connect(policyholder).submitClaim(policyID1, amountOut1, deadline.sub(1), signature)).to.be.revertedWith("invalid signature");
       });
       it("can open a claim", async function () {

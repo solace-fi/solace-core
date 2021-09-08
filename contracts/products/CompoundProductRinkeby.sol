@@ -20,7 +20,7 @@ contract CompoundProductRinkeby is BaseProduct {
 
     /**
       * @notice Constructs the CompoundRinkebyProduct.
-      * @param governance_ The address of the [governor](/docs/user-docs/Governance).
+      * @param governance_ The address of the [governor](/docs/protocol/governance).
       * @param policyManager_ The [`PolicyManager`](../PolicyManager) contract.
       * @param registry_ The [`Registry`](../Registry) contract.
       * @param comptroller_ The Compound Comptroller.
@@ -92,9 +92,9 @@ contract CompoundProductRinkeby is BaseProduct {
 
     /**
      * @notice Changes the covered platform.
-     * The function should be used if the the protocol changes their registry but keeps the children contracts.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @dev Use this if the the protocol changes their registry but keeps the children contracts.
      * A new version of the protocol will likely require a new Product.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
      * @param comptroller_ The new Comptroller.
      */
     function setCoveredPlatform(address comptroller_) public override {

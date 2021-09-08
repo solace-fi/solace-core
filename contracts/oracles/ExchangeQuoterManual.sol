@@ -38,7 +38,7 @@ contract ExchangeQuoterManual is IExchangeQuoter, Governable {
 
     /**
      * @notice Constructs the ExchangeQuoterManual contract.
-     * @param governance_ The address of the [governor](/docs/user-docs/Governance).
+     * @param governance_ The address of the [governor](/docs/protocol/governance).
      */
     constructor(address governance_) Governable(governance_) {
         _isAuthorizedSigner[governance_] = true; // add self
@@ -84,7 +84,7 @@ contract ExchangeQuoterManual is IExchangeQuoter, Governable {
 
     /**
      * @notice Sets the exchange rates.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param tokens The tokens to set.
      * @param newRates The rates to set.
      */
@@ -99,7 +99,7 @@ contract ExchangeQuoterManual is IExchangeQuoter, Governable {
 
     /**
      * @notice Adds a new signer that can authorize claims.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param signer The signer to add.
      */
     function addSigner(address signer) external onlyGovernance {
@@ -109,7 +109,7 @@ contract ExchangeQuoterManual is IExchangeQuoter, Governable {
 
     /**
      * @notice Removes a signer.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param signer The signer to remove.
      */
     function removeSigner(address signer) external onlyGovernance {

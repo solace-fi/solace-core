@@ -30,6 +30,8 @@ describe("ClaimsEscrow", function () {
 
   before(async function () {
     artifacts = await import_artifacts();
+    await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
+    
     // forking uses old timestamp, need to force update
     const timestamp = Math.floor(Date.now()/1000);
     await provider.send("evm_setNextBlockTimestamp", [timestamp]);

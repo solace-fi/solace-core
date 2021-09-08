@@ -16,7 +16,7 @@ import "./interface/ISolaceEthLpFarm.sol";
 /**
  * @title SolaceEthLpFarm
  * @author solace.fi
- * @notice Rewards [**Liquidity Providers**](/docs/user-docs/Liquidity%20Providers) in [**SOLACE**](./SOLACE) for providing liquidity in the [**SOLACE**](./SOLACE)-**ETH** [**Uniswap V3 Pool**](https://docs.uniswap.org/protocol/reference/core/UniswapV3Pool).
+ * @notice Rewards [**Liquidity Providers**](/docs/user-guides/liquidity-provider/lp-role-guide) in [**SOLACE**](./SOLACE) for providing liquidity in the [**SOLACE**](./SOLACE)-**ETH** [**Uniswap V3 Pool**](https://docs.uniswap.org/protocol/reference/core/UniswapV3Pool).
  *
  * Over the course of `startBlock` to `endBlock`, the farm distributes `blockReward` [**SOLACE**](./SOLACE) per block to all farmers split relative to the value of their deposited tokens.
  */
@@ -114,7 +114,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard, Governable {
 
     /**
      * @notice Constructs the farm.
-     * @param governance_ The address of the [governor](/docs/user-docs/Governance).
+     * @param governance_ The address of the [governor](/docs/protocol/governance).
      * @param master_ Address of the [`Master`](./Master) contract.
      * @param lpToken_ Address of the [**Uniswap NonFungiblePositionManager**](https://docs.uniswap.org/protocol/reference/periphery/NonfungiblePositionManager) contract.
      * @param solace_ Address of the [**SOLACE**](./SOLACE) token contract.
@@ -176,7 +176,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard, Governable {
 
     /**
      * @notice Sets the farm's end block. Used to extend the duration.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param endBlock_ The new end block.
      */
     function setEnd(uint256 endBlock_) external override onlyGovernance {
@@ -189,7 +189,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard, Governable {
 
     /**
      * @notice Sets the appraisal function.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param appraisor_ The new appraisor.
      */
     function setAppraisor(address appraisor_) external override onlyGovernance {

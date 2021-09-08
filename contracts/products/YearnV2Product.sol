@@ -18,7 +18,7 @@ contract YearnV2Product is BaseProduct {
 
     /**
       * @notice Constructs the YearnV2Product.
-      * @param governance_ The address of the [governor](/docs/user-docs/Governance).
+      * @param governance_ The address of the [governor](/docs/protocol/governance).
       * @param policyManager_ The [`PolicyManager`](../PolicyManager) contract.
       * @param registry_ The [`Registry`](../Registry) contract.
       * @param yregistry_ The Yearn YRegistry.
@@ -85,9 +85,9 @@ contract YearnV2Product is BaseProduct {
 
     /**
      * @notice Changes the covered platform.
-     * The function should be used if the the protocol changes their registry but keeps the children contracts.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @dev Use this if the the protocol changes their registry but keeps the children contracts.
      * A new version of the protocol will likely require a new Product.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
      * @param yregistry_ The new YRegistry.
      */
     function setCoveredPlatform(address yregistry_) public override {

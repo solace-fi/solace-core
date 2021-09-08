@@ -190,16 +190,16 @@ interface IProduct {
 
     /**
      * @notice Changes the covered platform.
-     * This function is used if the the protocol changes their registry but keeps the children contracts.
-     * A new version of the protocol will likely require a new **Product**.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @dev Use this if the the protocol changes their registry but keeps the children contracts.
+     * A new version of the protocol will likely require a new Product.
      * @param coveredPlatform_ The platform to cover.
      */
     function setCoveredPlatform(address coveredPlatform_) external;
 
     /**
      * @notice Changes the policy manager.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param policyManager_ The new policy manager.
      */
     function setPolicyManager(address policyManager_) external;

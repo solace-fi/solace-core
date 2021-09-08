@@ -17,11 +17,11 @@ import "./interface/IClaimsEscrow.sol";
  * @author solace.fi
  * @notice The payer of claims.
  *
- * [**Policyholders**](/docs/user-docs/Policy%20Holders) can submit claims through their policy's product contract, in the process burning the policy and converting it to a claim.
+ * [**Policyholders**](/docs/protocol/policy-holder) can submit claims through their policy's product contract, in the process burning the policy and converting it to a claim.
  *
- * The [**policyholder**](/docs/user-docs/Policy%20Holders) will then need to wait for a [`cooldownPeriod()`](#cooldownperiod) after which they can [`withdrawClaimsPayout()`](#withdrawclaimspayout).
+ * The [**policyholder**](/docs/protocol/policy-holder) will then need to wait for a [`cooldownPeriod()`](#cooldownperiod) after which they can [`withdrawClaimsPayout()`](#withdrawclaimspayout).
  *
- * To pay the claims funds are taken from the [`Vault`](./Vault) and deducted from [**capital provider**](/docs/user-docs/Capital%20Providers) earnings.
+ * To pay the claims funds are taken from the [`Vault`](./Vault) and deducted from [**capital provider**](/docs/user-guides/capital-provider/cp-role-guide) earnings.
  *
  * Claims are **ERC721**s and abbreviated as **SCT**.
  */
@@ -52,7 +52,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
 
     /**
      * @notice Constructs the ClaimsEscrow contract.
-     * @param governance_ The address of the [governor](/docs/user-docs/Governance).
+     * @param governance_ The address of the [governor](/docs/protocol/governance).
      * @param registry_ The address of the [`Registry`](./Registry).
      */
     constructor(address governance_, address registry_) ERC721("Solace Claim", "SCT") Governable(governance_) {
@@ -211,7 +211,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
 
     /**
      * @notice Adjusts the value of a claim.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param claimID The claim to adjust.
      * @param value The new payout of the claim.
      */
@@ -222,7 +222,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
 
     /**
      * @notice Returns **ETH** to the [`Vault`](../Vault).
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param amount Amount to pull.
      */
     function returnEth(uint256 amount) external override onlyGovernance nonReentrant {
@@ -231,7 +231,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
 
     /**
      * @notice Set the cooldown duration.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param cooldownPeriod_ The new cooldown duration in seconds.
      */
     function setCooldownPeriod(uint256 cooldownPeriod_) external override onlyGovernance {

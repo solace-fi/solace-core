@@ -37,7 +37,7 @@ interface IWaToken is IERC20Metadata {
 
     /**
      * @notice The waToken has lost money on its investments.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param uAmount Amount of losses in underlying.
      */
     function lose(uint256 uAmount) external;

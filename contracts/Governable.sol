@@ -6,7 +6,7 @@ import "./interface/IGovernable.sol";
 /**
  * @title Governable
  * @author solace.fi
- * @notice Enforces access control for important functions to [**governor**](/docs/user-docs/Governance).
+ * @notice Enforces access control for important functions to [**governor**](/docs/protocol/governance).
  *
  * Many contracts contain functionality that should only be accessible to a privileged user. The most common access control pattern is [OpenZeppelin's `Ownable`](https://docs.openzeppelin.com/contracts/4.x/access-control#ownership-and-ownable). We instead use `Governable` with a few key differences:
  * - Transferring the governance role is a two step process. The current governance must [`setGovernance(newGovernance_)`](#setgovernance) then the new governance must [`acceptGovernance()`](#acceptgovernance). This is to safeguard against accidentally setting ownership to the wrong address and locking yourself out of your contract.
@@ -26,7 +26,7 @@ contract Governable is IGovernable {
 
     /**
      * @notice Constructs the governable contract.
-     * @param governance_ The address of the [governor](/docs/user-docs/Governance).
+     * @param governance_ The address of the [governor](/docs/protocol/governance).
      */
     constructor(address governance_) {
         _governance = governance_;
@@ -69,7 +69,7 @@ contract Governable is IGovernable {
     /**
      * @notice Initiates transfer of the governance role to a new governor.
      * Transfer is not complete until the new governor accepts the role.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param newGovernance_ The new governor.
      */
     function setGovernance(address newGovernance_) external override onlyGovernance {

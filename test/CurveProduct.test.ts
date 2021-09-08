@@ -44,7 +44,8 @@ if(process.env.FORK_NETWORK === "mainnet"){
 
     before(async function () {
       artifacts = await import_artifacts();
-
+      await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
+      
       registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
       weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
       await registry.connect(governor).setWeth(weth.address);

@@ -50,7 +50,8 @@ describe("CpFarm", function () {
 
   before(async function () {
     artifacts = await import_artifacts();
-
+    await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
+    
     weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
 
     // deploy uniswap contracts
