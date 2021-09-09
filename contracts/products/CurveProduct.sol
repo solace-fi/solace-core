@@ -66,6 +66,7 @@ contract CurveProduct is BaseProduct {
      * @notice Determines if the byte encoded description of a position(s) is valid.
      * The description will only make sense in context of the product.
      * @dev This function should be overwritten in inheriting Product contracts.
+     * If invalid, return false if possible. Reverting is also acceptable.
      * @param positionDescription The description to validate.
      * @return isValid True if is valid.
      */

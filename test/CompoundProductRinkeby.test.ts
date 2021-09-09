@@ -11,45 +11,18 @@ dotenv_config();
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
 import { PolicyManager, CompoundProductRinkeby, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
-import { getDomainSeparator, sign } from "./utilities/signature";
+import { sign, assembleSignature, getSubmitClaimDigest } from "./utilities/signature";
 import { toBytes32, setStorageAt } from "./utilities/setStorage";
 import { encodeAddresses } from "./utilities/positionDescription";
 import { oneToken } from "./utilities/math";
-import { ECDSASignature } from "ethereumjs-util";
 
+const DOMAIN_NAME = "Solace.fi-CompoundProduct";
+const INVALID_DOMAIN = "Solace.fi-Invalid";
 const SUBMIT_CLAIM_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("CompoundProductSubmitClaim(uint256 policyID,uint256 amountOut,uint256 deadline)"));
+const INVALID_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("InvalidType(uint256 policyID,uint256 amountOut,uint256 deadline)"));
 
 const chainId = 31337;
 const deadline = constants.MaxUint256;
-
-// Returns the EIP712 hash which should be signed by the authorized signer
-// in order to make a call to CompoundProduct.submitClaim()
-function getSubmitClaimDigest(
-    name: string,
-    address: string,
-    chainId: number,
-    policyID: BigNumberish,
-    amountOut: BigNumberish,
-    deadline: BigNumberish
-    ) {
-    const DOMAIN_SEPARATOR = getDomainSeparator(name, address, chainId)
-    return utils.keccak256(
-        utils.solidityPack(
-        ["bytes1", "bytes1", "bytes32", "bytes32"],
-        [
-            "0x19",
-            "0x01",
-            DOMAIN_SEPARATOR,
-            utils.keccak256(
-            utils.defaultAbiCoder.encode(
-                ["bytes32", "uint256", "uint256","uint256"],
-                [SUBMIT_CLAIM_TYPEHASH, policyID, amountOut, deadline]
-            )
-            ),
-        ]
-        )
-    )
-}
 
 if(process.env.FORK_NETWORK === "rinkeby"){
   describe("CompoundProductRinkeby", function () {
@@ -83,7 +56,7 @@ if(process.env.FORK_NETWORK === "rinkeby"){
 
     const COMPTROLLER_ADDRESS = "0x2EAa9D77AE4D8f9cdD9FAAcd44016E746485bddb";
     const cETH_ADDRESS = "0xd6801a1DfFCd0a410336Ef88DeF4320D6DF1883e";
-    const USER1 = "0x0fb78424e5021404093aA0cFcf50B176B30a3c1d";
+    const REAL_USER1 = "0x0fb78424e5021404093aA0cFcf50B176B30a3c1d";
     const BALANCE1 = "1006239030286184920";
 
     const USDC_ADDRESS = "0x4DBCdF9B62e891a7cec5A2568C3F4FAF9E8Abe2b";
@@ -161,44 +134,99 @@ if(process.env.FORK_NETWORK === "rinkeby"){
       await product.connect(governor).addSigner(paclasSigner.address);
     });
 
+    describe("covered platform", function () {
+      it("starts as comptroller", async function () {
+        expect(await product.coveredPlatform()).to.equal(COMPTROLLER_ADDRESS);
+        expect(await product.comptroller()).to.equal(COMPTROLLER_ADDRESS);
+      });
+      it("cannot be set by non governor", async function () {
+        await expect(product.connect(user).setCoveredPlatform(user.address)).to.be.revertedWith("!governance");
+      });
+      it("can be set", async function () {
+        await product.connect(governor).setCoveredPlatform(treasury.address);
+        expect(await product.coveredPlatform()).to.equal(treasury.address);
+        expect(await product.comptroller()).to.equal(treasury.address);
+        await product.connect(governor).setCoveredPlatform(COMPTROLLER_ADDRESS);
+      });
+    });
+
+    describe("position description", function () {
+      it("cannot be zero length", async function () {
+        expect(await product.isValidPositionDescription("0x")).to.be.false;
+      });
+      it("cannot be odd size", async function () {
+        expect(await product.isValidPositionDescription("0xabcd")).to.be.false;
+        expect(await product.isValidPositionDescription("0x123456789012345678901234567890123456789077")).to.be.false;
+      });
+      it("cannot have non cTokens", async function () {
+        expect(await product.isValidPositionDescription("0x1234567890123456789012345678901234567890")).to.be.false;
+        expect(await product.isValidPositionDescription(REAL_USER1)).to.be.false;
+        expect(await product.isValidPositionDescription(encodeAddresses([REAL_USER1]))).to.be.false;
+        expect(await product.isValidPositionDescription(governor.address)).to.be.false;
+        expect(await product.isValidPositionDescription(COMPTROLLER_ADDRESS)).to.be.false;
+        expect(await product.isValidPositionDescription(encodeAddresses([ZERO_ADDRESS]))).to.be.false;
+        expect(await product.isValidPositionDescription(encodeAddresses([cETH_ADDRESS,ZERO_ADDRESS]))).to.be.false;
+      });
+      it("can be one or more cTokens", async function () {
+        for(var i = 0; i < ctokens.length; ++i) {
+          expect(await product.isValidPositionDescription(encodeAddresses([ctokens[i].address]))).to.be.true;
+          // don't care about duplicates
+          for(var j = 0; j < ctokens.length; ++j) {
+            expect(await product.isValidPositionDescription(encodeAddresses([ctokens[i].address, ctokens[j].address]))).to.be.true;
+          }
+        }
+        expect(await product.isValidPositionDescription(encodeAddresses(ctokens.map(ctoken => ctoken.address)))).to.be.true;
+      });
+    });
+
     describe("implementedFunctions", function () {
+      before(async function () {
+        expect(await policyManager.totalSupply()).to.equal(0);
+        expect(await policyManager.balanceOf(REAL_USER1)).to.equal(0);
+        // adding the owner product to the ProductManager
+        (await policyManager.connect(governor).addProduct(product.address));
+        expect(await policyManager.productIsActive(product.address)).to.equal(true);
+      });
       it("can getQuote", async function () {
         let quote = BN.from(await product.getQuote(coverAmount, blocks));
         expect(quote).to.equal(expectedPremium);
       });
+      it("cannot buy policy with invalid description", async function () {
+        await expect(product.buyPolicy(REAL_USER1, "0x1234567890123456789012345678901234567890", coverAmount, blocks, { value: expectedPremium })).to.be.reverted;
+      });
       it("can buyPolicy", async function () {
-        expect(await policyManager.totalSupply()).to.equal(0);
-        expect(await policyManager.balanceOf(USER1)).to.equal(0);
-        // adding the owner product to the ProductManager
-        (await policyManager.connect(governor).addProduct(product.address));
-        expect(await policyManager.productIsActive(product.address)).to.equal(true);
-
-        let tx = await product.buyPolicy(USER1, cETH_ADDRESS, coverAmount, blocks, { value: expectedPremium });
+        let tx = await product.buyPolicy(REAL_USER1, cETH_ADDRESS, coverAmount, blocks, { value: expectedPremium });
         expect(tx).to.emit(product, "PolicyCreated").withArgs(1);
         expect(await policyManager.totalSupply()).to.equal(1);
-        expect(await policyManager.balanceOf(USER1)).to.equal(1);
-      })
+        expect(await policyManager.balanceOf(REAL_USER1)).to.equal(1);
+      });
       it("can buy duplicate policy", async function () {
-        let tx = await product.buyPolicy(USER1, cETH_ADDRESS, coverAmount, blocks, { value: expectedPremium });
+        let tx = await product.buyPolicy(REAL_USER1, cETH_ADDRESS, coverAmount, blocks, { value: expectedPremium });
         expect(tx).to.emit(product, "PolicyCreated").withArgs(2);
         expect(await policyManager.totalSupply()).to.equal(2);
-        expect(await policyManager.balanceOf(USER1)).to.equal(2);
-      })
+        expect(await policyManager.balanceOf(REAL_USER1)).to.equal(2);
+      });
+      it("can buy policy that covers multiple positions", async function () {
+        let tx = await product.buyPolicy(REAL_USER1, encodeAddresses([cETH_ADDRESS, cDAI_ADDRESS]), coverAmount, blocks, { value: expectedPremium });
+        expect(tx).to.emit(product, "PolicyCreated").withArgs(3);
+        expect(await policyManager.totalSupply()).to.equal(3);
+        expect(await policyManager.balanceOf(REAL_USER1)).to.equal(3);
+      });
       it("can get product name", async function () {
         expect(await product.name()).to.equal("Compound");
       })
     })
 
     describe("submitClaim", function () {
-      let policyID1 = 3;
-      let policyID2 = 4;
-      let policyID3 = 5;
+      let policyID1: BN;
+      let policyID2: BN;
       let amountOut1 = 5000000000;
       let amountOut2 = 50000000;
-      let amountOut3 = 1000000;
-      let amountOut4 = 1000000;
 
       before(async function () {
+        let policyCount = await policyManager.totalPolicyCount();
+        policyID1 = policyCount.add(1);
+        policyID2 = policyCount.add(2);
         await deployer.sendTransaction({to: claimsEscrow.address, value: BN.from("1000000000000000000")});
         // create a cETH position and policy
         await ceth.connect(user).mint({value: BN.from("1000000000000000")});
@@ -217,23 +245,23 @@ if(process.env.FORK_NETWORK === "rinkeby"){
 
       });
       it("cannot submit claim with expired signature", async function () {
-        let digest = getSubmitClaimDigest("Solace.fi-CompoundProduct", product.address, chainId, policyID1, amountOut1, 0);
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, amountOut1, 0, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
         await expect(product.connect(user).submitClaim(policyID1, amountOut1, 0, signature)).to.be.revertedWith("expired deadline");
       });
       it("cannot submit claim on someone elses policy", async function () {
-        let digest = getSubmitClaimDigest("Solace.fi-CompoundProduct", product.address, chainId, policyID1, amountOut1, deadline);
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
         await expect(product.connect(deployer).submitClaim(policyID1, amountOut1, deadline, signature)).to.be.revertedWith("!policyholder");
       });
       it("cannot submit claim from wrong product", async function () {
-        let digest = getSubmitClaimDigest("Solace.fi-CompoundProduct", product.address, chainId, policyID1, amountOut1, deadline);
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
         await expect(product2.connect(user).submitClaim(policyID1, amountOut1, deadline, signature)).to.be.revertedWith("wrong product");
       });
       it("cannot submit claim with excessive payout", async function () {
         let coverAmount = (await policyManager.getPolicyInfo(policyID1)).coverAmount;
-        let digest = getSubmitClaimDigest("Solace.fi-AaveV2Product", product.address, chainId, policyID1, coverAmount.add(1), deadline);
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, coverAmount.add(1), deadline, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
         await expect(product.connect(user).submitClaim(policyID1, coverAmount.add(1), deadline, signature)).to.be.revertedWith("excessive amount out");
       });
@@ -243,19 +271,29 @@ if(process.env.FORK_NETWORK === "rinkeby"){
         await expect(product.connect(user).submitClaim(policyID1, amountOut1, deadline, "0x1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890")).to.be.revertedWith("invalid signature");
       });
       it("cannot submit claim from unauthorized signer", async function () {
-        let digest = getSubmitClaimDigest("Solace.fi-CompoundProduct", product.address, chainId, policyID1, amountOut1, deadline);
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(deployer.privateKey.slice(2), "hex")));
         await expect(product.connect(user).submitClaim(policyID1, amountOut1, deadline, signature)).to.be.revertedWith("invalid signature");
       });
       it("cannot submit claim with changed arguments", async function () {
-        let digest = getSubmitClaimDigest("Solace.fi-CompoundProduct", product.address, chainId, policyID1, amountOut1, deadline);
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
         await expect(product.connect(user).submitClaim(policyID1, amountOut2, deadline, signature)).to.be.revertedWith("invalid signature");
         await expect(product.connect(user).submitClaim(policyID1, amountOut1, deadline.sub(1), signature)).to.be.revertedWith("invalid signature");
       });
+      it("cannot submit claim with invalid domain", async function () {
+        let digest = getSubmitClaimDigest(INVALID_DOMAIN, product.address, chainId, policyID1, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
+        let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
+        await expect(product.connect(user).submitClaim(policyID1, amountOut1, deadline, signature)).to.be.revertedWith("invalid signature");
+      });
+      it("cannot submit claim with invalid typehash", async function () {
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, amountOut1, deadline, INVALID_TYPEHASH);
+        let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
+        await expect(product.connect(user).submitClaim(policyID1, amountOut1, deadline, signature)).to.be.revertedWith("invalid signature");
+      });
       it("can open a claim on a cETH position", async function () {
         // sign swap
-        let digest = getSubmitClaimDigest("Solace.fi-CompoundProduct", product.address, chainId, policyID1, amountOut1, deadline);
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
         // submit claim
         let userCeth1 = await ceth.balanceOf(user.address);
@@ -281,7 +319,7 @@ if(process.env.FORK_NETWORK === "rinkeby"){
       });
       it("can open a claim on a cERC20 position", async function () {
         // sign swap
-        let digest = getSubmitClaimDigest("Solace.fi-CompoundProduct", product.address, chainId, policyID2, amountOut2, deadline);
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID2, amountOut2, deadline, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
         // submit claim
         let userCusdc1 = await cusdc.balanceOf(user.address);
@@ -366,7 +404,7 @@ if(process.env.FORK_NETWORK === "rinkeby"){
             let policyID = (await policyManager.totalPolicyCount()).toNumber();
             // sign swap
             let amountOut = 10000;
-            let digest = getSubmitClaimDigest("Solace.fi-CompoundProduct", product.address, chainId, policyID, amountOut, deadline);
+            let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID, amountOut, deadline, SUBMIT_CLAIM_TYPEHASH);
             let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
             // submit claim
             let tx1 = await product.connect(policyholder3).submitClaim(policyID, amountOut, deadline, signature);
@@ -400,34 +438,6 @@ if(process.env.FORK_NETWORK === "rinkeby"){
         }
         expect(`${success}/${ctokens.length} supported ctokens`).to.equal(`${ctokens.length}/${ctokens.length} supported ctokens`);
       });
-    })
-
-    describe("covered platform", function () {
-      it("starts as comptroller", async function () {
-        expect(await product.coveredPlatform()).to.equal(COMPTROLLER_ADDRESS);
-        expect(await product.comptroller()).to.equal(COMPTROLLER_ADDRESS);
-      });
-      it("cannot be set by non governor", async function () {
-        await expect(product.connect(user).setCoveredPlatform(user.address)).to.be.revertedWith("!governance");
-      });
-      it("can be set", async function () {
-        await product.connect(governor).setCoveredPlatform(treasury.address);
-        expect(await product.coveredPlatform()).to.equal(treasury.address);
-        expect(await product.comptroller()).to.equal(treasury.address);
-        await product.connect(governor).setCoveredPlatform(COMPTROLLER_ADDRESS);
-      });
     });
-  })
-}
-
-function buf2hex(buffer: Buffer) { // buffer is an ArrayBuffer
-  return [...new Uint8Array(buffer)].map(x => x.toString(16).padStart(2, "0")).join("");
-}
-
-function assembleSignature(parts: ECDSASignature) {
-  let { v, r, s } = parts;
-  let v_ = Number(v).toString(16);
-  let r_ = buf2hex(r);
-  let s_ = buf2hex(s);
-  return `0x${r_}${s_}${v_}`;
+  });
 }

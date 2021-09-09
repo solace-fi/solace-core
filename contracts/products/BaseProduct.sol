@@ -440,6 +440,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
       * @notice Determines if the byte encoded description of a position(s) is valid.
       * The description will only make sense in context of the product.
       * @dev This function should be overwritten in inheriting Product contracts.
+      * If invalid, return false if possible. Reverting is also acceptable.
       * @param positionDescription The description to validate.
       * @return isValid True if is valid.
       */
@@ -560,15 +561,5 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         return (b > 0)
             ? a + uint256(b)
             : a - uint256(-b);
-    }
-
-    /**
-     * @notice Calculates the lesser of two numbers.
-     * @param a The first number.
-     * @param b The second number.
-     * @return c The mininum.
-     */
-    function min(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a < b ? a : b;
     }
 }

@@ -1,8 +1,8 @@
 import { ethers } from "hardhat";
-import { BigNumber as BN } from "ethers";
+import { BigNumber as BN, BigNumberish } from "ethers";
 
-export function toBytes32(bn: BN) {
-  return ethers.utils.hexlify(ethers.utils.zeroPad(bn.toHexString(), 32));
+export function toBytes32(bn: BigNumberish) {
+  return ethers.utils.hexlify(ethers.utils.zeroPad(BN.from(bn).toHexString(), 32));
 };
 
 export async function setStorageAt(address: string, index: string, value: string) {

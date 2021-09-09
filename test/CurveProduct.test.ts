@@ -9,11 +9,10 @@ chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
 import { PolicyManager, CurveProduct, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
-import { getDomainSeparator, sign } from "./utilities/signature";
+import { sign, assembleSignature, getSubmitClaimDigest } from "./utilities/signature";
 import { toBytes32, setStorageAt } from "./utilities/setStorage";
 import { encodeAddresses } from "./utilities/positionDescription";
 import { oneToken } from "./utilities/math";
-import { ECDSASignature } from "ethereumjs-util";
 
 if(process.env.FORK_NETWORK === "mainnet"){
   describe("CurveProduct", function () {

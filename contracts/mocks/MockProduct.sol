@@ -87,6 +87,7 @@ contract MockProduct is BaseProduct {
      * @param positionDescription The description to validate.
      * @return isValid True if is valid.
      */
+    // solhint-disable-next-line no-unused-vars
     function isValidPositionDescription(bytes memory positionDescription) public view virtual override returns (bool isValid) {
         return true;
     }
