@@ -3,9 +3,6 @@ const { deployContract, solidity } = waffle;
 import { MockProvider } from "ethereum-waffle";
 const provider: MockProvider = waffle.provider;
 import { BigNumber as BN, BigNumberish, utils, constants, Contract } from "ethers";
-import { ECDSASignature, ecsign } from "ethereumjs-util";
-import { getPermitDigest, sign, getDomainSeparator } from "./utilities/signature";
-import { toBytes32, setStorageAt } from "./utilities/setStorage";
 import chai from "chai";
 const { expect } = chai;
 chai.use(solidity);
@@ -13,7 +10,12 @@ import { config as dotenv_config } from "dotenv";
 dotenv_config();
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { PolicyManager, CompoundProduct, ExchangeQuoter1InchV1, ExchangeQuoterManual, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
+import { PolicyManager, CompoundProduct, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
+import { getDomainSeparator, sign } from "./utilities/signature";
+import { toBytes32, setStorageAt } from "./utilities/setStorage";
+import { encodeAddresses } from "./utilities/positionDescription";
+import { oneToken } from "./utilities/math";
+import { ECDSASignature } from "ethereumjs-util";
 
 const SUBMIT_CLAIM_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("CompoundProductSubmitClaim(uint256 policyID,uint256 amountOut,uint256 deadline)"));
 
@@ -57,8 +59,6 @@ if(process.env.FORK_NETWORK === "mainnet"){
     let policyManager: PolicyManager;
     let product: CompoundProduct;
     let product2: CompoundProduct;
-    let quoter: ExchangeQuoter1InchV1;
-    let quoter2: ExchangeQuoterManual;
     let weth: Weth9;
     let treasury: Treasury;
     let claimsEscrow: ClaimsEscrow;
@@ -76,6 +76,10 @@ if(process.env.FORK_NETWORK === "mainnet"){
     const threeDays = 19350;
     const maxCoverAmount = BN.from("1000000000000000000000"); // 1000 Ether in wei
     const price = 11044; // 2.60%/yr
+
+    const coverAmount = BN.from("10000000000000000000"); // 10 eth
+    const blocks = BN.from(threeDays);
+    const expectedPremium = BN.from("2137014000000000");
 
     const ONE_SPLIT_VIEW = "0xC586BeF4a0992C495Cf22e1aeEE4E446CECDee0E";
     const COMPTROLLER_ADDRESS = "0x3d9819210A31b4961b30EF54bE2aeD79B9c9Cd3B";
@@ -98,10 +102,31 @@ if(process.env.FORK_NETWORK === "mainnet"){
 
     const COOLDOWN_PERIOD = 3600; // one hour
 
+    const ctokens = [
+      {"symbol":"cBAT","address":"0x6C8c6b02E7b2BE14d4fA6022Dfd6d75921D90E4E"},
+      {"symbol":"cDAI","address":"0x5d3a536E4D6DbD6114cc1Ead35777bAB948E3643"},
+      {"symbol":"cETH","address":"0x4Ddc2D193948926D02f9B1fE9e1daa0718270ED5"},
+      //{"symbol":"cREP","address":"0x158079Ee67Fce2f58472A96584A73C7Ab9AC95c1"}, // deprecated
+      {"symbol":"cUSDC","address":"0x39AA39c021dfbaE8faC545936693aC917d5E7563","blacklist":"0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"},
+      {"symbol":"cUSDT","address":"0xf650C3d88D12dB855b8bf7D11Be6C55A4e07dCC9"},
+      //{"symbol":"cWBTC","address":"0xC11b1268C1A384e55C48c2391d8d480264A3A7F4"}, // deprecated (old wbtc)
+      {"symbol":"cZRX","address":"0xB3319f5D18Bc0D84dD1b4825Dcde5d5f7266d407"},
+      //{"symbol":"cDAI","address":"0xF5DCe57282A584D2746FaF1593d3121Fcac444dC"}, // deprecated (sai)
+      {"symbol":"cUNI","address":"0x35A18000230DA775CAc24873d00Ff85BccdeD550"},
+      {"symbol":"cCOMP","address":"0x70e36f6BF80a52b3B46b3aF8e106CC0ed743E8e4"},
+      {"symbol":"cWBTC","address":"0xccF4429DB6322D5C611ee964527D42E5d685DD6a"},
+      {"symbol":"cTUSD","address":"0x12392F67bdf24faE0AF363c24aC620a2f67DAd86"},
+      {"symbol":"cLINK","address":"0xFAce851a4921ce59e912d19329929CE6da6EB0c7","uimpl":"","blacklist":""},
+      {"symbol":"cMKR","address":"0x95b4eF2869eBD94BEb4eEE400a99824BF5DC325b"},
+      {"symbol":"cSUSHI","address":"0x4B0181102A0112A2ef11AbEE5563bb4a3176c9d7"},
+      {"symbol":"cAAVE","address":"0xe65cdB6479BaC1e22340E4E755fAE7E509EcD06c"},
+      {"symbol":"cYFI","address":"0x80a2AE356fc9ef4305676f7a3E2Ed04e12C33946"}
+    ];
+
     before(async function () {
       artifacts = await import_artifacts();
       await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
-      
+
       registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
       weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
       await registry.connect(governor).setWeth(weth.address);
@@ -116,13 +141,6 @@ if(process.env.FORK_NETWORK === "mainnet"){
       riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
       await registry.connect(governor).setRiskManager(riskManager.address);
 
-      // deploy exchange quoter
-      quoter = (await deployContract(deployer, artifacts.ExchangeQuoter1InchV1, [ONE_SPLIT_VIEW])) as ExchangeQuoter1InchV1;
-
-      // deploy manual exchange quoter
-      quoter2 = (await deployContract(deployer, artifacts.ExchangeQuoterManual, [deployer.address])) as ExchangeQuoterManual;
-      await quoter2.setRates(["0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","0x89d24a6b4ccb1b6faa2625fe562bdd9a23260359","0xc00e94cb662c3520282e6f5717214004a7f26888","0x1f9840a85d5af5bf1d1762f925bdaddc4201f984","0x514910771af9ca656af840dff83e8264ecf986ca","0x2260fac5e5542a773aa44fbcfedf7c193bc2c599","0xdac17f958d2ee523a2206206994597c13d831ec7","0x1985365e9f78359a9b6ad760e32412f4a445e862","0x0d8775f648430679a709e98d2b0cb6250d2887ef","0xe41d2489571d322189246dafa5ebde1f4699f498","0x0000000000085d4780b73119b644ae5ecd22b376","0x6b175474e89094c44da98b954eedeac495271d0f","0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"],["1000000000000000000","5214879005539865","131044789678131649","9259278326749300","9246653217422099","15405738054265288944","420072999319953","12449913804491249","281485209795972","372925580282399","419446558886231","205364954059859","50000000000000"]);
-
       // deploy Compound Product
       product = (await deployContract(
         deployer,
@@ -135,8 +153,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
           minPeriod,
           maxPeriod,
           price,
-          1,
-          quoter.address
+          1
         ]
       )) as CompoundProduct;
 
@@ -151,8 +168,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
           minPeriod,
           maxPeriod,
           price,
-          1,
-          quoter.address
+          1
         ]
       )) as CompoundProduct;
 
@@ -164,44 +180,13 @@ if(process.env.FORK_NETWORK === "mainnet"){
       await vault.connect(depositor).depositEth({value:maxCoverAmount});
       await riskManager.connect(governor).addProduct(product.address, 1);
       await product.connect(governor).addSigner(paclasSigner.address);
-    })
-
-    describe("appraisePosition", function () {
-      it("reverts if invalid pool or token", async function () {
-        await expect(product.appraisePosition(policyholder.address, ZERO_ADDRESS)).to.be.reverted;
-        await expect(product.appraisePosition(policyholder.address, policyholder.address)).to.be.reverted;
-      });
-      it("no positions should have no value", async function () {
-        expect(await product.appraisePosition(policyholder.address, cETH_ADDRESS)).to.equal(0);
-      });
-      it("a position should have a value", async function () {
-        expect(await product.appraisePosition(REAL_USER1, cETH_ADDRESS)).to.equal(BALANCE1);
-        expect(await product.appraisePosition(REAL_USER2, cDAI_ADDRESS)).to.equal(BALANCE2);
-        expect(await product.appraisePosition(REAL_USER3, cUSDC_ADDRESS)).to.equal(BALANCE3);
-      });
-      it("can change quoters", async function () {
-        expect(await product.quoter()).to.equal(quoter.address);
-        await expect(product.connect(policyholder).setExchangeQuoter(quoter2.address)).to.be.revertedWith("!governance");
-        await product.connect(governor).setExchangeQuoter(quoter2.address);
-        expect(await product.quoter()).to.equal(quoter2.address);
-        expect(await product.appraisePosition(REAL_USER1, cETH_ADDRESS)).to.equal(BALANCE11);
-        expect(await product.appraisePosition(REAL_USER2, cDAI_ADDRESS)).to.equal(BALANCE12);
-        expect(await product.appraisePosition(REAL_USER3, cUSDC_ADDRESS)).to.equal(BALANCE13);
-        await product.connect(governor).setExchangeQuoter(quoter.address);
-      });
-    })
+    });
 
     describe("implementedFunctions", function () {
       it("can getQuote", async function () {
-        let price = BN.from(await product.price());
-        let positionAmount = await product.appraisePosition(REAL_USER1, cETH_ADDRESS);
-        let coverAmount = positionAmount.mul(1).div(10000);
-        let blocks = BN.from(threeDays)
-        let expectedPremium = BN.from("256671452804548");
-        let quote = BN.from(await product.getQuote(REAL_USER1, cETH_ADDRESS, coverAmount, blocks))
+        let quote = BN.from(await product.getQuote(coverAmount, blocks));
         expect(quote).to.equal(expectedPremium);
-      })
-
+      });
       it("can buyPolicy", async function () {
         expect(await policyManager.totalSupply()).to.equal(0);
         expect(await policyManager.balanceOf(REAL_USER1)).to.equal(0);
@@ -209,30 +194,17 @@ if(process.env.FORK_NETWORK === "mainnet"){
         (await policyManager.connect(governor).addProduct(product.address));
         expect(await policyManager.productIsActive(product.address)).to.equal(true);
 
-        let positionAmount = await product.appraisePosition(REAL_USER1, cETH_ADDRESS);
-        let coverAmount = positionAmount.mul(1).div(10000);
-        let blocks = threeDays
-        let quote = BN.from(await product.getQuote(REAL_USER1, cETH_ADDRESS, coverAmount, blocks));
-        let res = (await product.buyPolicy(REAL_USER1, cETH_ADDRESS, coverAmount, blocks, { value: quote }));
-        let receipt = await res.wait()
-        if(receipt.events) {
-          var event = receipt.events.filter(event => event.event == "PolicyCreated")[0]
-          if(event.args) {
-            expect(event.args[0]).to.equal(1); // policyID
-          }
-        }
+        let tx = await product.buyPolicy(REAL_USER1, cETH_ADDRESS, coverAmount, blocks, { value: expectedPremium });
+        expect(tx).to.emit(product, "PolicyCreated").withArgs(1);
         expect(await policyManager.totalSupply()).to.equal(1);
         expect(await policyManager.balanceOf(REAL_USER1)).to.equal(1);
-      })
-
+      });
       it("can buy duplicate policy", async function () {
-        let positionAmount = await product.appraisePosition(REAL_USER1, cETH_ADDRESS);
-        let coverAmount = positionAmount.mul(1).div(10000);
-        let blocks = threeDays
-        let quote = BN.from(await product.getQuote(REAL_USER1, cETH_ADDRESS, coverAmount, blocks));
-        await product.buyPolicy(REAL_USER1, cETH_ADDRESS, coverAmount, blocks, { value: quote });
-      })
-
+        let tx = await product.buyPolicy(REAL_USER1, cETH_ADDRESS, coverAmount, blocks, { value: expectedPremium });
+        expect(tx).to.emit(product, "PolicyCreated").withArgs(2);
+        expect(await policyManager.totalSupply()).to.equal(2);
+        expect(await policyManager.balanceOf(REAL_USER1)).to.equal(2);
+      });
       it("can get product name", async function () {
         expect(await product.name()).to.equal("Compound");
       });
@@ -250,11 +222,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
         await deployer.sendTransaction({to: claimsEscrow.address, value: BN.from("1000000000000000000")});
         // create a cETH position and policy
         await ceth.connect(policyholder).mint({value: BN.from("1000000000000000")});
-        let positionAmount = await product.appraisePosition(policyholder.address, cETH_ADDRESS);
-        let coverAmount = positionAmount;
-        let blocks = threeDays
-        let quote = BN.from(await product.getQuote(policyholder.address, cETH_ADDRESS, coverAmount, blocks));
-        await product.connect(policyholder).buyPolicy(policyholder.address, cETH_ADDRESS, coverAmount, blocks, { value: quote });
+        await product.connect(policyholder).buyPolicy(policyholder.address, cETH_ADDRESS, coverAmount, blocks, { value: expectedPremium });
         // create a cUSDC position and policy
         let uAmount = BN.from("1000000");
         let index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[policyholder.address,9]);
@@ -264,8 +232,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
 
         await usdc.connect(policyholder).approve(cUSDC_ADDRESS, constants.MaxUint256)
         await cusdc.connect(policyholder).mint(usdcBalance);
-        quote = BN.from(await product.getQuote(policyholder.address, cUSDC_ADDRESS, coverAmount, blocks));
-        await product.connect(policyholder).buyPolicy(policyholder.address, cUSDC_ADDRESS, coverAmount, blocks, { value: quote });
+        await product.connect(policyholder).buyPolicy(policyholder.address, cUSDC_ADDRESS, coverAmount, blocks, { value: expectedPremium });
 
       });
       it("cannot submit claim with expired signature", async function () {
@@ -359,26 +326,6 @@ if(process.env.FORK_NETWORK === "mainnet"){
         expect(userEth2.sub(userEth1).add(gasCost)).to.equal(amountOut2);
       });
       it("should support all ctokens", async function () {
-        var ctokens = [
-          {"symbol":"cBAT","address":"0x6C8c6b02E7b2BE14d4fA6022Dfd6d75921D90E4E"},
-          {"symbol":"cDAI","address":"0x5d3a536E4D6DbD6114cc1Ead35777bAB948E3643"},
-          {"symbol":"cETH","address":"0x4Ddc2D193948926D02f9B1fE9e1daa0718270ED5"},
-          //{"symbol":"cREP","address":"0x158079Ee67Fce2f58472A96584A73C7Ab9AC95c1"}, // deprecated
-          {"symbol":"cUSDC","address":"0x39AA39c021dfbaE8faC545936693aC917d5E7563","blacklist":"0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"},
-          {"symbol":"cUSDT","address":"0xf650C3d88D12dB855b8bf7D11Be6C55A4e07dCC9"},
-          //{"symbol":"cWBTC","address":"0xC11b1268C1A384e55C48c2391d8d480264A3A7F4"}, // deprecated (old wbtc)
-          {"symbol":"cZRX","address":"0xB3319f5D18Bc0D84dD1b4825Dcde5d5f7266d407"},
-          //{"symbol":"cDAI","address":"0xF5DCe57282A584D2746FaF1593d3121Fcac444dC"}, // deprecated (sai)
-          {"symbol":"cUNI","address":"0x35A18000230DA775CAc24873d00Ff85BccdeD550"},
-          {"symbol":"cCOMP","address":"0x70e36f6BF80a52b3B46b3aF8e106CC0ed743E8e4"},
-          {"symbol":"cWBTC","address":"0xccF4429DB6322D5C611ee964527D42E5d685DD6a"},
-          {"symbol":"cTUSD","address":"0x12392F67bdf24faE0AF363c24aC620a2f67DAd86"},
-          {"symbol":"cLINK","address":"0xFAce851a4921ce59e912d19329929CE6da6EB0c7","uimpl":"","blacklist":""},
-          {"symbol":"cMKR","address":"0x95b4eF2869eBD94BEb4eEE400a99824BF5DC325b"},
-          {"symbol":"cSUSHI","address":"0x4B0181102A0112A2ef11AbEE5563bb4a3176c9d7"},
-          {"symbol":"cAAVE","address":"0xe65cdB6479BaC1e22340E4E755fAE7E509EcD06c"},
-          {"symbol":"cYFI","address":"0x80a2AE356fc9ef4305676f7a3E2Ed04e12C33946"}
-        ];
         var success = 0;
         var successList = [];
         var failList = [];
@@ -436,11 +383,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
             const cAmount = await cToken.balanceOf(policyholder3.address);
             expect(cAmount).to.be.gt(0);
             // create policy
-            let positionAmount = await product.appraisePosition(policyholder3.address, ctokenAddress);
-            let coverAmount = positionAmount;
-            let blocks = threeDays;
-            let quote = BN.from(await product.getQuote(policyholder3.address, ctokenAddress, coverAmount, blocks));
-            await product.connect(policyholder3).buyPolicy(policyholder3.address, ctokenAddress, coverAmount, blocks, { value: quote });
+            await product.connect(policyholder3).buyPolicy(policyholder3.address, ctokenAddress, coverAmount, blocks, { value: expectedPremium });
             let policyID = (await policyManager.totalPolicyCount()).toNumber();
             // sign swap
             let amountOut = 10000;
@@ -508,10 +451,4 @@ function assembleSignature(parts: ECDSASignature) {
   let r_ = buf2hex(r);
   let s_ = buf2hex(s);
   return `0x${r_}${s_}${v_}`;
-}
-
-function oneToken(decimals: number) {
-  var s = "1";
-  for(var i = 0; i < decimals; ++i) s += "0";
-  return BN.from(s);
 }

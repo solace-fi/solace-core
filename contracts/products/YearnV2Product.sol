@@ -3,7 +3,6 @@ pragma solidity 0.8.6;
 
 import "../interface/Yearn/IYRegistry.sol";
 import "../interface/Yearn/IYVault.sol";
-import "../interface/IExchangeQuoter.sol";
 import "./BaseProduct.sol";
 
 /**
@@ -26,7 +25,6 @@ contract YearnV2Product is BaseProduct {
       * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
       * @param price_ The cover price for the **Product**.
       * @param maxCoverPerUserDivisor_ The max cover amount divisor for per user. (maxCover / divisor = maxCoverPerUser).
-      * @param quoter_ The exchange quoter address.
      */
     constructor (
         address governance_,
@@ -36,8 +34,7 @@ contract YearnV2Product is BaseProduct {
         uint40 minPeriod_,
         uint40 maxPeriod_,
         uint24 price_,
-        uint32 maxCoverPerUserDivisor_,
-        address quoter_
+        uint32 maxCoverPerUserDivisor_
     ) BaseProduct(
         governance_,
         policyManager_,
@@ -47,7 +44,6 @@ contract YearnV2Product is BaseProduct {
         maxPeriod_,
         price_,
         maxCoverPerUserDivisor_,
-        quoter_,
         "Solace.fi-YearnV2Product",
         "1"
     ) {
@@ -57,26 +53,37 @@ contract YearnV2Product is BaseProduct {
     }
 
     /**
-     * @notice Calculate the value of a user's position in **ETH**.
-     * The `positionContract` must be a **yearn.fi vault**.
-     * @param policyholder The owner of the position.
-     * @param positionContract The address of the **vault**.
-     * @return positionAmount The value of the position.
-     */
-    function appraisePosition(address policyholder, address positionContract) public view override returns (uint256 positionAmount) {
-        ( , address token, , , ) = _yregistry.getVaultInfo(positionContract);
-        require(token != address(0x0), "Invalid position contract");
-        IYVault vault = IYVault(positionContract);
-        uint256 balance = vault.balanceOf(policyholder) * vault.getPricePerFullShare() / 1e18;
-        return _quoter.tokenToEth(token, balance);
-    }
-
-    /**
      * @notice Yearn's YRegistry.
      * @return yregistry_ The YRegistry.
      */
     function yregistry() external view returns (address yregistry_) {
         return address(_yregistry);
+    }
+
+    /**
+     * @notice Determines if the byte encoded description of a position(s) is valid.
+     * The description will only make sense in context of the product.
+     * @dev This function should be overwritten in inheriting Product contracts.
+     * @param positionDescription The description to validate.
+     * @return isValid True if is valid.
+     */
+    function isValidPositionDescription(bytes memory positionDescription) public view virtual override returns (bool isValid) {
+        // check length
+        uint256 ADDRESS_SIZE = 20;
+        // must be concatenation of one or more addresses
+        if(positionDescription.length == 0 || positionDescription.length % ADDRESS_SIZE != 0) return false;
+        // check all addresses in list
+        for(uint256 offset = 0; offset < positionDescription.length; offset += ADDRESS_SIZE) {
+            // get next address
+            address positionContract;
+            assembly {
+                positionContract := div(mload(add(add(positionDescription, 0x20), offset)), 0x1000000000000000000000000)
+            }
+            // must be a yVault
+            ( , address token, , , ) = _yregistry.getVaultInfo(positionContract);
+            if(token == address(0x0)) return false;
+        }
+        return true;
     }
 
     /***************************************

@@ -1,4 +1,5 @@
 import { BigNumber as BN, BigNumberish } from "ethers";
+import { parseUnits } from '@ethersproject/units';
 
 // multiplies and divides a set of big numbers
 export function bnMulDiv(
@@ -29,4 +30,8 @@ export function bnAddSub(
     res = res.sub(BN.from(subs[i]));
   }
   return res;
+}
+
+export function oneToken(decimals: number) {
+  return parseUnits("1", decimals);
 }

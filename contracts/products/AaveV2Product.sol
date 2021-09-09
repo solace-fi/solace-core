@@ -26,7 +26,6 @@ contract AaveV2Product is BaseProduct {
       * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
       * @param price_ The cover price for the **Product**.
       * @param maxCoverPerUserDivisor_ The max cover amount divisor for per user. (maxCover / divisor = maxCoverPerUser).
-      * @param quoter_ The exchange quoter address.
      */
     constructor (
         address governance_,
@@ -36,8 +35,7 @@ contract AaveV2Product is BaseProduct {
         uint40 minPeriod_,
         uint40 maxPeriod_,
         uint24 price_,
-        uint32 maxCoverPerUserDivisor_,
-        address quoter_
+        uint32 maxCoverPerUserDivisor_
     ) BaseProduct(
         governance_,
         policyManager_,
@@ -47,30 +45,12 @@ contract AaveV2Product is BaseProduct {
         maxPeriod_,
         price_,
         maxCoverPerUserDivisor_,
-        quoter_,
         "Solace.fi-AaveV2Product",
         "1"
     ) {
         _aaveDataProvider = IAaveProtocolDataProvider(dataProvider_);
         _SUBMIT_CLAIM_TYPEHASH = keccak256("AaveV2ProductSubmitClaim(uint256 policyID,uint256 amountOut,uint256 deadline)");
         _productName = "AaveV2";
-    }
-    /**
-     * @notice Calculate the value of a user's Aave V2 position in **ETH**.
-     * The `positionContract` must be an [**aToken**](https://etherscan.io/tokens/label/aave-v2).
-     * @param policyholder The owner of the position.
-     * @param positionContract The address of the **aToken**.
-     * @return positionAmount The value of the position.
-     */
-    function appraisePosition(address policyholder, address positionContract) public view override returns (uint256 positionAmount) {
-        // verify positionContract
-        IAToken token = IAToken(positionContract);
-        address underlying = token.UNDERLYING_ASSET_ADDRESS();
-        ( address aTokenAddress, , ) = _aaveDataProvider.getReserveTokensAddresses(underlying);
-        require(positionContract == aTokenAddress, "Invalid position contract");
-        // swap math
-        uint256 balance = token.balanceOf(policyholder);
-        return _quoter.tokenToEth(underlying, balance);
     }
 
     /**
@@ -79,6 +59,34 @@ contract AaveV2Product is BaseProduct {
      */
     function aaveDataProvider() external view returns (address dataProvider_) {
         return address(_aaveDataProvider);
+    }
+
+    /**
+     * @notice Determines if the byte encoded description of a position(s) is valid.
+     * The description will only make sense in context of the product.
+     * @dev This function should be overwritten in inheriting Product contracts.
+     * @param positionDescription The description to validate.
+     * @return isValid True if is valid.
+     */
+    function isValidPositionDescription(bytes memory positionDescription) public view virtual override returns (bool isValid) {
+        // check length
+        uint256 ADDRESS_SIZE = 20;
+        // must be concatenation of one or more addresses
+        if(positionDescription.length == 0 || positionDescription.length % ADDRESS_SIZE != 0) return false;
+        // check all addresses in list
+        for(uint256 offset = 0; offset < positionDescription.length; offset += ADDRESS_SIZE) {
+            // get next address
+            address positionContract;
+            assembly {
+                positionContract := div(mload(add(add(positionDescription, 0x20), offset)), 0x1000000000000000000000000)
+            }
+            // must be an aToken
+            IAToken token = IAToken(positionContract);
+            address underlying = token.UNDERLYING_ASSET_ADDRESS();
+            ( address aTokenAddress, , ) = _aaveDataProvider.getReserveTokensAddresses(underlying);
+            if(positionContract != aTokenAddress) return false;
+        }
+        return true;
     }
 
     /***************************************

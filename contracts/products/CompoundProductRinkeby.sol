@@ -28,7 +28,6 @@ contract CompoundProductRinkeby is BaseProduct {
       * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
       * @param price_ The cover price for the **Product**.
       * @param maxCoverPerUserDivisor_ The max cover amount divisor for per user. (maxCover / divisor = maxCoverPerUser).
-      * @param quoter_ The exchange quoter address.
      */
     constructor (
         address governance_,
@@ -38,8 +37,7 @@ contract CompoundProductRinkeby is BaseProduct {
         uint40 minPeriod_,
         uint40 maxPeriod_,
         uint24 price_,
-        uint32 maxCoverPerUserDivisor_,
-        address quoter_
+        uint32 maxCoverPerUserDivisor_
     ) BaseProduct(
         governance_,
         policyManager_,
@@ -49,7 +47,6 @@ contract CompoundProductRinkeby is BaseProduct {
         maxPeriod_,
         price_,
         maxCoverPerUserDivisor_,
-        quoter_,
         "Solace.fi-CompoundProduct",
         "1"
     ) {
@@ -59,31 +56,37 @@ contract CompoundProductRinkeby is BaseProduct {
     }
 
     /**
-     * @notice Calculate the value of a user's position in **ETH**.
-     * The `positionContract` must be a [**cToken**](https://etherscan.io/accounts/label/compound).
-     * @param policyholder The owner of the position.
-     * @param positionContract The address of the **cToken**.
-     * @return positionAmount The value of the position.
-     */
-    function appraisePosition(address policyholder, address positionContract) public view override returns (uint256 positionAmount) {
-        // verify positionContract
-        (bool isListed, ) = _comptroller.markets(positionContract);
-        require(isListed, "Invalid position contract");
-        // swap math
-        ICToken token = ICToken(positionContract);
-        uint256 balance = token.balanceOf(policyholder);
-        uint256 exchangeRate = token.exchangeRateStored();
-        balance = balance * exchangeRate / 1e18;
-        if(compareStrings(token.symbol(), "cETH")) return balance;
-        return _quoter.tokenToEth(token.underlying(), balance);
-    }
-
-    /**
      * @notice Compound's Comptroller.
      * @return comptroller_ The comptroller.
      */
     function comptroller() external view returns (address comptroller_) {
         return address(_comptroller);
+    }
+
+    /**
+     * @notice Determines if the byte encoded description of a position(s) is valid.
+     * The description will only make sense in context of the product.
+     * @dev This function should be overwritten in inheriting Product contracts.
+     * @param positionDescription The description to validate.
+     * @return isValid True if is valid.
+     */
+    function isValidPositionDescription(bytes memory positionDescription) public view virtual override returns (bool isValid) {
+        // check length
+        uint256 ADDRESS_SIZE = 20;
+        // must be concatenation of one or more addresses
+        if(positionDescription.length == 0 || positionDescription.length % ADDRESS_SIZE != 0) return false;
+        // check all addresses in list
+        for(uint256 offset = 0; offset < positionDescription.length; offset += ADDRESS_SIZE) {
+            // get next address
+            address positionContract;
+            assembly {
+                positionContract := div(mload(add(add(positionDescription, 0x20), offset)), 0x1000000000000000000000000)
+            }
+            // must be a cToken
+            (bool isListed, ) = _comptroller.markets(positionContract);
+            if(!isListed) return false;
+        }
+        return true;
     }
 
     /***************************************
@@ -100,19 +103,5 @@ contract CompoundProductRinkeby is BaseProduct {
     function setCoveredPlatform(address comptroller_) public override {
         super.setCoveredPlatform(comptroller_);
         _comptroller = IComptrollerRinkeby(comptroller_);
-    }
-
-    /***************************************
-    HELPER FUNCTIONS
-    ***************************************/
-
-    /**
-     * @notice String equality.
-     * @param a The first string.
-     * @param b The second string.
-     * @return bool Returns True if both strings are equal.
-     */
-    function compareStrings(string memory a, string memory b) internal pure returns (bool) {
-        return (keccak256(abi.encodePacked((a))) == keccak256(abi.encodePacked((b))));
     }
 }

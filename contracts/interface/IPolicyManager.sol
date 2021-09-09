@@ -41,7 +41,7 @@ interface IPolicyManager is IERC721Enumerable /*, IERC721Metadata*/ {
         uint40 expirationBlock;
         address product;
         uint24 price;
-        address positionContract;
+        bytes positionDescription;
     }
 
     /**
@@ -56,12 +56,12 @@ interface IPolicyManager is IERC721Enumerable /*, IERC721Metadata*/ {
      * @param policyID The policy ID to return info.
      * @return policyholder The address of the policy holder.
      * @return product The product of the policy.
-     * @return positionContract The covered contract for the policy.
+     * @return positionDescription The description of the covered position(s).
      * @return coverAmount The amount covered for the policy.
      * @return expirationBlock The expiration block of the policy.
      * @return price The price of the policy.
      */
-    function getPolicyInfo(uint256 policyID) external view returns (address policyholder, address product, address positionContract, uint256 coverAmount, uint40 expirationBlock, uint24 price);
+    function getPolicyInfo(uint256 policyID) external view returns (address policyholder, address product, bytes calldata positionDescription, uint256 coverAmount, uint40 expirationBlock, uint24 price);
 
     /**
      * @notice The holder of the policy.
@@ -78,11 +78,12 @@ interface IPolicyManager is IERC721Enumerable /*, IERC721Metadata*/ {
     function getPolicyProduct(uint256 policyID) external view returns (address product);
 
     /**
-     * @notice The position contract the policy covers.
+     * @notice The byte encoded description of the covered position(s).
+     * Only makes sense in context of the product.
      * @param policyID The policy ID.
-     * @return positionContract The position contract of the policy.
+     * @return positionDescription The description of the covered position(s).
      */
-    function getPolicyPositionContract(uint256 policyID) external view returns (address positionContract);
+    function getPositionDescription(uint256 policyID) external view returns (bytes calldata positionDescription);
 
     /**
      * @notice The expiration block of the policy.
@@ -164,7 +165,7 @@ interface IPolicyManager is IERC721Enumerable /*, IERC721Metadata*/ {
      * @notice Creates a new policy.
      * Can only be called by **products**.
      * @param policyholder The receiver of new policy token.
-     * @param positionContract The contract address of the position.
+     * @param positionDescription The description of the covered position(s).
      * @param expirationBlock The policy expiration block number.
      * @param coverAmount The policy coverage amount (in wei).
      * @param price The coverage price.
@@ -172,7 +173,7 @@ interface IPolicyManager is IERC721Enumerable /*, IERC721Metadata*/ {
      */
     function createPolicy(
         address policyholder,
-        address positionContract,
+        bytes calldata positionDescription,
         uint256 coverAmount,
         uint40 expirationBlock,
         uint24 price
@@ -183,12 +184,12 @@ interface IPolicyManager is IERC721Enumerable /*, IERC721Metadata*/ {
      * Can only be called by **products**.
      * @param policyID The policy ID.
      * @param policyholder The receiver of new policy token.
-     * @param positionContract The contract address where the position is covered.
+     * @param positionDescription The description of the covered position(s).
      * @param expirationBlock The policy expiration block number.
      * @param coverAmount The policy coverage amount (in wei).
      * @param price The coverage price.
      */
-    function setPolicyInfo(uint256 policyID, address policyholder, address positionContract, uint256 coverAmount, uint40 expirationBlock, uint24 price) external;
+    function setPolicyInfo(uint256 policyID, address policyholder, bytes calldata positionDescription, uint256 coverAmount, uint40 expirationBlock, uint24 price) external;
 
     /**
      * @notice Burns expired or cancelled policies.

@@ -10,24 +10,17 @@ const { expect } = chai;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { PolicyManager, AaveV2Product, ExchangeQuoterAaveV2, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
+import { PolicyManager, AaveV2Product, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
 import { getDomainSeparator, sign } from "./utilities/signature";
+import { toBytes32, setStorageAt } from "./utilities/setStorage";
+import { encodeAddresses } from "./utilities/positionDescription";
+import { oneToken } from "./utilities/math";
 import { ECDSASignature } from "ethereumjs-util";
 
 const SUBMIT_CLAIM_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("AaveV2ProductSubmitClaim(uint256 policyID,uint256 amountOut,uint256 deadline)"));
 
 const chainId = 31337;
 const deadline = constants.MaxUint256;
-
-const toBytes32 = (bn: BN) => {
-  return ethers.utils.hexlify(ethers.utils.zeroPad(bn.toHexString(), 32));
-};
-
-const setStorageAt = async (address: string, index: string, value: string) => {
-  index = ethers.utils.hexStripZeros(index);
-  await ethers.provider.send("hardhat_setStorageAt", [address, index, value]);
-  await ethers.provider.send("evm_mine", []); // Just mines to the next block
-};
 
 // Returns the EIP712 hash which should be signed by the authorized signer
 // in order to make a call to AaveV2Product.submitClaim()
@@ -66,7 +59,6 @@ if(process.env.FORK_NETWORK === "kovan"){
     let policyManager: PolicyManager;
     let product: AaveV2Product;
     let product2: AaveV2Product;
-    let quoter: ExchangeQuoterAaveV2;
     let weth: Weth9;
     let treasury: Treasury;
     let claimsEscrow: ClaimsEscrow;
@@ -86,6 +78,10 @@ if(process.env.FORK_NETWORK === "kovan"){
     const maxCoverAmount = BN.from("1000000000000000000000"); // 1000 Ether in wei
     const price = 11044; // 2.60%/yr
 
+    const coverAmount = BN.from("10000000000000000000"); // 10 eth
+    const blocks = BN.from(threeDays);
+    const expectedPremium = BN.from("2137014000000000");
+
     const aWETH_ADDRESS = "0x87b1f4cf9BD63f7BBD3eE1aD04E8F52540349347";
     const REAL_USER1 = "0xc2b74b547d02bafc93feb34bd964d42312ae70c3";
     const BALANCE1 = BN.from("689713795702756155");
@@ -100,10 +96,34 @@ if(process.env.FORK_NETWORK === "kovan"){
 
     const COOLDOWN_PERIOD = 3600; // one hour
 
+    const atokens = [
+      {"symbol":"aAAVE","address":"0x6d93ef8093F067f19d33C2360cE17b20a8c45CD7"},
+      {"symbol":"aBAT","address":"0x28f92b4c8Bdab37AF6C4422927158560b4bB446e"},
+      {"symbol":"aBUSD","address":"0xfe3E41Db9071458e39104711eF1Fa668bae44e85"},
+      {"symbol":"aDAI","address":"0xdCf0aF9e59C002FA3AA091a46196b37530FD48a8"},
+      {"symbol":"aENJ","address":"0x1d1F2Cb9ED46A8d5bf0254E5CE400514D62d55F0"},
+      {"symbol":"aKNC","address":"0xdDdEC78e29f3b579402C42ca1fd633DE00D23940"},
+      {"symbol":"aLINK","address":"0xeD9044cA8F7caCe8eACcD40367cF2bee39eD1b04"},
+      {"symbol":"aMANA","address":"0xA288B1767C91Aa9d8A14a65dC6B2E7ce68c02DFd"},
+      {"symbol":"aMKR","address":"0x9d9DaBEae6BcBa881404A9e499B13B2B3C1F329E"},
+      {"symbol":"aREN","address":"0x01875ee883B32f5f961A92eC597DcEe2dB7589c1"},
+      {"symbol":"aSNX","address":"0xAA74AdA92dE4AbC0371b75eeA7b1bd790a69C9e1"},
+      {"symbol":"aSUSD","address":"0x9488fF6F29ff75bfdF8cd5a95C6aa679bc7Cd65c"},
+      {"symbol":"aTUSD","address":"0x39914AdBe5fDbC2b9ADeedE8Bcd444b20B039204"},
+      {"symbol":"aUSDC","address":"0xe12AFeC5aa12Cf614678f9bFeeB98cA9Bb95b5B0"},
+      {"symbol":"aUSDT","address":"0xFF3c8bc103682FA918c954E84F5056aB4DD5189d"},
+      {"symbol":"aWBTC","address":"0x62538022242513971478fcC7Fb27ae304AB5C29F"},
+      {"symbol":"aWETH","address":"0x87b1f4cf9BD63f7BBD3eE1aD04E8F52540349347"},
+      {"symbol":"aYFI","address":"0xF6c7282943Beac96f6C70252EF35501a6c1148Fe"},
+      {"symbol":"aZRX","address":"0xf02D7C23948c9178C68f5294748EB778Ab5e5D9c","uimpl":""},
+      {"symbol":"aUNI","address":"0x601FFc9b7309bdb0132a02a569FBd57d6D1740f2"},
+      {"symbol":"aAMPL","address":"0xb8a16bbab34FA7A5C09Ec7679EAfb8fEC06897bc","uimpl":"0xcea5Db2E865213CDa8C0EAaD2e68Ccc54Dd88d27"}
+    ];
+
     before(async function () {
       artifacts = await import_artifacts();
       await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
-      
+
       registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
       weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
       await registry.connect(governor).setWeth(weth.address);
@@ -118,9 +138,6 @@ if(process.env.FORK_NETWORK === "kovan"){
       riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
       await registry.connect(governor).setRiskManager(riskManager.address);
 
-      // deploy exchange quoter
-      quoter = (await deployContract(deployer, artifacts.ExchangeQuoterAaveV2, [AAVE_DATA_PROVIDER])) as ExchangeQuoterAaveV2;
-
       // deploy Aave V2 Product
       product = (await deployContract(
         deployer,
@@ -133,8 +150,7 @@ if(process.env.FORK_NETWORK === "kovan"){
           minPeriod,
           maxPeriod,
           price,
-          1,
-          quoter.address
+          1
         ]
       )) as unknown as AaveV2Product;
 
@@ -149,8 +165,7 @@ if(process.env.FORK_NETWORK === "kovan"){
           minPeriod,
           maxPeriod,
           price,
-          1,
-          quoter.address
+          1
         ]
       )) as unknown as AaveV2Product;
 
@@ -162,20 +177,6 @@ if(process.env.FORK_NETWORK === "kovan"){
       await vault.connect(depositor).depositEth({value:maxCoverAmount});
       await riskManager.connect(governor).addProduct(product.address, 1);
       await product.connect(governor).addSigner(paclasSigner.address);
-    })
-
-    describe("appraisePosition", function () {
-      it("reverts if invalid pool or token", async function () {
-        await expect(product.appraisePosition(policyholder.address, ZERO_ADDRESS)).to.be.reverted;
-        await expect(product.appraisePosition(policyholder.address, policyholder.address)).to.be.reverted;
-      });
-      it("no positions should have no value", async function () {
-        expect(await product.appraisePosition(policyholder.address, aWETH_ADDRESS)).to.equal(0);
-      });
-      it("a position should have a value", async function () {
-        expect(await product.appraisePosition(REAL_USER1, aWETH_ADDRESS)).to.be.closeTo(BALANCE1, 100000000000)
-        expect(await product.appraisePosition(REAL_USER2, aUSDT_ADDRESS)).to.be.closeTo(BALANCE2, 100000000000)
-      });
     });
 
     describe("covered platform", function () {
@@ -194,39 +195,57 @@ if(process.env.FORK_NETWORK === "kovan"){
       });
     });
 
+    describe("position description", function () {
+      it("cannot be zero length", async function () {
+        expect(await product.isValidPositionDescription("0x")).to.be.false;
+      });
+      it("cannot be odd size", async function () {
+        expect(await product.isValidPositionDescription("0xabcd")).to.be.false;
+        expect(await product.isValidPositionDescription("0x123456789012345678901234567890123456789077")).to.be.false;
+      });
+      it("cannot have non aTokens", async function () {
+        // would like to.be.false, to.be.reverted will work though
+        await expect(product.isValidPositionDescription("0x1234567890123456789012345678901234567890")).to.be.reverted;
+        await expect(product.isValidPositionDescription(REAL_USER1)).to.be.reverted;
+        await expect(product.isValidPositionDescription(encodeAddresses([REAL_USER1]))).to.be.reverted;
+        await expect(product.isValidPositionDescription(governor.address)).to.be.reverted;
+        await expect(product.isValidPositionDescription(AAVE_DATA_PROVIDER)).to.be.reverted;
+      });
+      it("can be one or more aTokens", async function () {
+        for(var i = 0; i < atokens.length; ++i) {
+          expect(await product.isValidPositionDescription(encodeAddresses([atokens[i].address]))).to.be.true;
+          // don't care about duplicates
+          for(var j = 0; j < atokens.length; ++j) {
+            expect(await product.isValidPositionDescription(encodeAddresses([atokens[i].address, atokens[j].address]))).to.be.true;
+          }
+        }
+        expect(await product.isValidPositionDescription(encodeAddresses(atokens.map(atoken => atoken.address)))).to.be.true;
+      });
+    });
+
     describe("implementedFunctions", function () {
-      it("can getQuote", async function () {
-        let price = BN.from(await product.price());
-        let positionAmount = await product.appraisePosition(REAL_USER1, aWETH_ADDRESS);
-        let coverAmount = positionAmount.mul(5000).div(10000);
-        let blocks = BN.from(threeDays)
-        let expectedPremium = BN.from("73696438160454");
-        let quote = BN.from(await product.getQuote(REAL_USER1, aWETH_ADDRESS, coverAmount, blocks));
-        expect(quote).to.be.closeTo(expectedPremium, 1000000000);
-      })
-      it("can buyPolicy", async function () {
+      before(async function () {
         expect(await policyManager.totalSupply()).to.equal(0);
         expect(await policyManager.balanceOf(REAL_USER1)).to.equal(0);
         // adding the owner product to the ProductManager
         (await policyManager.connect(governor).addProduct(product.address));
         expect(await policyManager.productIsActive(product.address)).to.equal(true);
-
-        let positionAmount = await product.appraisePosition(REAL_USER1, aWETH_ADDRESS);
-        let coverAmount = positionAmount.mul(500).div(10000);
-        let blocks = threeDays
-        let quote = BN.from(await product.getQuote(REAL_USER1, aWETH_ADDRESS, coverAmount, blocks));
-        let tx = await product.buyPolicy(REAL_USER1, aWETH_ADDRESS, coverAmount, blocks, { value: quote });
+      });
+      it("can getQuote", async function () {
+        let quote = BN.from(await product.getQuote(coverAmount, blocks));
+        expect(quote).to.equal(expectedPremium);
+      });
+      it("can buyPolicy", async function () {
+        let tx = await product.buyPolicy(REAL_USER1, aWETH_ADDRESS, coverAmount, blocks, { value: expectedPremium });
         expect(tx).to.emit(product, "PolicyCreated").withArgs(1);
         expect(await policyManager.totalSupply()).to.equal(1);
         expect(await policyManager.balanceOf(REAL_USER1)).to.equal(1);
       });
       it("can buy duplicate policy", async function () {
-        let positionAmount = await product.appraisePosition(REAL_USER1, aWETH_ADDRESS);
-        let coverAmount = positionAmount.mul(500).div(10000);
-        let blocks = threeDays
-        let quote = BN.from(await product.getQuote(REAL_USER1, aWETH_ADDRESS, coverAmount, blocks));
-        let tx = await product.buyPolicy(REAL_USER1, aWETH_ADDRESS, coverAmount, blocks, { value: quote });
+        let tx = await product.buyPolicy(REAL_USER1, aWETH_ADDRESS, coverAmount, blocks, { value: expectedPremium });
         expect(tx).to.emit(product, "PolicyCreated").withArgs(2);
+        expect(await policyManager.totalSupply()).to.equal(2);
+        expect(await policyManager.balanceOf(REAL_USER1)).to.equal(2);
       });
       it("can get product name", async function () {
         expect(await product.name()).to.equal("AaveV2");
@@ -249,18 +268,14 @@ if(process.env.FORK_NETWORK === "kovan"){
         await lendingPool.connect(policyholder).deposit(LINK_ADDRESS, amountIn1, policyholder.address, 0);
         expect(await link.balanceOf(policyholder.address)).to.be.equal(0);
         expect(await alink.balanceOf(policyholder.address)).to.be.gte(amountIn1);
-        let positionAmount = await product.appraisePosition(policyholder.address, aLINK_ADDRESS);
-        let coverAmount = positionAmount;
-        let blocks = threeDays;
-        let quote = BN.from(await product.getQuote(policyholder.address, aLINK_ADDRESS, coverAmount, blocks));
-        await product.connect(policyholder).buyPolicy(policyholder.address, aLINK_ADDRESS, coverAmount, blocks, { value: quote });
+        await product.connect(policyholder).buyPolicy(policyholder.address, aLINK_ADDRESS, coverAmount, blocks, { value: expectedPremium });
         // create another aLink position and policy
         expect(await link.balanceOf(policyholder2.address)).to.equal(amountIn1);
         await link.connect(policyholder2).approve(lendingPool.address, constants.MaxUint256);
         await lendingPool.connect(policyholder2).deposit(LINK_ADDRESS, amountIn1, policyholder2.address, 0);
         expect(await link.balanceOf(policyholder2.address)).to.be.equal(0);
         expect(await alink.balanceOf(policyholder2.address)).to.be.gte(amountIn1);
-        await product.connect(policyholder2).buyPolicy(policyholder2.address, aLINK_ADDRESS, coverAmount, blocks, { value: quote });
+        await product.connect(policyholder2).buyPolicy(policyholder2.address, aLINK_ADDRESS, coverAmount, blocks, { value: expectedPremium });
       });
       it("cannot submit claim with expired signature", async function () {
         let digest = getSubmitClaimDigest("Solace.fi-AaveV2Product", product.address, chainId, policyID1, amountOut1, 0);
@@ -323,29 +338,6 @@ if(process.env.FORK_NETWORK === "kovan"){
         await hre.network.provider.request({method: "hardhat_impersonateAccount", params: [policyholder3Address]});
         await depositor.sendTransaction({to: policyholder3Address, value: BN.from("1000000000000000000")});
         const policyholder3 = await ethers.getSigner(policyholder3Address);
-        var atokens = [
-          {"symbol":"aAAVE","address":"0x6d93ef8093F067f19d33C2360cE17b20a8c45CD7"},
-          {"symbol":"aBAT","address":"0x28f92b4c8Bdab37AF6C4422927158560b4bB446e"},
-          {"symbol":"aBUSD","address":"0xfe3E41Db9071458e39104711eF1Fa668bae44e85"},
-          {"symbol":"aDAI","address":"0xdCf0aF9e59C002FA3AA091a46196b37530FD48a8"},
-          {"symbol":"aENJ","address":"0x1d1F2Cb9ED46A8d5bf0254E5CE400514D62d55F0"},
-          {"symbol":"aKNC","address":"0xdDdEC78e29f3b579402C42ca1fd633DE00D23940"},
-          {"symbol":"aLINK","address":"0xeD9044cA8F7caCe8eACcD40367cF2bee39eD1b04"},
-          {"symbol":"aMANA","address":"0xA288B1767C91Aa9d8A14a65dC6B2E7ce68c02DFd"},
-          {"symbol":"aMKR","address":"0x9d9DaBEae6BcBa881404A9e499B13B2B3C1F329E"},
-          {"symbol":"aREN","address":"0x01875ee883B32f5f961A92eC597DcEe2dB7589c1"},
-          {"symbol":"aSNX","address":"0xAA74AdA92dE4AbC0371b75eeA7b1bd790a69C9e1"},
-          {"symbol":"aSUSD","address":"0x9488fF6F29ff75bfdF8cd5a95C6aa679bc7Cd65c"},
-          {"symbol":"aTUSD","address":"0x39914AdBe5fDbC2b9ADeedE8Bcd444b20B039204"},
-          {"symbol":"aUSDC","address":"0xe12AFeC5aa12Cf614678f9bFeeB98cA9Bb95b5B0"},
-          {"symbol":"aUSDT","address":"0xFF3c8bc103682FA918c954E84F5056aB4DD5189d"},
-          {"symbol":"aWBTC","address":"0x62538022242513971478fcC7Fb27ae304AB5C29F"},
-          {"symbol":"aWETH","address":"0x87b1f4cf9BD63f7BBD3eE1aD04E8F52540349347"},
-          {"symbol":"aYFI","address":"0xF6c7282943Beac96f6C70252EF35501a6c1148Fe"},
-          {"symbol":"aZRX","address":"0xf02D7C23948c9178C68f5294748EB778Ab5e5D9c","uimpl":""},
-          {"symbol":"aUNI","address":"0x601FFc9b7309bdb0132a02a569FBd57d6D1740f2"},
-          {"symbol":"aAMPL","address":"0xb8a16bbab34FA7A5C09Ec7679EAfb8fEC06897bc","uimpl":"0xcea5Db2E865213CDa8C0EAaD2e68Ccc54Dd88d27"}
-        ];
         var success = 0;
         var successList = [];
         var failList = [];
@@ -385,11 +377,7 @@ if(process.env.FORK_NETWORK === "kovan"){
             const aAmount = await aToken.balanceOf(policyholder3.address);
             expect(aAmount).to.be.closeTo(uAmount, 100);
             // create policy
-            let positionAmount = await product.appraisePosition(policyholder3.address, aAddress);
-            let coverAmount = positionAmount;
-            let blocks = threeDays;
-            let quote = BN.from(await product.getQuote(policyholder3.address, aAddress, coverAmount, blocks));
-            await product.connect(policyholder3).buyPolicy(policyholder3.address, aAddress, coverAmount, blocks, { value: quote });
+            await product.connect(policyholder3).buyPolicy(policyholder3.address, aAddress, coverAmount, blocks, { value: expectedPremium });
             let policyID = (await policyManager.totalPolicyCount()).toNumber();
             // sign swap
             let amountOut = 10000;
@@ -442,10 +430,4 @@ function assembleSignature(parts: ECDSASignature) {
   let r_ = buf2hex(r);
   let s_ = buf2hex(s);
   return `0x${r_}${s_}${v_}`;
-}
-
-function oneToken(decimals: number) {
-  var s = "1";
-  for(var i = 0; i < decimals; ++i) s += "0";
-  return BN.from(s);
 }

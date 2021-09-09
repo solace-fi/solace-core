@@ -3,8 +3,6 @@ const { deployContract, solidity } = waffle;
 import { MockProvider } from "ethereum-waffle";
 const provider: MockProvider = waffle.provider;
 import { BigNumber as BN, BigNumberish, utils, constants, Contract } from "ethers";
-import { ECDSASignature, ecsign } from "ethereumjs-util";
-import { getPermitDigest, sign, getDomainSeparator } from "./utilities/signature";
 import chai from "chai";
 const { expect } = chai;
 chai.use(solidity);
@@ -12,21 +10,17 @@ import { config as dotenv_config } from "dotenv";
 dotenv_config();
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { PolicyManager, CompoundProductRinkeby, ExchangeQuoterManual, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
+import { PolicyManager, CompoundProductRinkeby, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
+import { getDomainSeparator, sign } from "./utilities/signature";
+import { toBytes32, setStorageAt } from "./utilities/setStorage";
+import { encodeAddresses } from "./utilities/positionDescription";
+import { oneToken } from "./utilities/math";
+import { ECDSASignature } from "ethereumjs-util";
 
 const SUBMIT_CLAIM_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("CompoundProductSubmitClaim(uint256 policyID,uint256 amountOut,uint256 deadline)"));
 
 const chainId = 31337;
 const deadline = constants.MaxUint256;
-
-const toBytes32 = (bn: BN) => {
-  return ethers.utils.hexlify(ethers.utils.zeroPad(bn.toHexString(), 32));
-};
-
-const setStorageAt = async (address: string, index: BigNumberish, value: string) => {
-  await ethers.provider.send("hardhat_setStorageAt", [address, index, value]);
-  await ethers.provider.send("evm_mine", []); // Just mines to the next block
-};
 
 // Returns the EIP712 hash which should be signed by the authorized signer
 // in order to make a call to CompoundProduct.submitClaim()
@@ -65,7 +59,6 @@ if(process.env.FORK_NETWORK === "rinkeby"){
     let policyManager: PolicyManager;
     let product: CompoundProductRinkeby;
     let product2: CompoundProductRinkeby;
-    let quoter2: ExchangeQuoterManual;
     let weth: Weth9;
     let treasury: Treasury;
     let claimsEscrow: ClaimsEscrow;
@@ -84,6 +77,10 @@ if(process.env.FORK_NETWORK === "rinkeby"){
     const maxCoverAmount = BN.from("1000000000000000000000"); // 1000 Ether in wei
     const price = 11044; // 2.60%/yr
 
+    const coverAmount = BN.from("10000000000000000000"); // 10 eth
+    const blocks = BN.from(threeDays);
+    const expectedPremium = BN.from("2137014000000000");
+
     const COMPTROLLER_ADDRESS = "0x2EAa9D77AE4D8f9cdD9FAAcd44016E746485bddb";
     const cETH_ADDRESS = "0xd6801a1DfFCd0a410336Ef88DeF4320D6DF1883e";
     const USER1 = "0x0fb78424e5021404093aA0cFcf50B176B30a3c1d";
@@ -94,13 +91,21 @@ if(process.env.FORK_NETWORK === "rinkeby"){
     const DAI_ADDRESS = "0x5592EC0cfb4dbc12D3aB100b257153436a1f0FEa";
     const cDAI_ADDRESS = "0x6D7F0754FFeb405d23C51CE938289d4835bE3b14";
 
-
     const COOLDOWN_PERIOD = 3600; // one hour
+
+    const ctokens = [
+      {"symbol":"cBAT","address":"0xEBf1A11532b93a529b5bC942B4bAA98647913002"},
+      {"symbol":"cDAI","address":"0x6D7F0754FFeb405d23C51CE938289d4835bE3b14"},
+      {"symbol":"cETH","address":"0xd6801a1DfFCd0a410336Ef88DeF4320D6DF1883e"},
+      {"symbol":"cUSDC","address":"0x5B281A6DdA0B271e91ae35DE655Ad301C976edb1"},
+      {"symbol":"cUSDT","address":"0x2fB298BDbeF468638AD6653FF8376575ea41e768","uimpl":"0x98394a121D26F90F4841e7BFE9dD4Aba05E666E4"},
+      {"symbol":"cZRX","address":"0x52201ff1720134bBbBB2f6BC97Bf3715490EC19B","uimpl":"","blacklist":""}
+    ];
 
     before(async function () {
       artifacts = await import_artifacts();
       await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
-      
+
       registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
       weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
       await registry.connect(governor).setWeth(weth.address);
@@ -115,17 +120,6 @@ if(process.env.FORK_NETWORK === "rinkeby"){
       riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
       await registry.connect(governor).setRiskManager(riskManager.address);
 
-      // deploy manual exchange quoter
-      quoter2 = (await deployContract(
-        deployer,
-        artifacts.ExchangeQuoterManual,
-        [
-          governor.address
-        ]
-      )) as ExchangeQuoterManual;
-      await expect(quoter2.connect(user).setRates([],[])).to.be.revertedWith("!signer");
-      await quoter2.connect(governor).setRates(["0xbf7a7169562078c96f0ec1a8afd6ae50f12e5a99","0x5592ec0cfb4dbc12d3ab100b257153436a1f0fea","0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","0x6e894660985207feb7cf89faf048998c71e8ee89","0x4dbcdf9b62e891a7cec5a2568c3f4faf9e8abe2b","0xd9ba894e0097f8cc2bbc9d24d308b98e36dc6d02","0x577d296678535e4903d59a4c929b718e1d575e0a","0xddea378a6ddc8afec82c36e9b0078826bf9e68b6"],["264389616860428","445946382179077","1000000000000000000","10221603363836799","444641132530148","448496810835719","14864363968434576288","334585685516318"]);
-
       // deploy Compound Product
       product = (await deployContract(
         deployer,
@@ -138,8 +132,7 @@ if(process.env.FORK_NETWORK === "rinkeby"){
           minPeriod,
           maxPeriod,
           price,
-          1,
-          quoter2.address
+          1
         ]
       )) as CompoundProductRinkeby;
 
@@ -154,8 +147,7 @@ if(process.env.FORK_NETWORK === "rinkeby"){
           minPeriod,
           maxPeriod,
           price,
-          1,
-          quoter2.address
+          1
         ]
       )) as CompoundProductRinkeby;
 
@@ -167,33 +159,13 @@ if(process.env.FORK_NETWORK === "rinkeby"){
       await vault.connect(deployer).depositEth({value:maxCoverAmount});
       await riskManager.connect(governor).addProduct(product.address, 1);
       await product.connect(governor).addSigner(paclasSigner.address);
-    })
-
-    describe("appraisePosition", function () {
-      it("reverts if invalid pool or token", async function () {
-        await expect(product.appraisePosition(user.address, ZERO_ADDRESS)).to.be.reverted;
-        await expect(product.appraisePosition(user.address, user.address)).to.be.reverted;
-      })
-
-      it("no positions should have no value", async function () {
-        expect(await product.appraisePosition(user.address, cETH_ADDRESS)).to.equal(0);
-      })
-
-      it("a position should have a value", async function () {
-        expect(await product.appraisePosition(USER1, cETH_ADDRESS)).to.equal(BALANCE1);
-      })
-    })
+    });
 
     describe("implementedFunctions", function () {
       it("can getQuote", async function () {
-        let price = BN.from(await product.price());
-        let positionAmount = await product.appraisePosition(USER1, cETH_ADDRESS);
-        let coverAmount = positionAmount.mul(5000).div(10000);
-        let blocks = BN.from(threeDays)
-        let expectedPremium = BN.from("107517344753400");
-        let quote = BN.from(await product.getQuote(USER1, cETH_ADDRESS, coverAmount, blocks))
+        let quote = BN.from(await product.getQuote(coverAmount, blocks));
         expect(quote).to.equal(expectedPremium);
-      })
+      });
       it("can buyPolicy", async function () {
         expect(await policyManager.totalSupply()).to.equal(0);
         expect(await policyManager.balanceOf(USER1)).to.equal(0);
@@ -201,27 +173,16 @@ if(process.env.FORK_NETWORK === "rinkeby"){
         (await policyManager.connect(governor).addProduct(product.address));
         expect(await policyManager.productIsActive(product.address)).to.equal(true);
 
-        let positionAmount = await product.appraisePosition(USER1, cETH_ADDRESS);
-        let coverAmount = positionAmount.mul(5000).div(10000);
-        let blocks = threeDays
-        let quote = BN.from(await product.getQuote(USER1, cETH_ADDRESS, coverAmount, blocks));
-        let res = (await product.buyPolicy(USER1, cETH_ADDRESS, coverAmount, blocks, { value: quote }));
-        let receipt = await res.wait()
-        if(receipt.events) {
-          var event = receipt.events.filter(event => event.event == "PolicyCreated")[0]
-          if(event.args) {
-            expect(event.args[0]).to.equal(1); // policyID
-          }
-        }
+        let tx = await product.buyPolicy(USER1, cETH_ADDRESS, coverAmount, blocks, { value: expectedPremium });
+        expect(tx).to.emit(product, "PolicyCreated").withArgs(1);
         expect(await policyManager.totalSupply()).to.equal(1);
         expect(await policyManager.balanceOf(USER1)).to.equal(1);
       })
       it("can buy duplicate policy", async function () {
-        let positionAmount = await product.appraisePosition(USER1, cETH_ADDRESS);
-        let coverAmount = positionAmount.mul(5000).div(10000);
-        let blocks = threeDays
-        let quote = BN.from(await product.getQuote(USER1, cETH_ADDRESS, coverAmount, blocks));
-        await product.buyPolicy(USER1, cETH_ADDRESS, coverAmount, blocks, { value: quote });
+        let tx = await product.buyPolicy(USER1, cETH_ADDRESS, coverAmount, blocks, { value: expectedPremium });
+        expect(tx).to.emit(product, "PolicyCreated").withArgs(2);
+        expect(await policyManager.totalSupply()).to.equal(2);
+        expect(await policyManager.balanceOf(USER1)).to.equal(2);
       })
       it("can get product name", async function () {
         expect(await product.name()).to.equal("Compound");
@@ -242,11 +203,7 @@ if(process.env.FORK_NETWORK === "rinkeby"){
         // create a cETH position and policy
         await ceth.connect(user).mint({value: BN.from("1000000000000000")});
         await ceth.connect(user).approve(product.address, constants.MaxUint256);
-        let positionAmount = await product.appraisePosition(user.address, cETH_ADDRESS);
-        let coverAmount = positionAmount;
-        let blocks = threeDays
-        let quote = BN.from(await product.getQuote(user.address, cETH_ADDRESS, coverAmount, blocks));
-        await product.connect(user).buyPolicy(user.address, cETH_ADDRESS, coverAmount, blocks, { value: quote });
+        await product.connect(user).buyPolicy(user.address, cETH_ADDRESS, coverAmount, blocks, { value: expectedPremium });
         // create a cUSDC position and policy
         let uAmount = BN.from("1000000");
         let index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[user.address,0]);
@@ -256,8 +213,7 @@ if(process.env.FORK_NETWORK === "rinkeby"){
         await usdc.connect(user).approve(cUSDC_ADDRESS, constants.MaxUint256)
         await cusdc.connect(user).mint(usdcBalance);
         await cusdc.connect(user).approve(product.address, constants.MaxUint256);
-        quote = BN.from(await product.getQuote(user.address, cUSDC_ADDRESS, coverAmount, blocks));
-        await product.connect(user).buyPolicy(user.address, cUSDC_ADDRESS, coverAmount, blocks, { value: quote });
+        await product.connect(user).buyPolicy(user.address, cUSDC_ADDRESS, coverAmount, blocks, { value: expectedPremium });
 
       });
       it("cannot submit claim with expired signature", async function () {
@@ -349,14 +305,6 @@ if(process.env.FORK_NETWORK === "rinkeby"){
         expect(userEth2.sub(userEth1).add(gasCost)).to.equal(amountOut2);
       });
       it("should support all ctokens", async function () {
-        var ctokens = [
-          {"symbol":"cBAT","address":"0xEBf1A11532b93a529b5bC942B4bAA98647913002"},
-          {"symbol":"cDAI","address":"0x6D7F0754FFeb405d23C51CE938289d4835bE3b14"},
-          {"symbol":"cETH","address":"0xd6801a1DfFCd0a410336Ef88DeF4320D6DF1883e"},
-          {"symbol":"cUSDC","address":"0x5B281A6DdA0B271e91ae35DE655Ad301C976edb1"},
-          {"symbol":"cUSDT","address":"0x2fB298BDbeF468638AD6653FF8376575ea41e768","uimpl":"0x98394a121D26F90F4841e7BFE9dD4Aba05E666E4"},
-          {"symbol":"cZRX","address":"0x52201ff1720134bBbBB2f6BC97Bf3715490EC19B","uimpl":"","blacklist":""}
-        ];
         var success = 0;
         var successList = [];
         var failList = [];
@@ -414,11 +362,7 @@ if(process.env.FORK_NETWORK === "rinkeby"){
             const cAmount = await cToken.balanceOf(policyholder3.address);
             expect(cAmount).to.be.gt(0);
             // create policy
-            let positionAmount = await product.appraisePosition(policyholder3.address, ctokenAddress);
-            let coverAmount = positionAmount;
-            let blocks = threeDays;
-            let quote = BN.from(await product.getQuote(policyholder3.address, ctokenAddress, coverAmount, blocks));
-            await product.connect(policyholder3).buyPolicy(policyholder3.address, ctokenAddress, coverAmount, blocks, { value: quote });
+            await product.connect(policyholder3).buyPolicy(policyholder3.address, ctokenAddress, coverAmount, blocks, { value: expectedPremium });
             let policyID = (await policyManager.totalPolicyCount()).toNumber();
             // sign swap
             let amountOut = 10000;
@@ -486,10 +430,4 @@ function assembleSignature(parts: ECDSASignature) {
   let r_ = buf2hex(r);
   let s_ = buf2hex(s);
   return `0x${r_}${s_}${v_}`;
-}
-
-function oneToken(decimals: number) {
-  var s = "1";
-  for(var i = 0; i < decimals; ++i) s += "0";
-  return BN.from(s);
 }

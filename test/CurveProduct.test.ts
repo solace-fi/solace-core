@@ -8,7 +8,12 @@ const { expect } = chai;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { PolicyManager, CurveProduct, ExchangeQuoter1InchV1, ExchangeQuoterManual, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
+import { PolicyManager, CurveProduct, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
+import { getDomainSeparator, sign } from "./utilities/signature";
+import { toBytes32, setStorageAt } from "./utilities/setStorage";
+import { encodeAddresses } from "./utilities/positionDescription";
+import { oneToken } from "./utilities/math";
+import { ECDSASignature } from "ethereumjs-util";
 
 if(process.env.FORK_NETWORK === "mainnet"){
   describe("CurveProduct", function () {
@@ -17,8 +22,6 @@ if(process.env.FORK_NETWORK === "mainnet"){
 
     let policyManager: PolicyManager;
     let product: CurveProduct;
-    let quoter: ExchangeQuoter1InchV1;
-    let quoter2: ExchangeQuoterManual;
     let weth: Weth9;
     let treasury: Treasury;
     let claimsEscrow: ClaimsEscrow;
@@ -35,6 +38,10 @@ if(process.env.FORK_NETWORK === "mainnet"){
     const cancelFee = BN.from("100000000000000000"); // 0.1 Ether in wei
     const price = 11044; // 2.60%/yr
 
+    const coverAmount = BN.from("10000000000000000000"); // 10 eth
+    const blocks = BN.from(threeDays);
+    const expectedPremium = BN.from("2137014000000000");
+
     const ONE_SPLIT_VIEW = "0xC586BeF4a0992C495Cf22e1aeEE4E446CECDee0E";
     const ADDRESS_PROVIDER = "0x0000000022D53366457F9d5E68Ec105046FC4383";
     const THREEPOOL_TOKEN = "0x6c3F90f043a72FA612cbac8115EE7e52BDe6E490";
@@ -45,7 +52,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
     before(async function () {
       artifacts = await import_artifacts();
       await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
-      
+
       registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
       weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
       await registry.connect(governor).setWeth(weth.address);
@@ -60,26 +67,6 @@ if(process.env.FORK_NETWORK === "mainnet"){
       riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
       await registry.connect(governor).setRiskManager(riskManager.address);
 
-      // deploy exchange quoter
-      quoter = (await deployContract(
-        deployer,
-        artifacts.ExchangeQuoter1InchV1,
-        [
-          ONE_SPLIT_VIEW
-        ]
-      )) as ExchangeQuoter1InchV1;
-
-      // deploy manual exchange quoter
-      quoter2 = (await deployContract(
-        deployer,
-        artifacts.ExchangeQuoterManual,
-        [
-          governor.address
-        ]
-      )) as ExchangeQuoterManual;
-      await expect(quoter2.connect(user).setRates([],[])).to.be.revertedWith("!signer");
-      await quoter2.connect(governor).setRates(["0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","0x89d24a6b4ccb1b6faa2625fe562bdd9a23260359","0xc00e94cb662c3520282e6f5717214004a7f26888","0x1f9840a85d5af5bf1d1762f925bdaddc4201f984","0x514910771af9ca656af840dff83e8264ecf986ca","0x2260fac5e5542a773aa44fbcfedf7c193bc2c599","0xdac17f958d2ee523a2206206994597c13d831ec7","0x1985365e9f78359a9b6ad760e32412f4a445e862","0x0d8775f648430679a709e98d2b0cb6250d2887ef","0xe41d2489571d322189246dafa5ebde1f4699f498","0x0000000000085d4780b73119b644ae5ecd22b376","0x6b175474e89094c44da98b954eedeac495271d0f","0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"],["1000000000000000000","5214879005539865","131044789678131649","9259278326749300","9246653217422099","15405738054265288944","420072999319953","12449913804491249","281485209795972","372925580282399","419446558886231","205364954059859","50000000000000"]);
-
       // deploy Curve Product
       product = (await deployContract(
         deployer,
@@ -92,32 +79,14 @@ if(process.env.FORK_NETWORK === "mainnet"){
           minPeriod,
           maxPeriod,
           price,
-          1,
-          quoter.address
+          1
         ]
       )) as CurveProduct;
 
       await vault.connect(deployer).depositEth({value:maxCoverAmount});
       await riskManager.connect(governor).addProduct(product.address, 1);
       await product.connect(governor).addSigner(paclasSigner.address);
-    })
-
-    describe("appraisePosition", function () {
-      it("reverts if invalid pool or token", async function () {
-        await expect(product.appraisePosition(user.address, ZERO_ADDRESS)).to.be.revertedWith("Not a valid pool or token");
-        await expect(product.appraisePosition(user.address, user.address)).to.be.revertedWith("Not a valid pool or token");
-      })
-
-      it("no positions should have no value", async function () {
-        expect(await product.appraisePosition(user.address, THREEPOOL_TOKEN)).to.equal(0);
-        expect(await product.appraisePosition(user.address, THREEPOOL_POOL)).to.equal(0);
-      })
-
-      it("a position should have a value", async function () {
-        expect(await product.appraisePosition(REAL_USER, THREEPOOL_TOKEN)).to.equal(BALANCE);
-        expect(await product.appraisePosition(REAL_USER, THREEPOOL_POOL)).to.equal(BALANCE);
-      })
-    })
+    });
 
     describe("covered platform", function () {
       it("starts as curve address provider", async function () {

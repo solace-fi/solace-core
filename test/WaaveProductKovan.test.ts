@@ -3,8 +3,6 @@ const { deployContract, solidity } = waffle;
 import { MockProvider } from "ethereum-waffle";
 const provider: MockProvider = waffle.provider;
 import { BigNumber as BN, BigNumberish, utils, constants, Contract } from "ethers";
-import { ECDSASignature, ecsign } from "ethereumjs-util";
-import { getPermitDigest, sign, getDomainSeparator } from "./utilities/signature";
 import chai from "chai";
 const { expect } = chai;
 chai.use(solidity);
@@ -12,21 +10,17 @@ import { config as dotenv_config } from "dotenv";
 dotenv_config();
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { PolicyManager, WaaveProduct, ExchangeQuoterAaveV2, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
+import { PolicyManager, WaaveProduct, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
+import { getDomainSeparator, sign } from "./utilities/signature";
+import { toBytes32, setStorageAt } from "./utilities/setStorage";
+import { encodeAddresses } from "./utilities/positionDescription";
+import { oneToken } from "./utilities/math";
+import { ECDSASignature } from "ethereumjs-util";
 
 const SUBMIT_CLAIM_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("WaaveProductSubmitClaim(uint256 policyID,uint256 amountOut,uint256 deadline)"));
 
 const chainId = 31337;
 const deadline = constants.MaxUint256;
-
-const toBytes32 = (bn: BN) => {
-  return ethers.utils.hexlify(ethers.utils.zeroPad(bn.toHexString(), 32));
-};
-
-const setStorageAt = async (address: string, index: BigNumberish, value: string) => {
-  await ethers.provider.send("hardhat_setStorageAt", [address, index, value]);
-  await ethers.provider.send("evm_mine", []); // Just mines to the next block
-};
 
 // Returns the EIP712 hash which should be signed by the authorized signer
 // in order to make a call to WaaveProduct.submitClaim()
@@ -65,7 +59,6 @@ if(process.env.FORK_NETWORK === "kovan"){
     let policyManager: PolicyManager;
     let product: WaaveProduct;
     let product2: WaaveProduct;
-    let quoter: ExchangeQuoterAaveV2;
     let treasury: Treasury;
     let claimsEscrow: ClaimsEscrow;
     let vault: Vault;
@@ -82,6 +75,10 @@ if(process.env.FORK_NETWORK === "kovan"){
     const threeDays = 19350;
     const price = 11044; // 2.60%/yr
 
+    const coverAmount = BN.from("10000000000000000000"); // 10 eth
+    const blocks = BN.from(threeDays);
+    const expectedPremium = BN.from("2137014000000000");
+
     const WAREGISTRY_ADDRESS        = "0x166956c3A96c875610DCfb80F228Da0f4e92B73B";
     const WETH_ADDRESS              = "0xd0A1E359811322d97991E03f863a0C30C2cF029C";
     const WAWETH_ADDRESS            = "0xe0f1cdB8AC8d75Af103b227Ee0aE7c7fd47A4A83";
@@ -91,10 +88,17 @@ if(process.env.FORK_NETWORK === "kovan"){
 
     const COOLDOWN_PERIOD = 3600; // one hour
 
+    var watokens = [
+      {"symbol":"waWETH","address":"0xe0f1cdB8AC8d75Af103b227Ee0aE7c7fd47A4A83"},
+      {"symbol":"waDAI","address":"0xcc920E61c23f39Ae5AFc7B494E669b975594Eeea"},
+      {"symbol":"waUSDT","address":"0x23887f03647282f4E5305e6Cd877842D76De07a1"},
+      {"symbol":"waWBTC","address":"0x23887f03647282f4E5305e6Cd877842D76De07a1","uimpl":"","blacklist":""}
+    ];
+
     before(async function () {
       artifacts = await import_artifacts();
       await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
-      
+
       registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
       weth = (await ethers.getContractAt(artifacts.WETH.abi, WETH_ADDRESS)) as Weth9;
       await registry.connect(governor).setWeth(weth.address);
@@ -109,9 +113,6 @@ if(process.env.FORK_NETWORK === "kovan"){
       riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
       await registry.connect(governor).setRiskManager(riskManager.address);
 
-      // deploy exchange quoter
-      quoter = (await deployContract(deployer, artifacts.ExchangeQuoterAaveV2, [AAVE_DATA_PROVIDER])) as ExchangeQuoterAaveV2;
-
       // deploy Waave Product
       product = (await deployContract(
         deployer,
@@ -124,8 +125,7 @@ if(process.env.FORK_NETWORK === "kovan"){
           minPeriod,
           maxPeriod,
           price,
-          1,
-          quoter.address
+          1
         ]
       )) as WaaveProduct;
 
@@ -140,8 +140,7 @@ if(process.env.FORK_NETWORK === "kovan"){
           minPeriod,
           maxPeriod,
           price,
-          1,
-          quoter.address
+          1
         ]
       )) as WaaveProduct;
 
@@ -151,33 +150,13 @@ if(process.env.FORK_NETWORK === "kovan"){
       await vault.connect(deployer).depositEth({value: BN.from("1000000000000000000000")}); // 1000 eth
       await riskManager.connect(governor).addProduct(product.address, 1);
       await product.connect(governor).addSigner(paclasSigner.address);
-    })
-
-    describe("appraisePosition", function () {
-      it("reverts if invalid pool or token", async function () {
-        await expect(product.appraisePosition(policyholder1.address, ZERO_ADDRESS)).to.be.reverted;
-        await expect(product.appraisePosition(policyholder1.address, policyholder1.address)).to.be.reverted;
-      })
-
-      it("no positions should have no value", async function () {
-        expect(await product.appraisePosition(policyholder1.address, WAWETH_ADDRESS)).to.equal(0);
-      })
-
-      it("a position should have a value", async function () {
-        expect(await product.appraisePosition(USER1, WAWETH_ADDRESS)).to.equal(BALANCE1);
-      })
-    })
+    });
 
     describe("implementedFunctions", function () {
       it("can getQuote", async function () {
-        let price = BN.from(await product.price());
-        let positionAmount = await product.appraisePosition(USER1, WAWETH_ADDRESS);
-        let coverAmount = positionAmount.mul(5000).div(10000);
-        let blocks = BN.from(threeDays);
-        let expectedPremium = BN.from("6411042000000");
-        let quote = BN.from(await product.getQuote(USER1, WAWETH_ADDRESS, coverAmount, blocks))
+        let quote = BN.from(await product.getQuote(coverAmount, blocks));
         expect(quote).to.equal(expectedPremium);
-      })
+      });
       it("can buyPolicy", async function () {
         expect(await policyManager.totalSupply()).to.equal(0);
         expect(await policyManager.balanceOf(USER1)).to.equal(0);
@@ -185,21 +164,16 @@ if(process.env.FORK_NETWORK === "kovan"){
         (await policyManager.connect(governor).addProduct(product.address));
         expect(await policyManager.productIsActive(product.address)).to.equal(true);
 
-        let positionAmount = await product.appraisePosition(USER1, WAWETH_ADDRESS);
-        let coverAmount = positionAmount.mul(5000).div(10000);
-        let blocks = threeDays;
-        let quote = BN.from(await product.getQuote(USER1, WAWETH_ADDRESS, coverAmount, blocks));
-        let tx = (await product.buyPolicy(USER1, WAWETH_ADDRESS, coverAmount, blocks, { value: quote }));
+        let tx = await product.buyPolicy(USER1, WAWETH_ADDRESS, coverAmount, blocks, { value: expectedPremium });
         expect(tx).to.emit(policyManager, "PolicyCreated").withArgs(1);
         expect(await policyManager.totalSupply()).to.equal(1);
         expect(await policyManager.balanceOf(USER1)).to.equal(1);
       })
       it("can buy duplicate policy", async function () {
-        let positionAmount = await product.appraisePosition(USER1, WAWETH_ADDRESS);
-        let coverAmount = positionAmount.mul(5000).div(10000);
-        let blocks = threeDays
-        let quote = BN.from(await product.getQuote(USER1, WAWETH_ADDRESS, coverAmount, blocks));
-        await product.buyPolicy(USER1, WAWETH_ADDRESS, coverAmount, blocks, { value: quote });
+        let tx = await product.buyPolicy(USER1, WAWETH_ADDRESS, coverAmount, blocks, { value: expectedPremium });
+        expect(tx).to.emit(product, "PolicyCreated").withArgs(2);
+        expect(await policyManager.totalSupply()).to.equal(2);
+        expect(await policyManager.balanceOf(USER1)).to.equal(2);
       })
       it("can get product name", async function () {
         expect(await product.name()).to.equal("Waave");
@@ -219,21 +193,13 @@ if(process.env.FORK_NETWORK === "kovan"){
         await weth.connect(policyholder1).deposit({value: depositAmount1});
         await weth.connect(policyholder1).approve(waWeth.address, depositAmount1);
         await waWeth.connect(policyholder1).deposit(depositAmount1);
-        let positionAmount1 = await product.appraisePosition(policyholder1.address, WAWETH_ADDRESS);
-        let coverAmount1 = positionAmount1;
-        let blocks1 = threeDays;
-        let quote1 = BN.from(await product.getQuote(policyholder1.address, WAWETH_ADDRESS, coverAmount1, blocks1));
-        await product.connect(policyholder1).buyPolicy(policyholder1.address, WAWETH_ADDRESS, coverAmount1, blocks1, { value: quote1 });
+        await product.connect(policyholder1).buyPolicy(policyholder1.address, WAWETH_ADDRESS, coverAmount, blocks, { value: expectedPremium });
         // create another waWETH position and policy
         let depositAmount2 = BN.from("2000000000000000");
         await weth.connect(policyholder2).deposit({value: depositAmount2});
         await weth.connect(policyholder2).approve(waWeth.address, depositAmount2);
         await waWeth.connect(policyholder2).deposit(depositAmount2);
-        let positionAmount2 = await product.appraisePosition(policyholder2.address, WAWETH_ADDRESS);
-        let coverAmount2 = positionAmount2;
-        let blocks2 = threeDays;
-        let quote2 = BN.from(await product.getQuote(policyholder2.address, WAWETH_ADDRESS, coverAmount2, blocks2));
-        await product.connect(policyholder2).buyPolicy(policyholder2.address, WAWETH_ADDRESS, coverAmount2, blocks2, { value: quote2 });
+        await product.connect(policyholder2).buyPolicy(policyholder2.address, WAWETH_ADDRESS, coverAmount, blocks, { value: expectedPremium });
       });
       it("cannot submit claim with expired signature", async function () {
         let digest = getSubmitClaimDigest("Solace.fi-WaaveProduct", product.address, chainId, policyID1, amountOut1, 0);
@@ -299,12 +265,6 @@ if(process.env.FORK_NETWORK === "kovan"){
         expect(userEth2.sub(userEth1).add(gasCost)).to.equal(amountOut1);
       });
       it("should support all watokens", async function () {
-        var watokens = [
-          {"symbol":"waWETH","address":"0xe0f1cdB8AC8d75Af103b227Ee0aE7c7fd47A4A83"},
-          {"symbol":"waDAI","address":"0xcc920E61c23f39Ae5AFc7B494E669b975594Eeea"},
-          {"symbol":"waUSDT","address":"0x23887f03647282f4E5305e6Cd877842D76De07a1"},
-          {"symbol":"waWBTC","address":"0x23887f03647282f4E5305e6Cd877842D76De07a1","uimpl":"","blacklist":""}
-        ];
         var success = 0;
         var successList = [];
         var failList = [];
@@ -358,11 +318,7 @@ if(process.env.FORK_NETWORK === "kovan"){
             const cAmount = await watoken.balanceOf(policyholder3.address);
             expect(cAmount).to.be.gt(0);
             // create policy
-            let positionAmount = await product.appraisePosition(policyholder3.address, watokenAddress);
-            let coverAmount = positionAmount;
-            let blocks = threeDays;
-            let quote = BN.from(await product.getQuote(policyholder3.address, watokenAddress, coverAmount, blocks));
-            await product.connect(policyholder3).buyPolicy(policyholder3.address, watokenAddress, coverAmount, blocks, { value: quote });
+            await product.connect(policyholder3).buyPolicy(policyholder3.address, watokenAddress, coverAmount, blocks, { value: expectedPremium });
             let policyID = (await policyManager.totalPolicyCount()).toNumber();
             // sign swap
             let amountOut = 10000;
@@ -430,10 +386,4 @@ function assembleSignature(parts: ECDSASignature) {
   let r_ = buf2hex(r);
   let s_ = buf2hex(s);
   return `0x${r_}${s_}${v_}`;
-}
-
-function oneToken(decimals: number) {
-  var s = "1";
-  for(var i = 0; i < decimals; ++i) s += "0";
-  return BN.from(s);
 }

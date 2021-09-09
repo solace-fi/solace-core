@@ -30,20 +30,20 @@ interface IProduct {
     /**
      * @notice Purchases and mints a policy on the behalf of the policyholder.
      * User will need to pay **ETH**.
-     * @param policyholder Holder of the position to cover.
-     * @param positionContract The contract address where the policyholder has a position to be covered.
-     * @param coverAmount The value to cover in **ETH**. Will only cover up to the appraised value.
+     * @param policyholder Holder of the position(s) to cover.
+     * @param positionDescription A byte encoded description of the position(s) to cover.
+     * @param coverAmount The value to cover in **ETH**.
      * @param blocks The length (in blocks) for policy.
      * @return policyID The ID of newly created policy.
      */
-    function buyPolicy(address policyholder, address positionContract, uint256 coverAmount, uint40 blocks) external payable returns (uint256 policyID);
+    function buyPolicy(address policyholder, bytes memory positionDescription, uint256 coverAmount, uint40 blocks) external payable returns (uint256 policyID);
 
     /**
      * @notice Increase or decrease the cover amount of the policy.
      * User may need to pay **ETH** for increased cover amount or receive a refund for decreased cover amount.
      * Can only be called by the policyholder.
      * @param policyID The ID of the policy.
-     * @param newCoverAmount The new value to cover in **ETH**. Will only cover up to the appraised value.
+     * @param newCoverAmount The new value to cover in **ETH**.
      */
     function updateCoverAmount(uint256 policyID, uint256 newCoverAmount) external payable;
 
@@ -61,7 +61,7 @@ interface IProduct {
      * User may need to pay **ETH** for increased cover amount or receive a refund for decreased cover amount.
      * Can only be called by the policyholder.
      * @param policyID The ID of the policy.
-     * @param newCoverAmount The new value to cover in **ETH**. Will only cover up to the appraised value.
+     * @param newCoverAmount The new value to cover in **ETH**.
      * @param extension The length of extension in blocks.
      */
     function updatePolicy(uint256 policyID, uint256 newCoverAmount, uint40 extension) external payable;
@@ -79,24 +79,12 @@ interface IProduct {
     ***************************************/
 
     /**
-     * @notice Calculate the value of a user's position in **ETH**.
-     * Every product will have a different mechanism to determine a user's total position in that product's protocol.
-     * @dev It should validate that the `positionContract` belongs to the protocol and revert if it doesn't.
-     * @param policyholder The owner of the position.
-     * @param positionContract The address of the smart contract the `policyholder` has their position in (e.g., for `UniswapV2Product` this would be the Pair's address).
-     * @return positionAmount The value of the position.
-     */
-    function appraisePosition(address policyholder, address positionContract) external view returns (uint256 positionAmount);
-
-    /**
      * @notice Calculate a premium quote for a policy.
-     * @param policyholder The holder of the position to cover.
-     * @param positionContract The address of the exact smart contract the policyholder has their position in (e.g., for UniswapProduct this would be Pair's address).
      * @param coverAmount The value to cover in **ETH**.
-     * @param blocks The length for policy.
-     * @return premium The quote for their policy in **Wei**.
+     * @param blocks The duration of the policy in blocks.
+     * @return premium The quote for their policy in **ETH**.
      */
-    function getQuote(address policyholder, address positionContract, uint256 coverAmount, uint40 blocks) external view returns (uint256 premium);
+    function getQuote(uint256 coverAmount, uint40 blocks) external view returns (uint256 premium);
 
     /***************************************
     GLOBAL VIEW FUNCTIONS
@@ -124,8 +112,6 @@ interface IProduct {
     /// A platform contract which locates contracts that are covered by this product.
     /// (e.g., `UniswapProduct` will have `Factory` as `coveredPlatform` contract, because every `Pair` address can be located through `getPool()` function).
     function coveredPlatform() external view returns (address);
-    /// @notice The total policy count this product sold.
-    function productPolicyCount() external view returns (uint256);
     /// @notice The current amount covered (in wei).
     function activeCoverAmount() external view returns (uint256);
 
