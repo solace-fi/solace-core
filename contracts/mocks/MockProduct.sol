@@ -43,7 +43,7 @@ contract MockProduct is BaseProduct {
         "Solace.fi-MockProduct",
         "1"
     ) {
-        _SUBMIT_CLAIM_TYPEHASH = keccak256("MockProductExchange(uint256 policyID,uint256 amountOut,uint256 deadline)");
+        _SUBMIT_CLAIM_TYPEHASH = keccak256("MockProductSubmitClaim(uint256 policyID,uint256 amountOut,uint256 deadline)");
         _productName = "Mock";
     }
 
@@ -53,8 +53,8 @@ contract MockProduct is BaseProduct {
      * @param expirationBlock The new expiration block for the policy.
      */
     function setPolicyExpiration(uint256 policyID, uint40 expirationBlock) external {
-        (address policyholder, , bytes memory positionDescription, uint256 coverAmount, , uint24 purchasePrice) = _policyManager.getPolicyInfo(policyID);
-        _policyManager.setPolicyInfo(policyID, policyholder, positionDescription, coverAmount, expirationBlock, purchasePrice);
+        ( , , bytes memory positionDescription, uint256 coverAmount, , uint24 purchasePrice) = _policyManager.getPolicyInfo(policyID);
+        _policyManager.setPolicyInfo(policyID, coverAmount, expirationBlock, purchasePrice, positionDescription);
     }
 
     /**
@@ -70,7 +70,7 @@ contract MockProduct is BaseProduct {
         // bypasses some important checks in BaseProduct
         // create the policy
         uint40 expirationBlock = uint40(block.number + blocks);
-        policyID = _policyManager.createPolicy(policyholder, positionDescription, coverAmount, expirationBlock, _price);
+        policyID = _policyManager.createPolicy(policyholder, coverAmount, expirationBlock, _price, positionDescription);
 
         // update local book-keeping variables
         _activeCoverAmount += coverAmount;
@@ -89,6 +89,6 @@ contract MockProduct is BaseProduct {
      */
     // solhint-disable-next-line no-unused-vars
     function isValidPositionDescription(bytes memory positionDescription) public view virtual override returns (bool isValid) {
-        return true;
+        return positionDescription.length >= 0; // always true
     }
 }

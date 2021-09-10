@@ -144,7 +144,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
 
         // create the policy
         uint40 expirationBlock = uint40(block.number + blocks);
-        policyID = _policyManager.createPolicy(policyholder, positionDescription, coverAmount, expirationBlock, _price);
+        policyID = _policyManager.createPolicy(policyholder, coverAmount, expirationBlock, _price, positionDescription);
 
         // update local book-keeping variables
         _activeCoverAmount += coverAmount;
@@ -203,7 +203,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
             ITreasury(payable(_registry.treasury())).refund(msg.sender, refundAmount);
         }
         // update policy's URI and emit event
-        _policyManager.setPolicyInfo(policyID, policyholder, positionDescription, coverAmount, expirationBlock, _price);
+        _policyManager.setPolicyInfo(policyID, coverAmount, expirationBlock, _price, positionDescription);
         emit PolicyUpdated(policyID);
     }
 
@@ -233,7 +233,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         uint40 duration = newExpirationBlock - uint40(block.number);
         require(duration >= _minPeriod && duration <= _maxPeriod, "invalid period");
         // update the policy's URI
-        _policyManager.setPolicyInfo(policyID, policyholder, positionDescription, coverAmount, newExpirationBlock, purchasePrice);
+        _policyManager.setPolicyInfo(policyID, coverAmount, newExpirationBlock, purchasePrice, positionDescription);
         emit PolicyExtended(policyID);
     }
 
@@ -267,7 +267,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         require(duration >= _minPeriod && duration <= _maxPeriod, "invalid period");
 
         // update policy info
-        _policyManager.setPolicyInfo(policyID, policyholder, positionDescription, coverAmount, newExpirationBlock, _price);
+        _policyManager.setPolicyInfo(policyID, coverAmount, newExpirationBlock, _price, positionDescription);
 
         // calculate premium needed for new cover amount as if policy is bought now
         uint256 newPremium = coverAmount * duration * _price / 1e12;

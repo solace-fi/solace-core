@@ -71,6 +71,7 @@ contract AaveV2Product is BaseProduct {
      */
     function isValidPositionDescription(bytes memory positionDescription) public view virtual override returns (bool isValid) {
         // check length
+        // solhint-disable-next-line var-name-mixedcase
         uint256 ADDRESS_SIZE = 20;
         // must be concatenation of one or more addresses
         if(positionDescription.length == 0 || positionDescription.length % ADDRESS_SIZE != 0) return false;
@@ -78,6 +79,7 @@ contract AaveV2Product is BaseProduct {
         for(uint256 offset = 0; offset < positionDescription.length; offset += ADDRESS_SIZE) {
             // get next address
             address positionContract;
+            // solhint-disable-next-line no-inline-assembly
             assembly {
                 positionContract := div(mload(add(add(positionDescription, 0x20), offset)), 0x1000000000000000000000000)
             }

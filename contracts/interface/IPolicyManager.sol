@@ -37,9 +37,8 @@ interface IPolicyManager is IERC721Enumerable /*, IERC721Metadata*/ {
     /// @notice PolicyInfo struct.
     struct PolicyInfo {
         uint256 coverAmount;
-        address policyholder;
-        uint40 expirationBlock;
         address product;
+        uint40 expirationBlock;
         uint24 price;
         bytes positionDescription;
     }
@@ -78,14 +77,6 @@ interface IPolicyManager is IERC721Enumerable /*, IERC721Metadata*/ {
     function getPolicyProduct(uint256 policyID) external view returns (address product);
 
     /**
-     * @notice The byte encoded description of the covered position(s).
-     * Only makes sense in context of the product.
-     * @param policyID The policy ID.
-     * @return positionDescription The description of the covered position(s).
-     */
-    function getPositionDescription(uint256 policyID) external view returns (bytes calldata positionDescription);
-
-    /**
      * @notice The expiration block of the policy.
      * @param policyID The policy ID.
      * @return expirationBlock The expiration block of the policy.
@@ -105,6 +96,14 @@ interface IPolicyManager is IERC721Enumerable /*, IERC721Metadata*/ {
      * @return price The price of the policy.
      */
     function getPolicyPrice(uint256 policyID) external view returns (uint24 price);
+
+    /**
+     * @notice The byte encoded description of the covered position(s).
+     * Only makes sense in context of the product.
+     * @param policyID The policy ID.
+     * @return positionDescription The description of the covered position(s).
+     */
+    function getPositionDescription(uint256 policyID) external view returns (bytes calldata positionDescription);
 
     /**
      * @notice Lists all policies for a given policy holder.
@@ -165,31 +164,30 @@ interface IPolicyManager is IERC721Enumerable /*, IERC721Metadata*/ {
      * @notice Creates a new policy.
      * Can only be called by **products**.
      * @param policyholder The receiver of new policy token.
-     * @param positionDescription The description of the covered position(s).
      * @param expirationBlock The policy expiration block number.
      * @param coverAmount The policy coverage amount (in wei).
      * @param price The coverage price.
+     * @param positionDescription The description of the covered position(s).
      * @return policyID The policy ID.
      */
     function createPolicy(
         address policyholder,
-        bytes calldata positionDescription,
         uint256 coverAmount,
         uint40 expirationBlock,
-        uint24 price
+        uint24 price,
+        bytes calldata positionDescription
     ) external returns (uint256 policyID);
 
     /**
      * @notice Modifies a policy.
      * Can only be called by **products**.
      * @param policyID The policy ID.
-     * @param policyholder The receiver of new policy token.
-     * @param positionDescription The description of the covered position(s).
      * @param expirationBlock The policy expiration block number.
      * @param coverAmount The policy coverage amount (in wei).
      * @param price The coverage price.
+     * @param positionDescription The description of the covered position(s).
      */
-    function setPolicyInfo(uint256 policyID, address policyholder, bytes calldata positionDescription, uint256 coverAmount, uint40 expirationBlock, uint24 price) external;
+    function setPolicyInfo(uint256 policyID, uint256 coverAmount, uint40 expirationBlock, uint24 price, bytes calldata positionDescription) external;
 
     /**
      * @notice Burns expired or cancelled policies.
