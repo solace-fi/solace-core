@@ -55,12 +55,12 @@ interface IPolicyManager is IERC721Enumerable /*, IERC721Metadata*/ {
      * @param policyID The policy ID to return info.
      * @return policyholder The address of the policy holder.
      * @return product The product of the policy.
-     * @return positionDescription The description of the covered position(s).
      * @return coverAmount The amount covered for the policy.
      * @return expirationBlock The expiration block of the policy.
      * @return price The price of the policy.
+     * @return positionDescription The description of the covered position(s).
      */
-    function getPolicyInfo(uint256 policyID) external view returns (address policyholder, address product, bytes calldata positionDescription, uint256 coverAmount, uint40 expirationBlock, uint24 price);
+    function getPolicyInfo(uint256 policyID) external view returns (address policyholder, address product, uint256 coverAmount, uint40 expirationBlock, uint24 price, bytes calldata positionDescription);
 
     /**
      * @notice The holder of the policy.
@@ -257,4 +257,24 @@ interface IPolicyManager is IERC721Enumerable /*, IERC721Metadata*/ {
      * @param policyDescriptor The new token descriptor address.
      */
     function setPolicyDescriptor(address policyDescriptor) external;
+
+    /***************************************
+    ERC721 FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Transfers `tokenID` from `msg.sender` to `to`.
+     * @dev This was excluded from the official `ERC721` standard in favor of `transferFrom(address from, address to, uint256 tokenID)`. We elect to include it.
+     * @param to The receipient of the token.
+     * @param tokenID The token to transfer.
+     */
+    function transfer(address to, uint256 tokenID) external;
+
+    /**
+     * @notice Safely transfers `tokenID` from `msg.sender` to `to`.
+     * @dev This was excluded from the official `ERC721` standard in favor of `safeTransferFrom(address from, address to, uint256 tokenID)`. We elect to include it.
+     * @param to The receipient of the token.
+     * @param tokenID The token to transfer.
+     */
+    function safeTransfer(address to, uint256 tokenID) external;
 }

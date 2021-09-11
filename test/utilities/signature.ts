@@ -62,15 +62,16 @@ export function getPermitDigest(
 // Returns the EIP712 hash which should be signed by the authorized signer
 // in order to make a call to Product.submitClaim()
 export function getSubmitClaimDigest(
-    name: string,
-    address: string,
-    chainId: number,
+    domainName: string,
+    productAddress: string,
+    chainID: number,
     policyID: BigNumberish,
+    claimant: string,
     amountOut: BigNumberish,
     deadline: BigNumberish,
     typehash: string
     ) {
-    const DOMAIN_SEPARATOR = getDomainSeparator(name, address, chainId)
+    const DOMAIN_SEPARATOR = getDomainSeparator(domainName, productAddress, chainID)
     return utils.keccak256(
         utils.solidityPack(
         ["bytes1", "bytes1", "bytes32", "bytes32"],
@@ -80,8 +81,8 @@ export function getSubmitClaimDigest(
             DOMAIN_SEPARATOR,
             utils.keccak256(
             utils.defaultAbiCoder.encode(
-                ["bytes32", "uint256", "uint256","uint256"],
-                [typehash, policyID, amountOut, deadline]
+                ["bytes32", "uint256", "address", "uint256","uint256"],
+                [typehash, policyID, claimant, amountOut, deadline]
             )
             ),
         ]

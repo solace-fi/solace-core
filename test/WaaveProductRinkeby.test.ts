@@ -18,8 +18,8 @@ import { oneToken } from "./utilities/math";
 
 const DOMAIN_NAME = "Solace.fi-WaaveProduct";
 const INVALID_DOMAIN = "Solace.fi-Invalid";
-const SUBMIT_CLAIM_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("WaaveProductSubmitClaim(uint256 policyID,uint256 amountOut,uint256 deadline)"));
-const INVALID_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("InvalidType(uint256 policyID,uint256 amountOut,uint256 deadline)"));
+const SUBMIT_CLAIM_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("WaaveProductSubmitClaim(uint256 policyID,address claimant,uint256 amountOut,uint256 deadline)"));
+const INVALID_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("InvalidType(uint256 policyID,address claimant,uint256 amountOut,uint256 deadline)"));
 
 const chainId = 31337;
 const deadline = constants.MaxUint256;
@@ -229,23 +229,35 @@ if(process.env.FORK_NETWORK === "rinkeby"){
         await product.connect(policyholder2).buyPolicy(policyholder2.address, WAWETH_ADDRESS, coverAmount, blocks, { value: expectedPremium });
       });
       it("cannot submit claim with expired signature", async function () {
-        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, amountOut1, 0, SUBMIT_CLAIM_TYPEHASH);
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, amountOut1, 0, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
         await expect(product.connect(policyholder1).submitClaim(policyID1, amountOut1, 0, signature)).to.be.revertedWith("expired deadline");
       });
       it("cannot submit claim on someone elses policy", async function () {
-        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
         await expect(product.connect(policyholder2).submitClaim(policyID1, amountOut1, deadline, signature)).to.be.revertedWith("!policyholder");
       });
+      it("cannot submit claim on someone elses policy after transfer", async function () {
+        await policyManager.connect(policyholder1).transferFrom(policyholder1.address, policyholder2.address, policyID1)
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
+        let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
+        await expect(product.connect(policyholder1).submitClaim(policyID1, amountOut1, deadline, signature)).to.be.revertedWith("!policyholder");
+        await policyManager.connect(policyholder2).transferFrom(policyholder2.address, policyholder1.address, policyID1)
+      });
+      it("cannot submit claim signed for someone else", async function () {
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder2.address, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
+        let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
+        await expect(product.connect(policyholder1).submitClaim(policyID1, amountOut1, deadline, signature)).to.be.revertedWith("invalid signature");
+      });
       it("cannot submit claim from wrong product", async function () {
-        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
         await expect(product2.connect(policyholder1).submitClaim(policyID1, amountOut1, deadline, signature)).to.be.revertedWith("wrong product");
       });
       it("cannot submit claim with excessive payout", async function () {
         let coverAmount = (await policyManager.getPolicyInfo(policyID1)).coverAmount;
-        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, coverAmount.add(1), deadline, SUBMIT_CLAIM_TYPEHASH);
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, coverAmount.add(1), deadline, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
         await expect(product.connect(policyholder1).submitClaim(policyID1, coverAmount.add(1), deadline, signature)).to.be.revertedWith("excessive amount out");
       });
@@ -255,29 +267,29 @@ if(process.env.FORK_NETWORK === "rinkeby"){
         await expect(product.connect(policyholder1).submitClaim(policyID1, amountOut1, deadline, "0x1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890")).to.be.revertedWith("invalid signature");
       });
       it("cannot submit claim from unauthorized signer", async function () {
-        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(deployer.privateKey.slice(2), "hex")));
         await expect(product.connect(policyholder1).submitClaim(policyID1, amountOut1, deadline, signature)).to.be.revertedWith("invalid signature");
       });
       it("cannot submit claim with changed arguments", async function () {
-        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
         await expect(product.connect(policyholder1).submitClaim(policyID1, amountOut2, deadline, signature)).to.be.revertedWith("invalid signature");
         await expect(product.connect(policyholder1).submitClaim(policyID1, amountOut1, deadline.sub(1), signature)).to.be.revertedWith("invalid signature");
       });
       it("cannot submit claim with invalid domain", async function () {
-        let digest = getSubmitClaimDigest(INVALID_DOMAIN, product.address, chainId, policyID1, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
+        let digest = getSubmitClaimDigest(INVALID_DOMAIN, product.address, chainId, policyID1, policyholder1.address, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
         await expect(product.connect(policyholder1).submitClaim(policyID1, amountOut1, deadline, signature)).to.be.revertedWith("invalid signature");
       });
       it("cannot submit claim with invalid typehash", async function () {
-        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, amountOut1, deadline, INVALID_TYPEHASH);
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, amountOut1, deadline, INVALID_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
         await expect(product.connect(policyholder1).submitClaim(policyID1, amountOut1, deadline, signature)).to.be.revertedWith("invalid signature");
       });
       it("can open a claim on a waWETH position", async function () {
         // sign swap
-        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
         // submit claim
         let userWaWeth1 = await waWeth.balanceOf(policyholder1.address);
@@ -359,7 +371,7 @@ if(process.env.FORK_NETWORK === "rinkeby"){
             let policyID = (await policyManager.totalPolicyCount()).toNumber();
             // sign swap
             let amountOut = 10000;
-            let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID, amountOut, deadline, SUBMIT_CLAIM_TYPEHASH);
+            let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID, policyholder3.address, amountOut, deadline, SUBMIT_CLAIM_TYPEHASH);
             let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
             // submit claim
             let tx1 = await product.connect(policyholder3).submitClaim(policyID, amountOut, deadline, signature);

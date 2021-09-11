@@ -74,14 +74,14 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
      * @param policyID The policy ID to return info.
      * @return policyholder The address of the policy holder.
      * @return product The product of the policy.
-     * @return positionDescription The description of the covered position(s).
      * @return coverAmount The amount covered for the policy.
      * @return expirationBlock The expiration block of the policy.
      * @return price The price of the policy.
+     * @return positionDescription The description of the covered position(s).
      */
-    function getPolicyInfo(uint256 policyID) external view override policyMustExist(policyID) returns (address policyholder, address product, bytes memory positionDescription, uint256 coverAmount, uint40 expirationBlock, uint24 price) {
+    function getPolicyInfo(uint256 policyID) external view override policyMustExist(policyID) returns (address policyholder, address product, uint256 coverAmount, uint40 expirationBlock, uint24 price, bytes memory positionDescription) {
         PolicyInfo memory info = _policyInfo[policyID];
-        return (ownerOf(policyID), info.product, info.positionDescription, info.coverAmount, info.expirationBlock, info.price);
+        return (ownerOf(policyID), info.product, info.coverAmount, info.expirationBlock, info.price, info.positionDescription);
     }
 
     /**
@@ -400,4 +400,27 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
         _policyDescriptor = policyDescriptor_;
     }
 
+    /***************************************
+    ERC721 FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Transfers `tokenID` from `msg.sender` to `to`.
+     * @dev This was excluded from the official `ERC721` standard in favor of `transferFrom(address from, address to, uint256 tokenID)`. We elect to include it.
+     * @param to The receipient of the token.
+     * @param tokenID The token to transfer.
+     */
+    function transfer(address to, uint256 tokenID) public override {
+        super.transferFrom(msg.sender, to, tokenID);
+    }
+
+    /**
+     * @notice Safely transfers `tokenID` from `msg.sender` to `to`.
+     * @dev This was excluded from the official `ERC721` standard in favor of `safeTransferFrom(address from, address to, uint256 tokenID)`. We elect to include it.
+     * @param to The receipient of the token.
+     * @param tokenID The token to transfer.
+     */
+    function safeTransfer(address to, uint256 tokenID) public override {
+        super.safeTransferFrom(msg.sender, to, tokenID, "");
+    }
 }

@@ -53,7 +53,7 @@ contract MockProduct is BaseProduct {
      * @param expirationBlock The new expiration block for the policy.
      */
     function setPolicyExpiration(uint256 policyID, uint40 expirationBlock) external {
-        ( , , bytes memory positionDescription, uint256 coverAmount, , uint24 purchasePrice) = _policyManager.getPolicyInfo(policyID);
+        ( , , uint256 coverAmount, , uint24 purchasePrice, bytes memory positionDescription) = _policyManager.getPolicyInfo(policyID);
         _policyManager.setPolicyInfo(policyID, coverAmount, expirationBlock, purchasePrice, positionDescription);
     }
 

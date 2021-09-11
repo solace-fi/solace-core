@@ -50,7 +50,7 @@ contract WaaveProduct is BaseProduct {
         "1"
     ) {
         _waRegistry = IWaRegistry(waRegistry_);
-        _SUBMIT_CLAIM_TYPEHASH = keccak256("WaaveProductSubmitClaim(uint256 policyID,uint256 amountOut,uint256 deadline)");
+        _SUBMIT_CLAIM_TYPEHASH = keccak256("WaaveProductSubmitClaim(uint256 policyID,address claimant,uint256 amountOut,uint256 deadline)");
         _productName = "Waave";
     }
 

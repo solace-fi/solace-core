@@ -380,6 +380,56 @@ describe("PolicyManager", function() {
     });
   });
 
+  describe("transfer", async function () {
+    let policyID = 4;
+    it("should reject transfer of nonexistent token", async function () {
+      await expect(policyManager.connect(user).transfer(user2.address, 99)).to.be.revertedWith("ERC721: operator query for nonexistent token");
+    });
+    it("should reject transfer by non owner", async function () {
+      await expect(policyManager.connect(user2).transfer(user2.address, policyID)).to.be.revertedWith("ERC721: transfer caller is not owner nor approved");
+    });
+    it("should transfer", async function () {
+      let bal11 = await policyManager.balanceOf(user.address);
+      let bal12 = await policyManager.balanceOf(user2.address);
+      let ts1 = await policyManager.totalSupply();
+      expect(await policyManager.ownerOf(policyID)).to.equal(user.address);
+      expect(await policyManager.getPolicyholder(policyID)).to.equal(user.address);
+      let tx = await policyManager.connect(user).transfer(user2.address, policyID);
+      expect(tx).to.emit(policyManager, "Transfer").withArgs(user.address, user2.address, policyID);
+      let bal21 = await policyManager.balanceOf(user.address);
+      let bal22 = await policyManager.balanceOf(user2.address);
+      let ts2 = await policyManager.totalSupply();
+      expect(await policyManager.ownerOf(policyID)).to.equal(user2.address);
+      expect(await policyManager.getPolicyholder(policyID)).to.equal(user2.address);
+      expect(bal11.sub(bal21)).to.equal(1);
+      expect(bal22.sub(bal12)).to.equal(1);
+      expect(ts1).to.equal(ts2);
+    });
+    it("should reject safeTransfer of nonexistent token", async function () {
+      await expect(policyManager.connect(user2).safeTransfer(user.address, 99)).to.be.revertedWith("ERC721: operator query for nonexistent token");
+    });
+    it("should reject safeTransfer by non owner", async function () {
+      await expect(policyManager.connect(user).safeTransfer(user.address, policyID)).to.be.revertedWith("ERC721: transfer caller is not owner nor approved");
+    });
+    it("should safeTransfer", async function () {
+      let bal11 = await policyManager.balanceOf(user.address);
+      let bal12 = await policyManager.balanceOf(user2.address);
+      let ts1 = await policyManager.totalSupply();
+      expect(await policyManager.ownerOf(policyID)).to.equal(user2.address);
+      expect(await policyManager.getPolicyholder(policyID)).to.equal(user2.address);
+      let tx = await policyManager.connect(user2).safeTransfer(user.address, policyID);
+      expect(tx).to.emit(policyManager, "Transfer").withArgs(user2.address, user.address, policyID);
+      let bal21 = await policyManager.balanceOf(user.address);
+      let bal22 = await policyManager.balanceOf(user2.address);
+      let ts2 = await policyManager.totalSupply();
+      expect(await policyManager.ownerOf(policyID)).to.equal(user.address);
+      expect(await policyManager.getPolicyholder(policyID)).to.equal(user.address);
+      expect(bal21.sub(bal11)).to.equal(1);
+      expect(bal12.sub(bal22)).to.equal(1);
+      expect(ts1).to.equal(ts2);
+    });
+  });
+
   describe("tokenURI", function() {
     let policyId:BN;
     let productName:string;

@@ -18,7 +18,7 @@ describe("ClaimsEscrow", function () {
   let policyManager: PolicyManager;
   let artifacts: ArtifactImports;
 
-  const [deployer, governor, newGovernor, depositor1, claimant, mockProduct] = provider.getWallets();
+  const [deployer, governor, newGovernor, depositor, claimant, mockProduct] = provider.getWallets();
   const testDepositAmount = BN.from("10");
   const testClaimAmount = BN.from("8");
   const testClaimAmount2 = BN.from("6");
@@ -31,7 +31,7 @@ describe("ClaimsEscrow", function () {
   before(async function () {
     artifacts = await import_artifacts();
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
-    
+
     // forking uses old timestamp, need to force update
     const timestamp = Math.floor(Date.now()/1000);
     await provider.send("evm_setNextBlockTimestamp", [timestamp]);
@@ -71,15 +71,15 @@ describe("ClaimsEscrow", function () {
       expect(await claimsEscrow.newGovernance()).to.equal(ZERO_ADDRESS);
     });
     it("should revert if not called by governance", async function () {
-      await expect(claimsEscrow.connect(depositor1).setGovernance(depositor1.address)).to.be.revertedWith("!governance");
+      await expect(claimsEscrow.connect(depositor).setGovernance(depositor.address)).to.be.revertedWith("!governance");
       await claimsEscrow.connect(governor).setGovernance(newGovernor.address);
-      await expect(claimsEscrow.connect(depositor1).acceptGovernance()).to.be.revertedWith("!governance");
+      await expect(claimsEscrow.connect(depositor).acceptGovernance()).to.be.revertedWith("!governance");
     });
   });
 
   describe("receiveClaim", function () {
     beforeEach("deposit", async function () {
-      await vault.connect(depositor1).depositEth({ value: testDepositAmount});
+      await vault.connect(depositor).depositEth({ value: testDepositAmount});
     });
     it("should revert if not called by the vault", async function () {
       await expect(claimsEscrow.connect(deployer).receiveClaim(1, deployer.address, 0)).to.be.revertedWith("!product");
@@ -102,7 +102,7 @@ describe("ClaimsEscrow", function () {
 
   describe("withdrawClaimsPayout", function () {
     beforeEach("deposit to vault and approve claim", async function () {
-      await vault.connect(depositor1).depositEth({ value: testDepositAmount});
+      await vault.connect(depositor).depositEth({ value: testDepositAmount});
       await claimsEscrow.connect(mockProduct).receiveClaim(claimID, claimant.address, testClaimAmount);
     });
     it("should revert if invalid claimID", async function () {
@@ -141,7 +141,7 @@ describe("ClaimsEscrow", function () {
       let balance1 = await claimant.getBalance();
       await claimsEscrow.connect(mockProduct).receiveClaim(claimID2, claimant.address, testClaimAmount3);
       expect(await claimsEscrow.totalClaimsOutstanding()).to.equal(testClaimAmount.add(testClaimAmount3));
-      await vault.connect(depositor1).depositEth({ value: 4 });
+      await vault.connect(depositor).depositEth({ value: 4 });
       await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add one hour
       let tx1 = await claimsEscrow.connect(claimant).withdrawClaimsPayout(claimID2);
       let receipt1 = await tx1.wait();
@@ -150,7 +150,7 @@ describe("ClaimsEscrow", function () {
       expect(balance2.sub(balance1).add(gasCost1)).to.equal(testDepositAmount.add(4));
       expect(await claimsEscrow.totalClaimsOutstanding()).to.equal(testClaimAmount.add(testClaimAmount3).sub(testDepositAmount.add(4)));
       expect(await claimsEscrow.exists(claimID2)).to.be.true;
-      await vault.connect(depositor1).depositEth({ value: 10 });
+      await vault.connect(depositor).depositEth({ value: 10 });
       let tx2 = await claimsEscrow.connect(claimant).withdrawClaimsPayout(claimID2);
       let receipt2 = await tx2.wait();
       let gasCost2 = receipt2.gasUsed.mul(receipt2.effectiveGasPrice);
@@ -163,7 +163,7 @@ describe("ClaimsEscrow", function () {
 
   describe("adjustClaim", function () {
     beforeEach("deposit to vault and approve claim", async function () {
-      await vault.connect(depositor1).depositEth({ value: testDepositAmount});
+      await vault.connect(depositor).depositEth({ value: testDepositAmount});
       await claimsEscrow.connect(mockProduct).receiveClaim(3, claimant.address, 3);
       await claimsEscrow.connect(mockProduct).receiveClaim(1, claimant.address, testClaimAmount);
     });
@@ -216,7 +216,7 @@ describe("ClaimsEscrow", function () {
       expect(await claimsEscrow.cooldownPeriod()).to.equal(COOLDOWN_PERIOD);
     });
     it("should revert setCooldown if called by non governance", async function () {
-      await expect(claimsEscrow.connect(depositor1).setCooldownPeriod(1)).to.be.revertedWith("!governance");
+      await expect(claimsEscrow.connect(depositor).setCooldownPeriod(1)).to.be.revertedWith("!governance");
     });
     it("should set cooldown", async function () {
       await claimsEscrow.connect(governor).setCooldownPeriod(1);
@@ -279,6 +279,54 @@ describe("ClaimsEscrow", function () {
       await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]);
       await claimsEscrow.connect(claimant).withdrawClaimsPayout(4);
       expect(await claimsEscrow.listClaims(claimant.address)).to.deep.equal([BN.from(2),BN.from(8)]);
+    });
+  });
+
+  describe("transfer", async function () {
+    beforeEach(async function () {
+      await claimsEscrow.connect(mockProduct).receiveClaim(1, claimant.address, 0);
+    });
+    it("should reject transfer of nonexistent token", async function () {
+      await expect(claimsEscrow.connect(claimant).transfer(depositor.address, 99)).to.be.revertedWith("ERC721: operator query for nonexistent token");
+    });
+    it("should reject transfer by non owner", async function () {
+      await expect(claimsEscrow.connect(depositor).transfer(depositor.address, claimID)).to.be.revertedWith("ERC721: transfer caller is not owner nor approved");
+    });
+    it("should transfer", async function () {
+      let bal11 = await claimsEscrow.balanceOf(claimant.address);
+      let bal12 = await claimsEscrow.balanceOf(depositor.address);
+      let ts1 = await claimsEscrow.totalSupply();
+      expect(await claimsEscrow.ownerOf(claimID)).to.equal(claimant.address);
+      let tx = await claimsEscrow.connect(claimant).transfer(depositor.address, claimID);
+      expect(tx).to.emit(claimsEscrow, "Transfer").withArgs(claimant.address, depositor.address, claimID);
+      let bal21 = await claimsEscrow.balanceOf(claimant.address);
+      let bal22 = await claimsEscrow.balanceOf(depositor.address);
+      let ts2 = await claimsEscrow.totalSupply();
+      expect(await claimsEscrow.ownerOf(claimID)).to.equal(depositor.address);
+      expect(bal11.sub(bal21)).to.equal(1);
+      expect(bal22.sub(bal12)).to.equal(1);
+      expect(ts1).to.equal(ts2);
+    });
+    it("should reject safeTransfer of nonexistent token", async function () {
+      await expect(claimsEscrow.connect(claimant).safeTransfer(claimant.address, 99)).to.be.revertedWith("ERC721: operator query for nonexistent token");
+    });
+    it("should reject safeTransfer by non owner", async function () {
+      await expect(claimsEscrow.connect(depositor).safeTransfer(depositor.address, claimID)).to.be.revertedWith("ERC721: transfer caller is not owner nor approved");
+    });
+    it("should safeTransfer", async function () {
+      let bal11 = await claimsEscrow.balanceOf(claimant.address);
+      let bal12 = await claimsEscrow.balanceOf(depositor.address);
+      let ts1 = await claimsEscrow.totalSupply();
+      expect(await claimsEscrow.ownerOf(claimID)).to.equal(claimant.address);
+      let tx = await claimsEscrow.connect(claimant).safeTransfer(depositor.address, claimID);
+      expect(tx).to.emit(claimsEscrow, "Transfer").withArgs(claimant.address, depositor.address, claimID);
+      let bal21 = await claimsEscrow.balanceOf(claimant.address);
+      let bal22 = await claimsEscrow.balanceOf(depositor.address);
+      let ts2 = await claimsEscrow.totalSupply();
+      expect(await claimsEscrow.ownerOf(claimID)).to.equal(depositor.address);
+      expect(bal11.sub(bal21)).to.equal(1);
+      expect(bal22.sub(bal12)).to.equal(1);
+      expect(ts1).to.equal(ts2);
     });
   });
 });

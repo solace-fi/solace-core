@@ -50,7 +50,7 @@ contract CurveProduct is BaseProduct {
         "1"
     ) {
         _addressProvider = ICurveAddressProvider(addressProvider_);
-        _SUBMIT_CLAIM_TYPEHASH = keccak256("CurveProductSubmitClaim(uint256 policyID,uint256 amountOut,uint256 deadline)");
+        _SUBMIT_CLAIM_TYPEHASH = keccak256("CurveProductSubmitClaim(uint256 policyID,address claimant,uint256 amountOut,uint256 deadline)");
         _productName = "Curve";
     }
 

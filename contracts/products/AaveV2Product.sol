@@ -49,7 +49,7 @@ contract AaveV2Product is BaseProduct {
         "1"
     ) {
         _aaveDataProvider = IAaveProtocolDataProvider(dataProvider_);
-        _SUBMIT_CLAIM_TYPEHASH = keccak256("AaveV2ProductSubmitClaim(uint256 policyID,uint256 amountOut,uint256 deadline)");
+        _SUBMIT_CLAIM_TYPEHASH = keccak256("AaveV2ProductSubmitClaim(uint256 policyID,address claimant,uint256 amountOut,uint256 deadline)");
         _productName = "AaveV2";
     }
 

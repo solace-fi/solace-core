@@ -126,7 +126,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
      * @return policyID The ID of newly created policy.
      */
     function buyPolicy(address policyholder, bytes memory positionDescription, uint256 coverAmount, uint40 blocks) external payable override nonReentrant whileUnpaused returns (uint256 policyID) {
-        require(coverAmount > 0, "zero position value");
+        require(coverAmount > 0, "zero cover value");
         require(isValidPositionDescription(positionDescription), "invalid position description");
         // check that the product can provide coverage for this policy
         {
@@ -167,8 +167,8 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
      * @param coverAmount The new value to cover in **ETH**.
      */
     function updateCoverAmount(uint256 policyID, uint256 coverAmount) external payable override nonReentrant whileUnpaused {
-        require(coverAmount > 0, "zero position value");
-        (address policyholder, address product, bytes memory positionDescription, uint256 previousCoverAmount, uint40 expirationBlock, uint24 purchasePrice) = _policyManager.getPolicyInfo(policyID);
+        require(coverAmount > 0, "zero cover value");
+        (address policyholder, address product, uint256 previousCoverAmount, uint40 expirationBlock, uint24 purchasePrice, bytes memory positionDescription) = _policyManager.getPolicyInfo(policyID);
         // check msg.sender is policyholder
         require(policyholder == msg.sender, "!policyholder");
         // check for correct product
@@ -216,7 +216,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
      */
     function extendPolicy(uint256 policyID, uint40 extension) external payable override nonReentrant whileUnpaused {
         // check that the msg.sender is the policyholder
-        (address policyholder, address product, bytes memory positionDescription, uint256 coverAmount, uint40 expirationBlock, uint24 purchasePrice) = _policyManager.getPolicyInfo(policyID);
+        (address policyholder, address product, uint256 coverAmount, uint40 expirationBlock, uint24 purchasePrice, bytes memory positionDescription) = _policyManager.getPolicyInfo(policyID);
         require(policyholder == msg.sender,"!policyholder");
         require(product == address(this), "wrong product");
         require(expirationBlock >= block.number, "policy is expired");
@@ -246,8 +246,8 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
      * @param extension The length of extension in blocks.
      */
     function updatePolicy(uint256 policyID, uint256 coverAmount, uint40 extension) external payable override nonReentrant whileUnpaused {
-        require(coverAmount > 0, "zero position value");
-        (address policyholder, address product, bytes memory positionDescription, uint256 previousCoverAmount, uint40 previousExpirationBlock, uint24 purchasePrice) = _policyManager.getPolicyInfo(policyID);
+        require(coverAmount > 0, "zero cover value");
+        (address policyholder, address product, uint256 previousCoverAmount, uint40 previousExpirationBlock, uint24 purchasePrice, bytes memory positionDescription) = _policyManager.getPolicyInfo(policyID);
         require(policyholder == msg.sender,"!policyholder");
         require(product == address(this), "wrong product");
         require(previousExpirationBlock >= block.number, "policy is expired");
@@ -295,7 +295,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
      * @param policyID The ID of the policy.
      */
     function cancelPolicy(uint256 policyID) external override nonReentrant {
-        (address policyholder, address product, , uint256 coverAmount, uint40 expirationBlock, uint24 purchasePrice) = _policyManager.getPolicyInfo(policyID);
+        (address policyholder, address product, uint256 coverAmount, uint40 expirationBlock, uint24 purchasePrice, ) = _policyManager.getPolicyInfo(policyID);
         require(policyholder == msg.sender,"!policyholder");
         require(product == address(this), "wrong product");
 
@@ -327,13 +327,13 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         // validate inputs
         // solhint-disable-next-line not-rely-on-time
         require(block.timestamp <= deadline, "expired deadline");
-        (address policyholder, address product, , uint256 coverAmount, , ) = _policyManager.getPolicyInfo(policyID);
+        (address policyholder, address product, uint256 coverAmount, , , ) = _policyManager.getPolicyInfo(policyID);
         require(policyholder == msg.sender, "!policyholder");
         require(product == address(this), "wrong product");
         require(amountOut <= coverAmount, "excessive amount out");
         // verify signature
         {
-        bytes32 structHash = keccak256(abi.encode(_SUBMIT_CLAIM_TYPEHASH, policyID, amountOut, deadline));
+        bytes32 structHash = keccak256(abi.encode(_SUBMIT_CLAIM_TYPEHASH, policyID, msg.sender, amountOut, deadline));
         bytes32 hash = _hashTypedDataV4(structHash);
         address signer = ECDSA.recover(hash, signature);
         require(_isAuthorizedSigner[signer], "invalid signature");
