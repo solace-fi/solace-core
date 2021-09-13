@@ -349,9 +349,10 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         // validate inputs
         // solhint-disable-next-line not-rely-on-time
         require(block.timestamp <= deadline, "expired deadline");
-        (address policyholder, address product, , , , ) = _policyManager.getPolicyInfo(policyID);
+        (address policyholder, address product, , uint256 coverAmount, , ) = _policyManager.getPolicyInfo(policyID);
         require(policyholder == msg.sender, "!policyholder");
         require(product == address(this), "wrong product");
+        require(amountOut <= coverAmount, "excessive amount out");
         // verify signature
         {
         bytes32 structHash = keccak256(abi.encode(_SUBMIT_CLAIM_TYPEHASH, policyID, amountOut, deadline));
@@ -533,7 +534,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
 
     /**
      * @notice Sets a new ExchangeQuoter.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param quoter_ The new quoter address.
      */
     function setExchangeQuoter(address quoter_) external onlyGovernance {
@@ -542,7 +543,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
 
     /**
      * @notice Adds a new signer that can authorize claims.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param signer The signer to add.
      */
     function addSigner(address signer) external onlyGovernance {
@@ -552,7 +553,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
 
     /**
      * @notice Removes a signer.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param signer The signer to remove.
      */
     function removeSigner(address signer) external onlyGovernance {
@@ -563,7 +564,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
     /**
      * @notice Pauses or unpauses buying and extending policies.
      * Cancelling policies and submitting claims are unaffected by pause.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @dev Used for security and to gracefully phase out old products.
      * @param paused_ True to pause, false to unpause.
      */
@@ -573,9 +574,9 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
 
     /**
      * @notice Changes the covered platform.
-     * The function should be used if the the protocol changes their registry but keeps the children contracts.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @dev Use this if the the protocol changes their registry but keeps the children contracts.
      * A new version of the protocol will likely require a new Product.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
      * @param coveredPlatform_ The platform to cover.
      */
     function setCoveredPlatform(address coveredPlatform_) public virtual override onlyGovernance {
@@ -584,7 +585,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
 
     /**
      * @notice Changes the policy manager.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param policyManager_ The new policy manager.
      */
     function setPolicyManager(address policyManager_) external override onlyGovernance {
@@ -596,7 +597,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
     ***************************************/
 
     /**
-     * @notice The function is used to add two numbers.
+     * @notice Adds two numbers.
      * @param a The first number as a uint256.
      * @param b The second number as an int256.
      * @return c The sum as a uint256.
@@ -608,10 +609,10 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
     }
 
     /**
-     * @notice The function is used to return minimum number between two numbers..
-     * @param a The first number as a uint256.
-     * @param b The second number as an int256.
-     * @return c The min as a uint256.
+     * @notice Calculates the lesser of two numbers.
+     * @param a The first number.
+     * @param b The second number.
+     * @return c The mininum.
      */
     function min(uint256 a, uint256 b) internal pure returns (uint256) {
         return a < b ? a : b;

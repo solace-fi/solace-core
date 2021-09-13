@@ -58,6 +58,7 @@ describe("Treasury", function() {
   before(async function() {
     [deployer, governor, liquidityProvider, mockPolicy, user, randAddress, mockProduct] = provider.getWallets();
     artifacts = await import_artifacts();
+    await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
 
     registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
     weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;

@@ -40,7 +40,7 @@ contract Master is IMaster, Governable {
 
     /**
      * @notice Constructs the master contract.
-     * @param governance_ The address of the [governor](/docs/user-docs/Governance).
+     * @param governance_ The address of the [governor](/docs/protocol/governance).
      * @param solace_ Address of the solace token.
      * @param solacePerBlock_ Amount of solace to distribute per block.
      */
@@ -51,7 +51,7 @@ contract Master is IMaster, Governable {
 
     /**
      * @notice Registers a farm.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * Cannot register a farm more than once.
      * @param farmAddress The farm's address.
      * @param allocPoints_ How many points to allocate this farm.
@@ -69,7 +69,7 @@ contract Master is IMaster, Governable {
 
     /**
      * @notice Sets a farm's allocation points.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param farmID The farm to set allocation points.
      * @param allocPoints_ How many points to allocate this farm.
      */

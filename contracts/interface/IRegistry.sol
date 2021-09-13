@@ -6,7 +6,7 @@ pragma solidity 0.8.6;
  * @author solace.fi
  * @notice Tracks the contracts of the Solaverse.
  *
- * [**Governance**](/docs/user-docs/Governance) can set the contract addresses and anyone can look them up.
+ * [**Governance**](/docs/protocol/governance) can set the contract addresses and anyone can look them up.
  *
  * Note that `Registry` doesn't track all Solace contracts. Farms are tracked in [`Master`](../Master), Products are tracked in [`PolicyManager`](../PolicyManager), and the `Registry` is untracked.
  */
@@ -99,63 +99,63 @@ interface IRegistry {
 
     /**
      * @notice Sets the [**WETH**](../WETH9) contract.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param weth_ The address of the [**WETH**](../WETH9) contract.
      */
     function setWeth(address weth_) external;
 
     /**
      * @notice Sets the [`Vault`](../Vault) contract.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param vault_ The address of the [`Vault`](../Vault) contract.
      */
     function setVault(address vault_) external;
 
     /**
      * @notice Sets the [`Claims Escrow`](../ClaimsEscrow) contract.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param claimsEscrow_ The address of the [`Claims Escrow`](../ClaimsEscrow) contract.
      */
     function setClaimsEscrow(address claimsEscrow_) external;
 
     /**
      * @notice Sets the [`Treasury`](../Treasury) contract.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param treasury_ The address of the [`Treasury`](../Treasury) contract.
      */
     function setTreasury(address treasury_) external;
 
     /**
      * @notice Sets the [`Policy Manager`](../PolicyManager) contract.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param policyManager_ The address of the [`Policy Manager`](../PolicyManager) contract.
      */
     function setPolicyManager(address policyManager_) external;
 
     /**
      * @notice Sets the [`Risk Manager`](../RiskManager) contract.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param riskManager_ The address of the [`Risk Manager`](../RiskManager) contract.
      */
     function setRiskManager(address riskManager_) external;
 
     /**
      * @notice Sets the [**SOLACE**](../SOLACE) contract.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param solace_ The address of the [**SOLACE**](../SOLACE) contract.
      */
     function setSolace(address solace_) external;
 
     /**
      * @notice Sets the [`Master`](../Master) contract.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param master_ The address of the [`Master`](../Master) contract.
      */
     function setMaster(address master_) external;
 
     /**
      * @notice Sets the [`Locker`](../Locker) contract.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param locker_ The address of the [`Locker`](../Locker) contract.
      */
     function setLocker(address locker_) external;

@@ -35,6 +35,7 @@ describe("Vault", function () {
 
   before(async function () {
     artifacts = await import_artifacts();
+    await owner.sendTransaction({to:owner.address}); // for some reason this helps solidity-coverage
   })
 
   beforeEach(async function () {
@@ -49,7 +50,7 @@ describe("Vault", function () {
     await registry.setPolicyManager(policyManager.address);
     riskManager = (await deployContract(owner, artifacts.RiskManager, [owner.address, registry.address])) as RiskManager;
     await registry.setRiskManager(riskManager.address);
-    mockProduct = (await deployContract(owner,artifacts.MockProduct,[owner.address,policyManager.address,registry.address,ZERO_ADDRESS,0,100000000000,1,16777215])) as MockProduct;
+    mockProduct = (await deployContract(owner,artifacts.MockProduct,[owner.address,policyManager.address,registry.address,ZERO_ADDRESS,0,100000000000,1,16777215, ZERO_ADDRESS])) as MockProduct;
     await policyManager.addProduct(mockProduct.address);
   });
 

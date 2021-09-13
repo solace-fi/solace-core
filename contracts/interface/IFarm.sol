@@ -39,7 +39,7 @@ interface IFarm {
 
     /**
      * @notice Sets the farm's end block. Used to extend the duration.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param endBlock_ The new end block.
      */
     function setEnd(uint256 endBlock_) external;

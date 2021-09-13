@@ -32,14 +32,14 @@ interface IWaRegistry {
 
     /**
      * @notice Registers a new waToken.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param waToken The new waToken.
      */
     function addToken(address waToken) external;
 
     /**
      * @notice Deregisters a waToken.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param waToken The waToken.
      */
     function removeToken(address waToken) external;

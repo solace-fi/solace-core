@@ -16,11 +16,11 @@ import "./interface/IVault.sol";
  * @author solace.fi
  * @notice The war chest of Castle Solace.
  *
- * As policies are purchased, premiums will flow from [**policyholders**](/docs/user-docs/Policy%20Holders) to the `Treasury`. By default `Treasury` reroutes 100% of the premiums into the [`Vault`](./Vault) where it is split amongst the [**capital providers**](/docs/user-docs/Capital%20Providers).
+ * As policies are purchased, premiums will flow from [**policyholders**](/docs/protocol/policy-holder) to the `Treasury`. By default `Treasury` reroutes 100% of the premiums into the [`Vault`](./Vault) where it is split amongst the [**capital providers**](/docs/user-guides/capital-provider/cp-role-guide).
  *
- * If a [**policyholder**](/docs/user-docs/Policy%20Holders) updates or cancels a policy they may receive a refund. Refunds will be paid out from the [`Vault`](./Vault). If there are not enough funds to pay out the refund in whole, the [`unpaidRefunds()`](#unpaidrefunds) will be tracked and can be retrieved later via [`withdraw()`](#withdraw).
+ * If a [**policyholder**](/docs/protocol/policy-holder) updates or cancels a policy they may receive a refund. Refunds will be paid out from the [`Vault`](./Vault). If there are not enough funds to pay out the refund in whole, the [`unpaidRefunds()`](#unpaidrefunds) will be tracked and can be retrieved later via [`withdraw()`](#withdraw).
  *
- * [**Governance**](/docs/user-docs/Governance) can change the premium recipients via [`setPremiumRecipients()`](#setpremiumrecipients). This can be used to add new building blocks to Castle Solace or enact a protocol fee. Premiums can be stored in the `Treasury` and managed with a number of functions.
+ * [**Governance**](/docs/protocol/governance) can change the premium recipients via [`setPremiumRecipients()`](#setpremiumrecipients). This can be used to add new building blocks to Castle Solace or enact a protocol fee. Premiums can be stored in the `Treasury` and managed with a number of functions.
  */
 contract Treasury is ITreasury, ReentrancyGuard, Governable {
     using SafeERC20 for IERC20;
@@ -45,7 +45,7 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
 
     /**
      * @notice Constructs the Treasury contract.
-     * @param governance_ The address of the [governor](/docs/user-docs/Governance).
+     * @param governance_ The address of the [governor](/docs/protocol/governance).
      * @param swapRouter_ Address of uniswap router.
      * @param registry_ Address of registry.
      */
@@ -185,7 +185,7 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
 
     /**
      * @notice Sets the premium recipients and their weights.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param recipients The premium recipients, plus an implicit `address(treasury)` at the end.
      * @param weights The recipient weights.
      */
@@ -208,7 +208,7 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
 
     /**
      * @notice Spends an **ERC20** token or **ETH**.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param token The address of the token to spend.
      * @param amount The amount of the token to spend.
      * @param recipient The address of the token receiver.
@@ -224,7 +224,7 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
 
     /**
      * @notice Manually swaps a token.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param path The path of pools to take.
      * @param amountIn The amount to swap.
      * @param amountOutMinimum The minimum about to receive.
@@ -252,7 +252,7 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
 
     /**
      * @notice Wraps some **ETH** into **WETH**.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param amount The amount to wrap.
      */
     function wrap(uint256 amount) external override onlyGovernance {
@@ -261,7 +261,7 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
 
     /**
      * @notice Unwraps some **WETH** into **ETH**.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param amount The amount to unwrap.
      */
     function unwrap(uint256 amount) external override onlyGovernance {

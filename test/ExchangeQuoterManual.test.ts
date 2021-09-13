@@ -22,6 +22,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
 
     before(async function () {
       artifacts = await import_artifacts();
+      await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
       // deploy exchange quoter manual
       quoter = (await deployContract(deployer, artifacts.ExchangeQuoterManual, [governor.address])) as ExchangeQuoterManual;
     });

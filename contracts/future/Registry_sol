@@ -39,7 +39,7 @@ contract Registry is IRegistry, Initializable, UUPSUpgradeable {
     /**
      * @notice Initialize function for the registry contract.
      * Only called once in contract deployment to initialize `governor` and `admin`.
-     * @param governance_ The address of the [governor](/docs/user-docs/Governance).
+     * @param governance_ The address of the [governor](/docs/protocol/governance).
      */
     function initialize(address governance_) public initializer {
         governance = governance_;
@@ -48,7 +48,7 @@ contract Registry is IRegistry, Initializable, UUPSUpgradeable {
 
     /**
      * @notice Allows governance to be transferred to a new `governor`.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param governance_ The new governor.
      */
     function setGovernance(address governance_) external override {
@@ -71,7 +71,7 @@ contract Registry is IRegistry, Initializable, UUPSUpgradeable {
 
     /**
      * @notice Sets the [**SOLACE**](./SOLACE) contract.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param _solace The **SOLACE** token address.
      */
     function setSolace(address _solace) external override {
@@ -83,7 +83,7 @@ contract Registry is IRegistry, Initializable, UUPSUpgradeable {
 
     /**
      * @notice Sets the [`Master`](./Master) contract.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param _master The contract address of the `Master` contract.
      */
     function setMaster(address _master) external override {
@@ -95,7 +95,7 @@ contract Registry is IRegistry, Initializable, UUPSUpgradeable {
 
     /**
      * @notice Sets the [`Claims Escrow`](./ClaimsEscrow) contract.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param _claimsEscrow The contract address of the `ClaimsEscrow` contract.
      */
     function setClaimsEscrow(address _claimsEscrow) external override {
@@ -107,7 +107,7 @@ contract Registry is IRegistry, Initializable, UUPSUpgradeable {
 
     /**
      * @notice Sets the [`Vault`](./Vault) contract.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param _vault The contract address of the `Vault` contract.
      */
     function setVault(address _vault) external override {
@@ -119,7 +119,7 @@ contract Registry is IRegistry, Initializable, UUPSUpgradeable {
 
     /**
      * @notice Sets the [`Treasury`](./Treasury) contract.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param _treasury The contract address of the `Treasury` contract.
      */
     function setTreasury(address _treasury) external override {
@@ -131,7 +131,7 @@ contract Registry is IRegistry, Initializable, UUPSUpgradeable {
 
     /**
      * @notice Sets the [`Locker`](./Locker) contract.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param _locker The contract address of the `Locker` contract.
      */
     function setLocker(address _locker) external override {
@@ -143,7 +143,7 @@ contract Registry is IRegistry, Initializable, UUPSUpgradeable {
 
     /**
      * @notice Sets the [`Policy Manager`](./PolicyManager) contract.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param policyManager_ The contract address of the `PolicyManager` contract.
      */
     function setPolicyManager(address policyManager_) external override {
@@ -155,7 +155,7 @@ contract Registry is IRegistry, Initializable, UUPSUpgradeable {
 
     /**
      * @notice Sets the [`Risk Manager`](./RiskManager) contract.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param _riskManager The contract address of the `RiskManager` contract.
      */
     function setRiskManager(address _riskManager) external override {

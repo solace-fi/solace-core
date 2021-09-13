@@ -51,7 +51,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
 
     /**
      * @notice Constructs the `PolicyManager`.
-     * @param governance_ The address of the [governor](/docs/user-docs/Governance).
+     * @param governance_ The address of the [governor](/docs/protocol/governance).
      */
     constructor(address governance_) ERC721("Solace Policy", "SPT") Governable(governance_) { }
 
@@ -375,7 +375,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
 
     /**
      * @notice Adds a new product.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param product the new product
      */
     function addProduct(address product) external override onlyGovernance {
@@ -385,7 +385,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
 
     /**
      * @notice Removes a product.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param product the product to remove
      */
     function removeProduct(address product) external override onlyGovernance {
@@ -395,7 +395,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
 
     /**
      * @notice Set the token descriptor.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param policyDescriptor_ The new token descriptor address.
      */
     function setPolicyDescriptor(address policyDescriptor_) external override onlyGovernance {

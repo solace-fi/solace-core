@@ -11,11 +11,11 @@ import "@openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol";
  * @author solace.fi
  * @notice The risk-backing capital pool.
  *
- * [**Capital Providers**](/docs/user-docs/Capital%20Providers) can deposit **ETH** or **WETH** into the `Vault` to mint shares. Shares are represented as **CP tokens** aka **SCP** and extend `ERC20`. [**Capital Providers**](/docs/user-docs/Capital%20Providers) should use [`depositEth()`](#depositeth) or [`depositWeth()`](#depositweth), not regular **ETH** or **WETH** transfer.
+ * [**Capital Providers**](/docs/user-guides/capital-provider/cp-role-guide) can deposit **ETH** or **WETH** into the `Vault` to mint shares. Shares are represented as **CP tokens** aka **SCP** and extend `ERC20`. [**Capital Providers**](/docs/user-guides/capital-provider/cp-role-guide) should use [`depositEth()`](#depositeth) or [`depositWeth()`](#depositweth), not regular **ETH** or **WETH** transfer.
  *
- * As [**Policyholders**](/docs/user-docs/Policy%20Holders) purchase coverage, premiums will flow into the capital pool and are split amongst the [**Capital Providers**](/docs/user-docs/Capital%20Providers). If a loss event occurs in an active policy, some funds will be used to payout the claim. These events will affect the price per share but not the number or distribution of shares.
+ * As [**Policyholders**](/docs/protocol/policy-holder) purchase coverage, premiums will flow into the capital pool and are split amongst the [**Capital Providers**](/docs/user-guides/capital-provider/cp-role-guide). If a loss event occurs in an active policy, some funds will be used to payout the claim. These events will affect the price per share but not the number or distribution of shares.
  *
- * By minting shares of the `Vault`, [**Capital Providers**](/docs/user-docs/Capital%20Providers) willingly accept the risk that the whole or a part of their funds may be used payout claims. A malicious [**Capital Providers**](/docs/user-docs/Capital%20Providers) could detect a loss event and try to withdraw their funds before claims are paid out. To prevent this, the `Vault` uses a cooldown mechanic such that while the [**capital provider**](/docs/user-docs/Capital%20Providers) is not in cooldown mode (default) they can mint, send, and receive **SCP** but not withdraw **ETH**. To withdraw their **ETH**, the [**capital provider**](/docs/user-docs/Capital%20Providers) must `startCooldown()`(#startcooldown), wait no less than `cooldownMin()`(#cooldownmin) and no more than `cooldownMax()`(#cooldownmax), then call `withdrawEth()`(#withdraweth) or `withdrawWeth()`(#withdrawweth). While in cooldown mode users cannot send or receive **SCP** and minting shares will take them out of cooldown.
+ * By minting shares of the `Vault`, [**Capital Providers**](/docs/user-guides/capital-provider/cp-role-guide) willingly accept the risk that the whole or a part of their funds may be used payout claims. A malicious [**Capital Providers**](/docs/user-guides/capital-provider/cp-role-guide) could detect a loss event and try to withdraw their funds before claims are paid out. To prevent this, the `Vault` uses a cooldown mechanic such that while the [**capital provider**](/docs/user-guides/capital-provider/cp-role-guide) is not in cooldown mode (default) they can mint, send, and receive **SCP** but not withdraw **ETH**. To withdraw their **ETH**, the [**capital provider**](/docs/user-guides/capital-provider/cp-role-guide) must `startCooldown()`(#startcooldown), wait no less than `cooldownMin()`(#cooldownmin) and no more than `cooldownMax()`(#cooldownmax), then call `withdrawEth()`(#withdraweth) or `withdrawWeth()`(#withdrawweth). While in cooldown mode users cannot send or receive **SCP** and minting shares will take them out of cooldown.
  */
 interface IVault is IERC20Metadata, IERC20Permit {
 
@@ -68,7 +68,7 @@ interface IVault is IERC20Metadata, IERC20Permit {
 
     /**
      * @notice Allows a user to redeem shares for **ETH**.
-     * Burns **SCP** and transfers **ETH** to the [**Capital Provider**](/docs/user-docs/Capital%20Providers).
+     * Burns **SCP** and transfers **ETH** to the [**Capital Provider**](/docs/user-guides/capital-provider/cp-role-guide).
      * @param shares Amount of shares to redeem.
      * @return value The amount in **ETH** that the shares where redeemed for.
      */
@@ -76,7 +76,7 @@ interface IVault is IERC20Metadata, IERC20Permit {
 
     /**
      * @notice Allows a user to redeem shares for **WETH**.
-     * Burns **SCP** tokens and transfers **WETH** to the [**Capital Provider**](/docs/user-docs/Capital%20Providers).
+     * Burns **SCP** tokens and transfers **WETH** to the [**Capital Provider**](/docs/user-guides/capital-provider/cp-role-guide).
      * @param shares amount of shares to redeem.
      * @return value The amount in **WETH** that the shares where redeemed for.
      */
@@ -160,7 +160,7 @@ interface IVault is IERC20Metadata, IERC20Permit {
 
     /**
      * @notice Activates or deactivates emergency shutdown.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * During Emergency Shutdown:
      * 1. No users may deposit into the Vault.
      * 2. Withdrawls can bypass cooldown.
@@ -172,7 +172,7 @@ interface IVault is IERC20Metadata, IERC20Permit {
 
     /**
      * @notice Sets the `minimum` and `maximum` amount of time in seconds that a user must wait to withdraw funds.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param cooldownMin_ Minimum time in seconds.
      * @param cooldownMax_ Maximum time in seconds.
      */
@@ -180,7 +180,7 @@ interface IVault is IERC20Metadata, IERC20Permit {
 
     /**
      * @notice Adds or removes requesting rights.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param dst The requestor.
      * @param status True to add or false to remove rights.
      */

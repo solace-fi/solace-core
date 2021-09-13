@@ -34,7 +34,8 @@ describe("PolicyManager", function() {
 
   before(async function() {
     artifacts = await import_artifacts();
-
+    await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
+    
     // deploy policy manager
     policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
 
@@ -330,7 +331,8 @@ describe("PolicyManager", function() {
           0,
           100000000000,
           1,
-          16777215
+          16777215,
+          ZERO_ADDRESS
         ]
       )) as MockProduct;
       await policyManager.connect(governor).addProduct(mockProduct.address);
@@ -399,7 +401,8 @@ describe("PolicyManager", function() {
             0,
             100000000000,
             1,
-            16777215
+            16777215,
+            ZERO_ADDRESS
           ]
         )) as MockProduct;
         await mockProduct.setPositionValue(0b10000);

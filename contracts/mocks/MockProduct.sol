@@ -23,6 +23,7 @@ contract MockProduct is BaseProduct {
       * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
       * @param price_ The cover price for the **Product**.
       * @param maxCoverPerUserDivisor_ The max cover amount divisor for per user. (maxCover / divisor = maxCoverPerUser).
+      * @param quoter_ The exchange quoter address.
      */
     constructor (
         address governance_,
@@ -32,7 +33,8 @@ contract MockProduct is BaseProduct {
         uint40 minPeriod_,
         uint40 maxPeriod_,
         uint24 price_,
-        uint32 maxCoverPerUserDivisor_
+        uint32 maxCoverPerUserDivisor_,
+        address quoter_
     ) BaseProduct(
         governance_,
         policyManager_,
@@ -42,7 +44,7 @@ contract MockProduct is BaseProduct {
         maxPeriod_,
         price_,
         maxCoverPerUserDivisor_,
-        address(0x0),
+        quoter_,
         "Solace.fi-MockProduct",
         "1"
     ) {
@@ -51,11 +53,12 @@ contract MockProduct is BaseProduct {
     }
 
     /**
-     * @notice It gives the user's total position in the product's protocol.
-     * The `positionContract` must be a **cToken** including **cETH** (Please see https://compound.finance/markets and https://etherscan.io/accounts/label/compound).
-     * @param policyholder The `buyer` who is requesting the coverage quote.
-     * @param positionContract The address of the exact smart contract the `buyer` has their position in (e.g., for UniswapProduct this would be Pair's address).
-     * @return positionAmount The user's total position in **Wei** in the product's protocol.
+     * @notice Calculate the value of a user's position in **ETH**.
+     * Every product will have a different mechanism to determine a user's total position in that product's protocol.
+     * @dev It should validate that the `positionContract` belongs to the protocol and revert if it doesn't.
+     * @param policyholder The owner of the position.
+     * @param positionContract The address of the smart contract the `policyholder` has their position in (e.g., for `UniswapV2Product` this would be the Pair's address).
+     * @return positionAmount The value of the position.
      */
     // solhint-disable-next-line no-unused-vars
     function appraisePosition(address policyholder, address positionContract) public view override returns (uint256 positionAmount) {
@@ -63,7 +66,7 @@ contract MockProduct is BaseProduct {
     }
 
     /**
-     * @notice The function sets the user's position value for the product.
+     * @notice Sets the **ETH** value of the position.
      * @param value The new position value for the product.
      */
     function setPositionValue(uint256 value) external {
@@ -71,8 +74,8 @@ contract MockProduct is BaseProduct {
     }
 
     /**
-     * @notice The function sets the policy's expiration block.
-     * @param policyID, The policy ID to set expiration for.
+     * @notice Sets a policy's expiration block.
+     * @param policyID The policy ID to set expiration for.
      * @param expirationBlock The new expiration block for the policy.
      */
     function setPolicyExpiration(uint256 policyID, uint40 expirationBlock) external {
@@ -81,14 +84,16 @@ contract MockProduct is BaseProduct {
     }
 
     /**
-     * @notice The function purchases and deploys a policy on the behalf of the policyholder. It returns the ID of newly created policy.
-     * @param policyholder Who's liquidity is being covered by the policy.
+     * @notice Purchases and mints a policy on the behalf of the policyholder.
+     * User will need to pay **ETH**.
+     * @param policyholder Holder of the position to cover.
      * @param positionContract The contract address where the policyholder has a position to be covered.
-     * @param coverAmount The value to cover in **ETH**.
+     * @param coverAmount The value to cover in **ETH**. Will only cover up to the appraised value.
      * @param blocks The length (in blocks) for policy.
-     * @return policyID The policy ID.
+     * @return policyID The ID of newly created policy.
      */
     function _buyPolicy(address policyholder, address positionContract, uint256 coverAmount, uint40 blocks) external payable nonReentrant returns (uint256 policyID){
+        // bypasses some important checks in BaseProduct
         // create the policy
         uint40 expirationBlock = uint40(block.number + blocks);
         policyID = _policyManager.createPolicy(policyholder, positionContract, coverAmount, expirationBlock, _price);

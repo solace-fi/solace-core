@@ -7,13 +7,21 @@ pragma solidity 0.8.6;
  * @author solace.fi
  * @notice Calculates the acceptable risk, sellable cover, and capital requirements of Solace products and capital pool.
  *
- * The total amount of sellable coverage is proportional to the assets in the [**risk backing capital pool**](../Vault). The max cover is split amongst products in a weighting system. [**Governance**](/docs/user-docs/Governance). can change these weights and with it each product's sellable cover.
+ * The total amount of sellable coverage is proportional to the assets in the [**risk backing capital pool**](../Vault). The max cover is split amongst products in a weighting system. [**Governance**](/docs/protocol/governance). can change these weights and with it each product's sellable cover.
  *
  * The minimum capital requirement is proportional to the amount of cover sold to [active policies](../PolicyManager).
  *
- * Solace can use leverage to sell more cover than the available capital. The amount of leverage is stored as [`partialReservesFactor`](#partialreservesfactor) and is settable by [**governance**](/docs/user-docs/Governance).
+ * Solace can use leverage to sell more cover than the available capital. The amount of leverage is stored as [`partialReservesFactor`](#partialreservesfactor) and is settable by [**governance**](/docs/protocol/governance).
  */
 interface IRiskManager {
+
+    /***************************************
+    EVENTS
+    ***************************************/
+
+    /// @notice Emitted when a product's weight is modified.
+    /// Includes adding and removing products.
+    event ProductWeightSet(address product, uint32 weight);
 
     /***************************************
     MAX COVER VIEW FUNCTIONS
@@ -40,7 +48,7 @@ interface IRiskManager {
 
     /**
      * @notice Return the product at an index.
-     * @dev Enumerable `[0, numProducts-1]`.
+     * @dev Enumerable `[1, numProducts]`.
      * @param index Index to query.
      * @return prod The product address.
      */
@@ -81,15 +89,22 @@ interface IRiskManager {
 
     /**
      * @notice Adds a new product and sets its weight.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param product_ Address of new product.
      * @param weight_ The products weight.
      */
     function addProduct(address product_, uint32 weight_) external;
 
     /**
+     * @notice Removes a product.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param product_ Address of the product to remove.
+     */
+    function removeProduct(address product_) external;
+
+    /**
      * @notice Sets the products and their weights.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param products_ The products.
      * @param weights_ The product weights.
      */
@@ -97,7 +112,7 @@ interface IRiskManager {
 
     /**
      * @notice Sets the partial reserves factor.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param partialReservesFactor_ New partial reserves factor in BPS.
      */
     function setPartialReservesFactor(uint16 partialReservesFactor_) external;

@@ -239,14 +239,14 @@ interface IPolicyManager is IERC721Enumerable /*, IERC721Metadata*/ {
 
     /**
      * @notice Adds a new product.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param product the new product
      */
     function addProduct(address product) external;
 
     /**
      * @notice Removes a product.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param product the product to remove
      */
     function removeProduct(address product) external;
@@ -254,7 +254,7 @@ interface IPolicyManager is IERC721Enumerable /*, IERC721Metadata*/ {
 
     /**
      * @notice Set the token descriptor.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param policyDescriptor The new token descriptor address.
      */
     function setPolicyDescriptor(address policyDescriptor) external;

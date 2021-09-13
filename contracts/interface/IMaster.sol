@@ -42,7 +42,7 @@ interface IMaster {
 
     /**
      * @notice Registers a farm.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * Cannot register a farm more than once.
      * @param farmAddress The farm's address.
      * @param allocPoints How many points to allocate this farm.
@@ -52,7 +52,7 @@ interface IMaster {
 
     /**
      * @notice Sets a farm's allocation points.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param farmID The farm to set allocation points.
      * @param allocPoints_ How many points to allocate this farm.
      */

@@ -100,7 +100,8 @@ if(process.env.FORK_NETWORK === "mainnet"){
 
     before(async function () {
       artifacts = await import_artifacts();
-
+      await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
+      
       registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
       weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
       await registry.connect(governor).setWeth(weth.address);
@@ -281,6 +282,12 @@ if(process.env.FORK_NETWORK === "mainnet"){
         let digest = getSubmitClaimDigest("Solace.fi-CompoundProduct", product.address, chainId, policyID1, amountOut1, deadline);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
         await expect(product2.connect(policyholder).submitClaim(policyID1, amountOut1, deadline, signature)).to.be.revertedWith("wrong product");
+      });
+      it("cannot submit claim with excessive payout", async function () {
+        let coverAmount = (await policyManager.getPolicyInfo(policyID1)).coverAmount;
+        let digest = getSubmitClaimDigest("Solace.fi-AaveV2Product", product.address, chainId, policyID1, coverAmount.add(1), deadline);
+        let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
+        await expect(product.connect(policyholder).submitClaim(policyID1, coverAmount.add(1), deadline, signature)).to.be.revertedWith("excessive amount out");
       });
       it("cannot submit claim with forged signature", async function () {
         await expect(product.connect(policyholder).submitClaim(policyID1, amountOut1, deadline, "0x")).to.be.revertedWith("invalid signature");

@@ -12,11 +12,11 @@ import "./interface/UniswapV3/ISwapRouter.sol";
 /**
  * @title CpFarm
  * @author solace.fi
- * @notice Rewards [**Capital Providers**](/docs/user-docs/Capital%20Providers) in [**SOLACE**](./SOLACE) for providing capital in the [`Vault`](./Vault).
+ * @notice Rewards [**Capital Providers**](/docs/user-guides/capital-provider/cp-role-guide) in [**SOLACE**](./SOLACE) for providing capital in the [`Vault`](./Vault).
  *
  * Over the course of `startBlock` to `endBlock`, the farm distributes `blockReward` [**SOLACE**](./SOLACE) per block to all farmers split relative to the amount of [**SCP**](./Vault) they have deposited.
  *
- * Users can become [**Capital Providers**](/docs/user-docs/Capital%20Providers) by depositing **ETH** into the [`Vault`](./Vault), receiving [**SCP**](./Vault) in the process. [**Capital Providers**](/docs/user-docs/Capital%20Providers) can then deposit their [**SCP**](./Vault) via [`depositCp()`](#depositcp) or [`depositCpSigned()`](#depositcpsigned). Alternatively users can bypass the [`Vault`](./Vault) and stake their **ETH** via [`depositEth()`](#depositeth).
+ * Users can become [**Capital Providers**](/docs/user-guides/capital-provider/cp-role-guide) by depositing **ETH** into the [`Vault`](./Vault), receiving [**SCP**](./Vault) in the process. [**Capital Providers**](/docs/user-guides/capital-provider/cp-role-guide) can then deposit their [**SCP**](./Vault) via [`depositCp()`](#depositcp) or [`depositCpSigned()`](#depositcpsigned). Alternatively users can bypass the [`Vault`](./Vault) and stake their **ETH** via [`depositEth()`](#depositeth).
  *
  * Users can withdraw their rewards via [`withdrawRewards()`](#withdrawrewards) and compound their rewards via [`compoundRewards()`](#compoundrewards).
  *
@@ -80,7 +80,7 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
 
     /**
      * @notice Constructs the CpFarm.
-     * @param governance_ The address of the [governor](/docs/user-docs/Governance).
+     * @param governance_ The address of the [governor](/docs/protocol/governance).
      * @param master_ Address of the [`Master`](./Master) contract.
      * @param vault_ Address of the [`Vault`](./Vault) contract.
      * @param solace_ Address of the [**SOLACE**](./SOLACE) token contract.
@@ -143,7 +143,7 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
 
     /**
      * @notice Sets the farm's end block. Used to extend the duration.
-     * Can only be called by the current [**governor**](/docs/user-docs/Governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param endBlock_ The new end block.
      */
     function setEnd(uint256 endBlock_) external override onlyGovernance {
