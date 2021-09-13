@@ -75,8 +75,7 @@ describe("BaseProduct", function () {
         minPeriod1,
         maxPeriod1,
         price1,
-        coverDivisor1,
-        ZERO_ADDRESS
+        coverDivisor1
       ]
     )) as MockProduct;
 
@@ -92,8 +91,7 @@ describe("BaseProduct", function () {
         minPeriod1,
         maxPeriod1,
         price1,
-        coverDivisor1,
-        ZERO_ADDRESS
+        coverDivisor1
       ]
     )) as MockProduct;
 
@@ -876,8 +874,7 @@ describe("BaseProduct", function () {
           minPeriod1,
           maxPeriod1,
           price1,
-          coverDivisor2,
-          ZERO_ADDRESS
+          coverDivisor2
         ]
       )) as MockProduct;
     })

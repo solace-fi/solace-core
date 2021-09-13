@@ -16,15 +16,15 @@ import { Registry, Weth9, Vault, ClaimsEscrow, Treasury, PolicyManager, PolicyDe
 
 const REGISTRY_ADDRESS          = "0x501ACEe6AAf57d5e37488145844f47c079a8F253";
 const VAULT_ADDRESS             = "0x501AcebC38338bC8c18843dc14fD4345f4DecF33";
-const CLAIMS_ESCROW_ADDRESS     = "0x501AcEF30A053765B83f34d38B0aD54bFE8D95Ae";
+const CLAIMS_ESCROW_ADDRESS     = "0x501AcE79a4b961cf86C5cCA36B7157Faf78A248D";
 const TREASURY_ADDRESS          = "0x501acE64D1B4dddAD50a579d28e8F9805651307D";
-const POLICY_MANAGER_ADDRESS    = "0x501aCE9a5cC1D39951691718D7EC583fB326c71b";
+const POLICY_MANAGER_ADDRESS    = "0x501ACeDE6cb432a1AA5590C04b88a6E92C00F381";
 const POLICY_DESCR_ADDRESS      = "0x501ACEA6EA69f4a4B68c8496243D3614256AC242";
-const RISK_MANAGER_ADDRESS      = "0x501acE40A875726DA80b9e34937A508bDf2C5560";
+const RISK_MANAGER_ADDRESS      = "0x501aCE0596b8Fdb2Eb7b2CF4644c7bb4485Ec971";
 
 const QUOTER_MANUAL_ADDRESS     = "0x501Ace288Bc04Dd86CEC06A56168F2abFaacA8Af";
-const COMPOUND_PRODUCT_ADDRESS  = "0x501aCE222905a3790373C89ff099C1BaB5C37185";
-const WAAVE_PRODUCT_ADDRESS     = "0x501acE6111e36D0E3bE90b89D3C404890b0A4f05";
+const COMPOUND_PRODUCT_ADDRESS  = "0x501acEdD6d13CE6597fb1fEc45eC0b2e66BbF2A3";
+const WAAVE_PRODUCT_ADDRESS     = "0x501ACE7070A38fA4398afaac304308D3a0912C50";
 
 const WETH_ADDRESS              = "0xc778417E063141139Fce010982780140Aa0cD5Ab";
 const COMPTROLLER_ADDRESS       = "0x2EAa9D77AE4D8f9cdD9FAAcd44016E746485bddb";
@@ -246,7 +246,7 @@ async function deployCompoundProduct() {
     compoundProduct = (await ethers.getContractAt(artifacts.CompoundProductRinkeby.abi, COMPOUND_PRODUCT_ADDRESS)) as CompoundProductRinkeby;
   } else {
     console.log("Deploying CompoundProduct");
-    var res = await create2Contract(deployer,artifacts.CompoundProductRinkeby,[signerAddress,policyManager.address,registry.address,COMPTROLLER_ADDRESS,minPeriod,maxPeriod,price,10,quoterManual.address]);
+    var res = await create2Contract(deployer,artifacts.CompoundProductRinkeby,[signerAddress,policyManager.address,registry.address,COMPTROLLER_ADDRESS,minPeriod,maxPeriod,price,10]);
     compoundProduct = (await ethers.getContractAt(artifacts.CompoundProductRinkeby.abi, res.address)) as CompoundProductRinkeby;
     transactions.push({"description": "Deploy CompoundProduct", "to": SINGLETON_FACTORY_ADDRESS, "gasLimit": res.gasUsed});
     console.log(`Deployed CompoundProduct to ${compoundProduct.address}`);
@@ -270,7 +270,7 @@ async function deployWaaveProduct() {
     waaveProduct = (await ethers.getContractAt(artifacts.WaaveProduct.abi, WAAVE_PRODUCT_ADDRESS)) as WaaveProduct;
   } else {
     console.log("Deploying WaaveProduct");
-    var res = await create2Contract(deployer,artifacts.WaaveProduct,[signerAddress,policyManager.address,registry.address,WAAVE_REGISTRY_ADDRESS,minPeriod,maxPeriod,price,10,quoterManual.address]);
+    var res = await create2Contract(deployer,artifacts.WaaveProduct,[signerAddress,policyManager.address,registry.address,WAAVE_REGISTRY_ADDRESS,minPeriod,maxPeriod,price,10]);
     waaveProduct = (await ethers.getContractAt(artifacts.WaaveProduct.abi, res.address)) as WaaveProduct;
     transactions.push({"description": "Deploy WaaveProduct", "to": SINGLETON_FACTORY_ADDRESS, "gasLimit": res.gasUsed});
     console.log(`Deployed WaaveProduct to ${waaveProduct.address}`);
