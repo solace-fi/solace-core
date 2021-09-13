@@ -334,7 +334,8 @@ describe("PolicyManager", function() {
           0,
           100000000000,
           1,
-          16777215
+          16777215,
+          ZERO_ADDRESS
         ]
       )) as MockProduct;
       await policyManager.connect(governor).addProduct(mockProduct.address);
@@ -448,7 +449,8 @@ describe("PolicyManager", function() {
             0,
             100000000000,
             1,
-            16777215
+            16777215,
+            ZERO_ADDRESS
           ]
         )) as MockProduct;
         await policyManager.connect(governor).addProduct(mockProduct.address);

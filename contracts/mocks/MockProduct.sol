@@ -21,6 +21,7 @@ contract MockProduct is BaseProduct {
       * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
       * @param price_ The cover price for the **Product**.
       * @param maxCoverPerUserDivisor_ The max cover amount divisor for per user. (maxCover / divisor = maxCoverPerUser).
+      * @param quoter_ The exchange quoter address.
      */
     constructor (
         address governance_,
@@ -30,7 +31,8 @@ contract MockProduct is BaseProduct {
         uint40 minPeriod_,
         uint40 maxPeriod_,
         uint24 price_,
-        uint32 maxCoverPerUserDivisor_
+        uint32 maxCoverPerUserDivisor_,
+        address quoter_
     ) BaseProduct(
         governance_,
         policyManager_,
