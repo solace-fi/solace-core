@@ -3,8 +3,6 @@ const { deployContract, solidity } = waffle;
 import { MockProvider } from "ethereum-waffle";
 const provider: MockProvider = waffle.provider;
 import { BigNumber as BN, BigNumberish, utils, constants, Contract } from "ethers";
-import { ECDSASignature, ecsign } from "ethereumjs-util";
-import { getPermitDigest, sign, getDomainSeparator } from "./utilities/signature";
 import chai from "chai";
 const { expect } = chai;
 chai.use(solidity);
@@ -12,50 +10,19 @@ import { config as dotenv_config } from "dotenv";
 dotenv_config();
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { PolicyManager, WaaveProduct, ExchangeQuoterManual, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
+import { PolicyManager, WaaveProduct, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
+import { sign, assembleSignature, getSubmitClaimDigest } from "./utilities/signature";
+import { toBytes32, setStorageAt } from "./utilities/setStorage";
+import { encodeAddresses } from "./utilities/positionDescription";
+import { oneToken } from "./utilities/math";
 
-const SUBMIT_CLAIM_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("WaaveProductSubmitClaim(uint256 policyID,uint256 amountOut,uint256 deadline)"));
+const DOMAIN_NAME = "Solace.fi-WaaveProduct";
+const INVALID_DOMAIN = "Solace.fi-Invalid";
+const SUBMIT_CLAIM_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("WaaveProductSubmitClaim(uint256 policyID,address claimant,uint256 amountOut,uint256 deadline)"));
+const INVALID_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("InvalidType(uint256 policyID,address claimant,uint256 amountOut,uint256 deadline)"));
 
 const chainId = 31337;
 const deadline = constants.MaxUint256;
-
-const toBytes32 = (bn: BN) => {
-  return ethers.utils.hexlify(ethers.utils.zeroPad(bn.toHexString(), 32));
-};
-
-const setStorageAt = async (address: string, index: BigNumberish, value: string) => {
-  await ethers.provider.send("hardhat_setStorageAt", [address, index, value]);
-  await ethers.provider.send("evm_mine", []); // Just mines to the next block
-};
-
-// Returns the EIP712 hash which should be signed by the authorized signer
-// in order to make a call to WaaveProduct.submitClaim()
-function getSubmitClaimDigest(
-    name: string,
-    address: string,
-    chainId: number,
-    policyID: BigNumberish,
-    amountOut: BigNumberish,
-    deadline: BigNumberish
-    ) {
-    const DOMAIN_SEPARATOR = getDomainSeparator(name, address, chainId)
-    return utils.keccak256(
-        utils.solidityPack(
-        ["bytes1", "bytes1", "bytes32", "bytes32"],
-        [
-            "0x19",
-            "0x01",
-            DOMAIN_SEPARATOR,
-            utils.keccak256(
-            utils.defaultAbiCoder.encode(
-                ["bytes32", "uint256", "uint256","uint256"],
-                [SUBMIT_CLAIM_TYPEHASH, policyID, amountOut, deadline]
-            )
-            ),
-        ]
-        )
-    )
-}
 
 if(process.env.FORK_NETWORK === "rinkeby"){
   describe("WaaveProduct", function () {
@@ -65,7 +32,6 @@ if(process.env.FORK_NETWORK === "rinkeby"){
     let policyManager: PolicyManager;
     let product: WaaveProduct;
     let product2: WaaveProduct;
-    let quoter2: ExchangeQuoterManual;
     let treasury: Treasury;
     let claimsEscrow: ClaimsEscrow;
     let vault: Vault;
@@ -81,19 +47,29 @@ if(process.env.FORK_NETWORK === "rinkeby"){
     const threeDays = 19350;
     const price = 11044; // 2.60%/yr
 
+    const coverAmount = BN.from("10000000000000000000"); // 10 eth
+    const blocks = BN.from(threeDays);
+    const expectedPremium = BN.from("2137014000000000");
+
     const WAREGISTRY_ADDRESS        = "0x670Fc618C48964F806Cd655600541807ed83a9C5";
     const WETH_ADDRESS              = "0xc778417E063141139Fce010982780140Aa0cD5Ab";
     const WAWETH_ADDRESS            = "0x4e1A6cE8EdEd8c9C74CbF797c6aA0Fbc12D89F71";
 
-    const USER1 = "0x0cdD2e13E5b612e8a34049a680cdd57Aca2952E4";
+    const REAL_USER1 = "0x0cdD2e13E5b612e8a34049a680cdd57Aca2952E4";
     const BALANCE1 = "600000000000000000";
 
     const COOLDOWN_PERIOD = 3600; // one hour
 
+    const watokens = [
+      {"symbol":"waWETH","address":"0x4e1A6cE8EdEd8c9C74CbF797c6aA0Fbc12D89F71"},
+      {"symbol":"waDAI","address":"0x51758E33047b1199439212cBAf3ecd1C04165bF0"},
+      {"symbol":"waBAT","address":"0x1E3713729Ab4F2570B823d9c5572B9Cc2E5753Df","uimpl":"","blacklist":""}
+    ];
+
     before(async function () {
       artifacts = await import_artifacts();
       await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
-      
+
       registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
       weth = (await ethers.getContractAt(artifacts.WETH.abi, WETH_ADDRESS)) as Weth9;
       await registry.connect(governor).setWeth(weth.address);
@@ -108,10 +84,6 @@ if(process.env.FORK_NETWORK === "rinkeby"){
       riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
       await registry.connect(governor).setRiskManager(riskManager.address);
 
-      // deploy manual exchange quoter
-      quoter2 = (await deployContract(deployer, artifacts.ExchangeQuoterManual, [governor.address])) as ExchangeQuoterManual;
-      await quoter2.connect(governor).setRates(["0xbf7a7169562078c96f0ec1a8afd6ae50f12e5a99","0x5592ec0cfb4dbc12d3ab100b257153436a1f0fea","0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","0x6e894660985207feb7cf89faf048998c71e8ee89","0x4dbcdf9b62e891a7cec5a2568c3f4faf9e8abe2b","0xd9ba894e0097f8cc2bbc9d24d308b98e36dc6d02","0x577d296678535e4903d59a4c929b718e1d575e0a","0xddea378a6ddc8afec82c36e9b0078826bf9e68b6","0xc778417E063141139Fce010982780140Aa0cD5Ab"],["264389616860428","445946382179077","1000000000000000000","10221603363836799","444641132530148","448496810835719","14864363968434576288","334585685516318","1000000000000000000"]);
-
       // deploy Waave Product
       product = (await deployContract(
         deployer,
@@ -124,8 +96,7 @@ if(process.env.FORK_NETWORK === "rinkeby"){
           minPeriod,
           maxPeriod,
           price,
-          1,
-          quoter2.address
+          1
         ]
       )) as WaaveProduct;
 
@@ -140,8 +111,7 @@ if(process.env.FORK_NETWORK === "rinkeby"){
           minPeriod,
           maxPeriod,
           price,
-          1,
-          quoter2.address
+          1
         ]
       )) as WaaveProduct;
 
@@ -151,108 +121,143 @@ if(process.env.FORK_NETWORK === "rinkeby"){
       await vault.connect(deployer).depositEth({value: BN.from("1000000000000000000000")}); // 1000 eth
       await riskManager.connect(governor).addProduct(product.address, 1);
       await product.connect(governor).addSigner(paclasSigner.address);
-    })
+    });
 
-    describe("appraisePosition", function () {
-      it("reverts if invalid pool or token", async function () {
-        await expect(product.appraisePosition(policyholder1.address, ZERO_ADDRESS)).to.be.reverted;
-        await expect(product.appraisePosition(policyholder1.address, policyholder1.address)).to.be.reverted;
-      })
+    describe("covered platform", function () {
+      it("starts as waRegistry", async function () {
+        expect(await product.coveredPlatform()).to.equal(WAREGISTRY_ADDRESS);
+        expect(await product.waRegistry()).to.equal(WAREGISTRY_ADDRESS);
+      });
+      it("cannot be set by non governor", async function () {
+        await expect(product.connect(policyholder1).setCoveredPlatform(policyholder1.address)).to.be.revertedWith("!governance");
+      });
+      it("can be set", async function () {
+        await product.connect(governor).setCoveredPlatform(treasury.address);
+        expect(await product.coveredPlatform()).to.equal(treasury.address);
+        expect(await product.waRegistry()).to.equal(treasury.address);
+        await product.connect(governor).setCoveredPlatform(WAREGISTRY_ADDRESS);
+      });
+    });
 
-      it("no positions should have no value", async function () {
-        expect(await product.appraisePosition(policyholder1.address, WAWETH_ADDRESS)).to.equal(0);
-      })
-
-      it("a position should have a value", async function () {
-        expect(await product.appraisePosition(USER1, WAWETH_ADDRESS)).to.equal(BALANCE1);
-      })
-    })
+    describe("position description", function () {
+      it("cannot be zero length", async function () {
+        expect(await product.isValidPositionDescription("0x")).to.be.false;
+      });
+      it("cannot be odd size", async function () {
+        expect(await product.isValidPositionDescription("0xabcd")).to.be.false;
+        expect(await product.isValidPositionDescription("0x123456789012345678901234567890123456789077")).to.be.false;
+      });
+      it("cannot have non waTokens", async function () {
+        expect(await product.isValidPositionDescription("0x1234567890123456789012345678901234567890")).to.be.false;
+        expect(await product.isValidPositionDescription(REAL_USER1)).to.be.false;
+        expect(await product.isValidPositionDescription(encodeAddresses([REAL_USER1]))).to.be.false;
+        expect(await product.isValidPositionDescription(governor.address)).to.be.false;
+        expect(await product.isValidPositionDescription(WAREGISTRY_ADDRESS)).to.be.false;
+        expect(await product.isValidPositionDescription(encodeAddresses([ZERO_ADDRESS]))).to.be.false;
+        expect(await product.isValidPositionDescription(encodeAddresses([watokens[0].address,ZERO_ADDRESS]))).to.be.false;
+      });
+      it("can be one or more waTokens", async function () {
+        for(var i = 0; i < watokens.length; ++i) {
+          expect(await product.isValidPositionDescription(encodeAddresses([watokens[i].address]))).to.be.true;
+          // don't care about duplicates
+          for(var j = 0; j < watokens.length; ++j) {
+            expect(await product.isValidPositionDescription(encodeAddresses([watokens[i].address, watokens[j].address]))).to.be.true;
+          }
+        }
+        expect(await product.isValidPositionDescription(encodeAddresses(watokens.map(watoken => watoken.address)))).to.be.true;
+      });
+    });
 
     describe("implementedFunctions", function () {
-      it("can getQuote", async function () {
-        let price = BN.from(await product.price());
-        let positionAmount = await product.appraisePosition(USER1, WAWETH_ADDRESS);
-        let coverAmount = positionAmount.mul(5000).div(10000);
-        let blocks = BN.from(threeDays);
-        let expectedPremium = BN.from("64110420000000");
-        let quote = BN.from(await product.getQuote(USER1, WAWETH_ADDRESS, coverAmount, blocks))
-        expect(quote).to.equal(expectedPremium);
-      })
-      it("can buyPolicy", async function () {
+      before(async function () {
         expect(await policyManager.totalSupply()).to.equal(0);
-        expect(await policyManager.balanceOf(USER1)).to.equal(0);
+        expect(await policyManager.balanceOf(REAL_USER1)).to.equal(0);
         // adding the owner product to the ProductManager
         (await policyManager.connect(governor).addProduct(product.address));
         expect(await policyManager.productIsActive(product.address)).to.equal(true);
-
-        let positionAmount = await product.appraisePosition(USER1, WAWETH_ADDRESS);
-        let coverAmount = positionAmount.mul(5000).div(10000);
-        let blocks = threeDays;
-        let quote = BN.from(await product.getQuote(USER1, WAWETH_ADDRESS, coverAmount, blocks));
-        let tx = (await product.buyPolicy(USER1, WAWETH_ADDRESS, coverAmount, blocks, { value: quote }));
+      });
+      it("can getQuote", async function () {
+        let quote = BN.from(await product.getQuote(coverAmount, blocks));
+        expect(quote).to.equal(expectedPremium);
+      });
+      it("cannot buy policy with invalid description", async function () {
+        await expect(product.buyPolicy(REAL_USER1, "0x1234567890123456789012345678901234567890", coverAmount, blocks, { value: expectedPremium })).to.be.reverted;
+      });
+      it("can buyPolicy", async function () {
+        let tx = await product.buyPolicy(REAL_USER1, WAWETH_ADDRESS, coverAmount, blocks, { value: expectedPremium });
         expect(tx).to.emit(policyManager, "PolicyCreated").withArgs(1);
         expect(await policyManager.totalSupply()).to.equal(1);
-        expect(await policyManager.balanceOf(USER1)).to.equal(1);
-      })
+        expect(await policyManager.balanceOf(REAL_USER1)).to.equal(1);
+      });
       it("can buy duplicate policy", async function () {
-        let positionAmount = await product.appraisePosition(USER1, WAWETH_ADDRESS);
-        let coverAmount = positionAmount.mul(5000).div(10000);
-        let blocks = threeDays
-        let quote = BN.from(await product.getQuote(USER1, WAWETH_ADDRESS, coverAmount, blocks));
-        await product.buyPolicy(USER1, WAWETH_ADDRESS, coverAmount, blocks, { value: quote });
-      })
+        let tx = await product.buyPolicy(REAL_USER1, WAWETH_ADDRESS, coverAmount, blocks, { value: expectedPremium });
+        expect(tx).to.emit(product, "PolicyCreated").withArgs(2);
+        expect(await policyManager.totalSupply()).to.equal(2);
+        expect(await policyManager.balanceOf(REAL_USER1)).to.equal(2);
+      });
+      it("can buy policy that covers multiple positions", async function () {
+        let tx = await product.buyPolicy(REAL_USER1, encodeAddresses([watokens[0].address, watokens[1].address]), coverAmount, blocks, { value: expectedPremium });
+        expect(tx).to.emit(product, "PolicyCreated").withArgs(3);
+        expect(await policyManager.totalSupply()).to.equal(3);
+        expect(await policyManager.balanceOf(REAL_USER1)).to.equal(3);
+      });
       it("can get product name", async function () {
         expect(await product.name()).to.equal("Waave");
-      })
+      });
     })
 
     describe("submitClaim", function () {
-      let policyID1 = 3;
-      let policyID2 = 4;
+      let policyID1: BN;
       let amountOut1 = 5000000000;
       let amountOut2 = 50000000;
 
       before(async function () {
+        let policyCount = await policyManager.totalPolicyCount();
+        policyID1 = policyCount.add(1);
         await deployer.sendTransaction({to: claimsEscrow.address, value: BN.from("1000000000000000000")});
         // create a waWETH position and policy
         let depositAmount1 = BN.from("1000000000000000");
         await weth.connect(policyholder1).deposit({value: depositAmount1});
         await weth.connect(policyholder1).approve(waWeth.address, depositAmount1);
         await waWeth.connect(policyholder1).deposit(depositAmount1);
-        let positionAmount1 = await product.appraisePosition(policyholder1.address, WAWETH_ADDRESS);
-        let coverAmount1 = positionAmount1;
-        let blocks1 = threeDays;
-        let quote1 = BN.from(await product.getQuote(policyholder1.address, WAWETH_ADDRESS, coverAmount1, blocks1));
-        await product.connect(policyholder1).buyPolicy(policyholder1.address, WAWETH_ADDRESS, coverAmount1, blocks1, { value: quote1 });
+        await product.connect(policyholder1).buyPolicy(policyholder1.address, WAWETH_ADDRESS, coverAmount, blocks, { value: expectedPremium });
         // create another waWETH position and policy
         let depositAmount2 = BN.from("2000000000000000");
         await weth.connect(policyholder2).deposit({value: depositAmount2});
         await weth.connect(policyholder2).approve(waWeth.address, depositAmount2);
         await waWeth.connect(policyholder2).deposit(depositAmount2);
-        let positionAmount2 = await product.appraisePosition(policyholder2.address, WAWETH_ADDRESS);
-        let coverAmount2 = positionAmount2;
-        let blocks2 = threeDays;
-        let quote2 = BN.from(await product.getQuote(policyholder2.address, WAWETH_ADDRESS, coverAmount2, blocks2));
-        await product.connect(policyholder2).buyPolicy(policyholder2.address, WAWETH_ADDRESS, coverAmount2, blocks2, { value: quote2 });
+        await product.connect(policyholder2).buyPolicy(policyholder2.address, WAWETH_ADDRESS, coverAmount, blocks, { value: expectedPremium });
       });
       it("cannot submit claim with expired signature", async function () {
-        let digest = getSubmitClaimDigest("Solace.fi-WaaveProduct", product.address, chainId, policyID1, amountOut1, 0);
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, amountOut1, 0, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
         await expect(product.connect(policyholder1).submitClaim(policyID1, amountOut1, 0, signature)).to.be.revertedWith("expired deadline");
       });
       it("cannot submit claim on someone elses policy", async function () {
-        let digest = getSubmitClaimDigest("Solace.fi-WaaveProduct", product.address, chainId, policyID1, amountOut1, deadline);
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
         await expect(product.connect(policyholder2).submitClaim(policyID1, amountOut1, deadline, signature)).to.be.revertedWith("!policyholder");
       });
+      it("cannot submit claim on someone elses policy after transfer", async function () {
+        await policyManager.connect(policyholder1).transferFrom(policyholder1.address, policyholder2.address, policyID1)
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
+        let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
+        await expect(product.connect(policyholder1).submitClaim(policyID1, amountOut1, deadline, signature)).to.be.revertedWith("!policyholder");
+        await policyManager.connect(policyholder2).transferFrom(policyholder2.address, policyholder1.address, policyID1)
+      });
+      it("cannot submit claim signed for someone else", async function () {
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder2.address, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
+        let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
+        await expect(product.connect(policyholder1).submitClaim(policyID1, amountOut1, deadline, signature)).to.be.revertedWith("invalid signature");
+      });
       it("cannot submit claim from wrong product", async function () {
-        let digest = getSubmitClaimDigest("Solace.fi-WaaveProduct", product.address, chainId, policyID1, amountOut1, deadline);
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
         await expect(product2.connect(policyholder1).submitClaim(policyID1, amountOut1, deadline, signature)).to.be.revertedWith("wrong product");
       });
       it("cannot submit claim with excessive payout", async function () {
         let coverAmount = (await policyManager.getPolicyInfo(policyID1)).coverAmount;
-        let digest = getSubmitClaimDigest("Solace.fi-AaveV2Product", product.address, chainId, policyID1, coverAmount.add(1), deadline);
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, coverAmount.add(1), deadline, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
         await expect(product.connect(policyholder1).submitClaim(policyID1, coverAmount.add(1), deadline, signature)).to.be.revertedWith("excessive amount out");
       });
@@ -262,19 +267,29 @@ if(process.env.FORK_NETWORK === "rinkeby"){
         await expect(product.connect(policyholder1).submitClaim(policyID1, amountOut1, deadline, "0x1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890")).to.be.revertedWith("invalid signature");
       });
       it("cannot submit claim from unauthorized signer", async function () {
-        let digest = getSubmitClaimDigest("Solace.fi-WaaveProduct", product.address, chainId, policyID1, amountOut1, deadline);
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(deployer.privateKey.slice(2), "hex")));
         await expect(product.connect(policyholder1).submitClaim(policyID1, amountOut1, deadline, signature)).to.be.revertedWith("invalid signature");
       });
       it("cannot submit claim with changed arguments", async function () {
-        let digest = getSubmitClaimDigest("Solace.fi-WaaveProduct", product.address, chainId, policyID1, amountOut1, deadline);
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
         await expect(product.connect(policyholder1).submitClaim(policyID1, amountOut2, deadline, signature)).to.be.revertedWith("invalid signature");
         await expect(product.connect(policyholder1).submitClaim(policyID1, amountOut1, deadline.sub(1), signature)).to.be.revertedWith("invalid signature");
       });
+      it("cannot submit claim with invalid domain", async function () {
+        let digest = getSubmitClaimDigest(INVALID_DOMAIN, product.address, chainId, policyID1, policyholder1.address, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
+        let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
+        await expect(product.connect(policyholder1).submitClaim(policyID1, amountOut1, deadline, signature)).to.be.revertedWith("invalid signature");
+      });
+      it("cannot submit claim with invalid typehash", async function () {
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, amountOut1, deadline, INVALID_TYPEHASH);
+        let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
+        await expect(product.connect(policyholder1).submitClaim(policyID1, amountOut1, deadline, signature)).to.be.revertedWith("invalid signature");
+      });
       it("can open a claim on a waWETH position", async function () {
         // sign swap
-        let digest = getSubmitClaimDigest("Solace.fi-WaaveProduct", product.address, chainId, policyID1, amountOut1, deadline);
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
         // submit claim
         let userWaWeth1 = await waWeth.balanceOf(policyholder1.address);
@@ -299,11 +314,6 @@ if(process.env.FORK_NETWORK === "rinkeby"){
         expect(userEth2.sub(userEth1).add(gasCost)).to.equal(amountOut1);
       });
       it("should support all watokens", async function () {
-        var watokens = [
-          {"symbol":"waWETH","address":"0x4e1A6cE8EdEd8c9C74CbF797c6aA0Fbc12D89F71"},
-          {"symbol":"waDAI","address":"0x51758E33047b1199439212cBAf3ecd1C04165bF0"},
-          {"symbol":"waBAT","address":"0x1E3713729Ab4F2570B823d9c5572B9Cc2E5753Df","uimpl":"","blacklist":""}
-        ];
         var success = 0;
         var successList = [];
         var failList = [];
@@ -357,15 +367,11 @@ if(process.env.FORK_NETWORK === "rinkeby"){
             const cAmount = await watoken.balanceOf(policyholder3.address);
             expect(cAmount).to.be.gt(0);
             // create policy
-            let positionAmount = await product.appraisePosition(policyholder3.address, watokenAddress);
-            let coverAmount = positionAmount;
-            let blocks = threeDays;
-            let quote = BN.from(await product.getQuote(policyholder3.address, watokenAddress, coverAmount, blocks));
-            await product.connect(policyholder3).buyPolicy(policyholder3.address, watokenAddress, coverAmount, blocks, { value: quote });
+            await product.connect(policyholder3).buyPolicy(policyholder3.address, watokenAddress, coverAmount, blocks, { value: expectedPremium });
             let policyID = (await policyManager.totalPolicyCount()).toNumber();
             // sign swap
             let amountOut = 10000;
-            let digest = getSubmitClaimDigest("Solace.fi-WaaveProduct", product.address, chainId, policyID, amountOut, deadline);
+            let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID, policyholder3.address, amountOut, deadline, SUBMIT_CLAIM_TYPEHASH);
             let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
             // submit claim
             let tx1 = await product.connect(policyholder3).submitClaim(policyID, amountOut, deadline, signature);
@@ -399,40 +405,6 @@ if(process.env.FORK_NETWORK === "rinkeby"){
         }
         expect(`${success}/${watokens.length} supported watokens`).to.equal(`${watokens.length}/${watokens.length} supported watokens`);
       });
-    })
-
-    describe("covered platform", function () {
-      it("starts as waRegistry", async function () {
-        expect(await product.coveredPlatform()).to.equal(WAREGISTRY_ADDRESS);
-        expect(await product.waRegistry()).to.equal(WAREGISTRY_ADDRESS);
-      });
-      it("cannot be set by non governor", async function () {
-        await expect(product.connect(policyholder1).setCoveredPlatform(policyholder1.address)).to.be.revertedWith("!governance");
-      });
-      it("can be set", async function () {
-        await product.connect(governor).setCoveredPlatform(treasury.address);
-        expect(await product.coveredPlatform()).to.equal(treasury.address);
-        expect(await product.waRegistry()).to.equal(treasury.address);
-        await product.connect(governor).setCoveredPlatform(WAREGISTRY_ADDRESS);
-      });
     });
-  })
-}
-
-function buf2hex(buffer: Buffer) { // buffer is an ArrayBuffer
-  return [...new Uint8Array(buffer)].map(x => x.toString(16).padStart(2, "0")).join("");
-}
-
-function assembleSignature(parts: ECDSASignature) {
-  let { v, r, s } = parts;
-  let v_ = Number(v).toString(16);
-  let r_ = buf2hex(r);
-  let s_ = buf2hex(s);
-  return `0x${r_}${s_}${v_}`;
-}
-
-function oneToken(decimals: number) {
-  var s = "1";
-  for(var i = 0; i < decimals; ++i) s += "0";
-  return BN.from(s);
+  });
 }

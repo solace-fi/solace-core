@@ -54,6 +54,7 @@ export async function import_artifacts() {
   // aave imports
   artifacts.LendingPool = await tryImport(`${artifact_dir}/interface/AaveV2/ILendingPool.sol/ILendingPool.json`);
   artifacts.AToken = await tryImport(`${artifact_dir}/interface/AaveV2/IAToken.sol/IAToken.json`);
+  artifacts.MockAToken = await tryImport(`${artifact_dir}/mocks/MockAToken.sol/MockAToken.json`);
 
   // compound imports
   artifacts.ICETH = await tryImport(`${artifact_dir}/interface/Compound/ICEth.sol/ICEth.json`);

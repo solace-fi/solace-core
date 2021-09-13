@@ -10,55 +10,28 @@ const { expect } = chai;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { PolicyManager, YearnV2Product, ExchangeQuoter1InchV1, ExchangeQuoterManual, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
-import { getDomainSeparator, sign } from "./utilities/signature";
+import { PolicyManager, YearnV2Product, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
+import { sign, assembleSignature, getSubmitClaimDigest } from "./utilities/signature";
 import { toBytes32, setStorageAt } from "./utilities/setStorage";
-import { ECDSASignature } from "ethereumjs-util";
+import { encodeAddresses } from "./utilities/positionDescription";
+import { oneToken } from "./utilities/math";
 
-const SUBMIT_CLAIM_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("YearnV2ProductSubmitClaim(uint256 policyID,uint256 amountOut,uint256 deadline)"));
+const DOMAIN_NAME = "Solace.fi-YearnV2Product";
+const INVALID_DOMAIN = "Solace.fi-Invalid";
+const SUBMIT_CLAIM_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("YearnV2ProductSubmitClaim(uint256 policyID,address claimant,uint256 amountOut,uint256 deadline)"));
+const INVALID_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("InvalidType(uint256 policyID,address claimant,uint256 amountOut,uint256 deadline)"));
 
 const chainId = 31337;
 const deadline = constants.MaxUint256;
 
-// Returns the EIP712 hash which should be signed by the authorized signer
-// in order to make a call to YearnV2Product.submitClaim()
-function getSubmitClaimDigest(
-    name: string,
-    address: string,
-    chainId: number,
-    policyID: BigNumberish,
-    amountOut: BigNumberish,
-    deadline: BigNumberish
-    ) {
-    const DOMAIN_SEPARATOR = getDomainSeparator(name, address, chainId)
-    return utils.keccak256(
-        utils.solidityPack(
-        ["bytes1", "bytes1", "bytes32", "bytes32"],
-        [
-            "0x19",
-            "0x01",
-            DOMAIN_SEPARATOR,
-            utils.keccak256(
-            utils.defaultAbiCoder.encode(
-                ["bytes32", "uint256", "uint256","uint256"],
-                [SUBMIT_CLAIM_TYPEHASH, policyID, amountOut, deadline]
-            )
-            ),
-        ]
-        )
-    )
-}
-
 if(process.env.FORK_NETWORK === "mainnet"){
   describe("YearnV2Product", function () {
-    const [deployer, governor, policyholder, policyholder2, depositor, paclasSigner] = provider.getWallets();
+    const [deployer, governor, policyholder1, policyholder2, depositor, paclasSigner] = provider.getWallets();
     let artifacts: ArtifactImports;
 
     let policyManager: PolicyManager;
     let product: YearnV2Product;
     let product2: YearnV2Product;
-    let quoter: ExchangeQuoter1InchV1;
-    let quoter2: ExchangeQuoterManual;
     let weth: Weth9;
     let treasury: Treasury;
     let claimsEscrow: ClaimsEscrow;
@@ -75,19 +48,60 @@ if(process.env.FORK_NETWORK === "mainnet"){
     const maxCoverAmount = BN.from("1000000000000000000000"); // 1000 Ether in wei
     const price = 11044; // 2.60%/yr
 
+    const coverAmount = BN.from("10000000000000000000"); // 10 eth
+    const blocks = BN.from(threeDays);
+    const expectedPremium = BN.from("2137014000000000");
+
     const ONE_SPLIT_VIEW = "0xC586BeF4a0992C495Cf22e1aeEE4E446CECDee0E";
     const IYREGISTRY = "0x3eE41C098f9666ed2eA246f4D2558010e59d63A0";
     const DAI_ADDRESS = "0x6B175474E89094C44Da98b954EedeAC495271d0F";
     const YDAI_ADDRESS = "0xacd43e627e64355f1861cec6d3a6688b31a6f952";
-    const REAL_USER = "0x452269ae20f7df9fc93f2f92d1c5351b895a39b3";
+    const REAL_USER1 = "0x452269ae20f7df9fc93f2f92d1c5351b895a39b3";
     const BALANCE = BN.from("7207201633777852");
 
     const COOLDOWN_PERIOD = 3600; // one hour
 
+    var yvaults = [
+      {"symbol":"yaLINK","address":"0x29e240cfd7946ba20895a7a02edb25c210f9f324"}, // safeerc20
+      {"symbol":"yLINK","address":"0x881b06da56bb5675c54e4ed311c21e54c5025298","uimpl":""},
+      {"symbol":"yUSDC","address":"0x597ad1e0c13bfe8025993d9e79c69e1c0233522e","blacklist":"0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"}, // black listed
+      {"symbol":"yyDAI+yUSDC+yUSDT+yTUSD","address":"0x5dbcf33d8c2e976c6b560249878e6f1491bca25c"}, // no reason
+      {"symbol":"yTUSD","address":"0x37d19d1c4e1fa9dc47bd1ea12f742a0887eda74a"},
+      {"symbol":"yDAI","address":"0xacd43e627e64355f1861cec6d3a6688b31a6f952"},
+      {"symbol":"yUSDT","address":"0x2f08119c6f07c006695e079aafc638b8789faf18"},
+      {"symbol":"yYFI","address":"0xba2e7fed597fd0e3e70f5130bcdbbfe06bb94fe1"},
+      {"symbol":"yyDAI+yUSDC+yUSDT+yBUSD","address":"0x2994529c0652d127b7842094103715ec5299bbed"}, // zero position value
+      {"symbol":"ycrvRenWSBTC","address":"0x7ff566e1d69deff32a7b244ae7276b9f90e9d0f6"}, // zero position value
+      {"symbol":"yWETH","address":"0xe1237aa7f535b0cc33fd973d66cbf830354d16c7"},
+      {"symbol":"y3Crv","address":"0x9ca85572e6a3ebf24dedd195623f188735a5179f"},
+      {"symbol":"yGUSD","address":"0xec0d8d3ed5477106c6d4ea27d90a60e594693c90","uimpl":"0x6704ba24b8640BCcEe6BF2fd276a6a1b8EdF4Ade"}, // gusd is proxy
+      {"symbol":"yvcDAI+cUSDC","address":"0x629c759d1e83efbf63d84eb3868b564d9521c129"}, // zero position value
+      {"symbol":"yvmusd3CRV","address":"0x0fcdaedfb8a7dfda2e9838564c5a1665d856afdf"}, // zero position value
+      {"symbol":"yvgusd3CRV","address":"0xcc7e70a958917cce67b4b87a8c30e6297451ae98"}, // zero position value
+      {"symbol":"yveursCRV","address":"0x98b058b2cbacf5e99bc7012df757ea7cfebd35bc"}, // zero position value
+      {"symbol":"yvmUSD","address":"0xe0db48b4f71752c4bef16de1dbd042b82976b8c7"},
+      {"symbol":"yvcrvRenWBTC","address":"0x5334e150b938dd2b6bd040d9c4a03cff0ced3765"}, // zero position value
+      {"symbol":"yvusdn3CRV","address":"0xfe39ce91437c76178665d64d7a2694b0f6f17fe3"}, // zero position value
+      {"symbol":"yvust3CRV","address":"0xf6c9e9af314982a4b38366f4abfaa00595c5a6fc"}, // zero position value
+      {"symbol":"yvbBTC/sbtcCRV","address":"0xa8b1cb4ed612ee179bdea16cca6ba596321ae52d"}, // zero position value
+      {"symbol":"yvtbtc/sbtcCrv","address":"0x07fb4756f67bd46b748b16119e802f1f880fb2cc"}, // zero position value
+      {"symbol":"yvoBTC/sbtcCRV","address":"0x7f83935ecfe4729c4ea592ab2bc1a32588409797"}, // zero position value
+      {"symbol":"yvpBTC/sbtcCRV","address":"0x123964ebe096a920dae00fb795ffbfa0c9ff4675"}, // zero position value
+      {"symbol":"yvhCRV","address":"0x46afc2dfbd1ea0c0760cad8262a5838e803a37e5"}, // zero position value
+      {"symbol":"yvcrvPlain3andSUSD","address":"0x5533ed0a3b83f70c3c4a1f69ef5546d3d4713e44"},
+      {"symbol":"yvhusd3CRV","address":"0x39546945695dcb1c037c836925b355262f551f55"}, // zero position value
+      {"symbol":"yvdusd3CRV","address":"0x8e6741b456a074f0bc45b8b82a755d4af7e965df"}, // zero position value
+      {"symbol":"yva3CRV","address":"0x03403154afc09ce8e44c3b185c82c6ad5f86b9ab"}, // zero position value
+      {"symbol":"yvankrCRV","address":"0xe625f5923303f1ce7a43acfefd11fd12f30dbca4"}, // zero position value
+      {"symbol":"yvsaCRV","address":"0xbacb69571323575c6a5a3b4f9eede1dc7d31fbc1"}, // zero position value
+      {"symbol":"yvusdp3CRV","address":"0x1b5eb1173d2bf770e50f10410c9a96f7a8eb6e75"}, // zero position value
+      {"symbol":"yvlinkCRV","address":"0x96ea6af74af09522fcb4c28c269c26f59a31ced6","uimpl":""} // zero position value
+    ];
+
     before(async function () {
       artifacts = await import_artifacts();
       await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
-      
+
       registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
       weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
       await registry.connect(governor).setWeth(weth.address);
@@ -102,14 +116,6 @@ if(process.env.FORK_NETWORK === "mainnet"){
       riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
       await registry.connect(governor).setRiskManager(riskManager.address);
 
-      // deploy exchange quoter
-      quoter = (await deployContract(deployer, artifacts.ExchangeQuoter1InchV1, [ONE_SPLIT_VIEW] )) as ExchangeQuoter1InchV1;
-
-      // deploy manual exchange quoter
-      quoter2 = (await deployContract(deployer, artifacts.ExchangeQuoterManual, [governor.address])) as ExchangeQuoterManual;
-      await expect(quoter2.connect(policyholder).setRates([],[])).to.be.revertedWith("!signer");
-      await quoter2.connect(governor).setRates(["0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","0x89d24a6b4ccb1b6faa2625fe562bdd9a23260359","0xc00e94cb662c3520282e6f5717214004a7f26888","0x1f9840a85d5af5bf1d1762f925bdaddc4201f984","0x514910771af9ca656af840dff83e8264ecf986ca","0x2260fac5e5542a773aa44fbcfedf7c193bc2c599","0xdac17f958d2ee523a2206206994597c13d831ec7","0x1985365e9f78359a9b6ad760e32412f4a445e862","0x0d8775f648430679a709e98d2b0cb6250d2887ef","0xe41d2489571d322189246dafa5ebde1f4699f498","0x0000000000085d4780b73119b644ae5ecd22b376","0x6b175474e89094c44da98b954eedeac495271d0f","0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"],["1000000000000000000","5214879005539865","131044789678131649","9259278326749300","9246653217422099","15405738054265288944","420072999319953","12449913804491249","281485209795972","372925580282399","419446558886231","205364954059859","50000000000000"]);
-
       // deploy YearnV2 Product
       product = (await deployContract(
         deployer,
@@ -122,8 +128,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
           minPeriod,
           maxPeriod,
           price,
-          1,
-          quoter.address
+          1
         ]
       )) as YearnV2Product;
 
@@ -139,8 +144,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
           minPeriod,
           maxPeriod,
           price,
-          1,
-          quoter.address
+          1
         ]
       )) as YearnV2Product;
 
@@ -151,22 +155,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
       await vault.connect(depositor).depositEth({value:maxCoverAmount});
       await riskManager.connect(governor).addProduct(product.address, 1);
       await product.connect(governor).addSigner(paclasSigner.address);
-    })
-
-    describe("appraisePosition", function () {
-      it("reverts if invalid pool or token", async function () {
-        await expect(product.appraisePosition(policyholder.address, ZERO_ADDRESS)).to.be.reverted;
-        await expect(product.appraisePosition(policyholder.address, policyholder.address)).to.be.reverted;
-      })
-
-      it("no positions should have no value", async function () {
-        expect(await product.appraisePosition(policyholder.address, YDAI_ADDRESS)).to.equal(0);
-      })
-
-      it("a position should have a value", async function () {
-        expect(await product.appraisePosition(REAL_USER, YDAI_ADDRESS)).to.equal(BALANCE);
-      })
-    })
+    });
 
     describe("covered platform", function () {
       it("starts as yearn registry", async function () {
@@ -174,7 +163,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
         expect(await product.yregistry()).to.equal(IYREGISTRY);
       });
       it("cannot be set by non governor", async function () {
-        await expect(product.connect(policyholder).setCoveredPlatform(policyholder.address)).to.be.revertedWith("!governance");
+        await expect(product.connect(policyholder1).setCoveredPlatform(policyholder1.address)).to.be.revertedWith("!governance");
       });
       it("can be set", async function () {
         await product.connect(governor).setCoveredPlatform(treasury.address);
@@ -184,127 +173,176 @@ if(process.env.FORK_NETWORK === "mainnet"){
       });
     });
 
-    describe("implementedFunctions", function () {
-      it("can get product name", async function () {
-        expect(await product.name()).to.equal("YearnV2");
+    describe("position description", function () {
+      it("cannot be zero length", async function () {
+        expect(await product.isValidPositionDescription("0x")).to.be.false;
       });
-      it("can getQuote", async function () {
-        let positionAmount = await product.appraisePosition(REAL_USER, YDAI_ADDRESS);
-        let coverAmount = positionAmount.mul(5000).div(10000);
-        let blocks = BN.from(threeDays)
-        let expectedPremium = BN.from("770094539610");
-        let quote = BN.from(await product.getQuote(REAL_USER, YDAI_ADDRESS, coverAmount, blocks));
-        expect(quote).to.be.closeTo(expectedPremium, 1000000000)
-      })
-      it("can buyPolicy", async function () {
+      it("cannot be odd size", async function () {
+        expect(await product.isValidPositionDescription("0xabcd")).to.be.false;
+        expect(await product.isValidPositionDescription("0x123456789012345678901234567890123456789077")).to.be.false;
+      });
+      it("cannot have non yVaults", async function () {
+        // would like to.be.false, to.be.reverted will work though
+        await expect(product.isValidPositionDescription("0x1234567890123456789012345678901234567890")).to.be.reverted;
+        await expect(product.isValidPositionDescription(REAL_USER1)).to.be.reverted;
+        await expect(product.isValidPositionDescription(encodeAddresses([REAL_USER1]))).to.be.reverted;
+        await expect(product.isValidPositionDescription(governor.address)).to.be.reverted;
+        await expect(product.isValidPositionDescription(IYREGISTRY)).to.be.reverted;
+        await expect(product.isValidPositionDescription(encodeAddresses([ZERO_ADDRESS]))).to.be.reverted;
+        await expect(product.isValidPositionDescription(encodeAddresses([yvaults[0].address,ZERO_ADDRESS]))).to.be.reverted;
+      });
+      it("can be one or more yVaults", async function () {
+        for(var i = 0; i < yvaults.length; ++i) {
+          expect(await product.isValidPositionDescription(encodeAddresses([yvaults[i].address]))).to.be.true;
+          // don't care about duplicates
+          for(var j = 0; j < yvaults.length; ++j) {
+            expect(await product.isValidPositionDescription(encodeAddresses([yvaults[i].address, yvaults[j].address]))).to.be.true;
+          }
+        }
+        expect(await product.isValidPositionDescription(encodeAddresses(yvaults.map(yvault => yvault.address)))).to.be.true;
+      });
+    });
+
+    describe("implementedFunctions", function () {
+      before(async function () {
         expect(await policyManager.totalSupply()).to.equal(0);
-        expect(await policyManager.balanceOf(REAL_USER)).to.equal(0);
+        expect(await policyManager.balanceOf(REAL_USER1)).to.equal(0);
         // adding the owner product to the ProductManager
         (await policyManager.connect(governor).addProduct(product.address));
         expect(await policyManager.productIsActive(product.address)).to.equal(true);
-
-        let positionAmount = await product.appraisePosition(REAL_USER, YDAI_ADDRESS);
-        let coverAmount = positionAmount.mul(500).div(10000);
-        let blocks = threeDays
-        let quote = BN.from(await product.getQuote(REAL_USER, YDAI_ADDRESS, coverAmount, blocks));
-        quote = quote.mul(10001).div(10000);
-        let tx = await product.buyPolicy(REAL_USER, YDAI_ADDRESS, coverAmount, blocks, { value: quote });
+      });
+      it("can getQuote", async function () {
+        let quote = BN.from(await product.getQuote(coverAmount, blocks));
+        expect(quote).to.equal(expectedPremium);
+      });
+      it("cannot buy policy with invalid description", async function () {
+        await expect(product.buyPolicy(REAL_USER1, "0x1234567890123456789012345678901234567890", coverAmount, blocks, { value: expectedPremium })).to.be.reverted;
+      });
+      it("can buyPolicy", async function () {
+        let tx = await product.buyPolicy(REAL_USER1, YDAI_ADDRESS, coverAmount, blocks, { value: expectedPremium });
         expect(tx).to.emit(product, "PolicyCreated").withArgs(1);
         expect(await policyManager.totalSupply()).to.equal(1);
-        expect(await policyManager.balanceOf(REAL_USER)).to.equal(1);
+        expect(await policyManager.balanceOf(REAL_USER1)).to.equal(1);
       });
       it("can buy duplicate policy", async function () {
-        let positionAmount = await product.appraisePosition(REAL_USER, YDAI_ADDRESS);
-        let coverAmount = positionAmount.mul(500).div(10000);
-        let blocks = threeDays
-        let quote = BN.from(await product.getQuote(REAL_USER, YDAI_ADDRESS, coverAmount, blocks));
-        quote = quote.mul(10001).div(10000);
-        let tx = await product.buyPolicy(REAL_USER, YDAI_ADDRESS, coverAmount, blocks, { value: quote });
+        let tx = await product.buyPolicy(REAL_USER1, YDAI_ADDRESS, coverAmount, blocks, { value: expectedPremium });
         expect(tx).to.emit(product, "PolicyCreated").withArgs(2);
+        expect(await policyManager.totalSupply()).to.equal(2);
+        expect(await policyManager.balanceOf(REAL_USER1)).to.equal(2);
+      });
+      it("can buy policy that covers multiple positions", async function () {
+        let tx = await product.buyPolicy(REAL_USER1, encodeAddresses([yvaults[0].address, yvaults[1].address]), coverAmount, blocks, { value: expectedPremium });
+        expect(tx).to.emit(product, "PolicyCreated").withArgs(3);
+        expect(await policyManager.totalSupply()).to.equal(3);
+        expect(await policyManager.balanceOf(REAL_USER1)).to.equal(3);
+      });
+      it("can get product name", async function () {
+        expect(await product.name()).to.equal("YearnV2");
       });
     })
 
     describe("submitClaim", async function () {
-      let policyID1 = 3;
-      let policyID2 = 4;
+      let policyID1: BN;
+      let policyID2: BN;
       let daiAmount = BN.from(100000000000);
       let amountOut1 = 500000;
+
       before(async function () {
+        let policyCount = await policyManager.totalPolicyCount();
+        policyID1 = policyCount.add(1);
+        policyID2 = policyCount.add(2);
         await dai.connect(policyholder2).transfer(depositor.address, await dai.balanceOf(policyholder2.address));
         await depositor.sendTransaction({to: claimsEscrow.address, value: BN.from("1000000000000000000")});
         // create a dai position and policy
-        let index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[policyholder.address,2]);
+        let index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[policyholder1.address,2]);
         await setStorageAt(DAI_ADDRESS,index,toBytes32(daiAmount.mul(2)).toString());
-        await dai.connect(policyholder).transfer(policyholder2.address, daiAmount);
-        expect(await dai.balanceOf(policyholder.address)).to.equal(daiAmount);
-        await dai.connect(policyholder).approve(ydai.address, constants.MaxUint256);
-        await ydai.connect(policyholder).deposit(daiAmount);
-        let positionAmount = await product.appraisePosition(policyholder.address, YDAI_ADDRESS);
-        let coverAmount = positionAmount;
-        let blocks = threeDays;
-        let quote = BN.from(await product.getQuote(policyholder.address, YDAI_ADDRESS, coverAmount, blocks));
-        quote = quote.mul(10001).div(10000);
-        await product.connect(policyholder).buyPolicy(policyholder.address, YDAI_ADDRESS, coverAmount, blocks, { value: quote });
+        await dai.connect(policyholder1).transfer(policyholder2.address, daiAmount);
+        expect(await dai.balanceOf(policyholder1.address)).to.equal(daiAmount);
+        await dai.connect(policyholder1).approve(ydai.address, constants.MaxUint256);
+        await ydai.connect(policyholder1).deposit(daiAmount);
+        await product.connect(policyholder1).buyPolicy(policyholder1.address, YDAI_ADDRESS, coverAmount, blocks, { value: expectedPremium });
         // create another dai position and policy
         expect(await dai.balanceOf(policyholder2.address)).to.equal(daiAmount);
         await dai.connect(policyholder2).approve(ydai.address, constants.MaxUint256);
         await ydai.connect(policyholder2).deposit(daiAmount);
-        await product.connect(policyholder2).buyPolicy(policyholder2.address, YDAI_ADDRESS, coverAmount, blocks, { value: quote });
+        await product.connect(policyholder2).buyPolicy(policyholder2.address, YDAI_ADDRESS, coverAmount, blocks, { value: expectedPremium });
       });
       it("cannot submit claim with expired signature", async function () {
-        let digest = getSubmitClaimDigest("Solace.fi-YearnV2Product", product.address, chainId, policyID1, amountOut1, 0);
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, amountOut1, 0, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
-        await expect(product.connect(policyholder).submitClaim(policyID1, amountOut1, 0, signature)).to.be.revertedWith("expired deadline");
+        await expect(product.connect(policyholder1).submitClaim(policyID1, amountOut1, 0, signature)).to.be.revertedWith("expired deadline");
       });
       it("cannot submit claim on someone elses policy", async function () {
-        let digest = getSubmitClaimDigest("Solace.fi-YearnV2Product", product.address, chainId, policyID2, amountOut1, deadline);
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
-        await expect(product.connect(policyholder).submitClaim(policyID2, amountOut1, deadline, signature)).to.be.revertedWith("!policyholder");
+        await expect(product.connect(policyholder2).submitClaim(policyID1, amountOut1, deadline, signature)).to.be.revertedWith("!policyholder");
+      });
+      it("cannot submit claim on someone elses policy after transfer", async function () {
+        await policyManager.connect(policyholder1).transferFrom(policyholder1.address, policyholder2.address, policyID1)
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
+        let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
+        await expect(product.connect(policyholder1).submitClaim(policyID1, amountOut1, deadline, signature)).to.be.revertedWith("!policyholder");
+        await policyManager.connect(policyholder2).transferFrom(policyholder2.address, policyholder1.address, policyID1)
+      });
+      it("cannot submit claim signed for someone else", async function () {
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder2.address, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
+        let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
+        await expect(product.connect(policyholder1).submitClaim(policyID1, amountOut1, deadline, signature)).to.be.revertedWith("invalid signature");
       });
       it("cannot submit claim from wrong product", async function () {
-        let digest = getSubmitClaimDigest("Solace.fi-YearnV2Product", product.address, chainId, policyID1, amountOut1, deadline);
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
-        await expect(product2.connect(policyholder).submitClaim(policyID1, amountOut1, deadline, signature)).to.be.revertedWith("wrong product");
+        await expect(product2.connect(policyholder1).submitClaim(policyID1, amountOut1, deadline, signature)).to.be.revertedWith("wrong product");
       });
       it("cannot submit claim with excessive payout", async function () {
         let coverAmount = (await policyManager.getPolicyInfo(policyID1)).coverAmount;
-        let digest = getSubmitClaimDigest("Solace.fi-AaveV2Product", product.address, chainId, policyID1, coverAmount.add(1), deadline);
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, coverAmount.add(1), deadline, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
-        await expect(product.connect(policyholder).submitClaim(policyID1, coverAmount.add(1), deadline, signature)).to.be.revertedWith("excessive amount out");
+        await expect(product.connect(policyholder1).submitClaim(policyID1, coverAmount.add(1), deadline, signature)).to.be.revertedWith("excessive amount out");
       });
       it("cannot submit claim with forged signature", async function () {
-        await expect(product.connect(policyholder).submitClaim(policyID1, amountOut1, deadline, "0x")).to.be.revertedWith("invalid signature");
-        await expect(product.connect(policyholder).submitClaim(policyID1, amountOut1, deadline, "0xabcd")).to.be.revertedWith("invalid signature");
-        await expect(product.connect(policyholder).submitClaim(policyID1, amountOut1, deadline, "0x1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890")).to.be.revertedWith("invalid signature");
+        await expect(product.connect(policyholder1).submitClaim(policyID1, amountOut1, deadline, "0x")).to.be.revertedWith("invalid signature");
+        await expect(product.connect(policyholder1).submitClaim(policyID1, amountOut1, deadline, "0xabcd")).to.be.revertedWith("invalid signature");
+        await expect(product.connect(policyholder1).submitClaim(policyID1, amountOut1, deadline, "0x1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890")).to.be.revertedWith("invalid signature");
       });
       it("cannot submit claim from unauthorized signer", async function () {
-        let digest = getSubmitClaimDigest("Solace.fi-YearnV2Product", product.address, chainId, policyID1, amountOut1, deadline);
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(deployer.privateKey.slice(2), "hex")));
-        await expect(product.connect(policyholder).submitClaim(policyID1, amountOut1, deadline, signature)).to.be.revertedWith("invalid signature");
+        await expect(product.connect(policyholder1).submitClaim(policyID1, amountOut1, deadline, signature)).to.be.revertedWith("invalid signature");
       });
       it("cannot submit claim with changed arguments", async function () {
-        let digest = getSubmitClaimDigest("Solace.fi-YearnV2Product", product.address, chainId, policyID1, amountOut1, deadline);
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
-        await expect(product.connect(policyholder).submitClaim(policyID1, "700000", deadline, signature)).to.be.revertedWith("invalid signature");
-        await expect(product.connect(policyholder).submitClaim(policyID1, amountOut1, deadline.sub(1), signature)).to.be.revertedWith("invalid signature");
+        await expect(product.connect(policyholder1).submitClaim(policyID1, "700000", deadline, signature)).to.be.revertedWith("invalid signature");
+        await expect(product.connect(policyholder1).submitClaim(policyID1, amountOut1, deadline.sub(1), signature)).to.be.revertedWith("invalid signature");
+      });
+      it("cannot submit claim with invalid domain", async function () {
+        let digest = getSubmitClaimDigest(INVALID_DOMAIN, product.address, chainId, policyID1, policyholder1.address, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
+        let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
+        await expect(product.connect(policyholder1).submitClaim(policyID1, amountOut1, deadline, signature)).to.be.revertedWith("invalid signature");
+      });
+      it("cannot submit claim with invalid typehash", async function () {
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, amountOut1, deadline, INVALID_TYPEHASH);
+        let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
+        await expect(product.connect(policyholder1).submitClaim(policyID1, amountOut1, deadline, signature)).to.be.revertedWith("invalid signature");
       });
       it("can open a claim", async function () {
         // sign swap
-        let digest = getSubmitClaimDigest("Solace.fi-YearnV2Product", product.address, chainId, policyID1, amountOut1, deadline);
+        let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
         // submit claim
-        let tx1 = await product.connect(policyholder).submitClaim(policyID1, amountOut1, deadline, signature);
+        let tx1 = await product.connect(policyholder1).submitClaim(policyID1, amountOut1, deadline, signature);
         expect(tx1).to.emit(product, "ClaimSubmitted").withArgs(policyID1);
-        expect(tx1).to.emit(claimsEscrow, "ClaimReceived").withArgs(policyID1, policyholder.address, amountOut1);
+        expect(tx1).to.emit(claimsEscrow, "ClaimReceived").withArgs(policyID1, policyholder1.address, amountOut1);
         expect(await policyManager.exists(policyID1)).to.be.false;
         // verify payout
         expect((await claimsEscrow.claim(policyID1)).amount).to.equal(amountOut1);
         await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add one hour
-        let userEth1 = await policyholder.getBalance();
-        let tx2 = await claimsEscrow.connect(policyholder).withdrawClaimsPayout(policyID1);
+        let userEth1 = await policyholder1.getBalance();
+        let tx2 = await claimsEscrow.connect(policyholder1).withdrawClaimsPayout(policyID1);
         let receipt = await tx2.wait();
         let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
-        let userEth2 = await policyholder.getBalance();
+        let userEth2 = await policyholder1.getBalance();
         expect(userEth2.sub(userEth1).add(gasCost)).to.equal(amountOut1);
       });
       it("should support all yearn vaults", async function () {
@@ -312,42 +350,6 @@ if(process.env.FORK_NETWORK === "mainnet"){
         await hre.network.provider.request({method: "hardhat_impersonateAccount", params: [policyholder3Address]});
         await depositor.sendTransaction({to: policyholder3Address, value: BN.from("1000000000000000000")});
         const policyholder3 = await ethers.getSigner(policyholder3Address);
-        var yvaults = [
-          {"symbol":"yaLINK","address":"0x29e240cfd7946ba20895a7a02edb25c210f9f324"}, // safeerc20
-          {"symbol":"yLINK","address":"0x881b06da56bb5675c54e4ed311c21e54c5025298","uimpl":""},
-          {"symbol":"yUSDC","address":"0x597ad1e0c13bfe8025993d9e79c69e1c0233522e","blacklist":"0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"}, // black listed
-          {"symbol":"yyDAI+yUSDC+yUSDT+yTUSD","address":"0x5dbcf33d8c2e976c6b560249878e6f1491bca25c"}, // no reason
-          {"symbol":"yTUSD","address":"0x37d19d1c4e1fa9dc47bd1ea12f742a0887eda74a"},
-          {"symbol":"yDAI","address":"0xacd43e627e64355f1861cec6d3a6688b31a6f952"},
-          {"symbol":"yUSDT","address":"0x2f08119c6f07c006695e079aafc638b8789faf18"},
-          {"symbol":"yYFI","address":"0xba2e7fed597fd0e3e70f5130bcdbbfe06bb94fe1"},
-          {"symbol":"yyDAI+yUSDC+yUSDT+yBUSD","address":"0x2994529c0652d127b7842094103715ec5299bbed"}, // zero position value
-          {"symbol":"ycrvRenWSBTC","address":"0x7ff566e1d69deff32a7b244ae7276b9f90e9d0f6"}, // zero position value
-          {"symbol":"yWETH","address":"0xe1237aa7f535b0cc33fd973d66cbf830354d16c7"},
-          {"symbol":"y3Crv","address":"0x9ca85572e6a3ebf24dedd195623f188735a5179f"},
-          {"symbol":"yGUSD","address":"0xec0d8d3ed5477106c6d4ea27d90a60e594693c90","uimpl":"0xc42B14e49744538e3C239f8ae48A1Eaaf35e68a0"}, // gusd is proxy
-          {"symbol":"yvcDAI+cUSDC","address":"0x629c759d1e83efbf63d84eb3868b564d9521c129"}, // zero position value
-          {"symbol":"yvmusd3CRV","address":"0x0fcdaedfb8a7dfda2e9838564c5a1665d856afdf"}, // zero position value
-          {"symbol":"yvgusd3CRV","address":"0xcc7e70a958917cce67b4b87a8c30e6297451ae98"}, // zero position value
-          {"symbol":"yveursCRV","address":"0x98b058b2cbacf5e99bc7012df757ea7cfebd35bc"}, // zero position value
-          {"symbol":"yvmUSD","address":"0xe0db48b4f71752c4bef16de1dbd042b82976b8c7"},
-          {"symbol":"yvcrvRenWBTC","address":"0x5334e150b938dd2b6bd040d9c4a03cff0ced3765"}, // zero position value
-          {"symbol":"yvusdn3CRV","address":"0xfe39ce91437c76178665d64d7a2694b0f6f17fe3"}, // zero position value
-          {"symbol":"yvust3CRV","address":"0xf6c9e9af314982a4b38366f4abfaa00595c5a6fc"}, // zero position value
-          {"symbol":"yvbBTC/sbtcCRV","address":"0xa8b1cb4ed612ee179bdea16cca6ba596321ae52d"}, // zero position value
-          {"symbol":"yvtbtc/sbtcCrv","address":"0x07fb4756f67bd46b748b16119e802f1f880fb2cc"}, // zero position value
-          {"symbol":"yvoBTC/sbtcCRV","address":"0x7f83935ecfe4729c4ea592ab2bc1a32588409797"}, // zero position value
-          {"symbol":"yvpBTC/sbtcCRV","address":"0x123964ebe096a920dae00fb795ffbfa0c9ff4675"}, // zero position value
-          {"symbol":"yvhCRV","address":"0x46afc2dfbd1ea0c0760cad8262a5838e803a37e5"}, // zero position value
-          {"symbol":"yvcrvPlain3andSUSD","address":"0x5533ed0a3b83f70c3c4a1f69ef5546d3d4713e44"},
-          {"symbol":"yvhusd3CRV","address":"0x39546945695dcb1c037c836925b355262f551f55"}, // zero position value
-          {"symbol":"yvdusd3CRV","address":"0x8e6741b456a074f0bc45b8b82a755d4af7e965df"}, // zero position value
-          {"symbol":"yva3CRV","address":"0x03403154afc09ce8e44c3b185c82c6ad5f86b9ab"}, // zero position value
-          {"symbol":"yvankrCRV","address":"0xe625f5923303f1ce7a43acfefd11fd12f30dbca4"}, // zero position value
-          {"symbol":"yvsaCRV","address":"0xbacb69571323575c6a5a3b4f9eede1dc7d31fbc1"}, // zero position value
-          {"symbol":"yvusdp3CRV","address":"0x1b5eb1173d2bf770e50f10410c9a96f7a8eb6e75"}, // zero position value
-          {"symbol":"yvlinkCRV","address":"0x96ea6af74af09522fcb4c28c269c26f59a31ced6","uimpl":""} // zero position value
-        ];
         var success = 0;
         var successList = [];
         var failList = [];
@@ -400,16 +402,11 @@ if(process.env.FORK_NETWORK === "mainnet"){
             const aAmount = await yvault.balanceOf(policyholder3.address);
             expect(aAmount).to.be.gt(0);
             // create policy
-            let positionAmount = await product.appraisePosition(policyholder3.address, yAddress);
-            let coverAmount = positionAmount;
-            let blocks = threeDays;
-            let quote = BN.from(await product.getQuote(policyholder3.address, yAddress, coverAmount, blocks));
-            quote = quote.mul(10001).div(10000);
-            await product.connect(policyholder3).buyPolicy(policyholder3.address, yAddress, coverAmount, blocks, { value: quote });
+            await product.connect(policyholder3).buyPolicy(policyholder3.address, yAddress, coverAmount, blocks, { value: expectedPremium });
             let policyID = (await policyManager.totalPolicyCount()).toNumber();
             // sign swap
             let amountOut = 10000;
-            let digest = getSubmitClaimDigest("Solace.fi-YearnV2Product", product.address, chainId, policyID, amountOut, deadline);
+            let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID, policyholder3.address, amountOut, deadline, SUBMIT_CLAIM_TYPEHASH);
             let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
             // submit claim
             let tx1 = await product.connect(policyholder3).submitClaim(policyID, amountOut, deadline, signature);
@@ -446,22 +443,4 @@ if(process.env.FORK_NETWORK === "mainnet"){
       });
     });
   })
-}
-
-function buf2hex(buffer: Buffer) { // buffer is an ArrayBuffer
-  return [...new Uint8Array(buffer)].map(x => x.toString(16).padStart(2, "0")).join("");
-}
-
-function assembleSignature(parts: ECDSASignature) {
-  let { v, r, s } = parts;
-  let v_ = Number(v).toString(16);
-  let r_ = buf2hex(r);
-  let s_ = buf2hex(s);
-  return `0x${r_}${s_}${v_}`;
-}
-
-function oneToken(decimals: number) {
-  var s = "1";
-  for(var i = 0; i < decimals; ++i) s += "0";
-  return BN.from(s);
 }

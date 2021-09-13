@@ -239,6 +239,30 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
     }
 
     /***************************************
+    ERC721 FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Transfers `tokenID` from `msg.sender` to `to`.
+     * @dev This was excluded from the official `ERC721` standard in favor of `transferFrom(address from, address to, uint256 tokenID)`. We elect to include it.
+     * @param to The receipient of the token.
+     * @param tokenID The token to transfer.
+     */
+    function transfer(address to, uint256 tokenID) public override {
+        super.transferFrom(msg.sender, to, tokenID);
+    }
+
+    /**
+     * @notice Safely transfers `tokenID` from `msg.sender` to `to`.
+     * @dev This was excluded from the official `ERC721` standard in favor of `safeTransferFrom(address from, address to, uint256 tokenID)`. We elect to include it.
+     * @param to The receipient of the token.
+     * @param tokenID The token to transfer.
+     */
+    function safeTransfer(address to, uint256 tokenID) public override {
+        super.safeTransferFrom(msg.sender, to, tokenID, "");
+    }
+
+    /***************************************
     FALLBACK FUNCTIONS
     ***************************************/
 

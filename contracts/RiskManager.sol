@@ -198,25 +198,25 @@ contract RiskManager is IRiskManager, Governable {
         require(products_.length == weights_.length, "length mismatch");
         // delete old products
         for(uint256 index = _productCount; index > 0; index--) {
-            address product = _indexToProduct[index];
-            delete _productToIndex[product];
+            address product_ = _indexToProduct[index];
+            delete _productToIndex[product_];
             delete _indexToProduct[index];
-            delete _weights[product];
-            emit ProductWeightSet(product, 0);
+            delete _weights[product_];
+            emit ProductWeightSet(product_, 0);
         }
         // add new products
         uint32 weightSum_ = 0;
         uint256 length = products_.length;
         for(uint256 i = 0; i < length; i++) {
-            address product = products_[i];
-            uint32 weight = weights_[i];
-            require(weight > 0, "no weight");
-            require(_weights[product] == 0, "duplicate product");
-            _weights[product] = weight;
-            weightSum_ += weight;
-            _productToIndex[product] = i+1;
-            _indexToProduct[i+1] = product;
-            emit ProductWeightSet(product, weight);
+            address product_ = products_[i];
+            uint32 weight_ = weights_[i];
+            require(weight_ > 0, "no weight");
+            require(_weights[product_] == 0, "duplicate product");
+            _weights[product_] = weight_;
+            weightSum_ += weight_;
+            _productToIndex[product_] = i+1;
+            _indexToProduct[i+1] = product_;
+            emit ProductWeightSet(product_, weight_);
         }
         _weightSum = (length == 0)
           ? type(uint32).max // no div by zero

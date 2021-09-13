@@ -30,7 +30,7 @@ describe("RiskManager", function () {
   before(async function () {
     artifacts = await import_artifacts();
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
-    
+
     registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
     weth = (await deployContract(deployer,artifacts.WETH)) as Weth9;
     await registry.connect(governor).setWeth(weth.address);
@@ -218,11 +218,11 @@ describe("RiskManager", function () {
       expect(await riskManager.minCapitalRequirement()).to.equal(0);
     });
     it("should track policy cover amount", async function () {
-      await policyManager.connect(product2).createPolicy(user.address, ZERO_ADDRESS, 1, 0, 0);
+      await policyManager.connect(product2).createPolicy(user.address, 1, 0, 0, ZERO_ADDRESS);
       expect(await riskManager.minCapitalRequirement()).to.equal(1);
-      await policyManager.connect(product3).createPolicy(user.address, ZERO_ADDRESS, 2, 0, 0);
+      await policyManager.connect(product3).createPolicy(user.address, 2, 0, 0, ZERO_ADDRESS);
       expect(await riskManager.minCapitalRequirement()).to.equal(3);
-      await policyManager.connect(product3).setPolicyInfo(2, user.address, ZERO_ADDRESS, 4, 0, 0);
+      await policyManager.connect(product3).setPolicyInfo(2, 4, 0, 0, ZERO_ADDRESS);
       expect(await riskManager.minCapitalRequirement()).to.equal(5);
       await policyManager.connect(product2).burn(1);
       expect(await riskManager.minCapitalRequirement()).to.equal(4);
@@ -230,7 +230,7 @@ describe("RiskManager", function () {
     it("should leverage", async function () {
       await riskManager.connect(governor).setPartialReservesFactor(5000);
       expect(await riskManager.minCapitalRequirement()).to.equal(2);
-      await policyManager.connect(product3).createPolicy(user.address, ZERO_ADDRESS, 9, 0, 0);
+      await policyManager.connect(product3).createPolicy(user.address, 9, 0, 0, ZERO_ADDRESS);
       expect(await riskManager.minCapitalRequirement()).to.equal(6);
       await riskManager.connect(governor).setPartialReservesFactor(7500);
       expect(await riskManager.minCapitalRequirement()).to.equal(9);
