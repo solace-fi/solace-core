@@ -169,6 +169,10 @@ if (process.env.FORK_NETWORK === "rinkeby") {
       it("can be liquity stable pool", async function () {
         expect(await product1.isValidPositionDescription(encodeAddresses([STABILITY_POOL_ADDRESS]))).to.be.true;
       });
+
+      it("can be multiple positions", async function () {
+        expect(await product1.isValidPositionDescription(encodeAddresses([TROVE_MANAGER_ADDRESS, LQTY_STAKING_ADDRESS, STABILITY_POOL_ADDRESS]))).to.be.true;
+      });
     });
 
     describe("implementedFunctions", function () {
