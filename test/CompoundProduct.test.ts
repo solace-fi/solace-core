@@ -124,9 +124,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
           registry.address,
           COMPTROLLER_ADDRESS,
           minPeriod,
-          maxPeriod,
-          price,
-          1
+          maxPeriod
         ]
       )) as CompoundProduct;
 
@@ -139,9 +137,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
           registry.address,
           COMPTROLLER_ADDRESS,
           minPeriod,
-          maxPeriod,
-          price,
-          1
+          maxPeriod
         ]
       )) as CompoundProduct;
 
@@ -151,7 +147,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
       usdc = await ethers.getContractAt(artifacts.ERC20.abi, USDC_ADDRESS);
 
       await vault.connect(depositor).depositEth({value:maxCoverAmount});
-      await riskManager.connect(governor).addProduct(product.address, 1);
+      await riskManager.connect(governor).addProduct(product.address, 1, 11044, 1);
       await product.connect(governor).addSigner(paclasSigner.address);
     });
 
@@ -213,22 +209,22 @@ if(process.env.FORK_NETWORK === "mainnet"){
         expect(quote).to.equal(expectedPremium);
       });
       it("cannot buy policy with invalid description", async function () {
-        await expect(product.buyPolicy(REAL_USER1, "0x1234567890123456789012345678901234567890", coverAmount, blocks, { value: expectedPremium })).to.be.reverted;
+        await expect(product.buyPolicy(REAL_USER1, coverAmount, blocks, "0x1234567890123456789012345678901234567890", { value: expectedPremium })).to.be.reverted;
       });
       it("can buyPolicy", async function () {
-        let tx = await product.buyPolicy(REAL_USER1, cETH_ADDRESS, coverAmount, blocks, { value: expectedPremium });
+        let tx = await product.buyPolicy(REAL_USER1, coverAmount, blocks, cETH_ADDRESS, { value: expectedPremium });
         expect(tx).to.emit(product, "PolicyCreated").withArgs(1);
         expect(await policyManager.totalSupply()).to.equal(1);
         expect(await policyManager.balanceOf(REAL_USER1)).to.equal(1);
       });
       it("can buy duplicate policy", async function () {
-        let tx = await product.buyPolicy(REAL_USER1, cETH_ADDRESS, coverAmount, blocks, { value: expectedPremium });
+        let tx = await product.buyPolicy(REAL_USER1, coverAmount, blocks, cETH_ADDRESS, { value: expectedPremium });
         expect(tx).to.emit(product, "PolicyCreated").withArgs(2);
         expect(await policyManager.totalSupply()).to.equal(2);
         expect(await policyManager.balanceOf(REAL_USER1)).to.equal(2);
       });
       it("can buy policy that covers multiple positions", async function () {
-        let tx = await product.buyPolicy(REAL_USER1, encodeAddresses([cETH_ADDRESS, cDAI_ADDRESS]), coverAmount, blocks, { value: expectedPremium });
+        let tx = await product.buyPolicy(REAL_USER1, coverAmount, blocks, encodeAddresses([cETH_ADDRESS, cDAI_ADDRESS]), { value: expectedPremium });
         expect(tx).to.emit(product, "PolicyCreated").withArgs(3);
         expect(await policyManager.totalSupply()).to.equal(3);
         expect(await policyManager.balanceOf(REAL_USER1)).to.equal(3);
@@ -251,7 +247,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
         await deployer.sendTransaction({to: claimsEscrow.address, value: BN.from("1000000000000000000")});
         // create a cETH position and policy
         await ceth.connect(policyholder1).mint({value: BN.from("1000000000000000")});
-        await product.connect(policyholder1).buyPolicy(policyholder1.address, cETH_ADDRESS, coverAmount, blocks, { value: expectedPremium });
+        await product.connect(policyholder1).buyPolicy(policyholder1.address, coverAmount, blocks, cETH_ADDRESS, { value: expectedPremium });
         // create a cUSDC position and policy
         let uAmount = BN.from("1000000");
         let index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[policyholder1.address,9]);
@@ -261,8 +257,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
 
         await usdc.connect(policyholder1).approve(cUSDC_ADDRESS, constants.MaxUint256)
         await cusdc.connect(policyholder1).mint(usdcBalance);
-        await product.connect(policyholder1).buyPolicy(policyholder1.address, cUSDC_ADDRESS, coverAmount, blocks, { value: expectedPremium });
-
+        await product.connect(policyholder1).buyPolicy(policyholder1.address, coverAmount, blocks, cUSDC_ADDRESS, { value: expectedPremium });
       });
       it("cannot submit claim with expired signature", async function () {
         let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, amountOut1, 0, SUBMIT_CLAIM_TYPEHASH);
@@ -434,7 +429,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
             const cAmount = await cToken.balanceOf(policyholder3.address);
             expect(cAmount).to.be.gt(0);
             // create policy
-            await product.connect(policyholder3).buyPolicy(policyholder3.address, ctokenAddress, coverAmount, blocks, { value: expectedPremium });
+            await product.connect(policyholder3).buyPolicy(policyholder3.address, coverAmount, blocks, ctokenAddress, { value: expectedPremium });
             let policyID = (await policyManager.totalPolicyCount()).toNumber();
             // sign swap
             let amountOut = 10000;

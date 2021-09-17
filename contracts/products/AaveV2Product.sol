@@ -24,8 +24,6 @@ contract AaveV2Product is BaseProduct {
       * @param dataProvider_ Aave protocol data provider address.
       * @param minPeriod_ The minimum policy period in blocks to purchase a **policy**.
       * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
-      * @param price_ The cover price for the **Product**.
-      * @param maxCoverPerUserDivisor_ The max cover amount divisor for per user. (maxCover / divisor = maxCoverPerUser).
      */
     constructor (
         address governance_,
@@ -33,9 +31,7 @@ contract AaveV2Product is BaseProduct {
         IRegistry registry_,
         address dataProvider_,
         uint40 minPeriod_,
-        uint40 maxPeriod_,
-        uint24 price_,
-        uint32 maxCoverPerUserDivisor_
+        uint40 maxPeriod_
     ) BaseProduct(
         governance_,
         policyManager_,
@@ -43,8 +39,6 @@ contract AaveV2Product is BaseProduct {
         dataProvider_,
         minPeriod_,
         maxPeriod_,
-        price_,
-        maxCoverPerUserDivisor_,
         "Solace.fi-AaveV2Product",
         "1"
     ) {

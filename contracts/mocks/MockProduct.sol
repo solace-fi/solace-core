@@ -11,6 +11,8 @@ import "../products/BaseProduct.sol";
  */
 contract MockProduct is BaseProduct {
 
+    uint24 private _price;
+
     /**
       * @notice The constructor.
       * @param governance_ The governor.
@@ -20,7 +22,6 @@ contract MockProduct is BaseProduct {
       * @param minPeriod_ The minimum policy period in blocks to purchase a **policy**.
       * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
       * @param price_ The cover price for the **Product**.
-      * @param maxCoverPerUserDivisor_ The max cover amount divisor for per user. (maxCover / divisor = maxCoverPerUser).
      */
     constructor (
         address governance_,
@@ -29,8 +30,7 @@ contract MockProduct is BaseProduct {
         address coveredPlatform_,
         uint40 minPeriod_,
         uint40 maxPeriod_,
-        uint24 price_,
-        uint32 maxCoverPerUserDivisor_
+        uint24 price_
     ) BaseProduct(
         governance_,
         policyManager_,
@@ -38,13 +38,12 @@ contract MockProduct is BaseProduct {
         coveredPlatform_,
         minPeriod_,
         maxPeriod_,
-        price_,
-        maxCoverPerUserDivisor_,
         "Solace.fi-MockProduct",
         "1"
     ) {
         _SUBMIT_CLAIM_TYPEHASH = keccak256("MockProductSubmitClaim(uint256 policyID,uint256 amountOut,uint256 deadline)");
         _productName = "Mock";
+        _price = price_;
     }
 
     /**
@@ -61,12 +60,12 @@ contract MockProduct is BaseProduct {
      * @notice Purchases and mints a policy on the behalf of the policyholder.
      * User will need to pay **ETH**.
      * @param policyholder Holder of the position to cover.
-     * @param positionDescription The byte encoded description of the covered position(s).
      * @param coverAmount The value to cover in **ETH**. Will only cover up to the appraised value.
      * @param blocks The length (in blocks) for policy.
+     * @param positionDescription The byte encoded description of the covered position(s).
      * @return policyID The ID of newly created policy.
      */
-    function _buyPolicy(address policyholder, bytes calldata positionDescription, uint256 coverAmount, uint40 blocks) external payable nonReentrant returns (uint256 policyID) {
+    function _buyPolicy(address policyholder, uint256 coverAmount, uint40 blocks, bytes calldata positionDescription) external payable nonReentrant returns (uint256 policyID) {
         // bypasses some important checks in BaseProduct
         // create the policy
         uint40 expirationBlock = uint40(block.number + blocks);
