@@ -343,23 +343,23 @@ describe("PolicyManager", function() {
     it("can update active policies", async function() {
       // create policies
       // policy 1 expires
-      await mockProduct.connect(user)._buyPolicy(user.address, positionContract.address, 0b00001, 110);
+      await mockProduct.connect(user)._buyPolicy(user.address, 0b00001, 110, positionContract.address);
       expect(await policyManager.activeCoverAmount()).to.equal(0b00001);
       expect(await riskManager.minCapitalRequirement()).to.equal(0b00001);
       // policy 2 expires
-      await mockProduct.connect(user)._buyPolicy(user.address, positionContract.address, 0b00010, 120);
+      await mockProduct.connect(user)._buyPolicy(user.address, 0b00010, 120, positionContract.address);
       expect(await policyManager.activeCoverAmount()).to.equal(0b00011);
       expect(await riskManager.minCapitalRequirement()).to.equal(0b00011);
       // policy 3 expires but is not updated
-      await mockProduct.connect(user)._buyPolicy(user.address, positionContract.address, 0b00100, 130);
+      await mockProduct.connect(user)._buyPolicy(user.address, 0b00100, 130, positionContract.address);
       expect(await policyManager.activeCoverAmount()).to.equal(0b00111);
       expect(await riskManager.minCapitalRequirement()).to.equal(0b00111);
       // policy 4 does not expire
-      await mockProduct.connect(user)._buyPolicy(user.address, positionContract.address, 0b01000, 200);
+      await mockProduct.connect(user)._buyPolicy(user.address, 0b01000, 200, positionContract.address);
       expect(await policyManager.activeCoverAmount()).to.equal(0b01111);
       expect(await riskManager.minCapitalRequirement()).to.equal(0b01111);
       // policy 5 is canceled
-      await mockProduct.connect(user)._buyPolicy(user.address, positionContract.address, 0b10000, 300);
+      await mockProduct.connect(user)._buyPolicy(user.address, 0b10000, 300, positionContract.address);
       expect(await policyManager.activeCoverAmount()).to.equal(0b11111);
       expect(await riskManager.minCapitalRequirement()).to.equal(0b11111);
       // pass time
@@ -454,7 +454,7 @@ describe("PolicyManager", function() {
         await policyManager.connect(governor).addProduct(mockProduct.address);
         await policyManager.connect(governor).setPolicyDescriptor(policyDescriptor.address);
         await registry.connect(governor).setPolicyManager(policyManager.address);
-        await mockProduct.connect(user)._buyPolicy(user.address, positionContract.address, 5000, 110);
+        await mockProduct.connect(user)._buyPolicy(user.address, 5000, 110, positionContract.address);
         policyId = await policyManager.totalPolicyCount();
         productName = await mockProduct.name();
     });

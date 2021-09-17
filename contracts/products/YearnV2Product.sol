@@ -23,8 +23,6 @@ contract YearnV2Product is BaseProduct {
       * @param yregistry_ The Yearn YRegistry.
       * @param minPeriod_ The minimum policy period in blocks to purchase a **policy**.
       * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
-      * @param price_ The cover price for the **Product**.
-      * @param maxCoverPerUserDivisor_ The max cover amount divisor for per user. (maxCover / divisor = maxCoverPerUser).
      */
     constructor (
         address governance_,
@@ -32,9 +30,7 @@ contract YearnV2Product is BaseProduct {
         IRegistry registry_,
         address yregistry_,
         uint40 minPeriod_,
-        uint40 maxPeriod_,
-        uint24 price_,
-        uint32 maxCoverPerUserDivisor_
+        uint40 maxPeriod_
     ) BaseProduct(
         governance_,
         policyManager_,
@@ -42,8 +38,6 @@ contract YearnV2Product is BaseProduct {
         yregistry_,
         minPeriod_,
         maxPeriod_,
-        price_,
-        maxCoverPerUserDivisor_,
         "Solace.fi-YearnV2Product",
         "1"
     ) {

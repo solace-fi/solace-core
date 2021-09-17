@@ -215,22 +215,22 @@ if(process.env.FORK_NETWORK === "kovan"){
         expect(quote).to.equal(expectedPremium);
       });
       it("cannot buy policy with invalid description", async function () {
-        await expect(product.buyPolicy(REAL_USER1, "0x1234567890123456789012345678901234567890", coverAmount, blocks, { value: expectedPremium })).to.be.reverted;
+        await expect(product.buyPolicy(REAL_USER1, coverAmount, blocks, "0x1234567890123456789012345678901234567890", { value: expectedPremium })).to.be.reverted;
       });
       it("can buyPolicy", async function () {
-        let tx = await product.buyPolicy(REAL_USER1, aWETH_ADDRESS, coverAmount, blocks, { value: expectedPremium });
+        let tx = await product.buyPolicy(REAL_USER1, coverAmount, blocks, aWETH_ADDRESS, { value: expectedPremium });
         expect(tx).to.emit(product, "PolicyCreated").withArgs(1);
         expect(await policyManager.totalSupply()).to.equal(1);
         expect(await policyManager.balanceOf(REAL_USER1)).to.equal(1);
       });
       it("can buy duplicate policy", async function () {
-        let tx = await product.buyPolicy(REAL_USER1, aWETH_ADDRESS, coverAmount, blocks, { value: expectedPremium });
+        let tx = await product.buyPolicy(REAL_USER1, coverAmount, blocks, aWETH_ADDRESS, { value: expectedPremium });
         expect(tx).to.emit(product, "PolicyCreated").withArgs(2);
         expect(await policyManager.totalSupply()).to.equal(2);
         expect(await policyManager.balanceOf(REAL_USER1)).to.equal(2);
       });
       it("can buy policy that covers multiple positions", async function () {
-        let tx = await product.buyPolicy(REAL_USER1, encodeAddresses([aWETH_ADDRESS, aLINK_ADDRESS]), coverAmount, blocks, { value: expectedPremium });
+        let tx = await product.buyPolicy(REAL_USER1, coverAmount, blocks, encodeAddresses([aWETH_ADDRESS, aLINK_ADDRESS]), { value: expectedPremium });
         expect(tx).to.emit(product, "PolicyCreated").withArgs(3);
         expect(await policyManager.totalSupply()).to.equal(3);
         expect(await policyManager.balanceOf(REAL_USER1)).to.equal(3);
@@ -259,14 +259,14 @@ if(process.env.FORK_NETWORK === "kovan"){
         await lendingPool.connect(policyholder1).deposit(LINK_ADDRESS, amountIn1, policyholder1.address, 0);
         expect(await link.balanceOf(policyholder1.address)).to.be.equal(0);
         expect(await alink.balanceOf(policyholder1.address)).to.be.gte(amountIn1);
-        await product.connect(policyholder1).buyPolicy(policyholder1.address, aLINK_ADDRESS, coverAmount, blocks, { value: expectedPremium });
+        await product.connect(policyholder1).buyPolicy(policyholder1.address, coverAmount, blocks, aLINK_ADDRESS, { value: expectedPremium });
         // create another aLink position and policy
         expect(await link.balanceOf(policyholder2.address)).to.equal(amountIn1);
         await link.connect(policyholder2).approve(lendingPool.address, constants.MaxUint256);
         await lendingPool.connect(policyholder2).deposit(LINK_ADDRESS, amountIn1, policyholder2.address, 0);
         expect(await link.balanceOf(policyholder2.address)).to.be.equal(0);
         expect(await alink.balanceOf(policyholder2.address)).to.be.gte(amountIn1);
-        await product.connect(policyholder2).buyPolicy(policyholder2.address, aLINK_ADDRESS, coverAmount, blocks, { value: expectedPremium });
+        await product.connect(policyholder2).buyPolicy(policyholder2.address, coverAmount, blocks, aLINK_ADDRESS, { value: expectedPremium });
       });
       it("cannot submit claim with expired signature", async function () {
         let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, amountOut1, 0, SUBMIT_CLAIM_TYPEHASH);
@@ -390,7 +390,7 @@ if(process.env.FORK_NETWORK === "kovan"){
             const aAmount = await aToken.balanceOf(policyholder3.address);
             expect(aAmount).to.be.closeTo(uAmount, 100);
             // create policy
-            await product.connect(policyholder3).buyPolicy(policyholder3.address, aAddress, coverAmount, blocks, { value: expectedPremium });
+            await product.connect(policyholder3).buyPolicy(policyholder3.address, coverAmount, blocks, aAddress, { value: expectedPremium });
             let policyID = (await policyManager.totalPolicyCount()).toNumber();
             // sign swap
             let amountOut = 10000;
