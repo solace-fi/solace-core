@@ -15,9 +15,6 @@ contract LiquityProduct is BaseProduct {
 
     /// @notice ITroveManager.
     ITroveManager internal _troveManager;
-    
-    /// @notice product position addresses. 
-    mapping(address => bool) internal _positions;
 
     /**
       * @notice Constructs the LiquityProduct.
@@ -54,11 +51,6 @@ contract LiquityProduct is BaseProduct {
         _troveManager = ITroveManager(troveManager_);
         _SUBMIT_CLAIM_TYPEHASH = keccak256("LiquityProductSubmitClaim(uint256 policyID,address claimant,uint256 amountOut,uint256 deadline)");
         _productName = "Liquity";
-
-        // store product position addresses
-        _positions[troveManager_] = true;
-        _positions[_troveManager.lqtyStaking()] = true;
-        _positions[_troveManager.stabilityPool()] = true;
     }
 
      /**
@@ -73,6 +65,9 @@ contract LiquityProduct is BaseProduct {
         uint256 ADDRESS_SIZE = 20;
         // must be concatenation of one or more addresses
         if (positionDescription.length == 0 || positionDescription.length % ADDRESS_SIZE != 0) return false;
+
+        address lqtyStaking = _troveManager.lqtyStaking();
+        address stabilityPool = _troveManager.stabilityPool();
       
         // check all addresses in list
         for (uint256 offset = 0; offset < positionDescription.length; offset += ADDRESS_SIZE) {
@@ -82,7 +77,7 @@ contract LiquityProduct is BaseProduct {
                 positionContract := div(mload(add(add(positionDescription, 0x20), offset)), 0x1000000000000000000000000)
             }
 
-            if (_positions[positionContract] == false) return false;
+            if (( address(_troveManager) != positionContract) && (lqtyStaking !=  positionContract) && (stabilityPool != positionContract)) return false;
         }
         return true;
     }
