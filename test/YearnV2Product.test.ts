@@ -126,9 +126,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
           registry.address,
           IYREGISTRY,
           minPeriod,
-          maxPeriod,
-          price,
-          1
+          maxPeriod
         ]
       )) as YearnV2Product;
 
@@ -142,9 +140,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
           registry.address,
           IYREGISTRY,
           minPeriod,
-          maxPeriod,
-          price,
-          1
+          maxPeriod
         ]
       )) as YearnV2Product;
 
@@ -153,7 +149,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
       ydai = await ethers.getContractAt(artifacts.YVault.abi, YDAI_ADDRESS);
 
       await vault.connect(depositor).depositEth({value:maxCoverAmount});
-      await riskManager.connect(governor).addProduct(product.address, 1);
+      await riskManager.connect(governor).addProduct(product.address, 1, 11044, 1);
       await product.connect(governor).addSigner(paclasSigner.address);
     });
 

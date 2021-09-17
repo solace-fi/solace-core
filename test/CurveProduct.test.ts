@@ -76,14 +76,12 @@ if(process.env.FORK_NETWORK === "mainnet"){
           treasury.address,
           ADDRESS_PROVIDER,
           minPeriod,
-          maxPeriod,
-          price,
-          1
+          maxPeriod
         ]
       )) as CurveProduct;
 
       await vault.connect(deployer).depositEth({value:maxCoverAmount});
-      await riskManager.connect(governor).addProduct(product.address, 1);
+      await riskManager.connect(governor).addProduct(product.address, 1, 11044, 1);
       await product.connect(governor).addSigner(paclasSigner.address);
     });
 

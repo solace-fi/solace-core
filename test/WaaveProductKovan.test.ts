@@ -96,9 +96,7 @@ if(process.env.FORK_NETWORK === "kovan"){
           registry.address,
           WAREGISTRY_ADDRESS,
           minPeriod,
-          maxPeriod,
-          price,
-          1
+          maxPeriod
         ]
       )) as WaaveProduct;
 
@@ -111,9 +109,7 @@ if(process.env.FORK_NETWORK === "kovan"){
           registry.address,
           WAREGISTRY_ADDRESS,
           minPeriod,
-          maxPeriod,
-          price,
-          1
+          maxPeriod
         ]
       )) as WaaveProduct;
 
@@ -121,7 +117,7 @@ if(process.env.FORK_NETWORK === "kovan"){
       waWeth = await ethers.getContractAt(artifacts.IWaToken.abi, WAWETH_ADDRESS);
 
       await vault.connect(deployer).depositEth({value: BN.from("1000000000000000000000")}); // 1000 eth
-      await riskManager.connect(governor).addProduct(product.address, 1);
+      await riskManager.connect(governor).addProduct(product.address, 1, 11044, 1);
       await product.connect(governor).addSigner(paclasSigner.address);
     });
 

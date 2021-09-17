@@ -124,9 +124,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
           registry.address,
           COMPTROLLER_ADDRESS,
           minPeriod,
-          maxPeriod,
-          price,
-          1
+          maxPeriod
         ]
       )) as CompoundProduct;
 
@@ -139,9 +137,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
           registry.address,
           COMPTROLLER_ADDRESS,
           minPeriod,
-          maxPeriod,
-          price,
-          1
+          maxPeriod
         ]
       )) as CompoundProduct;
 
@@ -151,7 +147,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
       usdc = await ethers.getContractAt(artifacts.ERC20.abi, USDC_ADDRESS);
 
       await vault.connect(depositor).depositEth({value:maxCoverAmount});
-      await riskManager.connect(governor).addProduct(product.address, 1);
+      await riskManager.connect(governor).addProduct(product.address, 1, 11044, 1);
       await product.connect(governor).addSigner(paclasSigner.address);
     });
 

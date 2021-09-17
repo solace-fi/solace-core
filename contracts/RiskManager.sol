@@ -107,8 +107,8 @@ contract RiskManager is IRiskManager, Governable {
         uint256 mc = maxCoverPerProduct(prod);
         // active cover
         uint256 ac = IProduct(prod).activeCoverAmount();
-        // diff
-        return (ac >= mc)
+        // diff non underflow
+        return (mc < ac)
           ? 0
           : (mc - ac);
     }
@@ -120,6 +120,7 @@ contract RiskManager is IRiskManager, Governable {
      */
     function maxCoverPerPolicy(address prod) external view override returns (uint256 cover) {
         ProductRiskParams storage params = _productRiskParams[prod];
+        require(params.weight > 0, "product inactive");
         return maxCover() * params.weight / (_weightSum * params.divisor);
     }
 
@@ -226,7 +227,7 @@ contract RiskManager is IRiskManager, Governable {
                 divisor: divisor_
             });
         }
-        emit ProductWeightSet(product_, weight_);
+        emit ProductParamsSet(product_, weight_, price_, divisor_);
     }
 
     /**
@@ -254,7 +255,7 @@ contract RiskManager is IRiskManager, Governable {
           : (_weightSum - _productRiskParams[product_].weight);
         _productCount = newProductCount;
         delete _productRiskParams[product_];
-        emit ProductWeightSet(product_, 0);
+        emit ProductParamsSet(product_, 0, 0, 0);
     }
 
     /**
@@ -266,19 +267,19 @@ contract RiskManager is IRiskManager, Governable {
      * @param divisors_ The max cover per policy divisors.
      */
     function setProductParams(address[] calldata products_, uint32[] calldata weights_, uint24[] calldata prices_, uint16[] calldata divisors_) external override onlyGovernance {
-        // check recipient - weight map
-        require(products_.length == weights_.length, "length mismatch");
+        // check array lengths
+        uint256 length = products_.length;
+        require(length == weights_.length && length == prices_.length && length == divisors_.length, "length mismatch");
         // delete old products
         for(uint256 index = _productCount; index > 0; index--) {
             address product_ = _indexToProduct[index];
             delete _productToIndex[product_];
             delete _indexToProduct[index];
             delete _productRiskParams[product_];
-            emit ProductWeightSet(product_, 0);
+            emit ProductParamsSet(product_, 0, 0, 0);
         }
         // add new products
         uint32 weightSum_ = 0;
-        uint256 length = products_.length;
         for(uint256 i = 0; i < length; i++) {
             address product_ = products_[i];
             uint32 weight_ = weights_[i];
@@ -296,7 +297,7 @@ contract RiskManager is IRiskManager, Governable {
             weightSum_ += weight_;
             _productToIndex[product_] = i+1;
             _indexToProduct[i+1] = product_;
-            emit ProductWeightSet(product_, weight_);
+            emit ProductParamsSet(product_, weight_, price_, divisor_);
         }
         _weightSum = (length == 0)
           ? type(uint32).max // no div by zero

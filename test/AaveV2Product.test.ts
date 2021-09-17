@@ -126,9 +126,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
           registry.address,
           AAVE_DATA_PROVIDER,
           minPeriod,
-          maxPeriod,
-          price,
-          1
+          maxPeriod
         ]
       )) as unknown as AaveV2Product;
 
@@ -141,9 +139,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
           registry.address,
           AAVE_DATA_PROVIDER,
           minPeriod,
-          maxPeriod,
-          price,
-          1
+          maxPeriod
         ]
       )) as unknown as AaveV2Product;
 
@@ -155,7 +151,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
       lendingPool = await ethers.getContractAt(artifacts.LendingPool.abi, LENDING_POOL_ADDRESS);
 
       await vault.connect(deployer).depositEth({value:maxCoverAmount});
-      await riskManager.connect(governor).addProduct(product.address, 1);
+      await riskManager.connect(governor).addProduct(product.address, 1, 11044, 1);
       await product.connect(governor).addSigner(paclasSigner.address);
     });
 

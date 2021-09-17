@@ -19,9 +19,9 @@ interface IRiskManager {
     EVENTS
     ***************************************/
 
-    /// @notice Emitted when a product's weight is modified.
+    /// @notice Emitted when a product's parameters are modified.
     /// Includes adding and removing products.
-    event ProductWeightSet(address product, uint32 weight);
+    event ProductParamsSet(address product, uint32 weight, uint24 price, uint16 divisor);
 
     /***************************************
     MAX COVER VIEW FUNCTIONS
