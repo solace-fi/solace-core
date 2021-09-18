@@ -71,8 +71,9 @@ interface IProduct {
      * User will receive a refund for the remaining blocks.
      * Can only be called by the policyholder.
      * @param policyID The ID of the policy.
+     * @param forfeitChange False to receive your claim, true to forfeit it to the capital pool.
      */
-    function cancelPolicy(uint256 policyID) external;
+    function cancelPolicy(uint256 policyID, bool forfeitChange) external;
 
     /***************************************
     QUOTE VIEW FUNCTIONS

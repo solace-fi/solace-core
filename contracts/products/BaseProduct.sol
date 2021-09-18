@@ -256,8 +256,9 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
      * User will receive a refund for the remaining blocks.
      * Can only be called by the policyholder.
      * @param policyID The ID of the policy.
+     * @param forfeitChange False to receive your claim, true to forfeit it to the capital pool.
      */
-    function cancelPolicy(uint256 policyID) external override nonReentrant {
+    function cancelPolicy(uint256 policyID, bool forfeitChange) external override nonReentrant {
         (address policyholder, address product, uint256 coverAmount, uint40 expirationBlock, uint24 purchasePrice, ) = _policyManager.getPolicyInfo(policyID);
         require(policyholder == msg.sender,"!policyholder");
         require(product == address(this), "wrong product");
@@ -265,7 +266,8 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         uint40 blocksLeft = expirationBlock - uint40(block.number);
         uint256 refundAmount = blocksLeft * coverAmount * purchasePrice / 1e12;
         _policyManager.burn(policyID);
-        ITreasury(payable(_registry.treasury())).refund(msg.sender, refundAmount);
+        ITreasury treasury = ITreasury(payable(_registry.treasury()));
+        if(refundAmount > 0 && !forfeitChange) treasury.refund(msg.sender, refundAmount);
         _activeCoverAmount -= coverAmount;
         emit PolicyCanceled(policyID);
     }
