@@ -766,18 +766,18 @@ describe("BaseProduct", function () {
     let policyID = BN.from(1);
 
     it("cannot cancel nonexistent policy", async function() {
-      await expect(product.connect(policyholder1).cancelPolicy(99)).to.be.revertedWith("query for nonexistent token");
+      await expect(product.connect(policyholder1).cancelPolicy(99, false)).to.be.revertedWith("query for nonexistent token");
     });
     it("cannot cancel someone elses policy", async function() {
-      await expect(product.connect(deployer).cancelPolicy(policyID)).to.be.revertedWith("!policyholder");
+      await expect(product.connect(deployer).cancelPolicy(policyID, false)).to.be.revertedWith("!policyholder");
     });
     it("cannot cancel someone elses policy after transfer", async function() {
       await policyManager.connect(policyholder1).transferFrom(policyholder1.address, policyholder2.address, policyID);
-      await expect(product.connect(policyholder1).cancelPolicy(policyID)).to.be.revertedWith("!policyholder");
+      await expect(product.connect(policyholder1).cancelPolicy(policyID, false)).to.be.revertedWith("!policyholder");
       await policyManager.connect(policyholder2).transferFrom(policyholder2.address, policyholder1.address, policyID);
     });
     it("cannot cancel from a different product", async function() {
-      await expect(product2.connect(policyholder1).cancelPolicy(policyID)).to.be.revertedWith("wrong product");
+      await expect(product2.connect(policyholder1).cancelPolicy(policyID, false)).to.be.revertedWith("wrong product");
     });
     it("can cancel and refunds proper amount", async function() {
       let info = await policyManager.policyInfo(policyID);
@@ -788,7 +788,7 @@ describe("BaseProduct", function () {
         .mul(info.price)
         .mul(info.coverAmount)
         .div(1e12);
-      let tx = await product.connect(policyholder1).cancelPolicy(policyID);
+      let tx = await product.connect(policyholder1).cancelPolicy(policyID, false);
       let receipt = await tx.wait();
       let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
       let balance2 = await policyholder1.getBalance();
@@ -802,7 +802,7 @@ describe("BaseProduct", function () {
       policyID = await policyManager.totalPolicyCount();
       expect(tx).to.emit(policyManager, "PolicyCreated").withArgs(policyID);
       await policyManager.connect(policyholder1).transferFrom(policyholder1.address, policyholder2.address, policyID);
-      await product.connect(policyholder2).cancelPolicy(policyID);
+      await product.connect(policyholder2).cancelPolicy(policyID, false);
       expect(await policyManager.exists(policyID)).to.be.false;
     });
   });

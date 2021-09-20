@@ -385,7 +385,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
       * @param positionDescription The description to validate.
       * @return isValid True if is valid.
       */
-     function isValidPositionDescription(bytes memory positionDescription) public view virtual returns (bool isValid);
+     function isValidPositionDescription(bytes memory positionDescription) public view virtual override returns (bool isValid);
 
     /***************************************
     MUTATOR FUNCTIONS

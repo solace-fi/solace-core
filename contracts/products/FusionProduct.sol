@@ -101,7 +101,8 @@ contract FusionProduct is IFusionProduct, EIP712, ReentrancyGuard, Governable {
         uint256 newCoverAmount;
         uint256 averagePriceAccumulator;
         uint40 newExpirationBlock;
-        uint16 newFusionDepth;
+        uint32 newFusionDepth; // aka bytes4
+        // TODO: will be cheaper to allocate array then copy
         bytes memory newPositionDescription;
         // for each policy to fuse
         for(uint256 i = 0; i < policyIDs.length; i++) {
@@ -120,21 +121,24 @@ contract FusionProduct is IFusionProduct, EIP712, ReentrancyGuard, Governable {
             if(product == address(this)) {
                 // if fusing in a fused policy
                 // use assembly to get fusionDepth from positionDescription
-                uint16 fusionDepth;
+                uint32 fusionDepth; // aka bytes4
+                // solhint-disable-next-line no-inline-assembly
                 assembly {
-                    // first 16 bytes
-                    fusionDepth := div(mload(add(positionDescription, 0x20)), 0x100000000000000000000000000000000)
+                    // first 4 bytes
+                    fusionDepth := shr(0xe0, mload(add(positionDescription, 0x20)))
                 }
                 newFusionDepth += fusionDepth;
             } else {
-                // if fusing in an unfused policy
+                // if fusing in an unfused policy, has an implicit fusion depth of 1
                 newFusionDepth++;
             }
-            // TODO: byte encoding of fused policy. use product and positionDescription
+            // byte encoding of fused policy
+            newPositionDescription = bytes.concat(newPositionDescription, bytes20(product), bytes4(uint32(positionDescription.length)), positionDescription);
             // burn the policy
             IProduct(product).cancelPolicy(policyID, true);
         }
-        // TODO: add fusion depth to front of newPositionDescription
+        // add fusion depth to front of newPositionDescription
+        newPositionDescription = bytes.concat(bytes4(newFusionDepth), newPositionDescription);
         // calculate price
         uint24 averagePrice = uint24(averagePriceAccumulator / newCoverAmount);
         // TODO: check with RiskManager
@@ -237,21 +241,110 @@ contract FusionProduct is IFusionProduct, EIP712, ReentrancyGuard, Governable {
      * @param account Potential signer to query.
      * @return status True if is authorized signer.
      */
-     function isAuthorizedSigner(address account) external view override returns (bool status) {
+    function isAuthorizedSigner(address account) external view override returns (bool status) {
         return _isAuthorizedSigner[account];
-     }
+    }
 
-     /**
-      * @notice Determines if the byte encoded description of a position(s) is valid.
-      * The description will only make sense in context of the product.
-      * @dev This function should be overwritten in inheriting Product contracts.
-      * If invalid, return false if possible. Reverting is also acceptable.
-      * @param positionDescription The description to validate.
-      * @return isValid True if is valid.
-      */
-     function isValidPositionDescription(bytes memory positionDescription) public view returns (bool isValid) {
-        return true; // TODO: this
-     }
+    /**
+     * @notice Determines if the byte encoded description of a position(s) is valid.
+     * The description will only make sense in context of the product.
+     * @dev This function should be overwritten in inheriting Product contracts.
+     * If invalid, return false if possible. Reverting is also acceptable.
+     * @param positionDescription The description to validate.
+     * @return isValid True if is valid.
+     */
+    function isValidPositionDescription(bytes memory positionDescription) public view virtual override returns (bool isValid) {
+        // TODO: switch to uint32/bytes4 for fusionDepth and descriptionLength
+        /*
+         * FUSED POLICY BYTE ENCODING
+         * bytes[0:4] contains fusionDepth, or the amount of policies that were fused to create the policy.
+         * eg fuse(policy1, fuse(policy2, policy3)).fusionDepth == 3
+         * Followed by a concatenation of two or more encoded nested policies.
+         * NESTED POLICY BYTE ENCODING
+         * bytes[0:20] contains the product address.
+         * bytes[20:24] contains the description length.
+         * bytes[24:24+descriptionLength] contains the description.
+         */
+        if(positionDescription.length < 52) return false; // 4 for fusion depth + 2 minimal positions
+        // use assembly to get fusionDepth from positionDescription
+        uint32 fusionDepth; // aka bytes4
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+          // first 4 bytes
+          fusionDepth := shr(0xe0, mload(add(positionDescription, 0x20)))
+        }
+        if(fusionDepth < 2) return false;
+        uint256 offset = 36; // 32 for length at slot 0, 4 for fusionDepth
+        // validate each fused position description
+        for(uint128 i = 0; i < fusionDepth; ) {
+            // get next address and description length
+            address positionContract;
+            uint32 descriptionLength; // aka bytes4
+            // solhint-disable-next-line no-inline-assembly
+            assembly {
+                // get 32 bytes starting at offset
+                let slot := mload(add(positionDescription, offset))
+                // first 20 bytes are address
+                positionContract := shr(0x60, slot)
+                // next 4 bytes are description length
+                descriptionLength := shr(0xe0, shl(0xa0, slot))
+            }
+            // check string bounds
+            if(offset + uint256(descriptionLength) > positionDescription.length) return false;
+            // get nested position description at positionDescription[offset+32, offset+32+desriptionLength]
+            // TODO: wait for solidity bytes memory slice() support :/
+            bytes memory nestedPositionDesription = new bytes(descriptionLength);
+            uint32 SLOT_SIZE = 32;
+            // copy each full slot
+            for(uint32 j = 0; j < descriptionLength; ) {
+                j += SLOT_SIZE;
+                // solhint-disable-next-line no-inline-assembly
+                assembly {
+                    // get 32 bytes from positionDescription starting at offset+j
+                    let nextSlot := mload(add(add(positionDescription, offset), j))
+                    // copy to nestedPositionDesription
+                    mstore(add(nestedPositionDesription, j), nextSlot)
+                }
+            }
+            // copy partial end slot
+            uint32 trailingBytes = descriptionLength % SLOT_SIZE;
+            if(trailingBytes != 0) {
+                // get full slot
+                bytes32 nextSlot;
+                // solhint-disable-next-line no-inline-assembly
+                assembly {
+                    // get 32 bytes starting at offset
+                    nextSlot := mload(add(positionDescription, offset))
+                }
+                // where to put bytes
+                uint32 startIndex = (descriptionLength <= 31)
+                  ? 0 // compact encoding
+                  : (descriptionLength + 32 - trailingBytes); // extended encoding
+                // copy each byte individually
+                for(uint32 k = 0; k < trailingBytes; k++) {
+                    positionDescription[startIndex + k] = bytes1((nextSlot << k) >> (31 - k));
+                }
+            }
+            // delegate to fused product
+            if(!IProduct(positionContract).isValidPositionDescription(nestedPositionDesription)) return false;
+            // iterate over fusionDepth
+            if(positionContract == address(this)) {
+                // nested position is fused
+                uint32 depth; // aka bytes4
+                assembly {
+                    // first 4 bytes of nested description
+                    depth := shr(0xe0, mload(add(add(positionDescription, offset), 0x20)))
+                }
+                i += depth;
+            } else {
+                // nested position is unfused
+                i++;
+            }
+            // jump forward address (20), length (4), and description
+            offset += (24 + descriptionLength);
+        }
+        return offset == positionDescription.length;
+    }
 
     /***************************************
     MUTATOR FUNCTIONS

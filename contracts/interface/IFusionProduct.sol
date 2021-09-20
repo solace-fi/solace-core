@@ -44,7 +44,7 @@ interface IFusionProduct {
     function cancelPolicy(uint256 policyID, bool forfeitChange) external;
 
     /***************************************
-    QUOTE VIEW FUNCTIONS
+    GLOBAL VIEW FUNCTIONS
     ***************************************/
 
     /// @notice The current amount covered (in wei).
@@ -69,6 +69,16 @@ interface IFusionProduct {
      * @return status True if is authorized signer.
      */
      function isAuthorizedSigner(address account) external view returns (bool status);
+
+     /**
+      * @notice Determines if the byte encoded description of a position(s) is valid.
+      * The description will only make sense in context of the product.
+      * @dev This function should be overwritten in inheriting Product contracts.
+      * If invalid, return false if possible. Reverting is also acceptable.
+      * @param positionDescription The description to validate.
+      * @return isValid True if is valid.
+      */
+     function isValidPositionDescription(bytes memory positionDescription) external view returns (bool isValid);
 
     /***************************************
     MUTATOR FUNCTIONS

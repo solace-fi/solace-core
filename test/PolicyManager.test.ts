@@ -363,7 +363,7 @@ describe("PolicyManager", function() {
       expect(await riskManager.minCapitalRequirement()).to.equal(0b11111);
       // pass time
       await burnBlocks(150);
-      await mockProduct.connect(user).cancelPolicy(5);
+      await mockProduct.connect(user).cancelPolicy(5, false);
       expect(await policyManager.activeCoverAmount()).to.equal(0b01111);
       expect(await riskManager.minCapitalRequirement()).to.equal(0b01111);
       // update policies
