@@ -2,6 +2,7 @@
 pragma solidity 0.8.6;
 
 import "./libraries/Math.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -21,6 +22,7 @@ import "./interface/ISolaceEthLpFarm.sol";
  * Over the course of `startBlock` to `endBlock`, the farm distributes `blockReward` [**SOLACE**](./SOLACE) per block to all farmers split relative to the value of their deposited tokens.
  */
 contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard, Governable {
+    using Address for address;
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.UintSet;
     using TickBitmap for mapping(int16 => uint256);
@@ -269,7 +271,7 @@ contract SolaceEthLpFarm is ISolaceEthLpFarm, ReentrancyGuard, Governable {
             : msg.value - amount0);
         if (ethReturnAmount > 0) {
           weth.withdraw(ethReturnAmount);
-          payable(msg.sender).transfer(ethReturnAmount);
+          Address.sendValue(payable(msg.sender), ethReturnAmount);
         }
         // accounting
         _deposit(params.depositor, tokenID);
