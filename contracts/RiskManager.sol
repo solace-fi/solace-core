@@ -14,7 +14,7 @@ import "./interface/IRiskManager.sol";
  * @author solace.fi
  * @notice Calculates the acceptable risk, sellable cover, and capital requirements of Solace products and capital pool.
  *
- * The total amount of sellable coverage is proportional to the assets in the [**risk backing capital pool**](./Vault). The max cover is split amongst products in a weighting system. [**Governance**](/docs/protocol/governance). can change these weights and with it each product's sellable cover.
+ * The total amount of sellable coverage is proportional to the assets in the [**risk backing capital pool**](./Vault). The max cover is split amongst products in a weighting system. [**Governance**](/docs/protocol/governance) can change these weights and with it each product's sellable cover.
  *
  * The minimum capital requirement is proportional to the amount of cover sold to [active policies](./PolicyManager).
  *
