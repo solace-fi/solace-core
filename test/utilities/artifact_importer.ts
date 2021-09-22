@@ -39,6 +39,8 @@ export async function import_artifacts() {
   artifacts.CurveProduct = await tryImport(`${artifact_dir}/products/CurveProduct.sol/CurveProduct.json`);
   artifacts.WaaveProduct = await tryImport(`${artifact_dir}/products/WaaveProduct.sol/WaaveProduct.json`);
   artifacts.YearnV2Product = await tryImport(`${artifact_dir}/products/YearnV2Product.sol/YearnV2Product.json`);
+  artifacts.LiquityProduct = await tryImport(`${artifact_dir}/products/LiquityProduct.sol/LiquityProduct.json`);
+
   // oracles
   artifacts.ExchangeQuoter1InchV1 = await tryImport(`${artifact_dir}/oracles/ExchangeQuoter1InchV1.sol/ExchangeQuoter1InchV1.json`);
   artifacts.ExchangeQuoterManual = await tryImport(`${artifact_dir}/oracles/ExchangeQuoterManual.sol/ExchangeQuoterManual.json`);
@@ -74,6 +76,15 @@ export async function import_artifacts() {
 
   // yearn imports
   artifacts.YVault = await tryImport(`${artifact_dir}/interface/Yearn/IYVault.sol/IYVault.json`);
+
+  // liquity imports
+  artifacts.TroveManager = await tryImport(`${artifact_dir}/interface/Liquity/ITroveManager.sol/ITroveManager.json`);
+  artifacts.LQTYStaking = await tryImport(`${artifact_dir}/interface/Liquity/ILQTYStaking.sol/ILQTYStaking.json`);
+  artifacts.LQTYToken = await tryImport(`${artifact_dir}/interface/Liquity/ILQTYToken.sol/ILQTYToken.json`);
+  artifacts.LUSDToken = await tryImport(`${artifact_dir}/interface/Liquity/ILUSDToken.sol/ILUSDToken.json`);
+  artifacts.StabilityPool = await tryImport(`${artifact_dir}/interface/Liquity/IStabilityPool.sol/IStabilityPool.json`);
+
+
 
   return artifacts;
 }
