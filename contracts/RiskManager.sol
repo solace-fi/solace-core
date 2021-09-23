@@ -125,6 +125,15 @@ contract RiskManager is IRiskManager, Governable {
     }
 
     /**
+     * @notice Checks is an address is an active product.
+     * @param prod The product to check.
+     * @return status Returns true if the product is active.
+     */
+    function productIsActive(address prod) external view override returns (bool status) {
+        return _productToIndex[prod] != 0;
+    }
+
+    /**
      * @notice Return the number of registered products.
      * @return count Number of products.
      */
