@@ -59,4 +59,9 @@ interface ITroveManager {
      */
     function getTroveColl(address _borrower) external view returns (uint _coll);
 
+    /**
+     * @notice Returns TVL amount in troves.
+     * @return _tvl tvl amount.
+     */
+    function totalStakes() external view returns (uint _tvl);
 }
