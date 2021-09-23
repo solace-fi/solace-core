@@ -40,7 +40,6 @@ if (process.env.FORK_NETWORK === "rinkeby") {
     let vault: Vault;
     let registry: Registry;
     let riskManager: RiskManager;
-
     const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
     const minPeriod = 6450; // this is about 1 day
     const maxPeriod = 45100; // this is about 1 week from https://ycharts.c om/indicators/ethereum_blocks_per_day
@@ -57,7 +56,6 @@ if (process.env.FORK_NETWORK === "rinkeby") {
     const LQTY_TOKEN_ADDRESS = "0xF74dcAbeA0954AeB6903c8a71d41e468a6B77357";
     const LUSD_TOKEN_ADDRESS = "0x9C5AE6852622ddE455B6Fca4C1551FC0352531a3";
     const REAL_USER =   "0x9Ada9Ae98457aD8a2D53DE2B888cd1337d3438E8";
-
     before (async function() {
       artifacts = await import_artifacts();
       await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
@@ -173,7 +171,6 @@ if (process.env.FORK_NETWORK === "rinkeby") {
       before(async function () {
         expect(await policyManager.totalSupply()).to.equal(0);
         expect(await policyManager.balanceOf(policyholder1.address)).to.equal(0);
-
         await policyManager.connect(governor).addProduct(product1.address);
         await policyManager.connect(governor).addProduct(product2.address);
         await policyManager.connect(governor).addProduct(product3.address);
@@ -300,13 +297,11 @@ if (process.env.FORK_NETWORK === "rinkeby") {
         // sign swap
         let digest = getSubmitClaimDigest(DOMAIN_NAME, product1.address, chainId, policyID1, policyholder1.address, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
-
         // submit claim
         let tx1 = await product1.connect(policyholder1).submitClaim(policyID1, amountOut1, deadline, signature);
         expect(tx1).to.emit(product1, "ClaimSubmitted").withArgs(policyID1);
         expect(tx1).to.emit(claimsEscrow, "ClaimReceived").withArgs(policyID1, policyholder1.address, amountOut1);
         expect(await policyManager.exists(policyID1)).to.be.false;
-
         // verify payout
         expect((await claimsEscrow.claim(policyID1)).amount).to.equal(amountOut1);
         await provider.send("evm_increaseTime", [cooldownPeriod]); // add one hour
