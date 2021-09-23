@@ -126,9 +126,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
           registry.address,
           IYREGISTRY,
           minPeriod,
-          maxPeriod,
-          price,
-          1
+          maxPeriod
         ]
       )) as YearnV2Product;
 
@@ -142,9 +140,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
           registry.address,
           IYREGISTRY,
           minPeriod,
-          maxPeriod,
-          price,
-          1
+          maxPeriod
         ]
       )) as YearnV2Product;
 
@@ -153,7 +149,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
       ydai = await ethers.getContractAt(artifacts.YVault.abi, YDAI_ADDRESS);
 
       await vault.connect(depositor).depositEth({value:maxCoverAmount});
-      await riskManager.connect(governor).addProduct(product.address, 1);
+      await riskManager.connect(governor).addProduct(product.address, 1, 11044, 1);
       await product.connect(governor).addSigner(paclasSigner.address);
     });
 
@@ -216,22 +212,22 @@ if(process.env.FORK_NETWORK === "mainnet"){
         expect(quote).to.equal(expectedPremium);
       });
       it("cannot buy policy with invalid description", async function () {
-        await expect(product.buyPolicy(REAL_USER1, "0x1234567890123456789012345678901234567890", coverAmount, blocks, { value: expectedPremium })).to.be.reverted;
+        await expect(product.buyPolicy(REAL_USER1, coverAmount, blocks, "0x1234567890123456789012345678901234567890", { value: expectedPremium })).to.be.reverted;
       });
       it("can buyPolicy", async function () {
-        let tx = await product.buyPolicy(REAL_USER1, YDAI_ADDRESS, coverAmount, blocks, { value: expectedPremium });
+        let tx = await product.buyPolicy(REAL_USER1, coverAmount, blocks, YDAI_ADDRESS, { value: expectedPremium });
         expect(tx).to.emit(product, "PolicyCreated").withArgs(1);
         expect(await policyManager.totalSupply()).to.equal(1);
         expect(await policyManager.balanceOf(REAL_USER1)).to.equal(1);
       });
       it("can buy duplicate policy", async function () {
-        let tx = await product.buyPolicy(REAL_USER1, YDAI_ADDRESS, coverAmount, blocks, { value: expectedPremium });
+        let tx = await product.buyPolicy(REAL_USER1, coverAmount, blocks, YDAI_ADDRESS, { value: expectedPremium });
         expect(tx).to.emit(product, "PolicyCreated").withArgs(2);
         expect(await policyManager.totalSupply()).to.equal(2);
         expect(await policyManager.balanceOf(REAL_USER1)).to.equal(2);
       });
       it("can buy policy that covers multiple positions", async function () {
-        let tx = await product.buyPolicy(REAL_USER1, encodeAddresses([yvaults[0].address, yvaults[1].address]), coverAmount, blocks, { value: expectedPremium });
+        let tx = await product.buyPolicy(REAL_USER1, coverAmount, blocks, encodeAddresses([yvaults[0].address, yvaults[1].address]), { value: expectedPremium });
         expect(tx).to.emit(product, "PolicyCreated").withArgs(3);
         expect(await policyManager.totalSupply()).to.equal(3);
         expect(await policyManager.balanceOf(REAL_USER1)).to.equal(3);
@@ -260,12 +256,12 @@ if(process.env.FORK_NETWORK === "mainnet"){
         expect(await dai.balanceOf(policyholder1.address)).to.equal(daiAmount);
         await dai.connect(policyholder1).approve(ydai.address, constants.MaxUint256);
         await ydai.connect(policyholder1).deposit(daiAmount);
-        await product.connect(policyholder1).buyPolicy(policyholder1.address, YDAI_ADDRESS, coverAmount, blocks, { value: expectedPremium });
+        await product.connect(policyholder1).buyPolicy(policyholder1.address, coverAmount, blocks, YDAI_ADDRESS, { value: expectedPremium });
         // create another dai position and policy
         expect(await dai.balanceOf(policyholder2.address)).to.equal(daiAmount);
         await dai.connect(policyholder2).approve(ydai.address, constants.MaxUint256);
         await ydai.connect(policyholder2).deposit(daiAmount);
-        await product.connect(policyholder2).buyPolicy(policyholder2.address, YDAI_ADDRESS, coverAmount, blocks, { value: expectedPremium });
+        await product.connect(policyholder2).buyPolicy(policyholder2.address, coverAmount, blocks, YDAI_ADDRESS, { value: expectedPremium });
       });
       it("cannot submit claim with expired signature", async function () {
         let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, amountOut1, 0, SUBMIT_CLAIM_TYPEHASH);
@@ -402,7 +398,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
             const aAmount = await yvault.balanceOf(policyholder3.address);
             expect(aAmount).to.be.gt(0);
             // create policy
-            await product.connect(policyholder3).buyPolicy(policyholder3.address, yAddress, coverAmount, blocks, { value: expectedPremium });
+            await product.connect(policyholder3).buyPolicy(policyholder3.address, coverAmount, blocks, yAddress, { value: expectedPremium });
             let policyID = (await policyManager.totalPolicyCount()).toNumber();
             // sign swap
             let amountOut = 10000;

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
+import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./Governable.sol";
@@ -23,6 +24,7 @@ import "./interface/IVault.sol";
  * [**Governance**](/docs/protocol/governance) can change the premium recipients via [`setPremiumRecipients()`](#setpremiumrecipients). This can be used to add new building blocks to Castle Solace or enact a protocol fee. Premiums can be stored in the `Treasury` and managed with a number of functions.
  */
 contract Treasury is ITreasury, ReentrancyGuard, Governable {
+    using Address for address;
     using SafeERC20 for IERC20;
 
     // Registry
@@ -176,7 +178,7 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
         uint256 transferAmount = min(address(this).balance, amount);
         uint256 unpaidRefunds2 = amount - transferAmount;
         if(unpaidRefunds2 != unpaidRefunds1) _unpaidRefunds[user] = unpaidRefunds2;
-        payable(user).transfer(transferAmount);
+        Address.sendValue(payable(user), transferAmount);
     }
 
     /***************************************
@@ -215,7 +217,7 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
      */
     function spend(address token, uint256 amount, address recipient) external override nonReentrant onlyGovernance {
         // transfer eth
-        if(token == _ETH_ADDRESS) payable(recipient).transfer(amount);
+        if(token == _ETH_ADDRESS) Address.sendValue(payable(recipient), amount);
         // transfer token
         else IERC20(token).safeTransfer(recipient, amount);
         // emit event

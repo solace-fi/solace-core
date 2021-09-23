@@ -31,12 +31,12 @@ interface IProduct {
      * @notice Purchases and mints a policy on the behalf of the policyholder.
      * User will need to pay **ETH**.
      * @param policyholder Holder of the position(s) to cover.
-     * @param positionDescription A byte encoded description of the position(s) to cover.
      * @param coverAmount The value to cover in **ETH**.
      * @param blocks The length (in blocks) for policy.
+     * @param positionDescription A byte encoded description of the position(s) to cover.
      * @return policyID The ID of newly created policy.
      */
-    function buyPolicy(address policyholder, bytes memory positionDescription, uint256 coverAmount, uint40 blocks) external payable returns (uint256 policyID);
+    function buyPolicy(address policyholder, uint256 coverAmount, uint40 blocks, bytes memory positionDescription) external payable returns (uint256 policyID);
 
     /**
      * @notice Increase or decrease the cover amount of the policy.
@@ -90,24 +90,10 @@ interface IProduct {
     GLOBAL VIEW FUNCTIONS
     ***************************************/
 
-    /// @notice Price in wei per 1e12 wei of coverage per block.
-    function price() external view returns (uint24);
     /// @notice The minimum policy period in blocks.
     function minPeriod() external view returns (uint40);
     /// @notice The maximum policy period in blocks.
     function maxPeriod() external view returns (uint40);
-    /**
-     * @notice The maximum sum of position values that can be covered by this product.
-     * @return maxCoverAmount The max cover amount.
-     */
-    function maxCoverAmount() external view returns (uint256 maxCoverAmount);
-    /**
-     * @notice The maximum cover amount for a single policy.
-     * @return maxCoverAmountPerUser The max cover amount per user.
-     */
-    function maxCoverPerUser() external view returns (uint256 maxCoverAmountPerUser);
-    /// @notice The max cover amount divisor for per user (maxCover / divisor = maxCoverPerUser).
-    function maxCoverPerUserDivisor() external view returns (uint32);
     /// @notice Covered platform.
     /// A platform contract which locates contracts that are covered by this product.
     /// (e.g., `UniswapProduct` will have `Factory` as `coveredPlatform` contract, because every `Pair` address can be located through `getPool()` function).
@@ -151,12 +137,6 @@ interface IProduct {
     ***************************************/
 
     /**
-     * @notice Sets the price for this product.
-     * @param price_ Price in wei per 1e12 wei of coverage per block.
-     */
-    function setPrice(uint24 price_) external;
-
-    /**
      * @notice Sets the minimum number of blocks a policy can be purchased for.
      * @param minPeriod_ The minimum number of blocks.
      */
@@ -167,12 +147,6 @@ interface IProduct {
      * @param maxPeriod_ The maximum number of blocks
      */
     function setMaxPeriod(uint40 maxPeriod_) external;
-
-    /**
-     * @notice Sets the max cover amount divisor per user (maxCover / divisor = maxCoverPerUser).
-     * @param maxCoverPerUserDivisor_ The new divisor.
-     */
-    function setMaxCoverPerUserDivisor(uint32 maxCoverPerUserDivisor_) external;
 
     /**
      * @notice Changes the covered platform.

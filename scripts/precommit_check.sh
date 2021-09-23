@@ -1,5 +1,6 @@
 # Performs a fresh install of all packages then
 # performs a fresh compile and test of all contracts.
+# I recommend running these commands individually in terminal
 
 # clean filesystem
 rm -rf artifacts
@@ -11,6 +12,9 @@ rm -rf node_modules
 rm -rf coverage
 rm coverage.json
 
+# verify your .env file. if it doesn't exist, copy from .env.example
+# you'll need to switch networks to run certain tests
+
 # install packages. process, compile, and test contracts
 npm install
 python3 scripts/process_contracts.py
@@ -18,7 +22,8 @@ npx hardhat compile
 npx hardhat test
 
 # code coverage
-# need to skip stack too deep contracts
+# need to skip stack too deep contracts caused by UniswapV3 NonfungiblePositionManager
+# the files referrenced below cannot be ran through coverage
 mv contracts/SolaceEthLpFarm.sol contracts/SolaceEthLpFarm.sol-ignore
 mv contracts/LpAppraisor.sol contracts/LpAppraisor.sol-ignore
 mv test/Master.test.ts test/Master.test.ts-ignore
@@ -30,10 +35,3 @@ mv contracts/LpAppraisor.sol-ignore contracts/LpAppraisor.sol
 mv test/Master.test.ts-ignore test/Master.test.ts
 mv test/SolaceEthLpFarm.test.ts-ignore test/SolaceEthLpFarm.test.ts
 mv test/LpAppraisor.test.ts-ignore test/LpAppraisor.test.ts
-
-# docs
-#npx solidity-docgen --solc-module solc-0.8 -o docs/_build/md
-
-# misc
-solhint contracts/**/*.sol
-npm outdated

@@ -40,7 +40,6 @@ if (process.env.FORK_NETWORK === "mainnet") {
     let vault: Vault;
     let registry: Registry;
     let riskManager: RiskManager;
- 
     const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
     const minPeriod = 6450; // this is about 1 day
     const maxPeriod = 45100; // this is about 1 week from https://ycharts.c om/indicators/ethereum_blocks_per_day
@@ -57,7 +56,6 @@ if (process.env.FORK_NETWORK === "mainnet") {
     const LQTY_TOKEN_ADDRESS = "0x6DEA81C8171D0bA574754EF6F8b412F2Ed88c54D";
     const LUSD_TOKEN_ADDRESS = "0x5f98805A4E8be255a32880FDeC7F6728C6568bA0";
     const REAL_USER =   "0x9Ada9Ae98457aD8a2D53DE2B888cd1337d3438E8";
-    
     before (async function() {
       artifacts = await import_artifacts();
       await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
@@ -84,9 +82,7 @@ if (process.env.FORK_NETWORK === "mainnet") {
           registry.address,
           TROVE_MANAGER_ADDRESS,
           minPeriod,
-          maxPeriod,
-          price,
-          1
+          maxPeriod
         ]
       )) as LiquityProduct;
       product2 = (await deployContract(
@@ -98,9 +94,7 @@ if (process.env.FORK_NETWORK === "mainnet") {
           registry.address,
           TROVE_MANAGER_ADDRESS,
           minPeriod,
-          maxPeriod,
-          price,
-          1
+          maxPeriod
         ]
       )) as LiquityProduct;
       product3 = (await deployContract(
@@ -112,14 +106,12 @@ if (process.env.FORK_NETWORK === "mainnet") {
           registry.address,
           TROVE_MANAGER_ADDRESS,
           minPeriod,
-          maxPeriod,
-          price,
-          1
+          maxPeriod
         ]
       )) as LiquityProduct;
 
       await vault.connect(deployer).depositEth({value:maxCoverAmount});
-      await riskManager.connect(governor).addProduct(product1.address, 1);
+      await riskManager.connect(governor).addProduct(product1.address, 1, 11044, 1);
       await product1.connect(governor).addSigner(paclasSigner.address);
     });
 
@@ -179,7 +171,6 @@ if (process.env.FORK_NETWORK === "mainnet") {
       before(async function () {
         expect(await policyManager.totalSupply()).to.equal(0);
         expect(await policyManager.balanceOf(policyholder1.address)).to.equal(0);
-       
         await policyManager.connect(governor).addProduct(product1.address);
         await policyManager.connect(governor).addProduct(product2.address);
         await policyManager.connect(governor).addProduct(product3.address);
@@ -195,25 +186,25 @@ if (process.env.FORK_NETWORK === "mainnet") {
       });
 
       it("cannot buy policy with invalid description", async function () {
-        await expect(product1.buyPolicy(policyholder1.address, "0x1234567890123456789012345678901234567890", coverAmount, blocks, { value: expectedPremium })).to.be.reverted;
+        await expect(product1.buyPolicy(policyholder1.address, coverAmount, blocks, "0x1234567890123456789012345678901234567890", { value: expectedPremium })).to.be.reverted;
       });
 
       it("can buyPolicy", async function () {
-        let tx = await product1.buyPolicy(policyholder1.address, TROVE_MANAGER_ADDRESS, coverAmount, blocks, { value: expectedPremium });
+        let tx = await product1.buyPolicy(policyholder1.address, coverAmount, blocks, TROVE_MANAGER_ADDRESS, { value: expectedPremium });
         expect(tx).to.emit(product1, "PolicyCreated").withArgs(1);
         expect(await policyManager.totalSupply()).to.equal(1);
         expect(await policyManager.balanceOf(policyholder1.address)).to.equal(1);
       });
 
       it("can buy duplicate policy", async function () {
-        let tx = await product1.buyPolicy(policyholder1.address, TROVE_MANAGER_ADDRESS, coverAmount, blocks, { value: expectedPremium });
+        let tx = await product1.buyPolicy(policyholder1.address, coverAmount, blocks, TROVE_MANAGER_ADDRESS, { value: expectedPremium });
         expect(tx).to.emit(product1, "PolicyCreated").withArgs(2);
         expect(await policyManager.totalSupply()).to.equal(2);
         expect(await policyManager.balanceOf(policyholder1.address)).to.equal(2);
       });
 
       it("can buy policy that covers multiple positions", async function () {
-        let tx = await product1.buyPolicy(policyholder1.address, encodeAddresses([LQTY_STAKING_ADDRESS, STABILITY_POOL_ADDRESS]), coverAmount, blocks, { value: expectedPremium });
+        let tx = await product1.buyPolicy(policyholder1.address, coverAmount, blocks, encodeAddresses([LQTY_STAKING_ADDRESS, STABILITY_POOL_ADDRESS]), { value: expectedPremium });
         expect(tx).to.emit(product1, "PolicyCreated").withArgs(3);
         expect(await policyManager.totalSupply()).to.equal(3);
         expect(await policyManager.balanceOf(policyholder1.address)).to.equal(3);
@@ -306,13 +297,11 @@ if (process.env.FORK_NETWORK === "mainnet") {
         // sign swap
         let digest = getSubmitClaimDigest(DOMAIN_NAME, product1.address, chainId, policyID1, policyholder1.address, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
-       
         // submit claim
         let tx1 = await product1.connect(policyholder1).submitClaim(policyID1, amountOut1, deadline, signature);
         expect(tx1).to.emit(product1, "ClaimSubmitted").withArgs(policyID1);
         expect(tx1).to.emit(claimsEscrow, "ClaimReceived").withArgs(policyID1, policyholder1.address, amountOut1);
         expect(await policyManager.exists(policyID1)).to.be.false;
-     
         // verify payout
         expect((await claimsEscrow.claim(policyID1)).amount).to.equal(amountOut1);
         await provider.send("evm_increaseTime", [cooldownPeriod]); // add one hour

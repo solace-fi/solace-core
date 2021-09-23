@@ -111,7 +111,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
             uint256 balance = address(this).balance;
             _totalClaimsOutstanding -= balance;
             _claims[claimID].amount -= balance;
-            payable(msg.sender).transfer(balance);
+            Address.sendValue(payable(msg.sender), balance);
             emit ClaimWithdrawn(claimID, msg.sender, balance);
         }
         // if enough eth, full withdraw and delete claim
@@ -119,7 +119,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
             _totalClaimsOutstanding -= amount;
             delete _claims[claimID];
             _burn(claimID);
-            payable(msg.sender).transfer(amount);
+            Address.sendValue(payable(msg.sender), amount);
             emit ClaimWithdrawn(claimID, msg.sender, amount);
         }
     }
@@ -226,7 +226,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
      * @param amount Amount to pull.
      */
     function returnEth(uint256 amount) external override onlyGovernance nonReentrant {
-        payable(_registry.vault()).transfer(amount);
+        Address.sendValue(payable(_registry.vault()), amount);
     }
 
     /**

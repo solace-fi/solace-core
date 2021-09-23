@@ -41,10 +41,6 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
     /// A platform contract which locates contracts that are covered by this product.
     /// (e.g., UniswapProduct will have Factory as coveredPlatform contract, because every Pair address can be located through getPool() function).
     address internal _coveredPlatform;
-    /// @notice Price in wei per 1e12 wei of coverage per block.
-    uint24 internal _price;
-    /// @notice The max cover amount divisor for per user (maxCover / divisor = maxCoverPerUser).
-    uint32 internal _maxCoverPerUserDivisor;
     /// @notice Cannot buy new policies while paused. (Default is False)
     bool internal _paused;
 
@@ -86,8 +82,6 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
      * @param coveredPlatform_ A platform contract which locates contracts that are covered by this product.
      * @param minPeriod_ The minimum policy period in blocks to purchase a **policy**.
      * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
-     * @param price_ The cover price for the **Product**.
-     * @param maxCoverPerUserDivisor_ The max cover amount divisor for per user. (maxCover / divisor = maxCoverPerUser).
      * @param domain_ The user readable name of the EIP712 signing domain.
      * @param version_ The current major version of the signing domain.
      */
@@ -98,8 +92,6 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         address coveredPlatform_,
         uint40 minPeriod_,
         uint40 maxPeriod_,
-        uint24 price_,
-        uint32 maxCoverPerUserDivisor_,
         string memory domain_,
         string memory version_
     ) EIP712(domain_, version_) Governable(governance_) {
@@ -108,8 +100,6 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         _coveredPlatform = coveredPlatform_;
         _minPeriod = minPeriod_;
         _maxPeriod = maxPeriod_;
-        _price = price_;
-        _maxCoverPerUserDivisor = maxCoverPerUserDivisor_;
     }
 
     /***************************************
@@ -120,42 +110,32 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
      * @notice Purchases and mints a policy on the behalf of the policyholder.
      * User will need to pay **ETH**.
      * @param policyholder Holder of the position(s) to cover.
-     * @param positionDescription A byte encoded description of the position(s) to cover.
      * @param coverAmount The value to cover in **ETH**.
      * @param blocks The length (in blocks) for policy.
+     * @param positionDescription A byte encoded description of the position(s) to cover.
      * @return policyID The ID of newly created policy.
      */
-    function buyPolicy(address policyholder, bytes memory positionDescription, uint256 coverAmount, uint40 blocks) external payable override nonReentrant whileUnpaused returns (uint256 policyID) {
+    function buyPolicy(address policyholder, uint256 coverAmount, uint40 blocks, bytes memory positionDescription) external payable override nonReentrant whileUnpaused returns (uint256 policyID) {
         require(coverAmount > 0, "zero cover value");
         require(isValidPositionDescription(positionDescription), "invalid position description");
         // check that the product can provide coverage for this policy
-        {
-        uint256 maxCover = maxCoverAmount();
-        uint256 maxUserCover = maxCover / _maxCoverPerUserDivisor;
-        require(_activeCoverAmount + coverAmount <= maxCover, "max covered amount is reached");
-        require(coverAmount <= maxUserCover, "over max cover single user");
-        }
+        (bool acceptable, uint24 price) = IRiskManager(_registry.riskManager()).assessRisk(address(this), 0, coverAmount);
+        require(acceptable, "cannot accept that risk");
         // check that the buyer has paid the correct premium
-        uint256 premium = coverAmount * blocks * _price / 1e12;
+        uint256 premium = coverAmount * blocks * price / 1e12;
         require(msg.value >= premium && premium != 0, "insufficient payment");
-
         // check that the buyer provided valid period
         require(blocks >= _minPeriod && blocks <= _maxPeriod, "invalid period");
-
         // create the policy
         uint40 expirationBlock = uint40(block.number + blocks);
-        policyID = _policyManager.createPolicy(policyholder, coverAmount, expirationBlock, _price, positionDescription);
-
+        policyID = _policyManager.createPolicy(policyholder, coverAmount, expirationBlock, price, positionDescription);
         // update local book-keeping variables
         _activeCoverAmount += coverAmount;
-
         // return excess payment
-        if(msg.value > premium) payable(msg.sender).transfer(msg.value - premium);
+        if(msg.value > premium) Address.sendValue(payable(msg.sender), msg.value - premium);
         // transfer premium to the treasury
         ITreasury(payable(_registry.treasury())).routePremiums{value: premium}();
-
         emit PolicyCreated(policyID);
-
         return policyID;
     }
 
@@ -175,35 +155,28 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         require(product == address(this), "wrong product");
         // check for policy expiration
         require(expirationBlock >= block.number, "policy is expired");
-
         // check that the product can provide coverage for this policy
-        {
-        uint256 maxCover = maxCoverAmount();
-        uint256 maxUserCover = maxCover / _maxCoverPerUserDivisor;
-        require(_activeCoverAmount + coverAmount - previousCoverAmount <= maxCover, "max covered amount is reached");
-        require(coverAmount <= maxUserCover, "over max cover single user");
-        }
+        (bool acceptable, uint24 price) = IRiskManager(_registry.riskManager()).assessRisk(address(this), previousCoverAmount, coverAmount);
+        require(acceptable, "cannot accept that risk");
         // calculate premium needed for new cover amount as if policy is bought now
         uint256 remainingBlocks = expirationBlock - block.number;
-        uint256 newPremium = coverAmount * remainingBlocks * _price / 1e12;
-
+        uint256 newPremium = coverAmount * remainingBlocks * price / 1e12;
         // calculate premium already paid based on current policy
         uint256 paidPremium = previousCoverAmount * remainingBlocks * purchasePrice / 1e12;
-
         if (newPremium >= paidPremium) {
             uint256 premium = newPremium - paidPremium;
             // check that the buyer has paid the correct premium
             require(msg.value >= premium, "insufficient payment");
-            if(msg.value > premium) payable(msg.sender).transfer(msg.value - premium);
+            if(msg.value > premium) Address.sendValue(payable(msg.sender), msg.value - premium);
             // transfer premium to the treasury
             ITreasury(payable(_registry.treasury())).routePremiums{value: premium}();
         } else {
-            if(msg.value > 0) payable(msg.sender).transfer(msg.value);
+            if(msg.value > 0) Address.sendValue(payable(msg.sender), msg.value);
             uint256 refundAmount = paidPremium - newPremium;
             ITreasury(payable(_registry.treasury())).refund(msg.sender, refundAmount);
         }
         // update policy's URI and emit event
-        _policyManager.setPolicyInfo(policyID, coverAmount, expirationBlock, _price, positionDescription);
+        _policyManager.setPolicyInfo(policyID, coverAmount, expirationBlock, price, positionDescription);
         emit PolicyUpdated(policyID);
     }
 
@@ -225,7 +198,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         uint256 premium = coverAmount * extension * purchasePrice / 1e12;
         // check that the buyer has paid the correct premium
         require(msg.value >= premium, "insufficient payment");
-        if(msg.value > premium) payable(msg.sender).transfer(msg.value - premium);
+        if(msg.value > premium) Address.sendValue(payable(msg.sender), msg.value - premium);
         // transfer premium to the treasury
         ITreasury(payable(_registry.treasury())).routePremiums{value: premium}();
         // check that the buyer provided valid period
@@ -251,37 +224,27 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         require(policyholder == msg.sender,"!policyholder");
         require(product == address(this), "wrong product");
         require(previousExpirationBlock >= block.number, "policy is expired");
-
-        // check that the product can still provide coverage
-        {
-        uint256 maxCover = maxCoverAmount();
-        uint256 maxUserCover = maxCover / _maxCoverPerUserDivisor;
-        require(_activeCoverAmount + coverAmount - previousCoverAmount <= maxCover, "max covered amount is reached");
-        require(coverAmount <= maxUserCover, "over max cover single user");
-        }
+        // check that the product can provide coverage for this policy
+        (bool acceptable, uint24 price) = IRiskManager(_registry.riskManager()).assessRisk(address(this), previousCoverAmount, coverAmount);
+        require(acceptable, "cannot accept that risk");
         // add new block extension
         uint40 newExpirationBlock = previousExpirationBlock + extension;
-
         // check if duration is valid
         uint40 duration = newExpirationBlock - uint40(block.number);
         require(duration >= _minPeriod && duration <= _maxPeriod, "invalid period");
-
         // update policy info
-        _policyManager.setPolicyInfo(policyID, coverAmount, newExpirationBlock, _price, positionDescription);
-
+        _policyManager.setPolicyInfo(policyID, coverAmount, newExpirationBlock, price, positionDescription);
         // calculate premium needed for new cover amount as if policy is bought now
-        uint256 newPremium = coverAmount * duration * _price / 1e12;
-
+        uint256 newPremium = coverAmount * duration * price / 1e12;
         // calculate premium already paid based on current policy
         uint256 paidPremium = previousCoverAmount * (previousExpirationBlock - uint40(block.number)) * purchasePrice / 1e12;
-
         if (newPremium >= paidPremium) {
             uint256 premium = newPremium - paidPremium;
             require(msg.value >= premium, "insufficient payment");
-            if(msg.value > premium) payable(msg.sender).transfer(msg.value - premium);
+            if(msg.value > premium) Address.sendValue(payable(msg.sender), msg.value - premium);
             ITreasury(payable(_registry.treasury())).routePremiums{value: premium}();
         } else {
-            if(msg.value > 0) payable(msg.sender).transfer(msg.value);
+            if(msg.value > 0) Address.sendValue(payable(msg.sender), msg.value);
             uint256 refund = paidPremium - newPremium;
             ITreasury(payable(_registry.treasury())).refund(msg.sender, refund);
         }
@@ -356,17 +319,13 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
      * @return premium The quote for their policy in **ETH**.
      */
     function getQuote(uint256 coverAmount, uint40 blocks) external view override returns (uint256 premium) {
-        return coverAmount * blocks * _price / 1e12;
+        (, uint24 price, ) = IRiskManager(_registry.riskManager()).productRiskParams(address(this));
+        return coverAmount * blocks * price / 1e12;
     }
 
     /***************************************
     GLOBAL VIEW FUNCTIONS
     ***************************************/
-
-    /// @notice Price in wei per 1e12 wei of coverage per block.
-    function price() external view override returns (uint24) {
-        return _price;
-    }
 
     /// @notice The minimum policy period in blocks.
     function minPeriod() external view override returns (uint40) {
@@ -378,26 +337,6 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         return _maxPeriod;
     }
 
-    /**
-     * @notice The maximum sum of position values that can be covered by this product.
-     * @return maxCover The max cover amount.
-     */
-    function maxCoverAmount() public view override returns (uint256 maxCover) {
-        return IRiskManager(_registry.riskManager()).maxCoverAmount(address(this));
-    }
-
-    /**
-     * @notice The maximum cover amount for a single policy.
-     * @return maxCover The max cover amount per user.
-     */
-    function maxCoverPerUser() external view override returns (uint256 maxCover) {
-        return maxCoverAmount() / _maxCoverPerUserDivisor;
-    }
-
-    /// @notice The max cover amount divisor for per user (maxCover / divisor = maxCoverPerUser).
-    function maxCoverPerUserDivisor() external view override returns (uint32) {
-        return _maxCoverPerUserDivisor;
-    }
     /// @notice Covered platform.
     /// A platform contract which locates contracts that are covered by this product.
     /// (e.g., `UniswapProduct` will have `Factory` as `coveredPlatform` contract, because every `Pair` address can be located through `getPool()` function).
@@ -465,14 +404,6 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
     ***************************************/
 
     /**
-     * @notice Sets the price for this product.
-     * @param price_ Price in wei per 1e12 wei of coverage per block.
-     */
-    function setPrice(uint24 price_) external override onlyGovernance {
-        _price = price_;
-    }
-
-    /**
      * @notice Sets the minimum number of blocks a policy can be purchased for.
      * @param minPeriod_ The minimum number of blocks.
      */
@@ -486,14 +417,6 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
      */
     function setMaxPeriod(uint40 maxPeriod_) external override onlyGovernance {
         _maxPeriod = maxPeriod_;
-    }
-
-    /**
-     * @notice Sets the max cover amount divisor per user (maxCover / divisor = maxCoverPerUser).
-     * @param maxCoverPerUserDivisor_ The new divisor.
-     */
-    function setMaxCoverPerUserDivisor(uint32 maxCoverPerUserDivisor_) external override onlyGovernance {
-        _maxCoverPerUserDivisor = maxCoverPerUserDivisor_;
     }
 
     /**

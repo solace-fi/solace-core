@@ -122,7 +122,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
             _weth.withdraw(value - address(this).balance);
         }
         // transfer eth
-        payable(msg.sender).transfer(value);
+        Address.sendValue(payable(msg.sender), value);
         emit WithdrawalMade(msg.sender, value);
         return value;
     }
@@ -257,7 +257,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
         }
         // transfer funds
         uint256 transferAmount = min(amount, address(this).balance);
-        payable(msg.sender).transfer(transferAmount);
+        Address.sendValue(payable(msg.sender), transferAmount);
         emit FundsSent(transferAmount);
         return transferAmount;
     }

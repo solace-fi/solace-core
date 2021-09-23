@@ -25,8 +25,6 @@ contract CurveProduct is BaseProduct {
       * @param addressProvider_ The Curve Address Provider.
       * @param minPeriod_ The minimum policy period in blocks to purchase a **policy**.
       * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
-      * @param price_ The cover price for the **Product**.
-      * @param maxCoverPerUserDivisor_ The max cover amount divisor for per user. (maxCover / divisor = maxCoverPerUser).
      */
     constructor (
         address governance_,
@@ -34,9 +32,7 @@ contract CurveProduct is BaseProduct {
         IRegistry registry_,
         address addressProvider_,
         uint40 minPeriod_,
-        uint40 maxPeriod_,
-        uint24 price_,
-        uint32 maxCoverPerUserDivisor_
+        uint40 maxPeriod_
     ) BaseProduct(
         governance_,
         policyManager_,
@@ -44,8 +40,6 @@ contract CurveProduct is BaseProduct {
         addressProvider_,
         minPeriod_,
         maxPeriod_,
-        price_,
-        maxCoverPerUserDivisor_,
         "Solace.fi-CurveProduct",
         "1"
     ) {

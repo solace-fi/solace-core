@@ -94,9 +94,7 @@ if(process.env.FORK_NETWORK === "rinkeby"){
           registry.address,
           WAREGISTRY_ADDRESS,
           minPeriod,
-          maxPeriod,
-          price,
-          1
+          maxPeriod
         ]
       )) as WaaveProduct;
 
@@ -109,9 +107,7 @@ if(process.env.FORK_NETWORK === "rinkeby"){
           registry.address,
           WAREGISTRY_ADDRESS,
           minPeriod,
-          maxPeriod,
-          price,
-          1
+          maxPeriod
         ]
       )) as WaaveProduct;
 
@@ -119,7 +115,7 @@ if(process.env.FORK_NETWORK === "rinkeby"){
       waWeth = await ethers.getContractAt(artifacts.IWaToken.abi, WAWETH_ADDRESS);
 
       await vault.connect(deployer).depositEth({value: BN.from("1000000000000000000000")}); // 1000 eth
-      await riskManager.connect(governor).addProduct(product.address, 1);
+      await riskManager.connect(governor).addProduct(product.address, 1, 11044, 1);
       await product.connect(governor).addSigner(paclasSigner.address);
     });
 
@@ -181,22 +177,22 @@ if(process.env.FORK_NETWORK === "rinkeby"){
         expect(quote).to.equal(expectedPremium);
       });
       it("cannot buy policy with invalid description", async function () {
-        await expect(product.buyPolicy(REAL_USER1, "0x1234567890123456789012345678901234567890", coverAmount, blocks, { value: expectedPremium })).to.be.reverted;
+        await expect(product.buyPolicy(REAL_USER1, coverAmount, blocks, "0x1234567890123456789012345678901234567890", { value: expectedPremium })).to.be.reverted;
       });
       it("can buyPolicy", async function () {
-        let tx = await product.buyPolicy(REAL_USER1, WAWETH_ADDRESS, coverAmount, blocks, { value: expectedPremium });
+        let tx = await product.buyPolicy(REAL_USER1, coverAmount, blocks, WAWETH_ADDRESS, { value: expectedPremium });
         expect(tx).to.emit(policyManager, "PolicyCreated").withArgs(1);
         expect(await policyManager.totalSupply()).to.equal(1);
         expect(await policyManager.balanceOf(REAL_USER1)).to.equal(1);
       });
       it("can buy duplicate policy", async function () {
-        let tx = await product.buyPolicy(REAL_USER1, WAWETH_ADDRESS, coverAmount, blocks, { value: expectedPremium });
+        let tx = await product.buyPolicy(REAL_USER1, coverAmount, blocks, WAWETH_ADDRESS, { value: expectedPremium });
         expect(tx).to.emit(product, "PolicyCreated").withArgs(2);
         expect(await policyManager.totalSupply()).to.equal(2);
         expect(await policyManager.balanceOf(REAL_USER1)).to.equal(2);
       });
       it("can buy policy that covers multiple positions", async function () {
-        let tx = await product.buyPolicy(REAL_USER1, encodeAddresses([watokens[0].address, watokens[1].address]), coverAmount, blocks, { value: expectedPremium });
+        let tx = await product.buyPolicy(REAL_USER1, coverAmount, blocks, encodeAddresses([watokens[0].address, watokens[1].address]), { value: expectedPremium });
         expect(tx).to.emit(product, "PolicyCreated").withArgs(3);
         expect(await policyManager.totalSupply()).to.equal(3);
         expect(await policyManager.balanceOf(REAL_USER1)).to.equal(3);
@@ -220,13 +216,13 @@ if(process.env.FORK_NETWORK === "rinkeby"){
         await weth.connect(policyholder1).deposit({value: depositAmount1});
         await weth.connect(policyholder1).approve(waWeth.address, depositAmount1);
         await waWeth.connect(policyholder1).deposit(depositAmount1);
-        await product.connect(policyholder1).buyPolicy(policyholder1.address, WAWETH_ADDRESS, coverAmount, blocks, { value: expectedPremium });
+        await product.connect(policyholder1).buyPolicy(policyholder1.address, coverAmount, blocks, WAWETH_ADDRESS, { value: expectedPremium });
         // create another waWETH position and policy
         let depositAmount2 = BN.from("2000000000000000");
         await weth.connect(policyholder2).deposit({value: depositAmount2});
         await weth.connect(policyholder2).approve(waWeth.address, depositAmount2);
         await waWeth.connect(policyholder2).deposit(depositAmount2);
-        await product.connect(policyholder2).buyPolicy(policyholder2.address, WAWETH_ADDRESS, coverAmount, blocks, { value: expectedPremium });
+        await product.connect(policyholder2).buyPolicy(policyholder2.address, coverAmount, blocks, WAWETH_ADDRESS, { value: expectedPremium });
       });
       it("cannot submit claim with expired signature", async function () {
         let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, amountOut1, 0, SUBMIT_CLAIM_TYPEHASH);
@@ -367,7 +363,7 @@ if(process.env.FORK_NETWORK === "rinkeby"){
             const cAmount = await watoken.balanceOf(policyholder3.address);
             expect(cAmount).to.be.gt(0);
             // create policy
-            await product.connect(policyholder3).buyPolicy(policyholder3.address, watokenAddress, coverAmount, blocks, { value: expectedPremium });
+            await product.connect(policyholder3).buyPolicy(policyholder3.address, coverAmount, blocks, watokenAddress, { value: expectedPremium });
             let policyID = (await policyManager.totalPolicyCount()).toNumber();
             // sign swap
             let amountOut = 10000;
