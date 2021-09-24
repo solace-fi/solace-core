@@ -20,7 +20,7 @@ const CLAIMS_ESCROW_ADDRESS     = "0x501AcE79a4b961cf86C5cCA36B7157Faf78A248D";
 const TREASURY_ADDRESS          = "0x501acE64D1B4dddAD50a579d28e8F9805651307D";
 const POLICY_MANAGER_ADDRESS    = "0x501ACeDE6cb432a1AA5590C04b88a6E92C00F381";
 const POLICY_DESCR_ADDRESS      = "0x501ACEA6EA69f4a4B68c8496243D3614256AC242";
-const RISK_MANAGER_ADDRESS      = "0x501aCeB96cEE3525c6439F045Ee630483fCC4Ea8";
+const RISK_MANAGER_ADDRESS      = "0x501aCE0596b8Fdb2Eb7b2CF4644c7bb4485Ec971";
 
 const AAVE_PRODUCT_ADDRESS      = "0x501aCe84EAA5F36F6E381CC6F1d9360D2568518E";
 const WAAVE_PRODUCT_ADDRESS     = "0x501aceb1e9Bc5716D34ad7Eb6c882038950f7119";
@@ -273,9 +273,9 @@ async function deployWaaveProduct() {
 }
 
 async function logAddresses() {
-  console.log("")
-  logContractAddress("Contract Name", "Address")
-  console.log("-------------------------------------------------------------");
+  console.log("");
+  console.log("| Contract Name    | Address                                      |");
+  console.log("|------------------|----------------------------------------------|");
   logContractAddress("Registry", registry.address);
   logContractAddress("WETH", weth.address);
   logContractAddress("Vault", vault.address);

@@ -30,7 +30,7 @@ const WETH_ADDRESS              = "0xc778417E063141139Fce010982780140Aa0cD5Ab";
 const COMPTROLLER_ADDRESS       = "0x2EAa9D77AE4D8f9cdD9FAAcd44016E746485bddb";
 const UNISWAP_ROUTER_ADDRESS    = "0xE592427A0AEce92De3Edee1F18E0157C05861564";
 const WAAVE_REGISTRY_ADDRESS    = "0x670Fc618C48964F806Cd655600541807ed83a9C5";
-const TROVE_MANAGER_ADDRESS     = "0xA39739EF8b0231DbFA0DcdA07d7e29faAbCf4bb2";
+const TROVE_MANAGER_ADDRESS     = "0x04d630Bff6dea193Fd644dEcfC460db249854a02";
 const SINGLETON_FACTORY_ADDRESS = "0xce0042B868300000d44A59004Da54A005ffdcf9f";
 
 // product params
@@ -301,9 +301,9 @@ async function deployLiquityProduct() {
 }
 
 async function logAddresses() {
-  console.log("")
-  logContractAddress("Contract Name", "Address")
-  console.log("-------------------------------------------------------------");
+  console.log("");
+  console.log("| Contract Name    | Address                                      |");
+  console.log("|------------------|----------------------------------------------|");
   logContractAddress("Registry", registry.address);
   logContractAddress("WETH", weth.address);
   logContractAddress("Vault", vault.address);

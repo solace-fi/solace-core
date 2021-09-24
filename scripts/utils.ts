@@ -12,7 +12,7 @@ export function expandStr(str: String, len: number) {
 }
 
 export function logContractAddress(contractName: String, address: String) {
-  console.log(`${expandStr(contractName,16)} | ${address}`)
+  console.log(`| ${expandStr(contractName,16)} | \`${expandStr(address,42)}\` |`)
 }
 
 // uniswap requires tokens to be in order
