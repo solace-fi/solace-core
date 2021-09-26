@@ -7,7 +7,6 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./Governable.sol";
 import "./interface/IVault.sol";
 import "./interface/ICpFarm.sol";
-import "./interface/UniswapV3/ISwapRouter.sol";
 
 /**
  * @title CpFarm
@@ -18,7 +17,7 @@ import "./interface/UniswapV3/ISwapRouter.sol";
  *
  * Users can become [**Capital Providers**](/docs/user-guides/capital-provider/cp-role-guide) by depositing **ETH** into the [`Vault`](./Vault), receiving [**SCP**](./Vault) in the process. [**Capital Providers**](/docs/user-guides/capital-provider/cp-role-guide) can then deposit their [**SCP**](./Vault) via [`depositCp()`](#depositcp) or [`depositCpSigned()`](#depositcpsigned). Alternatively users can bypass the [`Vault`](./Vault) and stake their **ETH** via [`depositEth()`](#depositeth).
  *
- * Users can withdraw their rewards via [`withdrawRewards()`](#withdrawrewards) and compound their rewards via [`compoundRewards()`](#compoundrewards).
+ * Users can withdraw their rewards via [`withdrawRewards()`](#withdrawrewards).
  *
  * Users can withdraw their [**SCP**](./Vault) via [`withdrawCp()`](#withdrawcp).
  *
@@ -26,28 +25,25 @@ import "./interface/UniswapV3/ISwapRouter.sol";
  */
 contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
     using SafeERC20 for IERC20;
-    using SafeERC20 for SOLACE;
 
     /// @notice A unique enumerator that identifies the farm type.
-    uint256 public constant override farmType = 1;
+    uint256 internal constant _farmType = 1;
     /// @notice Vault contract.
-    IVault public override vault;
-    /// @notice Native SOLACE Token.
-    SOLACE public override solace;
-    /// @notice Master contract.
-    address public override master;
+    IVault internal _vault;
+    /// @notice FarmController contract.
+    IFarmController internal _controller;
     /// @notice Amount of SOLACE distributed per block.
-    uint256 public override blockReward;
+    uint256 internal _blockReward;
     /// @notice When the farm will start.
-    uint256 public override startBlock;
+    uint256 internal _startBlock;
     /// @notice When the farm will end.
-    uint256 public override endBlock;
+    uint256 internal _endBlock;
     /// @notice Last time rewards were distributed or farm was updated.
-    uint256 public override lastRewardBlock;
+    uint256 internal _lastRewardBlock;
     /// @notice Accumulated rewards per share, times 1e12.
-    uint256 public override accRewardPerShare;
+    uint256 internal _accRewardPerShare;
     /// @notice Value of tokens staked by all farmers.
-    uint256 public override valueStaked;
+    uint256 internal _valueStaked;
 
     // Info of each user.
     struct UserInfo {
@@ -72,87 +68,119 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
     /// @dev user address => user info
     mapping(address => UserInfo) public userInfo;
 
-    /// @notice Address of Uniswap router.
-    ISwapRouter internal _swapRouter;
-
     // @notice WETH
     IERC20 public weth;
 
     /**
      * @notice Constructs the CpFarm.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
-     * @param master_ Address of the [`Master`](./Master) contract.
+     * @param controller_ Address of the [`FarmController`](./FarmController) contract.
      * @param vault_ Address of the [`Vault`](./Vault) contract.
-     * @param solace_ Address of the [**SOLACE**](./SOLACE) token contract.
      * @param startBlock_ When farming will begin.
      * @param endBlock_ When farming will end.
-     * @param swapRouter_ Address of [`Uniswap V3 SwapRouter`](https://docs.uniswap.org/protocol/reference/periphery/SwapRouter).
      * @param weth_ Address of **WETH**.
      */
     constructor(
         address governance_,
-        address master_,
+        address controller_,
         address vault_,
-        SOLACE solace_,
         uint256 startBlock_,
         uint256 endBlock_,
-        address swapRouter_,
         address weth_
     ) Governable(governance_) {
-        master = master_;
-        vault = IVault(payable(vault_));
-        solace = solace_;
-        startBlock = startBlock_;
-        endBlock = endBlock_;
-        lastRewardBlock = Math.max(block.number, startBlock_);
-        _swapRouter = ISwapRouter(swapRouter_);
+        _controller = IFarmController(controller_);
+        _vault = IVault(payable(vault_));
+        _startBlock = startBlock_;
+        _endBlock = endBlock_;
+        _lastRewardBlock = Math.max(block.number, startBlock_);
         weth = IERC20(weth_);
-        solace.approve(swapRouter_, type(uint256).max);
         weth.approve(vault_, type(uint256).max);
     }
 
-    /**
-     * Receive function. Deposits eth. User will receive accumulated rewards if any.
-     */
-    receive () external payable override {
-        if (msg.sender != address(vault)) _depositEth();
+    /***************************************
+    VIEW FUNCTIONS
+    ***************************************/
+
+    /// @notice A unique enumerator that identifies the farm type.
+    function farmType() external pure override returns (uint256) {
+        return _farmType;
+    }
+
+    /// @notice Vault contract.
+    function vault() external view override returns (address) {
+        return address(_vault);
+    }
+
+    /// @notice FarmController contract.
+    function farmController() external view override returns (address) {
+        return address(_controller);
+    }
+
+    /// @notice Amount of SOLACE distributed per block.
+    function blockReward() external view override returns (uint256) {
+        return _blockReward;
+    }
+
+    /// @notice When the farm will start.
+    function startBlock() external view override returns (uint256) {
+        return _startBlock;
+    }
+
+    /// @notice When the farm will end.
+    function endBlock() external view override returns (uint256) {
+        return _endBlock;
+    }
+
+    /// @notice Last time rewards were distributed or farm was updated.Block;
+    function lastRewardBlock() external view override returns (uint256) {
+        return _lastRewardBlock;
+    }
+
+    /// @notice Accumulated rewards per share, times 1e12.
+    function accRewardPerShare() external view override returns (uint256) {
+        return _accRewardPerShare;
+    }
+
+    /// @notice Value of tokens staked by all farmers.
+    function valueStaked() external view override returns (uint256) {
+        return _valueStaked;
     }
 
     /**
-     * Fallback function. Deposits eth. User will receive accumulated rewards if any.
+     * @notice Calculates the accumulated balance of [**SOLACE**](./SOLACE) for specified user.
+     * @param user The user for whom unclaimed tokens will be shown.
+     * @return reward Total amount of withdrawable reward tokens.
      */
-    fallback () external payable override {
-        if (msg.sender != address(vault)) _depositEth();
+    function pendingRewards(address user) external view override returns (uint256 reward) {
+        // get farmer information
+        UserInfo storage userInfo_ = userInfo[user];
+        // math
+        uint256 accRewardPerShare_ = _accRewardPerShare;
+        if (block.number > _lastRewardBlock && _valueStaked != 0) {
+            uint256 tokenReward = getMultiplier(_lastRewardBlock, block.number);
+            accRewardPerShare_ += tokenReward * 1e12 / _valueStaked;
+        }
+        return userInfo_.value * accRewardPerShare_ / 1e12 - userInfo_.rewardDebt + userInfo_.unpaidRewards;
     }
 
     /**
-     * @notice Sets the amount of [**SOLACE**](./SOLACE) to distribute per block.
-     * Only affects future rewards.
-     * Can only be called by [`Master`](./Master).
-     * @param blockReward_ Amount to distribute per block.
+     * @notice Calculates the reward multiplier over the given `from` until `to` block.
+     * @param from The start of the period to measure rewards for.
+     * @param to The end of the period to measure rewards for.
+     * @return multiplier The weighted multiplier for the given period.
      */
-    function setRewards(uint256 blockReward_) external override {
-        // can only be called by master contract
-        require(msg.sender == master, "!master");
-        // update
-        updateFarm();
-        // accounting
-        blockReward = blockReward_;
-        emit RewardsSet(blockReward_);
+    function getMultiplier(uint256 from, uint256 to) public view override returns (uint256 multiplier) {
+        // validate window
+        from = Math.max(from, _startBlock);
+        to = Math.min(to, _endBlock);
+        // no reward for negative window
+        if (from > to) return 0;
+        return (to - from) * _blockReward;
     }
 
-    /**
-     * @notice Sets the farm's end block. Used to extend the duration.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param endBlock_ The new end block.
-     */
-    function setEnd(uint256 endBlock_) external override onlyGovernance {
-        // accounting
-        endBlock = endBlock_;
-        // update
-        updateFarm();
-        emit FarmEndSet(endBlock_);
-    }
+    /***************************************
+    MUTATOR FUNCTIONS
+    ***************************************/
 
     /**
      * @notice Deposit some [**CP tokens**](./Vault).
@@ -162,7 +190,7 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
      */
     function depositCp(uint256 amount) external override {
         // pull tokens
-        IERC20(vault).safeTransferFrom(msg.sender, address(this), amount);
+        SafeERC20.safeTransferFrom(_vault, msg.sender, address(this), amount);
         // accounting
         _depositCp(msg.sender, amount);
     }
@@ -179,9 +207,9 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
      */
     function depositCpSigned(address depositor, uint256 amount, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external override {
         // permit
-        vault.permit(depositor, address(this), amount, deadline, v, r, s);
+        _vault.permit(depositor, address(this), amount, deadline, v, r, s);
         // pull tokens
-        IERC20(vault).safeTransferFrom(depositor, address(this), amount);
+        SafeERC20.safeTransferFrom(_vault, depositor, address(this), amount);
         // accounting
         _depositCp(depositor, amount);
     }
@@ -192,47 +220,6 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
      */
     function depositEth() external payable override {
         _depositEth();
-    }
-
-    /**
-     * @notice Your money already makes you money. Now make your money make more money!
-     * Withdraws your [**SOLACE**](./SOLACE) rewards, swaps it for **WETH**, then deposits that **WETH** onto the farm.
-     */
-    function compoundRewards() external override nonReentrant {
-        // update farm
-        updateFarm();
-        // get farmer information
-        UserInfo storage user = userInfo[msg.sender];
-        // calculate pending rewards
-        uint256 pending = user.value * accRewardPerShare / 1e12 - user.rewardDebt + user.unpaidRewards;
-        if (pending == 0) return;
-        // calculate safe swap amount
-        uint256 balance = solace.balanceOf(master);
-        uint256 solaceSwapAmount = Math.min(pending, balance);
-        user.unpaidRewards = pending - solaceSwapAmount;
-        // transfer solace from master
-        solace.safeTransferFrom(master, address(this), solaceSwapAmount);
-        // swap solace for weth
-        uint256 wethDepositAmount = _swapRouter.exactInputSingle(ISwapRouter.ExactInputSingleParams({
-            tokenIn: address(solace),
-            tokenOut: address(weth),
-            fee: 3000, // medium pool
-            recipient: address(this),
-            // solhint-disable-next-line not-rely-on-time
-            deadline: block.timestamp,
-            amountIn: solaceSwapAmount,
-            amountOutMinimum: 0,
-            sqrtPriceLimitX96: 0
-        }));
-        // exchange weth for cp
-        uint256 balanceBefore = vault.balanceOf(address(this));
-        vault.depositWeth(wethDepositAmount);
-        uint256 cpAmount = vault.balanceOf(address(this)) - balanceBefore;
-        // accounting
-        valueStaked += cpAmount;
-        user.value += cpAmount;
-        user.rewardDebt = user.value * accRewardPerShare / 1e12;
-        emit RewardsCompounded(msg.sender);
     }
 
     /**
@@ -247,11 +234,11 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
         // get farmer information
         UserInfo storage user = userInfo[msg.sender];
         // accounting
-        valueStaked -= amount;
+        _valueStaked -= amount;
         user.value -= amount; // also reverts overwithdraw
-        user.rewardDebt = user.value * accRewardPerShare / 1e12;
+        user.rewardDebt = user.value * _accRewardPerShare / 1e12;
         // return staked tokens
-        IERC20(vault).safeTransfer(msg.sender, amount);
+        SafeERC20.safeTransfer(_vault, msg.sender, amount);
         emit CpWithdrawn(msg.sender, amount);
     }
 
@@ -264,22 +251,7 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
         // get farmer information
         UserInfo storage user = userInfo[msg.sender];
         // accounting
-        user.rewardDebt = user.value * accRewardPerShare / 1e12;
-    }
-
-    /**
-     * @notice Withdraw a users rewards without unstaking their tokens.
-     * Can only be called by [`Master`](./Master) or the user.
-     * @param user User to withdraw rewards for.
-     */
-    function withdrawRewardsForUser(address user) external override nonReentrant {
-        require(msg.sender == master || msg.sender == user, "!master");
-        // harvest
-        _harvest(user);
-        // get farmer information
-        UserInfo storage userInfo_ = userInfo[user];
-        // accounting
-        userInfo_.rewardDebt = userInfo_.value * accRewardPerShare / 1e12;
+        user.rewardDebt = user.value * _accRewardPerShare / 1e12;
     }
 
     /**
@@ -287,47 +259,15 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
      */
     function updateFarm() public override {
         // dont update needlessly
-        if (block.number <= lastRewardBlock) return;
-        if (valueStaked == 0) {
-            lastRewardBlock = Math.min(block.number, endBlock);
+        if (block.number <= _lastRewardBlock) return;
+        if (_valueStaked == 0) {
+            _lastRewardBlock = Math.min(block.number, _endBlock);
             return;
         }
         // update math
-        uint256 tokenReward = getMultiplier(lastRewardBlock, block.number);
-        accRewardPerShare += tokenReward * 1e12 / valueStaked;
-        lastRewardBlock = Math.min(block.number, endBlock);
-    }
-
-    /**
-     * @notice Calculates the accumulated balance of [**SOLACE**](./SOLACE) for specified user.
-     * @param user The user for whom unclaimed tokens will be shown.
-     * @return reward Total amount of withdrawable reward tokens.
-     */
-    function pendingRewards(address user) external view override returns (uint256 reward) {
-        // get farmer information
-        UserInfo storage userInfo_ = userInfo[user];
-        // math
-        uint256 accRewardPerShare_ = accRewardPerShare;
-        if (block.number > lastRewardBlock && valueStaked != 0) {
-            uint256 tokenReward = getMultiplier(lastRewardBlock, block.number);
-            accRewardPerShare_ += tokenReward * 1e12 / valueStaked;
-        }
-        return userInfo_.value * accRewardPerShare_ / 1e12 - userInfo_.rewardDebt + userInfo_.unpaidRewards;
-    }
-
-    /**
-     * @notice Calculates the reward multiplier over the given `from` until `to` block.
-     * @param from The start of the period to measure rewards for.
-     * @param to The end of the period to measure rewards for.
-     * @return multiplier The weighted multiplier for the given period.
-     */
-    function getMultiplier(uint256 from, uint256 to) public view override returns (uint256 multiplier) {
-        // validate window
-        from = Math.max(from, startBlock);
-        to = Math.min(to, endBlock);
-        // no reward for negative window
-        if (from > to) return 0;
-        return (to - from) * blockReward;
+        uint256 tokenReward = getMultiplier(_lastRewardBlock, block.number);
+        _accRewardPerShare += tokenReward * 1e12 / _valueStaked;
+        _lastRewardBlock = Math.min(block.number, _endBlock);
     }
 
     /**
@@ -338,14 +278,14 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
         _harvest(msg.sender);
         // get farmer information
         UserInfo storage user = userInfo[msg.sender];
-        // exchange eth for cp
-        uint256 balanceBefore = vault.balanceOf(address(this));
-        vault.depositEth{value:msg.value}();
-        uint256 cpAmount = vault.balanceOf(address(this)) - balanceBefore;
+        // generate scp using eth
+        uint256 scpAmount = _vault.balanceOf(address(this));
+        _vault.depositEth{value:msg.value}();
+        scpAmount = _vault.balanceOf(address(this)) - scpAmount;
         // accounting
-        valueStaked += cpAmount;
-        user.value += cpAmount;
-        user.rewardDebt = user.value * accRewardPerShare / 1e12;
+        _valueStaked += scpAmount;
+        user.value += scpAmount;
+        user.rewardDebt = user.value * _accRewardPerShare / 1e12;
         emit EthDeposited(msg.sender, msg.value);
     }
 
@@ -361,9 +301,9 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
         // get farmer information
         UserInfo storage user = userInfo[depositor];
         // accounting
-        valueStaked += amount;
+        _valueStaked += amount;
         user.value += amount;
-        user.rewardDebt = user.value * accRewardPerShare / 1e12;
+        user.rewardDebt = user.value * _accRewardPerShare / 1e12;
         emit CpDeposited(depositor, amount);
     }
 
@@ -376,14 +316,99 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
         updateFarm();
         // get farmer information
         UserInfo storage userInfo_ = userInfo[user];
-        // transfer users pending rewards if nonzero
-        uint256 pending = userInfo_.value * accRewardPerShare / 1e12 - userInfo_.rewardDebt + userInfo_.unpaidRewards;
-        if (pending == 0) return;
-        // safe transfer rewards
-        uint256 balance = solace.balanceOf(master);
-        uint256 transferAmount = Math.min(pending, balance);
-        userInfo_.unpaidRewards = pending - transferAmount;
-        IERC20(solace).safeTransferFrom(master, user, transferAmount);
-        emit UserRewarded(user, transferAmount);
+        // accumulate unpaid rewards
+        userInfo_.unpaidRewards += userInfo_.value * _accRewardPerShare / 1e12 - userInfo_.rewardDebt;
+    }
+
+    /***************************************
+    OPTIONS MINING FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Converts the senders unpaid rewards into an Option.
+     * Will revert if the OptionsMiningController
+     * @return optionID The ID of the newly minted Option.
+     */
+    function mineOption() external returns (uint256 optionID) {
+        // update farm
+        updateFarm();
+        // get farmer information
+        UserInfo storage userInfo_ = userInfo[msg.sender];
+        // math
+        uint256 pending = userInfo_.value * _accRewardPerShare / 1e12 - userInfo_.rewardDebt + userInfo_.unpaidRewards;
+        require(pending > 0, "no nonzero options");
+        userInfo_.unpaidRewards = 0;
+        // create option
+        optionID = _controller.createOption(pending);
+        return optionID;
+    }
+
+    /**
+     * @notice Withdraw a users rewards without unstaking their tokens.
+     * Can only be called by [`FarmController`](./FarmController).
+     * @param user User to withdraw rewards for.
+     * @return rewardAmount The amount of rewards the user earned on this farm.
+     */
+    function withdrawRewardsForUser(address user) external override nonReentrant returns (uint256 rewardAmount) {
+        require(msg.sender == address(_controller), "!farmcontroller");
+        // update farm
+        updateFarm();
+        // get farmer information
+        UserInfo storage userInfo_ = userInfo[user];
+        // math
+        uint256 pending = userInfo_.value * _accRewardPerShare / 1e12 - userInfo_.rewardDebt + userInfo_.unpaidRewards;
+        userInfo_.unpaidRewards = 0;
+        return pending;
+    }
+
+    /***************************************
+    GOVERNANCE FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Sets the amount of [**SOLACE**](./SOLACE) to distribute per block.
+     * Only affects future rewards.
+     * Can only be called by [`FarmController`](./FarmController).
+     * @param blockReward_ Amount to distribute per block.
+     */
+    function setRewards(uint256 blockReward_) external override {
+        // can only be called by FarmController contract
+        require(msg.sender == address(_controller), "!farmcontroller");
+        // update
+        updateFarm();
+        // accounting
+        _blockReward = blockReward_;
+        emit RewardsSet(blockReward_);
+    }
+
+    /**
+     * @notice Sets the farm's end block. Used to extend the duration.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param endBlock_ The new end block.
+     */
+    function setEnd(uint256 endBlock_) external override onlyGovernance {
+        // accounting
+        _endBlock = endBlock_;
+        // update
+        updateFarm();
+        emit FarmEndSet(endBlock_);
+    }
+
+    /***************************************
+    FALLBACK FUNCTIONS
+    ***************************************/
+
+    /**
+     * Receive function. Deposits eth. User will receive accumulated rewards if any.
+     */
+    receive () external payable override {
+        if (msg.sender != address(_vault)) _depositEth();
+    }
+
+    /**
+     * Fallback function. Deposits eth. User will receive accumulated rewards if any.
+     */
+    fallback () external payable override {
+        if (msg.sender != address(_vault)) _depositEth();
     }
 }

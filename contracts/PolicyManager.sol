@@ -20,7 +20,7 @@ import "./interface/IPolicyDescriptor.sol";
  *
  * Policies are [**ERC721s**](https://docs.openzeppelin.com/contracts/4.x/api/token/erc721#ERC721).
  */
-contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
+contract PolicyManager is IPolicyManager, ERC721Enumerable, Governable {
     using Address for address;
     using EnumerableSet for EnumerableSet.AddressSet;
 
@@ -148,7 +148,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
     function listPolicies(address policyholder) external view override returns (uint256[] memory policyIDs) {
         uint256 tokenCount = balanceOf(policyholder);
         policyIDs = new uint256[](tokenCount);
-        for (uint256 index=0; index < tokenCount; index++) {
+        for(uint256 index=0; index < tokenCount; index++) {
             policyIDs[index] = tokenOfOwnerByIndex(policyholder, index);
         }
         return policyIDs;
@@ -314,7 +314,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
      */
     function updateActivePolicies(uint256[] calldata policyIDs) external override {
         uint256 activeCover = _activeCoverAmount;
-        for (uint256 i = 0; i < policyIDs.length; i++) {
+        for(uint256 i = 0; i < policyIDs.length; i++) {
             uint256 policyID = policyIDs[i];
             // dont burn active or nonexistent policies
             if (policyHasExpired(policyID)) {

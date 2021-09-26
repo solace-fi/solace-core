@@ -2,7 +2,6 @@
 pragma solidity 0.8.6;
 
 import "./IVault.sol";
-import "./../SOLACE.sol";
 import "./IFarm.sol";
 
 
@@ -15,7 +14,7 @@ import "./IFarm.sol";
  *
  * Users can become [**Capital Providers**](/docs/user-guides/capital-provider/cp-role-guide) by depositing **ETH** into the [`Vault`](../Vault), receiving [**SCP**](../Vault) in the process. [**Capital Providers**](/docs/user-guides/capital-provider/cp-role-guide) can then deposit their [**SCP**](../Vault) via [`depositCp()`](#depositcp) or [`depositCpSigned()`](#depositcpsigned). Alternatively users can bypass the [`Vault`](../Vault) and stake their **ETH** via [`depositEth()`](#depositeth).
  *
- * Users can withdraw their rewards via [`withdrawRewards()`](#withdrawrewards) and compound their rewards via [`compoundRewards()`](#compoundrewards).
+ * Users can withdraw their rewards via [`withdrawRewards()`](#withdrawrewards).
  *
  * Users can withdraw their [**SCP**](../Vault) via [`withdrawCp()`](#withdrawcp).
  *
@@ -23,30 +22,40 @@ import "./IFarm.sol";
  */
 interface ICpFarm is IFarm {
 
+    /***************************************
+    EVENTS
+    ***************************************/
+
     /// @notice Emitted when CP tokens are deposited onto the farm.
     event CpDeposited(address indexed user, uint256 amount);
     /// @notice Emitted when ETH is deposited onto the farm.
     event EthDeposited(address indexed user, uint256 amount);
-    /// @notice Emitted when a user compounds their rewards.
-    event RewardsCompounded(address indexed user);
     /// @notice Emitted when CP tokens are withdrawn from the farm.
     event CpWithdrawn(address indexed user, uint256 amount);
-    /// @notice Emitted when a user is rewarded.
-    event UserRewarded(address indexed user, uint256 amount);
     /// @notice Emitted when block reward is changed.
     event RewardsSet(uint256 blockReward);
     /// @notice Emitted when the end block is changed.
     event FarmEndSet(uint256 endBlock);
 
-    /**
-     * Receive function. Deposits eth. User will receive accumulated rewards if any.
-     */
-    receive () external payable;
+    /***************************************
+    VIEW FUNCTIONS
+    ***************************************/
 
-    /**
-     * Fallback function. Deposits eth. User will receive accumulated rewards if any.
-     */
-    fallback () external payable;
+    /// @notice Vault contract.
+    function vault() external view returns (address);
+
+    /// @notice Last time rewards were distributed or farm was updated.
+    function lastRewardBlock() external view returns (uint256);
+
+    /// @notice Accumulated rewards per share, times 1e12.
+    function accRewardPerShare() external view returns (uint256);
+
+    /// @notice Value of tokens staked by all farmers.
+    function valueStaked() external view returns (uint256);
+
+    /***************************************
+    MUTATOR FUNCTIONS
+    ***************************************/
 
     /**
      * @notice Deposit some [**CP tokens**](../Vault).
@@ -75,12 +84,6 @@ interface ICpFarm is IFarm {
     function depositEth() external payable;
 
     /**
-     * @notice Your money already makes you money. Now make your money make more money!
-     * Withdraws your [**SOLACE**](../SOLACE) rewards, swaps it for **WETH**, then deposits that **WETH** onto the farm.
-     */
-    function compoundRewards() external;
-
-    /**
      * @notice Withdraw some [**CP tokens**](../Vault).
      * User will receive amount of deposited tokens and accumulated rewards.
      * Can only withdraw as many tokens as you deposited.
@@ -88,15 +91,17 @@ interface ICpFarm is IFarm {
      */
     function withdrawCp(uint256 amount) external;
 
-    /// @notice Vault contract.
-    function vault() external view returns (IVault);
+    /***************************************
+    FALLBACK FUNCTIONS
+    ***************************************/
 
-    /// @notice Last time rewards were distributed or farm was updated.
-    function lastRewardBlock() external view returns (uint256);
+    /**
+     * Receive function. Deposits eth. User will receive accumulated rewards if any.
+     */
+    receive () external payable;
 
-    /// @notice Accumulated rewards per share, times 1e12.
-    function accRewardPerShare() external view returns (uint256);
-
-    /// @notice Value of tokens staked by all farmers.
-    function valueStaked() external view returns (uint256);
+    /**
+     * Fallback function. Deposits eth. User will receive accumulated rewards if any.
+     */
+    fallback () external payable;
 }

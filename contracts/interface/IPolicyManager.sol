@@ -2,7 +2,6 @@
 pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Enumerable.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
 
 /**
  * @title IPolicyManager
@@ -13,7 +12,7 @@ import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
  *
  * Policies are [**ERC721s**](https://docs.openzeppelin.com/contracts/4.x/api/token/erc721#ERC721).
  */
-interface IPolicyManager is IERC721Enumerable /*, IERC721Metadata*/ {
+interface IPolicyManager is IERC721Enumerable {
 
     /***************************************
     EVENTS

@@ -74,6 +74,7 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
      * Will be called by products with `msg.value = premium`.
      */
     function routePremiums() external payable override nonReentrant {
+        // preload variables
         uint256 div = _weightSum;
         uint256 length = _premiumRecipients.length;
         // transfer to all recipients
@@ -82,7 +83,8 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
             if (amount > 0) {
                 // this call may fail. let it
                 // funds will be safely stored in treasury
-                _premiumRecipients[i].call{value: amount}("");
+                // solhint-disable-next-line avoid-low-level-calls
+                _premiumRecipients[i].call{value: amount}(""); // IGNORE THIS WARNING
             }
         }
         // hold treasury share as eth

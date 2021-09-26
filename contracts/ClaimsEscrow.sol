@@ -25,7 +25,7 @@ import "./interface/IClaimsEscrow.sol";
  *
  * Claims are **ERC721**s and abbreviated as **SCT**.
  */
-contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Governable {
+contract ClaimsEscrow is IClaimsEscrow, ERC721Enumerable, ReentrancyGuard, Governable {
     using Address for address;
     using SafeERC20 for IERC20;
 
@@ -98,7 +98,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
      * @param claimID The ID of the claim to withdraw payout for.
      */
     function withdrawClaimsPayout(uint256 claimID) external override nonReentrant claimMustExist(claimID) {
-        require(msg.sender == ownerOf(claimID), "!claimant");
+        require(_isApprovedOrOwner(msg.sender, claimID), "!claimant");
         require(block.timestamp >= _claims[claimID].receivedAt + _cooldownPeriod, "cooldown period has not elapsed");
 
         uint256 amount = _claims[claimID].amount;
@@ -185,7 +185,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
     function listClaims(address claimant) external view override returns (uint256[] memory claimIDs) {
         uint256 tokenCount = balanceOf(claimant);
         claimIDs = new uint256[](tokenCount);
-        for (uint256 index = 0; index < tokenCount; index++) {
+        for(uint256 index = 0; index < tokenCount; index++) {
             claimIDs[index] = tokenOfOwnerByIndex(claimant, index);
         }
         return claimIDs;

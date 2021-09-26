@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
-import "../SOLACE.sol";
+import "./IFarmController.sol";
 
 
 /**
@@ -11,11 +11,12 @@ import "../SOLACE.sol";
  */
 interface IFarm {
 
-    /// @notice [`Master`](../Master) contract.
-    function master() external view returns (address);
+    /***************************************
+    VIEW FUNCTIONS
+    ***************************************/
 
-    /// @notice Native [**SOLACE**](../SOLACE) Token.
-    function solace() external view returns (SOLACE);
+    /// @notice [`IFarmController`](../FarmController) contract.
+    function farmController() external view returns (address);
 
     /// @notice A unique enumerator that identifies the farm type.
     function farmType() external view returns (uint256);
@@ -28,6 +29,47 @@ interface IFarm {
 
     /// @notice When the farm will end.
     function endBlock() external view returns (uint256);
+
+    /**
+     * @notice Calculates the accumulated balance of [**SOLACE**](../SOLACE) for specified user.
+     * @param user The user for whom unclaimed tokens will be shown.
+     * @return reward Total amount of withdrawable SOLACE.
+     */
+    function pendingRewards(address user) external view returns (uint256 reward);
+
+    /**
+     * @notice Calculates the reward multiplier over the given `from` until `to` block.
+     * @param from The start of the period to measure rewards for.
+     * @param to The end of the period to measure rewards for.
+     * @return multiplier The weighted multiplier for the given period.
+     */
+    function getMultiplier(uint256 from, uint256 to) external view returns (uint256 multiplier);
+
+    /***************************************
+    MUTATOR FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Withdraw your rewards without unstaking your tokens.
+     */
+    function withdrawRewards() external;
+
+    /**
+     * @notice Withdraw a users rewards without unstaking their tokens.
+     * Can only be called by [`FarmController`](./FarmController).
+     * @param user User to withdraw rewards for.
+     * @return rewardAmount The amount of rewards the user earned on this farm.
+     */
+    function withdrawRewardsForUser(address user) external returns (uint256 rewardAmount);
+
+    /**
+     * @notice Updates farm information to be up to date to the current block.
+     */
+    function updateFarm() external;
+
+    /***************************************
+    GOVERNANCE FUNCTIONS
+    ***************************************/
 
     /**
      * @notice Sets the amount of [**SOLACE**](../SOLACE) to distribute per block.
@@ -43,36 +85,4 @@ interface IFarm {
      * @param endBlock_ The new end block.
      */
     function setEnd(uint256 endBlock_) external;
-
-    /**
-     * @notice Withdraw your rewards without unstaking your tokens.
-     */
-    function withdrawRewards() external;
-
-    /**
-     * @notice Withdraw a users rewards without unstaking their tokens.
-     * Can only be called by ['Master`](../Master) or the user.
-     * @param user User to withdraw rewards for.
-     */
-    function withdrawRewardsForUser(address user) external;
-
-    /**
-     * @notice Calculates the accumulated balance of [**SOLACE**](../SOLACE) for specified user.
-     * @param user The user for whom unclaimed tokens will be shown.
-     * @return reward Total amount of withdrawable SOLACE.
-     */
-    function pendingRewards(address user) external view returns (uint256 reward);
-
-    /**
-     * @notice Updates farm information to be up to date to the current block.
-     */
-    function updateFarm() external;
-
-    /**
-     * @notice Calculates the reward multiplier over the given `from` until `to` block.
-     * @param from The start of the period to measure rewards for.
-     * @param to The end of the period to measure rewards for.
-     * @return multiplier The weighted multiplier for the given period.
-     */
-    function getMultiplier(uint256 from, uint256 to) external view returns (uint256 multiplier);
 }

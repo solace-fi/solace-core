@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
+import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Enumerable.sol";
+
 
 /**
  * @title IClaimsEscrow
@@ -15,7 +17,7 @@ pragma solidity 0.8.6;
  *
  * Claims are **ERC721**s and abbreviated as **SCT**.
  */
-interface IClaimsEscrow {
+interface IClaimsEscrow is IERC721Enumerable {
 
     /***************************************
     EVENTS
