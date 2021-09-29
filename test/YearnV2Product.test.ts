@@ -51,7 +51,6 @@ if(process.env.FORK_NETWORK === "mainnet"){
     const coverAmount = BN.from("10000000000000000000"); // 10 eth
     const blocks = BN.from(threeDays);
     const expectedPremium = BN.from("2137014000000000");
-
     const IYREGISTRY = "0x50c1a2eA0a861A967D9d0FFE2AE4012c2E053804";
     const DAI_ADDRESS = "0x6B175474E89094C44Da98b954EedeAC495271d0F";
     const YDAI_ADDRESS = "0xdA816459F1AB5631232FE5e97a05BBBb94970c95";

@@ -38,4 +38,10 @@ interface IYVault {
      * @return symbol `Vault` symbol.
      */
     function symbol() external view returns (string memory);
+
+    /**
+     * @notice Returns the decimals value of the `Vault`.
+     * @return decimals `Vault` decimals.
+     */
+    function decimals() external view returns (uint256);
 }
