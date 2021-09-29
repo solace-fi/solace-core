@@ -11,7 +11,7 @@ import "./interface/IRegistry.sol";
  *
  * [**Governance**](/docs/protocol/governance) can set the contract addresses and anyone can look them up.
  *
- * Note that `Registry` doesn't track all Solace contracts. Farms are tracked in [`Master`](../Master), Products are tracked in [`PolicyManager`](../PolicyManager), and the `Registry` is untracked.
+ * Note that `Registry` doesn't track all Solace contracts. FarmController is tracked in [`OptionsFarming`](../OptionsFarming), farms are tracked in FarmController, Products are tracked in [`PolicyManager`](../PolicyManager), and the `Registry` is untracked.
  */
 contract Registry is IRegistry, Governable {
 
@@ -33,8 +33,8 @@ contract Registry is IRegistry, Governable {
     address internal _riskManager;
     // SOLACE contract.
     address internal _solace;
-    // Master contract.
-    address internal _master;
+    // OptionsFarming contract.
+    address internal _optionsFarming;
     // Locker contract.
     address internal _locker;
 
@@ -91,10 +91,10 @@ contract Registry is IRegistry, Governable {
     function solace() external view override returns (address) { return _solace; }
 
     /**
-     * @notice Gets the [`Master`](./Master) contract.
-     * @return master_ The address of the [`Master`](./Master) contract.
+     * @notice Gets the [`OptionsFarming`](./OptionsFarming) contract.
+     * @return optionsFarming_ The address of the [`OptionsFarming`](./OptionsFarming) contract.
      */
-    function master() external view override returns (address) { return _master; }
+    function optionsFarming() external view override returns (address) { return _optionsFarming; }
 
     /**
      * @notice Gets the [`Locker`](./Locker) contract.
@@ -177,13 +177,13 @@ contract Registry is IRegistry, Governable {
     }
 
     /**
-     * @notice Sets the [`Master`](./Master) contract.
+     * @notice Sets the [`OptionsFarming`](./OptionsFarming) contract.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param master_ The address of the [`Master`](./Master) contract.
+     * @param optionsFarming_ The address of the [`OptionsFarming`](./OptionsFarming) contract.
      */
-    function setMaster(address master_) external override onlyGovernance {
-        _master = master_;
-        emit MasterSet(master_);
+    function setOptionsFarming(address optionsFarming_) external override onlyGovernance {
+        _optionsFarming = optionsFarming_;
+        emit OptionsFarmingSet(optionsFarming_);
     }
 
     /**

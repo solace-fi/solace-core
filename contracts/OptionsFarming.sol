@@ -69,7 +69,7 @@ contract OptionsFarming is IOptionsFarming, ERC721Enumerable, Governable {
      * @param rewardAmount Amount of **SOLACE**.
      * @return strikePrice_ Strike Price
      */
-    function strikePrice(uint256 rewardAmount) public view override returns (uint256 strikePrice_) {
+    function calculateStrikePrice(uint256 rewardAmount) public view override returns (uint256 strikePrice_) {
         require(address(_solace) != address(0x0), "solace not set");
         // TODO: TWAP
         strikePrice_ = rewardAmount;
@@ -92,7 +92,7 @@ contract OptionsFarming is IOptionsFarming, ERC721Enumerable, Governable {
         // create option
         Option memory option = Option({
             rewardAmount: rewardAmount,
-            strikePrice: strikePrice(rewardAmount),
+            strikePrice: calculateStrikePrice(rewardAmount),
             expiry: block.timestamp + _expiryFuture
         });
         optionID = ++_numOptions; // autoincrement from 1

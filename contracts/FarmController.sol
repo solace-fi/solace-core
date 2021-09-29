@@ -80,20 +80,6 @@ contract FarmController is IFarmController, Governable {
         return _allocPoints[farmID];
     }
 
-    /***************************************
-    MUTATOR FUNCTIONS
-    ***************************************/
-
-    /**
-     * @notice Updates all farms to be up to date to the current second.
-     */
-    function massUpdateFarms() external override {
-        uint256 numFarms_ = _numFarms; // copy to memory to save gas
-        for(uint256 farmID = 1; farmID <= numFarms_; ++farmID) {
-            IFarm(_farmAddresses[farmID]).updateFarm();
-        }
-    }
-
     /**
      * @notice Calculates the accumulated balance of [**SOLACE**](./SOLACE) for specified user.
      * @param user The user for whom unclaimed tokens will be shown.
@@ -107,6 +93,20 @@ contract FarmController is IFarmController, Governable {
             reward += farm.pendingRewards(user);
         }
         return reward;
+    }
+
+    /***************************************
+    MUTATOR FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Updates all farms to be up to date to the current second.
+     */
+    function massUpdateFarms() external override {
+        uint256 numFarms_ = _numFarms; // copy to memory to save gas
+        for(uint256 farmID = 1; farmID <= numFarms_; ++farmID) {
+            IFarm(_farmAddresses[farmID]).updateFarm();
+        }
     }
 
     /***************************************

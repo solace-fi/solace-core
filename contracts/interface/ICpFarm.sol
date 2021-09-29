@@ -10,7 +10,7 @@ import "./IFarm.sol";
  * @author solace.fi
  * @notice Rewards [**Capital Providers**](/docs/user-guides/capital-provider/cp-role-guide) in [**SOLACE**](../SOLACE) for providing capital in the [`Vault`](../Vault).
  *
- * Over the course of `startBlock` to `endBlock`, the farm distributes `blockReward` [**SOLACE**](../SOLACE) per block to all farmers split relative to the amount of [**SCP**](../Vault) they have deposited.
+ * Over the course of `startTime` to `endTime`, the farm distributes `rewardPerSecond` [**SOLACE**](../SOLACE) to all farmers split relative to the amount of [**SCP**](../Vault) they have deposited.
  *
  * Users can become [**Capital Providers**](/docs/user-guides/capital-provider/cp-role-guide) by depositing **ETH** into the [`Vault`](../Vault), receiving [**SCP**](../Vault) in the process. [**Capital Providers**](/docs/user-guides/capital-provider/cp-role-guide) can then deposit their [**SCP**](../Vault) via [`depositCp()`](#depositcp) or [`depositCpSigned()`](#depositcpsigned). Alternatively users can bypass the [`Vault`](../Vault) and stake their **ETH** via [`depositEth()`](#depositeth).
  *
@@ -32,10 +32,10 @@ interface ICpFarm is IFarm {
     event EthDeposited(address indexed user, uint256 amount);
     /// @notice Emitted when CP tokens are withdrawn from the farm.
     event CpWithdrawn(address indexed user, uint256 amount);
-    /// @notice Emitted when block reward is changed.
-    event RewardsSet(uint256 blockReward);
-    /// @notice Emitted when the end block is changed.
-    event FarmEndSet(uint256 endBlock);
+    /// @notice Emitted when rewardPerSecond is changed.
+    event RewardsSet(uint256 rewardPerSecond);
+    /// @notice Emitted when the end time is changed.
+    event FarmEndSet(uint256 endTime);
 
     /***************************************
     VIEW FUNCTIONS
@@ -45,7 +45,7 @@ interface ICpFarm is IFarm {
     function vault() external view returns (address);
 
     /// @notice Last time rewards were distributed or farm was updated.
-    function lastRewardBlock() external view returns (uint256);
+    function lastRewardTime() external view returns (uint256);
 
     /// @notice Accumulated rewards per share, times 1e12.
     function accRewardPerShare() external view returns (uint256);

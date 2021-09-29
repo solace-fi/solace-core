@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./Governable.sol";
 import "./interface/IVault.sol";
+import "./interface/IFarmController.sol";
 import "./interface/ICpFarm.sol";
 
 /**
@@ -13,7 +14,7 @@ import "./interface/ICpFarm.sol";
  * @author solace.fi
  * @notice Rewards [**Capital Providers**](/docs/user-guides/capital-provider/cp-role-guide) in [**SOLACE**](./SOLACE) for providing capital in the [`Vault`](./Vault).
  *
- * Over the course of `startBlock` to `endBlock`, the farm distributes `blockReward` [**SOLACE**](./SOLACE) per block to all farmers split relative to the amount of [**SCP**](./Vault) they have deposited.
+ * Over the course of `startTime` to `endTime`, the farm distributes `rewardPerSecond` [**SOLACE**](./SOLACE) to all farmers split relative to the amount of [**SCP**](./Vault) they have deposited.
  *
  * Users can become [**Capital Providers**](/docs/user-guides/capital-provider/cp-role-guide) by depositing **ETH** into the [`Vault`](./Vault), receiving [**SCP**](./Vault) in the process. [**Capital Providers**](/docs/user-guides/capital-provider/cp-role-guide) can then deposit their [**SCP**](./Vault) via [`depositCp()`](#depositcp) or [`depositCpSigned()`](#depositcpsigned). Alternatively users can bypass the [`Vault`](./Vault) and stake their **ETH** via [`depositEth()`](#depositeth).
  *
@@ -32,14 +33,14 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
     IVault internal _vault;
     /// @notice FarmController contract.
     IFarmController internal _controller;
-    /// @notice Amount of SOLACE distributed per block.
-    uint256 internal _blockReward;
+    /// @notice Amount of SOLACE distributed per seconds.
+    uint256 internal _rewardPerSecond;
     /// @notice When the farm will start.
-    uint256 internal _startBlock;
+    uint256 internal _startTime;
     /// @notice When the farm will end.
-    uint256 internal _endBlock;
+    uint256 internal _endTime;
     /// @notice Last time rewards were distributed or farm was updated.
-    uint256 internal _lastRewardBlock;
+    uint256 internal _lastRewardTime;
     /// @notice Accumulated rewards per share, times 1e12.
     uint256 internal _accRewardPerShare;
     /// @notice Value of tokens staked by all farmers.
@@ -57,7 +58,7 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
         //   pending reward = (user.value * accRewardPerShare) - user.rewardDebt + user.unpaidRewards
         //
         // Whenever a user deposits or withdraws LP tokens to a farm. Here's what happens:
-        //   1. The farm's `accRewardPerShare` and `lastRewardBlock` gets updated.
+        //   1. The farm's `accRewardPerShare` and `lastRewardTime` gets updated.
         //   2. User receives the pending reward sent to his/her address.
         //      Unsent rewards will be accumulated in `unpaidRewards`.
         //   3. User's `value` gets updated.
@@ -76,23 +77,23 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
      * @param governance_ The address of the [governor](/docs/protocol/governance).
      * @param controller_ Address of the [`FarmController`](./FarmController) contract.
      * @param vault_ Address of the [`Vault`](./Vault) contract.
-     * @param startBlock_ When farming will begin.
-     * @param endBlock_ When farming will end.
+     * @param startTime_ When farming will begin.
+     * @param endTime_ When farming will end.
      * @param weth_ Address of **WETH**.
      */
     constructor(
         address governance_,
         address controller_,
         address vault_,
-        uint256 startBlock_,
-        uint256 endBlock_,
+        uint256 startTime_,
+        uint256 endTime_,
         address weth_
     ) Governable(governance_) {
         _controller = IFarmController(controller_);
         _vault = IVault(payable(vault_));
-        _startBlock = startBlock_;
-        _endBlock = endBlock_;
-        _lastRewardBlock = Math.max(block.number, startBlock_);
+        _startTime = startTime_;
+        _endTime = endTime_;
+        _lastRewardTime = Math.max(block.timestamp, startTime_);
         weth = IERC20(weth_);
         weth.approve(vault_, type(uint256).max);
     }
@@ -116,24 +117,24 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
         return address(_controller);
     }
 
-    /// @notice Amount of SOLACE distributed per block.
-    function blockReward() external view override returns (uint256) {
-        return _blockReward;
+    /// @notice Amount of SOLACE distributed per second.
+    function rewardPerSecond() external view override returns (uint256) {
+        return _rewardPerSecond;
     }
 
     /// @notice When the farm will start.
-    function startBlock() external view override returns (uint256) {
-        return _startBlock;
+    function startTime() external view override returns (uint256) {
+        return _startTime;
     }
 
     /// @notice When the farm will end.
-    function endBlock() external view override returns (uint256) {
-        return _endBlock;
+    function endTime() external view override returns (uint256) {
+        return _endTime;
     }
 
-    /// @notice Last time rewards were distributed or farm was updated.Block;
-    function lastRewardBlock() external view override returns (uint256) {
-        return _lastRewardBlock;
+    /// @notice Last time rewards were distributed or farm was updated.
+    function lastRewardTime() external view override returns (uint256) {
+        return _lastRewardTime;
     }
 
     /// @notice Accumulated rewards per share, times 1e12.
@@ -156,26 +157,26 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
         UserInfo storage userInfo_ = userInfo[user];
         // math
         uint256 accRewardPerShare_ = _accRewardPerShare;
-        if (block.number > _lastRewardBlock && _valueStaked != 0) {
-            uint256 tokenReward = getMultiplier(_lastRewardBlock, block.number);
+        if (block.timestamp > _lastRewardTime && _valueStaked != 0) {
+            uint256 tokenReward = getMultiplier(_lastRewardTime, block.timestamp);
             accRewardPerShare_ += tokenReward * 1e12 / _valueStaked;
         }
         return userInfo_.value * accRewardPerShare_ / 1e12 - userInfo_.rewardDebt + userInfo_.unpaidRewards;
     }
 
     /**
-     * @notice Calculates the reward multiplier over the given `from` until `to` block.
+     * @notice Calculates the reward multiplier over the given `from` until `to` timestamps.
      * @param from The start of the period to measure rewards for.
      * @param to The end of the period to measure rewards for.
      * @return multiplier The weighted multiplier for the given period.
      */
     function getMultiplier(uint256 from, uint256 to) public view override returns (uint256 multiplier) {
         // validate window
-        from = Math.max(from, _startBlock);
-        to = Math.min(to, _endBlock);
+        from = Math.max(from, _startTime);
+        to = Math.min(to, _endTime);
         // no reward for negative window
         if (from > to) return 0;
-        return (to - from) * _blockReward;
+        return (to - from) * _rewardPerSecond;
     }
 
     /***************************************
@@ -255,19 +256,19 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
     }
 
     /**
-     * @notice Updates farm information to be up to date to the current block.
+     * @notice Updates farm information to be up to date to the current time.
      */
     function updateFarm() public override {
         // dont update needlessly
-        if (block.number <= _lastRewardBlock) return;
+        if (block.timestamp <= _lastRewardTime) return;
         if (_valueStaked == 0) {
-            _lastRewardBlock = Math.min(block.number, _endBlock);
+            _lastRewardTime = Math.min(block.timestamp, _endTime);
             return;
         }
         // update math
-        uint256 tokenReward = getMultiplier(_lastRewardBlock, block.number);
+        uint256 tokenReward = getMultiplier(_lastRewardTime, block.timestamp);
         _accRewardPerShare += tokenReward * 1e12 / _valueStaked;
-        _lastRewardBlock = Math.min(block.number, _endBlock);
+        _lastRewardTime = Math.min(block.timestamp, _endTime);
     }
 
     /**
@@ -366,32 +367,32 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
     ***************************************/
 
     /**
-     * @notice Sets the amount of [**SOLACE**](./SOLACE) to distribute per block.
+     * @notice Sets the amount of [**SOLACE**](./SOLACE) to distribute per second.
      * Only affects future rewards.
      * Can only be called by [`FarmController`](./FarmController).
-     * @param blockReward_ Amount to distribute per block.
+     * @param rewardPerSecond_ Amount to distribute per second.
      */
-    function setRewards(uint256 blockReward_) external override {
+    function setRewards(uint256 rewardPerSecond_) external override {
         // can only be called by FarmController contract
         require(msg.sender == address(_controller), "!farmcontroller");
         // update
         updateFarm();
         // accounting
-        _blockReward = blockReward_;
-        emit RewardsSet(blockReward_);
+        _rewardPerSecond = rewardPerSecond_;
+        emit RewardsSet(rewardPerSecond_);
     }
 
     /**
-     * @notice Sets the farm's end block. Used to extend the duration.
+     * @notice Sets the farm's end time. Used to extend the duration.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param endBlock_ The new end block.
+     * @param endTime_ The new end time.
      */
-    function setEnd(uint256 endBlock_) external override onlyGovernance {
+    function setEnd(uint256 endTime_) external override onlyGovernance {
         // accounting
-        _endBlock = endBlock_;
+        _endTime = endTime_;
         // update
         updateFarm();
-        emit FarmEndSet(endBlock_);
+        emit FarmEndSet(endTime_);
     }
 
     /***************************************

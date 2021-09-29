@@ -21,14 +21,14 @@ interface IFarm {
     /// @notice A unique enumerator that identifies the farm type.
     function farmType() external view returns (uint256);
 
-    /// @notice Amount of [**SOLACE**](../SOLACE) distributed per block.
-    function blockReward() external view returns (uint256);
+    /// @notice Amount of [**SOLACE**](../SOLACE) distributed per second.
+    function rewardPerSecond() external view returns (uint256);
 
     /// @notice When the farm will start.
-    function startBlock() external view returns (uint256);
+    function startTime() external view returns (uint256);
 
     /// @notice When the farm will end.
-    function endBlock() external view returns (uint256);
+    function endTime() external view returns (uint256);
 
     /**
      * @notice Calculates the accumulated balance of [**SOLACE**](../SOLACE) for specified user.
@@ -38,7 +38,7 @@ interface IFarm {
     function pendingRewards(address user) external view returns (uint256 reward);
 
     /**
-     * @notice Calculates the reward multiplier over the given `from` until `to` block.
+     * @notice Calculates the reward multiplier over the given `from` until `to` timestamps.
      * @param from The start of the period to measure rewards for.
      * @param to The end of the period to measure rewards for.
      * @return multiplier The weighted multiplier for the given period.
@@ -63,7 +63,7 @@ interface IFarm {
     function withdrawRewardsForUser(address user) external returns (uint256 rewardAmount);
 
     /**
-     * @notice Updates farm information to be up to date to the current block.
+     * @notice Updates farm information to be up to date to the current time.
      */
     function updateFarm() external;
 
@@ -72,17 +72,17 @@ interface IFarm {
     ***************************************/
 
     /**
-     * @notice Sets the amount of [**SOLACE**](../SOLACE) to distribute per block.
+     * @notice Sets the amount of [**SOLACE**](../SOLACE) to distribute per second.
      * Only affects future rewards.
      * Can only be called by [`Master`](../Master).
-     * @param blockReward_ Amount to distribute per block.
+     * @param rewardPerSecond_ Amount to distribute per second.
      */
-    function setRewards(uint256 blockReward_) external;
+    function setRewards(uint256 rewardPerSecond_) external;
 
     /**
-     * @notice Sets the farm's end block. Used to extend the duration.
+     * @notice Sets the farm's end time. Used to extend the duration.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param endBlock_ The new end block.
+     * @param endTime_ The new end time.
      */
-    function setEnd(uint256 endBlock_) external;
+    function setEnd(uint256 endTime_) external;
 }

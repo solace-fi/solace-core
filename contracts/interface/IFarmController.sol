@@ -58,6 +58,10 @@ interface IFarmController {
      */
     function massUpdateFarms() external;
 
+    /***************************************
+    OPTIONS CREATION FUNCTIONS
+    ***************************************/
+
     /**
      * @notice Withdraw your rewards from all farms and create an Option.
      * @return optionID The ID of the new Option.

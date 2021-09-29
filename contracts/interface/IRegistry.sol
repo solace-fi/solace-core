@@ -8,7 +8,7 @@ pragma solidity 0.8.6;
  *
  * [**Governance**](/docs/protocol/governance) can set the contract addresses and anyone can look them up.
  *
- * Note that `Registry` doesn't track all Solace contracts. Farms are tracked in [`Master`](../Master), Products are tracked in [`PolicyManager`](../PolicyManager), and the `Registry` is untracked.
+ * Note that `Registry` doesn't track all Solace contracts. FarmController is tracked in [`OptionsFarming`](../OptionsFarming), farms are tracked in FarmController, Products are tracked in [`PolicyManager`](../PolicyManager), and the `Registry` is untracked.
  */
 interface IRegistry {
 
@@ -30,8 +30,8 @@ interface IRegistry {
     event RiskManagerSet(address riskManager);
     // Emitted when Solace Token is set.
     event SolaceSet(address solace);
-    // Emitted when Master is set.
-    event MasterSet(address master);
+    // Emitted when OptionsFarming is set.
+    event OptionsFarmingSet(address optionsFarming);
     // Emitted when Locker is set.
     event LockerSet(address locker);
 
@@ -82,10 +82,10 @@ interface IRegistry {
     function solace() external view returns (address);
 
     /**
-     * @notice Gets the [`Master`](../Master) contract.
-     * @return master_ The address of the [`Master`](../Master) contract.
+     * @notice Gets the [`OptionsFarming`](../OptionsFarming) contract.
+     * @return optionsFarming_ The address of the [`OptionsFarming`](../OptionsFarming) contract.
      */
-    function master() external view returns (address);
+    function optionsFarming() external view returns (address);
 
     /**
      * @notice Gets the [`Locker`](../Locker) contract.
@@ -147,11 +147,11 @@ interface IRegistry {
     function setSolace(address solace_) external;
 
     /**
-     * @notice Sets the [`Master`](../Master) contract.
+     * @notice Sets the [`OptionsFarming`](../OptionsFarming) contract.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param master_ The address of the [`Master`](../Master) contract.
+     * @param optionsFarming_ The address of the [`OptionsFarming`](../OptionsFarming) contract.
      */
-    function setMaster(address master_) external;
+    function setOptionsFarming(address optionsFarming_) external;
 
     /**
      * @notice Sets the [`Locker`](../Locker) contract.

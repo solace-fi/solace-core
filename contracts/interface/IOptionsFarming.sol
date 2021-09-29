@@ -50,7 +50,7 @@ interface IOptionsFarming is IERC721Enumerable {
      * @param rewardAmount Amount of **SOLACE**.
      * @return strikePrice_ Strike Price
      */
-    function strikePrice(uint256 rewardAmount) external view returns (uint256 strikePrice_);
+    function calculateStrikePrice(uint256 rewardAmount) external view returns (uint256 strikePrice_);
 
     /***************************************
     MUTATOR FUNCTIONS
