@@ -77,8 +77,9 @@ contract YearnV2Product is BaseProduct {
                 positionContract := div(mload(add(add(positionDescription, 0x20), offset)), 0x1000000000000000000000000)
             }
             // must be a yVault
-            ( , address token, , , ) = _yregistry.getVaultInfo(positionContract);
-            if(token == address(0x0)) return false;
+            IYVault vault = IYVault(positionContract);
+            bool isRegistered = _yregistry.isRegistered(vault.token());
+            if (!isRegistered) return false;
         }
         return true;
     }
