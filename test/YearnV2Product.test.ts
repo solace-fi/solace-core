@@ -107,13 +107,13 @@ if(process.env.FORK_NETWORK === "mainnet"){
          "token":"0x6B175474E89094C44Da98b954EedeAC495271d0F",
          "registered":true
       },
-      {
-         "name":"HEGIC yVault",
-         "symbol":"yvHEGIC",
-         "address":"0xe11ba472F74869176652C35D30dB89854b5ae84D",
-         "token":"0x584bC13c7D411c00c01A62e8019472dE68768430",
-         "registered":true
-      },
+      // {
+      //    "name":"HEGIC yVault",
+      //    "symbol":"yvHEGIC",
+      //    "address":"0xe11ba472F74869176652C35D30dB89854b5ae84D",
+      //    "token":"0x584bC13c7D411c00c01A62e8019472dE68768430",
+      //    "registered":true
+      // },
       {
          "name":"USDC yVault",
          "symbol":"yvUSDC",
@@ -295,6 +295,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
          "symbol":"yvsUSD",
          "address":"0xa5cA62D95D24A4a350983D5B8ac4EB8638887396",
          "token":"0x57Ab1ec28D129707052df4dF418D58a2D46d5f51",
+         "uimpl": "0x967968963517AFDC9b8Ccc9AD6649bC507E83a7b",
          "registered":true
       },
       {
@@ -302,6 +303,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
          "symbol":"yvSNX",
          "address":"0xF29AE508698bDeF169B89834F76704C3B205aedf",
          "token":"0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F",
+         'uimpl':"0x54f25546260C7539088982bcF4b7dC8EDEF19f21",
          "registered":true
       },
       {
@@ -787,7 +789,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
             const uToken = await ethers.getContractAt(artifacts.ERC20.abi, uAddress);
             const decimals = await uToken.decimals();
             const uAmount = oneToken(decimals);
-            const uimpl =  uAddress;
+            const uimpl =  ((yvaults[i].uimpl || "") != "") ? yvaults[i].uimpl : uAddress;
             const blacklistAddress = uAddress;
             const isBlacklistable = yvaults[i].blacklist || false;
             // create position
