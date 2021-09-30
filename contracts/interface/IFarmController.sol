@@ -15,15 +15,15 @@ interface IFarmController {
 
     /// @notice Emitted when a farm is created.
     event FarmCreated(uint256 indexed farmID, address indexed farmAddress);
-    /// @notice Emitted when SOLACE per second is changed.
-    event RewardsSet(uint256 solacePerSecond);
+    /// @notice Emitted when reward per second is changed.
+    event RewardsSet(uint256 rewardPerSecond);
 
     /***************************************
     VIEW FUNCTIONS
     ***************************************/
 
-    /// @notice Total solace distributed per second across all farms.
-    function solacePerSecond() external view returns (uint256);
+    /// @notice Rewards distributed per second across all farms.
+    function rewardPerSecond() external view returns (uint256);
 
     /// @notice Total allocation points across all farms.
     function totalAllocPoints() external view returns (uint256);
@@ -43,9 +43,9 @@ interface IFarmController {
     function allocPoints(uint256 farmID) external view returns (uint256);
 
     /**
-     * @notice Calculates the accumulated balance of [**SOLACE**](../SOLACE) for specified user.
-     * @param user The user for whom unclaimed tokens will be shown.
-     * @return reward Total amount of withdrawable SOLACE.
+     * @notice Calculates the accumulated balance of rewards for the specified user.
+     * @param user The user for whom unclaimed rewards will be shown.
+     * @return reward Total amount of withdrawable rewards.
      */
     function pendingRewards(address user) external view returns (uint256 reward);
 
@@ -63,16 +63,16 @@ interface IFarmController {
     ***************************************/
 
     /**
-     * @notice Withdraw your rewards from all farms and create an Option.
-     * @return optionID The ID of the new Option.
+     * @notice Withdraw your rewards from all farms and create an [`Option`](../OptionsFarming).
+     * @return optionID The ID of the new [`Option`](./OptionsFarming).
      */
     function farmOptionMulti() external returns (uint256 optionID);
 
     /**
-     * @notice Creates an Option for the given `rewardAmount`.
+     * @notice Creates an [`Option`](../OptionsFarming) for the given `rewardAmount`.
      * Must be called by a farm.
      * @param rewardAmount The amount to reward in the Option.
-     * @return optionID The ID of the new Option.
+     * @return optionID The ID of the new [`Option`](./OptionsFarming).
      */
     function createOption(uint256 rewardAmount) external returns (uint256 optionID);
 
@@ -99,10 +99,9 @@ interface IFarmController {
     function setAllocPoints(uint256 farmID, uint256 allocPoints_) external;
 
     /**
-     * @notice Sets the Solace reward distribution across all farms.
-     * Optionally updates all farms.
+     * @notice Sets the reward distribution across all farms.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param solacePerSecond_ Amount of solace to distribute per second.
+     * @param rewardPerSecond_ Amount of reward to distribute per second.
      */
-    function setSolacePerSecond(uint256 solacePerSecond_) external;
+    function setRewardPerSecond(uint256 rewardPerSecond_) external;
 }

@@ -21,7 +21,7 @@ interface IFarm {
     /// @notice A unique enumerator that identifies the farm type.
     function farmType() external view returns (uint256);
 
-    /// @notice Amount of [**SOLACE**](../SOLACE) distributed per second.
+    /// @notice Amount of rewards distributed per second.
     function rewardPerSecond() external view returns (uint256);
 
     /// @notice When the farm will start.
@@ -31,9 +31,9 @@ interface IFarm {
     function endTime() external view returns (uint256);
 
     /**
-     * @notice Calculates the accumulated balance of [**SOLACE**](../SOLACE) for specified user.
+     * @notice Calculates the accumulated rewards for specified user.
      * @param user The user for whom unclaimed tokens will be shown.
-     * @return reward Total amount of withdrawable SOLACE.
+     * @return reward Total amount of withdrawable rewards.
      */
     function pendingRewards(address user) external view returns (uint256 reward);
 
@@ -50,13 +50,14 @@ interface IFarm {
     ***************************************/
 
     /**
-     * @notice Withdraw your rewards without unstaking your tokens.
+     * @notice Converts the senders unpaid rewards into an [`Option`](../OptionsFarming).
+     * @return optionID The ID of the newly minted [`Option`](../OptionsFarming).
      */
-    function withdrawRewards() external;
+    function withdrawRewards() external returns (uint256 optionID);
 
     /**
      * @notice Withdraw a users rewards without unstaking their tokens.
-     * Can only be called by [`FarmController`](./FarmController).
+     * Can only be called by [`FarmController`](../FarmController).
      * @param user User to withdraw rewards for.
      * @return rewardAmount The amount of rewards the user earned on this farm.
      */
@@ -72,9 +73,9 @@ interface IFarm {
     ***************************************/
 
     /**
-     * @notice Sets the amount of [**SOLACE**](../SOLACE) to distribute per second.
+     * @notice Sets the amount of rewards to distribute per second.
      * Only affects future rewards.
-     * Can only be called by [`Master`](../Master).
+     * Can only be called by [`FarmController`](../FarmController).
      * @param rewardPerSecond_ Amount to distribute per second.
      */
     function setRewards(uint256 rewardPerSecond_) external;

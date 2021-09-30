@@ -57,7 +57,7 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
         //
         //   pending reward = (user.value * accRewardPerShare) - user.rewardDebt + user.unpaidRewards
         //
-        // Whenever a user deposits or withdraws LP tokens to a farm. Here's what happens:
+        // Whenever a user deposits or withdraws CP tokens to a farm. Here's what happens:
         //   1. The farm's `accRewardPerShare` and `lastRewardTime` gets updated.
         //   2. User receives the pending reward sent to his/her address.
         //      Unsent rewards will be accumulated in `unpaidRewards`.
@@ -185,7 +185,6 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
 
     /**
      * @notice Deposit some [**CP tokens**](./Vault).
-     * User will receive accumulated rewards if any.
      * User must `ERC20.approve()` first.
      * @param amount The deposit amount.
      */
@@ -198,7 +197,6 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
 
     /**
      * @notice Deposit some [**CP tokens**](./Vault) using `ERC2612.permit()`.
-     * User will receive accumulated rewards if any.
      * @param depositor The depositing user.
      * @param amount The deposit amount.
      * @param deadline Time the transaction must go through before.
@@ -217,7 +215,6 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
 
     /**
      * @notice Deposit some **ETH**.
-     * User will receive accumulated rewards if any.
      */
     function depositEth() external payable override {
         _depositEth();
@@ -241,18 +238,6 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
         // return staked tokens
         SafeERC20.safeTransfer(_vault, msg.sender, amount);
         emit CpWithdrawn(msg.sender, amount);
-    }
-
-    /**
-     * @notice Withdraw your rewards without unstaking your tokens.
-     */
-    function withdrawRewards() external override nonReentrant {
-        // harvest
-        _harvest(msg.sender);
-        // get farmer information
-        UserInfo storage user = userInfo[msg.sender];
-        // accounting
-        user.rewardDebt = user.value * _accRewardPerShare / 1e12;
     }
 
     /**
@@ -292,7 +277,6 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
 
     /**
      * @notice Deposit some [**CP tokens**](./Vault).
-     * User will receive accumulated rewards if any.
      * @param depositor The depositing user.
      * @param amount The deposit amount.
      */
@@ -303,13 +287,15 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
         UserInfo storage user = userInfo[depositor];
         // accounting
         _valueStaked += amount;
+        //uint256 value = user.value + amount;
+        //user.value = value;
         user.value += amount;
         user.rewardDebt = user.value * _accRewardPerShare / 1e12;
         emit CpDeposited(depositor, amount);
     }
 
     /**
-    * @notice Calculate and transfer a user's rewards.
+    * @notice Update farm and accumulate a user's rewards.
     * @param user User to process rewards for.
     */
     function _harvest(address user) internal {
@@ -326,18 +312,16 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
     ***************************************/
 
     /**
-     * @notice Converts the senders unpaid rewards into an Option.
-     * Will revert if the OptionsMiningController
-     * @return optionID The ID of the newly minted Option.
+     * @notice Converts the senders unpaid rewards into an [`Option`](./OptionsFarming).
+     * @return optionID The ID of the newly minted [`Option`](./OptionsFarming).
      */
-    function mineOption() external returns (uint256 optionID) {
+    function withdrawRewards() external override nonReentrant returns (uint256 optionID) {
         // update farm
         updateFarm();
         // get farmer information
         UserInfo storage userInfo_ = userInfo[msg.sender];
         // math
         uint256 pending = userInfo_.value * _accRewardPerShare / 1e12 - userInfo_.rewardDebt + userInfo_.unpaidRewards;
-        require(pending > 0, "no nonzero options");
         userInfo_.unpaidRewards = 0;
         // create option
         optionID = _controller.createOption(pending);
@@ -357,8 +341,7 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
         // get farmer information
         UserInfo storage userInfo_ = userInfo[user];
         // math
-        uint256 pending = userInfo_.value * _accRewardPerShare / 1e12 - userInfo_.rewardDebt + userInfo_.unpaidRewards;
-        userInfo_.unpaidRewards = 0;
+        uint256 pending = userInfo_.value * _accRewardPerShare / 1e12 - userInfo_.rewardDebt;
         return pending;
     }
 
@@ -400,14 +383,14 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
     ***************************************/
 
     /**
-     * Receive function. Deposits eth. User will receive accumulated rewards if any.
+     * Receive function. Deposits eth.
      */
     receive () external payable override {
         if (msg.sender != address(_vault)) _depositEth();
     }
 
     /**
-     * Fallback function. Deposits eth. User will receive accumulated rewards if any.
+     * Fallback function. Deposits eth.
      */
     fallback () external payable override {
         if (msg.sender != address(_vault)) _depositEth();

@@ -59,7 +59,6 @@ interface ICpFarm is IFarm {
 
     /**
      * @notice Deposit some [**CP tokens**](../Vault).
-     * User will receive accumulated rewards if any.
      * User must `ERC20.approve()` first.
      * @param amount The deposit amount.
      */
@@ -67,7 +66,6 @@ interface ICpFarm is IFarm {
 
     /**
      * @notice Deposit some [**CP tokens**](../Vault) using `ERC2612.permit()`.
-     * User will receive accumulated rewards if any.
      * @param depositor The depositing user.
      * @param amount The deposit amount.
      * @param deadline Time the transaction must go through before.
@@ -79,7 +77,6 @@ interface ICpFarm is IFarm {
 
     /**
      * @notice Deposit some **ETH**.
-     * User will receive accumulated rewards if any.
      */
     function depositEth() external payable;
 
@@ -96,12 +93,12 @@ interface ICpFarm is IFarm {
     ***************************************/
 
     /**
-     * Receive function. Deposits eth. User will receive accumulated rewards if any.
+     * Receive function. Deposits eth.
      */
     receive () external payable;
 
     /**
-     * Fallback function. Deposits eth. User will receive accumulated rewards if any.
+     * Fallback function. Deposits eth.
      */
     fallback () external payable;
 }

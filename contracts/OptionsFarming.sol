@@ -41,12 +41,12 @@ contract OptionsFarming is IOptionsFarming, ERC721Enumerable, Governable {
     VIEW FUNCTIONS
     ***************************************/
 
-    /// @notice Native SOLACE Token.
+    /// @notice Native [**SOLACE**](./SOLACE) Token.
     function solace() external view override returns (address solace_) {
         return address(_solace);
     }
 
-    // @notice The Farm Controller.
+    // @notice The [`FarmController(./FarmController).
     function farmController() external view override returns (address controller_) {
         return address(_controller);
     }
@@ -65,9 +65,9 @@ contract OptionsFarming is IOptionsFarming, ERC721Enumerable, Governable {
     }
 
     /**
-     * @notice Calculate the strike price for an amount of **SOLACE**.
-     * @param rewardAmount Amount of **SOLACE**.
-     * @return strikePrice_ Strike Price
+     * @notice Calculate the strike price for an amount of [**SOLACE**](./SOLACE).
+     * @param rewardAmount Amount of [**SOLACE**](./SOLACE).
+     * @return strikePrice_ Strike Price.
      */
     function calculateStrikePrice(uint256 rewardAmount) public view override returns (uint256 strikePrice_) {
         require(address(_solace) != address(0x0), "solace not set");
@@ -106,7 +106,7 @@ contract OptionsFarming is IOptionsFarming, ERC721Enumerable, Governable {
     /**
      * @notice Exercises an Option.
      * `msg.sender` must pay `option.strikePrice` **ETH**.
-     * `msg.sender` will receive `option.rewardAmount` **SOLACE**.
+     * `msg.sender` will receive `option.rewardAmount` [**SOLACE**](./SOLACE).
      * Can only be called by the Option owner or approved.
      * Can only be called before `option.expiry`.
      * @param optionID The ID of the Option to exercise.
@@ -145,18 +145,18 @@ contract OptionsFarming is IOptionsFarming, ERC721Enumerable, Governable {
     ***************************************/
 
     /**
-     * @notice Sets the `FarmController` contract.
+     * @notice Sets the [`FarmController(./FarmController)` contract.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param controller_ The address of the new `FarmController`.
+     * @param controller_ The address of the new [`FarmController(./FarmController).
      */
     function setFarmController(address controller_) external override onlyGovernance {
         _controller = IFarmController(controller_);
     }
 
     /**
-     * @notice Sets the **SOLACE** native token.
+     * @notice Sets the [**SOLACE**](./SOLACE) native token.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param solace_ The address of the **SOLACE** contract.
+     * @param solace_ The address of the [**SOLACE**](./SOLACE) contract.
      */
     function setSolace(address solace_) external override onlyGovernance {
         _solace = ISOLACE(solace_);

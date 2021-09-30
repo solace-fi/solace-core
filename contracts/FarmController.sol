@@ -14,7 +14,7 @@ import "./interface/IFarmController.sol";
  */
 contract FarmController is IFarmController, Governable {
 
-    uint256 internal _solacePerSecond;
+    uint256 internal _rewardPerSecond;
 
     IOptionsFarming internal _optionsFarming;
 
@@ -38,19 +38,21 @@ contract FarmController is IFarmController, Governable {
     /**
      * @notice Constructs the `FarmController` contract.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
-     * @param solacePerSecond_ Amount of solace to distribute per second.
+     * @param optionsFarming_ The address of the [`OptionsFarming`](./OptionsFarming) contract.
+     * @param rewardPerSecond_ Amount of reward to distribute per second.
      */
-    constructor(address governance_, uint256 solacePerSecond_) Governable(governance_) {
-        _solacePerSecond = solacePerSecond_;
+    constructor(address governance_, address optionsFarming_, uint256 rewardPerSecond_) Governable(governance_) {
+        _optionsFarming = IOptionsFarming(optionsFarming_);
+        _rewardPerSecond = rewardPerSecond_;
     }
 
     /***************************************
     VIEW FUNCTIONS
     ***************************************/
 
-    /// @notice Total solace distributed per second across all farms.
-    function solacePerSecond() external view override returns (uint256) {
-        return _solacePerSecond;
+    /// @notice Rewards distributed per second across all farms.
+    function rewardPerSecond() external view override returns (uint256) {
+        return _rewardPerSecond;
     }
 
     /// @notice Total allocation points across all farms.
@@ -81,9 +83,9 @@ contract FarmController is IFarmController, Governable {
     }
 
     /**
-     * @notice Calculates the accumulated balance of [**SOLACE**](./SOLACE) for specified user.
-     * @param user The user for whom unclaimed tokens will be shown.
-     * @return reward Total amount of withdrawable reward tokens.
+     * @notice Calculates the accumulated balance of rewards for the specified user.
+     * @param user The user for whom unclaimed rewards will be shown.
+     * @return reward Total amount of withdrawable rewards.
      */
     function pendingRewards(address user) external view override returns (uint256 reward) {
         reward = 0;
@@ -114,8 +116,8 @@ contract FarmController is IFarmController, Governable {
     ***************************************/
 
     /**
-     * @notice Withdraw your rewards from all farms and create an option.
-     * @return optionID The ID of the new option.
+     * @notice Withdraw your rewards from all farms and create an [`Option`](./OptionsFarming).
+     * @return optionID The ID of the new [`Option`](./OptionsFarming).
      */
     function farmOptionMulti() external override returns (uint256 optionID) {
         // withdraw rewards from all farms
@@ -132,10 +134,10 @@ contract FarmController is IFarmController, Governable {
     }
 
     /**
-     * @notice Creates an option for the given `rewardAmount`.
+     * @notice Creates an [`Option`](./OptionsFarming) for the given `rewardAmount`.
      * Must be called by a farm.
      * @param rewardAmount The amount to reward in the Option.
-     * @return optionID The ID of the newly minted option.
+     * @return optionID The ID of the new [`Option`](./OptionsFarming).
      */
     function createOption(uint256 rewardAmount) external override returns (uint256 optionID) {
         require(_farmIndices[msg.sender] != 0, "!farm");
@@ -179,16 +181,15 @@ contract FarmController is IFarmController, Governable {
     }
 
     /**
-     * @notice Sets the Solace reward distribution across all farms.
-     * Optionally updates all farms.
+     * @notice Sets the reward distribution across all farms.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param solacePerSecond_ Amount of solace to distribute per second.
+     * @param rewardPerSecond_ Amount of reward to distribute per second.
      */
-    function setSolacePerSecond(uint256 solacePerSecond_) external override onlyGovernance {
+    function setRewardPerSecond(uint256 rewardPerSecond_) external override onlyGovernance {
         // accounting
-        _solacePerSecond = solacePerSecond_;
+        _rewardPerSecond = rewardPerSecond_;
         _updateRewards();
-        emit RewardsSet(solacePerSecond_);
+        emit RewardsSet(rewardPerSecond_);
     }
 
     /***************************************
@@ -211,10 +212,10 @@ contract FarmController is IFarmController, Governable {
      */
     function _updateRewards() internal {
         uint256 numFarms_ = _numFarms; // copy to memory to save gas
-        uint256 solacePerSecond_ = _solacePerSecond;
+        uint256 rewardPerSecond_ = _rewardPerSecond;
         uint256 totalAllocPoints_ = _totalAllocPoints;
         for(uint256 farmID = 1; farmID <= numFarms_; ++farmID) {
-            uint256 secondReward = totalAllocPoints_ == 0 ? 0 : solacePerSecond_ * _allocPoints[farmID] / totalAllocPoints_;
+            uint256 secondReward = (totalAllocPoints_ == 0) ? 0 : (rewardPerSecond_ * _allocPoints[farmID] / totalAllocPoints_);
             IFarm(_farmAddresses[farmID]).setRewards(secondReward);
         }
     }

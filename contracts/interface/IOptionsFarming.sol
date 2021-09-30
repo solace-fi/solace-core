@@ -24,10 +24,10 @@ interface IOptionsFarming is IERC721Enumerable {
     VIEW FUNCTIONS
     ***************************************/
 
-    /// @notice Native SOLACE Token.
+    /// @notice Native [**SOLACE**](../SOLACE) Token.
     function solace() external view returns (address solace_);
 
-    // @notice The Farm Controller.
+    // @notice The [`FarmController(../FarmController).
     function farmController() external view returns (address controller_);
 
     struct Option {
@@ -39,15 +39,15 @@ interface IOptionsFarming is IERC721Enumerable {
     /**
      * @notice Get information about an option.
      * @param optionID The ID of the option to query.
-     * @return rewardAmount The amount of **SOLACE** out.
+     * @return rewardAmount The amount of [**SOLACE**](../SOLACE) out.
      * @return strikePrice The amount of **ETH** in.
      * @return expiry The expiration timestamp.
      */
     function getOption(uint256 optionID) external view returns (uint256 rewardAmount, uint256 strikePrice, uint256 expiry);
 
     /**
-     * @notice Calculate the strike price for an amount of **SOLACE**.
-     * @param rewardAmount Amount of **SOLACE**.
+     * @notice Calculate the strike price for an amount of [**SOLACE**](../SOLACE).
+     * @param rewardAmount Amount of [**SOLACE**](../SOLACE).
      * @return strikePrice_ Strike Price
      */
     function calculateStrikePrice(uint256 rewardAmount) external view returns (uint256 strikePrice_);
@@ -67,7 +67,7 @@ interface IOptionsFarming is IERC721Enumerable {
     /**
      * @notice Exercises an Option.
      * `msg.sender` must pay `option.strikePrice` **ETH**.
-     * `msg.sender` will receive `option.rewardAmount` **SOLACE**.
+     * `msg.sender` will receive `option.rewardAmount` [**SOLACE**](../SOLACE).
      * Can only be called by the Option owner or approved.
      * Can only be called before `option.expiry`.
      * @param optionID The ID of the Option to exercise.
@@ -79,16 +79,16 @@ interface IOptionsFarming is IERC721Enumerable {
     ***************************************/
 
     /**
-     * @notice Sets the `FarmController` contract.
+     * @notice Sets the [`FarmController(../FarmController) contract.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param controller_ The address of the new `FarmController`.
+     * @param controller_ The address of the new [`FarmController(../FarmController).
      */
     function setFarmController(address controller_) external;
 
     /**
-     * @notice Sets the **SOLACE** native token.
+     * @notice Sets the [**SOLACE**](../SOLACE) native token.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param solace_ The address of the **SOLACE** contract.
+     * @param solace_ The address of the [**SOLACE**](../SOLACE) contract.
      */
     function setSolace(address solace_) external;
 
