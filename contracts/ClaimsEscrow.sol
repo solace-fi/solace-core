@@ -3,10 +3,10 @@
 pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./Governable.sol";
+import "./ERC721Enhanced.sol";
 import "./interface/IRegistry.sol";
 import "./interface/IVault.sol";
 import "./interface/IPolicyManager.sol";
@@ -25,7 +25,7 @@ import "./interface/IClaimsEscrow.sol";
  *
  * Claims are **ERC721**s and abbreviated as **SCT**.
  */
-contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Governable {
+contract ClaimsEscrow is ERC721Enhanced, IClaimsEscrow, ReentrancyGuard, Governable {
     using Address for address;
     using SafeERC20 for IERC20;
 
@@ -34,9 +34,6 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
 
     /// @notice Registry of protocol contract addresses.
     IRegistry private _registry;
-
-    /// @notice ETH_ADDRESS.
-    address private constant ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
     /// @notice mapping of claimID to Claim object
     mapping (uint256 => Claim) internal _claims;
@@ -55,7 +52,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
      * @param governance_ The address of the [governor](/docs/protocol/governance).
      * @param registry_ The address of the [`Registry`](./Registry).
      */
-    constructor(address governance_, address registry_) ERC721("Solace Claim", "SCT") Governable(governance_) {
+    constructor(address governance_, address registry_) ERC721Enhanced("Solace Claim", "SCT") Governable(governance_) {
         _registry = IRegistry(registry_);
     }
 
@@ -177,20 +174,6 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
         return end - block.timestamp;
     }
 
-    /**
-     * @notice List a user's claims.
-     * @param claimant User to check.
-     * @return claimIDs List of claimIDs.
-     */
-    function listClaims(address claimant) external view override returns (uint256[] memory claimIDs) {
-        uint256 tokenCount = balanceOf(claimant);
-        claimIDs = new uint256[](tokenCount);
-        for (uint256 index = 0; index < tokenCount; index++) {
-            claimIDs[index] = tokenOfOwnerByIndex(claimant, index);
-        }
-        return claimIDs;
-    }
-
     /***************************************
     GLOBAL VIEWS
     ***************************************/
@@ -236,30 +219,6 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
      */
     function setCooldownPeriod(uint256 cooldownPeriod_) external override onlyGovernance {
         _cooldownPeriod = cooldownPeriod_;
-    }
-
-    /***************************************
-    ERC721 FUNCTIONS
-    ***************************************/
-
-    /**
-     * @notice Transfers `tokenID` from `msg.sender` to `to`.
-     * @dev This was excluded from the official `ERC721` standard in favor of `transferFrom(address from, address to, uint256 tokenID)`. We elect to include it.
-     * @param to The receipient of the token.
-     * @param tokenID The token to transfer.
-     */
-    function transfer(address to, uint256 tokenID) public override {
-        super.transferFrom(msg.sender, to, tokenID);
-    }
-
-    /**
-     * @notice Safely transfers `tokenID` from `msg.sender` to `to`.
-     * @dev This was excluded from the official `ERC721` standard in favor of `safeTransferFrom(address from, address to, uint256 tokenID)`. We elect to include it.
-     * @param to The receipient of the token.
-     * @param tokenID The token to transfer.
-     */
-    function safeTransfer(address to, uint256 tokenID) public override {
-        super.safeTransferFrom(msg.sender, to, tokenID, "");
     }
 
     /***************************************

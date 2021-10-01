@@ -62,9 +62,8 @@ contract LiquityProduct is BaseProduct {
 
         address lqtyStaking = _troveManager.lqtyStaking();
         address stabilityPool = _troveManager.stabilityPool();
-
         // check all addresses in list
-        for (uint256 offset = 0; offset < positionDescription.length; offset += ADDRESS_SIZE) {
+        for(uint256 offset = 0; offset < positionDescription.length; offset += ADDRESS_SIZE) {
             // get next address
             address positionContract;
             assembly {

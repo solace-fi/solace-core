@@ -2,10 +2,10 @@
 pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "./Governable.sol";
+import "./ERC721Enhanced.sol";
 import "./interface/IProduct.sol";
 import "./interface/IPolicyManager.sol";
 import "./interface/IPolicyDescriptor.sol";
@@ -20,7 +20,7 @@ import "./interface/IPolicyDescriptor.sol";
  *
  * Policies are [**ERC721s**](https://docs.openzeppelin.com/contracts/4.x/api/token/erc721#ERC721).
  */
-contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
+contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
     using Address for address;
     using EnumerableSet for EnumerableSet.AddressSet;
 
@@ -53,7 +53,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
      * @notice Constructs the `PolicyManager`.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
      */
-    constructor(address governance_) ERC721("Solace Policy", "SPT") Governable(governance_) { }
+    constructor(address governance_) ERC721Enhanced("Solace Policy", "SPT") Governable(governance_) { }
 
     /***************************************
     POLICY VIEW FUNCTIONS
@@ -138,20 +138,6 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
     function getPositionDescription(uint256 policyID) external view override policyMustExist(policyID) returns (bytes memory positionDescription) {
         positionDescription = _policyInfo[policyID].positionDescription;
         return positionDescription;
-    }
-
-    /**
-     * @notice Lists all policies for a given policy holder.
-     * @param policyholder The address of the policy holder.
-     * @return policyIDs The list of policy IDs that the policy holder has in any order.
-     */
-    function listPolicies(address policyholder) external view override returns (uint256[] memory policyIDs) {
-        uint256 tokenCount = balanceOf(policyholder);
-        policyIDs = new uint256[](tokenCount);
-        for (uint256 index=0; index < tokenCount; index++) {
-            policyIDs[index] = tokenOfOwnerByIndex(policyholder, index);
-        }
-        return policyIDs;
     }
 
     /*
@@ -314,7 +300,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
      */
     function updateActivePolicies(uint256[] calldata policyIDs) external override {
         uint256 activeCover = _activeCoverAmount;
-        for (uint256 i = 0; i < policyIDs.length; i++) {
+        for(uint256 i = 0; i < policyIDs.length; i++) {
             uint256 policyID = policyIDs[i];
             // dont burn active or nonexistent policies
             if (policyHasExpired(policyID)) {
@@ -398,29 +384,5 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
      */
     function setPolicyDescriptor(address policyDescriptor_) external override onlyGovernance {
         _policyDescriptor = policyDescriptor_;
-    }
-
-    /***************************************
-    ERC721 FUNCTIONS
-    ***************************************/
-
-    /**
-     * @notice Transfers `tokenID` from `msg.sender` to `to`.
-     * @dev This was excluded from the official `ERC721` standard in favor of `transferFrom(address from, address to, uint256 tokenID)`. We elect to include it.
-     * @param to The receipient of the token.
-     * @param tokenID The token to transfer.
-     */
-    function transfer(address to, uint256 tokenID) public override {
-        super.transferFrom(msg.sender, to, tokenID);
-    }
-
-    /**
-     * @notice Safely transfers `tokenID` from `msg.sender` to `to`.
-     * @dev This was excluded from the official `ERC721` standard in favor of `safeTransferFrom(address from, address to, uint256 tokenID)`. We elect to include it.
-     * @param to The receipient of the token.
-     * @param tokenID The token to transfer.
-     */
-    function safeTransfer(address to, uint256 tokenID) public override {
-        super.safeTransferFrom(msg.sender, to, tokenID, "");
     }
 }
