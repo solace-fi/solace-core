@@ -41,12 +41,6 @@ contract ClaimsEscrow is ERC721Enhanced, IClaimsEscrow, ReentrancyGuard, Governa
     /// @notice Tracks how much **ETH** is required to payout all claims
     uint256 internal _totalClaimsOutstanding;
 
-    // Call will revert if the claim does not exist.
-    modifier claimMustExist(uint256 claimID) {
-        require(_exists(claimID), "query for nonexistent token");
-        _;
-    }
-
     /**
      * @notice Constructs the ClaimsEscrow contract.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
@@ -94,7 +88,7 @@ contract ClaimsEscrow is ERC721Enhanced, IClaimsEscrow, ReentrancyGuard, Governa
      * Only callable after the cooldown period has elapsed (from the time the claim was approved and processed).
      * @param claimID The ID of the claim to withdraw payout for.
      */
-    function withdrawClaimsPayout(uint256 claimID) external override nonReentrant claimMustExist(claimID) {
+    function withdrawClaimsPayout(uint256 claimID) external override nonReentrant tokenMustExist(claimID) {
         require(msg.sender == ownerOf(claimID), "!claimant");
         require(block.timestamp >= _claims[claimID].receivedAt + _cooldownPeriod, "cooldown period has not elapsed");
 
@@ -130,7 +124,7 @@ contract ClaimsEscrow is ERC721Enhanced, IClaimsEscrow, ReentrancyGuard, Governa
      * @param claimID Claim to query.
      * @return info Claim info as struct.
      */
-    function claim(uint256 claimID) external view override claimMustExist(claimID) returns (Claim memory info) {
+    function claim(uint256 claimID) external view override tokenMustExist(claimID) returns (Claim memory info) {
         return _claims[claimID];
     }
 
@@ -140,7 +134,7 @@ contract ClaimsEscrow is ERC721Enhanced, IClaimsEscrow, ReentrancyGuard, Governa
      * @return amount Claim amount in ETH.
      * @return receivedAt Time claim was received at.
      */
-    function getClaim(uint256 claimID) external view override claimMustExist(claimID) returns (uint256 amount, uint256 receivedAt) {
+    function getClaim(uint256 claimID) external view override tokenMustExist(claimID) returns (uint256 amount, uint256 receivedAt) {
         Claim memory info = _claims[claimID];
         return (info.amount, info.receivedAt);
     }
@@ -168,7 +162,7 @@ contract ClaimsEscrow is ERC721Enhanced, IClaimsEscrow, ReentrancyGuard, Governa
      * @param claimID The ID to check.
      * @return time The duration in seconds.
      */
-    function timeLeft(uint256 claimID) external view override claimMustExist(claimID) returns (uint256 time) {
+    function timeLeft(uint256 claimID) external view override tokenMustExist(claimID) returns (uint256 time) {
         uint256 end = _claims[claimID].receivedAt + _cooldownPeriod;
         if(block.timestamp >= end) return 0;
         return end - block.timestamp;
@@ -198,7 +192,7 @@ contract ClaimsEscrow is ERC721Enhanced, IClaimsEscrow, ReentrancyGuard, Governa
      * @param claimID The claim to adjust.
      * @param value The new payout of the claim.
      */
-    function adjustClaim(uint256 claimID, uint256 value) external override onlyGovernance claimMustExist(claimID) {
+    function adjustClaim(uint256 claimID, uint256 value) external override onlyGovernance tokenMustExist(claimID) {
         _totalClaimsOutstanding = _totalClaimsOutstanding - _claims[claimID].amount + value;
         _claims[claimID].amount = value;
     }

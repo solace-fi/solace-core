@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Enumerable.sol";
  * @author solace.fi
  * @notice An extension of `ERC721`.
  *
- * The base is OpenZeppelin's `ERC721Enumerable` which also includes the `Metadata` extension. This extension includes simpler transfers, gasless transfers, and better enumeration.
+ * The base is OpenZeppelin's `ERC721Enumerable` which also includes the `Metadata` extension. This extension includes simpler transfers, gasless approvals, and better enumeration.
  */
 interface IERC721Enhanced is IERC721Enumerable {
 
@@ -34,7 +34,7 @@ interface IERC721Enhanced is IERC721Enumerable {
     function safeTransfer(address to, uint256 tokenID) external;
 
     /***************************************
-    GASLESS TRANSFERS
+    GASLESS APPROVALS
     ***************************************/
 
     /**
@@ -98,4 +98,11 @@ interface IERC721Enhanced is IERC721Enumerable {
      * @return tokenIDs The list of token IDs.
      */
     function listTokensOfOwner(address owner) external view returns (uint256[] memory tokenIDs);
+
+    /***************************************
+    MODIFIERS
+    ***************************************/
+
+    // Call will revert if the token does not exist.
+    modifier tokenMustExist(uint256 tokenID) virtual;
 }

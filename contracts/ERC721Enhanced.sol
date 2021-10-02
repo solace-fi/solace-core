@@ -13,7 +13,7 @@ import "./interface/IERC721Enhanced.sol";
  * @author solace.fi
  * @notice An extension of `ERC721`.
  *
- * The base is OpenZeppelin's `ERC721Enumerable` which also includes the `Metadata` extension. This extension includes simpler transfers, gasless transfers, and better enumeration.
+ * The base is OpenZeppelin's `ERC721Enumerable` which also includes the `Metadata` extension. This extension includes simpler transfers, gasless approvals, and better enumeration.
  */
 abstract contract ERC721Enhanced is ERC721Enumerable, IERC721Enhanced, EIP712 {
 
@@ -59,7 +59,7 @@ abstract contract ERC721Enhanced is ERC721Enumerable, IERC721Enhanced, EIP712 {
     }
 
     /***************************************
-    GASLESS TRANSFERS
+    GASLESS APPROVALS
     ***************************************/
 
     /**
@@ -122,7 +122,7 @@ abstract contract ERC721Enhanced is ERC721Enumerable, IERC721Enhanced, EIP712 {
      * @return typehash The typehash for the `permit`.
      */
     // solhint-disable-next-line func-name-mixedcase
-    function PERMIT_TYPEHASH() external view override returns (bytes32 typehash) {
+    function PERMIT_TYPEHASH() external pure override returns (bytes32 typehash) {
         return _PERMIT_TYPEHASH;
     }
 
@@ -167,5 +167,15 @@ abstract contract ERC721Enhanced is ERC721Enumerable, IERC721Enhanced, EIP712 {
             tokenIDs[index] = tokenOfOwnerByIndex(owner, index);
         }
         return tokenIDs;
+    }
+
+    /***************************************
+    MODIFIERS
+    ***************************************/
+
+    // Call will revert if the token does not exist.
+    modifier tokenMustExist(uint256 tokenID) override {
+        require(_exists(tokenID), "query for nonexistent token");
+        _;
     }
 }

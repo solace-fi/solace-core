@@ -43,12 +43,6 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
     /// @notice Policy info (policy ID => policy info).
     mapping(uint256 => PolicyInfo) internal _policyInfo;
 
-    // Call will revert if the policy does not exist.
-    modifier policyMustExist(uint256 policyID) {
-        require(_exists(policyID), "query for nonexistent token");
-        _;
-    }
-
     /**
      * @notice Constructs the `PolicyManager`.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
@@ -64,7 +58,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
      * @param policyID The policy ID to return info.
      * @return info info in a struct.
      */
-    function policyInfo(uint256 policyID) external view override policyMustExist(policyID) returns (PolicyInfo memory info) {
+    function policyInfo(uint256 policyID) external view override tokenMustExist(policyID) returns (PolicyInfo memory info) {
         info = _policyInfo[policyID];
         return info;
     }
@@ -79,7 +73,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
      * @return price The price of the policy.
      * @return positionDescription The description of the covered position(s).
      */
-    function getPolicyInfo(uint256 policyID) external view override policyMustExist(policyID) returns (address policyholder, address product, uint256 coverAmount, uint40 expirationBlock, uint24 price, bytes memory positionDescription) {
+    function getPolicyInfo(uint256 policyID) external view override tokenMustExist(policyID) returns (address policyholder, address product, uint256 coverAmount, uint40 expirationBlock, uint24 price, bytes memory positionDescription) {
         PolicyInfo memory info = _policyInfo[policyID];
         return (ownerOf(policyID), info.product, info.coverAmount, info.expirationBlock, info.price, info.positionDescription);
     }
@@ -89,7 +83,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
      * @param policyID The policy ID.
      * @return policyholder The address of the policy holder.
      */
-    function getPolicyholder(uint256 policyID) external view override policyMustExist(policyID) returns (address policyholder) {
+    function getPolicyholder(uint256 policyID) external view override tokenMustExist(policyID) returns (address policyholder) {
         return ownerOf(policyID);
     }
 
@@ -98,7 +92,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
      * @param policyID The policy ID.
      * @return product The product of the policy.
      */
-    function getPolicyProduct(uint256 policyID) external view override policyMustExist(policyID) returns (address product) {
+    function getPolicyProduct(uint256 policyID) external view override tokenMustExist(policyID) returns (address product) {
         return _policyInfo[policyID].product;
     }
 
@@ -107,7 +101,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
      * @param policyID The policy ID.
      * @return expirationBlock The expiration block of the policy.
      */
-    function getPolicyExpirationBlock(uint256 policyID) external view override policyMustExist(policyID) returns (uint40 expirationBlock) {
+    function getPolicyExpirationBlock(uint256 policyID) external view override tokenMustExist(policyID) returns (uint40 expirationBlock) {
         return _policyInfo[policyID].expirationBlock;
     }
 
@@ -116,7 +110,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
      * @param policyID The policy ID.
      * @return coverAmount The cover amount of the policy.
      */
-    function getPolicyCoverAmount(uint256 policyID) external view override policyMustExist(policyID) returns (uint256 coverAmount) {
+    function getPolicyCoverAmount(uint256 policyID) external view override tokenMustExist(policyID) returns (uint256 coverAmount) {
         return _policyInfo[policyID].coverAmount;
     }
 
@@ -125,7 +119,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
      * @param policyID The policy ID.
      * @return price The price of the policy.
      */
-    function getPolicyPrice(uint256 policyID) external view override policyMustExist(policyID) returns (uint24 price) {
+    function getPolicyPrice(uint256 policyID) external view override tokenMustExist(policyID) returns (uint24 price) {
         return _policyInfo[policyID].price;
     }
 
@@ -135,7 +129,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
      * @param policyID The policy ID.
      * @return positionDescription The description of the covered position(s).
      */
-    function getPositionDescription(uint256 policyID) external view override policyMustExist(policyID) returns (bytes memory positionDescription) {
+    function getPositionDescription(uint256 policyID) external view override tokenMustExist(policyID) returns (bytes memory positionDescription) {
         positionDescription = _policyInfo[policyID].positionDescription;
         return positionDescription;
     }
@@ -201,7 +195,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
      * @param policyID The policy ID.
      * @return description The human readable description of the policy.
      */
-    function tokenURI(uint256 policyID) public view override(ERC721) policyMustExist(policyID) returns (string memory description) {
+    function tokenURI(uint256 policyID) public view override(ERC721) tokenMustExist(policyID) returns (string memory description) {
         return IPolicyDescriptor(_policyDescriptor).tokenURI(this, policyID);
     }
 
@@ -258,7 +252,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
         uint24 price,
         bytes calldata positionDescription
         )
-        external override policyMustExist(policyID)
+        external override tokenMustExist(policyID)
     {
         require(_policyInfo[policyID].product == msg.sender, "wrong product");
         _activeCoverAmount = _activeCoverAmount - _policyInfo[policyID].coverAmount + coverAmount;
@@ -278,7 +272,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
      * Can only be called by **products**.
      * @param policyID The ID of the policy to burn.
      */
-    function burn(uint256 policyID) external override policyMustExist(policyID) {
+    function burn(uint256 policyID) external override tokenMustExist(policyID) {
         require(_policyInfo[policyID].product == msg.sender, "wrong product");
         _burn(policyID);
     }
