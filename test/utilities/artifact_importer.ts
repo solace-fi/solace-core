@@ -84,7 +84,11 @@ export async function import_artifacts() {
   artifacts.LUSDToken = await tryImport(`${artifact_dir}/interface/Liquity/ILUSDToken.sol/ILUSDToken.json`);
   artifacts.StabilityPool = await tryImport(`${artifact_dir}/interface/Liquity/IStabilityPool.sol/IStabilityPool.json`);
 
-
+  // curve imports
+  artifacts.CurveAddressProvider = await tryImport(`${artifact_dir}/interface/Curve/ICurveAddressProvider.sol/ICurveAddressProvider.json`);
+  artifacts.CurveRegistry = await tryImport(`${artifact_dir}/interface/Curve/ICurveRegistry.sol/ICurveRegistry.json`);
+  artifacts.CurvePool = await tryImport(`${artifact_dir}/interface/Curve/ICurvePool.sol/ICurvePool.json`);
+  artifacts.CurveToken = await tryImport(`${artifact_dir}/interface/Curve/ICurveToken.sol/ICurveToken.json`);
 
   return artifacts;
 }
