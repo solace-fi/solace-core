@@ -523,95 +523,11 @@ if(process.env.FORK_NETWORK === "mainnet"){
         let success = 0;
         let successList = [];
         let failList = [];
-        // address:blacklist
-        let blacklistsMap = new Map([
-          ["0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", true] // USDC
-        ]);
-
+      
         for (let i = 0; i < lpTokens.length; i++) {
           const lpTokenAddress = lpTokens[i].address;
           const symbol = lpTokens[i].symbol;
           try {
-            // fetch contracts
-            const curveToken = await ethers.getContractAt(artifacts.CurveToken.abi, lpTokenAddress);
-            const poolAddress = await curveRegistry.get_pool_from_lp_token(lpTokenAddress);
-            const uTokenCount = await curveRegistry.get_n_coins(poolAddress);
-            const pool = await ethers.getContractAt(artifacts.CurvePool.abi, poolAddress);
-           
-            let uTokens = [];
-            let decimals = []; // await curveToken.decimals();
-            let uAmounts = []; // oneToken(decimals);
-            let uAmountTotal = BN.from(0);
-
-            // create positions
-            for (let i = 0; i < uTokenCount; i++) {
-              const uAddress = await pool.coins(i);
-              console.log(uAddress);
-              let uToken;
-              if (uAddress === '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE') {
-                uToken = await ethers.getContractAt(artifacts.WETH.abi, "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-              } else {
-                uToken = await ethers.getContractAt(artifacts.ERC20.abi, uAddress );
-              }
-              const decimal = await uToken.decimals();
-              const uAmount = BN.from("1000000000000000000");
-              uAmountTotal.add(uAmount);
-
-              if (uAddress === '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE') {
-                const oldBalance = await policyholder3.getBalance();
-                await depositor.sendTransaction({to: policyholder3Address, value: uAmount});
-                const newBalance = await policyholder3.getBalance();
-                expect(newBalance.sub(uAmount).eq(oldBalance));
-
-              } else if (blacklistsMap.has(uAddress)) {
-                const blacklistContract = await ethers.getContractAt(artifacts.Blacklist.abi, uAddress);
-                let value = toBytes32(BN.from(0)).toString();
-                for (let j = 0; j < 200; ++j) {
-                  try {
-                    let index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[policyholder3.address,j]);
-                    await setStorageAt(uAddress, index, value);
-                    var blacklisted = await blacklistContract.isBlacklisted(policyholder3.address);
-                    if (!blacklisted) break;
-                  } catch(e) { }
-                }
-                expect(await blacklistContract.isBlacklisted(policyholder3.address)).to.be.false;
-              } else {
-                let value = toBytes32(uAmount).toString();
-
-                for (let j = 0; j < 200; ++j) {
-                  try { // solidity rigged balanceOf
-                    let index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[policyholder3.address,j]);
-                    await setStorageAt(uAddress, index, value);
-                    let uBalance = await uToken.balanceOf(policyholder3.address);
-                    if (uBalance.eq(uAmount)) break;
-                  } catch(e) { }
-
-                  try { // vyper rigged balanceOf
-                    let index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[j,policyholder3.address]);
-                    await setStorageAt(value, index, value);
-                    let uBalance = await uToken.balanceOf(policyholder3.address);
-                    if (uBalance.eq(uAmount)) break;
-                  } catch(e) { }
-                }
-                expect(await uToken.balanceOf(policyholder3.address)).to.equal(uAmount);
-              }
-
-              uTokens.push(uToken);
-              uAmounts.push(uAmount)
-              decimals.push(decimal)
-
-              // approve
-              await uToken.connect(policyholder3).approve(poolAddress, constants.MaxUint256);
-            }
-
-            // deposit to pool
-            expect(await curveToken.balanceOf(policyholder3.address)).to.be.equal(0);
-            const minMintAmount = BN.from("100000000000000"); // setting some small value
-            await pool.connect(policyholder3).add_liquidity(uAmounts, minMintAmount)
-         
-            // check lp token balance
-            expect(await curveToken.balanceOf(policyholder3.address)).to.closeTo(uAmountTotal, 100);
-
             // create policy
             await product.connect(policyholder3).buyPolicy(policyholder3.address, coverAmount, blocks, lpTokenAddress, { value: expectedPremium });
             let policyID = (await policyManager.totalPolicyCount()).toNumber();
