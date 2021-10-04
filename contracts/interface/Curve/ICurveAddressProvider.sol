@@ -8,5 +8,5 @@ interface ICurveAddressProvider {
      * @return registry The registry address.
      */
     // solhint-disable-next-line func-name-mixedcase
-    function get_registry() external view returns (address);
+    function get_registry() external view returns (address registry);
 }

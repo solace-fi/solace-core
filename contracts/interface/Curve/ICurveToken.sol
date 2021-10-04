@@ -10,7 +10,7 @@ interface ICurveToken is IERC20 {
       * @notice Mints token for the user.
       * @param to The user address.
       * @param value The amount token.
-      * @return true Returns true.
+      * @return status If successfull returns true, otherwise false.
       */
-      function mint(address to, uint256 value) external view returns (bool);
+      function mint(address to, uint256 value) external returns (bool status);
 }
