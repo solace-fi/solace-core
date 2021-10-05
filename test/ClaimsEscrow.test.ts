@@ -291,68 +291,20 @@ describe("ClaimsEscrow", function () {
     });
   });
 
-  describe("listClaims", function () {
+  describe("listTokensOfOwner", function () {
     it("lists claims", async function () {
-      expect(await claimsEscrow.listClaims(claimant.address)).to.deep.equal([]);
+      expect(await claimsEscrow.listTokensOfOwner(claimant.address)).to.deep.equal([]);
       await claimsEscrow.connect(mockProduct).receiveClaim(2, claimant.address, 0);
-      expect(await claimsEscrow.listClaims(claimant.address)).to.deep.equal([BN.from(2)]);
+      expect(await claimsEscrow.listTokensOfOwner(claimant.address)).to.deep.equal([BN.from(2)]);
       await claimsEscrow.connect(mockProduct).receiveClaim(4, claimant.address, 0);
-      expect(await claimsEscrow.listClaims(claimant.address)).to.deep.equal([BN.from(2),BN.from(4)]);
+      expect(await claimsEscrow.listTokensOfOwner(claimant.address)).to.deep.equal([BN.from(2),BN.from(4)]);
       await claimsEscrow.connect(mockProduct).receiveClaim(6, deployer.address, 0);
-      expect(await claimsEscrow.listClaims(claimant.address)).to.deep.equal([BN.from(2),BN.from(4)]);
+      expect(await claimsEscrow.listTokensOfOwner(claimant.address)).to.deep.equal([BN.from(2),BN.from(4)]);
       await claimsEscrow.connect(mockProduct).receiveClaim(8, claimant.address, 0);
-      expect(await claimsEscrow.listClaims(claimant.address)).to.deep.equal([BN.from(2),BN.from(4),BN.from(8)]);
+      expect(await claimsEscrow.listTokensOfOwner(claimant.address)).to.deep.equal([BN.from(2),BN.from(4),BN.from(8)]);
       await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]);
       await claimsEscrow.connect(claimant).withdrawClaimsPayout(4);
-      expect(await claimsEscrow.listClaims(claimant.address)).to.deep.equal([BN.from(2),BN.from(8)]);
-    });
-  });
-
-  describe("transfer", async function () {
-    beforeEach(async function () {
-      await claimsEscrow.connect(mockProduct).receiveClaim(1, claimant.address, 0);
-    });
-    it("should reject transfer of nonexistent token", async function () {
-      await expect(claimsEscrow.connect(claimant).transfer(depositor.address, 99)).to.be.revertedWith("ERC721: operator query for nonexistent token");
-    });
-    it("should reject transfer by non owner", async function () {
-      await expect(claimsEscrow.connect(depositor).transfer(depositor.address, claimID)).to.be.revertedWith("ERC721: transfer caller is not owner nor approved");
-    });
-    it("should transfer", async function () {
-      let bal11 = await claimsEscrow.balanceOf(claimant.address);
-      let bal12 = await claimsEscrow.balanceOf(depositor.address);
-      let ts1 = await claimsEscrow.totalSupply();
-      expect(await claimsEscrow.ownerOf(claimID)).to.equal(claimant.address);
-      let tx = await claimsEscrow.connect(claimant).transfer(depositor.address, claimID);
-      expect(tx).to.emit(claimsEscrow, "Transfer").withArgs(claimant.address, depositor.address, claimID);
-      let bal21 = await claimsEscrow.balanceOf(claimant.address);
-      let bal22 = await claimsEscrow.balanceOf(depositor.address);
-      let ts2 = await claimsEscrow.totalSupply();
-      expect(await claimsEscrow.ownerOf(claimID)).to.equal(depositor.address);
-      expect(bal11.sub(bal21)).to.equal(1);
-      expect(bal22.sub(bal12)).to.equal(1);
-      expect(ts1).to.equal(ts2);
-    });
-    it("should reject safeTransfer of nonexistent token", async function () {
-      await expect(claimsEscrow.connect(claimant).safeTransfer(claimant.address, 99)).to.be.revertedWith("ERC721: operator query for nonexistent token");
-    });
-    it("should reject safeTransfer by non owner", async function () {
-      await expect(claimsEscrow.connect(depositor).safeTransfer(depositor.address, claimID)).to.be.revertedWith("ERC721: transfer caller is not owner nor approved");
-    });
-    it("should safeTransfer", async function () {
-      let bal11 = await claimsEscrow.balanceOf(claimant.address);
-      let bal12 = await claimsEscrow.balanceOf(depositor.address);
-      let ts1 = await claimsEscrow.totalSupply();
-      expect(await claimsEscrow.ownerOf(claimID)).to.equal(claimant.address);
-      let tx = await claimsEscrow.connect(claimant).safeTransfer(depositor.address, claimID);
-      expect(tx).to.emit(claimsEscrow, "Transfer").withArgs(claimant.address, depositor.address, claimID);
-      let bal21 = await claimsEscrow.balanceOf(claimant.address);
-      let bal22 = await claimsEscrow.balanceOf(depositor.address);
-      let ts2 = await claimsEscrow.totalSupply();
-      expect(await claimsEscrow.ownerOf(claimID)).to.equal(depositor.address);
-      expect(bal11.sub(bal21)).to.equal(1);
-      expect(bal22.sub(bal12)).to.equal(1);
-      expect(ts1).to.equal(ts2);
+      expect(await claimsEscrow.listTokensOfOwner(claimant.address)).to.deep.equal([BN.from(2),BN.from(8)]);
     });
   });
 });
