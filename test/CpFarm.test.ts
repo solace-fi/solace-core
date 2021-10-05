@@ -8,7 +8,7 @@ const { expect } = chai;
 chai.use(solidity);
 
 import { burnBlocks, burnBlocksUntil } from "./utilities/time";
-import { bnAddSub, bnMulDiv } from "./utilities/math";
+import { bnAddSub, bnMulDiv, expectClose } from "./utilities/math";
 import { getPermitDigest, sign, getDomainSeparator } from "./utilities/signature";
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
@@ -408,20 +408,12 @@ describe("CpFarm", function () {
       expectedReward1 = expectedReward1.add(
         bnMulDiv([solacePerSecond, 200, depositAmount1], [depositAmount123]), // 5% ownership for 200 seconds
       );
-      console.log('start time :', startTime);
-      console.log('block time :', (await provider.getBlock('latest')).timestamp);
-      console.log('pending  1 :', pendingReward1.toString(), pendingReward1);
-      console.log('expected 1 :', expectedReward1.toString(), expectedReward1);
-      //expect(pendingReward1).to.eq(expectedReward1);
       expectClose(pendingReward1, expectedReward1, solacePerSecond);
       // check farmer 2 rewards
       pendingReward2 = BN.from(await farm.pendingRewards(farmer2.address));
       expectedReward2 = expectedReward2.add(
         bnMulDiv([solacePerSecond, 200, depositAmount23], [depositAmount123]), // 95% ownership for 200 seconds
       );
-      console.log('pending  2 :', pendingReward2.toString(), pendingReward2);
-      console.log('expected 2 :', expectedReward2.toString(), expectedReward2);
-      //expect(pendingReward2).to.eq(expectedReward2);
       expectClose(pendingReward2, expectedReward2, solacePerSecond);
       /*
       // farmer 1 withdraw rewards
@@ -625,17 +617,5 @@ describe("CpFarm", function () {
       farmStake: balances1.farmStake.sub(balances2.farmStake),
       farmControllerSolace: balances1.farmControllerSolace.sub(balances2.farmControllerSolace),
     };
-  }
-
-  // asserts (expected-delta) <= actual <= expected+delta
-  function expectClose(actual: BigNumberish, expected: BigNumberish, delta: BigNumberish) {
-    let a = BN.from(actual);
-    let e = BN.from(expected);
-    let d = BN.from(delta);
-    let l = e.sub(d);
-    let r = e.add(d);
-    let b = a.gte(l) && a.lte(r);
-    let m = `Expected ${a.toString()} to be within ${d.toString()} of ${e.toString()}`;
-    expect(b, m).to.be.true;
   }
 });

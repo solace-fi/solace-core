@@ -13,8 +13,8 @@ interface IFarmController {
     EVENTS
     ***************************************/
 
-    /// @notice Emitted when a farm is created.
-    event FarmCreated(uint256 indexed farmID, address indexed farmAddress);
+    /// @notice Emitted when a farm is registered.
+    event FarmRegistered(uint256 indexed farmID, address indexed farmAddress);
     /// @notice Emitted when reward per second is changed.
     event RewardsSet(uint256 rewardPerSecond);
 

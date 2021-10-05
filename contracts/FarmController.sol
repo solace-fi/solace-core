@@ -160,13 +160,16 @@ contract FarmController is IFarmController, Governable {
      * @return farmID The farm ID.
      */
     function registerFarm(address farmAddress, uint256 allocPoints_) external override onlyGovernance returns (uint256 farmID) {
+        // note that each farm will be assigned a number of rewards to distribute per second,
+        // but there are no checks in case the farm exceeds that amount.
+        // check the farm logic before registering it
         require(_farmIndices[farmAddress] == 0, "already registered");
         require(IFarm(farmAddress).farmType() > 0, "not a farm");
         farmID = ++_numFarms; // starts at 1
         _farmAddresses[farmID] = farmAddress;
         _farmIndices[farmAddress] = farmID;
         _setAllocPoints(farmID, allocPoints_);
-        emit FarmCreated(farmID, farmAddress);
+        emit FarmRegistered(farmID, farmAddress);
     }
 
     /**
