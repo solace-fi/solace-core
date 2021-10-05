@@ -3,6 +3,10 @@ pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "./interface/UniswapV3/IUniswapV3Pool.sol";
+import "./libraries/UniswapV3/TickMath.sol";
+import "./libraries/UniswapV3/FixedPoint96.sol";
+import "./libraries/UniswapV3/FullMath.sol";
 import "./Governable.sol";
 import "./interface/ISOLACE.sol";
 import "./interface/IFarmController.sol";
@@ -20,22 +24,38 @@ contract OptionsFarming is IOptionsFarming, ERC721Enumerable, Governable {
     /// @notice Native SOLACE Token.
     ISOLACE internal _solace = ISOLACE(address(0x0));
 
+    // farm controller
     IFarmController internal _controller;
 
+    // receiver for options payments
     address payable internal _destination;
 
-    uint256 internal _expiryFuture = 2592000; // 30 days
+    // amount of time in seconds into the future that new options will expire
+    uint256 internal _expiryDuration;
 
+    // total number of options ever created
     uint256 internal _numOptions = 0;
 
     /// @dev _options[optionID] => Option info.
     mapping(uint256 => Option) internal _options;
 
+    // the uniswap solace-eth for calculating twap
+    IUniswapV3Pool internal _pool = IUniswapV3Pool(address(0x0));
+
+    // interval in seconds to calculate time weighted average price in strike price
+    uint32 internal _twapInterval;
+
+    // true if solace is token 0 of the pool. used in twap calculation
+    bool internal _solaceIsToken0;
+
     /**
      * @notice Constructs the `OptionsFarming` contract.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
      */
-    constructor(address governance_) ERC721("Solace Options Mining", "SOM") Governable(governance_) { }
+    constructor(address governance_) ERC721("Solace Options Mining", "SOM") Governable(governance_) {
+        _twapInterval = 3600; // one hour
+        _expiryDuration = 2592000; // 30 days
+    }
 
     /***************************************
     VIEW FUNCTIONS
@@ -67,13 +87,36 @@ contract OptionsFarming is IOptionsFarming, ERC721Enumerable, Governable {
     /**
      * @notice Calculate the strike price for an amount of [**SOLACE**](./SOLACE).
      * @param rewardAmount Amount of [**SOLACE**](./SOLACE).
-     * @return strikePrice_ Strike Price.
+     * @return strikePrice Strike Price.
      */
-    function calculateStrikePrice(uint256 rewardAmount) public view override returns (uint256 strikePrice_) {
-        require(address(_solace) != address(0x0), "solace not set");
-        // TODO: TWAP
-        strikePrice_ = rewardAmount;
-        return strikePrice_;
+    function calculateStrikePrice(uint256 rewardAmount) public view override returns (uint256 strikePrice) {
+        require(address(_pool) != address(0x0), "pool not set");
+        // TWAP
+        uint160 sqrtPriceX96;
+        if (_twapInterval == 0) {
+            // return the current price
+            (sqrtPriceX96, , , , , , ) = _pool.slot0();
+        } else {
+            // retrieve historic tick data from pool
+            uint32[] memory secondsAgos = new uint32[](2);
+            secondsAgos[0] = _twapInterval; // from (before)
+            secondsAgos[1] = 0; // to (now)
+            (int56[] memory tickCumulatives, ) = _pool.observe(secondsAgos);
+            // math
+            int56 tickCumulativesDelta = tickCumulatives[1] - tickCumulatives[0];
+            int56 interval = int56(uint56(_twapInterval));
+            int24 timeWeightedAverageTick = int24(tickCumulativesDelta / interval);
+            // always round to negative infinity
+            if (tickCumulativesDelta < 0 && (tickCumulativesDelta % interval) != 0) timeWeightedAverageTick--;
+            // tick to sqrtPriceX96
+            sqrtPriceX96 = TickMath.getSqrtRatioAtTick(timeWeightedAverageTick);
+        }
+        // TODO: token0/token1 ordering?
+        // sqrtPriceX96 to priceX96
+        uint256 priceX96 = FullMath.mulDiv(sqrtPriceX96, sqrtPriceX96, FixedPoint96.Q96);
+        // TODO: priceX96 to strikePrice?
+        strikePrice = rewardAmount * priceX96;
+        return strikePrice;
     }
 
     /***************************************
@@ -93,7 +136,7 @@ contract OptionsFarming is IOptionsFarming, ERC721Enumerable, Governable {
         Option memory option = Option({
             rewardAmount: rewardAmount,
             strikePrice: calculateStrikePrice(rewardAmount),
-            expiry: block.timestamp + _expiryFuture
+            expiry: block.timestamp + _expiryDuration
         });
         optionID = ++_numOptions; // autoincrement from 1
         // TODO: bookkeeping?
@@ -147,31 +190,55 @@ contract OptionsFarming is IOptionsFarming, ERC721Enumerable, Governable {
     /**
      * @notice Sets the [`FarmController(./FarmController)` contract.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param controller_ The address of the new [`FarmController(./FarmController).
+     * @param controller The address of the new [`FarmController(./FarmController).
      */
-    function setFarmController(address controller_) external override onlyGovernance {
-        _controller = IFarmController(controller_);
+    function setFarmController(address controller) external override onlyGovernance {
+        _controller = IFarmController(controller);
     }
 
     /**
-     * @notice Sets the [**SOLACE**](./SOLACE) native token.
+     * @notice Sets the [**SOLACE**](../SOLACE) native token.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param solace_ The address of the [**SOLACE**](./SOLACE) contract.
+     * @param solace_ The address of the [**SOLACE**](../SOLACE) contract.
      */
     function setSolace(address solace_) external override onlyGovernance {
         _solace = ISOLACE(solace_);
+        _pool = IUniswapV3Pool(address(0x0)); // reset
     }
 
-    // TODO
-    function setPool() external override onlyGovernance { }
+    /**
+     * @notice Sets the pool for twap calculations.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param pool The address of the pool.
+     */
+    function setPool(address pool) external override onlyGovernance {
+        IUniswapV3Pool pool_ = IUniswapV3Pool(pool);
+        // TODO: check if other token is weth (optional)
+        if(pool_.token0() == address(_solace)) {
+            _solaceIsToken0 = true;
+        } else if(pool_.token1() == address(_solace)) {
+            _solaceIsToken0 = false;
+        } else {
+            revert("invalid pool");
+        }
+    }
+
+    /**
+     * @notice Sets the interval for twap calculations.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param interval The interval of the twap.
+     */
+    function setTwapInterval(uint32 interval) external override onlyGovernance {
+        _twapInterval = interval;
+    }
 
     /**
      * @notice Sets the time into the future that new Options will expire.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param expiryFuture_ The duration in seconds.
+     * @param expiryDuration The duration in seconds.
      */
-    function setExpiryFuture(uint256 expiryFuture_) external override onlyGovernance {
-        _expiryFuture = expiryFuture_;
+    function setExpiryDuration(uint256 expiryDuration) external override onlyGovernance {
+        _expiryDuration = expiryDuration;
     }
 
     /**

@@ -48,9 +48,9 @@ interface IOptionsFarming is IERC721Enumerable {
     /**
      * @notice Calculate the strike price for an amount of [**SOLACE**](../SOLACE).
      * @param rewardAmount Amount of [**SOLACE**](../SOLACE).
-     * @return strikePrice_ Strike Price
+     * @return strikePrice Strike Price
      */
-    function calculateStrikePrice(uint256 rewardAmount) external view returns (uint256 strikePrice_);
+    function calculateStrikePrice(uint256 rewardAmount) external view returns (uint256 strikePrice);
 
     /***************************************
     MUTATOR FUNCTIONS
@@ -81,9 +81,9 @@ interface IOptionsFarming is IERC721Enumerable {
     /**
      * @notice Sets the [`FarmController(../FarmController) contract.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param controller_ The address of the new [`FarmController(../FarmController).
+     * @param controller The address of the new [`FarmController(../FarmController).
      */
-    function setFarmController(address controller_) external;
+    function setFarmController(address controller) external;
 
     /**
      * @notice Sets the [**SOLACE**](../SOLACE) native token.
@@ -92,22 +92,33 @@ interface IOptionsFarming is IERC721Enumerable {
      */
     function setSolace(address solace_) external;
 
-    // TODO
-    function setPool() external;
+    /**
+     * @notice Sets the pool for twap calculations.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param pool The address of the pool.
+     */
+    function setPool(address pool) external;
+
+    /**
+     * @notice Sets the interval for twap calculations.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param interval The interval of the twap.
+     */
+    function setTwapInterval(uint32 interval) external;
 
     /**
      * @notice Sets the time into the future that new Options will expire.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param expiryFuture_ The duration in seconds.
+     * @param expiryDuration The duration in seconds.
      */
-    function setExpiryFuture(uint256 expiryFuture_) external;
+    function setExpiryDuration(uint256 expiryDuration) external;
 
     /**
      * @notice Sets the recipient for Option payments.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param destination_ The new recipient.
+     * @param destination The new recipient.
      */
-    function setDestination(address payable destination_) external;
+    function setDestination(address payable destination) external;
 
     /***************************************
     ERC721 FUNCTIONS
