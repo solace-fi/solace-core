@@ -2,10 +2,10 @@
 pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "./Governable.sol";
+import "./ERC721Enhanced.sol";
 import "./interface/IProduct.sol";
 import "./interface/IPolicyManager.sol";
 import "./interface/IPolicyDescriptor.sol";
@@ -20,7 +20,7 @@ import "./interface/IPolicyDescriptor.sol";
  *
  * Policies are [**ERC721s**](https://docs.openzeppelin.com/contracts/4.x/api/token/erc721#ERC721).
  */
-contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
+contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
     using Address for address;
     using EnumerableSet for EnumerableSet.AddressSet;
 
@@ -43,17 +43,11 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
     /// @notice Policy info (policy ID => policy info).
     mapping(uint256 => PolicyInfo) internal _policyInfo;
 
-    // Call will revert if the policy does not exist.
-    modifier policyMustExist(uint256 policyID) {
-        require(_exists(policyID), "query for nonexistent token");
-        _;
-    }
-
     /**
      * @notice Constructs the `PolicyManager`.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
      */
-    constructor(address governance_) ERC721("Solace Policy", "SPT") Governable(governance_) { }
+    constructor(address governance_) ERC721Enhanced("Solace Policy", "SPT") Governable(governance_) { }
 
     /***************************************
     POLICY VIEW FUNCTIONS
@@ -64,7 +58,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
      * @param policyID The policy ID to return info.
      * @return info info in a struct.
      */
-    function policyInfo(uint256 policyID) external view override policyMustExist(policyID) returns (PolicyInfo memory info) {
+    function policyInfo(uint256 policyID) external view override tokenMustExist(policyID) returns (PolicyInfo memory info) {
         info = _policyInfo[policyID];
         return info;
     }
@@ -79,7 +73,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
      * @return price The price of the policy.
      * @return positionDescription The description of the covered position(s).
      */
-    function getPolicyInfo(uint256 policyID) external view override policyMustExist(policyID) returns (address policyholder, address product, uint256 coverAmount, uint40 expirationBlock, uint24 price, bytes memory positionDescription) {
+    function getPolicyInfo(uint256 policyID) external view override tokenMustExist(policyID) returns (address policyholder, address product, uint256 coverAmount, uint40 expirationBlock, uint24 price, bytes memory positionDescription) {
         PolicyInfo memory info = _policyInfo[policyID];
         return (ownerOf(policyID), info.product, info.coverAmount, info.expirationBlock, info.price, info.positionDescription);
     }
@@ -89,7 +83,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
      * @param policyID The policy ID.
      * @return policyholder The address of the policy holder.
      */
-    function getPolicyholder(uint256 policyID) external view override policyMustExist(policyID) returns (address policyholder) {
+    function getPolicyholder(uint256 policyID) external view override tokenMustExist(policyID) returns (address policyholder) {
         return ownerOf(policyID);
     }
 
@@ -98,7 +92,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
      * @param policyID The policy ID.
      * @return product The product of the policy.
      */
-    function getPolicyProduct(uint256 policyID) external view override policyMustExist(policyID) returns (address product) {
+    function getPolicyProduct(uint256 policyID) external view override tokenMustExist(policyID) returns (address product) {
         return _policyInfo[policyID].product;
     }
 
@@ -107,7 +101,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
      * @param policyID The policy ID.
      * @return expirationBlock The expiration block of the policy.
      */
-    function getPolicyExpirationBlock(uint256 policyID) external view override policyMustExist(policyID) returns (uint40 expirationBlock) {
+    function getPolicyExpirationBlock(uint256 policyID) external view override tokenMustExist(policyID) returns (uint40 expirationBlock) {
         return _policyInfo[policyID].expirationBlock;
     }
 
@@ -116,7 +110,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
      * @param policyID The policy ID.
      * @return coverAmount The cover amount of the policy.
      */
-    function getPolicyCoverAmount(uint256 policyID) external view override policyMustExist(policyID) returns (uint256 coverAmount) {
+    function getPolicyCoverAmount(uint256 policyID) external view override tokenMustExist(policyID) returns (uint256 coverAmount) {
         return _policyInfo[policyID].coverAmount;
     }
 
@@ -125,7 +119,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
      * @param policyID The policy ID.
      * @return price The price of the policy.
      */
-    function getPolicyPrice(uint256 policyID) external view override policyMustExist(policyID) returns (uint24 price) {
+    function getPolicyPrice(uint256 policyID) external view override tokenMustExist(policyID) returns (uint24 price) {
         return _policyInfo[policyID].price;
     }
 
@@ -135,23 +129,9 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
      * @param policyID The policy ID.
      * @return positionDescription The description of the covered position(s).
      */
-    function getPositionDescription(uint256 policyID) external view override policyMustExist(policyID) returns (bytes memory positionDescription) {
+    function getPositionDescription(uint256 policyID) external view override tokenMustExist(policyID) returns (bytes memory positionDescription) {
         positionDescription = _policyInfo[policyID].positionDescription;
         return positionDescription;
-    }
-
-    /**
-     * @notice Lists all policies for a given policy holder.
-     * @param policyholder The address of the policy holder.
-     * @return policyIDs The list of policy IDs that the policy holder has in any order.
-     */
-    function listPolicies(address policyholder) external view override returns (uint256[] memory policyIDs) {
-        uint256 tokenCount = balanceOf(policyholder);
-        policyIDs = new uint256[](tokenCount);
-        for (uint256 index=0; index < tokenCount; index++) {
-            policyIDs[index] = tokenOfOwnerByIndex(policyholder, index);
-        }
-        return policyIDs;
     }
 
     /*
@@ -215,7 +195,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
      * @param policyID The policy ID.
      * @return description The human readable description of the policy.
      */
-    function tokenURI(uint256 policyID) public view override(ERC721) policyMustExist(policyID) returns (string memory description) {
+    function tokenURI(uint256 policyID) public view override(ERC721) tokenMustExist(policyID) returns (string memory description) {
         return IPolicyDescriptor(_policyDescriptor).tokenURI(this, policyID);
     }
 
@@ -272,7 +252,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
         uint24 price,
         bytes calldata positionDescription
         )
-        external override policyMustExist(policyID)
+        external override tokenMustExist(policyID)
     {
         require(_policyInfo[policyID].product == msg.sender, "wrong product");
         _activeCoverAmount = _activeCoverAmount - _policyInfo[policyID].coverAmount + coverAmount;
@@ -292,7 +272,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
      * Can only be called by **products**.
      * @param policyID The ID of the policy to burn.
      */
-    function burn(uint256 policyID) external override policyMustExist(policyID) {
+    function burn(uint256 policyID) external override tokenMustExist(policyID) {
         require(_policyInfo[policyID].product == msg.sender, "wrong product");
         _burn(policyID);
     }
@@ -314,7 +294,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
      */
     function updateActivePolicies(uint256[] calldata policyIDs) external override {
         uint256 activeCover = _activeCoverAmount;
-        for (uint256 i = 0; i < policyIDs.length; i++) {
+        for(uint256 i = 0; i < policyIDs.length; i++) {
             uint256 policyID = policyIDs[i];
             // dont burn active or nonexistent policies
             if (policyHasExpired(policyID)) {
@@ -398,29 +378,5 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
      */
     function setPolicyDescriptor(address policyDescriptor_) external override onlyGovernance {
         _policyDescriptor = policyDescriptor_;
-    }
-
-    /***************************************
-    ERC721 FUNCTIONS
-    ***************************************/
-
-    /**
-     * @notice Transfers `tokenID` from `msg.sender` to `to`.
-     * @dev This was excluded from the official `ERC721` standard in favor of `transferFrom(address from, address to, uint256 tokenID)`. We elect to include it.
-     * @param to The receipient of the token.
-     * @param tokenID The token to transfer.
-     */
-    function transfer(address to, uint256 tokenID) public override {
-        super.transferFrom(msg.sender, to, tokenID);
-    }
-
-    /**
-     * @notice Safely transfers `tokenID` from `msg.sender` to `to`.
-     * @dev This was excluded from the official `ERC721` standard in favor of `safeTransferFrom(address from, address to, uint256 tokenID)`. We elect to include it.
-     * @param to The receipient of the token.
-     * @param tokenID The token to transfer.
-     */
-    function safeTransfer(address to, uint256 tokenID) public override {
-        super.safeTransferFrom(msg.sender, to, tokenID, "");
     }
 }
