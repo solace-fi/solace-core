@@ -248,7 +248,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
      * @param to The receipient of the token.
      * @param tokenID The token to transfer.
      */
-    function transfer(address to, uint256 tokenID) public override {
+    function transfer(address to, uint256 tokenID) external override {
         super.transferFrom(msg.sender, to, tokenID);
     }
 
@@ -258,7 +258,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
      * @param to The receipient of the token.
      * @param tokenID The token to transfer.
      */
-    function safeTransfer(address to, uint256 tokenID) public override {
+    function safeTransfer(address to, uint256 tokenID) external override {
         super.safeTransferFrom(msg.sender, to, tokenID, "");
     }
 

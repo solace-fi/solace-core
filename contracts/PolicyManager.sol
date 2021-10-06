@@ -398,6 +398,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
      */
     function setPolicyDescriptor(address policyDescriptor_) external override onlyGovernance {
         _policyDescriptor = policyDescriptor_;
+        emit PolicyDescriptorSet(policyDescriptor_);
     }
 
     /***************************************
@@ -410,7 +411,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
      * @param to The receipient of the token.
      * @param tokenID The token to transfer.
      */
-    function transfer(address to, uint256 tokenID) public override {
+    function transfer(address to, uint256 tokenID) external override {
         super.transferFrom(msg.sender, to, tokenID);
     }
 
@@ -420,7 +421,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
      * @param to The receipient of the token.
      * @param tokenID The token to transfer.
      */
-    function safeTransfer(address to, uint256 tokenID) public override {
+    function safeTransfer(address to, uint256 tokenID) external override {
         super.safeTransferFrom(msg.sender, to, tokenID, "");
     }
 }
