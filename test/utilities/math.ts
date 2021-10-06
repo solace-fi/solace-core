@@ -1,5 +1,7 @@
 import { BigNumber as BN, BigNumberish } from "ethers";
 import { parseUnits } from '@ethersproject/units';
+import chai from "chai";
+const { expect } = chai;
 
 // multiplies and divides a set of big numbers
 export function bnMulDiv(
@@ -34,4 +36,16 @@ export function bnAddSub(
 
 export function oneToken(decimals: number) {
   return parseUnits("1", decimals);
+}
+
+// asserts (expected-delta) <= actual <= expected+delta
+export function expectClose(actual: BigNumberish, expected: BigNumberish, delta: BigNumberish) {
+  let a = BN.from(actual);
+  let e = BN.from(expected);
+  let d = BN.from(delta);
+  let l = e.sub(d);
+  let r = e.add(d);
+  let b = a.gte(l) && a.lte(r);
+  let m = `Expected ${a.toString()} to be within ${d.toString()} of ${e.toString()}`;
+  expect(b, m).to.be.true;
 }

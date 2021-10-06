@@ -37,7 +37,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
       it("can set new governance", async function() {
         await quoter.connect(governor).setGovernance(deployer.address);
         expect(await quoter.governance()).to.equal(governor.address);
-        expect(await quoter.newGovernance()).to.equal(deployer.address);
+        expect(await quoter.pendingGovernance()).to.equal(deployer.address);
       });
       it("rejects governance transfer by non governor", async function() {
         await expect(quoter.connect(signer).acceptGovernance()).to.be.revertedWith("!governance");
@@ -48,7 +48,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
           .to.emit(quoter, "GovernanceTransferred")
           .withArgs(deployer.address);
         expect(await quoter.governance()).to.equal(deployer.address);
-        expect(await quoter.newGovernance()).to.equal(ZERO_ADDRESS);
+        expect(await quoter.pendingGovernance()).to.equal(ZERO_ADDRESS);
         await quoter.connect(deployer).setGovernance(governor.address);
         await quoter.connect(governor).acceptGovernance();
       });

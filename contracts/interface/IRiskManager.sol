@@ -22,6 +22,8 @@ interface IRiskManager {
     /// @notice Emitted when a product's parameters are modified.
     /// Includes adding and removing products.
     event ProductParamsSet(address product, uint32 weight, uint24 price, uint16 divisor);
+    /// @notice Emitted when partial reserve factor is set.
+    event PartialReservesFactorSet(uint16 factor);
 
     /***************************************
     MAX COVER VIEW FUNCTIONS
