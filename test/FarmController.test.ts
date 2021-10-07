@@ -72,6 +72,7 @@ describe("FarmController", function () {
     optionsFarming = (await deployContract(deployer, artifacts.OptionsFarming, [governor.address])) as OptionsFarming;
     await registry.connect(governor).setOptionsFarming(optionsFarming.address);
     farmController = (await deployContract(deployer, artifacts.FarmController, [governor.address, optionsFarming.address, solacePerSecond])) as FarmController;
+    await registry.connect(governor).setFarmController(farmController.address);
 
     // transfer tokens
     await solace.connect(governor).addMinter(governor.address);

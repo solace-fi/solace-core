@@ -8,7 +8,7 @@ const { expect } = chai;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Registry, Solace, OptionsFarming, Vault, Treasury, ClaimsEscrow, Weth9, PolicyManager, RiskManager } from "../typechain";
+import { Registry, Solace, FarmController, OptionsFarming, Vault, Treasury, ClaimsEscrow, Weth9, PolicyManager, RiskManager } from "../typechain";
 
 describe("Registry", function() {
   let artifacts: ArtifactImports;
@@ -24,6 +24,7 @@ describe("Registry", function() {
   let riskManager: RiskManager;
   let solace: Solace;
   let optionsFarming: OptionsFarming;
+  let farmController: FarmController;
   // mock contracts
   // TODO: switch from mocks and wallets to actual contracts after implementation
   //let locker: Locker;
@@ -210,6 +211,25 @@ describe("Registry", function() {
     });
     it("cannot be set by non governor", async function() {
       await expect(registry.connect(user).setOptionsFarming(optionsFarming.address)).to.be.revertedWith("!governance");
+    });
+  });
+
+  describe("farmController", function() {
+    before(async function () {
+      farmController = (await deployContract(deployer, artifacts.FarmController, [governor.address, optionsFarming.address, 1])) as FarmController;
+    });
+    it("starts as the zero address", async function() {
+      expect(await registry.farmController()).to.equal(ZERO_ADDRESS);
+    });
+    it("can be set", async function() {
+      let tx = await registry.connect(governor).setFarmController(farmController.address);
+      expect(await registry.farmController()).to.equal(farmController.address);
+      await expect(tx)
+        .to.emit(registry, "FarmControllerSet")
+        .withArgs(farmController.address);
+    });
+    it("cannot be set by non governor", async function() {
+      await expect(registry.connect(user).setFarmController(farmController.address)).to.be.revertedWith("!governance");
     });
   });
 

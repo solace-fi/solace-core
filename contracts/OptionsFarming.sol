@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interface/UniswapV3/IUniswapV3Pool.sol";
 import "./libraries/UniswapV3/TickMath.sol";
 import "./libraries/UniswapV3/FixedPoint96.sol";
 import "./libraries/UniswapV3/FullMath.sol";
 import "./Governable.sol";
+import "./ERC721Enhanced.sol";
 import "./interface/ISOLACE.sol";
 import "./interface/IFarmController.sol";
 import "./interface/IOptionsFarming.sol";
@@ -17,8 +17,14 @@ import "./interface/IOptionsFarming.sol";
  * @title OptionsFarming
  * @author solace.fi
  * @notice Distributes options to farmers.
+ *
+ * Rewards are accumulated by farmers for participating in farms. Rewards can be redeemed for options with 1:1 reward:[**SOLACE**](./SOLACE). Options can be exercised by paying `strike price` **ETH** before `expiry` to receive `rewardAmount` [**SOLACE**](./SOLACE).
+ *
+ * The `strike price` is calculated by either:
+ *   - The current market price of [**SOLACE**](./SOLACE) * `swap rate` as determined by the [**SOLACE**](./SOLACE)-**ETH** Uniswap pool.
+ *   - The floor price of [**SOLACE**](./SOLACE)/**USD** converted to **ETH** using a **ETH**-**USD** Uniswap pool.
  */
-contract OptionsFarming is IOptionsFarming, ERC721Enumerable, Governable {
+contract OptionsFarming is ERC721Enhanced, IOptionsFarming, Governable {
     using SafeERC20 for IERC20;
 
     /// @notice Native SOLACE Token.
@@ -28,7 +34,7 @@ contract OptionsFarming is IOptionsFarming, ERC721Enumerable, Governable {
     IFarmController internal _controller;
 
     // receiver for options payments
-    address payable internal _destination;
+    address payable internal _receiver;
 
     // amount of time in seconds into the future that new options will expire
     uint256 internal _expiryDuration;
@@ -39,22 +45,37 @@ contract OptionsFarming is IOptionsFarming, ERC721Enumerable, Governable {
     /// @dev _options[optionID] => Option info.
     mapping(uint256 => Option) internal _options;
 
-    // the uniswap solace-eth for calculating twap
-    IUniswapV3Pool internal _pool = IUniswapV3Pool(address(0x0));
+    // the uniswap solace-eth pool for calculating twap
+    IUniswapV3Pool internal _solaceEthPool = IUniswapV3Pool(address(0x0));
+
+    // the uniswap eth-usd pool for calculating twap
+    IUniswapV3Pool internal _ethUsdPool = IUniswapV3Pool(address(0x0));
 
     // interval in seconds to calculate time weighted average price in strike price
     uint32 internal _twapInterval;
 
-    // true if solace is token 0 of the pool. used in twap calculation
+    // the relative amount of the eth value that a user must pay, measured in BPS
+    uint16 internal _swapRate;
+
+    // true if solace is token 0 of the solace-eth pool. used in twap calculation
     bool internal _solaceIsToken0;
+
+    // true if usd is token 0 of the eth-usd pool. used in twap calculation
+    bool internal _usdIsToken0;
+
+    // the floor price of [**SOLACE**](./SOLACE) measured in **USD**.
+    // specifically, whichever stablecoin is in the eth-usd pool.
+    uint256 internal _priceFloor;
 
     /**
      * @notice Constructs the `OptionsFarming` contract.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
      */
-    constructor(address governance_) ERC721("Solace Options Mining", "SOM") Governable(governance_) {
-        _twapInterval = 3600; // one hour
+    constructor(address governance_) ERC721Enhanced("Solace Options Mining", "SOM") Governable(governance_) {
         _expiryDuration = 2592000; // 30 days
+        _twapInterval = 3600; // one hour
+        _swapRate = 10000; // 100%
+        _priceFloor = type(uint256).max;
     }
 
     /***************************************
@@ -69,6 +90,47 @@ contract OptionsFarming is IOptionsFarming, ERC721Enumerable, Governable {
     // @notice The [`FarmController(./FarmController).
     function farmController() external view override returns (address controller_) {
         return address(_controller);
+    }
+
+    /// @notice The receiver for options payments.
+    function receiver() external view override returns (address receiver_) {
+        return _receiver;
+    }
+
+    /// @notice Amount of time in seconds into the future that new options will expire.
+    function expiryDuration() external view override returns (uint256 expiryDuration_) {
+        return _expiryDuration;
+    }
+
+    /// @notice Total number of options ever created.
+    function numOptions() external view override returns (uint256 numOptions_) {
+        return _numOptions;
+    }
+
+    /// @notice The uniswap solace-eth pool for calculating twap.
+    function solaceEthPool() external view override returns (address solaceEthPool_) {
+        return address(_solaceEthPool);
+    }
+
+    /// @notice The uniswap eth-usd pool for calculating twap.
+    function ethUsdPool() external view override returns (address ethUsdPool_) {
+        return address(_ethUsdPool);
+    }
+
+    /// @notice Interval in seconds to calculate time weighted average price in strike price.
+    function twapInterval() external view override returns (uint32 twapInterval_) {
+        return _twapInterval;
+    }
+
+    /// @notice The relative amount of the eth value that a user must pay, measured in BPS.
+    function swapRate() external view override returns (uint16 swapRate_) {
+        return _swapRate;
+    }
+
+    /// @notice The floor price of [**SOLACE**](./SOLACE) measured in **USD**.
+    /// Specifically, whichever stablecoin is in the eth-usd pool.
+    function priceFloor() external view override returns (uint256 priceFloor_) {
+        return _priceFloor;
     }
 
     /**
@@ -86,22 +148,39 @@ contract OptionsFarming is IOptionsFarming, ERC721Enumerable, Governable {
 
     /**
      * @notice Calculate the strike price for an amount of [**SOLACE**](./SOLACE).
+     * SOLACE and at least one pool must be set.
      * @param rewardAmount Amount of [**SOLACE**](./SOLACE).
-     * @return strikePrice Strike Price.
+     * @return strikePrice Strike Price in **ETH**.
      */
     function calculateStrikePrice(uint256 rewardAmount) public view override returns (uint256 strikePrice) {
-        require(address(_pool) != address(0x0), "pool not set");
+        require(address(_solace) != address(0x0), "solace not set");
+        if(address(_solaceEthPool) != address(0x0)) {
+            return _calculateSolaceEthPrice(rewardAmount);
+        } else if (address(_ethUsdPool) != address(0x0)) {
+            return _calculateEthUsdPrice(rewardAmount);
+        } else {
+            revert("pools not set");
+        }
+    }
+
+    /**
+     * @notice Calculate the strike price for an amount of [**SOLACE**](./SOLACE).
+     * Uses the solace-eth uniswap pool.
+     * @param rewardAmount Amount of [**SOLACE**](./SOLACE).
+     * @return strikePrice Strike Price in **ETH**.
+     */
+    function _calculateSolaceEthPrice(uint256 rewardAmount) internal view returns (uint256 strikePrice) {
         // TWAP
         uint160 sqrtPriceX96;
         if (_twapInterval == 0) {
             // return the current price
-            (sqrtPriceX96, , , , , , ) = _pool.slot0();
+            (sqrtPriceX96, , , , , , ) = _solaceEthPool.slot0();
         } else {
             // retrieve historic tick data from pool
             uint32[] memory secondsAgos = new uint32[](2);
             secondsAgos[0] = _twapInterval; // from (before)
             secondsAgos[1] = 0; // to (now)
-            (int56[] memory tickCumulatives, ) = _pool.observe(secondsAgos);
+            (int56[] memory tickCumulatives, ) = _solaceEthPool.observe(secondsAgos);
             // math
             int56 tickCumulativesDelta = tickCumulatives[1] - tickCumulatives[0];
             int56 interval = int56(uint56(_twapInterval));
@@ -119,13 +198,24 @@ contract OptionsFarming is IOptionsFarming, ERC721Enumerable, Governable {
         return strikePrice;
     }
 
+    /**
+     * @notice Calculate the strike price for an amount of [**SOLACE**](./SOLACE).
+     * Uses the eth-usd uniswap pool.
+     * @param rewardAmount Amount of [**SOLACE**](./SOLACE).
+     * @return strikePrice Strike Price in **ETH**.
+     */
+    function _calculateEthUsdPrice(uint256 rewardAmount) internal view returns (uint256 strikePrice) {
+        // TODO
+        return rewardAmount;
+    }
+
     /***************************************
     MUTATOR FUNCTIONS
     ***************************************/
 
     /**
      * @notice Creates an option for the given `rewardAmount`.
-     * Must be called by a farm.
+     * Must be called by the [`FarmController(./FarmController).
      * @param rewardAmount The amount to reward in the Option.
      * @return optionID The ID of the newly minted option.
      */
@@ -171,30 +261,21 @@ contract OptionsFarming is IOptionsFarming, ERC721Enumerable, Governable {
     }
 
     /**
-     * @notice Sends this contract's **ETH** balance to `destination`.
+     * @notice Sends this contract's **ETH** balance to `receiver`.
      */
     function sendValue() public {
-        if(_destination == address(0x0)) return;
+        if(_receiver == address(0x0)) return;
         uint256 amount = address(this).balance;
         if(amount == 0) return;
         // this call may fail. let it
         // funds will be safely stored and can be sent later
         // solhint-disable-next-line avoid-low-level-calls
-        _destination.call{value: amount}(""); // IGNORE THIS WARNING
+        _receiver.call{value: amount}(""); // IGNORE THIS WARNING
     }
 
     /***************************************
     GOVERNANCE FUNCTIONS
     ***************************************/
-
-    /**
-     * @notice Sets the [`FarmController(./FarmController)` contract.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param controller The address of the new [`FarmController(./FarmController).
-     */
-    function setFarmController(address controller) external override onlyGovernance {
-        _controller = IFarmController(controller);
-    }
 
     /**
      * @notice Sets the [**SOLACE**](../SOLACE) native token.
@@ -203,15 +284,46 @@ contract OptionsFarming is IOptionsFarming, ERC721Enumerable, Governable {
      */
     function setSolace(address solace_) external override onlyGovernance {
         _solace = ISOLACE(solace_);
-        _pool = IUniswapV3Pool(address(0x0)); // reset
+        _solaceEthPool = IUniswapV3Pool(address(0x0)); // reset
+        emit SolaceSet(solace_);
     }
 
     /**
-     * @notice Sets the pool for twap calculations.
+     * @notice Sets the [`FarmController(./FarmController) contract.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param controller The address of the new [`FarmController(./FarmController).
+     */
+    function setFarmController(address controller) external override onlyGovernance {
+        _controller = IFarmController(controller);
+        emit FarmControllerSet(controller);
+    }
+
+    /**
+     * @notice Sets the recipient for Option payments.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param receiver_ The new recipient.
+     */
+    function setReceiver(address payable receiver_) external override onlyGovernance {
+        _receiver = receiver_;
+        emit ReceiverSet(receiver_);
+    }
+
+    /**
+     * @notice Sets the time into the future that new Options will expire.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param expiryDuration_ The duration in seconds.
+     */
+    function setExpiryDuration(uint256 expiryDuration_) external override onlyGovernance {
+        _expiryDuration = expiryDuration_;
+        emit ExpiryDurationSet(expiryDuration_);
+    }
+
+    /**
+     * @notice Sets the solace-eth pool for twap calculations.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param pool The address of the pool.
      */
-    function setPool(address pool) external override onlyGovernance {
+    function setSolaceEthPool(address pool) external override onlyGovernance {
         IUniswapV3Pool pool_ = IUniswapV3Pool(pool);
         // TODO: check if other token is weth (optional)
         if(pool_.token0() == address(_solace)) {
@@ -224,53 +336,43 @@ contract OptionsFarming is IOptionsFarming, ERC721Enumerable, Governable {
     }
 
     /**
+     * @notice Sets the eth-usd pool for twap calculations.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param pool The address of the pool.
+     */
+    function setEthUsdPool(address pool) external override onlyGovernance {
+        // TODO check
+        _ethUsdPool = IUniswapV3Pool(pool);
+    }
+
+    /**
      * @notice Sets the interval for twap calculations.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param interval The interval of the twap.
      */
     function setTwapInterval(uint32 interval) external override onlyGovernance {
         _twapInterval = interval;
+        emit TwapIntervalSet(interval);
     }
 
     /**
-     * @notice Sets the time into the future that new Options will expire.
+     * @notice Sets the swap rate for prices in the solace-eth pool.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param expiryDuration The duration in seconds.
+     * @param swapRate_ The new swap rate.
      */
-    function setExpiryDuration(uint256 expiryDuration) external override onlyGovernance {
-        _expiryDuration = expiryDuration;
+    function setSwapRate(uint16 swapRate_) external override onlyGovernance {
+        _swapRate = swapRate_;
+        emit SwapRateSet(swapRate_);
     }
 
     /**
-     * @notice Sets the recipient for Option payments.
+     * @notice Sets the floor price of [**SOLACE**](./SOLACE) measured in **USD**.
+     * Specifically, whichever stablecoin is in the eth-usd pool.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param destination_ The new recipient.
+     * @param priceFloor_ The new floor price.
      */
-    function setDestination(address payable destination_) external override onlyGovernance {
-        _destination = destination_;
-    }
-
-    /***************************************
-    ERC721 FUNCTIONS
-    ***************************************/
-
-    /**
-     * @notice Transfers `tokenID` from `msg.sender` to `to`.
-     * @dev This was excluded from the official `ERC721` standard in favor of `transferFrom(address from, address to, uint256 tokenID)`. We elect to include it.
-     * @param to The receipient of the token.
-     * @param tokenID The token to transfer.
-     */
-    function transfer(address to, uint256 tokenID) public override {
-        super.transferFrom(msg.sender, to, tokenID);
-    }
-
-    /**
-     * @notice Safely transfers `tokenID` from `msg.sender` to `to`.
-     * @dev This was excluded from the official `ERC721` standard in favor of `safeTransferFrom(address from, address to, uint256 tokenID)`. We elect to include it.
-     * @param to The receipient of the token.
-     * @param tokenID The token to transfer.
-     */
-    function safeTransfer(address to, uint256 tokenID) public override {
-        super.safeTransferFrom(msg.sender, to, tokenID, "");
+    function setPriceFloor(uint256 priceFloor_) external override onlyGovernance {
+        _priceFloor = priceFloor_;
+        emit PriceFloorSet(priceFloor_);
     }
 }
