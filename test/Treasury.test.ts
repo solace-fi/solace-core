@@ -140,9 +140,10 @@ describe("Treasury", function() {
     });
 
     it("can set new governance", async function() {
-      await treasury.connect(governor).setGovernance(deployer.address);
+      let tx = await treasury.connect(governor).setGovernance(deployer.address);
+      expect(tx).to.emit(treasury, "GovernancePending").withArgs(deployer.address);
       expect(await treasury.governance()).to.equal(governor.address);
-      expect(await treasury.newGovernance()).to.equal(deployer.address);
+      expect(await treasury.pendingGovernance()).to.equal(deployer.address);
     });
 
     it("rejects governance transfer by non governor", async function() {
@@ -153,9 +154,9 @@ describe("Treasury", function() {
       let tx = await treasury.connect(deployer).acceptGovernance();
       await expect(tx)
         .to.emit(treasury, "GovernanceTransferred")
-        .withArgs(deployer.address);
+        .withArgs(governor.address, deployer.address);
       expect(await treasury.governance()).to.equal(deployer.address);
-      expect(await treasury.newGovernance()).to.equal(ZERO_ADDRESS);
+      expect(await treasury.pendingGovernance()).to.equal(ZERO_ADDRESS);
 
       await treasury.connect(deployer).setGovernance(governor.address);
       await treasury.connect(governor).acceptGovernance();
@@ -437,7 +438,7 @@ describe("Treasury", function() {
         await registry.connect(governor).setVault(vault.address);
         treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, uniswapRouter.address, registry.address])) as Treasury;
         await registry.connect(governor).setTreasury(treasury.address);
-        await vault.connect(governor).setRequestor(treasury.address, true);
+        await vault.connect(governor).addRequestor(treasury.address);
       });
 
       it("vault is a premium recipient", async function() {

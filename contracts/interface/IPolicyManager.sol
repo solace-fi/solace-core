@@ -24,6 +24,8 @@ interface IPolicyManager is IERC721Enhanced {
     event PolicyUpdated(uint256 indexed policyID);
     /// @notice Emitted when a policy is burned.
     event PolicyBurned(uint256 policyID);
+    /// @notice Emitted when the policy descriptor is set.
+    event PolicyDescriptorSet(address policyDescriptor);
     /// @notice Emitted when a new product is added.
     event ProductAdded(address product);
     /// @notice Emitted when a new product is removed.

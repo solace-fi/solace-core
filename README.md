@@ -38,5 +38,13 @@ detailed technical documentation is located at https://docs.solace.fi
 * TypeScript: https://google.github.io/styleguide/tsguide.html
 * Git: https://github.com/kseniya292/standards
 
+## Installation
+1. Clone this repo
+2. Copy `.env.example` to `.env` and fill in the missing values. You'll need to sign up for API keys with various third party providers.
+3. Install node.js v12 https://nodejs.org/
+4. `npm install`
+5. `npx hardhat compile`
+6. `npx hardhat test`
+
 ## License
 GNU General Public License v3.0

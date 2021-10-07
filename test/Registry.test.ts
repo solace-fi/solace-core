@@ -45,9 +45,10 @@ describe("Registry", function() {
       await expect(registry.connect(user).setGovernance(user.address)).to.be.revertedWith("!governance");
     });
     it("can set new governance", async function() {
-      await registry.connect(governor).setGovernance(deployer.address);
+      let tx = await registry.connect(governor).setGovernance(deployer.address);
+      expect(tx).to.emit(registry, "GovernancePending").withArgs(deployer.address);
       expect(await registry.governance()).to.equal(governor.address);
-      expect(await registry.newGovernance()).to.equal(deployer.address);
+      expect(await registry.pendingGovernance()).to.equal(deployer.address);
     });
     it("rejects governance transfer by non governor", async function() {
       await expect(registry.connect(user).acceptGovernance()).to.be.revertedWith("!governance");
@@ -56,9 +57,9 @@ describe("Registry", function() {
       let tx = await registry.connect(deployer).acceptGovernance();
       await expect(tx)
         .to.emit(registry, "GovernanceTransferred")
-        .withArgs(deployer.address);
+        .withArgs(governor.address, deployer.address);
       expect(await registry.governance()).to.equal(deployer.address);
-      expect(await registry.newGovernance()).to.equal(ZERO_ADDRESS);
+      expect(await registry.pendingGovernance()).to.equal(ZERO_ADDRESS);
       await registry.connect(deployer).setGovernance(governor.address);
       await registry.connect(governor).acceptGovernance();
     });

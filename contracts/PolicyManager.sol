@@ -378,5 +378,6 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
      */
     function setPolicyDescriptor(address policyDescriptor_) external override onlyGovernance {
         _policyDescriptor = policyDescriptor_;
+        emit PolicyDescriptorSet(policyDescriptor_);
     }
 }
