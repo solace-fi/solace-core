@@ -190,11 +190,16 @@ contract OptionsFarming is ERC721Enhanced, IOptionsFarming, Governable {
             // tick to sqrtPriceX96
             sqrtPriceX96 = TickMath.getSqrtRatioAtTick(timeWeightedAverageTick);
         }
-        // TODO: token0/token1 ordering?
         // sqrtPriceX96 to priceX96
-        uint256 priceX96 = FullMath.mulDiv(sqrtPriceX96, sqrtPriceX96, FixedPoint96.Q96);
-        // TODO: priceX96 to strikePrice?
-        strikePrice = rewardAmount * priceX96;
+        uint256 priceX96 = FullMath.mulDiv(sqrtPriceX96, sqrtPriceX96, FixedPoint96.Q96); // token1/token0
+        // token0/token1 ordering
+        if(!_solaceIsToken0) {
+            priceX96 = FullMath.mulDiv(FixedPoint96.Q96, FixedPoint96.Q96, priceX96); // eth/solace
+        }
+        // priceX96 and rewardAmount to ethAmount
+        uint256 ethAmount = FullMath.mulDiv(rewardAmount, priceX96, FixedPoint96.Q96);
+        // ethAmount and swapRate to strikePrice
+        strikePrice = ethAmount * _swapRate / 10000;
         return strikePrice;
     }
 
@@ -205,8 +210,37 @@ contract OptionsFarming is ERC721Enhanced, IOptionsFarming, Governable {
      * @return strikePrice Strike Price in **ETH**.
      */
     function _calculateEthUsdPrice(uint256 rewardAmount) internal view returns (uint256 strikePrice) {
-        // TODO
-        return rewardAmount;
+      // TWAP
+      uint160 sqrtPriceX96;
+      if (_twapInterval == 0) {
+          // return the current price
+          (sqrtPriceX96, , , , , , ) = _ethUsdPool.slot0();
+      } else {
+          // retrieve historic tick data from pool
+          uint32[] memory secondsAgos = new uint32[](2);
+          secondsAgos[0] = _twapInterval; // from (before)
+          secondsAgos[1] = 0; // to (now)
+          (int56[] memory tickCumulatives, ) = _ethUsdPool.observe(secondsAgos);
+          // math
+          int56 tickCumulativesDelta = tickCumulatives[1] - tickCumulatives[0];
+          int56 interval = int56(uint56(_twapInterval));
+          int24 timeWeightedAverageTick = int24(tickCumulativesDelta / interval);
+          // always round to negative infinity
+          if (tickCumulativesDelta < 0 && (tickCumulativesDelta % interval) != 0) timeWeightedAverageTick--;
+          // tick to sqrtPriceX96
+          sqrtPriceX96 = TickMath.getSqrtRatioAtTick(timeWeightedAverageTick);
+      }
+      // sqrtPriceX96 to priceX96
+      uint256 priceX96 = FullMath.mulDiv(sqrtPriceX96, sqrtPriceX96, FixedPoint96.Q96); // token1/token0
+      // token0/token1 ordering
+      if(_usdIsToken0) {
+          priceX96 = FullMath.mulDiv(FixedPoint96.Q96, FixedPoint96.Q96, priceX96); // usd/eth
+      }
+      // TODO: priceX96, rewardAmount, and priceFloor to strikePrice
+      // priceX96 to strikePrice
+      //strikePrice = FullMath.mulDiv(rewardAmount, priceX96, FixedPoint96.Q96);
+      strikePrice = 0;
+      return strikePrice;
     }
 
     /***************************************
@@ -306,6 +340,7 @@ contract OptionsFarming is ERC721Enhanced, IOptionsFarming, Governable {
     function setReceiver(address payable receiver_) external override onlyGovernance {
         _receiver = receiver_;
         emit ReceiverSet(receiver_);
+        sendValue();
     }
 
     /**
@@ -322,27 +357,24 @@ contract OptionsFarming is ERC721Enhanced, IOptionsFarming, Governable {
      * @notice Sets the solace-eth pool for twap calculations.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param pool The address of the pool.
+     * @param solaceIsToken0 True if [**SOLACE**](./SOLACE) is token0 in the pool, false otherwise.
      */
-    function setSolaceEthPool(address pool) external override onlyGovernance {
-        IUniswapV3Pool pool_ = IUniswapV3Pool(pool);
-        // TODO: check if other token is weth (optional)
-        if(pool_.token0() == address(_solace)) {
-            _solaceIsToken0 = true;
-        } else if(pool_.token1() == address(_solace)) {
-            _solaceIsToken0 = false;
-        } else {
-            revert("invalid pool");
-        }
+    function setSolaceEthPool(address pool, bool solaceIsToken0) external override onlyGovernance {
+        _solaceEthPool = IUniswapV3Pool(pool);
+        _solaceIsToken0 = solaceIsToken0;
+        emit SolaceEthPoolSet(pool);
     }
 
     /**
      * @notice Sets the eth-usd pool for twap calculations.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param pool The address of the pool.
+     * @param usdIsToken0 True if **USD** is token0 in the pool, false otherwise.
      */
-    function setEthUsdPool(address pool) external override onlyGovernance {
-        // TODO check
+    function setEthUsdPool(address pool, bool usdIsToken0) external override onlyGovernance {
         _ethUsdPool = IUniswapV3Pool(pool);
+        _usdIsToken0 = usdIsToken0;
+        emit EthUsdPoolSet(pool);
     }
 
     /**
@@ -375,4 +407,18 @@ contract OptionsFarming is ERC721Enhanced, IOptionsFarming, Governable {
         _priceFloor = priceFloor_;
         emit PriceFloorSet(priceFloor_);
     }
+
+    /***************************************
+    FALLBACK FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Fallback function to allow contract to receive **ETH**.
+     */
+    receive () external payable override { }
+
+    /**
+     * @notice Fallback function to allow contract to receive **ETH**.
+     */
+    fallback () external payable override { }
 }

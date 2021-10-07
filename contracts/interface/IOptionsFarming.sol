@@ -160,15 +160,17 @@ interface IOptionsFarming is IERC721Enhanced {
      * @notice Sets the solace-eth pool for twap calculations.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param pool The address of the pool.
+     * @param solaceIsToken0 True if [**SOLACE**](./SOLACE) is token0 in the pool, false otherwise.
      */
-    function setSolaceEthPool(address pool) external;
+    function setSolaceEthPool(address pool, bool solaceIsToken0) external;
 
     /**
      * @notice Sets the eth-usd pool for twap calculations.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param pool The address of the pool.
+     * @param usdIsToken0 True if **USD** is token0 in the pool, false otherwise.
      */
-    function setEthUsdPool(address pool) external;
+    function setEthUsdPool(address pool, bool usdIsToken0) external;
 
     /**
      * @notice Sets the interval for twap calculations.
@@ -191,4 +193,18 @@ interface IOptionsFarming is IERC721Enhanced {
      * @param priceFloor_ The new floor price.
      */
     function setPriceFloor(uint256 priceFloor_) external;
+
+    /***************************************
+    FALLBACK FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Fallback function to allow contract to receive **ETH**.
+     */
+    receive() external payable;
+
+    /**
+     * @notice Fallback function to allow contract to receive **ETH**.
+     */
+    fallback () external payable;
 }

@@ -42,7 +42,7 @@ contract FarmController is IFarmController, Governable {
      * @param rewardPerSecond_ Amount of reward to distribute per second.
      */
     constructor(address governance_, address optionsFarming_, uint256 rewardPerSecond_) Governable(governance_) {
-        _optionsFarming = IOptionsFarming(optionsFarming_);
+        _optionsFarming = IOptionsFarming(payable(optionsFarming_));
         _rewardPerSecond = rewardPerSecond_;
     }
 

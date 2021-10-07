@@ -174,7 +174,7 @@ abstract contract ERC721Enhanced is ERC721Enumerable, IERC721Enhanced, EIP712 {
     ***************************************/
 
     // Call will revert if the token does not exist.
-    modifier tokenMustExist(uint256 tokenID) override {
+    modifier tokenMustExist(uint256 tokenID) {
         require(_exists(tokenID), "query for nonexistent token");
         _;
     }
