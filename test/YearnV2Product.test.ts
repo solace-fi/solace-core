@@ -26,7 +26,7 @@ const deadline = constants.MaxUint256;
 
 if(process.env.FORK_NETWORK === "mainnet"){
   describe("YearnV2Product", function () {
-    const [deployer, governor, policyholder1, policyholder2, depositor, paclasSigner] = provider.getWallets();
+    const [deployer, governor, policyholder1, policyholder2, policyholder3, depositor, paclasSigner] = provider.getWallets();
     let artifacts: ArtifactImports;
 
     let policyManager: PolicyManager;
@@ -783,50 +783,6 @@ if(process.env.FORK_NETWORK === "mainnet"){
           const yAddress = yvaults[i].address;
           const symbol = yvaults[i].symbol;
           try {
-            // fetch contracts
-            const yvault = await ethers.getContractAt(artifacts.YVault.abi, yAddress);
-            const uAddress = await yvault.token();
-            const uToken = await ethers.getContractAt(artifacts.ERC20.abi, uAddress);
-            const decimals = await uToken.decimals();
-            const uAmount = oneToken(decimals);
-            const uimpl =  ((yvaults[i].uimpl || "") != "") ? yvaults[i].uimpl : uAddress;
-            const blacklistAddress = uAddress;
-            const isBlacklistable = yvaults[i].blacklist || false;
-            // create position
-            var value = toBytes32(uAmount).toString();
-            for(var j = 0; j < 200; ++j) {
-              try { // solidity rigged balanceOf
-                var index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[policyholder3.address,j]);
-                await setStorageAt(uimpl, index, value);
-                var uBalance = await uToken.balanceOf(policyholder3.address);
-                if(uBalance.eq(uAmount)) break;
-              } catch(e) { console.log(e)}
-              try { // vyper rigged balanceOf
-                var index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[j,policyholder3.address]);
-                await setStorageAt(uimpl, index, value);
-                var uBalance = await uToken.balanceOf(policyholder3.address);
-                if(uBalance.eq(uAmount)) break;
-              } catch(e) { console.log(e) }
-            }
-            expect(await uToken.balanceOf(policyholder3.address)).to.equal(uAmount);
-            if(isBlacklistable) {
-              const blacklistContract = await ethers.getContractAt(artifacts.Blacklist.abi, blacklistAddress);
-              var value = toBytes32(BN.from(0)).toString();
-              for(var j = 0; j < 200; ++j) {
-                try {
-                  var index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[policyholder3.address,j]);
-                  await setStorageAt(uimpl, index, value);
-                  var blacklisted = await blacklistContract.isBlacklisted(policyholder3.address);
-                  if(!blacklisted) break;
-                } catch(e) { }
-              }
-              expect(await blacklistContract.isBlacklisted(policyholder3.address)).to.be.false;
-            }
-            await uToken.connect(policyholder3).approve(yvault.address, constants.MaxUint256);
-            await yvault.connect(policyholder3).deposit(uAmount);
-            expect(await uToken.balanceOf(policyholder3.address)).to.be.equal(0);
-            const aAmount = await yvault.balanceOf(policyholder3.address);
-            expect(aAmount).to.be.gt(0);
             // create policy
             await product.connect(policyholder3).buyPolicy(policyholder3.address, coverAmount, blocks, yAddress, { value: expectedPremium });
             let policyID = (await policyManager.totalPolicyCount()).toNumber();
@@ -851,14 +807,13 @@ if(process.env.FORK_NETWORK === "mainnet"){
             ++success;
             successList.push(symbol);
             console.log(`\x1b[38;5;239m        ✓ ${symbol}\x1b[0m`);
-          } catch (e) {
+          } catch (e: any ) {
             console.log(`\x1b[31m        ✘ ${symbol}`);
-            console.log("          "+e.stack.replace(/\n/g, "\n      "));
+            console.log("          " + e.stack.replace(/\n/g, "\n      "));
             console.log("\x1b[0m");
             failList.push(symbol);
           }
         }
-        await hre.network.provider.request({method: "hardhat_stopImpersonatingAccount",params: [policyholder3Address]});
         if(failList.length != 0) {
           console.log("supported vaults:");
           console.log(successList.reduce((acc,val)=>`${acc}  - ${val}\n`,""));

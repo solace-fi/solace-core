@@ -26,7 +26,7 @@ const deadline = constants.MaxUint256;
 
 if(process.env.FORK_NETWORK === "kovan"){
   describe("AaveV2ProductKovan", function () {
-    const [deployer, governor, policyholder1, policyholder2, depositor, paclasSigner] = provider.getWallets();
+    const [deployer, governor, policyholder1, policyholder2, policyholder3, depositor, paclasSigner] = provider.getWallets();
     let artifacts: ArtifactImports;
 
     let policyManager: PolicyManager;
@@ -343,10 +343,6 @@ if(process.env.FORK_NETWORK === "kovan"){
         expect(userEth2.sub(userEth1).add(gasCost)).to.equal(amountOut1);
       });
       it("should support all atokens", async function () {
-        const policyholder3Address = "0x688514032e2cD27fbCEc700E2b10aa8D34741956";
-        await hre.network.provider.request({method: "hardhat_impersonateAccount", params: [policyholder3Address]});
-        await depositor.sendTransaction({to: policyholder3Address, value: BN.from("1000000000000000000")});
-        const policyholder3 = await ethers.getSigner(policyholder3Address);
         var success = 0;
         var successList = [];
         var failList = [];
@@ -354,37 +350,6 @@ if(process.env.FORK_NETWORK === "kovan"){
           const aAddress = atokens[i].address;
           const symbol = atokens[i].symbol;
           try {
-            // fetch contracts
-            const aToken = await ethers.getContractAt(artifacts.AToken.abi, aAddress);
-            const uAddress = await aToken.UNDERLYING_ASSET_ADDRESS();
-            const uToken = await ethers.getContractAt(artifacts.ERC20.abi, uAddress);
-            const decimals = await uToken.decimals();
-            const uAmount = oneToken(decimals);
-            const poolAddress = await aToken.POOL();
-            const pool = await ethers.getContractAt(artifacts.LendingPool.abi, poolAddress);
-            const uimpl = ((atokens[i].uimpl || "") != "") ? atokens[i].uimpl : uAddress;
-            // create position
-
-            for(var j = 0; j < 200; ++j) {
-              try { // solidity rigged balanceOf
-                var index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[policyholder3.address,j]);
-                await setStorageAt(uimpl, index, toBytes32(uAmount).toString());
-                var uBalance = await uToken.balanceOf(policyholder3.address);
-                if(uBalance.eq(uAmount)) break;
-              } catch(e) { }
-              try { // vyper rigged balanceOf
-                var index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[j,policyholder3.address]);
-                await setStorageAt(uimpl, index, toBytes32(uAmount).toString());
-                var uBalance = await uToken.balanceOf(policyholder3.address);
-                if(uBalance.eq(uAmount)) break;
-              } catch(e) { }
-            }
-            expect(await uToken.balanceOf(policyholder3.address)).to.equal(uAmount);
-            await uToken.connect(policyholder3).approve(poolAddress, constants.MaxUint256);
-            await pool.connect(policyholder3).deposit(uAddress, uAmount, policyholder3.address, 0);
-            expect(await uToken.balanceOf(policyholder3.address)).to.be.equal(0);
-            const aAmount = await aToken.balanceOf(policyholder3.address);
-            expect(aAmount).to.be.closeTo(uAmount, 100);
             // create policy
             await product.connect(policyholder3).buyPolicy(policyholder3.address, coverAmount, blocks, aAddress, { value: expectedPremium });
             let policyID = (await policyManager.totalPolicyCount()).toNumber();
@@ -409,14 +374,13 @@ if(process.env.FORK_NETWORK === "kovan"){
             ++success;
             successList.push(symbol);
             console.log(`\x1b[38;5;239m        ✓ ${symbol}\x1b[0m`);
-          } catch (e) {
+          } catch (e: any) {
             console.log(`\x1b[31m        ✘ ${symbol}`);
-            console.log("          "+e.stack.replace(/\n/g, "\n      "));
+            console.log("          " + e.stack.replace(/\n/g, "\n      "));
             console.log("\x1b[0m");
             failList.push(atokens[i].symbol);
           }
         }
-        await hre.network.provider.request({method: "hardhat_stopImpersonatingAccount",params: [policyholder3Address]});
         if(failList.length != 0) {
           console.log("supported atokens:");
           console.log(successList.reduce((acc,val)=>`${acc}  - ${val}\n`,""));

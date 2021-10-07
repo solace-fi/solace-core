@@ -26,7 +26,7 @@ const deadline = constants.MaxUint256;
 
 if(process.env.FORK_NETWORK === "mainnet"){
   describe("CurveProduct", function () {
-    const [deployer, governor, policyholder1, policyholder2, depositor, paclasSigner] = provider.getWallets();
+    const [deployer, governor, policyholder1, policyholder2, policyholder3, depositor, paclasSigner] = provider.getWallets();
     let artifacts: ArtifactImports;
 
     let policyManager: PolicyManager;
@@ -516,10 +516,6 @@ if(process.env.FORK_NETWORK === "mainnet"){
         expect(userEth2.sub(userEth1).add(gasCost)).to.equal(amountOut1);
       });
       it("should support all curve lp tokens", async function () {
-        const policyholder3Address = "0x688514032e2cD27fbCEc700E2b10aa8D34741956";
-        await hre.network.provider.request({method: "hardhat_impersonateAccount", params: [policyholder3Address]});
-        await depositor.sendTransaction({to: policyholder3Address, value: BN.from("1000000000000000000")});
-        const policyholder3 = await ethers.getSigner(policyholder3Address);
         let success = 0;
         let successList = [];
         let failList = [];
@@ -565,7 +561,6 @@ if(process.env.FORK_NETWORK === "mainnet"){
           }
         }
         
-        await hre.network.provider.request({method: "hardhat_stopImpersonatingAccount",params: [policyholder3Address]});
         if (failList.length != 0) {
           console.log("supported lp tokens:");
           console.log(successList.reduce((acc,val)=>`${acc}  - ${val}\n`,""));
