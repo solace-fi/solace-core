@@ -40,6 +40,8 @@ export async function import_artifacts() {
   artifacts.WaaveProduct = await tryImport(`${artifact_dir}/products/WaaveProduct.sol/WaaveProduct.json`);
   artifacts.YearnV2Product = await tryImport(`${artifact_dir}/products/YearnV2Product.sol/YearnV2Product.json`);
   artifacts.LiquityProduct = await tryImport(`${artifact_dir}/products/LiquityProduct.sol/LiquityProduct.json`);
+  artifacts.SushiswapProduct = await tryImport(`${artifact_dir}/products/SushiswapProduct.sol/SushiswapProduct.json`);
+
 
   // oracles
   artifacts.ExchangeQuoter1InchV1 = await tryImport(`${artifact_dir}/oracles/ExchangeQuoter1InchV1.sol/ExchangeQuoter1InchV1.json`);
@@ -90,6 +92,10 @@ export async function import_artifacts() {
   artifacts.CurvePool = await tryImport(`${artifact_dir}/interface/Curve/ICurvePool.sol/ICurvePool.json`);
   artifacts.CurveToken = await tryImport(`${artifact_dir}/interface/Curve/ICurveToken.sol/ICurveToken.json`);
 
+  // sushiswap imports
+  artifacts.SushiswapV2Factory = await tryImport(`${artifact_dir}/interface/SushiSwap/ISushiV2Factory.sol/ISushiV2Factory.json`);
+  artifacts.MasterChef = await tryImport(`${artifact_dir}/interface/SushiSwap/IMasterChef.sol/IMasterChef.json`);
+  artifacts.SushiLPToken = await tryImport(`${artifact_dir}/interface/SushiSwap/ISushiLPToken.sol/ISushiLPToken.json`);
   return artifacts;
 }
 
