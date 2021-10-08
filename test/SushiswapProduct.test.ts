@@ -1545,7 +1545,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
     });
 
     describe("covered platform", function () {
-      it("starts as sushiswap masterchef address", async function () {
+      it("starts as sushiswap v2 factory address", async function () {
         expect(await product.coveredPlatform()).to.equal(SUSHI_V2_FACTORY_ADDRESS);
         expect(await product.sushiV2Factory()).to.equal(SUSHI_V2_FACTORY_ADDRESS);
       });

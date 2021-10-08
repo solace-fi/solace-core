@@ -41,7 +41,7 @@ export async function import_artifacts() {
   artifacts.YearnV2Product = await tryImport(`${artifact_dir}/products/YearnV2Product.sol/YearnV2Product.json`);
   artifacts.LiquityProduct = await tryImport(`${artifact_dir}/products/LiquityProduct.sol/LiquityProduct.json`);
   artifacts.SushiswapProduct = await tryImport(`${artifact_dir}/products/SushiswapProduct.sol/SushiswapProduct.json`);
-
+  artifacts.UniswapV2Product = await tryImport(`${artifact_dir}/products/UniswapV2Product.sol/UniswapV2Product.json`);
 
   // oracles
   artifacts.ExchangeQuoter1InchV1 = await tryImport(`${artifact_dir}/oracles/ExchangeQuoter1InchV1.sol/ExchangeQuoter1InchV1.json`);
@@ -96,6 +96,11 @@ export async function import_artifacts() {
   artifacts.SushiswapV2Factory = await tryImport(`${artifact_dir}/interface/SushiSwap/ISushiV2Factory.sol/ISushiV2Factory.json`);
   artifacts.MasterChef = await tryImport(`${artifact_dir}/interface/SushiSwap/IMasterChef.sol/IMasterChef.json`);
   artifacts.SushiLPToken = await tryImport(`${artifact_dir}/interface/SushiSwap/ISushiLPToken.sol/ISushiLPToken.json`);
+
+  // uniswapv2 imports
+  artifacts.UniswapV2Factory = await tryImport(`${artifact_dir}/interface/UniswapV2/IUniV2Factory.sol/IUniV2Factory.json`);
+  artifacts.UniLPToken = await tryImport(`${artifact_dir}/interface/UniswapV2/IUniLPToken.sol/IUniLPToken.json`);
+
   return artifacts;
 }
 
