@@ -2,6 +2,7 @@
 pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./interface/UniswapV3/IUniswapV3Pool.sol";
 import "./libraries/UniswapV3/TickMath.sol";
 import "./libraries/UniswapV3/FixedPoint96.sol";
@@ -24,7 +25,7 @@ import "./interface/IOptionsFarming.sol";
  *   - The current market price of [**SOLACE**](./SOLACE) * `swap rate` as determined by the [**SOLACE**](./SOLACE)-**ETH** Uniswap pool.
  *   - The floor price of [**SOLACE**](./SOLACE)/**USD** converted to **ETH** using a **ETH**-**USD** Uniswap pool.
  */
-contract OptionsFarming is ERC721Enhanced, IOptionsFarming, Governable {
+contract OptionsFarming is ERC721Enhanced, IOptionsFarming, ReentrancyGuard, Governable {
     using SafeERC20 for IERC20;
 
     /// @notice Native SOLACE Token.
@@ -45,27 +46,35 @@ contract OptionsFarming is ERC721Enhanced, IOptionsFarming, Governable {
     /// @dev _options[optionID] => Option info.
     mapping(uint256 => Option) internal _options;
 
-    // the uniswap solace-eth pool for calculating twap
+    // the uniswap [**SOLACE**](../SOLACE)-**ETH** pool for calculating twap
     IUniswapV3Pool internal _solaceEthPool = IUniswapV3Pool(address(0x0));
 
-    // the uniswap eth-usd pool for calculating twap
+    // the uniswap **ETH**-**USD** pool for calculating twap
     IUniswapV3Pool internal _ethUsdPool = IUniswapV3Pool(address(0x0));
 
     // interval in seconds to calculate time weighted average price in strike price
-    uint32 internal _twapInterval;
+    // used in [**SOLACE**](../SOLACE)-**ETH** twap
+    uint32 internal _solaceEthTwapInterval;
+
+    // interval in seconds to calculate time weighted average price in strike price
+    // used in **ETH**-**USD** twap
+    uint32 internal _ethUsdTwapInterval;
 
     // the relative amount of the eth value that a user must pay, measured in BPS
     uint16 internal _swapRate;
 
-    // true if solace is token 0 of the solace-eth pool. used in twap calculation
+    // true if solace is token 0 of the [**SOLACE**](../SOLACE)-**ETH** pool. used in twap calculation
     bool internal _solaceIsToken0;
 
-    // true if usd is token 0 of the eth-usd pool. used in twap calculation
+    // true if usd is token 0 of the **ETH**-**USD** pool. used in twap calculation
     bool internal _usdIsToken0;
 
     // the floor price of [**SOLACE**](./SOLACE) measured in **USD**.
-    // specifically, whichever stablecoin is in the eth-usd pool.
+    // specifically, whichever stablecoin is in the **ETH**-**USD** pool.
     uint256 internal _priceFloor;
+
+    // The amount of **SOLACE** that a user is owed if any.
+    mapping(address => uint256) internal _unpaidSolace;
 
     /**
      * @notice Constructs the `OptionsFarming` contract.
@@ -73,7 +82,8 @@ contract OptionsFarming is ERC721Enhanced, IOptionsFarming, Governable {
      */
     constructor(address governance_) ERC721Enhanced("Solace Options Mining", "SOM") Governable(governance_) {
         _expiryDuration = 2592000; // 30 days
-        _twapInterval = 3600; // one hour
+        _solaceEthTwapInterval = 3600; // one hour
+        _ethUsdTwapInterval = 3600; // one hour
         _swapRate = 10000; // 100%
         _priceFloor = type(uint256).max;
     }
@@ -107,19 +117,26 @@ contract OptionsFarming is ERC721Enhanced, IOptionsFarming, Governable {
         return _numOptions;
     }
 
-    /// @notice The uniswap solace-eth pool for calculating twap.
+    /// @notice The uniswap [**SOLACE**](../SOLACE)-**ETH** pool for calculating twap.
     function solaceEthPool() external view override returns (address solaceEthPool_) {
         return address(_solaceEthPool);
     }
 
-    /// @notice The uniswap eth-usd pool for calculating twap.
+    /// @notice The uniswap **ETH**-**USD** pool for calculating twap.
     function ethUsdPool() external view override returns (address ethUsdPool_) {
         return address(_ethUsdPool);
     }
 
     /// @notice Interval in seconds to calculate time weighted average price in strike price.
-    function twapInterval() external view override returns (uint32 twapInterval_) {
-        return _twapInterval;
+    // used in [**SOLACE**](./SOLACE)-**ETH** twap.
+    function solaceEthTwapInterval() external view override returns (uint32 twapInterval_) {
+        return _solaceEthTwapInterval;
+    }
+
+    /// @notice Interval in seconds to calculate time weighted average price in strike price.
+    // used in **ETH**-**USD** twap.
+    function ethUsdTwapInterval() external view override returns (uint32 twapInterval_) {
+        return _ethUsdTwapInterval;
     }
 
     /// @notice The relative amount of the eth value that a user must pay, measured in BPS.
@@ -128,9 +145,18 @@ contract OptionsFarming is ERC721Enhanced, IOptionsFarming, Governable {
     }
 
     /// @notice The floor price of [**SOLACE**](./SOLACE) measured in **USD**.
-    /// Specifically, whichever stablecoin is in the eth-usd pool.
+    /// Specifically, whichever stablecoin is in the **ETH**-**USD** pool.
     function priceFloor() external view override returns (uint256 priceFloor_) {
         return _priceFloor;
+    }
+
+    /**
+     * @notice The amount of [**SOLACE**](./SOLACE) that a user is owed if any.
+     * @param user The user.
+     * @return amount The amount.
+     */
+    function unpaidSolace(address user) external view override returns (uint256 amount) {
+        return _unpaidSolace[user];
     }
 
     /**
@@ -140,8 +166,7 @@ contract OptionsFarming is ERC721Enhanced, IOptionsFarming, Governable {
      * @return strikePrice The amount of **ETH** in.
      * @return expiry The expiration timestamp.
      */
-    function getOption(uint256 optionID) external view override returns (uint256 rewardAmount, uint256 strikePrice, uint256 expiry) {
-        require(_exists(optionID), "query for nonexistent token");
+    function getOption(uint256 optionID) external view override tokenMustExist(optionID) returns (uint256 rewardAmount, uint256 strikePrice, uint256 expiry) {
         Option storage option = _options[optionID];
         return (option.rewardAmount, option.strikePrice, option.expiry);
     }
@@ -163,86 +188,6 @@ contract OptionsFarming is ERC721Enhanced, IOptionsFarming, Governable {
         }
     }
 
-    /**
-     * @notice Calculate the strike price for an amount of [**SOLACE**](./SOLACE).
-     * Uses the solace-eth uniswap pool.
-     * @param rewardAmount Amount of [**SOLACE**](./SOLACE).
-     * @return strikePrice Strike Price in **ETH**.
-     */
-    function _calculateSolaceEthPrice(uint256 rewardAmount) internal view returns (uint256 strikePrice) {
-        // TWAP
-        uint160 sqrtPriceX96;
-        if (_twapInterval == 0) {
-            // return the current price
-            (sqrtPriceX96, , , , , , ) = _solaceEthPool.slot0();
-        } else {
-            // retrieve historic tick data from pool
-            uint32[] memory secondsAgos = new uint32[](2);
-            secondsAgos[0] = _twapInterval; // from (before)
-            secondsAgos[1] = 0; // to (now)
-            (int56[] memory tickCumulatives, ) = _solaceEthPool.observe(secondsAgos);
-            // math
-            int56 tickCumulativesDelta = tickCumulatives[1] - tickCumulatives[0];
-            int56 interval = int56(uint56(_twapInterval));
-            int24 timeWeightedAverageTick = int24(tickCumulativesDelta / interval);
-            // always round to negative infinity
-            if (tickCumulativesDelta < 0 && (tickCumulativesDelta % interval) != 0) timeWeightedAverageTick--;
-            // tick to sqrtPriceX96
-            sqrtPriceX96 = TickMath.getSqrtRatioAtTick(timeWeightedAverageTick);
-        }
-        // sqrtPriceX96 to priceX96
-        uint256 priceX96 = FullMath.mulDiv(sqrtPriceX96, sqrtPriceX96, FixedPoint96.Q96); // token1/token0
-        // token0/token1 ordering
-        if(!_solaceIsToken0) {
-            priceX96 = FullMath.mulDiv(FixedPoint96.Q96, FixedPoint96.Q96, priceX96); // eth/solace
-        }
-        // priceX96 and rewardAmount to ethAmount
-        uint256 ethAmount = FullMath.mulDiv(rewardAmount, priceX96, FixedPoint96.Q96);
-        // ethAmount and swapRate to strikePrice
-        strikePrice = ethAmount * _swapRate / 10000;
-        return strikePrice;
-    }
-
-    /**
-     * @notice Calculate the strike price for an amount of [**SOLACE**](./SOLACE).
-     * Uses the eth-usd uniswap pool.
-     * @param rewardAmount Amount of [**SOLACE**](./SOLACE).
-     * @return strikePrice Strike Price in **ETH**.
-     */
-    function _calculateEthUsdPrice(uint256 rewardAmount) internal view returns (uint256 strikePrice) {
-      // TWAP
-      uint160 sqrtPriceX96;
-      if (_twapInterval == 0) {
-          // return the current price
-          (sqrtPriceX96, , , , , , ) = _ethUsdPool.slot0();
-      } else {
-          // retrieve historic tick data from pool
-          uint32[] memory secondsAgos = new uint32[](2);
-          secondsAgos[0] = _twapInterval; // from (before)
-          secondsAgos[1] = 0; // to (now)
-          (int56[] memory tickCumulatives, ) = _ethUsdPool.observe(secondsAgos);
-          // math
-          int56 tickCumulativesDelta = tickCumulatives[1] - tickCumulatives[0];
-          int56 interval = int56(uint56(_twapInterval));
-          int24 timeWeightedAverageTick = int24(tickCumulativesDelta / interval);
-          // always round to negative infinity
-          if (tickCumulativesDelta < 0 && (tickCumulativesDelta % interval) != 0) timeWeightedAverageTick--;
-          // tick to sqrtPriceX96
-          sqrtPriceX96 = TickMath.getSqrtRatioAtTick(timeWeightedAverageTick);
-      }
-      // sqrtPriceX96 to priceX96
-      uint256 priceX96 = FullMath.mulDiv(sqrtPriceX96, sqrtPriceX96, FixedPoint96.Q96); // token1/token0
-      // token0/token1 ordering
-      if(_usdIsToken0) {
-          priceX96 = FullMath.mulDiv(FixedPoint96.Q96, FixedPoint96.Q96, priceX96); // usd/eth
-      }
-      // TODO: priceX96, rewardAmount, and priceFloor to strikePrice
-      // priceX96 to strikePrice
-      //strikePrice = FullMath.mulDiv(rewardAmount, priceX96, FixedPoint96.Q96);
-      strikePrice = 0;
-      return strikePrice;
-    }
-
     /***************************************
     MUTATOR FUNCTIONS
     ***************************************/
@@ -250,10 +195,11 @@ contract OptionsFarming is ERC721Enhanced, IOptionsFarming, Governable {
     /**
      * @notice Creates an option for the given `rewardAmount`.
      * Must be called by the [`FarmController(./FarmController).
+     * @param recipient The recipient of the option.
      * @param rewardAmount The amount to reward in the Option.
      * @return optionID The ID of the newly minted option.
      */
-    function createOption(uint256 rewardAmount) external override returns (uint256 optionID) {
+    function createOption(address recipient, uint256 rewardAmount) external override returns (uint256 optionID) {
         require(msg.sender == address(_controller), "!farmcontroller");
         require(rewardAmount > 0, "no zero value options");
         // create option
@@ -265,7 +211,7 @@ contract OptionsFarming is ERC721Enhanced, IOptionsFarming, Governable {
         optionID = ++_numOptions; // autoincrement from 1
         // TODO: bookkeeping?
         _options[optionID] = option;
-        _mint(msg.sender, optionID);
+        _mint(recipient, optionID);
         emit OptionCreated(optionID);
         return optionID;
     }
@@ -278,7 +224,7 @@ contract OptionsFarming is ERC721Enhanced, IOptionsFarming, Governable {
      * Can only be called before `option.expiry`.
      * @param optionID The ID of the Option to exercise.
      */
-    function exerciseOption(uint256 optionID) external payable override {
+    function exerciseOption(uint256 optionID) external payable override nonReentrant {
         require(_isApprovedOrOwner(msg.sender, optionID), "!owner");
         // check msg.value
         require(msg.value >= _options[optionID].strikePrice, "insufficient payment");
@@ -288,16 +234,23 @@ contract OptionsFarming is ERC721Enhanced, IOptionsFarming, Governable {
         uint256 rewardAmount = _options[optionID].rewardAmount;
         _burn(optionID);
         // transfer SOLACE
-        SafeERC20.safeTransfer(_solace, msg.sender, rewardAmount);
+        _transferSolace(msg.sender, rewardAmount);
         // transfer msg.value
         sendValue();
         emit OptionExercised(optionID);
     }
 
     /**
+     * @notice Transfers the unpaid [**SOLACE**](./SOLACE) to the user.
+     */
+    function withdraw() external override nonReentrant {
+        _transferSolace(msg.sender, 0);
+    }
+
+    /**
      * @notice Sends this contract's **ETH** balance to `receiver`.
      */
-    function sendValue() public {
+    function sendValue() public override {
         if(_receiver == address(0x0)) return;
         uint256 amount = address(this).balance;
         if(amount == 0) return;
@@ -354,41 +307,62 @@ contract OptionsFarming is ERC721Enhanced, IOptionsFarming, Governable {
     }
 
     /**
-     * @notice Sets the solace-eth pool for twap calculations.
+     * @notice Sets the [**SOLACE**](../SOLACE)-**ETH** pool for twap calculations.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param pool The address of the pool.
      * @param solaceIsToken0 True if [**SOLACE**](./SOLACE) is token0 in the pool, false otherwise.
+     * @param interval The interval of the twap.
      */
-    function setSolaceEthPool(address pool, bool solaceIsToken0) external override onlyGovernance {
+    function setSolaceEthPool(address pool, bool solaceIsToken0, uint32 interval) external override onlyGovernance {
         _solaceEthPool = IUniswapV3Pool(pool);
         _solaceIsToken0 = solaceIsToken0;
         emit SolaceEthPoolSet(pool);
+        _solaceEthTwapInterval = interval;
+        emit SolaceEthTwapIntervalSet(interval);
     }
 
     /**
-     * @notice Sets the eth-usd pool for twap calculations.
+     * @notice Sets the **ETH**-**USD** pool for twap calculations.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param pool The address of the pool.
      * @param usdIsToken0 True if **USD** is token0 in the pool, false otherwise.
+     * @param interval The interval of the twap.
+     * @param priceFloor_ The floor price in the **USD** stablecoin.
      */
-    function setEthUsdPool(address pool, bool usdIsToken0) external override onlyGovernance {
+    function setEthUsdPool(address pool, bool usdIsToken0, uint32 interval, uint256 priceFloor_) external override onlyGovernance {
         _ethUsdPool = IUniswapV3Pool(pool);
         _usdIsToken0 = usdIsToken0;
         emit EthUsdPoolSet(pool);
+        _ethUsdTwapInterval = interval;
+        emit EthUsdTwapIntervalSet(interval);
+        // also set this here in case we switch from usdc (6 decimals) to dai (18 decimals)
+        // we dont want to give out cheap solace
+        _priceFloor = priceFloor_;
+        emit PriceFloorSet(priceFloor_);
     }
 
     /**
-     * @notice Sets the interval for twap calculations.
+     * @notice Sets the interval for [**SOLACE**](./SOLACE) twap calculations.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param interval The interval of the twap.
      */
-    function setTwapInterval(uint32 interval) external override onlyGovernance {
-        _twapInterval = interval;
-        emit TwapIntervalSet(interval);
+    function setSolaceEthTwapInterval(uint32 interval) external override onlyGovernance {
+        _solaceEthTwapInterval = interval;
+        emit SolaceEthTwapIntervalSet(interval);
     }
 
     /**
-     * @notice Sets the swap rate for prices in the solace-eth pool.
+     * @notice Sets the interval for **ETH**-**USD** twap calculations.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param interval The interval of the twap.
+     */
+    function setEthUsdTwapInterval(uint32 interval) external override onlyGovernance {
+        _ethUsdTwapInterval = interval;
+        emit EthUsdTwapIntervalSet(interval);
+    }
+
+    /**
+     * @notice Sets the swap rate for prices in the [**SOLACE**](../SOLACE)-**ETH** pool.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param swapRate_ The new swap rate.
      */
@@ -399,13 +373,112 @@ contract OptionsFarming is ERC721Enhanced, IOptionsFarming, Governable {
 
     /**
      * @notice Sets the floor price of [**SOLACE**](./SOLACE) measured in **USD**.
-     * Specifically, whichever stablecoin is in the eth-usd pool.
+     * Specifically, whichever stablecoin is in the **ETH**-**USD** pool.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param priceFloor_ The new floor price.
      */
     function setPriceFloor(uint256 priceFloor_) external override onlyGovernance {
         _priceFloor = priceFloor_;
         emit PriceFloorSet(priceFloor_);
+    }
+
+    /***************************************
+    HELPER FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Calculate the strike price for an amount of [**SOLACE**](./SOLACE).
+     * Uses the [**SOLACE**](../SOLACE)-**ETH** uniswap pool.
+     * @param rewardAmount Amount of [**SOLACE**](./SOLACE).
+     * @return strikePrice Strike Price in **ETH**.
+     */
+    function _calculateSolaceEthPrice(uint256 rewardAmount) internal view returns (uint256 strikePrice) {
+        uint256 priceX96 = _getPriceX96(_solaceEthPool, _solaceEthTwapInterval); // token1/token0
+        // token0/token1 ordering
+        if(!_solaceIsToken0) {
+            priceX96 = FullMath.mulDiv(FixedPoint96.Q96, FixedPoint96.Q96, priceX96); // eth/solace
+        }
+        // rewardAmount, swapRate, and priceX96 to strikePrice
+        strikePrice = FullMath.mulDiv(rewardAmount * _swapRate / 10000, priceX96, FixedPoint96.Q96);
+        return strikePrice;
+    }
+
+    /**
+     * @notice Calculate the strike price for an amount of [**SOLACE**](./SOLACE).
+     * Uses the **ETH**-**USD** uniswap pool.
+     * @param rewardAmount Amount of [**SOLACE**](./SOLACE).
+     * @return strikePrice Strike Price in **ETH**.
+     */
+    function _calculateEthUsdPrice(uint256 rewardAmount) internal view returns (uint256 strikePrice) {
+        uint256 priceX96 = _getPriceX96(_ethUsdPool, _ethUsdTwapInterval); // token1/token0
+        // token0/token1 ordering
+        if(!_usdIsToken0) {
+            priceX96 = FullMath.mulDiv(FixedPoint96.Q96, FixedPoint96.Q96, priceX96); // eth/usd
+        }
+        // rewardAmount, priceFloor, and priceX96 to strikePrice
+        strikePrice = FullMath.mulDiv(rewardAmount * _priceFloor, priceX96, FixedPoint96.Q96 * 1 ether);
+        return strikePrice;
+    }
+
+    /**
+     * @notice Gets the relative price between tokens in a pool.
+     * Can use spot price or twap.
+     * @param pool The pool to fetch price.
+     * @param twapInterval The interval to calculate twap.
+     * @return priceX96 The price as a Q96.
+     */
+    function _getPriceX96(IUniswapV3Pool pool, uint32 twapInterval) internal view returns (uint256 priceX96) {
+        uint160 sqrtPriceX96;
+        if (twapInterval == 0) {
+            // spot price
+            (sqrtPriceX96, , , , , , ) = pool.slot0();
+        } else {
+            // TWAP
+            // retrieve historic tick data from pool
+            uint32[] memory secondsAgos = new uint32[](2);
+            secondsAgos[0] = twapInterval; // from (before)
+            secondsAgos[1] = 0; // to (now)
+            (int56[] memory tickCumulatives, ) = pool.observe(secondsAgos);
+            // math
+            int56 tickCumulativesDelta = tickCumulatives[1] - tickCumulatives[0];
+            int56 interval = int56(uint56(twapInterval));
+            int24 timeWeightedAverageTick = int24(tickCumulativesDelta / interval);
+            // always round to negative infinity
+            if (tickCumulativesDelta < 0 && (tickCumulativesDelta % interval) != 0) timeWeightedAverageTick--;
+            // tick to sqrtPriceX96
+            sqrtPriceX96 = TickMath.getSqrtRatioAtTick(timeWeightedAverageTick);
+        }
+        // sqrtPriceX96 to priceX96
+        priceX96 = FullMath.mulDiv(sqrtPriceX96, sqrtPriceX96, FixedPoint96.Q96); // token1/token0
+        return priceX96;
+    }
+
+    /**
+     * @notice Transfers [**SOLACE**](./SOLACE) to the user. It's called by [`exerciseOption()`](#exerciseoption) and [`withdraw()`](#withdraw) functions in the contract.
+     * Also adds on their unpaid [**SOLACE**](./SOLACE), and stores new unpaid [**SOLACE**](./SOLACE) if necessary.
+     * @param user The user to pay.
+     * @param amount The amount to pay _before_ unpaid funds.
+     */
+    function _transferSolace(address user, uint256 amount) internal {
+        // account for unpaid solace
+        uint256 unpaidSolace1 = _unpaidSolace[user];
+        amount += unpaidSolace1;
+        if(amount == 0) return;
+        // send eth
+        uint256 transferAmount = min(_solace.balanceOf(address(this)), amount);
+        uint256 unpaidSolace2 = amount - transferAmount;
+        if(unpaidSolace2 != unpaidSolace1) _unpaidSolace[user] = unpaidSolace2;
+        SafeERC20.safeTransfer(_solace, user, transferAmount);
+    }
+
+    /**
+     * @notice Internal function that returns the minimum value between two values.
+     * @param a The first value.
+     * @param b The second value.
+     * @return c The minimum value.
+     */
+    function min(uint256 a, uint256 b) internal pure returns (uint256 c) {
+        return a <= b ? a : b;
     }
 
     /***************************************

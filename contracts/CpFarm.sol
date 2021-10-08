@@ -59,8 +59,7 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
         //
         // Whenever a user deposits or withdraws CP tokens to a farm. Here's what happens:
         //   1. The farm's `accRewardPerShare` and `lastRewardTime` gets updated.
-        //   2. User receives the pending reward sent to his/her address.
-        //      Unsent rewards will be accumulated in `unpaidRewards`.
+        //   2. Users pending rewards accumulate in `unpaidRewards`.
         //   3. User's `value` gets updated.
         //   4. User's `rewardDebt` gets updated.
     }
@@ -321,10 +320,12 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
         // get farmer information
         UserInfo storage userInfo_ = userInfo[msg.sender];
         // math
-        uint256 pending = userInfo_.value * _accRewardPerShare / 1e12 - userInfo_.rewardDebt + userInfo_.unpaidRewards;
+        uint256 acc = userInfo_.value * _accRewardPerShare / 1e12;
+        uint256 pending = acc - userInfo_.rewardDebt + userInfo_.unpaidRewards;
+        userInfo_.rewardDebt = acc;
         userInfo_.unpaidRewards = 0;
         // create option
-        optionID = _controller.createOption(pending);
+        optionID = _controller.createOption(msg.sender, pending);
         return optionID;
     }
 
@@ -341,7 +342,10 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
         // get farmer information
         UserInfo storage userInfo_ = userInfo[user];
         // math
-        uint256 pending = userInfo_.value * _accRewardPerShare / 1e12 - userInfo_.rewardDebt;
+        uint256 acc = userInfo_.value * _accRewardPerShare / 1e12;
+        uint256 pending = acc - userInfo_.rewardDebt + userInfo_.unpaidRewards;
+        userInfo_.rewardDebt = acc;
+        userInfo_.unpaidRewards = 0;
         return pending;
     }
 

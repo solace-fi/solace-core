@@ -128,22 +128,21 @@ contract FarmController is IFarmController, Governable {
             rewardAmount += farm.withdrawRewardsForUser(msg.sender);
         }
         // create an option
-        optionID = _optionsFarming.createOption(rewardAmount);
-        // TODO: bookkeeping?
+        optionID = _optionsFarming.createOption(msg.sender, rewardAmount);
         return optionID;
     }
 
     /**
      * @notice Creates an [`Option`](./OptionsFarming) for the given `rewardAmount`.
      * Must be called by a farm.
+     * @param recipient The recipient of the option.
      * @param rewardAmount The amount to reward in the Option.
      * @return optionID The ID of the new [`Option`](./OptionsFarming).
      */
-    function createOption(uint256 rewardAmount) external override returns (uint256 optionID) {
+    function createOption(address recipient, uint256 rewardAmount) external override returns (uint256 optionID) {
         require(_farmIndices[msg.sender] != 0, "!farm");
         // create an option
-        optionID = _optionsFarming.createOption(rewardAmount);
-        // TODO: bookkeeping?
+        optionID = _optionsFarming.createOption(recipient, rewardAmount);
         return optionID;
     }
 

@@ -71,10 +71,11 @@ interface IFarmController {
     /**
      * @notice Creates an [`Option`](../OptionsFarming) for the given `rewardAmount`.
      * Must be called by a farm.
+     * @param recipient The recipient of the option.
      * @param rewardAmount The amount to reward in the Option.
      * @return optionID The ID of the new [`Option`](./OptionsFarming).
      */
-    function createOption(uint256 rewardAmount) external returns (uint256 optionID);
+    function createOption(address recipient, uint256 rewardAmount) external returns (uint256 optionID);
 
     /***************************************
     GOVERNANCE FUNCTIONS
