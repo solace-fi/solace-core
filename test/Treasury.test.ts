@@ -136,11 +136,11 @@ describe("Treasury", function() {
     });
 
     it("rejects setting new governance by non governor", async function() {
-      await expect(treasury.connect(user).setGovernance(user.address)).to.be.revertedWith("!governance");
+      await expect(treasury.connect(user).setPendingGovernance(user.address)).to.be.revertedWith("!governance");
     });
 
     it("can set new governance", async function() {
-      let tx = await treasury.connect(governor).setGovernance(deployer.address);
+      let tx = await treasury.connect(governor).setPendingGovernance(deployer.address);
       expect(tx).to.emit(treasury, "GovernancePending").withArgs(deployer.address);
       expect(await treasury.governance()).to.equal(governor.address);
       expect(await treasury.pendingGovernance()).to.equal(deployer.address);
@@ -158,7 +158,7 @@ describe("Treasury", function() {
       expect(await treasury.governance()).to.equal(deployer.address);
       expect(await treasury.pendingGovernance()).to.equal(ZERO_ADDRESS);
 
-      await treasury.connect(deployer).setGovernance(governor.address);
+      await treasury.connect(deployer).setPendingGovernance(governor.address);
       await treasury.connect(governor).acceptGovernance();
     });
   });

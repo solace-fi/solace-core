@@ -67,10 +67,10 @@ describe("Vault", function () {
     });
   });
 
-  describe("setGovernance", function () {
+  describe("setPendingGovernance", function () {
     it("should allow governance to set new governance address", async function () {
       expect(await vault.governance()).to.equal(owner.address);
-      let tx1 = await vault.connect(owner).setGovernance(newOwner.address);
+      let tx1 = await vault.connect(owner).setPendingGovernance(newOwner.address);
       expect(tx1).to.emit(vault, "GovernancePending").withArgs(newOwner.address);
       expect(await vault.governance()).to.equal(owner.address);
       expect(await vault.pendingGovernance()).to.equal(newOwner.address);
@@ -80,8 +80,8 @@ describe("Vault", function () {
       expect(await vault.pendingGovernance()).to.equal(ZERO_ADDRESS);
     });
     it("should revert if not called by governance", async function () {
-      await expect(vault.connect(depositor1).setGovernance(depositor1.address)).to.be.revertedWith("!governance");
-      await vault.connect(owner).setGovernance(newOwner.address);
+      await expect(vault.connect(depositor1).setPendingGovernance(depositor1.address)).to.be.revertedWith("!governance");
+      await vault.connect(owner).setPendingGovernance(newOwner.address);
       await expect(vault.connect(depositor1).acceptGovernance()).to.be.revertedWith("!governance");
     });
   });

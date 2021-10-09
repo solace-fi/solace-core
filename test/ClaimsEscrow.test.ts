@@ -63,10 +63,10 @@ describe("ClaimsEscrow", function () {
     });
   });
 
-  describe("setGovernance", function () {
+  describe("setPendingGovernance", function () {
     it("should allow governance to set new governance address", async function () {
       expect(await claimsEscrow.governance()).to.equal(governor.address);
-      let tx1 = await claimsEscrow.connect(governor).setGovernance(newGovernor.address);
+      let tx1 = await claimsEscrow.connect(governor).setPendingGovernance(newGovernor.address);
       expect(tx1).to.emit(claimsEscrow, "GovernancePending").withArgs(newGovernor.address);
       expect(await claimsEscrow.governance()).to.equal(governor.address);
       expect(await claimsEscrow.pendingGovernance()).to.equal(newGovernor.address);
@@ -76,8 +76,8 @@ describe("ClaimsEscrow", function () {
       expect(await claimsEscrow.pendingGovernance()).to.equal(ZERO_ADDRESS);
     });
     it("should revert if not called by governance", async function () {
-      await expect(claimsEscrow.connect(depositor).setGovernance(depositor.address)).to.be.revertedWith("!governance");
-      await claimsEscrow.connect(governor).setGovernance(newGovernor.address);
+      await expect(claimsEscrow.connect(depositor).setPendingGovernance(depositor.address)).to.be.revertedWith("!governance");
+      await claimsEscrow.connect(governor).setPendingGovernance(newGovernor.address);
       await expect(claimsEscrow.connect(depositor).acceptGovernance()).to.be.revertedWith("!governance");
     });
   });

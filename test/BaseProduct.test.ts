@@ -103,11 +103,11 @@ describe("BaseProduct", function () {
     });
 
     it("rejects setting new governance by non governor", async function() {
-      await expect(product.connect(policyholder1).setGovernance(policyholder1.address)).to.be.revertedWith("!governance");
+      await expect(product.connect(policyholder1).setPendingGovernance(policyholder1.address)).to.be.revertedWith("!governance");
     });
 
     it("can set new governance", async function() {
-      let tx = await product.connect(governor).setGovernance(newGovernor.address);
+      let tx = await product.connect(governor).setPendingGovernance(newGovernor.address);
       expect(tx).to.emit(product, "GovernancePending").withArgs(newGovernor.address);
       expect(await product.governance()).to.equal(governor.address);
       expect(await product.pendingGovernance()).to.equal(newGovernor.address);
@@ -124,7 +124,7 @@ describe("BaseProduct", function () {
         .withArgs(governor.address, newGovernor.address);
       expect(await product.governance()).to.equal(newGovernor.address);
       expect(await product.pendingGovernance()).to.equal(ZERO_ADDRESS);
-      await product.connect(newGovernor).setGovernance(governor.address);
+      await product.connect(newGovernor).setPendingGovernance(governor.address);
       await product.connect(governor).acceptGovernance();
     });
   });

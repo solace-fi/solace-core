@@ -12,7 +12,7 @@ import { encodePriceSqrt, FeeAmount, TICK_SPACINGS, getMaxTick, getMinTick } fro
 import { encodePath } from "./utilities/path";
 import { bnAddSub, bnMulDiv } from "./utilities/math";
 import { getPermitDigest, sign, getDomainSeparator } from "./utilities/signature";
-import getPermitNFTSignature from "./utilities/getPermitNFTSignature";
+import { getPermitNFTSignature } from "./utilities/getPermitNFTSignature";
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
 import { Solace, Master, Weth9, MockErc20, SolaceEthLpFarm, LpAppraisor } from "../typechain";
@@ -153,11 +153,11 @@ describe("SolaceEthLpFarm", function () {
     });
 
     it("rejects setting new governance by non governor", async function () {
-      await expect(farm.connect(farmer1).setGovernance(farmer1.address)).to.be.revertedWith("!governance");
+      await expect(farm.connect(farmer1).setPendingGovernance(farmer1.address)).to.be.revertedWith("!governance");
     });
 
     it("can set new governance", async function () {
-      await farm.connect(governor).setGovernance(deployer.address);
+      await farm.connect(governor).setPendingGovernance(deployer.address);
       expect(await farm.governance()).to.equal(governor.address);
       expect(await farm.newGovernance()).to.equal(deployer.address);
     });
@@ -172,7 +172,7 @@ describe("SolaceEthLpFarm", function () {
       expect(await farm.governance()).to.equal(deployer.address);
       expect(await farm.newGovernance()).to.equal(ZERO_ADDRESS);
 
-      await farm.connect(deployer).setGovernance(governor.address);
+      await farm.connect(deployer).setPendingGovernance(governor.address);
       await farm.connect(governor).acceptGovernance();
     });
   });

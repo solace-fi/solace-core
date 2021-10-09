@@ -138,11 +138,11 @@ describe("LpAppraisor", function () {
     })
 
     it("rejects setting new governance by non governor", async function () {
-      await expect(lpTokenAppraisor1.connect(farmer1).setGovernance(farmer1.address)).to.be.revertedWith("!governance");
+      await expect(lpTokenAppraisor1.connect(farmer1).setPendingGovernance(farmer1.address)).to.be.revertedWith("!governance");
     })
 
     it("can set new governance", async function () {
-      await lpTokenAppraisor1.connect(governor).setGovernance(deployer.address);
+      await lpTokenAppraisor1.connect(governor).setPendingGovernance(deployer.address);
       expect(await lpTokenAppraisor1.governance()).to.equal(governor.address);
       expect(await lpTokenAppraisor1.newGovernance()).to.equal(deployer.address);
     })
@@ -157,7 +157,7 @@ describe("LpAppraisor", function () {
       expect(await lpTokenAppraisor1.governance()).to.equal(deployer.address);
       expect(await lpTokenAppraisor1.newGovernance()).to.equal(ZERO_ADDRESS);
 
-      await lpTokenAppraisor1.connect(deployer).setGovernance(governor.address);
+      await lpTokenAppraisor1.connect(deployer).setPendingGovernance(governor.address);
       await lpTokenAppraisor1.connect(governor).acceptGovernance();
     })
   })
