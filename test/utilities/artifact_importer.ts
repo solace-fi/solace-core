@@ -54,6 +54,7 @@ export async function import_artifacts() {
   artifacts.MockERC1271 = await tryImport(`${artifact_dir}/mocks/MockERC1271.sol/MockERC1271.json`);
   artifacts.Blacklist = await tryImport(`${artifact_dir}/interface/IBlacklist.sol/IBlacklist.json`);
   artifacts.SingletonFactory = await tryImport(`${artifact_dir}/interface/ISingletonFactory.sol/ISingletonFactory.json`);
+  artifacts.Deployer = await tryImport(`${artifact_dir}/Deployer.sol/Deployer.json`);
 
   // aave imports
   artifacts.LendingPool = await tryImport(`${artifact_dir}/interface/AaveV2/ILendingPool.sol/ILendingPool.json`);

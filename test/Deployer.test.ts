@@ -1,0 +1,343 @@
+import chai from "chai";
+import { waffle, ethers } from "hardhat";
+const { expect } = chai;
+const { deployContract, solidity } = waffle;
+import { BigNumber as BN, Contract } from "ethers";
+const provider = waffle.provider;
+chai.use(solidity);
+
+import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
+import { Registry, Solace, Master, Vault, Treasury, ClaimsEscrow, Weth9, PolicyManager, RiskManager, MockErc20, Deployer } from "../typechain";
+import { toBytes32 } from "./utilities/setStorage";
+
+const ONE_BILLION = BN.from("1000000000000000000000000000");
+const TWO_BILLION = BN.from("2000000000000000000000000000");
+const THREE_BILLION = BN.from("3000000000000000000000000000");
+const FOUR_BILLION = BN.from("4000000000000000000000000000");
+
+describe("Deployer", function () {
+
+  let deployerContract: Deployer;
+  let solace: Solace;
+  const [owner, governor, minter, receiver1, receiver2] = provider.getWallets();
+  const name = "solace";
+  const symbol = "SOLACE";
+  const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+  const amount = BN.from("1000000000000000000");
+  let artifacts: ArtifactImports;
+
+  let initcode: string;
+  let solaceAddress: string;
+
+  before(async function () {
+    artifacts = await import_artifacts();
+    await owner.sendTransaction({to:owner.address}); // for some reason this helps solidity-coverage
+    deployerContract = (await deployContract(owner, artifacts.Deployer)) as Deployer;
+  });
+
+  describe("CREATE", async function () {
+    it("can get initcode from the create deployment tx", async function () {
+      solace = (await deployContract(owner, artifacts.SOLACE, [governor.address])) as Solace;
+      initcode = solace.deployTransaction.data;
+      expect(initcode.length).gt(2);
+      solaceAddress = solace.address;
+      expect(solaceAddress.length).gt(2);
+    });
+    it("duplicate deployment same initcode different address", async function () {
+      solace = (await deployContract(owner, artifacts.SOLACE, [governor.address])) as Solace;
+      expect(solace.deployTransaction.data).eq(initcode);
+      expect(solace.address).not.eq(solaceAddress);
+    });
+    it("different msg.sender same initcode", async function () {
+      solace = (await deployContract(governor, artifacts.SOLACE, [governor.address])) as Solace;
+      expect(solace.deployTransaction.data).eq(initcode);
+      expect(solace.address).not.eq(solaceAddress);
+    });
+    it("different params different initcode", async function () {
+      solace = (await deployContract(owner, artifacts.SOLACE, [owner.address])) as Solace;
+      expect(solace.deployTransaction.data).not.eq(initcode);
+      expect(solace.address).not.eq(solaceAddress);
+    });
+    it("different contract different initcode", async function () {
+      let token = (await deployContract(owner, artifacts.MockERC20, ["TKN", "MyToken", 1000000])) as MockErc20;
+      expect(token.deployTransaction.data).not.eq(initcode);
+      expect(token.address).not.eq(solaceAddress);
+    });
+  });
+
+  describe("CREATE2", function () {
+    before(async function () {
+      solace = (await deployContract(owner, artifacts.SOLACE, [governor.address])) as Solace;
+      initcode = solace.deployTransaction.data;
+    });
+    it("reverts invalid initcodes", async function () {
+      await expect(deployerContract.deploy("0x", toBytes32(0))).to.be.revertedWith("invalid initcode");
+      await expect(deployerContract.deploy("0xabcd", toBytes32(0))).to.be.revertedWith("invalid initcode");
+      //await expect(deployerContract.deploy(solace.deployTransaction.data, toBytes32(0))).to.be.revertedWith("invalid initcode");
+    });
+    it("can predict contract address", async function () {
+      // predict deployment
+      let predictedAddress = await deployerContract.callStatic.deploy(initcode, toBytes32(0));
+      expect(predictedAddress.length).eq(42);
+      expect(predictedAddress).to.not.equal(ZERO_ADDRESS);
+      // test no deployment
+      solace = (await ethers.getContractAt(artifacts.SOLACE.abi, predictedAddress)) as Solace;
+      await expect(solace.isMinter(governor.address)).to.be.reverted;
+      // test actual deployment
+      let tx = await deployerContract.deploy(initcode, toBytes32(0), {gasLimit: 10000000});
+      //let gasUsed = (await tx.wait()).gasUsed;
+      //console.log('gas used:', gasUsed.toNumber());
+      expect(tx).to.emit(deployerContract, "ContractDeployed").withArgs(predictedAddress);
+      solaceAddress = predictedAddress;
+    });
+    it("can manipulate contract address", async function () {
+      // predict deployment
+      let predictedAddress = await deployerContract.callStatic.deploy(initcode, toBytes32(1));
+      expect(predictedAddress.length).eq(42);
+      expect(predictedAddress).to.not.equal(ZERO_ADDRESS);
+      expect(predictedAddress).to.not.equal(solaceAddress);
+      // test no deployment
+      solace = (await ethers.getContractAt(artifacts.SOLACE.abi, predictedAddress)) as Solace;
+      await expect(solace.isMinter(governor.address)).to.be.reverted;
+      // test actual deployment
+      let tx = await deployerContract.deploy(initcode, toBytes32(1), {gasLimit: 10000000});
+      //let gasUsed = (await tx.wait()).gasUsed;
+      //console.log('gas used:', gasUsed.toNumber());
+      expect(tx).to.emit(deployerContract, "ContractDeployed").withArgs(predictedAddress);
+      solaceAddress = predictedAddress;
+      solace = (await ethers.getContractAt(artifacts.SOLACE.abi, predictedAddress)) as Solace;
+    });
+    it("can brute force a desired address", async function () {
+      // to brute force an exact address would cost $10B
+      // we can reasonably guess and check a few characters
+      let salt: number = 0;
+      let found = false;
+      let predictedAddress: string = "0x";
+      for(var i = 2; i < 1000 && !found; ++i) {
+        // calculate address for next salt
+        salt = i;
+        predictedAddress = await deployerContract.callStatic.deploy(initcode, toBytes32(salt));
+        if(predictedAddress.substring(0,4).toLowerCase() == "0xab") {
+          found = true;
+          break;
+        }
+      }
+      expect(found).eq(true);
+      await deployerContract.deploy(initcode, toBytes32(salt), {gasLimit: 10000000});
+      solace = (await ethers.getContractAt(artifacts.SOLACE.abi, predictedAddress)) as Solace;
+    });
+    it("contract works", async function () {
+      expect(await solace.isMinter(minter.address)).to.eq(false);
+      await solace.connect(governor).addMinter(minter.address);
+      expect(await solace.isMinter(minter.address)).to.eq(true);
+    });
+    //it("redeploys to same address ?", async function () {});
+  });
+
+  describe("deploy multiple", function () {
+    it("rejects length mismatch", async function () {
+      await expect(deployerContract.deployMultiple([], [toBytes32(0)])).to.be.revertedWith("length mismatch");
+    });
+    it("rejects invalid deploys", async function () {
+      await expect(deployerContract.deployMultiple([solace.deployTransaction.data], [toBytes32(0)])).to.be.revertedWith("invalid initcode");
+    });
+    it("can redeploy zero", async function () {
+      let initcodes = fill(0, initcode);
+      let salts = range(10000, 10000);
+      let saltBytes = salts.map(toBytes32);
+      let predictedAddresses = await deployerContract.callStatic.deployMultiple(initcodes, saltBytes);
+      let tx = await deployerContract.deployMultiple(initcodes, saltBytes);
+      predictedAddresses.forEach((addr: any) => { expect(tx).to.emit(deployerContract, "ContractDeployed").withArgs(addr); });
+      let gasUsed = (await tx.wait()).gasUsed;
+      console.log('gas used:', gasUsed.toNumber());
+    });
+    it("can redeploy one", async function () {
+      let initcodes = fill(1, initcode);
+      let salts = range(10000, 10001);
+      let saltBytes = salts.map(toBytes32);
+      let predictedAddresses = await deployerContract.callStatic.deployMultiple(initcodes, saltBytes);
+      let tx = await deployerContract.deployMultiple(initcodes, saltBytes);
+      predictedAddresses.forEach((addr: any) => { expect(tx).to.emit(deployerContract, "ContractDeployed").withArgs(addr); });
+      let gasUsed = (await tx.wait()).gasUsed;
+      console.log('gas used:', gasUsed.toNumber());
+    });
+    it("can redeploy more than one", async function () {
+      let initcodes = fill(2, initcode);
+      let salts = range(10010, 10012);
+      let saltBytes = salts.map(toBytes32);
+      let predictedAddresses = await deployerContract.callStatic.deployMultiple(initcodes, saltBytes);
+      let tx = await deployerContract.deployMultiple(initcodes, saltBytes);
+      predictedAddresses.forEach((addr: any) => { expect(tx).to.emit(deployerContract, "ContractDeployed").withArgs(addr); });
+      let gasUsed = (await tx.wait()).gasUsed;
+      console.log('gas used:', gasUsed.toNumber());
+    });
+    it("can deploy all", async function () {
+      // contracts
+      let registry: Registry;
+      let weth: Weth9;
+      let vault: Vault;
+      let claimsEscrow: ClaimsEscrow;
+      let treasury: Treasury;
+      let policyManager: PolicyManager;
+      let riskManager: RiskManager;
+      // deploy with create
+      registry = (await deployContract(owner, artifacts.Registry, [owner.address])) as Registry;
+      weth = (await deployContract(owner,artifacts.WETH)) as Weth9;
+      await registry.setWeth(weth.address);
+      vault = (await deployContract(owner,artifacts.Vault,[owner.address,registry.address])) as Vault;
+      await registry.setVault(vault.address);
+      claimsEscrow = (await deployContract(owner,artifacts.ClaimsEscrow,[owner.address,registry.address])) as ClaimsEscrow;
+      await registry.setClaimsEscrow(claimsEscrow.address);
+      treasury = (await deployContract(owner, artifacts.Treasury, [governor.address, ZERO_ADDRESS, registry.address])) as Treasury;
+      await registry.setTreasury(treasury.address);
+      policyManager = (await deployContract(owner,artifacts.PolicyManager,[owner.address])) as PolicyManager;
+      await registry.setPolicyManager(policyManager.address);
+      riskManager = (await deployContract(owner, artifacts.RiskManager, [owner.address, registry.address])) as RiskManager;
+      await registry.setRiskManager(riskManager.address);
+      // deploy with create2
+      let contracts = [vault, claimsEscrow, treasury, policyManager, riskManager];
+      let initcodes = contracts.map((contract: Contract) => { return contract.deployTransaction.data; });
+      let saltBytes = fill(contracts.length, toBytes32(0));
+      let predictedAddresses = await deployerContract.callStatic.deployMultiple(initcodes, saltBytes);
+      let tx = await deployerContract.deployMultiple(initcodes, saltBytes);
+      predictedAddresses.forEach((addr: any) => { expect(tx).to.emit(deployerContract, "ContractDeployed").withArgs(addr); });
+      let gasUsed = (await tx.wait()).gasUsed;
+      console.log('gas used:', gasUsed.toNumber());
+    });
+    //it("", async function () {});
+  });
+
+  function range(s: number, e: number) {
+    var a = [];
+    for(var i = s; i < e; ++i) a.push(i);
+    return a;
+  }
+
+  function fill(len: number, filler: any) {
+    var a = [];
+    for(var i = 0; i < len; ++i) a.push(filler);
+    return a;
+  }
+
+  /*
+  describe("deployment", function () {
+    it("has a correct name", async function () {
+      expect(await solace.name()).to.equal(name);
+    });
+    it("has a correct symbol", async function () {
+      expect(await solace.symbol()).to.equal(symbol);
+    });
+    it("has 18 decimals", async function () {
+      expect(await solace.decimals()).to.equal(18);
+    });
+    it("has a correct governance", async function () {
+      expect(await solace.governance()).to.equal(governor.address);
+    });
+  });
+
+  describe("_mint", function () {
+    it("rejects a null account", async function () {
+      await expect(solace.mint(ZERO_ADDRESS, amount)).to.be.reverted;
+    });
+    describe("for a non zero account", function () {
+      before("minting", async function () {
+        await solace.connect(governor).addMinter(minter.address)
+        await solace.connect(minter).mint(receiver1.address, amount);
+      });
+      it("increments totalSupply", async function () {
+        expect(await solace.totalSupply()).to.equal(amount);
+      });
+      it("increments recipient balance", async function () {
+        expect(await solace.balanceOf(receiver1.address)).to.equal(amount);
+      });
+      it("emits Transfer event", async function () {
+        expect(await solace.connect(minter).mint(receiver1.address, amount)).to.emit(solace, "Transfer").withArgs(ZERO_ADDRESS, receiver1.address, amount);
+      });
+    });
+  });
+
+  describe("mint", function () {
+    it("allows minters to mint", async function () {
+      let balanceBefore = await solace.balanceOf(receiver1.address);
+      let supplyBefore = await solace.totalSupply();
+      await solace.connect(governor).addMinter(minter.address);
+      await solace.connect(minter).mint(receiver1.address, amount);
+      expect(await solace.balanceOf(receiver1.address)).to.equal(amount.add(balanceBefore));
+      expect(await solace.totalSupply()).to.equal(amount.add(supplyBefore));
+    });
+    it("reverts mint() called by non-minters", async function () {
+      await expect(solace.connect(receiver1).mint(receiver1.address,amount)).to.be.reverted;
+    });
+    it("has a soft cap", async function () {
+      expect(await solace.maxSupply()).to.equal(ONE_BILLION);
+    });
+    it("can mint up to the cap", async function () {
+      let supply = await solace.totalSupply();
+      expect(supply).to.be.lt(ONE_BILLION);
+      let diff = ONE_BILLION.sub(supply);
+      await solace.connect(minter).mint(receiver1.address, diff);
+      expect(await solace.totalSupply()).to.equal(ONE_BILLION);
+    });
+    it("cannot mint more than the cap", async function () {
+      await expect(solace.connect(minter).mint(receiver1.address, 1)).to.be.revertedWith("capped");
+    });
+    it("non governance cannot change cap", async function () {
+      await expect(solace.connect(minter).setMaxSupply(TWO_BILLION)).to.be.revertedWith("!governance")
+    });
+    it("governance can change cap", async function () {
+      let tx1 = await solace.connect(governor).setMaxSupply(FOUR_BILLION);
+      expect(tx1).to.emit(solace, "MaxSupplySet").withArgs(FOUR_BILLION);
+      let tx2 = await solace.connect(governor).setMaxSupply(THREE_BILLION);
+      expect(tx2).to.emit(solace, "MaxSupplySet").withArgs(THREE_BILLION);
+    });
+    it("can mint to new cap", async function () {
+      let supply = await solace.totalSupply();
+      let diff = THREE_BILLION.sub(supply);
+      await solace.connect(minter).mint(receiver1.address, diff);
+    });
+    it("cannot lower cap under current supply", async function () {
+      await expect(solace.connect(governor).setMaxSupply(TWO_BILLION)).to.be.revertedWith("max < current supply")
+    });
+  });
+
+  describe("minters", function () {
+    it("governor is minter", async function () {
+      expect(await solace.isMinter(governor.address)).to.be.true;
+    });
+    it("can add minters", async function (){
+      let tx = await solace.connect(governor).addMinter(minter.address);
+      expect(tx).to.emit(solace, "MinterAdded").withArgs(minter.address);
+      expect(await solace.isMinter(minter.address)).to.equal(true);
+    });
+    it("can remove minters", async function () {
+      let tx = await solace.connect(governor).removeMinter(minter.address);
+      expect(tx).to.emit(solace, "MinterRemoved").withArgs(minter.address);
+      expect(await solace.isMinter(minter.address)).to.equal(false);
+    });
+    it("reverts when !governance adds / removes minters", async function () {
+      await expect(solace.connect(receiver1).addMinter(receiver2.address)).to.be.reverted;
+      await expect(solace.connect(receiver1).removeMinter(receiver2.address)).to.be.reverted;
+    });
+  });
+
+  describe("governance", function () {
+    it("can transfer governance", async function () {
+      expect(await solace.governance()).to.equal(governor.address);
+      let tx1 = await solace.connect(governor).setGovernance(owner.address);
+      expect(tx1).to.emit(solace, "GovernancePending").withArgs(owner.address);
+      expect(await solace.governance()).to.equal(governor.address);
+      expect(await solace.pendingGovernance()).to.equal(owner.address);
+      let tx2 = await solace.connect(owner).acceptGovernance();
+      await expect(tx2).to.emit(solace, "GovernanceTransferred").withArgs(governor.address, owner.address);
+      expect(await solace.governance()).to.equal(owner.address);
+      expect(await solace.pendingGovernance()).to.equal(ZERO_ADDRESS);
+    });
+    it("reverts governance transfers by non-governor", async function () {
+      await expect(solace.connect(receiver1).setGovernance(receiver2.address)).to.be.reverted;
+      await solace.connect(owner).setGovernance(governor.address);
+      await expect(solace.connect(receiver1).acceptGovernance()).to.be.revertedWith("!governance");
+      await solace.connect(governor).acceptGovernance();
+    });
+  });
+  */
+})

@@ -98,11 +98,4 @@ interface IERC721Enhanced is IERC721Enumerable {
      * @return tokenIDs The list of token IDs.
      */
     function listTokensOfOwner(address owner) external view returns (uint256[] memory tokenIDs);
-
-    /***************************************
-    MODIFIERS
-    ***************************************/
-
-    // Call will revert if the token does not exist.
-    modifier tokenMustExist(uint256 tokenID) virtual;
 }
