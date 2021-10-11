@@ -159,4 +159,29 @@ interface IRegistry {
      * @param locker_ The address of the [`Locker`](../Locker) contract.
      */
     function setLocker(address locker_) external;
+
+    /**
+     * @notice Sets multiple contracts in one call.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param weth_ The address of the [**WETH**](../WETH9) contract.
+     * @param vault_ The address of the [`Vault`](../Vault) contract.
+     * @param claimsEscrow_ The address of the [`Claims Escrow`](../ClaimsEscrow) contract.
+     * @param treasury_ The address of the [`Treasury`](../Treasury) contract.
+     * @param policyManager_ The address of the [`Policy Manager`](../PolicyManager) contract.
+     * @param riskManager_ The address of the [`Risk Manager`](../RiskManager) contract.
+     * @param solace_ The address of the [**SOLACE**](../SOLACE) contract.
+     * @param master_ The address of the [`Master`](../Master) contract.
+     * @param locker_ The address of the [`Locker`](../Locker) contract.
+     */
+    function setMultiple(
+        address weth_,
+        address vault_,
+        address claimsEscrow_,
+        address treasury_,
+        address policyManager_,
+        address riskManager_,
+        address solace_,
+        address master_,
+        address locker_
+    ) external;
 }

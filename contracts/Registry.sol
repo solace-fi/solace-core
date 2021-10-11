@@ -112,8 +112,8 @@ contract Registry is IRegistry, Governable {
      * @param weth_ The address of the [**WETH**](./WETH9) contract.
      */
     function setWeth(address weth_) external override onlyGovernance {
-      _weth = weth_;
-      emit WethSet(weth_);
+        _weth = weth_;
+        emit WethSet(weth_);
     }
 
     /**
@@ -192,6 +192,50 @@ contract Registry is IRegistry, Governable {
      * @param locker_ The address of the [`Locker`](./Locker) contract.
      */
     function setLocker(address locker_) external override onlyGovernance {
+        _locker = locker_;
+        emit LockerSet(locker_);
+    }
+
+    /**
+     * @notice Sets multiple contracts in one call.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param weth_ The address of the [**WETH**](../WETH9) contract.
+     * @param vault_ The address of the [`Vault`](../Vault) contract.
+     * @param claimsEscrow_ The address of the [`Claims Escrow`](../ClaimsEscrow) contract.
+     * @param treasury_ The address of the [`Treasury`](../Treasury) contract.
+     * @param policyManager_ The address of the [`Policy Manager`](../PolicyManager) contract.
+     * @param riskManager_ The address of the [`Risk Manager`](../RiskManager) contract.
+     * @param solace_ The address of the [**SOLACE**](../SOLACE) contract.
+     * @param master_ The address of the [`Master`](../Master) contract.
+     * @param locker_ The address of the [`Locker`](../Locker) contract.
+     */
+    function setMultiple(
+        address weth_,
+        address vault_,
+        address claimsEscrow_,
+        address treasury_,
+        address policyManager_,
+        address riskManager_,
+        address solace_,
+        address master_,
+        address locker_
+    ) external override onlyGovernance {
+        _weth = weth_;
+        emit WethSet(weth_);
+        _vault = vault_;
+        emit VaultSet(vault_);
+        _claimsEscrow = claimsEscrow_;
+        emit ClaimsEscrowSet(claimsEscrow_);
+        _treasury = treasury_;
+        emit TreasurySet(treasury_);
+        _policyManager = policyManager_;
+        emit PolicyManagerSet(policyManager_);
+        _riskManager = riskManager_;
+        emit RiskManagerSet(riskManager_);
+        _solace = solace_;
+        emit SolaceSet(solace_);
+        _master = master_;
+        emit MasterSet(master_);
         _locker = locker_;
         emit LockerSet(locker_);
     }
