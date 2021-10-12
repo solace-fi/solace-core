@@ -123,7 +123,7 @@ describe("Registry", function() {
 
   describe("treasury", function() {
     before(async function () {
-      treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, ZERO_ADDRESS, registry.address])) as Treasury;
+      treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, registry.address])) as Treasury;
     });
     it("starts as the zero address", async function() {
       expect(await registry.treasury()).to.equal(ZERO_ADDRESS);
