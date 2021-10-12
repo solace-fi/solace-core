@@ -5,7 +5,6 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./Governable.sol";
 import "./interface/IWETH9.sol";
-import "./interface/UniswapV3/ISwapRouter.sol";
 import "./interface/IRegistry.sol";
 import "./interface/IPolicyManager.sol";
 import "./interface/ITreasury.sol";
@@ -28,9 +27,6 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
     // Registry
     IRegistry internal _registry;
 
-    // Address of Uniswap router.
-    ISwapRouter internal _swapRouter;
-
     // Wrapped ether.
     IWETH9 internal _weth;
 
@@ -46,11 +42,9 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
     /**
      * @notice Constructs the Treasury contract.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
-     * @param swapRouter_ Address of uniswap router.
      * @param registry_ Address of registry.
      */
-    constructor(address governance_, address swapRouter_, address registry_) Governable(governance_) {
-        _swapRouter = ISwapRouter(swapRouter_);
+    constructor(address governance_, address registry_) Governable(governance_) {
         _registry = IRegistry(registry_);
         _weth = IWETH9(payable(_registry.weth()));
 
@@ -220,34 +214,6 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
         else IERC20(token).safeTransfer(recipient, amount);
         // emit event
         emit FundsSpent(token, amount, recipient);
-    }
-
-    /**
-     * @notice Manually swaps a token.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param path The path of pools to take.
-     * @param amountIn The amount to swap.
-     * @param amountOutMinimum The minimum about to receive.
-     */
-    function swap(bytes memory path, uint256 amountIn, uint256 amountOutMinimum) external override onlyGovernance {
-        // check allowance
-        address tokenAddr;
-        assembly {
-            tokenAddr := div(mload(add(add(path, 0x20), 0)), 0x1000000000000000000000000)
-        }
-        IERC20 token = IERC20(tokenAddr);
-        if(token.allowance(address(this), address(_swapRouter)) < amountIn) {
-            token.approve(address(_swapRouter), type(uint256).max);
-        }
-        // swap
-        _swapRouter.exactInput(ISwapRouter.ExactInputParams({
-            path: path,
-            recipient: address(this),
-            // solhint-disable-next-line not-rely-on-time
-            deadline: block.timestamp,
-            amountIn: amountIn,
-            amountOutMinimum: amountOutMinimum
-        }));
     }
 
     /**

@@ -245,9 +245,8 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      * @notice Sends **ETH** to other users or contracts. The users or contracts should be authorized requestors.
      * Can only be called by authorized `requestors`.
      * @param amount The amount of **ETH** wanted.
-     * @return amount The amount of **ETH** sent.
      */
-    function requestEth(uint256 amount) external override nonReentrant returns (uint256) {
+    function requestEth(uint256 amount) external override nonReentrant {
         require(_isRequestor[msg.sender], "!requestor");
         // unwrap some WETH to make ETH available for claims payout
         if(amount > address(this).balance) {
@@ -259,7 +258,6 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
         uint256 transferAmount = min(amount, address(this).balance);
         payable(msg.sender).transfer(transferAmount);
         emit FundsSent(transferAmount);
-        return transferAmount;
     }
 
     /**

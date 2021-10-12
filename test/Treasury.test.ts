@@ -90,7 +90,7 @@ describe("Treasury", function() {
     uniswapPositionManager = (await deployContract(deployer, artifacts.NonfungiblePositionManager, [uniswapFactory.address, weth.address, ZERO_ADDRESS])) as Contract;
 
     // deploy treasury contract
-    treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, uniswapRouter.address, registry.address])) as Treasury;
+    treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, registry.address])) as Treasury;
     await registry.connect(governor).setTreasury(treasury.address);
 
     // deploy policy manager
@@ -219,58 +219,6 @@ describe("Treasury", function() {
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       expect(balancesDiff.treasurySolace).to.equal(0); // solace should not increase
       expect(balancesDiff.treasuryMock1).to.equal(depositAmount); // should hold other token
-    });
-  });
-
-  describe("swap", function() {
-    it("non governor cannot swap", async function() {
-      await expect(treasury.connect(user).swap(wethPath, 100, 0)).to.be.revertedWith("!governance");
-    });
-    it("cannot swap token with no path", async function() {
-      let depositAmount = ONE_HUNDRED;
-      let balancesBefore = await getBalances(mockPolicy);
-      await mockToken1.transfer(treasury.address, depositAmount);
-      await expect(treasury.connect(governor).swap(defaultPath, 100, 0)).to.be.reverted;
-      let balancesAfter = await getBalances(mockPolicy);
-      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
-      expect(balancesDiff.treasurySolace).to.equal(0); // solace should not increase
-      expect(balancesDiff.treasuryMock1).to.equal(depositAmount); // should hold other token
-    });
-    it("can swap token with a swap path", async function() {
-      let depositAmount = ONE_HUNDRED;
-      let balancesBefore = await getBalances(mockPolicy);
-      await mockToken2.transfer(treasury.address, depositAmount);
-      await treasury.connect(governor).swap(mockToken2Path, await mockToken2.balanceOf(treasury.address), 0);
-      let balancesAfter = await getBalances(mockPolicy);
-      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
-      expect(balancesDiff.treasurySolace).to.be.gt(0); // solace should increase
-      expect(balancesAfter.treasuryMock2).to.equal(0); // should swap mock
-    });
-    it("can swap token with a multi pool swap path", async function() {
-      let depositAmount = ONE_HUNDRED;
-      let balancesBefore = await getBalances(mockPolicy);
-      await mockToken3.transfer(treasury.address, depositAmount);
-      await treasury.connect(governor).swap(mockToken3Path, await mockToken3.balanceOf(treasury.address), 0);
-      let balancesAfter = await getBalances(mockPolicy);
-      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
-      expect(balancesDiff.treasurySolace).to.be.gt(0); // solace should increase
-      expect(balancesAfter.treasuryMock3).to.equal(0); // should swap mock
-    });
-    it("cannot swap token with uniswap errors", async function() {
-      let depositAmount = ONE_HUNDRED;
-      let balancesBefore = await getBalances(mockPolicy);
-      await mockToken4.transfer(treasury.address, depositAmount);
-      await expect(treasury.connect(governor).swap(mockToken4Path, 100, 0)).to.be.reverted;
-      let balancesAfter = await getBalances(mockPolicy);
-      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
-      expect(balancesDiff.treasurySolace).to.equal(0); // solace should not increase
-      expect(balancesDiff.treasuryMock4).to.equal(depositAmount); // should hold mock
-    });
-    it("reverts if not enough received", async function() {
-      let amountIn = ONE_HUNDRED;
-      await mockToken2.transfer(treasury.address, amountIn);
-      let amountOut = 99;
-      await expect(treasury.connect(governor).swap(mockToken2Path, amountIn, amountOut)).to.be.revertedWith("Too little received");
     });
   });
 
@@ -435,7 +383,7 @@ describe("Treasury", function() {
       before(async function() {
         vault = (await deployContract(deployer,artifacts.Vault,[governor.address,registry.address])) as Vault;
         await registry.connect(governor).setVault(vault.address);
-        treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, uniswapRouter.address, registry.address])) as Treasury;
+        treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, registry.address])) as Treasury;
         await registry.connect(governor).setTreasury(treasury.address);
         await vault.connect(governor).setRequestor(treasury.address, true);
       });
