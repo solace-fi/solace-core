@@ -42,6 +42,7 @@ export async function import_artifacts() {
   artifacts.LiquityProduct = await tryImport(`${artifact_dir}/products/LiquityProduct.sol/LiquityProduct.json`);
   artifacts.SushiswapProduct = await tryImport(`${artifact_dir}/products/SushiswapProduct.sol/SushiswapProduct.json`);
   artifacts.UniswapV2Product = await tryImport(`${artifact_dir}/products/UniswapV2Product.sol/UniswapV2Product.json`);
+  artifacts.UniswapV3Product = await tryImport(`${artifact_dir}/products/UniswapV3Product.sol/UniswapV3Product.json`);
 
   // oracles
   artifacts.ExchangeQuoter1InchV1 = await tryImport(`${artifact_dir}/oracles/ExchangeQuoter1InchV1.sol/ExchangeQuoter1InchV1.json`);
@@ -66,7 +67,7 @@ export async function import_artifacts() {
   artifacts.IComptroller = await tryImport(`${artifact_dir}/interface/Compound/IComptroller.sol/IComptroller.json`);
   artifacts.IComptrollerRinkeby = await tryImport(`${artifact_dir}/interface/Compound/IComptrollerRinkeby.sol/IComptrollerRinkeby.json`);
 
-  // uniswap imports
+  // uniswapv3 imports
   artifacts.UniswapV3Factory = await tryImport("@uniswap/v3-core/artifacts/contracts/UniswapV3Factory.sol/UniswapV3Factory.json");
   artifacts.UniswapV3Pool = await tryImport("@uniswap/v3-core/artifacts/contracts/UniswapV3Pool.sol/UniswapV3Pool.json");
   artifacts.SwapRouter = await tryImport("@uniswap/v3-periphery/artifacts/contracts/SwapRouter.sol/SwapRouter.json");
