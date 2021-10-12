@@ -80,6 +80,9 @@ describe("Registry", function() {
     it("cannot be set by non governor", async function() {
       await expect(registry.connect(user).setWeth(weth.address)).to.be.revertedWith("!governance");
     });
+    it("cannot be set to the zero address", async function () {
+      await expect(registry.connect(governor).setWeth(ZERO_ADDRESS)).to.be.revertedWith("zero address");
+    });
   });
 
   describe("vault", function() {
@@ -98,6 +101,9 @@ describe("Registry", function() {
     });
     it("cannot be set by non governor", async function() {
       await expect(registry.connect(user).setVault(vault.address)).to.be.revertedWith("!governance");
+    });
+    it("cannot be set to the zero address", async function () {
+      await expect(registry.connect(governor).setVault(ZERO_ADDRESS)).to.be.revertedWith("zero address");
     });
   });
 
@@ -118,11 +124,14 @@ describe("Registry", function() {
     it("cannot be set by non governor", async function() {
       await expect(registry.connect(user).setClaimsEscrow(claimsEscrow.address)).to.be.revertedWith("!governance");
     });
+    it("cannot be set to the zero address", async function () {
+      await expect(registry.connect(governor).setClaimsEscrow(ZERO_ADDRESS)).to.be.revertedWith("zero address");
+    });
   });
 
   describe("treasury", function() {
     before(async function () {
-      treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, ZERO_ADDRESS, registry.address])) as Treasury;
+      treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, registry.address])) as Treasury;
     });
     it("starts as the zero address", async function() {
       expect(await registry.treasury()).to.equal(ZERO_ADDRESS);
@@ -136,6 +145,9 @@ describe("Registry", function() {
     });
     it("cannot be set by non governor", async function() {
       await expect(registry.connect(user).setTreasury(treasury.address)).to.be.revertedWith("!governance");
+    });
+    it("cannot be set to the zero address", async function () {
+      await expect(registry.connect(governor).setTreasury(ZERO_ADDRESS)).to.be.revertedWith("zero address");
     });
   });
 
@@ -156,6 +168,9 @@ describe("Registry", function() {
     it("cannot be set by non governor", async function() {
       await expect(registry.connect(user).setPolicyManager(policyManager.address)).to.be.revertedWith("!governance");
     });
+    it("cannot be set to the zero address", async function () {
+      await expect(registry.connect(governor).setPolicyManager(ZERO_ADDRESS)).to.be.revertedWith("zero address");
+    });
   });
 
   describe("riskManager", function () {
@@ -172,6 +187,9 @@ describe("Registry", function() {
     });
     it("cannot be set by non governor", async function () {
       await expect(registry.connect(user).setRiskManager(riskManager.address)).to.be.revertedWith("!governance");
+    });
+    it("cannot be set to the zero address", async function () {
+      await expect(registry.connect(governor).setRiskManager(ZERO_ADDRESS)).to.be.revertedWith("zero address");
     });
   });
 
@@ -192,6 +210,9 @@ describe("Registry", function() {
     it("cannot be set by non governor", async function() {
       await expect(registry.connect(user).setSolace(solace.address)).to.be.revertedWith("!governance");
     });
+    it("cannot be set to the zero address", async function () {
+      await expect(registry.connect(governor).setSolace(ZERO_ADDRESS)).to.be.revertedWith("zero address");
+    });
   });
 
   describe("master", function() {
@@ -211,6 +232,9 @@ describe("Registry", function() {
     it("cannot be set by non governor", async function() {
       await expect(registry.connect(user).setMaster(master.address)).to.be.revertedWith("!governance");
     });
+    it("cannot be set to the zero address", async function () {
+      await expect(registry.connect(governor).setMaster(ZERO_ADDRESS)).to.be.revertedWith("zero address");
+    });
   });
 
   describe("locker", function() {
@@ -226,6 +250,9 @@ describe("Registry", function() {
     });
     it("cannot be set by non governor", async function() {
       await expect(registry.connect(user).setLocker(locker.address)).to.be.revertedWith("!governance");
+    });
+    it("cannot be set to the zero address", async function () {
+      await expect(registry.connect(governor).setLocker(ZERO_ADDRESS)).to.be.revertedWith("zero address");
     });
   });
 });

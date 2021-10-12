@@ -79,7 +79,7 @@ if(process.env.FORK_NETWORK === "kovan"){
       await registry.connect(governor).setVault(vault.address);
       claimsEscrow = (await deployContract(deployer, artifacts.ClaimsEscrow, [governor.address, registry.address])) as ClaimsEscrow;
       await registry.connect(governor).setClaimsEscrow(claimsEscrow.address);
-      treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, ZERO_ADDRESS, registry.address])) as Treasury;
+      treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, registry.address])) as Treasury;
       await registry.connect(governor).setTreasury(treasury.address);
       policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
       await registry.connect(governor).setPolicyManager(policyManager.address);

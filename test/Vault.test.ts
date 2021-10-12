@@ -20,7 +20,7 @@ describe("Vault", function () {
   let mockProduct: MockProduct;
   let riskManager: RiskManager;
 
-  const [owner, newOwner, depositor1, depositor2, claimant, mockEscrow, mockTreasury] = provider.getWallets();
+  const [owner, newOwner, depositor1, depositor2, claimant, mockEscrow, mockTreasury, coveredPlatform] = provider.getWallets();
   const tokenName = "Solace CP Token";
   const tokenSymbol = "SCP";
   const testDepositAmount1 = BN.from("1000000000000000000"); // one eth
@@ -50,7 +50,7 @@ describe("Vault", function () {
     await registry.setPolicyManager(policyManager.address);
     riskManager = (await deployContract(owner, artifacts.RiskManager, [owner.address, registry.address])) as RiskManager;
     await registry.setRiskManager(riskManager.address);
-    mockProduct = (await deployContract(owner,artifacts.MockProduct,[owner.address,policyManager.address,registry.address,ZERO_ADDRESS,0,100000000000,1])) as MockProduct;
+    mockProduct = (await deployContract(owner,artifacts.MockProduct,[owner.address,policyManager.address,registry.address,coveredPlatform.address,0,100000000000,1])) as MockProduct;
     await policyManager.addProduct(mockProduct.address);
   });
 
@@ -64,6 +64,13 @@ describe("Vault", function () {
     });
     it("should initialize DOMAIN_SEPARATOR correctly", async function () {
       expect(await vault.DOMAIN_SEPARATOR()).to.equal(getDomainSeparator(tokenName, vault.address, chainId));
+    });
+    it("reverts if zero registry", async function () {
+      await expect(deployContract(owner, artifacts.Vault, [owner.address, ZERO_ADDRESS])).to.be.revertedWith("zero address registry");
+    });
+    it("reverts if zero weth", async function () {
+      let registry2 = (await deployContract(owner, artifacts.Registry, [owner.address])) as Registry;
+      await expect(deployContract(owner, artifacts.Vault, [owner.address, registry2.address])).to.be.revertedWith("zero address weth");
     });
   });
 
@@ -566,6 +573,10 @@ describe("Vault", function () {
       expect(await vault.isRequestor(claimsEscrow.address)).to.equal(true);
       await vault.connect(owner).setRequestor(claimsEscrow.address, false);
       expect(await vault.isRequestor(claimsEscrow.address)).to.equal(false);
+    });
+    it("cannot add zero address requestor", async function () {
+      await expect(vault.connect(owner).setRequestor(ZERO_ADDRESS, true)).to.be.revertedWith("zero address requestor");
+      await expect(vault.connect(owner).setRequestor(ZERO_ADDRESS, false)).to.be.revertedWith("zero address requestor");
     });
   });
 
