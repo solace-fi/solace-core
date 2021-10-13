@@ -120,9 +120,14 @@ describe("Vault", function () {
       await expect(vault.connect(owner).setCooldownWindow(4,3)).to.be.revertedWith("invalid window");
     });
     it("should successfully set cooldown window", async function () {
+      // <
       await vault.connect(owner).setCooldownWindow(3,4);
       expect(await vault.cooldownMin()).to.equal(3);
       expect(await vault.cooldownMax()).to.equal(4);
+      // ==
+      await vault.connect(owner).setCooldownWindow(7,7);
+      expect(await vault.cooldownMin()).to.equal(7);
+      expect(await vault.cooldownMax()).to.equal(7);
     });
   });
 

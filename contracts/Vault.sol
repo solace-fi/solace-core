@@ -301,7 +301,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      * @param cooldownMax_ Maximum time in seconds.
      */
     function setCooldownWindow(uint40 cooldownMin_, uint40 cooldownMax_) external override onlyGovernance {
-        require(cooldownMin_ < cooldownMax_, "invalid window");
+        require(cooldownMin_ <= cooldownMax_, "invalid window");
         _cooldownMin = cooldownMin_;
         _cooldownMax = cooldownMax_;
     }
