@@ -22,6 +22,16 @@ interface IProduct {
     event PolicyUpdated(uint256 indexed policyID);
     /// @notice Emitted when a claim is submitted.
     event ClaimSubmitted(uint256 indexed policyID);
+    /// @notice Emitted when min period is set.
+    event MinPeriodSet(uint40 minPeriod);
+    /// @notice Emitted when max period is set.
+    event MaxPeriodSet(uint40 maxPeriod);
+    /// @notice Emitted when buying is paused or unpaused.
+    event PauseSet(bool paused);
+    /// @notice Emitted when covered platform is set.
+    event CoveredPlatformSet(address coveredPlatform);
+    /// @notice Emitted when PolicyManager is set.
+    event PolicyManagerSet(address policyManager);
 
     /***************************************
     POLICYHOLDER FUNCTIONS

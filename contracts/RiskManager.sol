@@ -14,7 +14,7 @@ import "./interface/IRiskManager.sol";
  * @author solace.fi
  * @notice Calculates the acceptable risk, sellable cover, and capital requirements of Solace products and capital pool.
  *
- * The total amount of sellable coverage is proportional to the assets in the [**risk backing capital pool**](./Vault). The max cover is split amongst products in a weighting system. [**Governance**](/docs/protocol/governance). can change these weights and with it each product's sellable cover.
+ * The total amount of sellable coverage is proportional to the assets in the [**risk backing capital pool**](./Vault). The max cover is split amongst products in a weighting system. [**Governance**](/docs/protocol/governance) can change these weights and with it each product's sellable cover.
  *
  * The minimum capital requirement is proportional to the amount of cover sold to [active policies](./PolicyManager).
  *
@@ -123,6 +123,15 @@ contract RiskManager is IRiskManager, Governable {
         ProductRiskParams storage params = _productRiskParams[prod];
         require(params.weight > 0, "product inactive");
         return maxCover() * params.weight / (_weightSum * params.divisor);
+    }
+
+    /**
+     * @notice Checks is an address is an active product.
+     * @param prod The product to check.
+     * @return status Returns true if the product is active.
+     */
+    function productIsActive(address prod) external view override returns (bool status) {
+        return _productToIndex[prod] != 0;
     }
 
     /**
@@ -315,5 +324,6 @@ contract RiskManager is IRiskManager, Governable {
      */
     function setPartialReservesFactor(uint16 partialReservesFactor_) external override onlyGovernance {
         _partialReservesFactor = partialReservesFactor_;
+        emit PartialReservesFactorSet(partialReservesFactor_);
     }
 }

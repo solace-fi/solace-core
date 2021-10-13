@@ -65,7 +65,7 @@ describe("PolicyManager", function() {
     await registry.connect(governor).setPolicyManager(policyManager.address);
     await registry.connect(governor).setRiskManager(riskManager.address);
     await deployer.sendTransaction({ to: treasury.address, value: BN.from("10000000000000000") });
-    await vault.connect(governor).setRequestor(treasury.address, true);
+    await vault.connect(governor).addRequestor(treasury.address);
   });
 
   it("has a correct name", async function() {
@@ -92,9 +92,10 @@ describe("PolicyManager", function() {
       await expect(policyManager.connect(user).setGovernance(user.address)).to.be.revertedWith("!governance");
     });
     it("can set new governance", async function() {
-      await policyManager.connect(governor).setGovernance(deployer.address);
+      let tx = await policyManager.connect(governor).setGovernance(deployer.address);
+      expect(tx).to.emit(policyManager, "GovernancePending").withArgs(deployer.address);
       expect(await policyManager.governance()).to.equal(governor.address);
-      expect(await policyManager.newGovernance()).to.equal(deployer.address);
+      expect(await policyManager.pendingGovernance()).to.equal(deployer.address);
     });
     it("rejects governance transfer by non governor", async function() {
       await expect(policyManager.connect(user).acceptGovernance()).to.be.revertedWith("!governance");
@@ -103,9 +104,9 @@ describe("PolicyManager", function() {
       let tx = await policyManager.connect(deployer).acceptGovernance();
       await expect(tx)
         .to.emit(policyManager, "GovernanceTransferred")
-        .withArgs(deployer.address);
+        .withArgs(governor.address, deployer.address);
       expect(await policyManager.governance()).to.equal(deployer.address);
-      expect(await policyManager.newGovernance()).to.equal(ZERO_ADDRESS);
+      expect(await policyManager.pendingGovernance()).to.equal(ZERO_ADDRESS);
 
       await policyManager.connect(deployer).setGovernance(governor.address);
       await policyManager.connect(governor).acceptGovernance();
@@ -115,7 +116,8 @@ describe("PolicyManager", function() {
       await expect(policyManager.connect(user).setPolicyDescriptor(policyDescriptor.address)).to.be.revertedWith("!governance");
     });
     it("can set new nft token descriptor", async function() {
-      await policyManager.connect(governor).setPolicyDescriptor(policyDescriptor.address);
+      let tx = await policyManager.connect(governor).setPolicyDescriptor(policyDescriptor.address);
+      expect(tx).to.emit(policyManager, "PolicyDescriptorSet").withArgs(policyDescriptor.address);
       expect(await policyManager.connect(governor).policyDescriptor()).to.equal(policyDescriptor.address);
     });
   });
@@ -230,10 +232,10 @@ describe("PolicyManager", function() {
       expect(await riskManager.minCapitalRequirement()).to.equal(1);
     });
     it("can list my policies", async function() {
-      expect(await policyManager.listPolicies(deployer.address)).to.deep.equal([]);
-      expect(await policyManager.listPolicies(user.address)).to.deep.equal([BN.from(1)]);
+      expect(await policyManager.listTokensOfOwner(deployer.address)).to.deep.equal([]);
+      expect(await policyManager.listTokensOfOwner(user.address)).to.deep.equal([BN.from(1)]);
       await policyManager.connect(walletProduct2).createPolicy(user.address, coverAmount, expirationBlock, price, positionContract.address);
-      expect(await policyManager.listPolicies(user.address)).to.deep.equal([BN.from(1), BN.from(2)]);
+      expect(await policyManager.listTokensOfOwner(user.address)).to.deep.equal([BN.from(1), BN.from(2)]);
       expect(await policyManager.activeCoverAmount()).to.equal(coverAmount.add(1));
       expect(await riskManager.minCapitalRequirement()).to.equal(coverAmount.add(1));
     });
@@ -265,21 +267,21 @@ describe("PolicyManager", function() {
       expect(await policyManager.ownerOf(policyID)).to.equal(user.address);
       expect(await policyManager.getPolicyholder(policyID)).to.equal(user.address);
       expect((await policyManager.getPolicyInfo(policyID)).policyholder).to.equal(user.address);
-      expect(await policyManager.listPolicies(user.address)).to.deep.equal([policyID]);
-      expect(await policyManager.listPolicies(user2.address)).to.deep.equal([]);
+      expect(await policyManager.listTokensOfOwner(user.address)).to.deep.equal([policyID]);
+      expect(await policyManager.listTokensOfOwner(user2.address)).to.deep.equal([]);
       await policyManager.connect(user).transferFrom(user.address, user2.address, policyID);
       expect(await policyManager.ownerOf(policyID)).to.equal(user2.address);
       expect(await policyManager.getPolicyholder(policyID)).to.equal(user2.address);
       expect((await policyManager.getPolicyInfo(policyID)).policyholder).to.equal(user2.address);
-      expect(await policyManager.listPolicies(user.address)).to.deep.equal([]);
-      expect(await policyManager.listPolicies(user2.address)).to.deep.equal([policyID]);
+      expect(await policyManager.listTokensOfOwner(user.address)).to.deep.equal([]);
+      expect(await policyManager.listTokensOfOwner(user2.address)).to.deep.equal([policyID]);
       await policyManager.connect(user2).approve(user.address, policyID);
       await policyManager.connect(user).transferFrom(user2.address, user.address, policyID);
       expect(await policyManager.ownerOf(policyID)).to.equal(user.address);
       expect(await policyManager.getPolicyholder(policyID)).to.equal(user.address);
       expect((await policyManager.getPolicyInfo(policyID)).policyholder).to.equal(user.address);
-      expect(await policyManager.listPolicies(user.address)).to.deep.equal([policyID]);
-      expect(await policyManager.listPolicies(user2.address)).to.deep.equal([]);
+      expect(await policyManager.listTokensOfOwner(user.address)).to.deep.equal([policyID]);
+      expect(await policyManager.listTokensOfOwner(user2.address)).to.deep.equal([]);
     });
   });
 
@@ -384,56 +386,6 @@ describe("PolicyManager", function() {
       expect(await mockProduct.activeCoverAmount()).to.equal(0b01100);
       expect(await policyManager.activeCoverAmount()).to.equal(0b01100);
       expect(await riskManager.minCapitalRequirement()).to.equal(0b01100);
-    });
-  });
-
-  describe("transfer", async function () {
-    let policyID = 4;
-    it("should reject transfer of nonexistent token", async function () {
-      await expect(policyManager.connect(user).transfer(user2.address, 99)).to.be.revertedWith("ERC721: operator query for nonexistent token");
-    });
-    it("should reject transfer by non owner", async function () {
-      await expect(policyManager.connect(user2).transfer(user2.address, policyID)).to.be.revertedWith("ERC721: transfer caller is not owner nor approved");
-    });
-    it("should transfer", async function () {
-      let bal11 = await policyManager.balanceOf(user.address);
-      let bal12 = await policyManager.balanceOf(user2.address);
-      let ts1 = await policyManager.totalSupply();
-      expect(await policyManager.ownerOf(policyID)).to.equal(user.address);
-      expect(await policyManager.getPolicyholder(policyID)).to.equal(user.address);
-      let tx = await policyManager.connect(user).transfer(user2.address, policyID);
-      expect(tx).to.emit(policyManager, "Transfer").withArgs(user.address, user2.address, policyID);
-      let bal21 = await policyManager.balanceOf(user.address);
-      let bal22 = await policyManager.balanceOf(user2.address);
-      let ts2 = await policyManager.totalSupply();
-      expect(await policyManager.ownerOf(policyID)).to.equal(user2.address);
-      expect(await policyManager.getPolicyholder(policyID)).to.equal(user2.address);
-      expect(bal11.sub(bal21)).to.equal(1);
-      expect(bal22.sub(bal12)).to.equal(1);
-      expect(ts1).to.equal(ts2);
-    });
-    it("should reject safeTransfer of nonexistent token", async function () {
-      await expect(policyManager.connect(user2).safeTransfer(user.address, 99)).to.be.revertedWith("ERC721: operator query for nonexistent token");
-    });
-    it("should reject safeTransfer by non owner", async function () {
-      await expect(policyManager.connect(user).safeTransfer(user.address, policyID)).to.be.revertedWith("ERC721: transfer caller is not owner nor approved");
-    });
-    it("should safeTransfer", async function () {
-      let bal11 = await policyManager.balanceOf(user.address);
-      let bal12 = await policyManager.balanceOf(user2.address);
-      let ts1 = await policyManager.totalSupply();
-      expect(await policyManager.ownerOf(policyID)).to.equal(user2.address);
-      expect(await policyManager.getPolicyholder(policyID)).to.equal(user2.address);
-      let tx = await policyManager.connect(user2).safeTransfer(user.address, policyID);
-      expect(tx).to.emit(policyManager, "Transfer").withArgs(user2.address, user.address, policyID);
-      let bal21 = await policyManager.balanceOf(user.address);
-      let bal22 = await policyManager.balanceOf(user2.address);
-      let ts2 = await policyManager.totalSupply();
-      expect(await policyManager.ownerOf(policyID)).to.equal(user.address);
-      expect(await policyManager.getPolicyholder(policyID)).to.equal(user.address);
-      expect(bal21.sub(bal11)).to.equal(1);
-      expect(bal12.sub(bal22)).to.equal(1);
-      expect(ts1).to.equal(ts2);
     });
   });
 
