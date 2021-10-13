@@ -59,8 +59,13 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      * @param registry_ Address of the [`Registry`](./Registry) contract.
      */
     constructor (address governance_, address registry_) ERC20("Solace CP Token", "SCP") ERC20Permit("Solace CP Token") Governable(governance_) {
+        // set registry
+        require(registry_ != address(0x0), "zero address registry");
         _registry = IRegistry(registry_);
-        _weth = IWETH9(payable(_registry.weth()));
+        // set weth
+        address weth_ = _registry.weth();
+        require(weth_ != address(0x0), "zero address weth");
+        _weth = IWETH9(payable(weth_));
     }
 
     /***************************************
@@ -314,6 +319,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      * @param requestor The requestor to grant rights.
      */
     function addRequestor(address requestor) external override onlyGovernance {
+        require(requestor != address(0x0), "zero address requestor");
         _isRequestor[requestor] = true;
         emit RequestorAdded(requestor);
     }
@@ -324,6 +330,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      * @param requestor The requestor to revoke rights.
      */
     function removeRequestor(address requestor) external override onlyGovernance {
+        require(requestor != address(0x0), "zero address requestor");
         _isRequestor[requestor] = false;
         emit RequestorRemoved(requestor);
     }

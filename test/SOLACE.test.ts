@@ -127,6 +127,9 @@ describe("SOLACE", function () {
       await expect(solace.connect(receiver1).addMinter(receiver2.address)).to.be.reverted;
       await expect(solace.connect(receiver1).removeMinter(receiver2.address)).to.be.reverted;
     });
+    it("cannot add zero address minter", async function () {
+      await expect(solace.connect(governor).addMinter(ZERO_ADDRESS)).to.be.revertedWith("zero address");
+    });
   });
 
   describe("governance", function () {

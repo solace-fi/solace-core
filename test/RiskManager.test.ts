@@ -13,7 +13,7 @@ import { RiskManager, Registry, Vault, Weth9, PolicyManager, MockProduct } from 
 
 describe("RiskManager", function () {
   let artifacts: ArtifactImports;
-  const [deployer, governor, user, product1, product2, product3] = provider.getWallets();
+  const [deployer, governor, user, product1, product2, product3, coveredPlatform] = provider.getWallets();
 
   // solace contracts
   let registry: Registry;
@@ -45,9 +45,9 @@ describe("RiskManager", function () {
     riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
     await registry.connect(governor).setRiskManager(riskManager.address);
 
-    product4 = (await deployContract(deployer, artifacts.MockProduct, [governor.address, policyManager.address, registry.address, ZERO_ADDRESS, 0, 100000, 1])) as MockProduct;
-    product5 = (await deployContract(deployer, artifacts.MockProduct, [governor.address, policyManager.address, registry.address, ZERO_ADDRESS, 0, 100000, 1])) as MockProduct;
-    product6 = (await deployContract(deployer, artifacts.MockProduct, [governor.address, policyManager.address, registry.address, ZERO_ADDRESS, 0, 100000, 1])) as MockProduct;
+    product4 = (await deployContract(deployer, artifacts.MockProduct, [governor.address, policyManager.address, registry.address, coveredPlatform.address, 0, 100000, 1])) as MockProduct;
+    product5 = (await deployContract(deployer, artifacts.MockProduct, [governor.address, policyManager.address, registry.address, coveredPlatform.address, 0, 100000, 1])) as MockProduct;
+    product6 = (await deployContract(deployer, artifacts.MockProduct, [governor.address, policyManager.address, registry.address, coveredPlatform.address, 0, 100000, 1])) as MockProduct;
 
     await policyManager.connect(governor).addProduct(product1.address);
     await policyManager.connect(governor).addProduct(product2.address);
@@ -55,6 +55,12 @@ describe("RiskManager", function () {
     await policyManager.connect(governor).addProduct(product4.address);
     await policyManager.connect(governor).addProduct(product5.address);
     await policyManager.connect(governor).addProduct(product6.address);
+  });
+
+  describe("deployment", function () {
+    it("should revert if registry is zero address", async function () {
+      await expect(deployContract(deployer, artifacts.RiskManager, [governor.address, ZERO_ADDRESS])).to.be.revertedWith("zero address registry");
+    });
   });
 
   describe("governance", function () {
@@ -98,6 +104,7 @@ describe("RiskManager", function () {
       await expect(riskManager.connect(user).removeProduct(product1.address)).to.be.revertedWith("!governance");
     });
     it("should reject invalid inputs", async function () {
+      await expect(riskManager.connect(governor).addProduct(ZERO_ADDRESS, 1, 11044, 10)).to.be.revertedWith("zero address product");
       await expect(riskManager.connect(governor).addProduct(product1.address, 0, 11044, 10)).to.be.revertedWith("no weight");
       await expect(riskManager.connect(governor).addProduct(product1.address, 1, 0, 10)).to.be.revertedWith("no price");
       await expect(riskManager.connect(governor).addProduct(product1.address, 1, 11044, 0)).to.be.revertedWith("1/0");
@@ -106,6 +113,7 @@ describe("RiskManager", function () {
       await expect(riskManager.connect(governor).setProductParams([product1.address], [1], [11044,22088], [10])).to.be.revertedWith("length mismatch");
       await expect(riskManager.connect(governor).setProductParams([product1.address], [1], [11044], [10,20])).to.be.revertedWith("length mismatch");
       await expect(riskManager.connect(governor).setProductParams([product1.address,product1.address], [1,2], [11044,11044], [10,10])).to.be.revertedWith("duplicate product");
+      await expect(riskManager.connect(governor).setProductParams([ZERO_ADDRESS], [1], [11044], [10])).to.be.revertedWith("zero address product");
       await expect(riskManager.connect(governor).setProductParams([product1.address], [0], [11044], [10])).to.be.revertedWith("no weight");
       await expect(riskManager.connect(governor).setProductParams([product1.address], [1], [0], [10])).to.be.revertedWith("no price");
       await expect(riskManager.connect(governor).setProductParams([product1.address], [1], [11044], [0])).to.be.revertedWith("1/0");
