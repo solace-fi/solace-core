@@ -97,6 +97,12 @@ describe("BaseProduct", function () {
     await vault.connect(governor).setRequestor(treasury.address, true);
   });
 
+  describe("deployment", function () {
+    it("reverts invalid period", async function () {
+      await expect(deployContract(deployer, artifacts.MockProduct, [governor.address, policyManager.address, registry.address, treasury.address, 1000, 999, price1])).to.be.revertedWith("invalid period");
+    });
+  })
+
   describe("governance", function() {
     it("starts with the correct governor", async function() {
       expect(await product.governance()).to.equal(governor.address);
@@ -143,6 +149,10 @@ describe("BaseProduct", function () {
     it("should revert setMinPeriod if not called by governance", async function() {
       await expect(product.connect(policyholder1).setMinPeriod(minPeriod1)).to.be.revertedWith("!governance");
     });
+    it("should revert setMinPeriod if greater than maxPeriod", async function () {
+      let maxPeriod = await product.maxPeriod();
+      await expect(product.connect(governor).setMinPeriod(maxPeriod + 1)).to.be.revertedWith("invalid period");
+    });
     it("can get maxPeriod", async function() {
       expect(await product.maxPeriod()).to.eq(maxPeriod1);
     });
@@ -152,6 +162,10 @@ describe("BaseProduct", function () {
     });
     it("should revert setMaxPeriod if not called by governance", async function() {
       await expect(product.connect(policyholder1).setMaxPeriod(maxPeriod1)).to.be.revertedWith("!governance");
+    });
+    it("should revert setMaxPeriod if greater than maxPeriod", async function () {
+      let minPeriod = await product.minPeriod();
+      await expect(product.connect(governor).setMaxPeriod(minPeriod - 1)).to.be.revertedWith("invalid period");
     });
     it("can get covered platform", async function () {
       expect(await product.coveredPlatform()).to.equal(ONE_SPLIT_VIEW);
