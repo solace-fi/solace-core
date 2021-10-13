@@ -228,8 +228,8 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
      * @notice Creates a new policy.
      * Can only be called by **products**.
      * @param policyholder The receiver of new policy token.
-     * @param expirationBlock The policy expiration block number.
      * @param coverAmount The policy coverage amount (in wei).
+     * @param expirationBlock The policy expiration block number.
      * @param price The coverage price.
      * @param positionDescription The byte encoded description of the covered position(s).
      * @return policyID The policy ID.
@@ -261,8 +261,8 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
      * @notice Modifies a policy.
      * Can only be called by **products**.
      * @param policyID The policy ID.
-     * @param expirationBlock The policy expiration block number.
      * @param coverAmount The policy coverage amount (in wei).
+     * @param expirationBlock The policy expiration block number.
      * @param price The coverage price.
      * @param positionDescription The byte encoded description of the covered position(s).
      */
@@ -378,6 +378,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
      * @param product the new product
      */
     function addProduct(address product) external override onlyGovernance {
+        require(product != address(0x0), "zero product");
         products.add(product);
         emit ProductAdded(product);
     }

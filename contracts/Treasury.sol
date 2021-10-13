@@ -45,12 +45,17 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
      * @param registry_ Address of registry.
      */
     constructor(address governance_, address registry_) Governable(governance_) {
+        // set registry
+        require(registry_ != address(0x0), "zero address registry");
         _registry = IRegistry(registry_);
-        _weth = IWETH9(payable(_registry.weth()));
-
+        // set weth
+        address weth_ = _registry.weth();
+        require(weth_ != address(0x0), "zero address weth");
+        _weth = IWETH9(payable(weth_));
         // if vault is deployed, route 100% of the premiums to it
-        if (registry_ != address(0) && _registry.vault() != address(0)) {
-            _premiumRecipients = [payable(_registry.vault())];
+        address vault_ = _registry.vault();
+        if (vault_ != address(0x0)) {
+            _premiumRecipients = [payable(vault_)];
             _recipientWeights = [1,0];
             _weightSum = 1;
         } // if vault is not deployed, hold 100% of the premiums in the treasury
@@ -155,6 +160,7 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
      * @param amount The amount to pay _before_ unpaid funds.
      */
     function _transferEth(address user, uint256 amount) internal {
+        require(user != address(0x0), "zero address recipient");
         // account for unpaid rewards
         uint256 unpaidRefunds1 = _unpaidRefunds[user];
         amount += unpaidRefunds1;
@@ -208,6 +214,8 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
      * @param recipient The address of the token receiver.
      */
     function spend(address token, uint256 amount, address recipient) external override nonReentrant onlyGovernance {
+        require(token != address(0x0), "zero address token");
+        require(recipient != address(0x0), "zero address recipient");
         // transfer eth
         if(token == _ETH_ADDRESS) payable(recipient).transfer(amount);
         // transfer token

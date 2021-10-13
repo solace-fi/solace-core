@@ -95,8 +95,11 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         string memory domain_,
         string memory version_
     ) EIP712(domain_, version_) Governable(governance_) {
-        _policyManager = policyManager_;
+        require(address(registry_) != address(0x0), "zero address registry");
         _registry = registry_;
+        require(address(policyManager_) != address(0x0), "zero address policymanager");
+        _policyManager = policyManager_;
+        require(coveredPlatform_ != address(0x0), "zero address coveredplatform");
         _coveredPlatform = coveredPlatform_;
         _minPeriod = minPeriod_;
         _maxPeriod = maxPeriod_;
@@ -116,6 +119,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
      * @return policyID The ID of newly created policy.
      */
     function buyPolicy(address policyholder, uint256 coverAmount, uint40 blocks, bytes memory positionDescription) external payable override nonReentrant whileUnpaused returns (uint256 policyID) {
+        require(policyholder != address(0x0), "zero address");
         require(coverAmount > 0, "zero cover value");
         require(isValidPositionDescription(positionDescription), "invalid position description");
         // check that the product can provide coverage for this policy
@@ -425,6 +429,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
      * @param signer The signer to add.
      */
     function addSigner(address signer) external onlyGovernance {
+        require(signer != address(0x0), "zero address signer");
         _isAuthorizedSigner[signer] = true;
         emit SignerAdded(signer);
     }
@@ -458,6 +463,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
      * @param coveredPlatform_ The platform to cover.
      */
     function setCoveredPlatform(address coveredPlatform_) public virtual override onlyGovernance {
+        require(coveredPlatform_ != address(0x0), "zero address coveredplatform");
         _coveredPlatform = coveredPlatform_;
     }
 
@@ -467,6 +473,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
      * @param policyManager_ The new policy manager.
      */
     function setPolicyManager(address policyManager_) external override onlyGovernance {
+        require(policyManager_ != address(0x0), "zero address policymanager");
         _policyManager = IPolicyManager(policyManager_);
     }
 

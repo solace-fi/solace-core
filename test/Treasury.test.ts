@@ -130,6 +130,35 @@ describe("Treasury", function() {
     mockToken4Path = encodePath([randAddress.address, randAddress.address], [FeeAmount.MEDIUM]);
   });
 
+  describe("deployment", function () {
+    it("reverts if zero registry", async function () {
+      await expect(deployContract(deployer, artifacts.Treasury, [governor.address, ZERO_ADDRESS])).to.be.revertedWith("zero address registry");
+    });
+    it("reverts if zero weth", async function () {
+      let registry2 = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
+      await expect(deployContract(deployer, artifacts.Treasury, [governor.address, registry2.address])).to.be.revertedWith("zero address weth");
+    });
+    it("routes to vault if set", async function () {
+      let registry2 = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
+      await registry2.connect(governor).setWeth(weth.address);
+      let vault2 = (await deployContract(deployer,artifacts.Vault,[governor.address,registry.address])) as Vault;
+      await registry2.connect(governor).setVault(vault2.address);
+      let treasury2 = (await deployContract(deployer, artifacts.Treasury, [governor.address, registry2.address])) as Treasury;
+      expect(await treasury2.premiumRecipient(0)).to.equal(vault2.address);
+      expect(await treasury2.numPremiumRecipients()).to.equal(1);
+      expect(await treasury2.recipientWeight(0)).to.equal(1);
+      expect(await treasury2.recipientWeight(1)).to.equal(0);
+      expect(await treasury2.weightSum()).to.equal(1);
+    });
+    it("routes to treasury if vault not set", async function () {
+      let registry2 = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
+      await registry2.connect(governor).setWeth(weth.address);
+      let treasury2 = (await deployContract(deployer, artifacts.Treasury, [governor.address, registry2.address])) as Treasury;
+      expect(await treasury2.numPremiumRecipients()).to.equal(0);
+      expect(await treasury2.weightSum()).to.equal(0);
+    });
+  });
+
   describe("governance", function() {
     it("starts with the correct governor", async function() {
       expect(await treasury.governance()).to.equal(governor.address);
@@ -255,6 +284,12 @@ describe("Treasury", function() {
     it("non governor cannot spend", async function() {
       await expect(treasury.connect(user).spend(solace.address, 100, governor.address)).to.be.revertedWith("!governance");
     });
+    it("cannot spend zero address token", async function () {
+      await expect(treasury.connect(governor).spend(ZERO_ADDRESS, 100, governor.address)).to.be.revertedWith("zero address token");
+    });
+    it("cannot spend to zero address recipient", async function () {
+      await expect(treasury.connect(governor).spend(solace.address, 100, ZERO_ADDRESS)).to.be.revertedWith("zero address recipient");
+    });
     it("can spend solace", async function() {
       let spendAmount = BN.from("5");
       let balancesBefore = await getBalances(user);
@@ -335,11 +370,13 @@ describe("Treasury", function() {
     before(async function() {
       await registry.connect(governor).setPolicyManager(policyManager.address);
     });
-
     it("non product cannot refund", async function() {
       await expect(treasury.connect(mockProduct).refund(user.address, 1)).to.be.revertedWith("!product");
     });
-
+    it("cannot refund to zero address", async function () {
+      await policyManager.connect(governor).addProduct(mockProduct.address);
+      await expect(treasury.connect(mockProduct).refund(ZERO_ADDRESS, 1)).to.be.revertedWith("zero address recipient");
+    });
     it("product can refund in full", async function() {
       await policyManager.connect(governor).addProduct(mockProduct.address);
       let balancesBefore = await getBalances(user);
@@ -350,7 +387,6 @@ describe("Treasury", function() {
       expect(balancesDiff.treasuryEth).to.equal(refundAmount.mul(-1));
       expect(balancesDiff.userEth).to.equal(refundAmount);
     });
-
     it("product can partially refund", async function() {
       // part 1: partial refund
       let balancesBefore = await getBalances(user);

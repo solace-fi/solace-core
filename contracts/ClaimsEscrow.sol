@@ -56,6 +56,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
      * @param registry_ The address of the [`Registry`](./Registry).
      */
     constructor(address governance_, address registry_) ERC721("Solace Claim", "SCT") Governable(governance_) {
+        require(registry_ != address(0x0), "zero address registry");
         _registry = IRegistry(registry_);
     }
 
@@ -73,6 +74,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
      */
     function receiveClaim(uint256 policyID, address claimant, uint256 amount) external payable override {
         require(IPolicyManager(_registry.policyManager()).productIsActive(msg.sender), "!product");
+        require(claimant != address(0x0), "zero address");
         uint256 tco = _totalClaimsOutstanding + amount;
         _totalClaimsOutstanding = tco;
         uint256 bal = address(this).balance;
@@ -183,6 +185,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
      * @return claimIDs List of claimIDs.
      */
     function listClaims(address claimant) external view override returns (uint256[] memory claimIDs) {
+        require(claimant != address(0x0), "zero address");
         uint256 tokenCount = balanceOf(claimant);
         claimIDs = new uint256[](tokenCount);
         for (uint256 index = 0; index < tokenCount; index++) {
