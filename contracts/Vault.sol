@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 import "./Governable.sol";
 import "./interface/IRegistry.sol";
 import "./interface/IPolicyManager.sol";
@@ -256,11 +257,11 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
         // unwrap some WETH to make ETH available for claims payout
         if(amount > address(this).balance) {
             uint256 wanted = amount - address(this).balance;
-            uint256 withdrawAmount = min(_weth.balanceOf(address(this)), wanted);
+            uint256 withdrawAmount = Math.min(_weth.balanceOf(address(this)), wanted);
             _weth.withdraw(withdrawAmount);
         }
         // transfer funds
-        uint256 transferAmount = min(amount, address(this).balance);
+        uint256 transferAmount = Math.min(amount, address(this).balance);
         Address.sendValue(payable(msg.sender), transferAmount);
         emit FundsSent(transferAmount);
     }
@@ -417,16 +418,6 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
         return (_totalAssets() > 0)
             ? ((amount * totalSupply()) / _totalAssets())
             : 0;
-    }
-
-    /**
-     * @notice Internal function that returns the minimum value between two values.
-     * @param a  The first value.
-     * @param b  The second value.
-     * @return minValue The minimum value.
-     */
-    function min(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a < b ? a : b;
     }
 
     /**
