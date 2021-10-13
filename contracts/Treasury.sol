@@ -3,6 +3,7 @@ pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 import "./Governable.sol";
 import "./interface/IWETH9.sol";
 import "./interface/IRegistry.sol";
@@ -170,10 +171,10 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
         // unwrap weth if necessary
         if(address(this).balance < amount) {
             uint256 diff = amount - address(this).balance;
-            _weth.withdraw(min(_weth.balanceOf(address(this)), diff));
+            _weth.withdraw(Math.min(_weth.balanceOf(address(this)), diff));
         }
         // send eth
-        uint256 transferAmount = min(address(this).balance, amount);
+        uint256 transferAmount = Math.min(address(this).balance, amount);
         uint256 unpaidRefunds2 = amount - transferAmount;
         if(unpaidRefunds2 != unpaidRefunds1) _unpaidRefunds[user] = unpaidRefunds2;
         payable(user).transfer(transferAmount);
@@ -240,20 +241,6 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
      */
     function unwrap(uint256 amount) external override onlyGovernance {
         _weth.withdraw(amount);
-    }
-
-    /***************************************
-    HELPER FUNCTIONS
-    ***************************************/
-
-    /**
-     * @notice Internal function that returns the minimum value between two values.
-     * @param a The first value.
-     * @param b The second value.
-     * @return c The minimum value.
-     */
-    function min(uint256 a, uint256 b) internal pure returns (uint256 c) {
-        return a <= b ? a : b;
     }
 
     /***************************************
