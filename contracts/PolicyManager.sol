@@ -4,6 +4,7 @@ pragma solidity 0.8.6;
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
+import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "./Governable.sol";
 import "./ERC721Enhanced.sol";
 import "./interface/IProduct.sol";
@@ -301,7 +302,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
                 address product = _policyInfo[policyID].product;
                 uint256 coverAmount = _policyInfo[policyID].coverAmount;
                 activeCover -= coverAmount;
-                IProduct(product).updateActiveCoverAmount(-int256(coverAmount));
+                IProduct(product).updateActiveCoverAmount(-SafeCast.toInt256(coverAmount));
                 _burn(policyID);
             }
         }
