@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
+import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "./Governable.sol";
 import "./interface/IProduct.sol";
 import "./interface/IPolicyManager.sol";
@@ -321,7 +322,7 @@ contract PolicyManager is ERC721Enumerable, IPolicyManager, Governable {
                 address product = _policyInfo[policyID].product;
                 uint256 coverAmount = _policyInfo[policyID].coverAmount;
                 activeCover -= coverAmount;
-                IProduct(product).updateActiveCoverAmount(-int256(coverAmount));
+                IProduct(product).updateActiveCoverAmount(-SafeCast.toInt256(coverAmount));
                 _burn(policyID);
             }
         }
