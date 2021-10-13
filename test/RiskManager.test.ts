@@ -65,18 +65,19 @@ describe("RiskManager", function () {
       await expect(riskManager.connect(user).setGovernance(user.address)).to.be.revertedWith("!governance");
     });
     it("can set new governance", async function () {
-      await riskManager.connect(governor).setGovernance(deployer.address);
+      let tx = await riskManager.connect(governor).setGovernance(deployer.address);
+      expect(tx).to.emit(riskManager, "GovernancePending").withArgs(deployer.address);
       expect(await riskManager.governance()).to.equal(governor.address);
-      expect(await riskManager.newGovernance()).to.equal(deployer.address);
+      expect(await riskManager.pendingGovernance()).to.equal(deployer.address);
     });
     it("rejects governance transfer by non governor", async function () {
       await expect(riskManager.connect(user).acceptGovernance()).to.be.revertedWith("!governance");
     });
     it("can transfer governance", async function () {
       let tx = await riskManager.connect(deployer).acceptGovernance();
-      await expect(tx).to.emit(riskManager, "GovernanceTransferred").withArgs(deployer.address);
+      await expect(tx).to.emit(riskManager, "GovernanceTransferred").withArgs(governor.address, deployer.address);
       expect(await riskManager.governance()).to.equal(deployer.address);
-      expect(await riskManager.newGovernance()).to.equal(ZERO_ADDRESS);
+      expect(await riskManager.pendingGovernance()).to.equal(ZERO_ADDRESS);
       await riskManager.connect(deployer).setGovernance(governor.address);
       await riskManager.connect(governor).acceptGovernance();
     });
@@ -88,6 +89,8 @@ describe("RiskManager", function () {
       expect(await riskManager.product(0)).to.equal(ZERO_ADDRESS);
       await expect(riskManager.productRiskParams(product1.address)).to.be.revertedWith("product inactive");
       expect(await riskManager.weightSum()).to.equal(NO_WEIGHT);
+      expect(await riskManager.productIsActive(ZERO_ADDRESS)).to.be.false;
+      expect(await riskManager.productIsActive(product1.address)).to.be.false;
     });
     it("should reject change by non governor", async function () {
       await expect(riskManager.connect(user).addProduct(product1.address, 1, 11044, 10)).to.be.revertedWith("!governance");
@@ -116,6 +119,8 @@ describe("RiskManager", function () {
       expect(await riskManager.numProducts()).to.equal(2);
       expect(await riskManager.product(1)).to.equal(product1.address);
       expect(await riskManager.product(2)).to.equal(product2.address);
+      expect(await riskManager.productIsActive(product1.address)).to.be.true;
+      expect(await riskManager.productIsActive(product2.address)).to.be.true;
       let params1 = await riskManager.productRiskParams(product1.address);
       expect(params1.weight).to.equal(3);
       expect(params1.price).to.equal(11044);
@@ -131,6 +136,7 @@ describe("RiskManager", function () {
       expect(tx).to.emit(riskManager, "ProductParamsSet").withArgs(product3.address, 21, 10000, 1);
       expect(await riskManager.numProducts()).to.equal(3);
       expect(await riskManager.product(3)).to.equal(product3.address);
+      expect(await riskManager.productIsActive(product3.address)).to.be.true;
       let params3 = await riskManager.productRiskParams(product3.address);
       expect(params3.weight).to.equal(21);
       expect(params3.price).to.equal(10000);
@@ -146,6 +152,9 @@ describe("RiskManager", function () {
       expect(await riskManager.numProducts()).to.equal(2);
       expect(await riskManager.product(1)).to.equal(product2.address);
       expect(await riskManager.product(2)).to.equal(product3.address);
+      expect(await riskManager.productIsActive(product1.address)).to.be.false;
+      expect(await riskManager.productIsActive(product2.address)).to.be.true;
+      expect(await riskManager.productIsActive(product3.address)).to.be.true;
       await expect(riskManager.productRiskParams(product1.address)).to.be.revertedWith("product inactive");
       let params2 = await riskManager.productRiskParams(product2.address);
       expect(params2.weight).to.equal(7);
@@ -163,6 +172,9 @@ describe("RiskManager", function () {
       expect(await riskManager.numProducts()).to.equal(2);
       expect(await riskManager.product(2)).to.equal(product3.address);
       expect(await riskManager.product(3)).to.equal(ZERO_ADDRESS);
+      expect(await riskManager.productIsActive(product1.address)).to.be.false;
+      expect(await riskManager.productIsActive(product2.address)).to.be.true;
+      expect(await riskManager.productIsActive(product3.address)).to.be.true;
       let params3 = await riskManager.productRiskParams(product3.address);
       expect(params3.weight).to.equal(9);
       expect(params3.price).to.equal(5);
@@ -179,6 +191,9 @@ describe("RiskManager", function () {
       expect(await riskManager.product(1)).to.equal(product2.address);
       expect(await riskManager.product(2)).to.equal(product3.address);
       expect(await riskManager.product(3)).to.equal(product1.address);
+      expect(await riskManager.productIsActive(product1.address)).to.be.true;
+      expect(await riskManager.productIsActive(product2.address)).to.be.true;
+      expect(await riskManager.productIsActive(product3.address)).to.be.true;
       // remove product 2 / index 1
       let tx1 = await riskManager.connect(governor).removeProduct(product2.address);
       expect(tx1).to.emit(riskManager, "ProductParamsSet").withArgs(product2.address, 0, 0, 0);
@@ -190,6 +205,9 @@ describe("RiskManager", function () {
       expect((await riskManager.productRiskParams(product3.address)).weight).to.equal(9);
       expect(await riskManager.weightSum()).to.equal(22);
       expect(await riskManager.numProducts()).to.equal(2);
+      expect(await riskManager.productIsActive(product1.address)).to.be.true;
+      expect(await riskManager.productIsActive(product2.address)).to.be.false;
+      expect(await riskManager.productIsActive(product3.address)).to.be.true;
       // remove product 3 / index 2
       let tx2 = await riskManager.connect(governor).removeProduct(product3.address);
       expect(tx2).to.emit(riskManager, "ProductParamsSet").withArgs(product3.address, 0, 0, 0);
@@ -201,6 +219,9 @@ describe("RiskManager", function () {
       await expect(riskManager.productRiskParams(product3.address)).to.be.revertedWith("product inactive");
       expect(await riskManager.weightSum()).to.equal(13);
       expect(await riskManager.numProducts()).to.equal(1);
+      expect(await riskManager.productIsActive(product1.address)).to.be.true;
+      expect(await riskManager.productIsActive(product2.address)).to.be.false;
+      expect(await riskManager.productIsActive(product3.address)).to.be.false;
       await riskManager.connect(governor).removeProduct(product3.address); // remove non existent product
       // remove product 1 / index 1
       let tx3 = await riskManager.connect(governor).removeProduct(product1.address);
@@ -213,9 +234,15 @@ describe("RiskManager", function () {
       await expect(riskManager.productRiskParams(product3.address)).to.be.revertedWith("product inactive");
       expect(await riskManager.weightSum()).to.equal(NO_WEIGHT);
       expect(await riskManager.numProducts()).to.equal(0);
+      expect(await riskManager.productIsActive(product1.address)).to.be.false;
+      expect(await riskManager.productIsActive(product2.address)).to.be.false;
+      expect(await riskManager.productIsActive(product3.address)).to.be.false;
       await riskManager.connect(governor).removeProduct(product1.address); // remove non existent product
       // reset
       await riskManager.connect(governor).setProductParams([product2.address,product3.address], [7,9], [11044,22088], [10,20]);
+      expect(await riskManager.productIsActive(product1.address)).to.be.false;
+      expect(await riskManager.productIsActive(product2.address)).to.be.true;
+      expect(await riskManager.productIsActive(product3.address)).to.be.true;
     });
   });
 
@@ -249,7 +276,8 @@ describe("RiskManager", function () {
     });
     it("can be set", async function () {
       // set
-      await riskManager.connect(governor).setPartialReservesFactor(5000);
+      let tx = await riskManager.connect(governor).setPartialReservesFactor(5000);
+      expect(tx).to.emit(riskManager, "PartialReservesFactorSet").withArgs(5000);
       expect(await riskManager.partialReservesFactor()).to.equal(5000);
       // reset
       await riskManager.connect(governor).setPartialReservesFactor(10000);
