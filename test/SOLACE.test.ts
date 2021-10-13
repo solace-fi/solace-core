@@ -127,18 +127,22 @@ describe("SOLACE", function () {
       await expect(solace.connect(receiver1).addMinter(receiver2.address)).to.be.reverted;
       await expect(solace.connect(receiver1).removeMinter(receiver2.address)).to.be.reverted;
     });
+    it("cannot add zero address minter", async function () {
+      await expect(solace.connect(governor).addMinter(ZERO_ADDRESS)).to.be.revertedWith("zero address");
+    });
   });
 
   describe("governance", function () {
     it("can transfer governance", async function () {
       expect(await solace.governance()).to.equal(governor.address);
-      await solace.connect(governor).setGovernance(owner.address);
+      let tx1 = await solace.connect(governor).setGovernance(owner.address);
+      expect(tx1).to.emit(solace, "GovernancePending").withArgs(owner.address);
       expect(await solace.governance()).to.equal(governor.address);
-      expect(await solace.newGovernance()).to.equal(owner.address);
-      let tx = await solace.connect(owner).acceptGovernance();
-      await expect(tx).to.emit(solace, "GovernanceTransferred").withArgs(owner.address);
+      expect(await solace.pendingGovernance()).to.equal(owner.address);
+      let tx2 = await solace.connect(owner).acceptGovernance();
+      await expect(tx2).to.emit(solace, "GovernanceTransferred").withArgs(governor.address, owner.address);
       expect(await solace.governance()).to.equal(owner.address);
-      expect(await solace.newGovernance()).to.equal(ZERO_ADDRESS);
+      expect(await solace.pendingGovernance()).to.equal(ZERO_ADDRESS);
     });
     it("reverts governance transfers by non-governor", async function () {
       await expect(solace.connect(receiver1).setGovernance(receiver2.address)).to.be.reverted;

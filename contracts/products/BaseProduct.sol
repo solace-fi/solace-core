@@ -95,8 +95,11 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         string memory domain_,
         string memory version_
     ) EIP712(domain_, version_) Governable(governance_) {
-        _policyManager = policyManager_;
+        require(address(registry_) != address(0x0), "zero address registry");
         _registry = registry_;
+        require(address(policyManager_) != address(0x0), "zero address policymanager");
+        _policyManager = policyManager_;
+        require(coveredPlatform_ != address(0x0), "zero address coveredplatform");
         _coveredPlatform = coveredPlatform_;
         require(minPeriod_ <= maxPeriod_, "invalid period");
         _minPeriod = minPeriod_;
@@ -117,6 +120,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
      * @return policyID The ID of newly created policy.
      */
     function buyPolicy(address policyholder, uint256 coverAmount, uint40 blocks, bytes memory positionDescription) external payable override nonReentrant whileUnpaused returns (uint256 policyID) {
+        require(policyholder != address(0x0), "zero address");
         require(coverAmount > 0, "zero cover value");
         require(isValidPositionDescription(positionDescription), "invalid position description");
         // check that the product can provide coverage for this policy
@@ -133,7 +137,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         // update local book-keeping variables
         _activeCoverAmount += coverAmount;
         // return excess payment
-        if(msg.value > premium) payable(msg.sender).transfer(msg.value - premium);
+        if(msg.value > premium) Address.sendValue(payable(msg.sender), msg.value - premium);
         // transfer premium to the treasury
         ITreasury(payable(_registry.treasury())).routePremiums{value: premium}();
         emit PolicyCreated(policyID);
@@ -168,11 +172,11 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
             uint256 premium = newPremium - paidPremium;
             // check that the buyer has paid the correct premium
             require(msg.value >= premium, "insufficient payment");
-            if(msg.value > premium) payable(msg.sender).transfer(msg.value - premium);
+            if(msg.value > premium) Address.sendValue(payable(msg.sender), msg.value - premium);
             // transfer premium to the treasury
             ITreasury(payable(_registry.treasury())).routePremiums{value: premium}();
         } else {
-            if(msg.value > 0) payable(msg.sender).transfer(msg.value);
+            if(msg.value > 0) Address.sendValue(payable(msg.sender), msg.value);
             uint256 refundAmount = paidPremium - newPremium;
             ITreasury(payable(_registry.treasury())).refund(msg.sender, refundAmount);
         }
@@ -199,7 +203,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         uint256 premium = coverAmount * extension * purchasePrice / 1e12;
         // check that the buyer has paid the correct premium
         require(msg.value >= premium, "insufficient payment");
-        if(msg.value > premium) payable(msg.sender).transfer(msg.value - premium);
+        if(msg.value > premium) Address.sendValue(payable(msg.sender), msg.value - premium);
         // transfer premium to the treasury
         ITreasury(payable(_registry.treasury())).routePremiums{value: premium}();
         // check that the buyer provided valid period
@@ -242,10 +246,10 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         if (newPremium >= paidPremium) {
             uint256 premium = newPremium - paidPremium;
             require(msg.value >= premium, "insufficient payment");
-            if(msg.value > premium) payable(msg.sender).transfer(msg.value - premium);
+            if(msg.value > premium) Address.sendValue(payable(msg.sender), msg.value - premium);
             ITreasury(payable(_registry.treasury())).routePremiums{value: premium}();
         } else {
-            if(msg.value > 0) payable(msg.sender).transfer(msg.value);
+            if(msg.value > 0) Address.sendValue(payable(msg.sender), msg.value);
             uint256 refund = paidPremium - newPremium;
             ITreasury(payable(_registry.treasury())).refund(msg.sender, refund);
         }
@@ -411,6 +415,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
     function setMinPeriod(uint40 minPeriod_) external override onlyGovernance {
         require(minPeriod_ <= _maxPeriod, "invalid period");
         _minPeriod = minPeriod_;
+        emit MinPeriodSet(minPeriod_);
     }
 
     /**
@@ -420,6 +425,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
     function setMaxPeriod(uint40 maxPeriod_) external override onlyGovernance {
         require(_minPeriod <= maxPeriod_, "invalid period");
         _maxPeriod = maxPeriod_;
+        emit MaxPeriodSet(maxPeriod_);
     }
 
     /**
@@ -428,6 +434,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
      * @param signer The signer to add.
      */
     function addSigner(address signer) external onlyGovernance {
+        require(signer != address(0x0), "zero address signer");
         _isAuthorizedSigner[signer] = true;
         emit SignerAdded(signer);
     }
@@ -451,6 +458,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
      */
     function setPaused(bool paused_) external onlyGovernance {
         _paused = paused_;
+        emit PauseSet(paused_);
     }
 
     /**
@@ -461,7 +469,9 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
      * @param coveredPlatform_ The platform to cover.
      */
     function setCoveredPlatform(address coveredPlatform_) public virtual override onlyGovernance {
+        require(coveredPlatform_ != address(0x0), "zero address coveredplatform");
         _coveredPlatform = coveredPlatform_;
+        emit CoveredPlatformSet(coveredPlatform_);
     }
 
     /**
@@ -470,7 +480,9 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
      * @param policyManager_ The new policy manager.
      */
     function setPolicyManager(address policyManager_) external override onlyGovernance {
+        require(policyManager_ != address(0x0), "zero address policymanager");
         _policyManager = IPolicyManager(policyManager_);
+        emit PolicyManagerSet(policyManager_);
     }
 
     /***************************************

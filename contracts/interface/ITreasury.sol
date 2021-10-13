@@ -109,15 +109,6 @@ interface ITreasury {
     function spend(address token, uint256 amount, address recipient) external;
 
     /**
-     * @notice Manually swaps a token.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param path The path of pools to take.
-     * @param amountIn The amount to swap.
-     * @param amountOutMinimum The minimum about to receive.
-     */
-    function swap(bytes memory path, uint256 amountIn, uint256 amountOutMinimum) external;
-
-    /**
      * @notice Wraps some **ETH** into **WETH**.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param amount The amount to wrap.

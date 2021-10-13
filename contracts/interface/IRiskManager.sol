@@ -22,6 +22,8 @@ interface IRiskManager {
     /// @notice Emitted when a product's parameters are modified.
     /// Includes adding and removing products.
     event ProductParamsSet(address product, uint32 weight, uint24 price, uint16 divisor);
+    /// @notice Emitted when partial reserve factor is set.
+    event PartialReservesFactorSet(uint16 factor);
 
     /***************************************
     MAX COVER VIEW FUNCTIONS
@@ -70,6 +72,13 @@ interface IRiskManager {
      * @return cover The max amount of cover in wei.
      */
     function maxCoverPerPolicy(address prod) external view returns (uint256 cover);
+
+    /**
+     * @notice Checks is an address is an active product.
+     * @param prod The product to check.
+     * @return status True if the product is active.
+     */
+    function productIsActive(address prod) external view returns (bool status);
 
     /**
      * @notice Return the number of registered products.

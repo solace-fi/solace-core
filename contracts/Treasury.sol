@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
+import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./Governable.sol";
 import "./interface/IWETH9.sol";
-import "./interface/UniswapV3/ISwapRouter.sol";
 import "./interface/IRegistry.sol";
 import "./interface/IPolicyManager.sol";
 import "./interface/ITreasury.sol";
@@ -23,13 +23,11 @@ import "./interface/IVault.sol";
  * [**Governance**](/docs/protocol/governance) can change the premium recipients via [`setPremiumRecipients()`](#setpremiumrecipients). This can be used to add new building blocks to Castle Solace or enact a protocol fee. Premiums can be stored in the `Treasury` and managed with a number of functions.
  */
 contract Treasury is ITreasury, ReentrancyGuard, Governable {
+    using Address for address;
     using SafeERC20 for IERC20;
 
     // Registry
     IRegistry internal _registry;
-
-    // Address of Uniswap router.
-    ISwapRouter internal _swapRouter;
 
     // Wrapped ether.
     IWETH9 internal _weth;
@@ -46,17 +44,20 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
     /**
      * @notice Constructs the Treasury contract.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
-     * @param swapRouter_ Address of uniswap router.
      * @param registry_ Address of registry.
      */
-    constructor(address governance_, address swapRouter_, address registry_) Governable(governance_) {
-        _swapRouter = ISwapRouter(swapRouter_);
+    constructor(address governance_, address registry_) Governable(governance_) {
+        // set registry
+        require(registry_ != address(0x0), "zero address registry");
         _registry = IRegistry(registry_);
-        _weth = IWETH9(payable(_registry.weth()));
-
+        // set weth
+        address weth_ = _registry.weth();
+        require(weth_ != address(0x0), "zero address weth");
+        _weth = IWETH9(payable(weth_));
         // if vault is deployed, route 100% of the premiums to it
-        if (registry_ != address(0) && _registry.vault() != address(0)) {
-            _premiumRecipients = [payable(_registry.vault())];
+        address vault_ = _registry.vault();
+        if (vault_ != address(0x0)) {
+            _premiumRecipients = [payable(vault_)];
             _recipientWeights = [1,0];
             _weightSum = 1;
         } // if vault is not deployed, hold 100% of the premiums in the treasury
@@ -161,6 +162,7 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
      * @param amount The amount to pay _before_ unpaid funds.
      */
     function _transferEth(address user, uint256 amount) internal {
+        require(user != address(0x0), "zero address recipient");
         // account for unpaid rewards
         uint256 unpaidRefunds1 = _unpaidRefunds[user];
         amount += unpaidRefunds1;
@@ -176,7 +178,7 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
         uint256 transferAmount = min(address(this).balance, amount);
         uint256 unpaidRefunds2 = amount - transferAmount;
         if(unpaidRefunds2 != unpaidRefunds1) _unpaidRefunds[user] = unpaidRefunds2;
-        payable(user).transfer(transferAmount);
+        Address.sendValue(payable(user), transferAmount);
     }
 
     /***************************************
@@ -214,40 +216,14 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
      * @param recipient The address of the token receiver.
      */
     function spend(address token, uint256 amount, address recipient) external override nonReentrant onlyGovernance {
+        require(token != address(0x0), "zero address token");
+        require(recipient != address(0x0), "zero address recipient");
         // transfer eth
-        if(token == _ETH_ADDRESS) payable(recipient).transfer(amount);
+        if(token == _ETH_ADDRESS) Address.sendValue(payable(recipient), amount);
         // transfer token
         else IERC20(token).safeTransfer(recipient, amount);
         // emit event
         emit FundsSpent(token, amount, recipient);
-    }
-
-    /**
-     * @notice Manually swaps a token.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param path The path of pools to take.
-     * @param amountIn The amount to swap.
-     * @param amountOutMinimum The minimum about to receive.
-     */
-    function swap(bytes memory path, uint256 amountIn, uint256 amountOutMinimum) external override onlyGovernance {
-        // check allowance
-        address tokenAddr;
-        assembly {
-            tokenAddr := div(mload(add(add(path, 0x20), 0)), 0x1000000000000000000000000)
-        }
-        IERC20 token = IERC20(tokenAddr);
-        if(token.allowance(address(this), address(_swapRouter)) < amountIn) {
-            token.approve(address(_swapRouter), type(uint256).max);
-        }
-        // swap
-        _swapRouter.exactInput(ISwapRouter.ExactInputParams({
-            path: path,
-            recipient: address(this),
-            // solhint-disable-next-line not-rely-on-time
-            deadline: block.timestamp,
-            amountIn: amountIn,
-            amountOutMinimum: amountOutMinimum
-        }));
     }
 
     /**
