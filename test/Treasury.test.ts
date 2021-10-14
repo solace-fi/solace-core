@@ -1,9 +1,11 @@
+import hardhat from "hardhat";
 import { waffle, ethers, upgrades } from "hardhat";
 const { deployContract, solidity } = waffle;
 import { MockProvider } from "ethereum-waffle";
 const provider: MockProvider = waffle.provider;
 import { BigNumber as BN, BigNumberish, constants, Wallet } from "ethers";
 import { Contract } from "@ethersproject/contracts";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import chai from "chai";
 const { expect } = chai;
 chai.use(solidity);
@@ -12,18 +14,18 @@ import { encodePriceSqrt, FeeAmount, TICK_SPACINGS, getMaxTick, getMinTick } fro
 import { encodePath } from "./utilities/path";
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Solace, Treasury, MockErc20, Weth9, Registry, PolicyManager, Vault } from "../typechain";
+import { Solace, Treasury, MockErc20, Weth9, Registry, PolicyManager, Vault, GasGriefer } from "../typechain";
 
 describe("Treasury", function() {
   let artifacts: ArtifactImports;
   // users
-  let deployer: Wallet;
-  let governor: Wallet;
-  let liquidityProvider: Wallet;
-  let mockPolicy: Wallet;
-  let user: Wallet;
-  let randAddress: Wallet;
-  let mockProduct: Wallet;
+  let deployer: SignerWithAddress;
+  let governor: SignerWithAddress;
+  let liquidityProvider: SignerWithAddress;
+  let mockPolicy: SignerWithAddress;
+  let user: SignerWithAddress;
+  let randAddress: SignerWithAddress;
+  let mockProduct: SignerWithAddress;
 
   // solace contracts
   let solace: Solace;
@@ -56,7 +58,8 @@ describe("Treasury", function() {
   const ONE_MILLION_ETHER = BN.from("1000000000000000000000000");
 
   before(async function() {
-    [deployer, governor, liquidityProvider, mockPolicy, user, randAddress, mockProduct] = provider.getWallets();
+    //[deployer, governor, liquidityProvider, mockPolicy, user, randAddress, mockProduct] = provider.getWallets();
+    [deployer, governor, liquidityProvider, mockPolicy, user, randAddress, mockProduct] = await hardhat.ethers.getSigners();
     artifacts = await import_artifacts();
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
 
@@ -370,6 +373,22 @@ describe("Treasury", function() {
       let tx2 = await treasury.connect(governor).routePremiums(); // empty routing
       expect(tx2).to.emit(treasury, "PremiumsRouted").withArgs(0);
     });
+    it("is safe from gas griefing", async function () {
+      let gasGriefer = (await deployContract(deployer, artifacts.GasGriefer)) as GasGriefer;
+      await treasury.connect(governor).setPremiumRecipients([deployer.address, gasGriefer.address], [2, 3, 7]);
+      let balancesBefore = await getBalances(deployer);
+      let depositAmount = 120;
+      let tx = await treasury.connect(user).routePremiums({ value: depositAmount });
+      let balancesAfter = await getBalances(deployer);
+      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
+      expect(balancesDiff.userEth).to.equal(20);
+      expect(await provider.getBalance(gasGriefer.address)).to.eq(0);
+      expect(balancesDiff.treasuryEth).to.equal(100); // 30 + 70
+      let receipt = await tx.wait();
+      expect(receipt.gasUsed).to.be.lt(300000);
+      expect(await gasGriefer.acc()).to.eq(0);
+      await treasury.connect(governor).routePremiums(); // empty routing
+    });
   });
 
   describe("refund", function() {
@@ -519,7 +538,7 @@ describe("Treasury", function() {
   }
 
   // adds liquidity to a pool
-  async function addLiquidity(liquidityProvider: Wallet, tokenA: Contract, tokenB: Contract, fee: FeeAmount, amount: BigNumberish) {
+  async function addLiquidity(liquidityProvider: SignerWithAddress, tokenA: Contract, tokenB: Contract, fee: FeeAmount, amount: BigNumberish) {
     await tokenA.connect(liquidityProvider).approve(uniswapPositionManager.address, amount);
     await tokenB.connect(liquidityProvider).approve(uniswapPositionManager.address, amount);
     let [token0, token1] = sortTokens(tokenA.address, tokenB.address);
@@ -555,7 +574,7 @@ describe("Treasury", function() {
     treasuryMock4: BN;
   }
 
-  async function getBalances(user: Wallet): Promise<Balances> {
+  async function getBalances(user: SignerWithAddress): Promise<Balances> {
     return {
       userSolace: await solace.balanceOf(user.address),
       userEth: await user.getBalance(),
