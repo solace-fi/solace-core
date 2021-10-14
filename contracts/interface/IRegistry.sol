@@ -8,7 +8,7 @@ pragma solidity 0.8.6;
  *
  * [**Governance**](/docs/protocol/governance) can set the contract addresses and anyone can look them up.
  *
- * Note that `Registry` doesn't track all Solace contracts. Farms are tracked in [`Master`](../Master), Products are tracked in [`PolicyManager`](../PolicyManager), and the `Registry` is untracked.
+ * Note that `Registry` doesn't track all Solace contracts. FarmController is tracked in [`OptionsFarming`](../OptionsFarming), farms are tracked in FarmController, Products are tracked in [`PolicyManager`](../PolicyManager), and the `Registry` is untracked.
  */
 interface IRegistry {
 
@@ -30,8 +30,10 @@ interface IRegistry {
     event RiskManagerSet(address riskManager);
     // Emitted when Solace Token is set.
     event SolaceSet(address solace);
-    // Emitted when Master is set.
-    event MasterSet(address master);
+    // Emitted when OptionsFarming is set.
+    event OptionsFarmingSet(address optionsFarming);
+    // Emitted when FarmController is set.
+    event FarmControllerSet(address farmController);
     // Emitted when Locker is set.
     event LockerSet(address locker);
 
@@ -43,55 +45,61 @@ interface IRegistry {
      * @notice Gets the [**WETH**](../WETH9) contract.
      * @return weth_ The address of the [**WETH**](../WETH9) contract.
      */
-    function weth() external view returns (address);
+    function weth() external view returns (address weth_);
 
     /**
      * @notice Gets the [`Vault`](../Vault) contract.
      * @return vault_ The address of the [`Vault`](../Vault) contract.
      */
-    function vault() external view returns (address);
+    function vault() external view returns (address vault_);
 
     /**
      * @notice Gets the [`ClaimsEscrow`](../ClaimsEscrow) contract.
      * @return claimsEscrow_ The address of the [`ClaimsEscrow`](../ClaimsEscrow) contract.
      */
-    function claimsEscrow() external view returns (address);
+    function claimsEscrow() external view returns (address claimsEscrow_);
 
     /**
      * @notice Gets the [`Treasury`](../Treasury) contract.
      * @return treasury_ The address of the [`Treasury`](../Treasury) contract.
      */
-    function treasury() external view returns (address);
+    function treasury() external view returns (address treasury_);
 
     /**
      * @notice Gets the [`PolicyManager`](../PolicyManager) contract.
      * @return policyManager_ The address of the [`PolicyManager`](../PolicyManager) contract.
      */
-    function policyManager() external view returns (address);
+    function policyManager() external view returns (address policyManager_);
 
     /**
      * @notice Gets the [`RiskManager`](../RiskManager) contract.
      * @return riskManager_ The address of the [`RiskManager`](../RiskManager) contract.
      */
-    function riskManager() external view returns (address);
+    function riskManager() external view returns (address riskManager_);
 
     /**
      * @notice Gets the [**SOLACE**](../SOLACE) contract.
      * @return solace_ The address of the [**SOLACE**](../SOLACE) contract.
      */
-    function solace() external view returns (address);
+    function solace() external view returns (address solace_);
 
     /**
-     * @notice Gets the [`Master`](../Master) contract.
-     * @return master_ The address of the [`Master`](../Master) contract.
+     * @notice Gets the [`OptionsFarming`](../OptionsFarming) contract.
+     * @return optionsFarming_ The address of the [`OptionsFarming`](../OptionsFarming) contract.
      */
-    function master() external view returns (address);
+    function optionsFarming() external view returns (address optionsFarming_);
+
+    /**
+     * @notice Gets the [`FarmController`](../FarmController) contract.
+     * @return farmController_ The address of the [`FarmController`](../FarmController) contract.
+     */
+    function farmController() external view returns (address farmController_);
 
     /**
      * @notice Gets the [`Locker`](../Locker) contract.
      * @return locker_ The address of the [`Locker`](../Locker) contract.
      */
-    function locker() external view returns (address);
+    function locker() external view returns (address locker_);
 
     /***************************************
     GOVERNANCE FUNCTIONS
@@ -147,11 +155,18 @@ interface IRegistry {
     function setSolace(address solace_) external;
 
     /**
-     * @notice Sets the [`Master`](../Master) contract.
+     * @notice Sets the [`OptionsFarming`](../OptionsFarming) contract.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param master_ The address of the [`Master`](../Master) contract.
+     * @param optionsFarming_ The address of the [`OptionsFarming`](../OptionsFarming) contract.
      */
-    function setMaster(address master_) external;
+    function setOptionsFarming(address optionsFarming_) external;
+
+    /**
+     * @notice Sets the [`FarmController`](../FarmController) contract.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param farmController_ The address of the [`FarmController`](../FarmController) contract.
+     */
+    function setFarmController(address farmController_) external;
 
     /**
      * @notice Sets the [`Locker`](../Locker) contract.

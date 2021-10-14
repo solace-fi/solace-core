@@ -91,7 +91,7 @@ contract ClaimsEscrow is ERC721Enhanced, IClaimsEscrow, ReentrancyGuard, Governa
      * @param claimID The ID of the claim to withdraw payout for.
      */
     function withdrawClaimsPayout(uint256 claimID) external override nonReentrant tokenMustExist(claimID) {
-        require(msg.sender == ownerOf(claimID), "!claimant");
+        require(_isApprovedOrOwner(msg.sender, claimID), "!claimant");
         require(block.timestamp >= _claims[claimID].receivedAt + _cooldownPeriod, "cooldown period has not elapsed");
 
         uint256 amount = _claims[claimID].amount;

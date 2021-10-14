@@ -19,7 +19,7 @@ describe("ClaimsEscrow", function () {
   let policyManager: PolicyManager;
   let artifacts: ArtifactImports;
 
-  const [deployer, governor, newGovernor, depositor, claimant, mockProduct] = provider.getWallets();
+  const [deployer, governor, newGovernor, depositor, claimant, friend, mockProduct] = provider.getWallets();
   const testDepositAmount = BN.from("10");
   const testClaimAmount = BN.from("8");
   const testClaimAmount2 = BN.from("6");
@@ -119,7 +119,7 @@ describe("ClaimsEscrow", function () {
     it("should revert if invalid claimID", async function () {
       await expect(claimsEscrow.connect(deployer).withdrawClaimsPayout(999)).to.be.revertedWith("query for nonexistent token");
     });
-    it("should revert if not called by the claimant", async function () {
+    it("should revert if not called by the claimant or approved", async function () {
       await expect(claimsEscrow.connect(deployer).withdrawClaimsPayout(claimID)).to.be.revertedWith("!claimant");
     });
     it("should revert if cooldown period has not elapsed", async function () {
@@ -169,7 +169,33 @@ describe("ClaimsEscrow", function () {
       expect(balance3.sub(balance1).add(gasCost1).add(gasCost2)).to.equal(testClaimAmount3);
       expect(await claimsEscrow.totalClaimsOutstanding()).to.equal(testClaimAmount);
       expect(await claimsEscrow.exists(claimID2)).to.be.false;
-    })
+    });
+    it("should transfer claim amount to approved claimant - single approval", async function () {
+      await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add one hour
+      expect(await claimsEscrow.getApproved(claimID)).to.equal(ZERO_ADDRESS);
+      await claimsEscrow.connect(claimant).approve(friend.address, claimID);
+      expect(await claimsEscrow.getApproved(claimID)).to.equal(friend.address);
+      let bal1 = await friend.getBalance();
+      let tx = await claimsEscrow.connect(friend).withdrawClaimsPayout(claimID);
+      let receipt = await tx.wait();
+      let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
+      let bal2 = await friend.getBalance();
+      expect(bal2.sub(bal1).add(gasCost)).to.equal(testClaimAmount);
+      expect(await claimsEscrow.totalClaimsOutstanding()).to.equal(0);
+    });
+    it("should transfer claim amount to approved claimant - approval for all", async function () {
+      await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add one hour
+      expect(await claimsEscrow.isApprovedForAll(claimant.address, friend.address)).to.be.false;
+      await claimsEscrow.connect(claimant).setApprovalForAll(friend.address, true);
+      expect(await claimsEscrow.isApprovedForAll(claimant.address, friend.address)).to.be.true;
+      let bal1 = await friend.getBalance();
+      let tx = await claimsEscrow.connect(friend).withdrawClaimsPayout(claimID);
+      let receipt = await tx.wait();
+      let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
+      let bal2 = await friend.getBalance();
+      expect(bal2.sub(bal1).add(gasCost)).to.equal(testClaimAmount);
+      expect(await claimsEscrow.totalClaimsOutstanding()).to.equal(0);
+    });
   });
 
   describe("adjustClaim", function () {

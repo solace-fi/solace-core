@@ -8,7 +8,7 @@ const { expect } = chai;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Registry, Solace, Master, Vault, Treasury, ClaimsEscrow, Weth9, PolicyManager, RiskManager } from "../typechain";
+import { Registry, Solace, FarmController, OptionsFarming, Vault, Treasury, ClaimsEscrow, Weth9, PolicyManager, RiskManager } from "../typechain";
 
 describe("Registry", function() {
   let artifacts: ArtifactImports;
@@ -23,7 +23,8 @@ describe("Registry", function() {
   let policyManager: PolicyManager;
   let riskManager: RiskManager;
   let solace: Solace;
-  let master: Master;
+  let optionsFarming: OptionsFarming;
+  let farmController: FarmController;
   // mock contracts
   // TODO: switch from mocks and wallets to actual contracts after implementation
   //let locker: Locker;
@@ -216,25 +217,44 @@ describe("Registry", function() {
     });
   });
 
-  describe("master", function() {
+  describe("optionsFarming", function() {
     before(async function () {
-      master = (await deployContract(deployer, artifacts.Master, [governor.address, solace.address, 1])) as Master;
+      optionsFarming = (await deployContract(deployer, artifacts.OptionsFarming, [governor.address])) as OptionsFarming;
     });
     it("starts as the zero address", async function() {
-      expect(await registry.master()).to.equal(ZERO_ADDRESS);
+      expect(await registry.optionsFarming()).to.equal(ZERO_ADDRESS);
     });
     it("can be set", async function() {
-      let tx = await registry.connect(governor).setMaster(master.address);
-      expect(await registry.master()).to.equal(master.address);
+      let tx = await registry.connect(governor).setOptionsFarming(optionsFarming.address);
+      expect(await registry.optionsFarming()).to.equal(optionsFarming.address);
       await expect(tx)
-        .to.emit(registry, "MasterSet")
-        .withArgs(master.address);
+        .to.emit(registry, "OptionsFarmingSet")
+        .withArgs(optionsFarming.address);
     });
     it("cannot be set by non governor", async function() {
-      await expect(registry.connect(user).setMaster(master.address)).to.be.revertedWith("!governance");
+      await expect(registry.connect(user).setOptionsFarming(optionsFarming.address)).to.be.revertedWith("!governance");
+    });
+  });
+
+  describe("farmController", function() {
+    before(async function () {
+      farmController = (await deployContract(deployer, artifacts.FarmController, [governor.address, optionsFarming.address, 1])) as FarmController;
+    });
+    it("starts as the zero address", async function() {
+      expect(await registry.farmController()).to.equal(ZERO_ADDRESS);
+    });
+    it("can be set", async function() {
+      let tx = await registry.connect(governor).setFarmController(farmController.address);
+      expect(await registry.farmController()).to.equal(farmController.address);
+      await expect(tx)
+        .to.emit(registry, "FarmControllerSet")
+        .withArgs(farmController.address);
+    });
+    it("cannot be set by non governor", async function() {
+      await expect(registry.connect(user).setFarmController(farmController.address)).to.be.revertedWith("!governance");
     });
     it("cannot be set to the zero address", async function () {
-      await expect(registry.connect(governor).setMaster(ZERO_ADDRESS)).to.be.revertedWith("zero address master");
+      await expect(registry.connect(governor).setFarmController(ZERO_ADDRESS)).to.be.revertedWith("zero address farmcontroller");
     });
   });
 

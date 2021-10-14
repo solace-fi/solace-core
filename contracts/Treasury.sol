@@ -75,6 +75,7 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
      * Will be called by products with `msg.value = premium`.
      */
     function routePremiums() external payable override nonReentrant {
+        // preload variables
         uint256 div = _weightSum;
         uint256 length = _premiumRecipients.length;
         // transfer to all recipients
