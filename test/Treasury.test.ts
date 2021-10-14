@@ -168,18 +168,18 @@ describe("Treasury", function() {
     });
 
     it("rejects setting new governance by non governor", async function() {
-      await expect(treasury.connect(user).setGovernance(user.address)).to.be.revertedWith("!governance");
+      await expect(treasury.connect(user).setPendingGovernance(user.address)).to.be.revertedWith("!governance");
     });
 
     it("can set new governance", async function() {
-      let tx = await treasury.connect(governor).setGovernance(deployer.address);
+      let tx = await treasury.connect(governor).setPendingGovernance(deployer.address);
       expect(tx).to.emit(treasury, "GovernancePending").withArgs(deployer.address);
       expect(await treasury.governance()).to.equal(governor.address);
       expect(await treasury.pendingGovernance()).to.equal(deployer.address);
     });
 
     it("rejects governance transfer by non governor", async function() {
-      await expect(treasury.connect(user).acceptGovernance()).to.be.revertedWith("!governance");
+      await expect(treasury.connect(user).acceptGovernance()).to.be.revertedWith("!pending governance");
     });
 
     it("can transfer governance", async function() {
@@ -190,7 +190,7 @@ describe("Treasury", function() {
       expect(await treasury.governance()).to.equal(deployer.address);
       expect(await treasury.pendingGovernance()).to.equal(ZERO_ADDRESS);
 
-      await treasury.connect(deployer).setGovernance(governor.address);
+      await treasury.connect(deployer).setPendingGovernance(governor.address);
       await treasury.connect(governor).acceptGovernance();
     });
   });
@@ -340,7 +340,8 @@ describe("Treasury", function() {
     it("can route premiums with no recipients", async function() {
       let balancesBefore = await getBalances(user);
       let depositAmount = 100;
-      await treasury.connect(user).routePremiums({ value: depositAmount });
+      let tx = await treasury.connect(user).routePremiums({ value: depositAmount });
+      expect(tx).to.emit(treasury, "PremiumsRouted").withArgs(depositAmount);
       let balancesAfter = await getBalances(user);
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       expect(balancesDiff.treasuryEth).to.equal(depositAmount);
@@ -363,11 +364,29 @@ describe("Treasury", function() {
     it("can route premiums", async function() {
       let balancesBefore = await getBalances(deployer);
       let depositAmount = 100;
-      await treasury.connect(user).routePremiums({ value: depositAmount });
+      let tx1 = await treasury.connect(user).routePremiums({ value: depositAmount });
+      expect(tx1).to.emit(treasury, "PremiumsRouted").withArgs(depositAmount);
       let balancesAfter = await getBalances(deployer);
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       expect(balancesDiff.treasuryEth).to.equal(60);
       expect(balancesDiff.userEth).to.equal(40);
+      let tx2 = await treasury.connect(governor).routePremiums(); // empty routing
+      expect(tx2).to.emit(treasury, "PremiumsRouted").withArgs(0);
+    });
+    it("is safe from gas griefing", async function () {
+      let gasGriefer = (await deployContract(deployer, artifacts.GasGriefer)) as GasGriefer;
+      await treasury.connect(governor).setPremiumRecipients([deployer.address, gasGriefer.address], [2, 3, 7]);
+      let balancesBefore = await getBalances(deployer);
+      let depositAmount = 120;
+      let tx = await treasury.connect(user).routePremiums({ value: depositAmount });
+      let balancesAfter = await getBalances(deployer);
+      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
+      expect(balancesDiff.userEth).to.equal(20);
+      expect(await provider.getBalance(gasGriefer.address)).to.eq(0);
+      expect(balancesDiff.treasuryEth).to.equal(100); // 30 + 70
+      let receipt = await tx.wait();
+      expect(receipt.gasUsed).to.be.lt(300000);
+      expect(await gasGriefer.acc()).to.eq(0);
       await treasury.connect(governor).routePremiums(); // empty routing
     });
     it("is safe from gas griefing", async function () {
@@ -457,7 +476,8 @@ describe("Treasury", function() {
       it("can route premiums to vault", async function() {
         let vaultAmountBefore = await provider.getBalance(vault.address);
         let depositAmount = 100;
-        await treasury.connect(user).routePremiums({ value: depositAmount });
+        let tx = await treasury.connect(user).routePremiums({ value: depositAmount });
+        expect(tx).to.emit(treasury, "PremiumsRouted").withArgs(depositAmount);
         let vaultAmountAfter = await provider.getBalance(vault.address);
         expect(vaultAmountAfter.sub(depositAmount)).to.equal(vaultAmountBefore);
       });

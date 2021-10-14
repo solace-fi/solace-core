@@ -106,6 +106,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      */
     function startCooldown() external override {
         _cooldownStart[msg.sender] = uint40(block.timestamp);
+        emit CooldownStarted(msg.sender);
     }
 
     /**
@@ -113,6 +114,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      */
     function stopCooldown() external override {
         _cooldownStart[msg.sender] = 0;
+        emit CooldownStopped(msg.sender);
     }
 
     /**

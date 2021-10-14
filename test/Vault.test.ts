@@ -74,10 +74,10 @@ describe("Vault", function () {
     });
   });
 
-  describe("setGovernance", function () {
+  describe("setPendingGovernance", function () {
     it("should allow governance to set new governance address", async function () {
       expect(await vault.governance()).to.equal(owner.address);
-      let tx1 = await vault.connect(owner).setGovernance(newOwner.address);
+      let tx1 = await vault.connect(owner).setPendingGovernance(newOwner.address);
       expect(tx1).to.emit(vault, "GovernancePending").withArgs(newOwner.address);
       expect(await vault.governance()).to.equal(owner.address);
       expect(await vault.pendingGovernance()).to.equal(newOwner.address);
@@ -87,9 +87,9 @@ describe("Vault", function () {
       expect(await vault.pendingGovernance()).to.equal(ZERO_ADDRESS);
     });
     it("should revert if not called by governance", async function () {
-      await expect(vault.connect(depositor1).setGovernance(depositor1.address)).to.be.revertedWith("!governance");
-      await vault.connect(owner).setGovernance(newOwner.address);
-      await expect(vault.connect(depositor1).acceptGovernance()).to.be.revertedWith("!governance");
+      await expect(vault.connect(depositor1).setPendingGovernance(depositor1.address)).to.be.revertedWith("!governance");
+      await vault.connect(owner).setPendingGovernance(newOwner.address);
+      await expect(vault.connect(depositor1).acceptGovernance()).to.be.revertedWith("!pending governance");
     });
   });
 
@@ -124,11 +124,12 @@ describe("Vault", function () {
       await expect(vault.connect(owner).setCooldownWindow(4,3)).to.be.revertedWith("invalid window");
     });
     it("should successfully set cooldown window", async function () {
-      // <
-      await vault.connect(owner).setCooldownWindow(3,4);
+      // lt
+      let tx = await vault.connect(owner).setCooldownWindow(3,4);
+      expect(tx).to.emit(vault, "CooldownWindowSet").withArgs(3, 4);
       expect(await vault.cooldownMin()).to.equal(3);
       expect(await vault.cooldownMax()).to.equal(4);
-      // ==
+      // eq
       await vault.connect(owner).setCooldownWindow(7,7);
       expect(await vault.cooldownMin()).to.equal(7);
       expect(await vault.cooldownMax()).to.equal(7);
@@ -265,7 +266,8 @@ describe("Vault", function () {
       await expect(await vault.connect(depositor1).depositEth({ value: testDepositAmount1 })).to.emit(vault, "DepositMade").withArgs(depositor1.address, testDepositAmount1, testDepositAmount1);
     });
     it("should restart cooldown", async function () {
-      await vault.connect(depositor1).startCooldown();
+      let tx = await vault.connect(depositor1).startCooldown();
+      expect(tx).to.emit(vault, "CooldownStarted").withArgs(depositor1.address);
       expect(await vault.cooldownStart(depositor1.address)).to.be.gt(0);
       await vault.connect(depositor1).depositEth({value: 1});
       expect(await vault.cooldownStart(depositor1.address)).to.equal(0);
@@ -326,7 +328,8 @@ describe("Vault", function () {
       await expect(await vault.connect(depositor1).depositWeth(testDepositAmount1)).to.emit(vault, "DepositMade").withArgs(depositor1.address, testDepositAmount1, testDepositAmount1);
     });
     it("should restart cooldown", async function () {
-      await vault.connect(depositor1).startCooldown();
+      let tx = await vault.connect(depositor1).startCooldown();
+      expect(tx).to.emit(vault, "CooldownStarted").withArgs(depositor1.address);
       expect(await vault.cooldownStart(depositor1.address)).to.be.gt(0);
       await vault.connect(depositor1).depositWeth(1);
       expect(await vault.cooldownStart(depositor1.address)).to.equal(0);
@@ -358,7 +361,8 @@ describe("Vault", function () {
       await vault.connect(depositor1).startCooldown();
       expect(await vault.canTransfer(depositor1.address)).to.equal(false);
       await expect(vault.connect(depositor1).transfer(depositor2.address, 1)).to.be.revertedWith("cannot transfer during cooldown");
-      await vault.connect(depositor1).stopCooldown();
+      let tx = await vault.connect(depositor1).stopCooldown();
+      expect(tx).to.emit(vault, "CooldownStopped").withArgs(depositor1.address);
       expect(await vault.canTransfer(depositor1.address)).to.equal(true);
       await vault.connect(depositor1).transfer(depositor2.address, 1);
       expect(await vault.balanceOf(depositor1.address)).to.equal(0);
@@ -587,7 +591,6 @@ describe("Vault", function () {
     });
     it("cannot add zero address requestor", async function () {
       await expect(vault.connect(owner).addRequestor(ZERO_ADDRESS)).to.be.revertedWith("zero address requestor");
-      await expect(vault.connect(owner).removeRequestor(ZERO_ADDRESS)).to.be.revertedWith("zero address requestor");
     });
   });
 
@@ -637,7 +640,8 @@ describe("Vault", function () {
 
   describe("share value", function () {
     beforeEach("set no cooldown", async function () {
-      await vault.connect(owner).setCooldownWindow(0, "1099511627775"); // min, max uint40
+      let tx = await vault.connect(owner).setCooldownWindow(0, BN.from("1099511627775")); // min, max uint40
+      expect(tx).to.emit(vault, "CooldownWindowSet").withArgs(0, BN.from("1099511627775"));
     });
     it("deposits and withdraws at same value from start", async function () {
       // all zero initial state

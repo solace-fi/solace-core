@@ -269,4 +269,10 @@ describe("ERC721Enhanced", function() {
       expect(await token.nonces(tokenID4)).to.equal(1);
     });
   });
+
+  describe("listTokensOfOwner", function () {
+    it("reverts zero address lookup", async function () {
+      await expect(token.listTokensOfOwner(ZERO_ADDRESS)).to.be.revertedWith("zero address owner");
+    });
+  });
 });

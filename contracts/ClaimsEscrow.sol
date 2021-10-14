@@ -65,7 +65,7 @@ contract ClaimsEscrow is ERC721Enhanced, IClaimsEscrow, ReentrancyGuard, Governa
      */
     function receiveClaim(uint256 policyID, address claimant, uint256 amount) external payable override {
         require(IPolicyManager(_registry.policyManager()).productIsActive(msg.sender), "!product");
-        require(claimant != address(0x0), "zero address");
+        require(claimant != address(0x0), "zero address claimant");
         uint256 tco = _totalClaimsOutstanding + amount;
         _totalClaimsOutstanding = tco;
         uint256 bal = address(this).balance;
@@ -196,7 +196,9 @@ contract ClaimsEscrow is ERC721Enhanced, IClaimsEscrow, ReentrancyGuard, Governa
      */
     function adjustClaim(uint256 claimID, uint256 value) external override onlyGovernance tokenMustExist(claimID) {
         _totalClaimsOutstanding = _totalClaimsOutstanding - _claims[claimID].amount + value;
+        uint256 oldAmount = _claims[claimID].amount;
         _claims[claimID].amount = value;
+        emit ClaimAdjusted(claimID, ownerOf(claimID), oldAmount, value);
     }
 
     /**
@@ -206,6 +208,7 @@ contract ClaimsEscrow is ERC721Enhanced, IClaimsEscrow, ReentrancyGuard, Governa
      */
     function returnEth(uint256 amount) external override onlyGovernance nonReentrant {
         Address.sendValue(payable(_registry.vault()), amount);
+        emit EthReturned(amount);
     }
 
     /**
@@ -215,6 +218,7 @@ contract ClaimsEscrow is ERC721Enhanced, IClaimsEscrow, ReentrancyGuard, Governa
      */
     function setCooldownPeriod(uint256 cooldownPeriod_) external override onlyGovernance {
         _cooldownPeriod = cooldownPeriod_;
+        emit CooldownPeriodSet(cooldownPeriod_);
     }
 
     /***************************************

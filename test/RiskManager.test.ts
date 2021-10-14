@@ -68,23 +68,23 @@ describe("RiskManager", function () {
       expect(await riskManager.governance()).to.equal(governor.address);
     });
     it("rejects setting new governance by non governor", async function () {
-      await expect(riskManager.connect(user).setGovernance(user.address)).to.be.revertedWith("!governance");
+      await expect(riskManager.connect(user).setPendingGovernance(user.address)).to.be.revertedWith("!governance");
     });
     it("can set new governance", async function () {
-      let tx = await riskManager.connect(governor).setGovernance(deployer.address);
+      let tx = await riskManager.connect(governor).setPendingGovernance(deployer.address);
       expect(tx).to.emit(riskManager, "GovernancePending").withArgs(deployer.address);
       expect(await riskManager.governance()).to.equal(governor.address);
       expect(await riskManager.pendingGovernance()).to.equal(deployer.address);
     });
     it("rejects governance transfer by non governor", async function () {
-      await expect(riskManager.connect(user).acceptGovernance()).to.be.revertedWith("!governance");
+      await expect(riskManager.connect(user).acceptGovernance()).to.be.revertedWith("!pending governance");
     });
     it("can transfer governance", async function () {
       let tx = await riskManager.connect(deployer).acceptGovernance();
       await expect(tx).to.emit(riskManager, "GovernanceTransferred").withArgs(governor.address, deployer.address);
       expect(await riskManager.governance()).to.equal(deployer.address);
       expect(await riskManager.pendingGovernance()).to.equal(ZERO_ADDRESS);
-      await riskManager.connect(deployer).setGovernance(governor.address);
+      await riskManager.connect(deployer).setPendingGovernance(governor.address);
       await riskManager.connect(governor).acceptGovernance();
     });
   });

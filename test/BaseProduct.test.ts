@@ -107,25 +107,25 @@ describe("BaseProduct", function () {
       await expect(deployContract(deployer, artifacts.MockProduct, [governor.address, policyManager.address, registry.address, treasury.address, 1000, 999, price1])).to.be.revertedWith("invalid period");
     });
   });
-  
+
   describe("governance", function () {
     it("starts with the correct governor", async function () {
       expect(await product.governance()).to.equal(governor.address);
     });
 
     it("rejects setting new governance by non governor", async function () {
-      await expect(product.connect(policyholder1).setGovernance(policyholder1.address)).to.be.revertedWith("!governance");
+      await expect(product.connect(policyholder1).setPendingGovernance(policyholder1.address)).to.be.revertedWith("!governance");
     });
 
-    it("can set new governance", async function() {
-      let tx = await product.connect(governor).setGovernance(newGovernor.address);
-      expect(tx).to.emit(product, "GovernancePending").withArgs(governor.address, newGovernor.address);
+    it("can set new governance", async function () {
+      let tx = await product.connect(governor).setPendingGovernance(newGovernor.address);
+      expect(tx).to.emit(product, "GovernancePending").withArgs(newGovernor.address);
       expect(await product.governance()).to.equal(governor.address);
       expect(await product.pendingGovernance()).to.equal(newGovernor.address);
     });
 
     it("rejects governance transfer by non governor", async function () {
-      await expect(product.connect(policyholder1).acceptGovernance()).to.be.revertedWith("!governance");
+      await expect(product.connect(policyholder1).acceptGovernance()).to.be.revertedWith("!pending governance");
     });
 
     it("can transfer governance", async function () {
@@ -135,7 +135,7 @@ describe("BaseProduct", function () {
         .withArgs(governor.address, newGovernor.address);
       expect(await product.governance()).to.equal(newGovernor.address);
       expect(await product.pendingGovernance()).to.equal(ZERO_ADDRESS);
-      await product.connect(newGovernor).setGovernance(governor.address);
+      await product.connect(newGovernor).setPendingGovernance(governor.address);
       await product.connect(governor).acceptGovernance();
     });
   });
@@ -148,7 +148,7 @@ describe("BaseProduct", function () {
     it("can get minPeriod", async function () {
       expect(await product.minPeriod()).to.eq(minPeriod1);
     });
-    it("can set minPeriod", async function() {
+    it("can set minPeriod", async function () {
       let tx = await product.connect(governor).setMinPeriod(minPeriod2);
       expect(tx).to.emit(product, "MinPeriodSet").withArgs(minPeriod2);
       expect(await product.minPeriod()).to.equal(minPeriod2);
@@ -160,10 +160,10 @@ describe("BaseProduct", function () {
       let maxPeriod = await product.maxPeriod();
       await expect(product.connect(governor).setMinPeriod(maxPeriod + 1)).to.be.revertedWith("invalid period");
     });
-    it("can get maxPeriod", async function() {
+    it("can get maxPeriod", async function () {
       expect(await product.maxPeriod()).to.eq(maxPeriod1);
     });
-    it("can set maxPeriod", async function() {
+    it("can set maxPeriod", async function () {
       let tx = await product.connect(governor).setMaxPeriod(maxPeriod2);
       expect(tx).to.emit(product, "MaxPeriodSet").withArgs(maxPeriod2);
       expect(await product.maxPeriod()).to.equal(maxPeriod2);
@@ -178,7 +178,7 @@ describe("BaseProduct", function () {
     it("can get covered platform", async function () {
       expect(await product.coveredPlatform()).to.equal(ONE_SPLIT_VIEW);
     });
-    it("can set covered platform", async function() {
+    it("can set covered platform", async function () {
       let tx = await product.connect(governor).setCoveredPlatform(treasury.address);
       expect(tx).to.emit(product, "CoveredPlatformSet").withArgs(treasury.address);
       expect(await product.coveredPlatform()).to.equal(treasury.address);
@@ -193,7 +193,7 @@ describe("BaseProduct", function () {
     it("can get policy manager", async function () {
       expect(await product.policyManager()).to.equal(policyManager.address);
     });
-    it("can set policy manager", async function() {
+    it("can set policy manager", async function () {
       let tx = await product.connect(governor).setPolicyManager(treasury.address);
       expect(tx).to.emit(product, "PolicyManagerSet").withArgs(treasury.address);
       expect(await product.policyManager()).to.equal(treasury.address);
@@ -215,7 +215,7 @@ describe("BaseProduct", function () {
       await expect(product.connect(policyholder1).setPaused(true)).to.be.revertedWith("!governance");
       expect(await product.paused()).to.equal(false);
     });
-    it("can be paused", async function() {
+    it("can be paused", async function () {
       let tx = await product.connect(governor).setPaused(true);
       expect(tx).to.emit(product, "PauseSet").withArgs(true);
       expect(await product.paused()).to.equal(true);
@@ -656,7 +656,7 @@ describe("BaseProduct", function () {
       let maxCoverPerUser = await riskManager.maxCoverPerPolicy(product.address);
       await expect(product.connect(policyholder1).updatePolicy(policyID, maxCoverPerUser.add(1), blocks, { value: quote })).to.be.revertedWith("cannot accept that risk");
     });
-    it("can increase cover amount and extend", async function() {
+    it("can increase cover amount and extend", async function () {
       let activeCover1 = await product.activeCoverAmount();
       let prevExpirationBlock = BN.from(await policyManager.getPolicyExpirationBlock(policyID));
       let blockNumber = BN.from(await provider.getBlockNumber()).add(1);
@@ -844,7 +844,7 @@ describe("BaseProduct", function () {
     it("cannot cancel from a different product", async function () {
       await expect(product2.connect(policyholder1).cancelPolicy(policyID)).to.be.revertedWith("wrong product");
     });
-    it("can cancel and refunds proper amount", async function() {
+    it("can cancel and refunds proper amount", async function () {
       let activeCover1 = await product.activeCoverAmount();
       let info = await policyManager.policyInfo(policyID);
       let block = await provider.getBlockNumber();
