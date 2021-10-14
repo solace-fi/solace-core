@@ -7,7 +7,7 @@ const provider = waffle.provider;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Registry, Solace, Master, Vault, Treasury, ClaimsEscrow, Weth9, PolicyManager, RiskManager, MockErc20, Deployer } from "../typechain";
+import { Registry, Solace, OptionsFarming, FarmController, Vault, Treasury, ClaimsEscrow, Weth9, PolicyManager, RiskManager, MockErc20, Deployer } from "../typechain";
 import { toBytes32 } from "./utilities/setStorage";
 
 describe("Deployer", function () {
@@ -183,7 +183,7 @@ describe("Deployer", function () {
       await registry.setVault(vault.address);
       claimsEscrow = (await deployContract(owner,artifacts.ClaimsEscrow,[owner.address,registry.address])) as ClaimsEscrow;
       await registry.setClaimsEscrow(claimsEscrow.address);
-      treasury = (await deployContract(owner, artifacts.Treasury, [governor.address, ZERO_ADDRESS, registry.address])) as Treasury;
+      treasury = (await deployContract(owner, artifacts.Treasury, [governor.address, registry.address])) as Treasury;
       await registry.setTreasury(treasury.address);
       policyManager = (await deployContract(owner,artifacts.PolicyManager,[owner.address])) as PolicyManager;
       await registry.setPolicyManager(policyManager.address);
