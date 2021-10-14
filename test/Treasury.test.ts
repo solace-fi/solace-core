@@ -348,10 +348,12 @@ describe("Treasury", function() {
     it("validates recipients and weights", async function() {
       await expect(treasury.connect(governor).setPremiumRecipients([], [1, 2])).to.be.revertedWith("length mismatch");
       await expect(treasury.connect(governor).setPremiumRecipients([deployer.address], [0, 0])).to.be.revertedWith("1/0");
+      expect(treasury.connect(governor).setPremiumRecipients(fill(16, deployer.address), fill(17, 1))).to.be.revertedWith("too many recipients");
     });
     it("can set recipients", async function() {
       let tx1 = await treasury.connect(governor).setPremiumRecipients([], [0]);
       expect(tx1).to.emit(treasury, "RecipientsSet");
+      await treasury.connect(governor).setPremiumRecipients(fill(15, deployer.address), fill(16, 1));
       let tx2 = await treasury.connect(governor).setPremiumRecipients([deployer.address], [2, 3]);
       expect(tx2).to.emit(treasury, "RecipientsSet");
     });
@@ -587,3 +589,9 @@ describe("Treasury", function() {
     };
   }
 });
+
+function fill(length: number, filler: any) {
+  let a = [];
+  for(var i = 0; i < length; ++i) a.push(filler);
+  return a;
+}
