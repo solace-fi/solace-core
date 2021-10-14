@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
+import "./IERC721Enhanced.sol";
 
 /**
  * @title IClaimsEscrow
@@ -15,7 +16,7 @@ pragma solidity 0.8.6;
  *
  * Claims are **ERC721**s and abbreviated as **SCT**.
  */
-interface IClaimsEscrow {
+interface IClaimsEscrow is IERC721Enhanced {
 
     /***************************************
     EVENTS
@@ -105,13 +106,6 @@ interface IClaimsEscrow {
      */
     function timeLeft(uint256 claimID) external view returns (uint256 time);
 
-    /**
-     * @notice List a user's claims.
-     * @param claimant User to check.
-     * @return claimIDs List of claimIDs.
-     */
-    function listClaims(address claimant) external view returns (uint256[] memory claimIDs);
-
     /***************************************
     GLOBAL VIEWS
     ***************************************/
@@ -147,26 +141,6 @@ interface IClaimsEscrow {
      * @param cooldownPeriod_ New cooldown duration in seconds
      */
     function setCooldownPeriod(uint256 cooldownPeriod_) external;
-
-    /***************************************
-    ERC721 FUNCTIONS
-    ***************************************/
-
-    /**
-     * @notice Transfers `tokenID` from `msg.sender` to `to`.
-     * @dev This was excluded from the official `ERC721` standard in favor of `transferFrom(address from, address to, uint256 tokenID)`. We elect to include it.
-     * @param to The receipient of the token.
-     * @param tokenID The token to transfer.
-     */
-    function transfer(address to, uint256 tokenID) external;
-
-    /**
-     * @notice Safely transfers `tokenID` from `msg.sender` to `to`.
-     * @dev This was excluded from the official `ERC721` standard in favor of `safeTransferFrom(address from, address to, uint256 tokenID)`. We elect to include it.
-     * @param to The receipient of the token.
-     * @param tokenID The token to transfer.
-     */
-    function safeTransfer(address to, uint256 tokenID) external;
 
     /***************************************
     FALLBACK FUNCTIONS

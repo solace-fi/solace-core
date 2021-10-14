@@ -3,10 +3,10 @@
 pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./Governable.sol";
+import "./ERC721Enhanced.sol";
 import "./interface/IRegistry.sol";
 import "./interface/IVault.sol";
 import "./interface/IPolicyManager.sol";
@@ -25,7 +25,7 @@ import "./interface/IClaimsEscrow.sol";
  *
  * Claims are **ERC721**s and abbreviated as **SCT**.
  */
-contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Governable {
+contract ClaimsEscrow is ERC721Enhanced, IClaimsEscrow, ReentrancyGuard, Governable {
     using Address for address;
     using SafeERC20 for IERC20;
 
@@ -41,18 +41,12 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
     /// @notice Tracks how much **ETH** is required to payout all claims
     uint256 internal _totalClaimsOutstanding;
 
-    // Call will revert if the claim does not exist.
-    modifier claimMustExist(uint256 claimID) {
-        require(_exists(claimID), "query for nonexistent token");
-        _;
-    }
-
     /**
      * @notice Constructs the ClaimsEscrow contract.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
      * @param registry_ The address of the [`Registry`](./Registry).
      */
-    constructor(address governance_, address registry_) ERC721("Solace Claim", "SCT") Governable(governance_) {
+    constructor(address governance_, address registry_) ERC721Enhanced("Solace Claim", "SCT") Governable(governance_) {
         require(registry_ != address(0x0), "zero address registry");
         _registry = IRegistry(registry_);
     }
@@ -71,7 +65,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
      */
     function receiveClaim(uint256 policyID, address claimant, uint256 amount) external payable override {
         require(IPolicyManager(_registry.policyManager()).productIsActive(msg.sender), "!product");
-        require(claimant != address(0x0), "zero address");
+        require(claimant != address(0x0), "zero address claimant");
         uint256 tco = _totalClaimsOutstanding + amount;
         _totalClaimsOutstanding = tco;
         uint256 bal = address(this).balance;
@@ -96,7 +90,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
      * Only callable after the cooldown period has elapsed (from the time the claim was approved and processed).
      * @param claimID The ID of the claim to withdraw payout for.
      */
-    function withdrawClaimsPayout(uint256 claimID) external override nonReentrant claimMustExist(claimID) {
+    function withdrawClaimsPayout(uint256 claimID) external override nonReentrant tokenMustExist(claimID) {
         require(msg.sender == ownerOf(claimID), "!claimant");
         require(block.timestamp >= _claims[claimID].receivedAt + _cooldownPeriod, "cooldown period has not elapsed");
 
@@ -110,7 +104,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
             uint256 balance = address(this).balance;
             _totalClaimsOutstanding -= balance;
             _claims[claimID].amount -= balance;
-            payable(msg.sender).transfer(balance);
+            Address.sendValue(payable(msg.sender), balance);
             emit ClaimWithdrawn(claimID, msg.sender, balance);
         }
         // if enough eth, full withdraw and delete claim
@@ -118,7 +112,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
             _totalClaimsOutstanding -= amount;
             delete _claims[claimID];
             _burn(claimID);
-            payable(msg.sender).transfer(amount);
+            Address.sendValue(payable(msg.sender), amount);
             emit ClaimWithdrawn(claimID, msg.sender, amount);
         }
     }
@@ -132,7 +126,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
      * @param claimID Claim to query.
      * @return info Claim info as struct.
      */
-    function claim(uint256 claimID) external view override claimMustExist(claimID) returns (Claim memory info) {
+    function claim(uint256 claimID) external view override tokenMustExist(claimID) returns (Claim memory info) {
         return _claims[claimID];
     }
 
@@ -142,7 +136,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
      * @return amount Claim amount in ETH.
      * @return receivedAt Time claim was received at.
      */
-    function getClaim(uint256 claimID) external view override claimMustExist(claimID) returns (uint256 amount, uint256 receivedAt) {
+    function getClaim(uint256 claimID) external view override tokenMustExist(claimID) returns (uint256 amount, uint256 receivedAt) {
         Claim memory info = _claims[claimID];
         return (info.amount, info.receivedAt);
     }
@@ -170,25 +164,10 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
      * @param claimID The ID to check.
      * @return time The duration in seconds.
      */
-    function timeLeft(uint256 claimID) external view override claimMustExist(claimID) returns (uint256 time) {
+    function timeLeft(uint256 claimID) external view override tokenMustExist(claimID) returns (uint256 time) {
         uint256 end = _claims[claimID].receivedAt + _cooldownPeriod;
         if(block.timestamp >= end) return 0;
         return end - block.timestamp;
-    }
-
-    /**
-     * @notice List a user's claims.
-     * @param claimant User to check.
-     * @return claimIDs List of claimIDs.
-     */
-    function listClaims(address claimant) external view override returns (uint256[] memory claimIDs) {
-        require(claimant != address(0x0), "zero address");
-        uint256 tokenCount = balanceOf(claimant);
-        claimIDs = new uint256[](tokenCount);
-        for (uint256 index = 0; index < tokenCount; index++) {
-            claimIDs[index] = tokenOfOwnerByIndex(claimant, index);
-        }
-        return claimIDs;
     }
 
     /***************************************
@@ -215,7 +194,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
      * @param claimID The claim to adjust.
      * @param value The new payout of the claim.
      */
-    function adjustClaim(uint256 claimID, uint256 value) external override onlyGovernance claimMustExist(claimID) {
+    function adjustClaim(uint256 claimID, uint256 value) external override onlyGovernance tokenMustExist(claimID) {
         _totalClaimsOutstanding = _totalClaimsOutstanding - _claims[claimID].amount + value;
         uint256 oldAmount = _claims[claimID].amount;
         _claims[claimID].amount = value;
@@ -240,30 +219,6 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
     function setCooldownPeriod(uint256 cooldownPeriod_) external override onlyGovernance {
         _cooldownPeriod = cooldownPeriod_;
         emit CooldownPeriodSet(cooldownPeriod_);
-    }
-
-    /***************************************
-    ERC721 FUNCTIONS
-    ***************************************/
-
-    /**
-     * @notice Transfers `tokenID` from `msg.sender` to `to`.
-     * @dev This was excluded from the official `ERC721` standard in favor of `transferFrom(address from, address to, uint256 tokenID)`. We elect to include it.
-     * @param to The receipient of the token.
-     * @param tokenID The token to transfer.
-     */
-    function transfer(address to, uint256 tokenID) public override {
-        super.transferFrom(msg.sender, to, tokenID);
-    }
-
-    /**
-     * @notice Safely transfers `tokenID` from `msg.sender` to `to`.
-     * @dev This was excluded from the official `ERC721` standard in favor of `safeTransferFrom(address from, address to, uint256 tokenID)`. We elect to include it.
-     * @param to The receipient of the token.
-     * @param tokenID The token to transfer.
-     */
-    function safeTransfer(address to, uint256 tokenID) public override {
-        super.safeTransferFrom(msg.sender, to, tokenID, "");
     }
 
     /***************************************

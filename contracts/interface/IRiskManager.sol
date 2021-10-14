@@ -74,6 +74,13 @@ interface IRiskManager {
     function maxCoverPerPolicy(address prod) external view returns (uint256 cover);
 
     /**
+     * @notice Checks is an address is an active product.
+     * @param prod The product to check.
+     * @return status True if the product is active.
+     */
+    function productIsActive(address prod) external view returns (bool status);
+
+    /**
      * @notice Return the number of registered products.
      * @return count Number of products.
      */

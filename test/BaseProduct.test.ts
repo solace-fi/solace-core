@@ -93,8 +93,8 @@ describe("BaseProduct", function () {
       ]
     )) as MockProduct;
 
-    await vault.connect(governor).setRequestor(claimsEscrow.address, true);
-    await vault.connect(governor).setRequestor(treasury.address, true);
+    await vault.connect(governor).addRequestor(claimsEscrow.address);
+    await vault.connect(governor).addRequestor(treasury.address);
   });
 
   describe("deployment", function () {
@@ -182,7 +182,7 @@ describe("BaseProduct", function () {
       let tx = await product.connect(governor).setCoveredPlatform(treasury.address);
       expect(tx).to.emit(product, "CoveredPlatformSet").withArgs(treasury.address);
       expect(await product.coveredPlatform()).to.equal(treasury.address);
-      await product.connect(governor).setCoveredPlatform(ONE_SPLIT_VIEW);
+      await product.connect(governor).setCoveredPlatform(ONE_SPLIT_VIEW); // reset
     });
     it("should revert setCoveredPlatform if not called by governance", async function () {
       await expect(product.connect(policyholder1).setCoveredPlatform(policyholder1.address)).to.be.revertedWith("!governance");

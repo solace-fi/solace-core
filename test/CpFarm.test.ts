@@ -108,11 +108,9 @@ describe("CpFarm", function () {
     it("starts with the correct governor", async function () {
       expect(await farm1.governance()).to.equal(governor.address);
     });
-
     it("rejects setting new governance by non governor", async function () {
       await expect(farm1.connect(farmer1).setPendingGovernance(farmer1.address)).to.be.revertedWith("!governance");
     });
-
     it("can set new governance", async function () {
       let tx = await farm1.connect(governor).setPendingGovernance(deployer.address);
       expect(tx).to.emit(farm1, "GovernancePending").withArgs(deployer.address);

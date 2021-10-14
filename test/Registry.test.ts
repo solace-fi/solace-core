@@ -82,7 +82,7 @@ describe("Registry", function() {
       await expect(registry.connect(user).setWeth(weth.address)).to.be.revertedWith("!governance");
     });
     it("cannot be set to the zero address", async function () {
-      await expect(registry.connect(governor).setWeth(ZERO_ADDRESS)).to.be.revertedWith("zero address");
+      await expect(registry.connect(governor).setWeth(ZERO_ADDRESS)).to.be.revertedWith("zero address weth");
     });
   });
 
@@ -104,7 +104,7 @@ describe("Registry", function() {
       await expect(registry.connect(user).setVault(vault.address)).to.be.revertedWith("!governance");
     });
     it("cannot be set to the zero address", async function () {
-      await expect(registry.connect(governor).setVault(ZERO_ADDRESS)).to.be.revertedWith("zero address");
+      await expect(registry.connect(governor).setVault(ZERO_ADDRESS)).to.be.revertedWith("zero address vault");
     });
   });
 
@@ -126,7 +126,7 @@ describe("Registry", function() {
       await expect(registry.connect(user).setClaimsEscrow(claimsEscrow.address)).to.be.revertedWith("!governance");
     });
     it("cannot be set to the zero address", async function () {
-      await expect(registry.connect(governor).setClaimsEscrow(ZERO_ADDRESS)).to.be.revertedWith("zero address");
+      await expect(registry.connect(governor).setClaimsEscrow(ZERO_ADDRESS)).to.be.revertedWith("zero address claims escrow");
     });
   });
 
@@ -148,7 +148,7 @@ describe("Registry", function() {
       await expect(registry.connect(user).setTreasury(treasury.address)).to.be.revertedWith("!governance");
     });
     it("cannot be set to the zero address", async function () {
-      await expect(registry.connect(governor).setTreasury(ZERO_ADDRESS)).to.be.revertedWith("zero address");
+      await expect(registry.connect(governor).setTreasury(ZERO_ADDRESS)).to.be.revertedWith("zero address treasury");
     });
   });
 
@@ -170,7 +170,7 @@ describe("Registry", function() {
       await expect(registry.connect(user).setPolicyManager(policyManager.address)).to.be.revertedWith("!governance");
     });
     it("cannot be set to the zero address", async function () {
-      await expect(registry.connect(governor).setPolicyManager(ZERO_ADDRESS)).to.be.revertedWith("zero address");
+      await expect(registry.connect(governor).setPolicyManager(ZERO_ADDRESS)).to.be.revertedWith("zero address policymanager");
     });
   });
 
@@ -190,7 +190,7 @@ describe("Registry", function() {
       await expect(registry.connect(user).setRiskManager(riskManager.address)).to.be.revertedWith("!governance");
     });
     it("cannot be set to the zero address", async function () {
-      await expect(registry.connect(governor).setRiskManager(ZERO_ADDRESS)).to.be.revertedWith("zero address");
+      await expect(registry.connect(governor).setRiskManager(ZERO_ADDRESS)).to.be.revertedWith("zero address riskmanager");
     });
   });
 
@@ -212,7 +212,7 @@ describe("Registry", function() {
       await expect(registry.connect(user).setSolace(solace.address)).to.be.revertedWith("!governance");
     });
     it("cannot be set to the zero address", async function () {
-      await expect(registry.connect(governor).setSolace(ZERO_ADDRESS)).to.be.revertedWith("zero address");
+      await expect(registry.connect(governor).setSolace(ZERO_ADDRESS)).to.be.revertedWith("zero address solace");
     });
   });
 
@@ -234,7 +234,7 @@ describe("Registry", function() {
       await expect(registry.connect(user).setMaster(master.address)).to.be.revertedWith("!governance");
     });
     it("cannot be set to the zero address", async function () {
-      await expect(registry.connect(governor).setMaster(ZERO_ADDRESS)).to.be.revertedWith("zero address");
+      await expect(registry.connect(governor).setMaster(ZERO_ADDRESS)).to.be.revertedWith("zero address master");
     });
   });
 
@@ -253,7 +253,7 @@ describe("Registry", function() {
       await expect(registry.connect(user).setLocker(locker.address)).to.be.revertedWith("!governance");
     });
     it("cannot be set to the zero address", async function () {
-      await expect(registry.connect(governor).setLocker(ZERO_ADDRESS)).to.be.revertedWith("zero address");
+      await expect(registry.connect(governor).setLocker(ZERO_ADDRESS)).to.be.revertedWith("zero address locker");
     });
   });
 });

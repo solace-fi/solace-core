@@ -142,7 +142,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         // update local book-keeping variables
         _activeCoverAmount += coverAmount;
         // return excess payment
-        if(msg.value > premium) payable(msg.sender).transfer(msg.value - premium);
+        if(msg.value > premium) Address.sendValue(payable(msg.sender), msg.value - premium);
         // transfer premium to the treasury
         ITreasury(payable(_registry.treasury())).routePremiums{value: premium}();
         emit PolicyCreated(policyID);
@@ -179,11 +179,11 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
             uint256 premium = newPremium - paidPremium;
             // check that the buyer has paid the correct premium
             require(msg.value >= premium, "insufficient payment");
-            if(msg.value > premium) payable(msg.sender).transfer(msg.value - premium);
+            if(msg.value > premium) Address.sendValue(payable(msg.sender), msg.value - premium);
             // transfer premium to the treasury
             ITreasury(payable(_registry.treasury())).routePremiums{value: premium}();
         } else {
-            if(msg.value > 0) payable(msg.sender).transfer(msg.value);
+            if(msg.value > 0) Address.sendValue(payable(msg.sender), msg.value);
             uint256 refundAmount = paidPremium - newPremium;
             ITreasury(payable(_registry.treasury())).refund(msg.sender, refundAmount);
         }
@@ -209,7 +209,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         uint256 premium = coverAmount * extension * purchasePrice / Q12;
         // check that the buyer has paid the correct premium
         require(msg.value >= premium, "insufficient payment");
-        if(msg.value > premium) payable(msg.sender).transfer(msg.value - premium);
+        if(msg.value > premium) Address.sendValue(payable(msg.sender), msg.value - premium);
         // transfer premium to the treasury
         ITreasury(payable(_registry.treasury())).routePremiums{value: premium}();
         // check that the buyer provided valid period
@@ -254,10 +254,10 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         if (newPremium >= paidPremium) {
             uint256 premium = newPremium - paidPremium;
             require(msg.value >= premium, "insufficient payment");
-            if(msg.value > premium) payable(msg.sender).transfer(msg.value - premium);
+            if(msg.value > premium) Address.sendValue(payable(msg.sender), msg.value - premium);
             ITreasury(payable(_registry.treasury())).routePremiums{value: premium}();
         } else {
-            if(msg.value > 0) payable(msg.sender).transfer(msg.value);
+            if(msg.value > 0) Address.sendValue(payable(msg.sender), msg.value);
             uint256 refund = paidPremium - newPremium;
             ITreasury(payable(_registry.treasury())).refund(msg.sender, refund);
         }

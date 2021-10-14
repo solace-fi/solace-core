@@ -54,7 +54,7 @@ describe("ClaimsEscrow", function () {
     await registry.connect(governor).setPolicyManager(policyManager.address);
 
     await policyManager.connect(governor).addProduct(mockProduct.address);
-    await vault.connect(governor).setRequestor(claimsEscrow.address, true);
+    await vault.connect(governor).addRequestor(claimsEscrow.address);
   });
 
   describe("deployment", function () {
@@ -93,7 +93,7 @@ describe("ClaimsEscrow", function () {
       await expect(claimsEscrow.connect(deployer).receiveClaim(1, deployer.address, 0)).to.be.revertedWith("!product");
     });
     it("should revert if zero claimant", async function () {
-      await expect(claimsEscrow.connect(mockProduct).receiveClaim(claimID, ZERO_ADDRESS, testClaimAmount)).to.be.revertedWith("zero address");
+      await expect(claimsEscrow.connect(mockProduct).receiveClaim(claimID, ZERO_ADDRESS, testClaimAmount)).to.be.revertedWith("zero address claimant");
     });
     it("should create a Claim object with the right data", async function () {
       expect(await claimsEscrow.totalClaimsOutstanding()).to.equal(0);
@@ -279,23 +279,23 @@ describe("ClaimsEscrow", function () {
     });
   });
 
-  describe("listClaims", function () {
+  describe("listTokensOfOwner", function () {
     it("lists claims", async function () {
-      expect(await claimsEscrow.listClaims(claimant.address)).to.deep.equal([]);
+      expect(await claimsEscrow.listTokensOfOwner(claimant.address)).to.deep.equal([]);
       await claimsEscrow.connect(mockProduct).receiveClaim(2, claimant.address, 0);
-      expect(await claimsEscrow.listClaims(claimant.address)).to.deep.equal([BN.from(2)]);
+      expect(await claimsEscrow.listTokensOfOwner(claimant.address)).to.deep.equal([BN.from(2)]);
       await claimsEscrow.connect(mockProduct).receiveClaim(4, claimant.address, 0);
-      expect(await claimsEscrow.listClaims(claimant.address)).to.deep.equal([BN.from(2),BN.from(4)]);
+      expect(await claimsEscrow.listTokensOfOwner(claimant.address)).to.deep.equal([BN.from(2),BN.from(4)]);
       await claimsEscrow.connect(mockProduct).receiveClaim(6, deployer.address, 0);
-      expect(await claimsEscrow.listClaims(claimant.address)).to.deep.equal([BN.from(2),BN.from(4)]);
+      expect(await claimsEscrow.listTokensOfOwner(claimant.address)).to.deep.equal([BN.from(2),BN.from(4)]);
       await claimsEscrow.connect(mockProduct).receiveClaim(8, claimant.address, 0);
-      expect(await claimsEscrow.listClaims(claimant.address)).to.deep.equal([BN.from(2),BN.from(4),BN.from(8)]);
+      expect(await claimsEscrow.listTokensOfOwner(claimant.address)).to.deep.equal([BN.from(2),BN.from(4),BN.from(8)]);
       await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]);
       await claimsEscrow.connect(claimant).withdrawClaimsPayout(4);
-      expect(await claimsEscrow.listClaims(claimant.address)).to.deep.equal([BN.from(2),BN.from(8)]);
+      expect(await claimsEscrow.listTokensOfOwner(claimant.address)).to.deep.equal([BN.from(2),BN.from(8)]);
     });
     it("does not list claims for zero address", async function () {
-      await expect(claimsEscrow.listClaims(ZERO_ADDRESS)).to.be.revertedWith("zero address");
+      await expect(claimsEscrow.listTokensOfOwner(ZERO_ADDRESS)).to.be.revertedWith("zero address owner");
     });
   });
 

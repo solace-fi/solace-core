@@ -446,7 +446,7 @@ describe("Treasury", function() {
         await registry.connect(governor).setVault(vault.address);
         treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, registry.address])) as Treasury;
         await registry.connect(governor).setTreasury(treasury.address);
-        await vault.connect(governor).setRequestor(treasury.address, true);
+        await vault.connect(governor).addRequestor(treasury.address);
       });
 
       it("vault is a premium recipient", async function() {
