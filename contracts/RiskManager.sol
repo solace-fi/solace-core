@@ -315,5 +315,6 @@ contract RiskManager is IRiskManager, Governable {
      */
     function setPartialReservesFactor(uint16 partialReservesFactor_) external override onlyGovernance {
         _partialReservesFactor = partialReservesFactor_;
+        emit PartialReservesFactorSet(partialReservesFactor_);
     }
 }

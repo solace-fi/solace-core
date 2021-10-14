@@ -75,20 +75,20 @@ describe("Strategy", function () {
         });
     });
 
-    describe("setGovernance", function () {
+    describe("setPendingGovernance", function () {
         it("should allow governance to set new governance address", async function () {
             expect(await strategy.governance()).to.equal(owner.address);
-            await strategy.connect(owner).setGovernance(newOwner.address);
+            await strategy.connect(owner).setPendingGovernance(newOwner.address);
             expect(await strategy.governance()).to.equal(owner.address);
-            expect(await strategy.newGovernance()).to.equal(newOwner.address);
+            expect(await strategy.pendingGovernance()).to.equal(newOwner.address);
             let tx = await strategy.connect(newOwner).acceptGovernance();
             await expect(tx).to.emit(strategy, "GovernanceTransferred").withArgs(newOwner.address);
             expect(await strategy.governance()).to.equal(newOwner.address);
-            expect(await strategy.newGovernance()).to.equal(ZERO_ADDRESS);
+            expect(await strategy.pendingGovernance()).to.equal(ZERO_ADDRESS);
         });
         it("should revert if not called by governance", async function () {
-            await expect(strategy.connect(depositor1).setGovernance(depositor1.address)).to.be.revertedWith("!governance");
-            await strategy.connect(owner).setGovernance(newOwner.address);
+            await expect(strategy.connect(depositor1).setPendingGovernance(depositor1.address)).to.be.revertedWith("!governance");
+            await strategy.connect(owner).setPendingGovernance(newOwner.address);
             await expect(strategy.connect(depositor1).acceptGovernance()).to.be.revertedWith("!governance");
         });
     });

@@ -51,7 +51,7 @@ describe("CpFarm", function () {
   before(async function () {
     artifacts = await import_artifacts();
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
-    
+
     weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
 
     // deploy uniswap contracts
@@ -110,26 +110,27 @@ describe("CpFarm", function () {
     });
 
     it("rejects setting new governance by non governor", async function () {
-      await expect(farm1.connect(farmer1).setGovernance(farmer1.address)).to.be.revertedWith("!governance");
+      await expect(farm1.connect(farmer1).setPendingGovernance(farmer1.address)).to.be.revertedWith("!governance");
     });
 
     it("can set new governance", async function () {
-      await farm1.connect(governor).setGovernance(deployer.address);
+      let tx = await farm1.connect(governor).setPendingGovernance(deployer.address);
+      expect(tx).to.emit(farm1, "GovernancePending").withArgs(deployer.address);
       expect(await farm1.governance()).to.equal(governor.address);
-      expect(await farm1.newGovernance()).to.equal(deployer.address);
+      expect(await farm1.pendingGovernance()).to.equal(deployer.address);
     });
 
     it("rejects governance transfer by non governor", async function () {
-      await expect(farm1.connect(farmer1).acceptGovernance()).to.be.revertedWith("!governance");
+      await expect(farm1.connect(farmer1).acceptGovernance()).to.be.revertedWith("!pending governance");
     });
 
     it("can transfer governance", async function () {
       let tx = await farm1.connect(deployer).acceptGovernance();
-      await expect(tx).to.emit(farm1, "GovernanceTransferred").withArgs(deployer.address);
+      await expect(tx).to.emit(farm1, "GovernanceTransferred").withArgs(governor.address, deployer.address);
       expect(await farm1.governance()).to.equal(deployer.address);
-      expect(await farm1.newGovernance()).to.equal(ZERO_ADDRESS);
+      expect(await farm1.pendingGovernance()).to.equal(ZERO_ADDRESS);
 
-      await farm1.connect(deployer).setGovernance(governor.address);
+      await farm1.connect(deployer).setPendingGovernance(governor.address);
       await farm1.connect(governor).acceptGovernance();
     });
   });

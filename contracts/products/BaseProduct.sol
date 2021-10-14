@@ -415,6 +415,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
     function setMinPeriod(uint40 minPeriod_) external override onlyGovernance {
         require(minPeriod_ <= _maxPeriod, "invalid period");
         _minPeriod = minPeriod_;
+        emit MinPeriodSet(minPeriod_);
     }
 
     /**
@@ -424,6 +425,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
     function setMaxPeriod(uint40 maxPeriod_) external override onlyGovernance {
         require(_minPeriod <= maxPeriod_, "invalid period");
         _maxPeriod = maxPeriod_;
+        emit MaxPeriodSet(maxPeriod_);
     }
 
     /**
@@ -456,6 +458,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
      */
     function setPaused(bool paused_) external onlyGovernance {
         _paused = paused_;
+        emit PauseSet(paused_);
     }
 
     /**
@@ -468,6 +471,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
     function setCoveredPlatform(address coveredPlatform_) public virtual override onlyGovernance {
         require(coveredPlatform_ != address(0x0), "zero address coveredplatform");
         _coveredPlatform = coveredPlatform_;
+        emit CoveredPlatformSet(coveredPlatform_);
     }
 
     /**
@@ -478,6 +482,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
     function setPolicyManager(address policyManager_) external override onlyGovernance {
         require(policyManager_ != address(0x0), "zero address policymanager");
         _policyManager = IPolicyManager(policyManager_);
+        emit PolicyManagerSet(policyManager_);
     }
 
     /***************************************

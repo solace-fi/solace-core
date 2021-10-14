@@ -165,28 +165,29 @@ describe("Treasury", function() {
     });
 
     it("rejects setting new governance by non governor", async function() {
-      await expect(treasury.connect(user).setGovernance(user.address)).to.be.revertedWith("!governance");
+      await expect(treasury.connect(user).setPendingGovernance(user.address)).to.be.revertedWith("!governance");
     });
 
     it("can set new governance", async function() {
-      await treasury.connect(governor).setGovernance(deployer.address);
+      let tx = await treasury.connect(governor).setPendingGovernance(deployer.address);
+      expect(tx).to.emit(treasury, "GovernancePending").withArgs(deployer.address);
       expect(await treasury.governance()).to.equal(governor.address);
-      expect(await treasury.newGovernance()).to.equal(deployer.address);
+      expect(await treasury.pendingGovernance()).to.equal(deployer.address);
     });
 
     it("rejects governance transfer by non governor", async function() {
-      await expect(treasury.connect(user).acceptGovernance()).to.be.revertedWith("!governance");
+      await expect(treasury.connect(user).acceptGovernance()).to.be.revertedWith("!pending governance");
     });
 
     it("can transfer governance", async function() {
       let tx = await treasury.connect(deployer).acceptGovernance();
       await expect(tx)
         .to.emit(treasury, "GovernanceTransferred")
-        .withArgs(deployer.address);
+        .withArgs(governor.address, deployer.address);
       expect(await treasury.governance()).to.equal(deployer.address);
-      expect(await treasury.newGovernance()).to.equal(ZERO_ADDRESS);
+      expect(await treasury.pendingGovernance()).to.equal(ZERO_ADDRESS);
 
-      await treasury.connect(deployer).setGovernance(governor.address);
+      await treasury.connect(deployer).setPendingGovernance(governor.address);
       await treasury.connect(governor).acceptGovernance();
     });
   });
@@ -336,7 +337,8 @@ describe("Treasury", function() {
     it("can route premiums with no recipients", async function() {
       let balancesBefore = await getBalances(user);
       let depositAmount = 100;
-      await treasury.connect(user).routePremiums({ value: depositAmount });
+      let tx = await treasury.connect(user).routePremiums({ value: depositAmount });
+      expect(tx).to.emit(treasury, "PremiumsRouted").withArgs(depositAmount);
       let balancesAfter = await getBalances(user);
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       expect(balancesDiff.treasuryEth).to.equal(depositAmount);
@@ -357,12 +359,14 @@ describe("Treasury", function() {
     it("can route premiums", async function() {
       let balancesBefore = await getBalances(deployer);
       let depositAmount = 100;
-      await treasury.connect(user).routePremiums({ value: depositAmount });
+      let tx1 = await treasury.connect(user).routePremiums({ value: depositAmount });
+      expect(tx1).to.emit(treasury, "PremiumsRouted").withArgs(depositAmount);
       let balancesAfter = await getBalances(deployer);
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       expect(balancesDiff.treasuryEth).to.equal(60);
       expect(balancesDiff.userEth).to.equal(40);
-      await treasury.connect(governor).routePremiums(); // empty routing
+      let tx2 = await treasury.connect(governor).routePremiums(); // empty routing
+      expect(tx2).to.emit(treasury, "PremiumsRouted").withArgs(0);
     });
   });
 
@@ -435,7 +439,8 @@ describe("Treasury", function() {
       it("can route premiums to vault", async function() {
         let vaultAmountBefore = await provider.getBalance(vault.address);
         let depositAmount = 100;
-        await treasury.connect(user).routePremiums({ value: depositAmount });
+        let tx = await treasury.connect(user).routePremiums({ value: depositAmount });
+        expect(tx).to.emit(treasury, "PremiumsRouted").withArgs(depositAmount);
         let vaultAmountAfter = await provider.getBalance(vault.address);
         expect(vaultAmountAfter.sub(depositAmount)).to.equal(vaultAmountBefore);
       });

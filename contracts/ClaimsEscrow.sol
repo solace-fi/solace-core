@@ -220,7 +220,9 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
      */
     function adjustClaim(uint256 claimID, uint256 value) external override onlyGovernance claimMustExist(claimID) {
         _totalClaimsOutstanding = _totalClaimsOutstanding - _claims[claimID].amount + value;
+        uint256 oldAmount = _claims[claimID].amount;
         _claims[claimID].amount = value;
+        emit ClaimAdjusted(claimID, ownerOf(claimID), oldAmount, value);
     }
 
     /**
@@ -229,7 +231,8 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
      * @param amount Amount to pull.
      */
     function returnEth(uint256 amount) external override onlyGovernance nonReentrant {
-        payable(_registry.vault()).transfer(amount);
+        Address.sendValue(payable(_registry.vault()), amount);
+        emit EthReturned(amount);
     }
 
     /**
@@ -239,6 +242,7 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
      */
     function setCooldownPeriod(uint256 cooldownPeriod_) external override onlyGovernance {
         _cooldownPeriod = cooldownPeriod_;
+        emit CooldownPeriodSet(cooldownPeriod_);
     }
 
     /***************************************

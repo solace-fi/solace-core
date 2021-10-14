@@ -29,6 +29,8 @@ interface IPolicyManager is IERC721Enumerable /*, IERC721Metadata*/ {
     event ProductAdded(address product);
     /// @notice Emitted when a new product is removed.
     event ProductRemoved(address product);
+    /// @notice Emitted when the policy descriptor is set.
+    event PolicyDescriptorSet(address policyDescriptor);
 
     /***************************************
     POLICY VIEW FUNCTIONS

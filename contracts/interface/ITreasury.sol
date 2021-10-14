@@ -23,6 +23,10 @@ interface ITreasury {
     event FundsSpent(address token, uint256 amount, address recipient);
     /// @notice Emitted when premium recipients are set.
     event RecipientsSet();
+    /// @notice Emitted when premiums are routed.
+    event PremiumsRouted(uint256 amount);
+    /// @notice Emitted when ETH is refunded to a user.
+    event EthRefunded(address user, uint256 amount);
 
     /***************************************
     FUNDS IN
