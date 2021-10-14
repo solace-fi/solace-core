@@ -245,13 +245,17 @@ describe("BaseProduct", function () {
       await product.connect(governor).setPaused(false);
     });
     it("can buyPolicy", async function() {
+      let activeCover1 = await product.activeCoverAmount();
       let quote = BN.from(await product.getQuote(coverAmount, blocks));
       let tx = await product.connect(policyholder1).buyPolicy(policyholder1.address, coverAmount, blocks, positionContract.address, { value: quote });
+      let activeCover2 = await product.activeCoverAmount();
+      expect(activeCover2.sub(activeCover1)).eq(coverAmount);
       await expect(tx)
         .to.emit(product, "PolicyCreated")
         .withArgs(1);
     });
     it("returns overpayment from buy policy", async function() {
+      let activeCover1 = await product.activeCoverAmount();
       let vaultBalance1 = await provider.getBalance(vault.address);
       let quote = BN.from(await product.getQuote(coverAmount, blocks));
       let tx = await product.connect(policyholder1).buyPolicy(policyholder1.address, coverAmount, blocks, positionContract.address, { value: quote.add(100) });
@@ -260,6 +264,8 @@ describe("BaseProduct", function () {
         .withArgs(2);
       let vaultBalance2 = await provider.getBalance(vault.address);
       expect(vaultBalance2.sub(vaultBalance1)).to.equal(quote);
+      let activeCover2 = await product.activeCoverAmount();
+      expect(activeCover2.sub(activeCover1)).eq(coverAmount);
     });
   });
 
@@ -305,7 +311,10 @@ describe("BaseProduct", function () {
       await product.connect(governor).setPaused(false);
     });
     it("can extend policy", async function() {
+      let activeCover1 = await product.activeCoverAmount();
       let tx = await product.connect(policyholder1).extendPolicy(policyID, extension, { value: quote });
+      let activeCover2 = await product.activeCoverAmount();
+      expect(activeCover2.sub(activeCover1)).eq(0);
       await expect(tx)
         .to.emit(product, "PolicyExtended")
         .withArgs(policyID);
@@ -398,6 +407,7 @@ describe("BaseProduct", function () {
       await expect(product.connect(policyholder1).updateCoverAmount(policyID, newCoverAmount, { value: premium.sub(1) })).to.be.revertedWith("insufficient payment");
     });
     it("can increase cover amount with exact payment", async function () {
+      let activeCover1 = await product.activeCoverAmount();
       // calculate new premium
       let expBlock = BN.from(await policyManager.getPolicyExpirationBlock(policyID));
       let blockNumber = BN.from(await provider.getBlockNumber()).add(1);
@@ -427,8 +437,11 @@ describe("BaseProduct", function () {
       let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
       let bal2 = await policyholder1.getBalance();
       expect(bal1.sub(bal2).sub(gasCost)).to.equal(premium);
+      let activeCover2 = await product.activeCoverAmount();
+      expect(activeCover2.sub(activeCover1)).eq(newCoverAmount.sub(prevCoverAmount));
     });
     it("can increase cover amount and return over payment", async function () {
+      let activeCover1 = await product.activeCoverAmount();
       newCoverAmount = BN.from("1200000000000000000"); // 1.2 eth
       // calculate new premium
       let expBlock = BN.from(await policyManager.getPolicyExpirationBlock(policyID));
@@ -459,8 +472,11 @@ describe("BaseProduct", function () {
       let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
       let bal2 = await policyholder1.getBalance();
       expect(bal1.sub(bal2).sub(gasCost)).to.equal(premium);
+      let activeCover2 = await product.activeCoverAmount();
+      expect(activeCover2.sub(activeCover1)).eq(newCoverAmount.sub(prevCoverAmount));
     });
     it("can decrease cover amount", async function () {
+      let activeCover1 = await product.activeCoverAmount();
       newCoverAmount = BN.from("900000000000000000"); // 0.9 eth
       // calculate new premium
       let expBlock = BN.from(await policyManager.getPolicyExpirationBlock(policyID));
@@ -491,6 +507,8 @@ describe("BaseProduct", function () {
       let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
       let bal2 = await policyholder1.getBalance();
       expect(bal2.sub(bal1).add(gasCost)).to.equal(refund);
+      let activeCover2 = await product.activeCoverAmount();
+      expect(activeCover2.sub(activeCover1)).eq(newCoverAmount.sub(prevCoverAmount));
     });
     it("can decrease cover amount and return msg.value", async function () {
       newCoverAmount = BN.from("800000000000000000"); // 0.8 eth
@@ -525,6 +543,7 @@ describe("BaseProduct", function () {
       expect(bal2.sub(bal1).add(gasCost)).to.equal(refund);
     });
     it("can keep cover amount the same", async function () {
+      let activeCover1 = await product.activeCoverAmount();
       let policyCover = (await policyManager.policyInfo(policyID)).coverAmount;
       let bal1 = await policyholder1.getBalance();
       let tx = await product.connect(policyholder1).updateCoverAmount(policyID, policyCover, { value: "1000000000000" });
@@ -535,6 +554,8 @@ describe("BaseProduct", function () {
       let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
       let bal2 = await policyholder1.getBalance();
       expect(bal2.sub(bal1).add(gasCost)).to.equal(0);
+      let activeCover2 = await product.activeCoverAmount();
+      expect(activeCover2.sub(activeCover1)).eq(0);
     });
     it("can update cover amount after transfer", async function () {
       await policyManager.connect(policyholder1).transferFrom(policyholder1.address, policyholder2.address, policyID);
@@ -601,6 +622,7 @@ describe("BaseProduct", function () {
       await expect(product.connect(policyholder1).updatePolicy(policyID, maxCoverPerUser.add(1), blocks, { value: quote })).to.be.revertedWith("cannot accept that risk");
     });
     it("can increase cover amount and extend", async function() {
+      let activeCover1 = await product.activeCoverAmount();
       let prevExpirationBlock = BN.from(await policyManager.getPolicyExpirationBlock(policyID));
       let blockNumber = BN.from(await provider.getBlockNumber()).add(1);
       let prevCoverAmount = await policyManager.getPolicyCoverAmount(policyID);
@@ -627,6 +649,8 @@ describe("BaseProduct", function () {
         .withArgs(policyID);
       expect(prevExpirationBlock.add(threeDays)).to.equal(expirationBlock);
       expect(coverAmount2).to.equal(newCoverAmount);
+      let activeCover2 = await product.activeCoverAmount();
+      expect(activeCover2.sub(activeCover1)).eq(newCoverAmount.sub(prevCoverAmount));
     });
     it("returns overpayment from update policy", async function() {
       let vaultBalance1 = await provider.getBalance(vault.address);
@@ -660,6 +684,7 @@ describe("BaseProduct", function () {
       expect(vaultBalance2.sub(vaultBalance1)).to.equal(premium);
     });
     it("can decrease cover amount", async function () {
+      let activeCover1 = await product.activeCoverAmount();
       let policyCover = (await policyManager.policyInfo(policyID)).coverAmount;
       let coverAmount = policyCover.div(10);
       let prevExpirationBlock = BN.from(await policyManager.getPolicyExpirationBlock(policyID));
@@ -690,6 +715,8 @@ describe("BaseProduct", function () {
       let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
       let bal2 = await policyholder1.getBalance();
       expect(bal2.sub(bal1).add(gasCost)).to.equal(refund);
+      let activeCover2 = await product.activeCoverAmount();
+      expect(activeCover2.sub(activeCover1)).eq(coverAmount.sub(prevCoverAmount));
     });
     it("can decrease cover amount and return msg.value", async function () {
       let policyCover = (await policyManager.policyInfo(policyID)).coverAmount;
@@ -724,6 +751,7 @@ describe("BaseProduct", function () {
       expect(bal2.sub(bal1).add(gasCost)).to.equal(refund);
     });
     it("can keep cover amount the same", async function () {
+      let activeCover1 = await product.activeCoverAmount();
       let policyCover = (await policyManager.policyInfo(policyID)).coverAmount;
       let prevExpirationBlock = BN.from(await policyManager.getPolicyExpirationBlock(policyID));
       let blockNumber = BN.from(await provider.getBlockNumber()).add(1);
@@ -753,6 +781,8 @@ describe("BaseProduct", function () {
       let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
       let bal2 = await policyholder1.getBalance();
       expect(bal1.sub(bal2).sub(gasCost)).to.equal(premium);
+      let activeCover2 = await product.activeCoverAmount();
+      expect(activeCover2.sub(activeCover1)).eq(0);
     });
     it("can update policy after transfer", async function () {
       await policyManager.connect(policyholder1).transferFrom(policyholder1.address, policyholder2.address, policyID);
@@ -780,6 +810,7 @@ describe("BaseProduct", function () {
       await expect(product2.connect(policyholder1).cancelPolicy(policyID)).to.be.revertedWith("wrong product");
     });
     it("can cancel and refunds proper amount", async function() {
+      let activeCover1 = await product.activeCoverAmount();
       let info = await policyManager.policyInfo(policyID);
       let block = await provider.getBlockNumber();
       let balance1 = await policyholder1.getBalance();
@@ -795,6 +826,8 @@ describe("BaseProduct", function () {
       let actualRefund = balance2.add(gasCost).sub(balance1);
       expect(actualRefund).to.equal(expectedRefund);
       expect(await policyManager.exists(policyID)).to.be.false;
+      let activeCover2 = await product.activeCoverAmount();
+      expect(activeCover2.sub(activeCover1)).eq(info.coverAmount.mul(-1));
     });
     it("can cancel policy after transfer", async function () {
       expect(await product.policyManager()).to.equal(policyManager.address);

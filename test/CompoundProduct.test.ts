@@ -322,6 +322,8 @@ if(process.env.FORK_NETWORK === "mainnet"){
         // sign swap
         let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
+        let activeCover1 = await product.activeCoverAmount();
+        let policyInfo = await policyManager.getPolicyInfo(policyID1);
         // submit claim
         let userCeth1 = await ceth.balanceOf(policyholder1.address);
         let userEth0 = await policyholder1.getBalance();
@@ -344,6 +346,8 @@ if(process.env.FORK_NETWORK === "mainnet"){
         let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
         let userEth2 = await policyholder1.getBalance();
         expect(userEth2.sub(userEth1).add(gasCost)).to.equal(amountOut1);
+        let activeCover2 = await product.activeCoverAmount();
+        expect(activeCover1.sub(activeCover2)).eq(policyInfo.coverAmount);
       });
       it("can open a claim on a cERC20 position", async function () {
         // sign swap

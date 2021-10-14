@@ -158,6 +158,8 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         // check that the product can provide coverage for this policy
         (bool acceptable, uint24 price) = IRiskManager(_registry.riskManager()).assessRisk(address(this), previousCoverAmount, coverAmount);
         require(acceptable, "cannot accept that risk");
+        // update local book-keeping variables
+        _activeCoverAmount = _activeCoverAmount + coverAmount - previousCoverAmount;
         // calculate premium needed for new cover amount as if policy is bought now
         uint256 remainingBlocks = expirationBlock - block.number;
         uint256 newPremium = coverAmount * remainingBlocks * price / 1e12;
@@ -193,7 +195,6 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         require(policyholder == msg.sender,"!policyholder");
         require(product == address(this), "wrong product");
         require(expirationBlock >= block.number, "policy is expired");
-
         // compute the premium
         uint256 premium = coverAmount * extension * purchasePrice / 1e12;
         // check that the buyer has paid the correct premium
@@ -232,6 +233,8 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         // check if duration is valid
         uint40 duration = newExpirationBlock - uint40(block.number);
         require(duration >= _minPeriod && duration <= _maxPeriod, "invalid period");
+        // update local book-keeping variables
+        _activeCoverAmount = _activeCoverAmount + coverAmount - previousCoverAmount;
         // update policy info
         _policyManager.setPolicyInfo(policyID, coverAmount, newExpirationBlock, price, positionDescription);
         // calculate premium needed for new cover amount as if policy is bought now
@@ -261,7 +264,6 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         (address policyholder, address product, uint256 coverAmount, uint40 expirationBlock, uint24 purchasePrice, ) = _policyManager.getPolicyInfo(policyID);
         require(policyholder == msg.sender,"!policyholder");
         require(product == address(this), "wrong product");
-
         uint40 blocksLeft = expirationBlock - uint40(block.number);
         uint256 refundAmount = blocksLeft * coverAmount * purchasePrice / 1e12;
         _policyManager.burn(policyID);
@@ -301,6 +303,8 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         address signer = ECDSA.recover(hash, signature);
         require(_isAuthorizedSigner[signer], "invalid signature");
         }
+        // update local book-keeping variables
+        _activeCoverAmount -= coverAmount;
         // burn policy
         _policyManager.burn(policyID);
         // submit claim to ClaimsEscrow
