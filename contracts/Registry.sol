@@ -227,7 +227,7 @@ contract Registry is IRegistry, Governable {
      * @param farmController_ The address of the [`FarmController`](./FarmController) contract.
      */
     function setFarmController(address farmController_) external override onlyGovernance {
-        require(farmController_ != address(0x0), "zero address farmcontroller")
+        require(farmController_ != address(0x0), "zero address farmcontroller");
         _farmController = farmController_;
         emit FarmControllerSet(farmController_);
     }
@@ -239,6 +239,64 @@ contract Registry is IRegistry, Governable {
      */
     function setLocker(address locker_) external override onlyGovernance {
         require(locker_ != address(0x0), "zero address locker");
+        _locker = locker_;
+        emit LockerSet(locker_);
+    }
+
+    /**
+     * @notice Sets multiple contracts in one call.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param weth_ The address of the [**WETH**](../WETH9) contract.
+     * @param vault_ The address of the [`Vault`](../Vault) contract.
+     * @param claimsEscrow_ The address of the [`Claims Escrow`](../ClaimsEscrow) contract.
+     * @param treasury_ The address of the [`Treasury`](../Treasury) contract.
+     * @param policyManager_ The address of the [`Policy Manager`](../PolicyManager) contract.
+     * @param riskManager_ The address of the [`Risk Manager`](../RiskManager) contract.
+     * @param solace_ The address of the [**SOLACE**](../SOLACE) contract.
+     * @param optionsFarming_ The address of the [`OptionsFarming`](./OptionsFarming) contract.
+     * @param farmController_ The address of the [`FarmController`](./FarmController) contract.
+     * @param locker_ The address of the [`Locker`](../Locker) contract.
+     */
+    function setMultiple(
+        address weth_,
+        address vault_,
+        address claimsEscrow_,
+        address treasury_,
+        address policyManager_,
+        address riskManager_,
+        address solace_,
+        address optionsFarming_,
+        address farmController_,
+        address locker_
+    ) external override onlyGovernance {
+        require(weth_ != address(0x0), "zero address weth");
+        require(vault_ != address(0x0), "zero address vault");
+        require(claimsEscrow_ != address(0x0), "zero address claims escrow");
+        require(treasury_ != address(0x0), "zero address treasury");
+        require(policyManager_ != address(0x0), "zero address policymanager");
+        require(riskManager_ != address(0x0), "zero address riskmanager");
+        require(solace_ != address(0x0), "zero address solace");
+        require(optionsFarming_ != address(0x0), "zero address optionsfarming");
+        require(farmController_ != address(0x0), "zero address farmcontroller");
+        require(locker_ != address(0x0), "zero address locker");
+        _weth = weth_;
+        emit WethSet(weth_);
+        _vault = vault_;
+        emit VaultSet(vault_);
+        _claimsEscrow = claimsEscrow_;
+        emit ClaimsEscrowSet(claimsEscrow_);
+        _treasury = treasury_;
+        emit TreasurySet(treasury_);
+        _policyManager = policyManager_;
+        emit PolicyManagerSet(policyManager_);
+        _riskManager = riskManager_;
+        emit RiskManagerSet(riskManager_);
+        _solace = solace_;
+        emit SolaceSet(solace_);
+        _optionsFarming = optionsFarming_;
+        emit OptionsFarmingSet(optionsFarming_);
+        _farmController = farmController_;
+        emit FarmControllerSet(farmController_);
         _locker = locker_;
         emit LockerSet(locker_);
     }

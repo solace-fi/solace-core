@@ -14,18 +14,18 @@ let artifacts: ArtifactImports;
 
 let initialized = false;
 const SINGLETON_FACTORY_ADDRESS = "0xce0042B868300000d44A59004Da54A005ffdcf9f";
-let singletonFactory: Contract;
 let knownHashes: any = {"0x0": {"address": "0x0", "salt": "0x0"} };
 
 // deploys a new contract using CREATE2
 // call like you would waffle.deployContract
-export async function create2Contract(wallet: Signer, factoryOrContractJson: ContractJSON, args: any[] | undefined = [], overrideOptions = {}, contractPath: string = "") {
+export async function create2Contract(wallet: Signer, factoryOrContractJson: ContractJSON, args: any[] | undefined = [], overrideOptions = {}, contractPath: string = "", deployerAddress: string = SINGLETON_FACTORY_ADDRESS) {
   _init();
   var initCode = await _initCodeGetter(wallet, factoryOrContractJson, args, overrideOptions);
-  var [address, salt] = _hasher(initCode);
+  var [address, salt] = _hasher(initCode, deployerAddress);
   //var exists = await _exists(address, factoryOrContractJson);
   //if(!exists) await _deployer(wallet, initCode, salt);
-  var [deployCode, gasUsed] = await _deployer(wallet, initCode, salt);
+  console.log("deploying to ", address);
+  var [deployCode, gasUsed] = await _deployer(wallet, initCode, salt, deployerAddress);
   await _verifier(address, args, contractPath);
   return {
     "deployCode": deployCode,
@@ -38,7 +38,6 @@ export async function create2Contract(wallet: Signer, factoryOrContractJson: Con
 async function _init() {
   if(initialized) return;
   artifacts = await import_artifacts();
-  singletonFactory = await ethers.getContractAt(artifacts.SingletonFactory.abi, SINGLETON_FACTORY_ADDRESS);
   knownHashes = JSON.parse(readFileSync("stash/scripts/knownHashes.json").toString());
   initialized = true;
 }
@@ -52,6 +51,7 @@ async function _initCodeGetter(wallet: Signer, factoryOrContractJson: ContractJS
   try {
     contract = await deployContract(failDeployer, factoryOrContractJson, args, overrideOptions);
   } catch(e) {
+    //console.error(e);
     return e.tx.data;
   }
   console.log(contract);
@@ -59,14 +59,14 @@ async function _initCodeGetter(wallet: Signer, factoryOrContractJson: ContractJS
 }
 
 // test salts until one results in an acceptable address
-function _hasher(initCode: string): [string, string] {
+function _hasher(initCode: string, deployerAddress: string): [string, string] {
   // read known hashes from cache
   if(Object.keys(knownHashes).includes(initCode)) {
     var res: any = knownHashes[initCode];
     return [res.address, res.salt];
   }
   // 0xff ++ deployingAddress is fixed:
-  var string1 = '0xff'.concat(SINGLETON_FACTORY_ADDRESS.substring(2))
+  var string1 = '0xff'.concat(deployerAddress.substring(2))
   //var string1 = '0xffce0042B868300000d44A59004Da54A005ffdcf9f'
   // hash the initCode
   var string2 = keccak256(Buffer.from(initCode.substring(2), 'hex')).toString('hex');
@@ -104,10 +104,12 @@ async function _exists(address: string, factoryOrContractJson: ContractJSON) {
 }
 
 // deploy the contract
-async function _deployer(wallet: Signer, initCode: string, salt: string) {
-  let tx = await singletonFactory.connect(wallet).deploy(initCode, salt, {gasLimit: 10000000});
+async function _deployer(wallet: Signer, initCode: string, salt: string, deployerAddress: string) {
+  let deployerContract = await ethers.getContractAt(artifacts.SingletonFactory.abi, deployerAddress);
+  let tx = await deployerContract.connect(wallet).deploy(initCode, salt, {gasLimit: 5000000});
   let receipt = await tx.wait();
   return [tx.data, receipt.gasUsed.toString()]
+  //return ["", "0"];
 }
 
 // verify on etherscan

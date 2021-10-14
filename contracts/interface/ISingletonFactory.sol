@@ -1,5 +1,5 @@
-// code borrowed from https://rinkeby.etherscan.io/address/0xce0042B868300000d44A59004Da54A005ffdcf9f#code
 // SPDX-License-Identifier: GPL-3.0-or-later
+// code borrowed from https://rinkeby.etherscan.io/address/0xce0042B868300000d44A59004Da54A005ffdcf9f#code
 pragma solidity 0.8.6;
 
 /**

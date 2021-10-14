@@ -114,22 +114,22 @@ describe("FarmController", function () {
       expect(await farmController.governance()).to.equal(governor.address);
     });
     it("rejects setting new governance by non governor", async function () {
-      await expect(farmController.connect(farmer1).setGovernance(farmer1.address)).to.be.revertedWith("!governance");
+      await expect(farmController.connect(farmer1).setPendingGovernance(farmer1.address)).to.be.revertedWith("!governance");
     });
     it("can set new governance", async function () {
-      await farmController.connect(governor).setGovernance(deployer.address);
+      await farmController.connect(governor).setPendingGovernance(deployer.address);
       expect(await farmController.governance()).to.equal(governor.address);
       expect(await farmController.pendingGovernance()).to.equal(deployer.address);
     });
     it("rejects governance transfer by non governor", async function () {
-      await expect(farmController.connect(farmer1).acceptGovernance()).to.be.revertedWith("!governance");
+      await expect(farmController.connect(farmer1).acceptGovernance()).to.be.revertedWith("!pending governance");
     });
     it("can transfer governance", async function () {
       let tx = await farmController.connect(deployer).acceptGovernance();
       await expect(tx).to.emit(farmController, "GovernanceTransferred").withArgs(governor.address, deployer.address);
       expect(await farmController.governance()).to.equal(deployer.address);
       expect(await farmController.pendingGovernance()).to.equal(ZERO_ADDRESS);
-      await farmController.connect(deployer).setGovernance(governor.address);
+      await farmController.connect(deployer).setPendingGovernance(governor.address);
       await farmController.connect(governor).acceptGovernance();
     });
   })
@@ -152,7 +152,7 @@ describe("FarmController", function () {
     it("can register cp farms", async function () {
       // register first farm
       farm1 = await createCpFarm(startTime, endTime);
-      await expect(farm1.connect(deployer).setGovernance(governor.address)).to.be.revertedWith("!governance");
+      await expect(farm1.connect(deployer).setPendingGovernance(governor.address)).to.be.revertedWith("!governance");
       let tx = await farmController.connect(governor).registerFarm(farm1.address, 40);
       await expect(tx).to.emit(farmController, "FarmRegistered").withArgs(1, farm1.address);
       expect(await farmController.numFarms()).to.equal(1);
@@ -165,7 +165,7 @@ describe("FarmController", function () {
     it("can register additional farms", async function () {
       // register second farm
       farm2 = await createCpFarm(startTime, endTime);
-      await expect(farm2.connect(deployer).setGovernance(governor.address)).to.be.revertedWith("!governance");
+      await expect(farm2.connect(deployer).setPendingGovernance(governor.address)).to.be.revertedWith("!governance");
       let tx = await farmController.connect(governor).registerFarm(farm2.address, 60);
       await expect(tx).to.emit(farmController, "FarmRegistered").withArgs(2, farm2.address);
       expect(await farmController.numFarms()).to.equal(2);

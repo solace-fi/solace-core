@@ -124,23 +124,23 @@ describe("OptionsFarming", function () {
       expect(await optionsFarming.governance()).to.equal(governor.address);
     });
     it("rejects setting pending governance by non governor", async function () {
-      await expect(optionsFarming.connect(farmer).setGovernance(farmer.address)).to.be.revertedWith("!governance");
+      await expect(optionsFarming.connect(farmer).setPendingGovernance(farmer.address)).to.be.revertedWith("!governance");
     });
     it("can set pending governance", async function () {
-      let tx = await optionsFarming.connect(governor).setGovernance(deployer.address);
+      let tx = await optionsFarming.connect(governor).setPendingGovernance(deployer.address);
       expect(tx).to.emit(optionsFarming, "GovernancePending").withArgs(deployer.address);
       expect(await optionsFarming.governance()).to.equal(governor.address);
       expect(await optionsFarming.pendingGovernance()).to.equal(deployer.address);
     });
     it("rejects governance transfer by non governor", async function () {
-      await expect(optionsFarming.connect(farmer).acceptGovernance()).to.be.revertedWith("!governance");
+      await expect(optionsFarming.connect(farmer).acceptGovernance()).to.be.revertedWith("!pending governance");
     });
     it("can transfer governance", async function () {
       let tx = await optionsFarming.connect(deployer).acceptGovernance();
       await expect(tx).to.emit(optionsFarming, "GovernanceTransferred").withArgs(governor.address, deployer.address);
       expect(await optionsFarming.governance()).to.equal(deployer.address);
       expect(await optionsFarming.pendingGovernance()).to.equal(ZERO_ADDRESS);
-      await optionsFarming.connect(deployer).setGovernance(governor.address);
+      await optionsFarming.connect(deployer).setPendingGovernance(governor.address);
       await optionsFarming.connect(governor).acceptGovernance();
     });
   });

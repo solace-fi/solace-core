@@ -12,7 +12,7 @@ import { Registry, Solace, FarmController, OptionsFarming, Vault, Treasury, Clai
 
 describe("Registry", function() {
   let artifacts: ArtifactImports;
-  const [deployer, governor, user, locker] = provider.getWallets();
+  const [deployer, governor, user, locker, rand] = provider.getWallets();
 
   // contracts
   let registry: Registry;
@@ -276,4 +276,95 @@ describe("Registry", function() {
       await expect(registry.connect(governor).setLocker(ZERO_ADDRESS)).to.be.revertedWith("zero address locker");
     });
   });
+
+  describe("multiple", function () {
+    it("can reset", async function () {
+      let tx = await registry.connect(governor).setMultiple(
+        rand.address,
+        rand.address,
+        rand.address,
+        rand.address,
+        rand.address,
+        rand.address,
+        rand.address,
+        rand.address,
+        rand.address,
+        rand.address
+      );
+      expect(await registry.weth()).to.eq(rand.address);
+      expect(await registry.vault()).to.eq(rand.address);
+      expect(await registry.claimsEscrow()).to.eq(rand.address);
+      expect(await registry.treasury()).to.eq(rand.address);
+      expect(await registry.policyManager()).to.eq(rand.address);
+      expect(await registry.riskManager()).to.eq(rand.address);
+      expect(await registry.solace()).to.eq(rand.address);
+      expect(await registry.optionsFarming()).to.eq(rand.address);
+      expect(await registry.farmController()).to.eq(rand.address);
+      expect(await registry.locker()).to.eq(rand.address);
+      expect(tx).to.emit(registry, "WethSet").withArgs(rand.address);
+      expect(tx).to.emit(registry, "VaultSet").withArgs(rand.address);
+      expect(tx).to.emit(registry, "ClaimsEscrowSet").withArgs(rand.address);
+      expect(tx).to.emit(registry, "TreasurySet").withArgs(rand.address);
+      expect(tx).to.emit(registry, "PolicyManagerSet").withArgs(rand.address);
+      expect(tx).to.emit(registry, "RiskManagerSet").withArgs(rand.address);
+      expect(tx).to.emit(registry, "SolaceSet").withArgs(rand.address);
+      expect(tx).to.emit(registry, "OptionsFarmingSet").withArgs(rand.address);
+      expect(tx).to.emit(registry, "FarmControllerSet").withArgs(rand.address);
+      expect(tx).to.emit(registry, "LockerSet").withArgs(rand.address);
+    });
+    it("can set multiple", async function () {
+      let tx = await registry.connect(governor).setMultiple(
+        weth.address,
+        vault.address,
+        claimsEscrow.address,
+        treasury.address,
+        policyManager.address,
+        riskManager.address,
+        solace.address,
+        optionsFarming.address,
+        farmController.address,
+        locker.address
+      );
+      expect(await registry.weth()).to.eq(weth.address);
+      expect(await registry.vault()).to.eq(vault.address);
+      expect(await registry.claimsEscrow()).to.eq(claimsEscrow.address);
+      expect(await registry.treasury()).to.eq(treasury.address);
+      expect(await registry.policyManager()).to.eq(policyManager.address);
+      expect(await registry.riskManager()).to.eq(riskManager.address);
+      expect(await registry.solace()).to.eq(solace.address);
+      expect(await registry.optionsFarming()).to.eq(optionsFarming.address);
+      expect(await registry.farmController()).to.eq(farmController.address);
+      expect(await registry.locker()).to.eq(locker.address);
+      expect(tx).to.emit(registry, "WethSet").withArgs(weth.address);
+      expect(tx).to.emit(registry, "VaultSet").withArgs(vault.address);
+      expect(tx).to.emit(registry, "ClaimsEscrowSet").withArgs(claimsEscrow.address);
+      expect(tx).to.emit(registry, "TreasurySet").withArgs(treasury.address);
+      expect(tx).to.emit(registry, "PolicyManagerSet").withArgs(policyManager.address);
+      expect(tx).to.emit(registry, "RiskManagerSet").withArgs(riskManager.address);
+      expect(tx).to.emit(registry, "SolaceSet").withArgs(solace.address);
+      expect(tx).to.emit(registry, "OptionsFarmingSet").withArgs(optionsFarming.address);
+      expect(tx).to.emit(registry, "FarmControllerSet").withArgs(farmController.address);
+      expect(tx).to.emit(registry, "LockerSet").withArgs(locker.address);
+    });
+    it("cannot be set by non governor", async function () {
+      await expect(registry.setMultiple(
+        weth.address,
+        vault.address,
+        claimsEscrow.address,
+        treasury.address,
+        policyManager.address,
+        riskManager.address,
+        solace.address,
+        optionsFarming.address,
+        farmController.address,
+        locker.address
+      )).to.be.revertedWith("!governance");
+    });
+  });
 });
+
+function fill(len: number, filler: any) {
+  var a = [];
+  for(var i = 0; i < len; ++i) a.push(filler);
+  return a;
+}

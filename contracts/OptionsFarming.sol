@@ -81,9 +81,9 @@ contract OptionsFarming is ERC721Enhanced, IOptionsFarming, ReentrancyGuard, Gov
      * @param governance_ The address of the [governor](/docs/protocol/governance).
      */
     constructor(address governance_) ERC721Enhanced("Solace Options Mining", "SOM") Governable(governance_) {
-        _expiryDuration = 2592000; // 30 days
-        _solaceEthTwapInterval = 3600; // one hour
-        _ethUsdTwapInterval = 3600; // one hour
+        _expiryDuration = 30 days;
+        _solaceEthTwapInterval = 1 hours;
+        _ethUsdTwapInterval = 1 hours;
         _swapRate = 10000; // 100%
         _priceFloor = type(uint256).max;
     }
