@@ -138,26 +138,27 @@ describe("LpAppraisor", function () {
     })
 
     it("rejects setting new governance by non governor", async function () {
-      await expect(lpTokenAppraisor1.connect(farmer1).setGovernance(farmer1.address)).to.be.revertedWith("!governance");
+      await expect(lpTokenAppraisor1.connect(farmer1).setPendingGovernance(farmer1.address)).to.be.revertedWith("!governance");
     })
 
     it("can set new governance", async function () {
-      await lpTokenAppraisor1.connect(governor).setGovernance(deployer.address);
+      let tx = await lpTokenAppraisor1.connect(governor).setPendingGovernance(deployer.address);
+      expect(tx).to.emit(lpTokenAppraisor1, "GovernancePending").withArgs(deployer.address);
       expect(await lpTokenAppraisor1.governance()).to.equal(governor.address);
-      expect(await lpTokenAppraisor1.newGovernance()).to.equal(deployer.address);
+      expect(await lpTokenAppraisor1.pendingGovernance()).to.equal(deployer.address);
     })
 
     it("rejects governance transfer by non governor", async function () {
-      await expect(lpTokenAppraisor1.connect(farmer1).acceptGovernance()).to.be.revertedWith("!governance");
+      await expect(lpTokenAppraisor1.connect(farmer1).acceptGovernance()).to.be.revertedWith("!pending governance");
     })
 
     it("can transfer governance", async function () {
       let tx = await lpTokenAppraisor1.connect(deployer).acceptGovernance();
-      await expect(tx).to.emit(lpTokenAppraisor1, "GovernanceTransferred").withArgs(deployer.address);
+      await expect(tx).to.emit(lpTokenAppraisor1, "GovernanceTransferred").withArgs(governor.address, deployer.address);
       expect(await lpTokenAppraisor1.governance()).to.equal(deployer.address);
-      expect(await lpTokenAppraisor1.newGovernance()).to.equal(ZERO_ADDRESS);
+      expect(await lpTokenAppraisor1.pendingGovernance()).to.equal(ZERO_ADDRESS);
 
-      await lpTokenAppraisor1.connect(deployer).setGovernance(governor.address);
+      await lpTokenAppraisor1.connect(deployer).setPendingGovernance(governor.address);
       await lpTokenAppraisor1.connect(governor).acceptGovernance();
     })
   })

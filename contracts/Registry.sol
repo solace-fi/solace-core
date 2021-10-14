@@ -140,6 +140,7 @@ contract Registry is IRegistry, Governable {
      * @param weth_ The address of the [**WETH**](./WETH9) contract.
      */
     function setWeth(address weth_) external override onlyGovernance {
+        require(weth_ != address(0x0), "zero address weth");
         _weth = weth_;
         emit WethSet(weth_);
     }
@@ -150,6 +151,7 @@ contract Registry is IRegistry, Governable {
      * @param vault_ The address of the [`Vault`](./Vault) contract.
      */
     function setVault(address vault_) external override onlyGovernance {
+        require(vault_ != address(0x0), "zero address vault");
         _vault = vault_;
         emit VaultSet(vault_);
     }
@@ -160,6 +162,7 @@ contract Registry is IRegistry, Governable {
      * @param claimsEscrow_ The address of the [`Claims Escrow`](./ClaimsEscrow) contract.
      */
     function setClaimsEscrow(address claimsEscrow_) external override onlyGovernance {
+        require(claimsEscrow_ != address(0x0), "zero address claims escrow");
         _claimsEscrow = claimsEscrow_;
         emit ClaimsEscrowSet(claimsEscrow_);
     }
@@ -170,6 +173,7 @@ contract Registry is IRegistry, Governable {
      * @param treasury_ The address of the [`Treasury`](./Treasury) contract.
      */
     function setTreasury(address treasury_) external override onlyGovernance {
+        require(treasury_ != address(0x0), "zero address treasury");
         _treasury = treasury_;
         emit TreasurySet(treasury_);
     }
@@ -180,6 +184,7 @@ contract Registry is IRegistry, Governable {
      * @param policyManager_ The address of the [`Policy Manager`](./PolicyManager) contract.
      */
     function setPolicyManager(address policyManager_) external override onlyGovernance {
+        require(policyManager_ != address(0x0), "zero address policymanager");
         _policyManager = policyManager_;
         emit PolicyManagerSet(policyManager_);
     }
@@ -190,6 +195,7 @@ contract Registry is IRegistry, Governable {
      * @param riskManager_ The address of the [`Risk Manager`](./RiskManager) contract.
      */
     function setRiskManager(address riskManager_) external override onlyGovernance {
+        require(riskManager_ != address(0x0), "zero address riskmanager");
         _riskManager = riskManager_;
         emit RiskManagerSet(riskManager_);
     }
@@ -200,6 +206,7 @@ contract Registry is IRegistry, Governable {
      * @param solace_ The address of the [**SOLACE**](./SOLACE) contract.
      */
     function setSolace(address solace_) external override onlyGovernance {
+        require(solace_ != address(0x0), "zero address solace");
         _solace = solace_;
         emit SolaceSet(solace_);
     }
@@ -220,6 +227,7 @@ contract Registry is IRegistry, Governable {
      * @param farmController_ The address of the [`FarmController`](./FarmController) contract.
      */
     function setFarmController(address farmController_) external override onlyGovernance {
+        require(farmController_ != address(0x0), "zero address farmcontroller")
         _farmController = farmController_;
         emit FarmControllerSet(farmController_);
     }
@@ -230,6 +238,7 @@ contract Registry is IRegistry, Governable {
      * @param locker_ The address of the [`Locker`](./Locker) contract.
      */
     function setLocker(address locker_) external override onlyGovernance {
+        require(locker_ != address(0x0), "zero address locker");
         _locker = locker_;
         emit LockerSet(locker_);
     }

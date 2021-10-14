@@ -77,7 +77,8 @@ contract CompoundProductRinkeby is BaseProduct {
             address positionContract;
             // solhint-disable-next-line no-inline-assembly
             assembly {
-                positionContract := div(mload(add(add(positionDescription, 0x20), offset)), 0x1000000000000000000000000)
+                // get 20 bytes starting at offset+32
+                positionContract := shr(0x60, mload(add(add(positionDescription, 0x20), offset)))
             }
             // must be a cToken
             (bool isListed, ) = _comptroller.markets(positionContract);

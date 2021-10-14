@@ -12,7 +12,7 @@ import { encodePriceSqrt, FeeAmount, TICK_SPACINGS, getMaxTick, getMinTick } fro
 import { encodePath } from "./utilities/path";
 import { bnAddSub, bnMulDiv } from "./utilities/math";
 import { getPermitDigest, sign, getDomainSeparator } from "./utilities/signature";
-import getPermitNFTSignature from "./utilities/getPermitNFTSignature";
+import { getPermitNFTSignature } from "./utilities/getPermitNFTSignature";
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
 import { Solace, Master, Weth9, MockErc20, SolaceEthLpFarm, LpAppraisor } from "../typechain";
@@ -153,26 +153,27 @@ describe("SolaceEthLpFarm", function () {
     });
 
     it("rejects setting new governance by non governor", async function () {
-      await expect(farm.connect(farmer1).setGovernance(farmer1.address)).to.be.revertedWith("!governance");
+      await expect(farm.connect(farmer1).setPendingGovernance(farmer1.address)).to.be.revertedWith("!governance");
     });
 
     it("can set new governance", async function () {
-      await farm.connect(governor).setGovernance(deployer.address);
+      let tx = await farm.connect(governor).setPendingGovernance(deployer.address);
+      expect(tx).to.emit(farm, "GovernancePending").withArgs(deployer.address);
       expect(await farm.governance()).to.equal(governor.address);
-      expect(await farm.newGovernance()).to.equal(deployer.address);
+      expect(await farm.pendingGovernance()).to.equal(deployer.address);
     });
 
     it("rejects governance transfer by non governor", async function () {
-      await expect(farm.connect(farmer1).acceptGovernance()).to.be.revertedWith("!governance");
+      await expect(farm.connect(farmer1).acceptGovernance()).to.be.revertedWith("!pending governance");
     });
 
     it("can transfer governance", async function () {
       let tx = await farm.connect(deployer).acceptGovernance();
-      await expect(tx).to.emit(farm, "GovernanceTransferred").withArgs(deployer.address);
+      await expect(tx).to.emit(farm, "GovernanceTransferred").withArgs(governor.address, deployer.address);
       expect(await farm.governance()).to.equal(deployer.address);
-      expect(await farm.newGovernance()).to.equal(ZERO_ADDRESS);
+      expect(await farm.pendingGovernance()).to.equal(ZERO_ADDRESS);
 
-      await farm.connect(deployer).setGovernance(governor.address);
+      await farm.connect(deployer).setPendingGovernance(governor.address);
       await farm.connect(governor).acceptGovernance();
     });
   });
