@@ -84,25 +84,26 @@ describe("PolicyManager", function() {
       expect(await policyManager.governance()).to.equal(governor.address);
     });
     it("rejects setting new governance by non governor", async function() {
-      await expect(policyManager.connect(user).setGovernance(user.address)).to.be.revertedWith("!governance");
+      await expect(policyManager.connect(user).setPendingGovernance(user.address)).to.be.revertedWith("!governance");
     });
     it("can set new governance", async function() {
-      await policyManager.connect(governor).setGovernance(deployer.address);
+      let tx = await policyManager.connect(governor).setPendingGovernance(deployer.address);
+      expect(tx).to.emit(policyManager, "GovernancePending").withArgs(deployer.address);
       expect(await policyManager.governance()).to.equal(governor.address);
-      expect(await policyManager.newGovernance()).to.equal(deployer.address);
+      expect(await policyManager.pendingGovernance()).to.equal(deployer.address);
     });
     it("rejects governance transfer by non governor", async function() {
-      await expect(policyManager.connect(user).acceptGovernance()).to.be.revertedWith("!governance");
+      await expect(policyManager.connect(user).acceptGovernance()).to.be.revertedWith("!pending governance");
     });
     it("can transfer governance", async function() {
       let tx = await policyManager.connect(deployer).acceptGovernance();
       await expect(tx)
         .to.emit(policyManager, "GovernanceTransferred")
-        .withArgs(deployer.address);
+        .withArgs(governor.address, deployer.address);
       expect(await policyManager.governance()).to.equal(deployer.address);
-      expect(await policyManager.newGovernance()).to.equal(ZERO_ADDRESS);
+      expect(await policyManager.pendingGovernance()).to.equal(ZERO_ADDRESS);
 
-      await policyManager.connect(deployer).setGovernance(governor.address);
+      await policyManager.connect(deployer).setPendingGovernance(governor.address);
       await policyManager.connect(governor).acceptGovernance();
     });
 
@@ -110,7 +111,8 @@ describe("PolicyManager", function() {
       await expect(policyManager.connect(user).setPolicyDescriptor(policyDescriptor.address)).to.be.revertedWith("!governance");
     });
     it("can set new nft token descriptor", async function() {
-      await policyManager.connect(governor).setPolicyDescriptor(policyDescriptor.address);
+      let tx = await policyManager.connect(governor).setPolicyDescriptor(policyDescriptor.address);
+      expect(tx).to.emit(policyManager, "PolicyDescriptorSet").withArgs(policyDescriptor.address);
       expect(await policyManager.connect(governor).policyDescriptor()).to.equal(policyDescriptor.address);
     });
   });

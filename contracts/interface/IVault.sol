@@ -31,6 +31,14 @@ interface IVault is IERC20Metadata, IERC20Permit {
     event FundsSent(uint256 value);
     /// @notice Emitted when emergency shutdown mode is toggled.
     event EmergencyShutdown(bool active);
+    /// @notice Emitted when a user enters cooldown mode.
+    event CooldownStarted(address user);
+    /// @notice Emitted when a user leaves cooldown mode.
+    event CooldownStopped(address user);
+    /// @notice Emitted when the cooldown window is set.
+    event CooldownWindowSet(uint40 cooldownMin, uint40 cooldownMax);
+    /// @notice Emitted when a requestor is added or removed.
+    event RequestorSet(address requestor, bool status);
 
     /***************************************
     CAPITAL PROVIDER FUNCTIONS

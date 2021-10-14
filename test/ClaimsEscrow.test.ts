@@ -59,21 +59,22 @@ describe("ClaimsEscrow", function () {
     });
   });
 
-  describe("setGovernance", function () {
+  describe("setPendingGovernance", function () {
     it("should allow governance to set new governance address", async function () {
       expect(await claimsEscrow.governance()).to.equal(governor.address);
-      await claimsEscrow.connect(governor).setGovernance(newGovernor.address);
+      let tx1 = await claimsEscrow.connect(governor).setPendingGovernance(newGovernor.address);
+      expect(tx1).to.emit(claimsEscrow, "GovernancePending").withArgs(newGovernor.address);
       expect(await claimsEscrow.governance()).to.equal(governor.address);
-      expect(await claimsEscrow.newGovernance()).to.equal(newGovernor.address);
-      let tx = await claimsEscrow.connect(newGovernor).acceptGovernance();
-      await expect(tx).to.emit(claimsEscrow, "GovernanceTransferred").withArgs(newGovernor.address);
+      expect(await claimsEscrow.pendingGovernance()).to.equal(newGovernor.address);
+      let tx2 = await claimsEscrow.connect(newGovernor).acceptGovernance();
+      await expect(tx2).to.emit(claimsEscrow, "GovernanceTransferred").withArgs(governor.address, newGovernor.address);
       expect(await claimsEscrow.governance()).to.equal(newGovernor.address);
-      expect(await claimsEscrow.newGovernance()).to.equal(ZERO_ADDRESS);
+      expect(await claimsEscrow.pendingGovernance()).to.equal(ZERO_ADDRESS);
     });
     it("should revert if not called by governance", async function () {
-      await expect(claimsEscrow.connect(depositor).setGovernance(depositor.address)).to.be.revertedWith("!governance");
-      await claimsEscrow.connect(governor).setGovernance(newGovernor.address);
-      await expect(claimsEscrow.connect(depositor).acceptGovernance()).to.be.revertedWith("!governance");
+      await expect(claimsEscrow.connect(depositor).setPendingGovernance(depositor.address)).to.be.revertedWith("!governance");
+      await claimsEscrow.connect(governor).setPendingGovernance(newGovernor.address);
+      await expect(claimsEscrow.connect(depositor).acceptGovernance()).to.be.revertedWith("!pending governance");
     });
   });
 
@@ -175,7 +176,8 @@ describe("ClaimsEscrow", function () {
     });
     it("should update claim object with the right data", async function () {
       expect(await claimsEscrow.totalClaimsOutstanding()).to.equal(testClaimAmount.add(3));
-      await claimsEscrow.connect(governor).adjustClaim(claimID, testClaimAmount2);
+      let tx1 = await claimsEscrow.connect(governor).adjustClaim(claimID, testClaimAmount2);
+      expect(tx1).to.emit(claimsEscrow, "ClaimAdjusted").withArgs(claimID, claimant.address, testClaimAmount, testClaimAmount2);
       expect(await claimsEscrow.totalClaimsOutstanding()).to.equal(testClaimAmount2.add(3));
       const callClaimant = await claimsEscrow.ownerOf(claimID);
       const callAmount = (await claimsEscrow.claim(claimID)).amount;
@@ -183,8 +185,8 @@ describe("ClaimsEscrow", function () {
       expect(callAmount).to.equal(testClaimAmount2);
       await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add one hour
       let bal1 = await claimant.getBalance();
-      let tx = await claimsEscrow.connect(claimant).withdrawClaimsPayout(claimID);
-      let receipt = await tx.wait();
+      let tx2 = await claimsEscrow.connect(claimant).withdrawClaimsPayout(claimID);
+      let receipt = await tx2.wait();
       let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
       let bal2 = await claimant.getBalance();
       expect(bal2.sub(bal1).add(gasCost)).to.equal(testClaimAmount2);
@@ -203,7 +205,8 @@ describe("ClaimsEscrow", function () {
         value: 100,
         data: "0xabcd"
       });
-      await claimsEscrow.connect(governor).returnEth(20);
+      let tx = await claimsEscrow.connect(governor).returnEth(20);
+      expect(tx).to.emit(claimsEscrow, "EthReturned").withArgs(20);
       let escrowBalance2 = await provider.getBalance(claimsEscrow.address);
       let vaultBalance2 = await vault.totalAssets();
       expect(escrowBalance2.sub(escrowBalance1)).to.eq(80);
@@ -219,7 +222,8 @@ describe("ClaimsEscrow", function () {
       await expect(claimsEscrow.connect(depositor).setCooldownPeriod(1)).to.be.revertedWith("!governance");
     });
     it("should set cooldown", async function () {
-      await claimsEscrow.connect(governor).setCooldownPeriod(1);
+      let tx = await claimsEscrow.connect(governor).setCooldownPeriod(1);
+      expect(tx).to.emit(claimsEscrow, "CooldownPeriodSet").withArgs(1);
       expect(await claimsEscrow.cooldownPeriod()).to.equal(1);
     });
   });

@@ -100,6 +100,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      */
     function startCooldown() external override {
         _cooldownStart[msg.sender] = uint40(block.timestamp);
+        emit CooldownStarted(msg.sender);
     }
 
     /**
@@ -107,6 +108,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      */
     function stopCooldown() external override {
         _cooldownStart[msg.sender] = 0;
+        emit CooldownStopped(msg.sender);
     }
 
     /**
@@ -300,6 +302,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
         require(cooldownMin_ < cooldownMax_, "invalid window");
         _cooldownMin = cooldownMin_;
         _cooldownMax = cooldownMax_;
+        emit CooldownWindowSet(cooldownMin_, cooldownMax_);
     }
 
     /**
@@ -310,6 +313,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      */
     function setRequestor(address dst, bool status) external override onlyGovernance {
         _isRequestor[dst] = status;
+        emit RequestorSet(dst, status);
     }
 
     /***************************************

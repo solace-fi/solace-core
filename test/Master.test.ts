@@ -105,26 +105,27 @@ describe("Master", function () {
     })
 
     it("rejects setting new governance by non governor", async function () {
-      await expect(master.connect(farmer1).setGovernance(farmer1.address)).to.be.revertedWith("!governance");
+      await expect(master.connect(farmer1).setPendingGovernance(farmer1.address)).to.be.revertedWith("!governance");
     })
 
     it("can set new governance", async function () {
-      await master.connect(governor).setGovernance(deployer.address);
+      let tx = await master.connect(governor).setPendingGovernance(deployer.address);
+      expect(tx).to.emit(master, "GovernancePending").withArgs(deployer.address);
       expect(await master.governance()).to.equal(governor.address);
-      expect(await master.newGovernance()).to.equal(deployer.address);
+      expect(await master.pendingGovernance()).to.equal(deployer.address);
     })
 
     it("rejects governance transfer by non governor", async function () {
-      await expect(master.connect(farmer1).acceptGovernance()).to.be.revertedWith("!governance");
+      await expect(master.connect(farmer1).acceptGovernance()).to.be.revertedWith("!pending governance");
     })
 
     it("can transfer governance", async function () {
       let tx = await master.connect(deployer).acceptGovernance();
-      await expect(tx).to.emit(master, "GovernanceTransferred").withArgs(deployer.address);
+      await expect(tx).to.emit(master, "GovernanceTransferred").withArgs(governor.address, deployer.address);
       expect(await master.governance()).to.equal(deployer.address);
-      expect(await master.newGovernance()).to.equal(ZERO_ADDRESS);
+      expect(await master.pendingGovernance()).to.equal(ZERO_ADDRESS);
 
-      await master.connect(deployer).setGovernance(governor.address);
+      await master.connect(deployer).setPendingGovernance(governor.address);
       await master.connect(governor).acceptGovernance();
     })
   })
@@ -138,7 +139,7 @@ describe("Master", function () {
       expect(await master.numFarms()).to.equal(0);
       // create first farm
       farm1 = await createCpFarm(startBlock, endBlock);
-      await expect(farm1.connect(deployer).setGovernance(governor.address)).to.be.revertedWith("!governance");
+      await expect(farm1.connect(deployer).setPendingGovernance(governor.address)).to.be.revertedWith("!governance");
       let tx = await master.connect(governor).registerFarm(farm1.address, 0);
       await expect(tx).to.emit(master, "FarmCreated").withArgs(1, farm1.address);
       expect(await master.numFarms()).to.equal(1);
@@ -147,7 +148,7 @@ describe("Master", function () {
     it("can create uniswap farms", async function () {
       // create second farm
       farm2 = await createSolaceEthLpFarm(lpToken, startBlock, endBlock, mediumPool);
-      await expect(farm2.connect(deployer).setGovernance(governor.address)).to.be.revertedWith("!governance");
+      await expect(farm2.connect(deployer).setPendingGovernance(governor.address)).to.be.revertedWith("!governance");
       let tx = await master.connect(governor).registerFarm(farm2.address, 0);
       await expect(tx).to.emit(master, "FarmCreated").withArgs(2, farm2.address);
       expect(await master.numFarms()).to.equal(2);

@@ -22,9 +22,15 @@ interface IClaimsEscrow {
     ***************************************/
 
     /// @notice Emitted when a new claim is received.
-    event ClaimReceived(uint256 indexed claimID, address indexed claimant, uint256 indexed amount);
+    event ClaimReceived(uint256 indexed claimID, address indexed claimant, uint256 amount);
     /// @notice Emitted when a claim is paid out.
-    event ClaimWithdrawn(uint256 indexed claimID, address indexed claimant, uint256 indexed amount);
+    event ClaimWithdrawn(uint256 indexed claimID, address indexed claimant, uint256 amount);
+    /// @notice Emitted when a claim is adjusted.
+    event ClaimAdjusted(uint256 indexed claimID, address indexed claimant, uint256 oldAmount, uint256 newAmount);
+    /// @notice Emitted when ETH is returned to the Vault.
+    event EthReturned(uint256 amount);
+    /// @notice Emitted when the cooldown period is set.
+    event CooldownPeriodSet(uint256 cooldownPeriod);
 
     /***************************************
     CLAIM CREATION

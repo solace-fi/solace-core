@@ -84,6 +84,7 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
             }
         }
         // hold treasury share as eth
+        emit PremiumsRouted(msg.value);
     }
 
     /**
@@ -177,6 +178,7 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
         uint256 unpaidRefunds2 = amount - transferAmount;
         if(unpaidRefunds2 != unpaidRefunds1) _unpaidRefunds[user] = unpaidRefunds2;
         payable(user).transfer(transferAmount);
+        emit EthRefunded(user, transferAmount);
     }
 
     /***************************************
