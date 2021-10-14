@@ -161,6 +161,7 @@ abstract contract ERC721Enhanced is ERC721Enumerable, IERC721Enhanced, EIP712 {
      * @return tokenIDs The list of token IDs.
      */
     function listTokensOfOwner(address owner) public view override returns (uint256[] memory tokenIDs) {
+        require(owner != address(0x0), "zero address owner");
         uint256 tokenCount = balanceOf(owner);
         tokenIDs = new uint256[](tokenCount);
         for(uint256 index = 0; index < tokenCount; index++) {

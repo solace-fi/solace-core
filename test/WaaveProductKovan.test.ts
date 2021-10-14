@@ -79,7 +79,7 @@ if(process.env.FORK_NETWORK === "kovan"){
       await registry.connect(governor).setVault(vault.address);
       claimsEscrow = (await deployContract(deployer, artifacts.ClaimsEscrow, [governor.address, registry.address])) as ClaimsEscrow;
       await registry.connect(governor).setClaimsEscrow(claimsEscrow.address);
-      treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, ZERO_ADDRESS, registry.address])) as Treasury;
+      treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, registry.address])) as Treasury;
       await registry.connect(governor).setTreasury(treasury.address);
       policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
       await registry.connect(governor).setPolicyManager(policyManager.address);
@@ -289,6 +289,8 @@ if(process.env.FORK_NETWORK === "kovan"){
         // sign swap
         let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, amountOut1, deadline, SUBMIT_CLAIM_TYPEHASH);
         let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
+        let activeCover1 = await product.activeCoverAmount();
+        let policyInfo = await policyManager.getPolicyInfo(policyID1);
         // submit claim
         let userWaWeth1 = await waWeth.balanceOf(policyholder1.address);
         let userEth0 = await policyholder1.getBalance();
@@ -310,6 +312,8 @@ if(process.env.FORK_NETWORK === "kovan"){
         let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
         let userEth2 = await policyholder1.getBalance();
         expect(userEth2.sub(userEth1).add(gasCost)).to.equal(amountOut1);
+        let activeCover2 = await product.activeCoverAmount();
+        expect(activeCover1.sub(activeCover2)).eq(policyInfo.coverAmount);
       });
       it("should support all watokens", async function () {
         var success = 0;

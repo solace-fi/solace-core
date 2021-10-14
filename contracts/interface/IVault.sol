@@ -33,6 +33,10 @@ interface IVault is IERC20Metadata, IERC20Permit {
     event Paused();
     /// @notice Emitted when deposits are unpaused.
     event Unpaused();
+    /// @notice Emitted when a user enters cooldown mode.
+    event CooldownStarted(address user);
+    /// @notice Emitted when a user leaves cooldown mode.
+    event CooldownStopped(address user);
     /// @notice Emitted when the cooldown window is set.
     event CooldownWindowSet(uint40 cooldownMin, uint40 cooldownMax);
     /// @notice Emitted when a requestor is added.
@@ -151,9 +155,8 @@ interface IVault is IERC20Metadata, IERC20Permit {
      * @notice Sends **ETH** to other users or contracts.
      * Can only be called by authorized requestors.
      * @param amount Amount of **ETH** wanted.
-     * @return Amount of **ETH** sent.
      */
-    function requestEth(uint256 amount) external returns (uint256);
+    function requestEth(uint256 amount) external;
 
     /**
      * @notice Returns true if the destination is authorized to request **ETH**.

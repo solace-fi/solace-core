@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 import "./Governable.sol";
 import "./interface/IRegistry.sol";
 import "./interface/IPolicyManager.sol";
@@ -42,10 +43,10 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
     // capital providers must wait some time in this range in order to withdraw
     // used to prevent withdraw before claim payout
     /// @notice The minimum amount of time a user must wait to withdraw funds.
-    uint40 internal _cooldownMin = 604800;  // 7 days
+    uint40 internal _cooldownMin = 7 days;
 
     /// @notice The maximum amount of time a user must wait to withdraw funds.
-    uint40 internal _cooldownMax = 3024000; // 35 days
+    uint40 internal _cooldownMax = 35 days;
 
     // The timestamp that a depositor's cooldown started.
     mapping(address => uint40) internal _cooldownStart;
@@ -59,8 +60,13 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      * @param registry_ Address of the [`Registry`](./Registry) contract.
      */
     constructor (address governance_, address registry_) ERC20("Solace CP Token", "SCP") ERC20Permit("Solace CP Token") Governable(governance_) {
+        // set registry
+        require(registry_ != address(0x0), "zero address registry");
         _registry = IRegistry(registry_);
-        _weth = IWETH9(payable(_registry.weth()));
+        // set weth
+        address weth_ = _registry.weth();
+        require(weth_ != address(0x0), "zero address weth");
+        _weth = IWETH9(payable(weth_));
     }
 
     /***************************************
@@ -100,6 +106,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      */
     function startCooldown() external override {
         _cooldownStart[msg.sender] = uint40(block.timestamp);
+        emit CooldownStarted(msg.sender);
     }
 
     /**
@@ -107,6 +114,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      */
     function stopCooldown() external override {
         _cooldownStart[msg.sender] = 0;
+        emit CooldownStopped(msg.sender);
     }
 
     /**
@@ -245,21 +253,19 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      * @notice Sends **ETH** to other users or contracts. The users or contracts should be authorized requestors.
      * Can only be called by authorized `requestors`.
      * @param amount The amount of **ETH** wanted.
-     * @return amount The amount of **ETH** sent.
      */
-    function requestEth(uint256 amount) external override nonReentrant returns (uint256) {
+    function requestEth(uint256 amount) external override nonReentrant {
         require(_isRequestor[msg.sender], "!requestor");
         // unwrap some WETH to make ETH available for claims payout
         if(amount > address(this).balance) {
             uint256 wanted = amount - address(this).balance;
-            uint256 withdrawAmount = min(_weth.balanceOf(address(this)), wanted);
+            uint256 withdrawAmount = Math.min(_weth.balanceOf(address(this)), wanted);
             _weth.withdraw(withdrawAmount);
         }
         // transfer funds
-        uint256 transferAmount = min(amount, address(this).balance);
+        uint256 transferAmount = Math.min(amount, address(this).balance);
         Address.sendValue(payable(msg.sender), transferAmount);
         emit FundsSent(transferAmount);
-        return transferAmount;
     }
 
     /**
@@ -304,7 +310,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      * @param cooldownMax_ Maximum time in seconds.
      */
     function setCooldownWindow(uint40 cooldownMin_, uint40 cooldownMax_) external override onlyGovernance {
-        require(cooldownMin_ < cooldownMax_, "invalid window");
+        require(cooldownMin_ <= cooldownMax_, "invalid window");
         _cooldownMin = cooldownMin_;
         _cooldownMax = cooldownMax_;
         emit CooldownWindowSet(cooldownMin_, cooldownMax_);
@@ -316,6 +322,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      * @param requestor The requestor to grant rights.
      */
     function addRequestor(address requestor) external override onlyGovernance {
+        require(requestor != address(0x0), "zero address requestor");
         _isRequestor[requestor] = true;
         emit RequestorAdded(requestor);
     }
@@ -326,6 +333,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      * @param requestor The requestor to revoke rights.
      */
     function removeRequestor(address requestor) external override onlyGovernance {
+        require(requestor != address(0x0), "zero address requestor");
         _isRequestor[requestor] = false;
         emit RequestorRemoved(requestor);
     }
@@ -356,7 +364,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
     }
 
     /**
-     * @notice Handles burning of tokens during withdraw.
+     * @notice Handles burning of shares during withdraw.
      * Called by [`withdrawEth()`](#withdraweth) and [`withdrawWeth()`](#withdrawweth).
      * @param shares amount of shares to redeem.
      * @return value The amount in **ETH** that the shares where redeemed for.
@@ -383,7 +391,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
     ***************************************/
 
     /**
-     * @notice Internal function that returns quantity of all assets under control of this `Vault`, including those loaned out to `Strategies`.
+     * @notice Internal function that returns quantity of all assets under control of this `Vault`.
      * Called by **totalAssets()** function.
      * @return totalAssets The total assets under control of this vault.
      */
@@ -408,20 +416,9 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      * @return shares The amount of shares(tokens) for given amount.
      */
     function _sharesForAmount(uint256 amount) internal view returns (uint256) {
-        // NOTE: if sqrt(token.totalSupply()) > 1e37, this could potentially revert
         return (_totalAssets() > 0)
             ? ((amount * totalSupply()) / _totalAssets())
             : 0;
-    }
-
-    /**
-     * @notice Internal function that returns the minimum value between two values.
-     * @param a  The first value.
-     * @param b  The second value.
-     * @return minValue The minimum value.
-     */
-    function min(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a < b ? a : b;
     }
 
     /**

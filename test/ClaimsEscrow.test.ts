@@ -5,10 +5,10 @@ const { expect } = chai;
 const { deployContract, solidity } = waffle;
 const provider = waffle.provider;
 chai.use(solidity);
+import { expectClose } from "./utilities/math";
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
 import { Registry, Vault, ClaimsEscrow, Weth9, PolicyManager } from "../typechain";
-import { expectClose } from "./utilities/math";
 
 
 describe("ClaimsEscrow", function () {
@@ -19,7 +19,7 @@ describe("ClaimsEscrow", function () {
   let policyManager: PolicyManager;
   let artifacts: ArtifactImports;
 
-  const [deployer, governor, newGovernor, depositor, claimant, mockProduct] = provider.getWallets();
+  const [deployer, governor, newGovernor, depositor, claimant, friend, mockProduct] = provider.getWallets();
   const testDepositAmount = BN.from("10");
   const testClaimAmount = BN.from("8");
   const testClaimAmount2 = BN.from("6");
@@ -40,7 +40,7 @@ describe("ClaimsEscrow", function () {
     const setTimestamp = Math.max(blockTimestamp, dateTimestamp) + 1;
     await provider.send("evm_setNextBlockTimestamp", [setTimestamp]);
     await provider.send("evm_mine", []);
-  })
+  });
 
   beforeEach(async function () {
     registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
@@ -61,12 +61,15 @@ describe("ClaimsEscrow", function () {
     it("should set the governance address", async function () {
       expect(await claimsEscrow.governance()).to.equal(governor.address);
     });
+    it("should revert if registry is zero address", async function () {
+      await expect(deployContract(deployer, artifacts.ClaimsEscrow, [governor.address, ZERO_ADDRESS])).to.be.revertedWith("zero address registry");
+    });
   });
 
-  describe("setGovernance", function () {
+  describe("setPendingGovernance", function () {
     it("should allow governance to set new governance address", async function () {
       expect(await claimsEscrow.governance()).to.equal(governor.address);
-      let tx1 = await claimsEscrow.connect(governor).setGovernance(newGovernor.address);
+      let tx1 = await claimsEscrow.connect(governor).setPendingGovernance(newGovernor.address);
       expect(tx1).to.emit(claimsEscrow, "GovernancePending").withArgs(newGovernor.address);
       expect(await claimsEscrow.governance()).to.equal(governor.address);
       expect(await claimsEscrow.pendingGovernance()).to.equal(newGovernor.address);
@@ -76,9 +79,9 @@ describe("ClaimsEscrow", function () {
       expect(await claimsEscrow.pendingGovernance()).to.equal(ZERO_ADDRESS);
     });
     it("should revert if not called by governance", async function () {
-      await expect(claimsEscrow.connect(depositor).setGovernance(depositor.address)).to.be.revertedWith("!governance");
-      await claimsEscrow.connect(governor).setGovernance(newGovernor.address);
-      await expect(claimsEscrow.connect(depositor).acceptGovernance()).to.be.revertedWith("!governance");
+      await expect(claimsEscrow.connect(depositor).setPendingGovernance(depositor.address)).to.be.revertedWith("!governance");
+      await claimsEscrow.connect(governor).setPendingGovernance(newGovernor.address);
+      await expect(claimsEscrow.connect(depositor).acceptGovernance()).to.be.revertedWith("!pending governance");
     });
   });
 
@@ -88,6 +91,9 @@ describe("ClaimsEscrow", function () {
     });
     it("should revert if not called by the vault", async function () {
       await expect(claimsEscrow.connect(deployer).receiveClaim(1, deployer.address, 0)).to.be.revertedWith("!product");
+    });
+    it("should revert if zero claimant", async function () {
+      await expect(claimsEscrow.connect(mockProduct).receiveClaim(claimID, ZERO_ADDRESS, testClaimAmount)).to.be.revertedWith("zero address claimant");
     });
     it("should create a Claim object with the right data", async function () {
       expect(await claimsEscrow.totalClaimsOutstanding()).to.equal(0);
@@ -113,7 +119,7 @@ describe("ClaimsEscrow", function () {
     it("should revert if invalid claimID", async function () {
       await expect(claimsEscrow.connect(deployer).withdrawClaimsPayout(999)).to.be.revertedWith("query for nonexistent token");
     });
-    it("should revert if not called by the claimant", async function () {
+    it("should revert if not called by the claimant or approved", async function () {
       await expect(claimsEscrow.connect(deployer).withdrawClaimsPayout(claimID)).to.be.revertedWith("!claimant");
     });
     it("should revert if cooldown period has not elapsed", async function () {
@@ -163,7 +169,33 @@ describe("ClaimsEscrow", function () {
       expect(balance3.sub(balance1).add(gasCost1).add(gasCost2)).to.equal(testClaimAmount3);
       expect(await claimsEscrow.totalClaimsOutstanding()).to.equal(testClaimAmount);
       expect(await claimsEscrow.exists(claimID2)).to.be.false;
-    })
+    });
+    it("should transfer claim amount to approved claimant - single approval", async function () {
+      await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add one hour
+      expect(await claimsEscrow.getApproved(claimID)).to.equal(ZERO_ADDRESS);
+      await claimsEscrow.connect(claimant).approve(friend.address, claimID);
+      expect(await claimsEscrow.getApproved(claimID)).to.equal(friend.address);
+      let bal1 = await friend.getBalance();
+      let tx = await claimsEscrow.connect(friend).withdrawClaimsPayout(claimID);
+      let receipt = await tx.wait();
+      let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
+      let bal2 = await friend.getBalance();
+      expect(bal2.sub(bal1).add(gasCost)).to.equal(testClaimAmount);
+      expect(await claimsEscrow.totalClaimsOutstanding()).to.equal(0);
+    });
+    it("should transfer claim amount to approved claimant - approval for all", async function () {
+      await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add one hour
+      expect(await claimsEscrow.isApprovedForAll(claimant.address, friend.address)).to.be.false;
+      await claimsEscrow.connect(claimant).setApprovalForAll(friend.address, true);
+      expect(await claimsEscrow.isApprovedForAll(claimant.address, friend.address)).to.be.true;
+      let bal1 = await friend.getBalance();
+      let tx = await claimsEscrow.connect(friend).withdrawClaimsPayout(claimID);
+      let receipt = await tx.wait();
+      let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
+      let bal2 = await friend.getBalance();
+      expect(bal2.sub(bal1).add(gasCost)).to.equal(testClaimAmount);
+      expect(await claimsEscrow.totalClaimsOutstanding()).to.equal(0);
+    });
   });
 
   describe("adjustClaim", function () {
@@ -180,7 +212,8 @@ describe("ClaimsEscrow", function () {
     });
     it("should update claim object with the right data", async function () {
       expect(await claimsEscrow.totalClaimsOutstanding()).to.equal(testClaimAmount.add(3));
-      await claimsEscrow.connect(governor).adjustClaim(claimID, testClaimAmount2);
+      let tx1 = await claimsEscrow.connect(governor).adjustClaim(claimID, testClaimAmount2);
+      expect(tx1).to.emit(claimsEscrow, "ClaimAdjusted").withArgs(claimID, claimant.address, testClaimAmount, testClaimAmount2);
       expect(await claimsEscrow.totalClaimsOutstanding()).to.equal(testClaimAmount2.add(3));
       const callClaimant = await claimsEscrow.ownerOf(claimID);
       const callAmount = (await claimsEscrow.claim(claimID)).amount;
@@ -188,8 +221,8 @@ describe("ClaimsEscrow", function () {
       expect(callAmount).to.equal(testClaimAmount2);
       await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add one hour
       let bal1 = await claimant.getBalance();
-      let tx = await claimsEscrow.connect(claimant).withdrawClaimsPayout(claimID);
-      let receipt = await tx.wait();
+      let tx2 = await claimsEscrow.connect(claimant).withdrawClaimsPayout(claimID);
+      let receipt = await tx2.wait();
       let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
       let bal2 = await claimant.getBalance();
       expect(bal2.sub(bal1).add(gasCost)).to.equal(testClaimAmount2);
@@ -208,7 +241,8 @@ describe("ClaimsEscrow", function () {
         value: 100,
         data: "0xabcd"
       });
-      await claimsEscrow.connect(governor).returnEth(20);
+      let tx = await claimsEscrow.connect(governor).returnEth(20);
+      expect(tx).to.emit(claimsEscrow, "EthReturned").withArgs(20);
       let escrowBalance2 = await provider.getBalance(claimsEscrow.address);
       let vaultBalance2 = await vault.totalAssets();
       expect(escrowBalance2.sub(escrowBalance1)).to.eq(80);
@@ -224,7 +258,8 @@ describe("ClaimsEscrow", function () {
       await expect(claimsEscrow.connect(depositor).setCooldownPeriod(1)).to.be.revertedWith("!governance");
     });
     it("should set cooldown", async function () {
-      await claimsEscrow.connect(governor).setCooldownPeriod(1);
+      let tx = await claimsEscrow.connect(governor).setCooldownPeriod(1);
+      expect(tx).to.emit(claimsEscrow, "CooldownPeriodSet").withArgs(1);
       expect(await claimsEscrow.cooldownPeriod()).to.equal(1);
     });
   });
@@ -284,6 +319,57 @@ describe("ClaimsEscrow", function () {
       await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]);
       await claimsEscrow.connect(claimant).withdrawClaimsPayout(4);
       expect(await claimsEscrow.listTokensOfOwner(claimant.address)).to.deep.equal([BN.from(2),BN.from(8)]);
+    });
+    it("does not list claims for zero address", async function () {
+      await expect(claimsEscrow.listTokensOfOwner(ZERO_ADDRESS)).to.be.revertedWith("zero address owner");
+    });
+  });
+
+  describe("transfer", async function () {
+    beforeEach(async function () {
+      await claimsEscrow.connect(mockProduct).receiveClaim(1, claimant.address, 0);
+    });
+    it("should reject transfer of nonexistent token", async function () {
+      await expect(claimsEscrow.connect(claimant).transfer(depositor.address, 99)).to.be.revertedWith("ERC721: operator query for nonexistent token");
+    });
+    it("should reject transfer by non owner", async function () {
+      await expect(claimsEscrow.connect(depositor).transfer(depositor.address, claimID)).to.be.revertedWith("ERC721: transfer caller is not owner nor approved");
+    });
+    it("should transfer", async function () {
+      let bal11 = await claimsEscrow.balanceOf(claimant.address);
+      let bal12 = await claimsEscrow.balanceOf(depositor.address);
+      let ts1 = await claimsEscrow.totalSupply();
+      expect(await claimsEscrow.ownerOf(claimID)).to.equal(claimant.address);
+      let tx = await claimsEscrow.connect(claimant).transfer(depositor.address, claimID);
+      expect(tx).to.emit(claimsEscrow, "Transfer").withArgs(claimant.address, depositor.address, claimID);
+      let bal21 = await claimsEscrow.balanceOf(claimant.address);
+      let bal22 = await claimsEscrow.balanceOf(depositor.address);
+      let ts2 = await claimsEscrow.totalSupply();
+      expect(await claimsEscrow.ownerOf(claimID)).to.equal(depositor.address);
+      expect(bal11.sub(bal21)).to.equal(1);
+      expect(bal22.sub(bal12)).to.equal(1);
+      expect(ts1).to.equal(ts2);
+    });
+    it("should reject safeTransfer of nonexistent token", async function () {
+      await expect(claimsEscrow.connect(claimant).safeTransfer(claimant.address, 99)).to.be.revertedWith("ERC721: operator query for nonexistent token");
+    });
+    it("should reject safeTransfer by non owner", async function () {
+      await expect(claimsEscrow.connect(depositor).safeTransfer(depositor.address, claimID)).to.be.revertedWith("ERC721: transfer caller is not owner nor approved");
+    });
+    it("should safeTransfer", async function () {
+      let bal11 = await claimsEscrow.balanceOf(claimant.address);
+      let bal12 = await claimsEscrow.balanceOf(depositor.address);
+      let ts1 = await claimsEscrow.totalSupply();
+      expect(await claimsEscrow.ownerOf(claimID)).to.equal(claimant.address);
+      let tx = await claimsEscrow.connect(claimant).safeTransfer(depositor.address, claimID);
+      expect(tx).to.emit(claimsEscrow, "Transfer").withArgs(claimant.address, depositor.address, claimID);
+      let bal21 = await claimsEscrow.balanceOf(claimant.address);
+      let bal22 = await claimsEscrow.balanceOf(depositor.address);
+      let ts2 = await claimsEscrow.totalSupply();
+      expect(await claimsEscrow.ownerOf(claimID)).to.equal(depositor.address);
+      expect(bal11.sub(bal21)).to.equal(1);
+      expect(bal22.sub(bal12)).to.equal(1);
+      expect(ts1).to.equal(ts2);
     });
   });
 });

@@ -11,7 +11,7 @@ import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer
 import { burnBlocks, burnBlocksUntil } from "./utilities/time";
 import { encodeAddresses } from "./utilities/positionDescription";
 
-import { PolicyManager, MockProduct, Treasury, Registry, RiskManager, PolicyDescriptor, Vault } from "../typechain";
+import { PolicyManager, MockProduct, Treasury, Registry, RiskManager, PolicyDescriptor, Vault, Weth9 } from "../typechain";
 
 describe("PolicyManager", function() {
   let artifacts: ArtifactImports;
@@ -25,6 +25,7 @@ describe("PolicyManager", function() {
   let registry: Registry;
   let riskManager: RiskManager;
   let policyDescriptor: PolicyDescriptor;
+  let weth: Weth9;
 
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
   const name = "Solace Policy";
@@ -43,8 +44,12 @@ describe("PolicyManager", function() {
     // deploy registry contract
     registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
 
+    // deploy weth
+    weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
+    await registry.connect(governor).setWeth(weth.address);
+
     // deploy treasury contract
-    treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, ZERO_ADDRESS, registry.address])) as Treasury;
+    treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, registry.address])) as Treasury;
 
     // deploy vault contract
     vault = (await deployContract(deployer,artifacts.Vault,[governor.address,registry.address])) as Vault;
@@ -84,16 +89,16 @@ describe("PolicyManager", function() {
       expect(await policyManager.governance()).to.equal(governor.address);
     });
     it("rejects setting new governance by non governor", async function() {
-      await expect(policyManager.connect(user).setGovernance(user.address)).to.be.revertedWith("!governance");
+      await expect(policyManager.connect(user).setPendingGovernance(user.address)).to.be.revertedWith("!governance");
     });
     it("can set new governance", async function() {
-      let tx = await policyManager.connect(governor).setGovernance(deployer.address);
+      let tx = await policyManager.connect(governor).setPendingGovernance(deployer.address);
       expect(tx).to.emit(policyManager, "GovernancePending").withArgs(deployer.address);
       expect(await policyManager.governance()).to.equal(governor.address);
       expect(await policyManager.pendingGovernance()).to.equal(deployer.address);
     });
     it("rejects governance transfer by non governor", async function() {
-      await expect(policyManager.connect(user).acceptGovernance()).to.be.revertedWith("!governance");
+      await expect(policyManager.connect(user).acceptGovernance()).to.be.revertedWith("!pending governance");
     });
     it("can transfer governance", async function() {
       let tx = await policyManager.connect(deployer).acceptGovernance();
@@ -103,7 +108,7 @@ describe("PolicyManager", function() {
       expect(await policyManager.governance()).to.equal(deployer.address);
       expect(await policyManager.pendingGovernance()).to.equal(ZERO_ADDRESS);
 
-      await policyManager.connect(deployer).setGovernance(governor.address);
+      await policyManager.connect(deployer).setPendingGovernance(governor.address);
       await policyManager.connect(governor).acceptGovernance();
     });
 
@@ -121,6 +126,9 @@ describe("PolicyManager", function() {
     it("starts with no products", async function() {
       expect(await policyManager.numProducts()).to.equal(0);
     });
+    it("cannot add zero address", async function () {
+      await expect(policyManager.connect(governor).addProduct(ZERO_ADDRESS)).to.be.revertedWith("zero product");
+    })
     it("can add products", async function() {
       let tx1 = await policyManager.connect(governor).addProduct(walletProduct1.address);
       expect(await policyManager.numProducts()).to.equal(1);
