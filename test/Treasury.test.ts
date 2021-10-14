@@ -389,6 +389,22 @@ describe("Treasury", function() {
       expect(await gasGriefer.acc()).to.eq(0);
       await treasury.connect(governor).routePremiums(); // empty routing
     });
+    it("is safe from gas griefing", async function () {
+      let gasGriefer = (await deployContract(deployer, artifacts.GasGriefer)) as GasGriefer;
+      await treasury.connect(governor).setPremiumRecipients([deployer.address, gasGriefer.address], [2, 3, 7]);
+      let balancesBefore = await getBalances(deployer);
+      let depositAmount = 120;
+      let tx = await treasury.connect(user).routePremiums({ value: depositAmount });
+      let balancesAfter = await getBalances(deployer);
+      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
+      expect(balancesDiff.userEth).to.equal(20);
+      expect(await provider.getBalance(gasGriefer.address)).to.eq(0);
+      expect(balancesDiff.treasuryEth).to.equal(100); // 30 + 70
+      let receipt = await tx.wait();
+      expect(receipt.gasUsed).to.be.lt(300000);
+      expect(await gasGriefer.acc()).to.eq(0);
+      await treasury.connect(governor).routePremiums(); // empty routing
+    });
   });
 
   describe("refund", function() {

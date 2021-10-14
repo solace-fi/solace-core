@@ -333,6 +333,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      * @param requestor The requestor to revoke rights.
      */
     function removeRequestor(address requestor) external override onlyGovernance {
+        require(requestor != address(0x0), "zero address requestor");
         _isRequestor[requestor] = false;
         emit RequestorRemoved(requestor);
     }

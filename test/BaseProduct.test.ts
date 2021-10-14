@@ -108,8 +108,8 @@ describe("BaseProduct", function () {
     });
   });
 
-  describe("governance", function() {
-    it("starts with the correct governor", async function() {
+  describe("governance", function () {
+    it("starts with the correct governor", async function () {
       expect(await product.governance()).to.equal(governor.address);
     });
 
