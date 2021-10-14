@@ -1,7 +1,9 @@
+// a collection of utils for signing ERC20.permit() and Product.submitClaim()
+
 import { utils, BigNumberish } from "ethers";
 import { ECDSASignature, ecsign } from "ethereumjs-util";
 
-// works for ERC20s, not ERC721s for some reason
+// works for ERC20s, not ERC721s
 export const PERMIT_TYPEHASH = utils.keccak256(
     utils.toUtf8Bytes("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
 );
@@ -81,7 +83,7 @@ export function getSubmitClaimDigest(
             DOMAIN_SEPARATOR,
             utils.keccak256(
             utils.defaultAbiCoder.encode(
-                ["bytes32", "uint256", "address", "uint256","uint256"],
+                ["bytes32", "uint256", "address", "uint256", "uint256"],
                 [typehash, policyID, claimant, amountOut, deadline]
             )
             ),

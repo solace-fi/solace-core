@@ -9,7 +9,7 @@ import "./interface/IGovernable.sol";
  * @notice Enforces access control for important functions to [**governor**](/docs/protocol/governance).
  *
  * Many contracts contain functionality that should only be accessible to a privileged user. The most common access control pattern is [OpenZeppelin's `Ownable`](https://docs.openzeppelin.com/contracts/4.x/access-control#ownership-and-ownable). We instead use `Governable` with a few key differences:
- * - Transferring the governance role is a two step process. The current governance must [`setGovernance(newGovernance_)`](#setgovernance) then the new governance must [`acceptGovernance()`](#acceptgovernance). This is to safeguard against accidentally setting ownership to the wrong address and locking yourself out of your contract.
+ * - Transferring the governance role is a two step process. The current governance must [`setGovernance(pendingGovernance_)`](#setgovernance) then the new governance must [`acceptGovernance()`](#acceptgovernance). This is to safeguard against accidentally setting ownership to the wrong address and locking yourself out of your contract.
  * - `governance` is a constructor argument instead of `msg.sender`. This is especially useful when deploying contracts via a [`SingletonFactory`](./interface/ISingletonFactory)
  */
 contract Governable is IGovernable {
@@ -22,7 +22,7 @@ contract Governable is IGovernable {
     address private _governance;
 
     // governance to take over.
-    address private _newGovernance;
+    address private _pendingGovernance;
 
     /**
      * @notice Constructs the governable contract.
@@ -42,9 +42,9 @@ contract Governable is IGovernable {
         _;
     }
 
-    // can only be called by new governor
-    modifier onlyNewGovernance() {
-        require(msg.sender == _newGovernance, "!governance");
+    // can only be called by pending governor
+    modifier onlyPendingGovernance() {
+        require(msg.sender == _pendingGovernance, "!governance");
         _;
     }
 
@@ -53,13 +53,13 @@ contract Governable is IGovernable {
     ***************************************/
 
     /// @notice Address of the current governor.
-    function governance() public view override returns (address) {
+    function governance() external view override returns (address) {
         return _governance;
     }
 
     /// @notice Address of the governor to take over.
-    function newGovernance() public view override returns (address) {
-        return _newGovernance;
+    function pendingGovernance() external view override returns (address) {
+        return _pendingGovernance;
     }
 
     /***************************************
@@ -70,19 +70,25 @@ contract Governable is IGovernable {
      * @notice Initiates transfer of the governance role to a new governor.
      * Transfer is not complete until the new governor accepts the role.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param newGovernance_ The new governor.
+     * @param pendingGovernance_ The new governor.
      */
-    function setGovernance(address newGovernance_) external override onlyGovernance {
-        _newGovernance = newGovernance_;
+    function setGovernance(address pendingGovernance_) external override onlyGovernance {
+        _pendingGovernance = pendingGovernance_;
+        emit GovernancePending(pendingGovernance_);
     }
 
     /**
      * @notice Accepts the governance role.
-     * Can only be called by the new governor.
+     * Can only be called by the pending governor.
      */
-    function acceptGovernance() external override onlyNewGovernance {
-        _governance = _newGovernance;
-        _newGovernance = address(0x0);
-        emit GovernanceTransferred(_governance);
+    function acceptGovernance() external override onlyPendingGovernance {
+        // sanity check against transferring governance to the zero address
+        // if someone figures out how to sign transactions from the zero address
+        // consider the entirety of ethereum to be rekt
+        require(_pendingGovernance != address(0x0), "zero governance");
+        address oldGovernance = _governance;
+        _governance = _pendingGovernance;
+        _pendingGovernance = address(0x0);
+        emit GovernanceTransferred(oldGovernance, _governance);
     }
 }
