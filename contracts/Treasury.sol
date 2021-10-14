@@ -11,6 +11,7 @@ import "./interface/IPolicyManager.sol";
 import "./interface/ITreasury.sol";
 import "./interface/IVault.sol";
 
+
 /**
  * @title Treasury
  * @author solace.fi
@@ -195,8 +196,9 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
     function setPremiumRecipients(address payable[] calldata recipients, uint32[] calldata weights) external override onlyGovernance {
         // check recipient - weight map
         require(recipients.length + 1 == weights.length, "length mismatch");
-        uint32 sum = 0;
         uint256 length = weights.length;
+        require(length <= 16, "too many recipients");
+        uint32 sum = 0;
         for(uint256 i = 0; i < length; i++) sum += weights[i];
         if(length > 1) require(sum > 0, "1/0");
         // delete old recipients
