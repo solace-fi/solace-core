@@ -5,6 +5,7 @@ const { expect } = chai;
 const { deployContract, solidity } = waffle;
 const provider = waffle.provider;
 chai.use(solidity);
+import { expectClose } from "./utilities/math";
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
 import { Registry, Vault, ClaimsEscrow, Weth9, PolicyManager } from "../typechain";
@@ -33,10 +34,13 @@ describe("ClaimsEscrow", function () {
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
 
     // forking uses old timestamp, need to force update
-    const timestamp = Math.floor(Date.now()/1000);
-    await provider.send("evm_setNextBlockTimestamp", [timestamp]);
     await provider.send("evm_mine", []);
-  })
+    const blockTimestamp = (await provider.getBlock('latest')).timestamp;
+    const dateTimestamp = Math.floor(Date.now()/1000);
+    const setTimestamp = Math.max(blockTimestamp, dateTimestamp) + 1;
+    await provider.send("evm_setNextBlockTimestamp", [setTimestamp]);
+    await provider.send("evm_mine", []);
+  });
 
   beforeEach(async function () {
     registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
@@ -97,13 +101,13 @@ describe("ClaimsEscrow", function () {
       expect(await claimsEscrow.totalClaimsOutstanding()).to.equal(testClaimAmount);
       const callClaimant = await claimsEscrow.ownerOf(claimID);
       expect(callClaimant).to.equal(claimant.address);
-      const timestamp = BN.from(Math.floor(Date.now()/1000));
+      const timestamp = (await provider.getBlock('latest')).timestamp;
       const claim1 = await claimsEscrow.claim(claimID);
       expect(claim1.amount).to.equal(testClaimAmount);
-      expect(claim1.receivedAt).to.be.closeTo(timestamp, 900);
+      expectClose(claim1.receivedAt, timestamp, 900);
       const claim2 = await claimsEscrow.getClaim(claimID);
       expect(claim2.amount).to.equal(testClaimAmount);
-      expect(claim2.receivedAt).to.be.closeTo(timestamp, 900);
+      expectClose(claim2.receivedAt, timestamp, 900);
     });
   });
 

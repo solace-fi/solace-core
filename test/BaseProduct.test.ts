@@ -150,7 +150,7 @@ describe("BaseProduct", function () {
     });
     it("can set minPeriod", async function () {
       let tx = await product.connect(governor).setMinPeriod(minPeriod2);
-      expect(tx).to.emit(product, "MaxPeriodSet").withArgs(minPeriod2);
+      expect(tx).to.emit(product, "MinPeriodSet").withArgs(minPeriod2);
       expect(await product.minPeriod()).to.equal(minPeriod2);
     });
     it("should revert setMinPeriod if not called by governance", async function () {

@@ -638,8 +638,8 @@ describe("Vault", function () {
 
   describe("share value", function () {
     beforeEach("set no cooldown", async function () {
-      let tx = await vault.connect(owner).setCooldownWindow(0, "1099511627775"); // min, max uint40
-      expect(tx).to.emit(vault, "CooldownWindowSet").withArgs(0, "1099511627775");
+      let tx = await vault.connect(owner).setCooldownWindow(0, BN.from("1099511627775")); // min, max uint40
+      expect(tx).to.emit(vault, "CooldownWindowSet").withArgs(0, BN.from("1099511627775"));
     });
     it("deposits and withdraws at same value from start", async function () {
       // all zero initial state
