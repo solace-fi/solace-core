@@ -8,6 +8,7 @@ chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
 import { Registry, Vault, ClaimsEscrow, Weth9, PolicyManager } from "../typechain";
+import { expectClose } from "./utilities/math";
 
 
 describe("ClaimsEscrow", function () {
@@ -33,8 +34,11 @@ describe("ClaimsEscrow", function () {
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
 
     // forking uses old timestamp, need to force update
-    const timestamp = Math.floor(Date.now()/1000);
-    await provider.send("evm_setNextBlockTimestamp", [timestamp]);
+    await provider.send("evm_mine", []);
+    const blockTimestamp = (await provider.getBlock('latest')).timestamp;
+    const dateTimestamp = Math.floor(Date.now()/1000);
+    const setTimestamp = Math.max(blockTimestamp, dateTimestamp) + 1;
+    await provider.send("evm_setNextBlockTimestamp", [setTimestamp]);
     await provider.send("evm_mine", []);
   })
 
@@ -50,25 +54,29 @@ describe("ClaimsEscrow", function () {
     await registry.connect(governor).setPolicyManager(policyManager.address);
 
     await policyManager.connect(governor).addProduct(mockProduct.address);
-    await vault.connect(governor).setRequestor(claimsEscrow.address, true);
+    await vault.connect(governor).addRequestor(claimsEscrow.address);
   });
 
   describe("deployment", function () {
     it("should set the governance address", async function () {
       expect(await claimsEscrow.governance()).to.equal(governor.address);
     });
+    it("should revert if registry is zero address", async function () {
+      await expect(deployContract(deployer, artifacts.ClaimsEscrow, [governor.address, ZERO_ADDRESS])).to.be.revertedWith("zero address registry");
+    });
   });
 
   describe("setGovernance", function () {
     it("should allow governance to set new governance address", async function () {
       expect(await claimsEscrow.governance()).to.equal(governor.address);
-      await claimsEscrow.connect(governor).setGovernance(newGovernor.address);
+      let tx1 = await claimsEscrow.connect(governor).setGovernance(newGovernor.address);
+      expect(tx1).to.emit(claimsEscrow, "GovernancePending").withArgs(newGovernor.address);
       expect(await claimsEscrow.governance()).to.equal(governor.address);
-      expect(await claimsEscrow.newGovernance()).to.equal(newGovernor.address);
-      let tx = await claimsEscrow.connect(newGovernor).acceptGovernance();
-      await expect(tx).to.emit(claimsEscrow, "GovernanceTransferred").withArgs(newGovernor.address);
+      expect(await claimsEscrow.pendingGovernance()).to.equal(newGovernor.address);
+      let tx2 = await claimsEscrow.connect(newGovernor).acceptGovernance();
+      await expect(tx2).to.emit(claimsEscrow, "GovernanceTransferred").withArgs(governor.address, newGovernor.address);
       expect(await claimsEscrow.governance()).to.equal(newGovernor.address);
-      expect(await claimsEscrow.newGovernance()).to.equal(ZERO_ADDRESS);
+      expect(await claimsEscrow.pendingGovernance()).to.equal(ZERO_ADDRESS);
     });
     it("should revert if not called by governance", async function () {
       await expect(claimsEscrow.connect(depositor).setGovernance(depositor.address)).to.be.revertedWith("!governance");
@@ -84,19 +92,22 @@ describe("ClaimsEscrow", function () {
     it("should revert if not called by the vault", async function () {
       await expect(claimsEscrow.connect(deployer).receiveClaim(1, deployer.address, 0)).to.be.revertedWith("!product");
     });
+    it("should revert if zero claimant", async function () {
+      await expect(claimsEscrow.connect(mockProduct).receiveClaim(claimID, ZERO_ADDRESS, testClaimAmount)).to.be.revertedWith("zero address");
+    });
     it("should create a Claim object with the right data", async function () {
       expect(await claimsEscrow.totalClaimsOutstanding()).to.equal(0);
       await claimsEscrow.connect(mockProduct).receiveClaim(claimID, claimant.address, testClaimAmount);
       expect(await claimsEscrow.totalClaimsOutstanding()).to.equal(testClaimAmount);
       const callClaimant = await claimsEscrow.ownerOf(claimID);
       expect(callClaimant).to.equal(claimant.address);
-      const timestamp = BN.from(Math.floor(Date.now()/1000));
+      const timestamp = (await provider.getBlock('latest')).timestamp;
       const claim1 = await claimsEscrow.claim(claimID);
       expect(claim1.amount).to.equal(testClaimAmount);
-      expect(claim1.receivedAt).to.be.closeTo(timestamp, 900);
+      expectClose(claim1.receivedAt, timestamp, 900);
       const claim2 = await claimsEscrow.getClaim(claimID);
       expect(claim2.amount).to.equal(testClaimAmount);
-      expect(claim2.receivedAt).to.be.closeTo(timestamp, 900);
+      expectClose(claim2.receivedAt, timestamp, 900);
     });
   });
 
@@ -265,20 +276,23 @@ describe("ClaimsEscrow", function () {
     });
   });
 
-  describe("listClaims", function () {
+  describe("listTokensOfOwner", function () {
     it("lists claims", async function () {
-      expect(await claimsEscrow.listClaims(claimant.address)).to.deep.equal([]);
+      expect(await claimsEscrow.listTokensOfOwner(claimant.address)).to.deep.equal([]);
       await claimsEscrow.connect(mockProduct).receiveClaim(2, claimant.address, 0);
-      expect(await claimsEscrow.listClaims(claimant.address)).to.deep.equal([BN.from(2)]);
+      expect(await claimsEscrow.listTokensOfOwner(claimant.address)).to.deep.equal([BN.from(2)]);
       await claimsEscrow.connect(mockProduct).receiveClaim(4, claimant.address, 0);
-      expect(await claimsEscrow.listClaims(claimant.address)).to.deep.equal([BN.from(2),BN.from(4)]);
+      expect(await claimsEscrow.listTokensOfOwner(claimant.address)).to.deep.equal([BN.from(2),BN.from(4)]);
       await claimsEscrow.connect(mockProduct).receiveClaim(6, deployer.address, 0);
-      expect(await claimsEscrow.listClaims(claimant.address)).to.deep.equal([BN.from(2),BN.from(4)]);
+      expect(await claimsEscrow.listTokensOfOwner(claimant.address)).to.deep.equal([BN.from(2),BN.from(4)]);
       await claimsEscrow.connect(mockProduct).receiveClaim(8, claimant.address, 0);
-      expect(await claimsEscrow.listClaims(claimant.address)).to.deep.equal([BN.from(2),BN.from(4),BN.from(8)]);
+      expect(await claimsEscrow.listTokensOfOwner(claimant.address)).to.deep.equal([BN.from(2),BN.from(4),BN.from(8)]);
       await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]);
       await claimsEscrow.connect(claimant).withdrawClaimsPayout(4);
-      expect(await claimsEscrow.listClaims(claimant.address)).to.deep.equal([BN.from(2),BN.from(8)]);
+      expect(await claimsEscrow.listTokensOfOwner(claimant.address)).to.deep.equal([BN.from(2),BN.from(8)]);
+    });
+    it("does not list claims for zero address", async function () {
+      await expect(claimsEscrow.listTokensOfOwner(ZERO_ADDRESS)).to.be.revertedWith("zero address");
     });
   });
 

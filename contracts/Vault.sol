@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 import "./Governable.sol";
 import "./interface/IRegistry.sol";
 import "./interface/IPolicyManager.sol";
@@ -31,7 +32,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
     ***************************************/
 
     // pauses deposits
-    bool internal _emergencyShutdown;
+    bool internal _paused;
 
     // WETH
     IWETH9 internal _weth;
@@ -59,8 +60,13 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      * @param registry_ Address of the [`Registry`](./Registry) contract.
      */
     constructor (address governance_, address registry_) ERC20("Solace CP Token", "SCP") ERC20Permit("Solace CP Token") Governable(governance_) {
+        // set registry
+        require(registry_ != address(0x0), "zero address registry");
         _registry = IRegistry(registry_);
-        _weth = IWETH9(payable(_registry.weth()));
+        // set weth
+        address weth_ = _registry.weth();
+        require(weth_ != address(0x0), "zero address weth");
+        _weth = IWETH9(payable(weth_));
     }
 
     /***************************************
@@ -72,10 +78,10 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      * Shares of the `Vault` (CP tokens) are minted to caller.
      * It is called when `Vault` receives **ETH**.
      * It issues the amount of token share respected to the deposit to the `recipient`.
-     * Reverts if `Vault` is in **Emergency Shutdown**.
+     * Reverts if `Vault` is paused.
      * @return shares The number of shares minted.
      */
-    function depositEth() public payable override nonReentrant returns (uint256 shares) {
+    function depositEth() external payable override nonReentrant returns (uint256 shares) {
         // mint
         return _deposit(msg.value);
     }
@@ -84,7 +90,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      * @notice Allows a user to deposit **WETH** into the `Vault`(becoming a [**Capital Provider**](/docs/user-guides/capital-provider/cp-role-guide)).
      * Shares of the Vault (CP tokens) are minted to caller.
      * It issues the amount of token share respected to the deposit to the `recipient`.
-     * Reverts if `Vault` is in **Emergency Shutdown**.
+     * Reverts if `Vault` is in paused.
      * @param amount Amount of weth to deposit.
      * @return shares The number of shares minted.
      */
@@ -122,7 +128,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
             _weth.withdraw(value - address(this).balance);
         }
         // transfer eth
-        payable(msg.sender).transfer(value);
+        Address.sendValue(payable(msg.sender), value);
         emit WithdrawalMade(msg.sender, value);
         return value;
     }
@@ -232,9 +238,9 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
         return _cooldownMin <= elapsed && elapsed <= _cooldownMax;
     }
 
-    /// @notice Returns true if the vault is in shutdown.
-    function emergencyShutdown() external view override returns (bool status) {
-        return _emergencyShutdown;
+    /// @notice Returns true if the vault is paused.
+    function paused() external view override returns (bool paused_) {
+        return _paused;
     }
 
     /***************************************
@@ -245,21 +251,19 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      * @notice Sends **ETH** to other users or contracts. The users or contracts should be authorized requestors.
      * Can only be called by authorized `requestors`.
      * @param amount The amount of **ETH** wanted.
-     * @return amount The amount of **ETH** sent.
      */
-    function requestEth(uint256 amount) external override nonReentrant returns (uint256) {
+    function requestEth(uint256 amount) external override nonReentrant {
         require(_isRequestor[msg.sender], "!requestor");
         // unwrap some WETH to make ETH available for claims payout
         if(amount > address(this).balance) {
             uint256 wanted = amount - address(this).balance;
-            uint256 withdrawAmount = min(_weth.balanceOf(address(this)), wanted);
+            uint256 withdrawAmount = Math.min(_weth.balanceOf(address(this)), wanted);
             _weth.withdraw(withdrawAmount);
         }
         // transfer funds
-        uint256 transferAmount = min(amount, address(this).balance);
-        payable(msg.sender).transfer(transferAmount);
+        uint256 transferAmount = Math.min(amount, address(this).balance);
+        Address.sendValue(payable(msg.sender), transferAmount);
         emit FundsSent(transferAmount);
-        return transferAmount;
     }
 
     /**
@@ -276,18 +280,25 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
     ***************************************/
 
     /**
-     * @notice Activates or deactivates emergency shutdown.
+     * @notice Pauses deposits.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * During Emergency Shutdown:
-     * 1. No users may deposit into the `Vault`.
-     * 2. Withdraws can bypass cooldown.
-     * 3. Only `governance` may undo Emergency Shutdown.
-     * @param emergencyShutdown_ If true, the `Vault` goes into Emergency Shutdown.
-     * If false, the `Vault` goes back into Normal Operation.
+     * While paused:
+     * 1. No users may deposit into the Vault.
+     * 2. Withdrawls can bypass cooldown.
+     * 3. Only Governance may unpause.
     */
-    function setEmergencyShutdown(bool emergencyShutdown_) external override onlyGovernance {
-        _emergencyShutdown = emergencyShutdown_;
-        emit EmergencyShutdown(emergencyShutdown_);
+    function pause() external override onlyGovernance {
+        _paused = true;
+        emit Paused();
+    }
+
+    /**
+     * @notice Unpauses deposits.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+    */
+    function unpause() external override onlyGovernance {
+        _paused = false;
+        emit Unpaused();
     }
 
     /**
@@ -297,19 +308,32 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      * @param cooldownMax_ Maximum time in seconds.
      */
     function setCooldownWindow(uint40 cooldownMin_, uint40 cooldownMax_) external override onlyGovernance {
-        require(cooldownMin_ < cooldownMax_, "invalid window");
+        require(cooldownMin_ <= cooldownMax_, "invalid window");
         _cooldownMin = cooldownMin_;
         _cooldownMax = cooldownMax_;
+        emit CooldownWindowSet(cooldownMin_, cooldownMax_);
     }
 
     /**
-     * @notice Adds or removes requesting rights. The `requestor` can be user account or smart contract.
+     * @notice Adds requesting rights.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param dst The requestor address.
-     * @param status True to add or false to remove rights.
+     * @param requestor The requestor to grant rights.
      */
-    function setRequestor(address dst, bool status) external override onlyGovernance {
-        _isRequestor[dst] = status;
+    function addRequestor(address requestor) external override onlyGovernance {
+        require(requestor != address(0x0), "zero address requestor");
+        _isRequestor[requestor] = true;
+        emit RequestorAdded(requestor);
+    }
+
+    /**
+     * @notice Removes requesting rights.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param requestor The requestor to revoke rights.
+     */
+    function removeRequestor(address requestor) external override onlyGovernance {
+        require(requestor != address(0x0), "zero address requestor");
+        _isRequestor[requestor] = false;
+        emit RequestorRemoved(requestor);
     }
 
     /***************************************
@@ -323,7 +347,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      * @return tokens The number of shares minted.
      */
     function _deposit(uint256 amount) internal returns (uint256) {
-        require(!_emergencyShutdown, "cannot deposit when vault is in emergency shutdown");
+        require(!_paused, "cannot deposit while paused");
         // stop cooldown
         if(_cooldownStart[msg.sender] != 0) _cooldownStart[msg.sender] = 0;
         // calculate and mint shares
@@ -345,13 +369,13 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      */
     function _withdraw(uint256 shares) internal returns (uint256) {
         // validate shares to withdraw
-        require(shares <= balanceOf(msg.sender), "cannot redeem more shares than you own");
+        require(shares <= balanceOf(msg.sender), "insufficient scp balance");
         uint256 value = _shareValue(shares);
-        // bypass some checks in emergency shutdown
-        if(!_emergencyShutdown) {
+        // bypass some checks while paused
+        if(!_paused) {
             // Stop withdrawal if process brings the Vault's `totalAssets` value below minimum capital requirement
             uint256 mcr = IRiskManager(_registry.riskManager()).minCapitalRequirement();
-            require(_totalAssets() - value >= mcr, "withdrawal brings Vault assets below MCR");
+            require(_totalAssets() - value >= mcr, "insufficient assets");
             // validate cooldown
             require(canWithdraw(msg.sender), "not in cooldown window");
         }
@@ -390,20 +414,9 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      * @return shares The amount of shares(tokens) for given amount.
      */
     function _sharesForAmount(uint256 amount) internal view returns (uint256) {
-        // NOTE: if sqrt(token.totalSupply()) > 1e37, this could potentially revert
         return (_totalAssets() > 0)
             ? ((amount * totalSupply()) / _totalAssets())
             : 0;
-    }
-
-    /**
-     * @notice Internal function that returns the minimum value between two values.
-     * @param a  The first value.
-     * @param b  The second value.
-     * @return minValue The minimum value.
-     */
-    function min(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a < b ? a : b;
     }
 
     /**
@@ -413,8 +426,9 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
         // only care about user->user transfers
         // mint and burn are validated in deposit and withdraw
         if(from != address(0x0) && to != address(0x0)) {
-            // bypass check in emergency shutdown
-            if(!_emergencyShutdown) {
+            // bypass check while deposits are paused
+            // worded differently, easier withdraws
+            if(!_paused) {
                 uint40 cdm = _cooldownMax;
                 uint40 start1 = _cooldownStart[from];
                 uint40 start2 = _cooldownStart[to];

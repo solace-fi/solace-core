@@ -81,6 +81,7 @@ contract SOLACE is ISOLACE, ERC20Permit, Governable {
      * @param minter The new minter.
      */
     function addMinter(address minter) external onlyGovernance override {
+        require(minter != address(0x0), "zero address");
         _minters[minter] = true;
         emit MinterAdded(minter);
     }

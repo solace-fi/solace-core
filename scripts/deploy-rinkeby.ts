@@ -12,7 +12,7 @@ import { create2Contract } from "./create2Contract";
 import { logContractAddress } from "./utils";
 
 import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_importer";
-import { Registry, Weth9, Vault, ClaimsEscrow, Treasury, PolicyManager, PolicyDescriptor, RiskManager, ExchangeQuoterManual, CompoundProductRinkeby, WaaveProduct } from "../typechain";
+import { Registry, Weth9, Vault, ClaimsEscrow, Treasury, PolicyManager, PolicyDescriptor, RiskManager, CompoundProductRinkeby, WaaveProduct, LiquityProduct } from "../typechain";
 
 const REGISTRY_ADDRESS          = "0x501ACEe6AAf57d5e37488145844f47c079a8F253";
 const VAULT_ADDRESS             = "0x501AcebC38338bC8c18843dc14fD4345f4DecF33";
@@ -20,16 +20,17 @@ const CLAIMS_ESCROW_ADDRESS     = "0x501AcE79a4b961cf86C5cCA36B7157Faf78A248D";
 const TREASURY_ADDRESS          = "0x501acE64D1B4dddAD50a579d28e8F9805651307D";
 const POLICY_MANAGER_ADDRESS    = "0x501ACeDE6cb432a1AA5590C04b88a6E92C00F381";
 const POLICY_DESCR_ADDRESS      = "0x501ACEA6EA69f4a4B68c8496243D3614256AC242";
-const RISK_MANAGER_ADDRESS      = "0x501aCE0596b8Fdb2Eb7b2CF4644c7bb4485Ec971";
+const RISK_MANAGER_ADDRESS      = "0x501aCeB96cEE3525c6439F045Ee630483fCC4Ea8";
 
-const QUOTER_MANUAL_ADDRESS     = "0x501Ace288Bc04Dd86CEC06A56168F2abFaacA8Af";
-const COMPOUND_PRODUCT_ADDRESS  = "0x501acEdD6d13CE6597fb1fEc45eC0b2e66BbF2A3";
-const WAAVE_PRODUCT_ADDRESS     = "0x501ACE7070A38fA4398afaac304308D3a0912C50";
+const COMPOUND_PRODUCT_ADDRESS  = "0x501acE9BB94d0a616d990311D2B98D91De949885";
+const WAAVE_PRODUCT_ADDRESS     = "0x501AcE4Bb43c2E9c07dDE246B91cdF03B0A31d51";
+const LIQUITY_PRODUCT_ADDRESS   = "0x501Ace0e87bfB00116b0Ca4dADeFBE72A8f6E2A6";
 
 const WETH_ADDRESS              = "0xc778417E063141139Fce010982780140Aa0cD5Ab";
 const COMPTROLLER_ADDRESS       = "0x2EAa9D77AE4D8f9cdD9FAAcd44016E746485bddb";
 const UNISWAP_ROUTER_ADDRESS    = "0xE592427A0AEce92De3Edee1F18E0157C05861564";
 const WAAVE_REGISTRY_ADDRESS    = "0x670Fc618C48964F806Cd655600541807ed83a9C5";
+const TROVE_MANAGER_ADDRESS     = "0xA39739EF8b0231DbFA0DcdA07d7e29faAbCf4bb2";
 const SINGLETON_FACTORY_ADDRESS = "0xce0042B868300000d44A59004Da54A005ffdcf9f";
 
 // product params
@@ -47,10 +48,9 @@ let policyManager: PolicyManager;
 let policyDescriptor: PolicyDescriptor;
 let riskManager: RiskManager;
 
-let quoterManual: ExchangeQuoterManual;
-
 let compoundProduct: CompoundProductRinkeby;
 let waaveProduct: WaaveProduct;
+let liquityProduct: LiquityProduct;
 
 let signerAddress: string;
 
@@ -77,11 +77,10 @@ async function main() {
   await deployPolicyManager();
   await deployPolicyDescriptor();
   await deployRiskManager();
-  // quoters
-  await deployQuoterManual();
   // products
   await deployCompoundProduct();
   await deployWaaveProduct();
+  await deployLiquityProduct();
 
   writeFileSync("stash/transactions/deployTransactionsRinkeby.json", JSON.stringify(transactions, undefined, '  '));
   await logAddresses();
@@ -100,7 +99,7 @@ async function deployRegistry() {
 }
 
 async function deployWeth() {
-  weth = (new ethers.Contract(WETH_ADDRESS, artifacts.WETH.abi, provider)) as Weth9;
+  weth = (await ethers.getContractAt(artifacts.WETH.abi, WETH_ADDRESS)) as Weth9;
   if(await registry.weth() != weth.address && await registry.governance() == signerAddress) {
     console.log("Registering Weth");
     let tx = await registry.connect(deployer).setWeth(weth.address);
@@ -229,24 +228,12 @@ async function deployRiskManager() {
   }
 }
 
-async function deployQuoterManual() {
-  if(!!QUOTER_MANUAL_ADDRESS) {
-    quoterManual = (await ethers.getContractAt(artifacts.ExchangeQuoterManual.abi, QUOTER_MANUAL_ADDRESS)) as ExchangeQuoterManual;
-  } else {
-    console.log("Deploying ExchangeQuoterManual");
-    var res = await create2Contract(deployer,artifacts.ExchangeQuoterManual,[signerAddress]);
-    quoterManual = (await ethers.getContractAt(artifacts.ExchangeQuoterManual.abi, res.address)) as ExchangeQuoterManual;
-    transactions.push({"description": "Deploy ExchangeQuoterManual", "to": SINGLETON_FACTORY_ADDRESS, "gasLimit": res.gasUsed});
-    console.log(`Deployed ExchangeQuoterManual to ${quoterManual.address}`);
-  }
-}
-
 async function deployCompoundProduct() {
   if(!!COMPOUND_PRODUCT_ADDRESS) {
     compoundProduct = (await ethers.getContractAt(artifacts.CompoundProductRinkeby.abi, COMPOUND_PRODUCT_ADDRESS)) as CompoundProductRinkeby;
   } else {
     console.log("Deploying CompoundProduct");
-    var res = await create2Contract(deployer,artifacts.CompoundProductRinkeby,[signerAddress,policyManager.address,registry.address,COMPTROLLER_ADDRESS,minPeriod,maxPeriod,price,10]);
+    var res = await create2Contract(deployer,artifacts.CompoundProductRinkeby,[signerAddress,policyManager.address,registry.address,COMPTROLLER_ADDRESS,minPeriod,maxPeriod]);
     compoundProduct = (await ethers.getContractAt(artifacts.CompoundProductRinkeby.abi, res.address)) as CompoundProductRinkeby;
     transactions.push({"description": "Deploy CompoundProduct", "to": SINGLETON_FACTORY_ADDRESS, "gasLimit": res.gasUsed});
     console.log(`Deployed CompoundProduct to ${compoundProduct.address}`);
@@ -257,9 +244,9 @@ async function deployCompoundProduct() {
     let receipt = await tx.wait();
     transactions.push({"description": "Register CompoundProduct in PolicyManager", "to": policyManager.address, "gasLimit": receipt.gasUsed.toString()});
   }
-  if(await riskManager.governance() == signerAddress && (await riskManager.weight(compoundProduct.address) == 0)) {
+  if(await riskManager.governance() == signerAddress && !(await riskManager.productIsActive(compoundProduct.address))) {
     console.log("Registering CompoundProduct in RiskManager");
-    let tx = await riskManager.connect(deployer).addProduct(compoundProduct.address,10000);
+    let tx = await riskManager.connect(deployer).addProduct(compoundProduct.address,10000,price,10);
     let receipt = await tx.wait();
     transactions.push({"description": "Register CompoundProduct in RiskManager", "to": riskManager.address, "gasLimit": receipt.gasUsed.toString()});
   }
@@ -270,7 +257,7 @@ async function deployWaaveProduct() {
     waaveProduct = (await ethers.getContractAt(artifacts.WaaveProduct.abi, WAAVE_PRODUCT_ADDRESS)) as WaaveProduct;
   } else {
     console.log("Deploying WaaveProduct");
-    var res = await create2Contract(deployer,artifacts.WaaveProduct,[signerAddress,policyManager.address,registry.address,WAAVE_REGISTRY_ADDRESS,minPeriod,maxPeriod,price,10]);
+    var res = await create2Contract(deployer,artifacts.WaaveProduct,[signerAddress,policyManager.address,registry.address,WAAVE_REGISTRY_ADDRESS,minPeriod,maxPeriod]);
     waaveProduct = (await ethers.getContractAt(artifacts.WaaveProduct.abi, res.address)) as WaaveProduct;
     transactions.push({"description": "Deploy WaaveProduct", "to": SINGLETON_FACTORY_ADDRESS, "gasLimit": res.gasUsed});
     console.log(`Deployed WaaveProduct to ${waaveProduct.address}`);
@@ -281,11 +268,35 @@ async function deployWaaveProduct() {
     let receipt = await tx.wait();
     transactions.push({"description": "Register WaaveProduct in PolicyManager", "to": policyManager.address, "gasLimit": receipt.gasUsed.toString()});
   }
-  if(await riskManager.governance() == signerAddress && (await riskManager.weight(waaveProduct.address) == 0)) {
+  if(await riskManager.governance() == signerAddress && !(await riskManager.productIsActive(waaveProduct.address))) {
     console.log("Registering WaaveProduct in RiskManager");
-    let tx = await riskManager.connect(deployer).addProduct(waaveProduct.address,10000);
+    let tx = await riskManager.connect(deployer).addProduct(waaveProduct.address,10000,price,10);
     let receipt = await tx.wait();
     transactions.push({"description": "Register WaaveProduct in RiskManager", "to": riskManager.address, "gasLimit": receipt.gasUsed.toString()});
+  }
+}
+
+async function deployLiquityProduct() {
+  if(!!LIQUITY_PRODUCT_ADDRESS) {
+    liquityProduct = (await ethers.getContractAt(artifacts.LiquityProduct.abi, LIQUITY_PRODUCT_ADDRESS)) as LiquityProduct;
+  } else {
+    console.log("Deploying LiquityProduct");
+    var res = await create2Contract(deployer,artifacts.LiquityProduct,[signerAddress,policyManager.address,registry.address,TROVE_MANAGER_ADDRESS,minPeriod,maxPeriod]);
+    liquityProduct = (await ethers.getContractAt(artifacts.LiquityProduct.abi, res.address)) as LiquityProduct;
+    transactions.push({"description": "Deploy LiquityProduct", "to": SINGLETON_FACTORY_ADDRESS, "gasLimit": res.gasUsed});
+    console.log(`Deployed LiquityProduct to ${liquityProduct.address}`);
+  }
+  if(await policyManager.governance() == signerAddress && !(await policyManager.productIsActive(liquityProduct.address))) {
+    console.log("Registering LiquityProduct in PolicyManager");
+    let tx = await policyManager.connect(deployer).addProduct(liquityProduct.address);
+    let receipt = await tx.wait();
+    transactions.push({"description": "Register LiquityProduct in PolicyManager", "to": policyManager.address, "gasLimit": receipt.gasUsed.toString()});
+  }
+  if(await riskManager.governance() == signerAddress && !(await riskManager.productIsActive(liquityProduct.address))) {
+    console.log("Registering LiquityProduct in RiskManager");
+    let tx = await riskManager.connect(deployer).addProduct(liquityProduct.address,10000,price,10);
+    let receipt = await tx.wait();
+    transactions.push({"description": "Register LiquityProduct in RiskManager", "to": riskManager.address, "gasLimit": receipt.gasUsed.toString()});
   }
 }
 
@@ -302,9 +313,9 @@ async function logAddresses() {
   logContractAddress("PolicyDescriptor", policyDescriptor.address);
   logContractAddress("RiskManager", riskManager.address);
 
-  logContractAddress("QuoterManual", quoterManual.address);
   logContractAddress("CompoundProduct", compoundProduct.address);
   logContractAddress("WaaveProduct", waaveProduct.address);
+  logContractAddress("LiquityProduct", liquityProduct.address);
 
   console.log(``);
   console.log(`Copy and paste this into the .env file in the frontend client.`)
@@ -319,6 +330,7 @@ async function logAddresses() {
   console.log(`REACT_APP_RINKEBY_RISK_MANAGER_CONTRACT_ADDRESS=${riskManager.address}`);
   console.log(`REACT_APP_RINKEBY_COMPOUND_PRODUCT_CONTRACT_ADDRESS=${compoundProduct.address}`);
   console.log(`REACT_APP_RINKEBY_WAAVE_PRODUCT_CONTRACT_ADDRESS=${waaveProduct.address}`);
+  console.log(`REACT_APP_RINKEBY_LIQUITY_PRODUCT_CONTRACT_ADDRESS=${liquityProduct.address}`);
   console.log("")
 }
 

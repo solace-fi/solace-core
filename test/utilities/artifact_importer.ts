@@ -39,15 +39,20 @@ export async function import_artifacts() {
   artifacts.CurveProduct = await tryImport(`${artifact_dir}/products/CurveProduct.sol/CurveProduct.json`);
   artifacts.WaaveProduct = await tryImport(`${artifact_dir}/products/WaaveProduct.sol/WaaveProduct.json`);
   artifacts.YearnV2Product = await tryImport(`${artifact_dir}/products/YearnV2Product.sol/YearnV2Product.json`);
+  artifacts.LiquityProduct = await tryImport(`${artifact_dir}/products/LiquityProduct.sol/LiquityProduct.json`);
+
   // oracles
   artifacts.ExchangeQuoter1InchV1 = await tryImport(`${artifact_dir}/oracles/ExchangeQuoter1InchV1.sol/ExchangeQuoter1InchV1.json`);
   artifacts.ExchangeQuoterManual = await tryImport(`${artifact_dir}/oracles/ExchangeQuoterManual.sol/ExchangeQuoterManual.json`);
   artifacts.ExchangeQuoterAaveV2 = await tryImport(`${artifact_dir}/oracles/ExchangeQuoterAaveV2.sol/ExchangeQuoterAaveV2.json`);
 
   // generic imports
-  artifacts.MockERC20 = await tryImport(`${artifact_dir}/mocks/MockERC20.sol/MockERC20.json`);
   artifacts.ERC20 = await tryImport(`${artifact_dir}/SOLACE.sol/ERC20.json`);
   if(!artifacts.ERC20) artifacts.ERC20 = await tryImport(`../../artifacts/@openzeppelin/contracts/token/ERC20/ERC20.sol/ERC20.json`);
+  artifacts.MockERC20 = await tryImport(`${artifact_dir}/mocks/MockERC20.sol/MockERC20.json`);
+  artifacts.MockERC721 = await tryImport(`${artifact_dir}/mocks/MockERC721.sol/MockERC721.json`);
+  artifacts.MockERC1271 = await tryImport(`${artifact_dir}/mocks/MockERC1271.sol/MockERC1271.json`);
+  artifacts.GasGriefer = await tryImport(`${artifact_dir}/mocks/GasGriefer.sol/GasGriefer.json`)
   artifacts.Blacklist = await tryImport(`${artifact_dir}/interface/IBlacklist.sol/IBlacklist.json`);
   artifacts.SingletonFactory = await tryImport(`${artifact_dir}/interface/ISingletonFactory.sol/ISingletonFactory.json`);
 
@@ -74,6 +79,15 @@ export async function import_artifacts() {
 
   // yearn imports
   artifacts.YVault = await tryImport(`${artifact_dir}/interface/Yearn/IYVault.sol/IYVault.json`);
+
+  // liquity imports
+  artifacts.TroveManager = await tryImport(`${artifact_dir}/interface/Liquity/ITroveManager.sol/ITroveManager.json`);
+  artifacts.LQTYStaking = await tryImport(`${artifact_dir}/interface/Liquity/ILQTYStaking.sol/ILQTYStaking.json`);
+  artifacts.LQTYToken = await tryImport(`${artifact_dir}/interface/Liquity/ILQTYToken.sol/ILQTYToken.json`);
+  artifacts.LUSDToken = await tryImport(`${artifact_dir}/interface/Liquity/ILUSDToken.sol/ILUSDToken.json`);
+  artifacts.StabilityPool = await tryImport(`${artifact_dir}/interface/Liquity/IStabilityPool.sol/IStabilityPool.json`);
+
+
 
   return artifacts;
 }
