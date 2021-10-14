@@ -390,7 +390,6 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      * @return shares The amount of shares(tokens) for given amount.
      */
     function _sharesForAmount(uint256 amount) internal view returns (uint256) {
-        // NOTE: if sqrt(token.totalSupply()) > 1e37, this could potentially revert
         return (_totalAssets() > 0)
             ? ((amount * totalSupply()) / _totalAssets())
             : 0;
