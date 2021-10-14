@@ -48,14 +48,14 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
 
     // Info of each user.
     struct UserInfo {
-        uint256 value;      // Value of user provided tokens.
-        uint256 rewardDebt; // Reward debt. See explanation below.
+        uint256 value;         // Value of user provided tokens.
+        uint256 rewardDebt;    // Reward debt. See explanation below.
         uint256 unpaidRewards; // Rewards that have not been paid.
         //
         // We do some fancy math here. Basically, any point in time, the amount of reward token
         // entitled to a user but is pending to be distributed is:
         //
-        //   pending reward = (user.value * accRewardPerShare) - user.rewardDebt + user.unpaidRewards
+        //   pending reward = (user.value * _accRewardPerShare) - user.rewardDebt + user.unpaidRewards
         //
         // Whenever a user deposits or withdraws CP tokens to a farm. Here's what happens:
         //   1. The farm's `accRewardPerShare` and `lastRewardTime` gets updated.
@@ -66,7 +66,7 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
 
     /// @notice Information about each farmer.
     /// @dev user address => user info
-    mapping(address => UserInfo) public userInfo;
+    mapping(address => UserInfo) internal _userInfo;
 
     // @notice WETH
     IERC20 public weth;
@@ -141,6 +141,11 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
         return _accRewardPerShare;
     }
 
+    /// @notice The amount of [**SCP**](../Vault) tokens a user deposited.
+    function userStaked(address user) external view override returns (uint256) {
+        return _userInfo[user].value;
+    }
+
     /// @notice Value of tokens staked by all farmers.
     function valueStaked() external view override returns (uint256) {
         return _valueStaked;
@@ -153,23 +158,23 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
      */
     function pendingRewards(address user) external view override returns (uint256 reward) {
         // get farmer information
-        UserInfo storage userInfo_ = userInfo[user];
+        UserInfo storage userInfo_ = _userInfo[user];
         // math
         uint256 accRewardPerShare_ = _accRewardPerShare;
         if (block.timestamp > _lastRewardTime && _valueStaked != 0) {
-            uint256 tokenReward = getMultiplier(_lastRewardTime, block.timestamp);
+            uint256 tokenReward = getRewardAmountDistributed(_lastRewardTime, block.timestamp);
             accRewardPerShare_ += tokenReward * 1e12 / _valueStaked;
         }
         return userInfo_.value * accRewardPerShare_ / 1e12 - userInfo_.rewardDebt + userInfo_.unpaidRewards;
     }
 
     /**
-     * @notice Calculates the reward multiplier over the given `from` until `to` timestamps.
+     * @notice Calculates the reward amount distributed between two timestamps.
      * @param from The start of the period to measure rewards for.
      * @param to The end of the period to measure rewards for.
-     * @return multiplier The weighted multiplier for the given period.
+     * @return amount The reward amount distributed in the given period.
      */
-    function getMultiplier(uint256 from, uint256 to) public view override returns (uint256 multiplier) {
+    function getRewardAmountDistributed(uint256 from, uint256 to) public view override returns (uint256 amount) {
         // validate window
         from = Math.max(from, _startTime);
         to = Math.min(to, _endTime);
@@ -229,7 +234,7 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
         // harvest and update farm
         _harvest(msg.sender);
         // get farmer information
-        UserInfo storage user = userInfo[msg.sender];
+        UserInfo storage user = _userInfo[msg.sender];
         // accounting
         _valueStaked -= amount;
         user.value -= amount; // also reverts overwithdraw
@@ -250,7 +255,7 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
             return;
         }
         // update math
-        uint256 tokenReward = getMultiplier(_lastRewardTime, block.timestamp);
+        uint256 tokenReward = getRewardAmountDistributed(_lastRewardTime, block.timestamp);
         _accRewardPerShare += tokenReward * 1e12 / _valueStaked;
         _lastRewardTime = Math.min(block.timestamp, _endTime);
     }
@@ -262,7 +267,7 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
         // harvest and update farm
         _harvest(msg.sender);
         // get farmer information
-        UserInfo storage user = userInfo[msg.sender];
+        UserInfo storage user = _userInfo[msg.sender];
         // generate scp using eth
         uint256 scpAmount = _vault.balanceOf(address(this));
         _vault.depositEth{value:msg.value}();
@@ -283,11 +288,9 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
         // harvest and update farm
         _harvest(depositor);
         // get farmer information
-        UserInfo storage user = userInfo[depositor];
+        UserInfo storage user = _userInfo[depositor];
         // accounting
         _valueStaked += amount;
-        //uint256 value = user.value + amount;
-        //user.value = value;
         user.value += amount;
         user.rewardDebt = user.value * _accRewardPerShare / 1e12;
         emit CpDeposited(depositor, amount);
@@ -301,9 +304,9 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
         // update farm
         updateFarm();
         // get farmer information
-        UserInfo storage userInfo_ = userInfo[user];
+        UserInfo storage userInfo_ = _userInfo[user];
         // accumulate unpaid rewards
-        userInfo_.unpaidRewards += userInfo_.value * _accRewardPerShare / 1e12 - userInfo_.rewardDebt;
+        userInfo_.unpaidRewards = userInfo_.value * _accRewardPerShare / 1e12 - userInfo_.rewardDebt + userInfo_.unpaidRewards;
     }
 
     /***************************************
@@ -316,16 +319,14 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
      */
     function withdrawRewards() external override nonReentrant returns (uint256 optionID) {
         // update farm
-        updateFarm();
+        _harvest(msg.sender);
         // get farmer information
-        UserInfo storage userInfo_ = userInfo[msg.sender];
+        UserInfo storage userInfo_ = _userInfo[msg.sender];
         // math
-        uint256 acc = userInfo_.value * _accRewardPerShare / 1e12;
-        uint256 pending = acc - userInfo_.rewardDebt + userInfo_.unpaidRewards;
-        userInfo_.rewardDebt = acc;
+        userInfo_.rewardDebt = userInfo_.value * _accRewardPerShare / 1e12;
+        uint256 unpaidRewards = userInfo_.unpaidRewards;
         userInfo_.unpaidRewards = 0;
-        // create option
-        optionID = _controller.createOption(msg.sender, pending);
+        optionID = _controller.createOption(msg.sender, unpaidRewards);
         return optionID;
     }
 
@@ -338,15 +339,14 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
     function withdrawRewardsForUser(address user) external override nonReentrant returns (uint256 rewardAmount) {
         require(msg.sender == address(_controller), "!farmcontroller");
         // update farm
-        updateFarm();
+        _harvest(msg.sender);
         // get farmer information
-        UserInfo storage userInfo_ = userInfo[user];
+        UserInfo storage userInfo_ = _userInfo[user];
         // math
-        uint256 acc = userInfo_.value * _accRewardPerShare / 1e12;
-        uint256 pending = acc - userInfo_.rewardDebt + userInfo_.unpaidRewards;
-        userInfo_.rewardDebt = acc;
+        userInfo_.rewardDebt = userInfo_.value * _accRewardPerShare / 1e12;
+        uint256 unpaidRewards = userInfo_.unpaidRewards;
         userInfo_.unpaidRewards = 0;
-        return pending;
+        return unpaidRewards;
     }
 
     /***************************************

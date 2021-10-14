@@ -50,6 +50,9 @@ interface ICpFarm is IFarm {
     /// @notice Accumulated rewards per share, times 1e12.
     function accRewardPerShare() external view returns (uint256);
 
+    /// @notice The amount of [**SCP**](../Vault) tokens a user deposited.
+    function userStaked(address user) external view returns (uint256);
+
     /// @notice Value of tokens staked by all farmers.
     function valueStaked() external view returns (uint256);
 

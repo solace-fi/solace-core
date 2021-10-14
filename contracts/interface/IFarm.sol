@@ -38,12 +38,12 @@ interface IFarm {
     function pendingRewards(address user) external view returns (uint256 reward);
 
     /**
-     * @notice Calculates the reward multiplier over the given `from` until `to` timestamps.
+     * @notice Calculates the reward amount distributed between two timestamps.
      * @param from The start of the period to measure rewards for.
      * @param to The end of the period to measure rewards for.
-     * @return multiplier The weighted multiplier for the given period.
+     * @return amount The reward amount distributed in the given period.
      */
-    function getMultiplier(uint256 from, uint256 to) external view returns (uint256 multiplier);
+    function getRewardAmountDistributed(uint256 from, uint256 to) external view returns (uint256 amount);
 
     /***************************************
     MUTATOR FUNCTIONS

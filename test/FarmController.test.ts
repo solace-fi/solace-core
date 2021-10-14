@@ -468,9 +468,20 @@ describe("FarmController", function () {
         let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
         expect(balancesDiff.userSolace).to.equal(pendingRewards)
         // double withdraw rewards
-        pendingRewards = await farmController.pendingRewards(farmer1.address);
+        pendingRewards = await farmController.pendingRewards(farmer.address);
         expect(pendingRewards).to.equal(0);
-        await expect(farmController.connect(farmer1).farmOptionMulti()).to.be.revertedWith("no zero value options");
+        await expect(farmController.connect(farmer).farmOptionMulti()).to.be.revertedWith("no zero value options");
+        // withdraw stake
+        let farms = [cpFarm1, cpFarm2];
+        for(var farmI = 0; farmI < farms.length; ++farmI) {
+          let farm = farms[farmI];
+          let stake = await farm.userStaked(farmer.address);
+          await farm.connect(farmer).withdrawCp(stake);
+          expect(await farm.userStaked(farmer.address)).to.equal(0);
+          pendingRewards = await farmController.pendingRewards(farmer.address);
+          expect(pendingRewards).to.equal(0);
+          await expect(farmController.connect(farmer).farmOptionMulti()).to.be.revertedWith("no zero value options");
+        }
       }
     });
     it("non farmers cannot cash out", async function () {

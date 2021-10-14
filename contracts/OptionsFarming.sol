@@ -209,7 +209,6 @@ contract OptionsFarming is ERC721Enhanced, IOptionsFarming, ReentrancyGuard, Gov
             expiry: block.timestamp + _expiryDuration
         });
         optionID = ++_numOptions; // autoincrement from 1
-        // TODO: bookkeeping?
         _options[optionID] = option;
         _mint(recipient, optionID);
         emit OptionCreated(optionID);
@@ -236,7 +235,7 @@ contract OptionsFarming is ERC721Enhanced, IOptionsFarming, ReentrancyGuard, Gov
         // transfer SOLACE
         _transferSolace(msg.sender, rewardAmount);
         // transfer msg.value
-        sendValue();
+        _sendValue();
         emit OptionExercised(optionID);
     }
 
@@ -250,14 +249,8 @@ contract OptionsFarming is ERC721Enhanced, IOptionsFarming, ReentrancyGuard, Gov
     /**
      * @notice Sends this contract's **ETH** balance to `receiver`.
      */
-    function sendValue() public override {
-        if(_receiver == address(0x0)) return;
-        uint256 amount = address(this).balance;
-        if(amount == 0) return;
-        // this call may fail. let it
-        // funds will be safely stored and can be sent later
-        // solhint-disable-next-line avoid-low-level-calls
-        _receiver.call{value: amount}(""); // IGNORE THIS WARNING
+    function sendValue() external override {
+        _sendValue();
     }
 
     /***************************************
@@ -293,7 +286,7 @@ contract OptionsFarming is ERC721Enhanced, IOptionsFarming, ReentrancyGuard, Gov
     function setReceiver(address payable receiver_) external override onlyGovernance {
         _receiver = receiver_;
         emit ReceiverSet(receiver_);
-        sendValue();
+        _sendValue();
     }
 
     /**
@@ -469,6 +462,19 @@ contract OptionsFarming is ERC721Enhanced, IOptionsFarming, ReentrancyGuard, Gov
         uint256 unpaidSolace2 = amount - transferAmount;
         if(unpaidSolace2 != unpaidSolace1) _unpaidSolace[user] = unpaidSolace2;
         SafeERC20.safeTransfer(_solace, user, transferAmount);
+    }
+
+    /**
+     * @notice Sends this contract's **ETH** balance to `receiver`.
+     */
+    function _sendValue() internal {
+        if(_receiver == address(0x0)) return;
+        uint256 amount = address(this).balance;
+        if(amount == 0) return;
+        // this call may fail. let it
+        // funds will be safely stored and can be sent later
+        // solhint-disable-next-line avoid-low-level-calls
+        _receiver.call{value: amount}(""); // IGNORE THIS WARNING
     }
 
     /**
