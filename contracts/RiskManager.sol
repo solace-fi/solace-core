@@ -35,6 +35,8 @@ contract RiskManager is IRiskManager, Governable {
 
     // Multiplier for minimum capital requirement in BPS.
     uint16 internal _partialReservesFactor;
+    // 10k basis points (100%)
+    uint16 internal constant MAX_BPS = 10000;
 
     // Registry
     IRegistry internal _registry;
@@ -48,7 +50,7 @@ contract RiskManager is IRiskManager, Governable {
         require(registry_ != address(0x0), "zero address registry");
         _registry = IRegistry(registry_);
         _weightSum = type(uint32).max; // no div by zero
-        _partialReservesFactor = 10000;
+        _partialReservesFactor = MAX_BPS;
     }
 
     /***************************************
@@ -86,7 +88,7 @@ contract RiskManager is IRiskManager, Governable {
      * @return cover The max amount of cover in wei.
      */
     function maxCover() public view override returns (uint256 cover) {
-        return IVault(payable(_registry.vault())).totalAssets() * 10000 / _partialReservesFactor;
+        return IVault(payable(_registry.vault())).totalAssets() * MAX_BPS / _partialReservesFactor;
     }
 
     /**
@@ -183,7 +185,7 @@ contract RiskManager is IRiskManager, Governable {
      * @return mcr The minimum capital requirement.
      */
     function minCapitalRequirement() external view override returns (uint256 mcr) {
-        return IPolicyManager(_registry.policyManager()).activeCoverAmount() * _partialReservesFactor / 10000;
+        return IPolicyManager(_registry.policyManager()).activeCoverAmount() * _partialReservesFactor / MAX_BPS;
     }
 
     /**
