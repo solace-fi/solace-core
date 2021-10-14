@@ -164,8 +164,8 @@ interface IPolicyManager is IERC721Enumerable /*, IERC721Metadata*/ {
      * @notice Creates a new policy.
      * Can only be called by **products**.
      * @param policyholder The receiver of new policy token.
-     * @param expirationBlock The policy expiration block number.
      * @param coverAmount The policy coverage amount (in wei).
+     * @param expirationBlock The policy expiration block number.
      * @param price The coverage price.
      * @param positionDescription The description of the covered position(s).
      * @return policyID The policy ID.
@@ -182,8 +182,8 @@ interface IPolicyManager is IERC721Enumerable /*, IERC721Metadata*/ {
      * @notice Modifies a policy.
      * Can only be called by **products**.
      * @param policyID The policy ID.
-     * @param expirationBlock The policy expiration block number.
      * @param coverAmount The policy coverage amount (in wei).
+     * @param expirationBlock The policy expiration block number.
      * @param price The coverage price.
      * @param positionDescription The description of the covered position(s).
      */

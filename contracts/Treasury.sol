@@ -233,7 +233,8 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
         // check allowance
         address tokenAddr;
         assembly {
-            tokenAddr := div(mload(add(add(path, 0x20), 0)), 0x1000000000000000000000000)
+            // get first 20 bytes from path
+            tokenAddr := shr(0x60, mload(add(path, 0x20)))
         }
         IERC20 token = IERC20(tokenAddr);
         if(token.allowance(address(this), address(_swapRouter)) < amountIn) {

@@ -28,7 +28,7 @@ contract SOLACE is ISOLACE, ERC20Permit, Governable {
      * @param governance_ The address of the [governor](/docs/protocol/governance).
      */
     constructor(address governance_) ERC20("solace", "SOLACE") ERC20Permit("solace") Governable(governance_) {
-        _maxSupply = 1000000000000000000000000000; // one billion
+        _maxSupply = 1_000_000_000 ether; // one billion
         _minters[governance_] = true;
     }
 

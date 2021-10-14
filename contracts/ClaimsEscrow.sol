@@ -30,13 +30,10 @@ contract ClaimsEscrow is ERC721Enumerable, IClaimsEscrow, ReentrancyGuard, Gover
     using SafeERC20 for IERC20;
 
     /// @notice The duration of time in seconds the user must wait between submitting a claim and withdrawing the payout.
-    uint256 internal _cooldownPeriod = 3600; // one hour
+    uint256 internal _cooldownPeriod = 1 hours;
 
     /// @notice Registry of protocol contract addresses.
     IRegistry private _registry;
-
-    /// @notice ETH_ADDRESS.
-    address private constant ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
     /// @notice mapping of claimID to Claim object
     mapping (uint256 => Claim) internal _claims;

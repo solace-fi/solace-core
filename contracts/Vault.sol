@@ -42,10 +42,10 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
     // capital providers must wait some time in this range in order to withdraw
     // used to prevent withdraw before claim payout
     /// @notice The minimum amount of time a user must wait to withdraw funds.
-    uint40 internal _cooldownMin = 604800;  // 7 days
+    uint40 internal _cooldownMin = 7 days;
 
     /// @notice The maximum amount of time a user must wait to withdraw funds.
-    uint40 internal _cooldownMax = 3024000; // 35 days
+    uint40 internal _cooldownMax = 35 days;
 
     // The timestamp that a depositor's cooldown started.
     mapping(address => uint40) internal _cooldownStart;
@@ -156,8 +156,8 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
      */
     function pricePerShare() external view override returns (uint256 price) {
         return (totalSupply() == 0 || _totalAssets() == 0)
-            ? 1000000000000000000 // 1 eth in wei
-            : ((1000000000000000000 * _totalAssets()) / totalSupply());
+            ? 1 ether
+            : ((1 ether * _totalAssets()) / totalSupply());
     }
 
     /**
@@ -338,7 +338,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
     }
 
     /**
-     * @notice Handles burning of tokens during withdraw.
+     * @notice Handles burning of shares during withdraw.
      * Called by [`withdrawEth()`](#withdraweth) and [`withdrawWeth()`](#withdrawweth).
      * @param shares amount of shares to redeem.
      * @return value The amount in **ETH** that the shares where redeemed for.
@@ -365,7 +365,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard, Governable {
     ***************************************/
 
     /**
-     * @notice Internal function that returns quantity of all assets under control of this `Vault`, including those loaned out to `Strategies`.
+     * @notice Internal function that returns quantity of all assets under control of this `Vault`.
      * Called by **totalAssets()** function.
      * @return totalAssets The total assets under control of this vault.
      */
