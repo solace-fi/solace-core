@@ -31,12 +31,12 @@ const config: HardhatUserConfig = {
     hardhat: hardhat_network,
     localhost: { url: "http://127.0.0.1:8545" },
     rinkeby: {
-      url: process.env.RINKEBY_URL,
+      url: process.env.RINKEBY_URL || '',
       chainId: 4,
       accounts: JSON.parse(process.env.RINKEBY_ACCOUNTS || '[]')
     },
     kovan: {
-      url: process.env.KOVAN_URL,
+      url: process.env.KOVAN_URL || '',
       chainId: 42,
       accounts: JSON.parse(process.env.KOVAN_ACCOUNTS || '[]')
     }

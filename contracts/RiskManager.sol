@@ -14,7 +14,7 @@ import "./interface/IRiskManager.sol";
  * @author solace.fi
  * @notice Calculates the acceptable risk, sellable cover, and capital requirements of Solace products and capital pool.
  *
- * The total amount of sellable coverage is proportional to the assets in the [**risk backing capital pool**](./Vault). The max cover is split amongst products in a weighting system. [**Governance**](/docs/protocol/governance). can change these weights and with it each product's sellable cover.
+ * The total amount of sellable coverage is proportional to the assets in the [**risk backing capital pool**](./Vault). The max cover is split amongst products in a weighting system. [**Governance**](/docs/protocol/governance) can change these weights and with it each product's sellable cover.
  *
  * The minimum capital requirement is proportional to the amount of cover sold to [active policies](./PolicyManager).
  *
@@ -45,6 +45,7 @@ contract RiskManager is IRiskManager, Governable {
      * @param registry_ Address of registry.
      */
     constructor(address governance_, address registry_) Governable(governance_) {
+        require(registry_ != address(0x0), "zero address registry");
         _registry = IRegistry(registry_);
         _weightSum = type(uint32).max; // no div by zero
         _partialReservesFactor = 10000;
@@ -125,6 +126,15 @@ contract RiskManager is IRiskManager, Governable {
     }
 
     /**
+     * @notice Checks is an address is an active product.
+     * @param prod The product to check.
+     * @return status Returns true if the product is active.
+     */
+    function productIsActive(address prod) external view override returns (bool status) {
+        return _productToIndex[prod] != 0;
+    }
+
+    /**
      * @notice Return the number of registered products.
      * @return count Number of products.
      */
@@ -198,6 +208,7 @@ contract RiskManager is IRiskManager, Governable {
      * @param divisor_ The max cover amount divisor for per policy. (maxCover / divisor = maxCoverPerPolicy).
      */
     function addProduct(address product_, uint32 weight_, uint24 price_, uint16 divisor_) external override onlyGovernance {
+        require(product_ != address(0x0), "zero address product");
         require(weight_ > 0, "no weight");
         require(price_ > 0, "no price");
         require(divisor_ > 0, "1/0");
@@ -285,6 +296,7 @@ contract RiskManager is IRiskManager, Governable {
             uint32 weight_ = weights_[i];
             uint24 price_ = prices_[i];
             uint16 divisor_ = divisors_[i];
+            require(product_ != address(0x0), "zero address product");
             require(weight_ > 0, "no weight");
             require(price_ > 0, "no price");
             require(divisor_ > 0, "1/0");
@@ -312,5 +324,6 @@ contract RiskManager is IRiskManager, Governable {
      */
     function setPartialReservesFactor(uint16 partialReservesFactor_) external override onlyGovernance {
         _partialReservesFactor = partialReservesFactor_;
+        emit PartialReservesFactorSet(partialReservesFactor_);
     }
 }

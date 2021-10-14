@@ -29,8 +29,16 @@ interface IVault is IERC20Metadata, IERC20Permit {
     event WithdrawalMade(address indexed withdrawer, uint256 indexed value);
     /// @notice Emitted when funds are sent to a requestor.
     event FundsSent(uint256 value);
-    /// @notice Emitted when emergency shutdown mode is toggled.
-    event EmergencyShutdown(bool active);
+    /// @notice Emitted when deposits are paused.
+    event Paused();
+    /// @notice Emitted when deposits are unpaused.
+    event Unpaused();
+    /// @notice Emitted when the cooldown window is set.
+    event CooldownWindowSet(uint40 cooldownMin, uint40 cooldownMax);
+    /// @notice Emitted when a requestor is added.
+    event RequestorAdded(address requestor);
+    /// @notice Emitted when a requestor is removed.
+    event RequestorRemoved(address requestor);
 
     /***************************************
     CAPITAL PROVIDER FUNCTIONS
@@ -41,7 +49,7 @@ interface IVault is IERC20Metadata, IERC20Permit {
      * Shares of the `Vault` (CP tokens) are minted to caller.
      * It is called when `Vault` receives **ETH**.
      * It issues the amount of token share respected to the deposit to the `recipient`.
-     * Reverts if `Vault` is in **Emergency Shutdown**
+     * Reverts if `Vault` is paused.
      * @return shares The number of shares minted.
      */
     function depositEth() external payable returns (uint256 shares);
@@ -50,7 +58,7 @@ interface IVault is IERC20Metadata, IERC20Permit {
      * @notice Allows a user to deposit **WETH** into the `Vault`(becoming a **Capital Provider**).
      * Shares of the Vault (CP tokens) are minted to caller.
      * It issues the amount of token share respected to the deposit to the `recipient`.
-     * Reverts if `Vault` is in Emergency Shutdown
+     * Reverts if `Vault` is paused.
      * @param amount Amount of weth to deposit.
      * @return shares The number of shares minted.
      */
@@ -132,8 +140,8 @@ interface IVault is IERC20Metadata, IERC20Permit {
      */
     function canWithdraw(address user) external view returns (bool status);
 
-    /// @notice Returns true if the vault is in shutdown.
-    function emergencyShutdown() external view returns (bool status);
+    /// @notice Returns true if the vault is paused.
+    function paused() external view returns (bool paused_);
 
     /***************************************
     REQUESTOR FUNCTIONS
@@ -143,9 +151,8 @@ interface IVault is IERC20Metadata, IERC20Permit {
      * @notice Sends **ETH** to other users or contracts.
      * Can only be called by authorized requestors.
      * @param amount Amount of **ETH** wanted.
-     * @return Amount of **ETH** sent.
      */
-    function requestEth(uint256 amount) external returns (uint256);
+    function requestEth(uint256 amount) external;
 
     /**
      * @notice Returns true if the destination is authorized to request **ETH**.
@@ -159,16 +166,20 @@ interface IVault is IERC20Metadata, IERC20Permit {
     ***************************************/
 
     /**
-     * @notice Activates or deactivates emergency shutdown.
+     * @notice Pauses deposits.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * During Emergency Shutdown:
+     * While paused:
      * 1. No users may deposit into the Vault.
      * 2. Withdrawls can bypass cooldown.
-     * 3. Only Governance may undo Emergency Shutdown.
-     * @param emergencyShutdown_ If true, the Vault goes into Emergency Shutdown.
-     * If false, the Vault goes back into Normal Operation.
+     * 3. Only Governance may unpause.
     */
-    function setEmergencyShutdown(bool emergencyShutdown_) external;
+    function pause() external;
+
+    /**
+     * @notice Unpauses deposits.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+    */
+    function unpause() external;
 
     /**
      * @notice Sets the `minimum` and `maximum` amount of time in seconds that a user must wait to withdraw funds.
@@ -179,12 +190,18 @@ interface IVault is IERC20Metadata, IERC20Permit {
     function setCooldownWindow(uint40 cooldownMin_, uint40 cooldownMax_) external;
 
     /**
-     * @notice Adds or removes requesting rights.
+     * @notice Adds requesting rights.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param dst The requestor.
-     * @param status True to add or false to remove rights.
+     * @param requestor The requestor to grant rights.
      */
-    function setRequestor(address dst, bool status) external;
+    function addRequestor(address requestor) external;
+
+    /**
+     * @notice Removes requesting rights.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param requestor The requestor to revoke rights.
+     */
+    function removeRequestor(address requestor) external;
 
     /***************************************
     FALLBACK FUNCTIONS
