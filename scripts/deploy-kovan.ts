@@ -1,8 +1,8 @@
 import hardhat from "hardhat";
 const { waffle, ethers } = hardhat;
 const { provider } = waffle;
-import { config as dotenv_config } from "dotenv";
 const BN = ethers.BigNumber;
+import { config as dotenv_config } from "dotenv";
 dotenv_config();
 const deployer = new ethers.Wallet(JSON.parse(process.env.RINKEBY_ACCOUNTS || '[]')[0], provider);
 
@@ -16,20 +16,20 @@ import { Deployer, Registry, Weth9, Vault, ClaimsEscrow, Treasury, PolicyManager
 
 const DEPLOYER_CONTRACT_ADDRESS = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
 const REGISTRY_ADDRESS          = "0x501aCEE3310d98881c827d4357C970F23a30AD29";
-const VAULT_ADDRESS             = "0x501AcE0C4a39A171386acF2C63aaCd9D94d58A2C";
-const CLAIMS_ESCROW_ADDRESS     = "0x501ACE8a7647e7D74bC305B867F82F10752D6b2a";
-const TREASURY_ADDRESS          = "0x501aCE489A2fE2D36489A83d24c30c4B2DE056D8";
-const POLICY_MANAGER_ADDRESS    = "0x501ACE06b2AFC42Ed9944084E52fF9527120E2F1";
-const POLICY_DESCR_ADDRESS      = "0x501ACEbE3a9aAb063e3C3A99B58a9aa1dE8c2Bb9";
-const RISK_MANAGER_ADDRESS      = "0x501acE410659E453578155edebee855374Eb7412";
+const VAULT_ADDRESS             = "0x501AcEe83a6f269B77c167c6701843D454E2EFA0";
+const CLAIMS_ESCROW_ADDRESS     = "0x501aCEA73C7f4E5fB6Bce5A53603DA611F6A854C";
+const TREASURY_ADDRESS          = "0x501aCeAFb0d3e06Dc29db6Be51DFeB504c1D22ef";
+const POLICY_MANAGER_ADDRESS    = "0x501ace5E9f058bB2E851675BB3fA104Da6E3A22C";
+const POLICY_DESCR_ADDRESS      = "0x501ACe22C78C596227B1944D10d859c7f8a60d0a";
+const RISK_MANAGER_ADDRESS      = "0x501ACe9eE0AB4D2D4204Bcf3bE6eE13Fd6337804";
 
-const OPTIONS_FARMING_ADDRESS   = "0x501Acee44A3a7208367B6b5d9fAdDFd0E3dA4Df3";
-const FARM_CONTROLLER_ADDRESS   = "0x501ACEEC78F1a52040cd636fF62b7dD7153007BB";
-const CP_FARM_ADDRESS           = "0x501aCE1a36f8588B5FDeAC5aa05D7e2B5A5Ff2cf";
+const OPTIONS_FARMING_ADDRESS   = "0x501ACEB9772d1EfE5F8eA46FE5004fAd039e067A";
+const FARM_CONTROLLER_ADDRESS   = "0x501aCEDD1a697654d5F53514FF09eDECD3ca6D95";
+const CP_FARM_ADDRESS           = "0x501ACeb4D4C2CB7E4b07b53fbe644f3e51D25A3e";
 const SOLACE_ADDRESS            = "0x501ACe4A8d42bA427B67d0CaD1AB11e25AeA65Ab";
 
-const AAVE_PRODUCT_ADDRESS      = "";
-const WAAVE_PRODUCT_ADDRESS     = "";
+const AAVE_PRODUCT_ADDRESS      = "0x501ace153Ff22348076FdD236b774F6eb2d55EfB";
+const WAAVE_PRODUCT_ADDRESS     = "0x501Ace6Ff5FAc888273Bc03DC2Bc3aAD7C00fC68";
 
 const WETH_ADDRESS              = "0xd0A1E359811322d97991E03f863a0C30C2cF029C";
 const AAVE_DATA_PROVIDER        = "0x3c73A5E5785cAC854D468F727c606C07488a29D6";
@@ -42,9 +42,9 @@ const minPeriod = 6450; // this is about 1 day
 const maxPeriod = 2354250; // this is about 1 year from https://ycharts.com/indicators/ethereum_blocks_per_day
 const price = 11044; // 2.60%/yr
 // farm params
-const startTime = 1634169600; // Oct 14, 2021
-const endTime = 1665705600;   // Oct 14, 2022
-const solacePerSecond = BN.from("4756468797564688000"); // 150M over one year
+const startTime = 1634515200; // Oct 17, 2021
+const endTime   = 1666051200; // Oct 17, 2022
+const solacePerSecond = BN.from("1157407407407407400"); // 100K per day
 
 let artifacts: ArtifactImports;
 let deployerContract: Deployer;
@@ -305,7 +305,7 @@ async function deployCpFarm() {
     cpFarm = (await ethers.getContractAt(artifacts.CpFarm.abi, CP_FARM_ADDRESS)) as CpFarm;
   } else {
     console.log("Deploying CpFarm");
-    var res = await create2Contract(deployer,artifacts.CpFarm,[signerAddress,farmController.address,vault.address,startTime,endTime,weth.address], {}, "", deployerContract.address);
+    var res = await create2Contract(deployer,artifacts.CpFarm,[signerAddress,registry.address,startTime,endTime], {}, "", deployerContract.address);
     cpFarm = (await ethers.getContractAt(artifacts.CpFarm.abi, res.address)) as CpFarm;
     transactions.push({"description": "Deploy CpFarm", "to": deployerContract.address, "gasLimit": res.gasUsed});
     console.log(`Deployed CpFarm to ${cpFarm.address}`);
@@ -384,7 +384,7 @@ async function deployWaaveProduct() {
   }
   if(await riskManager.governance() == signerAddress && !(await riskManager.productIsActive(waaveProduct.address))) {
     console.log("Registering WaaveProduct in RiskManager");
-    let tx = await riskManager.connect(deployer).addProduct(waaveProduct.address,10000,price,10);
+    let tx = await riskManager.connect(deployer).addProduct(waaveProduct.address,100,price,10);
     let receipt = await tx.wait();
     transactions.push({"description": "Register WaaveProduct in RiskManager", "to": riskManager.address, "gasLimit": receipt.gasUsed.toString()});
   }

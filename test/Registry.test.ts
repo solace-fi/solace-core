@@ -360,11 +360,18 @@ describe("Registry", function() {
         locker.address
       )).to.be.revertedWith("!governance");
     });
+    it("cannot set zero", async function () {
+      await expect(registry.connect(governor).setMultiple(ZERO_ADDRESS, vault.address, claimsEscrow.address, treasury.address, policyManager.address, riskManager.address, solace.address, optionsFarming.address, farmController.address, locker.address)).to.be.revertedWith("zero address weth");
+      await expect(registry.connect(governor).setMultiple(weth.address, ZERO_ADDRESS, claimsEscrow.address, treasury.address, policyManager.address, riskManager.address, solace.address, optionsFarming.address, farmController.address, locker.address)).to.be.revertedWith("zero address vault");
+      await expect(registry.connect(governor).setMultiple(weth.address, vault.address, ZERO_ADDRESS, treasury.address, policyManager.address, riskManager.address, solace.address, optionsFarming.address, farmController.address, locker.address)).to.be.revertedWith("zero address claims escrow");
+      await expect(registry.connect(governor).setMultiple(weth.address, vault.address, claimsEscrow.address, ZERO_ADDRESS, policyManager.address, riskManager.address, solace.address, optionsFarming.address, farmController.address, locker.address)).to.be.revertedWith("zero address treasury");
+      await expect(registry.connect(governor).setMultiple(weth.address, vault.address, claimsEscrow.address, treasury.address, ZERO_ADDRESS, riskManager.address, solace.address, optionsFarming.address, farmController.address, locker.address)).to.be.revertedWith("zero address policymanager");
+      await expect(registry.connect(governor).setMultiple(weth.address, vault.address, claimsEscrow.address, treasury.address, policyManager.address, ZERO_ADDRESS, solace.address, optionsFarming.address, farmController.address, locker.address)).to.be.revertedWith("zero address riskmanager");
+      await expect(registry.connect(governor).setMultiple(weth.address, vault.address, claimsEscrow.address, treasury.address, policyManager.address, riskManager.address, ZERO_ADDRESS, optionsFarming.address, farmController.address, locker.address)).to.be.revertedWith("zero address solace");
+      await expect(registry.connect(governor).setMultiple(weth.address, vault.address, claimsEscrow.address, treasury.address, policyManager.address, riskManager.address, solace.address, ZERO_ADDRESS, farmController.address, locker.address)).to.be.revertedWith("zero address optionsfarming");
+      await expect(registry.connect(governor).setMultiple(weth.address, vault.address, claimsEscrow.address, treasury.address, policyManager.address, riskManager.address, solace.address, optionsFarming.address, ZERO_ADDRESS, locker.address)).to.be.revertedWith("zero address farmcontroller");
+      await expect(registry.connect(governor).setMultiple(weth.address, vault.address, claimsEscrow.address, treasury.address, policyManager.address, riskManager.address, solace.address, optionsFarming.address, farmController.address, ZERO_ADDRESS)).to.be.revertedWith("zero address locker");
+
+    });
   });
 });
-
-function fill(len: number, filler: any) {
-  var a = [];
-  for(var i = 0; i < len; ++i) a.push(filler);
-  return a;
-}

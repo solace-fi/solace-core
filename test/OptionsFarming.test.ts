@@ -515,6 +515,8 @@ describe("OptionsFarming", function () {
     it("starts with no options", async function () {
       expect(await optionsFarming.numOptions()).to.equal(0);
       expect(await optionsFarming.totalSupply()).to.equal(0);
+      expect(await optionsFarming.exists(0)).to.be.false;
+      expect(await optionsFarming.exists(1)).to.be.false;
     });
     it("rejects option creation by non farm controller", async function () {
       // for simplicity use wallet as farm controller
@@ -535,6 +537,7 @@ describe("OptionsFarming", function () {
       expect(await optionsFarming.totalSupply()).to.equal(1);
       expect(await optionsFarming.balanceOf(farmer.address)).to.equal(1);
       strikePrice1 = await optionsFarming.calculateStrikePrice(REWARD_AMOUNT);
+      expect(await optionsFarming.exists(1)).to.be.true;
       // option 2
       let tx2 = await optionsFarming.connect(mockFarmController).createOption(trader.address, REWARD_AMOUNT.mul(3));
       expect(tx2).to.emit(optionsFarming, "OptionCreated").withArgs(2);
@@ -542,6 +545,7 @@ describe("OptionsFarming", function () {
       expect(await optionsFarming.totalSupply()).to.equal(2);
       expect(await optionsFarming.balanceOf(trader.address)).to.equal(1);
       strikePrice2 = await optionsFarming.calculateStrikePrice(REWARD_AMOUNT.mul(3));
+      expect(await optionsFarming.exists(2)).to.be.true;
     });
     it("cannot view non existant options", async function () {
       await expect(optionsFarming.getOption(0)).to.be.revertedWith("query for nonexistent token");
@@ -562,97 +566,229 @@ describe("OptionsFarming", function () {
       expect(option.expiry).to.equal(timestamp + EXPIRY_DURATION);
       expect(await optionsFarming.ownerOf(2)).to.equal(trader.address);
     });
-    it("can exercise options", async function () {
-      let balancesBefore1 = await getBalances(farmer.address);
-      let balancesBefore2 = await getBalances(receiver.address);
-      let tx = await optionsFarming.connect(farmer).exerciseOption(1, {value: strikePrice1});
-      expect(tx).to.emit(optionsFarming, "OptionExercised").withArgs(1);
-      let balancesAfter1 = await getBalances(farmer.address);
-      let balancesDiff1 = getBalancesDiff(balancesAfter1, balancesBefore1);
-      expect(balancesDiff1.userSolace).to.equal(REWARD_AMOUNT);
-      expect(balancesDiff1.optionsFarmingSolace).to.equal(REWARD_AMOUNT.mul(-1));
-      let balancesAfter2 = await getBalances(receiver.address);
-      let balancesDiff2 = getBalancesDiff(balancesAfter2, balancesBefore2);
-      expect(balancesDiff2.userEth).to.equal(strikePrice1);
-      expect(await optionsFarming.numOptions()).to.equal(2);
-      expect(await optionsFarming.totalSupply()).to.equal(1);
-      expect(await optionsFarming.balanceOf(farmer.address)).to.equal(0);
-      await expect(optionsFarming.getOption(1)).to.be.revertedWith("query for nonexistent token");
+    context("exercise in full", async function () {
+      it("can exercise options", async function () {
+        let balancesBefore1 = await getBalances(farmer.address);
+        let balancesBefore2 = await getBalances(receiver.address);
+        let tx = await optionsFarming.connect(farmer).exerciseOption(1, {value: strikePrice1});
+        expect(tx).to.emit(optionsFarming, "OptionExercised").withArgs(1);
+        let balancesAfter1 = await getBalances(farmer.address);
+        let balancesDiff1 = getBalancesDiff(balancesAfter1, balancesBefore1);
+        expect(balancesDiff1.userSolace).to.equal(REWARD_AMOUNT);
+        expect(balancesDiff1.optionsFarmingSolace).to.equal(REWARD_AMOUNT.mul(-1));
+        let balancesAfter2 = await getBalances(receiver.address);
+        let balancesDiff2 = getBalancesDiff(balancesAfter2, balancesBefore2);
+        expect(balancesDiff2.userEth).to.equal(strikePrice1);
+        expect(await optionsFarming.numOptions()).to.equal(2);
+        expect(await optionsFarming.totalSupply()).to.equal(1);
+        expect(await optionsFarming.balanceOf(farmer.address)).to.equal(0);
+        await expect(optionsFarming.getOption(1)).to.be.revertedWith("query for nonexistent token");
+        expect(await optionsFarming.exists(1)).to.be.false;
+      });
+      it("can exercise non-owned option if approved", async function () {
+        let balancesBefore1 = await getBalances(farmer.address);
+        let balancesBefore2 = await getBalances(receiver.address);
+        await optionsFarming.connect(trader).approve(farmer.address, 2);
+        let tx = await optionsFarming.connect(farmer).exerciseOption(2, {value: strikePrice2});
+        expect(tx).to.emit(optionsFarming, "OptionExercised").withArgs(2);
+        let balancesAfter1 = await getBalances(farmer.address);
+        let balancesDiff1 = getBalancesDiff(balancesAfter1, balancesBefore1);
+        expect(balancesDiff1.userSolace).to.equal(REWARD_AMOUNT.mul(3));
+        expect(balancesDiff1.optionsFarmingSolace).to.equal(REWARD_AMOUNT.mul(-3));
+        let balancesAfter2 = await getBalances(receiver.address);
+        let balancesDiff2 = getBalancesDiff(balancesAfter2, balancesBefore2);
+        expect(balancesDiff2.userEth).to.equal(strikePrice2);
+        expect(await optionsFarming.numOptions()).to.equal(2);
+        expect(await optionsFarming.totalSupply()).to.equal(0);
+        expect(await optionsFarming.balanceOf(trader.address)).to.equal(0);
+        await expect(optionsFarming.getOption(2)).to.be.revertedWith("query for nonexistent token");
+        expect(await optionsFarming.exists(2)).to.be.false;
+      });
+      it("cannot exercise option with insufficient payment", async function () {
+        await optionsFarming.connect(mockFarmController).createOption(farmer.address, REWARD_AMOUNT);
+        let option = await optionsFarming.getOption(3);
+        let payment = option.strikePrice.sub(1);
+        await expect(optionsFarming.connect(farmer).exerciseOption(3, {value: payment})).to.be.revertedWith("insufficient payment");
+      });
+      it("cannot exercise someone elses option", async function () {
+        let option = await optionsFarming.getOption(3);
+        let payment = option.strikePrice;
+        await expect(optionsFarming.connect(trader).exerciseOption(3, {value: payment})).to.be.revertedWith("!owner");
+      });
+      it("cannot exercise option after expiry", async function () {
+        let option = await optionsFarming.getOption(3);
+        let payment = option.strikePrice;
+        await provider.send("evm_setNextBlockTimestamp", [option.expiry.add(1).toNumber()]);
+        await provider.send("evm_mine", []);
+        await expect(optionsFarming.connect(farmer).exerciseOption(3, {value: payment})).to.be.revertedWith("expired");
+      });
+      it("can exercise now and receive solace when available", async function () {
+        // create option
+        let balances1 = await getBalances(farmer.address);
+        expect(balances1.optionsFarmingSolace).to.be.gt(0);
+        expect(await optionsFarming.unpaidSolace(farmer.address)).to.equal(0);
+        let tx1 = await optionsFarming.connect(mockFarmController).createOption(farmer.address, balances1.optionsFarmingSolace.add(ONE_ETHER));
+        let optionID = 4;
+        expect(tx1).to.emit(optionsFarming, "OptionCreated").withArgs(optionID);
+        let option = await optionsFarming.getOption(optionID);
+        expect(await optionsFarming.exists(optionID)).to.be.true;
+        // exercise and receive partial
+        let tx2 = await optionsFarming.connect(farmer).exerciseOption(optionID, {value: option.strikePrice});
+        expect(tx2).to.emit(optionsFarming, "OptionExercised").withArgs(optionID);
+        let balances2 = await getBalances(farmer.address);
+        let balancesDiff12 = getBalancesDiff(balances2, balances1);
+        expect(balancesDiff12.userSolace).to.equal(balances1.optionsFarmingSolace);
+        expect(balances2.optionsFarmingSolace).to.equal(0);
+        expect(await optionsFarming.unpaidSolace(farmer.address)).to.equal(ONE_ETHER);
+        expect(await optionsFarming.exists(optionID)).to.be.false;
+        // withdraw zero with unpaid rewards
+        await optionsFarming.connect(farmer).withdraw();
+        let balances3 = await getBalances(farmer.address);
+        let balancesDiff23 = getBalancesDiff(balances3, balances2);
+        expect(balancesDiff23.userSolace).to.equal(0);
+        expect(balances3.optionsFarmingSolace).to.equal(0);
+        expect(await optionsFarming.unpaidSolace(farmer.address)).to.equal(ONE_ETHER);
+        // withdraw remainder
+        await solace.connect(governor).mint(optionsFarming.address, TEN_ETHER);
+        await optionsFarming.connect(farmer).withdraw();
+        let balances4 = await getBalances(farmer.address);
+        let balancesDiff34 = getBalancesDiff(balances4, balances3);
+        expect(balancesDiff34.userSolace).to.equal(ONE_ETHER);
+        expect(balances4.optionsFarmingSolace).to.equal(ONE_ETHER.mul(9));
+        expect(await optionsFarming.unpaidSolace(farmer.address)).to.equal(0);
+        // withdraw zero without unpaid rewards
+        await optionsFarming.connect(farmer).withdraw();
+        let balances5 = await getBalances(farmer.address);
+        let balancesDiff45 = getBalancesDiff(balances5, balances4);
+        expect(balancesDiff45.userSolace).to.equal(0);
+        expect(balances5.optionsFarmingSolace).to.equal(ONE_ETHER.mul(9));
+        expect(await optionsFarming.unpaidSolace(farmer.address)).to.equal(0);
+      });
     });
-    it("can exercise non-owned option if approved", async function () {
-      let balancesBefore1 = await getBalances(farmer.address);
-      let balancesBefore2 = await getBalances(receiver.address);
-      await optionsFarming.connect(trader).approve(farmer.address, 2);
-      let tx = await optionsFarming.connect(farmer).exerciseOption(2, {value: strikePrice2});
-      expect(tx).to.emit(optionsFarming, "OptionExercised").withArgs(2);
-      let balancesAfter1 = await getBalances(farmer.address);
-      let balancesDiff1 = getBalancesDiff(balancesAfter1, balancesBefore1);
-      expect(balancesDiff1.userSolace).to.equal(REWARD_AMOUNT.mul(3));
-      expect(balancesDiff1.optionsFarmingSolace).to.equal(REWARD_AMOUNT.mul(-3));
-      let balancesAfter2 = await getBalances(receiver.address);
-      let balancesDiff2 = getBalancesDiff(balancesAfter2, balancesBefore2);
-      expect(balancesDiff2.userEth).to.equal(strikePrice2);
-      expect(await optionsFarming.numOptions()).to.equal(2);
-      expect(await optionsFarming.totalSupply()).to.equal(0);
-      expect(await optionsFarming.balanceOf(trader.address)).to.equal(0);
-      await expect(optionsFarming.getOption(2)).to.be.revertedWith("query for nonexistent token");
-    });
-    it("cannot exercise option with insufficient payment", async function () {
-      await optionsFarming.connect(mockFarmController).createOption(farmer.address, REWARD_AMOUNT);
-      let option = await optionsFarming.getOption(3);
-      let payment = option.strikePrice.sub(1);
-      await expect(optionsFarming.connect(farmer).exerciseOption(3, {value: payment})).to.be.revertedWith("insufficient payment");
-    });
-    it("cannot exercise someone elses option", async function () {
-      let option = await optionsFarming.getOption(3);
-      let payment = option.strikePrice;
-      await expect(optionsFarming.connect(trader).exerciseOption(3, {value: payment})).to.be.revertedWith("!owner");
-    });
-    it("cannot exercise option after expiry", async function () {
-      let option = await optionsFarming.getOption(3);
-      let payment = option.strikePrice;
-      await provider.send("evm_setNextBlockTimestamp", [option.expiry.add(1).toNumber()]);
-      await provider.send("evm_mine", []);
-      await expect(optionsFarming.connect(farmer).exerciseOption(3, {value: payment})).to.be.revertedWith("expired");
-    });
-    it("can exercise now and receive solace when available", async function () {
-      // create option
-      let balances1 = await getBalances(farmer.address);
-      expect(balances1.optionsFarmingSolace).to.be.gt(0);
-      expect(await optionsFarming.unpaidSolace(farmer.address)).to.equal(0);
-      let tx1 = await optionsFarming.connect(mockFarmController).createOption(farmer.address, balances1.optionsFarmingSolace.add(ONE_ETHER));
-      expect(tx1).to.emit(optionsFarming, "OptionCreated").withArgs(4);
-      let option = await optionsFarming.getOption(4);
-      // exercise and receive partial
-      let tx2 = await optionsFarming.connect(farmer).exerciseOption(4, {value: option.strikePrice});
-      expect(tx2).to.emit(optionsFarming, "OptionExercised").withArgs(4);
-      let balances2 = await getBalances(farmer.address);
-      let balancesDiff12 = getBalancesDiff(balances2, balances1);
-      expect(balancesDiff12.userSolace).to.equal(balances1.optionsFarmingSolace);
-      expect(balances2.optionsFarmingSolace).to.equal(0);
-      expect(await optionsFarming.unpaidSolace(farmer.address)).to.equal(ONE_ETHER);
-      // withdraw zero with unpaid rewards
-      await optionsFarming.connect(farmer).withdraw();
-      let balances3 = await getBalances(farmer.address);
-      let balancesDiff23 = getBalancesDiff(balances3, balances2);
-      expect(balancesDiff23.userSolace).to.equal(0);
-      expect(balances3.optionsFarmingSolace).to.equal(0);
-      expect(await optionsFarming.unpaidSolace(farmer.address)).to.equal(ONE_ETHER);
-      // withdraw remainder
-      await solace.connect(governor).mint(optionsFarming.address, TEN_ETHER);
-      await optionsFarming.connect(farmer).withdraw();
-      let balances4 = await getBalances(farmer.address);
-      let balancesDiff34 = getBalancesDiff(balances4, balances3);
-      expect(balancesDiff34.userSolace).to.equal(ONE_ETHER);
-      expect(balances4.optionsFarmingSolace).to.equal(ONE_ETHER.mul(9));
-      expect(await optionsFarming.unpaidSolace(farmer.address)).to.equal(0);
-      // withdraw zero without unpaid rewards
-      await optionsFarming.connect(farmer).withdraw();
-      let balances5 = await getBalances(farmer.address);
-      let balancesDiff45 = getBalancesDiff(balances5, balances4);
-      expect(balancesDiff45.userSolace).to.equal(0);
-      expect(balances5.optionsFarmingSolace).to.equal(ONE_ETHER.mul(9));
-      expect(await optionsFarming.unpaidSolace(farmer.address)).to.equal(0);
+    context("exercise in part", function () {
+      before(async function () {
+        await solace.connect(governor).mint(optionsFarming.address, TEN_ETHER);
+      });
+      it("can exercise in part", async function () {
+        // create option
+        let balances1 = await getBalances(farmer.address);
+        expect(await optionsFarming.unpaidSolace(farmer.address)).to.equal(0);
+        let tx1 = await optionsFarming.connect(mockFarmController).createOption(farmer.address, ONE_ETHER);
+        let optionID = await optionsFarming.numOptions();
+        expect(tx1).to.emit(optionsFarming, "OptionCreated").withArgs(optionID);
+        let option1 = await optionsFarming.getOption(optionID);
+        expect(await optionsFarming.exists(optionID)).to.be.true;
+        // exercise in part
+        let tx2 = await optionsFarming.connect(farmer).exerciseOptionInPart(optionID, {value: option1.strikePrice.div(3)});
+        expect(tx2).to.emit(optionsFarming, "OptionExercised").withArgs(optionID);
+        let balances2 = await getBalances(farmer.address);
+        let balancesDiff12 = getBalancesDiff(balances2, balances1);
+        expectClose(balancesDiff12.userSolace, option1.rewardAmount.div(3), 10000);
+        expectClose(balancesDiff12.optionsFarmingSolace, option1.rewardAmount.div(-3), 10000);
+        expect(await optionsFarming.unpaidSolace(farmer.address)).to.equal(0);
+        expect(await optionsFarming.exists(optionID)).to.be.true;
+        let option2 = await optionsFarming.getOption(optionID);
+        expectClose(option2.rewardAmount, option1.rewardAmount.mul(2).div(3), 10000);
+        expectClose(option2.strikePrice, option1.strikePrice.mul(2).div(3), 10000);
+        expect(option2.expiry).eq(option1.expiry);
+      });
+      it("can exercise in part in full", async function () {
+        // create option
+        let balances1 = await getBalances(farmer.address);
+        expect(await optionsFarming.unpaidSolace(farmer.address)).to.equal(0);
+        let tx1 = await optionsFarming.connect(mockFarmController).createOption(farmer.address, ONE_ETHER);
+        let optionID = await optionsFarming.numOptions();
+        expect(tx1).to.emit(optionsFarming, "OptionCreated").withArgs(optionID);
+        let option1 = await optionsFarming.getOption(optionID);
+        expect(await optionsFarming.exists(optionID)).to.be.true;
+        // exercise in full
+        let tx2 = await optionsFarming.connect(farmer).exerciseOptionInPart(optionID, {value: option1.strikePrice});
+        expect(tx2).to.emit(optionsFarming, "OptionExercised").withArgs(optionID);
+        let balances2 = await getBalances(farmer.address);
+        let balancesDiff12 = getBalancesDiff(balances2, balances1);
+        expectClose(balancesDiff12.userSolace, option1.rewardAmount, 10000);
+        expectClose(balancesDiff12.optionsFarmingSolace, option1.rewardAmount.mul(-1), 10000);
+        expect(await optionsFarming.unpaidSolace(farmer.address)).to.equal(0);
+        expect(await optionsFarming.exists(optionID)).to.be.false;
+        await expect(optionsFarming.getOption(optionID)).to.be.revertedWith("query for nonexistent token");
+      });
+      it("cannot exercise someone elses option", async function () {
+        let option = await optionsFarming.getOption(3);
+        let payment = option.strikePrice;
+        await expect(optionsFarming.connect(trader).exerciseOptionInPart(3, {value: payment})).to.be.revertedWith("!owner");
+      });
+      it("can exercise non-owned option if approved", async function () {
+        // create option
+        let balances1 = await getBalances(farmer.address);
+        expect(await optionsFarming.unpaidSolace(farmer.address)).to.equal(0);
+        let tx1 = await optionsFarming.connect(mockFarmController).createOption(trader.address, ONE_ETHER);
+        let optionID = await optionsFarming.numOptions();
+        expect(tx1).to.emit(optionsFarming, "OptionCreated").withArgs(optionID);
+        let option1 = await optionsFarming.getOption(optionID);
+        expect(await optionsFarming.exists(optionID)).to.be.true;
+        // exercise in part
+        await optionsFarming.connect(trader).approve(farmer.address, optionID);
+        let tx2 = await optionsFarming.connect(farmer).exerciseOptionInPart(optionID, {value: option1.strikePrice.div(3)});
+        expect(tx2).to.emit(optionsFarming, "OptionExercised").withArgs(optionID);
+        let balances2 = await getBalances(farmer.address);
+        let balancesDiff12 = getBalancesDiff(balances2, balances1);
+        expectClose(balancesDiff12.userSolace, option1.rewardAmount.div(3), 10000);
+        expectClose(balancesDiff12.optionsFarmingSolace, option1.rewardAmount.div(-3), 10000);
+        expect(await optionsFarming.unpaidSolace(farmer.address)).to.equal(0);
+        expect(await optionsFarming.exists(optionID)).to.be.true;
+        let option2 = await optionsFarming.getOption(optionID);
+        expectClose(option2.rewardAmount, option1.rewardAmount.mul(2).div(3), 10000);
+        expectClose(option2.strikePrice, option1.strikePrice.mul(2).div(3), 10000);
+        expect(option2.expiry).eq(option1.expiry);
+      });
+      it("cannot exercise option after expiry", async function () {
+        let option = await optionsFarming.getOption(3);
+        let payment = option.strikePrice;
+        await expect(optionsFarming.connect(farmer).exerciseOptionInPart(3, {value: payment})).to.be.revertedWith("expired");
+      });
+      it("can exercise now and receive solace when available", async function () {
+        // create option
+        let balances1 = await getBalances(farmer.address);
+        expect(balances1.optionsFarmingSolace).to.be.gt(0);
+        expect(await optionsFarming.unpaidSolace(farmer.address)).to.equal(0);
+        let tx1 = await optionsFarming.connect(mockFarmController).createOption(farmer.address, balances1.optionsFarmingSolace.mul(2));
+        let optionID = await optionsFarming.numOptions();
+        expect(tx1).to.emit(optionsFarming, "OptionCreated").withArgs(optionID);
+        let option = await optionsFarming.getOption(optionID);
+        expect(await optionsFarming.exists(optionID)).to.be.true;
+        // exercise and receive partial
+        let tx2 = await optionsFarming.connect(farmer).exerciseOptionInPart(optionID, {value: option.strikePrice.mul(3).div(4)});
+        expect(tx2).to.emit(optionsFarming, "OptionExercised").withArgs(optionID);
+        let balances2 = await getBalances(farmer.address);
+        let balancesDiff12 = getBalancesDiff(balances2, balances1);
+        expect(balancesDiff12.userSolace).to.equal(balances1.optionsFarmingSolace);
+        expect(balances2.optionsFarmingSolace).to.equal(0);
+        let expectedRemaining = option.rewardAmount.div(4);
+        expectClose(await optionsFarming.unpaidSolace(farmer.address), expectedRemaining, 10000);
+        expect(await optionsFarming.exists(optionID)).to.be.true;
+        // withdraw zero with unpaid rewards
+        await optionsFarming.connect(farmer).withdraw();
+        let balances3 = await getBalances(farmer.address);
+        let balancesDiff23 = getBalancesDiff(balances3, balances2);
+        expect(balancesDiff23.userSolace).to.equal(0);
+        expect(balances3.optionsFarmingSolace).to.equal(0);
+        expectClose(await optionsFarming.unpaidSolace(farmer.address), expectedRemaining, 10000);
+        // withdraw remainder
+        await solace.connect(governor).mint(optionsFarming.address, TEN_ETHER);
+        await optionsFarming.connect(farmer).withdraw();
+        let balances4 = await getBalances(farmer.address);
+        let balancesDiff34 = getBalancesDiff(balances4, balances3);
+        expectClose(balancesDiff34.userSolace, expectedRemaining, 10000);
+        expectClose(balances4.optionsFarmingSolace, TEN_ETHER.sub(expectedRemaining), 10000);
+        expect(await optionsFarming.unpaidSolace(farmer.address)).to.equal(0);
+        // withdraw zero without unpaid rewards
+        await optionsFarming.connect(farmer).withdraw();
+        let balances5 = await getBalances(farmer.address);
+        let balancesDiff45 = getBalancesDiff(balances5, balances4);
+        expect(balancesDiff45.userSolace).to.equal(0);
+        expectClose(balances5.optionsFarmingSolace, TEN_ETHER.sub(expectedRemaining), 10000);
+        expect(await optionsFarming.unpaidSolace(farmer.address)).to.equal(0);
+      });
     });
   });
 
@@ -682,18 +818,6 @@ describe("OptionsFarming", function () {
       await pool.connect(governor).initialize(sqrtPrice);
     }
     return pool;
-  }
-
-  async function createCpFarm(startTime: BigNumberish = BN.from(0), endTime: BigNumberish = BN.from(0), vaultAddress: string = vault.address) {
-    let farm = (await deployContract(deployer, artifacts.CpFarm, [
-      governor.address,
-      farmController.address,
-      vaultAddress,
-      startTime,
-      endTime,
-      weth.address,
-    ])) as CpFarm;
-    return farm;
   }
 
   interface Balances {

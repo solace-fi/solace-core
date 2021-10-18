@@ -589,8 +589,9 @@ describe("Vault", function () {
       expect(tx2).to.emit(vault, "RequestorRemoved").withArgs(claimsEscrow.address);
       expect(await vault.isRequestor(claimsEscrow.address)).to.equal(false);
     });
-    it("cannot add zero address requestor", async function () {
+    it("cannot add or remove zero address requestor", async function () {
       await expect(vault.connect(owner).addRequestor(ZERO_ADDRESS)).to.be.revertedWith("zero address requestor");
+      await expect(vault.connect(owner).removeRequestor(ZERO_ADDRESS)).to.be.revertedWith("zero address requestor");
     });
   });
 

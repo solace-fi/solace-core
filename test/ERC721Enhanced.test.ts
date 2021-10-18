@@ -48,6 +48,8 @@ describe("ERC721Enhanced", function() {
     it("should start with zero supply", async function () {
       expect(await token.totalSupply()).to.equal(0);
       expect(await token.listTokens()).to.deep.equal([]);
+      expect(await token.exists(0)).to.be.false;
+      expect(await token.exists(1)).to.be.false;
     });
     it("should start with zero balance", async function () {
       expect(await token.balanceOf(user1.address)).to.equal(0);
@@ -64,6 +66,9 @@ describe("ERC721Enhanced", function() {
     });
     it("should increment balance", async function () {
       expect(await token.balanceOf(user1.address)).to.equal(1);
+    });
+    it("should exist", async function () {
+      expect(await token.exists(1)).to.be.true;
     });
     it("should be listed", async function () {
       expect(await token.listTokens()).to.deep.equal([BN.from(1)]);

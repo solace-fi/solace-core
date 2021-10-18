@@ -154,15 +154,6 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
     */
 
     /**
-     * @notice Checks if a policy exists.
-     * @param policyID The policy ID.
-     * @return status True if the policy exists.
-     */
-    function exists(uint256 policyID) external view override returns (bool status) {
-        return _exists(policyID);
-    }
-
-    /**
      * @notice Checks if a policy is active.
      * @param policyID The policy ID.
      * @return status True if the policy is active.

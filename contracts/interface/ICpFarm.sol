@@ -42,19 +42,22 @@ interface ICpFarm is IFarm {
     ***************************************/
 
     /// @notice Vault contract.
-    function vault() external view returns (address);
+    function vault() external view returns (address vault_);
+
+    /// @notice WETH contract.
+    function weth() external view returns (address weth_);
 
     /// @notice Last time rewards were distributed or farm was updated.
-    function lastRewardTime() external view returns (uint256);
+    function lastRewardTime() external view returns (uint256 timestamp);
 
     /// @notice Accumulated rewards per share, times 1e12.
-    function accRewardPerShare() external view returns (uint256);
+    function accRewardPerShare() external view returns (uint256 acc);
 
     /// @notice The amount of [**SCP**](../Vault) tokens a user deposited.
-    function userStaked(address user) external view returns (uint256);
+    function userStaked(address user) external view returns (uint256 amount);
 
     /// @notice Value of tokens staked by all farmers.
-    function valueStaked() external view returns (uint256);
+    function valueStaked() external view returns (uint256 amount);
 
     /***************************************
     MUTATOR FUNCTIONS
@@ -82,6 +85,12 @@ interface ICpFarm is IFarm {
      * @notice Deposit some **ETH**.
      */
     function depositEth() external payable;
+
+    /**
+     * @notice Deposit some **WETH**.
+     * @param amount The amount of **WETH** to deposit.
+     */
+    function depositWeth(uint256 amount) external;
 
     /**
      * @notice Withdraw some [**CP tokens**](../Vault).

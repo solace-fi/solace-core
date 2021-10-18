@@ -142,15 +142,6 @@ contract ClaimsEscrow is ERC721Enhanced, IClaimsEscrow, ReentrancyGuard, Governa
     }
 
     /**
-     * @notice Returns true if the claim exists.
-     * @param claimID The ID to check.
-     * @return status True if it exists, false if not.
-     */
-    function exists(uint256 claimID) external view override returns (bool status) {
-        return _exists(claimID);
-    }
-
-    /**
      * @notice Returns true if the payout of the claim can be withdrawn.
      * @param claimID The ID to check.
      * @return status True if it is withdrawable, false if not.

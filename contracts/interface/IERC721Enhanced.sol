@@ -98,4 +98,11 @@ interface IERC721Enhanced is IERC721Enumerable {
      * @return tokenIDs The list of token IDs.
      */
     function listTokensOfOwner(address owner) external view returns (uint256[] memory tokenIDs);
+
+    /**
+     * @notice Determines if a token exists or not.
+     * @param tokenID The ID of the token to query.
+     * @return status True if the token exists, false if it doesn't.
+     */
+    function exists(uint256 tokenID) external view returns (bool status);
 }

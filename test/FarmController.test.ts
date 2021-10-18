@@ -107,7 +107,16 @@ describe("FarmController", function () {
     let sqrtPrice = encodePriceSqrt(amount1, amount0);
     solaceEthPool = await createPool(weth, solace, FeeAmount.MEDIUM, sqrtPrice);
     await mintLpToken(trader, solace, weth, FeeAmount.MEDIUM, amount0, amount1);
-  })
+  });
+
+  describe("deployment", function () {
+    it("reverts if zero options farming", async function () {
+      await expect(deployContract(deployer, artifacts.FarmController, [governor.address, ZERO_ADDRESS, 1])).to.be.revertedWith("zero address optionsfarming");
+    });
+    it("deploys successfully", async function () {
+      await deployContract(deployer, artifacts.FarmController, [governor.address, optionsFarming.address, 1]);
+    })
+  });
 
   describe("governance", function () {
     it("starts with the correct governor", async function () {
@@ -151,7 +160,7 @@ describe("FarmController", function () {
     });
     it("can register cp farms", async function () {
       // register first farm
-      farm1 = await createCpFarm(startTime, endTime);
+      farm1 = (await deployContract(deployer, artifacts.CpFarm, [governor.address, registry.address, startTime, endTime])) as CpFarm;
       await expect(farm1.connect(deployer).setPendingGovernance(governor.address)).to.be.revertedWith("!governance");
       let tx = await farmController.connect(governor).registerFarm(farm1.address, 40);
       await expect(tx).to.emit(farmController, "FarmRegistered").withArgs(1, farm1.address);
@@ -164,7 +173,7 @@ describe("FarmController", function () {
     });
     it("can register additional farms", async function () {
       // register second farm
-      farm2 = await createCpFarm(startTime, endTime);
+      farm2 = (await deployContract(deployer, artifacts.CpFarm, [governor.address, registry.address, startTime, endTime])) as CpFarm;
       await expect(farm2.connect(deployer).setPendingGovernance(governor.address)).to.be.revertedWith("!governance");
       let tx = await farmController.connect(governor).registerFarm(farm2.address, 60);
       await expect(tx).to.emit(farmController, "FarmRegistered").withArgs(2, farm2.address);
@@ -175,7 +184,7 @@ describe("FarmController", function () {
       expect(await farmController.allocPoints(2)).to.equal(60);
     });
     it("rejects farm registration by non governor", async function () {
-      farm3 = await createCpFarm();
+      farm3 = (await deployContract(deployer, artifacts.CpFarm, [governor.address, registry.address, 0, 1])) as CpFarm;
       await expect(farmController.connect(farmer1).registerFarm(farm3.address, 1)).to.be.revertedWith("!governance");
     });
     it("rejects duplicate farm registration", async function () {
@@ -208,9 +217,9 @@ describe("FarmController", function () {
       initTime = (await provider.getBlock('latest')).timestamp;
       startTime = initTime + 200;
       endTime = initTime + 400;
-      cpFarm1 = await createCpFarm(startTime, endTime);
+      cpFarm1 = (await deployContract(deployer, artifacts.CpFarm, [governor.address, registry.address, startTime, endTime])) as CpFarm;
       await farmController.connect(governor).registerFarm(cpFarm1.address, allocPoints);
-      cpFarm2 = await createCpFarm(startTime, endTime);
+      cpFarm2 = (await deployContract(deployer, artifacts.CpFarm, [governor.address, registry.address, startTime, endTime])) as CpFarm;
       await farmController.connect(governor).registerFarm(cpFarm2.address, allocPoints);
     });
     it("can mass update", async function () {
@@ -270,6 +279,7 @@ describe("FarmController", function () {
     before(async function () {
       // redeploy farm controller
       farmController = (await deployContract(deployer, artifacts.FarmController, [governor.address, optionsFarming.address, solacePerSecond])) as FarmController;
+      await registry.connect(governor).setFarmController(farmController.address);
       await vault.connect(farmer1).transfer(governor.address, await vault.balanceOf(farmer1.address));
       await vault.connect(farmer2).transfer(governor.address, await vault.balanceOf(farmer2.address));
 
@@ -283,10 +293,10 @@ describe("FarmController", function () {
       await provider.send("evm_mine", []);
       initTime = (await provider.getBlock('latest')).timestamp;
       // farms start and end at different times, math should still work
-      cpFarm1 = await createCpFarm(initTime + 250, initTime + 5000);
+      cpFarm1 = (await deployContract(deployer, artifacts.CpFarm, [governor.address, registry.address, initTime+250, initTime+5000])) as CpFarm;
       await farmController.connect(governor).registerFarm(cpFarm1.address, allocPoints1a);
       cpFarmID1 = await farmController.numFarms();
-      cpFarm2 = await createCpFarm(initTime + 450, initTime + 2500);
+      cpFarm2 = (await deployContract(deployer, artifacts.CpFarm, [governor.address, registry.address, initTime+450, initTime+2500])) as CpFarm;
       await farmController.connect(governor).registerFarm(cpFarm2.address, allocPoints2);
       cpFarmID2 = await farmController.numFarms();
       await farmController.massUpdateFarms();
@@ -524,18 +534,6 @@ describe("FarmController", function () {
       await pool.connect(governor).initialize(sqrtPrice);
     }
     return pool;
-  }
-
-  async function createCpFarm(startTime: BigNumberish = BN.from(0), endTime: BigNumberish = BN.from(0), vaultAddress: string = vault.address) {
-    let farm = (await deployContract(deployer, artifacts.CpFarm, [
-      governor.address,
-      farmController.address,
-      vaultAddress,
-      startTime,
-      endTime,
-      weth.address,
-    ])) as CpFarm;
-    return farm;
   }
 
   interface Balances {

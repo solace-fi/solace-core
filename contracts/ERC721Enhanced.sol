@@ -170,6 +170,15 @@ abstract contract ERC721Enhanced is ERC721Enumerable, IERC721Enhanced, EIP712 {
         return tokenIDs;
     }
 
+    /**
+     * @notice Determines if a token exists or not.
+     * @param tokenID The ID of the token to query.
+     * @return status True if the token exists, false if it doesn't.
+     */
+    function exists(uint256 tokenID) external view override returns (bool status) {
+        return _exists(tokenID);
+    }
+
     /***************************************
     MODIFIERS
     ***************************************/
