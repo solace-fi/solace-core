@@ -30,6 +30,11 @@ const config: HardhatUserConfig = {
   networks: {
     hardhat: hardhat_network,
     localhost: { url: "http://127.0.0.1:8545" },
+    mainnet: {
+      url: process.env.MAINNET_URL || '',
+      chainId: 1,
+      accounts: JSON.parse(process.env.MAINNET_ACCOUNTS || '[]')
+    },
     rinkeby: {
       url: process.env.RINKEBY_URL || '',
       chainId: 4,

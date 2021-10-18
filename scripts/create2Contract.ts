@@ -25,7 +25,7 @@ export async function create2Contract(wallet: Signer, factoryOrContractJson: Con
   //var exists = await _exists(address, factoryOrContractJson);
   //if(!exists) await _deployer(wallet, initCode, salt);
   console.log("deploying to", address);
-  let deploy = false;
+  let deploy = true;
   if(deploy) var [deployCode, gasUsed] = await _deployer(wallet, initCode, salt, deployerAddress);
   await _verifier(address, args, contractPath);
   if(deploy) {
