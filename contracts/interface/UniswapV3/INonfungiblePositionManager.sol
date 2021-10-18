@@ -73,4 +73,16 @@ interface INonfungiblePositionManager  {
    * @return owner The owner of the token.  
    */
   function ownerOf(uint256 tokenId) external view returns (address owner);
+
+  /**
+   * @notice Returns the symbol of the token.
+   * @return symbol The token symbol.
+   */
+   function symbol() external view returns (string memory symbol);
+ 
+   /**
+    * @notice Returns the name of the token.
+    * @return name The token name.
+    */
+   function name() external view returns (string memory name);
 }

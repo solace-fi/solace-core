@@ -63,4 +63,29 @@ interface ICurveRegistry {
     */
     // solhint-disable-next-line func-name-mixedcase
     function get_pool_name(address pool) external view returns (string memory name);
+
+    /**
+     * @notice Returns the underlying coins of the pool.
+     * @param pool the address of the pool.
+     * @return underlyingCoins The underlying coins.
+    */
+    // solhint-disable-next-line func-name-mixedcase
+    function get_underlying_coins(address pool) external view returns (address[8] memory underlyingCoins);
+
+    /**
+     * @notice Returns the underlying decimals of the pool.
+     * @param pool the address of the pool.
+     * @return underlyingDecimals The underlying coins.
+    */
+    // solhint-disable-next-line func-name-mixedcase
+    function get_underlying_decimals(address pool) external view returns (uint256[8] memory underlyingDecimals);
+
+    /**
+     * @notice Returns the coins of the pool.
+     * @param pool the address of the pool.
+     * @return coins The pool coins.
+    */
+    // solhint-disable-next-line func-name-mixedcase
+    function get_coins(address pool) external view returns (address[8] memory coins);
+
 }

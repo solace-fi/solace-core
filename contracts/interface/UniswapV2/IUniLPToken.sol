@@ -28,6 +28,12 @@ interface IUniLPToken {
   function symbol() external view returns (string memory symbol);
 
   /**
+    * @notice Returns the decimals value of the `Uni LP Token`.
+    * @return decimals `Uni LP Token` decimals.
+   */
+  function decimals() external view returns (uint256);
+
+  /**
    * @notice Returns the name of the token.
    * @return name The token name.
    */

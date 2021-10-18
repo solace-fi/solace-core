@@ -45,4 +45,10 @@ interface ISushiLPToken {
    * @return balance The amount tokens user have.
    */
   function balanceOf(address account) external view returns (uint256 balance);
+
+  /**
+  * @notice Returns the decimals value.
+  * @return decimals The decimals value.
+  */
+  function decimals() external view returns (uint256);
 }
