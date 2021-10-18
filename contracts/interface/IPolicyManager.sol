@@ -124,13 +124,6 @@ interface IPolicyManager is IERC721Enhanced {
      *   hasExpired  0 0 1 0
 
     /**
-     * @notice Checks if a policy exists.
-     * @param policyID The policy ID.
-     * @return status True if the policy exists.
-     */
-    function exists(uint256 policyID) external view returns (bool status);
-
-    /**
      * @notice Checks if a policy is active.
      * @param policyID The policy ID.
      * @return status True if the policy is active.

@@ -1,7 +1,7 @@
 import { Signer } from "@ethersproject/abstract-signer";
 import { deployContract } from "ethereum-waffle";
 import { ContractJSON } from "ethereum-waffle/dist/esm/ContractJSON";
-import { Contract } from "ethers";
+import { Contract, BigNumber as BN } from "ethers";
 import { keccak256, bufferToHex } from "ethereumjs-util";
 import { readFileSync, writeFileSync } from "fs";
 
@@ -24,13 +24,22 @@ export async function create2Contract(wallet: Signer, factoryOrContractJson: Con
   var [address, salt] = _hasher(initCode, deployerAddress);
   //var exists = await _exists(address, factoryOrContractJson);
   //if(!exists) await _deployer(wallet, initCode, salt);
-  console.log("deploying to ", address);
-  var [deployCode, gasUsed] = await _deployer(wallet, initCode, salt, deployerAddress);
+  console.log("deploying to", address);
+  let deploy = false;
+  if(deploy) var [deployCode, gasUsed] = await _deployer(wallet, initCode, salt, deployerAddress);
   await _verifier(address, args, contractPath);
-  return {
-    "deployCode": deployCode,
-    "address": address,
-    "gasUsed": gasUsed
+  if(deploy) {
+    return {
+      "deployCode": deployCode,
+      "address": address,
+      "gasUsed": gasUsed
+    };
+  } else {
+    return {
+      "deployCode": "0x0",
+      "address": address,
+      "gasUsed": BN.from(0)
+    };
   }
 }
 
@@ -66,15 +75,17 @@ function _hasher(initCode: string, deployerAddress: string): [string, string] {
     return [res.address, res.salt];
   }
   // 0xff ++ deployingAddress is fixed:
-  var string1 = '0xff'.concat(deployerAddress.substring(2))
+  var string1 = '0xff'.concat(deployerAddress.substring(2));
   //var string1 = '0xffce0042B868300000d44A59004Da54A005ffdcf9f'
   // hash the initCode
   var string2 = keccak256(Buffer.from(initCode.substring(2), 'hex')).toString('hex');
+  //console.log(`hashing\n${string1}\n${string2}`);
   // In each loop, i is the value of the salt we are checking
   for (var i = 0; i < 72057594037927936; i++) {
   //for (var i =    6440000; i < 72057594037927936; i++) {
   //for (var i =  8821000; i < 72057594037927936; i++) {
   //for (var i = 27000000; i < 72057594037927936; i++) {
+  //for (var i = 100000000; i < 72057594037927936; i++) {
     //if(i % 1000000 == 0) console.log(i.toLocaleString('en-US'));
     // 1. Convert i to hex, and it pad to 32 bytes:
     var saltToBytes = i.toString(16).padStart(64, '0');
@@ -84,9 +95,11 @@ function _hasher(initCode: string, deployerAddress: string): [string, string] {
     var hashed = bufferToHex(keccak256(Buffer.from(concatString.substring(2), 'hex')));
     // 4. Remove leading 0x and 12 bytes to get address
     var addr = hashed.substr(26);
+    if(i % 1000000 == 0) console.log(`${i} -> ${addr}`);
     // 5. Check if the result starts with 'solace'
     if (addr.substring(0,6) == '501ace') {
       var address = ethers.utils.getAddress('0x'+addr);
+      console.log(`${i} -> ${address}`);
       var salt = '0x'+saltToBytes;
       // 6. Write hash to cache and return
       knownHashes[initCode] = {"address": address, "salt": salt};
@@ -115,6 +128,8 @@ async function _deployer(wallet: Signer, initCode: string, salt: string, deploye
 // verify on etherscan
 async function _verifier(address: string, args: any[] | undefined, contractPath: string) {
   if(provider.network.chainId == 31337) return; // dont try to verify local contracts
+  // likely just deployed a contract, let etherscan index it
+  await _sleeper(10000);
   var verifyArgs: any = {
     address: address,
     constructorArguments: args
@@ -123,4 +138,8 @@ async function _verifier(address: string, args: any[] | undefined, contractPath:
   try {
     await hardhat.run("verify:verify", verifyArgs);
   } catch(e) { /* probably already verified */ }
+}
+
+async function _sleeper(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }

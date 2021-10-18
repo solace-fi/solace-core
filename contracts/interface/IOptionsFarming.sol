@@ -140,6 +140,16 @@ interface IOptionsFarming is IERC721Enhanced {
     function exerciseOption(uint256 optionID) external payable;
 
     /**
+     * @notice Exercises an Option in part.
+     * `msg.sender` will pay `msg.value` **ETH**.
+     * `msg.sender` will receive a fair amount of [**SOLACE**](../SOLACE).
+     * Can only be called by the Option owner or approved.
+     * Can only be called before `option.expiry`.
+     * @param optionID The ID of the Option to exercise.
+     */
+    function exerciseOptionInPart(uint256 optionID) external payable;
+
+    /**
      * @notice Transfers the unpaid [**SOLACE**](../SOLACE) to the user.
      */
     function withdraw() external;

@@ -5,9 +5,11 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "./Governable.sol";
+import "./interface/IRegistry.sol";
 import "./interface/IVault.sol";
 import "./interface/IFarmController.sol";
 import "./interface/ICpFarm.sol";
+
 
 /**
  * @title CpFarm
@@ -69,32 +71,37 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
     mapping(address => UserInfo) internal _userInfo;
 
     // @notice WETH
-    IERC20 public weth;
+    IERC20 internal _weth;
 
     /**
      * @notice Constructs the CpFarm.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
-     * @param controller_ Address of the [`FarmController`](./FarmController) contract.
-     * @param vault_ Address of the [`Vault`](./Vault) contract.
+     * @param registry_ Address of the [`Registry`](./Registry) contract.
      * @param startTime_ When farming will begin.
      * @param endTime_ When farming will end.
-     * @param weth_ Address of **WETH**.
      */
     constructor(
         address governance_,
-        address controller_,
-        address vault_,
+        address registry_,
         uint256 startTime_,
-        uint256 endTime_,
-        address weth_
+        uint256 endTime_
     ) Governable(governance_) {
+        require(registry_ != address(0x0), "zero address registry");
+        IRegistry registry = IRegistry(registry_);
+        address controller_ = registry.farmController();
+        require(controller_ != address(0x0), "zero address controller");
         _controller = IFarmController(controller_);
+        address vault_ = registry.vault();
+        require(vault_ != address(0x0), "zero address vault");
         _vault = IVault(payable(vault_));
+        address weth_ = registry.weth();
+        require(weth_ != address(0x0), "zero address weth");
+        _weth = IERC20(weth_);
+        _weth.approve(vault_, type(uint256).max);
+        require(startTime_ <= endTime_, "invalid window");
         _startTime = startTime_;
         _endTime = endTime_;
         _lastRewardTime = Math.max(block.timestamp, startTime_);
-        weth = IERC20(weth_);
-        weth.approve(vault_, type(uint256).max);
     }
 
     /***************************************
@@ -102,17 +109,22 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
     ***************************************/
 
     /// @notice A unique enumerator that identifies the farm type.
-    function farmType() external pure override returns (uint256) {
+    function farmType() external pure override returns (uint256 farmType_) {
         return _farmType;
     }
 
     /// @notice Vault contract.
-    function vault() external view override returns (address) {
+    function vault() external view override returns (address vault_) {
         return address(_vault);
     }
 
+    /// @notice WETH contract.
+    function weth() external view override returns (address weth_) {
+        return address(_weth);
+    }
+
     /// @notice FarmController contract.
-    function farmController() external view override returns (address) {
+    function farmController() external view override returns (address controller_) {
         return address(_controller);
     }
 
@@ -122,32 +134,32 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
     }
 
     /// @notice When the farm will start.
-    function startTime() external view override returns (uint256) {
+    function startTime() external view override returns (uint256 timestamp) {
         return _startTime;
     }
 
     /// @notice When the farm will end.
-    function endTime() external view override returns (uint256) {
+    function endTime() external view override returns (uint256 timestamp) {
         return _endTime;
     }
 
     /// @notice Last time rewards were distributed or farm was updated.
-    function lastRewardTime() external view override returns (uint256) {
+    function lastRewardTime() external view override returns (uint256 timestamp) {
         return _lastRewardTime;
     }
 
     /// @notice Accumulated rewards per share, times 1e12.
-    function accRewardPerShare() external view override returns (uint256) {
+    function accRewardPerShare() external view override returns (uint256 acc) {
         return _accRewardPerShare;
     }
 
     /// @notice The amount of [**SCP**](../Vault) tokens a user deposited.
-    function userStaked(address user) external view override returns (uint256) {
+    function userStaked(address user) external view override returns (uint256 amount) {
         return _userInfo[user].value;
     }
 
     /// @notice Value of tokens staked by all farmers.
-    function valueStaked() external view override returns (uint256) {
+    function valueStaked() external view override returns (uint256 amount) {
         return _valueStaked;
     }
 
@@ -222,6 +234,28 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
      */
     function depositEth() external payable override {
         _depositEth();
+    }
+
+    /**
+     * @notice Deposit some **WETH**.
+     * @param amount The amount of **WETH** to deposit.
+     */
+    function depositWeth(uint256 amount) external override {
+        // pull weth
+        SafeERC20.safeTransferFrom(_weth, msg.sender, address(this), amount);
+        // harvest and update farm
+        _harvest(msg.sender);
+        // get farmer information
+        UserInfo storage user = _userInfo[msg.sender];
+        // generate scp using weth
+        uint256 scpAmount = _vault.balanceOf(address(this));
+        _vault.depositWeth(amount);
+        scpAmount = _vault.balanceOf(address(this)) - scpAmount;
+        // accounting
+        _valueStaked += scpAmount;
+        user.value += scpAmount;
+        user.rewardDebt = user.value * _accRewardPerShare / 1e12;
+        emit EthDeposited(msg.sender, amount);
     }
 
     /**
@@ -339,14 +373,14 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
     function withdrawRewardsForUser(address user) external override nonReentrant returns (uint256 rewardAmount) {
         require(msg.sender == address(_controller), "!farmcontroller");
         // update farm
-        _harvest(msg.sender);
+        _harvest(user);
         // get farmer information
         UserInfo storage userInfo_ = _userInfo[user];
         // math
         userInfo_.rewardDebt = userInfo_.value * _accRewardPerShare / 1e12;
-        uint256 unpaidRewards = userInfo_.unpaidRewards;
+        rewardAmount = userInfo_.unpaidRewards;
         userInfo_.unpaidRewards = 0;
-        return unpaidRewards;
+        return rewardAmount;
     }
 
     /***************************************

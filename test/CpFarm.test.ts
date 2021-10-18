@@ -82,10 +82,11 @@ describe("CpFarm", function () {
     await registry.connect(governor).setOptionsFarming(optionsFarming.address);
     farmController = (await deployContract(deployer, artifacts.FarmController, [governor.address, optionsFarming.address, solacePerSecond])) as FarmController;
     await registry.connect(governor).setFarmController(farmController.address);
+    await optionsFarming.connect(governor).setFarmController(farmController.address);
 
     // transfer tokens
     await solace.connect(governor).addMinter(governor.address);
-    await solace.connect(governor).mint(farmController.address, ONE_MILLION_ETHER);
+    //await solace.connect(governor).mint(farmController.address, ONE_MILLION_ETHER);
     await solace.connect(governor).mint(governor.address, ONE_MILLION_ETHER);
     await solace.connect(governor).mint(trader.address, FIFTY_THOUSAND_ETHER);
     await weth.connect(trader).deposit({ value: TEN_ETHER });
@@ -108,6 +109,41 @@ describe("CpFarm", function () {
     await mintLpToken(trader, solace, weth, FeeAmount.MEDIUM, amount0, amount1);
   });
 
+  describe("deployment", function () {
+    it("reverts if zero registry", async function () {
+      await expect(deployContract(deployer, artifacts.CpFarm, [governor.address, ZERO_ADDRESS, 1, 2])).to.be.revertedWith("zero address registry");
+    });
+    it("reverts if zero controller", async function () {
+      let registry2 = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
+      await expect(deployContract(deployer, artifacts.CpFarm, [governor.address, registry2.address, 1, 2])).to.be.revertedWith("zero address controller");
+    });
+    it("reverts if zero vault", async function () {
+      let registry2 = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
+      await registry2.connect(governor).setFarmController(farmController.address);
+      await expect(deployContract(deployer, artifacts.CpFarm, [governor.address, registry2.address, 1, 2])).to.be.revertedWith("zero address vault");
+    });
+    it("reverts if zero weth", async function () {
+      let registry2 = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
+      await registry2.connect(governor).setFarmController(farmController.address);
+      await registry2.connect(governor).setVault(vault.address);
+      await expect(deployContract(deployer, artifacts.CpFarm, [governor.address, registry2.address, 1, 2])).to.be.revertedWith("zero address weth");
+    });
+    it("reverts if invalid window", async function () {
+      let registry2 = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
+      await registry2.connect(governor).setFarmController(farmController.address);
+      await registry2.connect(governor).setVault(vault.address);
+      await registry2.connect(governor).setWeth(weth.address);
+      await expect(deployContract(deployer, artifacts.CpFarm, [governor.address, registry2.address, 4, 3])).to.be.revertedWith("invalid window");
+    });
+    it("deploys successfully", async function () {
+      let registry2 = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
+      await registry2.connect(governor).setFarmController(farmController.address);
+      await registry2.connect(governor).setVault(vault.address);
+      await registry2.connect(governor).setWeth(weth.address);
+      await deployContract(deployer, artifacts.CpFarm, [governor.address, registry2.address, 1, 2]);
+    });
+  });
+
   describe("farm creation", function () {
     before(async function () {
       // get referrence timestamp
@@ -117,7 +153,7 @@ describe("CpFarm", function () {
       endTime = initTime + ONE_YEAR;
     });
     it("can create farms", async function () {
-      farm1 = await createCpFarm(startTime, endTime);
+      farm1 = (await deployContract(deployer, artifacts.CpFarm, [governor.address, registry.address, startTime, endTime])) as CpFarm;
     });
     it("returns farm information", async function () {
       expect(await farm1.farmController()).to.equal(farmController.address);
@@ -129,6 +165,7 @@ describe("CpFarm", function () {
       expect(await farm1.valueStaked()).to.equal(0);
       expect(await farm1.lastRewardTime()).to.be.closeTo(BN.from(initTime), 5);
       expect(await farm1.accRewardPerShare()).to.equal(0);
+      expect(await farm1.weth()).to.eq(weth.address);
     });
   });
 
@@ -174,6 +211,7 @@ describe("CpFarm", function () {
       expect(balancesDiff.farmStake).to.equal(depositAmount1);
       expect(balancesDiff.farmCp).to.equal(depositAmount1);
       expect(balancesDiff.userStaked).to.equal(depositAmount1);
+      expect(balancesDiff.vaultAssets).to.equal(depositAmount1);
       // farmer 2, deposit 4 wei
       let depositAmount2 = BN.from(4);
       balancesBefore = await getBalances(farmer2, farm1);
@@ -184,6 +222,7 @@ describe("CpFarm", function () {
       expect(balancesDiff.farmStake).to.equal(depositAmount2);
       expect(balancesDiff.farmCp).to.equal(depositAmount2);
       expect(balancesDiff.userStaked).to.equal(depositAmount2);
+      expect(balancesDiff.vaultAssets).to.equal(depositAmount2);
       // farmer 1, deposit 2 wei
       let depositAmount3 = BN.from(2);
       balancesBefore = await getBalances(farmer1, farm1);
@@ -194,6 +233,7 @@ describe("CpFarm", function () {
       expect(balancesDiff.farmStake).to.equal(depositAmount3);
       expect(balancesDiff.farmCp).to.equal(depositAmount3);
       expect(balancesDiff.userStaked).to.equal(depositAmount3);
+      expect(balancesDiff.vaultAssets).to.equal(depositAmount3);
     });
     it("can deposit eth via receive", async function () {
       let depositAmount4 = BN.from(48);
@@ -209,6 +249,7 @@ describe("CpFarm", function () {
       expect(balancesDiff.farmStake).to.equal(depositAmount4);
       expect(balancesDiff.farmCp).to.equal(depositAmount4);
       expect(balancesDiff.userStaked).to.equal(depositAmount4);
+      expect(balancesDiff.vaultAssets).to.equal(depositAmount4);
     });
     it("can deposit eth via fallback", async function () {
       let depositAmount5 = BN.from(12345);
@@ -224,6 +265,7 @@ describe("CpFarm", function () {
       expect(balancesDiff.farmStake).to.equal(depositAmount5);
       expect(balancesDiff.farmCp).to.equal(depositAmount5);
       expect(balancesDiff.userStaked).to.equal(depositAmount5);
+      expect(balancesDiff.vaultAssets).to.equal(depositAmount5);
     });
     it("cannot deposit eth when lacking funds", async function () {
       let depositAmount = (await farmer1.getBalance()).add(1);
@@ -293,6 +335,21 @@ describe("CpFarm", function () {
       await vault.connect(farmer2).increaseAllowance(farm1.address, 1);
       await expect(farm1.connect(farmer2).depositCp(1)).to.be.reverted;
     });
+    it("can deposit weth", async function () {
+      await farmer1.sendTransaction({to: weth.address, value: ONE_ETHER});
+      let depositAmount1 = BN.from(100);
+      balancesBefore = await getBalances(farmer1, farm1);
+      await weth.connect(farmer1).approve(farm1.address, depositAmount1);
+      let tx1 = await farm1.connect(farmer1).depositWeth(depositAmount1);
+      await expect(tx1).to.emit(farm1, "EthDeposited").withArgs(farmer1.address, depositAmount1);
+      balancesAfter = await getBalances(farmer1, farm1);
+      balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
+      expect(balancesDiff.farmStake).to.equal(depositAmount1);
+      expect(balancesDiff.farmCp).to.equal(depositAmount1);
+      expect(balancesDiff.userStaked).to.equal(depositAmount1);
+      expect(balancesDiff.userWeth).to.equal(depositAmount1.mul(-1));
+      expect(balancesDiff.vaultAssets).to.equal(depositAmount1);
+    });
     it("cannot withdraw another user's rewards", async function () {
       await expect(farm1.connect(farmer1).withdrawRewardsForUser(farmer2.address)).to.be.revertedWith("!farmcontroller");
     });
@@ -323,8 +380,7 @@ describe("CpFarm", function () {
       initTime = (await provider.getBlock('latest')).timestamp;
       startTime = initTime + 10;
       endTime = initTime + 100;
-      farm2 = await createCpFarm(startTime, endTime);
-      //await farmController.connect(governor).registerFarm(farm2.address, allocPoints);
+      farm2 = (await deployContract(deployer, artifacts.CpFarm, [governor.address, registry.address, startTime, endTime])) as CpFarm;
     });
     it("can update a single farm", async function () {
       // init
@@ -382,7 +438,6 @@ describe("CpFarm", function () {
 
     before(async function () {
       await solace.connect(governor).mint(optionsFarming.address, ONE_MILLION_ETHER);
-      await optionsFarming.connect(governor).setFarmController(farmController.address);
       await optionsFarming.connect(governor).setSolace(solace.address);
       let solaceIsToken0 = BN.from(solace.address).lt(BN.from(weth.address));
       await optionsFarming.connect(governor).setSolaceEthPool(solaceEthPool.address, solaceIsToken0, 0);
@@ -398,7 +453,7 @@ describe("CpFarm", function () {
       initTime = (await provider.getBlock('latest')).timestamp;
       startTime = initTime + 200;
       endTime = initTime + 1000;
-      farm = await createCpFarm(startTime, endTime);
+      farm = (await deployContract(deployer, artifacts.CpFarm, [governor.address, registry.address, startTime, endTime])) as CpFarm;
       await farmController.connect(governor).registerFarm(farm.address, allocPoints);
       farmId = await farmController.numFarms();
     });
@@ -588,6 +643,7 @@ describe("CpFarm", function () {
       pendingRewards = await farm.pendingRewards(farmer1.address);
       expectedRewards = bnMulDiv([solacePerSecond, 29]); // 100% ownership for 29 seconds
       expect(pendingRewards).to.equal(expectedRewards);
+      tx = await farm.connect(farmer1).withdrawRewards();
       optionID = await optionsFarming.numOptions();
       expect(tx).to.emit(optionsFarming, "OptionCreated").withArgs(optionID);
       option = await optionsFarming.getOption(optionID);
@@ -607,7 +663,8 @@ describe("CpFarm", function () {
     let depositAmount: BN;
 
     before(async function () {
-      farm4 = await createCpFarm(0, 1000, mockVault.address);
+      await registry.connect(governor).setVault(mockVault.address);
+      farm4 = (await deployContract(deployer, artifacts.CpFarm, [governor.address, registry.address, 0, 1000])) as CpFarm;
       depositAmount = BN.from(100);
     });
     it("can receive eth from vault via receive()", async function () {
@@ -638,6 +695,9 @@ describe("CpFarm", function () {
       expect(balancesDiff.userEth).to.equal(depositAmount.mul(-1).sub(gasCost));
       expect(balancesDiff.userStaked).to.equal(0); // vault gains no stake
     });
+    it("can setRewards", async function () {
+      await farmController.connect(governor).setRewardPerSecond(solacePerSecond);
+    });
     it("rejects setRewards by non farmController", async function () {
       await expect(farm4.connect(governor).setRewards(ONE_MILLION_ETHER)).to.be.revertedWith("!farmcontroller");
       await expect(farm4.connect(farmer1).setRewards(ONE_MILLION_ETHER)).to.be.revertedWith("!farmcontroller");
@@ -647,6 +707,11 @@ describe("CpFarm", function () {
       let rewardPerSecond = await farm4.rewardPerSecond();
       expect(await farm4.getRewardAmountDistributed(20, 30)).to.equal(rewardPerSecond.mul(10));
       expect(await farm4.getRewardAmountDistributed(30, 20)).to.equal(0);
+    });
+    it("can withdraw rewards via farmcontroller", async function () {
+      expect(await farm1.farmController()).to.eq(farmController.address);
+      expect(await optionsFarming.farmController()).to.eq(farmController.address);
+      await farmController.connect(farmer1).farmOptionMulti();
     });
   });
 
@@ -678,20 +743,9 @@ describe("CpFarm", function () {
     return pool;
   }
 
-  async function createCpFarm(startTime: BigNumberish = BN.from(0), endTime: BigNumberish = BN.from(0), vaultAddress: string = vault.address) {
-    let farm = (await deployContract(deployer, artifacts.CpFarm, [
-      governor.address,
-      farmController.address,
-      vaultAddress,
-      startTime,
-      endTime,
-      weth.address,
-    ])) as CpFarm;
-    return farm;
-  }
-
   interface Balances {
     userEth: BN;
+    userWeth: BN;
     userCp: BN;
     userStaked: BN;
     userPendingRewards: BN;
@@ -699,11 +753,13 @@ describe("CpFarm", function () {
     farmCp: BN;
     farmStake: BN;
     farmControllerSolace: BN;
+    vaultAssets: BN;
   }
 
   async function getBalances(user: Wallet, farm: CpFarm): Promise<Balances> {
     return {
       userEth: await user.getBalance(),
+      userWeth: await weth.balanceOf(user.address),
       userCp: await vault.balanceOf(user.address),
       userStaked: await farm.userStaked(user.address),
       userPendingRewards: await farm.pendingRewards(user.address),
@@ -711,12 +767,14 @@ describe("CpFarm", function () {
       farmCp: await vault.balanceOf(farm.address),
       farmStake: await farm.valueStaked(),
       farmControllerSolace: await solace.balanceOf(farmController.address),
+      vaultAssets: await vault.totalAssets()
     };
   }
 
   function getBalancesDiff(balances1: Balances, balances2: Balances): Balances {
     return {
       userEth: balances1.userEth.sub(balances2.userEth),
+      userWeth: balances1.userWeth.sub(balances2.userWeth),
       userCp: balances1.userCp.sub(balances2.userCp),
       userStaked: balances1.userStaked.sub(balances2.userStaked),
       userPendingRewards: balances1.userPendingRewards.sub(balances2.userPendingRewards),
@@ -724,6 +782,7 @@ describe("CpFarm", function () {
       farmCp: balances1.farmCp.sub(balances2.farmCp),
       farmStake: balances1.farmStake.sub(balances2.farmStake),
       farmControllerSolace: balances1.farmControllerSolace.sub(balances2.farmControllerSolace),
+      vaultAssets: balances1.vaultAssets.sub(balances2.vaultAssets)
     };
   }
 

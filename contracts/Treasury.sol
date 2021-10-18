@@ -84,7 +84,7 @@ contract Treasury is ITreasury, ReentrancyGuard, Governable {
             if (amount > 0) {
                 // this call may fail. let it
                 // funds will be safely stored in treasury
-                _premiumRecipients[i].call{value: amount, gas: 100000}("");
+                _premiumRecipients[i].call{value: amount, gas: 100000}(""); // IGNORE THIS WARNING
             }
         }
         // hold treasury share as eth

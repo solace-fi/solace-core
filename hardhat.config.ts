@@ -14,7 +14,7 @@ dotenv_config();
 const USE_PROCESSED_FILES = process.env.USE_PROCESSED_FILES === "true";
 
 const mainnet_fork = { url: process.env.MAINNET_URL || '', blockNumber: 13097248 };
-const rinkeby_fork = { url: process.env.RINKEBY_URL || '', blockNumber: 9175122 };
+const rinkeby_fork = { url: process.env.RINKEBY_URL || '', blockNumber: 9487521 };
 const kovan_fork = { url: process.env.KOVAN_URL || '', blockNumber: 26927369 };
 const no_fork = { url: '', blockNumber: 0 };
 const forking = (

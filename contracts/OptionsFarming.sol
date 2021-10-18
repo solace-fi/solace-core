@@ -3,6 +3,7 @@ pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 import "./interface/UniswapV3/IUniswapV3Pool.sol";
 import "./libraries/UniswapV3/TickMath.sol";
 import "./libraries/UniswapV3/FixedPoint96.sol";
@@ -29,7 +30,7 @@ contract OptionsFarming is ERC721Enhanced, IOptionsFarming, ReentrancyGuard, Gov
     using SafeERC20 for IERC20;
 
     /// @notice Native SOLACE Token.
-    ISOLACE internal _solace = ISOLACE(address(0x0));
+    ISOLACE internal _solace;
 
     // farm controller
     IFarmController internal _controller;
@@ -41,16 +42,16 @@ contract OptionsFarming is ERC721Enhanced, IOptionsFarming, ReentrancyGuard, Gov
     uint256 internal _expiryDuration;
 
     // total number of options ever created
-    uint256 internal _numOptions = 0;
+    uint256 internal _numOptions;
 
     /// @dev _options[optionID] => Option info.
     mapping(uint256 => Option) internal _options;
 
     // the uniswap [**SOLACE**](../SOLACE)-**ETH** pool for calculating twap
-    IUniswapV3Pool internal _solaceEthPool = IUniswapV3Pool(address(0x0));
+    IUniswapV3Pool internal _solaceEthPool;
 
     // the uniswap **ETH**-**USD** pool for calculating twap
-    IUniswapV3Pool internal _ethUsdPool = IUniswapV3Pool(address(0x0));
+    IUniswapV3Pool internal _ethUsdPool;
 
     // interval in seconds to calculate time weighted average price in strike price
     // used in [**SOLACE**](../SOLACE)-**ETH** twap
@@ -86,6 +87,11 @@ contract OptionsFarming is ERC721Enhanced, IOptionsFarming, ReentrancyGuard, Gov
         _ethUsdTwapInterval = 1 hours;
         _swapRate = 10000; // 100%
         _priceFloor = type(uint256).max;
+        _numOptions = 0;
+        // start zero, set later
+        _solace = ISOLACE(address(0x0));
+        _solaceEthPool = IUniswapV3Pool(address(0x0));
+        _ethUsdPool = IUniswapV3Pool(address(0x0));
     }
 
     /***************************************
@@ -225,15 +231,47 @@ contract OptionsFarming is ERC721Enhanced, IOptionsFarming, ReentrancyGuard, Gov
      */
     function exerciseOption(uint256 optionID) external payable override nonReentrant {
         require(_isApprovedOrOwner(msg.sender, optionID), "!owner");
+        Option storage option = _options[optionID];
         // check msg.value
-        require(msg.value >= _options[optionID].strikePrice, "insufficient payment");
+        require(msg.value >= option.strikePrice, "insufficient payment");
         // check timestamp
-        require(block.timestamp <= _options[optionID].expiry, "expired");
+        require(block.timestamp <= option.expiry, "expired");
         // burn option
-        uint256 rewardAmount = _options[optionID].rewardAmount;
+        uint256 rewardAmount = option.rewardAmount;
         _burn(optionID);
         // transfer SOLACE
         _transferSolace(msg.sender, rewardAmount);
+        // transfer msg.value
+        _sendValue();
+        emit OptionExercised(optionID);
+    }
+
+    /**
+     * @notice Exercises an Option in part.
+     * `msg.sender` will pay `msg.value` **ETH**.
+     * `msg.sender` will receive a fair amount of [**SOLACE**](../SOLACE).
+     * Can only be called by the Option owner or approved.
+     * Can only be called before `option.expiry`.
+     * @param optionID The ID of the Option to exercise.
+     */
+    function exerciseOptionInPart(uint256 optionID) external payable override nonReentrant {
+        require(_isApprovedOrOwner(msg.sender, optionID), "!owner");
+        Option storage option = _options[optionID];
+        // check timestamp
+        require(block.timestamp <= option.expiry, "expired");
+        // calculate solace out
+        uint256 solaceOut = option.rewardAmount * msg.value / option.strikePrice;
+        if(solaceOut >= option.rewardAmount) {
+            // burn option if exercised in full
+            solaceOut = option.rewardAmount;
+            _burn(optionID);
+        } else {
+            // decrease amounts if exercised in part
+            option.rewardAmount -= solaceOut;
+            option.strikePrice -= msg.value;
+        }
+        // transfer SOLACE
+        _transferSolace(msg.sender, solaceOut);
         // transfer msg.value
         _sendValue();
         emit OptionExercised(optionID);
@@ -458,7 +496,7 @@ contract OptionsFarming is ERC721Enhanced, IOptionsFarming, ReentrancyGuard, Gov
         amount += unpaidSolace1;
         if(amount == 0) return;
         // send eth
-        uint256 transferAmount = min(_solace.balanceOf(address(this)), amount);
+        uint256 transferAmount = Math.min(_solace.balanceOf(address(this)), amount);
         uint256 unpaidSolace2 = amount - transferAmount;
         if(unpaidSolace2 != unpaidSolace1) _unpaidSolace[user] = unpaidSolace2;
         SafeERC20.safeTransfer(_solace, user, transferAmount);
@@ -475,16 +513,6 @@ contract OptionsFarming is ERC721Enhanced, IOptionsFarming, ReentrancyGuard, Gov
         // funds will be safely stored and can be sent later
         // solhint-disable-next-line avoid-low-level-calls
         _receiver.call{value: amount}(""); // IGNORE THIS WARNING
-    }
-
-    /**
-     * @notice Internal function that returns the minimum value between two values.
-     * @param a The first value.
-     * @param b The second value.
-     * @return c The minimum value.
-     */
-    function min(uint256 a, uint256 b) internal pure returns (uint256 c) {
-        return a <= b ? a : b;
     }
 
     /***************************************

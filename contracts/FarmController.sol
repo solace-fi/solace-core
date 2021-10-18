@@ -42,6 +42,7 @@ contract FarmController is IFarmController, Governable {
      * @param rewardPerSecond_ Amount of reward to distribute per second.
      */
     constructor(address governance_, address optionsFarming_, uint256 rewardPerSecond_) Governable(governance_) {
+        require(optionsFarming_ != address(0x0), "zero address optionsfarming");
         _optionsFarming = IOptionsFarming(payable(optionsFarming_));
         _rewardPerSecond = rewardPerSecond_;
     }
@@ -125,7 +126,8 @@ contract FarmController is IFarmController, Governable {
         uint256 numFarms_ = _numFarms; // copy to memory to save gas
         for(uint256 farmID = 1; farmID <= numFarms_; ++farmID) {
             IFarm farm = IFarm(_farmAddresses[farmID]);
-            rewardAmount += farm.withdrawRewardsForUser(msg.sender);
+            uint256 rewards = farm.withdrawRewardsForUser(msg.sender);
+            rewardAmount += rewards;
         }
         // create an option
         optionID = _optionsFarming.createOption(msg.sender, rewardAmount);

@@ -86,13 +86,6 @@ interface IClaimsEscrow is IERC721Enhanced {
     function getClaim(uint256 claimID) external view returns (uint256 amount, uint256 receivedAt);
 
     /**
-     * @notice Returns true if the claim exists.
-     * @param claimID The ID to check.
-     * @return status True if it exists, false if not.
-     */
-    function exists(uint256 claimID) external view returns (bool status);
-
-    /**
      * @notice Returns true if the payout of the claim can be withdrawn.
      * @param claimID The ID to check.
      * @return status True if it is withdrawable, false if not.
