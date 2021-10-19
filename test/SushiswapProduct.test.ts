@@ -54,7 +54,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
     const REAL_USER = "0x5dcd83cf2dd90a4c7e1c189e74ec7dc072ad78e1";
     const COOLDOWN_PERIOD = 3600; // one hour
 
-    const slpTokens = 
+    const slpTokens =
       [
         {
            "id":0,
@@ -1491,7 +1491,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
            "symbol":"SYN/WETH"
         }
      ]
-   
+
 
     before(async function () {
       artifacts = await import_artifacts();
@@ -1504,7 +1504,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
       await registry.connect(governor).setVault(vault.address);
       claimsEscrow = (await deployContract(deployer, artifacts.ClaimsEscrow, [governor.address, registry.address])) as ClaimsEscrow;
       await registry.connect(governor).setClaimsEscrow(claimsEscrow.address);
-      treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, ZERO_ADDRESS, registry.address])) as Treasury;
+      treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, registry.address])) as Treasury;
       await registry.connect(governor).setTreasury(treasury.address);
       policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
       await registry.connect(governor).setPolicyManager(policyManager.address);
@@ -1538,7 +1538,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
           maxPeriod
         ]
       )) as SushiswapProduct;
-      
+
       await vault.connect(deployer).depositEth({value:maxCoverAmount});
       await riskManager.connect(governor).addProduct(product.address, 1, 11044, 1);
       await product.connect(governor).addSigner(paclasSigner.address);
@@ -1579,7 +1579,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
         await expect( product.isValidPositionDescription(encodeAddresses([slpTokens[0].address, ZERO_ADDRESS]))).to.be.reverted;
       });
       it("can be one slp token", async function() {
-       
+
         for (var i = 0; i < slpTokens.length/2; ++i) {
           let status = await product.isValidPositionDescription(encodeAddresses([slpTokens[i].address]));
           if (!status) {
@@ -1744,7 +1744,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
             let amountOut = 10000;
             let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID, policyholder3.address, amountOut, deadline, SUBMIT_CLAIM_TYPEHASH);
             let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
-           
+
             // submit claim
             let tx1 = await product.connect(policyholder3).submitClaim(policyID, amountOut, deadline, signature);
             expect(tx1).to.emit(product, "ClaimSubmitted").withArgs(policyID);
@@ -1754,14 +1754,14 @@ if(process.env.FORK_NETWORK === "mainnet"){
             // verify payout
             expect((await claimsEscrow.claim(policyID)).amount).to.equal(amountOut);
             await provider.send("evm_increaseTime", [COOLDOWN_PERIOD]); // add one hour
-         
+
             let userEth1 = await policyholder3.getBalance();
             let tx2 = await claimsEscrow.connect(policyholder3).withdrawClaimsPayout(policyID);
             let receipt = await tx2.wait();
             let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
             let userEth2 = await policyholder3.getBalance();
             expect(userEth2.sub(userEth1).add(gasCost).toNumber()).to.equal(amountOut);
-        
+
             ++success;
             successList.push(symbol);
             console.log(`\x1b[38;5;239m        ✓ ${symbol}\x1b[0m`);
@@ -1772,7 +1772,7 @@ if(process.env.FORK_NETWORK === "mainnet"){
             failList.push(symbol);
           }
         }
-        
+
         if (failList.length != 0) {
           console.log("supported slp tokens:");
           console.log(successList.reduce((acc,val)=>`${acc}  - ${val}\n`,""));
