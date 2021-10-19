@@ -13,7 +13,7 @@ import { config as dotenv_config } from "dotenv";
 dotenv_config();
 const USE_PROCESSED_FILES = process.env.USE_PROCESSED_FILES === "true";
 
-const mainnet_fork = { url: process.env.MAINNET_URL || '', blockNumber: 13320237 };
+const mainnet_fork = { url: process.env.MAINNET_URL || '', blockNumber: 13449408 };
 const rinkeby_fork = { url: process.env.RINKEBY_URL || '', blockNumber: 9487521 };
 const kovan_fork = { url: process.env.KOVAN_URL || '', blockNumber: 26927369 };
 const no_fork = { url: '', blockNumber: 0 };
@@ -78,7 +78,7 @@ const config: HardhatUserConfig = {
   gasReporter: {
     enabled: true,
     currency: "USD",
-    gasPrice: 20,
+    gasPrice: 100,
     coinmarketcap: process.env.CMC_API_KEY || "",
   },
   etherscan: {
