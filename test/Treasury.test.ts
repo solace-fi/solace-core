@@ -1,9 +1,11 @@
+import hardhat from "hardhat";
 import { waffle, ethers, upgrades } from "hardhat";
 const { deployContract, solidity } = waffle;
 import { MockProvider } from "ethereum-waffle";
 const provider: MockProvider = waffle.provider;
 import { BigNumber as BN, BigNumberish, constants, Wallet } from "ethers";
 import { Contract } from "@ethersproject/contracts";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import chai from "chai";
 const { expect } = chai;
 chai.use(solidity);
@@ -12,18 +14,18 @@ import { encodePriceSqrt, FeeAmount, TICK_SPACINGS, getMaxTick, getMinTick } fro
 import { encodePath } from "./utilities/path";
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Solace, Treasury, MockErc20, Weth9, Registry, PolicyManager, Vault } from "../typechain";
+import { Solace, Treasury, MockErc20, Weth9, Registry, PolicyManager, Vault, GasGriefer } from "../typechain";
 
 describe("Treasury", function() {
   let artifacts: ArtifactImports;
   // users
-  let deployer: Wallet;
-  let governor: Wallet;
-  let liquidityProvider: Wallet;
-  let mockPolicy: Wallet;
-  let user: Wallet;
-  let randAddress: Wallet;
-  let mockProduct: Wallet;
+  let deployer: SignerWithAddress;
+  let governor: SignerWithAddress;
+  let liquidityProvider: SignerWithAddress;
+  let mockPolicy: SignerWithAddress;
+  let user: SignerWithAddress;
+  let randAddress: SignerWithAddress;
+  let mockProduct: SignerWithAddress;
 
   // solace contracts
   let solace: Solace;
@@ -56,7 +58,8 @@ describe("Treasury", function() {
   const ONE_MILLION_ETHER = BN.from("1000000000000000000000000");
 
   before(async function() {
-    [deployer, governor, liquidityProvider, mockPolicy, user, randAddress, mockProduct] = provider.getWallets();
+    //[deployer, governor, liquidityProvider, mockPolicy, user, randAddress, mockProduct] = provider.getWallets();
+    [deployer, governor, liquidityProvider, mockPolicy, user, randAddress, mockProduct] = await hardhat.ethers.getSigners();
     artifacts = await import_artifacts();
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
 
@@ -90,7 +93,7 @@ describe("Treasury", function() {
     uniswapPositionManager = (await deployContract(deployer, artifacts.NonfungiblePositionManager, [uniswapFactory.address, weth.address, ZERO_ADDRESS])) as Contract;
 
     // deploy treasury contract
-    treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, uniswapRouter.address, registry.address])) as Treasury;
+    treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, registry.address])) as Treasury;
     await registry.connect(governor).setTreasury(treasury.address);
 
     // deploy policy manager
@@ -130,34 +133,64 @@ describe("Treasury", function() {
     mockToken4Path = encodePath([randAddress.address, randAddress.address], [FeeAmount.MEDIUM]);
   });
 
+  describe("deployment", function () {
+    it("reverts if zero registry", async function () {
+      await expect(deployContract(deployer, artifacts.Treasury, [governor.address, ZERO_ADDRESS])).to.be.revertedWith("zero address registry");
+    });
+    it("reverts if zero weth", async function () {
+      let registry2 = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
+      await expect(deployContract(deployer, artifacts.Treasury, [governor.address, registry2.address])).to.be.revertedWith("zero address weth");
+    });
+    it("routes to vault if set", async function () {
+      let registry2 = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
+      await registry2.connect(governor).setWeth(weth.address);
+      let vault2 = (await deployContract(deployer,artifacts.Vault,[governor.address,registry.address])) as Vault;
+      await registry2.connect(governor).setVault(vault2.address);
+      let treasury2 = (await deployContract(deployer, artifacts.Treasury, [governor.address, registry2.address])) as Treasury;
+      expect(await treasury2.premiumRecipient(0)).to.equal(vault2.address);
+      expect(await treasury2.numPremiumRecipients()).to.equal(1);
+      expect(await treasury2.recipientWeight(0)).to.equal(1);
+      expect(await treasury2.recipientWeight(1)).to.equal(0);
+      expect(await treasury2.weightSum()).to.equal(1);
+    });
+    it("routes to treasury if vault not set", async function () {
+      let registry2 = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
+      await registry2.connect(governor).setWeth(weth.address);
+      let treasury2 = (await deployContract(deployer, artifacts.Treasury, [governor.address, registry2.address])) as Treasury;
+      expect(await treasury2.numPremiumRecipients()).to.equal(0);
+      expect(await treasury2.weightSum()).to.equal(0);
+    });
+  });
+
   describe("governance", function() {
     it("starts with the correct governor", async function() {
       expect(await treasury.governance()).to.equal(governor.address);
     });
 
     it("rejects setting new governance by non governor", async function() {
-      await expect(treasury.connect(user).setGovernance(user.address)).to.be.revertedWith("!governance");
+      await expect(treasury.connect(user).setPendingGovernance(user.address)).to.be.revertedWith("!governance");
     });
 
     it("can set new governance", async function() {
-      await treasury.connect(governor).setGovernance(deployer.address);
+      let tx = await treasury.connect(governor).setPendingGovernance(deployer.address);
+      expect(tx).to.emit(treasury, "GovernancePending").withArgs(deployer.address);
       expect(await treasury.governance()).to.equal(governor.address);
-      expect(await treasury.newGovernance()).to.equal(deployer.address);
+      expect(await treasury.pendingGovernance()).to.equal(deployer.address);
     });
 
     it("rejects governance transfer by non governor", async function() {
-      await expect(treasury.connect(user).acceptGovernance()).to.be.revertedWith("!governance");
+      await expect(treasury.connect(user).acceptGovernance()).to.be.revertedWith("!pending governance");
     });
 
     it("can transfer governance", async function() {
       let tx = await treasury.connect(deployer).acceptGovernance();
       await expect(tx)
         .to.emit(treasury, "GovernanceTransferred")
-        .withArgs(deployer.address);
+        .withArgs(governor.address, deployer.address);
       expect(await treasury.governance()).to.equal(deployer.address);
-      expect(await treasury.newGovernance()).to.equal(ZERO_ADDRESS);
+      expect(await treasury.pendingGovernance()).to.equal(ZERO_ADDRESS);
 
-      await treasury.connect(deployer).setGovernance(governor.address);
+      await treasury.connect(deployer).setPendingGovernance(governor.address);
       await treasury.connect(governor).acceptGovernance();
     });
   });
@@ -222,58 +255,6 @@ describe("Treasury", function() {
     });
   });
 
-  describe("swap", function() {
-    it("non governor cannot swap", async function() {
-      await expect(treasury.connect(user).swap(wethPath, 100, 0)).to.be.revertedWith("!governance");
-    });
-    it("cannot swap token with no path", async function() {
-      let depositAmount = ONE_HUNDRED;
-      let balancesBefore = await getBalances(mockPolicy);
-      await mockToken1.transfer(treasury.address, depositAmount);
-      await expect(treasury.connect(governor).swap(defaultPath, 100, 0)).to.be.reverted;
-      let balancesAfter = await getBalances(mockPolicy);
-      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
-      expect(balancesDiff.treasurySolace).to.equal(0); // solace should not increase
-      expect(balancesDiff.treasuryMock1).to.equal(depositAmount); // should hold other token
-    });
-    it("can swap token with a swap path", async function() {
-      let depositAmount = ONE_HUNDRED;
-      let balancesBefore = await getBalances(mockPolicy);
-      await mockToken2.transfer(treasury.address, depositAmount);
-      await treasury.connect(governor).swap(mockToken2Path, await mockToken2.balanceOf(treasury.address), 0);
-      let balancesAfter = await getBalances(mockPolicy);
-      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
-      expect(balancesDiff.treasurySolace).to.be.gt(0); // solace should increase
-      expect(balancesAfter.treasuryMock2).to.equal(0); // should swap mock
-    });
-    it("can swap token with a multi pool swap path", async function() {
-      let depositAmount = ONE_HUNDRED;
-      let balancesBefore = await getBalances(mockPolicy);
-      await mockToken3.transfer(treasury.address, depositAmount);
-      await treasury.connect(governor).swap(mockToken3Path, await mockToken3.balanceOf(treasury.address), 0);
-      let balancesAfter = await getBalances(mockPolicy);
-      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
-      expect(balancesDiff.treasurySolace).to.be.gt(0); // solace should increase
-      expect(balancesAfter.treasuryMock3).to.equal(0); // should swap mock
-    });
-    it("cannot swap token with uniswap errors", async function() {
-      let depositAmount = ONE_HUNDRED;
-      let balancesBefore = await getBalances(mockPolicy);
-      await mockToken4.transfer(treasury.address, depositAmount);
-      await expect(treasury.connect(governor).swap(mockToken4Path, 100, 0)).to.be.reverted;
-      let balancesAfter = await getBalances(mockPolicy);
-      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
-      expect(balancesDiff.treasurySolace).to.equal(0); // solace should not increase
-      expect(balancesDiff.treasuryMock4).to.equal(depositAmount); // should hold mock
-    });
-    it("reverts if not enough received", async function() {
-      let amountIn = ONE_HUNDRED;
-      await mockToken2.transfer(treasury.address, amountIn);
-      let amountOut = 99;
-      await expect(treasury.connect(governor).swap(mockToken2Path, amountIn, amountOut)).to.be.revertedWith("Too little received");
-    });
-  });
-
   describe("wrap", function () {
     it("non governor cannot wrap eth", async function() {
       await expect(treasury.connect(user).wrap(1)).to.be.revertedWith("!governance");
@@ -306,6 +287,12 @@ describe("Treasury", function() {
   describe("spend", function() {
     it("non governor cannot spend", async function() {
       await expect(treasury.connect(user).spend(solace.address, 100, governor.address)).to.be.revertedWith("!governance");
+    });
+    it("cannot spend zero address token", async function () {
+      await expect(treasury.connect(governor).spend(ZERO_ADDRESS, 100, governor.address)).to.be.revertedWith("zero address token");
+    });
+    it("cannot spend to zero address recipient", async function () {
+      await expect(treasury.connect(governor).spend(solace.address, 100, ZERO_ADDRESS)).to.be.revertedWith("zero address recipient");
     });
     it("can spend solace", async function() {
       let spendAmount = BN.from("5");
@@ -353,7 +340,8 @@ describe("Treasury", function() {
     it("can route premiums with no recipients", async function() {
       let balancesBefore = await getBalances(user);
       let depositAmount = 100;
-      await treasury.connect(user).routePremiums({ value: depositAmount });
+      let tx = await treasury.connect(user).routePremiums({ value: depositAmount });
+      expect(tx).to.emit(treasury, "PremiumsRouted").withArgs(depositAmount);
       let balancesAfter = await getBalances(user);
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       expect(balancesDiff.treasuryEth).to.equal(depositAmount);
@@ -364,21 +352,57 @@ describe("Treasury", function() {
     it("validates recipients and weights", async function() {
       await expect(treasury.connect(governor).setPremiumRecipients([], [1, 2])).to.be.revertedWith("length mismatch");
       await expect(treasury.connect(governor).setPremiumRecipients([deployer.address], [0, 0])).to.be.revertedWith("1/0");
+      expect(treasury.connect(governor).setPremiumRecipients(fill(16, deployer.address), fill(17, 1))).to.be.revertedWith("too many recipients");
     });
     it("can set recipients", async function() {
       let tx1 = await treasury.connect(governor).setPremiumRecipients([], [0]);
       expect(tx1).to.emit(treasury, "RecipientsSet");
+      await treasury.connect(governor).setPremiumRecipients(fill(15, deployer.address), fill(16, 1));
       let tx2 = await treasury.connect(governor).setPremiumRecipients([deployer.address], [2, 3]);
       expect(tx2).to.emit(treasury, "RecipientsSet");
     });
     it("can route premiums", async function() {
       let balancesBefore = await getBalances(deployer);
       let depositAmount = 100;
-      await treasury.connect(user).routePremiums({ value: depositAmount });
+      let tx1 = await treasury.connect(user).routePremiums({ value: depositAmount });
+      expect(tx1).to.emit(treasury, "PremiumsRouted").withArgs(depositAmount);
       let balancesAfter = await getBalances(deployer);
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       expect(balancesDiff.treasuryEth).to.equal(60);
       expect(balancesDiff.userEth).to.equal(40);
+      let tx2 = await treasury.connect(governor).routePremiums(); // empty routing
+      expect(tx2).to.emit(treasury, "PremiumsRouted").withArgs(0);
+    });
+    it("is safe from gas griefing", async function () {
+      let gasGriefer = (await deployContract(deployer, artifacts.GasGriefer)) as GasGriefer;
+      await treasury.connect(governor).setPremiumRecipients([deployer.address, gasGriefer.address], [2, 3, 7]);
+      let balancesBefore = await getBalances(deployer);
+      let depositAmount = 120;
+      let tx = await treasury.connect(user).routePremiums({ value: depositAmount });
+      let balancesAfter = await getBalances(deployer);
+      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
+      expect(balancesDiff.userEth).to.equal(20);
+      expect(await provider.getBalance(gasGriefer.address)).to.eq(0);
+      expect(balancesDiff.treasuryEth).to.equal(100); // 30 + 70
+      let receipt = await tx.wait();
+      expect(receipt.gasUsed).to.be.lt(300000);
+      expect(await gasGriefer.acc()).to.eq(0);
+      await treasury.connect(governor).routePremiums(); // empty routing
+    });
+    it("is safe from gas griefing", async function () {
+      let gasGriefer = (await deployContract(deployer, artifacts.GasGriefer)) as GasGriefer;
+      await treasury.connect(governor).setPremiumRecipients([deployer.address, gasGriefer.address], [2, 3, 7]);
+      let balancesBefore = await getBalances(deployer);
+      let depositAmount = 120;
+      let tx = await treasury.connect(user).routePremiums({ value: depositAmount });
+      let balancesAfter = await getBalances(deployer);
+      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
+      expect(balancesDiff.userEth).to.equal(20);
+      expect(await provider.getBalance(gasGriefer.address)).to.eq(0);
+      expect(balancesDiff.treasuryEth).to.equal(100); // 30 + 70
+      let receipt = await tx.wait();
+      expect(receipt.gasUsed).to.be.lt(300000);
+      expect(await gasGriefer.acc()).to.eq(0);
       await treasury.connect(governor).routePremiums(); // empty routing
     });
   });
@@ -387,11 +411,13 @@ describe("Treasury", function() {
     before(async function() {
       await registry.connect(governor).setPolicyManager(policyManager.address);
     });
-
     it("non product cannot refund", async function() {
       await expect(treasury.connect(mockProduct).refund(user.address, 1)).to.be.revertedWith("!product");
     });
-
+    it("cannot refund to zero address", async function () {
+      await policyManager.connect(governor).addProduct(mockProduct.address);
+      await expect(treasury.connect(mockProduct).refund(ZERO_ADDRESS, 1)).to.be.revertedWith("zero address recipient");
+    });
     it("product can refund in full", async function() {
       await policyManager.connect(governor).addProduct(mockProduct.address);
       let balancesBefore = await getBalances(user);
@@ -402,7 +428,6 @@ describe("Treasury", function() {
       expect(balancesDiff.treasuryEth).to.equal(refundAmount.mul(-1));
       expect(balancesDiff.userEth).to.equal(refundAmount);
     });
-
     it("product can partially refund", async function() {
       // part 1: partial refund
       let balancesBefore = await getBalances(user);
@@ -435,9 +460,9 @@ describe("Treasury", function() {
       before(async function() {
         vault = (await deployContract(deployer,artifacts.Vault,[governor.address,registry.address])) as Vault;
         await registry.connect(governor).setVault(vault.address);
-        treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, uniswapRouter.address, registry.address])) as Treasury;
+        treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, registry.address])) as Treasury;
         await registry.connect(governor).setTreasury(treasury.address);
-        await vault.connect(governor).setRequestor(treasury.address, true);
+        await vault.connect(governor).addRequestor(treasury.address);
       });
 
       it("vault is a premium recipient", async function() {
@@ -451,7 +476,8 @@ describe("Treasury", function() {
       it("can route premiums to vault", async function() {
         let vaultAmountBefore = await provider.getBalance(vault.address);
         let depositAmount = 100;
-        await treasury.connect(user).routePremiums({ value: depositAmount });
+        let tx = await treasury.connect(user).routePremiums({ value: depositAmount });
+        expect(tx).to.emit(treasury, "PremiumsRouted").withArgs(depositAmount);
         let vaultAmountAfter = await provider.getBalance(vault.address);
         expect(vaultAmountAfter.sub(depositAmount)).to.equal(vaultAmountBefore);
       });
@@ -528,7 +554,7 @@ describe("Treasury", function() {
   }
 
   // adds liquidity to a pool
-  async function addLiquidity(liquidityProvider: Wallet, tokenA: Contract, tokenB: Contract, fee: FeeAmount, amount: BigNumberish) {
+  async function addLiquidity(liquidityProvider: SignerWithAddress, tokenA: Contract, tokenB: Contract, fee: FeeAmount, amount: BigNumberish) {
     await tokenA.connect(liquidityProvider).approve(uniswapPositionManager.address, amount);
     await tokenB.connect(liquidityProvider).approve(uniswapPositionManager.address, amount);
     let [token0, token1] = sortTokens(tokenA.address, tokenB.address);
@@ -564,7 +590,7 @@ describe("Treasury", function() {
     treasuryMock4: BN;
   }
 
-  async function getBalances(user: Wallet): Promise<Balances> {
+  async function getBalances(user: SignerWithAddress): Promise<Balances> {
     return {
       userSolace: await solace.balanceOf(user.address),
       userEth: await user.getBalance(),
@@ -602,3 +628,9 @@ describe("Treasury", function() {
     };
   }
 });
+
+function fill(length: number, filler: any) {
+  let a = [];
+  for(var i = 0; i < length; ++i) a.push(filler);
+  return a;
+}

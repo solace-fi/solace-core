@@ -228,7 +228,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
         require(msg.sender == governance, "!governance");
         // check that each entry in input array is an active strategy
         uint256 length = _queue.length;
-        for (uint256 i = 0; i < length; ++i) {
+        for(uint256 i = 0; i < length; ++i) {
             require(_strategies[_queue[i]].activation > 0, "must be a current strategy");
         }
         // set input to be the new queue
@@ -293,7 +293,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
 
         // check that strategy is not already in the queue
         uint256 length = withdrawalQueue.length;
-        for (uint256 i = 0; i < length; i++) {
+        for(uint256 i = 0; i < length; i++) {
             require(withdrawalQueue[i] != _strategy, "strategy already in queue");
         }
 
@@ -506,7 +506,7 @@ contract Vault is ERC20Permit, IVault, ReentrancyGuard {
 
             uint256 _totalDebt = totalDebt;
             uint256 length = withdrawalQueue.length;
-            for (uint256 i = 0; i < length; ++i) {
+            for(uint256 i = 0; i < length; ++i) {
                 uint256 amountNeeded = min(
                     value - vaultBalance,
                     // Do not withdraw more than the Strategy's debt so that it can still work based on the profits it has

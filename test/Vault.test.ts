@@ -20,7 +20,7 @@ describe("Vault", function () {
   let mockProduct: MockProduct;
   let riskManager: RiskManager;
 
-  const [owner, newOwner, depositor1, depositor2, claimant, mockEscrow, mockTreasury] = provider.getWallets();
+  const [owner, newOwner, depositor1, depositor2, claimant, mockEscrow, mockTreasury, coveredPlatform] = provider.getWallets();
   const tokenName = "Solace CP Token";
   const tokenSymbol = "SCP";
   const testDepositAmount1 = BN.from("1000000000000000000"); // one eth
@@ -50,7 +50,7 @@ describe("Vault", function () {
     await registry.setPolicyManager(policyManager.address);
     riskManager = (await deployContract(owner, artifacts.RiskManager, [owner.address, registry.address])) as RiskManager;
     await registry.setRiskManager(riskManager.address);
-    mockProduct = (await deployContract(owner,artifacts.MockProduct,[owner.address,policyManager.address,registry.address,ZERO_ADDRESS,0,100000000000,1])) as MockProduct;
+    mockProduct = (await deployContract(owner,artifacts.MockProduct,[owner.address,policyManager.address,registry.address,coveredPlatform.address,0,100000000000,1])) as MockProduct;
     await policyManager.addProduct(mockProduct.address);
   });
 
@@ -65,39 +65,50 @@ describe("Vault", function () {
     it("should initialize DOMAIN_SEPARATOR correctly", async function () {
       expect(await vault.DOMAIN_SEPARATOR()).to.equal(getDomainSeparator(tokenName, vault.address, chainId));
     });
+    it("reverts if zero registry", async function () {
+      await expect(deployContract(owner, artifacts.Vault, [owner.address, ZERO_ADDRESS])).to.be.revertedWith("zero address registry");
+    });
+    it("reverts if zero weth", async function () {
+      let registry2 = (await deployContract(owner, artifacts.Registry, [owner.address])) as Registry;
+      await expect(deployContract(owner, artifacts.Vault, [owner.address, registry2.address])).to.be.revertedWith("zero address weth");
+    });
   });
 
-  describe("setGovernance", function () {
+  describe("setPendingGovernance", function () {
     it("should allow governance to set new governance address", async function () {
       expect(await vault.governance()).to.equal(owner.address);
-      await vault.connect(owner).setGovernance(newOwner.address);
+      let tx1 = await vault.connect(owner).setPendingGovernance(newOwner.address);
+      expect(tx1).to.emit(vault, "GovernancePending").withArgs(newOwner.address);
       expect(await vault.governance()).to.equal(owner.address);
-      expect(await vault.newGovernance()).to.equal(newOwner.address);
-      let tx = await vault.connect(newOwner).acceptGovernance();
-      await expect(tx).to.emit(vault, "GovernanceTransferred").withArgs(newOwner.address);
+      expect(await vault.pendingGovernance()).to.equal(newOwner.address);
+      let tx2 = await vault.connect(newOwner).acceptGovernance();
+      await expect(tx2).to.emit(vault, "GovernanceTransferred").withArgs(owner.address, newOwner.address);
       expect(await vault.governance()).to.equal(newOwner.address);
-      expect(await vault.newGovernance()).to.equal(ZERO_ADDRESS);
+      expect(await vault.pendingGovernance()).to.equal(ZERO_ADDRESS);
     });
     it("should revert if not called by governance", async function () {
-      await expect(vault.connect(depositor1).setGovernance(depositor1.address)).to.be.revertedWith("!governance");
-      await vault.connect(owner).setGovernance(newOwner.address);
-      await expect(vault.connect(depositor1).acceptGovernance()).to.be.revertedWith("!governance");
+      await expect(vault.connect(depositor1).setPendingGovernance(depositor1.address)).to.be.revertedWith("!governance");
+      await vault.connect(owner).setPendingGovernance(newOwner.address);
+      await expect(vault.connect(depositor1).acceptGovernance()).to.be.revertedWith("!pending governance");
     });
   });
 
-  describe("setEmergencyShutdown", function () {
+  describe("pause/unpause", function () {
     it("should revert if not called by governance", async function () {
-      await expect(vault.connect(depositor1).setEmergencyShutdown(true)).to.be.revertedWith("!governance");
+      await expect(vault.connect(depositor1).pause()).to.be.revertedWith("!governance");
+      await expect(vault.connect(depositor1).unpause()).to.be.revertedWith("!governance");
     });
-    it("should successfully toggle emergency shutdown state in Vault", async function () {
-      let callShutdownState = await vault.emergencyShutdown();
-      expect(callShutdownState).to.be.false;
-      await vault.connect(owner).setEmergencyShutdown(true);
-      callShutdownState = await vault.emergencyShutdown();
-      expect(callShutdownState).to.be.true;
-      await vault.connect(owner).setEmergencyShutdown(false);
-      callShutdownState = await vault.emergencyShutdown();
-      expect(callShutdownState).to.be.false;
+    it("should successfully toggle paused state in Vault", async function () {
+      let callPausedState = await vault.paused();
+      expect(callPausedState).to.be.false;
+      let tx1 = await vault.connect(owner).pause();
+      expect(tx1).to.emit(vault, "Paused");
+      callPausedState = await vault.paused();
+      expect(callPausedState).to.be.true;
+      let tx2 = await vault.connect(owner).unpause();
+      expect(tx2).to.emit(vault, "Unpaused");
+      callPausedState = await vault.paused();
+      expect(callPausedState).to.be.false;
     });
   });
 
@@ -113,9 +124,15 @@ describe("Vault", function () {
       await expect(vault.connect(owner).setCooldownWindow(4,3)).to.be.revertedWith("invalid window");
     });
     it("should successfully set cooldown window", async function () {
-      await vault.connect(owner).setCooldownWindow(3,4);
+      // lt
+      let tx = await vault.connect(owner).setCooldownWindow(3,4);
+      expect(tx).to.emit(vault, "CooldownWindowSet").withArgs(3, 4);
       expect(await vault.cooldownMin()).to.equal(3);
       expect(await vault.cooldownMax()).to.equal(4);
+      // eq
+      await vault.connect(owner).setCooldownWindow(7,7);
+      expect(await vault.cooldownMin()).to.equal(7);
+      expect(await vault.cooldownMax()).to.equal(7);
     });
   });
 
@@ -149,13 +166,13 @@ describe("Vault", function () {
     });
     it("should depreciate on payout of claims", async function () {
       await vault.connect(depositor1).depositEth({value: "500000000000000000"});
-      await vault.connect(owner).setRequestor(depositor1.address, true);
+      await vault.connect(owner).addRequestor(depositor1.address);
       await vault.connect(depositor1).requestEth("250000000000000000");
       expect(await vault.pricePerShare()).to.equal(BN.from("500000000000000000"));
     });
     it("should stay the same on deposit", async function () {
       await vault.connect(depositor1).depositEth({value: "500000000000000000"});
-      await vault.connect(owner).setRequestor(depositor1.address, true);
+      await vault.connect(owner).addRequestor(depositor1.address);
       await vault.connect(depositor1).requestEth("250000000000000000");
       expect(await vault.pricePerShare()).to.equal(BN.from("500000000000000000"));
       await vault.connect(depositor2).depositEth({value: "250000000000000000"});
@@ -163,7 +180,7 @@ describe("Vault", function () {
     });
     it("should stay the same on withdraw", async function () {
       await vault.connect(depositor1).depositEth({value: "500000000000000000"});
-      await vault.connect(owner).setRequestor(depositor1.address, true);
+      await vault.connect(owner).addRequestor(depositor1.address);
       await vault.connect(depositor1).requestEth("250000000000000000");
       expect(await vault.pricePerShare()).to.equal(BN.from("500000000000000000"));
       await vault.connect(owner).setCooldownWindow(0, "1099511627775"); // min, max uint40
@@ -213,9 +230,9 @@ describe("Vault", function () {
   });
 
   describe("deposit eth", function () {
-    it("revert if vault is in emergency shutdown", async function () {
-      await vault.connect(owner).setEmergencyShutdown(true);
-      await expect(vault.connect(depositor1).depositEth({ value: testDepositAmount1 })).to.be.revertedWith("cannot deposit when vault is in emergency shutdown");
+    it("revert if vault is paused", async function () {
+      await vault.connect(owner).pause();
+      await expect(vault.connect(depositor1).depositEth({ value: testDepositAmount1 })).to.be.revertedWith("cannot deposit while paused");
     });
     it("should mint the first depositor CP tokens with ratio 1:1", async function () {
       await vault.connect(depositor1).depositEth({ value: testDepositAmount1 });
@@ -249,7 +266,8 @@ describe("Vault", function () {
       await expect(await vault.connect(depositor1).depositEth({ value: testDepositAmount1 })).to.emit(vault, "DepositMade").withArgs(depositor1.address, testDepositAmount1, testDepositAmount1);
     });
     it("should restart cooldown", async function () {
-      await vault.connect(depositor1).startCooldown();
+      let tx = await vault.connect(depositor1).startCooldown();
+      expect(tx).to.emit(vault, "CooldownStarted").withArgs(depositor1.address);
       expect(await vault.cooldownStart(depositor1.address)).to.be.gt(0);
       await vault.connect(depositor1).depositEth({value: 1});
       expect(await vault.cooldownStart(depositor1.address)).to.equal(0);
@@ -279,9 +297,9 @@ describe("Vault", function () {
       await weth.connect(depositor2).deposit({value:testDepositAmount1});
       await weth.connect(depositor2).approve(vault.address, testDepositAmount1);
     })
-    it("revert if vault is in emergency shutdown", async function () {
-      await vault.connect(owner).setEmergencyShutdown(true);
-      await expect(vault.connect(depositor1).depositWeth(testDepositAmount1)).to.be.revertedWith("cannot deposit when vault is in emergency shutdown");
+    it("revert if vault is paused", async function () {
+      await vault.connect(owner).pause();
+      await expect(vault.connect(depositor1).depositWeth(testDepositAmount1)).to.be.revertedWith("cannot deposit while paused");
     });
     it("should mint the first depositor CP tokens with ratio 1:1", async function () {
       await vault.connect(depositor1).depositWeth(testDepositAmount1);
@@ -310,7 +328,8 @@ describe("Vault", function () {
       await expect(await vault.connect(depositor1).depositWeth(testDepositAmount1)).to.emit(vault, "DepositMade").withArgs(depositor1.address, testDepositAmount1, testDepositAmount1);
     });
     it("should restart cooldown", async function () {
-      await vault.connect(depositor1).startCooldown();
+      let tx = await vault.connect(depositor1).startCooldown();
+      expect(tx).to.emit(vault, "CooldownStarted").withArgs(depositor1.address);
       expect(await vault.cooldownStart(depositor1.address)).to.be.gt(0);
       await vault.connect(depositor1).depositWeth(1);
       expect(await vault.cooldownStart(depositor1.address)).to.equal(0);
@@ -342,7 +361,8 @@ describe("Vault", function () {
       await vault.connect(depositor1).startCooldown();
       expect(await vault.canTransfer(depositor1.address)).to.equal(false);
       await expect(vault.connect(depositor1).transfer(depositor2.address, 1)).to.be.revertedWith("cannot transfer during cooldown");
-      await vault.connect(depositor1).stopCooldown();
+      let tx = await vault.connect(depositor1).stopCooldown();
+      expect(tx).to.emit(vault, "CooldownStopped").withArgs(depositor1.address);
       expect(await vault.canTransfer(depositor1.address)).to.equal(true);
       await vault.connect(depositor1).transfer(depositor2.address, 1);
       expect(await vault.balanceOf(depositor1.address)).to.equal(0);
@@ -363,11 +383,11 @@ describe("Vault", function () {
       expect(await vault.balanceOf(depositor1.address)).to.equal(1);
       expect(await vault.balanceOf(depositor2.address)).to.equal(0);
     });
-    it("does not care about cooldown while in emergency shutdown", async function () {
+    it("does not care about cooldown while paused", async function () {
       expect(await vault.balanceOf(depositor1.address)).to.equal(0);
       expect(await vault.balanceOf(depositor2.address)).to.equal(0);
       await vault.connect(depositor1).depositEth({value: 1});
-      await vault.connect(owner).setEmergencyShutdown(true);
+      await vault.connect(owner).pause();
       expect(await vault.balanceOf(depositor1.address)).to.equal(1);
       expect(await vault.balanceOf(depositor2.address)).to.equal(0);
       await vault.connect(depositor1).startCooldown();
@@ -388,13 +408,13 @@ describe("Vault", function () {
     });
     it("should revert if withdrawer tries to redeem more shares than they own", async function () {
       let cpBalance = await vault.balanceOf(depositor1.address);
-      await expect(vault.connect(depositor1).withdrawEth(cpBalance.add(1))).to.be.revertedWith("cannot redeem more shares than you own");
+      await expect(vault.connect(depositor1).withdrawEth(cpBalance.add(1))).to.be.revertedWith("insufficient scp balance");
     });
     it("should revert if withdrawal brings Vault's totalAssets below the minimum capital requirement", async function () {
       let balance = await vault.totalAssets();
       await mockProduct.connect(depositor1)._buyPolicy(depositor1.address, balance, 123, ZERO_ADDRESS);
       expect(await riskManager.minCapitalRequirement()).to.equal(balance);
-      await expect(vault.connect(depositor1).withdrawEth(1)).to.be.revertedWith("withdrawal brings Vault assets below MCR");
+      await expect(vault.connect(depositor1).withdrawEth(1)).to.be.revertedWith("insufficient assets");
     });
     it("should revert if cooldown not started", async function () {
       expect(await vault.canWithdraw(depositor1.address)).to.equal(false);
@@ -449,9 +469,9 @@ describe("Vault", function () {
       expect(ub2.sub(ub1).add(gasCost)).to.equal(testDepositAmount1.mul(2));
       expect(vb1.sub(vb2)).to.equal(testDepositAmount1.mul(2));
     });
-    context("while vault is in emergency shutdown", function () {
+    context("while vault is in paused", function () {
       beforeEach(async function () {
-        await vault.connect(owner).setEmergencyShutdown(true);
+        await vault.connect(owner).pause();
       });
       it("does not care about mcr", async function () {
         let balance = await vault.balanceOf(depositor1.address);
@@ -481,13 +501,13 @@ describe("Vault", function () {
     });
     it("should revert if withdrawer tries to redeem more shares than they own", async function () {
       let cpBalance = await vault.balanceOf(depositor1.address);
-      await expect(vault.connect(depositor1).withdrawWeth(cpBalance.add(1))).to.be.revertedWith("cannot redeem more shares than you own");
+      await expect(vault.connect(depositor1).withdrawWeth(cpBalance.add(1))).to.be.revertedWith("insufficient scp balance");
     });
     it("should revert if withdrawal brings Vault's totalAssets below the minimum capital requirement", async function () {
       let balance = await vault.totalAssets();
       await mockProduct.connect(depositor1)._buyPolicy(depositor1.address, balance, 123, ZERO_ADDRESS);
       expect(await riskManager.minCapitalRequirement()).to.equal(balance);
-      await expect(vault.connect(depositor1).withdrawWeth(1)).to.be.revertedWith("withdrawal brings Vault assets below MCR");
+      await expect(vault.connect(depositor1).withdrawWeth(1)).to.be.revertedWith("insufficient assets");
     });
     it("should revert if cooldown not started", async function () {
       await expect(vault.connect(depositor1).withdrawWeth(0)).to.be.revertedWith("not in cooldown window");
@@ -529,9 +549,9 @@ describe("Vault", function () {
       expect(ub2.sub(ub1)).to.equal(testDepositAmount1.mul(2));
       expect(vb1.sub(vb2)).to.equal(testDepositAmount1.mul(2));
     });
-    context("while vault is in emergency shutdown", function () {
+    context("while vault is paused", function () {
       beforeEach(async function () {
-        await vault.connect(owner).setEmergencyShutdown(true);
+        await vault.connect(owner).pause();
       });
       it("does not care about mcr", async function () {
         let balance = await vault.balanceOf(depositor1.address);
@@ -558,20 +578,26 @@ describe("Vault", function () {
       expect(await vault.isRequestor(claimsEscrow.address)).to.equal(false);
     });
     it("should revert add and remove requestors by non governance", async function () {
-      await expect(vault.connect(depositor1).setRequestor(depositor1.address, true)).to.be.revertedWith("!governance");
-      await expect(vault.connect(depositor1).setRequestor(depositor1.address, false)).to.be.revertedWith("!governance");
+      await expect(vault.connect(depositor1).addRequestor(depositor1.address)).to.be.revertedWith("!governance");
+      await expect(vault.connect(depositor1).removeRequestor(depositor1.address)).to.be.revertedWith("!governance");
     });
     it("should add and remove requestors", async function () {
-      await vault.connect(owner).setRequestor(claimsEscrow.address, true);
+      let tx1 = await vault.connect(owner).addRequestor(claimsEscrow.address);
+      expect(tx1).to.emit(vault, "RequestorAdded").withArgs(claimsEscrow.address);
       expect(await vault.isRequestor(claimsEscrow.address)).to.equal(true);
-      await vault.connect(owner).setRequestor(claimsEscrow.address, false);
+      let tx2 = await vault.connect(owner).removeRequestor(claimsEscrow.address);
+      expect(tx2).to.emit(vault, "RequestorRemoved").withArgs(claimsEscrow.address);
       expect(await vault.isRequestor(claimsEscrow.address)).to.equal(false);
+    });
+    it("cannot add or remove zero address requestor", async function () {
+      await expect(vault.connect(owner).addRequestor(ZERO_ADDRESS)).to.be.revertedWith("zero address requestor");
+      await expect(vault.connect(owner).removeRequestor(ZERO_ADDRESS)).to.be.revertedWith("zero address requestor");
     });
   });
 
   describe("requestEth", function () {
     beforeEach(async function () {
-      await vault.connect(owner).setRequestor(mockEscrow.address, true);
+      await vault.connect(owner).addRequestor(mockEscrow.address);
     })
     it("should revert if not called by a requestor", async function () {
       await expect(vault.requestEth(0)).to.be.revertedWith("!requestor");
@@ -615,7 +641,8 @@ describe("Vault", function () {
 
   describe("share value", function () {
     beforeEach("set no cooldown", async function () {
-      await vault.connect(owner).setCooldownWindow(0, "1099511627775"); // min, max uint40
+      let tx = await vault.connect(owner).setCooldownWindow(0, BN.from("1099511627775")); // min, max uint40
+      expect(tx).to.emit(vault, "CooldownWindowSet").withArgs(0, BN.from("1099511627775"));
     });
     it("deposits and withdraws at same value from start", async function () {
       // all zero initial state
@@ -650,7 +677,7 @@ describe("Vault", function () {
     it("deposits and withdraws at same value from state n with losses", async function () {
       // create initial state
       await vault.connect(depositor2).depositEth({value: "5000000000000000000"}); // 5 eth
-      await vault.connect(owner).setRequestor(depositor2.address, true);
+      await vault.connect(owner).addRequestor(depositor2.address);
       await vault.connect(depositor2).requestEth("3000000000000000000"); // 3 eth
       // deposit then withdraw
       let depositAmount = "10000000000000000000"; // 10 eth
@@ -671,7 +698,7 @@ describe("Vault", function () {
         // create random initial state
         await vault.connect(depositor2).depositEth({value: randomBN("1000000000000000000")}); // deposit 0-1 eth
         if(Math.random() > 0.5) {
-          await vault.connect(owner).setRequestor(depositor2.address, true);
+          await vault.connect(owner).addRequestor(depositor2.address);
           await vault.connect(depositor2).requestEth(randomBN(await vault.totalAssets())); // remove some
         } else {
           await depositor2.sendTransaction({to: vault.address, value: randomBN(await vault.totalAssets())}); // add some more

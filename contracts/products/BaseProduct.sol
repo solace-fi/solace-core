@@ -60,6 +60,11 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
     // The name of the product.
     string internal _productName;
 
+    // used in our floating point price math
+    // price is measured in wei per block per wei of coverage * Q12
+    // divide by Q12 to get premium
+    uint256 internal constant Q12 = 1e12;
+
     /***************************************
     EVENTS
     ***************************************/
@@ -95,9 +100,13 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         string memory domain_,
         string memory version_
     ) EIP712(domain_, version_) Governable(governance_) {
-        _policyManager = policyManager_;
+        require(address(registry_) != address(0x0), "zero address registry");
         _registry = registry_;
+        require(address(policyManager_) != address(0x0), "zero address policymanager");
+        _policyManager = policyManager_;
+        require(coveredPlatform_ != address(0x0), "zero address coveredplatform");
         _coveredPlatform = coveredPlatform_;
+        require(minPeriod_ <= maxPeriod_, "invalid period");
         _minPeriod = minPeriod_;
         _maxPeriod = maxPeriod_;
     }
@@ -116,13 +125,14 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
      * @return policyID The ID of newly created policy.
      */
     function buyPolicy(address policyholder, uint256 coverAmount, uint40 blocks, bytes memory positionDescription) external payable override nonReentrant whileUnpaused returns (uint256 policyID) {
+        require(policyholder != address(0x0), "zero address");
         require(coverAmount > 0, "zero cover value");
         require(isValidPositionDescription(positionDescription), "invalid position description");
         // check that the product can provide coverage for this policy
         (bool acceptable, uint24 price) = IRiskManager(_registry.riskManager()).assessRisk(address(this), 0, coverAmount);
         require(acceptable, "cannot accept that risk");
         // check that the buyer has paid the correct premium
-        uint256 premium = coverAmount * blocks * price / 1e12;
+        uint256 premium = coverAmount * blocks * price / Q12;
         require(msg.value >= premium && premium != 0, "insufficient payment");
         // check that the buyer provided valid period
         require(blocks >= _minPeriod && blocks <= _maxPeriod, "invalid period");
@@ -158,11 +168,13 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         // check that the product can provide coverage for this policy
         (bool acceptable, uint24 price) = IRiskManager(_registry.riskManager()).assessRisk(address(this), previousCoverAmount, coverAmount);
         require(acceptable, "cannot accept that risk");
+        // update local book-keeping variables
+        _activeCoverAmount = _activeCoverAmount + coverAmount - previousCoverAmount;
         // calculate premium needed for new cover amount as if policy is bought now
         uint256 remainingBlocks = expirationBlock - block.number;
-        uint256 newPremium = coverAmount * remainingBlocks * price / 1e12;
+        uint256 newPremium = coverAmount * remainingBlocks * price / Q12;
         // calculate premium already paid based on current policy
-        uint256 paidPremium = previousCoverAmount * remainingBlocks * purchasePrice / 1e12;
+        uint256 paidPremium = previousCoverAmount * remainingBlocks * purchasePrice / Q12;
         if (newPremium >= paidPremium) {
             uint256 premium = newPremium - paidPremium;
             // check that the buyer has paid the correct premium
@@ -193,9 +205,8 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         require(policyholder == msg.sender,"!policyholder");
         require(product == address(this), "wrong product");
         require(expirationBlock >= block.number, "policy is expired");
-
         // compute the premium
-        uint256 premium = coverAmount * extension * purchasePrice / 1e12;
+        uint256 premium = coverAmount * extension * purchasePrice / Q12;
         // check that the buyer has paid the correct premium
         require(msg.value >= premium, "insufficient payment");
         if(msg.value > premium) Address.sendValue(payable(msg.sender), msg.value - premium);
@@ -232,12 +243,14 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         // check if duration is valid
         uint40 duration = newExpirationBlock - uint40(block.number);
         require(duration >= _minPeriod && duration <= _maxPeriod, "invalid period");
+        // update local book-keeping variables
+        _activeCoverAmount = _activeCoverAmount + coverAmount - previousCoverAmount;
         // update policy info
         _policyManager.setPolicyInfo(policyID, coverAmount, newExpirationBlock, price, positionDescription);
         // calculate premium needed for new cover amount as if policy is bought now
-        uint256 newPremium = coverAmount * duration * price / 1e12;
+        uint256 newPremium = coverAmount * duration * price / Q12;
         // calculate premium already paid based on current policy
-        uint256 paidPremium = previousCoverAmount * (previousExpirationBlock - uint40(block.number)) * purchasePrice / 1e12;
+        uint256 paidPremium = previousCoverAmount * (previousExpirationBlock - uint40(block.number)) * purchasePrice / Q12;
         if (newPremium >= paidPremium) {
             uint256 premium = newPremium - paidPremium;
             require(msg.value >= premium, "insufficient payment");
@@ -261,9 +274,8 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         (address policyholder, address product, uint256 coverAmount, uint40 expirationBlock, uint24 purchasePrice, ) = _policyManager.getPolicyInfo(policyID);
         require(policyholder == msg.sender,"!policyholder");
         require(product == address(this), "wrong product");
-
         uint40 blocksLeft = expirationBlock - uint40(block.number);
-        uint256 refundAmount = blocksLeft * coverAmount * purchasePrice / 1e12;
+        uint256 refundAmount = blocksLeft * coverAmount * purchasePrice / Q12;
         _policyManager.burn(policyID);
         ITreasury(payable(_registry.treasury())).refund(msg.sender, refundAmount);
         _activeCoverAmount -= coverAmount;
@@ -301,6 +313,8 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         address signer = ECDSA.recover(hash, signature);
         require(_isAuthorizedSigner[signer], "invalid signature");
         }
+        // update local book-keeping variables
+        _activeCoverAmount -= coverAmount;
         // burn policy
         _policyManager.burn(policyID);
         // submit claim to ClaimsEscrow
@@ -320,7 +334,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
      */
     function getQuote(uint256 coverAmount, uint40 blocks) external view override returns (uint256 premium) {
         (, uint24 price, ) = IRiskManager(_registry.riskManager()).productRiskParams(address(this));
-        return coverAmount * blocks * price / 1e12;
+        return coverAmount * blocks * price / Q12;
     }
 
     /***************************************
@@ -356,7 +370,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         return _productName;
     }
 
-    /// @notice Cannot buy new policies while paused. (Default is False)
+    /// @notice Returns whether or not product is currently in paused state.
     function paused() external view override returns (bool) {
         return _paused;
     }
@@ -408,7 +422,9 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
      * @param minPeriod_ The minimum number of blocks.
      */
     function setMinPeriod(uint40 minPeriod_) external override onlyGovernance {
+        require(minPeriod_ <= _maxPeriod, "invalid period");
         _minPeriod = minPeriod_;
+        emit MinPeriodSet(minPeriod_);
     }
 
     /**
@@ -416,7 +432,9 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
      * @param maxPeriod_ The maximum number of blocks
      */
     function setMaxPeriod(uint40 maxPeriod_) external override onlyGovernance {
+        require(_minPeriod <= maxPeriod_, "invalid period");
         _maxPeriod = maxPeriod_;
+        emit MaxPeriodSet(maxPeriod_);
     }
 
     /**
@@ -425,6 +443,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
      * @param signer The signer to add.
      */
     function addSigner(address signer) external onlyGovernance {
+        require(signer != address(0x0), "zero address signer");
         _isAuthorizedSigner[signer] = true;
         emit SignerAdded(signer);
     }
@@ -448,6 +467,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
      */
     function setPaused(bool paused_) external onlyGovernance {
         _paused = paused_;
+        emit PauseSet(paused_);
     }
 
     /**
@@ -458,7 +478,9 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
      * @param coveredPlatform_ The platform to cover.
      */
     function setCoveredPlatform(address coveredPlatform_) public virtual override onlyGovernance {
+        require(coveredPlatform_ != address(0x0), "zero address coveredplatform");
         _coveredPlatform = coveredPlatform_;
+        emit CoveredPlatformSet(coveredPlatform_);
     }
 
     /**
@@ -467,7 +489,9 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
      * @param policyManager_ The new policy manager.
      */
     function setPolicyManager(address policyManager_) external override onlyGovernance {
+        require(policyManager_ != address(0x0), "zero address policymanager");
         _policyManager = IPolicyManager(policyManager_);
+        emit PolicyManagerSet(policyManager_);
     }
 
     /***************************************

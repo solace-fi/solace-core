@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
+import "./IERC721Enhanced.sol";
 
 /**
  * @title IClaimsEscrow
@@ -15,16 +16,22 @@ pragma solidity 0.8.6;
  *
  * Claims are **ERC721**s and abbreviated as **SCT**.
  */
-interface IClaimsEscrow {
+interface IClaimsEscrow is IERC721Enhanced {
 
     /***************************************
     EVENTS
     ***************************************/
 
     /// @notice Emitted when a new claim is received.
-    event ClaimReceived(uint256 indexed claimID, address indexed claimant, uint256 indexed amount);
+    event ClaimReceived(uint256 indexed claimID, address indexed claimant, uint256 amount);
     /// @notice Emitted when a claim is paid out.
-    event ClaimWithdrawn(uint256 indexed claimID, address indexed claimant, uint256 indexed amount);
+    event ClaimWithdrawn(uint256 indexed claimID, address indexed claimant, uint256 amount);
+    /// @notice Emitted when a claim is adjusted.
+    event ClaimAdjusted(uint256 indexed claimID, address indexed claimant, uint256 oldAmount, uint256 newAmount);
+    /// @notice Emitted when ETH is returned to the Vault.
+    event EthReturned(uint256 amount);
+    /// @notice Emitted when the cooldown period is set.
+    event CooldownPeriodSet(uint256 cooldownPeriod);
 
     /***************************************
     CLAIM CREATION
@@ -79,13 +86,6 @@ interface IClaimsEscrow {
     function getClaim(uint256 claimID) external view returns (uint256 amount, uint256 receivedAt);
 
     /**
-     * @notice Returns true if the claim exists.
-     * @param claimID The ID to check.
-     * @return status True if it exists, false if not.
-     */
-    function exists(uint256 claimID) external view returns (bool status);
-
-    /**
      * @notice Returns true if the payout of the claim can be withdrawn.
      * @param claimID The ID to check.
      * @return status True if it is withdrawable, false if not.
@@ -98,13 +98,6 @@ interface IClaimsEscrow {
      * @return time The duration in seconds.
      */
     function timeLeft(uint256 claimID) external view returns (uint256 time);
-
-    /**
-     * @notice List a user's claims.
-     * @param claimant User to check.
-     * @return claimIDs List of claimIDs.
-     */
-    function listClaims(address claimant) external view returns (uint256[] memory claimIDs);
 
     /***************************************
     GLOBAL VIEWS
@@ -141,26 +134,6 @@ interface IClaimsEscrow {
      * @param cooldownPeriod_ New cooldown duration in seconds
      */
     function setCooldownPeriod(uint256 cooldownPeriod_) external;
-
-    /***************************************
-    ERC721 FUNCTIONS
-    ***************************************/
-
-    /**
-     * @notice Transfers `tokenID` from `msg.sender` to `to`.
-     * @dev This was excluded from the official `ERC721` standard in favor of `transferFrom(address from, address to, uint256 tokenID)`. We elect to include it.
-     * @param to The receipient of the token.
-     * @param tokenID The token to transfer.
-     */
-    function transfer(address to, uint256 tokenID) external;
-
-    /**
-     * @notice Safely transfers `tokenID` from `msg.sender` to `to`.
-     * @dev This was excluded from the official `ERC721` standard in favor of `safeTransferFrom(address from, address to, uint256 tokenID)`. We elect to include it.
-     * @param to The receipient of the token.
-     * @param tokenID The token to transfer.
-     */
-    function safeTransfer(address to, uint256 tokenID) external;
 
     /***************************************
     FALLBACK FUNCTIONS

@@ -14,7 +14,7 @@ dotenv_config();
 const USE_PROCESSED_FILES = process.env.USE_PROCESSED_FILES === "true";
 
 const mainnet_fork = { url: process.env.MAINNET_URL || '', blockNumber: 13320237 };
-const rinkeby_fork = { url: process.env.RINKEBY_URL || '', blockNumber: 9175122 };
+const rinkeby_fork = { url: process.env.RINKEBY_URL || '', blockNumber: 9487521 };
 const kovan_fork = { url: process.env.KOVAN_URL || '', blockNumber: 26927369 };
 const no_fork = { url: '', blockNumber: 0 };
 const forking = (
@@ -30,13 +30,18 @@ const config: HardhatUserConfig = {
   networks: {
     hardhat: hardhat_network,
     localhost: { url: "http://127.0.0.1:8545" },
+    mainnet: {
+      url: process.env.MAINNET_URL || '',
+      chainId: 1,
+      accounts: JSON.parse(process.env.MAINNET_ACCOUNTS || '[]')
+    },
     rinkeby: {
-      url: process.env.RINKEBY_URL,
+      url: process.env.RINKEBY_URL || '',
       chainId: 4,
       accounts: JSON.parse(process.env.RINKEBY_ACCOUNTS || '[]')
     },
     kovan: {
-      url: process.env.KOVAN_URL,
+      url: process.env.KOVAN_URL || '',
       chainId: 42,
       accounts: JSON.parse(process.env.KOVAN_ACCOUNTS || '[]')
     }

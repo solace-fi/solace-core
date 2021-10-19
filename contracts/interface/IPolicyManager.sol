@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
-import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Enumerable.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
+import "./IERC721Enhanced.sol";
 
 /**
  * @title IPolicyManager
@@ -13,7 +12,7 @@ import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
  *
  * Policies are [**ERC721s**](https://docs.openzeppelin.com/contracts/4.x/api/token/erc721#ERC721).
  */
-interface IPolicyManager is IERC721Enumerable /*, IERC721Metadata*/ {
+interface IPolicyManager is IERC721Enhanced {
 
     /***************************************
     EVENTS
@@ -25,6 +24,8 @@ interface IPolicyManager is IERC721Enumerable /*, IERC721Metadata*/ {
     event PolicyUpdated(uint256 indexed policyID);
     /// @notice Emitted when a policy is burned.
     event PolicyBurned(uint256 policyID);
+    /// @notice Emitted when the policy descriptor is set.
+    event PolicyDescriptorSet(address policyDescriptor);
     /// @notice Emitted when a new product is added.
     event ProductAdded(address product);
     /// @notice Emitted when a new product is removed.
@@ -105,13 +106,6 @@ interface IPolicyManager is IERC721Enumerable /*, IERC721Metadata*/ {
      */
     function getPositionDescription(uint256 policyID) external view returns (bytes calldata positionDescription);
 
-    /**
-     * @notice Lists all policies for a given policy holder.
-     * @param policyholder The address of the policy holder.
-     * @return policyIDs The list of policy IDs that the policy holder has in any order.
-     */
-    function listPolicies(address policyholder) external view returns (uint256[] memory policyIDs);
-
     /*
      * @notice These functions can be used to check a policys stage in the lifecycle.
      * There are three major lifecycle events:
@@ -128,13 +122,6 @@ interface IPolicyManager is IERC721Enumerable /*, IERC721Metadata*/ {
      *   exists      0 1 1 0
      *   isActive    0 1 0 0
      *   hasExpired  0 0 1 0
-
-    /**
-     * @notice Checks if a policy exists.
-     * @param policyID The policy ID.
-     * @return status True if the policy exists.
-     */
-    function exists(uint256 policyID) external view returns (bool status);
 
     /**
      * @notice Checks if a policy is active.
@@ -164,8 +151,8 @@ interface IPolicyManager is IERC721Enumerable /*, IERC721Metadata*/ {
      * @notice Creates a new policy.
      * Can only be called by **products**.
      * @param policyholder The receiver of new policy token.
-     * @param expirationBlock The policy expiration block number.
      * @param coverAmount The policy coverage amount (in wei).
+     * @param expirationBlock The policy expiration block number.
      * @param price The coverage price.
      * @param positionDescription The description of the covered position(s).
      * @return policyID The policy ID.
@@ -182,8 +169,8 @@ interface IPolicyManager is IERC721Enumerable /*, IERC721Metadata*/ {
      * @notice Modifies a policy.
      * Can only be called by **products**.
      * @param policyID The policy ID.
-     * @param expirationBlock The policy expiration block number.
      * @param coverAmount The policy coverage amount (in wei).
+     * @param expirationBlock The policy expiration block number.
      * @param price The coverage price.
      * @param positionDescription The description of the covered position(s).
      */
@@ -257,24 +244,4 @@ interface IPolicyManager is IERC721Enumerable /*, IERC721Metadata*/ {
      * @param policyDescriptor The new token descriptor address.
      */
     function setPolicyDescriptor(address policyDescriptor) external;
-
-    /***************************************
-    ERC721 FUNCTIONS
-    ***************************************/
-
-    /**
-     * @notice Transfers `tokenID` from `msg.sender` to `to`.
-     * @dev This was excluded from the official `ERC721` standard in favor of `transferFrom(address from, address to, uint256 tokenID)`. We elect to include it.
-     * @param to The receipient of the token.
-     * @param tokenID The token to transfer.
-     */
-    function transfer(address to, uint256 tokenID) external;
-
-    /**
-     * @notice Safely transfers `tokenID` from `msg.sender` to `to`.
-     * @dev This was excluded from the official `ERC721` standard in favor of `safeTransferFrom(address from, address to, uint256 tokenID)`. We elect to include it.
-     * @param to The receipient of the token.
-     * @param tokenID The token to transfer.
-     */
-    function safeTransfer(address to, uint256 tokenID) external;
 }
