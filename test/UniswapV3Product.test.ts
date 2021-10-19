@@ -4,42 +4,38 @@ import { waffle, upgrades, ethers } from "hardhat";
 const { deployContract, solidity } = waffle;
 import { MockProvider } from "ethereum-waffle";
 const provider: MockProvider = waffle.provider;
-import { BigNumber as BN, Wallet, Contract, constants, utils} from "ethers";
+import { BigNumber as BN, Contract, constants, utils} from "ethers";
 import chai from "chai";
 const { expect } = chai;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { PolicyManager, CurveProduct, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
+import { PolicyManager, UniswapV3Product, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager } from "../typechain";
 import { sign, assembleSignature, getSubmitClaimDigest } from "./utilities/signature";
-import { toBytes32, setStorageAt } from "./utilities/setStorage";
 import { encodeAddresses } from "./utilities/positionDescription";
-import { oneToken } from "./utilities/math";
 
-const DOMAIN_NAME = "Solace.fi-CurveProduct";
+const DOMAIN_NAME = "Solace.fi-UniswapV3Product";
 const INVALID_DOMAIN = "Solace.fi-Invalid";
-const SUBMIT_CLAIM_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("CurveProductSubmitClaim(uint256 policyID,address claimant,uint256 amountOut,uint256 deadline)"));
+const SUBMIT_CLAIM_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("UniswapV3ProductSubmitClaim(uint256 policyID,address claimant,uint256 amountOut,uint256 deadline)"));
 const INVALID_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("InvalidType(uint256 policyID,address claimant,uint256 amountOut,uint256 deadline)"));
 
 const chainId = 31337;
 const deadline = constants.MaxUint256;
 
 if(process.env.FORK_NETWORK === "mainnet"){
-  describe("CurveProduct", function () {
+  describe("UniswapV3Product", function () {
     const [deployer, governor, policyholder1, policyholder2, policyholder3, depositor, paclasSigner] = provider.getWallets();
     let artifacts: ArtifactImports;
 
     let policyManager: PolicyManager;
-    let product: CurveProduct;
-    let product2: CurveProduct;
+    let product: UniswapV3Product;
+    let product2: UniswapV3Product;
     let weth: Weth9;
     let treasury: Treasury;
     let claimsEscrow: ClaimsEscrow;
     let vault: Vault;
     let registry: Registry;
     let riskManager: RiskManager;
-    let lpToken: Contract;
-    let dai: Contract;
 
     const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
     const minPeriod = 6450; // this is about 1 day
@@ -54,224 +50,515 @@ if(process.env.FORK_NETWORK === "mainnet"){
     const blocks = BN.from(threeDays);
     const expectedPremium = BN.from("2137014000000000");
 
-    const ONE_SPLIT_VIEW = "0xC586BeF4a0992C495Cf22e1aeEE4E446CECDee0E";
-    const ADDRESS_PROVIDER = "0x0000000022D53366457F9d5E68Ec105046FC4383";
+    const UNISWAP_V3_FACTORY_ADDRESS = "0x1F98431c8aD98523631AE4a59f267346ea31F984";
     const REAL_USER = "0x5dcd83cf2dd90a4c7e1c189e74ec7dc072ad78e1";
-    const BALANCE = BN.from("72907407389975430");
-    const LP_TOKEN_ADDR = "0x6c3F90f043a72FA612cbac8115EE7e52BDe6E490"; // Curve.fi DAI/USDC/USDT
-    const LP_COIN_ADDR = "0x6B175474E89094C44Da98b954EedeAC495271d0F"; // DAI
     const COOLDOWN_PERIOD = 3600; // one hour
 
-    const lpTokens = [
+    const uniPools = [
       {
-         "name":"Curve.fi DAI/USDC/USDT",
-         "symbol":"3Crv",
-         "address":"0x6c3F90f043a72FA612cbac8115EE7e52BDe6E490"
+         "id":0,
+         "address":"0x1d42064Fc4Beb5F8aAF85F4617AE8b3b5B8Bd801",
+         "name":"UNI/WETH"
       },
       {
-         "name":"Curve.fi aDAI/aUSDC/aUSDT",
-         "symbol":"a3CRV",
-         "address":"0xFd2a8fA60Abd58Efe3EeE34dd494cD491dC14900"
+         "id":1,
+         "address":"0x6c6Bc977E13Df9b0de53b251522280BB72383700",
+         "name":"DAI/USDC"
       },
       {
-         "name":"Curve.fi ETH/aETH",
-         "symbol":"ankrCRV",
-         "address":"0xaA17A236F2bAdc98DDc0Cf999AbB47D47Fc0A6Cf"
+         "id":2,
+         "address":"0x7BeA39867e4169DBe237d55C8242a8f2fcDcc387",
+         "name":"USDC/WETH"
       },
       {
-         "name":"Curve.fi yDAI/yUSDC/yUSDT/yBUSD",
-         "symbol":"yDAI+yUSDC+yUSDT+yBUSD",
-         "address":"0x3B3Ac5386837Dc563660FB6a0937DFAa5924333B"
+         "id":3,
+         "address":"0xCBCdF9626bC03E24f779434178A73a0B4bad62eD",
+         "name":"WBTC/WETH"
       },
       {
-         "name":"Curve.fi cDAI/cUSDC",
-         "symbol":"cDAI+cUSDC",
-         "address":"0x845838DF265Dcd2c412A1Dc9e959c7d08537f8a2"
+         "id":6,
+         "address":"0xC2e9F25Be6257c210d7Adf0D4Cd6E3E881ba25f8",
+         "name":"DAI/WETH"
       },
       {
-         "name":"Curve.fi EURS/sEUR",
-         "symbol":"eursCRV",
-         "address":"0x194eBd173F6cDacE046C53eACcE9B953F28411d1"
+         "id":7,
+         "address":"0x7858E59e0C01EA06Df3aF3D20aC7B0003275D4Bf",
+         "name":"USDC/USDT"
       },
       {
-         "name":"Curve.fi hBTC/wBTC",
-         "symbol":"hCRV",
-         "address":"0xb19059ebb43466C323583928285a49f558E572Fd"
+         "id":9,
+         "address":"0xF83d5AaaB14507A53f97D3C18BDB52C4A62Efc40",
+         "name":"SOCKS/WETH"
       },
       {
-         "name":"Curve.fi cyDAI/cyUSDC/cyUSDT",
-         "symbol":"ib3CRV",
-         "address":"0x5282a4eF67D9C33135340fB3289cc1711c13638C"
+         "id":10,
+         "address":"0xD1D5A4c0eA98971894772Dcd6D2f1dc71083C44E",
+         "name":"LQTY/WETH"
       },
       {
-         "name":"Curve.fi LINK/sLINK",
-         "symbol":"linkCRV",
-         "address":"0xcee60cFa923170e4f8204AE08B4fA6A3F5656F3a"
+         "id":16,
+         "address":"0x6f48ECa74B38d2936B02ab603FF4e36A6C0E3A77",
+         "name":"DAI/USDT"
       },
       {
-         "name":"Curve.fi DAI/USDC/USDT/PAX",
-         "symbol":"ypaxCrv",
-         "address":"0xD905e2eaeBe188fc92179b6350807D8bd91Db0D8"
+         "id":18,
+         "address":"0xff2bDF3044C601679dEde16f5D4a460B35cebfeE",
+         "name":"POOL/WETH"
       },
       {
-         "name":"Curve.fi renBTC/wBTC",
-         "symbol":"crvRenWBTC",
-         "address":"0x49849C98ae39Fff122806C06791Fa73784FB3675"
+         "id":23,
+         "address":"0x04916039B1f59D9745Bf6E0a21f191D1e0A84287",
+         "name":"YFI/WETH"
       },
       {
-         "name":"Curve.fi aDAI/aSUSD",
-         "symbol":"saCRV",
-         "address":"0x02d341CcB60fAaf662bC0554d13778015d1b285C"
+         "id":25,
+         "address":"0x5598931BfBb43EEC686fa4b5b92B5152ebADC2f6",
+         "name":"COMP/WETH"
       },
       {
-         "name":"Curve.fi renBTC/wBTC/sBTC",
-         "symbol":"crvRenWSBTC",
-         "address":"0x075b1bb99792c9E1041bA13afEf80C91a1e70fB3"
+         "id":32,
+         "address":"0xDc7B403e2e967EaF6c97d79316D285B8A112fDa7",
+         "name":"FEI/WETH"
       },
       {
-         "name":"Curve.fi ETH/sETH",
-         "symbol":"eCRV",
-         "address":"0xA3D87FffcE63B53E0d54fAa1cc983B7eB0b74A9c"
+         "id":35,
+         "address":"0xbB2e5C2FF298FD96E166f90c8ABAcAF714Df14F8",
+         "name":"DAI/FEI"
       },
       {
-         "name":"Curve.fi ETH/stETH",
-         "symbol":"steCRV",
-         "address":"0x06325440D014e39736583c165C2963BA99fAf14E"
+         "id":41,
+         "address":"0x0dc9877F6024CCf16a470a74176C9260beb83AB6",
+         "name":"RAI/WETH"
       },
       {
-         "name":"Curve.fi DAI/USDC/USDT/sUSD",
-         "symbol":"crvPlain3andSUSD",
-         "address":"0xC25a3A3b969415c80451098fa907EC722572917F"
+         "id":102,
+         "address":"0x151CcB92bc1eD5c6D0F9Adb5ceC4763cEb66AC7f",
+         "name":"ETH2x-FLI/WETH"
       },
       {
-         "name":"Curve.fi cDAI/cUSDC/USDT",
-         "symbol":"cDAI+cUSDC+USDT",
-         "address":"0x9fC689CCaDa600B6DF723D9E47D84d76664a1F23"
+         "id":126,
+         "address":"0xcB0C5d9D92f4F2F80cce7aa271a1E148c226e19D",
+         "name":"RAI/DAI"
       },
       {
-         "name":"Curve.fi yDAI/yUSDC/yUSDT/yTUSD",
-         "symbol":"yDAI+yUSDC+yUSDT+yTUSD",
-         "address":"0xdF5e0e81Dff6FAF3A7e52BA697820c5e32D806A8"
+         "id":127,
+         "address":"0x4e68Ccd3E89f51C3074ca5072bbAC773960dFa36",
+         "name":"WETH/USDT"
       },
       {
-         "name":"Curve.fi DUSD/3Crv",
-         "symbol":"dusd3CRV",
-         "address":"0x3a664Ab939FD8482048609f652f9a0B0677337B9"
+         "id":135,
+         "address":"0x5aB53EE1d50eeF2C1DD3d5402789cd27bB52c1bB",
+         "name":"AAVE/WETH"
       },
       {
-         "name":"Curve.fi GUSD/3Crv",
-         "symbol":"gusd3CRV",
-         "address":"0xD2967f45c4f384DEEa880F807Be904762a3DeA07"
+         "id":137,
+         "address":"0xa6Cc3C2531FdaA6Ae1A3CA84c2855806728693e8",
+         "name":"LINK/WETH"
       },
       {
-         "name":"Curve.fi HUSD/3Crv",
-         "symbol":"husd3CRV",
-         "address":"0x5B5CFE992AdAC0C9D48E05854B2d91C73a003858"
+         "id":144,
+         "address":"0x3FE55D440adb6e07fa8e69451f5511D983882487",
+         "name":"🐟/WETH"
       },
       {
-         "name":"Curve.fi LinkUSD/3Crv",
-         "symbol":"LinkUSD3CRV",
-         "address":"0x6D65b498cb23deAba52db31c93Da9BFFb340FB8F"
+         "id":151,
+         "address":"0x2efeC2097beede290B2eED63e2FAf5ECbBC528FC",
+         "name":"WETH/TRU"
       },
       {
-         "name":"Curve.fi MUSD/3Crv",
-         "symbol":"musd3CRV",
-         "address":"0x1AEf73d49Dedc4b1778d0706583995958Dc862e6"
+         "id":163,
+         "address":"0x788f0399b9f012926e255D9F22ceea845b8f7a32",
+         "name":"WETH/PUSH"
       },
       {
-         "name":"Curve.fi RSV/3Crv",
-         "symbol":"rsv3CRV",
-         "address":"0xC2Ee6b0334C261ED60C72f6054450b61B8f18E35"
+         "id":179,
+         "address":"0x5447b274859457f11D7cc7131B378363bBee4E3A",
+         "name":"NDX/WETH"
       },
       {
-         "name":"Curve.fi USDK/3Crv",
-         "symbol":"usdk3CRV",
-         "address":"0x97E2768e8E73511cA874545DC5Ff8067eB19B787"
+         "id":184,
+         "address":"0x19E286157200418d6A1f7D1df834b82E65C920AA",
+         "name":"SUSHI/WETH"
       },
       {
-         "name":"Curve.fi USDN/3Crv",
-         "symbol":"usdn3CRV",
-         "address":"0x4f3E8F405CF5aFC05D68142F3783bDfE13811522"
+         "id":185,
+         "address":"0xFAaCE66BD25abFF62718AbD6DB97560E414eC074",
+         "name":"WETH/RARI"
       },
       {
-         "name":"Curve.fi USDP/3Crv",
-         "symbol":"usdp3CRV",
-         "address":"0x7Eb40E450b9655f4B3cC4259BCC731c63ff55ae6"
+         "id":186,
+         "address":"0x82bd0E16516F828A0616038002E152AA6F27AEdc",
+         "name":"cDAI/WETH"
       },
       {
-         "name":"Curve.fi UST/3Crv",
-         "symbol":"ust3CRV",
-         "address":"0x94e131324b6054c0D789b190b2dAC504e4361b53"
+         "id":189,
+         "address":"0x32A2c4C25BABEdC810fa466ab0F0C742Df3A3555",
+         "name":"CFi/WETH"
       },
       {
-         "name":"Curve.fi bBTC/sbtcCRV",
-         "symbol":"bBTC/sbtcCRV",
-         "address":"0x410e3E86ef427e30B9235497143881f717d93c2A"
+         "id":194,
+         "address":"0xeFbd546647FDA46067225bD0221e08bA91071584",
+         "name":"RVP/WETH"
       },
       {
-         "name":"Curve.fi oBTC/sbtcCRV",
-         "symbol":"oBTC/sbtcCRV",
-         "address":"0x2fE94ea3d5d4a175184081439753DE15AeF9d614"
+         "id":216,
+         "address":"0x3482296547783CB714c49E13717cD163b2951ba8",
+         "name":"Subs/DAI"
       },
       {
-         "name":"Curve.fi pBTC/sbtcCRV",
-         "symbol":"pBTC/sbtcCRV",
-         "address":"0xDE5331AC4B3630f94853Ff322B66407e0D6331E8"
+         "id":221,
+         "address":"0xAE614a7a56cB79c04Df2aeBA6f5dAB80A39CA78E",
+         "name":"BAT/WETH"
       },
       {
-         "name":"Curve.fi tBTC/sbtcCrv",
-         "symbol":"tbtc/sbtcCrv",
-         "address":"0x64eda51d3Ad40D56b9dFc5554E06F94e1Dd786Fd"
+         "id":223,
+         "address":"0x2552018fA2768fD0Af10d32a4C38586A9BadE6CE",
+         "name":"BIRD/USDC"
       },
       {
-         "name":"Curve.fi Factory USD Metapool: TrueUSD",
-         "symbol":"TUSD3CRV-f",
-         "address":"0xEcd5e75AFb02eFa118AF914515D6521aaBd189F1"
+         "id":225,
+         "address":"0x07AA6584385cCA15C2c6e13A5599fFc2D177E33b",
+         "name":"FLUX/WETH"
       },
       {
-         "name":"Curve.fi Factory USD Metapool: Liquity",
-         "symbol":"LUSD3CRV-f",
-         "address":"0xEd279fDD11cA84bEef15AF5D39BB4d4bEE23F0cA"
+         "id":227,
+         "address":"0x3139bbbA7f4B9125595cB4eBeefdaC1fCe7Ab5f1",
+         "name":"RUNE/WETH"
       },
       {
-         "name":"Curve.fi Factory USD Metapool: Frax",
-         "symbol":"FRAX3CRV-f",
-         "address":"0xd632f22692FaC7611d2AA1C0D552930D43CAEd3B"
+         "id":232,
+         "address":"0x7DdC2C3d12A9212112e5f99602AB16C338ec1116",
+         "name":"AGI/WETH"
       },
       {
-         "name":"Curve.fi Factory USD Metapool: Binance USD",
-         "symbol":"BUSD3CRV-f",
-         "address":"0x4807862AA8b2bF68830e4C8dc86D0e9A998e085a"
+         "id":233,
+         "address":"0x3CEC6746Ebd7658F58E5d786e0999118Fea2905C",
+         "name":"NFTX/WETH"
       },
       {
-         "name":"Curve.fi ETH/rETH",
-         "symbol":"rCRV",
-         "address":"0x53a901d48795C58f485cBB38df08FA96a24669D5"
+         "id":236,
+         "address":"0x85498E26aa6b5C7C8aC32ee8e872D95fb98640c4",
+         "name":"WETH/BANANA"
       },
       {
-         "name":"Curve.fi Factory USD Metapool: Alchemix USD",
-         "symbol":"alUSD3CRV-f",
-         "address":"0x43b4FdFD4Ff969587185cDB6f0BD875c5Fc83f8c"
+         "id":239,
+         "address":"0x5EB5dC3d8C74413834f1Ca65C3412f48cD1C67A6",
+         "name":"wSIENNA/WETH"
       },
       {
-         "name":"Curve.fi USD-BTC-ETH",
-         "symbol":"crvTricrypto",
-         "address":"0xcA3d75aC011BF5aD07a98d02f18225F9bD9A6BDF"
+         "id":244,
+         "address":"0x35815D67f717e7BcE9cc8519bDc80323ECf7d260",
+         "name":"BNT/WETH"
       },
       {
-         "name":"Curve.fi USD-BTC-ETH",
-         "symbol":"crv3crypto",
-         "address":"0xc4AD29ba4B3c580e6D59105FFf484999997675Ff"
+         "id":246,
+         "address":"0x4628a0A564DEBFc8798eb55DB5c91f2200486c24",
+         "name":"RNDR/WETH"
       },
       {
-         "name":"Curve.fi Factory Plain Pool: Euro Tether",
-         "symbol":"EURT-f",
-         "address":"0xFD5dB7463a3aB53fD211b4af195c5BCCC1A03890"
+         "id":257,
+         "address":"0x2356b745747Ed77191844c025EdDc894fCe5F5F6",
+         "name":"UNI-V3/WETH"
       },
       {
-         "name":"Curve.fi Factory USD Metapool: Magic Internet Money 3Pool",
-         "symbol":"MIM-3LP3CRV-f",
-         "address":"0x5a6A4D54456819380173272A5E8E9B9904BdF41B"
+         "id":273,
+         "address":"0xEDe8dd046586d22625Ae7fF2708F879eF7bdb8CF",
+         "name":"SNX/WETH"
+      },
+      {
+         "id":278,
+         "address":"0xBfA7b27ac817D57F938541E0e86dbEC32a03CE53",
+         "name":"WETH/WOA"
+      },
+      {
+         "id":282,
+         "address":"0xdceaf5d0E5E0dB9596A47C0c4120654e80B1d706",
+         "name":"AAVE/USDC"
+      },
+      {
+         "id":283,
+         "address":"0x2F62f2B4c5fcd7570a709DeC05D68EA19c82A9ec",
+         "name":"SHIB/WETH"
+      },
+      {
+         "id":287,
+         "address":"0xB2cd930798eFa9B6CB042F073A2CcEa5012E7AbF",
+         "name":"WETH/DOGE"
+      },
+      {
+         "id":290,
+         "address":"0xF15054BC50c39ad15FDC67f2AedD7c2c945ca5f6",
+         "name":"USDC/COMP"
+      },
+      {
+         "id":293,
+         "address":"0x28aF48a3468Bc4A00221cd35e10B746B9F945B14",
+         "name":"CHONK/WETH"
+      },
+      {
+         "id":294,
+         "address":"0xc3881FBB90daf3066dA30016d578eD024027317c",
+         "name":"GLQ/WETH"
+      },
+      {
+         "id":296,
+         "address":"0xc2cEAA15E6120D51daac0c90540922695Fcb0fC7",
+         "name":"WETH/MNDCC"
+      },
+      {
+         "id":301,
+         "address":"0x99ac8cA7087fA4A2A1FB6357269965A2014ABc35",
+         "name":"WBTC/USDC"
+      },
+      {
+         "id":306,
+         "address":"0x632E675672F2657F227da8D9bB3fE9177838e726",
+         "name":"RPL/WETH"
+      },
+      {
+         "id":307,
+         "address":"0xC9c3D642cFEfC60858655D4549CB5AcD5495E90E",
+         "name":"REPv2/USDC"
+      },
+      {
+         "id":318,
+         "address":"0x57aF956d3E2cCa3B86f3D8C6772C03ddca3eAacB",
+         "name":"PENDLE/WETH"
+      },
+      {
+         "id":322,
+         "address":"0x7F54B107fB1552292D8f2eB0C95C9Ae14aF1A181",
+         "name":"WETH/VGT"
+      },
+      {
+         "id":329,
+         "address":"0xbd5fDda17bC27bB90E37Df7A838b1bFC0dC997F5",
+         "name":"USDC/EURS"
+      },
+      {
+         "id":333,
+         "address":"0xb6873431c2c0e6502143148CaE4FAb419a325826",
+         "name":"renDOGE/WETH"
+      },
+      {
+         "id":335,
+         "address":"0x45F199B8aF62ab2847f56D0d2866ea20DA0C9BBc",
+         "name":"BANK/WETH"
+      },
+      {
+         "id":337,
+         "address":"0x9Db9e0e53058C89e5B94e29621a205198648425B",
+         "name":"WBTC/USDT"
+      },
+      {
+         "id":338,
+         "address":"0xD340B57AAcDD10F96FC1CF10e15921936F41E29c",
+         "name":"wstETH/WETH"
+      },
+      {
+         "id":343,
+         "address":"0x13236638051F7643C0006F92b72789684Dc92477",
+         "name":"WUSD/USDC"
+      },
+      {
+         "id":344,
+         "address":"0x44f6A8B9FF94AC5DbBAfB305B185e940561c5c7F",
+         "name":"YAXIS/WETH"
+      },
+      {
+         "id":347,
+         "address":"0x391E8501b626C623d39474AfcA6f9e46c2686649",
+         "name":"WBTC/DAI"
+      },
+      {
+         "id":353,
+         "address":"0x9663f2CA0454acCad3e094448Ea6f77443880454",
+         "name":"LUSD/WETH"
+      },
+      {
+         "id":354,
+         "address":"0xB13B2113dc40E8c2064F6D49577250d9f6131c28",
+         "name":"WETH/ZCX"
+      },
+      {
+         "id":355,
+         "address":"0x1c83F897788C1BB0880dE4801422f691F34406B6",
+         "name":"WETH/PDEX"
+      },
+      {
+         "id":358,
+         "address":"0xD94FdB60194FefA7Ef8B416f8bA99278Ab3E00dC",
+         "name":"DINU/WETH"
+      },
+      {
+         "id":367,
+         "address":"0x64652315D86f5dfAE30885FBD29D1da05b63ADD7",
+         "name":"FTM/WETH"
+      },
+      {
+         "id":369,
+         "address":"0x564aC0f88DE8b7754EE4C0403a26A386C6Bf89F5",
+         "name":"WETH/MEME"
+      },
+      {
+         "id":376,
+         "address":"0x6b1C477B4c67958915b194Ae8b007Bf078dadb81",
+         "name":"⚗️/WETH"
+      },
+      {
+         "id":382,
+         "address":"0xDC2c21F1B54dDaF39e944689a8f90cb844135cc9",
+         "name":"BAL/WETH"
+      },
+      {
+         "id":383,
+         "address":"0xF5381D47148ee3606448df3764f39Da0e7b25985",
+         "name":"POLS/WETH"
+      },
+      {
+         "id":385,
+         "address":"0xB853Cf2383D2d07c3C62c7841Ec164fD3a05a676",
+         "name":"WETH/XGT"
+      },
+      {
+         "id":392,
+         "address":"0xA424cea71C4Aea3d11877240B2F221C027c0E0Be",
+         "name":"ALEPH/WETH"
+      },
+      {
+         "id":398,
+         "address":"0x8661aE7918C0115Af9e3691662f605e9c550dDc9",
+         "name":"MANA/WETH"
+      },
+      {
+         "id":408,
+         "address":"0x9e0905249CeEFfFB9605E034b534544684A58BE6",
+         "name":"HEX/WETH"
+      },
+      {
+         "id":410,
+         "address":"0xb97909512d2711b69710B4cA0da10A3a7E624805",
+         "name":"WBTC/DIGG"
+      },
+      {
+         "id":417,
+         "address":"0x5b7E3E37a1aa6369386e5939053779abd3597508",
+         "name":"WETH/RIO"
+      },
+      {
+         "id":421,
+         "address":"0x5494d3a61369460147d754f3562b769218E90E96",
+         "name":"LPT/WETH"
+      },
+      {
+         "id":434,
+         "address":"0xD390B185603A730b00c546a951CE961b44F5f899",
+         "name":"DRC/WETH"
+      },
+      {
+         "id":446,
+         "address":"0xBd233D685eDE81E00faaEFEbD55150C76778a34e",
+         "name":"WETH/DAM"
+      },
+      {
+         "id":452,
+         "address":"0xC1dF8037881df17Dc88998824b9aeA81c71bbB1b",
+         "name":"FORTH/WETH"
+      },
+      {
+         "id":483,
+         "address":"0x903D26296a9269f9CFc08d6e5f640436B6d2F8F5",
+         "name":"ARMOR/DAI"
+      },
+      {
+         "id":489,
+         "address":"0x6aD1A683E09843c32D0092400613d6a590F3A949",
+         "name":"WETH/rUSD"
+      },
+      {
+         "id":497,
+         "address":"0xD626e123Da3A2161cCAAD13F28a12fDA472752aF",
+         "name":"RIO/rUSD"
+      },
+      {
+         "id":498,
+         "address":"0x695b30d636e4F232d443af6a93dF95AFD2FF485C",
+         "name":"WETH/BEPRO"
+      },
+      {
+         "id":503,
+         "address":"0xE845469aAe04f8823202b011A848cf199420B4C1",
+         "name":"UNI/USDC"
+      },
+      {
+         "id":508,
+         "address":"0x4E57F830B0b4A82321071ead6FfD1Df1575a16e2",
+         "name":"WETH/AMP"
+      },
+      {
+         "id":522,
+         "address":"0xa2f6EB84CF53A326152de0255f87828C647d9b95",
+         "name":"Auction/WETH"
+      },
+      {
+         "id":525,
+         "address":"0x919Fa96e88d67499339577Fa202345436bcDaf79",
+         "name":"WETH/CRV"
+      },
+      {
+         "id":542,
+         "address":"0x7eAc602913B707A6115f384fC4CFD7c5a68F538E",
+         "name":"⚗️/USDC"
+      },
+      {
+         "id":545,
+         "address":"0x9D9590Cd131A03A31942F1A198554d37D164E994",
+         "name":"PYRENEES/WETH"
+      },
+      {
+         "id":548,
+         "address":"0xc4580c566202F5343883D0c6a378a9de245C9399",
+         "name":"OCC/USDC"
+      },
+      {
+         "id":549,
+         "address":"0xB2d26108582AC26d665f8A00eF0E5b94c50e67AA",
+         "name":"SOX/WETH"
+      },
+      {
+         "id":554,
+         "address":"0xb66c491e2356Bf32b7E3EA14af7F60B3eD171A22",
+         "name":"QNT/USDC"
+      },
+      {
+         "id":559,
+         "address":"0x157Dfa656Fdf0D18E1bA94075a53600D81cB3a97",
+         "name":"UMA/WETH"
+      },
+      {
+         "id":562,
+         "address":"0xe0e1B825474ae06e7E932e214a735640c9Bc3e71",
+         "name":"WETH/VAL"
+      },
+      {
+         "id":564,
+         "address":"0x48783a921E9fE6E9F48dE8966B98A427D2CcBef0",
+         "name":"PROS/WETH"
+      },
+      {
+         "id":571,
+         "address":"0x46add4B3F80672989b9A1eAF62caD5206F5E2164",
+         "name":"WETH/GRT"
+      },
+      {
+         "id":581,
+         "address":"0x5654b1dd37Af02f327D98C04B72aCDF01ba2835c",
+         "name":"IGG/WETH"
+      },
+      {
+         "id":586,
+         "address":"0x27878aE7f961a126755042eE8E5C074ea971511F",
+         "name":"HUB/USDT"
       }
    ]
 
@@ -286,44 +573,40 @@ if(process.env.FORK_NETWORK === "mainnet"){
       await registry.connect(governor).setVault(vault.address);
       claimsEscrow = (await deployContract(deployer, artifacts.ClaimsEscrow, [governor.address, registry.address])) as ClaimsEscrow;
       await registry.connect(governor).setClaimsEscrow(claimsEscrow.address);
-      treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, registry.address])) as Treasury;
+      treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, ZERO_ADDRESS, registry.address])) as Treasury;
       await registry.connect(governor).setTreasury(treasury.address);
       policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
       await registry.connect(governor).setPolicyManager(policyManager.address);
       riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
       await registry.connect(governor).setRiskManager(riskManager.address);
 
-      // deploy Curve Product
+      // deploy Uniswap Product
       product = (await deployContract(
         deployer,
-        artifacts.CurveProduct,
+        artifacts.UniswapV3Product,
         [
           governor.address,
           policyManager.address,
           registry.address,
-          ADDRESS_PROVIDER,
+          UNISWAP_V3_FACTORY_ADDRESS,
           minPeriod,
           maxPeriod
         ]
-      )) as CurveProduct;
+      )) as UniswapV3Product;
 
-       // deploy Curve Product
+       // deploy Uniswap Product
        product2 = (await deployContract(
         deployer,
-        artifacts.CurveProduct,
+        artifacts.UniswapV3Product,
         [
           governor.address,
           policyManager.address,
           registry.address,
-          ADDRESS_PROVIDER,
+          UNISWAP_V3_FACTORY_ADDRESS,
           minPeriod,
           maxPeriod
         ]
-      )) as CurveProduct;
-
-      // fetch contracts
-      dai = await ethers.getContractAt(artifacts.ERC20.abi, LP_COIN_ADDR);
-      lpToken = await ethers.getContractAt(artifacts.CurveToken.abi, LP_TOKEN_ADDR);
+      )) as UniswapV3Product;
       
       await vault.connect(deployer).depositEth({value:maxCoverAmount});
       await riskManager.connect(governor).addProduct(product.address, 1, 11044, 1);
@@ -331,9 +614,9 @@ if(process.env.FORK_NETWORK === "mainnet"){
     });
 
     describe("covered platform", function () {
-      it("starts as curve address provider", async function () {
-        expect(await product.coveredPlatform()).to.equal(ADDRESS_PROVIDER);
-        expect(await product.addressProvider()).to.equal(ADDRESS_PROVIDER);
+      it("starts as uniswapv3 factory address", async function () {
+        expect(await product.coveredPlatform()).to.equal(UNISWAP_V3_FACTORY_ADDRESS);
+        expect(await product.uniV2Factory()).to.equal(UNISWAP_V3_FACTORY_ADDRESS);
       });
       it("cannot be set by non governor", async function () {
         await expect(product.connect(policyholder1).setCoveredPlatform(policyholder1.address)).to.be.revertedWith("!governance");
@@ -341,8 +624,8 @@ if(process.env.FORK_NETWORK === "mainnet"){
       it("can be set", async function () {
         await product.connect(governor).setCoveredPlatform(treasury.address);
         expect(await product.coveredPlatform()).to.equal(treasury.address);
-        expect(await product.addressProvider()).to.equal(treasury.address);
-        await product.connect(governor).setCoveredPlatform(ADDRESS_PROVIDER);
+        expect(await product.uniV2Factory()).to.equal(treasury.address);
+        await product.connect(governor).setCoveredPlatform(UNISWAP_V3_FACTORY_ADDRESS);
       });
     });
 
@@ -354,26 +637,26 @@ if(process.env.FORK_NETWORK === "mainnet"){
         expect(await product.isValidPositionDescription("0xabcd")).to.be.false;
         expect(await product.isValidPositionDescription("0x123456789012345678901234567890123456789077")).to.be.false;
       });
-      it("cannot have non lp tokens", async function () {
+      it("cannot have non uniswapv3 pool", async function () {
         // would like to.be.false, to.be.reverted will work though
         await expect( product.isValidPositionDescription("REAL_USER")).to.be.reverted;
-        expect(await product.isValidPositionDescription(REAL_USER)).to.be.false;
-        expect(await product.isValidPositionDescription(encodeAddresses([REAL_USER]))).to.be.false;
-        expect(await product.isValidPositionDescription(governor.address)).to.be.false;
-        expect(await product.isValidPositionDescription(ADDRESS_PROVIDER)).to.be.false;
-        expect(await product.isValidPositionDescription(encodeAddresses([ZERO_ADDRESS]))).to.be.false;
-        expect(await product.isValidPositionDescription(encodeAddresses([lpTokens[0].address, ZERO_ADDRESS]))).to.be.false;
+        await expect( product.isValidPositionDescription(REAL_USER)).to.be.reverted;
+        await expect( product.isValidPositionDescription(encodeAddresses([REAL_USER]))).to.be.reverted;
+        await expect( product.isValidPositionDescription(governor.address)).to.be.reverted;
+        await expect( product.isValidPositionDescription(UNISWAP_V3_FACTORY_ADDRESS)).to.be.reverted;
+        await expect( product.isValidPositionDescription(encodeAddresses([ZERO_ADDRESS]))).to.be.reverted;
+        await expect( product.isValidPositionDescription(encodeAddresses([uniPools[0].address, ZERO_ADDRESS]))).to.be.reverted;
       });
-      it("can be one lp token", async function() {
-        for (var i = 0; i < lpTokens.length; ++i) {
-          expect(await product.isValidPositionDescription(encodeAddresses([lpTokens[i].address]))).to.be.true;
+      it("can be one uniswapv3 pool", async function() {
+        for (var i = 0; i < uniPools.length/2; ++i) {
+          expect(await product.isValidPositionDescription(encodeAddresses([uniPools[i].address]))).to.be.true;
         }
       });
-      it("can be more lp tokens", async function () {
-        for(var i = 0; i < lpTokens.length; ++i) {
+      it("can be more uniswapv3 pool", async function () {
+        for(var i = 0; i < uniPools.length/2; ++i) {
           // don't care about duplicates
-          for(var j = 0; j < lpTokens.length; ++j) {
-            expect(await product.isValidPositionDescription(encodeAddresses([lpTokens[i].address, lpTokens[j].address]))).to.be.true;
+          for(var j = 0; j < uniPools.length/2; ++j) {
+            expect(await product.isValidPositionDescription(encodeAddresses([uniPools[i].address, uniPools[j].address]))).to.be.true;
           }
         }
       });
@@ -395,25 +678,25 @@ if(process.env.FORK_NETWORK === "mainnet"){
         await expect(product.buyPolicy(REAL_USER, coverAmount, blocks, "0x1234567890123456789012345678901234567890", { value: expectedPremium })).to.be.reverted;
       });
       it("can buyPolicy", async function () {
-        let tx = await product.buyPolicy(REAL_USER, coverAmount, blocks, lpTokens[0].address, { value: expectedPremium });
+        let tx = await product.buyPolicy(REAL_USER, coverAmount, blocks, uniPools[0].address, { value: expectedPremium });
         expect(tx).to.emit(product, "PolicyCreated").withArgs(1);
         expect(await policyManager.totalSupply()).to.equal(1);
         expect(await policyManager.balanceOf(REAL_USER)).to.equal(1);
       });
       it("can buy duplicate policy", async function () {
-        let tx = await product.buyPolicy(REAL_USER, coverAmount, blocks, lpTokens[0].address, { value: expectedPremium });
+        let tx = await product.buyPolicy(REAL_USER, coverAmount, blocks, uniPools[0].address, { value: expectedPremium });
         expect(tx).to.emit(product, "PolicyCreated").withArgs(2);
         expect(await policyManager.totalSupply()).to.equal(2);
         expect(await policyManager.balanceOf(REAL_USER)).to.equal(2);
       });
       it("can buy policy that covers multiple positions", async function () {
-        let tx = await product.buyPolicy(REAL_USER, coverAmount, blocks, encodeAddresses([lpTokens[0].address, lpTokens[1].address]), { value: expectedPremium });
+        let tx = await product.buyPolicy(REAL_USER, coverAmount, blocks, encodeAddresses([uniPools[0].address, uniPools[1].address]), { value: expectedPremium });
         expect(tx).to.emit(product, "PolicyCreated").withArgs(3);
         expect(await policyManager.totalSupply()).to.equal(3);
         expect(await policyManager.balanceOf(REAL_USER)).to.equal(3);
       });
       it("can get product name", async function () {
-        expect(await product.name()).to.equal("Curve");
+        expect(await product.name()).to.equal("UniswapV3");
       });
     });
 
@@ -421,21 +704,14 @@ if(process.env.FORK_NETWORK === "mainnet"){
       let policyID1: BN;
       let policyID2: BN;
       let amountOut1 = 500000;
-      let curveRegistry: Contract;
 
       before(async function () {
         let policyCount = await policyManager.totalPolicyCount();
         policyID1 = policyCount.add(1);
         policyID2 = policyCount.add(2);
         await depositor.sendTransaction({to: claimsEscrow.address, value: BN.from("1000000000000000000")});
-        await product.connect(policyholder1).buyPolicy(policyholder1.address, coverAmount, blocks, LP_TOKEN_ADDR, { value: expectedPremium });
-        await product.connect(policyholder2).buyPolicy(policyholder2.address, coverAmount, blocks, LP_TOKEN_ADDR, { value: expectedPremium });
-
-        // create registry
-        const addressProvider = await ethers.getContractAt(artifacts.CurveAddressProvider.abi, ADDRESS_PROVIDER);
-        const registryAddress = await addressProvider.get_registry();
-        curveRegistry = await ethers.getContractAt(artifacts.CurveRegistry.abi, registryAddress)
-        expect(curveRegistry).is.not.null;
+        await product.connect(policyholder1).buyPolicy(policyholder1.address, coverAmount, blocks, uniPools[0].address, { value: expectedPremium });
+        await product.connect(policyholder2).buyPolicy(policyholder2.address, coverAmount, blocks, uniPools[1].address, { value: expectedPremium });
       });
       it("cannot submit claim with expired signature", async function () {
         let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, amountOut1, 0, SUBMIT_CLAIM_TYPEHASH);
@@ -515,17 +791,17 @@ if(process.env.FORK_NETWORK === "mainnet"){
         let userEth2 = await policyholder1.getBalance();
         expect(userEth2.sub(userEth1).add(gasCost)).to.equal(amountOut1);
       });
-      it("should support all curve lp tokens", async function () {
+      it("should support sufficient uniswapv3 pools", async function () {
         let success = 0;
         let successList = [];
         let failList = [];
-      
-        for (let i = 0; i < lpTokens.length; i++) {
-          const lpTokenAddress = lpTokens[i].address;
-          const symbol = lpTokens[i].symbol;
+        const size = 50;
+        for (let i = 0; i < size; i++) {
+          const uniPoolAddress = uniPools[i].address;
+          const symbol = uniPools[i].name;
           try {
             // create policy
-            await product.connect(policyholder3).buyPolicy(policyholder3.address, coverAmount, blocks, lpTokenAddress, { value: expectedPremium });
+            await product.connect(policyholder3).buyPolicy(policyholder3.address, coverAmount, blocks, uniPoolAddress, { value: expectedPremium });
             let policyID = (await policyManager.totalPolicyCount()).toNumber();
 
             // sign swap
@@ -562,12 +838,12 @@ if(process.env.FORK_NETWORK === "mainnet"){
         }
         
         if (failList.length != 0) {
-          console.log("supported lp tokens:");
+          console.log("supported uniswapv3 pools:");
           console.log(successList.reduce((acc,val)=>`${acc}  - ${val}\n`,""));
-          console.log("unsupported lp tokens:");
+          console.log("supported uniswapv3 pools:");
           console.log(failList.reduce((acc,val)=>`${acc}  - ${val}\n`,""));
         }
-        expect(`${success}/${lpTokens.length} supported lp tokens`).to.equal(`${lpTokens.length}/${lpTokens.length} supported lp tokens`);
+        expect(`${success}/${size} supported uniswapv3 pools`).to.equal(`${size}/${size} supported uniswapv3 pools`);
       });
     });
   });

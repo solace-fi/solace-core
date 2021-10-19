@@ -1,26 +1,27 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
-import "../interface/Yearn/IYRegistry.sol";
-import "../interface/Yearn/IYVault.sol";
+import "../interface/SushiSwap/ISushiLPToken.sol";
+import "../interface/SushiSwap/ISushiV2Factory.sol";
+
 import "./BaseProduct.sol";
 
-/**
- * @title YearnV2Product
- * @author solace.fi
- * @notice The **YearnV2Product** can be used to purchase coverage for **YearnV2** positions.
- */
-contract YearnV2Product is BaseProduct {
 
-    // IYRegistry.
-    IYRegistry internal _yregistry;
+/**
+ * @title SushiswapProduct
+ * @author solace.fi
+ * @notice The **SushiswapProduct** can be used to purchase coverage for **Sushiswap LP** positions.
+ */
+contract SushiswapProduct is BaseProduct {
+
+    ISushiV2Factory internal _sushiV2Factory;
 
     /**
-      * @notice Constructs the YearnV2Product.
+      * @notice Constructs the SushiswapProduct.
       * @param governance_ The address of the [governor](/docs/protocol/governance).
       * @param policyManager_ The [`PolicyManager`](../PolicyManager) contract.
       * @param registry_ The [`Registry`](../Registry) contract.
-      * @param yregistry_ The Yearn YRegistry.
+      * @param sushiV2Factory_ The Sushiswap Factory.
       * @param minPeriod_ The minimum policy period in blocks to purchase a **policy**.
       * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
      */
@@ -28,30 +29,30 @@ contract YearnV2Product is BaseProduct {
         address governance_,
         IPolicyManager policyManager_,
         IRegistry registry_,
-        address yregistry_,
+        address sushiV2Factory_,
         uint40 minPeriod_,
         uint40 maxPeriod_
     ) BaseProduct(
         governance_,
         policyManager_,
         registry_,
-        yregistry_,
+        sushiV2Factory_,
         minPeriod_,
         maxPeriod_,
-        "Solace.fi-YearnV2Product",
+        "Solace.fi-SushiswapProduct",
         "1"
     ) {
-        _yregistry = IYRegistry(yregistry_);
-        _SUBMIT_CLAIM_TYPEHASH = keccak256("YearnV2ProductSubmitClaim(uint256 policyID,address claimant,uint256 amountOut,uint256 deadline)");
-        _productName = "YearnV2";
+        _sushiV2Factory = ISushiV2Factory(sushiV2Factory_);
+        _SUBMIT_CLAIM_TYPEHASH = keccak256("SushiswapProductSubmitClaim(uint256 policyID,address claimant,uint256 amountOut,uint256 deadline)");
+        _productName = "Sushiswap";
     }
 
     /**
-     * @notice Yearn's YRegistry.
-     * @return yregistry_ The YRegistry.
+     * @notice Sushiswap V2 Factory.
+     * @return sushiV2Factory_ The factory.
      */
-    function yregistry() external view returns (address yregistry_) {
-        return address(_yregistry);
+    function sushiV2Factory() external view returns (address sushiV2Factory_) {
+        return address(_sushiV2Factory);
     }
 
     /**
@@ -74,13 +75,12 @@ contract YearnV2Product is BaseProduct {
             address positionContract;
             // solhint-disable-next-line no-inline-assembly
             assembly {
-                // get 20 bytes starting at offset+32
-                positionContract := shr(0x60, mload(add(add(positionDescription, 0x20), offset)))
+                positionContract := div(mload(add(add(positionDescription, 0x20), offset)), 0x1000000000000000000000000)
             }
-            // must be a yVault
-            IYVault vault = IYVault(positionContract);
-            bool isRegistered = _yregistry.isRegistered(vault.token());
-            if (!isRegistered) return false;
+            // must be Sushi LP Token
+            ISushiLPToken slpToken = ISushiLPToken(positionContract);
+            address pair = _sushiV2Factory.getPair(slpToken.token0(), slpToken.token1());
+            if (pair != address(slpToken)) return false;
         }
         return true;
     }
@@ -94,10 +94,10 @@ contract YearnV2Product is BaseProduct {
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @dev Use this if the the protocol changes their registry but keeps the children contracts.
      * A new version of the protocol will likely require a new Product.
-     * @param yregistry_ The new YRegistry.
+     * @param sushiV2Factory_ The new Address Provider.
      */
-    function setCoveredPlatform(address yregistry_) public override {
-        super.setCoveredPlatform(yregistry_);
-        _yregistry = IYRegistry(yregistry_);
+    function setCoveredPlatform(address sushiV2Factory_) public override {
+        super.setCoveredPlatform(sushiV2Factory_);
+        _sushiV2Factory = ISushiV2Factory(sushiV2Factory_);
     }
 }

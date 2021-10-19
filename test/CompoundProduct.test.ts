@@ -383,55 +383,6 @@ if(process.env.FORK_NETWORK === "mainnet"){
           const symbol = ctokens[i].symbol;
           const ctokenAddress = ctokens[i].address;
           try {
-            // fetch contracts
-            const cToken = await ethers.getContractAt(artifacts.ICERC20.abi, ctokenAddress);
-            if(symbol == "cETH") {
-              await ceth.connect(policyholder3).mint({value: BN.from("1000000000000000000")});
-              expect(await cToken.balanceOf(policyholder3.address)).to.be.gt(0);
-            } else {
-              const uAddress = await cToken.underlying();
-              const uToken = await ethers.getContractAt(artifacts.ERC20.abi, uAddress);
-              const decimals = await uToken.decimals();
-              const uAmount = oneToken(decimals);
-              const uimpl = ((ctokens[i].uimpl || "") != "") ? ctokens[i].uimpl : uAddress;
-              const blacklistAddress = ctokens[i].blacklist || ZERO_ADDRESS;
-              const isBlacklistable = blacklistAddress != ZERO_ADDRESS;
-              // create position
-              var value = toBytes32(uAmount).toString();
-              for(var j = 0; j < 200; ++j) {
-                try { // solidity rigged balanceOf
-                  var index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[policyholder3.address,j]);
-                  await setStorageAt(uimpl, index, value);
-                  var uBalance = await uToken.balanceOf(policyholder3.address);
-                  if(uBalance.eq(uAmount)) break;
-                } catch(e) { }
-                try { // vyper rigged balanceOf
-                  var index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[j,policyholder3.address]);
-                  await setStorageAt(uimpl, index, value);
-                  var uBalance = await uToken.balanceOf(policyholder3.address);
-                  if(uBalance.eq(uAmount)) break;
-                } catch(e) { }
-              }
-              expect(await uToken.balanceOf(policyholder3.address)).to.equal(uAmount);
-              if(isBlacklistable) {
-                const blacklistContract = await ethers.getContractAt(artifacts.Blacklist.abi, blacklistAddress);
-                var value = toBytes32(BN.from(0)).toString();
-                for(var j = 0; j < 200; ++j) {
-                  try {
-                    var index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[policyholder3.address,j]);
-                    await setStorageAt(uimpl, index, value);
-                    var blacklisted = await blacklistContract.isBlacklisted(policyholder3.address);
-                    if(!blacklisted) break;
-                  } catch(e) { }
-                }
-                expect(await blacklistContract.isBlacklisted(policyholder3.address)).to.be.false;
-              }
-              await uToken.connect(policyholder3).approve(ctokenAddress, constants.MaxUint256);
-              await cToken.connect(policyholder3).mint(uAmount);
-              expect(await uToken.balanceOf(policyholder3.address)).to.be.equal(0);
-            }
-            const cAmount = await cToken.balanceOf(policyholder3.address);
-            expect(cAmount).to.be.gt(0);
             // create policy
             await product.connect(policyholder3).buyPolicy(policyholder3.address, coverAmount, blocks, ctokenAddress, { value: expectedPremium });
             let policyID = (await policyManager.totalPolicyCount()).toNumber();
@@ -456,9 +407,9 @@ if(process.env.FORK_NETWORK === "mainnet"){
             ++success;
             successList.push(symbol);
             console.log(`\x1b[38;5;239m        ✓ ${symbol}\x1b[0m`);
-          } catch (e) {
+          } catch (e: any ) {
             console.log(`\x1b[31m        ✘ ${symbol}`);
-            console.log("          "+e.stack.replace(/\n/g, "\n      "));
+            console.log("          " + e.stack.replace(/\n/g, "\n      "));
             console.log("\x1b[0m");
             failList.push(symbol);
           }

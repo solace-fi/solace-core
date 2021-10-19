@@ -213,18 +213,6 @@ if(process.env.FORK_NETWORK === "kovan"){
         let policyCount = await policyManager.totalPolicyCount();
         policyID1 = policyCount.add(1);
         await deployer.sendTransaction({to: claimsEscrow.address, value: BN.from("1000000000000000000")});
-        // create a waWETH position and policy
-        let depositAmount1 = BN.from("1000000000000000");
-        await weth.connect(policyholder1).deposit({value: depositAmount1});
-        await weth.connect(policyholder1).approve(waWeth.address, depositAmount1);
-        await waWeth.connect(policyholder1).deposit(depositAmount1);
-        await product.connect(policyholder1).buyPolicy(policyholder1.address, coverAmount, blocks, WAWETH_ADDRESS, { value: expectedPremium });
-        // create another waWETH position and policy
-        let depositAmount2 = BN.from("2000000000000000");
-        await weth.connect(policyholder2).deposit({value: depositAmount2});
-        await weth.connect(policyholder2).approve(waWeth.address, depositAmount2);
-        await waWeth.connect(policyholder2).deposit(depositAmount2);
-        await product.connect(policyholder2).buyPolicy(policyholder2.address, coverAmount, blocks, WAWETH_ADDRESS, { value: expectedPremium });
       });
       it("cannot submit claim with expired signature", async function () {
         let digest = getSubmitClaimDigest(DOMAIN_NAME, product.address, chainId, policyID1, policyholder1.address, amountOut1, 0, SUBMIT_CLAIM_TYPEHASH);
@@ -323,51 +311,6 @@ if(process.env.FORK_NETWORK === "kovan"){
           const watokenAddress = watokens[i].address;
           const symbol = watokens[i].symbol;
           try {
-            // fetch contracts
-            const watoken = await ethers.getContractAt(artifacts.IWaToken.abi, watokenAddress);
-            const uAddress = await watoken.underlying();
-            const uToken = await ethers.getContractAt(artifacts.ERC20.abi, uAddress);
-            const decimals = await uToken.decimals();
-            const uAmount = oneToken(decimals);
-            const uimpl = ((watokens[i].uimpl || "") != "") ? watokens[i].uimpl : uAddress;
-            const blacklistAddress = watokens[i].blacklist || ZERO_ADDRESS;
-            const isBlacklistable = blacklistAddress != ZERO_ADDRESS;
-            // create position
-            var value = toBytes32(uAmount).toString();
-            for(var j = 0; j < 200; ++j) {
-              try { // solidity rigged balanceOf
-                var index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[policyholder3.address,j]);
-                await setStorageAt(uimpl, index, value);
-                var uBalance = await uToken.balanceOf(policyholder3.address);
-                if(uBalance.eq(uAmount)) break;
-              } catch(e) { }
-              try { // vyper rigged balanceOf
-                var index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[j,policyholder3.address]);
-                await setStorageAt(uimpl, index, value);
-                var uBalance = await uToken.balanceOf(policyholder3.address);
-                if(uBalance.eq(uAmount)) break;
-              } catch(e) { }
-            }
-            expect(await uToken.balanceOf(policyholder3.address)).to.equal(uAmount);
-            if(isBlacklistable) {
-              const blacklistContract = await ethers.getContractAt(artifacts.Blacklist.abi, blacklistAddress);
-              var value = toBytes32(BN.from(0)).toString();
-              for(var j = 0; j < 200; ++j) {
-                try {
-                  var index = ethers.utils.solidityKeccak256(["uint256", "uint256"],[policyholder3.address,j]);
-                  await setStorageAt(uimpl, index, value);
-                  var blacklisted = await blacklistContract.isBlacklisted(policyholder3.address);
-                  if(!blacklisted) break;
-                } catch(e) { }
-              }
-              expect(await blacklistContract.isBlacklisted(policyholder3.address)).to.be.false;
-            }
-            await uToken.connect(policyholder3).approve(watokenAddress, constants.MaxUint256);
-            await watoken.connect(policyholder3).deposit(uAmount);
-            expect(await uToken.balanceOf(policyholder3.address)).to.be.equal(0);
-
-            const cAmount = await watoken.balanceOf(policyholder3.address);
-            expect(cAmount).to.be.gt(0);
             // create policy
             await product.connect(policyholder3).buyPolicy(policyholder3.address, coverAmount, blocks, watokenAddress, { value: expectedPremium });
             let policyID = (await policyManager.totalPolicyCount()).toNumber();
@@ -392,9 +335,9 @@ if(process.env.FORK_NETWORK === "kovan"){
             ++success;
             successList.push(symbol);
             console.log(`\x1b[38;5;239m        ✓ ${symbol}\x1b[0m`);
-          } catch (e) {
+          } catch (e: any) {
             console.log(`\x1b[31m        ✘ ${symbol}`);
-            console.log("          "+e.stack.replace(/\n/g, "\n      "));
+            console.log("          " + e.stack.replace(/\n/g, "\n      "));
             console.log("\x1b[0m");
             failList.push(symbol);
           }

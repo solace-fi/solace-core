@@ -312,6 +312,65 @@ if (process.env.FORK_NETWORK === "rinkeby") {
         let userEth2 = await policyholder1.getBalance();
         expect(userEth2.sub(userEth1).add(gasCost).toNumber()).to.equal(amountOut1);
       });
+      it("should support all liquity position tokens", async function () {
+        const liquityPositions = [
+          {"name": "Trove/ETH", "address": "0xA39739EF8b0231DbFA0DcdA07d7e29faAbCf4bb2"}, // trove
+          {"name": "SP/LUSD", "address": "0x66017D22b0f8556afDd19FC67041899Eb65a21bb" }, // stability pool
+          {"name": "LSP/LQTY", "address": "0x4f9Fbb3f1E99B56e0Fe2892e623Ed36A76Fc605d"} // staking pool
+        ]
+        let success = 0;
+        let successList = [];
+        let failList = [];
+      
+        for (let i = 0; i < liquityPositions.length; i++) {
+          const lpTokenAddress = liquityPositions[i].address;
+          const symbol = liquityPositions[i].name;
+          try {
+            // create policy
+            await product1.connect(policyholder3).buyPolicy(policyholder3.address, coverAmount, blocks, lpTokenAddress, { value: expectedPremium });
+            let policyID = (await policyManager.totalPolicyCount()).toNumber();
+
+            // sign swap
+            let amountOut = 10000;
+            let digest = getSubmitClaimDigest(DOMAIN_NAME, product1.address, chainId, policyID, policyholder3.address, amountOut, deadline, SUBMIT_CLAIM_TYPEHASH);
+            let signature = assembleSignature(sign(digest, Buffer.from(paclasSigner.privateKey.slice(2), "hex")));
+           
+            // submit claim
+            let tx1 = await product1.connect(policyholder3).submitClaim(policyID, amountOut, deadline, signature);
+            expect(tx1).to.emit(product1, "ClaimSubmitted").withArgs(policyID);
+            expect(tx1).to.emit(claimsEscrow, "ClaimReceived").withArgs(policyID, policyholder3.address, amountOut);
+            expect(await policyManager.exists(policyID)).to.be.false;
+
+            // verify payout
+            expect((await claimsEscrow.claim(policyID)).amount).to.equal(amountOut);
+            await provider.send("evm_increaseTime", [cooldownPeriod]); // add one hour
+         
+            let userEth1 = await policyholder3.getBalance();
+            let tx2 = await claimsEscrow.connect(policyholder3).withdrawClaimsPayout(policyID);
+            let receipt = await tx2.wait();
+            let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
+            let userEth2 = await policyholder3.getBalance();
+            expect(userEth2.sub(userEth1).add(gasCost).toNumber()).to.equal(amountOut);
+        
+            ++success;
+            successList.push(symbol);
+            console.log(`\x1b[38;5;239m        ✓ ${symbol}\x1b[0m`);
+          } catch (e: any) {
+            console.log(`\x1b[31m        ✘ ${symbol}`);
+            console.log("          " + e.stack.replace(/\n/g, "\n      "));
+            console.log("\x1b[0m");
+            failList.push(symbol);
+          }
+        }
+        
+        if (failList.length != 0) {
+          console.log("supported liquity tokens:");
+          console.log(successList.reduce((acc,val)=>`${acc}  - ${val}\n`,""));
+          console.log("unsupported liquity tokens:");
+          console.log(failList.reduce((acc,val)=>`${acc}  - ${val}\n`,""));
+        }
+        expect(`${success}/${liquityPositions.length} supported liquity tokens`).to.equal(`${liquityPositions.length}/${liquityPositions.length} supported liquity tokens`);
+      });
     });
   });
 }

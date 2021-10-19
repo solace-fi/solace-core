@@ -41,6 +41,9 @@ export async function import_artifacts() {
   artifacts.WaaveProduct = await tryImport(`${artifact_dir}/products/WaaveProduct.sol/WaaveProduct.json`);
   artifacts.YearnV2Product = await tryImport(`${artifact_dir}/products/YearnV2Product.sol/YearnV2Product.json`);
   artifacts.LiquityProduct = await tryImport(`${artifact_dir}/products/LiquityProduct.sol/LiquityProduct.json`);
+  artifacts.SushiswapProduct = await tryImport(`${artifact_dir}/products/SushiswapProduct.sol/SushiswapProduct.json`);
+  artifacts.UniswapV2Product = await tryImport(`${artifact_dir}/products/UniswapV2Product.sol/UniswapV2Product.json`);
+  artifacts.UniswapV3Product = await tryImport(`${artifact_dir}/products/UniswapV3Product.sol/UniswapV3Product.json`);
 
   // oracles
   artifacts.ExchangeQuoter1InchV1 = await tryImport(`${artifact_dir}/oracles/ExchangeQuoter1InchV1.sol/ExchangeQuoter1InchV1.json`);
@@ -71,7 +74,7 @@ export async function import_artifacts() {
   artifacts.IComptroller = await tryImport(`${artifact_dir}/interface/Compound/IComptroller.sol/IComptroller.json`);
   artifacts.IComptrollerRinkeby = await tryImport(`${artifact_dir}/interface/Compound/IComptrollerRinkeby.sol/IComptrollerRinkeby.json`);
 
-  // uniswap imports
+  // uniswapv3 imports
   artifacts.UniswapV3Factory = await tryImport("@uniswap/v3-core/artifacts/contracts/UniswapV3Factory.sol/UniswapV3Factory.json");
   artifacts.UniswapV3Pool = await tryImport("@uniswap/v3-core/artifacts/contracts/UniswapV3Pool.sol/UniswapV3Pool.json");
   artifacts.SwapRouter = await tryImport("@uniswap/v3-periphery/artifacts/contracts/SwapRouter.sol/SwapRouter.json");
@@ -91,7 +94,20 @@ export async function import_artifacts() {
   artifacts.LUSDToken = await tryImport(`${artifact_dir}/interface/Liquity/ILUSDToken.sol/ILUSDToken.json`);
   artifacts.StabilityPool = await tryImport(`${artifact_dir}/interface/Liquity/IStabilityPool.sol/IStabilityPool.json`);
 
+  // curve imports
+  artifacts.CurveAddressProvider = await tryImport(`${artifact_dir}/interface/Curve/ICurveAddressProvider.sol/ICurveAddressProvider.json`);
+  artifacts.CurveRegistry = await tryImport(`${artifact_dir}/interface/Curve/ICurveRegistry.sol/ICurveRegistry.json`);
+  artifacts.CurvePool = await tryImport(`${artifact_dir}/interface/Curve/ICurvePool.sol/ICurvePool.json`);
+  artifacts.CurveToken = await tryImport(`${artifact_dir}/interface/Curve/ICurveToken.sol/ICurveToken.json`);
 
+  // sushiswap imports
+  artifacts.SushiswapV2Factory = await tryImport(`${artifact_dir}/interface/SushiSwap/ISushiV2Factory.sol/ISushiV2Factory.json`);
+  artifacts.MasterChef = await tryImport(`${artifact_dir}/interface/SushiSwap/IMasterChef.sol/IMasterChef.json`);
+  artifacts.SushiLPToken = await tryImport(`${artifact_dir}/interface/SushiSwap/ISushiLPToken.sol/ISushiLPToken.json`);
+
+  // uniswapv2 imports
+  artifacts.UniswapV2Factory = await tryImport(`${artifact_dir}/interface/UniswapV2/IUniV2Factory.sol/IUniV2Factory.json`);
+  artifacts.UniLPToken = await tryImport(`${artifact_dir}/interface/UniswapV2/IUniLPToken.sol/IUniLPToken.json`);
 
   return artifacts;
 }
