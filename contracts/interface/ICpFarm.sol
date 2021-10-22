@@ -8,9 +8,9 @@ import "./IFarm.sol";
 /**
  * @title CpFarm
  * @author solace.fi
- * @notice Rewards [**Capital Providers**](/docs/user-guides/capital-provider/cp-role-guide) in [**SOLACE**](../SOLACE) for providing capital in the [`Vault`](../Vault).
+ * @notice Rewards [**Capital Providers**](/docs/user-guides/capital-provider/cp-role-guide) in [**Options**](../OptionFarming) for providing capital in the [`Vault`](../Vault).
  *
- * Over the course of `startTime` to `endTime`, the farm distributes `rewardPerSecond` [**SOLACE**](../SOLACE) to all farmers split relative to the amount of [**SCP**](../Vault) they have deposited.
+ * Over the course of `startTime` to `endTime`, the farm distributes `rewardPerSecond` [**Options**](../OptionFarming) to all farmers split relative to the amount of [**SCP**](../Vault) they have deposited.
  *
  * Users can become [**Capital Providers**](/docs/user-guides/capital-provider/cp-role-guide) by depositing **ETH** into the [`Vault`](../Vault), receiving [**SCP**](../Vault) in the process. [**Capital Providers**](/docs/user-guides/capital-provider/cp-role-guide) can then deposit their [**SCP**](../Vault) via [`depositCp()`](#depositcp) or [`depositCpSigned()`](#depositcpsigned). Alternatively users can bypass the [`Vault`](../Vault) and stake their **ETH** via [`depositEth()`](#depositeth).
  *

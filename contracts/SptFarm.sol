@@ -1,38 +1,37 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "./Governable.sol";
 import "./interface/IRegistry.sol";
-import "./interface/IVault.sol";
-import "./interface/IFarmController.sol";
-import "./interface/ICpFarm.sol";
+import "./interface/IPolicyManager.sol";
+import "./interface/ISptFarm.sol";
 
 
 /**
- * @title CpFarm
+ * @title ISptFarm
  * @author solace.fi
- * @notice Rewards [**Capital Providers**](/docs/user-guides/capital-provider/cp-role-guide) in [`Policy Manager`](./PolicyManager) for providing capital in the [`Vault`](./Vault).
+ * @notice Rewards [**Policyholders**](/docs/protocol/policy-holder) in [**Options**](../OptionFarming) for staking their [**Policies**](./PolicyManager).
  *
- * Over the course of `startTime` to `endTime`, the farm distributes `rewardPerSecond` [**SOLACE**](./SOLACE) to all farmers split relative to the amount of [**SCP**](./Vault) they have deposited.
+ * Over the course of `startTime` to `endTime`, the farm distributes `rewardPerSecond` [**Options**](../OptionFarming) to all farmers split relative to the amount of [**SCP**](../Vault) they have deposited.
  *
- * Users can become [**Capital Providers**](/docs/user-guides/capital-provider/cp-role-guide) by depositing **ETH** into the [`Vault`](./Vault), receiving [**SCP**](./Vault) in the process. [**Capital Providers**](/docs/user-guides/capital-provider/cp-role-guide) can then deposit their [**SCP**](./Vault) via [`depositCp()`](#depositcp) or [`depositCpSigned()`](#depositcpsigned). Alternatively users can bypass the [`Vault`](./Vault) and stake their **ETH** via [`depositEth()`](#depositeth).
+ * Users can become [**Capital Providers**](/docs/user-guides/capital-provider/cp-role-guide) by depositing **ETH** into the [`Vault`](../Vault), receiving [**SCP**](../Vault) in the process. [**Capital Providers**](/docs/user-guides/capital-provider/cp-role-guide) can then deposit their [**SCP**](../Vault) via [`depositCp()`](#depositcp) or [`depositCpSigned()`](#depositcpsigned). Alternatively users can bypass the [`Vault`](../Vault) and stake their **ETH** via [`depositEth()`](#depositeth).
  *
  * Users can withdraw their rewards via [`withdrawRewards()`](#withdrawrewards).
  *
- * Users can withdraw their [**SCP**](./Vault) via [`withdrawCp()`](#withdrawcp).
+ * Users can withdraw their [**SCP**](../Vault) via [`withdrawCp()`](#withdrawcp).
  *
- * Note that transferring in **ETH** will mint you shares, but transferring in **WETH** or [**SCP**](./Vault) will not. These must be deposited via functions in this contract. Misplaced funds cannot be rescued.
+ * Note that transferring in **ETH** will mint you shares, but transferring in **WETH** or [**SCP**](../Vault) will not. These must be deposited via functions in this contract. Misplaced funds cannot be rescued.
  */
-contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
-    using SafeERC20 for IERC20;
+contract SptFarm is ISptFarm, ReentrancyGuard, Governable {
+    using EnumerableSet for EnumerableSet.UintSet;
 
     /// @notice A unique enumerator that identifies the farm type.
-    uint256 internal constant _farmType = 1;
-    /// @notice Vault contract.
-    IVault internal _vault;
+    uint256 internal constant _farmType = 3;
+    /// @notice PolicyManager contract.
+    IPolicyManager internal _policyManager;
     /// @notice FarmController contract.
     IFarmController internal _controller;
     /// @notice Amount of SOLACE distributed per seconds.
@@ -45,12 +44,12 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
     uint256 internal _lastRewardTime;
     /// @notice Accumulated rewards per share, times 1e12.
     uint256 internal _accRewardPerShare;
-    /// @notice Value of tokens staked by all farmers.
+    /// @notice Value of policys staked by all farmers.
     uint256 internal _valueStaked;
 
     // Info of each user.
     struct UserInfo {
-        uint256 value;         // Value of user provided tokens.
+        uint256 value;         // Value of user provided policys.
         uint256 rewardDebt;    // Reward debt. See explanation below.
         uint256 unpaidRewards; // Rewards that have not been paid.
         //
@@ -59,7 +58,7 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
         //
         //   pending reward = (user.value * _accRewardPerShare) - user.rewardDebt + user.unpaidRewards
         //
-        // Whenever a user deposits or withdraws CP tokens to a farm. Here's what happens:
+        // Whenever a user deposits or withdraws policies to a farm. Here's what happens:
         //   1. The farm's `accRewardPerShare` and `lastRewardTime` gets updated.
         //   2. Users pending rewards accumulate in `unpaidRewards`.
         //   3. User's `value` gets updated.
@@ -70,11 +69,18 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
     /// @dev user address => user info
     mapping(address => UserInfo) internal _userInfo;
 
-    // @notice WETH
-    IERC20 internal _weth;
+    // list of tokens deposited by user
+    mapping(address => EnumerableSet.UintSet) internal _userDeposited;
+
+    struct PolicyInfo {
+        address depositor;
+        uint256 value;
+    }
+
+    mapping(uint256 => PolicyInfo) internal _policyInfo;
 
     /**
-     * @notice Constructs the CpFarm.
+     * @notice Constructs the SptFarm.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
      * @param registry_ Address of the [`Registry`](./Registry) contract.
      * @param startTime_ When farming will begin.
@@ -91,13 +97,9 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
         address controller_ = registry.farmController();
         require(controller_ != address(0x0), "zero address controller");
         _controller = IFarmController(controller_);
-        address vault_ = registry.vault();
-        require(vault_ != address(0x0), "zero address vault");
-        _vault = IVault(payable(vault_));
-        address weth_ = registry.weth();
-        require(weth_ != address(0x0), "zero address weth");
-        _weth = IERC20(weth_);
-        _weth.approve(vault_, type(uint256).max);
+        address policyManager_ = registry.policyManager();
+        require(policyManager_ != address(0x0), "zero address policymanager");
+        _policyManager = IPolicyManager(policyManager_);
         require(startTime_ <= endTime_, "invalid window");
         _startTime = startTime_;
         _endTime = endTime_;
@@ -113,14 +115,49 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
         return _farmType;
     }
 
-    /// @notice Vault contract.
-    function vault() external view override returns (address vault_) {
-        return address(_vault);
+    /// @notice [`PolicyManager`](./PolicyManager) contract.
+    function policyManager() external view override returns (address policyManager_) {
+        return address(_policyManager);
     }
 
-    /// @notice WETH contract.
-    function weth() external view override returns (address weth_) {
-        return address(_weth);
+    /**
+     * @notice Returns the count of [**policies**](./PolicyManager) that a user has deposited onto the farm.
+     * @param user The user to check count for.
+     * @return count The count of deposited [**policies**](./PolicyManager).
+     */
+    function countDeposited(address user) external view override returns (uint256 count) {
+        return _userDeposited[user].length();
+    }
+
+    /**
+     * @notice Returns the list of [**policies**](./PolicyManager) that a user has deposited onto the farm and their values.
+     * @param user The user to list deposited policies.
+     * @return policyIDs The list of deposited policies.
+     * @return policyValues The values of the policies.
+     */
+    function listDeposited(address user) external view override returns (uint256[] memory policyIDs, uint256[] memory policyValues) {
+        uint256 length = _userDeposited[user].length();
+        policyIDs = new uint256[](length);
+        policyValues = new uint256[](length);
+        for(uint256 i = 0; i < length; ++i) {
+            uint256 policyID = _userDeposited[user].at(i);
+            policyIDs[i] = policyID;
+            policyValues[i] = _policyInfo[policyID].value;
+        }
+        return (policyIDs, policyValues);
+    }
+
+    /**
+     * @notice Returns the ID of a [**Policies**](./PolicyManager) that a user has deposited onto a farm and its value.
+     * @param user The user to get policyID for.
+     * @param index The farm-based index of the policy.
+     * @return policyID The ID of the deposited [**policy**](./PolicyManager).
+     * @return policyValue The value of the [**policy**](./PolicyManager).
+     */
+    function getDeposited(address user, uint256 index) external view override returns (uint256 policyID, uint256 policyValue) {
+        policyID = _userDeposited[user].at(index);
+        policyValue = _policyInfo[policyID].value;
+        return (policyID, policyValue);
     }
 
     /// @notice FarmController contract.
@@ -153,20 +190,20 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
         return _accRewardPerShare;
     }
 
-    /// @notice The amount of [**SCP**](../Vault) tokens a user deposited.
+    /// @notice The value of [**policies**](./PolicyManager) a user deposited.
     function userStaked(address user) external view override returns (uint256 amount) {
         return _userInfo[user].value;
     }
 
-    /// @notice Value of tokens staked by all farmers.
+    /// @notice Value of [**policies**](./PolicyManager) staked by all farmers.
     function valueStaked() external view override returns (uint256 amount) {
         return _valueStaked;
     }
 
     /**
      * @notice Calculates the accumulated balance of [**SOLACE**](./SOLACE) for specified user.
-     * @param user The user for whom unclaimed tokens will be shown.
-     * @return reward Total amount of withdrawable reward tokens.
+     * @param user The user for whom unclaimed rewards will be shown.
+     * @return reward Total amount of withdrawable rewards.
      */
     function pendingRewards(address user) external view override returns (uint256 reward) {
         // get farmer information
@@ -200,82 +237,121 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
     ***************************************/
 
     /**
-     * @notice Deposit some [**CP tokens**](./Vault).
-     * User must `ERC20.approve()` first.
-     * @param amount The deposit amount.
+     * @notice Deposit a [**policy**](./PolicyManager).
+     * User must `ERC721.approve()` or `ERC721.setApprovalForAll()` first.
+     * @param policyID The ID of the policy to deposit.
      */
-    function depositCp(uint256 amount) external override {
-        // pull tokens
-        SafeERC20.safeTransferFrom(_vault, msg.sender, address(this), amount);
+    function depositPolicy(uint256 policyID) external override {
+        // pull policy
+        _policyManager.transferFrom(msg.sender, address(this), policyID);
         // accounting
-        _depositCp(msg.sender, amount);
+        _deposit(msg.sender, policyID);
     }
 
     /**
-     * @notice Deposit some [**CP tokens**](./Vault) using `ERC2612.permit()`.
+     * @notice Deposit a [**policy**](./PolicyManager) using permit.
      * @param depositor The depositing user.
-     * @param amount The deposit amount.
+     * @param policyID The ID of the policy to deposit.
      * @param deadline Time the transaction must go through before.
      * @param v secp256k1 signature
      * @param r secp256k1 signature
      * @param s secp256k1 signature
      */
-    function depositCpSigned(address depositor, uint256 amount, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external override {
+    function depositPolicySigned(address depositor, uint256 policyID, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external override {
         // permit
-        _vault.permit(depositor, address(this), amount, deadline, v, r, s);
-        // pull tokens
-        SafeERC20.safeTransferFrom(_vault, depositor, address(this), amount);
+        _policyManager.permit(address(this), policyID, deadline, v, r, s);
+        // pull policy
+        _policyManager.transferFrom(depositor, address(this), policyID);
         // accounting
-        _depositCp(depositor, amount);
+        _deposit(depositor, policyID);
     }
 
     /**
-     * @notice Deposit some **ETH**.
+     * @notice Performs the internal accounting for a deposit.
+     * @param depositor The depositing user.
+     * @param policyID The ID of the policy to deposit.
      */
-    function depositEth() external payable override {
-        _depositEth();
+    function _deposit(address depositor, uint256 policyID) internal {
+        // get policy
+        (/* address policyholder */, /* address product */, uint256 coverAmount, uint40 expirationBlock, uint24 price, /* bytes calldata positionDescription */) = _policyManager.getPolicyInfo(policyID);
+        require(expirationBlock > block.number, "policy is expired");
+        // harvest and update farm
+        _harvest(depositor);
+        // get farmer information
+        UserInfo storage user = _userInfo[depositor];
+        // record position
+        uint256 policyValue = coverAmount * uint256(price); // a multiple of premium per block
+        PolicyInfo memory policyInfo_ = PolicyInfo({
+            depositor: depositor,
+            value: policyValue
+        });
+        _policyInfo[policyID] = policyInfo_;
+        // accounting
+        user.value -= policyValue;
+        _valueStaked -= policyValue;
+        user.rewardDebt = user.value * _accRewardPerShare / 1e12;
+        _userDeposited[depositor].add(policyID);
+        // emit event
+        emit PolicyDeposited(depositor, policyID);
     }
 
     /**
-     * @notice Deposit some **WETH**.
-     * @param amount The amount of **WETH** to deposit.
+     * @notice Withdraw a [**policy**](./PolicyManager).
+     * Can only withdraw policies you deposited.
+     * @param policyID The ID of the policy to withdraw.
      */
-    function depositWeth(uint256 amount) external override {
-        // pull weth
-        SafeERC20.safeTransferFrom(_weth, msg.sender, address(this), amount);
+    function withdrawPolicy(uint256 policyID) external override {
         // harvest and update farm
         _harvest(msg.sender);
         // get farmer information
         UserInfo storage user = _userInfo[msg.sender];
-        // generate scp using weth
-        uint256 scpAmount = _vault.balanceOf(address(this));
-        _vault.depositWeth(amount);
-        scpAmount = _vault.balanceOf(address(this)) - scpAmount;
+        // get policy info
+        PolicyInfo memory policyInfo_ = _policyInfo[policyID];
+        // cannot withdraw a policy you didnt deposit
+        require(policyInfo_.depositor == msg.sender, "not your policy");
         // accounting
-        _valueStaked += scpAmount;
-        user.value += scpAmount;
+        user.value -= policyInfo_.value;
+        _valueStaked -= policyInfo_.value;
         user.rewardDebt = user.value * _accRewardPerShare / 1e12;
-        emit EthDeposited(msg.sender, amount);
+        // delete policy info
+        delete _policyInfo[policyID];
+        // return staked policy
+        _userDeposited[msg.sender].remove(policyID);
+        _policyManager.safeTransferFrom(address(this), msg.sender, policyID);
+        // emit event
+        emit PolicyWithdrawn(msg.sender, policyID);
     }
 
     /**
-     * @notice Withdraw some [**CP tokens**](./Vault).
-     * User will receive amount of deposited tokens and accumulated rewards.
-     * Can only withdraw as many tokens as you deposited.
-     * @param amount The withdraw amount.
+     * @notice Burns expired policies.
+     * @param policyIDs The list of expired policies.
      */
-    function withdrawCp(uint256 amount) external override nonReentrant {
-        // harvest and update farm
-        _harvest(msg.sender);
-        // get farmer information
-        UserInfo storage user = _userInfo[msg.sender];
-        // accounting
-        _valueStaked -= amount;
-        user.value -= amount; // also reverts overwithdraw
-        user.rewardDebt = user.value * _accRewardPerShare / 1e12;
-        // return staked tokens
-        SafeERC20.safeTransfer(_vault, msg.sender, amount);
-        emit CpWithdrawn(msg.sender, amount);
+    function updateActivePolicies(uint256[] calldata policyIDs) external override {
+        // update farm
+        updateFarm();
+        // for each policy to burn
+        for(uint256 i = 0; i < policyIDs.length; i++) {
+            uint256 policyID = policyIDs[i];
+            // get policy info
+            PolicyInfo memory policyInfo_ = _policyInfo[policyID];
+            // if policy is on the farm and policy is expired or burnt
+            if(policyInfo_.depositor != address(0x0) && !_policyManager.policyIsActive(policyID)) {
+                // get farmer information
+                UserInfo storage user = _userInfo[policyInfo_.depositor];
+                // accounting
+                user.value -= policyInfo_.value;
+                _valueStaked -= policyInfo_.value;
+                user.rewardDebt = user.value * _accRewardPerShare / 1e12;
+                // delete policy info
+                delete _policyInfo[policyID];
+                // remove staked policy
+                _userDeposited[policyInfo_.depositor].remove(policyID);
+                // emit event
+                emit PolicyWithdrawn(address(0x0), policyID);
+            }
+        }
+        // policymanager needs to do its own accounting
+        _policyManager.updateActivePolicies(policyIDs);
     }
 
     /**
@@ -292,42 +368,6 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
         uint256 tokenReward = getRewardAmountDistributed(_lastRewardTime, block.timestamp);
         _accRewardPerShare += tokenReward * 1e12 / _valueStaked;
         _lastRewardTime = Math.min(block.timestamp, _endTime);
-    }
-
-    /**
-     * @notice Deposits some ether.
-     */
-    function _depositEth() internal nonReentrant {
-        // harvest and update farm
-        _harvest(msg.sender);
-        // get farmer information
-        UserInfo storage user = _userInfo[msg.sender];
-        // generate scp using eth
-        uint256 scpAmount = _vault.balanceOf(address(this));
-        _vault.depositEth{value:msg.value}();
-        scpAmount = _vault.balanceOf(address(this)) - scpAmount;
-        // accounting
-        _valueStaked += scpAmount;
-        user.value += scpAmount;
-        user.rewardDebt = user.value * _accRewardPerShare / 1e12;
-        emit EthDeposited(msg.sender, msg.value);
-    }
-
-    /**
-     * @notice Deposit some [**CP tokens**](./Vault).
-     * @param depositor The depositing user.
-     * @param amount The deposit amount.
-     */
-    function _depositCp(address depositor, uint256 amount) internal nonReentrant {
-        // harvest and update farm
-        _harvest(depositor);
-        // get farmer information
-        UserInfo storage user = _userInfo[depositor];
-        // accounting
-        _valueStaked += amount;
-        user.value += amount;
-        user.rewardDebt = user.value * _accRewardPerShare / 1e12;
-        emit CpDeposited(depositor, amount);
     }
 
     /**
@@ -365,7 +405,7 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
     }
 
     /**
-     * @notice Withdraw a users rewards without unstaking their tokens.
+     * @notice Withdraw a users rewards without unstaking their policys.
      * Can only be called by [`FarmController`](./FarmController).
      * @param user User to withdraw rewards for.
      * @return rewardAmount The amount of rewards the user earned on this farm.
@@ -414,23 +454,5 @@ contract CpFarm is ICpFarm, ReentrancyGuard, Governable {
         // update
         updateFarm();
         emit FarmEndSet(endTime_);
-    }
-
-    /***************************************
-    FALLBACK FUNCTIONS
-    ***************************************/
-
-    /**
-     * Receive function. Deposits eth.
-     */
-    receive () external payable override {
-        if (msg.sender != address(_vault)) _depositEth();
-    }
-
-    /**
-     * Fallback function. Deposits eth.
-     */
-    fallback () external payable override {
-        if (msg.sender != address(_vault)) _depositEth();
     }
 }
