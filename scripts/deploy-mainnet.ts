@@ -60,6 +60,7 @@ let cpFarm: CpFarm;
 let solace: Solace;
 
 let signerAddress: string;
+let multisigAddress = "0xc47911f768c6fE3a9fe076B95e93a33Ed45B7B34";
 
 let transactions: any = [];
 
@@ -117,6 +118,11 @@ async function deployRegistry() {
     transactions.push({"description": "Deploy Registry", "to": deployerContract.address, "gasLimit": res.gasUsed});
     console.log(`Deployed Registry to ${registry.address}`);
   }
+  if(await registry.governance() === signerAddress && await registry.pendingGovernance() !== multisigAddress) {
+    console.log(`Registry.setPendingGovernance(${multisigAddress})`)
+    let tx = await registry.connect(deployer).setPendingGovernance(multisigAddress);
+    await tx.wait();
+  }
 }
 
 async function deployWeth() {
@@ -145,6 +151,11 @@ async function deployVault() {
     let receipt = await tx.wait();
     transactions.push({"description": "Register Vault", "to": registry.address, "gasLimit": receipt.gasUsed.toString()});
   }
+  if(await vault.governance() === signerAddress && await vault.pendingGovernance() !== multisigAddress) {
+    console.log(`vault.setPendingGovernance(${multisigAddress})`)
+    let tx = await vault.connect(deployer).setPendingGovernance(multisigAddress);
+    await tx.wait();
+  }
 }
 
 async function deployClaimsEscrow() {
@@ -168,6 +179,11 @@ async function deployClaimsEscrow() {
     let tx = await vault.connect(deployer).addRequestor(claimsEscrow.address);
     let receipt = await tx.wait();
     transactions.push({"description": "Add ClaimsEscrow as Vault Requestor", "to": vault.address, "gasLimit": receipt.gasUsed.toString()});
+  }
+  if(await claimsEscrow.governance() === signerAddress && await claimsEscrow.pendingGovernance() !== multisigAddress) {
+    console.log(`claimsEscrow.setPendingGovernance(${multisigAddress})`)
+    let tx = await claimsEscrow.connect(deployer).setPendingGovernance(multisigAddress);
+    await tx.wait();
   }
 }
 
@@ -193,6 +209,11 @@ async function deployTreasury() {
     let receipt = await tx.wait();
     transactions.push({"description": "Add Treasury as Vault Requestor", "to": vault.address, "gasLimit": receipt.gasUsed.toString()});
   }
+  if(await treasury.governance() === signerAddress && await treasury.pendingGovernance() !== multisigAddress) {
+    console.log(`treasury.setPendingGovernance(${multisigAddress})`)
+    let tx = await treasury.connect(deployer).setPendingGovernance(multisigAddress);
+    await tx.wait();
+  }
 }
 
 async function deployPolicyManager() {
@@ -210,6 +231,11 @@ async function deployPolicyManager() {
     let tx = await registry.connect(deployer).setPolicyManager(policyManager.address);
     let receipt = await tx.wait();
     transactions.push({"description": "Register PolicyManager", "to": registry.address, "gasLimit": receipt.gasUsed.toString()});
+  }
+  if(await policyManager.governance() === signerAddress && await policyManager.pendingGovernance() !== multisigAddress) {
+    console.log(`policyManager.setPendingGovernance(${multisigAddress})`)
+    let tx = await policyManager.connect(deployer).setPendingGovernance(multisigAddress);
+    await tx.wait();
   }
 }
 
@@ -247,6 +273,11 @@ async function deployRiskManager() {
     let receipt = await tx.wait();
     transactions.push({"description": "Register RiskManager", "to": registry.address, "gasLimit": receipt.gasUsed.toString()});
   }
+  if(await riskManager.governance() === signerAddress && await riskManager.pendingGovernance() !== multisigAddress) {
+    console.log(`riskManager.setPendingGovernance(${multisigAddress})`)
+    let tx = await riskManager.connect(deployer).setPendingGovernance(multisigAddress);
+    await tx.wait();
+  }
 }
 
 async function deployOptionsFarming() {
@@ -264,6 +295,11 @@ async function deployOptionsFarming() {
     let tx = await registry.connect(deployer).setOptionsFarming(optionsFarming.address);
     let receipt = await tx.wait();
     transactions.push({"description": "Register OptionsFarming", "to": registry.address, "gasLimit": receipt.gasUsed.toString()});
+  }
+  if(await optionsFarming.governance() === signerAddress && await optionsFarming.pendingGovernance() !== multisigAddress) {
+    console.log(`optionsFarming.setPendingGovernance(${multisigAddress})`)
+    let tx = await optionsFarming.connect(deployer).setPendingGovernance(multisigAddress);
+    await tx.wait();
   }
 }
 
@@ -289,6 +325,11 @@ async function deployFarmController() {
     let receipt = await tx.wait();
     transactions.push({"description": "Register FarmController in OptionsFarming", "to": optionsFarming.address, "gasLimit": receipt.gasUsed.toString()});
   }
+  if(await farmController.governance() === signerAddress && await farmController.pendingGovernance() !== multisigAddress) {
+    console.log(`farmController.setPendingGovernance(${multisigAddress})`)
+    let tx = await farmController.connect(deployer).setPendingGovernance(multisigAddress);
+    await tx.wait();
+  }
 }
 
 async function deployCpFarm() {
@@ -307,6 +348,11 @@ async function deployCpFarm() {
     let receipt = await tx.wait();
     transactions.push({"description": "Register CpFarm in FarmController", "to": farmController.address, "gasLimit": receipt.gasUsed.toString()});
   }
+  if(await cpFarm.governance() === signerAddress && await cpFarm.pendingGovernance() !== multisigAddress) {
+    console.log(`cpFarm.setPendingGovernance(${multisigAddress})`)
+    let tx = await cpFarm.connect(deployer).setPendingGovernance(multisigAddress);
+    await tx.wait();
+  }
 }
 
 async function deploySOLACE() {
@@ -324,12 +370,6 @@ async function deploySOLACE() {
     let tx = await registry.connect(deployer).setSolace(solace.address);
     let receipt = await tx.wait();
     transactions.push({"description": "Register SOLACE", "to": registry.address, "gasLimit": receipt.gasUsed.toString()});
-  }
-  if(!(await solace.isMinter(deployer.address)) && (await solace.balanceOf(optionsFarming.address)).eq(0)) {
-    console.log("Minting SOLACE to OptionsFarming");
-    let tx = await solace.connect(deployer).mint(optionsFarming.address, BN.from("150000000000000000000000000"));
-    let receipt = await tx.wait();
-    transactions.push({"description": "Mint SOLACE to OptionsFarming", "to": solace.address, "gasLimit": receipt.gasUsed.toString()});
   }
 }
 

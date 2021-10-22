@@ -33,6 +33,7 @@ export async function import_artifacts() {
   artifacts.LpAppraisor = await tryImport(`${artifact_dir}/LpAppraisor.sol/LpAppraisor.json`);
   artifacts.SolaceEthLpFarm = await tryImport(`${artifact_dir}/SolaceEthLpFarm.sol/SolaceEthLpFarm.json`);
   // products
+  artifacts.BaseProduct = await tryImport(`${artifact_dir}/products/BaseProduct.sol/BaseProduct.json`);
   artifacts.MockProduct = await tryImport(`${artifact_dir}/mocks/MockProduct.sol/MockProduct.json`);
   artifacts.AaveV2Product = await tryImport(`${artifact_dir}/products/AaveV2Product.sol/AaveV2Product.json`);
   artifacts.CompoundProduct = await tryImport(`${artifact_dir}/products/CompoundProduct.sol/CompoundProduct.json`);

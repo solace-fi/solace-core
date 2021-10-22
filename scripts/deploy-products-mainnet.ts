@@ -36,6 +36,12 @@ const UNISWAPV2_FACTORY_ADDRESS = "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f";
 const UNISWAPV3_FACTORY_ADDRESS = "0x1F98431c8aD98523631AE4a59f267346ea31F984";
 const SUSHISWAP_FACTORY_ADDRESS = "0xC0AEe478e3658e2610c5F7A4A2E1777cE9e4f2Ac";
 
+const PACLAS_SIGNER_ADDRESS     = "0xA32b8838Ba639A1a8a70C149a924C8Bc07d803a7";
+
+const productNames = ["AaveV2Product", "CompoundProduct", "LiquityProduct", "YearnV2Product", "CurveProduct", "UniswapV2Product", "UniswapV3Product", "SushiswapProduct"];
+const productAddresses = [AAVEV2_PRODUCT_ADDRESS, COMPOUND_PRODUCT_ADDRESS, LIQUITY_PRODUCT_ADDRESS, YEARNV2_PRODUCT_ADDRESS, CURVE_PRODUCT_ADDRESS, UNISWAPV2_PRODUCT_ADDRESS, UNISWAPV3_PRODUCT_ADDRESS, SUSHISWAP_PRODUCT_ADDRESS];
+
+
 // product params
 const minPeriod = 6450; // this is about 1 day
 const maxPeriod = 2354250; // this is about 1 year from https://ycharts.com/indicators/ethereum_blocks_per_day
@@ -43,7 +49,7 @@ const PRICE_22 = 9344;  // 2.20%/yr
 const PRICE_24 = 10194; // 2.40%/yr
 const PRICE_26 = 11044; // 2.60%/yr
 const EQUAL_WEIGHT = 10000;
-const DIVISOR = 10;
+const DIVISOR = 5;
 
 let artifacts: ArtifactImports;
 let deployerContract: Deployer;
@@ -81,6 +87,10 @@ async function main() {
   await deployUniswapV2Product();
   await deployUniswapV3Product();
   await deploySushiswapProduct();
+
+  //await adjustRiskParams();
+  await addSigners();
+  await setPendingGovernance();
 
   await logAddresses();
 }
@@ -266,6 +276,52 @@ async function deploySushiswapProduct() {
     let tx = await riskManager.connect(deployer).addProduct(sushiswapProduct.address, EQUAL_WEIGHT, PRICE_22, DIVISOR);
     await tx.wait();
     console.log("Registered SushiswapProduct in RiskManager");
+  }
+}
+
+async function adjustRiskParams() {
+  console.log("Adjusting risk parameters")
+  let weights = ["10000","10000","10000","10000","10000","10000","10000","10000"];
+  let prices = ["9344","9344","9344","9344","9344","9344","10194","9344"];
+  let divisors = ["5","5","5","5","5","5","5","5"];
+  let tx = await riskManager.connect(deployer).setProductParams(productAddresses, weights, prices, divisors);
+  console.log(tx);
+  console.log(await tx.wait());
+  console.log('');
+  for(let i = 0; i < productAddresses.length; ++i) {
+    let addr = productAddresses[i];
+    let riskParams = await riskManager.productRiskParams(addr);
+    console.log(`${addr}: ${riskParams.weight}, ${riskParams.price}, ${riskParams.divisor}`);
+  }
+}
+
+async function addSigners() {
+  console.log("Adding signers");
+  for(let i = 0; i < productAddresses.length; ++i) {
+    let name = productNames[i];
+    let addr = productAddresses[i];
+    let productContract = await ethers.getContractAt(artifacts.BaseProduct.abi, addr);
+    if(await productContract.governance() == signerAddress && !(await productContract.isAuthorizedSigner(PACLAS_SIGNER_ADDRESS))) {
+      console.log(`Adding signer to ${name} ${addr}`);
+      let tx = await productContract.connect(deployer).addSigner(PACLAS_SIGNER_ADDRESS);
+      await tx.wait();
+      console.log(`Added signer to ${name} ${addr}\n`);
+    }
+  }
+}
+
+async function setPendingGovernance() {
+  console.log("Setting pending governance");
+  for(let i = 0; i < productAddresses.length; ++i) {
+    let name = productNames[i];
+    let addr = productAddresses[i];
+    let productContract = await ethers.getContractAt(artifacts.BaseProduct.abi, addr);
+    if(await productContract.governance() === signerAddress && await productContract.pendingGovernance() !== multisigAddress) {
+      console.log(`${name}.setPendingGovernance(${multisigAddress})`)
+      let tx = await productContract.connect(deployer).setPendingGovernance(multisigAddress);
+      await tx.wait();
+      console.log('set\n');
+    }
   }
 }
 
