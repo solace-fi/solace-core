@@ -37,6 +37,8 @@ const UNISWAP_ROUTER_ADDRESS    = "0xE592427A0AEce92De3Edee1F18E0157C05861564";
 const WAAVE_REGISTRY_ADDRESS    = "0x166956c3A96c875610DCfb80F228Da0f4e92B73B";
 const SINGLETON_FACTORY_ADDRESS = "0xce0042B868300000d44A59004Da54A005ffdcf9f";
 
+const PACLAS_SIGNER_ADDRESS     = "0xA32b8838Ba639A1a8a70C149a924C8Bc07d803a7";
+
 // product params
 const minPeriod = 6450; // this is about 1 day
 const maxPeriod = 2354250; // this is about 1 year from https://ycharts.com/indicators/ethereum_blocks_per_day
@@ -99,6 +101,8 @@ async function main() {
   // products
   await deployAaveV2Product();
   await deployWaaveProduct();
+
+  await addSigners();
 
   writeFileSync("stash/transactions/deployTransactionsKovan.json", JSON.stringify(transactions, undefined, '  '));
   await logAddresses();
@@ -387,6 +391,23 @@ async function deployWaaveProduct() {
     let tx = await riskManager.connect(deployer).addProduct(waaveProduct.address,100,price,10);
     let receipt = await tx.wait();
     transactions.push({"description": "Register WaaveProduct in RiskManager", "to": riskManager.address, "gasLimit": receipt.gasUsed.toString()});
+  }
+}
+
+async function addSigners() {
+  console.log("Adding signers");
+  let productNames = ["AaveV2Product", "WaaveProduct"];
+  let productAddresses = [aaveProduct.address, waaveProduct.address];
+  for(let i = 0; i < productAddresses.length; ++i) {
+    let name = productNames[i];
+    let addr = productAddresses[i];
+    let productContract = await ethers.getContractAt(artifacts.BaseProduct.abi, addr);
+    if(await productContract.governance() == signerAddress && !(await productContract.isAuthorizedSigner(PACLAS_SIGNER_ADDRESS))) {
+      console.log(`Adding signer to ${name} ${addr}`);
+      let tx = await productContract.connect(deployer).addSigner(PACLAS_SIGNER_ADDRESS);
+      await tx.wait();
+      console.log(`Added signer to ${name} ${addr}\n`);
+    }
   }
 }
 
