@@ -339,7 +339,6 @@ async function logAddresses() {
   logContractAddress("SushiswapProduct", sushiswapProduct.address);
 }
 
-
 main()
     .then(() => process.exit(0))
     .catch(error => {
