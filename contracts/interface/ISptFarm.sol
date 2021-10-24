@@ -48,6 +48,9 @@ interface ISptFarm is IFarm {
     /// @notice Value of policies deposited by all farmers.
     function valueStaked() external view returns (uint256 amount);
 
+    /// @notice Information about a deposited policy.
+    function policyInfo(uint256 policyID) external view returns (address depositor, uint256 value);
+
     /**
      * @notice Returns the count of [**policies**](./PolicyManager) that a user has deposited onto the farm.
      * @param user The user to check count for.

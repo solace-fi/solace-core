@@ -77,6 +77,7 @@ contract SptFarm is ISptFarm, ReentrancyGuard, Governable {
         uint256 value;
     }
 
+    // policy id => policy info
     mapping(uint256 => PolicyInfo) internal _policyInfo;
 
     /**
@@ -200,6 +201,12 @@ contract SptFarm is ISptFarm, ReentrancyGuard, Governable {
         return _valueStaked;
     }
 
+    /// @notice Information about a deposited policy.
+    function policyInfo(uint256 policyID) external view override returns (address depositor, uint256 value) {
+        PolicyInfo storage policyInfo_ = _policyInfo[policyID];
+        return (policyInfo_.depositor, policyInfo_.value);
+    }
+
     /**
      * @notice Calculates the accumulated balance of [**SOLACE**](./SOLACE) for specified user.
      * @param user The user for whom unclaimed rewards will be shown.
@@ -287,8 +294,8 @@ contract SptFarm is ISptFarm, ReentrancyGuard, Governable {
         });
         _policyInfo[policyID] = policyInfo_;
         // accounting
-        user.value -= policyValue;
-        _valueStaked -= policyValue;
+        user.value += policyValue;
+        _valueStaked += policyValue;
         user.rewardDebt = user.value * _accRewardPerShare / 1e12;
         _userDeposited[depositor].add(policyID);
         // emit event

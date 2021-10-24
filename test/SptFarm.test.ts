@@ -9,21 +9,23 @@ chai.use(solidity);
 
 import { encodePriceSqrt, FeeAmount, TICK_SPACINGS, getMaxTick, getMinTick } from "./utilities/uniswap";
 import { bnAddSub, bnMulDiv, expectClose } from "./utilities/math";
-import { getPermitDigest, sign, getDomainSeparator } from "./utilities/signature";
+import { getPermitErc721EnhancedSignature } from "./utilities/getPermitNFTSignature";
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Solace, Vault, FarmController, OptionsFarming, Weth9, CpFarm, PolicyManager, RiskManager, Registry } from "../typechain";
+import { Solace, FarmController, OptionsFarming, SptFarm, PolicyManager, RiskManager, Registry, MockProduct, Weth9, Treasury } from "../typechain";
+import { burnBlocks } from "./utilities/time";
 
 // contracts
 let solace: Solace;
 let farmController: FarmController;
 let optionsFarming: OptionsFarming;
-let vault: Vault;
-let farm1: CpFarm;
+let farm1: SptFarm;
 let weth: Weth9;
 let registry: Registry;
+let treasury: Treasury;
 let policyManager: PolicyManager;
 let riskManager: RiskManager;
+let product: MockProduct;
 
 // uniswap contracts
 let uniswapFactory: Contract;
@@ -45,14 +47,14 @@ let timestamp: number;
 let initTime: number;
 let startTime: number;
 let endTime: number;
-let cpFarmType = 1;
-
-const cpTokenName = "Solace CP Token";
-const chainId = 31337;
+let sptFarmType = 3;
+const price = 10000;
+const duration = 1000;
+const chainID = 31337;
 const deadline = constants.MaxUint256;
 
-describe("CpFarm", function () {
-  const [deployer, governor, farmer1, farmer2, mockVault, trader] = provider.getWallets();
+describe("SptFarm", function () {
+  const [deployer, governor, farmer1, farmer2, trader, coveredPlatform] = provider.getWallets();
   let artifacts: ArtifactImports;
 
   before(async function () {
@@ -70,8 +72,8 @@ describe("CpFarm", function () {
     registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
     weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
     await registry.connect(governor).setWeth(weth.address);
-    vault = (await deployContract(deployer, artifacts.Vault, [governor.address, registry.address])) as Vault;
-    await registry.connect(governor).setVault(vault.address);
+    treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, registry.address])) as Treasury;
+    await registry.connect(governor).setTreasury(treasury.address);
     policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
     await registry.connect(governor).setPolicyManager(policyManager.address);
     riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
@@ -84,19 +86,21 @@ describe("CpFarm", function () {
     await registry.connect(governor).setFarmController(farmController.address);
     await optionsFarming.connect(governor).setFarmController(farmController.address);
 
+    // add products
+    product = (await deployContract(deployer, artifacts.MockProduct, [deployer.address, policyManager.address, registry.address, coveredPlatform.address, 0, 100000000000, price])) as MockProduct;
+    await policyManager.connect(governor).addProduct(product.address);
+    await riskManager.connect(governor).addProduct(product.address, 1, price, 1);
+
     // transfer tokens
     await solace.connect(governor).addMinter(governor.address);
-    //await solace.connect(governor).mint(farmController.address, ONE_MILLION_ETHER);
     await solace.connect(governor).mint(governor.address, ONE_MILLION_ETHER);
     await solace.connect(governor).mint(trader.address, FIFTY_THOUSAND_ETHER);
-    await weth.connect(trader).deposit({ value: TEN_ETHER });
-
-    // approve tokens
-    await solace.connect(farmer1).approve(lpToken.address, constants.MaxUint256);
-    await solace.connect(farmer2).approve(lpToken.address, constants.MaxUint256);
+    await solace.connect(trader).approve(uniswapRouter.address, constants.MaxUint256);
     await solace.connect(trader).approve(lpToken.address, constants.MaxUint256);
-    await weth.connect(farmer1).approve(lpToken.address, constants.MaxUint256);
-    await weth.connect(farmer2).approve(lpToken.address, constants.MaxUint256);
+    await weth.connect(farmer1).deposit({ value: TEN_ETHER });
+    await weth.connect(farmer2).deposit({ value: TEN_ETHER });
+    await weth.connect(trader).deposit({ value: TEN_ETHER });
+    await weth.connect(trader).approve(uniswapRouter.address, constants.MaxUint256);
     await weth.connect(trader).approve(lpToken.address, constants.MaxUint256);
 
     // create pools
@@ -111,36 +115,28 @@ describe("CpFarm", function () {
 
   describe("deployment", function () {
     it("reverts if zero registry", async function () {
-      await expect(deployContract(deployer, artifacts.CpFarm, [governor.address, ZERO_ADDRESS, 1, 2])).to.be.revertedWith("zero address registry");
+      await expect(deployContract(deployer, artifacts.SptFarm, [governor.address, ZERO_ADDRESS, 1, 2])).to.be.revertedWith("zero address registry");
     });
     it("reverts if zero controller", async function () {
       let registry2 = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
-      await expect(deployContract(deployer, artifacts.CpFarm, [governor.address, registry2.address, 1, 2])).to.be.revertedWith("zero address controller");
+      await expect(deployContract(deployer, artifacts.SptFarm, [governor.address, registry2.address, 1, 2])).to.be.revertedWith("zero address controller");
     });
-    it("reverts if zero vault", async function () {
+    it("reverts if zero policymanager", async function () {
       let registry2 = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
       await registry2.connect(governor).setFarmController(farmController.address);
-      await expect(deployContract(deployer, artifacts.CpFarm, [governor.address, registry2.address, 1, 2])).to.be.revertedWith("zero address vault");
-    });
-    it("reverts if zero weth", async function () {
-      let registry2 = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
-      await registry2.connect(governor).setFarmController(farmController.address);
-      await registry2.connect(governor).setVault(vault.address);
-      await expect(deployContract(deployer, artifacts.CpFarm, [governor.address, registry2.address, 1, 2])).to.be.revertedWith("zero address weth");
+      await expect(deployContract(deployer, artifacts.SptFarm, [governor.address, registry2.address, 1, 2])).to.be.revertedWith("zero address policymanager");
     });
     it("reverts if invalid window", async function () {
       let registry2 = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
       await registry2.connect(governor).setFarmController(farmController.address);
-      await registry2.connect(governor).setVault(vault.address);
-      await registry2.connect(governor).setWeth(weth.address);
-      await expect(deployContract(deployer, artifacts.CpFarm, [governor.address, registry2.address, 4, 3])).to.be.revertedWith("invalid window");
+      await registry2.connect(governor).setPolicyManager(policyManager.address);
+      await expect(deployContract(deployer, artifacts.SptFarm, [governor.address, registry2.address, 4, 3])).to.be.revertedWith("invalid window");
     });
     it("deploys successfully", async function () {
       let registry2 = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
       await registry2.connect(governor).setFarmController(farmController.address);
-      await registry2.connect(governor).setVault(vault.address);
-      await registry2.connect(governor).setWeth(weth.address);
-      await deployContract(deployer, artifacts.CpFarm, [governor.address, registry2.address, 1, 2]);
+      await registry2.connect(governor).setPolicyManager(policyManager.address);
+      await deployContract(deployer, artifacts.SptFarm, [governor.address, registry2.address, 1, 2]);
     });
   });
 
@@ -153,19 +149,18 @@ describe("CpFarm", function () {
       endTime = initTime + ONE_YEAR;
     });
     it("can create farms", async function () {
-      farm1 = (await deployContract(deployer, artifacts.CpFarm, [governor.address, registry.address, startTime, endTime])) as CpFarm;
+      farm1 = (await deployContract(deployer, artifacts.SptFarm, [governor.address, registry.address, startTime, endTime])) as SptFarm;
     });
     it("returns farm information", async function () {
       expect(await farm1.farmController()).to.equal(farmController.address);
-      expect(await farm1.vault()).to.equal(vault.address);
-      expect(await farm1.farmType()).to.equal(cpFarmType);
+      expect(await farm1.policyManager()).to.equal(policyManager.address);
+      expect(await farm1.farmType()).to.equal(sptFarmType);
       expect(await farm1.startTime()).to.equal(startTime);
       expect(await farm1.endTime()).to.equal(endTime);
       expect(await farm1.rewardPerSecond()).to.equal(0);
       expect(await farm1.valueStaked()).to.equal(0);
       expect(await farm1.lastRewardTime()).to.be.closeTo(BN.from(initTime), 5);
       expect(await farm1.accRewardPerShare()).to.equal(0);
-      expect(await farm1.weth()).to.eq(weth.address);
     });
   });
 
@@ -198,189 +193,181 @@ describe("CpFarm", function () {
   });
 
   describe("deposit and withdraw", function () {
-    let balancesBefore: Balances, balancesAfter: Balances, balancesDiff: Balances;
+    let policyID1: BN, policyID2: BN, policyID3: BN, policyID4: BN, policyID5: BN;
+    let coverAmount1 = ONE_ETHER;
+    let coverAmount2 = ONE_ETHER.mul(4);
+    let coverAmount3 = ONE_ETHER.mul(2);
+    let coverAmount4 = ONE_ETHER.mul(9);
+    let coverAmount5 = ONE_ETHER.mul(25);
+    let policyValue1 = coverAmount1.mul(price);
+    let policyValue2 = coverAmount2.mul(price);
+    let policyValue3 = coverAmount3.mul(price);
+    let policyValue4 = coverAmount4.mul(price);
+    let policyValue5 = coverAmount5.mul(price);
+    let policyValue12 = policyValue1.add(policyValue2);
+    let policyValue13 = policyValue1.add(policyValue3);
+    let policyValue123 = policyValue1.add(policyValue2).add(policyValue3);
 
-    it("can deposit eth", async function () {
-      // farmer 1, deposit 1 wei
-      let depositAmount1 = BN.from(1);
-      balancesBefore = await getBalances(farmer1, farm1);
-      let tx1 = await farm1.connect(farmer1).depositEth({ value: depositAmount1 });
-      await expect(tx1).to.emit(farm1, "EthDeposited").withArgs(farmer1.address, depositAmount1);
-      balancesAfter = await getBalances(farmer1, farm1);
-      balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
-      expect(balancesDiff.farmStake).to.equal(depositAmount1);
-      expect(balancesDiff.farmCp).to.equal(depositAmount1);
-      expect(balancesDiff.userStaked).to.equal(depositAmount1);
-      expect(balancesDiff.vaultAssets).to.equal(depositAmount1);
-      // farmer 2, deposit 4 wei
-      let depositAmount2 = BN.from(4);
-      balancesBefore = await getBalances(farmer2, farm1);
-      let tx2 = await farm1.connect(farmer2).depositEth({ value: depositAmount2 });
-      await expect(tx2).to.emit(farm1, "EthDeposited").withArgs(farmer2.address, depositAmount2);
-      balancesAfter = await getBalances(farmer2, farm1);
-      balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
-      expect(balancesDiff.farmStake).to.equal(depositAmount2);
-      expect(balancesDiff.farmCp).to.equal(depositAmount2);
-      expect(balancesDiff.userStaked).to.equal(depositAmount2);
-      expect(balancesDiff.vaultAssets).to.equal(depositAmount2);
-      // farmer 1, deposit 2 wei
-      let depositAmount3 = BN.from(2);
-      balancesBefore = await getBalances(farmer1, farm1);
-      let tx3 = await farm1.connect(farmer1).depositEth({ value: depositAmount3 });
-      await expect(tx3).to.emit(farm1, "EthDeposited").withArgs(farmer1.address, depositAmount3);
-      balancesAfter = await getBalances(farmer1, farm1);
-      balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
-      expect(balancesDiff.farmStake).to.equal(depositAmount3);
-      expect(balancesDiff.farmCp).to.equal(depositAmount3);
-      expect(balancesDiff.userStaked).to.equal(depositAmount3);
-      expect(balancesDiff.vaultAssets).to.equal(depositAmount3);
+    before(async function () {
+      await product.connect(farmer1)._buyPolicy(farmer1.address, coverAmount1, duration, ZERO_ADDRESS);
+      policyID1 = await policyManager.totalPolicyCount();
+      await product.connect(farmer2)._buyPolicy(farmer2.address, coverAmount2, duration, ZERO_ADDRESS);
+      policyID2 = await policyManager.totalPolicyCount();
+      await product.connect(farmer1)._buyPolicy(farmer1.address, coverAmount3, duration, ZERO_ADDRESS);
+      policyID3 = await policyManager.totalPolicyCount();
+      await product.connect(farmer1)._buyPolicy(farmer1.address, coverAmount4, duration, ZERO_ADDRESS);
+      policyID4 = await policyManager.totalPolicyCount();
+      await product.connect(farmer1)._buyPolicy(farmer1.address, coverAmount5, duration, ZERO_ADDRESS);
+      policyID5 = await policyManager.totalPolicyCount();
     });
-    it("can deposit eth via receive", async function () {
-      let depositAmount4 = BN.from(48);
-      balancesBefore = await getBalances(farmer2, farm1);
-      let tx = await farmer2.sendTransaction({
-        to: farm1.address,
-        value: depositAmount4,
-        data: "0x",
-      });
-      await expect(tx).to.emit(farm1, "EthDeposited").withArgs(farmer2.address, depositAmount4);
-      balancesAfter = await getBalances(farmer2, farm1);
-      balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
-      expect(balancesDiff.farmStake).to.equal(depositAmount4);
-      expect(balancesDiff.farmCp).to.equal(depositAmount4);
-      expect(balancesDiff.userStaked).to.equal(depositAmount4);
-      expect(balancesDiff.vaultAssets).to.equal(depositAmount4);
+    it("can deposit", async function () {
+      // empty
+      let balances1a = await getBalances(farmer1, farm1);
+      expect(await farm1.countDeposited(farmer1.address)).to.equal(0);
+      expect(await farm1.listDeposited(farmer1.address)).to.deep.equal([[], []]);
+      // farmer 1, deposit policy 1
+      expect((await farm1.policyInfo(policyID1)).depositor).to.equal(ZERO_ADDRESS);
+      await policyManager.connect(farmer1).approve(farm1.address, policyID1);
+      let tx1 = await farm1.connect(farmer1).depositPolicy(policyID1);
+      await expect(tx1).to.emit(farm1, "PolicyDeposited").withArgs(farmer1.address, policyID1);
+      let balances1b = await getBalances(farmer1, farm1);
+      let balancesDiff1 = getBalancesDiff(balances1b, balances1a);
+      expect(balancesDiff1.farmSpt).eq(1);
+      expect(balancesDiff1.userSpt).eq(-1);
+      expect(balancesDiff1.userStaked).eq(policyValue1);
+      expect(balancesDiff1.farmStake).eq(policyValue1);
+      expect(balances1b.userStaked).eq(policyValue1);
+      expect(balances1b.farmStake).eq(policyValue1);
+      expect(balances1b.farmSpt).eq(1);
+      expect(await farm1.countDeposited(farmer1.address)).to.equal(1);
+      expect(await farm1.getDeposited(farmer1.address, 0)).to.deep.equal([policyID1, policyValue1]);
+      expect(await farm1.listDeposited(farmer1.address)).to.deep.equal([[policyID1], [policyValue1]]);
+      let policyInfo = await farm1.policyInfo(policyID1);
+      expect(policyInfo.depositor).eq(farmer1.address);
+      expect(policyInfo.value).eq(policyValue1);
+      // farmer 2, deposit policy 2
+      let balances2a = await getBalances(farmer2, farm1);
+      await policyManager.connect(farmer2).approve(farm1.address, policyID2);
+      let tx2 = await farm1.connect(farmer2).depositPolicy(policyID2);
+      await expect(tx2).to.emit(farm1, "PolicyDeposited").withArgs(farmer2.address, policyID2);
+      let balances2b = await getBalances(farmer2, farm1);
+      let balancesDiff2 = getBalancesDiff(balances2b, balances2a);
+      expect(balancesDiff2.farmSpt).eq(1);
+      expect(balancesDiff2.userSpt).eq(-1);
+      expect(balancesDiff2.userStaked).eq(policyValue2);
+      expect(balancesDiff2.farmStake).eq(policyValue2);
+      expect(balances2b.userStaked).eq(policyValue2);
+      expect(balances2b.farmStake).eq(policyValue12);
+      expect(balances2b.farmSpt).eq(2);
+      expect(await farm1.countDeposited(farmer2.address)).to.equal(1);
+      expect(await farm1.getDeposited(farmer2.address, 0)).to.deep.equal([policyID2, policyValue2]);
+      expect(await farm1.listDeposited(farmer2.address)).to.deep.equal([[policyID2], [policyValue2]]);
+      policyInfo = await farm1.policyInfo(policyID2);
+      expect(policyInfo.depositor).eq(farmer2.address);
+      expect(policyInfo.value).eq(policyValue2);
+      // farmer 1, deposit policy 3
+      let balances3a = await getBalances(farmer1, farm1);
+      await policyManager.connect(farmer1).approve(farm1.address, policyID3);
+      let tx3 = await farm1.connect(farmer1).depositPolicy(policyID3);
+      await expect(tx3).to.emit(farm1, "PolicyDeposited").withArgs(farmer1.address, policyID3);
+      let balances3b = await getBalances(farmer1, farm1);
+      let balancesDiff3 = getBalancesDiff(balances3b, balances3a);
+      expect(balancesDiff3.farmSpt).eq(1);
+      expect(balancesDiff3.userSpt).eq(-1);
+      expect(balancesDiff3.userStaked).eq(policyValue3);
+      expect(balancesDiff3.farmStake).eq(policyValue3);
+      expect(balances3b.userStaked).eq(policyValue13);
+      expect(balances3b.farmStake).eq(policyValue123);
+      expect(balances3b.farmSpt).eq(3);
+      expect(await farm1.countDeposited(farmer1.address)).to.equal(2);
+      expect(await farm1.getDeposited(farmer1.address, 1)).to.deep.equal([policyID3, policyValue3]);
+      expect(await farm1.listDeposited(farmer1.address)).to.deep.equal([
+        [policyID1, policyID3],
+        [policyValue1, policyValue3],
+      ]);
+      policyInfo = await farm1.policyInfo(policyID3);
+      expect(policyInfo.depositor).eq(farmer1.address);
+      expect(policyInfo.value).eq(policyValue3);
     });
-    it("can deposit eth via fallback", async function () {
-      let depositAmount5 = BN.from(12345);
-      balancesBefore = await getBalances(farmer2, farm1);
-      let tx = await farmer2.sendTransaction({
-        to: farm1.address,
-        value: depositAmount5,
-        data: "0xabcd",
-      });
-      await expect(tx).to.emit(farm1, "EthDeposited").withArgs(farmer2.address, depositAmount5);
-      balancesAfter = await getBalances(farmer2, farm1);
-      balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
-      expect(balancesDiff.farmStake).to.equal(depositAmount5);
-      expect(balancesDiff.farmCp).to.equal(depositAmount5);
-      expect(balancesDiff.userStaked).to.equal(depositAmount5);
-      expect(balancesDiff.vaultAssets).to.equal(depositAmount5);
+    it("can deposit via permit", async function () {
+      let balances4a = await getBalances(farmer1, farm1);
+      const { v, r, s } = await getPermitErc721EnhancedSignature(farmer1, policyManager, farm1.address, policyID4, deadline);
+      let tx1 = await farm1.connect(farmer1).depositPolicySigned(farmer1.address, policyID4, deadline, v, r, s);
+      await expect(tx1).to.emit(farm1, "PolicyDeposited").withArgs(farmer1.address, policyID4);
+      let balances4b = await getBalances(farmer1, farm1);
+      let balancesDiff4 = getBalancesDiff(balances4b, balances4a);
+      expect(balancesDiff4.farmSpt).eq(1);
+      expect(balancesDiff4.userSpt).eq(-1);
+      expect(balancesDiff4.userStaked).eq(policyValue4);
+      expect(balancesDiff4.farmStake).eq(policyValue4);
+      expect(balances4b.farmSpt).eq(4);
+      expect(await farm1.countDeposited(farmer1.address)).to.equal(3);
+      expect(await farm1.getDeposited(farmer1.address, 2)).to.deep.equal([policyID4, policyValue4]);
+      expect(await farm1.listDeposited(farmer1.address)).to.deep.equal([
+        [policyID1, policyID3, policyID4],
+        [policyValue1, policyValue3, policyValue4],
+      ]);
+      let policyInfo = await farm1.policyInfo(policyID4);
+      expect(policyInfo.depositor).eq(farmer1.address);
+      expect(policyInfo.value).eq(policyValue4);
     });
-    it("cannot deposit eth when lacking funds", async function () {
-      let depositAmount = (await farmer1.getBalance()).add(1);
-      // throws InvalidInputError before it can revert
-      let error = false;
-      try {
-        await farm1.connect(farmer1).depositEth({ value: depositAmount });
-      } catch (e) {
-        error = true;
-      }
-      expect(error);
-    });
-    it("can deposit cp", async function () {
-      // farmer 1, deposit 13 cp
-      let depositAmount6 = BN.from(13);
-      balancesBefore = await getBalances(farmer1, farm1);
-      await vault.connect(farmer1).depositEth({ value: depositAmount6 });
-      await vault.connect(farmer1).increaseAllowance(farm1.address, depositAmount6);
-      let tx1 = await farm1.connect(farmer1).depositCp(depositAmount6);
-      await expect(tx1).to.emit(farm1, "CpDeposited").withArgs(farmer1.address, depositAmount6);
-      balancesAfter = await getBalances(farmer1, farm1);
-      balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
-      expect(balancesDiff.farmStake).to.equal(depositAmount6);
-      expect(balancesDiff.farmCp).to.equal(depositAmount6);
-      expect(balancesDiff.userStaked).to.equal(depositAmount6);
-      // farmer 2, deposit 25
-      let depositAmount7 = BN.from(25);
-      balancesBefore = await getBalances(farmer2, farm1);
-      await vault.connect(farmer2).depositEth({ value: depositAmount7 });
-      await vault.connect(farmer2).increaseAllowance(farm1.address, depositAmount7);
-      let tx2 = await farm1.connect(farmer2).depositCp(depositAmount7);
-      await expect(tx2).to.emit(farm1, "CpDeposited").withArgs(farmer2.address, depositAmount7);
-      balancesAfter = await getBalances(farmer2, farm1);
-      balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
-      expect(balancesDiff.farmStake).to.equal(depositAmount7);
-      expect(balancesDiff.farmCp).to.equal(depositAmount7);
-      expect(balancesDiff.userStaked).to.equal(depositAmount7);
-    });
-    it("can deposit cp via permit", async function () {
-      // farmer 1, deposit 111 cp
-      let depositAmount8 = BN.from(111);
-      balancesBefore = await getBalances(farmer1, farm1);
-      await vault.connect(farmer1).depositEth({ value: depositAmount8 });
-      let nonce = await vault.nonces(farmer1.address);
-      let approve = {
-        owner: farmer1.address,
-        spender: farm1.address,
-        value: depositAmount8,
-      };
-      let digest = getPermitDigest(cpTokenName, vault.address, chainId, approve, nonce, deadline);
-      let { v, r, s } = sign(digest, Buffer.from(farmer1.privateKey.slice(2), "hex"));
-      let tx1 = await farm1.connect(farmer2).depositCpSigned(farmer1.address, depositAmount8, deadline, v, r, s);
-      await expect(tx1).to.emit(farm1, "CpDeposited").withArgs(farmer1.address, depositAmount8);
-      balancesAfter = await getBalances(farmer1, farm1);
-      balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
-      expect(balancesDiff.farmStake).to.equal(depositAmount8);
-      expect(balancesDiff.farmCp).to.equal(depositAmount8);
-      expect(balancesDiff.userStaked).to.equal(depositAmount8);
-    });
-    it("cannot deposit cp when lacking funds", async function () {
-      // no funds and no allowance
-      await expect(farm1.connect(farmer1).depositCp(1)).to.be.reverted;
-      // yes funds and no allowance
-      await vault.connect(farmer1).depositEth({ value: 1 });
-      await expect(farm1.connect(farmer1).depositCp(1)).to.be.reverted;
-      // no funds and yes allowance
-      await vault.connect(farmer2).increaseAllowance(farm1.address, 1);
-      await expect(farm1.connect(farmer2).depositCp(1)).to.be.reverted;
-    });
-    it("can deposit weth", async function () {
-      await farmer1.sendTransaction({to: weth.address, value: ONE_ETHER});
-      let depositAmount1 = BN.from(100);
-      balancesBefore = await getBalances(farmer1, farm1);
-      await weth.connect(farmer1).approve(farm1.address, depositAmount1);
-      let tx1 = await farm1.connect(farmer1).depositWeth(depositAmount1);
-      await expect(tx1).to.emit(farm1, "EthDeposited").withArgs(farmer1.address, depositAmount1);
-      balancesAfter = await getBalances(farmer1, farm1);
-      balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
-      expect(balancesDiff.farmStake).to.equal(depositAmount1);
-      expect(balancesDiff.farmCp).to.equal(depositAmount1);
-      expect(balancesDiff.userStaked).to.equal(depositAmount1);
-      expect(balancesDiff.userWeth).to.equal(depositAmount1.mul(-1));
-      expect(balancesDiff.vaultAssets).to.equal(depositAmount1);
+    it("cannot deposit when lacking funds", async function () {
+      // non existant token
+      let policyID = (await policyManager.totalSupply()).add(2);
+      await expect(farm1.connect(farmer1).depositPolicy(policyID)).to.be.reverted;
+      // deposit without approval
+      await expect(farm1.connect(farmer1).depositPolicy(policyID5)).to.be.reverted;
+      // deposit someone elses token
+      await expect(farm1.connect(farmer2).depositPolicy(policyID)).to.be.reverted;
+      await policyManager.connect(farmer1).approve(farm1.address, policyID5);
+      await expect(farm1.connect(farmer2).depositPolicy(policyID5)).to.be.reverted;
+      // expired policy
+      await product.connect(farmer1)._buyPolicy(farmer1.address, coverAmount1, 0, ZERO_ADDRESS);
+      policyID = await policyManager.totalPolicyCount();
+      await policyManager.connect(farmer1).approve(farm1.address, policyID);
+      await expect(farm1.connect(farmer1).depositPolicy(policyID)).to.be.revertedWith("policy is expired");
+      const { v, r, s } = await getPermitErc721EnhancedSignature(farmer1, policyManager, farm1.address, policyID, deadline);
+      await expect(farm1.connect(farmer1).depositPolicySigned(farmer1.address, policyID, deadline, v, r, s)).to.be.revertedWith("policy is expired");
     });
     it("cannot withdraw another user's rewards", async function () {
       await expect(farm1.connect(farmer1).withdrawRewardsForUser(farmer2.address)).to.be.revertedWith("!farmcontroller");
     });
-    it("can withdraw cp", async function () {
+    it("can withdraw policies", async function () {
       // farmer 1, partial withdraw
-      let withdrawAmount2 = BN.from(20);
-      balancesBefore = await getBalances(farmer1, farm1);
-      let tx1 = await farm1.connect(farmer1).withdrawCp(withdrawAmount2);
-      await expect(tx1).to.emit(farm1, "CpWithdrawn").withArgs(farmer1.address, withdrawAmount2);
-      balancesAfter = await getBalances(farmer1, farm1);
-      balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
-      expect(balancesDiff.userCp).to.equal(withdrawAmount2);
-      expect(balancesDiff.farmStake).to.equal(withdrawAmount2.mul(-1));
-      expect(balancesDiff.farmCp).to.equal(withdrawAmount2.mul(-1));
-      expect(balancesDiff.userStaked).to.equal(withdrawAmount2.mul(-1));
+      let balances1a = await getBalances(farmer1, farm1);
+      let tx1 = await farm1.connect(farmer1).withdrawPolicy(policyID1);
+      await expect(tx1).to.emit(farm1, "PolicyWithdrawn").withArgs(farmer1.address, policyID1);
+      let balances1b = await getBalances(farmer1, farm1);
+      let balancesDiff1 = getBalancesDiff(balances1b, balances1a);
+      expect(balancesDiff1.farmSpt).eq(-1);
+      expect(balancesDiff1.userSpt).eq(1);
+      expect(balancesDiff1.userStaked).eq(policyValue1.mul(-1));
+      expect(balancesDiff1.farmStake).eq(policyValue1.mul(-1));
+      let policyInfo = await farm1.policyInfo(policyID1);
+      expect(policyInfo.depositor).eq(ZERO_ADDRESS);
+      expect(policyInfo.value).eq(0);
     });
     it("cannot overwithdraw", async function () {
-      let withdrawAmount = (await farm1.userStaked(farmer1.address)).add(1);
-      await expect(farm1.connect(farmer1).withdrawCp(withdrawAmount)).to.be.reverted;
+      // withdraw without deposit / double withdraw
+      await expect(farm1.connect(farmer1).withdrawPolicy(policyID1)).to.be.reverted;
+      // deposit one and withdraw another
+      await policyManager.connect(farmer1).approve(farm1.address, policyID1);
+      await farm1.connect(farmer1).depositPolicy(policyID1);
+      await expect(farm1.connect(farmer1).withdrawPolicy(policyID5)).to.be.reverted;
+      // withdraw a token someone else deposited
+      await expect(farm1.connect(farmer1).withdrawPolicy(policyID2)).to.be.reverted;
     });
   });
 
   describe("updates", async function () {
-    let farm2: CpFarm;
+    let farm2: SptFarm;
     before(async function () {
       // get referrence timestamp
       await provider.send("evm_mine", []);
       initTime = (await provider.getBlock('latest')).timestamp;
       startTime = initTime + 10;
       endTime = initTime + 100;
-      farm2 = (await deployContract(deployer, artifacts.CpFarm, [governor.address, registry.address, startTime, endTime])) as CpFarm;
+      farm2 = (await deployContract(deployer, artifacts.SptFarm, [governor.address, registry.address, startTime, endTime])) as SptFarm;
     });
     it("can update a single farm", async function () {
       // init
@@ -419,16 +406,20 @@ describe("CpFarm", function () {
   });
 
   describe("rewards", function () {
-    let farmId: BN;
-    let farm: CpFarm;
+    let farmID: BN;
+    let farm: SptFarm;
     let allocPoints = BN.from("1");
     // start with 1:4 ownership, switch to 1:19
-    let depositAmount1 = BN.from("10");
-    let depositAmount2 = BN.from("40");
-    let depositAmount3 = BN.from("150");
-    let depositAmount12 = depositAmount1.add(depositAmount2);
-    let depositAmount23 = depositAmount2.add(depositAmount3);
-    let depositAmount123 = depositAmount1.add(depositAmount2).add(depositAmount3);
+    let policyID1: BN, policyID2: BN, policyID3: BN;
+    let coverAmount1 = ONE_ETHER.mul(10);
+    let coverAmount2 = ONE_ETHER.mul(40);
+    let coverAmount3 = ONE_ETHER.mul(150);
+    let policyValue1 = coverAmount1.mul(price);
+    let policyValue2 = coverAmount2.mul(price);
+    let policyValue3 = coverAmount3.mul(price);
+    let policyValue12 = policyValue1.add(policyValue2);
+    let policyValue23 = policyValue2.add(policyValue3);
+    let policyValue123 = policyValue1.add(policyValue2).add(policyValue3);
     // reward math variables
     let pendingReward1: BN;
     let pendingReward2: BN;
@@ -444,8 +435,6 @@ describe("CpFarm", function () {
     });
 
     beforeEach(async function () {
-      await vault.connect(farmer1).transfer(governor.address, await vault.balanceOf(farmer1.address));
-      await vault.connect(farmer2).transfer(governor.address, await vault.balanceOf(farmer2.address));
       await solace.connect(farmer1).transfer(governor.address, await solace.balanceOf(farmer1.address));
       await solace.connect(farmer2).transfer(governor.address, await solace.balanceOf(farmer2.address));
       // get referrence timestamp
@@ -453,19 +442,27 @@ describe("CpFarm", function () {
       initTime = (await provider.getBlock('latest')).timestamp;
       startTime = initTime + 200;
       endTime = initTime + 1000;
-      farm = (await deployContract(deployer, artifacts.CpFarm, [governor.address, registry.address, startTime, endTime])) as CpFarm;
+      farm = (await deployContract(deployer, artifacts.SptFarm, [governor.address, registry.address, startTime, endTime])) as SptFarm;
       await farmController.connect(governor).registerFarm(farm.address, allocPoints);
-      farmId = await farmController.numFarms();
+      farmID = await farmController.numFarms();
+
+      await product.connect(farmer1)._buyPolicy(farmer1.address, coverAmount1, duration, ZERO_ADDRESS);
+      policyID1 = await policyManager.totalPolicyCount();
+      await product.connect(farmer2)._buyPolicy(farmer2.address, coverAmount2, duration, ZERO_ADDRESS);
+      policyID2 = await policyManager.totalPolicyCount();
+      await product.connect(farmer1)._buyPolicy(farmer2.address, coverAmount3, duration, ZERO_ADDRESS);
+      policyID3 = await policyManager.totalPolicyCount();
     });
 
     afterEach(async function () {
-      await farmController.connect(governor).setAllocPoints(farmId, 0); // remember to deallocate dead farms
+      await farmController.connect(governor).setAllocPoints(farmID, 0); // remember to deallocate dead farms
       expect(await farmController.totalAllocPoints()).to.equal(0);
     });
 
     it("provides rewards to only farmer", async function () {
       // deposit before start
-      await farm.connect(farmer1).depositEth({ value: depositAmount1 });
+      const { v, r, s } = await getPermitErc721EnhancedSignature(farmer1, policyManager, farm.address, policyID1, deadline);
+      await farm.connect(farmer1).depositPolicySigned(farmer1.address, policyID1, deadline, v, r, s);
       expect(await farm.pendingRewards(farmer1.address)).to.equal(0);
       timestamp = startTime + 100;
       await provider.send("evm_setNextBlockTimestamp", [timestamp]);
@@ -477,63 +474,68 @@ describe("CpFarm", function () {
     });
     it("fairly provides rewards to all farmers", async function () {
       // only farmer 1
-      await farm.connect(farmer1).depositEth({ value: depositAmount1 });
+      var { v, r, s } = await getPermitErc721EnhancedSignature(farmer1, policyManager, farm.address, policyID1, deadline);
+      await farm.connect(farmer1).depositPolicySigned(farmer1.address, policyID1, deadline, v, r, s);
       timestamp = startTime + 100;
       await provider.send("evm_setNextBlockTimestamp", [timestamp]);
       // add farmer 2
-      await farm.connect(farmer2).depositEth({ value: depositAmount2 });
+      var { v, r, s } = await getPermitErc721EnhancedSignature(farmer2, policyManager, farm.address, policyID2, deadline);
+      await farm.connect(farmer2).depositPolicySigned(farmer2.address, policyID2, deadline, v, r, s);
       timestamp += 100;
       await provider.send("evm_setNextBlockTimestamp", [timestamp]);
       await provider.send("evm_mine", []);
       // check farmer 1 rewards
       pendingReward1 = BN.from(await farm.pendingRewards(farmer1.address));
       expectedReward1 = bnAddSub([
-        bnMulDiv([solacePerSecond, 100, depositAmount1], [depositAmount1]), // 100% ownership for 100 seconds
-        bnMulDiv([solacePerSecond, 100, depositAmount1], [depositAmount12]), // 20% ownership for 100 seconds
+        bnMulDiv([solacePerSecond, 100, policyValue1], [policyValue1]), // 100% ownership for 100 seconds
+        bnMulDiv([solacePerSecond, 100, policyValue1], [policyValue12]), // 20% ownership for 100 seconds
       ]);
       expect(pendingReward1).to.eq(expectedReward1);
       // check farmer 2 rewards
       pendingReward2 = BN.from(await farm.pendingRewards(farmer2.address));
-      expectedReward2 = bnMulDiv([solacePerSecond, 100, depositAmount2], [depositAmount12]), // 80% ownership for 100 seconds
+      expectedReward2 = bnMulDiv([solacePerSecond, 100, policyValue2], [policyValue12]), // 80% ownership for 100 seconds
       expect(pendingReward2).to.eq(expectedReward2);
       // farmer 2 deposit more
-      await farm.connect(farmer2).depositEth({ value: depositAmount3 });
+      var { v, r, s } = await getPermitErc721EnhancedSignature(farmer2, policyManager, farm.address, policyID3, deadline);
+      await farm.connect(farmer2).depositPolicySigned(farmer2.address, policyID3, deadline, v, r, s);
       timestamp += 200;
       await provider.send("evm_setNextBlockTimestamp", [timestamp]);
       await provider.send("evm_mine", []);
       // check farmer 1 rewards
       pendingReward1 = BN.from(await farm.pendingRewards(farmer1.address));
       expectedReward1 = expectedReward1.add(
-        bnMulDiv([solacePerSecond, 200, depositAmount1], [depositAmount123]), // 5% ownership for 200 seconds
+        bnMulDiv([solacePerSecond, 200, policyValue1], [policyValue123]), // 5% ownership for 200 seconds
       );
       expectClose(pendingReward1, expectedReward1, solacePerSecond);
       // check farmer 2 rewards
       pendingReward2 = BN.from(await farm.pendingRewards(farmer2.address));
       expectedReward2 = expectedReward2.add(
-        bnMulDiv([solacePerSecond, 200, depositAmount23], [depositAmount123]), // 95% ownership for 200 seconds
+        bnMulDiv([solacePerSecond, 200, policyValue23], [policyValue123]), // 95% ownership for 200 seconds
       );
       expectClose(pendingReward2, expectedReward2, solacePerSecond);
     });
     it("does not distribute rewards before farm start", async function () {
-      await farm.connect(farmer1).depositEth({ value: depositAmount1 });
+      const { v, r, s } = await getPermitErc721EnhancedSignature(farmer1, policyManager, farm.address, policyID1, deadline);
+      await farm.connect(farmer1).depositPolicySigned(farmer1.address, policyID1, deadline, v, r, s);
       await provider.send("evm_setNextBlockTimestamp", [startTime]);
       await provider.send("evm_mine", []);
       expect(await farm.pendingRewards(farmer1.address)).to.equal(0);
     });
     it("does not distribute rewards after farm end", async function () {
-      await farm.connect(farmer1).depositEth({ value: depositAmount1 });
+      const { v, r, s } = await getPermitErc721EnhancedSignature(farmer1, policyManager, farm.address, policyID1, deadline);
+      await farm.connect(farmer1).depositPolicySigned(farmer1.address, policyID1, deadline, v, r, s);
       await provider.send("evm_setNextBlockTimestamp", [endTime]);
       await provider.send("evm_mine", []);
       let pendingReward1 = await farm.pendingRewards(farmer1.address);
       await provider.send("evm_setNextBlockTimestamp", [endTime+1000]);
       await provider.send("evm_mine", []);
       let pendingReward2 = await farm.pendingRewards(farmer1.address);
-      //expect(pendingReward2).to.be.closeTo(pendingReward1, 10);
       expect(pendingReward1).to.equal(pendingReward2);
     });
     it("allows farmers to cash out after farm end", async function () {
       // deposit before start
-      await farm.connect(farmer1).depositEth({ value: depositAmount1 });
+      const { v, r, s } = await getPermitErc721EnhancedSignature(farmer1, policyManager, farm.address, policyID1, deadline);
+      await farm.connect(farmer1).depositPolicySigned(farmer1.address, policyID1, deadline, v, r, s);
       expect(await farm.pendingRewards(farmer1.address)).to.equal(0);
       await provider.send("evm_setNextBlockTimestamp", [endTime+1000]);
       await provider.send("evm_mine", []);
@@ -558,7 +560,7 @@ describe("CpFarm", function () {
       await expect(farm.connect(farmer1).withdrawRewards()).to.be.revertedWith("no zero value options");
       // withdraw stake
       let stake = await farm.userStaked(farmer1.address);
-      await farm.connect(farmer1).withdrawCp(stake);
+      await farm.connect(farmer1).withdrawPolicy(policyID1);
       expect(await farm.userStaked(farmer1.address)).to.equal(0);
       pendingRewards = await farm.pendingRewards(farmer1.address);
       expect(pendingRewards).to.equal(0);
@@ -568,7 +570,8 @@ describe("CpFarm", function () {
     });
     it("allows farmers to cash out before farm end", async function () {
       // deposit before start
-      await farm.connect(farmer1).depositEth({ value: depositAmount1 });
+      var { v, r, s } = await getPermitErc721EnhancedSignature(farmer1, policyManager, farm.address, policyID1, deadline);
+      await farm.connect(farmer1).depositPolicySigned(farmer1.address, policyID1, deadline, v, r, s);
       expect(await farm.pendingRewards(farmer1.address)).to.equal(0);
       await provider.send("evm_setNextBlockTimestamp", [startTime+100]);
       await provider.send("evm_mine", []);
@@ -578,7 +581,7 @@ describe("CpFarm", function () {
       let tx = await farm.connect(farmer1).withdrawRewards();
       let optionID = await optionsFarming.numOptions();
       expect(tx).to.emit(optionsFarming, "OptionCreated").withArgs(optionID);
-      expect(await farm.userStaked(farmer1.address)).to.equal(depositAmount1);
+      expect(await farm.userStaked(farmer1.address)).to.equal(policyValue1);
       let option = await optionsFarming.getOption(optionID);
       expectedRewards = bnMulDiv([solacePerSecond, 101]); // 100% ownership for 101 seconds
       expect(option.rewardAmount).to.equal(expectedRewards);
@@ -604,8 +607,10 @@ describe("CpFarm", function () {
       expectedStrikePrice = await optionsFarming.calculateStrikePrice(expectedRewards);
       expect(option.strikePrice).to.equal(expectedStrikePrice);
       // increase balance
-      await farm.connect(farmer1).depositEth({ value: depositAmount2 });
-      expect(await farm.userStaked(farmer1.address)).to.equal(depositAmount12);
+      await policyManager.connect(farmer2).transfer(farmer1.address, policyID2);
+      var { v, r, s } = await getPermitErc721EnhancedSignature(farmer1, policyManager, farm.address, policyID2, deadline);
+      await farm.connect(farmer1).depositPolicySigned(farmer1.address, policyID2, deadline, v, r, s);
+      expect(await farm.userStaked(farmer1.address)).to.equal(policyValue12);
       await provider.send("evm_setNextBlockTimestamp", [startTime+325]);
       await provider.send("evm_mine", []);
       pendingRewards = await farm.pendingRewards(farmer1.address);
@@ -619,8 +624,8 @@ describe("CpFarm", function () {
       expectedStrikePrice = await optionsFarming.calculateStrikePrice(expectedRewards);
       expect(option.strikePrice).to.equal(expectedStrikePrice);
       // decrease balance
-      await farm.connect(farmer1).withdrawCp(depositAmount1);
-      expect(await farm.userStaked(farmer1.address)).to.equal(depositAmount2);
+      await farm.connect(farmer1).withdrawPolicy(policyID1);
+      expect(await farm.userStaked(farmer1.address)).to.equal(policyValue2);
       await provider.send("evm_setNextBlockTimestamp", [startTime+345]);
       await provider.send("evm_mine", []);
       pendingRewards = await farm.pendingRewards(farmer1.address);
@@ -637,8 +642,8 @@ describe("CpFarm", function () {
       await provider.send("evm_setNextBlockTimestamp", [startTime+374]);
       await provider.send("evm_mine", []);
       let stake = await farm.userStaked(farmer1.address);
-      expect(stake).to.equal(depositAmount2);
-      await farm.connect(farmer1).withdrawCp(stake);
+      expect(stake).to.equal(policyValue2);
+      await farm.connect(farmer1).withdrawPolicy(policyID2);
       expect(await farm.userStaked(farmer1.address)).to.equal(0);
       pendingRewards = await farm.pendingRewards(farmer1.address);
       expectedRewards = bnMulDiv([solacePerSecond, 29]); // 100% ownership for 29 seconds
@@ -658,42 +663,79 @@ describe("CpFarm", function () {
     });
   });
 
-  describe("edge cases", function () {
-    let farm4: CpFarm;
-    let depositAmount: BN;
-
+  describe("updateActivePolicies", function () {
     before(async function () {
-      await registry.connect(governor).setVault(mockVault.address);
-      farm4 = (await deployContract(deployer, artifacts.CpFarm, [governor.address, registry.address, 0, 1000])) as CpFarm;
-      depositAmount = BN.from(100);
+      product = (await deployContract(deployer, artifacts.MockProduct, [deployer.address, policyManager.address, registry.address, coveredPlatform.address, 0, 100000000000, price])) as MockProduct;
+      await policyManager.connect(governor).addProduct(product.address);
+      await riskManager.connect(governor).addProduct(product.address, 1, price, 1);
     });
-    it("can receive eth from vault via receive()", async function () {
-      let balancesBefore = await getBalances(mockVault, farm4);
-      let tx = await mockVault.sendTransaction({
-        to: farm4.address,
-        value: depositAmount,
-        data: "0x",
-      });
-      let balancesAfter = await getBalances(mockVault, farm4);
-      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
-      let receipt = await tx.wait();
-      let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
-      expect(balancesDiff.userEth).to.equal(depositAmount.mul(-1).sub(gasCost));
-      expect(balancesDiff.userStaked).to.equal(0); // vault gains no stake
+    it("can update no policies", async function () {
+      await farm1.updateActivePolicies([]);
     });
-    it("can receive eth from vault via fallback()", async function () {
-      let balancesBefore = await getBalances(mockVault, farm4);
-      let tx = await mockVault.sendTransaction({
-        to: farm4.address,
-        value: depositAmount,
-        data: "0xabcd",
-      });
-      let balancesAfter = await getBalances(mockVault, farm4);
-      let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
-      let receipt = await tx.wait();
-      let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
-      expect(balancesDiff.userEth).to.equal(depositAmount.mul(-1).sub(gasCost));
-      expect(balancesDiff.userStaked).to.equal(0); // vault gains no stake
+    it("can update active policies", async function () {
+      // policy 1 expires
+      let balances1 = await getBalances(farmer1, farm1);
+      await product.connect(farmer1)._buyPolicy(farmer1.address, 0b000001, 110, ZERO_ADDRESS);
+      let policyID1 = await policyManager.totalPolicyCount();
+      var { v, r, s } = await getPermitErc721EnhancedSignature(farmer1, policyManager, farm1.address, policyID1, deadline);
+      await farm1.connect(farmer1).depositPolicySigned(farmer1.address, policyID1, deadline, v, r, s);
+      // policy 2 expires
+      await product.connect(farmer1)._buyPolicy(farmer1.address, 0b000010, 120, ZERO_ADDRESS);
+      let policyID2 = await policyManager.totalPolicyCount();
+      var { v, r, s } = await getPermitErc721EnhancedSignature(farmer1, policyManager, farm1.address, policyID2, deadline);
+      await farm1.connect(farmer1).depositPolicySigned(farmer1.address, policyID2, deadline, v, r, s);
+      // policy 3 expires but is not updated
+      await product.connect(farmer1)._buyPolicy(farmer1.address, 0b000100, 130, ZERO_ADDRESS);
+      let policyID3 = await policyManager.totalPolicyCount();
+      var { v, r, s } = await getPermitErc721EnhancedSignature(farmer1, policyManager, farm1.address, policyID3, deadline);
+      await farm1.connect(farmer1).depositPolicySigned(farmer1.address, policyID3, deadline, v, r, s);
+      // policy 4 does not expire
+      await product.connect(farmer1)._buyPolicy(farmer1.address, 0b001000, 200, ZERO_ADDRESS);
+      let policyID4 = await policyManager.totalPolicyCount();
+      var { v, r, s } = await getPermitErc721EnhancedSignature(farmer1, policyManager, farm1.address, policyID4, deadline);
+      await farm1.connect(farmer1).depositPolicySigned(farmer1.address, policyID4, deadline, v, r, s);
+      // policy 5 is canceled
+      await product.connect(farmer1)._buyPolicy(farmer1.address, 0b010000, 300, ZERO_ADDRESS);
+      let policyID5 = await policyManager.totalPolicyCount();
+      var { v, r, s } = await getPermitErc721EnhancedSignature(farmer1, policyManager, farm1.address, policyID5, deadline);
+      await farm1.connect(farmer1).depositPolicySigned(farmer1.address, policyID5, deadline, v, r, s);
+      // policy 6 is expired but was never staked
+      await product.connect(farmer1)._buyPolicy(farmer1.address, 0b100000, 120, ZERO_ADDRESS);
+      let policyID6 = await policyManager.totalPolicyCount();
+      // pass time
+      await burnBlocks(150);
+      expect(await product.activeCoverAmount()).to.equal(0b111111);
+      await farm1.connect(farmer1).withdrawPolicy(policyID5);
+      await product.connect(farmer1).cancelPolicy(policyID5);
+      let balances2 = await getBalances(farmer1, farm1);
+      expect(await product.activeCoverAmount()).to.equal(0b101111);
+      // update policies
+      await farm1.updateActivePolicies([policyID1, policyID2, policyID4, policyID5, policyID6, 999]);
+      expect(await policyManager.exists(policyID1)).to.be.false;
+      expect(await policyManager.exists(policyID2)).to.be.false;
+      expect(await policyManager.exists(policyID3)).to.be.true;
+      expect(await policyManager.exists(policyID4)).to.be.true;
+      expect(await policyManager.exists(policyID5)).to.be.false;
+      expect(await policyManager.exists(policyID6)).to.be.false;
+      expect(await product.activeCoverAmount()).to.equal(0b001100);
+      let balances3 = await getBalances(farmer1, farm1);
+      let balancesDiff13 = getBalancesDiff(balances3, balances1);
+      expect(balancesDiff13.farmSpt).eq(2);
+      expect(balancesDiff13.userSpt).eq(0);
+      expect(balancesDiff13.userStaked).eq(0b001100*price);
+      expect(balancesDiff13.farmStake).eq(0b001100*price);
+      let balancesDiff23 = getBalancesDiff(balances3, balances2);
+      expect(balancesDiff23.farmSpt).eq(-2);
+      expect(balancesDiff23.userSpt).eq(-1);
+      expect(balancesDiff23.userStaked).eq(-0b000011*price);
+      expect(balancesDiff23.farmStake).eq(-0b000011*price);
+    });
+  });
+
+  describe("edge cases", function () {
+    let farm4: SptFarm;
+    before(async function () {
+      farm4 = (await deployContract(deployer, artifacts.SptFarm, [governor.address, registry.address, 0, 1000])) as SptFarm;
     });
     it("can setRewards", async function () {
       await farmController.connect(governor).setRewardPerSecond(solacePerSecond);
@@ -746,28 +788,26 @@ describe("CpFarm", function () {
   interface Balances {
     userEth: BN;
     userWeth: BN;
-    userCp: BN;
+    userSpt: BN;
     userStaked: BN;
     userPendingRewards: BN;
     userSolace: BN;
-    farmCp: BN;
+    farmSpt: BN;
     farmStake: BN;
     optionsFarmingSolace: BN;
-    vaultAssets: BN;
   }
 
-  async function getBalances(user: Wallet, farm: CpFarm): Promise<Balances> {
+  async function getBalances(user: Wallet, farm: SptFarm): Promise<Balances> {
     return {
       userEth: await user.getBalance(),
       userWeth: await weth.balanceOf(user.address),
-      userCp: await vault.balanceOf(user.address),
+      userSpt: await policyManager.balanceOf(user.address),
       userStaked: await farm.userStaked(user.address),
       userPendingRewards: await farm.pendingRewards(user.address),
       userSolace: await solace.balanceOf(user.address),
-      farmCp: await vault.balanceOf(farm.address),
+      farmSpt: await policyManager.balanceOf(farm.address),
       farmStake: await farm.valueStaked(),
-      optionsFarmingSolace: await solace.balanceOf(optionsFarming.address),
-      vaultAssets: await vault.totalAssets()
+      optionsFarmingSolace: await solace.balanceOf(optionsFarming.address)
     };
   }
 
@@ -775,18 +815,17 @@ describe("CpFarm", function () {
     return {
       userEth: balances1.userEth.sub(balances2.userEth),
       userWeth: balances1.userWeth.sub(balances2.userWeth),
-      userCp: balances1.userCp.sub(balances2.userCp),
+      userSpt: balances1.userSpt.sub(balances2.userSpt),
       userStaked: balances1.userStaked.sub(balances2.userStaked),
       userPendingRewards: balances1.userPendingRewards.sub(balances2.userPendingRewards),
       userSolace: balances1.userSolace.sub(balances2.userSolace),
-      farmCp: balances1.farmCp.sub(balances2.farmCp),
+      farmSpt: balances1.farmSpt.sub(balances2.farmSpt),
       farmStake: balances1.farmStake.sub(balances2.farmStake),
-      optionsFarmingSolace: balances1.optionsFarmingSolace.sub(balances2.optionsFarmingSolace),
-      vaultAssets: balances1.vaultAssets.sub(balances2.vaultAssets)
+      optionsFarmingSolace: balances1.optionsFarmingSolace.sub(balances2.optionsFarmingSolace)
     };
   }
 
-  // mints an lp token by providing liquidity
+  // mints an lp token by provIDing liquidity
   async function mintLpToken(
     liquidityProvider: Wallet,
     tokenA: Contract,
@@ -811,7 +850,7 @@ describe("CpFarm", function () {
       amount1Min: 0,
       deadline: constants.MaxUint256,
     });
-    let tokenId = await lpToken.totalSupply();
-    return tokenId;
+    let tokenID = await lpToken.totalSupply();
+    return tokenID;
   }
 });
