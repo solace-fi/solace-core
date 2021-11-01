@@ -752,7 +752,7 @@ describe("CpFarm", function () {
     userSolace: BN;
     farmCp: BN;
     farmStake: BN;
-    farmControllerSolace: BN;
+    optionsFarmingSolace: BN;
     vaultAssets: BN;
   }
 
@@ -766,7 +766,7 @@ describe("CpFarm", function () {
       userSolace: await solace.balanceOf(user.address),
       farmCp: await vault.balanceOf(farm.address),
       farmStake: await farm.valueStaked(),
-      farmControllerSolace: await solace.balanceOf(farmController.address),
+      optionsFarmingSolace: await solace.balanceOf(optionsFarming.address),
       vaultAssets: await vault.totalAssets()
     };
   }
@@ -781,7 +781,7 @@ describe("CpFarm", function () {
       userSolace: balances1.userSolace.sub(balances2.userSolace),
       farmCp: balances1.farmCp.sub(balances2.farmCp),
       farmStake: balances1.farmStake.sub(balances2.farmStake),
-      farmControllerSolace: balances1.farmControllerSolace.sub(balances2.farmControllerSolace),
+      optionsFarmingSolace: balances1.optionsFarmingSolace.sub(balances2.optionsFarmingSolace),
       vaultAssets: balances1.vaultAssets.sub(balances2.vaultAssets)
     };
   }

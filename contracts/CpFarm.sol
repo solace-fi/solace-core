@@ -14,7 +14,7 @@ import "./interface/ICpFarm.sol";
 /**
  * @title CpFarm
  * @author solace.fi
- * @notice Rewards [**Capital Providers**](/docs/user-guides/capital-provider/cp-role-guide) in [**SOLACE**](./SOLACE) for providing capital in the [`Vault`](./Vault).
+ * @notice Rewards [**Capital Providers**](/docs/user-guides/capital-provider/cp-role-guide) in [`Policy Manager`](./PolicyManager) for providing capital in the [`Vault`](./Vault).
  *
  * Over the course of `startTime` to `endTime`, the farm distributes `rewardPerSecond` [**SOLACE**](./SOLACE) to all farmers split relative to the amount of [**SCP**](./Vault) they have deposited.
  *
