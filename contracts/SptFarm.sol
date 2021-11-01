@@ -274,6 +274,43 @@ contract SptFarm is ISptFarm, ReentrancyGuard, Governable {
     }
 
     /**
+     * @notice Deposit multiple [**policies**](./PolicyManager).
+     * User must `ERC721.approve()` or `ERC721.setApprovalForAll()` first.
+     * @param policyIDs The IDs of the policies to deposit.
+     */
+    function depositPolicyMulti(uint256[] memory policyIDs) external override {
+        for(uint256 i = 0; i < policyIDs.length; i++) {
+            uint256 policyID = policyIDs[i];
+            // pull policy
+            _policyManager.transferFrom(msg.sender, address(this), policyID);
+            // accounting
+            _deposit(msg.sender, policyID);
+        }
+    }
+
+    /**
+     * @notice Deposit multiple [**policies**](./PolicyManager) using permit.
+     * @param depositors The depositing users.
+     * @param policyIDs The IDs of the policies to deposit.
+     * @param deadlines Times the transactions must go through before.
+     * @param vs secp256k1 signatures
+     * @param rs secp256k1 signatures
+     * @param ss secp256k1 signatures
+     */
+    function depositPolicySignedMulti(address[] memory depositors, uint256[] memory policyIDs, uint256[] memory deadlines, uint8[] memory vs, bytes32[] memory rs, bytes32[] memory ss) external override {
+        require(depositors.length == policyIDs.length && depositors.length == deadlines.length && depositors.length == vs.length && depositors.length == rs.length && depositors.length == ss.length, "length mismatch");
+        for(uint256 i = 0; i < policyIDs.length; i++) {
+            uint256 policyID = policyIDs[i];
+            // permit
+            _policyManager.permit(address(this), policyID, deadlines[i], vs[i], rs[i], ss[i]);
+            // pull policy
+            _policyManager.transferFrom(depositors[i], address(this), policyID);
+            // accounting
+            _deposit(depositors[i], policyID);
+        }
+    }
+
+    /**
      * @notice Performs the internal accounting for a deposit.
      * @param depositor The depositing user.
      * @param policyID The ID of the policy to deposit.
@@ -327,6 +364,41 @@ contract SptFarm is ISptFarm, ReentrancyGuard, Governable {
         _policyManager.safeTransferFrom(address(this), msg.sender, policyID);
         // emit event
         emit PolicyWithdrawn(msg.sender, policyID);
+    }
+
+    /**
+     * @notice Withdraw multiple [**policies**](./PolicyManager).
+     * Can only withdraw policies you deposited.
+     * @param policyIDs The IDs of the policies to withdraw.
+     */
+    function withdrawPolicyMulti(uint256[] memory policyIDs) external override {
+        // harvest and update farm
+        _harvest(msg.sender);
+        // get farmer information
+        UserInfo storage user = _userInfo[msg.sender];
+        uint256 userValue_ = user.value;
+        uint256 valueStaked_ = _valueStaked;
+        for(uint256 i = 0; i < policyIDs.length; i++) {
+            uint256 policyID = policyIDs[i];
+            // get policy info
+            PolicyInfo memory policyInfo_ = _policyInfo[policyID];
+            // cannot withdraw a policy you didnt deposit
+            require(policyInfo_.depositor == msg.sender, "not your policy");
+            // accounting
+            userValue_ -= policyInfo_.value;
+            valueStaked_ -= policyInfo_.value;
+            // delete policy info
+            delete _policyInfo[policyID];
+            // return staked policy
+            _userDeposited[msg.sender].remove(policyID);
+            _policyManager.safeTransferFrom(address(this), msg.sender, policyID);
+            // emit event
+            emit PolicyWithdrawn(msg.sender, policyID);
+        }
+        // accounting
+        user.value = userValue_;
+        _valueStaked = valueStaked_;
+        user.rewardDebt = user.value * _accRewardPerShare / 1e12;
     }
 
     /**

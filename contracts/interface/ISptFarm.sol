@@ -98,11 +98,36 @@ interface ISptFarm is IFarm {
     function depositPolicySigned(address depositor, uint256 policyID, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external;
 
     /**
+     * @notice Deposit multiple [**policies**](./PolicyManager).
+     * User must `ERC721.approve()` or `ERC721.setApprovalForAll()` first.
+     * @param policyIDs The IDs of the policies to deposit.
+     */
+    function depositPolicyMulti(uint256[] memory policyIDs) external;
+
+    /**
+     * @notice Deposit multiple [**policies**](./PolicyManager) using permit.
+     * @param depositors The depositing users.
+     * @param policyIDs The IDs of the policies to deposit.
+     * @param deadlines Times the transactions must go through before.
+     * @param vs secp256k1 signatures
+     * @param rs secp256k1 signatures
+     * @param ss secp256k1 signatures
+     */
+    function depositPolicySignedMulti(address[] memory depositors, uint256[] memory policyIDs, uint256[] memory deadlines, uint8[] memory vs, bytes32[] memory rs, bytes32[] memory ss) external;
+
+    /**
      * @notice Withdraw a [**policy**](./PolicyManager).
      * Can only withdraw policies you deposited.
      * @param policyID The ID of the policy to withdraw.
      */
     function withdrawPolicy(uint256 policyID) external;
+
+    /**
+     * @notice Withdraw multiple [**policies**](./PolicyManager).
+     * Can only withdraw policies you deposited.
+     * @param policyIDs The IDs of the policies to withdraw.
+     */
+    function withdrawPolicyMulti(uint256[] memory policyIDs) external;
 
     /**
      * @notice Burns expired policies.

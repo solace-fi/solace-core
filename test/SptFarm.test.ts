@@ -357,6 +357,139 @@ describe("SptFarm", function () {
       // withdraw a token someone else deposited
       await expect(farm1.connect(farmer1).withdrawPolicy(policyID2)).to.be.reverted;
     });
+    it("can deposit multi", async function () {
+      // create more policies
+      await product.connect(farmer1)._buyPolicy(farmer1.address, coverAmount1, duration, ZERO_ADDRESS);
+      policyID1 = await policyManager.totalPolicyCount();
+      await product.connect(farmer2)._buyPolicy(farmer2.address, coverAmount2, duration, ZERO_ADDRESS);
+      policyID2 = await policyManager.totalPolicyCount();
+      await product.connect(farmer1)._buyPolicy(farmer1.address, coverAmount3, duration, ZERO_ADDRESS);
+      policyID3 = await policyManager.totalPolicyCount();
+      await product.connect(farmer2)._buyPolicy(farmer2.address, coverAmount4, duration, ZERO_ADDRESS);
+      policyID4 = await policyManager.totalPolicyCount();
+      await product.connect(farmer1)._buyPolicy(farmer1.address, coverAmount5, duration, ZERO_ADDRESS);
+      policyID5 = await policyManager.totalPolicyCount();
+      // deposit
+      let balances1a = await getBalances(farmer1, farm1);
+      await policyManager.connect(farmer1).approve(farm1.address, policyID1);
+      await policyManager.connect(farmer1).approve(farm1.address, policyID3);
+      let tx1 = await farm1.connect(farmer1).depositPolicyMulti([policyID1, policyID3]);
+      await expect(tx1).to.emit(farm1, "PolicyDeposited").withArgs(farmer1.address, policyID1);
+      await expect(tx1).to.emit(farm1, "PolicyDeposited").withArgs(farmer1.address, policyID3);
+      let balances1b = await getBalances(farmer1, farm1);
+      let balancesDiff1 = getBalancesDiff(balances1b, balances1a);
+      expect(balancesDiff1.farmSpt).eq(2);
+      expect(balancesDiff1.userSpt).eq(-2);
+      expect(balancesDiff1.userStaked).eq(policyValue1.add(policyValue3));
+      expect(balancesDiff1.farmStake).eq(policyValue1.add(policyValue3));
+      let policyInfo = await farm1.policyInfo(policyID1);
+      expect(policyInfo.depositor).eq(farmer1.address);
+      expect(policyInfo.value).eq(policyValue1);
+      policyInfo = await farm1.policyInfo(policyID3);
+      expect(policyInfo.depositor).eq(farmer1.address);
+      expect(policyInfo.value).eq(policyValue3);
+      // revert if no approval
+      await expect(farm1.connect(farmer1).depositPolicyMulti([policyID5])).to.be.revertedWith("ERC721: transfer caller is not owner nor approved");
+      // revert double deposit
+      await expect(farm1.connect(farmer1).depositPolicyMulti([policyID1])).to.be.revertedWith("ERC721: transfer of token that is not own");
+      // revert not your token
+      await expect(farm1.connect(farmer1).depositPolicyMulti([policyID4])).to.be.revertedWith("ERC721: transfer caller is not owner nor approved");
+      // revert non existent token
+      await expect(farm1.connect(farmer1).depositPolicyMulti([999])).to.be.revertedWith("ERC721: operator query for nonexistent token");
+      // empty
+      await farm1.connect(farmer1).depositPolicyMulti([]);
+      // withdraw policies
+      await farm1.connect(farmer1).withdrawPolicy(policyID1);
+      await farm1.connect(farmer1).withdrawPolicy(policyID3);
+    });
+    it("can deposit multi signed", async function () {
+      // create signatures
+      let farmers = [farmer1, farmer2, farmer1];
+      let farmerAddresses = [farmer1.address, farmer2.address, farmer1.address];
+      let policyIDs = [policyID1, policyID2, policyID3];
+      let deadlines = [deadline, deadline, deadline];
+      let vs = [], rs = [], ss = [];
+      for(var i = 0; i < policyIDs.length; ++i) {
+        const { v, r, s } = await getPermitErc721EnhancedSignature(farmers[i], policyManager, farm1.address, policyIDs[i], deadline);
+        vs.push(v);
+        rs.push(r);
+        ss.push(s);
+      }
+      // deposit
+      let balances1a = await getBalances(farmer1, farm1);
+      let balances2a = await getBalances(farmer2, farm1);
+      let tx1 = await farm1.connect(farmer1).depositPolicySignedMulti(farmerAddresses, policyIDs, deadlines, vs, rs, ss);
+      await expect(tx1).to.emit(farm1, "PolicyDeposited").withArgs(farmer1.address, policyID1);
+      await expect(tx1).to.emit(farm1, "PolicyDeposited").withArgs(farmer2.address, policyID2);
+      await expect(tx1).to.emit(farm1, "PolicyDeposited").withArgs(farmer1.address, policyID3);
+      let balances1b = await getBalances(farmer1, farm1);
+      let balances2b = await getBalances(farmer2, farm1);
+      let balancesDiff1 = getBalancesDiff(balances1b, balances1a);
+      let balancesDiff2 = getBalancesDiff(balances2b, balances2a);
+      expect(balancesDiff1.farmSpt).eq(3);
+      expect(balancesDiff1.userSpt).eq(-2);
+      expect(balancesDiff2.userSpt).eq(-1);
+      expect(balancesDiff1.userStaked).eq(policyValue1.add(policyValue3));
+      expect(balancesDiff1.farmStake).eq(policyValue1.add(policyValue2).add(policyValue3));
+      expect(balancesDiff2.userStaked).eq(policyValue2);
+      let policyInfo = await farm1.policyInfo(policyID1);
+      expect(policyInfo.depositor).eq(farmer1.address);
+      expect(policyInfo.value).eq(policyValue1);
+      policyInfo = await farm1.policyInfo(policyID2);
+      expect(policyInfo.depositor).eq(farmer2.address);
+      expect(policyInfo.value).eq(policyValue2);
+      policyInfo = await farm1.policyInfo(policyID3);
+      expect(policyInfo.depositor).eq(farmer1.address);
+      expect(policyInfo.value).eq(policyValue3);
+      // revert length mismatch
+      await expect(farm1.connect(farmer1).depositPolicySignedMulti([farmer1.address, farmer2.address], [policyID5], [deadline], [vs[0]], [rs[0]], [ss[0]])).to.be.revertedWith("length mismatch");
+      await expect(farm1.connect(farmer1).depositPolicySignedMulti([farmer1.address], [policyID5, policyID4], [deadline], [vs[0]], [rs[0]], [ss[0]])).to.be.revertedWith("length mismatch");
+      await expect(farm1.connect(farmer1).depositPolicySignedMulti([farmer1.address], [policyID5], [deadline, deadline], [vs[0]], [rs[0]], [ss[0]])).to.be.revertedWith("length mismatch");
+      await expect(farm1.connect(farmer1).depositPolicySignedMulti([farmer1.address], [policyID5], [deadline], [vs[0], vs[1]], [rs[0]], [ss[0]])).to.be.revertedWith("length mismatch");
+      await expect(farm1.connect(farmer1).depositPolicySignedMulti([farmer1.address], [policyID5], [deadline], [vs[0]], [rs[0], rs[1]], [ss[0]])).to.be.revertedWith("length mismatch");
+      await expect(farm1.connect(farmer1).depositPolicySignedMulti([farmer1.address], [policyID5], [deadline], [vs[0]], [rs[0]], [ss[0], ss[1]])).to.be.revertedWith("length mismatch");
+      // revert double deposit
+      await expect(farm1.connect(farmer1).depositPolicySignedMulti([farmer1.address], [policyID1], [deadline], [vs[0]], [rs[0]], [ss[0]])).to.be.revertedWith("cannot permit to self");
+      // revert not your token
+      await expect(farm1.connect(farmer1).depositPolicySignedMulti([farmer1.address], [policyID4], [deadline], [vs[0]], [rs[0]], [ss[0]])).to.be.revertedWith("unauthorized");
+      // revert non existent token
+      await expect(farm1.connect(farmer1).depositPolicySignedMulti([farmer1.address], [999], [deadline], [vs[0]], [rs[0]], [ss[0]])).to.be.revertedWith("query for nonexistent token");
+      // revert invalid signature
+      const { v, r, s } = await getPermitErc721EnhancedSignature(farmer2, policyManager, farm1.address, policyID4, deadline);
+      await expect(farm1.connect(farmer1).depositPolicySignedMulti([farmer2.address], [policyID4], [deadline], [12], [r], [r])).to.be.revertedWith("invalid signature");
+      // empty
+      await farm1.connect(farmer1).depositPolicySignedMulti([], [], [], [], [], []);
+    });
+    it("can withdraw multi", async function () {
+      let balances1a = await getBalances(farmer1, farm1);
+      let tx1 = await farm1.connect(farmer1).withdrawPolicyMulti([policyID1, policyID3]);
+      await expect(tx1).to.emit(farm1, "PolicyWithdrawn").withArgs(farmer1.address, policyID1);
+      await expect(tx1).to.emit(farm1, "PolicyWithdrawn").withArgs(farmer1.address, policyID3);
+      let balances1b = await getBalances(farmer1, farm1);
+      let balancesDiff1 = getBalancesDiff(balances1b, balances1a);
+      expect(balancesDiff1.farmSpt).eq(-2);
+      expect(balancesDiff1.userSpt).eq(2);
+      expect(balancesDiff1.userStaked).eq(policyValue1.add(policyValue3).mul(-1));
+      expect(balancesDiff1.farmStake).eq(policyValue1.add(policyValue3).mul(-1));
+      let policyInfo = await farm1.policyInfo(policyID1);
+      expect(policyInfo.depositor).eq(ZERO_ADDRESS);
+      expect(policyInfo.value).eq(0);
+      policyInfo = await farm1.policyInfo(policyID3);
+      expect(policyInfo.depositor).eq(ZERO_ADDRESS);
+      expect(policyInfo.value).eq(0);
+      // withdraw without deposit / double withdraw
+      await expect(farm1.connect(farmer1).withdrawPolicyMulti([policyID1])).to.be.reverted;
+      // deposit one and withdraw another
+      await policyManager.connect(farmer1).approve(farm1.address, policyID1);
+      await farm1.connect(farmer1).depositPolicy(policyID1);
+      await expect(farm1.connect(farmer1).withdrawPolicyMulti([policyID5])).to.be.reverted;
+      // withdraw a token someone else deposited
+      await expect(farm1.connect(farmer1).withdrawPolicyMulti([policyID2])).to.be.reverted;
+      // withdraw non existant token
+      await expect(farm1.connect(farmer1).withdrawPolicyMulti([999])).to.be.reverted;
+      // empty
+      await farm1.connect(farmer1).withdrawPolicyMulti([]);
+    });
   });
 
   describe("updates", async function () {
