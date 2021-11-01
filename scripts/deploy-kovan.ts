@@ -12,7 +12,7 @@ import { create2Contract } from "./create2Contract";
 import { logContractAddress } from "./utils";
 
 import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_importer";
-import { Deployer, Registry, Weth9, Vault, ClaimsEscrow, Treasury, PolicyManager, PolicyDescriptor, RiskManager, OptionsFarming, FarmController, CpFarm, Solace, AaveV2Product, WaaveProduct } from "../typechain";
+import { Deployer, Registry, Weth9, Vault, ClaimsEscrow, Treasury, PolicyManager, PolicyDescriptor, RiskManager, OptionsFarming, FarmController, CpFarm, SptFarm, Solace, AaveV2Product, WaaveProduct } from "../typechain";
 
 const DEPLOYER_CONTRACT_ADDRESS = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
 const REGISTRY_ADDRESS          = "0x501aCEE3310d98881c827d4357C970F23a30AD29";
@@ -26,6 +26,7 @@ const RISK_MANAGER_ADDRESS      = "0x501ACe9eE0AB4D2D4204Bcf3bE6eE13Fd6337804";
 const OPTIONS_FARMING_ADDRESS   = "0x501ACEB9772d1EfE5F8eA46FE5004fAd039e067A";
 const FARM_CONTROLLER_ADDRESS   = "0x501aCEDD1a697654d5F53514FF09eDECD3ca6D95";
 const CP_FARM_ADDRESS           = "0x501ACeb4D4C2CB7E4b07b53fbe644f3e51D25A3e";
+const SPT_FARM_ADDRESS          = "0x501acE7644A3482F7358BE05454278cF2c699581";
 const SOLACE_ADDRESS            = "0x501ACe4A8d42bA427B67d0CaD1AB11e25AeA65Ab";
 
 const AAVE_PRODUCT_ADDRESS      = "0x501ace153Ff22348076FdD236b774F6eb2d55EfB";
@@ -44,9 +45,13 @@ const minPeriod = 6450; // this is about 1 day
 const maxPeriod = 2354250; // this is about 1 year from https://ycharts.com/indicators/ethereum_blocks_per_day
 const price = 11044; // 2.60%/yr
 // farm params
-const startTime = 1634515200; // Oct 17, 2021
-const endTime   = 1666051200; // Oct 17, 2022
-const solacePerSecond = BN.from("1157407407407407400"); // 100K per day
+const solacePerSecond    = BN.from("1157407407407407400"); // 100K per day across all farms
+const cpFarmStartTime    = 1634515200; // Oct 17, 2021
+const cpFarmEndTime      = 1666051200; // Oct 17, 2022
+const cpFarmAllocPoints  = 90000;
+const sptFarmStartTime   = 1635897600; // Nov 3, 2021
+const sptFarmEndTime     = 1667449200; // Nov 3, 2022
+const sptFarmAllocPoints = 10000;
 
 let artifacts: ArtifactImports;
 let deployerContract: Deployer;
@@ -62,6 +67,7 @@ let riskManager: RiskManager;
 let optionsFarming: OptionsFarming;
 let farmController: FarmController;
 let cpFarm: CpFarm;
+let sptFarm: SptFarm;
 let solace: Solace;
 
 let aaveProduct: AaveV2Product;
@@ -97,6 +103,7 @@ async function main() {
   await deployOptionsFarming();
   await deployFarmController();
   await deployCpFarm();
+  await deploySptFarm();
   await deploySOLACE();
   // products
   await deployAaveV2Product();
@@ -309,16 +316,34 @@ async function deployCpFarm() {
     cpFarm = (await ethers.getContractAt(artifacts.CpFarm.abi, CP_FARM_ADDRESS)) as CpFarm;
   } else {
     console.log("Deploying CpFarm");
-    var res = await create2Contract(deployer,artifacts.CpFarm,[signerAddress,registry.address,startTime,endTime], {}, "", deployerContract.address);
+    var res = await create2Contract(deployer,artifacts.CpFarm,[signerAddress,registry.address,cpFarmStartTime,cpFarmEndTime], {}, "", deployerContract.address);
     cpFarm = (await ethers.getContractAt(artifacts.CpFarm.abi, res.address)) as CpFarm;
     transactions.push({"description": "Deploy CpFarm", "to": deployerContract.address, "gasLimit": res.gasUsed});
     console.log(`Deployed CpFarm to ${cpFarm.address}`);
   }
   if((await farmController.farmIndices(cpFarm.address)).eq(0) && await farmController.governance() == signerAddress) {
     console.log("Registering CpFarm in FarmController");
-    let tx = await farmController.connect(deployer).registerFarm(cpFarm.address, 50);
+    let tx = await farmController.connect(deployer).registerFarm(cpFarm.address, cpFarmAllocPoints);
     let receipt = await tx.wait();
     transactions.push({"description": "Register CpFarm in FarmController", "to": farmController.address, "gasLimit": receipt.gasUsed.toString()});
+  }
+}
+
+async function deploySptFarm() {
+  if(!!SPT_FARM_ADDRESS) {
+    sptFarm = (await ethers.getContractAt(artifacts.SptFarm.abi, SPT_FARM_ADDRESS)) as SptFarm;
+  } else {
+    console.log("Deploying SptFarm");
+    var res = await create2Contract(deployer,artifacts.SptFarm,[signerAddress,registry.address,sptFarmStartTime,sptFarmEndTime], {}, "", deployerContract.address);
+    sptFarm = (await ethers.getContractAt(artifacts.SptFarm.abi, res.address)) as SptFarm;
+    transactions.push({"description": "Deploy SptFarm", "to": deployerContract.address, "gasLimit": res.gasUsed});
+    console.log(`Deployed SptFarm to ${sptFarm.address}`);
+  }
+  if((await farmController.farmIndices(sptFarm.address)).eq(0) && await farmController.governance() == signerAddress) {
+    console.log("Registering SptFarm in FarmController");
+    let tx = await farmController.connect(deployer).registerFarm(sptFarm.address, sptFarmAllocPoints);
+    let receipt = await tx.wait();
+    transactions.push({"description": "Register SptFarm in FarmController", "to": farmController.address, "gasLimit": receipt.gasUsed.toString()});
   }
 }
 
@@ -427,6 +452,7 @@ async function logAddresses() {
   logContractAddress("OptionsFarming", optionsFarming.address);
   logContractAddress("FarmController", farmController.address);
   logContractAddress("CpFarm", cpFarm.address);
+  logContractAddress("SptFarm", sptFarm.address);
   logContractAddress("SOLACE", solace.address);
 
   logContractAddress("AaveV2Product", aaveProduct.address);
