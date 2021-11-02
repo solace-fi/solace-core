@@ -12,7 +12,7 @@ import { create2Contract } from "./create2Contract";
 import { logContractAddress } from "./utils";
 
 import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_importer";
-import { Deployer, Registry, Weth9, Vault, ClaimsEscrow, Treasury, PolicyManager, PolicyDescriptor, RiskManager, OptionsFarming, FarmController, CpFarm, SptFarm, Solace } from "../typechain";
+import { Deployer, Registry, Weth9, Vault, ClaimsEscrow, Treasury, PolicyManager, PolicyDescriptorV2, RiskManager, OptionsFarming, FarmController, CpFarm, SptFarm, Solace } from "../typechain";
 
 const DEPLOYER_CONTRACT_ADDRESS = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
 const REGISTRY_ADDRESS          = "0x501aCEE3310d98881c827d4357C970F23a30AD29";
@@ -20,7 +20,7 @@ const VAULT_ADDRESS             = "0x501AcEe83a6f269B77c167c6701843D454E2EFA0";
 const CLAIMS_ESCROW_ADDRESS     = "0x501aCEA73C7f4E5fB6Bce5A53603DA611F6A854C";
 const TREASURY_ADDRESS          = "0x501aCeAFb0d3e06Dc29db6Be51DFeB504c1D22ef";
 const POLICY_MANAGER_ADDRESS    = "0x501ace5E9f058bB2E851675BB3fA104Da6E3A22C";
-const POLICY_DESCR_ADDRESS      = "0x501ACe22C78C596227B1944D10d859c7f8a60d0a";
+const POLICY_DESCR_ADDRESS      = "0x501acEF3315c5DcFE37be35fB59e33d755898E1A";
 const RISK_MANAGER_ADDRESS      = "0x501ACe9eE0AB4D2D4204Bcf3bE6eE13Fd6337804";
 
 const OPTIONS_FARMING_ADDRESS   = "0x501ACEB9772d1EfE5F8eA46FE5004fAd039e067A";
@@ -49,7 +49,7 @@ let vault: Vault;
 let claimsEscrow: ClaimsEscrow;
 let treasury: Treasury;
 let policyManager: PolicyManager;
-let policyDescriptor: PolicyDescriptor;
+let policyDescriptor: PolicyDescriptorV2;
 let riskManager: RiskManager;
 
 let optionsFarming: OptionsFarming;
@@ -241,11 +241,11 @@ async function deployPolicyManager() {
 
 async function deployPolicyDescriptor() {
   if(!!POLICY_DESCR_ADDRESS) {
-    policyDescriptor = (await ethers.getContractAt(artifacts.PolicyDescriptor.abi, POLICY_DESCR_ADDRESS)) as PolicyDescriptor;
+    policyDescriptor = (await ethers.getContractAt(artifacts.PolicyDescriptorV2.abi, POLICY_DESCR_ADDRESS)) as PolicyDescriptorV2;
   } else {
     console.log("Deploying PolicyDescriptor");
-    var res = await create2Contract(deployer,artifacts.PolicyDescriptor,[], {}, "", deployerContract.address);
-    policyDescriptor = (await ethers.getContractAt(artifacts.PolicyDescriptor.abi, res.address)) as PolicyDescriptor;
+    var res = await create2Contract(deployer,artifacts.PolicyDescriptorV2, [signerAddress], {}, "", deployerContract.address);
+    policyDescriptor = (await ethers.getContractAt(artifacts.PolicyDescriptorV2.abi, res.address)) as PolicyDescriptorV2;
     transactions.push({"description": "Deploy PolicyDescriptor", "to": deployerContract.address, "gasLimit": res.gasUsed});
     console.log(`Deployed PolicyDescriptor to ${policyDescriptor.address}`);
   }
