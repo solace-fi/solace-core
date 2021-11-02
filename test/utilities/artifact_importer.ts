@@ -24,6 +24,7 @@ export async function import_artifacts() {
   artifacts.Treasury = await tryImport (`${artifact_dir}/Treasury.sol/Treasury.json`);
   artifacts.PolicyManager = await tryImport(`${artifact_dir}/PolicyManager.sol/PolicyManager.json`);
   artifacts.PolicyDescriptor = await tryImport(`${artifact_dir}/PolicyDescriptor.sol/PolicyDescriptor.json`);
+  artifacts.PolicyDescriptorV2 = await tryImport(`${artifact_dir}/PolicyDescriptorV2.sol/PolicyDescriptorV2.json`);
   artifacts.RiskManager = await tryImport(`${artifact_dir}/RiskManager.sol/RiskManager.json`);
   // solace imports post-dao
   artifacts.SOLACE = await tryImport(`${artifact_dir}/SOLACE.sol/SOLACE.json`);

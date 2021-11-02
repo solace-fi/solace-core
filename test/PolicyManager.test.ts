@@ -11,7 +11,7 @@ import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer
 import { burnBlocks, burnBlocksUntil } from "./utilities/time";
 import { encodeAddresses } from "./utilities/positionDescription";
 
-import { PolicyManager, MockProduct, Treasury, Registry, RiskManager, PolicyDescriptor, Vault, Weth9 } from "../typechain";
+import { PolicyManager, MockProduct, Treasury, Registry, RiskManager, PolicyDescriptorV2, Vault, Weth9 } from "../typechain";
 
 describe("PolicyManager", function() {
   let artifacts: ArtifactImports;
@@ -24,7 +24,7 @@ describe("PolicyManager", function() {
   let vault: Vault;
   let registry: Registry;
   let riskManager: RiskManager;
-  let policyDescriptor: PolicyDescriptor;
+  let policyDescriptor: PolicyDescriptorV2;
   let weth: Weth9;
 
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
@@ -33,6 +33,7 @@ describe("PolicyManager", function() {
   const expirationBlock = 20000000;
   const coverAmount = BN.from("100000000000000"); // 10 Ether in wei
   const price = 11044; // price in wei for block/wei
+  const chainId = 31337;
 
   before(async function() {
     artifacts = await import_artifacts();
@@ -58,7 +59,7 @@ describe("PolicyManager", function() {
     riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
 
     // deploy nft descriptor
-    policyDescriptor = (await deployContract(deployer, artifacts.PolicyDescriptor)) as PolicyDescriptor;
+    policyDescriptor = (await deployContract(deployer, artifacts.PolicyDescriptorV2, [governor.address])) as PolicyDescriptorV2;
 
     await registry.connect(governor).setTreasury(treasury.address);
     await registry.connect(governor).setVault(vault.address);
@@ -417,8 +418,22 @@ describe("PolicyManager", function() {
         productName = await mockProduct.name();
     });
     it("can get tokenURI", async function() {
-        let tokenURI = `This is a Solace Finance policy that covers a ${productName} position`;
+        let tokenURI = `https://paclas.solace.fi/policy/?chainid=${chainId}&policyid=${policyId}`;
         expect(await policyManager.tokenURI(policyId)).to.equal(tokenURI);
+        let baseURI = `https://paclas.solace.fi/policy/?chainid=${chainId}&policyid=`;
+        expect(await policyDescriptor.baseURI()).to.equal(baseURI);
+    });
+    it("non governor cannot change base", async function () {
+      await expect(policyDescriptor.connect(deployer).setBaseURI("asdf")).to.be.revertedWith("!governance");
+    });
+    it("can change base", async function () {
+      let newBase = "https://new.site/";
+      let tx = await policyDescriptor.connect(governor).setBaseURI(newBase);
+      expect(tx).to.emit(policyDescriptor, "BaseUriSet").withArgs(newBase);
+      let tokenURI = `https://new.site/${policyId}`;
+      expect(await policyManager.tokenURI(policyId)).to.equal(tokenURI);
+      let baseURI = `https://new.site/`;
+      expect(await policyDescriptor.baseURI()).to.equal(baseURI);
     });
     it("cannot get tokenURI for nonexistant policy id", async function() {
       await expect(policyManager.tokenURI(1000)).to.be.revertedWith("query for nonexistent token");
