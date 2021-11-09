@@ -2,6 +2,7 @@
 pragma solidity 0.8.6;
 
 import "./Governable.sol";
+import "./RiskStrategy.sol";
 import "./interface/IVault.sol";
 import "./interface/IRegistry.sol";
 import "./interface/IProduct.sol";
@@ -25,6 +26,10 @@ contract RiskManager is IRiskManager, Governable {
     /***************************************
     GLOBAL VARIABLES
     ***************************************/
+    mapping(address => uint256) internal _strategyToId;
+    mapping(uint256 => address) internal _idToStrategy;
+    uint256 internal _strategyCount;
+    mapping(address => Strategy) internal _strategies;
 
     // enumerable map product address to uint32 weight
     mapping(address => uint256) internal _productToIndex;
@@ -51,6 +56,44 @@ contract RiskManager is IRiskManager, Governable {
         _registry = IRegistry(registry_);
         _weightSum = type(uint32).max; // no div by zero
         _partialReservesFactor = MAX_BPS;
+    }
+
+    /***************************************
+    RISK STRATEGY FUNCTIONS
+    ***************************************/
+    /**
+     * @notice Creates a new `Risk Strategy`.
+     * @param products    The strategy products.
+     * @param weights     The weights of the strategy products.
+     * @param prices      The prices of the strategy products.
+     * @param divisors    The divisors(max cover per policy divisor) of the strategy products. 
+     * @return strategy   The address of newly created strategy.
+    */
+    function createRiskStrategy(
+            address[] memory products,
+            uint32[] memory weights,
+            uint24[] memory prices,
+            uint16[] memory divisors) external override returns (address strategy) {
+        RiskStrategy riskStrategy = new RiskStrategy(
+                this.governance(),
+                address(this),
+                msg.sender,
+                products,
+                weights,
+                prices,
+                divisors
+        );
+        _strategies[address(riskStrategy)] = Strategy({
+            id: ++_strategyCount,
+            strategy: address(riskStrategy),
+            strategist: msg.sender,
+            weight: 0,
+            status: StrategyStatus.CREATED
+        });
+        _strategyToId[address(riskStrategy)] = _strategyCount;
+        _idToStrategy[_strategyCount] = address(riskStrategy);
+        emit StrategyCreated(address(riskStrategy), msg.sender);
+        return address(riskStrategy);
     }
 
     /***************************************

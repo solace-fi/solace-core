@@ -16,14 +16,56 @@ pragma solidity 0.8.6;
 interface IRiskManager {
 
     /***************************************
-    EVENTS
+    TYPE DEFINITIONS
     ***************************************/
 
+    enum StrategyStatus {
+        CREATED,
+        VOTING,
+        ACCEPTED,
+        ENABLED,
+        DISABLED
+    }
+
+    struct Strategy {
+        uint256 id;
+        address strategy;
+        address strategist;
+        uint32 weight;
+        StrategyStatus status; 
+    }
+
+    /***************************************
+    EVENTS
+    ***************************************/
+    /// @notice Emitted when new strategy is created.
+    event StrategyCreated(address strategy, address strategist);
+    
     /// @notice Emitted when a product's risk parameters are set.
     /// Includes adding and removing products.
     event ProductParamsSet(address product, uint32 weight, uint24 price, uint16 divisor);
     /// @notice Emitted when the partial reserves factor is set.
     event PartialReservesFactorSet(uint16 partialReservesFactor);
+
+    /***************************************
+    RISK STRATEGY FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Creates a new `Risk Strategy`.
+     * @param products    The strategy products.
+     * @param weights     The weights of the strategy products.
+     * @param prices      The prices of the strategy products.
+     * @param divisors    The divisors(max cover per policy divisor) of the strategy products. 
+     * @return strategy   The address of newly created strategy.
+    */
+    function createRiskStrategy(
+        address[] memory products, 
+        uint32[] memory weights, 
+        uint24[] memory prices,
+        uint16[] memory divisors) external returns (address strategy);
+
+  
 
     /***************************************
     MAX COVER VIEW FUNCTIONS
