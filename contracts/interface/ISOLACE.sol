@@ -16,29 +16,10 @@ interface ISOLACE is IERC20Metadata {
     EVENTS
     ***************************************/
 
-    /// @notice Emitted when the max supply is changed.
-    event MaxSupplySet(uint256 cap);
     /// @notice Emitted when a minter is added.
     event MinterAdded(address indexed minter);
     /// @notice Emitted when a minter is removed.
     event MinterRemoved(address indexed minter);
-
-    /***************************************
-    MAX SUPPLY FUNCTIONS
-    ***************************************/
-
-    /**
-     * @notice The total amount of **SOLACE** that can be minted.
-     * @return cap The supply cap.
-     */
-    function maxSupply() external view returns (uint256 cap);
-
-    /**
-     * @notice Changes the max supply of **SOLACE**.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param maxSupply_ The new supply cap.
-     */
-    function setMaxSupply(uint256 maxSupply_) external;
 
     /***************************************
     MINT FUNCTIONS
