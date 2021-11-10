@@ -20,8 +20,39 @@ interface IRiskStrategy {
     
     /// @notice Emitted when a product's risk parameters are set.
     /// Includes adding and removing products.
-    event ProductParamsSet(address product, uint32 weight, uint24 price, uint16 divisor);
+    event ProductRiskParamsSet(address product, uint32 weight, uint24 price, uint16 divisor);
     
+    /// @notice Emitted when strategy's allocation weight is increased.
+    event RiskStrategyWeightAllocationIncreased(address strategy, uint32 weight);
+
+    /// @notice Emitted when strategy's allocation weight is decreased.
+    event RiskStrategyWeightAllocationDecreased(address strategy, uint32 weight);
+
+    /// @notice Emitted when strategy's allocation weight is set.
+    event RiskStrategyWeightAllocationSet(address strategy, uint32 weight);
+
+    /***************************************
+      RISK STRATEGY MUTUATOR FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Increases the weight of the `Risk Strategy`.
+     * @param weight The value to increase.
+    */
+    function increaseWeightAllocation(uint32 weight) external;
+
+    /**
+     * @notice Decreases the weight of the `Risk Strategy`.
+     * @param weight The value to decrease.
+    */
+    function decreaseWeightAllocation(uint32 weight) external;
+
+    /**
+     * @notice Sets the weight of the `Risk Strategy`.
+     * @param weight The value to set.
+    */
+    function setWeightAllocation(uint32 weight) external;
+
     /***************************************
       RISK STRATEGY VIEW FUNCTIONS
     ***************************************/

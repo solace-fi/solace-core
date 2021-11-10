@@ -30,8 +30,15 @@ contract RiskStrategy is IRiskStrategy, Governable {
     /// @dev zero-assignment is fine. it is set on constructor.
     uint32 internal _weightSum = 0;
 
-    /// @notice the cover amount that is allocated by `Risk Manager`.
-    uint256 internal _coverAmount = 0;
+    /// @notice the allocation weight that is allocated by `Risk Manager`.
+    /// It defines how much amount the strategy can use for coverage. 
+    uint32 internal _weightAllocation = 0;
+
+    /// @notice controls the access that for only risk manager can access.
+    modifier onlyRiskManager() {
+      require(msg.sender == address(_riskManager), "not risk manager");
+      _;
+    }
 
     /**
      * @notice Constructs the `RiskStrategy` contract.
@@ -55,6 +62,40 @@ contract RiskStrategy is IRiskStrategy, Governable {
         // set strategy product risk params
         _initializeStrategyRiskParams(products, weights, prices, divisors); 
     }
+
+    /***************************************
+      RISK STRATEGY MUTUATOR FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Increases the weight of the `Risk Strategy`.
+     * @param weight The value to increase.
+    */
+    function increaseWeightAllocation(uint32 weight) external override onlyRiskManager {
+        require(weight > 0, "invalid weight!");
+        _weightAllocation += weight;
+        emit RiskStrategyWeightAllocationIncreased(address(this), weight);
+    }
+
+    /**
+     * @notice Decreases the weight of the `Risk Strategy`.
+     * @param weight The value to decrease.
+    */
+    function decreaseWeightAllocation(uint32 weight) external override onlyRiskManager {
+        require(weight > 0, "invalid weight!");
+        _weightAllocation = _weightAllocation == 0 ? 0 : _weightAllocation - weight;
+        emit RiskStrategyWeightAllocationDecreased(address(this), weight);
+    }
+
+    /**
+     * @notice Sets the weight of the `Risk Strategy`.
+     * @param weight The value to set.
+    */
+    function setWeightAllocation(uint32 weight) external override onlyRiskManager {
+        require(weight > 0, "invalid weight!");
+        _weightAllocation = weight;
+        emit RiskStrategyWeightAllocationSet(address(this), weight);
+    }
     
     /***************************************
       RISK STRATEGY VIEW FUNCTIONS
@@ -65,7 +106,7 @@ contract RiskStrategy is IRiskStrategy, Governable {
      * @return cover The max amount of cover in `wei`
     */
     function maxCover() public view override returns (uint256 cover) {
-        return _coverAmount;
+        return (_riskManager.maxCover() * _weightAllocation) / _riskManager.weightSum();
     }
 
     /**
@@ -151,6 +192,7 @@ contract RiskStrategy is IRiskStrategy, Governable {
     /***************************************
       RISK STRATEGY PRIVATE FUNCTIONS
     ***************************************/
+    
     function _initializeStrategyRiskParams(address[] memory products, uint32[] memory weights, uint24[] memory prices, uint16[] memory divisors ) private {
         uint256 size = products.length;
         require(size > 0 && (size == weights.length && size == prices.length && size == divisors.length), "risk param length mismatch");
@@ -172,7 +214,7 @@ contract RiskStrategy is IRiskStrategy, Governable {
             _productCount += 1;
             _weightSum += weights[i];
 
-            emit ProductParamsSet(products[i], weights[i], prices[i], divisors[i]);            
+            emit ProductRiskParamsSet(products[i], weights[i], prices[i], divisors[i]);            
         }
     }
 
