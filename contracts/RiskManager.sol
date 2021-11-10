@@ -26,16 +26,11 @@ contract RiskManager is IRiskManager, Governable {
     /***************************************
     GLOBAL VARIABLES
     ***************************************/
-    mapping(address => uint256) internal _strategyToId;
-    mapping(uint256 => address) internal _idToStrategy;
-    uint256 internal _strategyCount;
-    mapping(address => Strategy) internal _strategies;
 
-    // enumerable map product address to uint32 weight
-    mapping(address => uint256) internal _productToIndex;
-    mapping(uint256 => address) internal _indexToProduct;
-    uint256 internal _productCount;
-    mapping(address => ProductRiskParams) internal _productRiskParams;
+    mapping(address => uint256) internal _strategyToIndex;
+    mapping(uint256 => address) internal _indexToStrategy;
+    mapping(address => Strategy) internal _strategies;
+    uint256 internal _strategyCount;
     uint32 internal _weightSum;
 
     // Multiplier for minimum capital requirement in BPS.
@@ -90,8 +85,8 @@ contract RiskManager is IRiskManager, Governable {
             weight: 0,
             status: StrategyStatus.CREATED
         });
-        _strategyToId[address(riskStrategy)] = _strategyCount;
-        _idToStrategy[_strategyCount] = address(riskStrategy);
+        _strategyToIndex[address(riskStrategy)] = _strategyCount;
+        _indexToStrategy[_strategyCount] = address(riskStrategy);
         emit StrategyCreated(address(riskStrategy), msg.sender);
         return address(riskStrategy);
     }
@@ -102,28 +97,16 @@ contract RiskManager is IRiskManager, Governable {
 
     /**
      * @notice Given a request for coverage, determines if that risk is acceptable and if so at what price.
+     * @param strategy The risk strategy for the product.
      * @param prod The product that wants to sell coverage.
      * @param currentCover If updating an existing policy's cover amount, the current cover amount, otherwise 0.
      * @param newCover The cover amount requested.
      * @return acceptable True if risk of the new cover is acceptable, false otherwise.
      * @return price The price in wei per 1e12 wei of coverage per block.
      */
-    function assessRisk(address prod, uint256 currentCover, uint256 newCover) external view override returns (bool acceptable, uint24 price) {
-        // must be a registered product
-        if(_productToIndex[prod] == 0) return (false, type(uint24).max);
-        // max cover checks
-        uint256 mc = maxCover();
-        ProductRiskParams storage params = _productRiskParams[prod];
-        // must be less than maxCoverPerProduct
-        mc = mc * params.weight / _weightSum;
-        uint256 productActiveCoverAmount = IProduct(prod).activeCoverAmount();
-        productActiveCoverAmount = productActiveCoverAmount + newCover - currentCover;
-        if(productActiveCoverAmount > mc) return (false, params.price);
-        // must be less than maxCoverPerPolicy
-        mc = mc / params.divisor;
-        if(newCover > mc) return (false, params.price);
-        // risk is acceptable
-        return (true, params.price);
+    function assessRisk(address strategy, address prod, uint256 currentCover, uint256 newCover) external view override returns (bool acceptable, uint24 price) {
+        require(strategyIsActive(strategy), "inactive strategy!");
+        return IRiskStrategy(strategy).assessRisk(prod, currentCover, newCover);
     }
 
     /**
@@ -136,83 +119,93 @@ contract RiskManager is IRiskManager, Governable {
 
     /**
      * @notice The maximum amount of cover that a product can sell in total.
+     * @param strategy The risk strategy for the product.
      * @param prod The product that wants to sell cover.
      * @return cover The max amount of cover in wei.
      */
-    function maxCoverPerProduct(address prod) public view override returns (uint256 cover) {
-        return maxCover() * _productRiskParams[prod].weight / _weightSum;
+    function maxCoverPerProduct(address strategy, address prod) public view override returns (uint256 cover) {
+        require(strategyIsActive(strategy), "inactive strategy!");
+        return IRiskStrategy(strategy).maxCoverPerProduct(prod);
     }
 
     /**
      * @notice The amount of cover that a product can still sell.
+     * @param strategy The risk strategy for the product.
      * @param prod The product that wants to sell cover.
      * @return cover The max amount of cover in wei.
      */
-    function sellableCoverPerProduct(address prod) external view override returns (uint256 cover) {
-        // max cover
-        uint256 mc = maxCoverPerProduct(prod);
-        // active cover
-        uint256 ac = IProduct(prod).activeCoverAmount();
-        // diff non underflow
-        return (mc < ac)
-          ? 0
-          : (mc - ac);
+    function sellableCoverPerProduct(address strategy, address prod) external view override returns (uint256 cover) {
+        require(strategyIsActive(strategy), "inactive strategy!");
+        return IRiskStrategy(strategy).sellableCoverPerProduct(prod);
     }
 
     /**
      * @notice The maximum amount of cover that a product can sell in a single policy.
+     * @param strategy The risk strategy for the product.
      * @param prod The product that wants to sell cover.
      * @return cover The max amount of cover in wei.
      */
-    function maxCoverPerPolicy(address prod) external view override returns (uint256 cover) {
-        ProductRiskParams storage params = _productRiskParams[prod];
-        require(params.weight > 0, "product inactive");
-        return maxCover() * params.weight / (_weightSum * params.divisor);
+    function maxCoverPerPolicy(address strategy, address prod) external view override returns (uint256 cover) {
+        require(strategyIsActive(strategy), "inactive strategy!");
+        return IRiskStrategy(strategy).maxCoverPerPolicy(prod);
     }
 
     /**
      * @notice Checks is an address is an active product.
+     * @param strategy The risk strategy for the product.
      * @param prod The product to check.
      * @return status Returns true if the product is active.
      */
-    function productIsActive(address prod) external view override returns (bool status) {
-        return _productToIndex[prod] != 0;
+    function productIsActive(address strategy, address prod) external view override returns (bool status) {
+        require(strategyIsActive(strategy), "inactive strategy!");
+        return IRiskStrategy(strategy).productIsActive(prod);
     }
 
     /**
-     * @notice Return the number of registered products.
+     * @notice Checks if the given risk strategy is active.
+     * @param strategy The risk strategy.
+     * @return status True if the strategy is active.
+     */
+     function strategyIsActive(address strategy) public view override returns (bool status) {
+         return _strategies[strategy].status == StrategyStatus.ENABLED;
+     }
+
+    /**
+     * @notice Return the number of registered products for given risk strategy.
+     * @param strategy The risk strategy.
      * @return count Number of products.
      */
-    function numProducts() external view override returns (uint256 count) {
-        return _productCount;
+    function numProducts(address strategy) external view override returns (uint256 count) {
+        require(strategyIsActive(strategy), "inactive strategy!");
+        return IRiskStrategy(strategy).numProducts();
     }
 
     /**
-     * @notice Return the product at an index.
-     * @dev Enumerable `[1, numProducts]`.
+     * @notice Return the strategy at an index.
+     * @dev Enumerable `[1, numStrategies]`.
      * @param index Index to query.
-     * @return prod The product address.
+     * @return strategy The product address.
      */
-    function product(uint256 index) external view override returns (address prod) {
-        return _indexToProduct[index];
+    function strategyAt(uint256 index) external view override returns (address strategy) {
+        return _indexToStrategy[index];
     }
 
     /**
      * @notice Returns a product's risk parameters.
      * The product must be active.
+     * @param strategy The risk strategy.
      * @param prod The product to get parameters for.
      * @return weight The weighted allocation of this product vs other products.
      * @return price The price in wei per 1e12 wei of coverage per block.
      * @return divisor The max cover amount divisor for per policy. (maxCover / divisor = maxCoverPerPolicy).
      */
-    function productRiskParams(address prod) external view override returns (uint32 weight, uint24 price, uint16 divisor) {
-        ProductRiskParams storage params = _productRiskParams[prod];
-        require(params.weight > 0, "product inactive");
-        return (params.weight, params.price, params.divisor);
+    function productRiskParams(address strategy, address prod) external view override returns (uint32 weight, uint24 price, uint16 divisor) {
+        require(strategyIsActive(strategy), "inactive strategy!");
+        return IRiskStrategy(strategy).productRiskParams(prod);
     }
 
     /**
-     * @notice Returns the sum of weights.
+     * @notice Returns the sum of allocation weights for all strategies.
      * @return sum WeightSum.
      */
     function weightSum() external view override returns (uint32 sum) {
@@ -232,134 +225,23 @@ contract RiskManager is IRiskManager, Governable {
     }
 
     /**
+     * @notice The minimum amount of capital required to safely cover all policies.
+     * @dev The strategy could have active policies when it is disabled. Because of that
+     * we are not adding "strategyIsActive()" require statement.
+     * @param strategy The risk strategy.
+     * @return smcr The strategy minimum capital requirement.
+     */
+    function minCapitalRequirementPerStrategy(address strategy) external view override returns (uint256 smcr) {
+        // TODO: Implement the logic per strategy
+        return IPolicyManager(_registry.policyManager()).activeCoverAmount() * _partialReservesFactor / MAX_BPS;
+    }
+
+    /**
      * @notice Multiplier for minimum capital requirement.
      * @return factor Partial reserves factor in BPS.
      */
     function partialReservesFactor() external view override returns (uint16 factor) {
         return _partialReservesFactor;
-    }
-
-    /***************************************
-    GOVERNANCE FUNCTIONS
-    ***************************************/
-
-    /**
-     * @notice Adds a product.
-     * If the product is already added, sets its parameters.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param product_ Address of the product.
-     * @param weight_ The products weight.
-     * @param price_ The products price in wei per 1e12 wei of coverage per block.
-     * @param divisor_ The max cover amount divisor for per policy. (maxCover / divisor = maxCoverPerPolicy).
-     */
-    function addProduct(address product_, uint32 weight_, uint24 price_, uint16 divisor_) external override onlyGovernance {
-        require(product_ != address(0x0), "zero address product");
-        require(weight_ > 0, "no weight");
-        require(price_ > 0, "no price");
-        require(divisor_ > 0, "1/0");
-        uint256 index = _productToIndex[product_];
-        if(index == 0) {
-            // add new product
-            uint32 weightSum_ = (_productCount == 0)
-              ? weight_ // first product
-              : (_weightSum + weight_);
-            _weightSum = weightSum_;
-            _productRiskParams[product_] = ProductRiskParams({
-                weight: weight_,
-                price: price_,
-                divisor: divisor_
-            });
-            index = ++_productCount;
-            _productToIndex[product_] = index;
-            _indexToProduct[index] = product_;
-        } else {
-            // change params of existing product
-            uint32 prevWeight = _productRiskParams[product_].weight;
-            uint32 weightSum_ = _weightSum - prevWeight + weight_;
-            _weightSum = weightSum_;
-            _productRiskParams[product_] = ProductRiskParams({
-                weight: weight_,
-                price: price_,
-                divisor: divisor_
-            });
-        }
-        emit ProductParamsSet(product_, weight_, price_, divisor_);
-    }
-
-    /**
-     * @notice Removes a product.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param product_ Address of the product to remove.
-     */
-    function removeProduct(address product_) external override onlyGovernance {
-        uint256 index = _productToIndex[product_];
-        // product wasn't added to begin with
-        if(index == 0) return;
-        // if not at the end copy down
-        uint256 lastIndex = _productCount;
-        if(index != lastIndex) {
-            address lastProduct = _indexToProduct[lastIndex];
-            _productToIndex[lastProduct] = index;
-            _indexToProduct[index] = lastProduct;
-        }
-        // pop end of array
-        delete _productToIndex[product_];
-        delete _indexToProduct[lastIndex];
-        uint256 newProductCount = _productCount - 1;
-        _weightSum = (newProductCount == 0)
-          ? type(uint32).max // no div by zero
-          : (_weightSum - _productRiskParams[product_].weight);
-        _productCount = newProductCount;
-        delete _productRiskParams[product_];
-        emit ProductParamsSet(product_, 0, 0, 0);
-    }
-
-    /**
-     * @notice Sets the products and their parameters.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param products_ The products.
-     * @param weights_ The product weights.
-     * @param prices_ The product prices.
-     * @param divisors_ The max cover per policy divisors.
-     */
-    function setProductParams(address[] calldata products_, uint32[] calldata weights_, uint24[] calldata prices_, uint16[] calldata divisors_) external override onlyGovernance {
-        // check array lengths
-        uint256 length = products_.length;
-        require(length == weights_.length && length == prices_.length && length == divisors_.length, "length mismatch");
-        // delete old products
-        for(uint256 index = _productCount; index > 0; index--) {
-            address product_ = _indexToProduct[index];
-            delete _productToIndex[product_];
-            delete _indexToProduct[index];
-            delete _productRiskParams[product_];
-            emit ProductParamsSet(product_, 0, 0, 0);
-        }
-        // add new products
-        uint32 weightSum_ = 0;
-        for(uint256 i = 0; i < length; i++) {
-            address product_ = products_[i];
-            uint32 weight_ = weights_[i];
-            uint24 price_ = prices_[i];
-            uint16 divisor_ = divisors_[i];
-            require(product_ != address(0x0), "zero address product");
-            require(weight_ > 0, "no weight");
-            require(price_ > 0, "no price");
-            require(divisor_ > 0, "1/0");
-            require(_productToIndex[product_] == 0, "duplicate product");
-            _productRiskParams[product_] = ProductRiskParams({
-                weight: weight_,
-                price: price_,
-                divisor: divisor_
-            });
-            weightSum_ += weight_;
-            _productToIndex[product_] = i+1;
-            _indexToProduct[i+1] = product_;
-            emit ProductParamsSet(product_, weight_, price_, divisor_);
-        }
-        _weightSum = (length == 0)
-          ? type(uint32).max // no div by zero
-          : weightSum_;
-        _productCount = length;
     }
 
     /**

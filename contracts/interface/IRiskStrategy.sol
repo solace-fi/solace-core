@@ -8,7 +8,7 @@ interface IRiskStrategy {
     ***************************************/
    
     /// @notice Struct for a product's risk parameters.
-    struct RiskParams {
+    struct ProductRiskParams {
       uint32 weight;  // The weighted allocation of this product vs other products.
       uint24 price;   // The price in wei per 1e12 wei of coverage per block.
       uint16 divisor; // The max cover per policy divisor. (maxCoverPerProduct / divisor = maxCoverPerPolicy)
@@ -18,8 +18,7 @@ interface IRiskStrategy {
       EVENTS
     ***************************************/
     
-    /// @notice Emitted when a product's risk parameters are set.
-    /// Includes adding and removing products.
+    /// @notice Emitted when a product's risk parameters are set at initialization.
     event ProductRiskParamsSet(address product, uint32 weight, uint24 price, uint16 divisor);
     
     /// @notice Emitted when strategy's allocation weight is increased.
@@ -30,6 +29,18 @@ interface IRiskStrategy {
 
     /// @notice Emitted when strategy's allocation weight is set.
     event RiskStrategyWeightAllocationSet(address strategy, uint32 weight);
+
+    /// @notice Emitted when governance adds a product.
+    event ProductAddedByGovernance(address product, uint32 weight, uint24 price, uint16 divisor);
+    
+    /// @notice Emitted when governance updates a product.
+    event ProductUpdatedByGovernance(address product, uint32 weight, uint24 price, uint16 divisor);
+
+    /// @notice Emitted when governance removes a product.
+    event ProductRemovedByGovernance(address product);
+
+    /// @notice Emitted when governance sets product risk params.
+    event ProductRiskParamsSetByGovernance(address product, uint32 weight, uint24 price, uint16 divisor);
 
     /***************************************
       RISK STRATEGY MUTUATOR FUNCTIONS
@@ -56,6 +67,17 @@ interface IRiskStrategy {
     /***************************************
       RISK STRATEGY VIEW FUNCTIONS
     ***************************************/
+
+    /**
+     * @notice Given a request for coverage, determines if that risk is acceptable and if so at what price.
+     * @param product The product that wants to sell coverage.
+     * @param currentCover If updating an existing policy's cover amount, the current cover amount, otherwise 0.
+     * @param newCover The cover amount requested.
+     * @return acceptable True if risk of the new cover is acceptable, false otherwise.
+     * @return price The price in wei per 1e12 wei of coverage per block.
+    */
+    function assessRisk(address product, uint256 currentCover, uint256 newCover) external view returns (bool acceptable, uint24 price);
+
     
     /**
      * @notice The maximum amount of cover that `Risk Strategy` as a whole can sell.
@@ -119,4 +141,35 @@ interface IRiskStrategy {
     */
     function weightSum() external view returns (uint32 sum);
 
+    /***************************************
+    RISK STRATEGY GOVERNANCE FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Adds a product.
+     * If the product is already added, sets its parameters.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param product_ Address of the product.
+     * @param weight_ The products weight.
+     * @param price_ The products price in wei per 1e12 wei of coverage per block.
+     * @param divisor_ The max cover per policy divisor.
+     */
+     function addProduct(address product_, uint32 weight_, uint24 price_, uint16 divisor_) external;
+
+     /**
+      * @notice Removes a product.
+      * Can only be called by the current [**governor**](/docs/protocol/governance).
+      * @param product_ Address of the product to remove.
+      */
+     function removeProduct(address product_) external;
+ 
+     /**
+      * @notice Sets the products and their parameters.
+      * Can only be called by the current [**governor**](/docs/protocol/governance).
+      * @param products_ The products.
+      * @param weights_ The product weights.
+      * @param prices_ The product prices.
+      * @param divisors_ The max cover per policy divisors.
+      */
+     function setProductParams(address[] calldata products_, uint32[] calldata weights_, uint24[] calldata prices_, uint16[] calldata divisors_) external;
 }
