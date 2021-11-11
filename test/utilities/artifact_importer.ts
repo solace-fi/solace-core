@@ -26,6 +26,7 @@ export async function import_artifacts() {
   artifacts.PolicyDescriptor = await tryImport(`${artifact_dir}/PolicyDescriptor.sol/PolicyDescriptor.json`);
   artifacts.PolicyDescriptorV2 = await tryImport(`${artifact_dir}/PolicyDescriptorV2.sol/PolicyDescriptorV2.json`);
   artifacts.RiskManager = await tryImport(`${artifact_dir}/RiskManager.sol/RiskManager.json`);
+  artifacts.MockGovernableInitializable = await tryImport(`${artifact_dir}/mocks/MockGovernableInitializable.sol/MockGovernableInitializable.json`);
   // solace imports post-dao
   artifacts.SOLACE = await tryImport(`${artifact_dir}/SOLACE.sol/SOLACE.json`);
   artifacts.OptionsFarming = await tryImport(`${artifact_dir}/OptionsFarming.sol/OptionsFarming.json`);
@@ -34,7 +35,7 @@ export async function import_artifacts() {
   artifacts.LpAppraisor = await tryImport(`${artifact_dir}/LpAppraisor.sol/LpAppraisor.json`);
   artifacts.SolaceEthLpFarm = await tryImport(`${artifact_dir}/SolaceEthLpFarm.sol/SolaceEthLpFarm.json`);
   artifacts.SptFarm = await tryImport(`${artifact_dir}/SptFarm.sol/SptFarm.json`);
-  // products
+  // products v1
   artifacts.BaseProduct = await tryImport(`${artifact_dir}/products/BaseProduct.sol/BaseProduct.json`);
   artifacts.MockProduct = await tryImport(`${artifact_dir}/mocks/MockProduct.sol/MockProduct.json`);
   artifacts.AaveV2Product = await tryImport(`${artifact_dir}/products/AaveV2Product.sol/AaveV2Product.json`);
@@ -47,6 +48,10 @@ export async function import_artifacts() {
   artifacts.SushiswapProduct = await tryImport(`${artifact_dir}/products/SushiswapProduct.sol/SushiswapProduct.json`);
   artifacts.UniswapV2Product = await tryImport(`${artifact_dir}/products/UniswapV2Product.sol/UniswapV2Product.json`);
   artifacts.UniswapV3Product = await tryImport(`${artifact_dir}/products/UniswapV3Product.sol/UniswapV3Product.json`);
+  // product v2
+  artifacts.ProductFactory = await tryImport(`${artifact_dir}/ProductFactory.sol/ProductFactory.json`);
+  artifacts.BaseProductV2 = await tryImport(`${artifact_dir}/products/BaseProductV2.sol/BaseProductV2.json`);
+  artifacts.MockProductV2 = await tryImport(`${artifact_dir}/mocks/MockProductV2.sol/MockProductV2.json`);
 
   // oracles
   artifacts.ExchangeQuoter1InchV1 = await tryImport(`${artifact_dir}/oracles/ExchangeQuoter1InchV1.sol/ExchangeQuoter1InchV1.json`);
