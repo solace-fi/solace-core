@@ -111,13 +111,6 @@ interface IProduct {
     /// @notice The current amount covered (in wei).
     function activeCoverAmount() external view returns (uint256);
 
-    /**
-     * @notice Returns the name of the product.
-     * Must be implemented by child contracts.
-     * @return productName The name of the product.
-     */
-    function name() external view returns (string memory productName);
-
     /// @notice Cannot buy new policies while paused. (Default is False)
     function paused() external view returns (bool);
 

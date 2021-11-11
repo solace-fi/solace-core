@@ -2,9 +2,9 @@
 pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/utils/Address.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
-import "../Governable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/cryptography/draft-EIP712Upgradeable.sol";
+import "../GovernableInitializable.sol";
 import "../interface/IPolicyManager.sol";
 import "../interface/IRiskManager.sol";
 import "../interface/ITreasury.sol";
@@ -14,13 +14,14 @@ import "../interface/IProduct.sol";
 
 
 /**
- * @title BaseProduct
+ * @title BaseProductV2
  * @author solace.fi
  * @notice The abstract smart contract that is inherited by every concrete individual **Product** contract.
  *
  * It is required to extend [`IProduct`](../interface/IProduct) and recommended to extend `BaseProduct`. `BaseProduct` extends [`IProduct`](../interface/IProduct) and takes care of the heavy lifting; new products simply need to set some variables in the constructor. It has some helpful functionality not included in [`IProduct`](../interface/IProduct) including claim signers.
  */
-abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
+//contract BaseProductV2 is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradeable, GovernableInitializable, Initializable {
+contract BaseProductV2 is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradeable, GovernableInitializable {
     using Address for address;
 
     /***************************************
@@ -57,9 +58,6 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
     // solhint-disable-next-line var-name-mixedcase
     bytes32 internal _SUBMIT_CLAIM_TYPEHASH;
 
-    // The name of the product.
-    string internal _productName;
-
     // used in our floating point price math
     // price is measured in wei per block per wei of coverage * Q12
     // divide by Q12 to get premium
@@ -80,26 +78,31 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
     }
 
     /**
-     * @notice Constructs the product. `BaseProduct` by itself is not deployable, only its subclasses.
+     * @notice Initializes the product.
      * @param governance_ The governor.
      * @param policyManager_ The IPolicyManager contract.
      * @param registry_ The IRegistry contract.
      * @param coveredPlatform_ A platform contract which locates contracts that are covered by this product.
      * @param minPeriod_ The minimum policy period in blocks to purchase a **policy**.
      * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
+     * @param typehash_ The typehash for submitting claims.
      * @param domain_ The user readable name of the EIP712 signing domain.
      * @param version_ The current major version of the signing domain.
      */
-    constructor (
+    function initialize(
         address governance_,
         IPolicyManager policyManager_,
         IRegistry registry_,
         address coveredPlatform_,
         uint40 minPeriod_,
         uint40 maxPeriod_,
+        bytes32 typehash_,
         string memory domain_,
         string memory version_
-    ) EIP712(domain_, version_) Governable(governance_) {
+    ) public virtual initializer {
+        __Governable_init(governance_);
+        __EIP712_init(domain_, version_);
+        __ReentrancyGuard_init();
         require(address(registry_) != address(0x0), "zero address registry");
         _registry = registry_;
         require(address(policyManager_) != address(0x0), "zero address policymanager");
@@ -109,6 +112,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         require(minPeriod_ <= maxPeriod_, "invalid period");
         _minPeriod = minPeriod_;
         _maxPeriod = maxPeriod_;
+        _SUBMIT_CLAIM_TYPEHASH = typehash_;
     }
 
     /***************************************
@@ -127,7 +131,6 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
     function buyPolicy(address policyholder, uint256 coverAmount, uint40 blocks, bytes memory positionDescription) external payable override nonReentrant whileUnpaused returns (uint256 policyID) {
         require(policyholder != address(0x0), "zero address");
         require(coverAmount > 0, "zero cover value");
-        require(isValidPositionDescription(positionDescription), "invalid position description");
         // check that the product can provide coverage for this policy
         (bool acceptable, uint24 price) = IRiskManager(_registry.riskManager()).assessRisk(address(this), 0, coverAmount);
         require(acceptable, "cannot accept that risk");
@@ -310,7 +313,7 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         {
         bytes32 structHash = keccak256(abi.encode(_SUBMIT_CLAIM_TYPEHASH, policyID, msg.sender, amountOut, deadline));
         bytes32 hash = _hashTypedDataV4(structHash);
-        address signer = ECDSA.recover(hash, signature);
+        address signer = ECDSAUpgradeable.recover(hash, signature);
         require(_isAuthorizedSigner[signer], "invalid signature");
         }
         // update local book-keeping variables
@@ -362,14 +365,6 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
         return _activeCoverAmount;
     }
 
-    /**
-     * @notice Returns the name of the product.
-     * @return productName The name of the product.
-     */
-    function name() external view virtual returns (string memory productName) {
-        return _productName;
-    }
-
     /// @notice Returns whether or not product is currently in paused state.
     function paused() external view override returns (bool) {
         return _paused;
@@ -388,16 +383,6 @@ abstract contract BaseProduct is IProduct, EIP712, ReentrancyGuard, Governable {
      function isAuthorizedSigner(address account) external view override returns (bool status) {
         return _isAuthorizedSigner[account];
      }
-
-     /**
-      * @notice Determines if the byte encoded description of a position(s) is valid.
-      * The description will only make sense in context of the product.
-      * @dev This function should be overwritten in inheriting Product contracts.
-      * If invalid, return false if possible. Reverting is also acceptable.
-      * @param positionDescription The description to validate.
-      * @return isValid True if is valid.
-      */
-     function isValidPositionDescription(bytes memory positionDescription) public view virtual returns (bool isValid);
 
     /***************************************
     MUTATOR FUNCTIONS

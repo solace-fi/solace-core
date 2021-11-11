@@ -19,8 +19,9 @@ contract PolicyDescriptor is IPolicyDescriptor {
      * @return description The URI of the ERC721-compliant metadata.
      */
     function tokenURI(IPolicyManager policyManager, uint256 policyID) external view override returns (string memory description) {
-        address product = policyManager.getPolicyProduct(policyID);
-        string memory productName = IProduct(product).name();
+        //address product = policyManager.getPolicyProduct(policyID);
+        //string memory productName = IProduct(product).name();
+        string memory productName = "[name() deprecated]";
         return string(abi.encodePacked("This is a Solace Finance policy that covers a ", productName, " position"));
     }
 }
