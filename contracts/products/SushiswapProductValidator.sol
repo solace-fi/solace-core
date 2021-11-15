@@ -3,48 +3,31 @@ pragma solidity 0.8.6;
 
 import "../interface/SushiSwap/ISushiLPToken.sol";
 import "../interface/SushiSwap/ISushiV2Factory.sol";
-
-import "./BaseProduct.sol";
+import "../Governable.sol";
+import "../interface/IProductValidator.sol";
 
 
 /**
- * @title SushiswapProduct
+ * @title SushiswapProductValidator
  * @author solace.fi
- * @notice The **SushiswapProduct** can be used to purchase coverage for **Sushiswap LP** positions.
+ * @notice The **SushiswapProductValidator** can be used to purchase coverage for **Sushiswap LP** positions.
  */
-contract SushiswapProduct is BaseProduct {
+contract SushiswapProductValidator is IProductValidator, Governable {
 
+    // emitted when sushiswapv2 factory is updated.
+    event SushiswapV2FactoryUpdated(address newAddress);
+
+    // Sushi v2 factory.
     ISushiV2Factory internal _sushiV2Factory;
 
     /**
-      * @notice Constructs the SushiswapProduct.
+      * @notice Constructs the SushiswapProductValidator.
       * @param governance_ The address of the [governor](/docs/protocol/governance).
-      * @param policyManager_ The [`PolicyManager`](../PolicyManager) contract.
-      * @param registry_ The [`Registry`](../Registry) contract.
       * @param sushiV2Factory_ The Sushiswap Factory.
-      * @param minPeriod_ The minimum policy period in blocks to purchase a **policy**.
-      * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
      */
-    constructor (
-        address governance_,
-        IPolicyManager policyManager_,
-        IRegistry registry_,
-        address sushiV2Factory_,
-        uint40 minPeriod_,
-        uint40 maxPeriod_
-    ) BaseProduct(
-        governance_,
-        policyManager_,
-        registry_,
-        sushiV2Factory_,
-        minPeriod_,
-        maxPeriod_,
-        "Solace.fi-SushiswapProduct",
-        "1"
-    ) {
+    constructor (address governance_, address sushiV2Factory_) Governable(governance_) {
+        require(sushiV2Factory_ != address(0x0), "zero address sushiv2factory!");
         _sushiV2Factory = ISushiV2Factory(sushiV2Factory_);
-        _SUBMIT_CLAIM_TYPEHASH = keccak256("SushiswapProductSubmitClaim(uint256 policyID,address claimant,uint256 amountOut,uint256 deadline)");
-        _productName = "Sushiswap";
     }
 
     /**
@@ -60,22 +43,22 @@ contract SushiswapProduct is BaseProduct {
      * The description will only make sense in context of the product.
      * @dev This function should be overwritten in inheriting Product contracts.
      * If invalid, return false if possible. Reverting is also acceptable.
-     * @param positionDescription The description to validate.
+     * @param positionDescription_ The description to validate.
      * @return isValid True if is valid.
      */
-    function isValidPositionDescription(bytes memory positionDescription) public view virtual override returns (bool isValid) {
+    function validate(bytes memory positionDescription_) public view virtual override returns (bool isValid) {
         // check length
         // solhint-disable-next-line var-name-mixedcase
         uint256 ADDRESS_SIZE = 20;
         // must be concatenation of one or more addresses
-        if(positionDescription.length == 0 || positionDescription.length % ADDRESS_SIZE != 0) return false;
+        if(positionDescription_.length == 0 || positionDescription_.length % ADDRESS_SIZE != 0) return false;
         // check all addresses in list
-        for(uint256 offset = 0; offset < positionDescription.length; offset += ADDRESS_SIZE) {
+        for(uint256 offset = 0; offset < positionDescription_.length; offset += ADDRESS_SIZE) {
             // get next address
             address positionContract;
             // solhint-disable-next-line no-inline-assembly
             assembly {
-                positionContract := div(mload(add(add(positionDescription, 0x20), offset)), 0x1000000000000000000000000)
+                positionContract := div(mload(add(add(positionDescription_, 0x20), offset)), 0x1000000000000000000000000)
             }
             // must be Sushi LP Token
             ISushiLPToken slpToken = ISushiLPToken(positionContract);
@@ -96,8 +79,8 @@ contract SushiswapProduct is BaseProduct {
      * A new version of the protocol will likely require a new Product.
      * @param sushiV2Factory_ The new Address Provider.
      */
-    function setCoveredPlatform(address sushiV2Factory_) public override {
-        super.setCoveredPlatform(sushiV2Factory_);
+    function setSushiV2Factory(address sushiV2Factory_) external onlyGovernance {
         _sushiV2Factory = ISushiV2Factory(sushiV2Factory_);
+        emit SushiswapV2FactoryUpdated(sushiV2Factory_);
     }
 }

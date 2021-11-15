@@ -317,7 +317,7 @@ contract SptFarm is ISptFarm, ReentrancyGuard, Governable {
      */
     function _deposit(address depositor, uint256 policyID) internal {
         // get policy
-        (/* address policyholder */, /* address product */, uint256 coverAmount, uint40 expirationBlock, uint24 price, /* bytes calldata positionDescription */) = _policyManager.getPolicyInfo(policyID);
+        (/* address policyholder */, /* address product */, uint256 coverAmount, uint40 expirationBlock, uint24 price, /* bytes calldata positionDescription */,) = _policyManager.getPolicyInfo(policyID);
         require(expirationBlock > block.number, "policy is expired");
         // harvest and update farm
         _harvest(depositor);

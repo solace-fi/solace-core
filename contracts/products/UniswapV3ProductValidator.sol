@@ -3,55 +3,37 @@ pragma solidity 0.8.6;
 
 import "../interface/UniswapV3/IUniswapV3Pool.sol";
 import "../interface/UniswapV3/IUniswapV3Factory.sol";
-
-import "./BaseProduct.sol";
-
+import "../Governable.sol";
+import "../interface/IProductValidator.sol";
 
 /**
- * @title UniswapV3Product
+ * @title UniswapV3ProductValidator
  * @author solace.fi
- * @notice The **UniswapV3Product** can be used to purchase coverage for **UniswapV3 LP** positions.
+ * @notice The **UniswapV3ProductValidator** can be used to purchase coverage for **UniswapV3 LP** positions.
  */
-contract UniswapV3Product is BaseProduct {
+contract UniswapV3ProductValidator is IProductValidator, Governable {
 
+    // emitted when UniswapV3 factory is updated.
+    event UniswapV3FactoryUpdated(address newAddress);
+
+    // UniswapV3 factory.
     IUniswapV3Factory internal _uniV3Factory;
 
     /**
-      * @notice Constructs the UniswapV3Product.
+      * @notice Constructs the UniswapV3ProductValidator.
       * @param governance_ The address of the [governor](/docs/protocol/governance).
-      * @param policyManager_ The [`PolicyManager`](../PolicyManager) contract.
-      * @param registry_ The [`Registry`](../Registry) contract.
-      * @param uniV3Factory_ The UniswapV3Product Factory.
-      * @param minPeriod_ The minimum policy period in blocks to purchase a **policy**.
-      * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
+      * @param uniV3Factory_ The UniswapV3ProductValidator Factory.
      */
-    constructor (
-        address governance_,
-        IPolicyManager policyManager_,
-        IRegistry registry_,
-        address uniV3Factory_,
-        uint40 minPeriod_,
-        uint40 maxPeriod_
-    ) BaseProduct(
-        governance_,
-        policyManager_,
-        registry_,
-        uniV3Factory_,
-        minPeriod_,
-        maxPeriod_,
-        "Solace.fi-UniswapV3Product",
-        "1"
-    ) {
+    constructor (address governance_, address uniV3Factory_ ) Governable(governance_) {
+        require(uniV3Factory_ != address(0x0), "zero address univ3factory!");
         _uniV3Factory = IUniswapV3Factory(uniV3Factory_);
-        _SUBMIT_CLAIM_TYPEHASH = keccak256("UniswapV3ProductSubmitClaim(uint256 policyID,address claimant,uint256 amountOut,uint256 deadline)");
-        _productName = "UniswapV3";
     }
 
     /**
-     * @notice Uniswap V2 Factory.
+     * @notice Uniswap V3 Factory.
      * @return uniV3Factory_ The factory.
      */
-    function uniV2Factory() external view returns (address uniV3Factory_) {
+    function uniV3Factory() external view returns (address uniV3Factory_) {
         return address(_uniV3Factory);
     }
 
@@ -60,22 +42,22 @@ contract UniswapV3Product is BaseProduct {
      * The description will only make sense in context of the product.
      * @dev This function should be overwritten in inheriting Product contracts.
      * If invalid, return false if possible. Reverting is also acceptable.
-     * @param positionDescription The description to validate.
+     * @param positionDescription_ The description to validate.
      * @return isValid True if is valid.
      */
-    function isValidPositionDescription(bytes memory positionDescription) public view virtual override returns (bool isValid) {
+    function validate(bytes memory positionDescription_) public view virtual override returns (bool isValid) {
         // check length
         // solhint-disable-next-line var-name-mixedcase
         uint256 ADDRESS_SIZE = 20;
         // must be concatenation of one or more addresses
-        if(positionDescription.length == 0 || positionDescription.length % ADDRESS_SIZE != 0) return false;
+        if(positionDescription_.length == 0 || positionDescription_.length % ADDRESS_SIZE != 0) return false;
         // check all addresses in list
-        for(uint256 offset = 0; offset < positionDescription.length; offset += ADDRESS_SIZE) {
+        for(uint256 offset = 0; offset < positionDescription_.length; offset += ADDRESS_SIZE) {
             // get next address
             address positionContract;
             // solhint-disable-next-line no-inline-assembly
             assembly {
-                positionContract := div(mload(add(add(positionDescription, 0x20), offset)), 0x1000000000000000000000000)
+                positionContract := div(mload(add(add(positionDescription_, 0x20), offset)), 0x1000000000000000000000000)
             }
             // must be UniswapV3 Pool
             IUniswapV3Pool uniswapV3Pool = IUniswapV3Pool(positionContract);
@@ -96,8 +78,8 @@ contract UniswapV3Product is BaseProduct {
      * A new version of the protocol will likely require a new Product.
      * @param uniV3Factory_ The new Address Provider.
      */
-    function setCoveredPlatform(address uniV3Factory_) public override {
-        super.setCoveredPlatform(uniV3Factory_);
+    function setUniV3Factory(address uniV3Factory_) external onlyGovernance {
         _uniV3Factory = IUniswapV3Factory(uniV3Factory_);
+        emit UniswapV3FactoryUpdated(uniV3Factory_);
     }
 }

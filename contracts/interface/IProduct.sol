@@ -28,10 +28,14 @@ interface IProduct {
     event MaxPeriodSet(uint40 maxPeriod);
     /// @notice Emitted when buying is paused or unpaused.
     event PauseSet(bool paused);
-    /// @notice Emitted when covered platform is set.
-    event CoveredPlatformSet(address coveredPlatform);
+    /// @notice Emitted when product validator is set.
+    event ProductValidatorSet(address productValidator);
     /// @notice Emitted when PolicyManager is set.
     event PolicyManagerSet(address policyManager);
+    /// @notice Emitted when a risk strategy is added.
+    event StrategyAdded(address strategy);
+    /// @notice Emitted when a risk strategy is removed.
+    event StrategyRemoved(address strategy);
 
     /***************************************
     POLICYHOLDER FUNCTIONS
@@ -44,9 +48,10 @@ interface IProduct {
      * @param coverAmount The value to cover in **ETH**.
      * @param blocks The length (in blocks) for policy.
      * @param positionDescription A byte encoded description of the position(s) to cover.
+     * @param riskStrategy The risk strategy of the product to cover.
      * @return policyID The ID of newly created policy.
      */
-    function buyPolicy(address policyholder, uint256 coverAmount, uint40 blocks, bytes memory positionDescription) external payable returns (uint256 policyID);
+    function buyPolicy(address policyholder, uint256 coverAmount, uint40 blocks, bytes memory positionDescription, address riskStrategy) external payable returns (uint256 policyID);
 
     /**
      * @notice Increase or decrease the cover amount of the policy.
@@ -92,30 +97,57 @@ interface IProduct {
      * @notice Calculate a premium quote for a policy.
      * @param coverAmount The value to cover in **ETH**.
      * @param blocks The duration of the policy in blocks.
+     * @param riskStrategy The risk strategy address.
      * @return premium The quote for their policy in **ETH**.
      */
-    function getQuote(uint256 coverAmount, uint40 blocks) external view returns (uint256 premium);
+    function getQuote(uint256 coverAmount, uint40 blocks, address riskStrategy) external view returns (uint256 premium);
 
     /***************************************
     GLOBAL VIEW FUNCTIONS
     ***************************************/
 
-    /// @notice The minimum policy period in blocks.
+    /** 
+     * @notice Returns the minimum policy period in blocks.
+     * @return period The minimum period value.
+    */
     function minPeriod() external view returns (uint40);
-    /// @notice The maximum policy period in blocks.
+
+    /**
+     * @notice Returns the maximum policy period in blocks.
+     * @return period The maxiumum period value.
+    */
     function maxPeriod() external view returns (uint40);
-    /// @notice Covered platform.
-    /// A platform contract which locates contracts that are covered by this product.
-    /// (e.g., `UniswapProduct` will have `Factory` as `coveredPlatform` contract, because every `Pair` address can be located through `getPool()` function).
-    function coveredPlatform() external view returns (address);
-    /// @notice The current amount covered (in wei).
-    function activeCoverAmount() external view returns (uint256);
 
-    /// @notice Cannot buy new policies while paused. (Default is False)
-    function paused() external view returns (bool);
+    /**
+     * @notice Returns product validator.
+     * @return productValidator The address of product validator contract.
+    */
+    function productValidtor() external returns (address productValidator);
 
-    /// @notice Address of the [`PolicyManager`](../PolicyManager).
-    function policyManager() external view returns (address);
+    /**
+     * @notice Returns the current amount covered (in wei).
+     * @return amount The current amount.
+    */
+    function activeCoverAmount() external view returns (uint256 amount);
+
+    /**
+     * @notice Returns the current amount covered (in wei) per risk strategy.
+     * @param riskStrategy The risk strategy address.
+     * @return amount The current amount.
+    */
+    function activeCoverAmountPerStrategy(address riskStrategy) external view returns (uint256 amount);
+
+    /**
+     * @notice Returns whether or not product is currently in paused state.
+     * @return status True if product is paused.
+    */
+    function paused() external view returns (bool status);
+
+    /**
+     * @notice Returns the address of the [`PolicyManager`](../PolicyManager).
+     * @return policymanager The policy manager address.
+    */
+    function policyManager() external view returns (address policymanager);
 
     /**
      * @notice Returns true if the given account is authorized to sign claims.
@@ -152,13 +184,11 @@ interface IProduct {
     function setMaxPeriod(uint40 maxPeriod_) external;
 
     /**
-     * @notice Changes the covered platform.
+     * @notice Changes the product validator.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @dev Use this if the the protocol changes their registry but keeps the children contracts.
-     * A new version of the protocol will likely require a new Product.
-     * @param coveredPlatform_ The platform to cover.
+     * @param productValidator_ The platform to cover.
      */
-    function setCoveredPlatform(address coveredPlatform_) external;
+     function setProductValidtor(address productValidator_) external;
 
     /**
      * @notice Changes the policy manager.
@@ -166,4 +196,18 @@ interface IProduct {
      * @param policyManager_ The new policy manager.
      */
     function setPolicyManager(address policyManager_) external;
+
+    /**
+     * @notice Adds a risk strategy for the product.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param strategy_ The address of the risk strategy.
+    */
+    function addRiskStrategy(address strategy_) external;
+
+    /**
+     * @notice Removes risk strategy from the product.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param strategy_ The address of the risk strategy to remove.
+    */
+    function removeRiskStrategy(address strategy_) external;
 }

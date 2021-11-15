@@ -36,6 +36,8 @@ interface IRegistry {
     event FarmControllerSet(address farmController);
     // Emitted when Locker is set.
     event LockerSet(address locker);
+    // Emitted when Locker is set.
+    event CoverageDataProviderSet(address coverageDataProvider);
 
     /***************************************
     VIEW FUNCTIONS
@@ -100,6 +102,12 @@ interface IRegistry {
      * @return locker_ The address of the [`Locker`](../Locker) contract.
      */
     function locker() external view returns (address locker_);
+
+    /**
+     * @notice Gets the [`CoverageDataProvider`](../CoverageDataProvider) contract.
+     * @return coverageDataProvider_ The address of the [`CoverageDataProvider`](../CoverageDataProvider) contract.
+     */
+    function coverageDataProvider() external view returns (address coverageDataProvider_);
 
     /***************************************
     GOVERNANCE FUNCTIONS
@@ -176,6 +184,13 @@ interface IRegistry {
     function setLocker(address locker_) external;
 
     /**
+     * @notice Sets the [`CoverageDataProvider`](../CoverageDataProvider) contract.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param coverageDataProvider_ The address of the [`CoverageDataProvider`](../CoverageDataProvider) contract.
+     */
+    function setCoverageDataProvider(address coverageDataProvider_) external;
+
+    /**
      * @notice Sets multiple contracts in one call.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param weth_ The address of the [**WETH**](../WETH9) contract.
@@ -188,6 +203,7 @@ interface IRegistry {
      * @param optionsFarming_ The address of the [`OptionsFarming`](./OptionsFarming) contract.
      * @param farmController_ The address of the [`FarmController`](./FarmController) contract.
      * @param locker_ The address of the [`Locker`](../Locker) contract.
+     * @param coverageDataProvider_ The address of the [`CoverageDataProvider`](../CoverageDataProvider) contract.
      */
     function setMultiple(
         address weth_,
@@ -199,6 +215,7 @@ interface IRegistry {
         address solace_,
         address optionsFarming_,
         address farmController_,
-        address locker_
+        address locker_,
+        address coverageDataProvider_
     ) external;
 }

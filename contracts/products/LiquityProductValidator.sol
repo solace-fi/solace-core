@@ -4,71 +4,54 @@ pragma solidity 0.8.6;
 import "../interface/Liquity/ILQTYStaking.sol";
 import "../interface/Liquity/ILQTYToken.sol";
 import "../interface/Liquity/ITroveManager.sol";
-import "./BaseProduct.sol";
+import "../Governable.sol";
+import "../interface/IProductValidator.sol";
 
 /**
- * @title LiquityProduct
+ * @title LiquityProductValidator
  * @author solace.fi
- * @notice The **LiquityProduct** can be used to purchase coverage for **Liquity** positions.
+ * @notice The **LiquityProductValidator** can be used to purchase coverage for **Liquity** positions.
  */
-contract LiquityProduct is BaseProduct {
+contract LiquityProductValidator is IProductValidator, Governable {
+
+    // emitted when trove manager is updated.
+    event TroveManagerUpdated(address newAddress);
 
     /// @notice ITroveManager.
     ITroveManager internal _troveManager;
 
     /**
-      * @notice Constructs the LiquityProduct.
+      * @notice Constructs the LiquityProductValidator.
       * @param governance_ The address of the [governor](/docs/user-docs/Governance).
-      * @param policyManager_ The [`PolicyManager`](../PolicyManager) contract.
-      * @param registry_ The [`Registry`](../Registry) contract.
       * @param troveManager_ The Liquity trove manager.
-      * @param minPeriod_ The minimum policy period in blocks to purchase a **policy**.
-      * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
      */
-    constructor (
-        address governance_,
-        IPolicyManager policyManager_,
-        IRegistry registry_,
-        address troveManager_,
-        uint40 minPeriod_,
-        uint40 maxPeriod_
-    ) BaseProduct(
-        governance_,
-        policyManager_,
-        registry_,
-        troveManager_,
-        minPeriod_,
-        maxPeriod_,
-        "Solace.fi-LiquityProduct",
-        "1"
-    ) {
+    constructor (address governance_, address troveManager_) Governable(governance_) {
+        require(troveManager_ != address(0x0), "zero address trovemanager!");
         _troveManager = ITroveManager(troveManager_);
-        _SUBMIT_CLAIM_TYPEHASH = keccak256("LiquityProductSubmitClaim(uint256 policyID,address claimant,uint256 amountOut,uint256 deadline)");
-        _productName = "Liquity";
     }
 
      /**
      * @notice Determines if the byte encoded description of a position(s) is valid.
      * The description will only make sense in context of the product.
      * @dev This function should be overwritten in inheriting Product contracts.
-     * @param positionDescription The description to validate.
+     * @param positionDescription_ The description to validate.
      * @return isValid True if is valid.
      */
-    function isValidPositionDescription(bytes memory positionDescription) public view virtual override returns (bool isValid) {
+    function validate(bytes memory positionDescription_) public view virtual override returns (bool isValid) {
         // check length
         // solhint-disable-next-line var-name-mixedcase
         uint256 ADDRESS_SIZE = 20;
         // must be concatenation of one or more addresses
-        if (positionDescription.length == 0 || positionDescription.length % ADDRESS_SIZE != 0) return false;
+        if (positionDescription_.length == 0 || positionDescription_.length % ADDRESS_SIZE != 0) return false;
         address lqtyStaking = _troveManager.lqtyStaking();
         address stabilityPool = _troveManager.stabilityPool();
         // check all addresses in list
-        for(uint256 offset = 0; offset < positionDescription.length; offset += ADDRESS_SIZE) {
+        for(uint256 offset = 0; offset < positionDescription_.length; offset += ADDRESS_SIZE) {
             // get next address
             address positionContract;
             // solhint-disable-next-line no-inline-assembly
             assembly {
-                positionContract := div(mload(add(add(positionDescription, 0x20), offset)), 0x1000000000000000000000000)
+                positionContract := div(mload(add(add(positionDescription_, 0x20), offset)), 0x1000000000000000000000000)
             }
             // must be one of TroveManager, LqtyStaking, or StabilityPool
             if (( address(_troveManager) != positionContract) && (lqtyStaking !=  positionContract) && (stabilityPool != positionContract)) return false;
@@ -95,8 +78,8 @@ contract LiquityProduct is BaseProduct {
      * Can only be called by the current [**governor**](/docs/user-docs/Governance).
      * @param troveManager_ The new Liquity Trove Manager.
      */
-    function setCoveredPlatform(address troveManager_) public override {
-        super.setCoveredPlatform(troveManager_);
+    function setTroveManager(address troveManager_) external onlyGovernance {
         _troveManager = ITroveManager(troveManager_);
+        emit TroveManagerUpdated(troveManager_);
     }
 }

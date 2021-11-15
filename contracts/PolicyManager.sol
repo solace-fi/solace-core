@@ -44,6 +44,9 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
     /// @notice Policy info (policy ID => policy info).
     mapping(uint256 => PolicyInfo) internal _policyInfo;
 
+    /// @notice The current amount covered (in wei) per strategy;
+    mapping(address => uint256) internal _activeCoverAmountPerStrategy;
+
     /**
      * @notice Constructs the `PolicyManager`.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
@@ -73,10 +76,11 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
      * @return expirationBlock The expiration block of the policy.
      * @return price The price of the policy.
      * @return positionDescription The description of the covered position(s).
+     * @return riskStrategy The risk strategy of the covered product.
      */
-    function getPolicyInfo(uint256 policyID) external view override tokenMustExist(policyID) returns (address policyholder, address product, uint256 coverAmount, uint40 expirationBlock, uint24 price, bytes memory positionDescription) {
+    function getPolicyInfo(uint256 policyID) external view override tokenMustExist(policyID) returns (address policyholder, address product, uint256 coverAmount, uint40 expirationBlock, uint24 price, bytes memory positionDescription, address riskStrategy) {
         PolicyInfo memory info = _policyInfo[policyID];
-        return (ownerOf(policyID), info.product, info.coverAmount, info.expirationBlock, info.price, info.positionDescription);
+        return (ownerOf(policyID), info.product, info.coverAmount, info.expirationBlock, info.price, info.positionDescription, info.riskStrategy);
     }
 
     /**
@@ -134,6 +138,16 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
         positionDescription = _policyInfo[policyID].positionDescription;
         return positionDescription;
     }
+
+    /**
+     * @notice Returns the risk strategy of the product in policy.
+     * @param policyID The policy ID.
+     * @return strategy The risk strategy address.
+    */
+    function getPolicyRiskStrategy(uint256 policyID) external view override returns (address strategy) {
+        return _policyInfo[policyID].riskStrategy;
+    }
+
 
     /*
      * @notice These functions can be used to check a policys stage in the lifecycle.
@@ -203,6 +217,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
      * @param expirationBlock The policy expiration block number.
      * @param price The coverage price.
      * @param positionDescription The byte encoded description of the covered position(s).
+     * @param riskStrategy The risk strategy of the covered product.
      * @return policyID The policy ID.
      */
     function createPolicy(
@@ -210,7 +225,8 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
         uint256 coverAmount,
         uint40 expirationBlock,
         uint24 price,
-        bytes calldata positionDescription
+        bytes calldata positionDescription,
+        address riskStrategy
     ) external override returns (uint256 policyID) {
         require(products.contains(msg.sender), "product inactive");
         PolicyInfo memory info = PolicyInfo({
@@ -218,10 +234,12 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
             positionDescription: positionDescription,
             expirationBlock: expirationBlock,
             coverAmount: coverAmount,
-            price: price
+            price: price,
+            riskStrategy: riskStrategy
         });
         policyID = ++_totalPolicyCount; // starts at 1
         _activeCoverAmount += coverAmount;
+        _activeCoverAmountPerStrategy[riskStrategy] += coverAmount;
         _policyInfo[policyID] = info;
         _mint(policyholder, policyID);
         emit PolicyCreated(policyID);
@@ -236,24 +254,61 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
      * @param expirationBlock The policy expiration block number.
      * @param price The coverage price.
      * @param positionDescription The byte encoded description of the covered position(s).
+     * @param riskStrategy The risk strategy of the covered positions(s).
      */
     function setPolicyInfo(
         uint256 policyID,
         uint256 coverAmount,
         uint40 expirationBlock,
         uint24 price,
-        bytes calldata positionDescription
+        bytes calldata positionDescription,
+        address riskStrategy
         )
         external override tokenMustExist(policyID)
     {
         require(_policyInfo[policyID].product == msg.sender, "wrong product");
         _activeCoverAmount = _activeCoverAmount - _policyInfo[policyID].coverAmount + coverAmount;
+        _activeCoverAmountPerStrategy[riskStrategy] = _activeCoverAmountPerStrategy[riskStrategy] - _policyInfo[policyID].coverAmount + coverAmount;
         PolicyInfo memory info = PolicyInfo({
             product: msg.sender,
             positionDescription: positionDescription,
             expirationBlock: expirationBlock,
             coverAmount: coverAmount,
-            price: price
+            price: price,
+            riskStrategy: riskStrategy
+        });
+        _policyInfo[policyID] = info;
+        emit PolicyUpdated(policyID);
+    }
+
+    /**
+     * @notice Modifies a policy.
+     * Can only be called by **products**.
+     * @param policyID The policy ID.
+     * @param coverAmount The policy coverage amount (in wei).
+     * @param expirationBlock The policy expiration block number.
+     * @param price The coverage price.
+     * @param riskStrategy The risk strategy of the covered positions(s).
+     */
+     function setPolicyInfo(
+        uint256 policyID,
+        uint256 coverAmount,
+        uint40 expirationBlock,
+        uint24 price,
+        address riskStrategy
+        )
+        external override tokenMustExist(policyID)
+    {
+        require(_policyInfo[policyID].product == msg.sender, "wrong product");
+        _activeCoverAmount = _activeCoverAmount - _policyInfo[policyID].coverAmount + coverAmount;
+        _activeCoverAmountPerStrategy[riskStrategy] = _activeCoverAmountPerStrategy[riskStrategy] - _policyInfo[policyID].coverAmount + coverAmount;
+        PolicyInfo memory info = PolicyInfo({
+            product: msg.sender,
+            positionDescription: _policyInfo[policyID].positionDescription,
+            expirationBlock: expirationBlock,
+            coverAmount: coverAmount,
+            price: price,
+            riskStrategy: riskStrategy
         });
         _policyInfo[policyID] = info;
         emit PolicyUpdated(policyID);
@@ -286,6 +341,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
      */
     function updateActivePolicies(uint256[] calldata policyIDs) external override {
         uint256 activeCover = _activeCoverAmount;
+
         for(uint256 i = 0; i < policyIDs.length; i++) {
             uint256 policyID = policyIDs[i];
             // dont burn active or nonexistent policies
@@ -293,6 +349,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
                 address product = _policyInfo[policyID].product;
                 uint256 coverAmount = _policyInfo[policyID].coverAmount;
                 activeCover -= coverAmount;
+                _activeCoverAmountPerStrategy[_policyInfo[policyID].riskStrategy] -= coverAmount;
                 IProduct(product).updateActiveCoverAmount(-SafeCast.toInt256(coverAmount));
                 _burn(policyID);
             }
@@ -334,9 +391,21 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
     OTHER VIEW FUNCTIONS
     ***************************************/
 
-    /// @notice The current amount covered (in wei).
-    function activeCoverAmount() external view override returns (uint256) {
+    /**
+     * @notice Returns the current amount covered (in wei).
+     * @return amount The covered amount (in wei).
+    */
+    function activeCoverAmount() external view override returns (uint256 amount) {
         return _activeCoverAmount;
+    }
+
+    /**
+     * @notice Returns the current amount covered (in wei).
+     * @param riskStrategy The risk strategy address.
+     * @return amount The covered amount (in wei).
+    */
+    function activeCoverAmountPerStrategy(address riskStrategy) external view override returns (uint256 amount) {
+        return _activeCoverAmountPerStrategy[riskStrategy];
     }
 
     /***************************************

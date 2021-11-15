@@ -18,3 +18,8 @@ typechain/
 
 *-ignore
 *.hbs
+
+analysis.json
+bin/
+contracts_processed.zip
+scripts/contract_locations.txt

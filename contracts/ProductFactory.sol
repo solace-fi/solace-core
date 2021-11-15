@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
-import "./products/BaseProductV2.sol";
+import "./products/CoverageProduct.sol";
 import "./Factory.sol";
 import "./interface/IProductFactory.sol";
 
@@ -18,7 +18,7 @@ contract ProductFactory is Factory, IProductFactory {
      * @param governance_ The governor.
      * @param policyManager_ The IPolicyManager contract.
      * @param registry_ The IRegistry contract.
-     * @param coveredPlatform_ A platform contract which locates contracts that are covered by this product.
+     * @param productValidator_ The product validator of the product.
      * @param minPeriod_ The minimum policy period in blocks to purchase a **policy**.
      * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
      * @param typehash_ The typehash for submitting claims.
@@ -30,7 +30,7 @@ contract ProductFactory is Factory, IProductFactory {
         address governance_,
         IPolicyManager policyManager_,
         IRegistry registry_,
-        address coveredPlatform_,
+        address productValidator_,
         uint40 minPeriod_,
         uint40 maxPeriod_,
         bytes32 typehash_,
@@ -38,11 +38,11 @@ contract ProductFactory is Factory, IProductFactory {
         string memory version_
     ) external override returns (address product) {
         product = _deployMinimalProxy(base_);
-        BaseProductV2(product).initialize(
+        CoverageProduct(product).initialize(
             governance_,
             policyManager_,
             registry_,
-            coveredPlatform_,
+            productValidator_,
             minPeriod_,
             maxPeriod_,
             typehash_,
@@ -59,7 +59,7 @@ contract ProductFactory is Factory, IProductFactory {
      * @param governance_ The governor.
      * @param policyManager_ The IPolicyManager contract.
      * @param registry_ The IRegistry contract.
-     * @param coveredPlatform_ A platform contract which locates contracts that are covered by this product.
+     * @param productValidator_ The product validator of the product.
      * @param minPeriod_ The minimum policy period in blocks to purchase a **policy**.
      * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
      * @param typehash_ The typehash for submitting claims.
@@ -72,7 +72,7 @@ contract ProductFactory is Factory, IProductFactory {
         address governance_,
         IPolicyManager policyManager_,
         IRegistry registry_,
-        address coveredPlatform_,
+        address productValidator_,
         uint40 minPeriod_,
         uint40 maxPeriod_,
         bytes32 typehash_,
@@ -80,11 +80,11 @@ contract ProductFactory is Factory, IProductFactory {
         string memory version_
     ) external override returns (address product) {
         product = _deployMinimalProxy(base_, salt_);
-        BaseProductV2(product).initialize(
+        CoverageProduct(product).initialize(
             governance_,
             policyManager_,
             registry_,
-            coveredPlatform_,
+            productValidator_,
             minPeriod_,
             maxPeriod_,
             typehash_,

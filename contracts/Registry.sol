@@ -39,6 +39,8 @@ contract Registry is IRegistry, Governable {
     address internal _farmController;
     // Locker contract.
     address internal _locker;
+    // CoverageDataProvider contract
+    address internal _coverageDataProvider;
 
     /**
      * @notice Constructs the registry contract.
@@ -128,6 +130,14 @@ contract Registry is IRegistry, Governable {
      */
     function locker() external view override returns (address) {
         return _locker;
+    }
+
+    /**
+     * @notice Gets the [`CoverageDataProvider`](../CoverageDataProvider) contract.
+     * @return coverageDataProvider_ The address of the [`CoverageDataProvider`](../CoverageDataProvider) contract.
+     */
+    function coverageDataProvider() external view override returns (address coverageDataProvider_) {
+        return _coverageDataProvider;
     }
 
     /***************************************
@@ -244,6 +254,17 @@ contract Registry is IRegistry, Governable {
     }
 
     /**
+     * @notice Sets the [`CoverageDataProvider`](../CoverageDataProvider) contract.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param coverageDataProvider_ The address of the [`CoverageDataProvider`](../CoverageDataProvider) contract.
+     */
+    function setCoverageDataProvider(address coverageDataProvider_) external override onlyGovernance {
+        require(coverageDataProvider_ != address(0x0), "zero address coveragedataprovider");
+        _coverageDataProvider = coverageDataProvider_;
+        emit CoverageDataProviderSet(coverageDataProvider_);
+    }
+
+    /**
      * @notice Sets multiple contracts in one call.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param weth_ The address of the [**WETH**](../WETH9) contract.
@@ -267,7 +288,8 @@ contract Registry is IRegistry, Governable {
         address solace_,
         address optionsFarming_,
         address farmController_,
-        address locker_
+        address locker_,
+        address coverageDataProvider_
     ) external override onlyGovernance {
         require(weth_ != address(0x0), "zero address weth");
         require(vault_ != address(0x0), "zero address vault");
@@ -279,6 +301,7 @@ contract Registry is IRegistry, Governable {
         require(optionsFarming_ != address(0x0), "zero address optionsfarming");
         require(farmController_ != address(0x0), "zero address farmcontroller");
         require(locker_ != address(0x0), "zero address locker");
+        require(coverageDataProvider_ != address(0x0), "zero address coveragedataprovier");
         _weth = weth_;
         emit WethSet(weth_);
         _vault = vault_;
@@ -299,5 +322,7 @@ contract Registry is IRegistry, Governable {
         emit FarmControllerSet(farmController_);
         _locker = locker_;
         emit LockerSet(locker_);
+        _coverageDataProvider = coverageDataProvider_;
+        emit CoverageDataProviderSet(coverageDataProvider_);
     }
 }

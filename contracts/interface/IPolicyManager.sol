@@ -42,6 +42,7 @@ interface IPolicyManager is IERC721Enhanced {
         uint40 expirationBlock;
         uint24 price;
         bytes positionDescription;
+        address riskStrategy;
     }
 
     /**
@@ -60,8 +61,9 @@ interface IPolicyManager is IERC721Enhanced {
      * @return expirationBlock The expiration block of the policy.
      * @return price The price of the policy.
      * @return positionDescription The description of the covered position(s).
+     * @return riskStrategy The risk strategy of the covered product.
      */
-    function getPolicyInfo(uint256 policyID) external view returns (address policyholder, address product, uint256 coverAmount, uint40 expirationBlock, uint24 price, bytes calldata positionDescription);
+    function getPolicyInfo(uint256 policyID) external view returns (address policyholder, address product, uint256 coverAmount, uint40 expirationBlock, uint24 price, bytes calldata positionDescription, address riskStrategy);
 
     /**
      * @notice The holder of the policy.
@@ -105,6 +107,13 @@ interface IPolicyManager is IERC721Enhanced {
      * @return positionDescription The description of the covered position(s).
      */
     function getPositionDescription(uint256 policyID) external view returns (bytes calldata positionDescription);
+
+    /**
+     * @notice Returns the risk strategy of the product in policy.
+     * @param policyID The policy ID.
+     * @return strategy The risk strategy address.
+    */
+    function getPolicyRiskStrategy(uint256 policyID) external view returns (address strategy);
 
     /*
      * @notice These functions can be used to check a policys stage in the lifecycle.
@@ -155,6 +164,7 @@ interface IPolicyManager is IERC721Enhanced {
      * @param expirationBlock The policy expiration block number.
      * @param price The coverage price.
      * @param positionDescription The description of the covered position(s).
+     * @param riskStrategy The risk strategy of the covered product.
      * @return policyID The policy ID.
      */
     function createPolicy(
@@ -162,7 +172,8 @@ interface IPolicyManager is IERC721Enhanced {
         uint256 coverAmount,
         uint40 expirationBlock,
         uint24 price,
-        bytes calldata positionDescription
+        bytes calldata positionDescription,
+        address riskStrategy
     ) external returns (uint256 policyID);
 
     /**
@@ -173,8 +184,20 @@ interface IPolicyManager is IERC721Enhanced {
      * @param expirationBlock The policy expiration block number.
      * @param price The coverage price.
      * @param positionDescription The description of the covered position(s).
+     * @param riskStrategy The risk strategy of the covered positions(s).
      */
-    function setPolicyInfo(uint256 policyID, uint256 coverAmount, uint40 expirationBlock, uint24 price, bytes calldata positionDescription) external;
+    function setPolicyInfo(uint256 policyID, uint256 coverAmount, uint40 expirationBlock, uint24 price, bytes calldata positionDescription, address riskStrategy) external;
+
+    /**
+     * @notice Modifies a policy.
+     * Can only be called by **products**.
+     * @param policyID The policy ID.
+     * @param coverAmount The policy coverage amount (in wei).
+     * @param expirationBlock The policy expiration block number.
+     * @param price The coverage price.
+     * @param riskStrategy The risk strategy of the covered positions(s).
+     */
+     function setPolicyInfo(uint256 policyID, uint256 coverAmount, uint40 expirationBlock, uint24 price, address riskStrategy) external;
 
     /**
      * @notice Burns expired or cancelled policies.
@@ -217,7 +240,18 @@ interface IPolicyManager is IERC721Enhanced {
     OTHER VIEW FUNCTIONS
     ***************************************/
 
-    function activeCoverAmount() external view returns (uint256);
+    /**
+     * @notice Returns the current amount covered (in wei).
+     * @return amount The covered amount (in wei).
+    */
+    function activeCoverAmount() external view returns (uint256 amount);
+
+    /**
+     * @notice Returns the current amount covered (in wei).
+     * @param riskStrategy The risk strategy address.
+     * @return amount The covered amount (in wei).
+    */
+    function activeCoverAmountPerStrategy(address riskStrategy) external returns (uint256 amount);
 
     /***************************************
     GOVERNANCE FUNCTIONS

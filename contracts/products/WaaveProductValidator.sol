@@ -3,49 +3,32 @@ pragma solidity 0.8.6;
 
 import "../interface/Waave/IWaRegistry.sol";
 import "../interface/Waave/IWaToken.sol";
-import "./BaseProduct.sol";
+import "../Governable.sol";
+import "../interface/IProductValidator.sol";
 
 /**
- * @title WaaveProduct
+ * @title WaaveProductValidator
  * @author solace.fi
- * @notice The **WaaveProduct** can be used to purchase coverage for **Waave** positions.
+ * @notice The **WaaveProductValidator** can be used to purchase coverage for **Waave** positions.
  *
  * Note that the Waave Protocol is exploitable by design. Use this product or the Waave Protocol at your own risk.
  */
-contract WaaveProduct is BaseProduct {
+contract WaaveProductValidator is IProductValidator, Governable {
+    
+    // emitted when waregistry is updated.
+    event WaRegistryUpdated(address newAddress);
 
     // IWaRegistry.
     IWaRegistry internal _waRegistry;
 
     /**
-      * @notice Constructs the WaaveProduct.
+      * @notice Constructs the WaaveProductValidator.
       * @param governance_ The address of the [governor](/docs/protocol/governance).
-      * @param policyManager_ The [`PolicyManager`](../PolicyManager) contract.
-      * @param registry_ The [`Registry`](../Registry) contract.
       * @param waRegistry_ The Waave Registry.
-      * @param minPeriod_ The minimum policy period in blocks to purchase a **policy**.
-      * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
      */
-    constructor (
-        address governance_,
-        IPolicyManager policyManager_,
-        IRegistry registry_,
-        address waRegistry_,
-        uint40 minPeriod_,
-        uint40 maxPeriod_
-    ) BaseProduct(
-        governance_,
-        policyManager_,
-        registry_,
-        waRegistry_,
-        minPeriod_,
-        maxPeriod_,
-        "Solace.fi-WaaveProduct",
-        "1"
-    ) {
+    constructor(address governance_, address waRegistry_) Governable(governance_) {
+        require(waRegistry_ != address(0x0), "zero address waregistry!");
         _waRegistry = IWaRegistry(waRegistry_);
-        _SUBMIT_CLAIM_TYPEHASH = keccak256("WaaveProductSubmitClaim(uint256 policyID,address claimant,uint256 amountOut,uint256 deadline)");
-        _productName = "Waave";
     }
 
     /**
@@ -61,23 +44,23 @@ contract WaaveProduct is BaseProduct {
      * The description will only make sense in context of the product.
      * @dev This function should be overwritten in inheriting Product contracts.
      * If invalid, return false if possible. Reverting is also acceptable.
-     * @param positionDescription The description to validate.
+     * @param positionDescription_ The description to validate.
      * @return isValid True if is valid.
      */
-    function isValidPositionDescription(bytes memory positionDescription) public view virtual override returns (bool isValid) {
+    function validate(bytes memory positionDescription_) public view virtual override returns (bool isValid) {
         // check length
         // solhint-disable-next-line var-name-mixedcase
         uint256 ADDRESS_SIZE = 20;
         // must be concatenation of one or more addresses
-        if(positionDescription.length == 0 || positionDescription.length % ADDRESS_SIZE != 0) return false;
+        if(positionDescription_.length == 0 || positionDescription_.length % ADDRESS_SIZE != 0) return false;
         // check all addresses in list
-        for(uint256 offset = 0; offset < positionDescription.length; offset += ADDRESS_SIZE) {
+        for(uint256 offset = 0; offset < positionDescription_.length; offset += ADDRESS_SIZE) {
             // get next address
             address positionContract;
             // solhint-disable-next-line no-inline-assembly
             assembly {
                 // get 20 bytes starting at offset+32
-                positionContract := shr(0x60, mload(add(add(positionDescription, 0x20), offset)))
+                positionContract := shr(0x60, mload(add(add(positionDescription_, 0x20), offset)))
             }
             // must be a waToken
             if(!_waRegistry.isWaToken(positionContract)) return false;
@@ -96,8 +79,8 @@ contract WaaveProduct is BaseProduct {
      * A new version of the protocol will likely require a new Product.
      * @param waRegistry_ The new waRegistry.
      */
-    function setCoveredPlatform(address waRegistry_) public override {
-        super.setCoveredPlatform(waRegistry_);
+    function setWaaveRegistry(address waRegistry_) external onlyGovernance {
         _waRegistry = IWaRegistry(waRegistry_);
+        emit WaRegistryUpdated(waRegistry_);
     }
 }

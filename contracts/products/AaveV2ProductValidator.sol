@@ -3,48 +3,31 @@ pragma solidity 0.8.6;
 
 import "../interface/AaveV2/IAaveProtocolDataProvider.sol";
 import "../interface/AaveV2/IAToken.sol";
-import "./BaseProduct.sol";
+import "../interface/IProductValidator.sol";
+import "../Governable.sol";
 
 
 /**
- * @title AaveV2Product
+ * @title AaveV2ProductValidator
  * @author solace.fi
  * @notice The **AaveV2** product can be used to purchase coverage for **AaveV2** positions.
  */
-contract AaveV2Product is BaseProduct {
+contract AaveV2ProductValidator is IProductValidator, Governable {
+
+    // emitted when data provider is updated.
+    event AaveDataProviderUpdated(address newAddress);
 
     // IAaveProtocolDataProvider.
     IAaveProtocolDataProvider internal _aaveDataProvider;
 
     /**
-      * @notice Constructs the AaveV2Product.
+      * @notice Constructs the AaveV2ProductValidator.
       * @param governance_ The address of the [governor](/docs/protocol/governance).
-      * @param policyManager_ The [`PolicyManager`](../PolicyManager) contract.
-      * @param registry_ The [`Registry`](../Registry) contract.
       * @param dataProvider_ Aave protocol data provider address.
-      * @param minPeriod_ The minimum policy period in blocks to purchase a **policy**.
-      * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
      */
-    constructor (
-        address governance_,
-        IPolicyManager policyManager_,
-        IRegistry registry_,
-        address dataProvider_,
-        uint40 minPeriod_,
-        uint40 maxPeriod_
-    ) BaseProduct(
-        governance_,
-        policyManager_,
-        registry_,
-        dataProvider_,
-        minPeriod_,
-        maxPeriod_,
-        "Solace.fi-AaveV2Product",
-        "1"
-    ) {
+    constructor (address governance_, address dataProvider_) Governable (governance_) {
+        require(dataProvider_ != address(dataProvider_), "zero address dataprovier");
         _aaveDataProvider = IAaveProtocolDataProvider(dataProvider_);
-        _SUBMIT_CLAIM_TYPEHASH = keccak256("AaveV2ProductSubmitClaim(uint256 policyID,address claimant,uint256 amountOut,uint256 deadline)");
-        _productName = "AaveV2";
     }
 
     /**
@@ -60,23 +43,23 @@ contract AaveV2Product is BaseProduct {
      * The description will only make sense in context of the product.
      * @dev This function should be overwritten in inheriting Product contracts.
      * If invalid, return false if possible. Reverting is also acceptable.
-     * @param positionDescription The description to validate.
+     * @param positionDescription_ The description to validate.
      * @return isValid True if is valid.
      */
-    function isValidPositionDescription(bytes memory positionDescription) public view virtual override returns (bool isValid) {
+    function validate(bytes memory positionDescription_) public view virtual override returns (bool isValid) {
         // check length
         // solhint-disable-next-line var-name-mixedcase
         uint256 ADDRESS_SIZE = 20;
         // must be concatenation of one or more addresses
-        if(positionDescription.length == 0 || positionDescription.length % ADDRESS_SIZE != 0) return false;
+        if(positionDescription_.length == 0 || positionDescription_.length % ADDRESS_SIZE != 0) return false;
         // check all addresses in list
-        for(uint256 offset = 0; offset < positionDescription.length; offset += ADDRESS_SIZE) {
+        for(uint256 offset = 0; offset < positionDescription_.length; offset += ADDRESS_SIZE) {
             // get next address
             address positionContract;
             // solhint-disable-next-line no-inline-assembly
             assembly {
                 // get 20 bytes starting at offset+32
-                positionContract := shr(0x60, mload(add(add(positionDescription, 0x20), offset)))
+                positionContract := shr(0x60, mload(add(add(positionDescription_, 0x20), offset)))
             }
             // must be an aToken
             IAToken token = IAToken(positionContract);
@@ -98,8 +81,8 @@ contract AaveV2Product is BaseProduct {
      * A new version of the protocol will likely require a new Product.
      * @param dataProvider_ The new Data Provider.
      */
-    function setCoveredPlatform(address dataProvider_) public override {
-        super.setCoveredPlatform(dataProvider_);
+    function setAaveDataProvider(address dataProvider_) external onlyGovernance {
         _aaveDataProvider = IAaveProtocolDataProvider(dataProvider_);
+        emit AaveDataProviderUpdated(dataProvider_);
     }
 }

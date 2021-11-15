@@ -38,12 +38,19 @@ interface IRiskManager {
     /***************************************
     EVENTS
     ***************************************/
-    /// @notice Emitted when new strategy is created.
-    event StrategyCreated(address strategy, address strategist);
 
-    /// @notice Emitted when a product's risk parameters are set.
-    /// Includes adding and removing products.
-    event ProductParamsSet(address product, uint32 weight, uint24 price, uint16 divisor);
+    /// @notice Emitted when new strategy is created.
+    event StrategyAdded(address strategy);
+
+    /// @notice Emitted when strategy's allocation weight is increased.
+    event RiskStrategyWeightAllocationIncreased(address strategy, uint32 weight);
+
+    /// @notice Emitted when strategy's allocation weight is decreased.
+    event RiskStrategyWeightAllocationDecreased(address strategy, uint32 weight);
+
+    /// @notice Emitted when strategy's allocation weight is set.
+    event RiskStrategyWeightAllocationSet(address strategy, uint32 weight);
+
     /// @notice Emitted when the partial reserves factor is set.
     event PartialReservesFactorSet(uint16 partialReservesFactor);
 
@@ -52,113 +59,51 @@ interface IRiskManager {
     ***************************************/
 
     /**
-     * @notice Creates a new `Risk Strategy`.
-     * @param products    The strategy products.
-     * @param weights     The weights of the strategy products.
-     * @param prices      The prices of the strategy products.
-     * @param divisors    The divisors(max cover per policy divisor) of the strategy products. 
-     * @return strategy   The address of newly created strategy.
+     * @notice Adds a new `Risk Strategy` to the `Risk Manager`. The community votes the strategy for coverage weight allocation.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param strategy_ The address of the risk strategy.
+     * @return index The index of the risk strategy.
     */
-    function createRiskStrategy(
-        address[] memory products, 
-        uint32[] memory weights, 
-        uint24[] memory prices,
-        uint16[] memory divisors) external returns (address strategy);
+    function addRiskStrategy(address strategy_) external returns (uint256 index);
 
-  
+    /**
+     * @notice Checks is an address is an active strategy.
+     * @param strategy_ The risk strategy.
+     * @return status True if the strategy is active.
+    */
+    function strategyIsActive(address strategy_) external view returns (bool status);
+
+     /**
+      * @notice Return the strategy at an index.
+      * @dev Enumerable `[1, numStrategies]`.
+      * @param index_ Index to query.
+      * @return strategy The product address.
+    */
+    function strategyAt(uint256 index_) external view returns (address strategy);
+
+    /**
+     * @notice Sets the weight of the `Risk Strategy`.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param strategy_ The address of the risk strategy.
+     * @param weight_ The value to set.
+    */
+    function setWeightAllocation(address strategy_, uint32 weight_) external;
+
+    /**
+     * @notice Returns the number of registered strategies..
+     * @return count The number of strategies.
+    */
+    function numStrategies() external view returns (uint256 count);
 
     /***************************************
     MAX COVER VIEW FUNCTIONS
     ***************************************/
-
-    /// @notice Struct for a product's risk parameters.
-    struct ProductRiskParams {
-        uint32 weight;  // The weighted allocation of this product vs other products.
-        uint24 price;   // The price in wei per 1e12 wei of coverage per block.
-        uint16 divisor; // The max cover per policy divisor. (maxCoverPerProduct / divisor = maxCoverPerPolicy)
-    }
-
-    /**
-     * @notice Given a request for coverage, determines if that risk is acceptable and if so at what price.
-     * @param strategy The risk strategy for the product.
-     * @param product The product that wants to sell coverage.
-     * @param currentCover If updating an existing policy's cover amount, the current cover amount, otherwise 0.
-     * @param newCover The cover amount requested.
-     * @return acceptable True if risk of the new cover is acceptable, false otherwise.
-     * @return price The price in wei per 1e12 wei of coverage per block.
-     */
-    function assessRisk(address strategy, address product, uint256 currentCover, uint256 newCover) external view returns (bool acceptable, uint24 price);
 
     /**
      * @notice The maximum amount of cover that Solace as a whole can sell.
      * @return cover The max amount of cover in wei.
      */
     function maxCover() external view returns (uint256 cover);
-
-    /**
-     * @notice The maximum amount of cover that a product can sell in total.
-     * @param strategy The risk strategy for the product.
-     * @param prod The product that wants to sell cover.
-     * @return cover The max amount of cover in wei.
-     */
-    function maxCoverPerProduct(address strategy, address prod) external view returns (uint256 cover);
-
-    /**
-     * @notice The amount of cover that a product can still sell.
-     * @param strategy The risk strategy for the product.
-     * @param prod The product that wants to sell cover.
-     * @return cover The max amount of cover in wei.
-     */
-    function sellableCoverPerProduct(address strategy, address prod) external view returns (uint256 cover);
-
-    /**
-     * @notice The maximum amount of cover that a product can sell in a single policy.
-     * @param strategy The risk strategy for the product.
-     * @param prod The product that wants to sell cover.
-     * @return cover The max amount of cover in wei.
-     */
-    function maxCoverPerPolicy(address strategy, address prod) external view returns (uint256 cover);
-
-    /**
-     * @notice Checks is an address is an active product.
-     * @param strategy The risk strategy for the product.
-     * @param prod The product to check.
-     * @return status True if the product is active.
-     */
-    function productIsActive(address strategy, address prod) external view returns (bool status);
-
-    /**
-     * @notice Checks is an address is an active strategy.
-     * @param strategy The risk strategy.
-     * @return status True if the strategy is active.
-     */
-    function strategyIsActive(address strategy) external view returns (bool status);
-
-    /**
-     * @notice Return the number of registered products.
-     * @param strategy The risk strategy.
-     * @return count Number of products.
-     */
-    function numProducts(address strategy) external view returns (uint256 count);
-
-    /**
-     * @notice Return the strategy at an index.
-     * @dev Enumerable `[1, numStrategies]`.
-     * @param index Index to query.
-     * @return strategy The product address.
-     */
-    function strategyAt(uint256 index) external view returns (address strategy);
-
-    /**
-     * @notice Returns a product's risk parameters.
-     * The product must be active.
-     * @param strategy The risk strategy.
-     * @param prod The product to get parameters for.
-     * @return weight The weighted allocation of this product vs other products.
-     * @return price The price in wei per 1e12 wei of coverage per block.
-     * @return divisor The max cover per policy divisor.
-     */
-    function productRiskParams(address strategy, address prod) external view returns (uint32 weight, uint24 price, uint16 divisor);
 
     /**
      * @notice Returns the sum of allocation weights for all strategies.
@@ -178,10 +123,10 @@ interface IRiskManager {
 
     /**
      * @notice The minimum amount of capital required to safely cover all policies.
-     * @param strategy The risk strategy.
+     * @param strategy_ The risk strategy.
      * @return mcr The minimum capital requirement.
      */
-    function minCapitalRequirementPerStrategy(address strategy) external view returns (uint256 mcr);
+    function minCapitalRequirementPerStrategy(address strategy_) external view returns (uint256 mcr);
 
     /**
      * @notice Multiplier for minimum capital requirement.

@@ -3,7 +3,7 @@ pragma solidity 0.8.6;
 
 import "./Governable.sol";
 import "./RiskStrategy.sol";
-import "./interface/IVault.sol";
+import "./interface/ICoverageDataProvider.sol";
 import "./interface/IRegistry.sol";
 import "./interface/IProduct.sol";
 import "./interface/IPolicyManager.sol";
@@ -56,109 +56,46 @@ contract RiskManager is IRiskManager, Governable {
     /***************************************
     RISK STRATEGY FUNCTIONS
     ***************************************/
+
     /**
-     * @notice Creates a new `Risk Strategy`.
-     * @param products    The strategy products.
-     * @param weights     The weights of the strategy products.
-     * @param prices      The prices of the strategy products.
-     * @param divisors    The divisors(max cover per policy divisor) of the strategy products. 
-     * @return strategy   The address of newly created strategy.
+     * @notice Adds a new `Risk Strategy` to the `Risk Manager`. The community votes the strategy for coverage weight allocation.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param strategy_ The address of the risk strategy.
+     * @return index The index of the risk strategy.
     */
-    function createRiskStrategy(
-            address[] memory products,
-            uint32[] memory weights,
-            uint24[] memory prices,
-            uint16[] memory divisors) external override returns (address strategy) {
-        RiskStrategy riskStrategy = new RiskStrategy(
-                this.governance(),
-                address(this),
-                msg.sender,
-                products,
-                weights,
-                prices,
-                divisors
-        );
-        _strategies[address(riskStrategy)] = Strategy({
-            id: ++_strategyCount,
-            strategy: address(riskStrategy),
+    function addRiskStrategy(address strategy_) external override onlyGovernance returns (uint256 index) {
+        require(strategy_ != address(0x0), "zero address strategy");
+        require(_strategyToIndex[strategy_] == 0, "duplicate strategy");
+
+        uint256 strategyCount = _strategyCount;
+        _strategies[strategy_] = Strategy({
+            id: ++strategyCount,
+            strategy: strategy_,
             strategist: msg.sender,
             weight: 0,
             status: StrategyStatus.CREATED
         });
-        _strategyToIndex[address(riskStrategy)] = _strategyCount;
-        _indexToStrategy[_strategyCount] = address(riskStrategy);
-        emit StrategyCreated(address(riskStrategy), msg.sender);
-        return address(riskStrategy);
-    }
-
-    /***************************************
-    MAX COVER VIEW FUNCTIONS
-    ***************************************/
-
-    /**
-     * @notice Given a request for coverage, determines if that risk is acceptable and if so at what price.
-     * @param strategy The risk strategy for the product.
-     * @param prod The product that wants to sell coverage.
-     * @param currentCover If updating an existing policy's cover amount, the current cover amount, otherwise 0.
-     * @param newCover The cover amount requested.
-     * @return acceptable True if risk of the new cover is acceptable, false otherwise.
-     * @return price The price in wei per 1e12 wei of coverage per block.
-     */
-    function assessRisk(address strategy, address prod, uint256 currentCover, uint256 newCover) external view override returns (bool acceptable, uint24 price) {
-        require(strategyIsActive(strategy), "inactive strategy!");
-        return IRiskStrategy(strategy).assessRisk(prod, currentCover, newCover);
+        _strategyToIndex[strategy_] = strategyCount;
+        _indexToStrategy[strategyCount] = strategy_;
+        _strategyCount = strategyCount;
+        emit StrategyAdded(strategy_);
+        return strategyCount;
     }
 
     /**
-     * @notice The maximum amount of cover that Solace as a whole can sell.
-     * @return cover The max amount of cover in wei.
-     */
-    function maxCover() public view override returns (uint256 cover) {
-        return IVault(payable(_registry.vault())).totalAssets() * MAX_BPS / _partialReservesFactor;
-    }
-
-    /**
-     * @notice The maximum amount of cover that a product can sell in total.
-     * @param strategy The risk strategy for the product.
-     * @param prod The product that wants to sell cover.
-     * @return cover The max amount of cover in wei.
-     */
-    function maxCoverPerProduct(address strategy, address prod) public view override returns (uint256 cover) {
-        require(strategyIsActive(strategy), "inactive strategy!");
-        return IRiskStrategy(strategy).maxCoverPerProduct(prod);
-    }
-
-    /**
-     * @notice The amount of cover that a product can still sell.
-     * @param strategy The risk strategy for the product.
-     * @param prod The product that wants to sell cover.
-     * @return cover The max amount of cover in wei.
-     */
-    function sellableCoverPerProduct(address strategy, address prod) external view override returns (uint256 cover) {
-        require(strategyIsActive(strategy), "inactive strategy!");
-        return IRiskStrategy(strategy).sellableCoverPerProduct(prod);
-    }
-
-    /**
-     * @notice The maximum amount of cover that a product can sell in a single policy.
-     * @param strategy The risk strategy for the product.
-     * @param prod The product that wants to sell cover.
-     * @return cover The max amount of cover in wei.
-     */
-    function maxCoverPerPolicy(address strategy, address prod) external view override returns (uint256 cover) {
-        require(strategyIsActive(strategy), "inactive strategy!");
-        return IRiskStrategy(strategy).maxCoverPerPolicy(prod);
-    }
-
-    /**
-     * @notice Checks is an address is an active product.
-     * @param strategy The risk strategy for the product.
-     * @param prod The product to check.
-     * @return status Returns true if the product is active.
-     */
-    function productIsActive(address strategy, address prod) external view override returns (bool status) {
-        require(strategyIsActive(strategy), "inactive strategy!");
-        return IRiskStrategy(strategy).productIsActive(prod);
+     * @notice Sets the weight of the `Risk Strategy`.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param strategy_ The address of the risk strategy.
+     * @param weight_ The value to set.
+    */
+    function setWeightAllocation(address strategy_, uint32 weight_) external override onlyGovernance {
+        require(weight_ > 0, "invalid weight!");
+        require(strategyIsActive(strategy_), "inactive strategy");
+        Strategy storage riskStrategy = _strategies[strategy_];
+        _weightSum = riskStrategy.weight == 0 ? _weightSum + weight_ : (_weightSum - riskStrategy.weight) + weight_;
+        riskStrategy.weight = weight_;
+        IRiskStrategy(strategy_).setWeightAllocation(weight_);
+        emit RiskStrategyWeightAllocationSet(strategy_, weight_);
     }
 
     /**
@@ -167,41 +104,37 @@ contract RiskManager is IRiskManager, Governable {
      * @return status True if the strategy is active.
      */
      function strategyIsActive(address strategy) public view override returns (bool status) {
-         return _strategies[strategy].status == StrategyStatus.ENABLED;
-     }
-
-    /**
-     * @notice Return the number of registered products for given risk strategy.
-     * @param strategy The risk strategy.
-     * @return count Number of products.
-     */
-    function numProducts(address strategy) external view override returns (uint256 count) {
-        require(strategyIsActive(strategy), "inactive strategy!");
-        return IRiskStrategy(strategy).numProducts();
+        return _strategies[strategy].status == StrategyStatus.ENABLED;
     }
 
     /**
-     * @notice Return the strategy at an index.
-     * @dev Enumerable `[1, numStrategies]`.
-     * @param index Index to query.
-     * @return strategy The product address.
-     */
+    * @notice Return the strategy at an index.
+    * @dev Enumerable `[1, numStrategies]`.
+    * @param index Index to query.
+    * @return strategy The product address.
+    */
     function strategyAt(uint256 index) external view override returns (address strategy) {
-        return _indexToStrategy[index];
+       return _indexToStrategy[index];
     }
 
     /**
-     * @notice Returns a product's risk parameters.
-     * The product must be active.
-     * @param strategy The risk strategy.
-     * @param prod The product to get parameters for.
-     * @return weight The weighted allocation of this product vs other products.
-     * @return price The price in wei per 1e12 wei of coverage per block.
-     * @return divisor The max cover amount divisor for per policy. (maxCover / divisor = maxCoverPerPolicy).
+     * @notice Returns the number of registered strategies..
+     * @return count The number of strategies.
+    */
+    function numStrategies() external view override returns (uint256 count) {
+        return _strategyCount;
+    }
+
+    /***************************************
+    RISK MANAGER VIEW FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice The maximum amount of cover that Solace as a whole can sell.
+     * @return cover The max amount of cover in wei.
      */
-    function productRiskParams(address strategy, address prod) external view override returns (uint32 weight, uint24 price, uint16 divisor) {
-        require(strategyIsActive(strategy), "inactive strategy!");
-        return IRiskStrategy(strategy).productRiskParams(prod);
+    function maxCover() public view override returns (uint256 cover) {
+        return ICoverageDataProvider(_registry.coverageDataProvider()).maxCover() * MAX_BPS / _partialReservesFactor;
     }
 
     /**
