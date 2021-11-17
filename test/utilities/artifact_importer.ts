@@ -52,6 +52,8 @@ export async function import_artifacts() {
   artifacts.ProductFactory = await tryImport(`${artifact_dir}/ProductFactory.sol/ProductFactory.json`);
   artifacts.BaseProductV2 = await tryImport(`${artifact_dir}/products/BaseProductV2.sol/BaseProductV2.json`);
   artifacts.MockProductV2 = await tryImport(`${artifact_dir}/mocks/MockProductV2.sol/MockProductV2.json`);
+  // investing v2
+  artifacts.CapitalPool = await tryImport(`${artifact_dir}/CapitalPool.sol/CapitalPool.json`);
 
   // oracles
   artifacts.ExchangeQuoter1InchV1 = await tryImport(`${artifact_dir}/oracles/ExchangeQuoter1InchV1.sol/ExchangeQuoter1InchV1.json`);
