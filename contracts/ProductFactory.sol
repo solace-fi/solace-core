@@ -18,7 +18,6 @@ contract ProductFactory is Factory, IProductFactory {
      * @param governance_ The governor.
      * @param policyManager_ The IPolicyManager contract.
      * @param registry_ The IRegistry contract.
-     * @param productValidator_ The product validator of the product.
      * @param minPeriod_ The minimum policy period in blocks to purchase a **policy**.
      * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
      * @param typehash_ The typehash for submitting claims.
@@ -30,7 +29,6 @@ contract ProductFactory is Factory, IProductFactory {
         address governance_,
         IPolicyManager policyManager_,
         IRegistry registry_,
-        address productValidator_,
         uint40 minPeriod_,
         uint40 maxPeriod_,
         bytes32 typehash_,
@@ -42,7 +40,6 @@ contract ProductFactory is Factory, IProductFactory {
             governance_,
             policyManager_,
             registry_,
-            productValidator_,
             minPeriod_,
             maxPeriod_,
             typehash_,
@@ -59,7 +56,6 @@ contract ProductFactory is Factory, IProductFactory {
      * @param governance_ The governor.
      * @param policyManager_ The IPolicyManager contract.
      * @param registry_ The IRegistry contract.
-     * @param productValidator_ The product validator of the product.
      * @param minPeriod_ The minimum policy period in blocks to purchase a **policy**.
      * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
      * @param typehash_ The typehash for submitting claims.
@@ -72,7 +68,6 @@ contract ProductFactory is Factory, IProductFactory {
         address governance_,
         IPolicyManager policyManager_,
         IRegistry registry_,
-        address productValidator_,
         uint40 minPeriod_,
         uint40 maxPeriod_,
         bytes32 typehash_,
@@ -84,7 +79,6 @@ contract ProductFactory is Factory, IProductFactory {
             governance_,
             policyManager_,
             registry_,
-            productValidator_,
             minPeriod_,
             maxPeriod_,
             typehash_,

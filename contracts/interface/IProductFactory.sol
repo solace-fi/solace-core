@@ -17,7 +17,6 @@ interface IProductFactory {
      * @param governance_ The governor.
      * @param policyManager_ The IPolicyManager contract.
      * @param registry_ The IRegistry contract.
-     * @param coveredPlatform_ A platform contract which locates contracts that are covered by this product.
      * @param minPeriod_ The minimum policy period in blocks to purchase a **policy**.
      * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
      * @param typehash_ The typehash for submitting claims.
@@ -29,7 +28,6 @@ interface IProductFactory {
         address governance_,
         IPolicyManager policyManager_,
         IRegistry registry_,
-        address coveredPlatform_,
         uint40 minPeriod_,
         uint40 maxPeriod_,
         bytes32 typehash_,
@@ -44,7 +42,6 @@ interface IProductFactory {
      * @param governance_ The governor.
      * @param policyManager_ The IPolicyManager contract.
      * @param registry_ The IRegistry contract.
-     * @param coveredPlatform_ A platform contract which locates contracts that are covered by this product.
      * @param minPeriod_ The minimum policy period in blocks to purchase a **policy**.
      * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
      * @param typehash_ The typehash for submitting claims.
@@ -57,7 +54,6 @@ interface IProductFactory {
         address governance_,
         IPolicyManager policyManager_,
         IRegistry registry_,
-        address coveredPlatform_,
         uint40 minPeriod_,
         uint40 maxPeriod_,
         bytes32 typehash_,

@@ -165,8 +165,7 @@ contract RiskManager is IRiskManager, Governable {
      * @return smcr The strategy minimum capital requirement.
      */
     function minCapitalRequirementPerStrategy(address strategy) external view override returns (uint256 smcr) {
-        // TODO: Implement the logic per strategy
-        return IPolicyManager(_registry.policyManager()).activeCoverAmount() * _partialReservesFactor / MAX_BPS;
+        return IPolicyManager(_registry.policyManager()).activeCoverAmountPerStrategy(strategy) * _partialReservesFactor / MAX_BPS;
     }
 
     /**

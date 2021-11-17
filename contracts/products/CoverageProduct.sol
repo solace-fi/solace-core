@@ -12,7 +12,6 @@ import "../interface/ITreasury.sol";
 import "../interface/IClaimsEscrow.sol";
 import "../interface/IRegistry.sol";
 import "../interface/IProduct.sol";
-import "../interface/IProductValidator.sol";
 
 
 /**
@@ -35,9 +34,6 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
 
     /// @notice Registry contract.
     IRegistry internal _registry;
-
-    /// @notice Product validator.
-    IProductValidator internal _productValidtor;
 
     /// @notice The minimum policy period in blocks.
     uint40 internal _minPeriod;
@@ -98,8 +94,6 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
      * @notice Initializes the product.
      * @param governance_ The governor.
      * @param policyManager_ The IPolicyManager contract.
-     * @param registry_ The IRegistry contract.
-     * @param productValidator_ The product validator of the product.
      * @param minPeriod_ The minimum policy period in blocks to purchase a **policy**.
      * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
      * @param typehash_ The typehash for submitting claims.
@@ -110,7 +104,6 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
         address governance_,
         IPolicyManager policyManager_,
         IRegistry registry_,
-        address productValidator_,
         uint40 minPeriod_,
         uint40 maxPeriod_,
         bytes32 typehash_,
@@ -124,8 +117,6 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
         _registry = registry_;
         require(address(policyManager_) != address(0x0), "zero address policymanager");
         _policyManager = policyManager_;
-        require(productValidator_ != address(0x0), "zero address productvalidator");
-        _productValidtor = IProductValidator(productValidator_);
         require(minPeriod_ <= maxPeriod_, "invalid period");
         _minPeriod = minPeriod_;
         _maxPeriod = maxPeriod_;
@@ -149,7 +140,6 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
     function buyPolicy(address policyholder, uint256 coverAmount, uint40 blocks, bytes memory positionDescription, address riskStrategy) external payable override nonReentrant whileUnpaused returns (uint256 policyID) {
         require(policyholder != address(0x0), "zero address");
         require(coverAmount > 0, "zero cover value");
-        require(_productValidtor.validate(positionDescription), "invalid position description");
         require(_strategyToIndex[riskStrategy] > 0, "invalid strategy");
 
         // check that the product can provide coverage for this policy
@@ -392,14 +382,6 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
     }
 
     /**
-     * @notice Returns the product validator.
-     * @return productValidator The address of product validator contract.
-    */
-    function productValidtor() external view override returns (address productValidator) {
-        return address(_productValidtor);
-    }
-
-    /**
      * @notice Returns the current amount covered (in wei).
      * @return amount The current amount.
     */
@@ -510,17 +492,6 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
     function setPaused(bool paused_) external onlyGovernance {
         _paused = paused_;
         emit PauseSet(paused_);
-    }
-
-    /**
-     * @notice Changes the product validator.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param productValidator_ The platform to cover.
-     */
-    function setProductValidtor(address productValidator_) external override onlyGovernance {
-        require(productValidator_ != address(0x0), "zero address coveredplatform");
-        _productValidtor = IProductValidator(productValidator_);
-        emit ProductValidatorSet(productValidator_);
     }
 
     /**

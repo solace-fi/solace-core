@@ -251,7 +251,7 @@ interface IPolicyManager is IERC721Enhanced {
      * @param riskStrategy The risk strategy address.
      * @return amount The covered amount (in wei).
     */
-    function activeCoverAmountPerStrategy(address riskStrategy) external returns (uint256 amount);
+    function activeCoverAmountPerStrategy(address riskStrategy) external view returns (uint256 amount);
 
     /***************************************
     GOVERNANCE FUNCTIONS

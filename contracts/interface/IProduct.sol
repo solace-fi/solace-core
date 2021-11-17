@@ -28,8 +28,6 @@ interface IProduct {
     event MaxPeriodSet(uint40 maxPeriod);
     /// @notice Emitted when buying is paused or unpaused.
     event PauseSet(bool paused);
-    /// @notice Emitted when product validator is set.
-    event ProductValidatorSet(address productValidator);
     /// @notice Emitted when PolicyManager is set.
     event PolicyManagerSet(address policyManager);
     /// @notice Emitted when a risk strategy is added.
@@ -119,12 +117,6 @@ interface IProduct {
     function maxPeriod() external view returns (uint40);
 
     /**
-     * @notice Returns product validator.
-     * @return productValidator The address of product validator contract.
-    */
-    function productValidtor() external returns (address productValidator);
-
-    /**
      * @notice Returns the current amount covered (in wei).
      * @return amount The current amount.
     */
@@ -182,13 +174,6 @@ interface IProduct {
      * @param maxPeriod_ The maximum number of blocks
      */
     function setMaxPeriod(uint40 maxPeriod_) external;
-
-    /**
-     * @notice Changes the product validator.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param productValidator_ The platform to cover.
-     */
-     function setProductValidtor(address productValidator_) external;
 
     /**
      * @notice Changes the policy manager.
