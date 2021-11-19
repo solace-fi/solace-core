@@ -13,7 +13,6 @@ import "../interface/IClaimsEscrow.sol";
 import "../interface/IRegistry.sol";
 import "../interface/IProduct.sol";
 
-
 /**
  * @title CoverageProduct
  * @author solace.fi
@@ -93,7 +92,6 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
     /**
      * @notice Initializes the product.
      * @param governance_ The governor.
-     * @param policyManager_ The IPolicyManager contract.
      * @param minPeriod_ The minimum policy period in blocks to purchase a **policy**.
      * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
      * @param typehash_ The typehash for submitting claims.
@@ -102,7 +100,6 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
      */
     function initialize(
         address governance_,
-        IPolicyManager policyManager_,
         IRegistry registry_,
         uint40 minPeriod_,
         uint40 maxPeriod_,
@@ -115,8 +112,8 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
         __ReentrancyGuard_init();
         require(address(registry_) != address(0x0), "zero address registry");
         _registry = registry_;
-        require(address(policyManager_) != address(0x0), "zero address policymanager");
-        _policyManager = policyManager_;
+        _policyManager = IPolicyManager(IRegistry(registry_).policyManager());
+        require(address(_policyManager) != address(0x0), "zero address policymanager");
         require(minPeriod_ <= maxPeriod_, "invalid period");
         _minPeriod = minPeriod_;
         _maxPeriod = maxPeriod_;
@@ -140,7 +137,7 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
     function buyPolicy(address policyholder, uint256 coverAmount, uint40 blocks, bytes memory positionDescription, address riskStrategy) external payable override nonReentrant whileUnpaused returns (uint256 policyID) {
         require(policyholder != address(0x0), "zero address");
         require(coverAmount > 0, "zero cover value");
-        require(_strategyToIndex[riskStrategy] > 0, "invalid strategy");
+        require(_strategyToIndex[riskStrategy] > 0, "invalid risk strategy");
 
         // check that the product can provide coverage for this policy
         (bool acceptable, uint24 price) = IRiskStrategy(riskStrategy).assessRisk(address(this), 0, coverAmount);
@@ -174,14 +171,14 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
     function updateCoverAmount(uint256 policyID, uint256 coverAmount) external payable override nonReentrant whileUnpaused {
         require(coverAmount > 0, "zero cover value");
         (address policyholder, address product, uint256 previousCoverAmount, uint40 expirationBlock, uint24 purchasePrice, bytes memory positionDescription, address riskStrategy) = _policyManager.getPolicyInfo(policyID);
-        // check policy risk strategy is active
-        require(_strategyToIndex[riskStrategy] > 0, "strategy removed");
         // check msg.sender is policyholder
         require(policyholder == msg.sender, "!policyholder");
         // check for correct product
         require(product == address(this), "wrong product");
         // check for policy expiration
         require(expirationBlock >= block.number, "policy is expired");
+        // check policy risk strategy is active
+        require(_strategyToIndex[riskStrategy] > 0, "invalid risk strategy");
         // check that the product can provide coverage for this policy
         (bool acceptable, uint24 price) = IRiskStrategy(riskStrategy).assessRisk(address(this), previousCoverAmount, coverAmount);
         require(acceptable, "cannot accept that risk");
@@ -223,6 +220,8 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
         require(policyholder == msg.sender,"!policyholder");
         require(product == address(this), "wrong product");
         require(expirationBlock >= block.number, "policy is expired");
+        // check policy risk strategy is active
+        require(_strategyToIndex[riskStrategy] > 0, "invalid risk strategy");
        
         // compute the premium
         uint256 premium = coverAmount * extension * purchasePrice / Q12;
@@ -255,7 +254,7 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
         require(product == address(this), "wrong product");
         require(previousExpirationBlock >= block.number, "policy is expired");
         // check policy risk strategy is active
-        require(_strategyToIndex[riskStrategy] > 0, "strategy removed");
+        require(_strategyToIndex[riskStrategy] > 0, "invalid strategy");
         // check that the product can provide coverage for this policy
         (bool acceptable, uint24 price) = IRiskStrategy(riskStrategy).assessRisk(address(this), previousCoverAmount, coverAmount);
         require(acceptable, "cannot accept that risk");
@@ -293,7 +292,7 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
      * @param policyID The ID of the policy.
      */
     function cancelPolicy(uint256 policyID) external override nonReentrant {
-        (address policyholder, address product, uint256 coverAmount, uint40 expirationBlock, uint24 purchasePrice, ,) = _policyManager.getPolicyInfo(policyID);
+        (address policyholder, address product, uint256 coverAmount, uint40 expirationBlock, uint24 purchasePrice, , address riskStrategy) = _policyManager.getPolicyInfo(policyID);
         require(policyholder == msg.sender,"!policyholder");
         require(product == address(this), "wrong product");
         uint40 blocksLeft = expirationBlock - uint40(block.number);
@@ -301,6 +300,7 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
         _policyManager.burn(policyID);
         ITreasury(payable(_registry.treasury())).refund(msg.sender, refundAmount);
         _activeCoverAmount -= coverAmount;
+        _activeCoverAmountPerStrategy[riskStrategy] -= coverAmount;
         emit PolicyCanceled(policyID);
     }
 
@@ -399,6 +399,24 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
     }
 
     /**
+    * @notice Return the strategy at an index.
+    * @dev Enumerable `[1, numStrategies]`.
+    * @param index Index to query.
+    * @return strategy The product address.
+    */
+    function strategyAt(uint256 index) external view override returns (address strategy) {
+        return _indexToStrategy[index];
+     }
+ 
+     /**
+      * @notice Returns the number of registered strategies.
+      * @return count The number of strategies.
+     */
+    function numStrategies() external view override returns (uint256 count) {
+         return _strategyCount;
+    }
+
+    /**
      * @notice Returns whether or not product is currently in paused state.
      * @return status True if product is paused.
     */
@@ -412,6 +430,14 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
     */
     function policyManager() external view override returns (address policymanager) {
         return address(_policyManager);
+    }
+
+    /**
+     * @notice Returns the address of the [`Registry`](../Registry).
+     * @return registry_ The registry address.
+    */
+    function registry() external view override returns (address registry_) {
+        return address(_registry);
     }
 
     /**
@@ -512,7 +538,8 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
     */
     function addRiskStrategy(address strategy_) external override onlyGovernance {
         require(strategy_ != address(0x0), "zero address strategy");
-      
+        require(_strategyToIndex[strategy_] == 0, "duplicate strategy");
+
         // strategy is active?
         bool status = IRiskManager(_registry.riskManager()).strategyIsActive(strategy_);
         require(status, "inactive strategy");

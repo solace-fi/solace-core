@@ -11,11 +11,13 @@ import "./IRegistry.sol";
  */
 interface IProductFactory {
 
+    /// @notice Emitted when a new product is created
+    event ProductCreated(address product);
+
     /**
      * @notice Creates and initializes a new product.
      * @param base_ The product's source code.
      * @param governance_ The governor.
-     * @param policyManager_ The IPolicyManager contract.
      * @param registry_ The IRegistry contract.
      * @param minPeriod_ The minimum policy period in blocks to purchase a **policy**.
      * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
@@ -26,7 +28,6 @@ interface IProductFactory {
     function createProduct(
         address base_,
         address governance_,
-        IPolicyManager policyManager_,
         IRegistry registry_,
         uint40 minPeriod_,
         uint40 maxPeriod_,
@@ -40,7 +41,6 @@ interface IProductFactory {
      * @param base_ The product's source code.
      * @param salt_ The salt for CREATE2.
      * @param governance_ The governor.
-     * @param policyManager_ The IPolicyManager contract.
      * @param registry_ The IRegistry contract.
      * @param minPeriod_ The minimum policy period in blocks to purchase a **policy**.
      * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
@@ -52,7 +52,6 @@ interface IProductFactory {
         address base_,
         bytes32 salt_,
         address governance_,
-        IPolicyManager policyManager_,
         IRegistry registry_,
         uint40 minPeriod_,
         uint40 maxPeriod_,

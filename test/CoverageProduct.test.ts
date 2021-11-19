@@ -2,7 +2,7 @@ import { waffle, ethers, upgrades } from "hardhat";
 const { deployContract, solidity } = waffle;
 import { MockProvider } from "ethereum-waffle";
 const provider: MockProvider = waffle.provider;
-import { BigNumber as BN, BigNumberish, utils, constants } from "ethers";
+import { BigNumber as BN, BigNumberish, utils, constants, Contract } from "ethers";
 import chai from "chai";
 const { expect } = chai;
 chai.use(solidity);
@@ -10,17 +10,18 @@ import { config as dotenv_config } from "dotenv";
 dotenv_config();
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { PolicyManager, ProductFactory, MockProductV2, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager, BaseProductV2 } from "../typechain";
+import { PolicyManager, ProductFactory, MockProductV2, Treasury, Weth9, ClaimsEscrow, Registry, Vault, RiskManager, RiskStrategy, RiskStrategyFactory, MockRiskStrategy, CoverageDataProvider } from "../typechain";
 import { toBytes32 } from "./utilities/setStorage";
+import { after } from "mocha";
 
 const SUBMIT_CLAIM_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("MockProductSubmitClaim(uint256 policyID,address claimant,uint256 amountOut,uint256 deadline)"));
 const DOMAIN_NAME = "Solace.fi-MockProduct";
 
-describe("BaseProduct", function () {
+describe("CoverageProduct", function () {
   let artifacts: ArtifactImports;
   let policyManager: PolicyManager;
   let productFactory: ProductFactory;
-  let baseProduct: MockProductV2;
+  let coverageProduct: MockProductV2;
   let product: MockProductV2;
   let product2: MockProductV2;
   let weth: Weth9;
@@ -29,7 +30,11 @@ describe("BaseProduct", function () {
   let vault: Vault;
   let registry: Registry;
   let riskManager: RiskManager;
-  const [deployer, governor, newGovernor, positionContract, policyholder1, policyholder2, mockPolicyManager] = provider.getWallets();
+  let riskStrategy: RiskStrategy;
+  let riskStrategyFactory: Contract;
+  let mockRiskStrategy: RiskStrategy;
+  let coverageDataProvider: CoverageDataProvider;
+  const [deployer, governor, newGovernor, positionContract, policyholder1, policyholder2, mockPolicyManager, riskStrategist] = provider.getWallets();
 
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
   const ONE_SPLIT_VIEW = "0xC586BeF4a0992C495Cf22e1aeEE4E446CECDee0E";
@@ -68,28 +73,41 @@ describe("BaseProduct", function () {
     await registry.connect(governor).setPolicyManager(policyManager.address);
     riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
     await registry.connect(governor).setRiskManager(riskManager.address);
+    coverageDataProvider = (await deployContract(deployer, artifacts.CoverageDataProvider, [registry.address])) as CoverageDataProvider;
+    await registry.connect(governor).setCoverageDataProvider(coverageDataProvider.address);
 
     // deploy product factory
     productFactory = (await deployContract(deployer, artifacts.ProductFactory)) as ProductFactory;
 
     // deploy base product
-    baseProduct = (await deployContract(deployer, artifacts.MockProductV2)) as MockProductV2;
+    coverageProduct = (await deployContract(deployer, artifacts.MockProductV2)) as MockProductV2;
 
+    // deploy risk strategy factory
+    let riskStrategyContractFactory = await ethers.getContractFactory("RiskStrategyFactory", deployer);
+    riskStrategyFactory = (await riskStrategyContractFactory.deploy(registry.address, governor.address));
+    await riskStrategyFactory.deployed();
+
+    mockRiskStrategy = (await deployContract(deployer, artifacts.MockRiskStrategy)) as RiskStrategy;
+    
     await vault.connect(governor).addRequestor(claimsEscrow.address);
     await vault.connect(governor).addRequestor(treasury.address);
   });
 
   describe("deployment", function () {
     it("reverts zero addresses", async function () {
-      await expect(productFactory.createProduct(baseProduct.address, governor.address, policyManager.address, ZERO_ADDRESS, treasury.address, minPeriod1, maxPeriod1, SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, "1")).to.be.revertedWith("zero address registry");
-      await expect(productFactory.createProduct(baseProduct.address, governor.address, ZERO_ADDRESS, registry.address, treasury.address, minPeriod1, maxPeriod1, SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, "1")).to.be.revertedWith("zero address policymanager");
-      await expect(productFactory.createProduct(baseProduct.address, governor.address, policyManager.address, registry.address, ZERO_ADDRESS, minPeriod1, maxPeriod1, SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, "1")).to.be.revertedWith("zero address coveredplatform");
+      await expect(productFactory.createProduct(coverageProduct.address, governor.address, ZERO_ADDRESS, minPeriod1, maxPeriod1, SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, "1")).to.be.revertedWith("zero address registry");
+
+      let registry2 = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
+      await expect(productFactory.createProduct(coverageProduct.address, governor.address, registry2.address, minPeriod1, maxPeriod1, SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, "1")).to.be.revertedWith("zero address policymanager");
+
     });
+
     it("reverts invalid period", async function () {
-      await expect(productFactory.createProduct(baseProduct.address, governor.address, policyManager.address, registry.address, treasury.address, 1000, 999, SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, "1")).to.be.revertedWith("invalid period");
+      await expect(productFactory.createProduct(coverageProduct.address, governor.address, registry.address, 1000, 999, SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, "1")).to.be.revertedWith("invalid period");
     });
+
     it("can deploy", async function () {
-      let tx1 = await productFactory.createProduct(baseProduct.address, governor.address, policyManager.address, registry.address, ONE_SPLIT_VIEW, minPeriod1, maxPeriod1, SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, "1");
+      let tx1 = await productFactory.createProduct(coverageProduct.address, governor.address, registry.address, minPeriod1, maxPeriod1, SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, "1");
       let events1 = (await tx1.wait())?.events;
       if(events1 && events1.length > 0) {
         let event1 = events1[0];
@@ -97,7 +115,7 @@ describe("BaseProduct", function () {
       } else throw "no deployment";
       await product.connect(governor).setPrice(price1);
 
-      let tx2 = await productFactory.createProduct(baseProduct.address, governor.address, policyManager.address, registry.address, ONE_SPLIT_VIEW, minPeriod1, maxPeriod1, SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, "1");
+      let tx2 = await productFactory.createProduct(coverageProduct.address, governor.address, registry.address, minPeriod1, maxPeriod1, SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, "1");
       let events2 = (await tx2.wait())?.events;
       if(events2 && events2.length > 0) {
         let event2 = events2[0];
@@ -105,12 +123,13 @@ describe("BaseProduct", function () {
       } else throw "no deployment";
       await product2.connect(governor).setPrice(price1);
     });
+
     it("can deploy with create2", async function () {
       let product3: MockProductV2;
       let product4: MockProductV2;
 
-      let predictedAddress1 = await productFactory.calculateMinimalProxyDeploymentAddress(baseProduct.address, toBytes32(0));
-      let tx1 = await productFactory.create2Product(baseProduct.address, toBytes32(0), governor.address, policyManager.address, registry.address, ONE_SPLIT_VIEW, minPeriod1, maxPeriod1, SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, "1");
+      let predictedAddress1 = await productFactory.calculateMinimalProxyDeploymentAddress(coverageProduct.address, toBytes32(0));
+      let tx1 = await productFactory.create2Product(coverageProduct.address, toBytes32(0), governor.address, registry.address, minPeriod1, maxPeriod1, SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, "1");
       let events1 = (await tx1.wait())?.events;
       if(events1 && events1.length > 0) {
         let event1 = events1[0];
@@ -118,8 +137,8 @@ describe("BaseProduct", function () {
       } else throw "no deployment";
       expect(product3.address).eq(predictedAddress1);
 
-      let predictedAddress2 = await productFactory.calculateMinimalProxyDeploymentAddress(baseProduct.address, toBytes32(1));
-      let tx2 = await productFactory.create2Product(baseProduct.address, toBytes32(1), governor.address, policyManager.address, registry.address, ONE_SPLIT_VIEW, minPeriod1, maxPeriod1, SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, "1");
+      let predictedAddress2 = await productFactory.calculateMinimalProxyDeploymentAddress(coverageProduct.address, toBytes32(1));
+      let tx2 = await productFactory.create2Product(coverageProduct.address, toBytes32(1), governor.address, registry.address, minPeriod1, maxPeriod1, SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, "1");
       let events2 = (await tx2.wait())?.events;
       if(events2 && events2.length > 0) {
         let event2 = events2[0];
@@ -128,12 +147,14 @@ describe("BaseProduct", function () {
       expect(product3.address != product4.address);
       expect(product4.address).eq(predictedAddress2);
     });
+
     it("cannot redeploy with same salt", async function () {
-      await expect(productFactory.create2Product(baseProduct.address, toBytes32(1), governor.address, policyManager.address, registry.address, ONE_SPLIT_VIEW, minPeriod1, maxPeriod1, SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, "1")).to.be.revertedWith("Factory: failed deployment");
+      await expect(productFactory.create2Product(coverageProduct.address, toBytes32(1), governor.address, registry.address, minPeriod1, maxPeriod1, SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, "1")).to.be.revertedWith("Factory: failed deployment");
       // todo: how to test failed deployment with create?
     });
-    it("cannot reinitialize", async function () {
 
+    it("cannot reinitialize", async function () {
+      await expect(product.connect(governor).initialize(governor.address, registry.address, minPeriod1, maxPeriod1, SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, "1")).to.be.reverted
     });
   });
 
@@ -141,9 +162,11 @@ describe("BaseProduct", function () {
     it("starts with the correct governor", async function () {
       expect(await product.governance()).to.equal(governor.address);
     });
+
     it("rejects setting new governance by non governor", async function () {
       await expect(product.connect(policyholder1).setPendingGovernance(policyholder1.address)).to.be.revertedWith("!governance");
     });
+
     it("can set new governance", async function () {
       let tx = await product.connect(governor).setPendingGovernance(newGovernor.address);
       expect(tx).to.emit(product, "GovernancePending").withArgs(newGovernor.address);
@@ -168,87 +191,153 @@ describe("BaseProduct", function () {
   describe("productParameters", function () {
     before(async function () {
       await vault.connect(deployer).depositEth({value:maxCoverAmount1.mul(3)});
-      await riskManager.connect(governor).setProductParams([product.address,product2.address],[1,2],[10000,10000],[1,1]);
+ 
+      let tx = await riskStrategyFactory.createRiskStrategy(mockRiskStrategy.address, [product.address,product2.address],[1,2],[11044,10000],[1,1]);
+      let events = (await tx.wait())?.events;
+      if (events && events.length > 0) {
+        let event = events[0];
+        riskStrategy = await ethers.getContractAt(artifacts.MockRiskStrategy.abi, event?.args?.["deployment"]) as MockRiskStrategy;
+      } else {
+        throw "no risk strategy deployment!";
+      }
+
+      // add and enable risk strategy
+      await riskManager.connect(governor).addRiskStrategy(riskStrategy.address);
+      await riskManager.connect(governor).setStrategyStatus(riskStrategy.address, 3);
+      await riskManager.connect(governor).setWeightAllocation(riskStrategy.address, 100);
     });
+
     it("can get minPeriod", async function () {
       expect(await product.minPeriod()).to.eq(minPeriod1);
     });
+
     it("can set minPeriod", async function () {
       let tx = await product.connect(governor).setMinPeriod(minPeriod2);
       expect(tx).to.emit(product, "MinPeriodSet").withArgs(minPeriod2);
       expect(await product.minPeriod()).to.equal(minPeriod2);
     });
+
     it("should revert setMinPeriod if not called by governance", async function () {
       await expect(product.connect(policyholder1).setMinPeriod(minPeriod1)).to.be.revertedWith("!governance");
     });
+
     it("should revert setMinPeriod if greater than maxPeriod", async function () {
       let maxPeriod = await product.maxPeriod();
       await expect(product.connect(governor).setMinPeriod(maxPeriod + 1)).to.be.revertedWith("invalid period");
     });
+
     it("can get maxPeriod", async function () {
       expect(await product.maxPeriod()).to.eq(maxPeriod1);
     });
+
     it("can set maxPeriod", async function () {
       let tx = await product.connect(governor).setMaxPeriod(maxPeriod2);
       expect(tx).to.emit(product, "MaxPeriodSet").withArgs(maxPeriod2);
       expect(await product.maxPeriod()).to.equal(maxPeriod2);
     });
+
     it("should revert setMaxPeriod if not called by governance", async function () {
       await expect(product.connect(policyholder1).setMaxPeriod(maxPeriod1)).to.be.revertedWith("!governance");
     });
+
     it("should revert setMaxPeriod if greater than maxPeriod", async function () {
       let minPeriod = await product.minPeriod();
       await expect(product.connect(governor).setMaxPeriod(minPeriod - 1)).to.be.revertedWith("invalid period");
     });
-    it("can get covered platform", async function () {
-      expect(await product.coveredPlatform()).to.equal(ONE_SPLIT_VIEW);
-    });
-    it("can set covered platform", async function () {
-      let tx = await product.connect(governor).setCoveredPlatform(treasury.address);
-      expect(tx).to.emit(product, "CoveredPlatformSet").withArgs(treasury.address);
-      expect(await product.coveredPlatform()).to.equal(treasury.address);
-      await product.connect(governor).setCoveredPlatform(ONE_SPLIT_VIEW); // reset
-    });
-    it("should revert setCoveredPlatform if not called by governance", async function () {
-      await expect(product.connect(policyholder1).setCoveredPlatform(policyholder1.address)).to.be.revertedWith("!governance");
-    });
-    it("should revert setCoveredPlatform to zero address", async function () {
-      await expect(product.connect(governor).setCoveredPlatform(ZERO_ADDRESS)).to.be.revertedWith("zero address coveredplatform");
-    })
+
     it("can get policy manager", async function () {
       expect(await product.policyManager()).to.equal(policyManager.address);
     });
+
     it("can set policy manager", async function () {
       let tx = await product.connect(governor).setPolicyManager(treasury.address);
       expect(tx).to.emit(product, "PolicyManagerSet").withArgs(treasury.address);
       expect(await product.policyManager()).to.equal(treasury.address);
       await product.connect(governor).setPolicyManager(policyManager.address);
     });
+
     it("should revert setPolicyManager if not called by governance", async function () {
       await expect(product.connect(policyholder1).setPolicyManager(policyholder1.address)).to.be.revertedWith("!governance");
     });
+
     it("should revert setPolicyManager if not called by governance", async function () {
       await expect(product.connect(governor).setPolicyManager(ZERO_ADDRESS)).to.be.revertedWith("zero address policymanager");
     });
+
+    it("start with zero strategy", async function() {
+      expect(await product.connect(governor).numStrategies()).to.eq(0);
+      expect(await product2.connect(governor).numStrategies()).to.eq(0);
+    });
+
+    it("should revert addRiskStrategy if not called by governance", async function() {
+      await expect(product.connect(policyholder1).addRiskStrategy(riskStrategy.address)).to.be.revertedWith("!governance");
+    });
+
+    it("should revert addRiskStrategy if zero address is provided", async function() {
+      await expect(product.connect(governor).addRiskStrategy(ZERO_ADDRESS)).to.be.revertedWith("zero address strategy");
+    });
+
+    it("should add risk strategy", async function() {
+      let strategyCount = await product.connect(governor).numStrategies();
+      let tx = await product.connect(governor).addRiskStrategy(riskStrategy.address);
+      expect(tx).to.emit(product, "StrategyAdded").withArgs(riskStrategy.address);
+      expect(await product.connect(governor).numStrategies()).to.eq(strategyCount.add(1));
+      expect(await product.connect(governor).strategyAt(strategyCount.add(1))).to.equal(riskStrategy.address);
+    });
+
+    it("should revert addRiskStrategy if duplicate strategy is provided", async function() {
+      await expect(product.connect(governor).addRiskStrategy(riskStrategy.address)).to.be.revertedWith("duplicate strategy");
+    });
+
+    it("should revert removeRiskStrategy if not called by governance", async function() {
+      await expect(product2.connect(policyholder1).removeRiskStrategy(riskStrategy.address)).to.be.revertedWith("!governance");
+    });
+
+    it("should do nothing if removeRiskStrategy is called by non-existing strategy", async function() {
+      let strategyCount = await product2.connect(governor).numStrategies();
+      await product2.connect(governor).removeRiskStrategy(riskStrategy.address);
+      expect(await product2.connect(governor).numStrategies()).to.eq(strategyCount);
+    });
+
+    it("should remove risk strategy", async function() {
+      let strategyCount = await product2.connect(governor).numStrategies();
+      // add strategy to the product
+      let tx = await product2.connect(governor).addRiskStrategy(riskStrategy.address);
+      expect(tx).to.emit(product2, "StrategyAdded").withArgs(riskStrategy.address);
+      expect(await product2.connect(governor).numStrategies()).to.eq(strategyCount.add(1));
+      expect(await product2.connect(governor).strategyAt(strategyCount.add(1))).to.equal(riskStrategy.address);
+
+      // remove strategy from the product
+      strategyCount = await product2.connect(governor).numStrategies();
+      tx = await product2.connect(governor).removeRiskStrategy(riskStrategy.address);
+      expect(tx).to.emit(product2, "StrategyRemoved").withArgs(riskStrategy.address);
+      expect(await product2.connect(governor).numStrategies()).to.eq(strategyCount.sub(1));
+      expect(await product2.connect(governor).strategyAt(strategyCount.sub(1))).to.equal(ZERO_ADDRESS);
+    });
+
   });
 
   describe("pause", function () {
     it("starts unpaused", async function () {
       expect(await product.paused()).to.equal(false);
     });
+
     it("cannot be paused by non governance", async function () {
       await expect(product.connect(policyholder1).setPaused(true)).to.be.revertedWith("!governance");
       expect(await product.paused()).to.equal(false);
     });
+
     it("can be paused", async function () {
       let tx = await product.connect(governor).setPaused(true);
       expect(tx).to.emit(product, "PauseSet").withArgs(true);
       expect(await product.paused()).to.equal(true);
     });
+
     it("cannot be unpaused by non governance", async function () {
       await expect(product.connect(policyholder1).setPaused(false)).to.be.revertedWith("!governance");
       expect(await product.paused()).to.equal(true);
     });
+
     it("can be unpaused", async function() {
       let tx = await product.connect(governor).setPaused(false);
       expect(tx).to.emit(product, "PauseSet").withArgs(false);
@@ -262,69 +351,88 @@ describe("BaseProduct", function () {
       await vault.connect(deployer).depositEth({value:depositAmount});
       await policyManager.connect(governor).addProduct(product.address);
       expect(await policyManager.productIsActive(product.address)).to.equal(true);
-      await riskManager.connect(governor).addProduct(product.address, 1, 11044, 1);
+      let vaultBalance = await provider.getBalance(vault.address);
     });
+
     it("can getQuote", async function () {
-      let quote = BN.from(await product.getQuote(coverAmount, blocks));
+      let quote = BN.from(await product.getQuote(coverAmount, blocks, riskStrategy.address));
       expect(quote).to.equal(expectedPremium);
     });
+
     it("cannot buy policy for zero address", async function () {
-      await expect(product.connect(policyholder1).buyPolicy(ZERO_ADDRESS, coverAmount, blocks, positionContract.address)).to.be.revertedWith("zero address");
+      await expect(product.connect(policyholder1).buyPolicy(ZERO_ADDRESS, coverAmount, blocks, positionContract.address, riskStrategy.address)).to.be.revertedWith("zero address");
     });
+
     it("cannot buy policy with zero cover value", async function () {
-      await expect(product.connect(policyholder1).buyPolicy(policyholder1.address, 0, blocks, positionContract.address)).to.be.revertedWith("zero cover value");
+      await expect(product.connect(policyholder1).buyPolicy(policyholder1.address, 0, blocks, positionContract.address, riskStrategy.address)).to.be.revertedWith("zero cover value");
     });
+
     it("cannot buy policy over max cover amount per product", async function () {
-      let mc = await riskManager.maxCoverPerProduct(product.address);
-      let ac = await product.activeCoverAmount();
+      let mc = await riskStrategy.maxCoverPerProduct(product.address);
+      let ac = await product.activeCoverAmountPerStrategy(riskStrategy.address);
       let coverAmount2 = mc.sub(ac).add(1);
-      await expect(product.connect(policyholder1).buyPolicy(policyholder1.address, coverAmount2, blocks, positionContract.address)).to.be.revertedWith("cannot accept that risk");
+      await expect(product.connect(policyholder1).buyPolicy(policyholder1.address, coverAmount2, blocks, positionContract.address, riskStrategy.address)).to.be.revertedWith("cannot accept that risk");
     });
+
     it("cannot buy policy over max cover amount per policy", async function () {
-      let coverAmount2 = (await riskManager.maxCoverPerPolicy(product.address)).add(1);
-      await expect(product.connect(policyholder1).buyPolicy(policyholder1.address, coverAmount2, blocks, positionContract.address)).to.be.revertedWith("cannot accept that risk");
+      let coverAmount2 = (await riskStrategy.maxCoverPerPolicy(product.address)).add(1);
+      await expect(product.connect(policyholder1).buyPolicy(policyholder1.address, coverAmount2, blocks, positionContract.address, riskStrategy.address)).to.be.revertedWith("cannot accept that risk");
     });
+
     it("cannot buy policy with insufficient payment", async function () {
-      let quote = BN.from(await product.getQuote(coverAmount, blocks));
-      await expect(product.connect(policyholder1).buyPolicy(policyholder1.address, coverAmount, blocks, positionContract.address, { value: quote.sub(1) })).to.be.revertedWith("insufficient payment");
+      let quote = BN.from(await product.getQuote(coverAmount, blocks, riskStrategy.address));
+      console.log("quote: ", quote.toNumber())
+      await expect(product.connect(policyholder1).buyPolicy(policyholder1.address, coverAmount, blocks, positionContract.address, riskStrategy.address, { value: quote.sub(1) })).to.be.revertedWith("insufficient payment");
     });
+
     it("cannot buy policy under min period", async function () {
       let blocks2 = minPeriod2 - 1;
-      let quote = BN.from(await product.getQuote(coverAmount, blocks2));
-      await expect(product.connect(policyholder1).buyPolicy(policyholder1.address, coverAmount, blocks2, positionContract.address, { value: quote })).to.be.revertedWith("invalid period");
+      let quote = BN.from(await product.getQuote(coverAmount, blocks2, riskStrategy.address));
+      await expect(product.connect(policyholder1).buyPolicy(policyholder1.address, coverAmount, blocks2, positionContract.address, riskStrategy.address, { value: quote })).to.be.revertedWith("invalid period");
     });
+
     it("cannot buy policy over max period", async function () {
       let blocks2 = maxPeriod2 + 1;
-      let quote = BN.from(await product.getQuote(coverAmount, blocks2));
-      await expect(product.connect(policyholder1).buyPolicy(policyholder1.address, coverAmount, blocks2, positionContract.address, { value: quote })).to.be.revertedWith("invalid period");
+      let quote = BN.from(await product.getQuote(coverAmount, blocks2, riskStrategy.address));
+      await expect(product.connect(policyholder1).buyPolicy(policyholder1.address, coverAmount, blocks2, positionContract.address, riskStrategy.address, { value: quote })).to.be.revertedWith("invalid period");
     });
+
     it("cannot buy policy while paused", async function () {
       await product.connect(governor).setPaused(true);
-      let quote = BN.from(await product.getQuote(coverAmount, blocks));
-      await expect(product.connect(policyholder1).buyPolicy(policyholder1.address, coverAmount, blocks, positionContract.address, { value: quote })).to.be.revertedWith("cannot buy when paused");
+      let quote = BN.from(await product.getQuote(coverAmount, blocks, riskStrategy.address));
+      await expect(product.connect(policyholder1).buyPolicy(policyholder1.address, coverAmount, blocks, positionContract.address, riskStrategy.address, { value: quote })).to.be.revertedWith("cannot buy when paused");
       await product.connect(governor).setPaused(false);
     });
+
+    it("cannot buy policy if there is no risk strategy", async function () {
+      let quote = BN.from(await product.getQuote(coverAmount, blocks, riskStrategy.address));
+      await product.connect(governor).removeRiskStrategy(riskStrategy.address);
+      await expect(product.connect(policyholder1).buyPolicy(policyholder1.address, coverAmount, blocks, positionContract.address, riskStrategy.address, { value: quote })).to.be.revertedWith("invalid risk strategy");
+      await product.connect(governor).addRiskStrategy(riskStrategy.address);
+    });
+
     it("can buyPolicy", async function () {
-      let activeCover1 = await product.activeCoverAmount();
-      let quote = BN.from(await product.getQuote(coverAmount, blocks));
-      let tx = await product.connect(policyholder1).buyPolicy(policyholder1.address, coverAmount, blocks, positionContract.address, { value: quote });
-      let activeCover2 = await product.activeCoverAmount();
+      let activeCover1 = await product.activeCoverAmountPerStrategy(riskStrategy.address);
+      let quote = BN.from(await product.getQuote(coverAmount, blocks, riskStrategy.address));
+      let tx = await product.connect(policyholder1).buyPolicy(policyholder1.address, coverAmount, blocks, positionContract.address, riskStrategy.address, { value: quote });
+      let activeCover2 = await product.activeCoverAmountPerStrategy(riskStrategy.address);
       expect(activeCover2.sub(activeCover1)).eq(coverAmount);
       await expect(tx)
         .to.emit(product, "PolicyCreated")
         .withArgs(1);
     });
+
     it("returns overpayment from buy policy", async function () {
-      let activeCover1 = await product.activeCoverAmount();
+      let activeCover1 = await product.activeCoverAmountPerStrategy(riskStrategy.address);
       let vaultBalance1 = await provider.getBalance(vault.address);
-      let quote = BN.from(await product.getQuote(coverAmount, blocks));
-      let tx = await product.connect(policyholder1).buyPolicy(policyholder1.address, coverAmount, blocks, positionContract.address, { value: quote.add(100) });
+      let quote = BN.from(await product.getQuote(coverAmount, blocks, riskStrategy.address));
+      let tx = await product.connect(policyholder1).buyPolicy(policyholder1.address, coverAmount, blocks, positionContract.address, riskStrategy.address, { value: quote.add(100) });
       await expect(tx)
         .to.emit(product, "PolicyCreated")
         .withArgs(2);
       let vaultBalance2 = await provider.getBalance(vault.address);
       expect(vaultBalance2.sub(vaultBalance1)).to.equal(quote);
-      let activeCover2 = await product.activeCoverAmount();
+      let activeCover2 = await product.activeCoverAmountPerStrategy(riskStrategy.address);
       expect(activeCover2.sub(activeCover1)).eq(coverAmount);
     });
   });
@@ -334,51 +442,67 @@ describe("BaseProduct", function () {
     let extension = BN.from(6450);
     let quote: BN;
     before(async function () {
-      quote = await product.connect(policyholder1).getQuote(coverAmount, extension);
+      quote = await product.connect(policyholder1).getQuote(coverAmount, extension, riskStrategy.address);
     });
 
     it("cannot extend nonexistent policy", async function () {
       await expect(product.connect(policyholder1).extendPolicy(99, extension, { value: quote })).to.be.revertedWith("query for nonexistent token");
     });
+
     it("cannot extend someone elses policy", async function () {
       await expect(product.connect(deployer).extendPolicy(policyID, extension, { value: quote })).to.be.revertedWith("!policyholder");
     });
+
     it("cannot extend someone elses policy after transfer", async function () {
       await policyManager.connect(policyholder1).transferFrom(policyholder1.address, policyholder2.address, policyID);
       await expect(product.connect(policyholder1).extendPolicy(policyID, extension, { value: quote })).to.be.revertedWith("!policyholder");
       await policyManager.connect(policyholder2).transferFrom(policyholder2.address, policyholder1.address, policyID);
     });
+
     it("cannot extend from a different product", async function () {
       await expect(product2.connect(policyholder1).extendPolicy(policyID, extension, { value: quote })).to.be.revertedWith("wrong product");
     });
+
     it("cannot extend an expired policy", async function () {
       let expBlock = await policyManager.getPolicyExpirationBlock(policyID);
       await product.setPolicyExpiration(policyID, 10);
       await expect(product.connect(policyholder1).extendPolicy(policyID, extension, { value: quote })).to.be.revertedWith("policy is expired");
       await product.setPolicyExpiration(policyID, expBlock);
     });
+
     it("cannot over extend policy", async function () {
       let blocks2 = maxPeriod2 + 1;
-      let quote2 = await product.connect(policyholder1).getQuote(coverAmount, blocks2);
+      let quote2 = await product.connect(policyholder1).getQuote(coverAmount, blocks2, riskStrategy.address);
       await expect(product.connect(policyholder1).extendPolicy(policyID, blocks2, { value: quote2 })).to.be.revertedWith("invalid period");
     });
+
     it("cannot extend policy with insufficient payment", async function () {
       await expect(product.connect(policyholder1).extendPolicy(policyID, extension, { value: quote.sub(1) })).to.be.revertedWith("insufficient payment");
     });
+
     it("cannot extend policy while paused", async function () {
       await product.connect(governor).setPaused(true);
       await expect(product.connect(policyholder1).extendPolicy(policyID, extension, { value: quote })).to.be.revertedWith("cannot buy when paused");
       await product.connect(governor).setPaused(false);
     });
+
+    it("cannot extend policy if there is no risk strategy", async function () {
+      let quote = BN.from(await product.getQuote(coverAmount, blocks, riskStrategy.address));
+      await product.connect(governor).removeRiskStrategy(riskStrategy.address);
+      await expect(product.connect(policyholder1).extendPolicy(policyID, extension, { value: quote })).to.be.revertedWith("invalid risk strategy");
+      await product.connect(governor).addRiskStrategy(riskStrategy.address);
+    });
+
     it("can extend policy", async function () {
-      let activeCover1 = await product.activeCoverAmount();
+      let activeCover1 = await product.activeCoverAmountPerStrategy(riskStrategy.address);
       let tx = await product.connect(policyholder1).extendPolicy(policyID, extension, { value: quote });
-      let activeCover2 = await product.activeCoverAmount();
+      let activeCover2 = await product.activeCoverAmountPerStrategy(riskStrategy.address);
       expect(activeCover2.sub(activeCover1)).eq(0);
       await expect(tx)
         .to.emit(product, "PolicyExtended")
         .withArgs(policyID);
     });
+
     it("returns overpayment from extend policy", async function () {
       let vaultBalance1 = await provider.getBalance(vault.address);
       let tx = await product.connect(policyholder1).extendPolicy(policyID, extension, { value: quote.add(100) });
@@ -388,6 +512,7 @@ describe("BaseProduct", function () {
       let vaultBalance2 = await provider.getBalance(vault.address);
       expect(vaultBalance2.sub(vaultBalance1)).to.equal(quote);
     });
+
     it("can extend your policy after transfer", async function () {
       await policyManager.connect(policyholder1).transferFrom(policyholder1.address, policyholder2.address, policyID);
       await product.connect(policyholder2).extendPolicy(policyID, extension, { value: quote });
@@ -400,49 +525,66 @@ describe("BaseProduct", function () {
     let newCoverAmount = BN.from("1100000000000000000"); // 1.1 eth
     let quote: BN;
     before(async function () {
-      quote = await product.connect(policyholder1).getQuote(newCoverAmount, blocks);
+      quote = await product.connect(policyholder1).getQuote(newCoverAmount, blocks, riskStrategy.address);
     });
+
     it("cannot update cover amount while paused", async function () {
       await product.connect(governor).setPaused(true);
       await expect(product.connect(policyholder1).updateCoverAmount(policyID, newCoverAmount, { value: quote })).to.be.revertedWith("cannot buy when paused");
       await product.connect(governor).setPaused(false);
     });
+
     it("cannot update cover amount for nonexistent policy", async function () {
       await expect(product.connect(policyholder1).updateCoverAmount(99, newCoverAmount, { value: quote })).to.be.revertedWith("query for nonexistent token");
     });
+
     it("cannot update cover amount for someone elses policy", async function () {
       await expect(product.connect(deployer).updateCoverAmount(policyID, newCoverAmount, { value: quote })).to.be.revertedWith("!policyholder");
     });
+
     it("cannot update cover amount for someone elses policy after transfer", async function () {
       await policyManager.connect(policyholder1).transferFrom(policyholder1.address, policyholder2.address, policyID);
       await expect(product.connect(policyholder1).updateCoverAmount(policyID, newCoverAmount, { value: quote })).to.be.revertedWith("!policyholder");
       await policyManager.connect(policyholder2).transferFrom(policyholder2.address, policyholder1.address, policyID);
     });
+
     it("cannot update cover amount for from a different product", async function () {
       await expect(product2.connect(policyholder1).updateCoverAmount(policyID, newCoverAmount, { value: quote })).to.be.revertedWith("wrong product");
     });
+
     it("cannot update cover amount for an expired policy", async function () {
       let expBlock = await policyManager.getPolicyExpirationBlock(policyID);
       await product.setPolicyExpiration(policyID, 10);
       await expect(product.connect(policyholder1).updateCoverAmount(policyID, newCoverAmount, { value: quote })).to.be.revertedWith("policy is expired");
       await product.setPolicyExpiration(policyID, expBlock);
     });
+
     it("cannot update cover amount to zero", async function () {
-      let quote2 = BN.from(await product.getQuote(0, blocks));
+      let quote2 = BN.from(await product.getQuote(0, blocks, riskStrategy.address));
       await expect(product.connect(policyholder1).updateCoverAmount(policyID, 0, { value: quote2 })).to.be.revertedWith("zero cover value");
     });
+
     it("cannot update cover amount over max global cover amount", async function () {
-      let maxCover = await riskManager.maxCoverPerProduct(product.address);
+      let maxCover = await riskStrategy.maxCoverPerProduct(product.address);
       let policyCover = (await policyManager.policyInfo(policyID)).coverAmount;
-      let productCover = await product.activeCoverAmount();
+      let productCover = await product.activeCoverAmountPerStrategy(riskStrategy.address);
       let newCover = maxCover.sub(productCover).add(policyCover).add(1);
-      let quote2 = BN.from(await product.getQuote(newCover, blocks));
+      let quote2 = BN.from(await product.getQuote(newCover, blocks, riskStrategy.address));
       await expect(product.connect(policyholder1).updateCoverAmount(policyID, newCover, { value: quote2 })).to.be.revertedWith("cannot accept that risk");
     });
+
     it("cannot update cover amount over max user cover amount", async function () {
-      let maxCoverPerUser = await riskManager.maxCoverPerPolicy(product.address);
+      let maxCoverPerUser = await riskStrategy.maxCoverPerPolicy(product.address);
       await expect(product.connect(policyholder1).updateCoverAmount(policyID, maxCoverPerUser.add(1), { value: quote })).to.be.revertedWith("cannot accept that risk");
     });
+
+    it("cannot update cover amaount if there is no risk strategy", async function () {
+      let quote = BN.from(await product.getQuote(coverAmount, blocks, riskStrategy.address));
+      await product.connect(governor).removeRiskStrategy(riskStrategy.address);
+      await expect(product.connect(policyholder1).updateCoverAmount(policyID, maxCoverAmount1, { value: quote })).to.be.revertedWith("invalid risk strategy");
+      await product.connect(governor).addRiskStrategy(riskStrategy.address);
+    });
+
     it("reverts insufficient payment", async function () {
       // calculate new premium
       let expBlock = BN.from(await policyManager.getPolicyExpirationBlock(policyID));
@@ -466,8 +608,9 @@ describe("BaseProduct", function () {
       let premium = newPremium.sub(paidPremium);
       await expect(product.connect(policyholder1).updateCoverAmount(policyID, newCoverAmount, { value: premium.sub(1) })).to.be.revertedWith("insufficient payment");
     });
+
     it("can increase cover amount with exact payment", async function () {
-      let activeCover1 = await product.activeCoverAmount();
+      let activeCover1 = await product.activeCoverAmountPerStrategy(riskStrategy.address);
       // calculate new premium
       let expBlock = BN.from(await policyManager.getPolicyExpirationBlock(policyID));
       let blockNumber = BN.from(await provider.getBlockNumber()).add(1);
@@ -497,11 +640,12 @@ describe("BaseProduct", function () {
       let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
       let bal2 = await policyholder1.getBalance();
       expect(bal1.sub(bal2).sub(gasCost)).to.equal(premium);
-      let activeCover2 = await product.activeCoverAmount();
+      let activeCover2 = await product.activeCoverAmountPerStrategy(riskStrategy.address);
       expect(activeCover2.sub(activeCover1)).eq(newCoverAmount.sub(prevCoverAmount));
     });
+
     it("can increase cover amount and return over payment", async function () {
-      let activeCover1 = await product.activeCoverAmount();
+      let activeCover1 = await product.activeCoverAmountPerStrategy(riskStrategy.address);
       newCoverAmount = BN.from("1200000000000000000"); // 1.2 eth
       // calculate new premium
       let expBlock = BN.from(await policyManager.getPolicyExpirationBlock(policyID));
@@ -532,11 +676,12 @@ describe("BaseProduct", function () {
       let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
       let bal2 = await policyholder1.getBalance();
       expect(bal1.sub(bal2).sub(gasCost)).to.equal(premium);
-      let activeCover2 = await product.activeCoverAmount();
+      let activeCover2 = await product.activeCoverAmountPerStrategy(riskStrategy.address);
       expect(activeCover2.sub(activeCover1)).eq(newCoverAmount.sub(prevCoverAmount));
     });
+
     it("can decrease cover amount", async function () {
-      let activeCover1 = await product.activeCoverAmount();
+      let activeCover1 = await product.activeCoverAmountPerStrategy(riskStrategy.address);
       newCoverAmount = BN.from("900000000000000000"); // 0.9 eth
       // calculate new premium
       let expBlock = BN.from(await policyManager.getPolicyExpirationBlock(policyID));
@@ -567,9 +712,10 @@ describe("BaseProduct", function () {
       let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
       let bal2 = await policyholder1.getBalance();
       expect(bal2.sub(bal1).add(gasCost)).to.equal(refund);
-      let activeCover2 = await product.activeCoverAmount();
+      let activeCover2 = await product.activeCoverAmountPerStrategy(riskStrategy.address);
       expect(activeCover2.sub(activeCover1)).eq(newCoverAmount.sub(prevCoverAmount));
     });
+
     it("can decrease cover amount and return msg.value", async function () {
       newCoverAmount = BN.from("800000000000000000"); // 0.8 eth
       // calculate new premium
@@ -602,8 +748,9 @@ describe("BaseProduct", function () {
       let bal2 = await policyholder1.getBalance();
       expect(bal2.sub(bal1).add(gasCost)).to.equal(refund);
     });
+
     it("can keep cover amount the same", async function () {
-      let activeCover1 = await product.activeCoverAmount();
+      let activeCover1 = await product.activeCoverAmountPerStrategy(riskStrategy.address);
       let policyCover = (await policyManager.policyInfo(policyID)).coverAmount;
       let bal1 = await policyholder1.getBalance();
       let tx = await product.connect(policyholder1).updateCoverAmount(policyID, policyCover, { value: "1000000000000" });
@@ -614,9 +761,10 @@ describe("BaseProduct", function () {
       let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
       let bal2 = await policyholder1.getBalance();
       expect(bal2.sub(bal1).add(gasCost)).to.equal(0);
-      let activeCover2 = await product.activeCoverAmount();
+      let activeCover2 = await product.activeCoverAmountPerStrategy(riskStrategy.address);
       expect(activeCover2.sub(activeCover1)).eq(0);
     });
+
     it("can update cover amount after transfer", async function () {
       await policyManager.connect(policyholder1).transferFrom(policyholder1.address, policyholder2.address, policyID);
       let policyCover = (await policyManager.policyInfo(policyID)).coverAmount;
@@ -631,58 +779,70 @@ describe("BaseProduct", function () {
     let policyID = BN.from(1);
     let quote: BN;
     before(async function () {
-      quote = await product.connect(policyholder1).getQuote(newCoverAmount, blocks);
+      quote = await product.connect(policyholder1).getQuote(newCoverAmount, blocks, riskStrategy.address);
     });
+
     it("cannot update while paused", async function () {
       await product.connect(governor).setPaused(true);
       await expect(product.connect(policyholder1).updatePolicy(policyID, newCoverAmount, blocks, { value: quote })).to.be.revertedWith("cannot buy when paused");
       await product.connect(governor).setPaused(false);
     });
+
     it("cannot update nonexistent policy", async function () {
       await expect(product.connect(policyholder1).updatePolicy(99, newCoverAmount, blocks, { value: quote })).to.be.revertedWith("query for nonexistent token");
     });
+
     it("cannot update someone elses policy", async function () {
       await expect(product.connect(deployer).updatePolicy(policyID, newCoverAmount, blocks, { value: quote })).to.be.revertedWith("!policyholder");
     });
+
     it("cannot update someone elses policy after transfer", async function () {
       await policyManager.connect(policyholder1).transferFrom(policyholder1.address, policyholder2.address, policyID);
       await expect(product.connect(policyholder1).updatePolicy(policyID, newCoverAmount, blocks, { value: quote })).to.be.revertedWith("!policyholder");
       await policyManager.connect(policyholder2).transferFrom(policyholder2.address, policyholder1.address, policyID);
     });
+
     it("cannot update from a different product", async function () {
       await expect(product2.connect(policyholder1).updatePolicy(policyID, newCoverAmount, blocks, { value: quote })).to.be.revertedWith("wrong product");
     });
+
     it("cannot update an expired policy", async function () {
       let expBlock = await policyManager.getPolicyExpirationBlock(policyID);
       await product.setPolicyExpiration(policyID, 10);
       await expect(product.connect(policyholder1).updatePolicy(policyID, newCoverAmount, blocks, { value: quote })).to.be.revertedWith("policy is expired");
       await product.setPolicyExpiration(policyID, expBlock);
     });
+
     it("cannot over extend policy", async function () {
       let blocks2 = maxPeriod2 + 1;
-      let quote2 = await product.connect(policyholder1).getQuote(newCoverAmount, blocks2);
+      let quote2 = await product.connect(policyholder1).getQuote(newCoverAmount, blocks2, riskStrategy.address);
       await expect(product.connect(policyholder1).updatePolicy(policyID, newCoverAmount, blocks2, { value: quote2 })).to.be.revertedWith("invalid period");
     });
+
     it("cannot update policy with insufficient payment", async function () {
       await expect(product.connect(policyholder1).updatePolicy(policyID, newCoverAmount, blocks, { value: BN.from(0) })).to.be.revertedWith("insufficient payment");
     });
+
     it("cannot update policy to zero cover amount", async function () {
       await expect(product.connect(policyholder1).updatePolicy(policyID, 0, blocks, { value: quote })).to.be.revertedWith("zero cover value");
     });
+
     it("cannot update over max global cover amount", async function () {
-      let maxCover = await riskManager.maxCoverPerProduct(product.address);
+      let maxCover = await riskStrategy.maxCoverPerProduct(product.address);
       let policyCover = (await policyManager.policyInfo(policyID)).coverAmount;
-      let productCover = await product.activeCoverAmount();
+      let productCover = await product.activeCoverAmountPerStrategy(riskStrategy.address);
       let newCover = maxCover.sub(productCover).add(policyCover).add(1);
-      let quote2 = BN.from(await product.getQuote(newCover, blocks));
+      let quote2 = BN.from(await product.getQuote(newCover, blocks, riskStrategy.address));
       await expect(product.connect(policyholder1).updatePolicy(policyID, newCover, blocks, { value: quote2 })).to.be.revertedWith("cannot accept that risk");
     });
+
     it("cannot update over max user cover amount", async function () {
-      let maxCoverPerUser = await riskManager.maxCoverPerPolicy(product.address);
+      let maxCoverPerUser = await riskStrategy.maxCoverPerPolicy(product.address);
       await expect(product.connect(policyholder1).updatePolicy(policyID, maxCoverPerUser.add(1), blocks, { value: quote })).to.be.revertedWith("cannot accept that risk");
     });
+
     it("can increase cover amount and extend", async function () {
-      let activeCover1 = await product.activeCoverAmount();
+      let activeCover1 = await product.activeCoverAmountPerStrategy(riskStrategy.address);
       let prevExpirationBlock = BN.from(await policyManager.getPolicyExpirationBlock(policyID));
       let blockNumber = BN.from(await provider.getBlockNumber()).add(1);
       let prevCoverAmount = await policyManager.getPolicyCoverAmount(policyID);
@@ -709,9 +869,10 @@ describe("BaseProduct", function () {
         .withArgs(policyID);
       expect(prevExpirationBlock.add(threeDays)).to.equal(expirationBlock);
       expect(coverAmount2).to.equal(newCoverAmount);
-      let activeCover2 = await product.activeCoverAmount();
+      let activeCover2 = await product.activeCoverAmountPerStrategy(riskStrategy.address);
       expect(activeCover2.sub(activeCover1)).eq(newCoverAmount.sub(prevCoverAmount));
     });
+
     it("returns overpayment from update policy", async function () {
       let vaultBalance1 = await provider.getBalance(vault.address);
       newCoverAmount = BN.from("1000000000000000000"); // 1  eth
@@ -743,8 +904,9 @@ describe("BaseProduct", function () {
       let vaultBalance2 = await provider.getBalance(vault.address);
       expect(vaultBalance2.sub(vaultBalance1)).to.equal(premium);
     });
+
     it("can decrease cover amount", async function () {
-      let activeCover1 = await product.activeCoverAmount();
+      let activeCover1 = await product.activeCoverAmountPerStrategy(riskStrategy.address);
       let policyCover = (await policyManager.policyInfo(policyID)).coverAmount;
       let coverAmount = policyCover.div(10);
       let prevExpirationBlock = BN.from(await policyManager.getPolicyExpirationBlock(policyID));
@@ -775,9 +937,10 @@ describe("BaseProduct", function () {
       let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
       let bal2 = await policyholder1.getBalance();
       expect(bal2.sub(bal1).add(gasCost)).to.equal(refund);
-      let activeCover2 = await product.activeCoverAmount();
+      let activeCover2 = await product.activeCoverAmountPerStrategy(riskStrategy.address);
       expect(activeCover2.sub(activeCover1)).eq(coverAmount.sub(prevCoverAmount));
     });
+
     it("can decrease cover amount and return msg.value", async function () {
       let policyCover = (await policyManager.policyInfo(policyID)).coverAmount;
       let coverAmount = policyCover.div(10);
@@ -810,8 +973,9 @@ describe("BaseProduct", function () {
       let bal2 = await policyholder1.getBalance();
       expect(bal2.sub(bal1).add(gasCost)).to.equal(refund);
     });
+
     it("can keep cover amount the same", async function () {
-      let activeCover1 = await product.activeCoverAmount();
+      let activeCover1 = await product.activeCoverAmountPerStrategy(riskStrategy.address);
       let policyCover = (await policyManager.policyInfo(policyID)).coverAmount;
       let prevExpirationBlock = BN.from(await policyManager.getPolicyExpirationBlock(policyID));
       let blockNumber = BN.from(await provider.getBlockNumber()).add(1);
@@ -841,9 +1005,10 @@ describe("BaseProduct", function () {
       let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
       let bal2 = await policyholder1.getBalance();
       expect(bal1.sub(bal2).sub(gasCost)).to.equal(premium);
-      let activeCover2 = await product.activeCoverAmount();
+      let activeCover2 = await product.activeCoverAmountPerStrategy(riskStrategy.address);
       expect(activeCover2.sub(activeCover1)).eq(0);
     });
+
     it("can update policy after transfer", async function () {
       await policyManager.connect(policyholder1).transferFrom(policyholder1.address, policyholder2.address, policyID);
       let policyCover = (await policyManager.policyInfo(policyID)).coverAmount;
@@ -858,19 +1023,23 @@ describe("BaseProduct", function () {
     it("cannot cancel nonexistent policy", async function () {
       await expect(product.connect(policyholder1).cancelPolicy(99)).to.be.revertedWith("query for nonexistent token");
     });
+
     it("cannot cancel someone elses policy", async function () {
       await expect(product.connect(deployer).cancelPolicy(policyID)).to.be.revertedWith("!policyholder");
     });
+
     it("cannot cancel someone elses policy after transfer", async function () {
       await policyManager.connect(policyholder1).transferFrom(policyholder1.address, policyholder2.address, policyID);
       await expect(product.connect(policyholder1).cancelPolicy(policyID)).to.be.revertedWith("!policyholder");
       await policyManager.connect(policyholder2).transferFrom(policyholder2.address, policyholder1.address, policyID);
     });
+
     it("cannot cancel from a different product", async function () {
       await expect(product2.connect(policyholder1).cancelPolicy(policyID)).to.be.revertedWith("wrong product");
     });
+
     it("can cancel and refunds proper amount", async function () {
-      let activeCover1 = await product.activeCoverAmount();
+      let activeCover1 = await product.activeCoverAmountPerStrategy(riskStrategy.address);
       let info = await policyManager.policyInfo(policyID);
       let block = await provider.getBlockNumber();
       let balance1 = await policyholder1.getBalance();
@@ -886,12 +1055,13 @@ describe("BaseProduct", function () {
       let actualRefund = balance2.add(gasCost).sub(balance1);
       expect(actualRefund).to.equal(expectedRefund);
       expect(await policyManager.exists(policyID)).to.be.false;
-      let activeCover2 = await product.activeCoverAmount();
+      let activeCover2 = await product.activeCoverAmountPerStrategy(riskStrategy.address);
       expect(activeCover2.sub(activeCover1)).eq(info.coverAmount.mul(-1));
     });
+
     it("can cancel policy after transfer", async function () {
       expect(await product.policyManager()).to.equal(policyManager.address);
-      let tx = await product.connect(policyholder1).buyPolicy(policyholder1.address, coverAmount, blocks, positionContract.address, { value: "1000000000000000000" });
+      let tx = await product.connect(policyholder1).buyPolicy(policyholder1.address, coverAmount, blocks, positionContract.address, riskStrategy.address, { value: "1000000000000000000" });
       policyID = await policyManager.totalPolicyCount();
       expect(tx).to.emit(policyManager, "PolicyCreated").withArgs(policyID);
       await policyManager.connect(policyholder1).transferFrom(policyholder1.address, policyholder2.address, policyID);
@@ -904,9 +1074,11 @@ describe("BaseProduct", function () {
     it("non governance cannot add signers", async function () {
       await expect(product.connect(policyholder1).addSigner(policyholder1.address)).to.be.revertedWith("!governance");
     });
+
     it("cannot add zero signer", async function () {
       await expect(product.connect(governor).addSigner(ZERO_ADDRESS)).to.be.revertedWith("zero address signer");
     });
+
     it("can add signers", async function () {
       expect(await product.isAuthorizedSigner(governor.address)).to.equal(false);
       let tx = await product.connect(governor).addSigner(governor.address);
@@ -915,9 +1087,11 @@ describe("BaseProduct", function () {
         .withArgs(governor.address);
       expect(await product.isAuthorizedSigner(governor.address)).to.equal(true);
     });
+
     it("non governance cannot remove signers", async function () {
       await expect(product.connect(policyholder1).removeSigner(policyholder1.address)).to.be.revertedWith("!governance");
     });
+
     it("can remove signers", async function () {
       expect(await product.isAuthorizedSigner(governor.address)).to.equal(true);
       let tx = await product.connect(governor).removeSigner(governor.address);
@@ -932,20 +1106,29 @@ describe("BaseProduct", function () {
   describe("active cover amount", function () {
     let product3: MockProductV2;
     before(async function () {
-      let tx1 = await productFactory.createProduct(baseProduct.address, governor.address, mockPolicyManager.address, registry.address, ONE_SPLIT_VIEW, minPeriod1, maxPeriod1, SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, "1");
+      await registry.connect(governor).setPolicyManager(mockPolicyManager.address);
+
+      let tx1 = await productFactory.createProduct(coverageProduct.address, governor.address, registry.address, minPeriod1, maxPeriod1, SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, "1");
       let events1 = (await tx1.wait())?.events;
       if(events1 && events1.length > 0) {
         let event1 = events1[0];
         product3 = await ethers.getContractAt(artifacts.MockProductV2.abi, event1?.args?.["deployment"]) as MockProductV2;
       } else throw "no deployment";
       await product3.connect(governor).setPrice(price1);
+    });
+
+    after(async function () {
+      await registry.connect(governor).setPolicyManager(policyManager.address);
     })
+
     it("starts at zero", async function () {
       expect(await product3.activeCoverAmount()).to.equal(0);
     });
+
     it("cannot update by non policy manager", async function () {
       await expect(product3.connect(deployer).updateActiveCoverAmount(1)).to.be.revertedWith("!policymanager");
     });
+
     it("can update", async function () {
       await product3.connect(mockPolicyManager).updateActiveCoverAmount(3);
       expect(await product3.activeCoverAmount()).to.equal(3);
@@ -953,7 +1136,9 @@ describe("BaseProduct", function () {
       expect(await product3.activeCoverAmount()).to.equal(8);
       await product3.connect(mockPolicyManager).updateActiveCoverAmount(-6);
       expect(await product3.activeCoverAmount()).to.equal(2);
+
     });
+
     it("cannot be negative", async function () {
       await expect(product3.connect(mockPolicyManager).updateActiveCoverAmount(-7)).to.be.reverted;
     });

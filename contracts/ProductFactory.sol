@@ -11,12 +11,10 @@ import "./interface/IProductFactory.sol";
  * @notice The **ProductFactory** manages the creation of new products.
  */
 contract ProductFactory is Factory, IProductFactory {
-
     /**
      * @notice Creates and initializes a new product.
      * @param base_ The product's source code.
      * @param governance_ The governor.
-     * @param policyManager_ The IPolicyManager contract.
      * @param registry_ The IRegistry contract.
      * @param minPeriod_ The minimum policy period in blocks to purchase a **policy**.
      * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
@@ -27,7 +25,6 @@ contract ProductFactory is Factory, IProductFactory {
     function createProduct(
         address base_,
         address governance_,
-        IPolicyManager policyManager_,
         IRegistry registry_,
         uint40 minPeriod_,
         uint40 maxPeriod_,
@@ -38,7 +35,6 @@ contract ProductFactory is Factory, IProductFactory {
         product = _deployMinimalProxy(base_);
         CoverageProduct(product).initialize(
             governance_,
-            policyManager_,
             registry_,
             minPeriod_,
             maxPeriod_,
@@ -46,6 +42,7 @@ contract ProductFactory is Factory, IProductFactory {
             domain_,
             version_
         );
+        emit ProductCreated(product);
         return product;
     }
 
@@ -54,7 +51,6 @@ contract ProductFactory is Factory, IProductFactory {
      * @param base_ The product's source code.
      * @param salt_ The salt for CREATE2.
      * @param governance_ The governor.
-     * @param policyManager_ The IPolicyManager contract.
      * @param registry_ The IRegistry contract.
      * @param minPeriod_ The minimum policy period in blocks to purchase a **policy**.
      * @param maxPeriod_ The maximum policy period in blocks to purchase a **policy**.
@@ -66,7 +62,6 @@ contract ProductFactory is Factory, IProductFactory {
         address base_,
         bytes32 salt_,
         address governance_,
-        IPolicyManager policyManager_,
         IRegistry registry_,
         uint40 minPeriod_,
         uint40 maxPeriod_,
@@ -77,7 +72,6 @@ contract ProductFactory is Factory, IProductFactory {
         product = _deployMinimalProxy(base_, salt_);
         CoverageProduct(product).initialize(
             governance_,
-            policyManager_,
             registry_,
             minPeriod_,
             maxPeriod_,
@@ -85,6 +79,7 @@ contract ProductFactory is Factory, IProductFactory {
             domain_,
             version_
         );
+        emit ProductCreated(product);
         return product;
     }
 }

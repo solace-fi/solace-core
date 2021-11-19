@@ -282,7 +282,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
     }
 
     /**
-     * @notice Modifies a policy.
+     * @notice Modifies a policy without position description value.
      * Can only be called by **products**.
      * @param policyID The policy ID.
      * @param coverAmount The policy coverage amount (in wei).
@@ -290,7 +290,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
      * @param price The coverage price.
      * @param riskStrategy The risk strategy of the covered positions(s).
      */
-     function setPolicyInfo(
+     function updatePolicyInfo(
         uint256 policyID,
         uint256 coverAmount,
         uint40 expirationBlock,

@@ -5,6 +5,7 @@ import "./GovernableInitializable.sol";
 import "./interface/IProduct.sol";
 import "./interface/IRiskManager.sol";
 import "./interface/IRiskStrategy.sol";
+import "hardhat/console.sol";
 
 /**
  * @title RiskStrategy
@@ -39,7 +40,7 @@ contract RiskStrategy is IRiskStrategy, GovernableInitializable {
 
     /// @notice the allocation weight that is allocated by `Risk Manager`.
     /// It defines how much amount the strategy can use for coverage. 
-    uint32 internal _weightAllocation = 0;
+    uint32 internal _weightAllocation = type(uint32).max;
 
     /// @notice controls the access that for only risk manager can access.
     modifier onlyRiskManager() {
@@ -107,13 +108,25 @@ contract RiskStrategy is IRiskStrategy, GovernableInitializable {
         // max cover checks
         uint256 mc = maxCover();
         ProductRiskParams storage params = _productRiskParams[prod_];
+
+        console.log("Current cover:", currentCover_);
+        console.log("New cover: ", newCover_);
+        console.log("mc:", mc);
         // must be less than maxCoverPerProduct
         mc = mc * params.weight / _weightSum;
         uint256 productActiveCoverAmount = IProduct(prod_).activeCoverAmountPerStrategy(address(this));
         productActiveCoverAmount = productActiveCoverAmount + newCover_ - currentCover_;
+    
+        console.log("Must be less than maxCoverPerProduct");
+        console.log("mc = mc * params.weight / _weightSum:", mc);
+        console.log("Product Active Cover Amount:", productActiveCoverAmount);
+
         if (productActiveCoverAmount > mc) return (false, params.price);
         // must be less than maxCoverPerPolicy
         mc = mc / params.divisor;
+        console.log("Must be less than maxCoverPerPolicy");
+        console.log("mc = mc / params.divisor", mc);
+       
         if(newCover_ > mc) return (false, params.price);
         // risk is acceptable
         return (true, params.price);
@@ -124,6 +137,11 @@ contract RiskStrategy is IRiskStrategy, GovernableInitializable {
      * @return cover The max amount of cover in `wei`
     */
     function maxCover() public view override returns (uint256 cover) {
+        console.log("_riskManager.maxCover()", _riskManager.maxCover());
+        console.log(" _weightAllocation",  _weightAllocation);
+        console.log("_riskManager.weightSum()", _riskManager.weightSum());
+        console.log("_riskManager.maxCover() * _weightAllocation) / _riskManager.weightSum()", (_riskManager.maxCover() * _weightAllocation) / _riskManager.weightSum());
+
         return (_riskManager.maxCover() * _weightAllocation) / _riskManager.weightSum();
     }
 

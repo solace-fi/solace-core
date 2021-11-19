@@ -42,6 +42,9 @@ interface IRiskManager {
     /// @notice Emitted when new strategy is created.
     event StrategyAdded(address strategy);
 
+    /// @notice Emitted when strategy status is updated.
+    event StrategyStatusUpdated(address strategy, uint8 status);
+
     /// @notice Emitted when strategy's allocation weight is increased.
     event RiskStrategyWeightAllocationIncreased(address strategy, uint32 weight);
 
@@ -88,6 +91,14 @@ interface IRiskManager {
      * @param weight_ The value to set.
     */
     function setWeightAllocation(address strategy_, uint32 weight_) external;
+
+    /**
+     * @notice Sets the status of the `Risk Strategy`.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param strategy_ The address of the risk strategy.
+     * @param status_ The status to set.
+    */
+    function setStrategyStatus(address strategy_, uint8 status_) external;
 
     /**
      * @notice Returns the number of registered strategies..

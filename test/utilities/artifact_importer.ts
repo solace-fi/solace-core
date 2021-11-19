@@ -35,22 +35,10 @@ export async function import_artifacts() {
   artifacts.LpAppraisor = await tryImport(`${artifact_dir}/LpAppraisor.sol/LpAppraisor.json`);
   artifacts.SolaceEthLpFarm = await tryImport(`${artifact_dir}/SolaceEthLpFarm.sol/SolaceEthLpFarm.json`);
   artifacts.SptFarm = await tryImport(`${artifact_dir}/SptFarm.sol/SptFarm.json`);
-  // products v1
-  artifacts.BaseProduct = await tryImport(`${artifact_dir}/products/BaseProduct.sol/BaseProduct.json`);
-  artifacts.MockProduct = await tryImport(`${artifact_dir}/mocks/MockProduct.sol/MockProduct.json`);
-  artifacts.AaveV2Product = await tryImport(`${artifact_dir}/products/AaveV2Product.sol/AaveV2Product.json`);
-  artifacts.CompoundProduct = await tryImport(`${artifact_dir}/products/CompoundProduct.sol/CompoundProduct.json`);
-  artifacts.CompoundProductRinkeby = await tryImport(`${artifact_dir}/products/CompoundProductRinkeby.sol/CompoundProductRinkeby.json`);
-  artifacts.CurveProduct = await tryImport(`${artifact_dir}/products/CurveProduct.sol/CurveProduct.json`);
-  artifacts.WaaveProduct = await tryImport(`${artifact_dir}/products/WaaveProduct.sol/WaaveProduct.json`);
-  artifacts.YearnV2Product = await tryImport(`${artifact_dir}/products/YearnV2Product.sol/YearnV2Product.json`);
-  artifacts.LiquityProduct = await tryImport(`${artifact_dir}/products/LiquityProduct.sol/LiquityProduct.json`);
-  artifacts.SushiswapProduct = await tryImport(`${artifact_dir}/products/SushiswapProduct.sol/SushiswapProduct.json`);
-  artifacts.UniswapV2Product = await tryImport(`${artifact_dir}/products/UniswapV2Product.sol/UniswapV2Product.json`);
-  artifacts.UniswapV3Product = await tryImport(`${artifact_dir}/products/UniswapV3Product.sol/UniswapV3Product.json`);
+
   // product v2
   artifacts.ProductFactory = await tryImport(`${artifact_dir}/ProductFactory.sol/ProductFactory.json`);
-  artifacts.BaseProductV2 = await tryImport(`${artifact_dir}/products/BaseProductV2.sol/BaseProductV2.json`);
+  artifacts.CoverageProduct = await tryImport(`${artifact_dir}/products/CoverageProduct.sol/CoverageProduct.json`);
   artifacts.MockProductV2 = await tryImport(`${artifact_dir}/mocks/MockProductV2.sol/MockProductV2.json`);
 
   // oracles
@@ -71,16 +59,10 @@ export async function import_artifacts() {
   artifacts.SingletonFactory = await tryImport(`${artifact_dir}/interface/ISingletonFactory.sol/ISingletonFactory.json`);
   artifacts.Deployer = await tryImport(`${artifact_dir}/Deployer.sol/Deployer.json`);
 
-  // aave imports
-  artifacts.LendingPool = await tryImport(`${artifact_dir}/interface/AaveV2/ILendingPool.sol/ILendingPool.json`);
-  artifacts.AToken = await tryImport(`${artifact_dir}/interface/AaveV2/IAToken.sol/IAToken.json`);
-  artifacts.MockAToken = await tryImport(`${artifact_dir}/mocks/MockAToken.sol/MockAToken.json`);
-
-  // compound imports
-  artifacts.ICETH = await tryImport(`${artifact_dir}/interface/Compound/ICEth.sol/ICEth.json`);
-  artifacts.ICERC20 = await tryImport(`${artifact_dir}/interface/Compound/ICErc20.sol/ICErc20.json`);
-  artifacts.IComptroller = await tryImport(`${artifact_dir}/interface/Compound/IComptroller.sol/IComptroller.json`);
-  artifacts.IComptrollerRinkeby = await tryImport(`${artifact_dir}/interface/Compound/IComptrollerRinkeby.sol/IComptrollerRinkeby.json`);
+  // risk strategy imports
+  artifacts.RiskStrategyFactory = await tryImport(`${artifact_dir}/RiskStrategyFactory.sol/RiskStrategyFactory.json`);
+  artifacts.RiskStrategy = await tryImport(`${artifact_dir}/RiskStrategy.sol/RiskStrategy.json`);
+  artifacts.MockRiskStrategy = await tryImport(`${artifact_dir}/mocks/MockRiskStrategy.sol/MockRiskStrategy.json`);
 
   // uniswapv3 imports
   artifacts.UniswapV3Factory = await tryImport("@uniswap/v3-core/artifacts/contracts/UniswapV3Factory.sol/UniswapV3Factory.json");
@@ -88,34 +70,8 @@ export async function import_artifacts() {
   artifacts.SwapRouter = await tryImport("@uniswap/v3-periphery/artifacts/contracts/SwapRouter.sol/SwapRouter.json");
   artifacts.NonfungiblePositionManager = await tryImport("@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json");
 
-  // waave imports
-  artifacts.IWaToken = await tryImport(`${artifact_dir}/interface/Waave/IWaToken.sol/IWaToken.json`);
-  artifacts.IWaRegistry = await tryImport(`${artifact_dir}/interface/Waave/IWaRegistry.sol/IWaRegistry.json`);
-
-  // yearn imports
-  artifacts.YVault = await tryImport(`${artifact_dir}/interface/Yearn/IYVault.sol/IYVault.json`);
-
-  // liquity imports
-  artifacts.TroveManager = await tryImport(`${artifact_dir}/interface/Liquity/ITroveManager.sol/ITroveManager.json`);
-  artifacts.LQTYStaking = await tryImport(`${artifact_dir}/interface/Liquity/ILQTYStaking.sol/ILQTYStaking.json`);
-  artifacts.LQTYToken = await tryImport(`${artifact_dir}/interface/Liquity/ILQTYToken.sol/ILQTYToken.json`);
-  artifacts.LUSDToken = await tryImport(`${artifact_dir}/interface/Liquity/ILUSDToken.sol/ILUSDToken.json`);
-  artifacts.StabilityPool = await tryImport(`${artifact_dir}/interface/Liquity/IStabilityPool.sol/IStabilityPool.json`);
-
-  // curve imports
-  artifacts.CurveAddressProvider = await tryImport(`${artifact_dir}/interface/Curve/ICurveAddressProvider.sol/ICurveAddressProvider.json`);
-  artifacts.CurveRegistry = await tryImport(`${artifact_dir}/interface/Curve/ICurveRegistry.sol/ICurveRegistry.json`);
-  artifacts.CurvePool = await tryImport(`${artifact_dir}/interface/Curve/ICurvePool.sol/ICurvePool.json`);
-  artifacts.CurveToken = await tryImport(`${artifact_dir}/interface/Curve/ICurveToken.sol/ICurveToken.json`);
-
-  // sushiswap imports
-  artifacts.SushiswapV2Factory = await tryImport(`${artifact_dir}/interface/SushiSwap/ISushiV2Factory.sol/ISushiV2Factory.json`);
-  artifacts.MasterChef = await tryImport(`${artifact_dir}/interface/SushiSwap/IMasterChef.sol/IMasterChef.json`);
-  artifacts.SushiLPToken = await tryImport(`${artifact_dir}/interface/SushiSwap/ISushiLPToken.sol/ISushiLPToken.json`);
-
-  // uniswapv2 imports
-  artifacts.UniswapV2Factory = await tryImport(`${artifact_dir}/interface/UniswapV2/IUniV2Factory.sol/IUniV2Factory.json`);
-  artifacts.UniLPToken = await tryImport(`${artifact_dir}/interface/UniswapV2/IUniLPToken.sol/IUniLPToken.json`);
+  // coverage data provider
+  artifacts.CoverageDataProvider = await tryImport(`${artifact_dir}/CoverageDataProvider.sol/CoverageDataProvider.json`);
 
   return artifacts;
 }

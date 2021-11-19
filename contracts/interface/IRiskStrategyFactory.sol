@@ -15,7 +15,7 @@ interface IRiskStrategyFactory {
     EVENTS
     ***************************************/
     /// @notice Emitted when new strategy is created.
-    event StrategyCreated(address factory, address strategy, address strategist);
+    event StrategyCreated(address strategy, address strategist);
 
     /**
      * @notice Creates a new `Risk Strategy`.

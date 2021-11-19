@@ -130,6 +130,20 @@ interface IProduct {
     function activeCoverAmountPerStrategy(address riskStrategy) external view returns (uint256 amount);
 
     /**
+      * @notice Return the strategy at an index.
+      * @dev Enumerable `[1, numStrategies]`.
+      * @param index_ Index to query.
+      * @return strategy The product address.
+    */
+    function strategyAt(uint256 index_) external view returns (address strategy);
+
+    /**
+     * @notice Returns the number of registered strategies.
+     * @return count The number of strategies.
+    */
+    function numStrategies() external view returns (uint256 count);
+
+    /**
      * @notice Returns whether or not product is currently in paused state.
      * @return status True if product is paused.
     */
@@ -141,6 +155,12 @@ interface IProduct {
     */
     function policyManager() external view returns (address policymanager);
 
+    /**
+     * @notice Returns the address of the [`Registry`](../Registry).
+     * @return registry The registry address.
+    */
+    function registry() external view returns (address registry);
+   
     /**
      * @notice Returns true if the given account is authorized to sign claims.
      * @param account Potential signer to query.

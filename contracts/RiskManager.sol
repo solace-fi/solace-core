@@ -9,6 +9,7 @@ import "./interface/IProduct.sol";
 import "./interface/IPolicyManager.sol";
 import "./interface/IRiskManager.sol";
 
+import "hardhat/console.sol";
 
 /**
  * @title RiskManager
@@ -49,7 +50,6 @@ contract RiskManager is IRiskManager, Governable {
     constructor(address governance_, address registry_) Governable(governance_) {
         require(registry_ != address(0x0), "zero address registry");
         _registry = IRegistry(registry_);
-        _weightSum = type(uint32).max; // no div by zero
         _partialReservesFactor = MAX_BPS;
     }
 
@@ -92,10 +92,23 @@ contract RiskManager is IRiskManager, Governable {
         require(weight_ > 0, "invalid weight!");
         require(strategyIsActive(strategy_), "inactive strategy");
         Strategy storage riskStrategy = _strategies[strategy_];
-        _weightSum = riskStrategy.weight == 0 ? _weightSum + weight_ : (_weightSum - riskStrategy.weight) + weight_;
+        _weightSum = (_weightSum + weight_) - riskStrategy.weight;
         riskStrategy.weight = weight_;
         IRiskStrategy(strategy_).setWeightAllocation(weight_);
         emit RiskStrategyWeightAllocationSet(strategy_, weight_);
+    }
+
+    /**
+     * @notice Sets the status of the `Risk Strategy`.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param strategy_ The address of the risk strategy.
+     * @param status_ The status to set.
+    */
+    function setStrategyStatus(address strategy_, uint8 status_) public override onlyGovernance {
+        require(strategy_ != address(0x0), "zero address strategy");
+        Strategy storage riskStrategy = _strategies[strategy_];
+        riskStrategy.status = StrategyStatus(status_);
+        emit StrategyStatusUpdated(strategy_, status_);
     }
 
     /**
@@ -103,7 +116,7 @@ contract RiskManager is IRiskManager, Governable {
      * @param strategy The risk strategy.
      * @return status True if the strategy is active.
      */
-     function strategyIsActive(address strategy) public view override returns (bool status) {
+    function strategyIsActive(address strategy) public view override returns (bool status) {
         return _strategies[strategy].status == StrategyStatus.ENABLED;
     }
 

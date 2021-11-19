@@ -5,7 +5,7 @@ pragma solidity 0.8.6;
 import "../products/CoverageProduct.sol";
 
 /**
- * @title MockProduct
+ * @title MockProductV2
  * @author solace.fi
  * @notice Mock product for testing purposes.
  */
