@@ -49,6 +49,14 @@ contract SOLACE is ISOLACE, ERC20Permit, Governable {
     }
 
     /**
+     * @notice Burns **SOLACE** from msg.sender.
+     * @param amount Amount to burn.
+     */
+    function burn(uint256 amount) external override {
+        _burn(msg.sender, amount);
+    }
+
+    /**
      * @notice Adds a new minter.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param minter The new minter.

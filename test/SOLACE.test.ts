@@ -109,6 +109,31 @@ describe("SOLACE", function () {
     });
   });
 
+  describe("burn", function () {
+    it("anyone can burn their own balance", async function () {
+      let balance1 = await solace.balanceOf(receiver1.address);
+      let supply1 = await solace.totalSupply();
+      let burnAmount1 = balance1.div(2);
+      let burnAmount2 = balance1.sub(burnAmount1);
+      await solace.connect(receiver1).burn(burnAmount1);
+      let balance2 = await solace.balanceOf(receiver1.address);
+      let supply2 = await solace.totalSupply();
+      expect(balance1.sub(balance2)).to.equal(burnAmount1);
+      expect(supply1.sub(supply2)).to.equal(burnAmount1);
+      await solace.connect(receiver1).burn(burnAmount2);
+      let balance3 = await solace.balanceOf(receiver1.address);
+      let supply3 = await solace.totalSupply();
+      expect(balance3).to.equal(0);
+      expect(supply1.sub(supply3)).to.equal(balance1);
+    });
+    it("cannot burn more than balance", async function () {
+      await expect(solace.connect(receiver2).burn(1)).to.be.revertedWith("ERC20: burn amount exceeds balance");
+      await solace.connect(governor).addMinter(minter.address);
+      await solace.connect(minter).mint(receiver2.address, 2);
+      await expect(solace.connect(receiver2).burn(3)).to.be.revertedWith("ERC20: burn amount exceeds balance");
+    });
+  });
+
   describe("governance", function () {
     it("can transfer governance", async function () {
       expect(await solace.governance()).to.equal(governor.address);

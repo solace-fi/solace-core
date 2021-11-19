@@ -27,8 +27,7 @@ export async function import_artifacts() {
   artifacts.PolicyDescriptorV2 = await tryImport(`${artifact_dir}/PolicyDescriptorV2.sol/PolicyDescriptorV2.json`);
   artifacts.RiskManager = await tryImport(`${artifact_dir}/RiskManager.sol/RiskManager.json`);
   artifacts.MockGovernableInitializable = await tryImport(`${artifact_dir}/mocks/MockGovernableInitializable.sol/MockGovernableInitializable.json`);
-  // solace imports post-dao
-  artifacts.SOLACE = await tryImport(`${artifact_dir}/SOLACE.sol/SOLACE.json`);
+  // farms (deprecated)
   artifacts.OptionsFarming = await tryImport(`${artifact_dir}/OptionsFarming.sol/OptionsFarming.json`);
   artifacts.FarmController = await tryImport(`${artifact_dir}/FarmController.sol/FarmController.json`);
   artifacts.CpFarm = await tryImport(`${artifact_dir}/CpFarm.sol/CpFarm.json`);
@@ -53,6 +52,8 @@ export async function import_artifacts() {
   artifacts.BaseProductV2 = await tryImport(`${artifact_dir}/products/BaseProductV2.sol/BaseProductV2.json`);
   artifacts.MockProductV2 = await tryImport(`${artifact_dir}/mocks/MockProductV2.sol/MockProductV2.json`);
   // investing v2
+  artifacts.SOLACE = await tryImport(`${artifact_dir}/SOLACE.sol/SOLACE.json`);
+  artifacts.xSOLACE = await tryImport(`${artifact_dir}/xSOLACE.sol/xSOLACE.json`);
   artifacts.CapitalPool = await tryImport(`${artifact_dir}/CapitalPool.sol/CapitalPool.json`);
 
   // oracles

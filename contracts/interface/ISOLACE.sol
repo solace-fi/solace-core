@@ -41,6 +41,12 @@ interface ISOLACE is IERC20Metadata {
     function mint(address account, uint256 amount) external;
 
     /**
+     * @notice Burns **SOLACE** from msg.sender.
+     * @param amount Amount to burn.
+     */
+    function burn(uint256 amount) external;
+
+    /**
      * @notice Adds a new minter.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param minter The new minter.
