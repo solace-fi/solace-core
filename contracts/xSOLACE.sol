@@ -58,7 +58,7 @@ contract xSOLACE is IxSOLACE, ERC20Permit, ReentrancyGuard, Governable {
      * @param amountXSolace The amount of xsolace.
      * @return amountSolace The amount of solace.
      */
-    function xsolaceToSolace(uint256 amountXSolace) public view override returns (uint256 amountSolace) {
+    function xSolaceToSolace(uint256 amountXSolace) public view override returns (uint256 amountSolace) {
         uint256 s = IERC20(_solace).balanceOf(address(this));
         uint256 x = totalSupply();
         return (s == 0 || x == 0)

@@ -6,11 +6,11 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 
 /**
- * @title Mock ERC-20 v2
+ * @title Mock ERC-20 Decimals
  * @author solace.fi
  * @notice An alternative Mock ERC-20 with changeable decimals.
  */
-contract MockERC20v2 is ERC20 {
+contract MockERC20Decimals is ERC20 {
     using SafeERC20 for IERC20;
 
     uint8 internal _decimals;

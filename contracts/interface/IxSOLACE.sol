@@ -40,7 +40,7 @@ interface IxSOLACE is IERC20, IERC20Permit {
      * @param amountXSolace The amount of xsolace.
      * @return amountSolace The amount of solace.
      */
-    function xsolaceToSolace(uint256 amountXSolace) external view returns (uint256 amountSolace);
+    function xSolaceToSolace(uint256 amountXSolace) external view returns (uint256 amountSolace);
 
     /***************************************
     MUTATOR FUNCTIONS

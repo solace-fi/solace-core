@@ -66,6 +66,8 @@ describe("xSOLACE", function () {
       expect(bal1.stakingXSolace).eq(0);
       expect(bal1.allowanceSolace).eq(ONE_ETHER.mul(2));
       expect(bal1.allowanceXSolace).eq(0);
+      let amountXSolace1 = await xsolace.connect(depositor1).callStatic.stake(ONE_ETHER);
+      expect(amountXSolace1).eq(ONE_ETHER);
       let tx1 = await xsolace.connect(depositor1).stake(ONE_ETHER);
       expect(tx1).to.emit(xsolace, "Staked").withArgs(depositor1.address, ONE_ETHER, ONE_ETHER);
       let bal2 = await getBalances(depositor1);
@@ -77,6 +79,8 @@ describe("xSOLACE", function () {
       expect(bal2.stakingXSolace).eq(0);
       expect(bal2.allowanceSolace).eq(ONE_ETHER);
       expect(bal2.allowanceXSolace).eq(0);
+      let amountXSolace2 = await xsolace.connect(depositor1).callStatic.stake(ONE_ETHER);
+      expect(amountXSolace2).eq(ONE_ETHER);
       let tx2 = await xsolace.connect(depositor1).stake(ONE_ETHER);
       expect(tx2).to.emit(xsolace, "Staked").withArgs(depositor1.address, ONE_ETHER, ONE_ETHER);
       let bal3 = await getBalances(depositor1);
@@ -124,6 +128,8 @@ describe("xSOLACE", function () {
       expect(bal1.stakingXSolace).eq(0);
       expect(bal1.allowanceSolace).eq(0);
       expect(bal1.allowanceXSolace).eq(0);
+      let amountSolace = await xsolace.connect(depositor2).callStatic.unstake(ONE_ETHER);
+      expect(amountSolace).eq(ONE_ETHER);
       let tx1 = await xsolace.connect(depositor2).unstake(ONE_ETHER);
       expect(tx1).to.emit(xsolace, "Unstaked").withArgs(depositor2.address, ONE_ETHER, ONE_ETHER);
       let bal2 = await getBalances(depositor2);
@@ -146,16 +152,18 @@ describe("xSOLACE", function () {
     });
     it("should initially return 1:1 SOLACE:xSOLACE", async function () {
       expect(await xsolace.solaceToXSolace(ONE_ETHER)).to.equal(ONE_ETHER);
-      expect(await xsolace.xsolaceToSolace(ONE_ETHER)).to.equal(ONE_ETHER);
+      expect(await xsolace.xSolaceToSolace(ONE_ETHER)).to.equal(ONE_ETHER);
     });
     it("should return 1:1 with only solace", async function () {
       await solace.connect(minter).mint(xsolace.address, ONE_ETHER.mul(10));
       expect(await xsolace.solaceToXSolace(ONE_ETHER)).to.equal(ONE_ETHER);
-      expect(await xsolace.xsolaceToSolace(ONE_ETHER)).to.equal(ONE_ETHER);
+      expect(await xsolace.xSolaceToSolace(ONE_ETHER)).to.equal(ONE_ETHER);
     });
     it("should change with uneven amounts", async function () {
       await solace.connect(minter).mint(depositor1.address, ONE_ETHER.mul(10));
       await solace.connect(depositor1).approve(xsolace.address, ONE_ETHER.mul(10));
+      let amountXSolace = await xsolace.connect(depositor1).callStatic.stake(ONE_ETHER.mul(5));
+      expect(amountXSolace).eq(ONE_ETHER.mul(5));
       let tx1 = await xsolace.connect(depositor1).stake(ONE_ETHER.mul(5));
       expect(tx1).to.emit(xsolace, "Staked").withArgs(depositor1.address, ONE_ETHER.mul(5), ONE_ETHER.mul(5));
       let bal1 = await getBalances(depositor1);
@@ -168,11 +176,13 @@ describe("xSOLACE", function () {
       expect(bal1.allowanceSolace).eq(ONE_ETHER.mul(5));
       expect(bal1.allowanceXSolace).eq(0);
       expect(await xsolace.solaceToXSolace(ONE_ETHER.mul(6))).to.equal(ONE_ETHER.mul(2));
-      expect(await xsolace.xsolaceToSolace(ONE_ETHER.mul(4))).to.equal(ONE_ETHER.mul(12));
+      expect(await xsolace.xSolaceToSolace(ONE_ETHER.mul(4))).to.equal(ONE_ETHER.mul(12));
     });
     it("staking should maintain ratio", async function () {
       await solace.connect(minter).mint(depositor2.address, ONE_ETHER.mul(20));
       await solace.connect(depositor2).approve(xsolace.address, ONE_ETHER.mul(20));
+      let amountXSolace = await xsolace.connect(depositor2).callStatic.stake(ONE_ETHER.mul(9));
+      expect(amountXSolace).eq(ONE_ETHER.mul(3));
       let tx1 = await xsolace.connect(depositor2).stake(ONE_ETHER.mul(9));
       expect(tx1).to.emit(xsolace, "Staked").withArgs(depositor2.address, ONE_ETHER.mul(9), ONE_ETHER.mul(3));
       let bal1 = await getBalances(depositor2);
@@ -185,7 +195,7 @@ describe("xSOLACE", function () {
       expect(bal1.allowanceSolace).eq(ONE_ETHER.mul(11));
       expect(bal1.allowanceXSolace).eq(0);
       expect(await xsolace.solaceToXSolace(ONE_ETHER.mul(6))).to.equal(ONE_ETHER.mul(2));
-      expect(await xsolace.xsolaceToSolace(ONE_ETHER.mul(4))).to.equal(ONE_ETHER.mul(12));
+      expect(await xsolace.xSolaceToSolace(ONE_ETHER.mul(4))).to.equal(ONE_ETHER.mul(12));
     });
     it("solace rewards should change ratio", async function () {
       await solace.connect(minter).mint(xsolace.address, ONE_ETHER.mul(8));
@@ -199,9 +209,11 @@ describe("xSOLACE", function () {
       expect(bal1.allowanceSolace).eq(ONE_ETHER.mul(11));
       expect(bal1.allowanceXSolace).eq(0);
       expect(await xsolace.solaceToXSolace(ONE_ETHER.mul(8))).to.equal(ONE_ETHER.mul(2));
-      expect(await xsolace.xsolaceToSolace(ONE_ETHER.mul(4))).to.equal(ONE_ETHER.mul(16));
+      expect(await xsolace.xSolaceToSolace(ONE_ETHER.mul(4))).to.equal(ONE_ETHER.mul(16));
     });
     it("unstaking should maintain ratio", async function () {
+      let amountSolace = await xsolace.connect(depositor1).callStatic.unstake(ONE_ETHER.mul(2));
+      expect(amountSolace).eq(ONE_ETHER.mul(8));
       let tx1 = await xsolace.connect(depositor2).unstake(ONE_ETHER.mul(2));
       expect(tx1).to.emit(xsolace, "Unstaked").withArgs(depositor2.address, ONE_ETHER.mul(8), ONE_ETHER.mul(2));
       let bal1 = await getBalances(depositor2);
@@ -214,7 +226,7 @@ describe("xSOLACE", function () {
       expect(bal1.allowanceSolace).eq(ONE_ETHER.mul(11));
       expect(bal1.allowanceXSolace).eq(0);
       expect(await xsolace.solaceToXSolace(ONE_ETHER.mul(8))).to.equal(ONE_ETHER.mul(2));
-      expect(await xsolace.xsolaceToSolace(ONE_ETHER.mul(4))).to.equal(ONE_ETHER.mul(16));
+      expect(await xsolace.xSolaceToSolace(ONE_ETHER.mul(4))).to.equal(ONE_ETHER.mul(16));
     });
     it("burning xsolace should change ratio", async function () {
       await xsolace.connect(depositor1).burn(ONE_ETHER.mul(3));
@@ -228,7 +240,7 @@ describe("xSOLACE", function () {
       expect(bal1.allowanceSolace).eq(ONE_ETHER.mul(5));
       expect(bal1.allowanceXSolace).eq(0);
       expect(await xsolace.solaceToXSolace(ONE_ETHER.mul(16))).to.equal(ONE_ETHER.mul(2));
-      expect(await xsolace.xsolaceToSolace(ONE_ETHER.mul(4))).to.equal(ONE_ETHER.mul(32));
+      expect(await xsolace.xSolaceToSolace(ONE_ETHER.mul(4))).to.equal(ONE_ETHER.mul(32));
     });
   });
 
