@@ -15,6 +15,7 @@ import { getPermitDigest, sign, getDomainSeparator } from "./utilities/signature
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
 import { Solace, XSolace, MockErc20, MockErc20Permit, BondDepository, BondTellerErc20 } from "../typechain";
 import { expectClose } from "./utilities/math";
+import { getBondTellerDepositSignature } from "./utilities/getBondTellerDepositSignature";
 
 const chainId = 31337;
 const deadline = constants.MaxUint256;
@@ -188,14 +189,7 @@ describe("BondTellerERC20", function() {
       await expect(teller1.connect(depositor1).deposit(1, 1, depositor1.address, false)).to.be.revertedWith("ERC20: transfer amount exceeds allowance");
     });
     it("cannot permit a non erc20permit token", async function () {
-      let nonce = 1;
-      let approve = {
-        owner: depositor1.address,
-        spender: teller1.address,
-        value: 1,
-      };
-      let digest = getPermitDigest(await tkn1.name(), tkn1.address, chainId, approve, nonce, deadline);
-      let { v, r, s } = sign(digest, Buffer.from(depositor1.privateKey.slice(2), "hex"));
+      let { v, r, s } = await getBondTellerDepositSignature(depositor1, teller1, tkn1, 1, constants.MaxUint256, 1);
       await expect(teller1.connect(depositor1).depositSigned(1, 1, depositor1.address, false, deadline, v, r, s)).to.be.revertedWith("Transaction reverted: function selector was not recognized and there's no fallback function");
     });
     it("cannot deposit to zero address", async function () {
@@ -267,7 +261,8 @@ describe("BondTellerERC20", function() {
       await expect(teller1.connect(depositor1).deposit(ONE_ETHER.mul(3), ONE_ETHER.mul(2), depositor1.address, true)).to.be.revertedWith("slippage protection: insufficient output");
     });
     it("can deposit", async function () {
-      await teller1.connect(governor).setTerms(ONE_ETHER.mul(2), VESTING_TERM, 0, MAX_UINT64, 0, HALF_LIFE, ONE_ETHER.mul(10), false, ONE_ETHER.mul(2), 1);
+      const MOMENTUM_FACTOR = BN.from(1).shl(128).add(10); // every ten SOLACE bonded raises the price one tkn
+      await teller1.connect(governor).setTerms(ONE_ETHER.mul(2), VESTING_TERM, 0, MAX_UINT64, 0, HALF_LIFE, ONE_ETHER.mul(10), false, ONE_ETHER.mul(2), MOMENTUM_FACTOR);
       await teller1.connect(governor).setFees(STAKE_FEE, DAO_FEE);
       let bal1 = await getBalances(teller1, depositor1);
       const blockTimestamp = (await provider.getBlock('latest')).timestamp;
@@ -291,7 +286,6 @@ describe("BondTellerERC20", function() {
       expect(bal12.vestingSolace).eq(bondInfo.payoutAmount);
       expect(bal12.vestingXSolace).eq(0);
       expectClose(bal12.stakingSolace, ONE_ETHER.mul(3).div(2).mul(STAKE_FEE).div(MAX_BPS), 1e14);
-      //expect(bal12.stakingSolace).eq(0);
       expect(bal12.totalXSolace).eq(0);
       expect(bal12.userTkn1).eq(ONE_ETHER.mul(-3));
       expect(bal12.userTkn2).eq(0);
@@ -303,10 +297,12 @@ describe("BondTellerERC20", function() {
       expect(bal12.totalBonds).eq(1);
       expect(await xsolace.solaceToXSolace(ONE_ETHER)).to.equal(ONE_ETHER);
       expect(await xsolace.xSolaceToSolace(ONE_ETHER)).to.equal(ONE_ETHER);
-      // TODO: check capacity and next price
+      expect(bal12.tellerCapacity).eq(bondInfo.pricePaid.mul(-1));
+      expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-STAKE_FEE), 1e14);
     });
     it("can deposit and stake", async function () {
-      await teller1.connect(governor).setTerms(ONE_ETHER.mul(2), VESTING_TERM, 0, MAX_UINT64, 0, HALF_LIFE, ONE_ETHER.mul(10), true, ONE_ETHER.mul(2), 1);
+      const MOMENTUM_FACTOR = BN.from(1).shl(128).add(10); // every ten SOLACE bonded raises the price one tkn
+      await teller1.connect(governor).setTerms(ONE_ETHER.mul(2), VESTING_TERM, 0, MAX_UINT64, 0, HALF_LIFE, ONE_ETHER.mul(10), true, ONE_ETHER.mul(2), MOMENTUM_FACTOR);
       await solace.connect(governor).addMinter(minter.address);
       await solace.connect(minter).mint(xsolace.address, ONE_ETHER);
       let bal1 = await getBalances(teller1, depositor1);
@@ -340,10 +336,12 @@ describe("BondTellerERC20", function() {
       expect(bal12.poolTkn2).eq(0);
       expect(bal12.userBonds).eq(1);
       expect(bal12.totalBonds).eq(1);
-      // TODO: check capacity and next price
+      expectClose(bal12.tellerCapacity, bondInfo.pricePaid.mul(-1).div(2), 1e14);
+      expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-STAKE_FEE), 1e14);
     });
     it("deposits have minimum price", async function () {
-      await teller1.connect(governor).setTerms(ONE_ETHER, VESTING_TERM, 0, MAX_UINT64, ONE_ETHER.mul(2), HALF_LIFE, ONE_ETHER.mul(10), false, ONE_ETHER.mul(2), 1);
+      const MOMENTUM_FACTOR = BN.from(1).shl(128).add(10); // every ten SOLACE bonded raises the price one tkn
+      await teller1.connect(governor).setTerms(ONE_ETHER, VESTING_TERM, 0, MAX_UINT64, ONE_ETHER.mul(2), HALF_LIFE, ONE_ETHER.mul(10), false, ONE_ETHER.mul(2), MOMENTUM_FACTOR);
       let bal1 = await getBalances(teller1, depositor1);
       const blockTimestamp = (await provider.getBlock('latest')).timestamp;
       let predictedAmountOut = await teller1.calculateAmountOut(ONE_ETHER.mul(3), false);
@@ -375,7 +373,8 @@ describe("BondTellerERC20", function() {
       expect(bal12.poolTkn2).eq(0);
       expect(bal12.userBonds).eq(1);
       expect(bal12.totalBonds).eq(1);
-      // TODO: check capacity and next price
+      expect(bal12.tellerCapacity).eq(bondInfo.pricePaid.mul(-1));
+      expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-STAKE_FEE), 1e14);
     });
     it("", async function () {});
     it("", async function () {});
@@ -436,21 +435,15 @@ describe("BondTellerERC20", function() {
       teller2 = await deployProxyTeller(teller1.address, tkn2.address);
     });
     it("can deposit signed", async function () {
-      await teller2.connect(governor).setTerms(ONE_ETHER.mul(2), VESTING_TERM, 0, MAX_UINT64, 0, HALF_LIFE, ONE_ETHER.mul(10), false, ONE_ETHER.mul(2), 1);
+      const MOMENTUM_FACTOR = BN.from(1).shl(128).add(10); // every ten SOLACE bonded raises the price one tkn
+      await teller2.connect(governor).setTerms(ONE_ETHER.mul(2), VESTING_TERM, 0, MAX_UINT64, 0, HALF_LIFE, ONE_ETHER.mul(10), false, ONE_ETHER.mul(2), MOMENTUM_FACTOR);
       await teller2.connect(governor).setFees(STAKE_FEE, DAO_FEE);
       await tkn2.connect(deployer).transfer(depositor1.address, ONE_ETHER.mul(100));
       let bal1 = await getBalances(teller2, depositor1);
       const blockTimestamp = (await provider.getBlock('latest')).timestamp;
       let predictedAmountOut = await teller2.calculateAmountOut(ONE_ETHER.mul(3), false);
       let predictedAmountIn = await teller2.calculateAmountIn(predictedAmountOut, false);
-      let nonce = await tkn2.nonces(depositor1.address);
-      let approve = {
-        owner: depositor1.address,
-        spender: teller2.address,
-        value: ONE_ETHER.mul(3),
-      };
-      let digest = getPermitDigest(await tkn2.name(), tkn2.address, chainId, approve, nonce, deadline);
-      let { v, r, s } = sign(digest, Buffer.from(depositor1.privateKey.slice(2), "hex"));
+      let { v, r, s } = await getBondTellerDepositSignature(depositor1, teller2, tkn2, ONE_ETHER.mul(3));
       let tx1 = await teller2.connect(depositor1).depositSigned(ONE_ETHER.mul(3), ONE_ETHER, depositor1.address, false, deadline, v, r, s);
       let bondID1 = await teller2.numBonds();
       expect(bondID1).eq(1);
@@ -480,24 +473,19 @@ describe("BondTellerERC20", function() {
       expect(bal12.totalBonds).eq(1);
       expect(await xsolace.solaceToXSolace(ONE_ETHER)).to.equal(ONE_ETHER);
       expect(await xsolace.xSolaceToSolace(ONE_ETHER)).to.equal(ONE_ETHER);
-      // TODO: check capacity and next price
+      expect(bal12.tellerCapacity).eq(bondInfo.pricePaid.mul(-1));
+      expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-STAKE_FEE), 1e14);
     });
     it("can deposit signed and stake", async function () {
-      await teller2.connect(governor).setTerms(ONE_ETHER.mul(2), VESTING_TERM, 0, MAX_UINT64, 0, HALF_LIFE, ONE_ETHER.mul(10), true, ONE_ETHER.mul(2), 1);
+      const MOMENTUM_FACTOR = BN.from(1).shl(128).add(10); // every ten SOLACE bonded raises the price one tkn
+      await teller2.connect(governor).setTerms(ONE_ETHER.mul(2), VESTING_TERM, 0, MAX_UINT64, 0, HALF_LIFE, ONE_ETHER.mul(10), true, ONE_ETHER.mul(2), MOMENTUM_FACTOR);
       await solace.connect(governor).addMinter(minter.address);
       await solace.connect(minter).mint(xsolace.address, ONE_ETHER);
       let bal1 = await getBalances(teller2, depositor1);
       const blockTimestamp = (await provider.getBlock('latest')).timestamp;
       let predictedAmountOut = await teller2.calculateAmountOut(ONE_ETHER.mul(3), true);
       let predictedAmountIn = await teller2.calculateAmountIn(predictedAmountOut, true);
-      let nonce = await tkn2.nonces(depositor1.address);
-      let approve = {
-        owner: depositor1.address,
-        spender: teller2.address,
-        value: ONE_ETHER.mul(3),
-      };
-      let digest = getPermitDigest(await tkn2.name(), tkn2.address, chainId, approve, nonce, deadline);
-      let { v, r, s } = sign(digest, Buffer.from(depositor1.privateKey.slice(2), "hex"));
+      let { v, r, s } = await getBondTellerDepositSignature(depositor1, teller2, tkn2, ONE_ETHER.mul(3));
       let tx1 = await teller2.connect(depositor1).depositSigned(ONE_ETHER.mul(3), ONE_ETHER, depositor1.address, true, deadline, v, r, s);
       let bondID1 = await teller2.numBonds();
       expect(bondID1).eq(2);
@@ -525,22 +513,17 @@ describe("BondTellerERC20", function() {
       expect(bal12.poolTkn2).eq(ONE_ETHER.mul(3).mul(MAX_BPS-DAO_FEE).div(MAX_BPS));
       expect(bal12.userBonds).eq(1);
       expect(bal12.totalBonds).eq(1);
-      // TODO: check capacity and next price
+      expectClose(bal12.tellerCapacity, bondInfo.pricePaid.mul(-1).div(2), 1e14);
+      expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-STAKE_FEE), 1e14);
     });
     it("deposits have minimum price", async function () {
-      await teller2.connect(governor).setTerms(ONE_ETHER, VESTING_TERM, 0, MAX_UINT64, ONE_ETHER.mul(2), HALF_LIFE, ONE_ETHER.mul(10), false, ONE_ETHER.mul(2), 1);
+      const MOMENTUM_FACTOR = BN.from(1).shl(128).add(10); // every ten SOLACE bonded raises the price one tkn
+      await teller2.connect(governor).setTerms(ONE_ETHER, VESTING_TERM, 0, MAX_UINT64, ONE_ETHER.mul(2), HALF_LIFE, ONE_ETHER.mul(10), false, ONE_ETHER.mul(2), MOMENTUM_FACTOR);
       let bal1 = await getBalances(teller2, depositor1);
       const blockTimestamp = (await provider.getBlock('latest')).timestamp;
       let predictedAmountOut = await teller2.calculateAmountOut(ONE_ETHER.mul(3), false);
       let predictedAmountIn = await teller2.calculateAmountIn(predictedAmountOut, false);
-      let nonce = await tkn2.nonces(depositor1.address);
-      let approve = {
-        owner: depositor1.address,
-        spender: teller2.address,
-        value: ONE_ETHER.mul(3),
-      };
-      let digest = getPermitDigest(await tkn2.name(), tkn2.address, chainId, approve, nonce, deadline);
-      let { v, r, s } = sign(digest, Buffer.from(depositor1.privateKey.slice(2), "hex"));
+      let { v, r, s } = await getBondTellerDepositSignature(depositor1, teller2, tkn2, ONE_ETHER.mul(3));
       let tx1 = await teller2.connect(depositor1).depositSigned(ONE_ETHER.mul(3), ONE_ETHER, depositor1.address, false, deadline, v, r, s);
       let bondID1 = await teller2.numBonds();
       expect(bondID1).eq(3);
@@ -568,7 +551,8 @@ describe("BondTellerERC20", function() {
       expect(bal12.poolTkn2).eq(ONE_ETHER.mul(3).mul(MAX_BPS-DAO_FEE).div(MAX_BPS));
       expect(bal12.userBonds).eq(1);
       expect(bal12.totalBonds).eq(1);
-      // TODO: check capacity and next price
+      expect(bal12.tellerCapacity).eq(bondInfo.pricePaid.mul(-1));
+      expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-STAKE_FEE), 1e14);
     });
   });
 
@@ -589,6 +573,9 @@ describe("BondTellerERC20", function() {
 
     userBonds: BN;
     totalBonds: BN;
+
+    tellerCapacity: BN;
+    tellerBondPrice: BN;
   }
 
   async function getBalances(teller: Contract, user: Wallet): Promise<Balances> {
@@ -608,7 +595,10 @@ describe("BondTellerERC20", function() {
       poolTkn2: await tkn2.balanceOf(underwritingPool.address),
 
       userBonds: await teller.balanceOf(user.address),
-      totalBonds: await teller.totalSupply()
+      totalBonds: await teller.totalSupply(),
+
+      tellerCapacity: await teller.capacity(),
+      tellerBondPrice: await teller.bondPrice()
     };
   }
 
@@ -629,7 +619,10 @@ describe("BondTellerERC20", function() {
       poolTkn2: balances1.poolTkn2.sub(balances2.poolTkn2),
 
       userBonds: balances1.userBonds.sub(balances2.userBonds),
-      totalBonds: balances1.totalBonds.sub(balances2.totalBonds)
+      totalBonds: balances1.totalBonds.sub(balances2.totalBonds),
+
+      tellerCapacity: balances1.tellerCapacity.sub(balances2.tellerCapacity),
+      tellerBondPrice: balances1.tellerBondPrice.sub(balances2.tellerBondPrice),
     };
   }
 

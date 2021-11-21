@@ -13,11 +13,17 @@ import "./interface/IxSOLACE.sol";
 import "./interface/IBondDepository.sol";
 import "./interface/IBondTellerErc20.sol";
 
-
+/**
+ * @title BondTellerErc20
+ * @author solace.fi
+ * @notice A bond teller that accepts an ERC20 as payment.
+ *
+ * Bond tellers allow users to buy bonds. After vesting for `vestingTerm`, bonds can be redeemed for [**SOLACE**](./SOLACE) or [**xSOLACE**](./xSOLACE). Payments are made in `principal` which is sent to the underwriting pool and used to back risk.
+ *
+ * Bonds can be purchased via [`deposit()`](#deposit) or [`depositSigned()`](#depositsigned). Bonds are represented as ERC721s, can be viewed with [`bonds()`](#bonds), and redeemed with [`redeem()`](#redeem).
+ */
 contract BondTellerErc20 is IBondTellerErc20, ReentrancyGuard, GovernableInitializable, ERC721EnhancedInitializable {
-
     using SafeERC20 for IERC20;
-
 
     /* ======== STRUCTS ======== */
 
@@ -343,7 +349,7 @@ contract BondTellerErc20 is IBondTellerErc20, ReentrancyGuard, GovernableInitial
     ***************************************/
 
     /**
-     * @notice Calculate the payout and update the current price of a bond.
+     * @notice Calculate the payout in **SOLACE** and update the current price of a bond.
      * @param depositAmount asdf
      * @return amountOut asdf
      */
@@ -354,10 +360,10 @@ contract BondTellerErc20 is IBondTellerErc20, ReentrancyGuard, GovernableInitial
         if(price_ < minimumPrice) price_ = minimumPrice;
         require(price_ != 0, "invalid price");
         lastPriceUpdate = block.timestamp;
-        // update next price
-        nextPrice = price_ + (depositAmount * uint256(momentumNum) / uint256(momentumDenom));
         // calculate amount out
         amountOut = 1 ether * depositAmount / price_; // 1 ether => 1 solace
+        // update next price
+        nextPrice = price_ + (amountOut * uint256(momentumNum) / uint256(momentumDenom));
     }
 
     /**
@@ -380,12 +386,15 @@ contract BondTellerErc20 is IBondTellerErc20, ReentrancyGuard, GovernableInitial
     /**
      * @notice set minimum price for bond
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param startPrice_ asdf
-     * @param vestingTerm_ uint
-     * @param startTime_ uint
-     * @param endTime_ uint
-     * @param minimumPrice_ uint
-     * @param halfLife_ asdf
+     * @param startPrice_ The starting price, measured in `principal` for one **SOLACE**.
+     * @param vestingTerm_ The duration that users must wait to redeem bonds.
+     * @param startTime_ The time that purchases start.
+     * @param endTime_ The time that purchases end.
+     * @param minimumPrice_ The minimum price of a bond, measured in `principal` for one **SOLACE**.
+     * @param halfLife_ Used to calculate price decay.
+     * @param capacity_ The amount still sellable.
+     * @param capacityIsPayout_ True if `capacity_` is measured in **SOLACE**, false if measured in `principal`.
+     * @param maxPayout_ The maximum **SOLACE** that can be sold in a single bond.
      * @param momentumFactor_ Used to calculate price increase after bond purchase. The uint128 numerator and denominator of a fraction, pass as `( momentumNum << 128 | momentumDenom )`.
      */
     function setTerms(

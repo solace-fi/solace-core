@@ -10,6 +10,7 @@ chai.use(solidity);
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
 import { Solace, XSolace } from "../typechain";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { getXSolaceStakeSignature } from "./utilities/getXSolaceStakeSignature";
 
 describe("xSOLACE", function () {
   let artifacts: ArtifactImports;
@@ -94,14 +95,7 @@ describe("xSOLACE", function () {
       expect(bal3.allowanceXSolace).eq(0);
     });
     it("can deposit solace with permit", async function () {
-      let nonce = await solace.nonces(depositor1.address);
-      let approve = {
-        owner: depositor1.address,
-        spender: xsolace.address,
-        value: ONE_ETHER,
-      };
-      let digest = getPermitDigest(solaceName, solace.address, chainId, approve, nonce, deadline);
-      let { v, r, s } = sign(digest, Buffer.from(depositor1.privateKey.slice(2), "hex"));
+      let { v, r, s } = await getXSolaceStakeSignature(solace, xsolace, depositor1, ONE_ETHER);
       let tx1 = await xsolace.connect(depositor2).stakeSigned(depositor1.address, ONE_ETHER, deadline, v, r, s);
       expect(tx1).to.emit(xsolace, "Staked").withArgs(depositor1.address, ONE_ETHER, ONE_ETHER);
       let bal1 = await getBalances(depositor1);

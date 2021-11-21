@@ -1,10 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./IBondTeller.sol";
 
 
+/**
+ * @title IBondTellerErc20
+ * @author solace.fi
+ * @notice A bond teller that accepts an ERC20 as payment.
+ *
+ * Bond tellers allow users to buy bonds. After vesting for `vestingTerm`, bonds can be redeemed for [**SOLACE**](./SOLACE) or [**xSOLACE**](./xSOLACE). Payments are made in `principal` which is sent to the underwriting pool and used to back risk.
+ *
+ * Bonds can be purchased via [`deposit()`](#deposit) or [`depositSigned()`](#depositsigned). Bonds are represented as ERC721s, can be viewed with [`bonds()`](#bonds), and redeemed with [`redeem()`](#redeem).
+ */
 interface IBondTellerErc20 is IBondTeller {
 
     /***************************************

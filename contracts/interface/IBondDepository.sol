@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
-
+/**
+ * @title BondDepository
+ * @author solace.fi
+ * @notice Factory for [`bond tellers`](./BondTeller).
+ */
 interface IBondDepository {
 
     /***************************************

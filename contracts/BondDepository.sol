@@ -8,8 +8,14 @@ import "./interface/IxSOLACE.sol";
 import "./interface/IBondTeller.sol";
 import "./interface/IBondDepository.sol";
 
+/**
+ * @title BondDepository
+ * @author solace.fi
+ * @notice Factory for [`bond tellers`](./BondTeller).
+ */
 contract BondDepository is IBondDepository, Factory, Governable {
 
+    // pass these when initializing tellers
     ISOLACE internal _solace;
     IxSOLACE internal _xsolace;
     address internal _pool;
