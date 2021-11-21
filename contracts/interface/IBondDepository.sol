@@ -45,12 +45,14 @@ interface IBondDepository {
     /**
      * @notice Creates a new [`BondTeller`](./bondteller).
      * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param name The name of the bond token.
      * @param governance The address of the teller's [governor](/docs/protocol/governance).
      * @param impl The address of BondTeller implementation.
      * @param principal address The ERC20 token that users give.
      * @return teller The address of the new teller.
      */
     function createBondTeller(
+        string memory name,
         address governance,
         address impl,
         address principal
@@ -58,6 +60,7 @@ interface IBondDepository {
 
     /**
      * @notice Creates a new [`BondTeller`](./bondteller).
+     * @param name The name of the bond token.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param governance The address of the teller's [governor](/docs/protocol/governance).
      * @param impl The address of BondTeller implementation.
@@ -66,6 +69,7 @@ interface IBondDepository {
      * @return teller The address of the new teller.
      */
     function create2BondTeller(
+        string memory name,
         address governance,
         address impl,
         bytes32 salt,

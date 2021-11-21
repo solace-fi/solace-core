@@ -34,22 +34,24 @@ interface IBondTeller {
 
     /**
      * @notice Initializes the teller.
-     * @param governance The address of the [governor](/docs/protocol/governance).
-     * @param solace The SOLACE token.
-     * @param xsolace The xSOLACE token.
-     * @param pool The underwriting pool.
-     * @param dao The DAO.
-     * @param principal address The ERC20 token that users deposit.
-     * @param bondDepo The bond depository.
+     * @param name_ The name of the bond token.
+     * @param governance_ The address of the [governor](/docs/protocol/governance).
+     * @param solace_ The SOLACE token.
+     * @param xsolace_ The xSOLACE token.
+     * @param pool_ The underwriting pool.
+     * @param dao_ The DAO.
+     * @param principal_ address The ERC20 token that users deposit.
+     * @param bondDepo_ The bond depository.
      */
     function initialize(
-        address governance,
-        address solace,
-        address xsolace,
-        address pool,
-        address dao,
-        address principal,
-        address bondDepo
+        string memory name_,
+        address governance_,
+        address solace_,
+        address xsolace_,
+        address pool_,
+        address dao_,
+        address principal_,
+        address bondDepo_
     ) external;
 
     /***************************************

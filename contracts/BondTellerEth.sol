@@ -11,18 +11,18 @@ import "./ERC721EnhancedInitializable.sol";
 import "./interface/ISOLACE.sol";
 import "./interface/IxSOLACE.sol";
 import "./interface/IBondDepository.sol";
-import "./interface/IBondTellerErc20.sol";
+import "./interface/IBondTellerEth.sol";
 
 /**
- * @title BondTellerErc20
+ * @title BondTellerEth
  * @author solace.fi
- * @notice A bond teller that accepts an ERC20 as payment.
+ * @notice A bond teller that accepts **ETH** and **WETH** as payment.
  *
- * Bond tellers allow users to buy bonds. After vesting for `vestingTerm`, bonds can be redeemed for [**SOLACE**](./SOLACE) or [**xSOLACE**](./xSOLACE). Payments are made in `principal` which is sent to the underwriting pool and used to back risk.
+ * Bond tellers allow users to buy bonds. After vesting for `vestingTerm`, bonds can be redeemed for [**SOLACE**](./SOLACE) or [**xSOLACE**](./xSOLACE). Payments are made in **ETH** or **WETH** which is sent to the underwriting pool and used to back risk.
  *
  * Bonds can be purchased via [`deposit()`](#deposit) or [`depositSigned()`](#depositsigned). Bonds are represented as ERC721s, can be viewed with [`bonds()`](#bonds), and redeemed with [`redeem()`](#redeem).
  */
-contract BondTellerErc20 is IBondTellerErc20, ReentrancyGuard, GovernableInitializable, ERC721EnhancedInitializable {
+contract BondTellerEth is IBondTellerEth, ReentrancyGuard, GovernableInitializable, ERC721EnhancedInitializable {
     using SafeERC20 for IERC20;
 
     /* ======== STRUCTS ======== */
@@ -200,16 +200,34 @@ contract BondTellerErc20 is IBondTellerErc20, ReentrancyGuard, GovernableInitial
     ***************************************/
 
     /**
-     * @notice Create a bond by depositing `amount` of `principal`.
+     * @notice Create a bond by depositing **ETH**.
      * Principal will be transferred from `msg.sender` using `allowance`.
-     * @param amount Amount of principal to deposit.
      * @param minAmountOut The minimum **SOLACE** or **xSOLACE** out.
      * @param depositor The bond recipient, default msg.sender.
      * @param stake True to stake, false to not stake.
      * @return payout The amount of SOLACE or xSOLACE in the bond.
      * @return bondID The ID of the newly created bond.
      */
-    function deposit(
+    function depositEth(
+        uint256 minAmountOut,
+        address depositor,
+        bool stake
+    ) external payable override returns (uint256 payout, uint256 bondID) {
+        // accounting
+        return _deposit(msg.value, minAmountOut, depositor, stake, false);
+    }
+
+    /**
+     * @notice Create a bond by depositing `amount` **WETH**.
+     * **WETH** will be transferred from `msg.sender` using `allowance`.
+     * @param amount Amount of **WETH** to deposit.
+     * @param minAmountOut The minimum **SOLACE** or **xSOLACE** out.
+     * @param depositor The bond recipient, default msg.sender.
+     * @param stake True to stake, false to not stake.
+     * @return payout The amount of SOLACE or xSOLACE in the bond.
+     * @return bondID The ID of the newly created bond.
+     */
+    function depositWeth(
         uint256 amount,
         uint256 minAmountOut,
         address depositor,
@@ -218,14 +236,14 @@ contract BondTellerErc20 is IBondTellerErc20, ReentrancyGuard, GovernableInitial
         // pull tokens
         SafeERC20.safeTransferFrom(principal, msg.sender, address(this), amount);
         // accounting
-        return _deposit(amount, minAmountOut, depositor, stake);
+        return _deposit(amount, minAmountOut, depositor, stake, true);
     }
 
     /**
-     * @notice Create a bond by depositing `amount` of `principal`.
-     * Principal will be transferred from `depositor` using `permit`.
-     * Note that not all ERC20s have a permit function, in which case this function will revert.
-     * @param amount Amount of principal to deposit.
+     * @notice Create a bond by depositing `amount` **WETH**.
+     * **WETH** will be transferred from `depositor` using `permit`.
+     * Note that not all **WETH**s have a permit function, in which case this function will revert.
+     * @param amount Amount of **WETH** to deposit.
      * @param minAmountOut The minimum **SOLACE** or **xSOLACE** out.
      * @param depositor The bond recipient, default msg.sender.
      * @param stake True to stake, false to not stake.
@@ -236,7 +254,7 @@ contract BondTellerErc20 is IBondTellerErc20, ReentrancyGuard, GovernableInitial
      * @return payout The amount of SOLACE or xSOLACE in the bond.
      * @return bondID The ID of the newly created bond.
      */
-    function depositSigned(
+    function depositWethSigned(
         uint256 amount,
         uint256 minAmountOut,
         address depositor,
@@ -251,7 +269,7 @@ contract BondTellerErc20 is IBondTellerErc20, ReentrancyGuard, GovernableInitial
         // pull tokens
         SafeERC20.safeTransferFrom(principal, depositor, address(this), amount);
         // accounting
-        return _deposit(amount, minAmountOut, depositor, stake);
+        return _deposit(amount, minAmountOut, depositor, stake, true);
     }
 
     /**
@@ -260,6 +278,7 @@ contract BondTellerErc20 is IBondTellerErc20, ReentrancyGuard, GovernableInitial
      * @param minAmountOut The minimum **SOLACE** or **xSOLACE** out.
      * @param depositor The bond recipient, default msg.sender.
      * @param stake True to stake, false to not stake.
+     * @param isWrapped True if payment was made in **WETH**, false if made in **ETH**.
      * @return payout The amount of SOLACE or xSOLACE in the bond.
      * @return bondID The ID of the newly created bond.
      */
@@ -267,7 +286,8 @@ contract BondTellerErc20 is IBondTellerErc20, ReentrancyGuard, GovernableInitial
         uint256 amount,
         uint256 minAmountOut,
         address depositor,
-        bool stake
+        bool stake,
+        bool isWrapped
     ) internal returns (uint256 payout, uint256 bondID) {
         require(depositor != address(0), "invalid address");
         require(!paused, "cannot deposit while paused");
@@ -293,8 +313,8 @@ contract BondTellerErc20 is IBondTellerErc20, ReentrancyGuard, GovernableInitial
         uint256 maturation = vestingTerm + block.timestamp;
         // route principal
         uint256 daoFee = amount * daoFeeBps / MAX_BPS;
-        if(daoFee > 0) SafeERC20.safeTransfer(principal, dao, daoFee);
-        SafeERC20.safeTransfer(principal, underwritingPool, amount - daoFee);
+        if(daoFee > 0) _transferEth(dao, daoFee, isWrapped);
+        _transferEth(underwritingPool, amount - daoFee, isWrapped);
         // route solace
         bondDepo.mint(payout);
         uint256 stakeFee = payout * stakeFeeBps / MAX_BPS;
@@ -379,6 +399,17 @@ contract BondTellerErc20 is IBondTellerErc20, ReentrancyGuard, GovernableInitial
         endValue -= endValue * (time % halfLife) / halfLife / 2;
     }
 
+    /**
+     * @notice Safely transfers **ETH** or **WETH**.
+     * @param destination Where to send.
+     * @param amount Amount to send.
+     * @param isWrapped True to send **WETH**, false to send **ETH**.
+     */
+    function _transferEth(address destination, uint256 amount, bool isWrapped) internal {
+        if(isWrapped) SafeERC20.safeTransfer(principal, destination, amount);
+        else Address.sendValue(payable(destination), amount);
+    }
+
     /***************************************
     GOVERNANCE FUNCTIONS
     ***************************************/
@@ -460,5 +491,25 @@ contract BondTellerErc20 is IBondTellerErc20, ReentrancyGuard, GovernableInitial
     function unpause() external override onlyGovernance {
         paused = false;
         emit Unpaused();
+    }
+
+    /***************************************
+    FALLBACK FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Fallback function to allow contract to receive *ETH*.
+     * Deposits **ETH** and creates bond.
+     */
+    receive () external payable override nonReentrant {
+        _deposit(msg.value, 0, msg.sender, false, false);
+    }
+
+    /**
+     * @notice Fallback function to allow contract to receive **ETH**.
+     * Deposits **ETH** and creates bond.
+     */
+    fallback () external payable override nonReentrant {
+        _deposit(msg.value, 0, msg.sender, false, false);
     }
 }

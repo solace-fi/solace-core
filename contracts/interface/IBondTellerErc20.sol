@@ -21,6 +21,8 @@ interface IBondTellerErc20 is IBondTeller {
 
     /// @notice Emitted when terms are set.
     event TermsSet();
+    /// @notice Emitted when fees are set.
+    event FeesSet();
 
     /**
      * @notice Create a bond by depositing `amount` of `principal`.

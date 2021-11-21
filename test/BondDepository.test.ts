@@ -165,11 +165,11 @@ describe("BondDepository", function() {
       //tellerEthImpl = (await deployContract(deployer, artifacts.BondTellerETH)) as BondTellerEth;
     });
     it("non governance cannot create tellers", async function () {
-      await expect(bondDepo.connect(depositor).createBondTeller(governor.address, tellerErc20Impl.address, weth.address)).to.be.revertedWith("!governance");
-      await expect(bondDepo.connect(depositor).create2BondTeller(governor.address, tellerErc20Impl.address, toBytes32(0), weth.address)).to.be.revertedWith("!governance");
+      await expect(bondDepo.connect(depositor).createBondTeller("Solace USDC Bond", governor.address, tellerErc20Impl.address, weth.address)).to.be.revertedWith("!governance");
+      await expect(bondDepo.connect(depositor).create2BondTeller("Solace USDC Bond", governor.address, tellerErc20Impl.address, toBytes32(0), weth.address)).to.be.revertedWith("!governance");
     });
     it("governance can create tellers", async function () {
-      let tx1 = await bondDepo.connect(governor).createBondTeller(governor.address, tellerErc20Impl.address, weth.address);
+      let tx1 = await bondDepo.connect(governor).createBondTeller("Solace USDC Bond", governor.address, tellerErc20Impl.address, weth.address);
       let events1 = (await tx1.wait())?.events;
       if(events1 && events1.length > 0) {
         let event1 = events1[0];
@@ -177,7 +177,7 @@ describe("BondDepository", function() {
       } else throw "no deployment";
       expect(teller1.address).not.eq(ZERO_ADDRESS);
 
-      let tx2 = await bondDepo.connect(governor).createBondTeller(governor.address, tellerErc20Impl.address, weth.address);
+      let tx2 = await bondDepo.connect(governor).createBondTeller("Solace SOLACE-DAI SLP Bond", governor.address, tellerErc20Impl.address, weth.address);
       let events2 = (await tx2.wait())?.events;
       if(events2 && events2.length > 0) {
         let event2 = events2[0];
@@ -185,7 +185,7 @@ describe("BondDepository", function() {
       } else throw "no deployment";
       expect(teller2.address).not.eq(teller1.address);
 
-      let tx3 = await bondDepo.connect(governor).create2BondTeller(governor.address, tellerErc20Impl.address, toBytes32(0), weth.address);
+      let tx3 = await bondDepo.connect(governor).create2BondTeller("Solace SOLACE-USDC SLP Bond", governor.address, tellerErc20Impl.address, toBytes32(0), weth.address);
       let events3 = (await tx3.wait())?.events;
       if(events3 && events3.length > 0) {
         let event3 = events3[0];
@@ -193,7 +193,7 @@ describe("BondDepository", function() {
       } else throw "no deployment";
       expect(teller3.address).not.eq(teller2.address);
 
-      let tx4 = await bondDepo.connect(governor).create2BondTeller(governor.address, tellerErc20Impl.address, toBytes32(1), dai.address);
+      let tx4 = await bondDepo.connect(governor).create2BondTeller("Solace USDC Bond", governor.address, tellerErc20Impl.address, toBytes32(1), dai.address);
       let events4 = (await tx4.wait())?.events;
       if(events4 && events4.length > 0) {
         let event4 = events4[0];
@@ -202,7 +202,7 @@ describe("BondDepository", function() {
       expect(teller4.address).not.eq(teller3.address);
 
       /*
-      let tx5 = await bondDepo.connect(governor).createBondTeller(governor.address, tellerEthImpl.address, weth.address);
+      let tx5 = await bondDepo.connect(governor).createBondTeller("Solace USDC Bond", governor.address, tellerEthImpl.address, weth.address);
       let events5 = (await tx5.wait())?.events;
       if(events5 && events5.length > 0) {
         let event5 = events5[0];

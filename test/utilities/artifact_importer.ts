@@ -56,6 +56,7 @@ export async function import_artifacts() {
   artifacts.xSOLACE = await tryImport(`${artifact_dir}/xSOLACE.sol/xSOLACE.json`);
   artifacts.CapitalPool = await tryImport(`${artifact_dir}/CapitalPool.sol/CapitalPool.json`);
   artifacts.BondDepository = await tryImport(`${artifact_dir}/BondDepository.sol/BondDepository.json`);
+  artifacts.BondTellerETH = await tryImport(`${artifact_dir}/BondTellerEth.sol/BondTellerEth.json`);
   artifacts.BondTellerERC20 = await tryImport(`${artifact_dir}/BondTellerErc20.sol/BondTellerErc20.json`);
   artifacts.Faucet = await tryImport(`${artifact_dir}/Faucet.sol/Faucet.json`);
 

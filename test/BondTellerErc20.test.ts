@@ -51,7 +51,7 @@ describe("BondTellerERC20", function() {
     solace = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
     xsolace = (await deployContract(deployer, artifacts.xSOLACE, [governor.address, solace.address])) as XSolace;
     tkn1 = (await deployContract(deployer, artifacts.MockERC20, ["Dai Stablecoin", "DAI", ONE_ETHER.mul(1000000)])) as MockErc20;
-    tkn2 = (await deployContract(deployer, artifacts.MockERC20Permit, ["Wrapped Ether", "WETH", ONE_ETHER.mul(1000000)])) as MockErc20Permit;
+    tkn2 = (await deployContract(deployer, artifacts.MockERC20Permit, ["USD Coin", "USDC", ONE_ETHER.mul(1000000)])) as MockErc20Permit;
     bondDepo = (await deployContract(deployer, artifacts.BondDepository, [governor.address, solace.address, xsolace.address, underwritingPool.address, dao.address])) as BondDepository;
     await solace.connect(governor).addMinter(bondDepo.address);
   });
@@ -67,31 +67,31 @@ describe("BondTellerERC20", function() {
       expect(await teller1.totalSupply()).eq(0);
     });
     it("reverts if zero governor", async function () {
-      await expect(teller1.initialize(ZERO_ADDRESS, solace.address, xsolace.address, underwritingPool.address, dao.address, tkn1.address, bondDepo.address)).to.be.revertedWith("zero address governance");
+      await expect(teller1.initialize("Solace DAI Bond", ZERO_ADDRESS, solace.address, xsolace.address, underwritingPool.address, dao.address, tkn1.address, bondDepo.address)).to.be.revertedWith("zero address governance");
     });
     it("reverts if zero solace", async function () {
-      await expect(teller1.initialize(governor.address, ZERO_ADDRESS, xsolace.address, underwritingPool.address, dao.address, tkn1.address, bondDepo.address)).to.be.revertedWith("zero address solace");
+      await expect(teller1.initialize("Solace DAI Bond", governor.address, ZERO_ADDRESS, xsolace.address, underwritingPool.address, dao.address, tkn1.address, bondDepo.address)).to.be.revertedWith("zero address solace");
     });
     it("reverts if zero xsolace", async function () {
-      await expect(teller1.initialize(governor.address, solace.address, ZERO_ADDRESS, underwritingPool.address, dao.address, tkn1.address, bondDepo.address)).to.be.revertedWith("zero address xsolace");
+      await expect(teller1.initialize("Solace DAI Bond", governor.address, solace.address, ZERO_ADDRESS, underwritingPool.address, dao.address, tkn1.address, bondDepo.address)).to.be.revertedWith("zero address xsolace");
     });
     it("reverts if zero pool", async function () {
-      await expect(teller1.initialize(governor.address, solace.address, xsolace.address, ZERO_ADDRESS, dao.address, tkn1.address, bondDepo.address)).to.be.revertedWith("zero address pool");
+      await expect(teller1.initialize("Solace DAI Bond", governor.address, solace.address, xsolace.address, ZERO_ADDRESS, dao.address, tkn1.address, bondDepo.address)).to.be.revertedWith("zero address pool");
     });
     it("reverts if zero dao", async function () {
-      await expect(teller1.initialize(governor.address, solace.address, xsolace.address, underwritingPool.address, ZERO_ADDRESS, tkn1.address, bondDepo.address)).to.be.revertedWith("zero address dao");
+      await expect(teller1.initialize("Solace DAI Bond", governor.address, solace.address, xsolace.address, underwritingPool.address, ZERO_ADDRESS, tkn1.address, bondDepo.address)).to.be.revertedWith("zero address dao");
     });
     it("reverts if zero principal", async function () {
-      await expect(teller1.initialize(governor.address, solace.address, xsolace.address, underwritingPool.address, dao.address, ZERO_ADDRESS, bondDepo.address)).to.be.revertedWith("zero address principal");
+      await expect(teller1.initialize("Solace DAI Bond", governor.address, solace.address, xsolace.address, underwritingPool.address, dao.address, ZERO_ADDRESS, bondDepo.address)).to.be.revertedWith("zero address principal");
     });
     it("reverts if zero bond depo", async function () {
-      await expect(teller1.initialize(governor.address, solace.address, xsolace.address, underwritingPool.address, dao.address, tkn1.address, ZERO_ADDRESS)).to.be.revertedWith("zero address bond depo");
+      await expect(teller1.initialize("Solace DAI Bond", governor.address, solace.address, xsolace.address, underwritingPool.address, dao.address, tkn1.address, ZERO_ADDRESS)).to.be.revertedWith("zero address bond depo");
     });
     it("inits", async function () {
-      await teller1.initialize(governor.address, solace.address, xsolace.address, underwritingPool.address, dao.address, tkn1.address, bondDepo.address);
+      await teller1.initialize("Solace DAI Bond", governor.address, solace.address, xsolace.address, underwritingPool.address, dao.address, tkn1.address, bondDepo.address);
     });
     it("inits with a name and symbol", async function () {
-      expect(await teller1.name()).eq("SOLACE-DAI Bond");
+      expect(await teller1.name()).eq("Solace DAI Bond");
       expect(await teller1.symbol()).eq("SBT");
     });
     it("starts with correct solace", async function () {
@@ -110,10 +110,10 @@ describe("BondTellerERC20", function() {
       expect(await teller1.principal()).eq(tkn1.address);
     });
     it("can deploy proxy", async function () {
-      teller2 = await deployProxyTeller(teller1.address, tkn2.address);
+      teller2 = await deployProxyTeller("Solace USDC Bond", teller1.address, tkn2.address);
     });
     it("inits proxy with a name and symbol", async function () {
-      expect(await teller2.name()).eq("SOLACE-WETH Bond");
+      expect(await teller2.name()).eq("Solace USDC Bond");
       expect(await teller2.symbol()).eq("SBT");
     });
   });
@@ -376,8 +376,6 @@ describe("BondTellerERC20", function() {
       expect(bal12.tellerCapacity).eq(bondInfo.pricePaid.mul(-1));
       expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-STAKE_FEE), 1e14);
     });
-    it("", async function () {});
-    it("", async function () {});
   });
 
   describe("redeem", function () {
@@ -416,7 +414,31 @@ describe("BondTellerERC20", function() {
       expect(bal12.totalBonds).eq(-1);
     });
     it("can redeem with approval", async function () {
-      //await teller1.connect(depositor2).redeem(1);
+      let bal1 = await getBalances(teller1, depositor2);
+      let bondID = 2;
+      await teller1.connect(depositor1).approve(depositor2.address, bondID);
+      const blockTimestamp = (await provider.getBlock('latest')).timestamp;
+      await provider.send("evm_setNextBlockTimestamp", [blockTimestamp + VESTING_TERM]);
+      await provider.send("evm_mine", []);
+      let bondInfo = await teller1.bonds(bondID);
+      let tx1 = await teller1.connect(depositor2).redeem(bondID);
+      expect(tx1).to.emit(teller1, "RedeemBond").withArgs(bondID, depositor2.address, xsolace.address, bondInfo.payoutAmount);
+      let bal2 = await getBalances(teller1, depositor2);
+      let bal12 = getBalancesDiff(bal2, bal1);
+      expect(bal12.userSolace).eq(0);
+      expect(bal12.userXSolace).eq(bondInfo.payoutAmount);
+      expect(bal12.vestingSolace).eq(0);
+      expect(bal12.vestingXSolace).eq(bondInfo.payoutAmount.mul(-1));
+      expect(bal12.stakingSolace).eq(0);
+      expect(bal12.totalXSolace).eq(0);
+      expect(bal12.userTkn1).eq(0);
+      expect(bal12.userTkn2).eq(0);
+      expect(bal12.daoTkn1).eq(0);
+      expect(bal12.daoTkn2).eq(0);
+      expect(bal12.poolTkn1).eq(0);
+      expect(bal12.poolTkn2).eq(0);
+      expect(bal12.userBonds).eq(0);
+      expect(bal12.totalBonds).eq(-1);
     });
     it("cannot double redeem", async function () {
       await expect(teller1.connect(depositor1).redeem(1)).to.be.revertedWith("query for nonexistent token");
@@ -432,7 +454,7 @@ describe("BondTellerERC20", function() {
       xsolace = (await deployContract(deployer, artifacts.xSOLACE, [governor.address, solace.address])) as XSolace;
       await solace.connect(governor).addMinter(bondDepo.address);
       await bondDepo.connect(governor).setParams(solace.address, xsolace.address, underwritingPool.address, dao.address);
-      teller2 = await deployProxyTeller(teller1.address, tkn2.address);
+      teller2 = await deployProxyTeller("Solace USDC Bond", teller1.address, tkn2.address);
     });
     it("can deposit signed", async function () {
       const MOMENTUM_FACTOR = BN.from(1).shl(128).add(10); // every ten SOLACE bonded raises the price one tkn
@@ -556,6 +578,100 @@ describe("BondTellerERC20", function() {
     });
   });
 
+  describe("set terms", async function () {
+    let STAKE_FEE = 300;
+    let DAO_FEE = 200;
+
+    before("redeploy", async function () {
+      solace = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
+      xsolace = (await deployContract(deployer, artifacts.xSOLACE, [governor.address, solace.address])) as XSolace;
+      await solace.connect(governor).addMinter(bondDepo.address);
+      await bondDepo.connect(governor).setParams(solace.address, xsolace.address, underwritingPool.address, dao.address);
+      teller2 = await deployProxyTeller("Solace USDC Bond", teller1.address, tkn2.address);
+    });
+    it("terms start unset", async function () {
+      await expect(teller2.bondPrice()).to.be.reverted;
+      expect(await teller2.nextPrice()).eq(0);
+      expect(await teller2.vestingTerm()).eq(0);
+      expect(await teller2.startTime()).eq(0);
+      expect(await teller2.endTime()).eq(0);
+      expect(await teller2.minimumPrice()).eq(0);
+      expect(await teller2.halfLife()).eq(0);
+      expect(await teller2.capacity()).eq(0);
+      expect(await teller2.capacityIsPayout()).eq(false);
+      expect(await teller2.maxPayout()).eq(0);
+      expect(await teller2.momentumNum()).eq(0);
+      expect(await teller2.momentumDenom()).eq(0);
+      expect(await teller2.termsSet()).eq(false);
+      expect(await teller2.lastPriceUpdate()).eq(0);
+    });
+    it("non governance cannot set terms", async function () {
+      await expect(teller2.connect(depositor1).setTerms(0,0,0,0,0,0,0,false,0,0)).to.be.revertedWith("!governance");
+    });
+    it("validates inputs", async function () {
+      await expect(teller2.connect(governor).setTerms(0,0,0,0,0,0,0,false,0,0)).to.be.revertedWith("invalid price");
+      await expect(teller2.connect(governor).setTerms(1,0,2,1,0,0,0,false,0,0)).to.be.revertedWith("invalid dates");
+      await expect(teller2.connect(governor).setTerms(1,0,2,3,0,0,0,false,0,0)).to.be.revertedWith("invalid halflife");
+      await expect(teller2.connect(governor).setTerms(1,0,2,3,0,4,0,false,0,0)).to.be.revertedWith("1/0");
+    });
+    it("can set terms", async function () {
+      let momentumFactor = BN.from(5).shl(128).add(6);
+      let tx = teller2.connect(governor).setTerms(1,7,2,3,8,4,9,false,10,momentumFactor);
+      expect(tx).to.emit(teller2, "TermsSet");
+      const blockTimestamp = (await provider.getBlock('latest')).timestamp;
+      expect(await teller2.bondPrice()).eq(8);
+      expect(await teller2.nextPrice()).eq(1);
+      expect(await teller2.vestingTerm()).eq(7);
+      expect(await teller2.startTime()).eq(2);
+      expect(await teller2.endTime()).eq(3);
+      expect(await teller2.minimumPrice()).eq(8);
+      expect(await teller2.halfLife()).eq(4);
+      expect(await teller2.capacity()).eq(9);
+      expect(await teller2.capacityIsPayout()).eq(false);
+      expect(await teller2.maxPayout()).eq(10);
+      expect(await teller2.momentumNum()).eq(5);
+      expect(await teller2.momentumDenom()).eq(6);
+      expect(await teller2.termsSet()).eq(true);
+      expectClose(await teller2.lastPriceUpdate(), blockTimestamp, 5);
+    });
+  });
+
+  describe("set fees", async function () {
+    let STAKE_FEE = 300;
+    let DAO_FEE = 200;
+
+    before("redeploy", async function () {
+      solace = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
+      xsolace = (await deployContract(deployer, artifacts.xSOLACE, [governor.address, solace.address])) as XSolace;
+      await solace.connect(governor).addMinter(bondDepo.address);
+      await bondDepo.connect(governor).setParams(solace.address, xsolace.address, underwritingPool.address, dao.address);
+      teller2 = await deployProxyTeller("Solace USDC Bond", teller1.address, tkn2.address);
+    });
+    it("fees start unset", async function () {
+      expect(await teller2.stakeFeeBps()).eq(0);
+      expect(await teller2.daoFeeBps()).eq(0);
+    });
+    it("non governance cannot set fees", async function () {
+      await expect(teller2.connect(depositor1).setFees(0, 0)).to.be.revertedWith("!governance");
+    });
+    it("validates inputs", async function () {
+      await expect(teller2.connect(governor).setFees(10001, 0)).to.be.revertedWith("invalid stake fee");
+      await expect(teller2.connect(governor).setFees(0, 10001)).to.be.revertedWith("invalid dao fee");
+    });
+    it("can set terms", async function () {
+      let tx = teller2.connect(governor).setFees(STAKE_FEE, DAO_FEE);
+      expect(tx).to.emit(teller2, "FeesSet");
+      expect(await teller2.stakeFeeBps()).eq(STAKE_FEE);
+      expect(await teller2.daoFeeBps()).eq(DAO_FEE);
+    });
+    it("can set to zero", async function () {
+      let tx = teller2.connect(governor).setFees(0, 0);
+      expect(tx).to.emit(teller2, "FeesSet");
+      expect(await teller2.stakeFeeBps()).eq(0);
+      expect(await teller2.daoFeeBps()).eq(0);
+    });
+  });
+
   interface Balances {
     userSolace: BN;
     userXSolace: BN;
@@ -626,9 +742,9 @@ describe("BondTellerERC20", function() {
     };
   }
 
-  async function deployProxyTeller(implAddress: string, tokenAddress: string) {
+  async function deployProxyTeller(name: string, implAddress: string, tokenAddress: string) {
     let newTeller;
-    let tx = await bondDepo.connect(governor).createBondTeller(governor.address, implAddress, tokenAddress);
+    let tx = await bondDepo.connect(governor).createBondTeller(name, governor.address, implAddress, tokenAddress);
     let events = (await tx.wait())?.events;
     if(events && events.length > 0) {
       let event = events[0];

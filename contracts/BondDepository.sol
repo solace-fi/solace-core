@@ -72,18 +72,20 @@ contract BondDepository is IBondDepository, Factory, Governable {
     /**
      * @notice Creates a new [`BondTeller`](./bondteller).
      * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param name The name of the bond token.
      * @param governance The address of the teller's [governor](/docs/protocol/governance).
      * @param impl The address of BondTeller implementation.
      * @param principal address The ERC20 token that users give.
      * @return teller The address of the new teller.
      */
     function createBondTeller(
+        string memory name,
         address governance,
         address impl,
         address principal
     ) external override onlyGovernance returns (address teller) {
         teller = _deployMinimalProxy(impl);
-        IBondTeller(teller).initialize(governance, address(_solace), address(_xsolace), _pool, _dao, principal, address(this));
+        IBondTeller(teller).initialize(name, governance, address(_solace), address(_xsolace), _pool, _dao, principal, address(this));
         _isTeller[teller] = true;
         emit TellerAdded(teller);
         return teller;
@@ -92,6 +94,7 @@ contract BondDepository is IBondDepository, Factory, Governable {
     /**
      * @notice Creates a new [`BondTeller`](./bondteller).
      * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param name The name of the bond token.
      * @param governance The address of the teller's [governor](/docs/protocol/governance).
      * @param impl The address of BondTeller implementation.
      * @param salt The salt for CREATE2.
@@ -99,13 +102,14 @@ contract BondDepository is IBondDepository, Factory, Governable {
      * @return teller The address of the new teller.
      */
     function create2BondTeller(
+        string memory name,
         address governance,
         address impl,
         bytes32 salt,
         address principal
     ) external override onlyGovernance returns (address teller) {
         teller = _deployMinimalProxy(impl, salt);
-        IBondTeller(teller).initialize(governance, address(_solace), address(_xsolace), _pool, _dao, principal, address(this));
+        IBondTeller(teller).initialize(name, governance, address(_solace), address(_xsolace), _pool, _dao, principal, address(this));
         _isTeller[teller] = true;
         emit TellerAdded(teller);
         return teller;
