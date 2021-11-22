@@ -35,12 +35,14 @@ contract RiskStrategy is IRiskStrategy, GovernableInitializable {
     address internal _strategist = address(0);
 
     /// @notice sum of the product weights in strategy
-    /// @dev zero-assignment is fine. it is set on constructor.
-    uint32 internal _weightSum = 0;
+    uint32 internal _weightSum = type(uint32).max;
 
     /// @notice the allocation weight that is allocated by `Risk Manager`.
     /// It defines how much amount the strategy can use for coverage. 
     uint32 internal _weightAllocation = type(uint32).max;
+
+    /// @notice the status of the risk strategy.
+    bool _status = false;
 
     /// @notice controls the access that for only risk manager can access.
     modifier onlyRiskManager() {
@@ -82,12 +84,24 @@ contract RiskStrategy is IRiskStrategy, GovernableInitializable {
 
     /**
      * @notice Sets the weight of the `Risk Strategy`.
+     * Can only be called by the current [**Risk Manager**](./RiskManager).
      * @param weight_ The value to set.
     */
     function setWeightAllocation(uint32 weight_) external override onlyRiskManager {
+        require(_status, "strategy inactive");
         require(weight_ > 0, "invalid weight!");
         _weightAllocation = weight_;
         emit WeightAllocationSet(weight_);
+    }
+
+    /**
+     * @notice Sets the status of the `Risk Strategy`.
+     * Can only be called by the current [**Risk Manager**](./RiskManager).
+     * @param status_ True to activate, false otherwise.
+    */
+    function setStatus(bool status_) external override onlyRiskManager {
+        _status = status_;
+        emit StatusSet(status_);
     }
     
     /***************************************
@@ -96,6 +110,9 @@ contract RiskStrategy is IRiskStrategy, GovernableInitializable {
 
     /**
     * @notice Given a request for coverage, determines if that risk is acceptable and if so at what price.
+    * @dev The strategy should be active. The status check is important because, we don't force any status check
+    * in the products. So, we don't allow any product to call assessRisk function if the strategy is not active
+    * and also product is not in the strategy.  
     * @param prod_ The product that wants to sell coverage.
     * @param currentCover_ If updating an existing policy's cover amount, the current cover amount, otherwise 0.
     * @param newCover_ The cover amount requested.
@@ -103,8 +120,9 @@ contract RiskStrategy is IRiskStrategy, GovernableInitializable {
     * @return price The price in wei per 1e12 wei of coverage per block.
     */
     function assessRisk(address prod_, uint256 currentCover_, uint256 newCover_) external view override returns (bool acceptable, uint24 price) {
-        // must be a registered product
-        if (_productToIndex[prod_] == 0) return (false, type(uint24).max);
+        require(_status, "strategy inactive");
+        require(_productToIndex[prod_] > 0, "invalid product");
+
         // max cover checks
         uint256 mc = maxCover();
         ProductRiskParams storage params = _productRiskParams[prod_];
@@ -224,6 +242,22 @@ contract RiskStrategy is IRiskStrategy, GovernableInitializable {
     */
     function weightSum() external view override returns (uint32 sum) {
         return _weightSum;
+    }
+
+    /**
+     * @notice Returns the strategist address.
+     * @return strategist_ The address of the risk strategy owner.
+    */
+    function strategist() external view override returns (address strategist_) {
+        return _strategist;
+    }
+
+    /**
+     * @notice Returns the status of the risk strategy.
+     * @return status True if strategy is active.
+    */
+    function status() public view override returns (bool status) {
+        return _status;
     }
 
     /***************************************

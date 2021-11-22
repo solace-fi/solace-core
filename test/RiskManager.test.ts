@@ -24,7 +24,6 @@ describe("RiskManager", function () {
   let policyManager: PolicyManager;
   let riskManager: RiskManager;
   let riskStrategy: RiskStrategy;
-  let riskStrategy2: RiskStrategy;
   let riskStrategyFactory: Contract;
   let coverageDataProvider: CoverageDataProvider;
   let productFactory: ProductFactory;
@@ -36,8 +35,8 @@ describe("RiskManager", function () {
 
   // vars
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-  const NO_WEIGHT = BN.from("4294967295"); // max uint32
-  const MAX_PRICE = BN.from("16777215"); // max uint24
+  const STRATEGY_STATUS_ACTIVE = 1;
+  const STRATEGY_STATUS_INACTIVE = 0;
 
   before(async function () {
     artifacts = await import_artifacts();
@@ -203,6 +202,99 @@ describe("RiskManager", function () {
       expect(await riskManager.minCapitalRequirement()).to.equal(6);
       await riskManager.connect(governor).setPartialReservesFactor(7500);
       expect(await riskManager.minCapitalRequirement()).to.equal(9);
+    });
+  });
+
+  describe("addRiskStrategy", function() {
+    it("cannot add risk strategy by non governance", async function() {
+      await expect(riskManager.connect(user).addRiskStrategy(riskStrategy.address)).to.be.revertedWith("!governance");
+    });
+
+    it("cannot add zero address strategy", async function() {
+      await expect(riskManager.connect(governor).addRiskStrategy(ZERO_ADDRESS)).to.be.revertedWith("zero address strategy");
+    });
+
+    it("can add risk strategy", async function() {
+      let prevStrategyCount = await riskManager.connect(user).numStrategies();
+      let tx = await riskManager.connect(governor).addRiskStrategy(riskStrategy.address);
+      // should emit event
+      expect(tx).to.emit(riskManager, "StrategyAdded").withArgs(riskStrategy.address);
+      // strategy count should be increased
+      let strategyCount = await riskManager.connect(user).numStrategies();
+      expect(prevStrategyCount.add(1)).to.eq(strategyCount);
+      // strategy status should be inactive(by default INACTIVE=0. ACTIVE=1)
+      expect(await riskManager.connect(user).strategyIsActive(riskStrategy.address)).to.eq(false);
+      // index to strategy should be correct
+      expect(await riskManager.connect(user).strategyAt(strategyCount)).to.equal(riskStrategy.address);
+    });
+
+    it("cannot add duplicate strategy", async function() {
+      await expect(riskManager.connect(governor).addRiskStrategy(riskStrategy.address)).to.be.revertedWith("duplicate strategy");
+    });
+
+    it("can get strategy info", async function() {
+      let id = BN.from(1)
+      let strategyAddress = riskStrategy.address;
+      let strategist = deployer.address;
+      let weight = BN.from(0);
+      let status = STRATEGY_STATUS_INACTIVE;
+      let info = await riskManager.connect(user).strategyInfo(riskStrategy.address);
+      expect(info.id).to.eq(id);
+      expect(info.strategyAddress).to.equal(strategyAddress);
+      expect(info.strategist).to.equal(strategist);
+      expect(info.weight).to.eq(weight);
+      expect(info.status).to.eq(status);
+      expect(info.timestamp).to.gt(0);
+    });
+  });
+
+  describe("setWeightAllocation", function() {
+    before(async function() {
+      await riskManager.connect(governor).setStrategyStatus(riskStrategy.address, STRATEGY_STATUS_INACTIVE);
+      let vaultAmount = await vault.totalAssets();
+    });
+
+    it("cannot set weight by non governance", async function() {
+      await expect(riskManager.connect(user).setWeightAllocation(riskStrategy.address, 1000)).to.be.revertedWith("!governance");
+    });
+
+    it("cannot set invalid weight", async function() {
+      await expect(riskManager.connect(governor).setWeightAllocation(riskStrategy.address, 0)).to.be.revertedWith("invalid weight!");
+    });
+
+    it("cannot set weight for inactive strategy", async function() {
+      await expect(riskManager.connect(governor).setWeightAllocation(riskStrategy.address, 1000)).to.be.revertedWith("inactive strategy");
+    });
+
+    it("can set weight", async function() {
+      await riskManager.connect(governor).setStrategyStatus(riskStrategy.address, STRATEGY_STATUS_ACTIVE);
+      let tx = await riskManager.connect(governor).setWeightAllocation(riskStrategy.address, 1000);
+      expect(tx).to.emit(riskManager, "RiskStrategyWeightAllocationSet").withArgs(riskStrategy.address, 1000);
+    });
+
+    it("cannot set weight if allocation drops under the strategy mcr", async function() {
+      let maxCover = await riskManager.connect(governor).maxCover();
+      await policyManager.connect(product1).createPolicy(user.address, maxCover.mul(2), 0, 0, ZERO_ADDRESS, riskStrategy.address);
+      await expect(riskManager.connect(governor).setWeightAllocation(riskStrategy.address, 1)).to.be.revertedWith("invalid weight allocation");
+    });
+  });
+
+  describe("setStrategyStatus", function() {
+    it("cannot set strategy status by non governance", async function() {
+      await expect(riskManager.connect(user).setStrategyStatus(riskStrategy.address, STRATEGY_STATUS_ACTIVE)).to.be.revertedWith("!governance");
+    });
+
+    it("cannot set status for zero address strategy", async function() {
+      await expect(riskManager.connect(governor).setStrategyStatus(ZERO_ADDRESS, STRATEGY_STATUS_ACTIVE)).to.be.revertedWith("zero address strategy");
+    });
+
+    it("cannot set status for non-exist strategy", async function() {
+      await expect(riskManager.connect(governor).setStrategyStatus(user.address, STRATEGY_STATUS_ACTIVE)).to.be.revertedWith("non-exist strategy");
+    });
+
+    it("can set status", async function() {
+      let tx  = await riskManager.connect(governor).setStrategyStatus(riskStrategy.address, STRATEGY_STATUS_ACTIVE);
+      expect(tx).to.emit(riskManager, "StrategyStatusUpdated").withArgs(riskStrategy.address, 1);
     });
   });
 

@@ -43,16 +43,6 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
     /// @notice Cannot buy new policies while paused. (Default is False)
     bool internal _paused;
 
-    /// @notice The number of risk strategies for the product.
-    uint256 internal _strategyCount;
-
-    /// @notice strategy => index mapping.
-    /// @dev [0, strategyCount]
-    mapping(address => uint256) internal _strategyToIndex;
-    
-    /// @notice index => strategy mappping
-    mapping(uint256 => address) internal _indexToStrategy;
-
     /****
         Book-Keeping Variables
     ****/
@@ -137,8 +127,6 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
     function buyPolicy(address policyholder, uint256 coverAmount, uint40 blocks, bytes memory positionDescription, address riskStrategy) external payable override nonReentrant whileUnpaused returns (uint256 policyID) {
         require(policyholder != address(0x0), "zero address");
         require(coverAmount > 0, "zero cover value");
-        require(_strategyToIndex[riskStrategy] > 0, "invalid risk strategy");
-
         // check that the product can provide coverage for this policy
         (bool acceptable, uint24 price) = IRiskStrategy(riskStrategy).assessRisk(address(this), 0, coverAmount);
         require(acceptable, "cannot accept that risk");
@@ -177,8 +165,6 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
         require(product == address(this), "wrong product");
         // check for policy expiration
         require(expirationBlock >= block.number, "policy is expired");
-        // check policy risk strategy is active
-        require(_strategyToIndex[riskStrategy] > 0, "invalid risk strategy");
         // check that the product can provide coverage for this policy
         (bool acceptable, uint24 price) = IRiskStrategy(riskStrategy).assessRisk(address(this), previousCoverAmount, coverAmount);
         require(acceptable, "cannot accept that risk");
@@ -220,8 +206,7 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
         require(policyholder == msg.sender,"!policyholder");
         require(product == address(this), "wrong product");
         require(expirationBlock >= block.number, "policy is expired");
-        // check policy risk strategy is active
-        require(_strategyToIndex[riskStrategy] > 0, "invalid risk strategy");
+        require(IRiskStrategy(riskStrategy).status(), "strategy inactive");
        
         // compute the premium
         uint256 premium = coverAmount * extension * purchasePrice / Q12;
@@ -253,8 +238,6 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
         require(policyholder == msg.sender,"!policyholder");
         require(product == address(this), "wrong product");
         require(previousExpirationBlock >= block.number, "policy is expired");
-        // check policy risk strategy is active
-        require(_strategyToIndex[riskStrategy] > 0, "invalid strategy");
         // check that the product can provide coverage for this policy
         (bool acceptable, uint24 price) = IRiskStrategy(riskStrategy).assessRisk(address(this), previousCoverAmount, coverAmount);
         require(acceptable, "cannot accept that risk");
@@ -356,7 +339,6 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
      * @return premium The quote for their policy in **ETH**.
      */
     function getQuote(uint256 coverAmount, uint40 blocks, address riskStrategy) external view override returns (uint256 premium) {
-        require(_strategyToIndex[riskStrategy] > 0, "invalid risk strategy");
         (, uint24 price, ) = IRiskStrategy(riskStrategy).productRiskParams(address(this));
         return coverAmount * blocks * price / Q12;
     }
@@ -396,24 +378,6 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
     */
     function activeCoverAmountPerStrategy(address riskStrategy) external view override returns (uint256 amount) {
         return _activeCoverAmountPerStrategy[riskStrategy];
-    }
-
-    /**
-    * @notice Return the strategy at an index.
-    * @dev Enumerable `[1, numStrategies]`.
-    * @param index Index to query.
-    * @return strategy The product address.
-    */
-    function strategyAt(uint256 index) external view override returns (address strategy) {
-        return _indexToStrategy[index];
-     }
- 
-     /**
-      * @notice Returns the number of registered strategies.
-      * @return count The number of strategies.
-     */
-    function numStrategies() external view override returns (uint256 count) {
-         return _strategyCount;
     }
 
     /**
@@ -529,48 +493,6 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
         require(policyManager_ != address(0x0), "zero address policymanager");
         _policyManager = IPolicyManager(policyManager_);
         emit PolicyManagerSet(policyManager_);
-    }
-
-    /**
-     * @notice Adds a risk strategy for the product.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param strategy_ The address of the risk strategy.
-    */
-    function addRiskStrategy(address strategy_) external override onlyGovernance {
-        require(strategy_ != address(0x0), "zero address strategy");
-        require(_strategyToIndex[strategy_] == 0, "duplicate strategy");
-
-        // strategy is active?
-        bool status = IRiskManager(_registry.riskManager()).strategyIsActive(strategy_);
-        require(status, "inactive strategy");
-        uint256 index = _strategyCount + 1;
-        _strategyToIndex[strategy_] = index;
-        _indexToStrategy[index] = strategy_;
-        _strategyCount = index;
-        emit StrategyAdded(strategy_);
-    }
-
-    /**
-     * @notice Removes risk strategy from the product.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param strategy_ The address of the risk strategy to remove.
-    */
-    function removeRiskStrategy(address strategy_) external override onlyGovernance {
-        uint256 index = _strategyToIndex[strategy_];
-        uint256 strategyCount = _strategyCount;
-        if (strategyCount == 0 && index == 0) return;
-        
-        uint256 lastIndex = strategyCount - 1;
-        if (index != lastIndex) {
-            address lastStrategy = _indexToStrategy[lastIndex];
-            _strategyToIndex[lastStrategy] = index;
-            _indexToStrategy[index] = lastStrategy;
-        }
-
-        delete _strategyToIndex[strategy_];
-        delete _indexToStrategy[lastIndex];
-        _strategyCount = strategyCount - 1;
-        emit StrategyRemoved(strategy_);
     }
 
     /***************************************

@@ -30,10 +30,6 @@ interface IProduct {
     event PauseSet(bool paused);
     /// @notice Emitted when PolicyManager is set.
     event PolicyManagerSet(address policyManager);
-    /// @notice Emitted when a risk strategy is added.
-    event StrategyAdded(address strategy);
-    /// @notice Emitted when a risk strategy is removed.
-    event StrategyRemoved(address strategy);
 
     /***************************************
     POLICYHOLDER FUNCTIONS
@@ -130,20 +126,6 @@ interface IProduct {
     function activeCoverAmountPerStrategy(address riskStrategy) external view returns (uint256 amount);
 
     /**
-      * @notice Return the strategy at an index.
-      * @dev Enumerable `[1, numStrategies]`.
-      * @param index_ Index to query.
-      * @return strategy The product address.
-    */
-    function strategyAt(uint256 index_) external view returns (address strategy);
-
-    /**
-     * @notice Returns the number of registered strategies.
-     * @return count The number of strategies.
-    */
-    function numStrategies() external view returns (uint256 count);
-
-    /**
      * @notice Returns whether or not product is currently in paused state.
      * @return status True if product is paused.
     */
@@ -201,18 +183,4 @@ interface IProduct {
      * @param policyManager_ The new policy manager.
      */
     function setPolicyManager(address policyManager_) external;
-
-    /**
-     * @notice Adds a risk strategy for the product.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param strategy_ The address of the risk strategy.
-    */
-    function addRiskStrategy(address strategy_) external;
-
-    /**
-     * @notice Removes risk strategy from the product.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param strategy_ The address of the risk strategy to remove.
-    */
-    function removeRiskStrategy(address strategy_) external;
 }

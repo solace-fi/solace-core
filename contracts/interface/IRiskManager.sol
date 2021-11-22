@@ -20,11 +20,8 @@ interface IRiskManager {
     ***************************************/
 
     enum StrategyStatus {
-        CREATED,
-        VOTING,
-        ACCEPTED,
-        ENABLED,
-        DISABLED
+       INACTIVE,
+       ACTIVE
     }
 
     struct Strategy {
@@ -32,7 +29,8 @@ interface IRiskManager {
         address strategy;
         address strategist;
         uint32 weight;
-        StrategyStatus status; 
+        StrategyStatus status;
+        uint256 timestamp;
     }
 
     /***************************************
@@ -105,6 +103,19 @@ interface IRiskManager {
      * @return count The number of strategies.
     */
     function numStrategies() external view returns (uint256 count);
+
+    /**
+     * @notice Returns the risk strategy information.
+     * @param strategy_ The risk strategy.
+     * @return id The id of the risk strategy.
+     * @return strategyAddress The address of the risk strategy.
+     * @return strategist The address of the creator of the risk strategy.
+     * @return weight The risk strategy weight allocation.
+     * @return status The status of risk strategy.
+     * @return timestamp The added time of the risk strategy.
+     *
+    */
+    function strategyInfo(address strategy_) external view returns (uint256 id, address strategyAddress, address strategist, uint32 weight, StrategyStatus status, uint256 timestamp);
 
     /***************************************
     MAX COVER VIEW FUNCTIONS

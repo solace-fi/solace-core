@@ -31,6 +31,9 @@ interface IRiskStrategy {
     /// @notice Emitted when strategy's allocation weight is set.
     event WeightAllocationSet(uint32 weight);
 
+    /// @notice Emitted when strategy's status is set.
+    event StatusSet(bool status);
+
     /// @notice Emitted when governance adds a product.
     event ProductAddedByGovernance(address product, uint32 weight, uint24 price, uint16 divisor);
     
@@ -52,9 +55,17 @@ interface IRiskStrategy {
 
     /**
      * @notice Sets the weight of the `Risk Strategy`.
+     * Can only be called by the current [**Risk Manager**](./RiskManager).
      * @param weight_ The value to set.
     */
     function setWeightAllocation(uint32 weight_) external;
+
+    /**
+     * @notice Sets the status of the `Risk Strategy`.
+     * Can only be called by the current [**Risk Manager**](./RiskManager).
+     * @param status_ True to activate, false otherwise.
+    */
+    function setStatus(bool status_) external;
 
     /***************************************
       RISK STRATEGY VIEW FUNCTIONS
@@ -132,6 +143,18 @@ interface IRiskStrategy {
      * @return sum The weight sum.
     */
     function weightSum() external view returns (uint32 sum);
+
+    /**
+     * @notice Returns the strategist address.
+     * @return strategist_ The address of the risk strategy owner.
+    */
+    function strategist() external view returns (address strategist_);
+
+    /**
+     * @notice Returns the status of the risk strategy.
+     * @return status True if strategy is active.
+    */
+    function status() external view returns (bool status);
 
     /***************************************
     RISK STRATEGY GOVERNANCE FUNCTIONS

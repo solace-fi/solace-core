@@ -17,7 +17,7 @@ import "./interface/IPolicyDescriptor.sol";
  * @author solace.fi
  * @notice The **PolicyManager** manages the creation of new policies and modification of existing policies.
  *
- * Most users will not interact with **PolicyManager** directly. To buy, modify, or cancel policies, users should use the respective [**product**](./products/BaseProduct) for the position they would like to cover. Use **PolicyManager** to view policies.
+ * Most users will not interact with **PolicyManager** directly. To buy, modify, or cancel policies, users should use the respective [**product**](./products/CoverageProduct) for the position they would like to cover. Use **PolicyManager** to view policies.
  *
  * Policies are [**ERC721s**](https://docs.openzeppelin.com/contracts/4.x/api/token/erc721#ERC721).
  */
@@ -331,6 +331,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
     function _burn(uint256 policyID) internal override {
         super._burn(policyID);
         _activeCoverAmount -= _policyInfo[policyID].coverAmount;
+        _activeCoverAmountPerStrategy[_policyInfo[policyID].riskStrategy] -=  _policyInfo[policyID].coverAmount;
         delete _policyInfo[policyID];
         emit PolicyBurned(policyID);
     }
@@ -351,7 +352,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
                 activeCover -= coverAmount;
                 _activeCoverAmountPerStrategy[_policyInfo[policyID].riskStrategy] -= coverAmount;
                 IProduct(product).updateActiveCoverAmount(-SafeCast.toInt256(coverAmount));
-                _burn(policyID);
+                super._burn(policyID);
             }
         }
         _activeCoverAmount = activeCover;

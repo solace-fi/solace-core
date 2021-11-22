@@ -9,8 +9,6 @@ import "./interface/IProduct.sol";
 import "./interface/IPolicyManager.sol";
 import "./interface/IRiskManager.sol";
 
-import "hardhat/console.sol";
-
 /**
  * @title RiskManager
  * @author solace.fi
@@ -71,9 +69,10 @@ contract RiskManager is IRiskManager, Governable {
         _strategies[strategy_] = Strategy({
             id: ++strategyCount,
             strategy: strategy_,
-            strategist: msg.sender,
+            strategist: IRiskStrategy(strategy_).strategist(),
             weight: 0,
-            status: StrategyStatus.CREATED
+            status: StrategyStatus.INACTIVE,
+            timestamp: block.timestamp
         });
         _strategyToIndex[strategy_] = strategyCount;
         _indexToStrategy[strategyCount] = strategy_;
@@ -91,6 +90,7 @@ contract RiskManager is IRiskManager, Governable {
     function setWeightAllocation(address strategy_, uint32 weight_) external override onlyGovernance {
         require(weight_ > 0, "invalid weight!");
         require(strategyIsActive(strategy_), "inactive strategy");
+        require(isValidWeightAllocation(strategy_, weight_), "invalid weight allocation");
         Strategy storage riskStrategy = _strategies[strategy_];
         _weightSum = (_weightSum + weight_) - riskStrategy.weight;
         riskStrategy.weight = weight_;
@@ -106,28 +106,31 @@ contract RiskManager is IRiskManager, Governable {
     */
     function setStrategyStatus(address strategy_, uint8 status_) public override onlyGovernance {
         require(strategy_ != address(0x0), "zero address strategy");
+        require(_strategyToIndex[strategy_] > 0, "non-exist strategy");
         Strategy storage riskStrategy = _strategies[strategy_];
         riskStrategy.status = StrategyStatus(status_);
+        bool status = riskStrategy.status == StrategyStatus.ACTIVE ? true : false;
+        IRiskStrategy(strategy_).setStatus(status);
         emit StrategyStatusUpdated(strategy_, status_);
     }
 
     /**
      * @notice Checks if the given risk strategy is active.
-     * @param strategy The risk strategy.
+     * @param strategy_ The risk strategy.
      * @return status True if the strategy is active.
      */
-    function strategyIsActive(address strategy) public view override returns (bool status) {
-        return _strategies[strategy].status == StrategyStatus.ENABLED;
+    function strategyIsActive(address strategy_) public view override returns (bool status) {
+        return _strategies[strategy_].status == StrategyStatus.ACTIVE;
     }
 
     /**
     * @notice Return the strategy at an index.
     * @dev Enumerable `[1, numStrategies]`.
-    * @param index Index to query.
+    * @param index_ Index to query.
     * @return strategy The product address.
     */
-    function strategyAt(uint256 index) external view override returns (address strategy) {
-       return _indexToStrategy[index];
+    function strategyAt(uint256 index_) external view override returns (address strategy) {
+       return _indexToStrategy[index_];
     }
 
     /**
@@ -136,6 +139,22 @@ contract RiskManager is IRiskManager, Governable {
     */
     function numStrategies() external view override returns (uint256 count) {
         return _strategyCount;
+    }
+
+    /**
+     * @notice Returns the risk strategy information.
+     * @param strategy_ The risk strategy.
+     * @return id The id of the risk strategy.
+     * @return strategyAddress The address of the risk strategy.
+     * @return strategist The address of the creator of the risk strategy.
+     * @return weight The risk strategy weight allocation.
+     * @return status The status of risk strategy.
+     * @return timestamp The added time of the risk strategy.
+     *
+    */
+    function strategyInfo(address strategy_) external view override returns (uint256 id, address strategyAddress, address strategist, uint32 weight, StrategyStatus status, uint256 timestamp) {
+        Strategy memory strategy = _strategies[strategy_];
+        return (strategy.id, strategy.strategy, strategy.strategist, strategy.weight, strategy.status, strategy.timestamp);
     }
 
     /***************************************
@@ -177,7 +196,7 @@ contract RiskManager is IRiskManager, Governable {
      * @param strategy The risk strategy.
      * @return smcr The strategy minimum capital requirement.
      */
-    function minCapitalRequirementPerStrategy(address strategy) external view override returns (uint256 smcr) {
+    function minCapitalRequirementPerStrategy(address strategy) public view override returns (uint256 smcr) {
         return IPolicyManager(_registry.policyManager()).activeCoverAmountPerStrategy(strategy) * _partialReservesFactor / MAX_BPS;
     }
 
@@ -197,5 +216,37 @@ contract RiskManager is IRiskManager, Governable {
     function setPartialReservesFactor(uint16 partialReservesFactor_) external override onlyGovernance {
         _partialReservesFactor = partialReservesFactor_;
         emit PartialReservesFactorSet(partialReservesFactor_);
+    }
+
+    /**
+     * @notice The function checks if the new weight allocation is valid.
+     * @param strategy_ The strategy address.
+     * @param weight_ The weight allocation to set.
+     * @return status True if the weight allocation is valid.
+    */
+    function isValidWeightAllocation(address strategy_, uint32 weight_) private view returns(bool status) {
+        Strategy memory riskStrategy = _strategies[strategy_];
+        uint32 weightsum = _weightSum;
+
+        // check if new allocation is valid for the strategy
+        uint256 smcr = minCapitalRequirementPerStrategy(strategy_);
+        uint256 mc = maxCover();
+        weightsum = weightsum + weight_ - riskStrategy.weight;
+        uint256 newAllocationAmount = (mc * weight_) / weightsum;
+        if (newAllocationAmount < smcr) return false;
+        console.log("New allocation amount:", newAllocationAmount);
+
+        // check other risk strategies
+        uint256 strategyCount = _strategyCount;
+        for (uint256 i = strategyCount; i > 0; i--) {
+            address strategy = _indexToStrategy[i];
+            riskStrategy = _strategies[strategy];
+            if (strategy == strategy_ || riskStrategy.weight == 0) continue;
+
+            smcr = minCapitalRequirementPerStrategy(strategy);
+            newAllocationAmount = (mc * riskStrategy.weight) / weightsum;
+            if (newAllocationAmount < smcr) return false;
+        }
+        return true;
     }
 }
