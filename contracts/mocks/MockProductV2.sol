@@ -45,6 +45,7 @@ contract MockProductV2 is CoverageProduct {
 
         // update local book-keeping variables
         _activeCoverAmount += coverAmount;
+        _activeCoverAmountPerStrategy[riskStrategy] += coverAmount;
 
         emit PolicyCreated(policyID);
 

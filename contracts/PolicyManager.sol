@@ -144,7 +144,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
      * @param policyID The policy ID.
      * @return strategy The risk strategy address.
     */
-    function getPolicyRiskStrategy(uint256 policyID) external view override returns (address strategy) {
+    function getPolicyRiskStrategy(uint256 policyID) external view override tokenMustExist(policyID) returns (address strategy) {
         return _policyInfo[policyID].riskStrategy;
     }
 

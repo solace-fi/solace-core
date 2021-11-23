@@ -235,7 +235,7 @@ contract RiskManager is IRiskManager, Governable {
         uint256 newAllocationAmount = (mc * weight_) / weightsum;
         if (newAllocationAmount < smcr) return false;
         console.log("New allocation amount:", newAllocationAmount);
-
+        console.log("SMCR:", smcr);
         // check other risk strategies
         uint256 strategyCount = _strategyCount;
         for (uint256 i = strategyCount; i > 0; i--) {

@@ -61,7 +61,6 @@ describe("RiskManager", function () {
     let riskStrategyContractFactory = await ethers.getContractFactory("RiskStrategyFactory", deployer);
     riskStrategyFactory = (await riskStrategyContractFactory.deploy(registry.address, governor.address));
     await riskStrategyFactory.deployed();
-    console.log(riskStrategyFactory.address);
 
     // create product4
     let baseProduct4 = (await deployContract(deployer, artifacts.MockProductV2)) as MockProductV2;
