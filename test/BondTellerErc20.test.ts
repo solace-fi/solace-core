@@ -23,7 +23,7 @@ const VESTING_TERM = 432000; // 5 days
 const HALF_LIFE = 2592000; // 30 days
 const MAX_BPS = 10000;
 
-const MAX_UINT64 = BN.from("0xffffffffffffffff");
+const MAX_UINT40 = BN.from("1099511627775");
 
 describe("BondTellerERC20", function() {
   let artifacts: ArtifactImports;
@@ -53,7 +53,8 @@ describe("BondTellerERC20", function() {
     tkn1 = (await deployContract(deployer, artifacts.MockERC20, ["Dai Stablecoin", "DAI", ONE_ETHER.mul(1000000)])) as MockErc20;
     tkn2 = (await deployContract(deployer, artifacts.MockERC20Permit, ["USD Coin", "USDC", ONE_ETHER.mul(1000000)])) as MockErc20Permit;
     bondDepo = (await deployContract(deployer, artifacts.BondDepository, [governor.address, solace.address, xsolace.address, underwritingPool.address, dao.address])) as BondDepository;
-    await solace.connect(governor).addMinter(bondDepo.address);
+    await solace.connect(governor).addMinter(minter.address);
+    await solace.connect(minter).mint(bondDepo.address, ONE_ETHER.mul(1000));
   });
 
   describe("initialization", function () {
@@ -208,16 +209,16 @@ describe("BondTellerERC20", function() {
     });
     it("cannot deposit before start", async function () {
       const blockTimestamp = (await provider.getBlock('latest')).timestamp;
-      await teller1.connect(governor).setTerms(ONE_ETHER.mul(2), VESTING_TERM, blockTimestamp+10, MAX_UINT64, 0, HALF_LIFE, 0, false, 0, 1);
+      await teller1.connect(governor).setTerms({startPrice: ONE_ETHER, minimumPrice: ONE_ETHER.mul(2), maxPayout: ONE_ETHER.mul(2), priceAdjNum: 1, priceAdjDenom: 10, capacity: ONE_ETHER.mul(10), capacityIsPayout: false, startTime: blockTimestamp+10, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
       await expect(teller1.connect(depositor1).deposit(1, ONE_ETHER.mul(2), depositor1.address, false)).to.be.revertedWith("bond not yet started");
     });
     it("cannot deposit after conclusion", async function () {
       const blockTimestamp = (await provider.getBlock('latest')).timestamp;
-      await teller1.connect(governor).setTerms(ONE_ETHER.mul(2), VESTING_TERM, 0, blockTimestamp-1, 0, HALF_LIFE, 0, false, 0, 1);
+      await teller1.connect(governor).setTerms({startPrice: ONE_ETHER, minimumPrice: ONE_ETHER.mul(2), maxPayout: ONE_ETHER.mul(2), priceAdjNum: 1, priceAdjDenom: 10, capacity: ONE_ETHER.mul(10), capacityIsPayout: false, startTime: 0, endTime: blockTimestamp-1, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
       await expect(teller1.connect(depositor1).deposit(1, ONE_ETHER.mul(2), depositor1.address, false)).to.be.revertedWith("bond concluded");
     });
     it("cannot divide by zero price", async function () {
-      await teller1.connect(governor).setTerms(1, VESTING_TERM, 0, MAX_UINT64, 0, 1, 0, false, 0, 1);
+      await teller1.connect(governor).setTerms({startPrice: 1, minimumPrice: 0, maxPayout: ONE_ETHER.mul(2), priceAdjNum: 1, priceAdjDenom: 10, capacity: ONE_ETHER.mul(10), capacityIsPayout: false, startTime: 0, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: 1});
       const blockTimestamp = (await provider.getBlock('latest')).timestamp;
       await provider.send("evm_setNextBlockTimestamp", [blockTimestamp + 99999]);
       await provider.send("evm_mine", []);
@@ -227,10 +228,7 @@ describe("BondTellerERC20", function() {
       await expect(teller1.connect(depositor1).deposit(1, 1, depositor1.address, false)).to.be.revertedWith("invalid price");
     });
     it("cannot exceed capacity in principal", async function () {
-      expect(await teller1.capacity()).eq(0);
-      expect(await teller1.capacityIsPayout()).eq(false);
-
-      await teller1.connect(governor).setTerms(ONE_ETHER.mul(2), VESTING_TERM, 0, MAX_UINT64, 0, HALF_LIFE, ONE_ETHER, false, 0, 1);
+      await teller1.connect(governor).setTerms({startPrice: ONE_ETHER.mul(2), minimumPrice: 0, maxPayout: ONE_ETHER.mul(2), priceAdjNum: 1, priceAdjDenom: 10, capacity: ONE_ETHER, capacityIsPayout: false, startTime: 0, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
       expect(await teller1.capacity()).eq(ONE_ETHER);
       expect(await teller1.capacityIsPayout()).eq(false);
       await expect(teller1.calculateAmountIn(ONE_ETHER.mul(3), false)).to.be.revertedWith("bond at capacity");
@@ -238,7 +236,7 @@ describe("BondTellerERC20", function() {
       await expect(teller1.connect(depositor1).deposit(ONE_ETHER.add(1), ONE_ETHER.mul(2), depositor1.address, false)).to.be.revertedWith("bond at capacity");
     });
     it("cannot exceed capacity in payout", async function () {
-      await teller1.connect(governor).setTerms(ONE_ETHER.mul(2), VESTING_TERM, 0, MAX_UINT64, 0, HALF_LIFE, ONE_ETHER, true, 0, 1);
+      await teller1.connect(governor).setTerms({startPrice: ONE_ETHER.mul(2), minimumPrice: 0, maxPayout: ONE_ETHER.mul(2), priceAdjNum: 1, priceAdjDenom: 10, capacity: ONE_ETHER, capacityIsPayout: true, startTime: 0, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
       expect(await teller1.capacity()).eq(ONE_ETHER);
       expect(await teller1.capacityIsPayout()).eq(true);
       await expect(teller1.calculateAmountIn(ONE_ETHER.mul(5), false)).to.be.revertedWith("bond at capacity");
@@ -246,13 +244,13 @@ describe("BondTellerERC20", function() {
       await expect(teller1.connect(depositor1).deposit(ONE_ETHER.mul(2).add(1), ONE_ETHER.mul(2), depositor1.address, false)).to.be.revertedWith("bond at capacity");
     });
     it("cannot be over max payout", async function () {
-      await teller1.connect(governor).setTerms(ONE_ETHER.mul(2), VESTING_TERM, 0, MAX_UINT64, 0, HALF_LIFE, ONE_ETHER.mul(10), false, ONE_ETHER.mul(2), 1);
+      await teller1.connect(governor).setTerms({startPrice: ONE_ETHER.mul(2), minimumPrice: 0, maxPayout: ONE_ETHER.mul(2), priceAdjNum: 1, priceAdjDenom: 10, capacity: ONE_ETHER.mul(10), capacityIsPayout: false, startTime: 0, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
       await expect(teller1.calculateAmountIn(ONE_ETHER.mul(3), false)).to.be.revertedWith("bond too large");
       await expect(teller1.calculateAmountOut(ONE_ETHER.mul(4).add(10), false)).to.be.revertedWith("bond too large");
       await expect(teller1.connect(depositor1).deposit(ONE_ETHER.mul(4).add(1), ONE_ETHER.mul(2), depositor1.address, false)).to.be.revertedWith("bond too large");
     });
     it("slippage protection", async function () {
-      await teller1.connect(governor).setTerms(ONE_ETHER.mul(2), VESTING_TERM, 0, MAX_UINT64, 0, HALF_LIFE, ONE_ETHER.mul(10), false, ONE_ETHER.mul(2), 1);
+      await teller1.connect(governor).setTerms({startPrice: ONE_ETHER.mul(2), minimumPrice: 0, maxPayout: ONE_ETHER.mul(2), priceAdjNum: 1, priceAdjDenom: 10, capacity: ONE_ETHER.mul(10), capacityIsPayout: false, startTime: 0, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
       expect(await teller1.calculateAmountIn(ONE_ETHER.mul(3).div(2), false)).eq(ONE_ETHER.mul(3));
       expect(await teller1.calculateAmountOut(ONE_ETHER.mul(3), false)).eq(ONE_ETHER.mul(3).div(2));
       await expect(teller1.connect(depositor1).deposit(ONE_ETHER.mul(3), ONE_ETHER.mul(2), depositor1.address, false)).to.be.revertedWith("slippage protection: insufficient output");
@@ -260,9 +258,14 @@ describe("BondTellerERC20", function() {
       expect(await teller1.calculateAmountOut(ONE_ETHER.mul(3), true)).eq(ONE_ETHER.mul(3).div(2));
       await expect(teller1.connect(depositor1).deposit(ONE_ETHER.mul(3), ONE_ETHER.mul(2), depositor1.address, true)).to.be.revertedWith("slippage protection: insufficient output");
     });
+    it("cannot deposit with insufficient bond depo solace", async function () {
+      let bal1 = await solace.balanceOf(bondDepo.address);
+      await bondDepo.connect(governor).returnSolace(depositor1.address, bal1);
+      await expect(teller1.connect(depositor1).deposit(2, 0, depositor1.address, false)).to.be.revertedWith("ERC20: transfer amount exceeds balance");
+      await solace.connect(depositor1).transfer(bondDepo.address, bal1);
+    });
     it("can deposit", async function () {
-      const MOMENTUM_FACTOR = BN.from(1).shl(128).add(10); // every ten SOLACE bonded raises the price one tkn
-      await teller1.connect(governor).setTerms(ONE_ETHER.mul(2), VESTING_TERM, 0, MAX_UINT64, 0, HALF_LIFE, ONE_ETHER.mul(10), false, ONE_ETHER.mul(2), MOMENTUM_FACTOR);
+      await teller1.connect(governor).setTerms({startPrice: ONE_ETHER.mul(2), minimumPrice: 0, maxPayout: ONE_ETHER.mul(2), priceAdjNum: 1, priceAdjDenom: 10, capacity: ONE_ETHER.mul(10), capacityIsPayout: false, startTime: 0, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
       await teller1.connect(governor).setFees(STAKE_FEE, DAO_FEE);
       let bal1 = await getBalances(teller1, depositor1);
       const blockTimestamp = (await provider.getBlock('latest')).timestamp;
@@ -301,8 +304,7 @@ describe("BondTellerERC20", function() {
       expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-STAKE_FEE), 1e14);
     });
     it("can deposit and stake", async function () {
-      const MOMENTUM_FACTOR = BN.from(1).shl(128).add(10); // every ten SOLACE bonded raises the price one tkn
-      await teller1.connect(governor).setTerms(ONE_ETHER.mul(2), VESTING_TERM, 0, MAX_UINT64, 0, HALF_LIFE, ONE_ETHER.mul(10), true, ONE_ETHER.mul(2), MOMENTUM_FACTOR);
+      await teller1.connect(governor).setTerms({startPrice: ONE_ETHER.mul(2), minimumPrice: 0, maxPayout: ONE_ETHER.mul(2), priceAdjNum: 1, priceAdjDenom: 10, capacity: ONE_ETHER.mul(10), capacityIsPayout: true, startTime: 0, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
       await solace.connect(governor).addMinter(minter.address);
       await solace.connect(minter).mint(xsolace.address, ONE_ETHER);
       let bal1 = await getBalances(teller1, depositor1);
@@ -340,8 +342,7 @@ describe("BondTellerERC20", function() {
       expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-STAKE_FEE), 1e14);
     });
     it("deposits have minimum price", async function () {
-      const MOMENTUM_FACTOR = BN.from(1).shl(128).add(10); // every ten SOLACE bonded raises the price one tkn
-      await teller1.connect(governor).setTerms(ONE_ETHER, VESTING_TERM, 0, MAX_UINT64, ONE_ETHER.mul(2), HALF_LIFE, ONE_ETHER.mul(10), false, ONE_ETHER.mul(2), MOMENTUM_FACTOR);
+      await teller1.connect(governor).setTerms({startPrice: ONE_ETHER, minimumPrice: ONE_ETHER.mul(2), maxPayout: ONE_ETHER.mul(2), priceAdjNum: 1, priceAdjDenom: 10, capacity: ONE_ETHER.mul(10), capacityIsPayout: false, startTime: 0, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
       let bal1 = await getBalances(teller1, depositor1);
       const blockTimestamp = (await provider.getBlock('latest')).timestamp;
       let predictedAmountOut = await teller1.calculateAmountOut(ONE_ETHER.mul(3), false);
@@ -452,13 +453,14 @@ describe("BondTellerERC20", function() {
     before("redeploy", async function () {
       solace = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
       xsolace = (await deployContract(deployer, artifacts.xSOLACE, [governor.address, solace.address])) as XSolace;
-      await solace.connect(governor).addMinter(bondDepo.address);
+      await solace.connect(governor).addMinter(minter.address);
+      await solace.connect(minter).mint(bondDepo.address, ONE_ETHER.mul(1000));
       await bondDepo.connect(governor).setParams(solace.address, xsolace.address, underwritingPool.address, dao.address);
       teller2 = await deployProxyTeller("Solace USDC Bond", teller1.address, tkn2.address);
     });
     it("can deposit signed", async function () {
-      const MOMENTUM_FACTOR = BN.from(1).shl(128).add(10); // every ten SOLACE bonded raises the price one tkn
-      await teller2.connect(governor).setTerms(ONE_ETHER.mul(2), VESTING_TERM, 0, MAX_UINT64, 0, HALF_LIFE, ONE_ETHER.mul(10), false, ONE_ETHER.mul(2), MOMENTUM_FACTOR);
+      //await teller2.connect(governor).setTerms(ONE_ETHER.mul(2), VESTING_TERM, 0, MAX_UINT64, 0, HALF_LIFE, ONE_ETHER.mul(10), false, ONE_ETHER.mul(2), MOMENTUM_FACTOR);
+      await teller2.connect(governor).setTerms({startPrice: ONE_ETHER.mul(2), minimumPrice: 0, maxPayout: ONE_ETHER.mul(2), priceAdjNum: 1, priceAdjDenom: 10, capacity: ONE_ETHER.mul(10), capacityIsPayout: false, startTime: 0, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
       await teller2.connect(governor).setFees(STAKE_FEE, DAO_FEE);
       await tkn2.connect(deployer).transfer(depositor1.address, ONE_ETHER.mul(100));
       let bal1 = await getBalances(teller2, depositor1);
@@ -499,8 +501,8 @@ describe("BondTellerERC20", function() {
       expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-STAKE_FEE), 1e14);
     });
     it("can deposit signed and stake", async function () {
-      const MOMENTUM_FACTOR = BN.from(1).shl(128).add(10); // every ten SOLACE bonded raises the price one tkn
-      await teller2.connect(governor).setTerms(ONE_ETHER.mul(2), VESTING_TERM, 0, MAX_UINT64, 0, HALF_LIFE, ONE_ETHER.mul(10), true, ONE_ETHER.mul(2), MOMENTUM_FACTOR);
+      //await teller2.connect(governor).setTerms(ONE_ETHER.mul(2), VESTING_TERM, 0, MAX_UINT64, 0, HALF_LIFE, ONE_ETHER.mul(10), true, ONE_ETHER.mul(2), MOMENTUM_FACTOR);
+      await teller2.connect(governor).setTerms({startPrice: ONE_ETHER.mul(2), minimumPrice: 0, maxPayout: ONE_ETHER.mul(2), priceAdjNum: 1, priceAdjDenom: 10, capacity: ONE_ETHER.mul(10), capacityIsPayout: true, startTime: 0, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
       await solace.connect(governor).addMinter(minter.address);
       await solace.connect(minter).mint(xsolace.address, ONE_ETHER);
       let bal1 = await getBalances(teller2, depositor1);
@@ -539,8 +541,8 @@ describe("BondTellerERC20", function() {
       expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-STAKE_FEE), 1e14);
     });
     it("deposits have minimum price", async function () {
-      const MOMENTUM_FACTOR = BN.from(1).shl(128).add(10); // every ten SOLACE bonded raises the price one tkn
-      await teller2.connect(governor).setTerms(ONE_ETHER, VESTING_TERM, 0, MAX_UINT64, ONE_ETHER.mul(2), HALF_LIFE, ONE_ETHER.mul(10), false, ONE_ETHER.mul(2), MOMENTUM_FACTOR);
+      //await teller2.connect(governor).setTerms(ONE_ETHER, VESTING_TERM, 0, MAX_UINT64, ONE_ETHER.mul(2), HALF_LIFE, ONE_ETHER.mul(10), false, ONE_ETHER.mul(2), MOMENTUM_FACTOR);
+      await teller2.connect(governor).setTerms({startPrice: ONE_ETHER, minimumPrice: ONE_ETHER.mul(2), maxPayout: ONE_ETHER.mul(2), priceAdjNum: 1, priceAdjDenom: 10, capacity: ONE_ETHER.mul(10), capacityIsPayout: false, startTime: 0, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
       let bal1 = await getBalances(teller2, depositor1);
       const blockTimestamp = (await provider.getBlock('latest')).timestamp;
       let predictedAmountOut = await teller2.calculateAmountOut(ONE_ETHER.mul(3), false);
@@ -585,7 +587,8 @@ describe("BondTellerERC20", function() {
     before("redeploy", async function () {
       solace = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
       xsolace = (await deployContract(deployer, artifacts.xSOLACE, [governor.address, solace.address])) as XSolace;
-      await solace.connect(governor).addMinter(bondDepo.address);
+      await solace.connect(governor).addMinter(minter.address);
+      await solace.connect(minter).mint(bondDepo.address, ONE_ETHER.mul(1000));
       await bondDepo.connect(governor).setParams(solace.address, xsolace.address, underwritingPool.address, dao.address);
       teller2 = await deployProxyTeller("Solace USDC Bond", teller1.address, tkn2.address);
     });
@@ -600,37 +603,36 @@ describe("BondTellerERC20", function() {
       expect(await teller2.capacity()).eq(0);
       expect(await teller2.capacityIsPayout()).eq(false);
       expect(await teller2.maxPayout()).eq(0);
-      expect(await teller2.momentumNum()).eq(0);
-      expect(await teller2.momentumDenom()).eq(0);
+      expect(await teller2.priceAdjNum()).eq(0);
+      expect(await teller2.priceAdjDenom()).eq(0);
       expect(await teller2.termsSet()).eq(false);
       expect(await teller2.lastPriceUpdate()).eq(0);
     });
     it("non governance cannot set terms", async function () {
-      await expect(teller2.connect(depositor1).setTerms(0,0,0,0,0,0,0,false,0,0)).to.be.revertedWith("!governance");
+      await expect(teller2.connect(depositor1).setTerms({startPrice: ONE_ETHER.mul(2), minimumPrice: 0, maxPayout: ONE_ETHER.mul(2), priceAdjNum: 0, priceAdjDenom: 1, capacity: ONE_ETHER, capacityIsPayout: false, startTime: 0, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE})).to.be.revertedWith("!governance");
     });
     it("validates inputs", async function () {
-      await expect(teller2.connect(governor).setTerms(0,0,0,0,0,0,0,false,0,0)).to.be.revertedWith("invalid price");
-      await expect(teller2.connect(governor).setTerms(1,0,2,1,0,0,0,false,0,0)).to.be.revertedWith("invalid dates");
-      await expect(teller2.connect(governor).setTerms(1,0,2,3,0,0,0,false,0,0)).to.be.revertedWith("invalid halflife");
-      await expect(teller2.connect(governor).setTerms(1,0,2,3,0,4,0,false,0,0)).to.be.revertedWith("1/0");
+      await expect(teller2.connect(governor).setTerms({startPrice: 0, minimumPrice: 0, maxPayout: 0, priceAdjNum: 0, priceAdjDenom: 1, capacity: 0, capacityIsPayout: false, startTime: 0, endTime: 0, vestingTerm: 0, halfLife: 0})).to.be.revertedWith("invalid price");
+      await expect(teller2.connect(governor).setTerms({startPrice: 1, minimumPrice: 0, maxPayout: 0, priceAdjNum: 0, priceAdjDenom: 0, capacity: 0, capacityIsPayout: false, startTime: 0, endTime: 0, vestingTerm: 0, halfLife: 0})).to.be.revertedWith("1/0");
+      await expect(teller2.connect(governor).setTerms({startPrice: 1, minimumPrice: 0, maxPayout: 0, priceAdjNum: 0, priceAdjDenom: 1, capacity: 0, capacityIsPayout: false, startTime: 3, endTime: 2, vestingTerm: 0, halfLife: 0})).to.be.revertedWith("invalid dates");
+      await expect(teller2.connect(governor).setTerms({startPrice: 1, minimumPrice: 0, maxPayout: 0, priceAdjNum: 0, priceAdjDenom: 1, capacity: 0, capacityIsPayout: false, startTime: 2, endTime: 3, vestingTerm: 0, halfLife: 0})).to.be.revertedWith("invalid halflife");
     });
     it("can set terms", async function () {
-      let momentumFactor = BN.from(5).shl(128).add(6);
-      let tx = teller2.connect(governor).setTerms(1,7,2,3,8,4,9,false,10,momentumFactor);
+      let tx = await teller2.connect(governor).setTerms({startPrice: 1, minimumPrice: 2, maxPayout: 3, priceAdjNum: 5, priceAdjDenom: 6, capacity: 7, capacityIsPayout: true, startTime: 8, endTime: 9, vestingTerm: 10, halfLife: 11});
       expect(tx).to.emit(teller2, "TermsSet");
       const blockTimestamp = (await provider.getBlock('latest')).timestamp;
-      expect(await teller2.bondPrice()).eq(8);
+      expect(await teller2.bondPrice()).eq(2);
       expect(await teller2.nextPrice()).eq(1);
-      expect(await teller2.vestingTerm()).eq(7);
-      expect(await teller2.startTime()).eq(2);
-      expect(await teller2.endTime()).eq(3);
-      expect(await teller2.minimumPrice()).eq(8);
-      expect(await teller2.halfLife()).eq(4);
-      expect(await teller2.capacity()).eq(9);
-      expect(await teller2.capacityIsPayout()).eq(false);
-      expect(await teller2.maxPayout()).eq(10);
-      expect(await teller2.momentumNum()).eq(5);
-      expect(await teller2.momentumDenom()).eq(6);
+      expect(await teller2.vestingTerm()).eq(10);
+      expect(await teller2.startTime()).eq(8);
+      expect(await teller2.endTime()).eq(9);
+      expect(await teller2.minimumPrice()).eq(2);
+      expect(await teller2.halfLife()).eq(11);
+      expect(await teller2.capacity()).eq(7);
+      expect(await teller2.capacityIsPayout()).eq(true);
+      expect(await teller2.maxPayout()).eq(3);
+      expect(await teller2.priceAdjNum()).eq(5);
+      expect(await teller2.priceAdjDenom()).eq(6);
       expect(await teller2.termsSet()).eq(true);
       expectClose(await teller2.lastPriceUpdate(), blockTimestamp, 5);
     });
@@ -643,7 +645,8 @@ describe("BondTellerERC20", function() {
     before("redeploy", async function () {
       solace = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
       xsolace = (await deployContract(deployer, artifacts.xSOLACE, [governor.address, solace.address])) as XSolace;
-      await solace.connect(governor).addMinter(bondDepo.address);
+      await solace.connect(governor).addMinter(minter.address);
+      await solace.connect(minter).mint(bondDepo.address, ONE_ETHER.mul(1000));
       await bondDepo.connect(governor).setParams(solace.address, xsolace.address, underwritingPool.address, dao.address);
       teller2 = await deployProxyTeller("Solace USDC Bond", teller1.address, tkn2.address);
     });
@@ -658,7 +661,7 @@ describe("BondTellerERC20", function() {
       await expect(teller2.connect(governor).setFees(10001, 0)).to.be.revertedWith("invalid stake fee");
       await expect(teller2.connect(governor).setFees(0, 10001)).to.be.revertedWith("invalid dao fee");
     });
-    it("can set terms", async function () {
+    it("can set fees", async function () {
       let tx = teller2.connect(governor).setFees(STAKE_FEE, DAO_FEE);
       expect(tx).to.emit(teller2, "FeesSet");
       expect(await teller2.stakeFeeBps()).eq(STAKE_FEE);

@@ -15,15 +15,6 @@ import "./IBondTeller.sol";
  */
 interface IBondTellerErc20 is IBondTeller {
 
-    /***************************************
-    EVENTS
-    ***************************************/
-
-    /// @notice Emitted when terms are set.
-    event TermsSet();
-    /// @notice Emitted when fees are set.
-    event FeesSet();
-
     /**
      * @notice Create a bond by depositing `amount` of `principal`.
      * Principal will be transferred from `msg.sender` using `allowance`.

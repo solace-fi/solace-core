@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./Factory.sol";
 import "./Governable.sol";
-import "./interface/ISOLACE.sol";
-import "./interface/IxSOLACE.sol";
 import "./interface/IBondTeller.sol";
 import "./interface/IBondDepository.sol";
 
@@ -16,8 +15,8 @@ import "./interface/IBondDepository.sol";
 contract BondDepository is IBondDepository, Factory, Governable {
 
     // pass these when initializing tellers
-    ISOLACE internal _solace;
-    IxSOLACE internal _xsolace;
+    address internal _solace;
+    address internal _xsolace;
     address internal _pool;
     address internal _dao;
 
@@ -42,12 +41,12 @@ contract BondDepository is IBondDepository, Factory, Governable {
 
     /// @notice Native [**SOLACE**](./SOLACE) Token.
     function solace() external view override returns (address solace_) {
-        return address(_solace);
+        return _solace;
     }
 
     /// @notice [**xSOLACE**](./xSOLACE) Token.
     function xsolace() external view override returns (address xsolace_) {
-        return address(_xsolace);
+        return _xsolace;
     }
 
     /// @notice Underwriting Pool contract.
@@ -85,7 +84,7 @@ contract BondDepository is IBondDepository, Factory, Governable {
         address principal
     ) external override onlyGovernance returns (address teller) {
         teller = _deployMinimalProxy(impl);
-        IBondTeller(teller).initialize(name, governance, address(_solace), address(_xsolace), _pool, _dao, principal, address(this));
+        IBondTeller(teller).initialize(name, governance, _solace, _xsolace, _pool, _dao, principal, address(this));
         _isTeller[teller] = true;
         emit TellerAdded(teller);
         return teller;
@@ -109,7 +108,7 @@ contract BondDepository is IBondDepository, Factory, Governable {
         address principal
     ) external override onlyGovernance returns (address teller) {
         teller = _deployMinimalProxy(impl, salt);
-        IBondTeller(teller).initialize(name, governance, address(_solace), address(_xsolace), _pool, _dao, principal, address(this));
+        IBondTeller(teller).initialize(name, governance, _solace, _xsolace, _pool, _dao, principal, address(this));
         _isTeller[teller] = true;
         emit TellerAdded(teller);
         return teller;
@@ -159,30 +158,40 @@ contract BondDepository is IBondDepository, Factory, Governable {
         require(xsolace != address(0x0), "zero address xsolace");
         require(pool != address(0x0), "zero address pool");
         require(dao != address(0x0), "zero address dao");
-        _solace = ISOLACE(solace);
-        _xsolace = IxSOLACE(xsolace);
+        _solace = solace;
+        _xsolace = xsolace;
         _pool = pool;
         _dao = dao;
         emit ParamsSet(solace, xsolace, pool, dao);
     }
 
     /***************************************
-    TELLER ONLY FUNCTIONS
+    FUND MANAGEMENT FUNCTIONS
     ***************************************/
 
     /**
-     * @notice Mints new **SOLACE** to the teller.
+     * @notice Sends **SOLACE** to the teller.
      * Can only be called by tellers.
-     * @param amount The number of new tokens.
+     * @param amount The amount of **SOLACE** to send.
      */
-    function mint(uint256 amount) external override {
+    function pullSolace(uint256 amount) external override {
         // this contract must have permissions to mint solace
         // tellers should mint via bond depository instead of directly through solace
         // acts as a second layer of access control that declutters solace minters
 
         // can only be called by authorized minters
         require(_isTeller[msg.sender], "!teller");
-        // mint
-        _solace.mint(msg.sender, amount);
+        // transfer
+        SafeERC20.safeTransfer(IERC20(_solace), msg.sender, amount);
+    }
+
+    /**
+     * @notice Sends **SOLACE** to an address.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param dst Destination to send **SOLACE**.
+     * @param amount The amount of **SOLACE** to send.
+     */
+    function returnSolace(address dst, uint256 amount) external override onlyGovernance {
+        SafeERC20.safeTransfer(IERC20(_solace), dst, amount);
     }
 }

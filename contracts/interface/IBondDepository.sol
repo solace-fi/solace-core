@@ -101,13 +101,21 @@ interface IBondDepository {
     function setParams(address solace, address xsolace, address pool, address dao) external;
 
     /***************************************
-    TELLER ONLY FUNCTIONS
+    FUND MANAGEMENT FUNCTIONS
     ***************************************/
 
     /**
-     * @notice Mints new **SOLACE** to the teller.
+     * @notice Sends **SOLACE** to the teller.
      * Can only be called by tellers.
-     * @param amount The number of new tokens.
+     * @param amount The amount of **SOLACE** to send.
      */
-    function mint(uint256 amount) external;
+    function pullSolace(uint256 amount) external;
+
+    /**
+     * @notice Sends **SOLACE** to an address.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param dst Destination to send **SOLACE**.
+     * @param amount The amount of **SOLACE** to send.
+     */
+    function returnSolace(address dst, uint256 amount) external;
 }

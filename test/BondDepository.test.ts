@@ -11,12 +11,12 @@ const { expect } = chai;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Solace, XSolace, MockErc20, Weth9, Registry, CapitalPool, BondDepository, BondTellerErc20/*, BondTellerEth*/ } from "../typechain";
+import { Solace, XSolace, MockErc20, Weth9, Registry, CapitalPool, BondDepository, BondTellerErc20, BondTellerEth } from "../typechain";
 import { toBytes32 } from "./utilities/setStorage";
 
 describe("BondDepository", function() {
   let artifacts: ArtifactImports;
-  const [deployer, governor, depositor, mockTeller, dao] = provider.getWallets();
+  const [deployer, governor, minter, depositor, mockTeller, dao] = provider.getWallets();
 
   // solace contracts
   let weth: Weth9;
@@ -28,7 +28,6 @@ describe("BondDepository", function() {
 
   // vars
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-  const ETH_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
   const TEN_ETHER = BN.from("10000000000000000000");
   const ONE_MILLION_ETHER = BN.from("1000000000000000000000000");
 
@@ -42,6 +41,7 @@ describe("BondDepository", function() {
     underwritingPool = (await deployContract(deployer, artifacts.CapitalPool, [governor.address])) as CapitalPool;
     dai = (await deployContract(deployer, artifacts.MockERC20, ["DAI", "DAI", ONE_MILLION_ETHER])) as MockErc20;
     await weth.connect(depositor).deposit({ value: TEN_ETHER });
+    await solace.connect(governor).addMinter(minter.address);
   });
 
   describe("deployment", function () {
@@ -131,38 +131,40 @@ describe("BondDepository", function() {
       expect(tx2).to.emit(bondDepo, "TellerRemoved").withArgs(mockTeller.address);
       expect(await bondDepo.isTeller(mockTeller.address)).to.be.false;
     });
-    it("non tellers cannot mint", async function () {
-      await expect(bondDepo.connect(mockTeller).mint(1)).to.be.revertedWith("!teller");
+    it("non tellers cannot pull solace", async function () {
+      await expect(bondDepo.connect(mockTeller).pullSolace(1)).to.be.revertedWith("!teller");
     });
     it("tellers should not mint directly via solace", async function () {
       await expect(solace.connect(mockTeller).mint(mockTeller.address, 1)).to.be.revertedWith("!minter");
     });
-    it("will fail without solace mint permissions", async function () {
+    it("will fail without solace balance", async function () {
       await bondDepo.connect(governor).addTeller(mockTeller.address);
-      await expect(bondDepo.connect(mockTeller).mint(1)).to.be.revertedWith("!minter");
+      await expect(bondDepo.connect(mockTeller).pullSolace(1)).to.be.revertedWith("ERC20: transfer amount exceeds balance");
     });
-    it("tellers can mint", async function () {
-      await solace.connect(governor).addMinter(bondDepo.address);
+    it("tellers can pull solace", async function () {
+      expect(await solace.balanceOf(bondDepo.address)).eq(0);
+      await solace.connect(minter).mint(bondDepo.address, 10);
       expect(await solace.balanceOf(mockTeller.address)).eq(0);
-      await bondDepo.connect(mockTeller).mint(1);
+      await bondDepo.connect(mockTeller).pullSolace(1);
       expect(await solace.balanceOf(mockTeller.address)).eq(1);
-      await bondDepo.connect(mockTeller).mint(2);
+      await bondDepo.connect(mockTeller).pullSolace(2);
       expect(await solace.balanceOf(mockTeller.address)).eq(3);
+      expect(await solace.balanceOf(bondDepo.address)).eq(7);
     });
   });
 
   describe("create teller", function () {
     let tellerErc20Impl: BondTellerErc20;
-    //let tellerEthImpl: BondTellerEth;
+    let tellerEthImpl: BondTellerEth;
     let teller1: BondTellerErc20;
     let teller2: BondTellerErc20;
     let teller3: BondTellerErc20;
     let teller4: BondTellerErc20;
-    //let teller5: BondTellerEth;
+    let teller5: BondTellerEth;
 
     before(async function () {
       tellerErc20Impl = (await deployContract(deployer, artifacts.BondTellerERC20)) as BondTellerErc20;
-      //tellerEthImpl = (await deployContract(deployer, artifacts.BondTellerETH)) as BondTellerEth;
+      tellerEthImpl = (await deployContract(deployer, artifacts.BondTellerETH)) as BondTellerEth;
     });
     it("non governance cannot create tellers", async function () {
       await expect(bondDepo.connect(depositor).createBondTeller("Solace USDC Bond", governor.address, tellerErc20Impl.address, weth.address)).to.be.revertedWith("!governance");
@@ -201,15 +203,31 @@ describe("BondDepository", function() {
       } else throw "no deployment";
       expect(teller4.address).not.eq(teller3.address);
 
-      /*
-      let tx5 = await bondDepo.connect(governor).createBondTeller("Solace USDC Bond", governor.address, tellerEthImpl.address, weth.address);
+      let tx5 = await bondDepo.connect(governor).createBondTeller("Solace ETH Bond", governor.address, tellerEthImpl.address, weth.address);
       let events5 = (await tx5.wait())?.events;
       if(events5 && events5.length > 0) {
         let event5 = events5[0];
-        teller5 = await ethers.getContractAt(artifacts.BondTellerERC20.abi, event5?.args?.["deployment"]) as BondTellerEth;
+        teller5 = await ethers.getContractAt(artifacts.BondTellerETH.abi, event5?.args?.["deployment"]) as BondTellerEth;
       } else throw "no deployment";
       expect(teller5.address).not.eq(teller4.address);
-      */
+    });
+  });
+
+  describe("return solace", function () {
+    it("cannot be called by non governance", async function () {
+      await expect(bondDepo.connect(depositor).returnSolace(depositor.address, 1)).to.be.revertedWith("!governance");
+    });
+    it("cannot return more solace than balance", async function () {
+      let bal1 = await solace.balanceOf(bondDepo.address);
+      await expect(bondDepo.connect(governor).returnSolace(depositor.address, bal1.add(1))).to.be.revertedWith("ERC20: transfer amount exceeds balance");
+    });
+    it("can return solace", async function () {
+      let bal1 = await solace.balanceOf(bondDepo.address);
+      let depositAmount = bal1.div(2);
+      expect(depositAmount).gt(0);
+      await bondDepo.connect(governor).returnSolace(depositor.address, depositAmount);
+      let bal2 = await solace.balanceOf(bondDepo.address);
+      expect(bal1.sub(bal2)).eq(depositAmount);
     });
   });
 

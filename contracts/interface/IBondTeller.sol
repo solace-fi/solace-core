@@ -27,6 +27,10 @@ interface IBondTeller {
     event Paused();
     /// @notice Emitted when deposits are unpaused.
     event Unpaused();
+    /// @notice Emitted when terms are set.
+    event TermsSet();
+    /// @notice Emitted when fees are set.
+    event FeesSet();
 
     /***************************************
     INITIALIZER
