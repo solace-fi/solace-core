@@ -174,7 +174,7 @@ contract RiskManager is IRiskManager, Governable {
      * @return sum WeightSum.
      */
     function weightSum() external view override returns (uint32 sum) {
-        return _weightSum;
+        return _weightSum == 0 ? type(uint32).max : _weightSum;
     }
 
     /***************************************
@@ -234,8 +234,6 @@ contract RiskManager is IRiskManager, Governable {
         weightsum = weightsum + weight_ - riskStrategy.weight;
         uint256 newAllocationAmount = (mc * weight_) / weightsum;
         if (newAllocationAmount < smcr) return false;
-        console.log("New allocation amount:", newAllocationAmount);
-        console.log("SMCR:", smcr);
         // check other risk strategies
         uint256 strategyCount = _strategyCount;
         for (uint256 i = strategyCount; i > 0; i--) {

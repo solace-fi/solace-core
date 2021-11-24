@@ -144,11 +144,23 @@ interface IRiskStrategy {
     */
     function weightSum() external view returns (uint32 sum);
 
+   /**
+     * @notice Returns risk allocation weight in `Risk Strategy`.
+     * @return weightAllocation_ The weight allocation.
+    */
+    function weightAllocation() external view returns (uint32 weightAllocation_);
+      
     /**
      * @notice Returns the strategist address.
      * @return strategist_ The address of the risk strategy owner.
     */
     function strategist() external view returns (address strategist_);
+
+    /**
+     * @notice Returns the risk manager address.
+     * @return riskManager_ The address of the risk strategy owner.
+    */
+    function riskManager() external view returns (address riskManager_);
 
     /**
      * @notice Returns the status of the risk strategy.

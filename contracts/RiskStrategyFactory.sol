@@ -6,7 +6,7 @@ import "./Factory.sol";
 import "./RiskStrategy.sol";
 import "./RiskManager.sol";
 import "./interface/IRiskStrategyFactory.sol";
-import "hardhat/console.sol";
+
 /**
  * @title RiskStrategyFactory
  * @author solace.fi
@@ -54,11 +54,6 @@ contract RiskStrategyFactory is Factory, IRiskStrategyFactory, Governable {
             prices_,
             divisors_
         );
-        console.log("Risk strategy base:", base_);
-
-        console.log("Risk strategy created by:", msg.sender);
-        console.log("Risk strategy address:", strategy);
-        console.log("Products:", products_.length);
         emit StrategyCreated(strategy, msg.sender);
         return strategy;
    

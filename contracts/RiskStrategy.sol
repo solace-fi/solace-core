@@ -5,7 +5,6 @@ import "./GovernableInitializable.sol";
 import "./interface/IProduct.sol";
 import "./interface/IRiskManager.sol";
 import "./interface/IRiskStrategy.sol";
-import "hardhat/console.sol";
 
 /**
  * @title RiskStrategy
@@ -35,14 +34,14 @@ contract RiskStrategy is IRiskStrategy, GovernableInitializable {
     address internal _strategist = address(0);
 
     /// @notice sum of the product weights in strategy
-    uint32 internal _weightSum = type(uint32).max;
+    uint32 internal _weightSum = 0;
 
     /// @notice the allocation weight that is allocated by `Risk Manager`.
     /// It defines how much amount the strategy can use for coverage. 
-    uint32 internal _weightAllocation = type(uint32).max;
+    uint32 internal _weightAllocation = 0;
 
     /// @notice the status of the risk strategy.
-    bool _status = false;
+    bool internal _status = false;
 
     /// @notice controls the access that for only risk manager can access.
     modifier onlyRiskManager() {
@@ -73,6 +72,8 @@ contract RiskStrategy is IRiskStrategy, GovernableInitializable {
         require(strategist_  != address(0x0), "zero address strategist");
         _riskManager = IRiskManager(riskManager_);
         _strategist = strategist_;
+        _weightSum = type(uint32).max;
+        _weightAllocation = type(uint32).max;
 
         // set strategy product risk params
         _initializeStrategyRiskParams(products_, weights_, prices_, divisors_); 
@@ -127,24 +128,15 @@ contract RiskStrategy is IRiskStrategy, GovernableInitializable {
         uint256 mc = maxCover();
         ProductRiskParams storage params = _productRiskParams[prod_];
 
-        console.log("Current cover:", currentCover_);
-        console.log("New cover: ", newCover_);
-        console.log("mc:", mc);
         // must be less than maxCoverPerProduct
         mc = mc * params.weight / _weightSum;
         uint256 productActiveCoverAmount = IProduct(prod_).activeCoverAmountPerStrategy(address(this));
         productActiveCoverAmount = productActiveCoverAmount + newCover_ - currentCover_;
     
-        console.log("Must be less than maxCoverPerProduct");
-        console.log("mc = mc * params.weight / _weightSum:", mc);
-        console.log("Product Active Cover Amount:", productActiveCoverAmount);
-
         if (productActiveCoverAmount > mc) return (false, params.price);
         // must be less than maxCoverPerPolicy
         mc = mc / params.divisor;
-        console.log("Must be less than maxCoverPerPolicy");
-        console.log("mc = mc / params.divisor", mc);
-       
+
         if(newCover_ > mc) return (false, params.price);
         // risk is acceptable
         return (true, params.price);
@@ -155,11 +147,6 @@ contract RiskStrategy is IRiskStrategy, GovernableInitializable {
      * @return cover The max amount of cover in `wei`
     */
     function maxCover() public view override returns (uint256 cover) {
-        console.log("_riskManager.maxCover()", _riskManager.maxCover());
-        console.log(" _weightAllocation",  _weightAllocation);
-        console.log("_riskManager.weightSum()", _riskManager.weightSum());
-        console.log("_riskManager.maxCover() * _weightAllocation) / _riskManager.weightSum()", (_riskManager.maxCover() * _weightAllocation) / _riskManager.weightSum());
-
         return (_riskManager.maxCover() * _weightAllocation) / _riskManager.weightSum();
     }
 
@@ -199,9 +186,9 @@ contract RiskStrategy is IRiskStrategy, GovernableInitializable {
     /**
      * @notice Checks if product is an active product in `Risk Strategy`.
      * @param prod_ The product to check.
-     * @return status True if the product is active.
+     * @return status_ True if the product is active.
     */
-    function productIsActive(address prod_) public view override returns (bool status) {
+    function productIsActive(address prod_) public view override returns (bool status_) {
         return _productToIndex[prod_] != 0;
     }
 
@@ -245,6 +232,14 @@ contract RiskStrategy is IRiskStrategy, GovernableInitializable {
     }
 
     /**
+     * @notice Returns risk allocation weight in `Risk Strategy`.
+     * @return weightAllocation_ The weight allocation.
+    */
+    function weightAllocation() external view override returns (uint32 weightAllocation_) {
+        return _weightAllocation;
+    }
+
+    /**
      * @notice Returns the strategist address.
      * @return strategist_ The address of the risk strategy owner.
     */
@@ -254,10 +249,18 @@ contract RiskStrategy is IRiskStrategy, GovernableInitializable {
 
     /**
      * @notice Returns the status of the risk strategy.
-     * @return status True if strategy is active.
+     * @return status_ True if strategy is active.
     */
-    function status() public view override returns (bool status) {
+    function status() public view override returns (bool status_) {
         return _status;
+    }
+
+    /**
+     * @notice Returns the risk manager address.
+     * @return riskManager_ The address of the risk strategy owner.
+    */
+    function riskManager() external view override returns (address riskManager_) {
+        return address(_riskManager);
     }
 
     /***************************************
@@ -291,8 +294,8 @@ contract RiskStrategy is IRiskStrategy, GovernableInitializable {
                 divisor: divisor_
             });
             index = _productCount;
-            _productToIndex[prod_] = index;
-            _indexToProduct[index] = prod_;
+            _productToIndex[prod_] = index + 1;
+            _indexToProduct[index + 1] = prod_;
             _productCount++;
             emit ProductAddedByGovernance(prod_, weight_, price_, divisor_);
         } else {
@@ -323,7 +326,7 @@ contract RiskStrategy is IRiskStrategy, GovernableInitializable {
         // product wasn't added to begin with
         if (index == 0) return;
         // if not at the end copy down
-        uint256 lastIndex = productCount - 1;
+        uint256 lastIndex = productCount;
         if (index != lastIndex) {
             address lastProduct = _indexToProduct[lastIndex];
             _productToIndex[lastProduct] = index;
@@ -380,9 +383,9 @@ contract RiskStrategy is IRiskStrategy, GovernableInitializable {
                 divisor: divisor_
             });
             weightSum_ += weight_;
-            _productToIndex[prod_] = i;
-            _indexToProduct[i] = prod_;
-            emit ProductRiskParamsSetByGovernance(prod_, 0, 0, 0);
+            _productToIndex[prod_] = i + 1;
+            _indexToProduct[i + 1] = prod_;
+            emit ProductRiskParamsSetByGovernance(prod_, weight_, price_, divisor_);
         }
         _weightSum = (length == 0) ? type(uint32).max : weightSum_;
         _productCount = length;
@@ -406,7 +409,7 @@ contract RiskStrategy is IRiskStrategy, GovernableInitializable {
     function _initializeStrategyRiskParams(address[] memory products_, uint32[] memory weights_, uint24[] memory prices_, uint16[] memory divisors_ ) private {
         uint256 length = products_.length;
         require(length > 0 && (length == weights_.length && length == prices_.length && length == divisors_.length), "risk param length mismatch");
-        
+        uint32 weightsum = 0;
         for (uint256 i = 0; i < length; i++) {
             require(products_[i] != address(0x0), "invalid product risk param");
             require(weights_[i]  > 0, "invalid weight risk param");
@@ -421,10 +424,11 @@ contract RiskStrategy is IRiskStrategy, GovernableInitializable {
 
             _productToIndex[products_[i]] = i + 1;
             _indexToProduct[i + 1] = products_[i];
-            _weightSum += weights_[i];
+            weightsum += weights_[i];
 
             emit ProductRiskParamsSet(products_[i], weights_[i], prices_[i], divisors_[i]);            
         }
+        _weightSum = weightsum;
         _productCount = length;
     }
 }
