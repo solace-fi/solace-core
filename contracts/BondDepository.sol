@@ -10,7 +10,7 @@ import "./interface/IBondDepository.sol";
 /**
  * @title BondDepository
  * @author solace.fi
- * @notice Factory for [`bond tellers`](./BondTeller).
+ * @notice Factory and manager of [`Bond Tellers`](./BondTellerBase).
  */
 contract BondDepository is IBondDepository, Factory, Governable {
 
@@ -28,7 +28,7 @@ contract BondDepository is IBondDepository, Factory, Governable {
      * @param governance_ The address of the [governor](/docs/protocol/governance).
      * @param solace_ Address of [**SOLACE**](./solace).
      * @param xsolace_ Address of [**xSOLACE**](./xsolace).
-     * @param pool_ Address of [`UnderwritingPool`](./underwritingpool).
+     * @param pool_ Address of underwriting pool.
      * @param dao_ Address of the DAO.
      */
     constructor(address governance_, address solace_, address xsolace_, address pool_, address dao_) Governable(governance_) {
@@ -49,7 +49,7 @@ contract BondDepository is IBondDepository, Factory, Governable {
         return _xsolace;
     }
 
-    /// @notice Underwriting Pool contract.
+    /// @notice Underwriting pool contract.
     function underwritingPool() external view override returns (address pool_) {
         return _pool;
     }
@@ -69,7 +69,7 @@ contract BondDepository is IBondDepository, Factory, Governable {
     ***************************************/
 
     /**
-     * @notice Creates a new [`BondTeller`](./bondteller).
+     * @notice Creates a new [`BondTeller`](./BondTellerBase).
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param name The name of the bond token.
      * @param governance The address of the teller's [governor](/docs/protocol/governance).
@@ -91,7 +91,7 @@ contract BondDepository is IBondDepository, Factory, Governable {
     }
 
     /**
-     * @notice Creates a new [`BondTeller`](./bondteller).
+     * @notice Creates a new [`BondTeller`](./BondTellerBase).
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param name The name of the bond token.
      * @param governance The address of the teller's [governor](/docs/protocol/governance).
@@ -139,7 +139,7 @@ contract BondDepository is IBondDepository, Factory, Governable {
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param solace_ Address of [**SOLACE**](./solace).
      * @param xsolace_ Address of [**xSOLACE**](./xsolace).
-     * @param pool_ Address of [`UnderwritingPool`](./underwritingpool).
+     * @param pool_ Address of underwriting pool.
      * @param dao_ Address of the DAO.
      */
     function setAddresses(address solace_, address xsolace_, address pool_, address dao_) external override onlyGovernance {
@@ -150,7 +150,7 @@ contract BondDepository is IBondDepository, Factory, Governable {
      * @notice Sets the parameters to pass to new tellers.
      * @param solace_ Address of [**SOLACE**](./solace).
      * @param xsolace_ Address of [**xSOLACE**](./xsolace).
-     * @param pool_ Address of [`UnderwritingPool`](./underwritingpool).
+     * @param pool_ Address of underwriting pool.
      * @param dao_ Address of the DAO.
      */
     function _setAddresses(address solace_, address xsolace_, address pool_, address dao_) internal {
@@ -175,10 +175,7 @@ contract BondDepository is IBondDepository, Factory, Governable {
      * @param amount The amount of **SOLACE** to send.
      */
     function pullSolace(uint256 amount) external override {
-        // this contract must have permissions to mint solace
-        // tellers should mint via bond depository instead of directly through solace
-        // acts as a second layer of access control that declutters solace minters
-
+        // this contract must hold solace
         // can only be called by authorized minters
         require(_isTeller[msg.sender], "!teller");
         // transfer

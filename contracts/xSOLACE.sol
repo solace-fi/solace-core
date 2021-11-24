@@ -12,7 +12,9 @@ import "./interface/IxSOLACE.sol";
 /**
  * @title xSolace Token (xSOLACE)
  * @author solace.fi
- * @notice
+ * @notice The **SOLACE** staking contract.
+ *
+ * Users can stake their **SOLACE** and receive **xSOLACE**. **xSOLACE** is designed to be a safe up-only contract that allows users to enter or leave at any time. The value of **xSOLACE** relative to **SOLACE** will increase when **SOLACE** is sent to this contract, namely from premiums from coverage polices.
  */
 contract xSOLACE is IxSOLACE, ERC20Permit, ReentrancyGuard, Governable {
     using SafeERC20 for IERC20;

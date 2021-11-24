@@ -11,18 +11,17 @@ const { expect } = chai;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Solace, XSolace, MockErc20, Weth9, Registry, CapitalPool, BondDepository, BondTellerErc20, BondTellerEth } from "../typechain";
+import { Solace, XSolace, MockErc20, Weth9, Registry, BondDepository, BondTellerErc20, BondTellerEth } from "../typechain";
 import { toBytes32 } from "./utilities/setStorage";
 
 describe("BondDepository", function() {
   let artifacts: ArtifactImports;
-  const [deployer, governor, minter, depositor, mockTeller, dao] = provider.getWallets();
+  const [deployer, governor, minter, depositor, mockTeller, dao, underwritingPool] = provider.getWallets();
 
   // solace contracts
   let weth: Weth9;
   let solace: Solace;
   let xsolace: XSolace;
-  let underwritingPool: CapitalPool;
   let bondDepo: BondDepository;
   let dai: MockErc20;
 
@@ -38,7 +37,6 @@ describe("BondDepository", function() {
     weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
     solace = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
     xsolace = (await deployContract(deployer, artifacts.xSOLACE, [governor.address, solace.address])) as XSolace;
-    underwritingPool = (await deployContract(deployer, artifacts.CapitalPool, [governor.address])) as CapitalPool;
     dai = (await deployContract(deployer, artifacts.MockERC20, ["DAI", "DAI", ONE_MILLION_ETHER])) as MockErc20;
     await weth.connect(depositor).deposit({ value: TEN_ETHER });
     await solace.connect(governor).addMinter(minter.address);

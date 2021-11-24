@@ -4,7 +4,7 @@ pragma solidity 0.8.6;
 /**
  * @title BondDepository
  * @author solace.fi
- * @notice Factory for [`bond tellers`](./BondTeller).
+ * @notice Factory and manager of [`Bond Tellers`](./IBondTeller).
  */
 interface IBondDepository {
 
@@ -29,7 +29,7 @@ interface IBondDepository {
     /// @notice [**xSOLACE**](./xSOLACE) Token.
     function xsolace() external view returns (address xsolace_);
 
-    /// @notice Underwriting Pool contract.
+    /// @notice Underwriting pool contract.
     function underwritingPool() external view returns (address pool_);
 
     /// @notice The DAO.
@@ -43,7 +43,7 @@ interface IBondDepository {
     ***************************************/
 
     /**
-     * @notice Creates a new [`BondTeller`](./bondteller).
+     * @notice Creates a new [`BondTeller`](./IBondTeller).
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param name The name of the bond token.
      * @param governance The address of the teller's [governor](/docs/protocol/governance).
@@ -59,7 +59,7 @@ interface IBondDepository {
     ) external returns (address teller);
 
     /**
-     * @notice Creates a new [`BondTeller`](./bondteller).
+     * @notice Creates a new [`BondTeller`](./IBondTeller).
      * @param name The name of the bond token.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param governance The address of the teller's [governor](/docs/protocol/governance).
@@ -95,7 +95,7 @@ interface IBondDepository {
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param solace_ Address of [**SOLACE**](./solace).
      * @param xsolace_ Address of [**xSOLACE**](./xsolace).
-     * @param pool_ Address of [`UnderwritingPool`](./underwritingpool).
+     * @param pool_ Address of underwriting pool.
      * @param dao_ Address of the DAO.
      */
     function setAddresses(address solace_, address xsolace_, address pool_, address dao_) external;

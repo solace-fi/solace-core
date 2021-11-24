@@ -7,8 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 /**
  * @title Solace Token (SOLACE)
  * @author solace.fi
- * @notice **Solace** tokens can be earned by depositing **Capital Provider** or **Liquidity Provider** tokens to the [`Master`](./Master) contract.
- * **SOLACE** can also be locked for a preset time in the `Locker` contract to recieve `veSOLACE` tokens.
+ * @notice The native governance token of the Solace Coverage Protocol.
  */
 interface ISOLACE is IERC20Metadata {
 

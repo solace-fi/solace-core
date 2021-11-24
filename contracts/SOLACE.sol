@@ -10,8 +10,7 @@ import "./interface/ISOLACE.sol";
 /**
  * @title Solace Token (SOLACE)
  * @author solace.fi
- * @notice **Solace** tokens can be earned by depositing **Capital Provider** or **Liquidity Provider** tokens to the [`Master`](./Master) contract.
- * **SOLACE** can also be locked for a preset time in the `Locker` contract to recieve `veSOLACE` tokens.
+ * @notice The native governance token of the Solace Coverage Protocol.
  */
 contract SOLACE is ISOLACE, ERC20Permit, Governable {
     using SafeERC20 for IERC20;
