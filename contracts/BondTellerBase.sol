@@ -97,21 +97,9 @@ abstract contract BondTellerBase is IBondTeller, ReentrancyGuard, GovernableInit
         address bondDepo_
     ) external override initializer {
         __Governable_init(governance_);
-        require(solace_ != address(0x0), "zero address solace");
-        require(xsolace_ != address(0x0), "zero address xsolace");
-        require(pool_ != address(0x0), "zero address pool");
-        require(dao_ != address(0x0), "zero address dao");
-        require(principal_ != address(0x0), "zero address principal");
-        require(bondDepo_ != address(0x0), "zero address bond depo");
         string memory symbol = "SBT";
         __ERC721Enhanced_init(name_, symbol);
-        solace = ISOLACE(solace_);
-        xsolace = IxSOLACE(xsolace_);
-        solace.approve(xsolace_, type(uint256).max);
-        underwritingPool = pool_;
-        dao = dao_;
-        principal = IERC20(principal_);
-        bondDepo = IBondDepository(bondDepo_);
+        _setAddresses(solace_, xsolace_, pool_, dao_, principal_, bondDepo_);
     }
 
     /***************************************
@@ -125,7 +113,7 @@ abstract contract BondTellerBase is IBondTeller, ReentrancyGuard, GovernableInit
      * Assumes 1 SOLACE payout.
      * @return price_ The price of the bond measured in `principal`.
      */
-    function bondPrice() public view returns (uint256 price_) {
+    function bondPrice() public view override returns (uint256 price_) {
         uint256 timeSinceLast = block.timestamp - lastPriceUpdate;
         price_ = exponentialDecay(nextPrice, timeSinceLast);
         if (price_ < minimumPrice) {
@@ -139,10 +127,7 @@ abstract contract BondTellerBase is IBondTeller, ReentrancyGuard, GovernableInit
      * @param stake True to stake, false to not stake.
      * @return amountOut Amount of **SOLACE** or **xSOLACE** out.
      */
-    function calculateAmountOut(
-        uint256 amountIn,
-        bool stake
-    ) external view returns (uint256 amountOut) {
+    function calculateAmountOut(uint256 amountIn, bool stake) external view override returns (uint256 amountOut) {
         require(termsSet, "not initialized");
         // exchange rate
         uint256 bondPrice_ = bondPrice();
@@ -175,7 +160,7 @@ abstract contract BondTellerBase is IBondTeller, ReentrancyGuard, GovernableInit
      * @param stake True to stake, false to not stake.
      * @return amountIn Amount of principal to deposit.
      */
-    function calculateAmountIn(uint256 amountOut, bool stake) public view returns (uint256 amountIn) {
+    function calculateAmountIn(uint256 amountOut, bool stake) external view override returns (uint256 amountIn) {
         require(termsSet, "not initialized");
         // optionally stake
         if(stake) {
@@ -208,7 +193,7 @@ abstract contract BondTellerBase is IBondTeller, ReentrancyGuard, GovernableInit
      * Redeemer must be owner or approved.
      * @param bondID The ID of the bond to redeem.
      */
-    function redeem(uint256 bondID) external nonReentrant tokenMustExist(bondID) returns ( uint256 ) {
+    function redeem(uint256 bondID) external override nonReentrant tokenMustExist(bondID) {
         // checks
         Bond memory bond = bonds[bondID];
         require(_isApprovedOrOwner(msg.sender, bondID), "!bonder");
@@ -258,6 +243,24 @@ abstract contract BondTellerBase is IBondTeller, ReentrancyGuard, GovernableInit
     /***************************************
     GOVERNANCE FUNCTIONS
     ***************************************/
+
+    /**
+     * @notice Pauses deposits.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+    */
+    function pause() external override onlyGovernance {
+        paused = true;
+        emit Paused();
+    }
+
+    /**
+     * @notice Unpauses deposits.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+    */
+    function unpause() external override onlyGovernance {
+        paused = false;
+        emit Unpaused();
+    }
 
     struct Terms {
         uint256 startPrice;     // The starting price, measured in `principal` for one **SOLACE**.
@@ -313,20 +316,57 @@ abstract contract BondTellerBase is IBondTeller, ReentrancyGuard, GovernableInit
     }
 
     /**
-     * @notice Pauses deposits.
+     * @notice Sets the addresses to call out.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-    */
-    function pause() external override onlyGovernance {
-        paused = true;
-        emit Paused();
+     * @param solace_ The SOLACE token.
+     * @param xsolace_ The xSOLACE token.
+     * @param pool_ The underwriting pool.
+     * @param dao_ The DAO.
+     * @param principal_ address The ERC20 token that users deposit.
+     * @param bondDepo_ The bond depository.
+     */
+    function setAddresses(
+        address solace_,
+        address xsolace_,
+        address pool_,
+        address dao_,
+        address principal_,
+        address bondDepo_
+    ) external override onlyGovernance {
+        _setAddresses(solace_, xsolace_, pool_, dao_, principal_, bondDepo_);
     }
 
     /**
-     * @notice Unpauses deposits.
+     * @notice Sets the addresses to call out.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-    */
-    function unpause() external override onlyGovernance {
-        paused = false;
-        emit Unpaused();
+     * @param solace_ The SOLACE token.
+     * @param xsolace_ The xSOLACE token.
+     * @param pool_ The underwriting pool.
+     * @param dao_ The DAO.
+     * @param principal_ address The ERC20 token that users deposit.
+     * @param bondDepo_ The bond depository.
+     */
+    function _setAddresses(
+        address solace_,
+        address xsolace_,
+        address pool_,
+        address dao_,
+        address principal_,
+        address bondDepo_
+    ) internal {
+        require(solace_ != address(0x0), "zero address solace");
+        require(xsolace_ != address(0x0), "zero address xsolace");
+        require(pool_ != address(0x0), "zero address pool");
+        require(dao_ != address(0x0), "zero address dao");
+        require(principal_ != address(0x0), "zero address principal");
+        require(bondDepo_ != address(0x0), "zero address bond depo");
+        solace = ISOLACE(solace_);
+        xsolace = IxSOLACE(xsolace_);
+        solace.approve(xsolace_, type(uint256).max);
+        underwritingPool = pool_;
+        dao = dao_;
+        principal = IERC20(principal_);
+        bondDepo = IBondDepository(bondDepo_);
+        emit AddressesSet();
     }
 }

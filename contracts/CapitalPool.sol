@@ -9,6 +9,13 @@ import "./Governable.sol";
 import "./interface/ICapitalPool.sol";
 
 
+/**
+ * @title CapitalPool
+ * @author solace.fi
+ * @notice The Capital Pool can hold ETH and ERC20s. Assets can be pulled by asset managers. Asset managers can be added and removed by governance.
+ *
+ * Note that it is usually cheaper and more practical to use a gnosis multisig than this.
+ */
 contract CapitalPool is ICapitalPool, ReentrancyGuard, Governable {
 
     address internal constant _ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;

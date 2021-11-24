@@ -27,7 +27,7 @@ const MAX_UINT40 = BN.from("1099511627775");
 
 describe("BondTellerETH", function() {
   let artifacts: ArtifactImports;
-  const [deployer, governor, depositor1, depositor2, dao, minter, underwritingPool] = provider.getWallets();
+  const [deployer, governor, depositor1, depositor2, minter, dao, underwritingPool, dao2, underwritingPool2] = provider.getWallets();
 
   // solace contracts
   let solace: Solace;
@@ -465,7 +465,7 @@ describe("BondTellerETH", function() {
       xsolace = (await deployContract(deployer, artifacts.xSOLACE, [governor.address, solace.address])) as XSolace;
       await solace.connect(governor).addMinter(minter.address);
       await solace.connect(minter).mint(bondDepo.address, ONE_ETHER.mul(1000));
-      await bondDepo.connect(governor).setParams(solace.address, xsolace.address, underwritingPool.address, dao.address);
+      await bondDepo.connect(governor).setAddresses(solace.address, xsolace.address, underwritingPool.address, dao.address);
       teller1 = (await deployContract(deployer, artifacts.BondTellerETH)) as BondTellerEth;
       await bondDepo.connect(governor).addTeller(teller1.address);
       await teller1.initialize("Solace ETH Bond", governor.address, solace.address, xsolace.address, underwritingPool.address, dao.address, weth9.address, bondDepo.address);
@@ -672,7 +672,7 @@ describe("BondTellerETH", function() {
       xsolace = (await deployContract(deployer, artifacts.xSOLACE, [governor.address, solace.address])) as XSolace;
       await solace.connect(governor).addMinter(minter.address);
       await solace.connect(minter).mint(bondDepo.address, ONE_ETHER.mul(1000));
-      await bondDepo.connect(governor).setParams(solace.address, xsolace.address, underwritingPool.address, dao.address);
+      await bondDepo.connect(governor).setAddresses(solace.address, xsolace.address, underwritingPool.address, dao.address);
       teller1 = (await deployContract(deployer, artifacts.BondTellerETH)) as BondTellerEth;
       await bondDepo.connect(governor).addTeller(teller1.address);
       await teller1.initialize("Solace ETH Bond", governor.address, solace.address, xsolace.address, underwritingPool.address, dao.address, weth9.address, bondDepo.address);
@@ -806,7 +806,7 @@ describe("BondTellerETH", function() {
       xsolace = (await deployContract(deployer, artifacts.xSOLACE, [governor.address, solace.address])) as XSolace;
       await solace.connect(governor).addMinter(minter.address);
       await solace.connect(minter).mint(bondDepo.address, ONE_ETHER.mul(1000));
-      await bondDepo.connect(governor).setParams(solace.address, xsolace.address, underwritingPool.address, dao.address);
+      await bondDepo.connect(governor).setAddresses(solace.address, xsolace.address, underwritingPool.address, dao.address);
       teller1 = (await deployContract(deployer, artifacts.BondTellerETH)) as BondTellerEth;
       await bondDepo.connect(governor).addTeller(teller1.address);
       await teller1.initialize("Solace ETH Bond", governor.address, solace.address, xsolace.address, underwritingPool.address, dao.address, weth9.address, bondDepo.address);
@@ -977,7 +977,7 @@ describe("BondTellerETH", function() {
       xsolace = (await deployContract(deployer, artifacts.xSOLACE, [governor.address, solace.address])) as XSolace;
       await solace.connect(governor).addMinter(minter.address);
       await solace.connect(minter).mint(bondDepo.address, ONE_ETHER.mul(1000));
-      await bondDepo.connect(governor).setParams(solace.address, xsolace.address, underwritingPool.address, dao.address);
+      await bondDepo.connect(governor).setAddresses(solace.address, xsolace.address, underwritingPool.address, dao.address);
       teller2 = await deployProxyTeller("Solace USDC Bond", teller1.address, weth10.address);
     });
     it("terms start unset", async function () {
@@ -1035,7 +1035,7 @@ describe("BondTellerETH", function() {
       xsolace = (await deployContract(deployer, artifacts.xSOLACE, [governor.address, solace.address])) as XSolace;
       await solace.connect(governor).addMinter(minter.address);
       await solace.connect(minter).mint(bondDepo.address, ONE_ETHER.mul(1000));
-      await bondDepo.connect(governor).setParams(solace.address, xsolace.address, underwritingPool.address, dao.address);
+      await bondDepo.connect(governor).setAddresses(solace.address, xsolace.address, underwritingPool.address, dao.address);
       teller2 = await deployProxyTeller("Solace USDC Bond", teller1.address, weth10.address);
     });
     it("fees start unset", async function () {
@@ -1060,6 +1060,83 @@ describe("BondTellerETH", function() {
       expect(tx).to.emit(teller2, "FeesSet");
       expect(await teller2.stakeFeeBps()).eq(0);
       expect(await teller2.daoFeeBps()).eq(0);
+    });
+  });
+
+  describe("set addresses", function () {
+    let STAKE_FEE = 300;
+    let DAO_FEE = 200;
+
+    let solace2: Solace;
+    let xsolace2: XSolace;
+    let bondDepo2: BondDepository;
+
+    before("redeploy", async function () {
+      solace2 = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
+      xsolace2 = (await deployContract(deployer, artifacts.xSOLACE, [governor.address, solace.address])) as XSolace;
+      await solace2.connect(governor).addMinter(minter.address);
+      bondDepo2 = (await deployContract(deployer, artifacts.BondDepository, [governor.address, solace2.address, xsolace2.address, underwritingPool.address, dao.address])) as BondDepository;
+      await solace2.connect(minter).mint(bondDepo2.address, ONE_ETHER.mul(1000));
+      await bondDepo2.connect(governor).addTeller(teller1.address);
+    });
+    it("non governance cannot set addresses", async function () {
+      await expect(teller1.connect(depositor1).setAddresses(solace.address, xsolace.address, underwritingPool.address, dao.address, weth9.address, bondDepo.address)).to.be.revertedWith("!governance");
+    });
+    it("validates input", async function () {
+      await expect(teller1.connect(governor).setAddresses(ZERO_ADDRESS, xsolace.address, underwritingPool.address, dao.address, weth9.address, bondDepo.address)).to.be.revertedWith("zero address solace");
+      await expect(teller1.connect(governor).setAddresses(solace.address, ZERO_ADDRESS, underwritingPool.address, dao.address, weth9.address, bondDepo.address)).to.be.revertedWith("zero address xsolace");
+      await expect(teller1.connect(governor).setAddresses(solace.address, xsolace.address, ZERO_ADDRESS, dao.address, weth9.address, bondDepo.address)).to.be.revertedWith("zero address pool");
+      await expect(teller1.connect(governor).setAddresses(solace.address, xsolace.address, underwritingPool.address, ZERO_ADDRESS, weth9.address, bondDepo.address)).to.be.revertedWith("zero address dao");
+      await expect(teller1.connect(governor).setAddresses(solace.address, xsolace.address, underwritingPool.address, dao.address, ZERO_ADDRESS, bondDepo.address)).to.be.revertedWith("zero address principal");
+      await expect(teller1.connect(governor).setAddresses(solace.address, xsolace.address, underwritingPool.address, dao.address, weth9.address, ZERO_ADDRESS)).to.be.revertedWith("zero address bond depo");
+    })
+    it("governance can set addresses", async function () {
+      let tx = await teller1.connect(governor).setAddresses(solace2.address, xsolace2.address, underwritingPool2.address, dao2.address, weth10.address, bondDepo2.address);
+      expect(tx).to.emit(teller1, "AddressesSet");
+      expect(await teller1.solace()).eq(solace2.address);
+      expect(await teller1.xsolace()).eq(xsolace2.address);
+      expect(await teller1.underwritingPool()).eq(underwritingPool2.address);
+      expect(await teller1.dao()).eq(dao2.address);
+      expect(await teller1.principal()).eq(weth10.address);
+      expect(await teller1.bondDepo()).eq(bondDepo2.address);
+    });
+    it("uses new addresses", async function () {
+      await weth10.connect(deployer).transfer(depositor1.address, ONE_ETHER.mul(100));
+      await weth10.connect(depositor1).approve(teller1.address, constants.MaxUint256);
+      await teller1.connect(governor).setTerms({startPrice: ONE_ETHER, minimumPrice: ONE_ETHER.mul(2), maxPayout: ONE_ETHER.mul(2), priceAdjNum: 1, priceAdjDenom: 10, capacity: ONE_ETHER.mul(10), capacityIsPayout: false, startTime: 0, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
+      let bal1 = await getBalances(teller1, depositor1);
+      const blockTimestamp = (await provider.getBlock('latest')).timestamp;
+      let predictedAmountOut = await teller1.calculateAmountOut(ONE_ETHER.mul(3), false);
+      let predictedAmountIn = await teller1.calculateAmountIn(predictedAmountOut, false);
+      let tx1 = await teller1.connect(depositor1).depositWeth(ONE_ETHER.mul(3), ONE_ETHER, depositor1.address, false);
+      let bondID1 = await teller1.numBonds();
+      expect(bondID1).eq(3);
+      let bondInfo = await teller1.bonds(bondID1);
+      expect(tx1).to.emit(teller1, "CreateBond").withArgs(bondID1, bondInfo.pricePaid, bondInfo.payoutToken, bondInfo.payoutAmount, bondInfo.maturation);
+      expect(bondInfo.pricePaid).eq(ONE_ETHER.mul(3));
+      expect(bondInfo.payoutToken).eq(solace2.address);
+      expectClose(predictedAmountIn, ONE_ETHER.mul(3), 1e14);
+      expectClose(predictedAmountOut, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-STAKE_FEE).div(MAX_BPS), 1e14);
+      expectClose(bondInfo.payoutAmount, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-STAKE_FEE).div(MAX_BPS), 1e14);
+      expectClose(bondInfo.maturation, VESTING_TERM+blockTimestamp+1, 5);
+      let bal2 = await getBalances(teller1, depositor1);
+      let bal12 = getBalancesDiff(bal2, bal1);
+      expect(bal12.userSolace).eq(0);
+      expect(bal12.userXSolace).eq(0);
+      expect(await solace2.balanceOf(teller1.address)).eq(bondInfo.payoutAmount);
+      expect(bal12.vestingXSolace).eq(0);
+      expectClose(await solace2.balanceOf(xsolace2.address), ONE_ETHER.mul(3).div(2).mul(STAKE_FEE).div(MAX_BPS), 1e14);
+      expect(bal12.totalXSolace).eq(0);
+      expect(bal12.userWeth9).eq(0);
+      expect(bal12.userWeth10).eq(ONE_ETHER.mul(-3));
+      expect(bal12.daoWeth9).eq(0);
+      expect(await weth10.balanceOf(dao2.address)).eq(ONE_ETHER.mul(3).mul(DAO_FEE).div(MAX_BPS));
+      expect(bal12.poolWeth9).eq(0);
+      expect(await weth10.balanceOf(underwritingPool2.address)).eq(ONE_ETHER.mul(3).mul(MAX_BPS-DAO_FEE).div(MAX_BPS));
+      expect(bal12.userBonds).eq(1);
+      expect(bal12.totalBonds).eq(1);
+      expect(bal12.tellerCapacity).eq(bondInfo.pricePaid.mul(-1));
+      expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-STAKE_FEE), 1e14);
     });
   });
 

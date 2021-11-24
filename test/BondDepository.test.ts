@@ -233,16 +233,16 @@ describe("BondDepository", function() {
 
   describe("params", function () {
     it("non governance cannot change params", async function () {
-      await expect(bondDepo.connect(depositor).setParams(solace.address, xsolace.address, underwritingPool.address, dao.address)).to.be.revertedWith("!governance")
+      await expect(bondDepo.connect(depositor).setAddresses(solace.address, xsolace.address, underwritingPool.address, dao.address)).to.be.revertedWith("!governance")
     });
     it("cannot set to zero addresses", async function () {
-      await expect(bondDepo.connect(governor).setParams(ZERO_ADDRESS, xsolace.address, underwritingPool.address, dao.address)).to.be.revertedWith("zero address solace");
-      await expect(bondDepo.connect(governor).setParams(solace.address, ZERO_ADDRESS, underwritingPool.address, dao.address)).to.be.revertedWith("zero address xsolace");
-      await expect(bondDepo.connect(governor).setParams(solace.address, xsolace.address, ZERO_ADDRESS, dao.address)).to.be.revertedWith("zero address pool");
-      await expect(bondDepo.connect(governor).setParams(solace.address, xsolace.address, underwritingPool.address, ZERO_ADDRESS)).to.be.revertedWith("zero address dao");
+      await expect(bondDepo.connect(governor).setAddresses(ZERO_ADDRESS, xsolace.address, underwritingPool.address, dao.address)).to.be.revertedWith("zero address solace");
+      await expect(bondDepo.connect(governor).setAddresses(solace.address, ZERO_ADDRESS, underwritingPool.address, dao.address)).to.be.revertedWith("zero address xsolace");
+      await expect(bondDepo.connect(governor).setAddresses(solace.address, xsolace.address, ZERO_ADDRESS, dao.address)).to.be.revertedWith("zero address pool");
+      await expect(bondDepo.connect(governor).setAddresses(solace.address, xsolace.address, underwritingPool.address, ZERO_ADDRESS)).to.be.revertedWith("zero address dao");
     });
     it("governance can change params", async function () {
-      let tx = await bondDepo.connect(governor).setParams(weth.address, dai.address, solace.address, xsolace.address);
+      let tx = await bondDepo.connect(governor).setAddresses(weth.address, dai.address, solace.address, xsolace.address);
       expect(tx).to.emit(bondDepo, "ParamsSet").withArgs(weth.address, dai.address, solace.address, xsolace.address);
       expect(await bondDepo.solace()).eq(weth.address);
       expect(await bondDepo.xsolace()).eq(dai.address);

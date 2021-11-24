@@ -93,12 +93,12 @@ interface IBondDepository {
     /**
      * @notice Sets the parameters to pass to new tellers.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param solace Address of [**SOLACE**](./solace).
-     * @param solace Address of [**xSOLACE**](./xsolace).
-     * @param pool Address of [`UnderwritingPool`](./underwritingpool).
-     * @param solace Address of the DAO.
+     * @param solace_ Address of [**SOLACE**](./solace).
+     * @param xsolace_ Address of [**xSOLACE**](./xsolace).
+     * @param pool_ Address of [`UnderwritingPool`](./underwritingpool).
+     * @param dao_ Address of the DAO.
      */
-    function setParams(address solace, address xsolace, address pool, address dao) external;
+    function setAddresses(address solace_, address xsolace_, address pool_, address dao_) external;
 
     /***************************************
     FUND MANAGEMENT FUNCTIONS

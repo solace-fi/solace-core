@@ -25,14 +25,14 @@ contract BondDepository is IBondDepository, Factory, Governable {
 
     /**
      * @notice Constructs the BondDepository contract.
-     * @param governance The address of the [governor](/docs/protocol/governance).
-     * @param solace Address of [**SOLACE**](./solace).
-     * @param solace Address of [**xSOLACE**](./xsolace).
-     * @param pool Address of [`UnderwritingPool`](./underwritingpool).
-     * @param solace Address of the DAO.
+     * @param governance_ The address of the [governor](/docs/protocol/governance).
+     * @param solace_ Address of [**SOLACE**](./solace).
+     * @param xsolace_ Address of [**xSOLACE**](./xsolace).
+     * @param pool_ Address of [`UnderwritingPool`](./underwritingpool).
+     * @param dao_ Address of the DAO.
      */
-    constructor(address governance, address solace, address xsolace, address pool, address dao) Governable(governance) {
-        _setParams(solace, xsolace, pool, dao);
+    constructor(address governance_, address solace_, address xsolace_, address pool_, address dao_) Governable(governance_) {
+        _setAddresses(solace_, xsolace_, pool_, dao_);
     }
 
     /***************************************
@@ -137,32 +137,32 @@ contract BondDepository is IBondDepository, Factory, Governable {
     /**
      * @notice Sets the parameters to pass to new tellers.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param solace Address of [**SOLACE**](./solace).
-     * @param solace Address of [**xSOLACE**](./xsolace).
-     * @param pool Address of [`UnderwritingPool`](./underwritingpool).
-     * @param solace Address of the DAO.
+     * @param solace_ Address of [**SOLACE**](./solace).
+     * @param xsolace_ Address of [**xSOLACE**](./xsolace).
+     * @param pool_ Address of [`UnderwritingPool`](./underwritingpool).
+     * @param dao_ Address of the DAO.
      */
-    function setParams(address solace, address xsolace, address pool, address dao) external override onlyGovernance {
-        _setParams(solace, xsolace, pool, dao);
+    function setAddresses(address solace_, address xsolace_, address pool_, address dao_) external override onlyGovernance {
+        _setAddresses(solace_, xsolace_, pool_, dao_);
     }
 
     /**
      * @notice Sets the parameters to pass to new tellers.
-     * @param solace Address of [**SOLACE**](./solace).
-     * @param solace Address of [**xSOLACE**](./xsolace).
-     * @param pool Address of [`UnderwritingPool`](./underwritingpool).
-     * @param solace Address of the DAO.
+     * @param solace_ Address of [**SOLACE**](./solace).
+     * @param xsolace_ Address of [**xSOLACE**](./xsolace).
+     * @param pool_ Address of [`UnderwritingPool`](./underwritingpool).
+     * @param dao_ Address of the DAO.
      */
-    function _setParams(address solace, address xsolace, address pool, address dao) internal {
-        require(solace != address(0x0), "zero address solace");
-        require(xsolace != address(0x0), "zero address xsolace");
-        require(pool != address(0x0), "zero address pool");
-        require(dao != address(0x0), "zero address dao");
-        _solace = solace;
-        _xsolace = xsolace;
-        _pool = pool;
-        _dao = dao;
-        emit ParamsSet(solace, xsolace, pool, dao);
+    function _setAddresses(address solace_, address xsolace_, address pool_, address dao_) internal {
+        require(solace_ != address(0x0), "zero address solace");
+        require(xsolace_ != address(0x0), "zero address xsolace");
+        require(pool_ != address(0x0), "zero address pool");
+        require(dao_ != address(0x0), "zero address dao");
+        _solace = solace_;
+        _xsolace = xsolace_;
+        _pool = pool_;
+        _dao = dao_;
+        emit ParamsSet(solace_, xsolace_, pool_, dao_);
     }
 
     /***************************************

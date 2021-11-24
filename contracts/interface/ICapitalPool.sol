@@ -3,6 +3,13 @@
 pragma solidity 0.8.6;
 
 
+/**
+ * @title CapitalPool
+ * @author solace.fi
+ * @notice The Capital Pool can hold ETH and ERC20s. Assets can be pulled by asset managers. Asset managers can be added and removed by governance.
+ *
+ * Note that it is usually cheaper and more practical to use a gnosis multisig than this.
+ */
 interface ICapitalPool {
 
     /***************************************

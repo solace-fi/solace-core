@@ -31,6 +31,8 @@ interface IBondTeller {
     event TermsSet();
     /// @notice Emitted when fees are set.
     event FeesSet();
+    /// @notice Emitted when fees are set.
+    event AddressesSet();
 
     /***************************************
     INITIALIZER
@@ -59,7 +61,48 @@ interface IBondTeller {
     ) external;
 
     /***************************************
-    MUTATOR FUNCTIONS
+    VIEW FUNCTIONS
+    ***************************************/
+
+    // BOND PRICE
+
+    /**
+     * @notice Calculate the current price of a bond.
+     * Assumes 1 SOLACE payout.
+     * @return price_ The price of the bond measured in `principal`.
+     */
+    function bondPrice() external view returns (uint256 price_);
+
+    /**
+     * @notice Calculate the amount of **SOLACE** or **xSOLACE** out for an amount of `principal`.
+     * @param amountIn Amount of principal to deposit.
+     * @param stake True to stake, false to not stake.
+     * @return amountOut Amount of **SOLACE** or **xSOLACE** out.
+     */
+    function calculateAmountOut(uint256 amountIn, bool stake) external view returns (uint256 amountOut);
+
+    /**
+     * @notice Calculate the amount of `principal` in for an amount of **SOLACE** or **xSOLACE** out.
+     * @param amountOut Amount of **SOLACE** or **xSOLACE** out.
+     * @param stake True to stake, false to not stake.
+     * @return amountIn Amount of principal to deposit.
+     */
+    function calculateAmountIn(uint256 amountOut, bool stake) external view returns (uint256 amountIn);
+
+    /***************************************
+    BONDER FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Redeem a bond.
+     * Bond must be matured.
+     * Redeemer must be owner or approved.
+     * @param bondID The ID of the bond to redeem.
+     */
+    function redeem(uint256 bondID) external;
+
+    /***************************************
+    GOVERNANCE FUNCTIONS
     ***************************************/
 
     /**
@@ -73,4 +116,23 @@ interface IBondTeller {
      * Can only be called by the current [**governor**](/docs/protocol/governance).
     */
     function unpause() external;
+
+    /**
+     * @notice Sets the addresses to call out.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param solace_ The SOLACE token.
+     * @param xsolace_ The xSOLACE token.
+     * @param pool_ The underwriting pool.
+     * @param dao_ The DAO.
+     * @param principal_ address The ERC20 token that users deposit.
+     * @param bondDepo_ The bond depository.
+     */
+    function setAddresses(
+        address solace_,
+        address xsolace_,
+        address pool_,
+        address dao_,
+        address principal_,
+        address bondDepo_
+    ) external;
 }
