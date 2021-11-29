@@ -12,7 +12,7 @@ import { create2Contract } from "./create2Contract";
 import { logContractAddress } from "./utils";
 
 import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_importer";
-import { Deployer, Registry, Weth9, Vault, ClaimsEscrow, Treasury, PolicyManager, PolicyDescriptorV2, RiskManager, OptionsFarming, FarmController, CpFarm, SptFarm, Solace, AaveV2Product, WaaveProduct } from "../typechain";
+import { Deployer, Registry, Weth9, Vault, ClaimsEscrow, Treasury, PolicyManager, PolicyDescriptorV2, RiskManager, OptionsFarming, FarmController, CpFarm, SptFarm, Solace } from "../typechain";
 
 const DEPLOYER_CONTRACT_ADDRESS = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
 const REGISTRY_ADDRESS          = "0x501aCEE3310d98881c827d4357C970F23a30AD29";
@@ -27,31 +27,19 @@ const OPTIONS_FARMING_ADDRESS   = "0x501ACEB9772d1EfE5F8eA46FE5004fAd039e067A";
 const FARM_CONTROLLER_ADDRESS   = "0x501aCEDD1a697654d5F53514FF09eDECD3ca6D95";
 const CP_FARM_ADDRESS           = "0x501ACeb4D4C2CB7E4b07b53fbe644f3e51D25A3e";
 const SPT_FARM_ADDRESS          = "0x501acE7644A3482F7358BE05454278cF2c699581";
-const SOLACE_ADDRESS            = "0x501ACe4A8d42bA427B67d0CaD1AB11e25AeA65Ab";
+const SOLACE_ADDRESS            = "0x501acE9c35E60f03A2af4d484f49F9B1EFde9f40";
 
-const AAVE_PRODUCT_ADDRESS      = "0x501ace153Ff22348076FdD236b774F6eb2d55EfB";
-const WAAVE_PRODUCT_ADDRESS     = "0x501Ace6Ff5FAc888273Bc03DC2Bc3aAD7C00fC68";
-
-const WETH_ADDRESS              = "0xd0A1E359811322d97991E03f863a0C30C2cF029C";
-const AAVE_DATA_PROVIDER        = "0x3c73A5E5785cAC854D468F727c606C07488a29D6";
-const UNISWAP_ROUTER_ADDRESS    = "0xE592427A0AEce92De3Edee1F18E0157C05861564";
-const WAAVE_REGISTRY_ADDRESS    = "0x166956c3A96c875610DCfb80F228Da0f4e92B73B";
+const WETH_ADDRESS              = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
 const SINGLETON_FACTORY_ADDRESS = "0xce0042B868300000d44A59004Da54A005ffdcf9f";
 
-const PACLAS_SIGNER_ADDRESS     = "0xA32b8838Ba639A1a8a70C149a924C8Bc07d803a7";
-
-// product params
-const minPeriod = 6450; // this is about 1 day
-const maxPeriod = 2354250; // this is about 1 year from https://ycharts.com/indicators/ethereum_blocks_per_day
-const price = 11044; // 2.60%/yr
 // farm params
 const solacePerSecond    = BN.from("1157407407407407400"); // 100K per day across all farms
 const cpFarmStartTime    = 1634515200; // Oct 17, 2021
 const cpFarmEndTime      = 1666051200; // Oct 17, 2022
-const cpFarmAllocPoints  = 90000;
+const cpFarmAllocPoints  = 50;
 const sptFarmStartTime   = 1635897600; // Nov 3, 2021
 const sptFarmEndTime     = 1667449200; // Nov 3, 2022
-const sptFarmAllocPoints = 10000;
+const sptFarmAllocPoints = 0;
 
 let artifacts: ArtifactImports;
 let deployerContract: Deployer;
@@ -70,10 +58,8 @@ let cpFarm: CpFarm;
 let sptFarm: SptFarm;
 let solace: Solace;
 
-let aaveProduct: AaveV2Product;
-let waaveProduct: WaaveProduct;
-
 let signerAddress: string;
+let multisigAddress = "0xc47911f768c6fE3a9fe076B95e93a33Ed45B7B34";
 
 let transactions: any = [];
 
@@ -105,13 +91,8 @@ async function main() {
   await deployCpFarm();
   await deploySptFarm();
   await deploySOLACE();
-  // products
-  await deployAaveV2Product();
-  await deployWaaveProduct();
 
-  await addSigners();
-
-  writeFileSync("stash/transactions/deployTransactionsKovan.json", JSON.stringify(transactions, undefined, '  '));
+  writeFileSync("stash/transactions/deployTransactionsMainnet.json", JSON.stringify(transactions, undefined, '  '));
   await logAddresses();
 }
 
@@ -136,6 +117,11 @@ async function deployRegistry() {
     registry = (await ethers.getContractAt(artifacts.Registry.abi, res.address)) as Registry;
     transactions.push({"description": "Deploy Registry", "to": deployerContract.address, "gasLimit": res.gasUsed});
     console.log(`Deployed Registry to ${registry.address}`);
+  }
+  if(await registry.governance() === signerAddress && await registry.pendingGovernance() !== multisigAddress) {
+    console.log(`Registry.setPendingGovernance(${multisigAddress})`)
+    let tx = await registry.connect(deployer).setPendingGovernance(multisigAddress);
+    await tx.wait();
   }
 }
 
@@ -165,6 +151,11 @@ async function deployVault() {
     let receipt = await tx.wait();
     transactions.push({"description": "Register Vault", "to": registry.address, "gasLimit": receipt.gasUsed.toString()});
   }
+  if(await vault.governance() === signerAddress && await vault.pendingGovernance() !== multisigAddress) {
+    console.log(`vault.setPendingGovernance(${multisigAddress})`)
+    let tx = await vault.connect(deployer).setPendingGovernance(multisigAddress);
+    await tx.wait();
+  }
 }
 
 async function deployClaimsEscrow() {
@@ -188,6 +179,11 @@ async function deployClaimsEscrow() {
     let tx = await vault.connect(deployer).addRequestor(claimsEscrow.address);
     let receipt = await tx.wait();
     transactions.push({"description": "Add ClaimsEscrow as Vault Requestor", "to": vault.address, "gasLimit": receipt.gasUsed.toString()});
+  }
+  if(await claimsEscrow.governance() === signerAddress && await claimsEscrow.pendingGovernance() !== multisigAddress) {
+    console.log(`claimsEscrow.setPendingGovernance(${multisigAddress})`)
+    let tx = await claimsEscrow.connect(deployer).setPendingGovernance(multisigAddress);
+    await tx.wait();
   }
 }
 
@@ -213,6 +209,11 @@ async function deployTreasury() {
     let receipt = await tx.wait();
     transactions.push({"description": "Add Treasury as Vault Requestor", "to": vault.address, "gasLimit": receipt.gasUsed.toString()});
   }
+  if(await treasury.governance() === signerAddress && await treasury.pendingGovernance() !== multisigAddress) {
+    console.log(`treasury.setPendingGovernance(${multisigAddress})`)
+    let tx = await treasury.connect(deployer).setPendingGovernance(multisigAddress);
+    await tx.wait();
+  }
 }
 
 async function deployPolicyManager() {
@@ -230,6 +231,11 @@ async function deployPolicyManager() {
     let tx = await registry.connect(deployer).setPolicyManager(policyManager.address);
     let receipt = await tx.wait();
     transactions.push({"description": "Register PolicyManager", "to": registry.address, "gasLimit": receipt.gasUsed.toString()});
+  }
+  if(await policyManager.governance() === signerAddress && await policyManager.pendingGovernance() !== multisigAddress) {
+    console.log(`policyManager.setPendingGovernance(${multisigAddress})`)
+    let tx = await policyManager.connect(deployer).setPendingGovernance(multisigAddress);
+    await tx.wait();
   }
 }
 
@@ -267,6 +273,11 @@ async function deployRiskManager() {
     let receipt = await tx.wait();
     transactions.push({"description": "Register RiskManager", "to": registry.address, "gasLimit": receipt.gasUsed.toString()});
   }
+  if(await riskManager.governance() === signerAddress && await riskManager.pendingGovernance() !== multisigAddress) {
+    console.log(`riskManager.setPendingGovernance(${multisigAddress})`)
+    let tx = await riskManager.connect(deployer).setPendingGovernance(multisigAddress);
+    await tx.wait();
+  }
 }
 
 async function deployOptionsFarming() {
@@ -284,6 +295,11 @@ async function deployOptionsFarming() {
     let tx = await registry.connect(deployer).setOptionsFarming(optionsFarming.address);
     let receipt = await tx.wait();
     transactions.push({"description": "Register OptionsFarming", "to": registry.address, "gasLimit": receipt.gasUsed.toString()});
+  }
+  if(await optionsFarming.governance() === signerAddress && await optionsFarming.pendingGovernance() !== multisigAddress) {
+    console.log(`optionsFarming.setPendingGovernance(${multisigAddress})`)
+    let tx = await optionsFarming.connect(deployer).setPendingGovernance(multisigAddress);
+    await tx.wait();
   }
 }
 
@@ -309,6 +325,11 @@ async function deployFarmController() {
     let receipt = await tx.wait();
     transactions.push({"description": "Register FarmController in OptionsFarming", "to": optionsFarming.address, "gasLimit": receipt.gasUsed.toString()});
   }
+  if(await farmController.governance() === signerAddress && await farmController.pendingGovernance() !== multisigAddress) {
+    console.log(`farmController.setPendingGovernance(${multisigAddress})`)
+    let tx = await farmController.connect(deployer).setPendingGovernance(multisigAddress);
+    await tx.wait();
+  }
 }
 
 async function deployCpFarm() {
@@ -327,6 +348,11 @@ async function deployCpFarm() {
     let receipt = await tx.wait();
     transactions.push({"description": "Register CpFarm in FarmController", "to": farmController.address, "gasLimit": receipt.gasUsed.toString()});
   }
+  if(await cpFarm.governance() === signerAddress && await cpFarm.pendingGovernance() !== multisigAddress) {
+    console.log(`cpFarm.setPendingGovernance(${multisigAddress})`)
+    let tx = await cpFarm.connect(deployer).setPendingGovernance(multisigAddress);
+    await tx.wait();
+  }
 }
 
 async function deploySptFarm() {
@@ -334,17 +360,36 @@ async function deploySptFarm() {
     sptFarm = (await ethers.getContractAt(artifacts.SptFarm.abi, SPT_FARM_ADDRESS)) as SptFarm;
   } else {
     console.log("Deploying SptFarm");
-    var res = await create2Contract(deployer,artifacts.SptFarm,[signerAddress,registry.address,sptFarmStartTime,sptFarmEndTime], {}, "", deployerContract.address);
+    var res = await create2Contract(deployer,artifacts.SptFarm,[signerAddress,registry.address,sptFarmStartTime,sptFarmEndTime], {nonce: 74}, "", deployerContract.address);
     sptFarm = (await ethers.getContractAt(artifacts.SptFarm.abi, res.address)) as SptFarm;
     transactions.push({"description": "Deploy SptFarm", "to": deployerContract.address, "gasLimit": res.gasUsed});
     console.log(`Deployed SptFarm to ${sptFarm.address}`);
   }
+  /*
+  // register
   if((await farmController.farmIndices(sptFarm.address)).eq(0) && await farmController.governance() == signerAddress) {
     console.log("Registering SptFarm in FarmController");
     let tx = await farmController.connect(deployer).registerFarm(sptFarm.address, sptFarmAllocPoints);
     let receipt = await tx.wait();
     transactions.push({"description": "Register SptFarm in FarmController", "to": farmController.address, "gasLimit": receipt.gasUsed.toString()});
   }
+  */
+  // deregister
+  if((await farmController.allocPoints(2)).gt(0) && await farmController.governance() == signerAddress) {
+    console.log("Deregistering SptFarm");
+    let tx = await farmController.connect(deployer).setAllocPoints(2, 0);
+    let receipt = await tx.wait();
+    //transactions.push({"description": "Register SptFarm in FarmController", "to": farmController.address, "gasLimit": receipt.gasUsed.toString()});
+    console.log(tx);
+    console.log(receipt);
+  }
+  /*
+  if(await sptFarm.governance() === signerAddress && await sptFarm.pendingGovernance() !== multisigAddress) {
+    console.log(`sptFarm.setPendingGovernance(${multisigAddress})`)
+    let tx = await sptFarm.connect(deployer).setPendingGovernance(multisigAddress);
+    await tx.wait();
+  }
+  */
 }
 
 async function deploySOLACE() {
@@ -357,89 +402,18 @@ async function deploySOLACE() {
     transactions.push({"description": "Deploy SOLACE", "to": deployerContract.address, "gasLimit": res.gasUsed});
     console.log(`Deployed SOLACE to ${solace.address}`);
   }
-  if(await registry.solace() != solace.address && await registry.governance() == signerAddress) {
-    console.log("Registering SOLACE");
-    let tx = await registry.connect(deployer).setSolace(solace.address);
-    let receipt = await tx.wait();
-    transactions.push({"description": "Register SOLACE", "to": registry.address, "gasLimit": receipt.gasUsed.toString()});
-  }
-  if(!(await solace.isMinter(deployer.address)) && (await solace.balanceOf(optionsFarming.address)).eq(0)) {
-    console.log("Minting SOLACE to OptionsFarming");
-    let tx = await solace.connect(deployer).mint(optionsFarming.address, BN.from("150000000000000000000000000"));
-    let receipt = await tx.wait();
-    transactions.push({"description": "Mint SOLACE to OptionsFarming", "to": vault.address, "gasLimit": receipt.gasUsed.toString()});
-  }
-}
-
-async function deployAaveV2Product() {
-  if(!!AAVE_PRODUCT_ADDRESS) {
-    aaveProduct = (await ethers.getContractAt(artifacts.AaveV2Product.abi, AAVE_PRODUCT_ADDRESS)) as AaveV2Product;
-  } else {
-    console.log("Deploying AaveV2Product");
-    var res = await create2Contract(deployer,artifacts.AaveV2Product,[signerAddress,policyManager.address,registry.address,AAVE_DATA_PROVIDER,minPeriod,maxPeriod], {}, "", deployerContract.address);
-    aaveProduct = (await ethers.getContractAt(artifacts.AaveV2Product.abi, res.address)) as AaveV2Product;
-    transactions.push({"description": "Deploy AaveV2Product", "to": deployerContract.address_ADDRESS, "gasLimit": res.gasUsed});
-    console.log(`Deployed AaveV2Product to ${aaveProduct.address}`);
-  }
-  if(await policyManager.governance() == signerAddress && !(await policyManager.productIsActive(aaveProduct.address))) {
-    console.log("Registering AaveV2Product in PolicyManager");
-    let tx = await policyManager.connect(deployer).addProduct(aaveProduct.address);
-    let receipt = await tx.wait();
-    transactions.push({"description": "Register AaveV2Product in PolicyManager", "to": policyManager.address, "gasLimit": receipt.gasUsed.toString()});
-  }
-  if(await riskManager.governance() == signerAddress && !(await riskManager.productIsActive(aaveProduct.address))) {
-    console.log("Registering AaveV2Product in RiskManager");
-    let tx = await riskManager.connect(deployer).addProduct(aaveProduct.address,10000,price,10);
-    let receipt = await tx.wait();
-    transactions.push({"description": "Register AaveV2Product in RiskManager", "to": riskManager.address, "gasLimit": receipt.gasUsed.toString()});
-  }
-}
-
-async function deployWaaveProduct() {
-  if(!!WAAVE_PRODUCT_ADDRESS) {
-    waaveProduct = (await ethers.getContractAt(artifacts.WaaveProduct.abi, WAAVE_PRODUCT_ADDRESS)) as WaaveProduct;
-  } else {
-    console.log("Deploying WaaveProduct");
-    var res = await create2Contract(deployer,artifacts.WaaveProduct,[signerAddress,policyManager.address,registry.address,WAAVE_REGISTRY_ADDRESS,minPeriod,maxPeriod], {}, "", deployerContract.address);
-    waaveProduct = (await ethers.getContractAt(artifacts.WaaveProduct.abi, res.address)) as WaaveProduct;
-    transactions.push({"description": "Deploy WaaveProduct", "to": deployerContract.address_ADDRESS, "gasLimit": res.gasUsed});
-    console.log(`Deployed WaaveProduct to ${waaveProduct.address}`);
-  }
-  if(await policyManager.governance() == signerAddress && !(await policyManager.productIsActive(waaveProduct.address))) {
-    console.log("Registering WaaveProduct in PolicyManager");
-    let tx = await policyManager.connect(deployer).addProduct(waaveProduct.address);
-    let receipt = await tx.wait();
-    transactions.push({"description": "Register WaaveProduct in PolicyManager", "to": policyManager.address, "gasLimit": receipt.gasUsed.toString()});
-  }
-  if(await riskManager.governance() == signerAddress && !(await riskManager.productIsActive(waaveProduct.address))) {
-    console.log("Registering WaaveProduct in RiskManager");
-    let tx = await riskManager.connect(deployer).addProduct(waaveProduct.address,100,price,10);
-    let receipt = await tx.wait();
-    transactions.push({"description": "Register WaaveProduct in RiskManager", "to": riskManager.address, "gasLimit": receipt.gasUsed.toString()});
-  }
-}
-
-async function addSigners() {
-  console.log("Adding signers");
-  let productNames = ["AaveV2Product", "WaaveProduct"];
-  let productAddresses = [aaveProduct.address, waaveProduct.address];
-  for(let i = 0; i < productAddresses.length; ++i) {
-    let name = productNames[i];
-    let addr = productAddresses[i];
-    let productContract = await ethers.getContractAt(artifacts.BaseProduct.abi, addr);
-    if(await productContract.governance() == signerAddress && !(await productContract.isAuthorizedSigner(PACLAS_SIGNER_ADDRESS))) {
-      console.log(`Adding signer to ${name} ${addr}`);
-      let tx = await productContract.connect(deployer).addSigner(PACLAS_SIGNER_ADDRESS);
-      await tx.wait();
-      console.log(`Added signer to ${name} ${addr}\n`);
-    }
+  if(await solace.governance() === signerAddress && await solace.pendingGovernance() !== multisigAddress) {
+    console.log(`solace.setPendingGovernance(${multisigAddress})`)
+    let tx = await solace.connect(deployer).setPendingGovernance(multisigAddress);
+    await tx.wait();
+    console.log('set');
   }
 }
 
 async function logAddresses() {
   console.log("");
-  console.log("| Contract Name    | Address                                      |");
-  console.log("|------------------|----------------------------------------------|");
+  console.log("| Contract Name                | Address                                      |");
+  console.log("|------------------------------|----------------------------------------------|");
   logContractAddress("DeployerContract", deployerContract.address);
   logContractAddress("Registry", registry.address);
   logContractAddress("WETH", weth.address);
@@ -452,25 +426,19 @@ async function logAddresses() {
   logContractAddress("OptionsFarming", optionsFarming.address);
   logContractAddress("FarmController", farmController.address);
   logContractAddress("CpFarm", cpFarm.address);
-  logContractAddress("SptFarm", sptFarm.address);
   logContractAddress("SOLACE", solace.address);
-
-  logContractAddress("AaveV2Product", aaveProduct.address);
-  logContractAddress("WaaveProduct", waaveProduct.address);
 
   console.log(``);
   console.log(`Copy and paste this into the .env file in the frontend client.`)
   console.log(``);
-  console.log(`REACT_APP_KOVAN_REGISTRY_CONTRACT_ADDRESS=${registry.address}`);
-  console.log(`REACT_APP_KOVAN_WETH_CONTRACT_ADDRESS=${weth.address}`);
-  console.log(`REACT_APP_KOVAN_VAULT_CONTRACT_ADDRESS=${vault.address}`);
-  console.log(`REACT_APP_KOVAN_CLAIMS_ESCROW_CONTRACT_ADDRESS=${claimsEscrow.address}`);
-  console.log(`REACT_APP_KOVAN_TREASURY_CONTRACT_ADDRESS=${treasury.address}`);
-  console.log(`REACT_APP_KOVAN_POLICY_MANAGER_CONTRACT_ADDRESS=${policyManager.address}`);
-  console.log(`REACT_APP_KOVAN_POLICY_DESCRIPTOR_CONTRACT_ADDRESS=${policyDescriptor.address}`);
-  console.log(`REACT_APP_KOVAN_RISK_MANAGER_CONTRACT_ADDRESS=${riskManager.address}`);
-  console.log(`REACT_APP_KOVAN_AAVE_PRODUCT_CONTRACT_ADDRESS=${aaveProduct.address}`);
-  console.log(`REACT_APP_KOVAN_WAAVE_PRODUCT_CONTRACT_ADDRESS=${waaveProduct.address}`);
+  console.log(`REACT_APP_MAINNET_REGISTRY_CONTRACT_ADDRESS=${registry.address}`);
+  console.log(`REACT_APP_MAINNET_WETH_CONTRACT_ADDRESS=${weth.address}`);
+  console.log(`REACT_APP_MAINNET_VAULT_CONTRACT_ADDRESS=${vault.address}`);
+  console.log(`REACT_APP_MAINNET_CLAIMS_ESCROW_CONTRACT_ADDRESS=${claimsEscrow.address}`);
+  console.log(`REACT_APP_MAINNET_TREASURY_CONTRACT_ADDRESS=${treasury.address}`);
+  console.log(`REACT_APP_MAINNET_POLICY_MANAGER_CONTRACT_ADDRESS=${policyManager.address}`);
+  console.log(`REACT_APP_MAINNET_POLICY_DESCRIPTOR_CONTRACT_ADDRESS=${policyDescriptor.address}`);
+  console.log(`REACT_APP_MAINNET_RISK_MANAGER_CONTRACT_ADDRESS=${riskManager.address}`);
   console.log("")
 }
 

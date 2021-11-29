@@ -48,4 +48,11 @@ contract MockERC20Decimals is ERC20 {
     function decimals() public view virtual override returns (uint8) {
         return _decimals;
     }
+
+    /**
+     * @notice Mints 1000 new tokens to msg.sender
+     */
+    function mint() external {
+        _mint(msg.sender, 1000*(10**_decimals));
+    }
 }

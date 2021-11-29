@@ -12,7 +12,7 @@ import { create2Contract } from "./create2Contract";
 import { logContractAddress } from "./utils";
 
 import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_importer";
-import { Deployer, Registry, Weth9, Vault, ClaimsEscrow, Treasury, PolicyManager, PolicyDescriptorV2, RiskManager, OptionsFarming, FarmController, CpFarm, SptFarm, CompoundProductRinkeby, WaaveProduct, LiquityProduct, Solace, XSolace, BondDepository, BondTellerErc20, Faucet } from "../typechain";
+import { Deployer, Registry, Weth9, Vault, ClaimsEscrow, Treasury, PolicyManager, PolicyDescriptorV2, RiskManager, OptionsFarming, FarmController, CpFarm, SptFarm, CompoundProductRinkeby, WaaveProduct, LiquityProduct } from "../typechain";
 
 const DEPLOYER_CONTRACT_ADDRESS = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
 const REGISTRY_ADDRESS          = "0x501aCEE3310d98881c827d4357C970F23a30AD29";
@@ -39,15 +39,6 @@ const TROVE_MANAGER_ADDRESS     = "0x04d630Bff6dea193Fd644dEcfC460db249854a02";
 const SINGLETON_FACTORY_ADDRESS = "0xce0042B868300000d44A59004Da54A005ffdcf9f";
 
 const WETH_ADDRESS              = "0xc778417E063141139Fce010982780140Aa0cD5Ab";
-const DAI_ADDRESS               = "0x5592EC0cfb4dbc12D3aB100b257153436a1f0FEa";
-
-const SOLACE_ADDRESS            = "0x501acE9c35E60f03A2af4d484f49F9B1EFde9f40";
-const XSOLACE_ADDRESS           = "0x501aCEEc685777D250c6D0f23680B08441dBe96b";
-const UNDERWRITING_POOL_ADDRESS = "0x9Fec1Bb252e20bFB7C492beeEe70314DDfe89c55";
-const DAO_ADDRESS               = "0x9Fec1Bb252e20bFB7C492beeEe70314DDfe89c55";
-const BOND_DEPO_ADDRESS         = "0x501acE9d9B02bcC3f3505Dc4ab480A2f8c4e3737";
-const DAI_BOND_TELLER_ADDRESS   = "0x501aceE3d0C198f0952d59e13871D17DcC91a58C";
-const FAUCET_ADDRESS            = "0x501AcE1396AD0Dd9067d36797cf734A2482Aa20b";
 
 const PACLAS_SIGNER_ADDRESS     = "0xA32b8838Ba639A1a8a70C149a924C8Bc07d803a7";
 
@@ -84,12 +75,6 @@ let compoundProduct: CompoundProductRinkeby;
 let waaveProduct: WaaveProduct;
 let liquityProduct: LiquityProduct;
 
-let solace: Solace;
-let xsolace: XSolace;
-let bondDepo: BondDepository;
-let daiTeller: BondTellerErc20;
-let faucet: Faucet;
-
 let signerAddress: string;
 
 let transactions: any = [];
@@ -125,12 +110,6 @@ async function main() {
   await deployCompoundProduct();
   await deployWaaveProduct();
   await deployLiquityProduct();
-  // new underwriting
-  await deploySOLACE();
-  await deployXSOLACE();
-  await deployBondDepo();
-  await deployDaiTeller();
-  await deployFaucet();
 
   await addSigners();
 
@@ -458,118 +437,10 @@ async function addSigners() {
   }
 }
 
-async function deploySOLACE() {
-  if(!!SOLACE_ADDRESS) {
-    solace = (await ethers.getContractAt(artifacts.SOLACE.abi, SOLACE_ADDRESS)) as Solace;
-  } else {
-    console.log("Deploying SOLACE");
-    var res = await create2Contract(deployer,artifacts.SOLACE,[signerAddress], {}, "", deployerContract.address);
-    solace = (await ethers.getContractAt(artifacts.SOLACE.abi, res.address)) as Solace;
-    transactions.push({"description": "Deploy SOLACE", "to": deployerContract.address, "gasLimit": res.gasUsed});
-    console.log(`Deployed SOLACE to ${solace.address}`);
-  }
-  if(await registry.solace() != solace.address && await registry.governance() == signerAddress) {
-    console.log("Registering SOLACE");
-    let tx = await registry.connect(deployer).setSolace(solace.address);
-    let receipt = await tx.wait();
-    transactions.push({"description": "Register SOLACE", "to": registry.address, "gasLimit": receipt.gasUsed.toString()});
-  }
-  if(!(await solace.isMinter(deployer.address)) && (await solace.governance()) == signerAddress) {
-    console.log("Adding deployer as SOLACE minter");
-    let tx = await solace.connect(deployer).addMinter(deployer.address);
-    await tx.wait();
-  } ;
-  if(await solace.isMinter(deployer.address) && (await solace.balanceOf(optionsFarming.address)).eq(0)) {
-    console.log("Minting SOLACE to OptionsFarming");
-    let tx = await solace.connect(deployer).mint(optionsFarming.address, BN.from("150000000000000000000000000"));
-    let receipt = await tx.wait();
-    transactions.push({"description": "Mint SOLACE to OptionsFarming", "to": solace.address, "gasLimit": receipt.gasUsed.toString()});
-  }
-}
-
-async function deployXSOLACE() {
-  if(!!XSOLACE_ADDRESS) {
-    xsolace = (await ethers.getContractAt(artifacts.xSOLACE.abi, XSOLACE_ADDRESS)) as XSolace;
-  } else {
-    console.log("Deploying xSOLACE");
-    var res = await create2Contract(deployer,artifacts.xSOLACE,[signerAddress, solace.address], {}, "", deployerContract.address);
-    xsolace = (await ethers.getContractAt(artifacts.xSOLACE.abi, res.address)) as XSolace;
-    transactions.push({"description": "Deploy xSOLACE", "to": deployerContract.address, "gasLimit": res.gasUsed});
-    console.log(`Deployed xSOLACE to ${xsolace.address}`);
-  }
-}
-
-async function deployBondDepo() {
-  if(!!BOND_DEPO_ADDRESS) {
-    bondDepo = (await ethers.getContractAt(artifacts.BondDepository.abi, BOND_DEPO_ADDRESS)) as BondDepository;
-  } else {
-    console.log("Deploying BondDepository");
-    var res = await create2Contract(deployer,artifacts.BondDepository, [signerAddress, solace.address, xsolace.address, UNDERWRITING_POOL_ADDRESS, DAO_ADDRESS], {}, "", deployerContract.address);
-    bondDepo = (await ethers.getContractAt(artifacts.BondDepository.abi, res.address)) as BondDepository;
-    transactions.push({"description": "Deploy BondDepository", "to": deployerContract.address, "gasLimit": res.gasUsed});
-    console.log(`Deployed BondDepository to ${bondDepo.address}`);
-  }
-  if(!(await solace.isMinter(bondDepo.address)) && (await solace.governance()) == signerAddress) {
-    console.log("Adding bond depo as SOLACE minter");
-    let tx = await solace.connect(deployer).addMinter(bondDepo.address);
-    await tx.wait();
-    console.log("Added bond depo as SOLACE minter");
-  }
-}
-
-async function deployDaiTeller() {
-  const VESTING_TERM = 432000; // 5 days
-  const HALF_LIFE = 2592000; // 30 days
-  const MAX_UINT64 = BN.from("0xffffffffffffffff");
-  const START_PRICE = BN.from("30000000000000000"); // 3 cents
-  const MAX_PAYOUT = BN.from("1000000000000000000000000") // 1 million SOLACE max single bond
-  const CAPACITY = BN.from("10000000000000000000000000"); // 10 million SOLACE max over lifetime
-  const MOMENTUM_FACTOR = BN.from(1).shl(128).add(1000000); // every 10,000 SOLACE bonded raises the price one cent
-
-  if(!!DAI_BOND_TELLER_ADDRESS) {
-    daiTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, BOND_DEPO_ADDRESS)) as BondTellerErc20;
-  } else {
-    console.log("Deploying DaiTeller");
-    var res = await create2Contract(deployer, artifacts.BondTellerERC20, [], {}, "", deployerContract.address);
-    daiTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, res.address)) as BondTellerErc20;
-    transactions.push({"description": "Deploy DaiTeller", "to": deployerContract.address, "gasLimit": res.gasUsed});
-    console.log(`Deployed DaiTeller to ${daiTeller.address}`);
-    let tx1 = await daiTeller.connect(deployer).initialize(signerAddress, solace.address, xsolace.address, UNDERWRITING_POOL_ADDRESS, DAO_ADDRESS, DAI_ADDRESS, bondDepo.address);
-    await tx1.wait();
-    console.log('DAI teller - init');
-    let tx2 = await daiTeller.connect(deployer).setTerms(START_PRICE, VESTING_TERM, 0, MAX_UINT64, 0, HALF_LIFE, CAPACITY, true, MAX_PAYOUT, MOMENTUM_FACTOR);
-    await tx2.wait();
-    console.log('DAI teller - set terms');
-    let tx3 = await bondDepo.connect(deployer).addTeller(daiTeller.address);
-    await tx3.wait();
-    console.log('DAI teller - add to bond depo');
-  }
-}
-
-async function deployFaucet() {
-  if(!!FAUCET_ADDRESS) {
-    faucet = (await ethers.getContractAt(artifacts.Faucet.abi, FAUCET_ADDRESS)) as Faucet;
-  } else {
-    console.log("Deploying Faucet");
-    var res = await create2Contract(deployer, artifacts.Faucet, [solace.address], {}, "", deployerContract.address);
-    faucet = (await ethers.getContractAt(artifacts.Faucet.abi, res.address)) as Faucet;
-    transactions.push({"description": "Deploy Faucet", "to": deployerContract.address, "gasLimit": res.gasUsed});
-    console.log(`Deployed Faucet to ${faucet.address}`);
-  }
-  if(!(await solace.isMinter(faucet.address)) && (await solace.governance()) == signerAddress) {
-    console.log("Adding faucet as SOLACE minter");
-    let tx = await solace.connect(deployer).addMinter(faucet.address);
-    await tx.wait();
-    console.log("Added faucet as SOLACE minter");
-  }
-}
-
-
-
 async function logAddresses() {
   console.log("");
-  console.log("| Contract Name    | Address                                      |");
-  console.log("|------------------|----------------------------------------------|");
+  console.log("| Contract Name                | Address                                      |");
+  console.log("|------------------------------|----------------------------------------------|");
   logContractAddress("DeployerContract", deployerContract.address);
   logContractAddress("Registry", registry.address);
   logContractAddress("WETH", weth.address);
@@ -587,13 +458,6 @@ async function logAddresses() {
   logContractAddress("CompoundProduct", compoundProduct.address);
   logContractAddress("WaaveProduct", waaveProduct.address);
   logContractAddress("LiquityProduct", liquityProduct.address);
-
-  logContractAddress("SOLACE", solace.address);
-  logContractAddress("xSOLACE", xsolace.address);
-  logContractAddress("BondDepository", bondDepo.address);
-  logContractAddress("DAI", DAI_ADDRESS);
-  logContractAddress("DAI Bond Teller", daiTeller.address);
-  logContractAddress("Faucet", faucet.address);
 
   console.log(``);
   console.log(`Copy and paste this into the .env file in the frontend client.`)
