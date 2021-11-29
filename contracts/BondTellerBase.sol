@@ -41,7 +41,7 @@ abstract contract BondTellerBase is IBondTeller, ReentrancyGuard, GovernableInit
     uint256 public maxPayout;                  // max payout in a single bond measured in principal
     uint256 internal constant MAX_BPS = 10000; // 10k basis points (100%)
     uint256 public daoFeeBps;                  // portion of principal that is sent to the dao, the rest to the pool
-    uint256 public stakeFeeBps;                // portion of SOLACE that is sent to stakers, the rest to the bonder
+    uint256 public bondFeeBps;                 // portion of SOLACE that is sent to stakers, the rest to the bonder
     bool public termsSet;                      // have terms been set
     bool public capacityIsPayout;              // capacity limit is for payout vs principal
     bool public paused;                        // pauses deposits
@@ -143,9 +143,9 @@ abstract contract BondTellerBase is IBondTeller, ReentrancyGuard, GovernableInit
         }
         require(amountOut <= maxPayout, "bond too large");
         // route solace
-        uint256 stakeFee = amountOut * stakeFeeBps / MAX_BPS;
-        if(stakeFee > 0) {
-            amountOut -= stakeFee;
+        uint256 bondFee = amountOut * bondFeeBps / MAX_BPS;
+        if(bondFee > 0) {
+            amountOut -= bondFee;
         }
         // optionally stake
         if(stake) {
@@ -166,8 +166,8 @@ abstract contract BondTellerBase is IBondTeller, ReentrancyGuard, GovernableInit
         if(stake) {
             amountOut = xsolace.xSolaceToSolace(amountOut);
         }
-        // stake fee
-        amountOut = amountOut * MAX_BPS / (MAX_BPS - stakeFeeBps);
+        // bond fee
+        amountOut = amountOut * MAX_BPS / (MAX_BPS - bondFeeBps);
         // exchange rate
         uint256 bondPrice_ = bondPrice();
         require(bondPrice_ > 0, "zero price");
@@ -304,13 +304,13 @@ abstract contract BondTellerBase is IBondTeller, ReentrancyGuard, GovernableInit
 
     /**
      * @notice Sets the bond fees.
-     * @param stakeFee The fraction of **SOLACE** that will be sent to stakers measured in BPS.
+     * @param bondFee The fraction of **SOLACE** that will be sent to stakers measured in BPS.
      * @param daoFee The fraction of `principal` that will be sent to the dao measured in BPS.
      */
-    function setFees(uint256 stakeFee, uint256 daoFee) external onlyGovernance {
-        require(stakeFee <= MAX_BPS, "invalid stake fee");
+    function setFees(uint256 bondFee, uint256 daoFee) external onlyGovernance {
+        require(bondFee <= MAX_BPS, "invalid bond fee");
         require(daoFee <= MAX_BPS, "invalid dao fee");
-        stakeFeeBps = stakeFee;
+        bondFeeBps = bondFee;
         daoFeeBps = daoFee;
         emit FeesSet();
     }

@@ -140,10 +140,10 @@ contract BondTellerEth is BondTellerBase, IBondTellerEth {
         _transferEth(underwritingPool, amount - daoFee, isWrapped);
         // route solace
         bondDepo.pullSolace(payout);
-        uint256 stakeFee = payout * stakeFeeBps / MAX_BPS;
-        if(stakeFee > 0) {
-            SafeERC20.safeTransfer(solace, address(xsolace), stakeFee);
-            payout -= stakeFee;
+        uint256 bondFee = payout * bondFeeBps / MAX_BPS;
+        if(bondFee > 0) {
+            SafeERC20.safeTransfer(solace, address(xsolace), bondFee);
+            payout -= bondFee;
         }
 
         // optionally stake

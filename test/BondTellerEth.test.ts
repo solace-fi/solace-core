@@ -179,7 +179,7 @@ describe("BondTellerETH", function() {
   });
 
   describe("depositEth", async function () {
-    let STAKE_FEE = 300;
+    let BOND_FEE = 300;
     let DAO_FEE = 200;
 
     it("cannot deposit with insufficient balance", async function () {
@@ -261,7 +261,7 @@ describe("BondTellerETH", function() {
     it("can deposit", async function () {
       await teller1.connect(governor).setTerms({startPrice: ONE_ETHER.mul(2), minimumPrice: 0, maxPayout: ONE_ETHER.mul(2), priceAdjNum: 1, priceAdjDenom: 10, capacity: ONE_ETHER.mul(10), capacityIsPayout: false, startTime: 0, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
 
-      await teller1.connect(governor).setFees(STAKE_FEE, DAO_FEE);
+      await teller1.connect(governor).setFees(BOND_FEE, DAO_FEE);
       let bal1 = await getBalances(teller1, depositor1);
       const blockTimestamp = (await provider.getBlock('latest')).timestamp;
       let predictedAmountOut = await teller1.calculateAmountOut(ONE_ETHER.mul(3), false);
@@ -274,8 +274,8 @@ describe("BondTellerETH", function() {
       expect(bondInfo.pricePaid).eq(ONE_ETHER.mul(3));
       expect(bondInfo.payoutToken).eq(solace.address);
       expectClose(predictedAmountIn, ONE_ETHER.mul(3), 1e14);
-      expectClose(predictedAmountOut, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-STAKE_FEE).div(MAX_BPS), 1e14);
-      expectClose(bondInfo.payoutAmount, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-STAKE_FEE).div(MAX_BPS), 1e14);
+      expectClose(predictedAmountOut, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
+      expectClose(bondInfo.payoutAmount, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
       expectClose(bondInfo.maturation, VESTING_TERM+blockTimestamp+1, 5);
       let bal2 = await getBalances(teller1, depositor1);
       let bal12 = getBalancesDiff(bal2, bal1);
@@ -283,7 +283,7 @@ describe("BondTellerETH", function() {
       expect(bal12.userXSolace).eq(0);
       expect(bal12.vestingSolace).eq(bondInfo.payoutAmount);
       expect(bal12.vestingXSolace).eq(0);
-      expectClose(bal12.stakingSolace, ONE_ETHER.mul(3).div(2).mul(STAKE_FEE).div(MAX_BPS), 1e14);
+      expectClose(bal12.stakingSolace, ONE_ETHER.mul(3).div(2).mul(BOND_FEE).div(MAX_BPS), 1e14);
       expect(bal12.totalXSolace).eq(0);
       let receipt = await tx1.wait();
       let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
@@ -301,7 +301,7 @@ describe("BondTellerETH", function() {
       expect(await xsolace.solaceToXSolace(ONE_ETHER)).to.equal(ONE_ETHER);
       expect(await xsolace.xSolaceToSolace(ONE_ETHER)).to.equal(ONE_ETHER);
       expect(bal12.tellerCapacity).eq(bondInfo.pricePaid.mul(-1));
-      expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-STAKE_FEE), 1e14);
+      expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-BOND_FEE), 1e14);
     });
     it("can deposit and stake", async function () {
       await teller1.connect(governor).setTerms({startPrice: ONE_ETHER.mul(2), minimumPrice: 0, maxPayout: ONE_ETHER.mul(2), priceAdjNum: 1, priceAdjDenom: 10, capacity: ONE_ETHER.mul(10), capacityIsPayout: true, startTime: 0, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
@@ -319,8 +319,8 @@ describe("BondTellerETH", function() {
       expect(bondInfo.pricePaid).eq(ONE_ETHER.mul(3));
       expect(bondInfo.payoutToken).eq(xsolace.address);
       expectClose(predictedAmountIn, ONE_ETHER.mul(3), 1e14);
-      expectClose(predictedAmountOut, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-STAKE_FEE).div(MAX_BPS), 1e14);
-      expectClose(bondInfo.payoutAmount, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-STAKE_FEE).div(MAX_BPS), 1e14);
+      expectClose(predictedAmountOut, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
+      expectClose(bondInfo.payoutAmount, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
       expectClose(bondInfo.maturation, VESTING_TERM+blockTimestamp+1, 5);
       let bal2 = await getBalances(teller1, depositor1);
       let bal12 = getBalancesDiff(bal2, bal1);
@@ -328,7 +328,7 @@ describe("BondTellerETH", function() {
       expect(bal12.userXSolace).eq(0);
       expect(bal12.vestingSolace).eq(0);
       expect(bal12.vestingXSolace).eq(bondInfo.payoutAmount);
-      expectClose(bal12.totalXSolace, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-STAKE_FEE).div(MAX_BPS), 1e14);
+      expectClose(bal12.totalXSolace, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
       expectClose(bal12.stakingSolace, ONE_ETHER.mul(3).div(2), 1e14);
       let receipt = await tx1.wait();
       let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
@@ -344,7 +344,7 @@ describe("BondTellerETH", function() {
       expect(bal12.userBonds).eq(1);
       expect(bal12.totalBonds).eq(1);
       expectClose(bal12.tellerCapacity, bondInfo.pricePaid.mul(-1).div(2), 1e14);
-      expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-STAKE_FEE), 1e14);
+      expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-BOND_FEE), 1e14);
     });
     it("deposits have minimum price", async function () {
       await teller1.connect(governor).setTerms({startPrice: ONE_ETHER, minimumPrice: ONE_ETHER.mul(2), maxPayout: ONE_ETHER.mul(2), priceAdjNum: 1, priceAdjDenom: 10, capacity: ONE_ETHER.mul(10), capacityIsPayout: false, startTime: 0, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
@@ -360,8 +360,8 @@ describe("BondTellerETH", function() {
       expect(bondInfo.pricePaid).eq(ONE_ETHER.mul(3));
       expect(bondInfo.payoutToken).eq(solace.address);
       expectClose(predictedAmountIn, ONE_ETHER.mul(3), 1e14);
-      expectClose(predictedAmountOut, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-STAKE_FEE).div(MAX_BPS), 1e14);
-      expectClose(bondInfo.payoutAmount, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-STAKE_FEE).div(MAX_BPS), 1e14);
+      expectClose(predictedAmountOut, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
+      expectClose(bondInfo.payoutAmount, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
       expectClose(bondInfo.maturation, VESTING_TERM+blockTimestamp+1, 5);
       let bal2 = await getBalances(teller1, depositor1);
       let bal12 = getBalancesDiff(bal2, bal1);
@@ -369,7 +369,7 @@ describe("BondTellerETH", function() {
       expect(bal12.userXSolace).eq(0);
       expect(bal12.vestingSolace).eq(bondInfo.payoutAmount);
       expect(bal12.vestingXSolace).eq(0);
-      expectClose(bal12.stakingSolace, ONE_ETHER.mul(3).div(2).mul(STAKE_FEE).div(MAX_BPS), 1e14);
+      expectClose(bal12.stakingSolace, ONE_ETHER.mul(3).div(2).mul(BOND_FEE).div(MAX_BPS), 1e14);
       expect(bal12.totalXSolace).eq(0);
       let receipt = await tx1.wait();
       let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
@@ -385,7 +385,7 @@ describe("BondTellerETH", function() {
       expect(bal12.userBonds).eq(1);
       expect(bal12.totalBonds).eq(1);
       expect(bal12.tellerCapacity).eq(bondInfo.pricePaid.mul(-1));
-      expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-STAKE_FEE), 1e14);
+      expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-BOND_FEE), 1e14);
     });
   });
 
@@ -457,7 +457,7 @@ describe("BondTellerETH", function() {
   });
 
   describe("depositWeth", async function () {
-    let STAKE_FEE = 300;
+    let BOND_FEE = 300;
     let DAO_FEE = 200;
 
     before("redeploy", async function () {
@@ -550,7 +550,7 @@ describe("BondTellerETH", function() {
     });
     it("can deposit", async function () {
       await teller1.connect(governor).setTerms({startPrice: ONE_ETHER.mul(2), minimumPrice: 0, maxPayout: ONE_ETHER.mul(2), priceAdjNum: 1, priceAdjDenom: 10, capacity: ONE_ETHER.mul(10), capacityIsPayout: false, startTime: 0, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
-      await teller1.connect(governor).setFees(STAKE_FEE, DAO_FEE);
+      await teller1.connect(governor).setFees(BOND_FEE, DAO_FEE);
       let bal1 = await getBalances(teller1, depositor1);
       const blockTimestamp = (await provider.getBlock('latest')).timestamp;
       let predictedAmountOut = await teller1.calculateAmountOut(ONE_ETHER.mul(3), false);
@@ -563,8 +563,8 @@ describe("BondTellerETH", function() {
       expect(bondInfo.pricePaid).eq(ONE_ETHER.mul(3));
       expect(bondInfo.payoutToken).eq(solace.address);
       expectClose(predictedAmountIn, ONE_ETHER.mul(3), 1e14);
-      expectClose(predictedAmountOut, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-STAKE_FEE).div(MAX_BPS), 1e14);
-      expectClose(bondInfo.payoutAmount, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-STAKE_FEE).div(MAX_BPS), 1e14);
+      expectClose(predictedAmountOut, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
+      expectClose(bondInfo.payoutAmount, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
       expectClose(bondInfo.maturation, VESTING_TERM+blockTimestamp+1, 5);
       let bal2 = await getBalances(teller1, depositor1);
       let bal12 = getBalancesDiff(bal2, bal1);
@@ -572,7 +572,7 @@ describe("BondTellerETH", function() {
       expect(bal12.userXSolace).eq(0);
       expect(bal12.vestingSolace).eq(bondInfo.payoutAmount);
       expect(bal12.vestingXSolace).eq(0);
-      expectClose(bal12.stakingSolace, ONE_ETHER.mul(3).div(2).mul(STAKE_FEE).div(MAX_BPS), 1e14);
+      expectClose(bal12.stakingSolace, ONE_ETHER.mul(3).div(2).mul(BOND_FEE).div(MAX_BPS), 1e14);
       expect(bal12.totalXSolace).eq(0);
       expect(bal12.userWeth9).eq(ONE_ETHER.mul(-3));
       expect(bal12.userWeth10).eq(0);
@@ -585,7 +585,7 @@ describe("BondTellerETH", function() {
       expect(await xsolace.solaceToXSolace(ONE_ETHER)).to.equal(ONE_ETHER);
       expect(await xsolace.xSolaceToSolace(ONE_ETHER)).to.equal(ONE_ETHER);
       expect(bal12.tellerCapacity).eq(bondInfo.pricePaid.mul(-1));
-      expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-STAKE_FEE), 1e14);
+      expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-BOND_FEE), 1e14);
     });
     it("can deposit and stake", async function () {
       await teller1.connect(governor).setTerms({startPrice: ONE_ETHER.mul(2), minimumPrice: 0, maxPayout: ONE_ETHER.mul(2), priceAdjNum: 1, priceAdjDenom: 10, capacity: ONE_ETHER.mul(10), capacityIsPayout: true, startTime: 0, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
@@ -603,8 +603,8 @@ describe("BondTellerETH", function() {
       expect(bondInfo.pricePaid).eq(ONE_ETHER.mul(3));
       expect(bondInfo.payoutToken).eq(xsolace.address);
       expectClose(predictedAmountIn, ONE_ETHER.mul(3), 1e14);
-      expectClose(predictedAmountOut, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-STAKE_FEE).div(MAX_BPS), 1e14);
-      expectClose(bondInfo.payoutAmount, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-STAKE_FEE).div(MAX_BPS), 1e14);
+      expectClose(predictedAmountOut, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
+      expectClose(bondInfo.payoutAmount, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
       expectClose(bondInfo.maturation, VESTING_TERM+blockTimestamp+1, 5);
       let bal2 = await getBalances(teller1, depositor1);
       let bal12 = getBalancesDiff(bal2, bal1);
@@ -612,7 +612,7 @@ describe("BondTellerETH", function() {
       expect(bal12.userXSolace).eq(0);
       expect(bal12.vestingSolace).eq(0);
       expect(bal12.vestingXSolace).eq(bondInfo.payoutAmount);
-      expectClose(bal12.totalXSolace, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-STAKE_FEE).div(MAX_BPS), 1e14);
+      expectClose(bal12.totalXSolace, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
       expectClose(bal12.stakingSolace, ONE_ETHER.mul(3).div(2), 1e14);
       expect(bal12.userWeth9).eq(ONE_ETHER.mul(-3));
       expect(bal12.userWeth10).eq(0);
@@ -623,7 +623,7 @@ describe("BondTellerETH", function() {
       expect(bal12.userBonds).eq(1);
       expect(bal12.totalBonds).eq(1);
       expectClose(bal12.tellerCapacity, bondInfo.pricePaid.mul(-1).div(2), 1e14);
-      expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-STAKE_FEE), 1e14);
+      expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-BOND_FEE), 1e14);
     });
     it("deposits have minimum price", async function () {
       await teller1.connect(governor).setTerms({startPrice: ONE_ETHER, minimumPrice: ONE_ETHER.mul(2), maxPayout: ONE_ETHER.mul(2), priceAdjNum: 1, priceAdjDenom: 10, capacity: ONE_ETHER.mul(10), capacityIsPayout: false, startTime: 0, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
@@ -639,8 +639,8 @@ describe("BondTellerETH", function() {
       expect(bondInfo.pricePaid).eq(ONE_ETHER.mul(3));
       expect(bondInfo.payoutToken).eq(solace.address);
       expectClose(predictedAmountIn, ONE_ETHER.mul(3), 1e14);
-      expectClose(predictedAmountOut, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-STAKE_FEE).div(MAX_BPS), 1e14);
-      expectClose(bondInfo.payoutAmount, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-STAKE_FEE).div(MAX_BPS), 1e14);
+      expectClose(predictedAmountOut, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
+      expectClose(bondInfo.payoutAmount, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
       expectClose(bondInfo.maturation, VESTING_TERM+blockTimestamp+1, 5);
       let bal2 = await getBalances(teller1, depositor1);
       let bal12 = getBalancesDiff(bal2, bal1);
@@ -648,7 +648,7 @@ describe("BondTellerETH", function() {
       expect(bal12.userXSolace).eq(0);
       expect(bal12.vestingSolace).eq(bondInfo.payoutAmount);
       expect(bal12.vestingXSolace).eq(0);
-      expectClose(bal12.stakingSolace, ONE_ETHER.mul(3).div(2).mul(STAKE_FEE).div(MAX_BPS), 1e14);
+      expectClose(bal12.stakingSolace, ONE_ETHER.mul(3).div(2).mul(BOND_FEE).div(MAX_BPS), 1e14);
       expect(bal12.totalXSolace).eq(0);
       expect(bal12.userWeth9).eq(ONE_ETHER.mul(-3));
       expect(bal12.userWeth10).eq(0);
@@ -659,12 +659,12 @@ describe("BondTellerETH", function() {
       expect(bal12.userBonds).eq(1);
       expect(bal12.totalBonds).eq(1);
       expect(bal12.tellerCapacity).eq(bondInfo.pricePaid.mul(-1));
-      expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-STAKE_FEE), 1e14);
+      expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-BOND_FEE), 1e14);
     });
   });
 
   describe("deposit signed", function () {
-    let STAKE_FEE = 300;
+    let BOND_FEE = 300;
     let DAO_FEE = 200;
 
     before("redeploy", async function () {
@@ -680,7 +680,7 @@ describe("BondTellerETH", function() {
     });
     it("can deposit signed", async function () {
       await teller2.connect(governor).setTerms({startPrice: ONE_ETHER.mul(2), minimumPrice: 0, maxPayout: ONE_ETHER.mul(2), priceAdjNum: 1, priceAdjDenom: 10, capacity: ONE_ETHER.mul(10), capacityIsPayout: false, startTime: 0, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
-      await teller2.connect(governor).setFees(STAKE_FEE, DAO_FEE);
+      await teller2.connect(governor).setFees(BOND_FEE, DAO_FEE);
       await weth10.connect(deployer).transfer(depositor1.address, ONE_ETHER.mul(100));
       let bal1 = await getBalances(teller2, depositor1);
       const blockTimestamp = (await provider.getBlock('latest')).timestamp;
@@ -695,8 +695,8 @@ describe("BondTellerETH", function() {
       expect(bondInfo.pricePaid).eq(ONE_ETHER.mul(3));
       expect(bondInfo.payoutToken).eq(solace.address);
       expectClose(predictedAmountIn, ONE_ETHER.mul(3), 1e14);
-      expectClose(predictedAmountOut, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-STAKE_FEE).div(MAX_BPS), 1e14);
-      expectClose(bondInfo.payoutAmount, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-STAKE_FEE).div(MAX_BPS), 1e14);
+      expectClose(predictedAmountOut, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
+      expectClose(bondInfo.payoutAmount, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
       expectClose(bondInfo.maturation, VESTING_TERM+blockTimestamp+1, 5);
       let bal2 = await getBalances(teller2, depositor1);
       let bal12 = getBalancesDiff(bal2, bal1);
@@ -704,7 +704,7 @@ describe("BondTellerETH", function() {
       expect(bal12.userXSolace).eq(0);
       expect(bal12.vestingSolace).eq(bondInfo.payoutAmount);
       expect(bal12.vestingXSolace).eq(0);
-      expectClose(bal12.stakingSolace, ONE_ETHER.mul(3).div(2).mul(STAKE_FEE).div(MAX_BPS), 1e14);
+      expectClose(bal12.stakingSolace, ONE_ETHER.mul(3).div(2).mul(BOND_FEE).div(MAX_BPS), 1e14);
       expect(bal12.totalXSolace).eq(0);
       expect(bal12.userWeth9).eq(0);
       expect(bal12.userWeth10).eq(ONE_ETHER.mul(-3));
@@ -717,7 +717,7 @@ describe("BondTellerETH", function() {
       expect(await xsolace.solaceToXSolace(ONE_ETHER)).to.equal(ONE_ETHER);
       expect(await xsolace.xSolaceToSolace(ONE_ETHER)).to.equal(ONE_ETHER);
       expect(bal12.tellerCapacity).eq(bondInfo.pricePaid.mul(-1));
-      expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-STAKE_FEE), 1e14);
+      expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-BOND_FEE), 1e14);
     });
     it("can deposit signed and stake", async function () {
       await teller2.connect(governor).setTerms({startPrice: ONE_ETHER.mul(2), minimumPrice: 0, maxPayout: ONE_ETHER.mul(2), priceAdjNum: 1, priceAdjDenom: 10, capacity: ONE_ETHER.mul(10), capacityIsPayout: true, startTime: 0, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
@@ -736,8 +736,8 @@ describe("BondTellerETH", function() {
       expect(bondInfo.pricePaid).eq(ONE_ETHER.mul(3));
       expect(bondInfo.payoutToken).eq(xsolace.address);
       expectClose(predictedAmountIn, ONE_ETHER.mul(3), 1e14);
-      expectClose(predictedAmountOut, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-STAKE_FEE).div(MAX_BPS), 1e14);
-      expectClose(bondInfo.payoutAmount, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-STAKE_FEE).div(MAX_BPS), 1e14);
+      expectClose(predictedAmountOut, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
+      expectClose(bondInfo.payoutAmount, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
       expectClose(bondInfo.maturation, VESTING_TERM+blockTimestamp+1, 5);
       let bal2 = await getBalances(teller2, depositor1);
       let bal12 = getBalancesDiff(bal2, bal1);
@@ -745,7 +745,7 @@ describe("BondTellerETH", function() {
       expect(bal12.userXSolace).eq(0);
       expect(bal12.vestingSolace).eq(0);
       expect(bal12.vestingXSolace).eq(bondInfo.payoutAmount);
-      expectClose(bal12.totalXSolace, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-STAKE_FEE).div(MAX_BPS), 1e14);
+      expectClose(bal12.totalXSolace, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
       expectClose(bal12.stakingSolace, ONE_ETHER.mul(3).div(2), 1e14);
       expect(bal12.userWeth9).eq(0);
       expect(bal12.userWeth10).eq(ONE_ETHER.mul(-3));
@@ -756,7 +756,7 @@ describe("BondTellerETH", function() {
       expect(bal12.userBonds).eq(1);
       expect(bal12.totalBonds).eq(1);
       expectClose(bal12.tellerCapacity, bondInfo.pricePaid.mul(-1).div(2), 1e14);
-      expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-STAKE_FEE), 1e14);
+      expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-BOND_FEE), 1e14);
     });
     it("deposits have minimum price", async function () {
       await teller2.connect(governor).setTerms({startPrice: ONE_ETHER, minimumPrice: ONE_ETHER.mul(2), maxPayout: ONE_ETHER.mul(2), priceAdjNum: 1, priceAdjDenom: 10, capacity: ONE_ETHER.mul(10), capacityIsPayout: false, startTime: 0, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
@@ -773,8 +773,8 @@ describe("BondTellerETH", function() {
       expect(bondInfo.pricePaid).eq(ONE_ETHER.mul(3));
       expect(bondInfo.payoutToken).eq(solace.address);
       expectClose(predictedAmountIn, ONE_ETHER.mul(3), 1e14);
-      expectClose(predictedAmountOut, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-STAKE_FEE).div(MAX_BPS), 1e14);
-      expectClose(bondInfo.payoutAmount, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-STAKE_FEE).div(MAX_BPS), 1e14);
+      expectClose(predictedAmountOut, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
+      expectClose(bondInfo.payoutAmount, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
       expectClose(bondInfo.maturation, VESTING_TERM+blockTimestamp+1, 5);
       let bal2 = await getBalances(teller2, depositor1);
       let bal12 = getBalancesDiff(bal2, bal1);
@@ -782,7 +782,7 @@ describe("BondTellerETH", function() {
       expect(bal12.userXSolace).eq(0);
       expect(bal12.vestingSolace).eq(bondInfo.payoutAmount);
       expect(bal12.vestingXSolace).eq(0);
-      expectClose(bal12.stakingSolace, ONE_ETHER.mul(3).div(2).mul(STAKE_FEE).div(MAX_BPS), 1e14);
+      expectClose(bal12.stakingSolace, ONE_ETHER.mul(3).div(2).mul(BOND_FEE).div(MAX_BPS), 1e14);
       expect(bal12.totalXSolace).eq(0);
       expect(bal12.userWeth9).eq(0);
       expect(bal12.userWeth10).eq(ONE_ETHER.mul(-3));
@@ -793,12 +793,12 @@ describe("BondTellerETH", function() {
       expect(bal12.userBonds).eq(1);
       expect(bal12.totalBonds).eq(1);
       expect(bal12.tellerCapacity).eq(bondInfo.pricePaid.mul(-1));
-      expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-STAKE_FEE), 1e14);
+      expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-BOND_FEE), 1e14);
     });
   });
 
   describe("deposit via fallback", async function () {
-    let STAKE_FEE = 300;
+    let BOND_FEE = 300;
     let DAO_FEE = 200;
 
     before("redeploy", async function () {
@@ -883,7 +883,7 @@ describe("BondTellerETH", function() {
     });
     it("can deposit", async function () {
       await teller1.connect(governor).setTerms({startPrice: ONE_ETHER.mul(2), minimumPrice: 0, maxPayout: ONE_ETHER.mul(2), priceAdjNum: 1, priceAdjDenom: 10, capacity: ONE_ETHER.mul(10), capacityIsPayout: false, startTime: 0, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
-      await teller1.connect(governor).setFees(STAKE_FEE, DAO_FEE);
+      await teller1.connect(governor).setFees(BOND_FEE, DAO_FEE);
       let bal1 = await getBalances(teller1, depositor1);
       const blockTimestamp = (await provider.getBlock('latest')).timestamp;
       let predictedAmountOut = await teller1.calculateAmountOut(ONE_ETHER.mul(3), false);
@@ -896,8 +896,8 @@ describe("BondTellerETH", function() {
       expect(bondInfo.pricePaid).eq(ONE_ETHER.mul(3));
       expect(bondInfo.payoutToken).eq(solace.address);
       expectClose(predictedAmountIn, ONE_ETHER.mul(3), 1e14);
-      expectClose(predictedAmountOut, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-STAKE_FEE).div(MAX_BPS), 1e14);
-      expectClose(bondInfo.payoutAmount, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-STAKE_FEE).div(MAX_BPS), 1e14);
+      expectClose(predictedAmountOut, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
+      expectClose(bondInfo.payoutAmount, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
       expectClose(bondInfo.maturation, VESTING_TERM+blockTimestamp+1, 5);
       let bal2 = await getBalances(teller1, depositor1);
       let bal12 = getBalancesDiff(bal2, bal1);
@@ -905,7 +905,7 @@ describe("BondTellerETH", function() {
       expect(bal12.userXSolace).eq(0);
       expect(bal12.vestingSolace).eq(bondInfo.payoutAmount);
       expect(bal12.vestingXSolace).eq(0);
-      expectClose(bal12.stakingSolace, ONE_ETHER.mul(3).div(2).mul(STAKE_FEE).div(MAX_BPS), 1e14);
+      expectClose(bal12.stakingSolace, ONE_ETHER.mul(3).div(2).mul(BOND_FEE).div(MAX_BPS), 1e14);
       expect(bal12.totalXSolace).eq(0);
       let receipt = await tx1.wait();
       let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
@@ -923,7 +923,7 @@ describe("BondTellerETH", function() {
       expect(await xsolace.solaceToXSolace(ONE_ETHER)).to.equal(ONE_ETHER);
       expect(await xsolace.xSolaceToSolace(ONE_ETHER)).to.equal(ONE_ETHER);
       expect(bal12.tellerCapacity).eq(bondInfo.pricePaid.mul(-1));
-      expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-STAKE_FEE), 1e14);
+      expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-BOND_FEE), 1e14);
     });
     it("deposits have minimum price", async function () {
       await teller1.connect(governor).setTerms({startPrice: ONE_ETHER, minimumPrice: ONE_ETHER.mul(2), maxPayout: ONE_ETHER.mul(2), priceAdjNum: 1, priceAdjDenom: 10, capacity: ONE_ETHER.mul(10), capacityIsPayout: false, startTime: 0, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
@@ -939,8 +939,8 @@ describe("BondTellerETH", function() {
       expect(bondInfo.pricePaid).eq(ONE_ETHER.mul(3));
       expect(bondInfo.payoutToken).eq(solace.address);
       expectClose(predictedAmountIn, ONE_ETHER.mul(3), 1e14);
-      expectClose(predictedAmountOut, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-STAKE_FEE).div(MAX_BPS), 1e14);
-      expectClose(bondInfo.payoutAmount, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-STAKE_FEE).div(MAX_BPS), 1e14);
+      expectClose(predictedAmountOut, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
+      expectClose(bondInfo.payoutAmount, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
       expectClose(bondInfo.maturation, VESTING_TERM+blockTimestamp+1, 5);
       let bal2 = await getBalances(teller1, depositor1);
       let bal12 = getBalancesDiff(bal2, bal1);
@@ -948,7 +948,7 @@ describe("BondTellerETH", function() {
       expect(bal12.userXSolace).eq(0);
       expect(bal12.vestingSolace).eq(bondInfo.payoutAmount);
       expect(bal12.vestingXSolace).eq(0);
-      expectClose(bal12.stakingSolace, ONE_ETHER.mul(3).div(2).mul(STAKE_FEE).div(MAX_BPS), 1e14);
+      expectClose(bal12.stakingSolace, ONE_ETHER.mul(3).div(2).mul(BOND_FEE).div(MAX_BPS), 1e14);
       expect(bal12.totalXSolace).eq(0);
       let receipt = await tx1.wait();
       let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
@@ -964,12 +964,12 @@ describe("BondTellerETH", function() {
       expect(bal12.userBonds).eq(1);
       expect(bal12.totalBonds).eq(1);
       expect(bal12.tellerCapacity).eq(bondInfo.pricePaid.mul(-1));
-      expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-STAKE_FEE), 1e14);
+      expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-BOND_FEE), 1e14);
     });
   });
 
   describe("set terms", async function () {
-    let STAKE_FEE = 300;
+    let BOND_FEE = 300;
     let DAO_FEE = 200;
 
     before("redeploy", async function () {
@@ -1027,7 +1027,7 @@ describe("BondTellerETH", function() {
   });
 
   describe("set fees", async function () {
-    let STAKE_FEE = 300;
+    let BOND_FEE = 300;
     let DAO_FEE = 200;
 
     before("redeploy", async function () {
@@ -1039,32 +1039,32 @@ describe("BondTellerETH", function() {
       teller2 = await deployProxyTeller("Solace USDC Bond", teller1.address, weth10.address);
     });
     it("fees start unset", async function () {
-      expect(await teller2.stakeFeeBps()).eq(0);
+      expect(await teller2.bondFeeBps()).eq(0);
       expect(await teller2.daoFeeBps()).eq(0);
     });
     it("non governance cannot set fees", async function () {
       await expect(teller2.connect(depositor1).setFees(0, 0)).to.be.revertedWith("!governance");
     });
     it("validates inputs", async function () {
-      await expect(teller2.connect(governor).setFees(10001, 0)).to.be.revertedWith("invalid stake fee");
+      await expect(teller2.connect(governor).setFees(10001, 0)).to.be.revertedWith("invalid bond fee");
       await expect(teller2.connect(governor).setFees(0, 10001)).to.be.revertedWith("invalid dao fee");
     });
     it("can set fees", async function () {
-      let tx = teller2.connect(governor).setFees(STAKE_FEE, DAO_FEE);
+      let tx = teller2.connect(governor).setFees(BOND_FEE, DAO_FEE);
       expect(tx).to.emit(teller2, "FeesSet");
-      expect(await teller2.stakeFeeBps()).eq(STAKE_FEE);
+      expect(await teller2.bondFeeBps()).eq(BOND_FEE);
       expect(await teller2.daoFeeBps()).eq(DAO_FEE);
     });
     it("can set to zero", async function () {
       let tx = teller2.connect(governor).setFees(0, 0);
       expect(tx).to.emit(teller2, "FeesSet");
-      expect(await teller2.stakeFeeBps()).eq(0);
+      expect(await teller2.bondFeeBps()).eq(0);
       expect(await teller2.daoFeeBps()).eq(0);
     });
   });
 
   describe("set addresses", function () {
-    let STAKE_FEE = 300;
+    let BOND_FEE = 300;
     let DAO_FEE = 200;
 
     let solace2: Solace;
@@ -1116,8 +1116,8 @@ describe("BondTellerETH", function() {
       expect(bondInfo.pricePaid).eq(ONE_ETHER.mul(3));
       expect(bondInfo.payoutToken).eq(solace2.address);
       expectClose(predictedAmountIn, ONE_ETHER.mul(3), 1e14);
-      expectClose(predictedAmountOut, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-STAKE_FEE).div(MAX_BPS), 1e14);
-      expectClose(bondInfo.payoutAmount, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-STAKE_FEE).div(MAX_BPS), 1e14);
+      expectClose(predictedAmountOut, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
+      expectClose(bondInfo.payoutAmount, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
       expectClose(bondInfo.maturation, VESTING_TERM+blockTimestamp+1, 5);
       let bal2 = await getBalances(teller1, depositor1);
       let bal12 = getBalancesDiff(bal2, bal1);
@@ -1125,7 +1125,7 @@ describe("BondTellerETH", function() {
       expect(bal12.userXSolace).eq(0);
       expect(await solace2.balanceOf(teller1.address)).eq(bondInfo.payoutAmount);
       expect(bal12.vestingXSolace).eq(0);
-      expectClose(await solace2.balanceOf(xsolace2.address), ONE_ETHER.mul(3).div(2).mul(STAKE_FEE).div(MAX_BPS), 1e14);
+      expectClose(await solace2.balanceOf(xsolace2.address), ONE_ETHER.mul(3).div(2).mul(BOND_FEE).div(MAX_BPS), 1e14);
       expect(bal12.totalXSolace).eq(0);
       expect(bal12.userWeth9).eq(0);
       expect(bal12.userWeth10).eq(ONE_ETHER.mul(-3));
@@ -1136,7 +1136,7 @@ describe("BondTellerETH", function() {
       expect(bal12.userBonds).eq(1);
       expect(bal12.totalBonds).eq(1);
       expect(bal12.tellerCapacity).eq(bondInfo.pricePaid.mul(-1));
-      expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-STAKE_FEE), 1e14);
+      expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-BOND_FEE), 1e14);
     });
   });
 
