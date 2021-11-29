@@ -10,15 +10,11 @@ import "./interface/ISOLACE.sol";
 /**
  * @title Solace Token (SOLACE)
  * @author solace.fi
- * @notice **Solace** tokens can be earned by depositing **Capital Provider** or **Liquidity Provider** tokens to the [`Master`](./Master) contract.
- * **SOLACE** can also be locked for a preset time in the `Locker` contract to recieve `veSOLACE` tokens.
+ * @notice The native governance token of the Solace Coverage Protocol.
  */
 contract SOLACE is ISOLACE, ERC20Permit, Governable {
     using SafeERC20 for IERC20;
     using Address for address;
-
-    // max supply
-    uint256 internal _maxSupply;
 
     // Minters
     mapping (address => bool) internal _minters;
@@ -27,29 +23,7 @@ contract SOLACE is ISOLACE, ERC20Permit, Governable {
      * @notice Constructs the Solace Token contract.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
      */
-    constructor(address governance_) ERC20("solace", "SOLACE") ERC20Permit("solace") Governable(governance_) {
-        _maxSupply = 1_000_000_000 ether; // one billion
-        _minters[governance_] = true;
-    }
-
-    /**
-     * @notice The total amount of **SOLACE** that can be minted.
-     * @return cap The supply cap.
-     */
-    function maxSupply() external view override returns (uint256 cap) {
-        return _maxSupply;
-    }
-
-    /**
-     * @notice Changes the max supply of **SOLACE**.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param maxSupply_ The new supply cap.
-     */
-    function setMaxSupply(uint256 maxSupply_) external override onlyGovernance {
-        require(maxSupply_ >= totalSupply(), "max < current supply");
-        _maxSupply = maxSupply_;
-        emit MaxSupplySet(maxSupply_);
-    }
+    constructor(address governance_) ERC20("solace", "SOLACE") ERC20Permit("solace") Governable(governance_) { }
 
     /**
      * @notice Returns true if `account` is authorized to mint **SOLACE**.
@@ -69,10 +43,16 @@ contract SOLACE is ISOLACE, ERC20Permit, Governable {
     function mint(address account, uint256 amount) external override {
         // can only be called by authorized minters
         require(_minters[msg.sender], "!minter");
-        // can only mint up to the cap
-        require(totalSupply() + amount <= _maxSupply, "capped");
         // mint
         _mint(account, amount);
+    }
+
+    /**
+     * @notice Burns **SOLACE** from msg.sender.
+     * @param amount Amount to burn.
+     */
+    function burn(uint256 amount) external override {
+        _burn(msg.sender, amount);
     }
 
     /**

@@ -12,13 +12,13 @@ contract MockFaultyReceiver {
      * @notice Fallback function to allow contract to receive **ETH**.
      */
     receive () external payable {
-        revert();
+        revert("get stickbugged");
     }
 
     /**
      * @notice Fallback function to allow contract to receive **ETH**.
      */
     fallback () external payable {
-        revert();
+        revert("get stickbugged");
     }
 }

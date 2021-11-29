@@ -67,51 +67,28 @@ describe("SOLACE", function () {
 
   describe("mint", function () {
     it("allows minters to mint", async function () {
-      let balanceBefore = await solace.balanceOf(receiver1.address);
-      let supplyBefore = await solace.totalSupply();
       await solace.connect(governor).addMinter(minter.address);
+      let balance1 = await solace.balanceOf(receiver1.address);
+      let supply1 = await solace.totalSupply();
       await solace.connect(minter).mint(receiver1.address, amount);
-      expect(await solace.balanceOf(receiver1.address)).to.equal(amount.add(balanceBefore));
-      expect(await solace.totalSupply()).to.equal(amount.add(supplyBefore));
+      let balance2 = await solace.balanceOf(receiver1.address);
+      let supply2 = await solace.totalSupply();
+      expect(balance2).to.equal(amount.add(balance1));
+      expect(supply2).to.equal(amount.add(supply1));
+      await solace.connect(minter).mint(receiver1.address, amount);
+      let balance3 = await solace.balanceOf(receiver1.address);
+      let supply3 = await solace.totalSupply();
+      expect(balance3).to.equal(amount.add(balance2));
+      expect(supply3).to.equal(amount.add(supply2));
     });
     it("reverts mint() called by non-minters", async function () {
       await expect(solace.connect(receiver1).mint(receiver1.address,amount)).to.be.reverted;
     });
-    it("has a soft cap", async function () {
-      expect(await solace.maxSupply()).to.equal(ONE_BILLION);
-    });
-    it("can mint up to the cap", async function () {
-      let supply = await solace.totalSupply();
-      expect(supply).to.be.lt(ONE_BILLION);
-      let diff = ONE_BILLION.sub(supply);
-      await solace.connect(minter).mint(receiver1.address, diff);
-      expect(await solace.totalSupply()).to.equal(ONE_BILLION);
-    });
-    it("cannot mint more than the cap", async function () {
-      await expect(solace.connect(minter).mint(receiver1.address, 1)).to.be.revertedWith("capped");
-    });
-    it("non governance cannot change cap", async function () {
-      await expect(solace.connect(minter).setMaxSupply(TWO_BILLION)).to.be.revertedWith("!governance")
-    });
-    it("governance can change cap", async function () {
-      let tx1 = await solace.connect(governor).setMaxSupply(FOUR_BILLION);
-      expect(tx1).to.emit(solace, "MaxSupplySet").withArgs(FOUR_BILLION);
-      let tx2 = await solace.connect(governor).setMaxSupply(THREE_BILLION);
-      expect(tx2).to.emit(solace, "MaxSupplySet").withArgs(THREE_BILLION);
-    });
-    it("can mint to new cap", async function () {
-      let supply = await solace.totalSupply();
-      let diff = THREE_BILLION.sub(supply);
-      await solace.connect(minter).mint(receiver1.address, diff);
-    });
-    it("cannot lower cap under current supply", async function () {
-      await expect(solace.connect(governor).setMaxSupply(TWO_BILLION)).to.be.revertedWith("max < current supply")
-    });
   });
 
   describe("minters", function () {
-    it("governor is minter", async function () {
-      expect(await solace.isMinter(governor.address)).to.be.true;
+    it("governor is not minter", async function () {
+      expect(await solace.isMinter(governor.address)).to.be.false;
     });
     it("can add minters", async function (){
       let tx = await solace.connect(governor).addMinter(minter.address);
@@ -129,6 +106,31 @@ describe("SOLACE", function () {
     });
     it("cannot add zero address minter", async function () {
       await expect(solace.connect(governor).addMinter(ZERO_ADDRESS)).to.be.revertedWith("zero address");
+    });
+  });
+
+  describe("burn", function () {
+    it("anyone can burn their own balance", async function () {
+      let balance1 = await solace.balanceOf(receiver1.address);
+      let supply1 = await solace.totalSupply();
+      let burnAmount1 = balance1.div(2);
+      let burnAmount2 = balance1.sub(burnAmount1);
+      await solace.connect(receiver1).burn(burnAmount1);
+      let balance2 = await solace.balanceOf(receiver1.address);
+      let supply2 = await solace.totalSupply();
+      expect(balance1.sub(balance2)).to.equal(burnAmount1);
+      expect(supply1.sub(supply2)).to.equal(burnAmount1);
+      await solace.connect(receiver1).burn(burnAmount2);
+      let balance3 = await solace.balanceOf(receiver1.address);
+      let supply3 = await solace.totalSupply();
+      expect(balance3).to.equal(0);
+      expect(supply1.sub(supply3)).to.equal(balance1);
+    });
+    it("cannot burn more than balance", async function () {
+      await expect(solace.connect(receiver2).burn(1)).to.be.revertedWith("ERC20: burn amount exceeds balance");
+      await solace.connect(governor).addMinter(minter.address);
+      await solace.connect(minter).mint(receiver2.address, 2);
+      await expect(solace.connect(receiver2).burn(3)).to.be.revertedWith("ERC20: burn amount exceeds balance");
     });
   });
 

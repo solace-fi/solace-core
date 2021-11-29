@@ -7,8 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 /**
  * @title Solace Token (SOLACE)
  * @author solace.fi
- * @notice **Solace** tokens can be earned by depositing **Capital Provider** or **Liquidity Provider** tokens to the [`Master`](./Master) contract.
- * **SOLACE** can also be locked for a preset time in the `Locker` contract to recieve `veSOLACE` tokens.
+ * @notice The native governance token of the Solace Coverage Protocol.
  */
 interface ISOLACE is IERC20Metadata {
 
@@ -16,29 +15,10 @@ interface ISOLACE is IERC20Metadata {
     EVENTS
     ***************************************/
 
-    /// @notice Emitted when the max supply is changed.
-    event MaxSupplySet(uint256 cap);
     /// @notice Emitted when a minter is added.
     event MinterAdded(address indexed minter);
     /// @notice Emitted when a minter is removed.
     event MinterRemoved(address indexed minter);
-
-    /***************************************
-    MAX SUPPLY FUNCTIONS
-    ***************************************/
-
-    /**
-     * @notice The total amount of **SOLACE** that can be minted.
-     * @return cap The supply cap.
-     */
-    function maxSupply() external view returns (uint256 cap);
-
-    /**
-     * @notice Changes the max supply of **SOLACE**.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param maxSupply_ The new supply cap.
-     */
-    function setMaxSupply(uint256 maxSupply_) external;
 
     /***************************************
     MINT FUNCTIONS
@@ -58,6 +38,12 @@ interface ISOLACE is IERC20Metadata {
      * @param amount The number of new tokens.
      */
     function mint(address account, uint256 amount) external;
+
+    /**
+     * @notice Burns **SOLACE** from msg.sender.
+     * @param amount Amount to burn.
+     */
+    function burn(uint256 amount) external;
 
     /**
      * @notice Adds a new minter.
