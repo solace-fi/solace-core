@@ -2,7 +2,7 @@ import { ethers, waffle, upgrades } from "hardhat";
 const { deployContract, solidity } = waffle;
 import { MockProvider } from "ethereum-waffle";
 const provider: MockProvider = waffle.provider;
-import { Transaction, BigNumber as BN, Contract, constants, BigNumberish, Wallet } from "ethers";
+import { Transaction, BigNumber as BN, Contract, constants, BigNumberish, Wallet, utils } from "ethers";
 import chai from "chai";
 const { expect } = chai;
 chai.use(solidity);
@@ -12,7 +12,7 @@ import { bnAddSub, bnMulDiv, expectClose } from "./utilities/math";
 import { getPermitErc721EnhancedSignature } from "./utilities/getPermitNFTSignature";
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Solace, FarmController, OptionsFarming, SptFarm, PolicyManager, RiskManager, Registry, MockProduct, Weth9, Treasury } from "../typechain";
+import { Solace, FarmController, OptionsFarming, SptFarm, PolicyManager, RiskManager, Registry, MockProductV2, Weth9, Treasury,CoverageDataProvider, RiskStrategy, MockRiskStrategy, ProductFactory, Vault } from "../typechain";
 import { burnBlocks } from "./utilities/time";
 
 // contracts
@@ -23,9 +23,15 @@ let farm1: SptFarm;
 let weth: Weth9;
 let registry: Registry;
 let treasury: Treasury;
+let vault: Vault;
 let policyManager: PolicyManager;
 let riskManager: RiskManager;
-let product: MockProduct;
+let product: MockProductV2;
+let coverageDataProvider: CoverageDataProvider;
+let riskStrategy: RiskStrategy;
+let riskStrategyFactory: Contract;
+let mockRiskStrategy: RiskStrategy;
+let productFactory: ProductFactory;
 
 // uniswap contracts
 let uniswapFactory: Contract;
@@ -52,6 +58,8 @@ const price = 10000;
 const duration = 1000;
 const chainID = 31337;
 const deadline = constants.MaxUint256;
+const SUBMIT_CLAIM_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("MockProductSubmitClaim(uint256 policyID,address claimant,uint256 amountOut,uint256 deadline)"));
+const DOMAIN_NAME = "Solace.fi-MockProduct";
 
 describe("SptFarm", function () {
   const [deployer, governor, farmer1, farmer2, trader, coveredPlatform] = provider.getWallets();
@@ -74,6 +82,8 @@ describe("SptFarm", function () {
     await registry.connect(governor).setWeth(weth.address);
     treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, registry.address])) as Treasury;
     await registry.connect(governor).setTreasury(treasury.address);
+    vault = (await deployContract(deployer,artifacts.Vault,[governor.address,registry.address])) as Vault;
+    await registry.connect(governor).setVault(vault.address);
     policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
     await registry.connect(governor).setPolicyManager(policyManager.address);
     riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
@@ -85,11 +95,8 @@ describe("SptFarm", function () {
     farmController = (await deployContract(deployer, artifacts.FarmController, [governor.address, optionsFarming.address, solacePerSecond])) as FarmController;
     await registry.connect(governor).setFarmController(farmController.address);
     await optionsFarming.connect(governor).setFarmController(farmController.address);
-
-    // add products
-    product = (await deployContract(deployer, artifacts.MockProduct, [deployer.address, policyManager.address, registry.address, coveredPlatform.address, 0, 100000000000, price])) as MockProduct;
-    await policyManager.connect(governor).addProduct(product.address);
-    await riskManager.connect(governor).addProduct(product.address, 1, price, 1);
+    coverageDataProvider = (await deployContract(deployer, artifacts.CoverageDataProvider, [registry.address])) as CoverageDataProvider;
+    await registry.connect(governor).setCoverageDataProvider(coverageDataProvider.address);
 
     // transfer tokens
     await solace.connect(governor).addMinter(governor.address);
@@ -111,6 +118,40 @@ describe("SptFarm", function () {
     let sqrtPrice = encodePriceSqrt(amount1, amount0);
     solaceEthPool = await createPool(weth, solace, FeeAmount.MEDIUM, sqrtPrice);
     await mintLpToken(trader, solace, weth, FeeAmount.MEDIUM, amount0, amount1);
+
+    // deploy product factory
+    productFactory = (await deployContract(governor, artifacts.ProductFactory)) as ProductFactory;
+
+    // create product
+    let baseProduct = (await deployContract(governor, artifacts.MockProductV2)) as MockProductV2;
+    let tx1 = await productFactory.createProduct(baseProduct.address, governor.address, registry.address, 0, 1000000, SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, "1");
+    let events1 = (await tx1.wait())?.events;
+    if(events1 && events1.length > 0) {
+      let event1 = events1[0];
+      product = await ethers.getContractAt(artifacts.MockProductV2.abi, event1?.args?.["deployment"]) as MockProductV2;
+    } else throw "no deployment";
+
+    // deploy risk strategy factory
+    let riskStrategyContractFactory = await ethers.getContractFactory("RiskStrategyFactory", deployer);
+    riskStrategyFactory = (await riskStrategyContractFactory.deploy(registry.address, governor.address));
+    await riskStrategyFactory.deployed();
+
+    mockRiskStrategy = (await deployContract(deployer, artifacts.MockRiskStrategy)) as MockRiskStrategy;
+    let tx = await riskStrategyFactory.createRiskStrategy(mockRiskStrategy.address, [product.address],[1],[price],[1]);
+    let events = (await tx.wait())?.events;
+    if (events && events.length > 0) {
+      let event = events[0];
+      riskStrategy = await ethers.getContractAt(artifacts.MockRiskStrategy.abi, event?.args?.["deployment"]) as RiskStrategy;
+    } else {
+      throw "no risk strategy deployment!";
+    }
+
+    // add and enable risk strategy
+    await policyManager.connect(governor).addProduct(product.address);
+    await riskManager.connect(governor).addRiskStrategy(riskStrategy.address);
+    await riskManager.connect(governor).setStrategyStatus(riskStrategy.address, 1);
+    await riskManager.connect(governor).setWeightAllocation(riskStrategy.address, 100);
+    
   });
 
   describe("deployment", function () {
@@ -209,15 +250,15 @@ describe("SptFarm", function () {
     let policyValue123 = policyValue1.add(policyValue2).add(policyValue3);
 
     before(async function () {
-      await product.connect(farmer1)._buyPolicy(farmer1.address, coverAmount1, duration, ZERO_ADDRESS);
+      await product.connect(farmer1)._buyPolicy(farmer1.address, coverAmount1, duration, ZERO_ADDRESS, riskStrategy.address);
       policyID1 = await policyManager.totalPolicyCount();
-      await product.connect(farmer2)._buyPolicy(farmer2.address, coverAmount2, duration, ZERO_ADDRESS);
+      await product.connect(farmer2)._buyPolicy(farmer2.address, coverAmount2, duration, ZERO_ADDRESS, riskStrategy.address);
       policyID2 = await policyManager.totalPolicyCount();
-      await product.connect(farmer1)._buyPolicy(farmer1.address, coverAmount3, duration, ZERO_ADDRESS);
+      await product.connect(farmer1)._buyPolicy(farmer1.address, coverAmount3, duration, ZERO_ADDRESS, riskStrategy.address);
       policyID3 = await policyManager.totalPolicyCount();
-      await product.connect(farmer1)._buyPolicy(farmer1.address, coverAmount4, duration, ZERO_ADDRESS);
+      await product.connect(farmer1)._buyPolicy(farmer1.address, coverAmount4, duration, ZERO_ADDRESS, riskStrategy.address);
       policyID4 = await policyManager.totalPolicyCount();
-      await product.connect(farmer1)._buyPolicy(farmer1.address, coverAmount5, duration, ZERO_ADDRESS);
+      await product.connect(farmer1)._buyPolicy(farmer1.address, coverAmount5, duration, ZERO_ADDRESS, riskStrategy.address);
       policyID5 = await policyManager.totalPolicyCount();
     });
     it("can deposit", async function () {
@@ -322,7 +363,7 @@ describe("SptFarm", function () {
       await policyManager.connect(farmer1).approve(farm1.address, policyID5);
       await expect(farm1.connect(farmer2).depositPolicy(policyID5)).to.be.reverted;
       // expired policy
-      await product.connect(farmer1)._buyPolicy(farmer1.address, coverAmount1, 0, ZERO_ADDRESS);
+      await product.connect(farmer1)._buyPolicy(farmer1.address, coverAmount1, 0, ZERO_ADDRESS, riskStrategy.address);
       policyID = await policyManager.totalPolicyCount();
       await policyManager.connect(farmer1).approve(farm1.address, policyID);
       await expect(farm1.connect(farmer1).depositPolicy(policyID)).to.be.revertedWith("policy is expired");
@@ -359,15 +400,15 @@ describe("SptFarm", function () {
     });
     it("can deposit multi", async function () {
       // create more policies
-      await product.connect(farmer1)._buyPolicy(farmer1.address, coverAmount1, duration, ZERO_ADDRESS);
+      await product.connect(farmer1)._buyPolicy(farmer1.address, coverAmount1, duration, ZERO_ADDRESS, riskStrategy.address);
       policyID1 = await policyManager.totalPolicyCount();
-      await product.connect(farmer2)._buyPolicy(farmer2.address, coverAmount2, duration, ZERO_ADDRESS);
+      await product.connect(farmer2)._buyPolicy(farmer2.address, coverAmount2, duration, ZERO_ADDRESS, riskStrategy.address);
       policyID2 = await policyManager.totalPolicyCount();
-      await product.connect(farmer1)._buyPolicy(farmer1.address, coverAmount3, duration, ZERO_ADDRESS);
+      await product.connect(farmer1)._buyPolicy(farmer1.address, coverAmount3, duration, ZERO_ADDRESS, riskStrategy.address);
       policyID3 = await policyManager.totalPolicyCount();
-      await product.connect(farmer2)._buyPolicy(farmer2.address, coverAmount4, duration, ZERO_ADDRESS);
+      await product.connect(farmer2)._buyPolicy(farmer2.address, coverAmount4, duration, ZERO_ADDRESS, riskStrategy.address);
       policyID4 = await policyManager.totalPolicyCount();
-      await product.connect(farmer1)._buyPolicy(farmer1.address, coverAmount5, duration, ZERO_ADDRESS);
+      await product.connect(farmer1)._buyPolicy(farmer1.address, coverAmount5, duration, ZERO_ADDRESS, riskStrategy.address);
       policyID5 = await policyManager.totalPolicyCount();
       // deposit
       let balances1a = await getBalances(farmer1, farm1);
@@ -579,11 +620,11 @@ describe("SptFarm", function () {
       await farmController.connect(governor).registerFarm(farm.address, allocPoints);
       farmID = await farmController.numFarms();
 
-      await product.connect(farmer1)._buyPolicy(farmer1.address, coverAmount1, duration, ZERO_ADDRESS);
+      await product.connect(farmer1)._buyPolicy(farmer1.address, coverAmount1, duration, ZERO_ADDRESS, riskStrategy.address);
       policyID1 = await policyManager.totalPolicyCount();
-      await product.connect(farmer2)._buyPolicy(farmer2.address, coverAmount2, duration, ZERO_ADDRESS);
+      await product.connect(farmer2)._buyPolicy(farmer2.address, coverAmount2, duration, ZERO_ADDRESS, riskStrategy.address);
       policyID2 = await policyManager.totalPolicyCount();
-      await product.connect(farmer1)._buyPolicy(farmer2.address, coverAmount3, duration, ZERO_ADDRESS);
+      await product.connect(farmer1)._buyPolicy(farmer2.address, coverAmount3, duration, ZERO_ADDRESS, riskStrategy.address);
       policyID3 = await policyManager.totalPolicyCount();
     });
 
@@ -798,9 +839,34 @@ describe("SptFarm", function () {
 
   describe("updateActivePolicies", function () {
     before(async function () {
-      product = (await deployContract(deployer, artifacts.MockProduct, [deployer.address, policyManager.address, registry.address, coveredPlatform.address, 0, 100000000000, price])) as MockProduct;
+      let baseProduct = (await deployContract(governor, artifacts.MockProductV2)) as MockProductV2;
+      let tx1 = await productFactory.createProduct(baseProduct.address, governor.address, registry.address, 0, 100000000000, SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, "1");
+      let events1 = (await tx1.wait())?.events;
+      if(events1 && events1.length > 0) {
+        let event1 = events1[0];
+        product = await ethers.getContractAt(artifacts.MockProductV2.abi, event1?.args?.["deployment"]) as MockProductV2;
+      } else throw "no deployment";
+  
+      // deploy risk strategy factory
+      let riskStrategyContractFactory = await ethers.getContractFactory("RiskStrategyFactory", deployer);
+      riskStrategyFactory = (await riskStrategyContractFactory.deploy(registry.address, governor.address));
+      await riskStrategyFactory.deployed();
+  
+      mockRiskStrategy = (await deployContract(deployer, artifacts.MockRiskStrategy)) as MockRiskStrategy;
+      let tx = await riskStrategyFactory.createRiskStrategy(mockRiskStrategy.address, [product.address],[1],[price],[1]);
+      let events = (await tx.wait())?.events;
+      if (events && events.length > 0) {
+        let event = events[0];
+        riskStrategy = await ethers.getContractAt(artifacts.MockRiskStrategy.abi, event?.args?.["deployment"]) as RiskStrategy;
+      } else {
+        throw "no risk strategy deployment!";
+      }
+  
+      // add and enable risk strategy
       await policyManager.connect(governor).addProduct(product.address);
-      await riskManager.connect(governor).addProduct(product.address, 1, price, 1);
+      await riskManager.connect(governor).addRiskStrategy(riskStrategy.address);
+      await riskManager.connect(governor).setStrategyStatus(riskStrategy.address, 1);
+      await riskManager.connect(governor).setWeightAllocation(riskStrategy.address, 100);
     });
     it("can update no policies", async function () {
       await farm1.updateActivePolicies([]);
@@ -808,32 +874,32 @@ describe("SptFarm", function () {
     it("can update active policies", async function () {
       // policy 1 expires
       let balances1 = await getBalances(farmer1, farm1);
-      await product.connect(farmer1)._buyPolicy(farmer1.address, 0b000001, 110, ZERO_ADDRESS);
+      await product.connect(farmer1)._buyPolicy(farmer1.address, 0b000001, 110, ZERO_ADDRESS, riskStrategy.address);
       let policyID1 = await policyManager.totalPolicyCount();
       var { v, r, s } = await getPermitErc721EnhancedSignature(farmer1, policyManager, farm1.address, policyID1, deadline);
       await farm1.connect(farmer1).depositPolicySigned(farmer1.address, policyID1, deadline, v, r, s);
       // policy 2 expires
-      await product.connect(farmer1)._buyPolicy(farmer1.address, 0b000010, 120, ZERO_ADDRESS);
+      await product.connect(farmer1)._buyPolicy(farmer1.address, 0b000010, 120, ZERO_ADDRESS, riskStrategy.address);
       let policyID2 = await policyManager.totalPolicyCount();
       var { v, r, s } = await getPermitErc721EnhancedSignature(farmer1, policyManager, farm1.address, policyID2, deadline);
       await farm1.connect(farmer1).depositPolicySigned(farmer1.address, policyID2, deadline, v, r, s);
       // policy 3 expires but is not updated
-      await product.connect(farmer1)._buyPolicy(farmer1.address, 0b000100, 130, ZERO_ADDRESS);
+      await product.connect(farmer1)._buyPolicy(farmer1.address, 0b000100, 130, ZERO_ADDRESS, riskStrategy.address);
       let policyID3 = await policyManager.totalPolicyCount();
       var { v, r, s } = await getPermitErc721EnhancedSignature(farmer1, policyManager, farm1.address, policyID3, deadline);
       await farm1.connect(farmer1).depositPolicySigned(farmer1.address, policyID3, deadline, v, r, s);
       // policy 4 does not expire
-      await product.connect(farmer1)._buyPolicy(farmer1.address, 0b001000, 200, ZERO_ADDRESS);
+      await product.connect(farmer1)._buyPolicy(farmer1.address, 0b001000, 200, ZERO_ADDRESS, riskStrategy.address);
       let policyID4 = await policyManager.totalPolicyCount();
       var { v, r, s } = await getPermitErc721EnhancedSignature(farmer1, policyManager, farm1.address, policyID4, deadline);
       await farm1.connect(farmer1).depositPolicySigned(farmer1.address, policyID4, deadline, v, r, s);
       // policy 5 is canceled
-      await product.connect(farmer1)._buyPolicy(farmer1.address, 0b010000, 300, ZERO_ADDRESS);
+      await product.connect(farmer1)._buyPolicy(farmer1.address, 0b010000, 300, ZERO_ADDRESS, riskStrategy.address);
       let policyID5 = await policyManager.totalPolicyCount();
       var { v, r, s } = await getPermitErc721EnhancedSignature(farmer1, policyManager, farm1.address, policyID5, deadline);
       await farm1.connect(farmer1).depositPolicySigned(farmer1.address, policyID5, deadline, v, r, s);
       // policy 6 is expired but was never staked
-      await product.connect(farmer1)._buyPolicy(farmer1.address, 0b100000, 120, ZERO_ADDRESS);
+      await product.connect(farmer1)._buyPolicy(farmer1.address, 0b100000, 120, ZERO_ADDRESS, riskStrategy.address);
       let policyID6 = await policyManager.totalPolicyCount();
       // pass time
       await burnBlocks(150);

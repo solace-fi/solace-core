@@ -301,7 +301,7 @@ contract Registry is IRegistry, Governable {
         require(optionsFarming_ != address(0x0), "zero address optionsfarming");
         require(farmController_ != address(0x0), "zero address farmcontroller");
         require(locker_ != address(0x0), "zero address locker");
-        require(coverageDataProvider_ != address(0x0), "zero address coveragedataprovier");
+        require(coverageDataProvider_ != address(0x0), "zero address coveragedataprovider");
         _weth = weth_;
         emit WethSet(weth_);
         _vault = vault_;

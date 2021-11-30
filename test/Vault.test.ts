@@ -1,6 +1,6 @@
 import chai from "chai";
 import { ethers, waffle, upgrades } from "hardhat";
-import { BigNumber as BN, BigNumberish, constants } from "ethers";
+import { BigNumber as BN, BigNumberish, constants, Contract, utils} from "ethers";
 import { getPermitDigest, sign, getDomainSeparator } from "./utilities/signature";
 const { expect } = chai;
 const { deployContract, solidity } = waffle;
@@ -8,7 +8,7 @@ const provider = waffle.provider;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Vault, Weth9, Registry, ClaimsEscrow, PolicyManager, RiskManager, MockProduct } from "../typechain";
+import { Vault, Weth9, Registry, ClaimsEscrow, PolicyManager, RiskManager, MockProductV2, CoverageDataProvider, RiskStrategy, MockRiskStrategy, ProductFactory } from "../typechain";
 
 describe("Vault", function () {
   let artifacts: ArtifactImports;
@@ -17,8 +17,13 @@ describe("Vault", function () {
   let registry: Registry;
   let claimsEscrow: ClaimsEscrow;
   let policyManager: PolicyManager;
-  let mockProduct: MockProduct;
+  let mockProduct: MockProductV2;
   let riskManager: RiskManager;
+  let coverageDataProvider: CoverageDataProvider;
+  let riskStrategy: RiskStrategy;
+  let riskStrategyFactory: Contract;
+  let mockRiskStrategy: MockRiskStrategy;
+  let productFactory: ProductFactory;
 
   const [owner, newOwner, depositor1, depositor2, claimant, mockEscrow, mockTreasury, coveredPlatform] = provider.getWallets();
   const tokenName = "Solace CP Token";
@@ -29,6 +34,8 @@ describe("Vault", function () {
   const testClaimAmount = BN.from("200000000000000000"); // 0.2 eth
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
   const chainId = 31337;
+  const SUBMIT_CLAIM_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("MockProductSubmitClaim(uint256 policyID,address claimant,uint256 amountOut,uint256 deadline)"));
+  const DOMAIN_NAME = "Solace.fi-MockProduct";
 
   const cooldownMin = BN.from(604800);  // 7 days
   const cooldownMax = BN.from(3024000); // 35 days
@@ -50,8 +57,41 @@ describe("Vault", function () {
     await registry.setPolicyManager(policyManager.address);
     riskManager = (await deployContract(owner, artifacts.RiskManager, [owner.address, registry.address])) as RiskManager;
     await registry.setRiskManager(riskManager.address);
-    mockProduct = (await deployContract(owner,artifacts.MockProduct,[owner.address,policyManager.address,registry.address,coveredPlatform.address,0,100000000000,1])) as MockProduct;
+    coverageDataProvider = (await deployContract(owner, artifacts.CoverageDataProvider, [registry.address])) as CoverageDataProvider;
+    await registry.connect(owner).setCoverageDataProvider(coverageDataProvider.address);
+   
+    // deploy product factory
+    productFactory = (await deployContract(owner, artifacts.ProductFactory)) as ProductFactory;
+
+    // create product
+    let baseProduct = (await deployContract(owner, artifacts.MockProductV2)) as MockProductV2;
+    let tx1 = await productFactory.createProduct(baseProduct.address, owner.address, registry.address, 0, 1000, SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, "1");
+    let events1 = (await tx1.wait())?.events;
+    if(events1 && events1.length > 0) {
+      let event1 = events1[0];
+      mockProduct = await ethers.getContractAt(artifacts.MockProductV2.abi, event1?.args?.["deployment"]) as MockProductV2;
+    } else throw "no deployment";
+    
+    // deploy risk strategy factory
+    let riskStrategyContractFactory = await ethers.getContractFactory("RiskStrategyFactory", owner);
+    riskStrategyFactory = (await riskStrategyContractFactory.deploy(registry.address, owner.address));
+    await riskStrategyFactory.deployed();
+
+    mockRiskStrategy = (await deployContract(owner, artifacts.MockRiskStrategy)) as MockRiskStrategy;
+    let tx = await riskStrategyFactory.createRiskStrategy(mockRiskStrategy.address, [mockProduct.address],[1],[1000],[1]);
+    let events = (await tx.wait())?.events;
+    if (events && events.length > 0) {
+      let event = events[0];
+      riskStrategy = await ethers.getContractAt(artifacts.MockRiskStrategy.abi, event?.args?.["deployment"]) as RiskStrategy;
+    } else {
+      throw "no risk strategy deployment!";
+    }
+
+    // add and enable risk strategy
     await policyManager.addProduct(mockProduct.address);
+    await riskManager.connect(owner).addRiskStrategy(riskStrategy.address);
+    await riskManager.connect(owner).setStrategyStatus(riskStrategy.address, 1);
+    await riskManager.connect(owner).setWeightAllocation(riskStrategy.address, 100);
   });
 
   describe("deployment", function () {
@@ -198,7 +238,7 @@ describe("Vault", function () {
     it("should return the correct maxRedeemableShares - user can withdraw entire CP token balance", async function () {
       // cover 0.5 eth
       let coverAmount = BN.from("500000000000000000");
-      await mockProduct.connect(depositor1)._buyPolicy(depositor1.address, coverAmount, 123, ZERO_ADDRESS);
+      await mockProduct.connect(depositor1)._buyPolicy(depositor1.address, coverAmount, 123, ZERO_ADDRESS, riskStrategy.address);
       expect(await riskManager.minCapitalRequirement()).to.equal(coverAmount);
       // deposit 1 + 3 = 4 eth
       await vault.connect(depositor1).depositEth({ value: testDepositAmount1 });
@@ -214,7 +254,7 @@ describe("Vault", function () {
     it("should return the correct maxRedeemableShares - user can withdraw up to a portion of their CP token balance", async function () {
       // cover 3.5 eth
       let coverAmount = BN.from("3500000000000000000");
-      await mockProduct.connect(depositor1)._buyPolicy(depositor1.address, coverAmount, 123, ZERO_ADDRESS);
+      await mockProduct.connect(depositor1)._buyPolicy(depositor1.address, coverAmount, 123, ZERO_ADDRESS, riskStrategy.address);
       expect(await riskManager.minCapitalRequirement()).to.equal(coverAmount);
       // deposit 1 + 3 = 4 eth
       await vault.connect(depositor1).depositEth({ value: testDepositAmount1 });
@@ -412,7 +452,7 @@ describe("Vault", function () {
     });
     it("should revert if withdrawal brings Vault's totalAssets below the minimum capital requirement", async function () {
       let balance = await vault.totalAssets();
-      await mockProduct.connect(depositor1)._buyPolicy(depositor1.address, balance, 123, ZERO_ADDRESS);
+      await mockProduct.connect(depositor1)._buyPolicy(depositor1.address, balance, 123, ZERO_ADDRESS, riskStrategy.address);
       expect(await riskManager.minCapitalRequirement()).to.equal(balance);
       await expect(vault.connect(depositor1).withdrawEth(1)).to.be.revertedWith("insufficient assets");
     });
@@ -475,7 +515,7 @@ describe("Vault", function () {
       });
       it("does not care about mcr", async function () {
         let balance = await vault.balanceOf(depositor1.address);
-        await mockProduct.connect(depositor1)._buyPolicy(depositor1.address, balance, 123, ZERO_ADDRESS);
+        await mockProduct.connect(depositor1)._buyPolicy(depositor1.address, balance, 123, ZERO_ADDRESS, riskStrategy.address);
         expect(await riskManager.minCapitalRequirement()).to.equal(balance);
         await expect(vault.connect(depositor1).withdrawEth(balance)).to.emit(vault, "WithdrawalMade").withArgs(depositor1.address, balance);
       });
@@ -505,7 +545,7 @@ describe("Vault", function () {
     });
     it("should revert if withdrawal brings Vault's totalAssets below the minimum capital requirement", async function () {
       let balance = await vault.totalAssets();
-      await mockProduct.connect(depositor1)._buyPolicy(depositor1.address, balance, 123, ZERO_ADDRESS);
+      await mockProduct.connect(depositor1)._buyPolicy(depositor1.address, balance, 123, ZERO_ADDRESS, riskStrategy.address);
       expect(await riskManager.minCapitalRequirement()).to.equal(balance);
       await expect(vault.connect(depositor1).withdrawWeth(1)).to.be.revertedWith("insufficient assets");
     });
@@ -555,7 +595,7 @@ describe("Vault", function () {
       });
       it("does not care about mcr", async function () {
         let balance = await vault.balanceOf(depositor1.address);
-        await mockProduct.connect(depositor1)._buyPolicy(depositor1.address, balance, 123, ZERO_ADDRESS);
+        await mockProduct.connect(depositor1)._buyPolicy(depositor1.address, balance, 123, ZERO_ADDRESS, riskStrategy.address);
         expect(await riskManager.minCapitalRequirement()).to.equal(balance);
         await expect(vault.connect(depositor1).withdrawWeth(balance)).to.emit(vault, "WithdrawalMade").withArgs(depositor1.address, balance);
       });
