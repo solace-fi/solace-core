@@ -12,7 +12,7 @@ import { create2Contract } from "./create2Contract";
 import { logContractAddress } from "./utils";
 
 import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_importer";
-import { Deployer, Registry, Weth9, Vault, ClaimsEscrow, Treasury, PolicyManager, PolicyDescriptorV2, RiskManager, OptionsFarming, FarmController, CpFarm, SptFarm, Solace, AaveV2Product, WaaveProduct } from "../typechain";
+import { Deployer, Registry, Weth9, Vault, ClaimsEscrow, Treasury, PolicyManager, PolicyDescriptorV2, RiskManager, OptionsFarming, FarmController, CpFarm, SptFarm, AaveV2Product, WaaveProduct } from "../typechain";
 
 const DEPLOYER_CONTRACT_ADDRESS = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
 const REGISTRY_ADDRESS          = "0x501aCEE3310d98881c827d4357C970F23a30AD29";
@@ -27,7 +27,6 @@ const OPTIONS_FARMING_ADDRESS   = "0x501ACEB9772d1EfE5F8eA46FE5004fAd039e067A";
 const FARM_CONTROLLER_ADDRESS   = "0x501aCEDD1a697654d5F53514FF09eDECD3ca6D95";
 const CP_FARM_ADDRESS           = "0x501ACeb4D4C2CB7E4b07b53fbe644f3e51D25A3e";
 const SPT_FARM_ADDRESS          = "0x501acE7644A3482F7358BE05454278cF2c699581";
-const SOLACE_ADDRESS            = "0x501ACe4A8d42bA427B67d0CaD1AB11e25AeA65Ab";
 
 const AAVE_PRODUCT_ADDRESS      = "0x501ace153Ff22348076FdD236b774F6eb2d55EfB";
 const WAAVE_PRODUCT_ADDRESS     = "0x501Ace6Ff5FAc888273Bc03DC2Bc3aAD7C00fC68";
@@ -68,7 +67,6 @@ let optionsFarming: OptionsFarming;
 let farmController: FarmController;
 let cpFarm: CpFarm;
 let sptFarm: SptFarm;
-let solace: Solace;
 
 let aaveProduct: AaveV2Product;
 let waaveProduct: WaaveProduct;
@@ -104,7 +102,6 @@ async function main() {
   await deployFarmController();
   await deployCpFarm();
   await deploySptFarm();
-  await deploySOLACE();
   // products
   await deployAaveV2Product();
   await deployWaaveProduct();
@@ -347,30 +344,6 @@ async function deploySptFarm() {
   }
 }
 
-async function deploySOLACE() {
-  if(!!SOLACE_ADDRESS) {
-    solace = (await ethers.getContractAt(artifacts.SOLACE.abi, SOLACE_ADDRESS)) as Solace;
-  } else {
-    console.log("Deploying SOLACE");
-    var res = await create2Contract(deployer,artifacts.SOLACE,[signerAddress], {}, "", deployerContract.address);
-    solace = (await ethers.getContractAt(artifacts.SOLACE.abi, res.address)) as Solace;
-    transactions.push({"description": "Deploy SOLACE", "to": deployerContract.address, "gasLimit": res.gasUsed});
-    console.log(`Deployed SOLACE to ${solace.address}`);
-  }
-  if(await registry.solace() != solace.address && await registry.governance() == signerAddress) {
-    console.log("Registering SOLACE");
-    let tx = await registry.connect(deployer).setSolace(solace.address);
-    let receipt = await tx.wait();
-    transactions.push({"description": "Register SOLACE", "to": registry.address, "gasLimit": receipt.gasUsed.toString()});
-  }
-  if(!(await solace.isMinter(deployer.address)) && (await solace.balanceOf(optionsFarming.address)).eq(0)) {
-    console.log("Minting SOLACE to OptionsFarming");
-    let tx = await solace.connect(deployer).mint(optionsFarming.address, BN.from("150000000000000000000000000"));
-    let receipt = await tx.wait();
-    transactions.push({"description": "Mint SOLACE to OptionsFarming", "to": vault.address, "gasLimit": receipt.gasUsed.toString()});
-  }
-}
-
 async function deployAaveV2Product() {
   if(!!AAVE_PRODUCT_ADDRESS) {
     aaveProduct = (await ethers.getContractAt(artifacts.AaveV2Product.abi, AAVE_PRODUCT_ADDRESS)) as AaveV2Product;
@@ -438,8 +411,8 @@ async function addSigners() {
 
 async function logAddresses() {
   console.log("");
-  console.log("| Contract Name    | Address                                      |");
-  console.log("|------------------|----------------------------------------------|");
+  console.log("| Contract Name                | Address                                      |");
+  console.log("|------------------------------|----------------------------------------------|");
   logContractAddress("DeployerContract", deployerContract.address);
   logContractAddress("Registry", registry.address);
   logContractAddress("WETH", weth.address);
@@ -453,7 +426,6 @@ async function logAddresses() {
   logContractAddress("FarmController", farmController.address);
   logContractAddress("CpFarm", cpFarm.address);
   logContractAddress("SptFarm", sptFarm.address);
-  logContractAddress("SOLACE", solace.address);
 
   logContractAddress("AaveV2Product", aaveProduct.address);
   logContractAddress("WaaveProduct", waaveProduct.address);

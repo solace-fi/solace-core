@@ -327,8 +327,8 @@ async function setPendingGovernance() {
 
 async function logAddresses() {
   console.log("");
-  console.log("| Contract Name    | Address                                      |");
-  console.log("|------------------|----------------------------------------------|");
+  console.log("| Contract Name                | Address                                      |");
+  console.log("|------------------------------|----------------------------------------------|");
   logContractAddress("AaveV2Product", aaveProduct.address);
   logContractAddress("CompoundProduct", compoundProduct.address);
   logContractAddress("LiquityProduct", liquityProduct.address);

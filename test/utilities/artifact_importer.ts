@@ -27,8 +27,7 @@ export async function import_artifacts() {
   artifacts.PolicyDescriptorV2 = await tryImport(`${artifact_dir}/PolicyDescriptorV2.sol/PolicyDescriptorV2.json`);
   artifacts.RiskManager = await tryImport(`${artifact_dir}/RiskManager.sol/RiskManager.json`);
   artifacts.MockGovernableInitializable = await tryImport(`${artifact_dir}/mocks/MockGovernableInitializable.sol/MockGovernableInitializable.json`);
-  // solace imports post-dao
-  artifacts.SOLACE = await tryImport(`${artifact_dir}/SOLACE.sol/SOLACE.json`);
+  // farms (deprecated)
   artifacts.OptionsFarming = await tryImport(`${artifact_dir}/OptionsFarming.sol/OptionsFarming.json`);
   artifacts.FarmController = await tryImport(`${artifact_dir}/FarmController.sol/FarmController.json`);
   artifacts.CpFarm = await tryImport(`${artifact_dir}/CpFarm.sol/CpFarm.json`);
@@ -40,6 +39,13 @@ export async function import_artifacts() {
   artifacts.ProductFactory = await tryImport(`${artifact_dir}/ProductFactory.sol/ProductFactory.json`);
   artifacts.CoverageProduct = await tryImport(`${artifact_dir}/products/CoverageProduct.sol/CoverageProduct.json`);
   artifacts.MockProductV2 = await tryImport(`${artifact_dir}/mocks/MockProductV2.sol/MockProductV2.json`);
+  // investing v2
+  artifacts.SOLACE = await tryImport(`${artifact_dir}/SOLACE.sol/SOLACE.json`);
+  artifacts.xSOLACE = await tryImport(`${artifact_dir}/xSOLACE.sol/xSOLACE.json`);
+  artifacts.BondDepository = await tryImport(`${artifact_dir}/BondDepository.sol/BondDepository.json`);
+  artifacts.BondTellerETH = await tryImport(`${artifact_dir}/BondTellerEth.sol/BondTellerEth.json`);
+  artifacts.BondTellerERC20 = await tryImport(`${artifact_dir}/BondTellerErc20.sol/BondTellerErc20.json`);
+  artifacts.Faucet = await tryImport(`${artifact_dir}/Faucet.sol/Faucet.json`);
 
   // oracles
   artifacts.ExchangeQuoter1InchV1 = await tryImport(`${artifact_dir}/oracles/ExchangeQuoter1InchV1.sol/ExchangeQuoter1InchV1.json`);
@@ -50,8 +56,10 @@ export async function import_artifacts() {
   artifacts.ERC20 = await tryImport(`${artifact_dir}/SOLACE.sol/ERC20.json`);
   if(!artifacts.ERC20) artifacts.ERC20 = await tryImport(`../../artifacts/@openzeppelin/contracts/token/ERC20/ERC20.sol/ERC20.json`);
   artifacts.MockERC20 = await tryImport(`${artifact_dir}/mocks/MockERC20.sol/MockERC20.json`);
-  artifacts.MockERC20v2 = await tryImport(`${artifact_dir}/mocks/MockERC20v2.sol/MockERC20v2.json`);
+  artifacts.MockERC20Permit = await tryImport(`${artifact_dir}/mocks/MockERC20Permit.sol/MockERC20Permit.json`);
+  artifacts.MockERC20Decimals = await tryImport(`${artifact_dir}/mocks/MockERC20Decimals.sol/MockERC20Decimals.json`);
   artifacts.MockERC721 = await tryImport(`${artifact_dir}/mocks/MockERC721.sol/MockERC721.json`);
+  artifacts.MockERC721Initializable = await tryImport(`${artifact_dir}/mocks/MockERC721Initializable.sol/MockERC721Initializable.json`);
   artifacts.MockERC1271 = await tryImport(`${artifact_dir}/mocks/MockERC1271.sol/MockERC1271.json`);
   artifacts.MockFaultyReceiver = await tryImport(`${artifact_dir}/mocks/MockFaultyReceiver.sol/MockFaultyReceiver.json`);
   artifacts.GasGriefer = await tryImport(`${artifact_dir}/mocks/GasGriefer.sol/GasGriefer.json`);

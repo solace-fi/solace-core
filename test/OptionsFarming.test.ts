@@ -9,7 +9,7 @@ const { expect } = chai;
 import { encodePriceSqrt, FeeAmount, TICK_SPACINGS, getMaxTick, getMinTick } from "./utilities/uniswap";
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Solace, Vault, FarmController, OptionsFarming, CpFarm, Weth9, PolicyManager, RiskManager, Registry, MockFaultyReceiver, MockErc20V2 } from "../typechain";
+import { Solace, Vault, FarmController, OptionsFarming, CpFarm, Weth9, PolicyManager, RiskManager, Registry, MockFaultyReceiver, MockErc20Decimals } from "../typechain";
 import { bnAddSub, bnMulDiv, expectClose } from "./utilities/math";
 
 chai.use(solidity);
@@ -20,7 +20,7 @@ let farmController: FarmController;
 let optionsFarming: OptionsFarming;
 let vault: Vault;
 let weth: Weth9;
-let usdc: MockErc20V2;
+let usdc: MockErc20Decimals;
 let registry: Registry;
 let policyManager: PolicyManager;
 let riskManager: RiskManager;
@@ -69,7 +69,7 @@ describe("OptionsFarming", function () {
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
 
     weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
-    usdc = (await deployContract(deployer, artifacts.MockERC20v2, ["USD Coin", "USDC", constants.MaxUint256, 6])) as MockErc20V2;
+    usdc = (await deployContract(deployer, artifacts.MockERC20Decimals, ["USD Coin", "USDC", constants.MaxUint256, 6])) as MockErc20Decimals;
 
     // deploy uniswap contracts
     uniswapFactory = (await deployContract(deployer, artifacts.UniswapV3Factory)) as Contract;
@@ -377,7 +377,7 @@ describe("OptionsFarming", function () {
             // redploy usdc until order is correct
             let orderCorrect = false;
             while(!orderCorrect) {
-              usdc = (await deployContract(deployer, artifacts.MockERC20v2, ["USD Coin", "USDC", constants.MaxUint256, 6])) as MockErc20V2;
+              usdc = (await deployContract(deployer, artifacts.MockERC20Decimals, ["USD Coin", "USDC", constants.MaxUint256, 6])) as MockErc20Decimals;
               let usdIsToken0 = BN.from(usdc.address).lt(BN.from(weth.address));
               orderCorrect = (usdIsToken0 === token0);
             }
@@ -448,6 +448,7 @@ describe("OptionsFarming", function () {
             await optionsFarming.connect(governor).setSolace(solace.address);
             solaceEthPool = await createPool(weth, solace, FeeAmount.MEDIUM, sqrtPrice);
             await optionsFarming.connect(governor).setSolaceEthPool(solaceEthPool.address, token0, 0);
+            await solace.connect(governor).addMinter(governor.address);
             await solace.connect(governor).mint(trader.address, ONE_MILLION_ETHER);
             await solace.connect(trader).approve(lpToken.address, constants.MaxUint256);
             await solace.connect(trader).approve(uniswapRouter.address, constants.MaxUint256);

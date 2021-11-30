@@ -9,16 +9,16 @@ chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
 
-import { MockErc721, MockErc1271 } from "../typechain";
+import { MockErc721Initializable, MockErc1271 } from "../typechain";
 import { getPermitErc721EnhancedSignature, getPermitErc721EnhancedDigest, getDomainSeparator, assembleRSV } from "./utilities/getPermitNFTSignature";
 
-describe("ERC721Enhanced", function() {
+describe("ERC721EnhancedInitializable", function() {
   let artifacts: ArtifactImports;
   const [deployer, user1, user2, user3] = provider.getWallets();
 
   // contracts
-  let token: MockErc721;
-  let token2: MockErc721;
+  let token: MockErc721Initializable;
+  let token2: MockErc721Initializable;
   let signerContract: MockErc1271;
 
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
@@ -37,7 +37,19 @@ describe("ERC721Enhanced", function() {
 
   describe("deployment", async function () {
     before(async function () {
-      token = (await deployContract(deployer, artifacts.MockERC721, [name, symbol])) as MockErc721;
+      token = (await deployContract(deployer, artifacts.MockERC721Initializable)) as MockErc721Initializable;
+    });
+    it("starts with no name", async function() {
+      expect(await token.name()).to.equal("");
+    });
+    it("starts with no symbol", async function() {
+      expect(await token.symbol()).to.equal("");
+    });
+    it("can be initialized", async function () {
+      await token.initialize(name, symbol);
+    });
+    it("cannot be double initialized", async function () {
+      await expect(token.initialize(name, symbol)).to.be.revertedWith("Initializable: contract is already initialized");
     });
     it("has a correct name", async function() {
       expect(await token.name()).to.equal(name);
@@ -211,7 +223,8 @@ describe("ERC721Enhanced", function() {
       await expect(token.permit(user3.address, tokenID2, deadline, v, r, s)).to.be.revertedWith("unauthorized");
     });
     it("cannot use signature for another contract", async function () {
-      token2 = (await deployContract(deployer, artifacts.MockERC721, ["", ""])) as MockErc721;
+      token2 = (await deployContract(deployer, artifacts.MockERC721Initializable)) as MockErc721Initializable;
+      await token2.initialize(name, symbol);
       await token2.mint(user1.address);
       const { v, r, s } = await getPermitErc721EnhancedSignature(user1, token2, user2.address, tokenID);
       await expect(token.permit(user2.address, tokenID, deadline, v, r, s)).to.be.revertedWith("unauthorized");
