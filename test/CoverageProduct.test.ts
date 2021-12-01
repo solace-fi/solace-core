@@ -73,7 +73,7 @@ describe("CoverageProduct", function () {
     await registry.connect(governor).setPolicyManager(policyManager.address);
     riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
     await registry.connect(governor).setRiskManager(riskManager.address);
-    coverageDataProvider = (await deployContract(deployer, artifacts.CoverageDataProvider, [registry.address])) as CoverageDataProvider;
+    coverageDataProvider = (await deployContract(deployer, artifacts.CoverageDataProvider, [governor.address, registry.address])) as CoverageDataProvider;
     await registry.connect(governor).setCoverageDataProvider(coverageDataProvider.address);
 
     // deploy product factory

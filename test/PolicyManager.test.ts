@@ -71,7 +71,7 @@ describe("PolicyManager", function() {
 
     // deploy coverage provider contract
     await registry.connect(governor).setPolicyManager(policyManager.address);
-    coverageDataProvider = (await deployContract(deployer, artifacts.CoverageDataProvider, [registry.address])) as CoverageDataProvider;
+    coverageDataProvider = (await deployContract(deployer, artifacts.CoverageDataProvider, [governor.address, registry.address])) as CoverageDataProvider;
 
     await registry.connect(governor).setTreasury(treasury.address);
     await registry.connect(governor).setVault(vault.address);

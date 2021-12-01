@@ -57,7 +57,7 @@ describe("Vault", function () {
     await registry.setPolicyManager(policyManager.address);
     riskManager = (await deployContract(owner, artifacts.RiskManager, [owner.address, registry.address])) as RiskManager;
     await registry.setRiskManager(riskManager.address);
-    coverageDataProvider = (await deployContract(owner, artifacts.CoverageDataProvider, [registry.address])) as CoverageDataProvider;
+    coverageDataProvider = (await deployContract(owner, artifacts.CoverageDataProvider, [owner.address, registry.address])) as CoverageDataProvider;
     await registry.connect(owner).setCoverageDataProvider(coverageDataProvider.address);
    
     // deploy product factory

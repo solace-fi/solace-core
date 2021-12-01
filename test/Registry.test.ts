@@ -280,7 +280,7 @@ describe("Registry", function() {
 
   describe("coverageDataProvider", function() {
     before(async function() {
-      coverageDataProvider = (await deployContract(deployer, artifacts.CoverageDataProvider, [registry.address])) as CoverageDataProvider;
+      coverageDataProvider = (await deployContract(deployer, artifacts.CoverageDataProvider, [governor.address, registry.address])) as CoverageDataProvider;
     });
 
     it("starts as the zero address", async function() {
