@@ -12,13 +12,11 @@ import "./interface/IFarmController.sol";
 
 
 /**
- * @title OptionsFarming
+ * @title FarmRewards
  * @author solace.fi
- * @notice Distributes options to farmers.
+ * @notice Rewards farmers with [**SOLACE**](./SOLACE).
  *
- * Rewards are accumulated by farmers for participating in farms. Rewards can be redeemed for options with 1:1 reward:[**SOLACE**](./SOLACE). Options can be exercised by paying `strike price` USD before `expiry`.
- *
- * The `strike price` is 0.03 cents in USD and can be paid in any supported stablecoin.
+ * Rewards were accumulated by farmers for participating in farms. Rewards will be unlocked linearly over six months and can be redeemed for [**SOLACE**](./SOLACE) by paying $0.03/[**SOLACE**](./SOLACE).
  */
 contract FarmRewards is ReentrancyGuard, Governable {
     using SafeERC20 for IERC20;
@@ -34,30 +32,29 @@ contract FarmRewards is ReentrancyGuard, Governable {
     /// @notice farm controller
     IFarmController public farmController;
 
-    /// @notice receiver for options payments
+    /// @notice receiver for payments
     address public receiver;
 
-    /// @notice timestamp that bonds must be exercised before
-    uint256 constant public expiry = 1646154000; // 5 PM UTC March 1, 2022
+    /// @notice timestamp that rewards start vesting
+    uint256 constant public vestingStart = 1638316800; // midnight UTC before December 1, 2021
 
-    /// @notice the duration of vesting in seconds
-    uint256 constant public vestingTerm = 15552000; // 6 months
+    /// @notice timestamp that rewards finish vesting
+    uint256 constant public vestingEnd = 1651363200; // midnight UTC before May 1, 2022
 
     /// @notice The stablecoins that can be used for payment.
     mapping(address => bool) public tokenInSupported;
 
-    struct Option {
-        uint256 totalSolaceRewards;  // amount of SOLACE purchased
-        uint256 totalXSolaceRewards; // amount of xSOLACE staked
-        uint256 redeemedXSolace;     // amount of xSOLACE rewarded
-        uint256 startTime;           // timestamp that option was first exercised
-    }
+    /// @notice The amount of **SOLACE** in the **xSOLACE** contract at construction. Used for reward math.
+    uint256 public conversionSolace;
 
-    /// @notice Options of a user.
-    mapping(address => Option) public options;
+    /// @notice The total supply of **xSOLACE** at construction. Used for reward math.
+    uint256 public conversionXSolace;
+
+    /// @notice Redeemed rewards of a user.
+    mapping(address => uint256) public redeemedRewards;
 
     /**
-     * @notice Constructs the `OptionsFarming` contract.
+     * @notice Constructs the `FarmRewards` contract.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
      * @param farmController_ The address of the farm controller.
      * @param solace_ Address of [**SOLACE**](./solace).
@@ -69,11 +66,12 @@ contract FarmRewards is ReentrancyGuard, Governable {
         require(solace_ != address(0x0), "zero address solace");
         require(xsolace_ != address(0x0), "zero address xsolace");
         require(receiver_ != address(0x0), "zero address receiver");
-        farmController = IFarmController(farmController);
+        farmController = IFarmController(farmController_);
         solace = solace_;
         xsolace = xsolace_;
         receiver = receiver_;
-        ERC20(solace_).approve(xsolace, type(uint256).max);
+        conversionSolace = ERC20(solace_).balanceOf(xsolace_);
+        conversionXSolace = ERC20(xsolace_).totalSupply();
     }
 
     /***************************************
@@ -81,13 +79,29 @@ contract FarmRewards is ReentrancyGuard, Governable {
     ***************************************/
 
     /**
-     * @notice The amount of [**SOLACE**](./SOLACE) that a user is owed if any.
-     * @param user The user.
-     * @return amount The amount.
+     * @notice The amount of [**SOLACE**](./SOLACE) that a user has vested.
+     * Does not include the amount they've already redeemed.
+     * @param user The user to query.
+     * @return amount The amount of vested [**SOLACE**](./SOLACE).
      */
-    function unpaidSolace(address user) external view returns (uint256 amount) {
-        if(block.timestamp > expiry) return 0;
-        return farmController.pendingRewards(user) - options[user].totalSolaceRewards;
+    function vestedSolace(address user) public view returns (uint256 amount) {
+        uint256 timestamp = block.timestamp;
+        uint256 totalRewards = farmController.pendingRewards(user);
+        uint256 totalVestedAmount = (timestamp >= vestingEnd)
+            ? totalRewards // fully vested
+            : (totalRewards * (timestamp - vestingStart) / (vestingEnd - vestingStart)); // partially vested
+        amount = totalVestedAmount - redeemedRewards[user];
+        return amount;
+    }
+
+    /**
+     * @notice The amount of [**xSOLACE**](./xSOLACE) that a user has vested.
+     * Does not include the amount they've already redeemed.
+     * @param user The user to query.
+     * @return amount The amount of vested [**xSOLACE**](./xSOLACE).
+     */
+    function vestedXSolace(address user) external view returns (uint256 amount) {
+        return vestedSolace(user) * conversionXSolace / conversionSolace;
     }
 
     /***************************************
@@ -95,19 +109,19 @@ contract FarmRewards is ReentrancyGuard, Governable {
     ***************************************/
 
     /**
-     * @notice Deposit tokens to create or increase an option.
+     * @notice Deposit tokens to redeem rewards.
      * @param tokenIn The token to use as payment.
      * @param amountIn The max amount to pay.
      */
-    function deposit(address tokenIn, uint256 amountIn) external nonReentrant {
+    function redeem(address tokenIn, uint256 amountIn) external nonReentrant {
         // accounting
-        amountIn = _createOption(tokenIn, amountIn, msg.sender);
+        amountIn = _redeem(tokenIn, amountIn, msg.sender);
         // pull tokens
         SafeERC20.safeTransferFrom(IERC20(tokenIn), msg.sender, receiver, amountIn);
     }
 
     /**
-     * @notice Deposit tokens to create or increase an option.
+     * @notice Deposit tokens to redeem rewards.
      * @param tokenIn The token to use as payment.
      * @param amountIn The max amount to pay.
      * @param depositor The user that deposits.
@@ -116,64 +130,43 @@ contract FarmRewards is ReentrancyGuard, Governable {
      * @param r secp256k1 signature
      * @param s secp256k1 signature
      */
-    function depositSigned(address tokenIn, uint256 amountIn, address depositor, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external nonReentrant {
+    function redeemSigned(address tokenIn, uint256 amountIn, address depositor, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external nonReentrant {
         // permit
         ERC20Permit(tokenIn).permit(depositor, address(this), amountIn, deadline, v, r, s);
         // accounting
-        amountIn = _createOption(tokenIn, amountIn, depositor);
+        amountIn = _redeem(tokenIn, amountIn, depositor);
         // pull tokens
         SafeERC20.safeTransferFrom(IERC20(tokenIn), depositor, receiver, amountIn);
     }
 
     /**
-     * @notice Creates or increases an option.
+     * @notice Redeems a users rewards.
      * @param tokenIn The token to use as payment.
      * @param amountIn The max amount to pay.
      * @param depositor The user that deposits.
      * @return actualAmountIn The amount of tokens used.
      */
-    function _createOption(address tokenIn, uint256 amountIn, address depositor) internal returns (uint256 actualAmountIn) {
-        // check expiry
-        require(block.timestamp <= expiry, "deposits expired");
+    function _redeem(address tokenIn, uint256 amountIn, address depositor) internal returns (uint256 actualAmountIn) {
         // check token support
         require(tokenInSupported[tokenIn], "token in not supported");
         // calculate solace out @ $0.03/SOLACE
         uint256 pricePerSolace = 3 * (10 ** (ERC20(tokenIn).decimals() - 2));
         uint256 solaceOut = amountIn * 1 ether / pricePerSolace;
         // verify solace rewards
-        Option memory option = options[depositor];
-        uint256 pendingRewards = farmController.pendingRewards(depositor) - option.totalSolaceRewards;
-        if(solaceOut > pendingRewards) {
-            solaceOut = pendingRewards;
+        uint256 vestedSolace_ = vestedSolace(depositor);
+        if(solaceOut > vestedSolace_) {
+            solaceOut = vestedSolace_;
             // calculate amount in for max solace
             actualAmountIn = solaceOut * pricePerSolace / 1 ether;
         } else {
             actualAmountIn = amountIn;
         }
-        // stake
-        uint256 xsolaceOut = IxSOLACE(xsolace).stake(solaceOut);
+        // reward
+        uint256 xsolaceOut = solaceOut * conversionXSolace / conversionSolace;
+        SafeERC20.safeTransfer(IERC20(xsolace), depositor, xsolaceOut);
         // record
-        option.totalSolaceRewards += solaceOut;
-        option.totalXSolaceRewards += xsolaceOut;
-        if(option.startTime == 0) option.startTime = block.timestamp;
-        options[depositor] = option;
+        redeemedRewards[depositor] += solaceOut;
         return actualAmountIn;
-    }
-
-    /**
-     * @notice Sends rewards to a user.
-     * @param depositor The user to reward.
-     */
-    function redeemRewards(address depositor) external nonReentrant {
-        Option memory option = options[depositor];
-        if(option.totalSolaceRewards == 0) return;
-        // calculate rewards
-        uint256 timestamp = block.timestamp;
-        uint256 redeemableAmount = (option.totalXSolaceRewards * (timestamp - option.startTime) / vestingTerm) - option.redeemedXSolace;
-        // record
-        options[depositor].redeemedXSolace += redeemableAmount;
-        // send rewards
-        SafeERC20.safeTransfer(IERC20(xsolace), depositor, redeemableAmount);
     }
 
     /***************************************
@@ -194,7 +187,7 @@ contract FarmRewards is ReentrancyGuard, Governable {
     }
 
     /**
-     * @notice Sets the recipient for Option payments.
+     * @notice Sets the recipient for proceeds.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param receiver_ The new recipient.
      */
@@ -205,11 +198,11 @@ contract FarmRewards is ReentrancyGuard, Governable {
     }
 
     /**
-     * @notice Returns the unclaimed **SOLACE**.
+     * @notice Returns excess [**xSOLACE**](./xSOLACE).
      * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param amount Amount to send. Will be sent from this contract to `receiver`.
      */
-    function returnSolace() external onlyGovernance {
-        require(block.timestamp > expiry, "deposits not expired");
-        SafeERC20.safeTransfer(IERC20(solace), receiver, ERC20(solace).balanceOf(address(this)));
+    function returnXSolace(uint256 amount) external onlyGovernance {
+        SafeERC20.safeTransfer(IERC20(xsolace), receiver, amount);
     }
 }
