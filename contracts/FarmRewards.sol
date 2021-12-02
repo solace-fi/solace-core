@@ -7,7 +7,6 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "./Governable.sol";
 import "./interface/IxSOLACE.sol";
-import "./interface/IFarmController.sol";
 //import "./interface/IFarmRewards.sol";
 
 
@@ -23,14 +22,8 @@ contract FarmRewards is ReentrancyGuard, Governable {
 
     event ReceiverSet(address receiver);
 
-    /// @notice Native SOLACE Token.
-    address public solace;
-
     /// @notice xSOLACE Token.
     address public xsolace;
-
-    /// @notice farm controller
-    IFarmController public farmController;
 
     /// @notice receiver for payments
     address public receiver;
@@ -41,14 +34,13 @@ contract FarmRewards is ReentrancyGuard, Governable {
     /// @notice timestamp that rewards finish vesting
     uint256 constant public vestingEnd = 1651363200; // midnight UTC before May 1, 2022
 
+    uint256 public solacePerXSolace;
+
     /// @notice The stablecoins that can be used for payment.
     mapping(address => bool) public tokenInSupported;
 
-    /// @notice The amount of **SOLACE** in the **xSOLACE** contract at construction. Used for reward math.
-    uint256 public conversionSolace;
-
-    /// @notice The total supply of **xSOLACE** at construction. Used for reward math.
-    uint256 public conversionXSolace;
+    /// @notice Total farmed rewards of a user.
+    mapping(address => uint256) public farmedRewards;
 
     /// @notice Redeemed rewards of a user.
     mapping(address => uint256) public redeemedRewards;
@@ -56,22 +48,16 @@ contract FarmRewards is ReentrancyGuard, Governable {
     /**
      * @notice Constructs the `FarmRewards` contract.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
-     * @param farmController_ The address of the farm controller.
-     * @param solace_ Address of [**SOLACE**](./solace).
-     * @param xsolace_ Address of [**xSOLACE**](./xsolace).
+     * @param xsolace_ Address of [**xSOLACE**](./xSOLACE).
      * @param receiver_ Address to send proceeds.
+     * @param solacePerXSolace_ The amount of [**SOLACE**](./SOLACE) for one [**xSOLACE**](./xSOLACE).
      */
-    constructor(address governance_, address farmController_, address solace_, address xsolace_, address receiver_) Governable(governance_) {
-        require(farmController_ != address(0x0), "zero address farmcontroller");
-        require(solace_ != address(0x0), "zero address solace");
+    constructor(address governance_, address xsolace_, address receiver_, uint256 solacePerXSolace_) Governable(governance_) {
         require(xsolace_ != address(0x0), "zero address xsolace");
         require(receiver_ != address(0x0), "zero address receiver");
-        farmController = IFarmController(farmController_);
-        solace = solace_;
         xsolace = xsolace_;
         receiver = receiver_;
-        conversionSolace = ERC20(solace_).balanceOf(xsolace_);
-        conversionXSolace = ERC20(xsolace_).totalSupply();
+        solacePerXSolace = solacePerXSolace_;
     }
 
     /***************************************
@@ -79,19 +65,35 @@ contract FarmRewards is ReentrancyGuard, Governable {
     ***************************************/
 
     /**
-     * @notice The amount of [**SOLACE**](./SOLACE) that a user has vested.
-     * Does not include the amount they've already redeemed.
-     * @param user The user to query.
-     * @return amount The amount of vested [**SOLACE**](./SOLACE).
+     * @notice Calculates the amount of token in needed for an amount of [**xSOLACE**](./xSOLACE) out.
+     * @param tokenIn The token to pay with.
+     * @param amountOut The amount of [**xSOLACE**](./xSOLACE) wanted.
+     * @return amountIn The amount of `tokenIn` needed.
      */
-    function vestedSolace(address user) public view returns (uint256 amount) {
-        uint256 timestamp = block.timestamp;
-        uint256 totalRewards = farmController.pendingRewards(user);
-        uint256 totalVestedAmount = (timestamp >= vestingEnd)
-            ? totalRewards // fully vested
-            : (totalRewards * (timestamp - vestingStart) / (vestingEnd - vestingStart)); // partially vested
-        amount = totalVestedAmount - redeemedRewards[user];
-        return amount;
+    function calculateAmountIn(address tokenIn, uint256 amountOut) external view returns (uint256 amountIn) {
+        // check token support
+        require(tokenInSupported[tokenIn], "token in not supported");
+        // calculate xsolace out @ $0.03/SOLACE
+        uint256 pricePerSolace = 3 * (10 ** (ERC20(tokenIn).decimals() - 2)); // usd/solace
+        uint256 pricePerXSolace = pricePerSolace * solacePerXSolace / 1 ether; // usd/xsolace
+        amountIn = amountOut * pricePerXSolace / 1 ether;
+        return amountIn;
+    }
+
+    /**
+     * @notice Calculates the amount of [**xSOLACE**](./xSOLACE) out for an amount of token in.
+     * @param tokenIn The token to pay with.
+     * @param amountIn The amount of `tokenIn` in.
+     * @return amountOut The amount of [**xSOLACE**](./xSOLACE) out.
+     */
+    function calculateAmountOut(address tokenIn, uint256 amountIn) external view returns (uint256 amountOut) {
+        // check token support
+        require(tokenInSupported[tokenIn], "token in not supported");
+        // calculate xsolace out @ $0.03/SOLACE
+        uint256 pricePerSolace = 3 * (10 ** (ERC20(tokenIn).decimals() - 2)); // usd/solace
+        uint256 pricePerXSolace = pricePerSolace * solacePerXSolace / 1 ether; // usd/xsolace
+        amountOut = amountIn * 1 ether / pricePerXSolace;
+        return amountOut;
     }
 
     /**
@@ -100,8 +102,14 @@ contract FarmRewards is ReentrancyGuard, Governable {
      * @param user The user to query.
      * @return amount The amount of vested [**xSOLACE**](./xSOLACE).
      */
-    function vestedXSolace(address user) external view returns (uint256 amount) {
-        return vestedSolace(user) * conversionXSolace / conversionSolace;
+    function purchaseableVestedXSolace(address user) public view returns (uint256 amount) {
+        uint256 timestamp = block.timestamp;
+        uint256 totalRewards = farmedRewards[user];
+        uint256 totalVestedAmount = (timestamp >= vestingEnd)
+            ? totalRewards // fully vested
+            : (totalRewards * (timestamp - vestingStart) / (vestingEnd - vestingStart)); // partially vested
+        amount = totalVestedAmount - redeemedRewards[user];
+        return amount;
     }
 
     /***************************************
@@ -149,23 +157,23 @@ contract FarmRewards is ReentrancyGuard, Governable {
     function _redeem(address tokenIn, uint256 amountIn, address depositor) internal returns (uint256 actualAmountIn) {
         // check token support
         require(tokenInSupported[tokenIn], "token in not supported");
-        // calculate solace out @ $0.03/SOLACE
-        uint256 pricePerSolace = 3 * (10 ** (ERC20(tokenIn).decimals() - 2));
-        uint256 solaceOut = amountIn * 1 ether / pricePerSolace;
-        // verify solace rewards
-        uint256 vestedSolace_ = vestedSolace(depositor);
-        if(solaceOut > vestedSolace_) {
-            solaceOut = vestedSolace_;
+        // calculate xsolace out @ $0.03/SOLACE
+        uint256 pricePerSolace = 3 * (10 ** (ERC20(tokenIn).decimals() - 2)); // usd/solace
+        uint256 pricePerXSolace = pricePerSolace * solacePerXSolace / 1 ether; // usd/xsolace
+        uint256 xsolaceOut = amountIn * 1 ether / pricePerXSolace;
+        // verify xsolace rewards
+        uint256 vestedXSolace_ = purchaseableVestedXSolace(depositor);
+        if(xsolaceOut > vestedXSolace_) {
+            xsolaceOut = vestedXSolace_;
             // calculate amount in for max solace
-            actualAmountIn = solaceOut * pricePerSolace / 1 ether;
+            actualAmountIn = xsolaceOut * pricePerXSolace / 1 ether;
         } else {
             actualAmountIn = amountIn;
         }
         // reward
-        uint256 xsolaceOut = solaceOut * conversionXSolace / conversionSolace;
         SafeERC20.safeTransfer(IERC20(xsolace), depositor, xsolaceOut);
         // record
-        redeemedRewards[depositor] += solaceOut;
+        redeemedRewards[depositor] += xsolaceOut;
         return actualAmountIn;
     }
 
@@ -204,5 +212,18 @@ contract FarmRewards is ReentrancyGuard, Governable {
      */
     function returnXSolace(uint256 amount) external onlyGovernance {
         SafeERC20.safeTransfer(IERC20(xsolace), receiver, amount);
+    }
+
+    /**
+     * @notice Sets the rewards that farmers have earned.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param farmers Array of farmers to set.
+     * @param rewards Array of rewards to set.
+     */
+    function setFarmedRewards(address[] calldata farmers, uint256[] calldata rewards) external onlyGovernance {
+        require(farmers.length == rewards.length, "length mismatch");
+        for(uint256 i = 0; i < farmers.length; i++) {
+            farmedRewards[farmers[i]] = rewards[i];
+        }
     }
 }
