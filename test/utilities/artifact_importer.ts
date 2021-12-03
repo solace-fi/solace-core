@@ -28,6 +28,7 @@ export async function import_artifacts() {
   artifacts.RiskManager = await tryImport(`${artifact_dir}/RiskManager.sol/RiskManager.json`);
   artifacts.MockGovernableInitializable = await tryImport(`${artifact_dir}/mocks/MockGovernableInitializable.sol/MockGovernableInitializable.json`);
   // farms (deprecated)
+  artifacts.FarmRewards = await tryImport(`${artifact_dir}/FarmRewards.sol/FarmRewards.json`);
   artifacts.OptionsFarming = await tryImport(`${artifact_dir}/OptionsFarming.sol/OptionsFarming.json`);
   artifacts.FarmController = await tryImport(`${artifact_dir}/FarmController.sol/FarmController.json`);
   artifacts.CpFarm = await tryImport(`${artifact_dir}/CpFarm.sol/CpFarm.json`);

@@ -1,7 +1,6 @@
 import chai from "chai";
 import { ethers, waffle, upgrades } from "hardhat";
 import { BigNumber as BN, BigNumberish, constants, Wallet } from "ethers";
-import { getPermitDigest, sign, getDomainSeparator } from "./utilities/signature";
 const { expect } = chai;
 const { deployContract, solidity } = waffle;
 const provider = waffle.provider;
@@ -9,8 +8,7 @@ chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
 import { Solace, XSolace } from "../typechain";
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { getXSolaceStakeSignature } from "./utilities/getXSolaceStakeSignature";
+import { getERC20PermitSignature } from "./utilities/getERC20PermitSignature";
 
 describe("xSOLACE", function () {
   let artifacts: ArtifactImports;
@@ -21,9 +19,6 @@ describe("xSOLACE", function () {
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
   const ONE_ETHER = BN.from("1000000000000000000");
   const deadline = constants.MaxUint256;
-  const chainId = 31337;
-  const solaceName = "solace";
-  const xsolaceName = "xsolace";
 
   before(async function () {
     artifacts = await import_artifacts();
@@ -95,7 +90,7 @@ describe("xSOLACE", function () {
       expect(bal3.allowanceXSolace).eq(0);
     });
     it("can deposit solace with permit", async function () {
-      let { v, r, s } = await getXSolaceStakeSignature(solace, xsolace, depositor1, ONE_ETHER);
+      let { v, r, s } = await getERC20PermitSignature(depositor1, xsolace.address, solace, ONE_ETHER);
       let tx1 = await xsolace.connect(depositor2).stakeSigned(depositor1.address, ONE_ETHER, deadline, v, r, s);
       expect(tx1).to.emit(xsolace, "Staked").withArgs(depositor1.address, ONE_ETHER, ONE_ETHER);
       let bal1 = await getBalances(depositor1);

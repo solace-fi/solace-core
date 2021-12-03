@@ -1,36 +1,37 @@
-// a collection of utils for signing ERC721.permit()
+// utils for signing ERC20.permit()
 
-import { BigNumber as BN, BigNumberish, constants, Signature, Wallet, Contract, utils } from "ethers";
+import { BigNumber as BN, BigNumberish, constants, Signature, Wallet, Contract } from "ethers";
 import { splitSignature } from "ethers/lib/utils";
 
-export async function getXSolaceStakeSignature(
-  solace: Contract,
-  xsolace: Contract,
-  depositor: Wallet,
+export async function getERC20PermitSignature(
+  owner: Wallet | Contract,
+  spender: Wallet | Contract | string,
+  token: Contract,
   amount: BigNumberish,
   deadline: BigNumberish = constants.MaxUint256,
   nonce: BigNumberish = constants.MaxUint256 // optional override. leave empty to use correct nonce
 ): Promise<Signature> {
+  var spender2 = (typeof spender === "string") ? spender : spender.address;
   // get nonce if not given
   let nonceBN = BN.from(nonce);
   if(nonceBN.eq(constants.MaxUint256)) {
-    nonceBN = await solace.nonces(depositor.address);
+    nonceBN = await token.nonces(owner.address);
   }
   // get other vars
   const [name, version, chainId] = await Promise.all([
-    solace.name(),
+    token.name(),
     "1",
-    depositor.getChainId(),
+    owner.getChainId(),
   ]);
   // split v, r, s
   return splitSignature(
     // sign message
-    await depositor._signTypedData(
+    await owner._signTypedData(
       {
         name,
         version,
         chainId,
-        verifyingContract: solace.address,
+        verifyingContract: token.address,
       },
       {
         Permit: [
@@ -42,8 +43,8 @@ export async function getXSolaceStakeSignature(
         ],
       },
       {
-        owner: depositor.address,
-        spender: xsolace.address,
+        owner: owner.address,
+        spender: spender2,
         value: amount,
         nonce: nonceBN,
         deadline: deadline,
