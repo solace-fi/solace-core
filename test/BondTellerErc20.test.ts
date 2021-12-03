@@ -5,19 +5,15 @@ import { MockProvider } from "ethereum-waffle";
 const provider: MockProvider = waffle.provider;
 import { BigNumber as BN, BigNumberish, constants, Wallet } from "ethers";
 import { Contract } from "@ethersproject/contracts";
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import chai from "chai";
 const { expect } = chai;
 chai.use(solidity);
 
-import { getPermitDigest, sign, getDomainSeparator } from "./utilities/signature";
-
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
 import { Solace, XSolace, MockErc20, MockErc20Permit, BondDepository, BondTellerErc20 } from "../typechain";
 import { expectClose } from "./utilities/math";
-import { getBondTellerDepositSignature } from "./utilities/getBondTellerDepositSignature";
+import { getERC20PermitSignature } from "./utilities/getERC20PermitSignature";
 
-const chainId = 31337;
 const deadline = constants.MaxUint256;
 const VESTING_TERM = 432000; // 5 days
 const HALF_LIFE = 2592000; // 30 days
@@ -189,7 +185,7 @@ describe("BondTellerERC20", function() {
       await expect(teller1.connect(depositor1).deposit(1, 1, depositor1.address, false)).to.be.revertedWith("ERC20: transfer amount exceeds allowance");
     });
     it("cannot permit a non erc20permit token", async function () {
-      let { v, r, s } = await getBondTellerDepositSignature(depositor1, teller1, tkn1, 1, constants.MaxUint256, 1);
+      let { v, r, s } = await getERC20PermitSignature(depositor1, teller1.address, tkn1, 1, constants.MaxUint256, 1);
       await expect(teller1.connect(depositor1).depositSigned(1, 1, depositor1.address, false, deadline, v, r, s)).to.be.revertedWith("Transaction reverted: function selector was not recognized and there's no fallback function");
     });
     it("cannot deposit to zero address", async function () {
@@ -466,7 +462,7 @@ describe("BondTellerERC20", function() {
       const blockTimestamp = (await provider.getBlock('latest')).timestamp;
       let predictedAmountOut = await teller2.calculateAmountOut(ONE_ETHER.mul(3), false);
       let predictedAmountIn = await teller2.calculateAmountIn(predictedAmountOut, false);
-      let { v, r, s } = await getBondTellerDepositSignature(depositor1, teller2, tkn2, ONE_ETHER.mul(3));
+      let { v, r, s } = await getERC20PermitSignature(depositor1, teller2.address, tkn2, ONE_ETHER.mul(3));
       let tx1 = await teller2.connect(depositor1).depositSigned(ONE_ETHER.mul(3), ONE_ETHER, depositor1.address, false, deadline, v, r, s);
       let bondID1 = await teller2.numBonds();
       expect(bondID1).eq(1);
@@ -508,7 +504,7 @@ describe("BondTellerERC20", function() {
       const blockTimestamp = (await provider.getBlock('latest')).timestamp;
       let predictedAmountOut = await teller2.calculateAmountOut(ONE_ETHER.mul(3), true);
       let predictedAmountIn = await teller2.calculateAmountIn(predictedAmountOut, true);
-      let { v, r, s } = await getBondTellerDepositSignature(depositor1, teller2, tkn2, ONE_ETHER.mul(3));
+      let { v, r, s } = await getERC20PermitSignature(depositor1, teller2.address, tkn2, ONE_ETHER.mul(3));
       let tx1 = await teller2.connect(depositor1).depositSigned(ONE_ETHER.mul(3), ONE_ETHER, depositor1.address, true, deadline, v, r, s);
       let bondID1 = await teller2.numBonds();
       expect(bondID1).eq(2);
@@ -545,7 +541,7 @@ describe("BondTellerERC20", function() {
       const blockTimestamp = (await provider.getBlock('latest')).timestamp;
       let predictedAmountOut = await teller2.calculateAmountOut(ONE_ETHER.mul(3), false);
       let predictedAmountIn = await teller2.calculateAmountIn(predictedAmountOut, false);
-      let { v, r, s } = await getBondTellerDepositSignature(depositor1, teller2, tkn2, ONE_ETHER.mul(3));
+      let { v, r, s } = await getERC20PermitSignature(depositor1, teller2.address, tkn2, ONE_ETHER.mul(3));
       let tx1 = await teller2.connect(depositor1).depositSigned(ONE_ETHER.mul(3), ONE_ETHER, depositor1.address, false, deadline, v, r, s);
       let bondID1 = await teller2.numBonds();
       expect(bondID1).eq(3);

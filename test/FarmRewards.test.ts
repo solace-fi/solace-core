@@ -10,6 +10,7 @@ import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer
 import { Solace, XSolace, Vault, OptionsFarming, FarmRewards, CpFarm, Weth9, PolicyManager, RiskManager, Registry, MockErc20Decimals, MockErc20Permit } from "../typechain";
 import { bnAddSub, bnMulDiv, expectClose } from "./utilities/math";
 import { getERC20PermitSignature } from "./utilities/getERC20PermitSignature";
+import { readFileSync } from "fs";
 
 chai.use(solidity);
 
@@ -165,14 +166,11 @@ describe("FarmRewards", function () {
       await expect(farmRewards.connect(governor).setFarmedRewards([],[1])).to.be.revertedWith("length mismatch");
     })
     it("can be set", async function () {
-      let farmer1s = ["0x97de953cde13fd813ac6bf8e3ad8735cc18a74b7", "0x71ad3b3bac0ab729fe8961512c6d430f34a36a34", "0xe5d8eb1d907e1554dd69d05536e056b90ae43d7b", "0x4f6798d42feb2a9169f4fbe0f986d005e1b76180", "0x68b53aa18d1b8437b7cd9524040c776e2261e06d", "0x501ace0e8d16b92236763e2ded7ae3bc2dffa276", "0xf8fe281a44def550c620882364e4a00f2ea80218", "0x091b922f4ec3c7bf73b4c484428a9d9679f8c53f", "0xc3422497f17a60d06a10f049c65a1dfd2b3b31be", "0xfb5caae76af8d3ce730f3d62c6442744853d43ef", "0xb6c9a522a303bf3f3988fd8e3efc2383060f4cc6", "0xdaca78193e7e5bb52221aef14d61ead2cae27fb6", "0x0f763341b448bb0f02370f4037fe4a2c84c9283f", "0x215a3749879e0ab83343d81aa670c45107a02620", "0x216d5609afb295931b47b7ececc36e3fc1908262", "0xf04de0999c16d51f8c79bdc9dd6a25eb90a94a8f", "0xde0639aa8a85cc9ea40f53f2dc2ad3f0d791b69c", "0xfa088e1f6691a4de186b6486a3266687019cf916", "0x7d77fbd7b12887f9ba83110b721905efa3707223", "0x02f98c63e6352c06fa8d5f14c004926f165cee74", "0x3fcab7343a2ccbc463200d7b19ea8c5e5766a676", "0x3da9d70305b83db1f545a5d50b19208b93cd0c21", "0xa9f078b3b6dd6c04308f19def394b6d5a1b8b732", "0x4bdf6d1dfc9993183dee1c95822a5511a234241d", "0x31b9084568783fd9d47c733f3799567379015e6d", "0xa752eea12f7ecaa7674363255e5e7f0b083a515c", "0x283e8531d354d1296de7591018d7fb8aaefb1dd2", "0x17466b61cffebe6670853c68e694e0897779e19d", "0xb0d6ae7784a9f20c1e34218998f0fc5c24972441", "0xcffe08bdf20918007f8ab268c32f8756494fc8d8", "0xba6a5d1d74e056fb7ec1263a110f5bd9462df58a", "0x874cc5222207858c4ee336386ed32d5b04293d22", "0xeaa4f3773f57af1d4c7130e07cde48050245511b", "0xfb6676656a4b6eade2c9a9f18c8cb71411e37289", "0xebc146cc23b0742b603595f8bea7dabcbf05840a", "0xd5236cca5bae6e09d044ade099397ebc30f52131", "0xe73deef8189dd8f8f9d82229ab31f0aae8f4c875", "0x2759b5efe48015bfbb9b0ed8bedcf62bb991ff4b", "0x55a6514978e8f72691454617ad187065f729d07e", "0xbbde1e05d96c5c4f7e377d5eaed21cac08a92945", "0x646e115e018766ec6a272ae5fe738c38b7f43521", "0xf0bdfd6899389449aa77cefbed28891b12d19880", "0x95f6b040a013d89883e36545df53844dbda4d8d1", "0x5eb67a3b141f3036899ee77822a41277166c540e", "0x36463b59b1b8f0cc1a94054425a2b2b3a17c6901", "0x53646c6c68e5b99168cbbf7470e47e89897a8273", "0xdfab977372a039e78839687b8c359465f0f17532", "0x8adace41ec579423f149d7402f282301fcfaff36", "0xfb306239c89d9b6e6a9ab080070a68bb08cbaaa2", "0xafe13742864bfa0a1950bfd1200dd27da4485d94", "0x0d7b281fbfd3281f7859e55ff579f5ebb41e2fcb", "0xa2490947b30258b522b7d6fd8fabec2d21c42d57", "0xedd88ca63d7c0b9cf182afdee3852258f31961f9", "0x653a480ce4887a9081397abe77caf6221b3d4f4c", "0xef9f32bf7c6381d42bb942832fd0e56ab99008fb", "0x11bb97923209df97e8c9839e1e394798cb0c0336", "0xd8faec528b9fbf4fe3226d6beb8b14a4f9bad655", "0x3194770e03ec3b0ebeaa7eb93b01290a85acc905", "0xe62c522b0eea657414fad0a1893223f54ccd5190", "0xcf3a24407aae7c87bd800c47928c5f20cd4764d2", "0xce66c6a88bd7bec215aa04fda4cf7c81055521d0", "0xdd6fd6622d4af631d8c5c1f637526e89ccff9646", "0x70e439584ef1ba300106b9c16543eaa1de676dc2", "0x8501518fe7d26c416d63072847c59d454103db4b", "0x8829f99344bca59d5c7ccb36848fe7efd2efb4eb", "0xe859f96c7a5a25c74dc7bb1f8ac2af2ea3a6160f", "0x4a86e7efce5f37583e6b7c4db88d37eff5812685", "0x0025befed0d57a11db1dc26a80e651bb38c97027", "0xdd13eb27af410ea094c2ac357f1b79b62f738062", "0x7c224beeb6064d7ca376dc66a8d1245ad5926aa6", "0x5bcf75ff702e90c889ae5c41ee25af364abc77cb", "0x195f61d13576f2ec92c812dc01faafd6433b6af7", "0x773cfc636f996f8bb0334c60fbb67ceb4154a6c2", "0x5edd81949604c74e984ee3424a72c6733df463d3", "0x404d846c95b2a70104fbae9797305beaa27a4062", "0x167d6fb10d4e6f037e97d4d9879f96b0b36023d1", "0x75352403b0355bf8c7b92bbd27fbe09d25f099c4", "0xf71e9c766cdf169edfbe2749490943c1dc6b8a55", "0xa72dd12b9329e6efe095c030f361131604a79586", "0xeda6b8db5517b1b55d3c99dfed9b671a143f8d05", "0x1750e7dfdd32fe6205e900b9cfb6c2247af8095f", "0x63c87453ad6ac61754092780713d96bc57d16288", "0x56ddd887fd2ed44c73d51f4127ab00ba3efc6527", "0x2808edd543813fcf418de85bb42eedf3b39ba72c", "0x10b0a72ea6110a4b985e21f62c4e30d09ccec89c", "0xe3bf79e595a4be7b0dc9d60b32dea80ab7ee5d17", "0x942b04e62bd86b1e273f3df3e52b7a980b5f07ba", "0x7894684edfdaa6113cf416e84cdb826a41ef45b8", "0x9893360c45ef5a51c3b38dcbdfe0039c80fd6f60", "0x8707cde20dd43e3db1f74c28fcd509ef38b0ba51", "0x529813a65f05a6c479db8d7443739448463a9d1c", "0x34bb9e91dc8ac1e13fb42a0e23f7236999e063d4", "0x45c791d8fe882f36c38edae92ef048f8a736c805", "0x70f8d86ac14548ce33da8a3fcd19076c56e0ea9d", "0x6d5fa92e25721aa23071ea6a8df9cee67c5820b3", "0x9d156bc7c8768294510a4a41883d5a4eb15b15e3", "0x8ac9db9c51e0d077a2fa432868eafd02d9142d53", "0x049aa75e6ab5e2ab2ae21ddab95252ab76ec800a", "0x31bfb5c4ee08ba9f65582f3e5ff215cccfa3f860", "0xa841b95d61171a55ca5bfaf99da5b19e2d5b710f", "0xc724f1558eb9216bb9e04be169317f70dcbef857"];
-      let rewards = [];
-      while(rewards.length < farmer1s.length) {
-        rewards.push(ONE_ETHER.mul(rewards.length+1));
-      }
-      await farmRewards.connect(governor).setFarmedRewards(farmer1s, rewards);
-      for(var i = 0; i < farmer1s.length; ++i) {
-        expect(await farmRewards.farmedRewards(farmer1s[i])).eq(rewards[i]);
+      var farmers = JSON.parse(readFileSync("./stash/cp farmers.json").toString());
+      var rewards = JSON.parse(readFileSync("./stash/cp farm rewards.json").toString());
+      await farmRewards.connect(governor).setFarmedRewards(farmers, rewards);
+      for(var i = 0; i < farmers.length; ++i) {
+        expect(await farmRewards.farmedRewards(farmers[i])).eq(rewards[i]);
       }
     });
   });
@@ -212,7 +210,7 @@ describe("FarmRewards", function () {
       await expect(farmRewards.connect(trader).redeem(uni.address, 1)).to.be.revertedWith("token in not supported");
     });
     it("can redeem using too much input", async function () {
-      let amountIn1 = ONE_ETHER.mul(100);
+      let amountIn1 = ONE_ETHER.mul(10000);
       let expectedAmountOut1 = await farmRewards.calculateAmountOut(dai.address, amountIn1);
       let bal1 = await getBalances(farmer1.address);
       await dai.connect(farmer1).approve(farmRewards.address, amountIn1);
@@ -228,7 +226,7 @@ describe("FarmRewards", function () {
       expect(expectedAmountIn1).to.be.lt(amountIn1);
       expectClose(expectedAmountIn1, bal12.userDAI.mul(-1), tolerance);
 
-      let amountIn2 = BN.from(1000000).mul(100);
+      let amountIn2 = BN.from(1000000).mul(10000);
       let expectedAmountOut2 = await farmRewards.calculateAmountOut(usdc.address, amountIn2);
       await usdc.connect(farmer1).approve(farmRewards.address, amountIn2);
       await farmRewards.connect(farmer1).redeem(usdc.address, amountIn2);
@@ -244,7 +242,7 @@ describe("FarmRewards", function () {
       expectClose(expectedAmountIn2, bal23.userUSDC.mul(-1), 10000);
     });
     it("can redeem signed using too much input", async function () {
-      let amountIn1 = ONE_ETHER.mul(100);
+      let amountIn1 = ONE_ETHER.mul(10000);
       let expectedAmountOut1 = await farmRewards.calculateAmountOut(dai.address, amountIn1);
       let bal1 = await getBalances(farmer2.address);
       var { v, r, s } = await getERC20PermitSignature(farmer2, farmRewards.address, dai, amountIn1);
@@ -260,7 +258,7 @@ describe("FarmRewards", function () {
       expect(expectedAmountIn1).to.be.lt(amountIn1);
       expectClose(expectedAmountIn1, bal12.userDAI.mul(-1), tolerance);
 
-      let amountIn2 = BN.from(1000000).mul(100);
+      let amountIn2 = BN.from(1000000).mul(10000);
       let expectedAmountOut2 = await farmRewards.calculateAmountOut(usdc.address, amountIn2);
       var { v, r, s } = await getERC20PermitSignature(farmer2, farmRewards.address, usdc, amountIn2);
       await farmRewards.connect(trader).redeemSigned(usdc.address, amountIn2, farmer2.address, deadline, v, r, s);
