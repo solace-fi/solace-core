@@ -11,8 +11,10 @@ import { create2Contract } from "./create2Contract";
 import { logContractAddress } from "./utils";
 
 import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_importer";
-import { Deployer, Solace, XSolace, BondDepository, BondTellerErc20, BondTellerEth } from "../typechain";
-import { BytesLike } from "ethers";
+import { Deployer, Solace, XSolace, BondDepository, BondTellerErc20, BondTellerEth, FarmRewards } from "../typechain";
+import { BytesLike, constants } from "ethers";
+import { readFileSync } from "fs";
+import { getERC20PermitSignature } from "../test/utilities/getERC20PermitSignature";
 
 const DEPLOYER_CONTRACT_ADDRESS    = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
 
@@ -48,7 +50,11 @@ const USDT_ADDRESS                  = "0xdAC17F958D2ee523a2206206994597C13D831ec
 const USDT_BOND_TELLER_ADDRESS      = "0x501acE6061D6176Da12FCBa36Bc85B2fc3FFd5e3";
 
 const SCP_ADDRESS                   = "0x501AcEe83a6f269B77c167c6701843D454E2EFA0";
-const SCP_BOND_TELLER_ADDRESS       = "";
+const SCP_BOND_TELLER_ADDRESS       = "0x501aCE163FfaCDa6584D75b274eD23155BFf4812";
+
+const FRAX_ADDRESS                  = "0x853d955aCEf822Db058eb8505911ED77F175b99e";
+
+const FARM_REWARDS_ADDRESS          = "0x501aCE3c1A6aA2f1C00A5A7F32B171e648e542F9";
 
 let artifacts: ArtifactImports;
 let deployerContract: Deployer;
@@ -63,8 +69,9 @@ let usdcTeller: BondTellerErc20;
 let slpUsdcTeller: BondTellerErc20;
 let wbtcTeller: BondTellerErc20;
 let usdtTeller: BondTellerErc20;
-
 let scpTeller: BondTellerErc20;
+
+let farmRewards: FarmRewards;
 
 let signerAddress: string;
 let tellerImplementationAddress: string;
@@ -97,6 +104,8 @@ async function main() {
   await deployWbtcTeller();
   await deployUsdtTeller();
   await deployScpTeller();
+
+  await deployFarmRewards();
 
   await logAddresses();
 }
@@ -359,12 +368,54 @@ async function deploy2ProxyTeller(name: string, implAddress: string, tokenAddres
   return newTeller;
 }
 
+async function deployFarmRewards() {
+  if(!!FARM_REWARDS_ADDRESS) {
+    farmRewards = (await ethers.getContractAt(artifacts.FarmRewards.abi, FARM_REWARDS_ADDRESS)) as FarmRewards;
+  } else {
+    console.log("Deploying FarmRewards");
+    let receiver = "0xc47911f768c6fE3a9fe076B95e93a33Ed45B7B34"; // mainnet core multisig
+    let solacePerXSolace = BN.from("21338806133989362485"); // as of midnight before December 2, 2021
+    var res = await create2Contract(deployer, artifacts.FarmRewards, [signerAddress, xsolace.address, receiver, solacePerXSolace], {}, "", deployerContract.address);
+    farmRewards = (await ethers.getContractAt(artifacts.FarmRewards.abi, res.address)) as FarmRewards;
+    console.log(`Deployed FarmRewards to ${farmRewards.address}`);
+  }
+  let solaceAmount = BN.from("4250000000000000000000000");
+  let xsolaceAmount = BN.from("199167656021318753349893");
+  /*
+  console.log('minting solace')
+  let tx1 = await solace.connect(deployer).mint(signerAddress, solaceAmount);
+  await tx1.wait();
+  */
+  /*
+  console.log('approving solace')
+  let tx4 = await solace.connect(deployer).approve(xsolace.address, constants.MaxUint256);
+  await tx4.wait();
+  console.log('staking')
+  let tx5 = await xsolace.connect(deployer).stake(solaceAmount);
+  await tx5.wait();
+  */
+  /*
+  console.log('adding support')
+  let tx2 = await farmRewards.connect(deployer).supportTokens([DAI_ADDRESS, USDC_ADDRESS, USDT_ADDRESS, FRAX_ADDRESS]);
+  await tx2.wait();
+  console.log('writing farm rewards')
+  var farmers = JSON.parse(readFileSync("./stash/cp farmers.json").toString());
+  var rewards = JSON.parse(readFileSync("./stash/cp farm rewards.json").toString());
+  let tx8 = await farmRewards.connect(deployer).setFarmedRewards(farmers, rewards);
+  await tx8.wait();
+  console.log('transferring xsolace')
+  let tx6 = await xsolace.connect(deployer).transfer(farmRewards.address, xsolaceAmount);
+  await tx6.wait();
+  */
+}
+
 async function logAddresses() {
   console.log("");
   console.log("| Contract Name                | Address                                      |");
   console.log("|------------------------------|----------------------------------------------|");
   logContractAddress("SOLACE", solace.address);
   logContractAddress("xSOLACE", xsolace.address);
+  logContractAddress("FarmRewards", farmRewards.address);
   logContractAddress("BondDepository", bondDepo.address);
   logContractAddress("DAI Bond Teller", daiTeller.address);
   logContractAddress("ETH Bond Teller", ethTeller.address);
@@ -380,6 +431,7 @@ async function logAddresses() {
   logContractAddress("WBTC", WBTC_ADDRESS);
   logContractAddress("USDT", USDT_ADDRESS);
   logContractAddress("SCP", SCP_ADDRESS);
+  logContractAddress("FRAX", FRAX_ADDRESS);
 }
 
 main()

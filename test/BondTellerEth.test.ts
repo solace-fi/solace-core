@@ -51,7 +51,7 @@ describe("BondTellerETH", function() {
     xsolace = (await deployContract(deployer, artifacts.xSOLACE, [governor.address, solace.address])) as XSolace;
     weth9 = (await deployContract(deployer, artifacts.WETH)) as Weth9;
     await weth9.connect(deployer).deposit({value: ONE_ETHER.mul(100)});
-    weth10 = (await deployContract(deployer, artifacts.MockERC20Permit, ["Wrapped Ether 10", "WETH10", ONE_ETHER.mul(1000000)])) as MockErc20Permit;
+    weth10 = (await deployContract(deployer, artifacts.MockERC20Permit, ["Wrapped Ether 10", "WETH10", ONE_ETHER.mul(1000000), 18])) as MockErc20Permit;
     bondDepo = (await deployContract(deployer, artifacts.BondDepository, [governor.address, solace.address, xsolace.address, underwritingPool.address, dao.address])) as BondDepository;
     await solace.connect(governor).addMinter(minter.address);
     await solace.connect(minter).mint(bondDepo.address, ONE_ETHER.mul(1000));

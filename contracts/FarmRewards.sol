@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "./Governable.sol";
 import "./interface/IxSOLACE.sol";
-//import "./interface/IFarmRewards.sol";
+import "./interface/IFarmRewards.sol";
 
 
 /**
@@ -17,33 +17,30 @@ import "./interface/IxSOLACE.sol";
  *
  * Rewards were accumulated by farmers for participating in farms. Rewards will be unlocked linearly over six months and can be redeemed for [**SOLACE**](./SOLACE) by paying $0.03/[**SOLACE**](./SOLACE).
  */
-contract FarmRewards is ReentrancyGuard, Governable {
-    using SafeERC20 for IERC20;
-
-    event ReceiverSet(address receiver);
+contract FarmRewards is IFarmRewards, ReentrancyGuard, Governable {
 
     /// @notice xSOLACE Token.
-    address public xsolace;
+    address public override xsolace;
 
     /// @notice receiver for payments
-    address public receiver;
+    address public override receiver;
 
     /// @notice timestamp that rewards start vesting
-    uint256 constant public vestingStart = 1638316800; // midnight UTC before December 1, 2021
+    uint256 constant public override vestingStart = 1638316800; // midnight UTC before December 1, 2021
 
     /// @notice timestamp that rewards finish vesting
-    uint256 constant public vestingEnd = 1651363200; // midnight UTC before May 1, 2022
+    uint256 constant public override vestingEnd = 1651363200; // midnight UTC before May 1, 2022
 
-    uint256 public solacePerXSolace;
+    uint256 public override solacePerXSolace;
 
     /// @notice The stablecoins that can be used for payment.
-    mapping(address => bool) public tokenInSupported;
+    mapping(address => bool) public override tokenInSupported;
 
-    /// @notice Total farmed rewards of a user.
-    mapping(address => uint256) public farmedRewards;
+    /// @notice Total farmed rewards of a farmer.
+    mapping(address => uint256) public override farmedRewards;
 
-    /// @notice Redeemed rewards of a user.
-    mapping(address => uint256) public redeemedRewards;
+    /// @notice Redeemed rewards of a farmer.
+    mapping(address => uint256) public override redeemedRewards;
 
     /**
      * @notice Constructs the `FarmRewards` contract.
@@ -70,7 +67,7 @@ contract FarmRewards is ReentrancyGuard, Governable {
      * @param amountOut The amount of [**xSOLACE**](./xSOLACE) wanted.
      * @return amountIn The amount of `tokenIn` needed.
      */
-    function calculateAmountIn(address tokenIn, uint256 amountOut) external view returns (uint256 amountIn) {
+    function calculateAmountIn(address tokenIn, uint256 amountOut) external view override returns (uint256 amountIn) {
         // check token support
         require(tokenInSupported[tokenIn], "token in not supported");
         // calculate xsolace out @ $0.03/SOLACE
@@ -86,7 +83,7 @@ contract FarmRewards is ReentrancyGuard, Governable {
      * @param amountIn The amount of `tokenIn` in.
      * @return amountOut The amount of [**xSOLACE**](./xSOLACE) out.
      */
-    function calculateAmountOut(address tokenIn, uint256 amountIn) external view returns (uint256 amountOut) {
+    function calculateAmountOut(address tokenIn, uint256 amountIn) external view override returns (uint256 amountOut) {
         // check token support
         require(tokenInSupported[tokenIn], "token in not supported");
         // calculate xsolace out @ $0.03/SOLACE
@@ -97,18 +94,18 @@ contract FarmRewards is ReentrancyGuard, Governable {
     }
 
     /**
-     * @notice The amount of [**xSOLACE**](./xSOLACE) that a user has vested.
+     * @notice The amount of [**xSOLACE**](./xSOLACE) that a farmer has vested.
      * Does not include the amount they've already redeemed.
-     * @param user The user to query.
+     * @param farmer The farmer to query.
      * @return amount The amount of vested [**xSOLACE**](./xSOLACE).
      */
-    function purchaseableVestedXSolace(address user) public view returns (uint256 amount) {
+    function purchaseableVestedXSolace(address farmer) public view override returns (uint256 amount) {
         uint256 timestamp = block.timestamp;
-        uint256 totalRewards = farmedRewards[user];
+        uint256 totalRewards = farmedRewards[farmer];
         uint256 totalVestedAmount = (timestamp >= vestingEnd)
             ? totalRewards // fully vested
             : (totalRewards * (timestamp - vestingStart) / (vestingEnd - vestingStart)); // partially vested
-        amount = totalVestedAmount - redeemedRewards[user];
+        amount = totalVestedAmount - redeemedRewards[farmer];
         return amount;
     }
 
@@ -121,7 +118,7 @@ contract FarmRewards is ReentrancyGuard, Governable {
      * @param tokenIn The token to use as payment.
      * @param amountIn The max amount to pay.
      */
-    function redeem(address tokenIn, uint256 amountIn) external nonReentrant {
+    function redeem(address tokenIn, uint256 amountIn) external override nonReentrant {
         // accounting
         amountIn = _redeem(tokenIn, amountIn, msg.sender);
         // pull tokens
@@ -132,13 +129,13 @@ contract FarmRewards is ReentrancyGuard, Governable {
      * @notice Deposit tokens to redeem rewards.
      * @param tokenIn The token to use as payment.
      * @param amountIn The max amount to pay.
-     * @param depositor The user that deposits.
+     * @param depositor The farmer that deposits.
      * @param deadline Time the transaction must go through before.
      * @param v secp256k1 signature
      * @param r secp256k1 signature
      * @param s secp256k1 signature
      */
-    function redeemSigned(address tokenIn, uint256 amountIn, address depositor, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external nonReentrant {
+    function redeemSigned(address tokenIn, uint256 amountIn, address depositor, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external override nonReentrant {
         // permit
         ERC20Permit(tokenIn).permit(depositor, address(this), amountIn, deadline, v, r, s);
         // accounting
@@ -148,10 +145,10 @@ contract FarmRewards is ReentrancyGuard, Governable {
     }
 
     /**
-     * @notice Redeems a users rewards.
+     * @notice Redeems a farmers rewards.
      * @param tokenIn The token to use as payment.
      * @param amountIn The max amount to pay.
-     * @param depositor The user that deposits.
+     * @param depositor The farmer that deposits.
      * @return actualAmountIn The amount of tokens used.
      */
     function _redeem(address tokenIn, uint256 amountIn, address depositor) internal returns (uint256 actualAmountIn) {
@@ -186,7 +183,7 @@ contract FarmRewards is ReentrancyGuard, Governable {
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param tokens The tokens to add support for.
      */
-    function supportTokens(address[] calldata tokens) external onlyGovernance {
+    function supportTokens(address[] calldata tokens) external override onlyGovernance {
         for(uint256 i = 0; i < tokens.length; ++i) {
             address token = tokens[i];
             require(token != address(0x0), "zero address token");
@@ -199,7 +196,7 @@ contract FarmRewards is ReentrancyGuard, Governable {
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param receiver_ The new recipient.
      */
-    function setReceiver(address payable receiver_) external onlyGovernance {
+    function setReceiver(address payable receiver_) external override onlyGovernance {
         require(receiver_ != address(0x0), "zero address receiver");
         receiver = receiver_;
         emit ReceiverSet(receiver_);
@@ -210,7 +207,7 @@ contract FarmRewards is ReentrancyGuard, Governable {
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param amount Amount to send. Will be sent from this contract to `receiver`.
      */
-    function returnXSolace(uint256 amount) external onlyGovernance {
+    function returnXSolace(uint256 amount) external override onlyGovernance {
         SafeERC20.safeTransfer(IERC20(xsolace), receiver, amount);
     }
 
@@ -220,7 +217,7 @@ contract FarmRewards is ReentrancyGuard, Governable {
      * @param farmers Array of farmers to set.
      * @param rewards Array of rewards to set.
      */
-    function setFarmedRewards(address[] calldata farmers, uint256[] calldata rewards) external onlyGovernance {
+    function setFarmedRewards(address[] calldata farmers, uint256[] calldata rewards) external override onlyGovernance {
         require(farmers.length == rewards.length, "length mismatch");
         for(uint256 i = 0; i < farmers.length; i++) {
             farmedRewards[farmers[i]] = rewards[i];

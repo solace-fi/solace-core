@@ -50,7 +50,7 @@ describe("BondTellerERC20", function() {
     solace = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
     xsolace = (await deployContract(deployer, artifacts.xSOLACE, [governor.address, solace.address])) as XSolace;
     tkn1 = (await deployContract(deployer, artifacts.MockERC20, ["Dai Stablecoin", "DAI", ONE_ETHER.mul(1000000)])) as MockErc20;
-    tkn2 = (await deployContract(deployer, artifacts.MockERC20Permit, ["USD Coin", "USDC", ONE_ETHER.mul(1000000)])) as MockErc20Permit;
+    tkn2 = (await deployContract(deployer, artifacts.MockERC20Permit, ["USD Coin", "USDC", ONE_ETHER.mul(1000000), 18])) as MockErc20Permit;
     bondDepo = (await deployContract(deployer, artifacts.BondDepository, [governor.address, solace.address, xsolace.address, underwritingPool.address, dao.address])) as BondDepository;
     await solace.connect(governor).addMinter(minter.address);
     await solace.connect(minter).mint(bondDepo.address, ONE_ETHER.mul(1000));
