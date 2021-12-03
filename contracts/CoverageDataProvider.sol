@@ -6,7 +6,9 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./interface/ICoverageDataProvider.sol";
 import "./interface/IRegistry.sol";
 import "./interface/IVault.sol";
+import "./interface/ISOLACE.sol";
 import "./interface/AaveV2/IAavePriceOracle.sol";
+import "./interface/Sushiswap/ISushiswapLPToken.sol";
 import "./Governable.sol";
 
 /**
@@ -15,25 +17,36 @@ import "./Governable.sol";
  * @notice Calculates the maximum amount of cover that `Solace` protocol can sell as a coverage. 
 */
 contract CoverageDataProvider is ICoverageDataProvider, Governable {
-    
+    /***************************************
+     STATE VARIABLES
+    ***************************************/
+
     /// @notice price oracle.
+    /// @dev AAVE price returns asset price in ETH.
     IAavePriceOracle internal _priceOracle;
+    /// @notice Registry contract.
+    IRegistry internal _registry;
 
-    /// @notice SOLACE-USDC SLP Pool address.
-    address public immutable solaceSLP = 0x9C051F8A6648a51eF324D30C235da74D060153aC;
-    /// @notice SCP address.
-    address public immutable solaceSCP = 0x501AcEe83a6f269B77c167c6701843D454E2EFA0;
-    /// @notice DAI address.
-    address public immutable dai = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
-    /// @notice WETH address. 
-    address public immutable weth = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
-    /// @notice USDC address.
-    address public immutable usdc = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
-    /// @notice WBTC address.
-    address public immutable wbtc = 0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599;
-    /// @notice USDT address.
-    address public immutable usdt = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
+    /// @notice SOLACE token address.
+    ISOLACE internal _solace;
 
+    /// @notice SOLACE-USDC SLP pool address.
+    /// @dev We define a state variable for the solace-usdcs pool address
+    /// in order to get SOLACE token price from this pool.
+    ISushiswapLPToken internal _solaceUsdcPool;
+
+    /// Asset Mappings
+    /// @notice asset => index.
+    mapping(address => uint256) internal _assetToIndex;
+    /// @notice index => asset.
+    mapping(uint256 => address) internal _indexToAsset;
+    /// @notice assets.
+    /// @dev Map enumeration [1, numOfAssets]
+    mapping(address => AssetType) internal _assets;
+    /// @notice asset count.
+    uint256 internal _assetCount;
+
+    /// Underwriting Pool Mappings
     /// @notice Underwriting pool => index.
     mapping(address => uint256) internal _underwritingPoolToIndex;
     /// @notice Index => underwriting pool.
@@ -43,14 +56,44 @@ contract CoverageDataProvider is ICoverageDataProvider, Governable {
     /// @notice Underwriting pool count.
     uint256 internal _underwritingPoolCount = 0;
 
-    /// @notice Registry contract.
-    IRegistry internal immutable _registry;
-
-    constructor(address governance_, address registry_) Governable(governance_) {
+    /**
+     * @notice Constructs the `CoverageDataProvider` contract.
+     * @param governance_ The address of the [governor](/docs/protocol/governance).
+     * @param registry_ The address of registry.
+     * @param aaveV2PriceOracle_ The address of the AAVEv2 price oracle.
+     * @param solaceUsdcPool_ The address of `Sushiswap SOLACE-USDC` pool to get `SOLACE` token price.
+    */
+    constructor(address governance_, address registry_, address aaveV2PriceOracle_, address solaceUsdcPool_) Governable(governance_) {
       require(registry_ != address(0x0), "zero address registry");
+      require(aaveV2PriceOracle_ != address(0x0), "zero address oracle");
+      require(solaceUsdcPool_ != address(0x0), "zero address pool");
+
       _registry = IRegistry(registry_);
-      _priceOracle = IAavePriceOracle(0xA50ba011c48153De246E5192C8f9258A2ba79Ca9);
+      _priceOracle = IAavePriceOracle(aaveV2PriceOracle_);
+      _solaceUsdcPool = ISushiswapLPToken(solaceUsdcPool_);
+      _solace = ISOLACE(_registry.solace());
+
+      // SOLACE
+      _addAsset(address(_solace), AssetType.SOLACE);
+      // SOLACE-USDC SLP Pool
+      _addAsset(address(_solaceUsdcPool), AssetType.SOLACE_SLP);
+      // SCP
+      _addAsset(0x501AcEe83a6f269B77c167c6701843D454E2EFA0, AssetType.SCP);
+      // DAI
+      _addAsset(0x6B175474E89094C44Da98b954EedeAC495271d0F, AssetType.ERC20);
+      // WETH
+      _addAsset(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2, AssetType.WETH);
+      // USDC
+      _addAsset(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48, AssetType.ERC20);
+      // WBTC
+      _addAsset(0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599, AssetType.ERC20);
+      // USDT
+      _addAsset(0xdAC17F958D2ee523a2206206994597C13D831ec7, AssetType.ERC20);
     }
+
+    /***************************************
+     GOVERNANCE FUNCTIONS
+    ***************************************/
 
     /**
      * @notice Adds new underwriting pools.
@@ -88,6 +131,120 @@ contract CoverageDataProvider is ICoverageDataProvider, Governable {
     function setPriceOracle(address priceOracle_) external override onlyGovernance {
       require(priceOracle_ != address(0x0), "zero address price oracle");
       _priceOracle = IAavePriceOracle(priceOracle_);
+    }
+
+    /**
+     * @notice Adds a new asset.
+     * @param asset_ The asset address.
+     * @param assetType_ The type of asset.(e.g. ERC20, Sushi LP or Uniswap LP etc.)
+    */
+    function addAsset(address asset_, AssetType assetType_) external override onlyGovernance {
+      _addAsset(asset_, assetType_);
+    }
+
+    /**
+     * @notice Removes an asset.
+     * @param asset_ The asset to remove.
+    */
+    function removeAsset(address asset_) external override onlyGovernance {
+      uint256 index = _assetToIndex[asset_];
+      if (index == 0) return;
+
+      uint256 assetCount = _assetCount;
+      if (assetCount == 0) return;
+
+      if (index != assetCount) {
+        address lastAsset = _indexToAsset[assetCount];
+        _assetToIndex[lastAsset] = index;
+        _indexToAsset[index] = lastAsset; 
+      }
+      delete _assetToIndex[asset_];
+      delete _indexToAsset[assetCount];
+      delete _assets[asset_];
+      _assetCount = assetCount - 1;
+      emit AssetRemoved(asset_);
+    }
+
+    /**
+     * @notice Sets the pools and assets. Removes the current assets.
+     * @param assets_ The assets to set.
+     * @param assetTypes_ The asset types to set.
+    */
+    function setAssets( address[] calldata assets_, AssetType[] calldata assetTypes_) external override onlyGovernance {
+      require(assets_.length == assetTypes_.length, "length mismatch");
+      // delete assets
+      uint256 assetCount = _assetCount;
+      for (uint256 i = assetCount; i > 0; i--) {
+        address asset = _indexToAsset[i];
+        delete _assetToIndex[asset];
+        delete _indexToAsset[i];
+        delete _assets[asset];
+        emit AssetRemoved(asset);
+      }
+      _assetCount = 0;
+
+      for (uint256 i = 0; i < assets_.length; i++) {
+        _addAsset(assets_[i], assetTypes_[i]);
+      }
+    }
+
+    /**
+     * @notice Sets the registry address.
+     * @param registry_ The address of the new registry.
+    */
+    function setRegistry(address registry_) external override onlyGovernance {
+      require(registry_ != address(0x0), "zero address registry");
+      _registry = IRegistry(registry_);
+      _solace = ISOLACE(IRegistry(registry_).solace());
+      emit RegistryUpdated(registry_);
+    }
+
+    /**
+     * @notice Sets `SOLACE` token address.
+     * @param solace_ The new token address.
+    */
+    function setSolace(address solace_) external override onlyGovernance {
+      require(solace_ != address(0x0), "zero address solace");
+      _solace = ISOLACE(solace_);
+      emit SolaceUpdated(solace_);
+    }
+
+    /**
+     * @notice Sets `SOLACE/USDC` SLP address.
+     * @param solaceUsdcPool_ The address of the SLP pool.
+    */
+    function setSolaceUsdcPool(address solaceUsdcPool_) external override onlyGovernance {
+      require(solaceUsdcPool_ != address(0x0), "zero address slp");
+      _solaceUsdcPool = ISushiswapLPToken(solaceUsdcPool_);
+      emit SolaceUsdcPoolUpdated(solaceUsdcPool_);
+    }
+
+    /***************************************
+     VIEW FUNCTIONS
+    ***************************************/
+   
+    /**
+     * @notice Returns the `SOLACE`.
+     * @return solace_ The address of the `SOLACE` token.
+    */
+    function solace() public view override returns (address solace_) {
+      return address(_solace);
+    }
+
+    /**
+     * @notice Returns the `SOLACE/USDC` SLP pool.
+     * @return solaceUsdcPool_ The address of the pool.
+    */
+    function solaceUsdcPool() public view override returns (address solaceUsdcPool_) {
+      return address(_solaceUsdcPool);
+    }
+
+    /**
+     * @notice Returns registry address.
+     * @return registry_ The registry address.
+    */
+    function registry() external view override returns (address registry_) {
+      return address(_registry);
     }
 
     /**
@@ -137,7 +294,7 @@ contract CoverageDataProvider is ICoverageDataProvider, Governable {
       // get pool balance
       uint256 pools = poolCount();
       for (uint256 i = 0; i < pools; i++) {
-        cover += getPoolBalance(_indexToUnderwritingPool[i]);
+        cover += getPoolAmount(_indexToUnderwritingPool[i]);
       }
     }
 
@@ -146,27 +303,74 @@ contract CoverageDataProvider is ICoverageDataProvider, Governable {
      * @param pool_ The underwriting pool.
      * @return amount The total asset value of the underwriting pool in ETH.
     */
-    function getPoolBalance(address pool_) public view override returns (uint256 amount) {
+    function getPoolAmount(address pool_) public view override returns (uint256 amount) {
       require(_underwritingPoolToIndex[pool_] > 0, "invalid pool");
       require(_underwritingPoolStatus[pool_], "inactive pool");
       // get pool's eth balance
       amount += address(pool_).balance;
-      // get pool's weth balance
-      amount += ERC20(weth).balanceOf(pool_);
-      // get pool's dai balance in eth
-      amount += _getAssetValue(pool_, dai);
-      // get pool's usdc balance in eth
-      amount += _getAssetValue(pool_, usdc);
-      // get pool's usdt balance in eth
-      amount += _getAssetValue(pool_, usdt);
-      // get pool's wbtc balance in eth
-      amount += _getAssetValue(pool_, wbtc);
-      // TODO: get pool's slp balance in eth
-      // TODO: get pool's scp balance in eth
+      uint256 assetCount = _assetCount;
+      for (uint256 i = assetCount; i > 0; i--) {
+        address asset = _indexToAsset[i];
+        AssetType assetType = _assets[asset];
+        amount += _getAmount(pool_, asset, assetType);
+      }
     }
 
-    function _getAssetValue(address pool, address asset) private view returns (uint256 value) {
-      ERC20 erc20 = ERC20(asset);
-      return (erc20.balanceOf(pool) / erc20.decimals()) * _priceOracle.getAssetPrice(asset);
-    } 
+    /***************************************
+     PRIVATE FUNCTIONS
+    ***************************************/
+
+    function _getAmount(address pool, address asset, AssetType assetType) private view returns (uint256 amount) {
+      if (assetType == AssetType.ERC20) {
+        // any ERC20 token
+        amount += _getAmountInETH(asset, ERC20(asset).balanceOf(pool), ERC20(asset).decimals());
+      } else if (assetType == AssetType.WETH || assetType == AssetType.SCP) {
+        // WETH or SCP
+        amount += ERC20(asset).balanceOf(pool);
+      } else if (assetType == AssetType.SOLACE) {
+        // only SOLACE
+        amount += _solace.balanceOf(pool) * _getSolacePriceInETH();
+      } else if (assetType == AssetType.SOLACE_SLP) {
+        // any SOLACE SLP pool
+        ISushiswapLPToken lpToken = ISushiswapLPToken(asset);
+        ERC20 token1 = ERC20(lpToken.token1());
+        (uint112 reserve0, uint112 reserve1,) = lpToken.getReserves();
+        amount += reserve0 * _getSolacePriceInETH();
+        amount += _getAmountInETH(asset, reserve1, token1.decimals());
+      } else if (assetType == AssetType.SLP) {
+        // any SLP pool other than SOLACE pair
+        ISushiswapLPToken lpToken = ISushiswapLPToken(asset);
+        ERC20 token0 = ERC20(lpToken.token0());
+        ERC20 token1 = ERC20(lpToken.token1());
+        (uint112 reserve0, uint112 reserve1,) = lpToken.getReserves();
+        amount += _getAmountInETH(asset, reserve0, token0.decimals());
+        amount += _getAmountInETH(asset, reserve1, token1.decimals());
+      }
+    }
+
+    function _getAmountInETH(address asset, uint256 balance, uint8 decimals) private view returns (uint256 amount) {
+      return (balance * _priceOracle.getAssetPrice(asset)) / decimals;
+    }
+
+    function _getSolacePriceInETH() private view returns (uint256 price) {
+      (uint112 reserve0, uint112 reserve1,) = _solaceUsdcPool.getReserves();
+      if (reserve0 == 0 || reserve1 == 0) return 0;
+      address token1 = _solaceUsdcPool.token1();
+      uint112 priceInUsdcs = reserve1 / reserve0;
+      uint256 priceInETH = priceInUsdcs * _priceOracle.getAssetPrice(token1);
+      return priceInETH;
+    }
+
+    function _addAsset(address asset_, AssetType assetType_) private {
+      require(asset_ != address(0x0), "zero address asset");
+      uint256 index = _assetToIndex[asset_];
+      if (index > 0) return;
+
+      index = _assetCount;
+      _assets[asset_] = assetType_;
+      _assetToIndex[asset_] = ++index;
+      _indexToAsset[index] = asset_;
+      _assetCount = index;
+      emit AssetAdded(asset_);
+    }
 }

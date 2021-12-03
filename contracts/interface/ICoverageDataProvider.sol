@@ -7,12 +7,50 @@ pragma solidity 0.8.6;
  * @notice Calculates the maximum amount of cover that `Solace` protocol can sell as a coverage. 
 */
 interface ICoverageDataProvider {
+    /***************************************
+     TYPE DEFINITIONS
+    ***************************************/
+
+    /// @notice Underwriting Pool asset types.
+    /// 0 = SOLACE token
+    /// 1 = Any ERC20 token
+    /// 2 = Wrapped ETH
+    /// 3 = Solace Capital Provider Token. (1 ETH = 1 SCP)
+    /// 4 = Sushiswap SOLACE/? SLP pools
+    /// 5 = Sushiswap ?/? SLP pools(other than SOLACE token pairs).
+    enum AssetType {
+        SOLACE, 
+        ERC20,
+        WETH,
+        SCP,
+        SOLACE_SLP,
+        SLP 
+    }
+
+    /***************************************
+     EVENTS
+    ***************************************/
+
     /// @notice Emitted when a new underwriting pool is added.
     event UnderwritingPoolAdded(address pool);
     /// @notice Emitted when underwriting pool is updated.
     event UnderwritingPoolStatusUpdated(address pool, bool status);
     /// @notice Emitted when price oracle address is updated.
     event PriceOracleUpdated(address oracle);
+    /// @notice Emitted when a new asset is added.
+    event AssetAdded(address asset);
+    /// @notice Emitted when an asset is removed.
+    event AssetRemoved(address asset);
+    /// @notice Emitted when registry is updated.
+    event RegistryUpdated(address registry);
+    /// @notice Emitted when SOLACE is updated.
+    event SolaceUpdated(address solace);
+    /// @notice Emitted when SOLACE/USDC SLP pool is updated.
+    event SolaceUsdcPoolUpdated(address solaceUsdcPool);
+
+    /***************************************
+     GOVERNANCE FUNCTIONS
+    ***************************************/
 
     /**
      * @notice Adds new underwriting pools.
@@ -32,6 +70,66 @@ interface ICoverageDataProvider {
      * @param priceOracle_ The new price oracle address.
     */
     function setPriceOracle(address priceOracle_) external;
+
+    /**
+     * @notice Adds a new asset.
+     * @param asset_ The asset address.
+     * @param assetType_ The type of asset.(e.g. ERC20, Sushi LP or Uniswap LP etc.)
+    */
+    function addAsset(address asset_, AssetType assetType_) external;
+
+    /**
+     * @notice Removes an asset.
+     * @param asset_ The asset to remove.
+    */
+    function removeAsset(address asset_) external;
+
+    /**
+     * @notice Sets the pools and assets. Removes the current assets.
+     * @param assets_ The assets to set.
+     * @param assetTypes_ The asset types to set.
+    */
+    function setAssets(address[] calldata assets_, AssetType[] calldata assetTypes_) external;
+
+    /**
+     * @notice Sets the registry address.
+     * @param registry_ The address of the new registry.
+    */
+    function setRegistry(address registry_) external;
+
+    /**
+     * @notice Sets `SOLACE` token address.
+     * @param solace_ The new token address.
+    */
+    function setSolace(address solace_) external;
+
+    /**
+     * @notice Sets `SOLACE/USDC` SLP address.
+     * @param solaceUsdcPool_ The address of the SLP pool.
+    */
+    function setSolaceUsdcPool(address solaceUsdcPool_) external;
+
+    /***************************************
+     VIEW FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Returns the `SOLACE`.
+     * @return solace_ The address of the `SOLACE` token.
+    */
+    function solace() external view returns (address solace_);
+
+    /**
+     * @notice Returns the `SOLACE/USDC` SLP pool.
+     * @return solaceUsdcPool_ The address of the pool.
+    */
+    function solaceUsdcPool() external view returns (address solaceUsdcPool_);
+    
+    /**
+     * @notice Returns registry address.
+     * @return registry_ The registry address.
+    */
+    function registry() external view returns (address registry_);
 
     /**
      * @notice Returns the price oracle.
@@ -70,5 +168,5 @@ interface ICoverageDataProvider {
      * @param pool_ The underwriting pool.
      * @return amount The total asset value of the underwriting pool in ETH.
     */
-    function getPoolBalance(address pool_) external view returns (uint256 amount);
+    function getPoolAmount(address pool_) external view returns (uint256 amount);
 }
