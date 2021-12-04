@@ -26,9 +26,31 @@ See tags for deployment addresses
 1. Clone this repo
 2. Copy `.env.example` to `.env` and fill in the missing values. You'll need to sign up for API keys with various third party providers.
 3. Install node.js v12 https://nodejs.org/
-4. `npm install`
-5. `npx hardhat compile`
-6. `npx hardhat test`
+4. Run `npm install`
+5. Run `npx hardhat compile`
+6. Run `npx hardhat test`
+
+## Local Deployment
+1. Clone this repo
+2. Copy `.env.example` to `.env` and fill in the missing values. You'll need to sign up for API keys with various third party providers.
+3. Install node.js v12 https://nodejs.org/
+4. Run `npm install`
+5. Run `npx hardhat compile`
+
+You can choose to fork mainnet or redeploy.
+
+Forking:
+1. In `.env` set `FORK_NETWORK=mainnet`
+2. In `hardhat.config.ts` set `mainnet_fork.blockNumber` to a recent block.
+3. Run `npx hardhat node`. Your local network will be available at `localhost:8545`.
+4. See https://github.com/solace-fi/solace-core/releases or https://docs.solace.fi/docs/dev-docs/Contract%20Addresses for a list of contract addresses.
+
+Redeploying:
+1. In `.env` set `FORK_NETWORK=none`
+2. Run `npx hardhat node`. Let this run and open a new terminal.
+3. Run `npx hardhat run scripts/deploy-local-1.ts --network localhost`.
+4. Run `npx hardhat run scripts/deploy-local-2.ts --network localhost`.
+5. Your local network will be available at `localhost:8545`. See the outputs of the above commands for a list of contract addresses.
 
 ## License
 GNU General Public License v3.0
