@@ -44,10 +44,11 @@ contract CoverageDataProvider is ICoverageDataProvider, Governable {
     /// @dev Map enumeration [1, numOfAssets]
     mapping(address => AssetType) internal _assets;
     /// @notice asset count.
-    uint256 internal _assetCount;
+    uint256 internal _assetCount = 0;
 
     /// Underwriting Pool Mappings
     /// @notice Underwriting pool => index.
+    /// @dev Map enumeration [1, numOfPools]
     mapping(address => uint256) internal _underwritingPoolToIndex;
     /// @notice Index => underwriting pool.
     mapping(uint256 => address) internal _indexToUnderwritingPool;
@@ -67,8 +68,9 @@ contract CoverageDataProvider is ICoverageDataProvider, Governable {
       require(registry_ != address(0x0), "zero address registry");
       require(aaveV2PriceOracle_ != address(0x0), "zero address oracle");
       require(solaceUsdcPool_ != address(0x0), "zero address pool");
-
       _registry = IRegistry(registry_);
+      require(_registry.solace() != address(0x0), "zero address solace");
+
       _priceOracle = IAavePriceOracle(aaveV2PriceOracle_);
       _solaceUsdcPool = ISushiswapLPToken(solaceUsdcPool_);
       _solace = ISOLACE(_registry.solace());
@@ -77,8 +79,6 @@ contract CoverageDataProvider is ICoverageDataProvider, Governable {
       _addAsset(address(_solace), AssetType.SOLACE);
       // SOLACE-USDC SLP Pool
       _addAsset(address(_solaceUsdcPool), AssetType.SOLACE_SLP);
-      // SCP
-      _addAsset(0x501AcEe83a6f269B77c167c6701843D454E2EFA0, AssetType.SCP);
       // DAI
       _addAsset(0x6B175474E89094C44Da98b954EedeAC495271d0F, AssetType.ERC20);
       // WETH
@@ -101,7 +101,7 @@ contract CoverageDataProvider is ICoverageDataProvider, Governable {
     */
     function addPools(address[] calldata pools_) external override onlyGovernance {
       require(pools_.length > 0, "invalid pool length");
-      uint256 index = poolCount();
+      uint256 index = numOfPools();
 
       for (uint256 i = 0; i < pools_.length; i++) {
         require(pools_[i] != address(0x0), "zero address pool");
@@ -122,15 +122,7 @@ contract CoverageDataProvider is ICoverageDataProvider, Governable {
       require(pool_ != address(0x0), "zero address pool");
       require(_underwritingPoolToIndex[pool_] > 0, "invalid pool");
       _underwritingPoolStatus[pool_] = status_;
-    }
-
-    /**
-     * @notice Sets the price oracle address.
-     * @param priceOracle_ The new price oracle address.
-    */
-    function setPriceOracle(address priceOracle_) external override onlyGovernance {
-      require(priceOracle_ != address(0x0), "zero address price oracle");
-      _priceOracle = IAavePriceOracle(priceOracle_);
+      emit UnderwritingPoolStatusUpdated(pool_, status_);
     }
 
     /**
@@ -195,8 +187,10 @@ contract CoverageDataProvider is ICoverageDataProvider, Governable {
     function setRegistry(address registry_) external override onlyGovernance {
       require(registry_ != address(0x0), "zero address registry");
       _registry = IRegistry(registry_);
-      _solace = ISOLACE(IRegistry(registry_).solace());
+      require(_registry.solace() != address(0x0), "zero address solace");
+      _solace = ISOLACE(_registry.solace());
       emit RegistryUpdated(registry_);
+      emit SolaceUpdated(address(_solace));
     }
 
     /**
@@ -217,6 +211,16 @@ contract CoverageDataProvider is ICoverageDataProvider, Governable {
       require(solaceUsdcPool_ != address(0x0), "zero address slp");
       _solaceUsdcPool = ISushiswapLPToken(solaceUsdcPool_);
       emit SolaceUsdcPoolUpdated(solaceUsdcPool_);
+    }
+
+    /**
+     * @notice Sets the price oracle address.
+     * @param priceOracle_ The new price oracle address.
+    */
+    function setPriceOracle(address priceOracle_) external override onlyGovernance {
+      require(priceOracle_ != address(0x0), "zero address oracle");
+      _priceOracle = IAavePriceOracle(priceOracle_);
+      emit PriceOracleUpdated(priceOracle_);
     }
 
     /***************************************
@@ -277,8 +281,27 @@ contract CoverageDataProvider is ICoverageDataProvider, Governable {
      * @notice Returns the underwriting pool count.
      * @return count The number of underwriting pools.
     */
-    function poolCount() public view override returns (uint256 count) {
+    function numOfPools() public view override returns (uint256 count) {
       return _underwritingPoolCount;
+    }
+
+    /**
+     * @notice Returns the underwriting pool asset count.
+     * @return count The number of underwriting pools.
+    */
+    function numOfAssets() public view override returns (uint256 count) {
+      return _assetCount;
+    }
+
+    /**
+     * @notice Returns the underwriting pool asset for the given index.
+     * @param index_ The underwriting pool asset index.
+     * @return asset_ The underwriting pool asset.
+     * @return assetType_ The underwriting pool asset.
+    */
+    function assetAt(uint256 index_) external view override returns (address asset_, AssetType assetType_) {
+      address asset = _indexToAsset[index_];
+      return (asset, _assets[asset]);
     }
 
     /**
@@ -292,7 +315,7 @@ contract CoverageDataProvider is ICoverageDataProvider, Governable {
         cover += IVault(payable(vault)).totalAssets();
       }
       // get pool balance
-      uint256 pools = poolCount();
+      uint256 pools = numOfPools();
       for (uint256 i = 0; i < pools; i++) {
         cover += getPoolAmount(_indexToUnderwritingPool[i]);
       }
@@ -324,8 +347,8 @@ contract CoverageDataProvider is ICoverageDataProvider, Governable {
       if (assetType == AssetType.ERC20) {
         // any ERC20 token
         amount += _getAmountInETH(asset, ERC20(asset).balanceOf(pool), ERC20(asset).decimals());
-      } else if (assetType == AssetType.WETH || assetType == AssetType.SCP) {
-        // WETH or SCP
+      } else if (assetType == AssetType.WETH) {
+        // WETH
         amount += ERC20(asset).balanceOf(pool);
       } else if (assetType == AssetType.SOLACE) {
         // only SOLACE

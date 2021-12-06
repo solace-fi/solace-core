@@ -22,7 +22,6 @@ interface ICoverageDataProvider {
         SOLACE, 
         ERC20,
         WETH,
-        SCP,
         SOLACE_SLP,
         SLP 
     }
@@ -155,8 +154,22 @@ interface ICoverageDataProvider {
      * @notice Returns the underwriting pool count.
      * @return count The number of underwriting pools.
     */
-    function poolCount() external view returns (uint256 count);
+    function numOfPools() external view returns (uint256 count);
+
+    /**
+     * @notice Returns the underwriting pool asset count.
+     * @return count The number of underwriting pools.
+    */
+    function numOfAssets() external view returns (uint256 count);
     
+    /**
+     * @notice Returns the underwriting pool asset for the given index.
+     * @param index_ The underwriting pool asset index.
+     * @return asset_ The underwriting pool asset.
+     * @return assetType_ The underwriting pool asset.
+    */
+    function assetAt(uint256 index_) external view returns (address asset_, AssetType assetType_);
+   
     /**
      * @notice The maximum amount of cover that Solace as a whole can sell.
      * @return cover The max amount of cover in wei.

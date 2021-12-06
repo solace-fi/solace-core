@@ -12,7 +12,7 @@ import { Registry, Solace, FarmController, OptionsFarming, Vault, Treasury, Clai
 
 describe("Registry", function() {
   let artifacts: ArtifactImports;
-  const [deployer, governor, user, locker, rand] = provider.getWallets();
+  const [deployer, governor, user, locker, rand, solaceUsdcPool, priceOracle] = provider.getWallets();
 
   // contracts
   let registry: Registry;
@@ -280,7 +280,7 @@ describe("Registry", function() {
 
   describe("coverageDataProvider", function() {
     before(async function() {
-      coverageDataProvider = (await deployContract(deployer, artifacts.CoverageDataProvider, [governor.address, registry.address])) as CoverageDataProvider;
+      coverageDataProvider = (await deployContract(deployer, artifacts.CoverageDataProvider, [governor.address, registry.address, priceOracle.address, solaceUsdcPool.address])) as CoverageDataProvider;
     });
 
     it("starts as the zero address", async function() {

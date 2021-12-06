@@ -16,7 +16,7 @@ const DOMAIN_NAME = "Solace.fi-MockProduct";
 
 describe("RiskManager", function () {
   let artifacts: ArtifactImports;
-  const [deployer, governor, user, product1, product2, product3, coveredPlatform] = provider.getWallets();
+  const [deployer, governor, user, product1, product2, product3, solace, solaceUsdcPool, priceOracle] = provider.getWallets();
 
   // solace contracts
   let registry: Registry;
@@ -49,7 +49,8 @@ describe("RiskManager", function () {
     await registry.connect(governor).setVault(vault.address);
     policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
     await registry.connect(governor).setPolicyManager(policyManager.address);
-    coverageDataProvider = (await deployContract(deployer, artifacts.CoverageDataProvider, [governor.address, registry.address])) as CoverageDataProvider;
+    await registry.connect(governor).setSolace(solace.address);
+    coverageDataProvider = (await deployContract(deployer, artifacts.CoverageDataProvider, [governor.address, registry.address, priceOracle.address, solaceUsdcPool.address])) as CoverageDataProvider;
     await registry.connect(governor).setCoverageDataProvider(coverageDataProvider.address);
     riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
     await registry.connect(governor).setRiskManager(riskManager.address);

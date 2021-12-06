@@ -11,11 +11,11 @@ import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer
 import { burnBlocks, burnBlocksUntil } from "./utilities/time";
 import { encodeAddresses } from "./utilities/positionDescription";
 
-import { PolicyManager, MockProductV2, Treasury, Registry, RiskManager, PolicyDescriptorV2, Vault, Weth9, MockRiskStrategy, RiskStrategyFactory, CoverageDataProvider, ProductFactory } from "../typechain";
+import { PolicyManager, MockProductV2, Treasury, Registry, RiskManager, PolicyDescriptorV2, Vault, Weth9, MockRiskStrategy, CoverageDataProvider, ProductFactory } from "../typechain";
 
 describe("PolicyManager", function() {
   let artifacts: ArtifactImports;
-  const [deployer, governor, user, user2, walletProduct1, walletProduct2, walletProduct3, positionContract] = provider.getWallets();
+  const [deployer, governor, user, user2, walletProduct1, walletProduct2, walletProduct3, positionContract, solace, solaceUsdcPool, priceOracle] = provider.getWallets();
 
   // contracts
   let policyManager: PolicyManager;
@@ -71,7 +71,9 @@ describe("PolicyManager", function() {
 
     // deploy coverage provider contract
     await registry.connect(governor).setPolicyManager(policyManager.address);
-    coverageDataProvider = (await deployContract(deployer, artifacts.CoverageDataProvider, [governor.address, registry.address])) as CoverageDataProvider;
+    await registry.connect(governor).setSolace(solace.address);
+
+    coverageDataProvider = (await deployContract(deployer, artifacts.CoverageDataProvider, [governor.address, registry.address, priceOracle.address, solaceUsdcPool.address])) as CoverageDataProvider;
 
     await registry.connect(governor).setTreasury(treasury.address);
     await registry.connect(governor).setVault(vault.address);

@@ -34,7 +34,7 @@ describe("CoverageProduct", function () {
   let riskStrategyFactory: Contract;
   let mockRiskStrategy: RiskStrategy;
   let coverageDataProvider: CoverageDataProvider;
-  const [deployer, governor, newGovernor, positionContract, policyholder1, policyholder2, mockPolicyManager] = provider.getWallets();
+  const [deployer, governor, newGovernor, positionContract, policyholder1, policyholder2, mockPolicyManager, solace, solaceUsdcPool, priceOracle] = provider.getWallets();
 
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
   const ONE_SPLIT_VIEW = "0xC586BeF4a0992C495Cf22e1aeEE4E446CECDee0E";
@@ -73,7 +73,8 @@ describe("CoverageProduct", function () {
     await registry.connect(governor).setPolicyManager(policyManager.address);
     riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
     await registry.connect(governor).setRiskManager(riskManager.address);
-    coverageDataProvider = (await deployContract(deployer, artifacts.CoverageDataProvider, [governor.address, registry.address])) as CoverageDataProvider;
+    await registry.connect(governor).setSolace(solace.address);
+    coverageDataProvider = (await deployContract(deployer, artifacts.CoverageDataProvider, [governor.address, registry.address, solace.address, solaceUsdcPool.address])) as CoverageDataProvider;
     await registry.connect(governor).setCoverageDataProvider(coverageDataProvider.address);
 
     // deploy product factory

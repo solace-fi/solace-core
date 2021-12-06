@@ -12,14 +12,13 @@ import { bnAddSub, bnMulDiv, expectClose } from "./utilities/math";
 import { getPermitErc721EnhancedSignature } from "./utilities/getPermitNFTSignature";
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Solace, FarmController, OptionsFarming, SptFarm, PolicyManager, RiskManager, Registry, MockProductV2, Weth9, Treasury } from "../typechain";
+import { Solace, FarmController, OptionsFarming, PolicyManager, RiskManager, Registry, MockProductV2, Weth9, Treasury } from "../typechain";
 import { burnBlocks } from "./utilities/time";
 
 // contracts
 let solace: Solace;
 let farmController: FarmController;
 let optionsFarming: OptionsFarming;
-let farm1: SptFarm;
 let weth: Weth9;
 let registry: Registry;
 let treasury: Treasury;
