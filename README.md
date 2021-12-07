@@ -7,7 +7,7 @@ https://solace.fi
 Detailed technical documentation is located at https://docs.solace.fi
 
 ## Deployments
-See tags for deployment addresses
+See https://github.com/solace-fi/solace-core/releases or https://docs.solace.fi/docs/dev-docs/Contract%20Addresses for a list of contract addresses.
 
 ## Development Stack
 * Solidity 0.8.6: https://docs.soliditylang.org/en/v0.8.6/
@@ -25,7 +25,7 @@ See tags for deployment addresses
 ## Installation
 1. Clone this repo
 2. Copy `.env.example` to `.env` and fill in the missing values. You'll need to sign up for API keys with various third party providers.
-3. Install node.js v12 https://nodejs.org/
+3. Install node.js v16 https://nodejs.org/
 4. Run `npm install`
 5. Run `npx hardhat compile`
 6. Run `npx hardhat test`
@@ -33,7 +33,7 @@ See tags for deployment addresses
 ## Local Deployment
 1. Clone this repo
 2. Copy `.env.example` to `.env` and fill in the missing values. You'll need to sign up for API keys with various third party providers.
-3. Install node.js v12 https://nodejs.org/
+3. Install node.js v16 https://nodejs.org/
 4. Run `npm install`
 5. Run `npx hardhat compile`
 
