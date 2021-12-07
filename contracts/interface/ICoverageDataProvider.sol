@@ -182,4 +182,10 @@ interface ICoverageDataProvider {
      * @return amount The total asset value of the underwriting pool in ETH.
     */
     function getPoolAmount(address pool_) external view returns (uint256 amount);
+
+    /**
+     * @notice Returns `SOLACE` token price in `ETH` from `SOLACE/USDC Sushiswap Pool`.
+     * @return solacePrice The `SOLACE` price in `ETH`.
+    */
+    function getSolacePriceInETH() external view returns (uint256 solacePrice); 
 }

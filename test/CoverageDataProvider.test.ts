@@ -10,17 +10,17 @@ const { expect } = chai;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Solace, MockErc20, MockSlp, CoverageDataProvider, Registry, MockErc20Decimals, Vault, Weth9, RiskManager } from "../typechain";
+import { Solace, MockErc20, MockSlp, CoverageDataProvider, Registry, MockErc20Decimals, Vault, Weth9, MockPriceOracle } from "../typechain";
 import { emit } from "process";
 
 describe("CoverageDataProvider", function() {
-  console.log("helsjflakjsf;")
   let artifacts: ArtifactImports;
   const [deployer, governor, user, underwritingPool, underwritingPool2, asset1, asset2, asset3] = provider.getWallets();
 
   let coverageDataProvider: CoverageDataProvider;
   let registry: Registry;
   let vault: Vault;
+  let weth9: Weth9;
 
   // assets
   let solace: Solace;
@@ -38,6 +38,13 @@ describe("CoverageDataProvider", function() {
   const TOKEN1 = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
   const RESERVE0 = BN.from("13250148273341498385651903");
   const RESERVE1 = BN.from("1277929641956");
+  const ONE_SOLACE = ONE_ETHER;
+  const ONE_DAI = ONE_ETHER;
+  const ONE_WETH = ONE_ETHER;
+  const ONE_WBTC = BN.from("100000000");
+  const ONE_USDT = BN.from("1000000");
+  const ONE_USDC = BN.from("1000000");
+  const ONE_SLP = ONE_ETHER;
 
   // mainnet addresses
   const ETH_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
@@ -63,16 +70,16 @@ describe("CoverageDataProvider", function() {
 
     // deploy mock assets
     solace = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
-    dai = (await deployContract(deployer, artifacts.MockERC20, ["Dai Stablecoin", "DAI", ONE_ETHER.mul(1000000)])) as MockErc20;
-    weth = (await deployContract(deployer, artifacts.MockERC20, ["Wrapped Ether", "WETH", ONE_ETHER.mul(1000000)])) as MockErc20;
-    wbtc = (await deployContract(deployer, artifacts.MockERC20Decimals, ["Wrapped BTC", "WBTC", ONE_ETHER.mul(1000000), 8])) as MockErc20Decimals;
-    dai = (await deployContract(deployer, artifacts.MockERC20Decimals, ["Tether USD", "USDT", ONE_ETHER.mul(1000000), 6])) as MockErc20Decimals;
-    usdc = (await deployContract(deployer, artifacts.MockERC20Decimals, ["USD Coin", "USDC", ONE_ETHER.mul(1000000), 6])) as MockErc20Decimals;
+    dai = (await deployContract(deployer, artifacts.MockERC20, ["Dai Stablecoin", "DAI", ONE_DAI.mul(1000000)])) as MockErc20;
+    weth = (await deployContract(deployer, artifacts.MockERC20, ["Wrapped Ether", "WETH", ONE_WETH.mul(1000000)])) as MockErc20;
+    wbtc = (await deployContract(deployer, artifacts.MockERC20Decimals, ["Wrapped BTC", "WBTC", ONE_WBTC.mul(1000000), 8])) as MockErc20Decimals;
+    usdt = (await deployContract(deployer, artifacts.MockERC20Decimals, ["Tether USD", "USDT", ONE_USDT.mul(1000000), 6])) as MockErc20Decimals;
+    usdc = (await deployContract(deployer, artifacts.MockERC20Decimals, ["USD Coin", "USDC", ONE_USDC.mul(1000000), 6])) as MockErc20Decimals;
     solaceUsdcPool = (await deployContract(deployer, artifacts.MockSLP, ["SushiSwap LP Token", "SLP", ONE_ETHER.mul(1000000), TOKEN0, TOKEN1, RESERVE0, RESERVE1])) as MockSlp;
     // deploy registry
     registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
-    weth = (await deployContract(deployer,artifacts.WETH)) as Weth9;
-    await registry.connect(governor).setWeth(weth.address); 
+    weth9 = (await deployContract(deployer,artifacts.WETH)) as Weth9;
+    await registry.connect(governor).setWeth(weth9.address); 
     vault = (await deployContract(deployer,artifacts.Vault,[deployer.address,registry.address])) as Vault;
     await registry.connect(governor).setVault(vault.address);
     await registry.connect(governor).setSolace(solace.address);
@@ -497,6 +504,155 @@ describe("CoverageDataProvider", function() {
 
       asset = await coverageDataProvider2.connect(user).assetAt(2);
       expect(asset.asset_).to.be.equal(ZERO_ADDRESS);
+    });
+  });
+
+  describe("getSolacePriceInETH", function() {
+    let mockPriceOracle: MockPriceOracle;
+
+    before(async function() {
+      mockPriceOracle = (await deployContract(deployer, artifacts.MockPriceOracle)) as MockPriceOracle;
+      await mockPriceOracle.deployed();
+      await coverageDataProvider.connect(governor).setSolaceUsdcPool(solaceUsdcPool.address);
+      await coverageDataProvider.connect(governor).setPriceOracle(mockPriceOracle.address);
+
+      expect(await coverageDataProvider.connect(user).solaceUsdcPool()).to.be.equal(solaceUsdcPool.address);
+      expect(await coverageDataProvider.connect(user).priceOracle()).to.be.equal(mockPriceOracle.address);
+    });
+
+    after(async function() {
+      await coverageDataProvider.connect(governor).setSolaceUsdcPool(SOLACE_USDC_POOL);
+      await coverageDataProvider.connect(governor).setPriceOracle(AAVE_PRICE_ORACLE);
+
+      expect(await coverageDataProvider.connect(user).solaceUsdcPool()).to.be.equal(SOLACE_USDC_POOL);
+      expect(await coverageDataProvider.connect(user).priceOracle()).to.be.equal(AAVE_PRICE_ORACLE);
+    });
+
+    it("should get price", async function() {
+      let usdcPriceInETH = BN.from(await mockPriceOracle.getAssetPrice(USDC));
+      let solacePriceInETH = RESERVE1.div(RESERVE0).mul(usdcPriceInETH);
+      expect(await coverageDataProvider.connect(user).getSolacePriceInETH()).to.be.equal(solacePriceInETH);
+    });
+  });
+
+  describe("getPoolAmount", function() {
+    let mockPriceOracle: MockPriceOracle;
+    let asset;
+    let underwritingPoolAmount: BN = BN.from(0);
+
+    before(async function() {
+      // set underwriting pool
+      expect(await coverageDataProvider.connect(user).numOfPools()).to.be.equal(2);
+      expect(await coverageDataProvider.connect(user).poolAt(1)).to.be.equal(underwritingPool.address);
+      expect(await coverageDataProvider.connect(user).poolAt(2)).to.be.equal(underwritingPool2.address);
+
+      // set oracles
+      mockPriceOracle = (await deployContract(deployer, artifacts.MockPriceOracle)) as MockPriceOracle;
+      await mockPriceOracle.deployed();
+      await coverageDataProvider.connect(governor).setSolaceUsdcPool(solaceUsdcPool.address);
+      await coverageDataProvider.connect(governor).setPriceOracle(mockPriceOracle.address);
+      await coverageDataProvider.connect(governor).setSolace(solace.address);
+      expect(await coverageDataProvider.connect(user).solaceUsdcPool()).to.be.equal(solaceUsdcPool.address);
+      expect(await coverageDataProvider.connect(user).priceOracle()).to.be.equal(mockPriceOracle.address);
+      expect(await coverageDataProvider.connect(user).solace()).to.be.equal(solace.address);
+
+      // transfer funds to underwriting pool
+      await solace.connect(governor).addMinter(governor.address);
+      await solace.connect(governor).mint(underwritingPool.address, ONE_SOLACE);
+      const solaceBalance = await solace.balanceOf(underwritingPool.address);
+      expect(solaceBalance).to.be.equal(ONE_SOLACE);
+      const solacePriceInETH = await coverageDataProvider.getSolacePriceInETH();
+      underwritingPoolAmount = underwritingPoolAmount.add(solaceBalance.mul(solacePriceInETH));
+
+      await dai.connect(deployer).transfer(underwritingPool.address, ONE_DAI);
+      expect(await dai.balanceOf(underwritingPool.address)).to.be.equal(ONE_DAI);
+      const daiPriceInETH = await mockPriceOracle.getAssetPrice(dai.address);
+      underwritingPoolAmount = underwritingPoolAmount.add(ONE_DAI.mul(daiPriceInETH));
+
+      await weth.connect(deployer).transfer(underwritingPool.address, ONE_WETH);
+      expect(await weth.balanceOf(underwritingPool.address)).to.be.equal(ONE_WETH);
+      underwritingPoolAmount = underwritingPoolAmount.add(ONE_ETHER);
+
+      await wbtc.connect(deployer).transfer(underwritingPool.address, ONE_WBTC);
+      expect(await wbtc.balanceOf(underwritingPool.address)).to.be.equal(ONE_WBTC);
+      const wbtcPriceInETH = await mockPriceOracle.getAssetPrice(wbtc.address);
+      underwritingPoolAmount = underwritingPoolAmount.add(ONE_WBTC.mul(wbtcPriceInETH));
+
+      await usdt.connect(deployer).transfer(underwritingPool.address, ONE_USDT);
+      expect(await usdt.balanceOf(underwritingPool.address)).to.be.equal(ONE_USDT);
+      const usdtPriceInETH = await mockPriceOracle.getAssetPrice(usdt.address);
+      underwritingPoolAmount = underwritingPoolAmount.add(ONE_USDT.mul(usdtPriceInETH));
+
+      await usdc.connect(deployer).transfer(underwritingPool.address, ONE_USDC);
+      expect(await usdc.balanceOf(underwritingPool.address)).to.be.equal(ONE_USDC);
+      const usdcPriceInETH = await mockPriceOracle.getAssetPrice(usdc.address);
+      underwritingPoolAmount = underwritingPoolAmount.add(ONE_USDC.mul(usdcPriceInETH));
+
+      await solaceUsdcPool.connect(deployer).transfer(underwritingPool.address, ONE_SLP);
+      expect(await solaceUsdcPool.balanceOf(underwritingPool.address)).to.be.equal(ONE_SLP);
+      const solaceAmount = RESERVE0.mul(solacePriceInETH);
+      const usdcAmount = RESERVE1.mul(usdcPriceInETH).div(await usdc.decimals());
+      underwritingPoolAmount = underwritingPoolAmount.add(solaceAmount.add(usdcAmount).mul(ONE_SLP).div(await solaceUsdcPool.totalSupply()));
+
+      // add underwriting pool eth balance
+      underwritingPoolAmount = underwritingPoolAmount.add(await underwritingPool.getBalance());
+
+      // set mock assets
+      await coverageDataProvider.connect(governor).setAssets([
+         solace.address, 
+         dai.address,
+         weth.address,
+         wbtc.address,
+         usdt.address,
+         usdc.address,
+         solaceUsdcPool.address
+        ], 
+        [ASSET_TYPE.SOLACE, ASSET_TYPE.ERC20, ASSET_TYPE.WETH, ASSET_TYPE.ERC20, ASSET_TYPE.ERC20, ASSET_TYPE.ERC20, ASSET_TYPE.SOLACE_SLP]
+      );
+      expect(await coverageDataProvider.connect(user).numOfAssets()).to.be.equal(7);
+
+      asset = await coverageDataProvider.connect(user).assetAt(1);
+      expect(asset.asset_).to.be.equal(solace.address);
+      expect(asset.assetType_).to.be.equal(ASSET_TYPE.SOLACE);
+
+      asset = await coverageDataProvider.connect(user).assetAt(2);
+      expect(asset.asset_).to.be.equal(dai.address);
+      expect(asset.assetType_).to.be.equal(ASSET_TYPE.ERC20);
+
+      asset = await coverageDataProvider.connect(user).assetAt(3);
+      expect(asset.asset_).to.be.equal(weth.address);
+      expect(asset.assetType_).to.be.equal(ASSET_TYPE.WETH);
+
+      asset = await coverageDataProvider.connect(user).assetAt(4);
+      expect(asset.asset_).to.be.equal(wbtc.address);
+      expect(asset.assetType_).to.be.equal(ASSET_TYPE.ERC20);
+
+      asset = await coverageDataProvider.connect(user).assetAt(5);
+      expect(asset.asset_).to.be.equal(usdt.address);
+      expect(asset.assetType_).to.be.equal(ASSET_TYPE.ERC20);
+
+      asset = await coverageDataProvider.connect(user).assetAt(6);
+      expect(asset.asset_).to.be.equal(usdc.address);
+      expect(asset.assetType_).to.be.equal(ASSET_TYPE.ERC20);
+
+      asset = await coverageDataProvider.connect(user).assetAt(7);
+      expect(asset.asset_).to.be.equal(solaceUsdcPool.address);
+      expect(asset.assetType_).to.be.equal(ASSET_TYPE.SOLACE_SLP);
+
+    });
+
+    it("should return 0 for invalid underwriting pool", async function() {
+      expect(await coverageDataProvider.connect(user).getPoolAmount(user.address)).to.be.equal(0);
+    });
+
+    it("should return 0 if underwriting pool is disabled", async function() {
+      expect(await coverageDataProvider.connect(governor).setPoolStatus(underwritingPool2.address, false));
+      expect(await coverageDataProvider.connect(governor).poolStatus(underwritingPool2.address)).to.be.false;
+      expect(await coverageDataProvider.connect(user).getPoolAmount(underwritingPool2.address)).to.be.equal(0);
+    });
+
+    it("should get underwriting pool amount", async function() {
+      expect(await coverageDataProvider.connect(user).getPoolAmount(underwritingPool.address)).to.be.equal(underwritingPoolAmount);
     });
   });
 

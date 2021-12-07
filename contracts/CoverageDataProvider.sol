@@ -105,6 +105,7 @@ contract CoverageDataProvider is ICoverageDataProvider, Governable {
 
       for (uint256 i = 0; i < pools_.length; i++) {
         require(pools_[i] != address(0x0), "zero address pool");
+        if (_underwritingPoolToIndex[pools_[i]] > 0) continue;
         _underwritingPoolToIndex[pools_[i]] = ++index;
         _indexToUnderwritingPool[index] = pools_[i];
         _underwritingPoolStatus[pools_[i]] = true;
@@ -327,8 +328,8 @@ contract CoverageDataProvider is ICoverageDataProvider, Governable {
      * @return amount The total asset value of the underwriting pool in ETH.
     */
     function getPoolAmount(address pool_) public view override returns (uint256 amount) {
-      require(_underwritingPoolToIndex[pool_] > 0, "invalid pool");
-      require(_underwritingPoolStatus[pool_], "inactive pool");
+      if (_underwritingPoolToIndex[pool_] == 0) return 0;
+      if (_underwritingPoolStatus[pool_] == false) return 0;
       // get pool's eth balance
       amount += address(pool_).balance;
       uint256 assetCount = _assetCount;
@@ -337,6 +338,19 @@ contract CoverageDataProvider is ICoverageDataProvider, Governable {
         AssetType assetType = _assets[asset];
         amount += _getAmount(pool_, asset, assetType);
       }
+    }
+
+    /**
+     * @notice Returns `SOLACE` token price in `ETH` from `SOLACE/USDC Sushiswap Pool`.
+     * @return solacePrice The `SOLACE` price in `ETH`.
+    */
+    function getSolacePriceInETH() public view override returns (uint256 solacePrice) {
+      (uint112 reserve0, uint112 reserve1,) = _solaceUsdcPool.getReserves();
+      if (reserve0 == 0 || reserve1 == 0) return 0;
+      address token1 = _solaceUsdcPool.token1();
+      uint112 priceInUsdcs = reserve1 / reserve0;
+      uint256 priceInETH = priceInUsdcs * _priceOracle.getAssetPrice(token1);
+      return priceInETH;
     }
 
     /***************************************
@@ -352,36 +366,29 @@ contract CoverageDataProvider is ICoverageDataProvider, Governable {
         amount += ERC20(asset).balanceOf(pool);
       } else if (assetType == AssetType.SOLACE) {
         // only SOLACE
-        amount += _solace.balanceOf(pool) * _getSolacePriceInETH();
+        amount += _solace.balanceOf(pool) * getSolacePriceInETH();
       } else if (assetType == AssetType.SOLACE_SLP) {
         // any SOLACE SLP pool
         ISushiswapLPToken lpToken = ISushiswapLPToken(asset);
         ERC20 token1 = ERC20(lpToken.token1());
         (uint112 reserve0, uint112 reserve1,) = lpToken.getReserves();
-        amount += reserve0 * _getSolacePriceInETH();
-        amount += _getAmountInETH(asset, reserve1, token1.decimals());
+        uint256 slpAmount = reserve0 * getSolacePriceInETH();
+        slpAmount += _getAmountInETH(asset, reserve1, token1.decimals());
+        amount += (slpAmount * lpToken.balanceOf(pool)) / lpToken.totalSupply();
       } else if (assetType == AssetType.SLP) {
         // any SLP pool other than SOLACE pair
         ISushiswapLPToken lpToken = ISushiswapLPToken(asset);
         ERC20 token0 = ERC20(lpToken.token0());
         ERC20 token1 = ERC20(lpToken.token1());
         (uint112 reserve0, uint112 reserve1,) = lpToken.getReserves();
-        amount += _getAmountInETH(asset, reserve0, token0.decimals());
-        amount += _getAmountInETH(asset, reserve1, token1.decimals());
+        uint256 slpAmount = _getAmountInETH(asset, reserve0, token0.decimals());
+        slpAmount += _getAmountInETH(asset, reserve1, token1.decimals());
+        amount += (slpAmount * lpToken.balanceOf(pool)) / lpToken.totalSupply();
       }
     }
 
     function _getAmountInETH(address asset, uint256 balance, uint8 decimals) private view returns (uint256 amount) {
       return (balance * _priceOracle.getAssetPrice(asset)) / decimals;
-    }
-
-    function _getSolacePriceInETH() private view returns (uint256 price) {
-      (uint112 reserve0, uint112 reserve1,) = _solaceUsdcPool.getReserves();
-      if (reserve0 == 0 || reserve1 == 0) return 0;
-      address token1 = _solaceUsdcPool.token1();
-      uint112 priceInUsdcs = reserve1 / reserve0;
-      uint256 priceInETH = priceInUsdcs * _priceOracle.getAssetPrice(token1);
-      return priceInETH;
     }
 
     function _addAsset(address asset_, AssetType assetType_) private {
