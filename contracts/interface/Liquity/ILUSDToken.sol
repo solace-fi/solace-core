@@ -5,7 +5,7 @@ pragma solidity 0.8.6;
 interface ILUSDToken  {
  
     /**
-     * @notice Function returns totoal LQTY token supply.
+     * @notice Function returns total LQTY token supply.
      * @return totalSupply
      */
     function totalSupply() external view returns (uint256);

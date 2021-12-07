@@ -12,7 +12,7 @@ interface ILQTYStaking {
 
     /**
      * @notice function returns total staked lqty token amount.
-     * @return total The amount of staked lqyt token amount.
+     * @return total The amount of staked lqty token amount.
      */
     function totalLQTYStaked() external view returns (uint256);
 }
