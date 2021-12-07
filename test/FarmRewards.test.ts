@@ -166,8 +166,17 @@ describe("FarmRewards", function () {
       await expect(farmRewards.connect(governor).setFarmedRewards([],[1])).to.be.revertedWith("length mismatch");
     })
     it("can be set", async function () {
-      var farmers = JSON.parse(readFileSync("./stash/cp farmers.json").toString());
-      var rewards = JSON.parse(readFileSync("./stash/cp farm rewards.json").toString());
+      let farmers;
+      let rewards;
+      try {
+        farmers = JSON.parse(readFileSync("./stash/cp farmers.json").toString());
+        rewards = JSON.parse(readFileSync("./stash/cp farm rewards.json").toString());
+        if(farmers.length != rewards.length) throw("length mismatch");
+      } catch (e) {
+        console.log('e')
+        farmers = [deployer.address, governor.address, farmer1.address, farmer2.address, trader.address, receiver.address];
+        rewards = [11, 12, 13, 14, 15, 16];
+      }
       await farmRewards.connect(governor).setFarmedRewards(farmers, rewards);
       for(var i = 0; i < farmers.length; ++i) {
         expect(await farmRewards.farmedRewards(farmers[i])).eq(rewards[i]);
