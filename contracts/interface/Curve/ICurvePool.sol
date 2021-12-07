@@ -17,7 +17,7 @@ interface ICurvePool {
     function add_liquidity(uint256[] memory amounts, uint256 minMintAmount) external;
 
     /**
-     * @notice Calculates the witdraw amount for given `amount` and `coin`.
+     * @notice Calculates the withdraw amount for given `amount` and `coin`.
      * The given coin index must be valid for the pool.
      * @param tokenAmount The balance of the user in the pool.
      * @param i The coin index.

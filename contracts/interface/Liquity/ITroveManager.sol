@@ -40,7 +40,7 @@ interface ITroveManager {
 
     /**
      * @notice Returns the user's trove stake amount.
-     * @param _borrower the user address.* 
+     * @param _borrower the user address.
      * @return _stake stake amount.
      */
     function getTroveStake(address _borrower) external view returns (uint _stake);
