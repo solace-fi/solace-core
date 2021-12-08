@@ -1,3 +1,5 @@
+// Only point of custodian address in this contract is to set a recipient for the rescueSOLACEtokens() function, do we need a custodian or should we just set msg.sender to be the recipient?
+
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
@@ -6,6 +8,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "./Governable.sol";
 import "./interface/ISOLACE.sol";
+import "./interface/ITokenVesting.sol";
 
 /**
  * @title TokenVesting
@@ -15,28 +18,32 @@ import "./interface/ISOLACE.sol";
  * Predetermined agreement with investors for a linear unlock over three years, with a six month cliff
  */
 
- contract TokenVesting is ReentrancyGuard, Governable {
+ contract TokenVesting is ITokenVesting, ReentrancyGuard, Governable {
  
+    /***************************************
+    GLOBAL VARIABLES
+    ***************************************/
+
     /// @notice SOLACE Token.
-    address public solace;
+    address public override solace;
 
     /// @notice custodian of SOLACE tokens - EOA that transfers investor SOLACE tokens to this contract
-    address public custodian;
+    address public override custodian;
 
     /// @notice timestamp that investor tokens start vesting.
-    uint256 public vestingStart;
+    uint256 public override vestingStart;
 
     /// @notice timestamp that cliff for investor tokens finishes.
-    uint256 public cliff;
+    uint256 public override cliff;
 
     /// @notice timestamp that investor tokens finish vesting.
-    uint256 public vestingEnd;
+    uint256 public override vestingEnd;
  
     /// @notice Total tokens for an investor.
-    mapping(address => uint256) public totalInvestorTokens;
+    mapping(address => uint256) public override totalInvestorTokens;
 
     /// @notice Redeemed tokens for an investor.
-    mapping(address => uint256) public redeemedInvestorTokens;
+    mapping(address => uint256) public override redeemedInvestorTokens;
 
     /**
      * @notice Constructs the `InvestorVesting` contract.
@@ -63,7 +70,7 @@ import "./interface/ISOLACE.sol";
     /**
      * @notice Function for investor to claim SOLACE tokens - will claim all redeemable tokens
      */
-    function claimTokens () external nonReentrant {
+    function claimTokens () external override nonReentrant {
         require(totalInvestorTokens[msg.sender] != 0, "You have no tokens to claim");
         require(getRedeemableUnlockedTokens(msg.sender) > 0, "You cannot claim this many tokens");
         uint256 redeemableUnlockedTokens = getRedeemableUnlockedTokens(msg.sender);
@@ -76,7 +83,7 @@ import "./interface/ISOLACE.sol";
      * @param investor Investor address
      * @return redeemableUnlockedAmount The amount of unlocked tokens an investor can claim from the smart contract
      */
-    function getRedeemableUnlockedTokens(address investor) public view returns (uint256 redeemableUnlockedAmount) {
+    function getRedeemableUnlockedTokens(address investor) public view override returns (uint256 redeemableUnlockedAmount) {
         uint256 timestamp = block.timestamp;
         uint256 redeemableUnlockedAmount;
         if(timestamp <= cliff) {
@@ -100,10 +107,9 @@ import "./interface/ISOLACE.sol";
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param custodian_ The new custodian.
      */
-    function setCustodian(address payable custodian_) external onlyGovernance {
+    function setCustodian(address payable custodian_) external override onlyGovernance {
         require(custodian_ != address(0x0), "zero address receiver");
         custodian = custodian_;
-        // UNSURE - Do we want to emit an event here?
     }
 
     /**
@@ -112,7 +118,7 @@ import "./interface/ISOLACE.sol";
      * @dev Trusting governance to perform accurate accounting off-chain and ensure there is sufficient SOLACE in contract to make payouts as dictated in totalInvestorTokens mapping
      * @param amount Amount to send. Will be sent from this contract to `custodian`.
      */
-    function rescueSOLACEtokens(uint256 amount) external onlyGovernance {
+    function rescueSOLACEtokens(uint256 amount) external override onlyGovernance {
         SafeERC20.safeTransfer(IERC20(solace), custodian, amount);
     }
 
@@ -123,7 +129,7 @@ import "./interface/ISOLACE.sol";
      * @param investors Array of investors to set.
      * @param totalTokenAmounts Array of token amounts to set.
      */
-    function setTotalInvestorTokens(address[] calldata investors, uint256[] calldata totalTokenAmounts) external onlyGovernance {
+    function setTotalInvestorTokens(address[] calldata investors, uint256[] calldata totalTokenAmounts) external override onlyGovernance {
         require(investors.length == totalTokenAmounts.length, "length mismatch");
         for(uint256 i = 0; i < investors.length; i++) {
             totalInvestorTokens[investors[i]] = totalTokenAmounts[i];
