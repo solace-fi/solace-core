@@ -197,7 +197,7 @@ describe("TokenVesting", function () {
         }) 
       })
 
-      describe("t = just after cliff", function () {
+      describe("t = One day after cliff", function () {
         it("Sets timestamp to 1 day / 86,400s after cliff", async function () {
             let cliff_timestamp = ( await tokenVesting.cliff() );
             let desired_timestamp = Number(cliff_timestamp.add(86400))
@@ -213,10 +213,10 @@ describe("TokenVesting", function () {
             expect((await tokenVesting.getRedeemableUnlockedTokens(investor2.address))).to.be.above(0);
             expect((await tokenVesting.getRedeemableUnlockedTokens(investor3.address))).to.be.above(0);
         })
-      //   it("claimTokens will fail for non-investors", async function () {
-      //       await expect(tokenVesting.connect(deployer).claimTokens()).to.be.revertedWith("You have no tokens to claim");
-      //       await expect(tokenVesting.connect(governor).claimTokens()).to.be.revertedWith("You have no tokens to claim");
-      //       await expect(tokenVesting.connect(randomGreedyPerson).claimTokens()).to.be.revertedWith("You have no tokens to claim");
-      //   })
+        it("claimTokens will fail for non-investors", async function () {
+            await expect(tokenVesting.connect(deployer).claimTokens()).to.be.revertedWith("You have no tokens to claim");
+            await expect(tokenVesting.connect(governor).claimTokens()).to.be.revertedWith("You have no tokens to claim");
+            await expect(tokenVesting.connect(randomGreedyPerson).claimTokens()).to.be.revertedWith("You have no tokens to claim");
+        })
       })
 })
