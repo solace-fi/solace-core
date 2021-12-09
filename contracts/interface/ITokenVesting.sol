@@ -19,9 +19,6 @@ pragma solidity 0.8.6;
     /// @notice SOLACE Token.
     function solace() external view returns (address);
 
-    /// @notice custodian of SOLACE tokens - EOA that transfers investor SOLACE tokens to this contract
-    function custodian() external view returns (address);
-
     /// @notice timestamp that investor tokens start vesting.
     function vestingStart() external view returns (uint256);
 
@@ -58,19 +55,13 @@ pragma solidity 0.8.6;
     ***************************************/
 
     /**
-     * @notice Sets the custodian which can transfer SOLACE tokens to this contract
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param custodian_ The new custodian.
-     */
-    function setCustodian(address payable custodian_) external;
-
-    /**
      * @notice Rescues excess [**SOLACE**](./SOLACE).
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @dev Trusting governance to perform accurate accounting off-chain and ensure there is sufficient SOLACE in contract to make payouts as dictated in totalInvestorTokens mapping
-     * @param amount Amount to send. Will be sent from this contract to `custodian`.
+     * @param amount Amount to send.
+     * @param recipient Address to send rescued SOLACE tokens to.
      */
-    function rescueSOLACEtokens(uint256 amount) external;
+    function rescueSOLACEtokens(uint256 amount, address recipient) external;
 
     /**
      * @notice Sets the total SOLACE token amounts that investors are eligible for.

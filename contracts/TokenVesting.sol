@@ -1,5 +1,3 @@
-// Only point of custodian address in this contract is to set a recipient for the rescueSOLACEtokens() function, do we need a custodian or should we just set msg.sender to be the recipient?
-
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
@@ -27,9 +25,6 @@ import "./interface/ITokenVesting.sol";
     /// @notice SOLACE Token.
     address public override solace;
 
-    /// @notice custodian of SOLACE tokens - EOA that transfers investor SOLACE tokens to this contract
-    address public override custodian;
-
     /// @notice timestamp that investor tokens start vesting.
     uint256 public override vestingStart;
 
@@ -49,15 +44,12 @@ import "./interface/ITokenVesting.sol";
      * @notice Constructs the `InvestorVesting` contract.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
      * @param solace_ Address of [**SOLACE**](./SOLACE).
-     * @param custodian_ Address which will transfer investor SOLACE tokens to this contract
      * @param vestingStart_ Unix timestamp for start of vesting period for investor tokens
      */
-    constructor(address governance_, address solace_, address custodian_, uint256 vestingStart_) Governable(governance_) {
+    constructor(address governance_, address solace_, uint256 vestingStart_) Governable(governance_) {
         require(solace_ != address(0x0), "zero address solace");
-        require(custodian_ != address(0x0), "zero address custodian");
         require(vestingStart_ != 0, "vestingStart cannot be initialized as 0");
         solace = solace_;
-        custodian = custodian_;
         vestingStart = vestingStart_;
         cliff = vestingStart_ + 15768000; // Cliff is 6-months after vesting start
         vestingEnd = vestingStart_ + 94608000; // Vesting ends 3-years after vesting start
@@ -103,23 +95,15 @@ import "./interface/ITokenVesting.sol";
     ***************************************/
 
     /**
-     * @notice Sets the custodian which can transfer SOLACE tokens to this contract
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param custodian_ The new custodian.
-     */
-    function setCustodian(address payable custodian_) external override onlyGovernance {
-        require(custodian_ != address(0x0), "zero address receiver");
-        custodian = custodian_;
-    }
-
-    /**
      * @notice Rescues excess [**SOLACE**](./SOLACE).
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @dev Trusting governance to perform accurate accounting off-chain and ensure there is sufficient SOLACE in contract to make payouts as dictated in totalInvestorTokens mapping
-     * @param amount Amount to send. Will be sent from this contract to `custodian`.
+     * @param amount Amount to send.
+     * @param recipient Address to send rescued SOLACE tokens to.
      */
-    function rescueSOLACEtokens(uint256 amount) external override onlyGovernance {
-        SafeERC20.safeTransfer(IERC20(solace), custodian, amount);
+    function rescueSOLACEtokens(uint256 amount, address recipient) external override onlyGovernance {
+        require(recipient != address(0x0), "zero address recipient");
+        SafeERC20.safeTransfer(IERC20(solace), recipient, amount);
     }
 
     /**
