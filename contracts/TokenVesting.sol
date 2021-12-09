@@ -89,7 +89,7 @@ import "./interface/ITokenVesting.sol";
         if(timestamp <= cliff) {
             return 0;
         } else if(timestamp <= vestingEnd) {
-            uint256 totalUnlockedAmount = totalInvestorTokens[investor] * ( (timestamp - vestingStart) / (vestingEnd - vestingStart) );
+            uint256 totalUnlockedAmount = totalInvestorTokens[investor] * ( (timestamp - cliff) / (vestingEnd - cliff) );
             redeemableUnlockedAmount = totalUnlockedAmount - redeemedInvestorTokens[investor];
             return redeemableUnlockedAmount;
         } else {
