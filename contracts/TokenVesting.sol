@@ -64,7 +64,7 @@ import "./interface/ITokenVesting.sol";
      */
     function claimTokens () external override nonReentrant {
         require(totalInvestorTokens[msg.sender] != 0, "You have no tokens to claim");
-        require(getRedeemableUnlockedTokens(msg.sender) > 0, "You cannot claim this many tokens");
+        require(getRedeemableUnlockedTokens(msg.sender) > 0, "You cannot claim any tokens at the moment");
         uint256 redeemableUnlockedTokens = getRedeemableUnlockedTokens(msg.sender);
         redeemedInvestorTokens[msg.sender] += redeemableUnlockedTokens;
         SafeERC20.safeTransfer(IERC20(solace), msg.sender, redeemableUnlockedTokens);
@@ -118,6 +118,6 @@ import "./interface/ITokenVesting.sol";
         for(uint256 i = 0; i < investors.length; i++) {
             totalInvestorTokens[investors[i]] = totalTokenAmounts[i];
         }
-        // UNSURE - should we use a checksum to ensure (sum of []totalTokenAmounts) <= (SOLACE balance of this contract)), or trust governance
+        // UNSURE - should we use a checksum to ensure (sum of []totalTokenAmounts) <= (SOLACE balance of this contract)), or trust governance to do the correct off-chain accounting
     }
  }

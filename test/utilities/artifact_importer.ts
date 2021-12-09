@@ -59,6 +59,7 @@ export async function import_artifacts() {
   artifacts.BondTellerETH = await tryImport(`${artifact_dir}/BondTellerEth.sol/BondTellerEth.json`);
   artifacts.BondTellerERC20 = await tryImport(`${artifact_dir}/BondTellerErc20.sol/BondTellerErc20.json`);
   artifacts.Faucet = await tryImport(`${artifact_dir}/Faucet.sol/Faucet.json`);
+  artifacts.TokenVesting = await tryImport(`${artifact_dir}/TokenVesting.sol/TokenVesting.json`);
 
   // oracles
   artifacts.ExchangeQuoter1InchV1 = await tryImport(`${artifact_dir}/oracles/ExchangeQuoter1InchV1.sol/ExchangeQuoter1InchV1.json`);
