@@ -1,21 +1,15 @@
 // npx hardhat test test/TokenVesting.test.ts
 
-import { ethers, waffle, upgrades } from "hardhat";
+import { waffle} from "hardhat";
 const { deployContract, solidity } = waffle;
 import { MockProvider } from "ethereum-waffle";
 const provider: MockProvider = waffle.provider;
-import { Transaction, BigNumber as BN, Contract, constants, BigNumberish, Wallet, utils } from "ethers";
+import { BigNumber as BN } from "ethers";
 import chai from "chai";
 const { expect } = chai;
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
 import { Solace, MockErc20Decimals, MockErc20Permit, TokenVesting } from "../typechain";
-import { bnAddSub, bnMulDiv, expectClose } from "./utilities/math";
-import { getERC20PermitSignature } from "./utilities/getERC20PermitSignature";
-import { readFileSync } from "fs";
-import { threadId } from "worker_threads";
-import { zeroAddress } from "ethereumjs-util";
-
 chai.use(solidity);
 
 // contracts
@@ -30,12 +24,11 @@ let uni: MockErc20Permit;
 
 // vars
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-const ONE_ETHER = BN.from("1000000000000000000");
-const TEN_ETHER = BN.from("10000000000000000000");
-const ONE_THOUSAND_ETHER = BN.from("1000000000000000000000");
+// const ONE_ETHER = BN.from("1000000000000000000");
+// const TEN_ETHER = BN.from("10000000000000000000");
+// const ONE_THOUSAND_ETHER = BN.from("1000000000000000000000");
 const ONE_HUNDRED_THOUSAND_ETHER = BN.from("100000000000000000000000");
 const THREE_HUNDRED_THOUSAND_ETHER = BN.from("300000000000000000000000");
-const FOUR_HUNDRED_THOUSAND_ETHER = BN.from("400000000000000000000000");
 const ONE_MILLION_ETHER = BN.from("1000000000000000000000000");
 const TEN_MILLION_ETHER = BN.from("10000000000000000000000000");
 
