@@ -11,9 +11,10 @@ import "./interface/ITokenVesting.sol";
 /**
  * @title TokenVesting
  * @author solace.fi
- * @notice Stores and handles vested [**SOLACE**](./SOLACE) tokens for SOLACE investors
+ * @notice Stores and handles vested [**SOLACE**](./SOLACE) tokens for SOLACE investors.
  *
- * Predetermined agreement with investors for a linear unlock over three years, with a six month cliff
+ * Predetermined agreement with investors for a linear unlock over three years, with a six month cliff.
+ * We use a Unix timestamp of 1638209176 for the vestingStart, using the following transaction as our reference - https://etherscan.io/tx/0x71f1de15ee75f414c454aec3612433d0123e44ec5987515fc3566795cd840bc3
  */
 
  contract TokenVesting is ITokenVesting, ReentrancyGuard, Governable {
@@ -44,15 +45,15 @@ import "./interface/ITokenVesting.sol";
      * @notice Constructs the `InvestorVesting` contract.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
      * @param solace_ Address of [**SOLACE**](./SOLACE).
-     * @param vestingStart_ Unix timestamp for start of vesting period for investor tokens
+     * @param vestingStart_ Unix timestamp for start of vesting period for investor tokens.
      */
     constructor(address governance_, address solace_, uint256 vestingStart_) Governable(governance_) {
         require(solace_ != address(0x0), "zero address solace");
         require(vestingStart_ != 0, "vestingStart cannot be initialized as 0");
         solace = solace_;
         vestingStart = vestingStart_;
-        cliff = vestingStart_ + 15768000; // Cliff is 6-months after vesting start
-        vestingEnd = vestingStart_ + 94608000; // Vesting ends 3-years after vesting start
+        cliff = vestingStart_ + 15768000; // Cliff is 6-months after vesting start.
+        vestingEnd = vestingStart_ + 94608000; // Vesting ends 3-years after vesting start.
     }
 
     /***************************************
@@ -60,20 +61,20 @@ import "./interface/ITokenVesting.sol";
     ***************************************/
 
     /**
-     * @notice Function for investor to claim SOLACE tokens - will claim all redeemable tokens
+     * @notice Function for investor to claim SOLACE tokens - will claim all redeemable tokens.
      */
     function claimTokens () external override nonReentrant {
         require(totalInvestorTokens[msg.sender] != 0, "You have no tokens to claim");
-        require(getRedeemableUnlockedTokens(msg.sender) > 0, "You cannot claim any tokens at the moment");
         uint256 redeemableUnlockedTokens = getRedeemableUnlockedTokens(msg.sender);
+        require(redeemableUnlockedTokens > 0, "You cannot claim any tokens at the moment"); // Placed require statement here so that getRedeemableUnlockedTokens(msg.sender) doesn't have to be computed twice
         redeemedInvestorTokens[msg.sender] += redeemableUnlockedTokens;
         SafeERC20.safeTransfer(IERC20(solace), msg.sender, redeemableUnlockedTokens);
     }
 
     /**
-     * @notice Calculates the amount of unlocked SOLACE tokens an investor can claim
-     * @param investor Investor address
-     * @return redeemableUnlockedAmount The amount of unlocked tokens an investor can claim from the smart contract
+     * @notice Calculates the amount of unlocked SOLACE tokens an investor can claim.
+     * @param investor Investor address.
+     * @return redeemableUnlockedAmount The amount of unlocked tokens an investor can claim from the smart contract.
      */
     function getRedeemableUnlockedTokens(address investor) public view override returns (uint256 redeemableUnlockedAmount) {
         uint256 timestamp = block.timestamp;
@@ -97,7 +98,7 @@ import "./interface/ITokenVesting.sol";
     /**
      * @notice Rescues excess [**SOLACE**](./SOLACE).
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @dev Trusting governance to perform accurate accounting off-chain and ensure there is sufficient SOLACE in contract to make payouts as dictated in totalInvestorTokens mapping
+     * @dev Trusting governance to perform accurate accounting off-chain and ensure there is sufficient SOLACE in contract to make payouts as dictated in totalInvestorTokens mapping.
      * @param amount Amount to send.
      * @param recipient Address to send rescued SOLACE tokens to.
      */
@@ -109,7 +110,7 @@ import "./interface/ITokenVesting.sol";
     /**
      * @notice Sets the total SOLACE token amounts that investors are eligible for.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @dev Trusting governance to perform accurate accounting off-chain and ensure there is sufficient SOLACE in contract to make payouts as dictated in totalInvestorTokens mapping
+     * @dev Trusting governance to perform accurate accounting off-chain and ensure there is sufficient SOLACE in contract to make payouts as dictated in totalInvestorTokens mapping.
      * @param investors Array of investors to set.
      * @param totalTokenAmounts Array of token amounts to set.
      */
@@ -123,11 +124,11 @@ import "./interface/ITokenVesting.sol";
     /**
      * @notice Changes address for an investor.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param oldAddress Original investor address.
-     * @param newAddress Intended new investor address.
+     * @param oldAddress Old investor address.
+     * @param newAddress New investor address.
      */
     function setNewInvestorAddress(address oldAddress, address newAddress) external override onlyGovernance {
-        // Require these guards to avoid overwriting pre-existing key-value pairs
+        // Require these guards to avoid overwriting pre-existing key-value pairs in the totalInvestorTokens and redeemedInvestorTokens mappings
         require(totalInvestorTokens[newAddress] == 0, "Cannot set to a pre-existing address");
         require(redeemedInvestorTokens[newAddress] == 0, "Cannot set to a pre-existing address");
         totalInvestorTokens[newAddress] = totalInvestorTokens[oldAddress];

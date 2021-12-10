@@ -1,5 +1,3 @@
-// npx hardhat test test/TokenVesting.test.ts
-
 import { waffle} from "hardhat";
 const { deployContract, solidity } = waffle;
 import { MockProvider } from "ethereum-waffle";
@@ -47,7 +45,7 @@ describe("TokenVesting", function () {
 
         // transfer tokens
         await solace.connect(governor).addMinter(governor.address);
-        await solace.connect(governor).mint(governor.address, ONE_MILLION_ETHER); // become SOLACE whale
+        await solace.connect(governor).mint(governor.address, ONE_MILLION_ETHER);
     })
 
     describe("deployment", function () {
@@ -55,7 +53,6 @@ describe("TokenVesting", function () {
           await expect(deployContract(deployer, artifacts.TokenVesting, [ZERO_ADDRESS, solace.address, VESTING_START])).to.be.revertedWith("zero address governance");
           await expect(deployContract(deployer, artifacts.TokenVesting, [governor.address, ZERO_ADDRESS, VESTING_START])).to.be.revertedWith("zero address solace");
           await expect(deployContract(deployer, artifacts.TokenVesting, [governor.address, solace.address, 0])).to.be.revertedWith("vestingStart cannot be initialized as 0");
-
         });
         it("deploys successfully", async function () {
           tokenVesting = (await deployContract(deployer, artifacts.TokenVesting, [governor.address, solace.address, VESTING_START])) as TokenVesting;
@@ -149,7 +146,7 @@ describe("TokenVesting", function () {
         })
       })
 
-      describe("t = vestingStart", function () {
+      describe("t = 0", function () {
         it("getRedeemableUnlockedTokens = 0 for all investors", async function () {
             expect((await tokenVesting.getRedeemableUnlockedTokens(investor1.address))).to.equal(0);
             expect((await tokenVesting.getRedeemableUnlockedTokens(investor2.address))).to.equal(0);
@@ -163,14 +160,16 @@ describe("TokenVesting", function () {
             await expect(tokenVesting.connect(investor2).claimTokens()).to.be.revertedWith("You cannot claim any tokens at the moment");
             await expect(tokenVesting.connect(investor3).claimTokens()).to.be.revertedWith("You cannot claim any tokens at the moment");
         })
-        it("totalInvestorTokens and redeemedInvestorTokens mappings have values of 0", async function() {
-            expect((await tokenVesting.totalInvestorTokens(investor1.address))).to.equal(THREE_HUNDRED_THOUSAND_ETHER);
-            expect((await tokenVesting.totalInvestorTokens(investor2.address))).to.equal(THREE_HUNDRED_THOUSAND_ETHER);
-            expect((await tokenVesting.totalInvestorTokens(investor3.address))).to.equal(THREE_HUNDRED_THOUSAND_ETHER);
+        it("totalInvestorTokens mappings have not been altered", async function() {
+          expect((await tokenVesting.totalInvestorTokens(investor1.address))).to.equal(THREE_HUNDRED_THOUSAND_ETHER);
+          expect((await tokenVesting.totalInvestorTokens(investor2.address))).to.equal(THREE_HUNDRED_THOUSAND_ETHER);
+          expect((await tokenVesting.totalInvestorTokens(investor3.address))).to.equal(THREE_HUNDRED_THOUSAND_ETHER);
+        })
+        it("redeemedInvestorTokens mappings have values of 0", async function() {
             expect((await tokenVesting.redeemedInvestorTokens(investor1.address))).to.equal(0);
             expect((await tokenVesting.redeemedInvestorTokens(investor2.address))).to.equal(0);
             expect((await tokenVesting.redeemedInvestorTokens(investor3.address))).to.equal(0);
-        }) 
+        })
       })
 
       describe("t = 1s before cliff", function () {
@@ -178,11 +177,7 @@ describe("TokenVesting", function () {
             let cliff_timestamp = ( await tokenVesting.cliff() );
             let desired_timestamp = Number(cliff_timestamp.sub(1))
             await provider.send("evm_mine", [desired_timestamp]);
-
-            const currentBlockNumber = await provider.getBlockNumber();
-            const currentBlock = await provider.getBlock(currentBlockNumber);
-            const currentTimestamp = currentBlock.timestamp;
-            expect(currentTimestamp).to.equal(VESTING_START + 15768000 - 1);
+            expect(await getCurrentTimestamp()).to.equal(VESTING_START + 15768000 - 1);
         })
         it("getRedeemableUnlockedTokens = 0 for all investors", async function () {
             expect((await tokenVesting.getRedeemableUnlockedTokens(investor1.address))).to.equal(0);
@@ -197,10 +192,12 @@ describe("TokenVesting", function () {
             await expect(tokenVesting.connect(investor2).claimTokens()).to.be.revertedWith("You cannot claim any tokens at the moment");
             await expect(tokenVesting.connect(investor3).claimTokens()).to.be.revertedWith("You cannot claim any tokens at the moment");
         })
-        it("totalInvestorTokens and redeemedInvestorTokens mappings have values of 0", async function() {
+        it("totalInvestorTokens mappings have not been altered", async function() {
           expect((await tokenVesting.totalInvestorTokens(investor1.address))).to.equal(THREE_HUNDRED_THOUSAND_ETHER);
           expect((await tokenVesting.totalInvestorTokens(investor2.address))).to.equal(THREE_HUNDRED_THOUSAND_ETHER);
           expect((await tokenVesting.totalInvestorTokens(investor3.address))).to.equal(THREE_HUNDRED_THOUSAND_ETHER);
+        })
+        it("totalInvestorTokens and redeemedInvestorTokens mappings have values of 0", async function() {
           expect((await tokenVesting.redeemedInvestorTokens(investor1.address))).to.equal(0);
           expect((await tokenVesting.redeemedInvestorTokens(investor2.address))).to.equal(0);
           expect((await tokenVesting.redeemedInvestorTokens(investor3.address))).to.equal(0);
@@ -212,11 +209,7 @@ describe("TokenVesting", function () {
             let cliff_timestamp = ( await tokenVesting.cliff() );
             let desired_timestamp = Number(cliff_timestamp.add(86400))
             await provider.send("evm_mine", [desired_timestamp]);
-
-            const currentBlockNumber = await provider.getBlockNumber();
-            const currentBlock = await provider.getBlock(currentBlockNumber);
-            const currentTimestamp = currentBlock.timestamp;
-            expect(currentTimestamp).to.equal(VESTING_START + 15768000 + 86400);
+            expect(await getCurrentTimestamp()).to.equal(VESTING_START + 15768000 + 86400);
         })
         it("getRedeemableUnlockedTokens > 0 for all investors", async function () {
             expect((await tokenVesting.getRedeemableUnlockedTokens(investor1.address))).to.be.above(0);
@@ -229,35 +222,21 @@ describe("TokenVesting", function () {
             await expect(tokenVesting.connect(randomGreedyPerson).claimTokens()).to.be.revertedWith("You have no tokens to claim");
         })
         it("Investors can claim one days worth of tokens", async function () {
-
             let investor1_claim_tx = await tokenVesting.connect(investor1).claimTokens();
-
-            // Need to re-get timestamp, because it has moved forward from the last instance we called currentTimestamp
-            // The timestamp for this point appears to be "VESTING_START + 86401" rather than "VESTING_START + 86400" as we expect
-            // Need to re-get timestamp to avoid error in below test assertion
-            // Need to repeat this block of code with each claimToken() call
-            let currentBlockNumber = await provider.getBlockNumber();
-            let currentBlock = await provider.getBlock(currentBlockNumber);
-            let currentTimestamp = currentBlock.timestamp;
-            let redeemedTokenAmount = THREE_HUNDRED_THOUSAND_ETHER.mul(currentTimestamp - (VESTING_START + 15768000)).div(94608000 - 15768000);
+            // Need to re-get timestamp, because the timestamp moves forward after each transaction (from `await provider.send("evm_mine", [desired_timestamp])`)
+            let redeemedTokenAmount = THREE_HUNDRED_THOUSAND_ETHER.mul(await getCurrentTimestamp() - (VESTING_START + 15768000)).div(94608000 - 15768000);
             await expect(investor1_claim_tx).to.emit(solace, "Transfer").withArgs(tokenVesting.address, investor1.address, redeemedTokenAmount);
             expect((await tokenVesting.redeemedInvestorTokens(investor1.address))).to.equal(redeemedTokenAmount);
 
             let investor2_claim_tx = await tokenVesting.connect(investor2).claimTokens();
-            currentBlockNumber = await provider.getBlockNumber();
-            currentBlock = await provider.getBlock(currentBlockNumber);
-            currentTimestamp = currentBlock.timestamp;
-            redeemedTokenAmount = THREE_HUNDRED_THOUSAND_ETHER.mul(currentTimestamp - (VESTING_START + 15768000)).div(94608000 - 15768000);
+            redeemedTokenAmount = THREE_HUNDRED_THOUSAND_ETHER.mul(await getCurrentTimestamp() - (VESTING_START + 15768000)).div(94608000 - 15768000);
             await expect(investor2_claim_tx).to.emit(solace, "Transfer").withArgs(tokenVesting.address, investor2.address, redeemedTokenAmount);
-            expect((await tokenVesting.redeemedInvestorTokens(investor2.address))).to.equal(THREE_HUNDRED_THOUSAND_ETHER.mul(currentTimestamp - (VESTING_START + 15768000)).div(94608000 - 15768000) );
+            expect((await tokenVesting.redeemedInvestorTokens(investor2.address))).to.equal(redeemedTokenAmount);
 
             let investor3_claim_tx = await tokenVesting.connect(investor3).claimTokens();
-            currentBlockNumber = await provider.getBlockNumber();
-            currentBlock = await provider.getBlock(currentBlockNumber);
-            currentTimestamp = currentBlock.timestamp;
-            redeemedTokenAmount = THREE_HUNDRED_THOUSAND_ETHER.mul(currentTimestamp - (VESTING_START + 15768000)).div(94608000 - 15768000);
+            redeemedTokenAmount = THREE_HUNDRED_THOUSAND_ETHER.mul(await getCurrentTimestamp() - (VESTING_START + 15768000)).div(94608000 - 15768000);
             await expect(investor3_claim_tx).to.emit(solace, "Transfer").withArgs(tokenVesting.address, investor3.address, redeemedTokenAmount);
-            expect((await tokenVesting.redeemedInvestorTokens(investor3.address))).to.equal(THREE_HUNDRED_THOUSAND_ETHER.mul(currentTimestamp - (VESTING_START + 15768000)).div(94608000 - 15768000) );
+            expect((await tokenVesting.redeemedInvestorTokens(investor3.address))).to.equal(redeemedTokenAmount);
         })
         it("Sanity check redeemedInvestorTokens - should be <1% of totalInvestorTokens for same addresses", async function () {
           const investor1_reedemedTokens = await tokenVesting.redeemedInvestorTokens(investor1.address);
@@ -280,7 +259,6 @@ describe("TokenVesting", function () {
           expect((await tokenVesting.totalInvestorTokens(investor1_new_account.address))).to.equal(placeholder_investor1_totalInvestorTokens);
           expect((await tokenVesting.redeemedInvestorTokens(investor1_new_account.address))).to.equal(placeholder_investor1_redeemedInvestorTokens);
         })
-
       })
 
       describe("t = One month before vestingEnd", function () {
@@ -288,42 +266,32 @@ describe("TokenVesting", function () {
           let vestingEnd_timestamp = ( await tokenVesting.vestingEnd() );
           let desired_timestamp = Number(vestingEnd_timestamp.sub(2500000))
           await provider.send("evm_mine", [desired_timestamp]);
-
-          const currentBlockNumber = await provider.getBlockNumber();
-          const currentBlock = await provider.getBlock(currentBlockNumber);
-          const currentTimestamp = currentBlock.timestamp;
-          expect(currentTimestamp).to.equal(VESTING_START + 94608000 - 2500000);
+          expect(await getCurrentTimestamp()).to.equal(VESTING_START + 94608000 - 2500000);
         })
         it("claimTokens will fail for non-investors", async function () {
           await expect(tokenVesting.connect(deployer).claimTokens()).to.be.revertedWith("You have no tokens to claim");
           await expect(tokenVesting.connect(governor).claimTokens()).to.be.revertedWith("You have no tokens to claim");
           await expect(tokenVesting.connect(randomGreedyPerson).claimTokens()).to.be.revertedWith("You have no tokens to claim");
         })
+        it("claimToken will fail for old investor address", async function() {
+          await expect(tokenVesting.connect(investor1).claimTokens()).to.be.revertedWith("You have no tokens to claim");
+        })
         it("Investors can claim 29 months worth of tokens", async function () {
           let preClaimTxRedeemedAmount = await tokenVesting.redeemedInvestorTokens(investor1_new_account.address);
           let investor1_claim_tx = await tokenVesting.connect(investor1_new_account).claimTokens();
-          let currentBlockNumber = await provider.getBlockNumber();
-          let currentBlock = await provider.getBlock(currentBlockNumber);
-          let currentTimestamp = currentBlock.timestamp;
-          let totalUnlockedTokenAmount = THREE_HUNDRED_THOUSAND_ETHER.mul(currentTimestamp - (VESTING_START + 15768000)).div(94608000 - 15768000);
+          let totalUnlockedTokenAmount = THREE_HUNDRED_THOUSAND_ETHER.mul(await getCurrentTimestamp() - (VESTING_START + 15768000)).div(94608000 - 15768000);
           let redeemedTokenAmount = totalUnlockedTokenAmount.sub(preClaimTxRedeemedAmount);
           await expect(investor1_claim_tx).to.emit(solace, "Transfer").withArgs(tokenVesting.address, investor1_new_account.address, redeemedTokenAmount);
 
           preClaimTxRedeemedAmount = await tokenVesting.redeemedInvestorTokens(investor2.address);
           let investor2_claim_tx = await tokenVesting.connect(investor2).claimTokens();
-          currentBlockNumber = await provider.getBlockNumber();
-          currentBlock = await provider.getBlock(currentBlockNumber);
-          currentTimestamp = currentBlock.timestamp;
-          totalUnlockedTokenAmount = THREE_HUNDRED_THOUSAND_ETHER.mul(currentTimestamp - (VESTING_START + 15768000)).div(94608000 - 15768000);
+          totalUnlockedTokenAmount = THREE_HUNDRED_THOUSAND_ETHER.mul(await getCurrentTimestamp() - (VESTING_START + 15768000)).div(94608000 - 15768000);
           redeemedTokenAmount = totalUnlockedTokenAmount.sub(preClaimTxRedeemedAmount);
           await expect(investor2_claim_tx).to.emit(solace, "Transfer").withArgs(tokenVesting.address, investor2.address, redeemedTokenAmount);
 
           preClaimTxRedeemedAmount = await tokenVesting.redeemedInvestorTokens(investor3.address);
           let investor3_claim_tx = await tokenVesting.connect(investor3).claimTokens();
-          currentBlockNumber = await provider.getBlockNumber();
-          currentBlock = await provider.getBlock(currentBlockNumber);
-          currentTimestamp = currentBlock.timestamp;
-          totalUnlockedTokenAmount = THREE_HUNDRED_THOUSAND_ETHER.mul(currentTimestamp - (VESTING_START + 15768000)).div(94608000 - 15768000);
+          totalUnlockedTokenAmount = THREE_HUNDRED_THOUSAND_ETHER.mul(await getCurrentTimestamp() - (VESTING_START + 15768000)).div(94608000 - 15768000);
           redeemedTokenAmount = totalUnlockedTokenAmount.sub(preClaimTxRedeemedAmount);
           await expect(investor3_claim_tx).to.emit(solace, "Transfer").withArgs(tokenVesting.address, investor3.address, redeemedTokenAmount);          
         })
@@ -356,38 +324,31 @@ describe("TokenVesting", function () {
           let vestingEnd_timestamp = ( await tokenVesting.vestingEnd() );
           let desired_timestamp = Number(vestingEnd_timestamp.add(1))
           await provider.send("evm_mine", [desired_timestamp]);
-
-          const currentBlockNumber = await provider.getBlockNumber();
-          const currentBlock = await provider.getBlock(currentBlockNumber);
-          const currentTimestamp = currentBlock.timestamp;
-          expect(currentTimestamp).to.equal(VESTING_START + 94608000 + 1);
+          expect(await getCurrentTimestamp()).to.equal(VESTING_START + 94608000 + 1);
         })
         it("claimTokens will fail for non-investors", async function () {
           await expect(tokenVesting.connect(deployer).claimTokens()).to.be.revertedWith("You have no tokens to claim");
           await expect(tokenVesting.connect(governor).claimTokens()).to.be.revertedWith("You have no tokens to claim");
           await expect(tokenVesting.connect(randomGreedyPerson).claimTokens()).to.be.revertedWith("You have no tokens to claim");
         })
+        it("claimToken will fail for old investor address", async function() {
+          await expect(tokenVesting.connect(investor1).claimTokens()).to.be.revertedWith("You have no tokens to claim");
+        })
         it("Investors can claim all remaining tokens", async function () {
           let preClaimTxRedeemedAmount = await tokenVesting.redeemedInvestorTokens(investor1_new_account.address);
           let investor1_claim_tx = await tokenVesting.connect(investor1_new_account).claimTokens();
-          let currentBlockNumber = await provider.getBlockNumber();
-          let currentBlock = await provider.getBlock(currentBlockNumber);
           let totalUnlockedTokenAmount = THREE_HUNDRED_THOUSAND_ETHER
           let redeemedTokenAmount = totalUnlockedTokenAmount.sub(preClaimTxRedeemedAmount);
           await expect(investor1_claim_tx).to.emit(solace, "Transfer").withArgs(tokenVesting.address, investor1_new_account.address, redeemedTokenAmount);
 
           preClaimTxRedeemedAmount = await tokenVesting.redeemedInvestorTokens(investor2.address);
           let investor2_claim_tx = await tokenVesting.connect(investor2).claimTokens();
-          currentBlockNumber = await provider.getBlockNumber();
-          currentBlock = await provider.getBlock(currentBlockNumber);
           totalUnlockedTokenAmount = THREE_HUNDRED_THOUSAND_ETHER
           redeemedTokenAmount = totalUnlockedTokenAmount.sub(preClaimTxRedeemedAmount);
           await expect(investor2_claim_tx).to.emit(solace, "Transfer").withArgs(tokenVesting.address, investor2.address, redeemedTokenAmount);
 
           preClaimTxRedeemedAmount = await tokenVesting.redeemedInvestorTokens(investor3.address);
           let investor3_claim_tx = await tokenVesting.connect(investor3).claimTokens();
-          currentBlockNumber = await provider.getBlockNumber();
-          currentBlock = await provider.getBlock(currentBlockNumber);
           totalUnlockedTokenAmount = THREE_HUNDRED_THOUSAND_ETHER
           redeemedTokenAmount = totalUnlockedTokenAmount.sub(preClaimTxRedeemedAmount);
           await expect(investor3_claim_tx).to.emit(solace, "Transfer").withArgs(tokenVesting.address, investor3.address, redeemedTokenAmount);          
@@ -423,3 +384,10 @@ describe("TokenVesting", function () {
       })
 
 })
+
+async function getCurrentTimestamp() {
+  const currentBlockNumber = await provider.getBlockNumber();
+  const currentBlock = await provider.getBlock(currentBlockNumber);
+  const currentTimestamp = currentBlock.timestamp;
+  return currentTimestamp
+}
