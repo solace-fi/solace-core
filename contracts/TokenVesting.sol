@@ -127,6 +127,9 @@ import "./interface/ITokenVesting.sol";
      * @param newAddress Intended new investor address.
      */
     function setNewInvestorAddress(address oldAddress, address newAddress) external override onlyGovernance {
+        // Require these guards to avoid overwriting pre-existing key-value pairs
+        require(totalInvestorTokens[newAddress] == 0, "Cannot set to a pre-existing address");
+        require(redeemedInvestorTokens[newAddress] == 0, "Cannot set to a pre-existing address");
         totalInvestorTokens[newAddress] = totalInvestorTokens[oldAddress];
         redeemedInvestorTokens[newAddress] = redeemedInvestorTokens[oldAddress];
         totalInvestorTokens[oldAddress] = 0;
