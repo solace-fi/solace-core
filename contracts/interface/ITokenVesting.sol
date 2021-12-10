@@ -35,6 +35,13 @@ pragma solidity 0.8.6;
     function redeemedInvestorTokens(address investor) external view returns (uint256);
 
     /***************************************
+    EVENTS
+    ***************************************/
+
+    /// @notice Emitted when investor address is changed
+    event InvestorAddressChanged(address oldAddress, address newAddress);
+
+    /***************************************
     INVESTOR FUNCTIONS
     ***************************************/
 
@@ -71,4 +78,12 @@ pragma solidity 0.8.6;
      * @param totalTokenAmounts Array of token amounts to set.
      */
     function setTotalInvestorTokens(address[] calldata investors, uint256[] calldata totalTokenAmounts) external;
+
+    /**
+     * @notice Changes address for an investor.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param oldAddress Original investor address.
+     * @param newAddress Intended new investor address.
+     */
+    function setNewInvestorAddress(address oldAddress, address newAddress) external;
  }

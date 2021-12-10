@@ -118,6 +118,19 @@ import "./interface/ITokenVesting.sol";
         for(uint256 i = 0; i < investors.length; i++) {
             totalInvestorTokens[investors[i]] = totalTokenAmounts[i];
         }
-        // UNSURE - should we use a checksum to ensure (sum of []totalTokenAmounts) <= (SOLACE balance of this contract)), or trust governance to do the correct off-chain accounting
+    }
+
+    /**
+     * @notice Changes address for an investor.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param oldAddress Original investor address.
+     * @param newAddress Intended new investor address.
+     */
+    function setNewInvestorAddress(address oldAddress, address newAddress) external override onlyGovernance {
+        totalInvestorTokens[newAddress] = totalInvestorTokens[oldAddress];
+        redeemedInvestorTokens[newAddress] = redeemedInvestorTokens[oldAddress];
+        totalInvestorTokens[oldAddress] = 0;
+        redeemedInvestorTokens[oldAddress] = 0;
+        emit InvestorAddressChanged(oldAddress, newAddress);
     }
  }
