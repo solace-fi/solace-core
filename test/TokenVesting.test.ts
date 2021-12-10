@@ -14,6 +14,7 @@ import { bnAddSub, bnMulDiv, expectClose } from "./utilities/math";
 import { getERC20PermitSignature } from "./utilities/getERC20PermitSignature";
 import { readFileSync } from "fs";
 import { threadId } from "worker_threads";
+import { zeroAddress } from "ethereumjs-util";
 
 chai.use(solidity);
 
@@ -32,6 +33,7 @@ const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const ONE_ETHER = BN.from("1000000000000000000");
 const TEN_ETHER = BN.from("10000000000000000000");
 const ONE_THOUSAND_ETHER = BN.from("1000000000000000000000");
+const ONE_HUNDRED_THOUSAND_ETHER = BN.from("100000000000000000000000");
 const THREE_HUNDRED_THOUSAND_ETHER = BN.from("300000000000000000000000");
 const FOUR_HUNDRED_THOUSAND_ETHER = BN.from("400000000000000000000000");
 const ONE_MILLION_ETHER = BN.from("1000000000000000000000000");
@@ -40,7 +42,7 @@ const TEN_MILLION_ETHER = BN.from("10000000000000000000000000");
 const VESTING_START = 1638209176; // Unix timestamp for initial SOLACE add liquidity transaction - https://etherscan.io/tx/0x71f1de15ee75f414c454aec3612433d0123e44ec5987515fc3566795cd840bc3
 
 describe("TokenVesting", function () {
-    const [deployer, governor, investor1, investor2, investor3, randomGreedyPerson, receiver] = provider.getWallets();
+    const [deployer, governor, investor1, investor2, investor3, randomGreedyPerson, recipient] = provider.getWallets();
     let artifacts: ArtifactImports;
   
     before(async function () {
@@ -163,7 +165,7 @@ describe("TokenVesting", function () {
         }) 
       })
 
-      describe("t = just before cliff", function () {
+      describe("t = 1s before cliff", function () {
         it("Sets timestamp to 1s before cliff", async function () {
             let cliff_timestamp = ( await tokenVesting.cliff() );
             let desired_timestamp = Number(cliff_timestamp.sub(1))
@@ -218,5 +220,190 @@ describe("TokenVesting", function () {
             await expect(tokenVesting.connect(governor).claimTokens()).to.be.revertedWith("You have no tokens to claim");
             await expect(tokenVesting.connect(randomGreedyPerson).claimTokens()).to.be.revertedWith("You have no tokens to claim");
         })
+        it("Investors can claim one days worth of tokens", async function () {
+
+            let investor1_claim_tx = await tokenVesting.connect(investor1).claimTokens();
+
+            // Need to re-get timestamp, because it has moved forward from the last instance we called currentTimestamp
+            // The timestamp for this point appears to be "VESTING_START + 86401" rather than "VESTING_START + 86400" as we expect
+            // Need to re-get timestamp to avoid error in below test assertion
+            // Need to repeat this block of code with each claimToken() call
+            let currentBlockNumber = await provider.getBlockNumber();
+            let currentBlock = await provider.getBlock(currentBlockNumber);
+            let currentTimestamp = currentBlock.timestamp;
+            let redeemedTokenAmount = THREE_HUNDRED_THOUSAND_ETHER.mul(currentTimestamp - (VESTING_START + 15768000)).div(94608000 - 15768000);
+            await expect(investor1_claim_tx).to.emit(solace, "Transfer").withArgs(tokenVesting.address, investor1.address, redeemedTokenAmount);
+            expect((await tokenVesting.redeemedInvestorTokens(investor1.address))).to.equal(redeemedTokenAmount);
+
+            let investor2_claim_tx = await tokenVesting.connect(investor2).claimTokens();
+            currentBlockNumber = await provider.getBlockNumber();
+            currentBlock = await provider.getBlock(currentBlockNumber);
+            currentTimestamp = currentBlock.timestamp;
+            redeemedTokenAmount = THREE_HUNDRED_THOUSAND_ETHER.mul(currentTimestamp - (VESTING_START + 15768000)).div(94608000 - 15768000);
+            await expect(investor2_claim_tx).to.emit(solace, "Transfer").withArgs(tokenVesting.address, investor2.address, redeemedTokenAmount);
+            expect((await tokenVesting.redeemedInvestorTokens(investor2.address))).to.equal(THREE_HUNDRED_THOUSAND_ETHER.mul(currentTimestamp - (VESTING_START + 15768000)).div(94608000 - 15768000) );
+
+            let investor3_claim_tx = await tokenVesting.connect(investor3).claimTokens();
+            currentBlockNumber = await provider.getBlockNumber();
+            currentBlock = await provider.getBlock(currentBlockNumber);
+            currentTimestamp = currentBlock.timestamp;
+            redeemedTokenAmount = THREE_HUNDRED_THOUSAND_ETHER.mul(currentTimestamp - (VESTING_START + 15768000)).div(94608000 - 15768000);
+            await expect(investor3_claim_tx).to.emit(solace, "Transfer").withArgs(tokenVesting.address, investor3.address, redeemedTokenAmount);
+            expect((await tokenVesting.redeemedInvestorTokens(investor3.address))).to.equal(THREE_HUNDRED_THOUSAND_ETHER.mul(currentTimestamp - (VESTING_START + 15768000)).div(94608000 - 15768000) );
+        })
+        it("Sanity check redeemedInvestorTokens - should be <1% of totalInvestorTokens for same addresses", async function () {
+          const investor1_reedemedTokens = await tokenVesting.redeemedInvestorTokens(investor1.address);
+          const investor2_reedemedTokens = await tokenVesting.redeemedInvestorTokens(investor2.address);
+          const investor3_reedemedTokens = await tokenVesting.redeemedInvestorTokens(investor3.address);
+          const investor1_totalTokens = await tokenVesting.totalInvestorTokens(investor1.address);
+          const investor2_totalTokens = await tokenVesting.totalInvestorTokens(investor2.address);
+          const investor3_totalTokens = await tokenVesting.totalInvestorTokens(investor3.address);
+          expect(investor1_reedemedTokens).to.be.below(investor1_totalTokens.mul(1).div(100));
+          expect(investor2_reedemedTokens).to.be.below(investor2_totalTokens.mul(1).div(100));
+          expect(investor3_reedemedTokens).to.be.below(investor3_totalTokens.mul(1).div(100));
+        })
       })
+
+      describe("t = One month before vestingEnd", function () {
+        it("Sets timestamp to ~1 month / 2,500,000s before vestingEnd", async function () {
+          let vestingEnd_timestamp = ( await tokenVesting.vestingEnd() );
+          let desired_timestamp = Number(vestingEnd_timestamp.sub(2500000))
+          await provider.send("evm_mine", [desired_timestamp]);
+
+          const currentBlockNumber = await provider.getBlockNumber();
+          const currentBlock = await provider.getBlock(currentBlockNumber);
+          const currentTimestamp = currentBlock.timestamp;
+          expect(currentTimestamp).to.equal(VESTING_START + 94608000 - 2500000);
+        })
+        it("claimTokens will fail for non-investors", async function () {
+          await expect(tokenVesting.connect(deployer).claimTokens()).to.be.revertedWith("You have no tokens to claim");
+          await expect(tokenVesting.connect(governor).claimTokens()).to.be.revertedWith("You have no tokens to claim");
+          await expect(tokenVesting.connect(randomGreedyPerson).claimTokens()).to.be.revertedWith("You have no tokens to claim");
+        })
+        it("Investors can claim 29 months worth of tokens", async function () {
+          let preClaimTxRedeemedAmount = await tokenVesting.redeemedInvestorTokens(investor1.address);
+          let investor1_claim_tx = await tokenVesting.connect(investor1).claimTokens();
+          let currentBlockNumber = await provider.getBlockNumber();
+          let currentBlock = await provider.getBlock(currentBlockNumber);
+          let currentTimestamp = currentBlock.timestamp;
+          let totalUnlockedTokenAmount = THREE_HUNDRED_THOUSAND_ETHER.mul(currentTimestamp - (VESTING_START + 15768000)).div(94608000 - 15768000);
+          let redeemedTokenAmount = totalUnlockedTokenAmount.sub(preClaimTxRedeemedAmount);
+          await expect(investor1_claim_tx).to.emit(solace, "Transfer").withArgs(tokenVesting.address, investor1.address, redeemedTokenAmount);
+
+          preClaimTxRedeemedAmount = await tokenVesting.redeemedInvestorTokens(investor2.address);
+          let investor2_claim_tx = await tokenVesting.connect(investor2).claimTokens();
+          currentBlockNumber = await provider.getBlockNumber();
+          currentBlock = await provider.getBlock(currentBlockNumber);
+          currentTimestamp = currentBlock.timestamp;
+          totalUnlockedTokenAmount = THREE_HUNDRED_THOUSAND_ETHER.mul(currentTimestamp - (VESTING_START + 15768000)).div(94608000 - 15768000);
+          redeemedTokenAmount = totalUnlockedTokenAmount.sub(preClaimTxRedeemedAmount);
+          await expect(investor2_claim_tx).to.emit(solace, "Transfer").withArgs(tokenVesting.address, investor2.address, redeemedTokenAmount);
+
+          preClaimTxRedeemedAmount = await tokenVesting.redeemedInvestorTokens(investor3.address);
+          let investor3_claim_tx = await tokenVesting.connect(investor3).claimTokens();
+          currentBlockNumber = await provider.getBlockNumber();
+          currentBlock = await provider.getBlock(currentBlockNumber);
+          currentTimestamp = currentBlock.timestamp;
+          totalUnlockedTokenAmount = THREE_HUNDRED_THOUSAND_ETHER.mul(currentTimestamp - (VESTING_START + 15768000)).div(94608000 - 15768000);
+          redeemedTokenAmount = totalUnlockedTokenAmount.sub(preClaimTxRedeemedAmount);
+          await expect(investor3_claim_tx).to.emit(solace, "Transfer").withArgs(tokenVesting.address, investor3.address, redeemedTokenAmount);          
+        })
+        it("Sanity check redeemedInvestorTokens - should have lower values than totalInvestorTokens for same addresses", async function () {
+          const investor1_reedemedTokens = await tokenVesting.redeemedInvestorTokens(investor1.address);
+          const investor2_reedemedTokens = await tokenVesting.redeemedInvestorTokens(investor2.address);
+          const investor3_reedemedTokens = await tokenVesting.redeemedInvestorTokens(investor3.address);
+          const investor1_totalTokens = await tokenVesting.totalInvestorTokens(investor1.address);
+          const investor2_totalTokens = await tokenVesting.totalInvestorTokens(investor2.address);
+          const investor3_totalTokens = await tokenVesting.totalInvestorTokens(investor3.address);
+          expect(investor1_reedemedTokens).to.be.below(investor1_totalTokens);
+          expect(investor2_reedemedTokens).to.be.below(investor2_totalTokens);
+          expect(investor3_reedemedTokens).to.be.below(investor3_totalTokens);
+        })
+        it("Sanity check redeemedInvestorTokens - should be at least 95% of totalInvestorTokens for same addresses", async function () {
+          const investor1_reedemedTokens = await tokenVesting.redeemedInvestorTokens(investor1.address);
+          const investor2_reedemedTokens = await tokenVesting.redeemedInvestorTokens(investor2.address);
+          const investor3_reedemedTokens = await tokenVesting.redeemedInvestorTokens(investor3.address);
+          const investor1_totalTokens = await tokenVesting.totalInvestorTokens(investor1.address);
+          const investor2_totalTokens = await tokenVesting.totalInvestorTokens(investor2.address);
+          const investor3_totalTokens = await tokenVesting.totalInvestorTokens(investor3.address);
+          expect(investor1_reedemedTokens).to.be.above(investor1_totalTokens.mul(95).div(100));
+          expect(investor2_reedemedTokens).to.be.above(investor2_totalTokens.mul(95).div(100));
+          expect(investor3_reedemedTokens).to.be.above(investor3_totalTokens.mul(95).div(100));
+        })
+      })
+
+      describe("t = 1s after vestingEnd", function () {
+        it("Sets timestamp to 1s after vestingEnd", async function () {
+          let vestingEnd_timestamp = ( await tokenVesting.vestingEnd() );
+          let desired_timestamp = Number(vestingEnd_timestamp.add(1))
+          await provider.send("evm_mine", [desired_timestamp]);
+
+          const currentBlockNumber = await provider.getBlockNumber();
+          const currentBlock = await provider.getBlock(currentBlockNumber);
+          const currentTimestamp = currentBlock.timestamp;
+          expect(currentTimestamp).to.equal(VESTING_START + 94608000 + 1);
+        })
+        it("claimTokens will fail for non-investors", async function () {
+          await expect(tokenVesting.connect(deployer).claimTokens()).to.be.revertedWith("You have no tokens to claim");
+          await expect(tokenVesting.connect(governor).claimTokens()).to.be.revertedWith("You have no tokens to claim");
+          await expect(tokenVesting.connect(randomGreedyPerson).claimTokens()).to.be.revertedWith("You have no tokens to claim");
+        })
+        it("Investors can claim all remaining tokens", async function () {
+          let preClaimTxRedeemedAmount = await tokenVesting.redeemedInvestorTokens(investor1.address);
+          let investor1_claim_tx = await tokenVesting.connect(investor1).claimTokens();
+          let currentBlockNumber = await provider.getBlockNumber();
+          let currentBlock = await provider.getBlock(currentBlockNumber);
+          let currentTimestamp = currentBlock.timestamp;
+          let totalUnlockedTokenAmount = THREE_HUNDRED_THOUSAND_ETHER
+          let redeemedTokenAmount = totalUnlockedTokenAmount.sub(preClaimTxRedeemedAmount);
+          await expect(investor1_claim_tx).to.emit(solace, "Transfer").withArgs(tokenVesting.address, investor1.address, redeemedTokenAmount);
+
+          preClaimTxRedeemedAmount = await tokenVesting.redeemedInvestorTokens(investor2.address);
+          let investor2_claim_tx = await tokenVesting.connect(investor2).claimTokens();
+          currentBlockNumber = await provider.getBlockNumber();
+          currentBlock = await provider.getBlock(currentBlockNumber);
+          currentTimestamp = currentBlock.timestamp;
+          totalUnlockedTokenAmount = THREE_HUNDRED_THOUSAND_ETHER
+          redeemedTokenAmount = totalUnlockedTokenAmount.sub(preClaimTxRedeemedAmount);
+          await expect(investor2_claim_tx).to.emit(solace, "Transfer").withArgs(tokenVesting.address, investor2.address, redeemedTokenAmount);
+
+          preClaimTxRedeemedAmount = await tokenVesting.redeemedInvestorTokens(investor3.address);
+          let investor3_claim_tx = await tokenVesting.connect(investor3).claimTokens();
+          currentBlockNumber = await provider.getBlockNumber();
+          currentBlock = await provider.getBlock(currentBlockNumber);
+          currentTimestamp = currentBlock.timestamp;
+          totalUnlockedTokenAmount = THREE_HUNDRED_THOUSAND_ETHER
+          redeemedTokenAmount = totalUnlockedTokenAmount.sub(preClaimTxRedeemedAmount);
+          await expect(investor3_claim_tx).to.emit(solace, "Transfer").withArgs(tokenVesting.address, investor3.address, redeemedTokenAmount);          
+        })
+        it("Sanity check redeemedInvestorTokens - should be equivalent to totalInvestorTokens for same addresses", async function () {
+          const investor1_reedemedTokens = await tokenVesting.redeemedInvestorTokens(investor1.address);
+          const investor2_reedemedTokens = await tokenVesting.redeemedInvestorTokens(investor2.address);
+          const investor3_reedemedTokens = await tokenVesting.redeemedInvestorTokens(investor3.address);
+          const investor1_totalTokens = await tokenVesting.totalInvestorTokens(investor1.address);
+          const investor2_totalTokens = await tokenVesting.totalInvestorTokens(investor2.address);
+          const investor3_totalTokens = await tokenVesting.totalInvestorTokens(investor3.address);
+          expect(investor1_reedemedTokens).to.equal(investor1_totalTokens);
+          expect(investor2_reedemedTokens).to.equal(investor2_totalTokens);
+          expect(investor3_reedemedTokens).to.equal(investor3_totalTokens);
+        })
+        it("TokenVesting.sol should have 100K SOLACE tokens remaining", async function () {
+          const balance = await solace.balanceOf(tokenVesting.address)
+          expect(balance).to.equal(ONE_HUNDRED_THOUSAND_ETHER)
+        })
+        it("Only governance can rescueSOLACEtokens", async function () {
+          await expect(tokenVesting.connect(deployer).rescueSOLACEtokens(ONE_HUNDRED_THOUSAND_ETHER, recipient.address)).to.be.revertedWith("!governance");
+          await expect(tokenVesting.connect(investor1).rescueSOLACEtokens(ONE_HUNDRED_THOUSAND_ETHER, recipient.address)).to.be.revertedWith("!governance");
+          await expect(tokenVesting.connect(investor2).rescueSOLACEtokens(ONE_HUNDRED_THOUSAND_ETHER, recipient.address)).to.be.revertedWith("!governance");
+          await expect(tokenVesting.connect(investor3).rescueSOLACEtokens(ONE_HUNDRED_THOUSAND_ETHER, recipient.address)).to.be.revertedWith("!governance");
+          await expect(tokenVesting.connect(randomGreedyPerson).rescueSOLACEtokens(ONE_HUNDRED_THOUSAND_ETHER, recipient.address)).to.be.revertedWith("!governance");
+          await expect(tokenVesting.connect(recipient).rescueSOLACEtokens(ONE_HUNDRED_THOUSAND_ETHER, recipient.address)).to.be.revertedWith("!governance");
+        })
+        it("Governance can rescue SOLACE tokens to desired recipient address", async function () {
+          await expect(tokenVesting.connect(governor).rescueSOLACEtokens(ONE_HUNDRED_THOUSAND_ETHER, ZERO_ADDRESS)).to.be.revertedWith("zero address recipient");
+          let tx = await tokenVesting.connect(governor).rescueSOLACEtokens(ONE_HUNDRED_THOUSAND_ETHER, recipient.address);
+          await expect(tx).to.emit(solace, "Transfer").withArgs(tokenVesting.address, recipient.address, ONE_HUNDRED_THOUSAND_ETHER);
+        })
+      })
+
 })
