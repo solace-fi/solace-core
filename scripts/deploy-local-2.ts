@@ -9,12 +9,13 @@ const deployer = new ethers.Wallet(JSON.parse(process.env.LOCALHOST_ACCOUNTS || 
 import { logContractAddress } from "./utils";
 
 import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_importer";
-import { Solace, XSolace, BondDepository, BondTellerErc20, BondTellerEth, FarmRewards } from "../typechain";
+import { Solace, XSolace, BondDepository, BondTellerErc20, BondTellerEth, FarmRewards, TokenVesting } from "../typechain";
 import { BytesLike, constants } from "ethers";
 
 const BOND_START_TIME = BN.from("1638205200"); // 5 PM UTC November 29 2021
 const MAX_UINT40 = BN.from("1099511627775");
 const ONE_ETHER = BN.from("1000000000000000000");
+const VESTING_START = 1638209176; // https://etherscan.io/tx/0x71f1de15ee75f414c454aec3612433d0123e44ec5987515fc3566795cd840bc3
 const VESTING_TERM = 432000; // 5 days
 const HALF_LIFE = 2592000; // 30 days
 const FIFTY_THOUSAND_SOLACE = BN.from("50000000000000000000000");
@@ -48,6 +49,7 @@ const SCP_BOND_TELLER_ADDRESS       = "";
 const FRAX_ADDRESS                  = "";
 
 const FARM_REWARDS_ADDRESS          = "";
+const TOKEN_VESTING_ADDRESS          = "";
 
 let artifacts: ArtifactImports;
 
@@ -64,6 +66,7 @@ let usdtTeller: BondTellerErc20;
 let scpTeller: BondTellerErc20;
 
 let farmRewards: FarmRewards;
+let tokenVesting: TokenVesting;
 
 let signerAddress: string;
 let tellerImplementationAddress: string;
@@ -93,6 +96,7 @@ async function main() {
   await deployScpTeller();
 
   await deployFarmRewards();
+  await deployTokenVesting();
 
   await logAddresses();
 }
@@ -353,6 +357,16 @@ async function deployFarmRewards() {
   }
 }
 
+async function deployTokenVesting() {
+  if(!!TOKEN_VESTING_ADDRESS) {
+    tokenVesting = (await ethers.getContractAt(artifacts.TokenVesting.abi, TOKEN_VESTING_ADDRESS)) as TokenVesting;
+  } else {
+    console.log("Deploying TokenVesting");
+    tokenVesting = (await deployContract(deployer, artifacts.TokenVesting, [signerAddress, solace.address, VESTING_START])) as TokenVesting;
+    console.log(`Deployed TokenVesting to ${tokenVesting.address}`);
+  }
+}
+
 async function deployTestnetTokens() {
   let tokens: any[] = [
     {name: "Wrapped Ether", symbol: "WETH", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
@@ -381,6 +395,7 @@ async function logAddresses() {
   logContractAddress("SOLACE", solace.address);
   logContractAddress("xSOLACE", xsolace.address);
   logContractAddress("FarmRewards", farmRewards.address);
+  logContractAddress("TokenVesting", tokenVesting.address);
   logContractAddress("BondDepository", bondDepo.address);
   logContractAddress("DAI Bond Teller", daiTeller.address);
   logContractAddress("ETH Bond Teller", ethTeller.address);
