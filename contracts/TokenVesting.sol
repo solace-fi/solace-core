@@ -27,13 +27,13 @@ import "./interface/ITokenVesting.sol";
     address public override solace;
 
     /// @notice timestamp that investor tokens start vesting.
-    uint256 public override vestingStart;
+    uint256 immutable public override vestingStart;
 
     /// @notice timestamp that cliff for investor tokens finishes.
-    uint256 public override cliff;
+    uint256 immutable public override cliff;
 
     /// @notice timestamp that investor tokens finish vesting.
-    uint256 public override vestingEnd;
+    uint256 immutable public override vestingEnd;
  
     /// @notice Total tokens for an investor.
     mapping(address => uint256) public override totalInvestorTokens;
