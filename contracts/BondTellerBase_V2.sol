@@ -20,7 +20,7 @@ import "./interface/IBondTellerErc20_V2.sol";
  * @author solace.fi
  * @notice A base type for bond tellers.
  *
- * The main difference between V1 and V2 SOLACE bonds, is that V1 SOLACE bonds can be redeemed for payout only after the vestingTerm, while V2 SOLACE bonds linearly vest over the vestingTerm.
+ * The main difference between V1 and V2 SOLACE bonds, is that V1 SOLACE bonds can be redeemed for payout only after the vestingTerm, while V2 SOLACE bonds linearly vest over the localVestingTerm.
  * `redeem()` in BondTellerBase.sol has been renamed to `claimPayout()` in BondTellerBase_V2.sol - to reduce confusion
  *
  * Users purchase SOLACE bonds from Bond Tellers, think of them as the merchant stores specialising in SOLACE protocol bonds
@@ -29,9 +29,9 @@ import "./interface/IBondTellerErc20_V2.sol";
  * Buying a bond from a Bond Teller will mint a `SPT V2` ERC721 to the user
  * Purchasers pay `principal` to the Bond Teller to purchase the bond, these payments are routed to the underwriting pool to help the SOLACE protocol back risk.
  * Buying a bond will entitle the purchaser to an amount of `payoutToken` - either [**SOLACE**](./SOLACE) or [**xSOLACE**](./xSOLACE)
- * Bonds will linearly vest over the `vestingTerm` (default 5-days or 432,000 seconds)
+ * Bonds will linearly vest over the `localVestingTerm` (default 5-days or 432,000 seconds)
  * Purchasers can `claimPayout` anytime after the `startTime`.
- * If `claimPayout` is called anytime after `vestingStart + vestingTerm`, then the `SPT V2` ERC721 is burned and the bond terms are completed.
+ * If `claimPayout` is called anytime after `vestingStart + localVestingTerm`, then the `SPT V2` ERC721 is burned and the bond terms are completed.
  * 
  */
 abstract contract BondTellerBase_V2 is IBondTeller_V2, ReentrancyGuard, GovernableInitializable, ERC721EnhancedInitializable {
@@ -60,7 +60,7 @@ abstract contract BondTellerBase_V2 is IBondTeller_V2, ReentrancyGuard, Governab
     // times
     uint40 public startTime;                   // timestamp bonds start
     uint40 public endTime;                     // timestamp bonds no longer offered
-    uint40 public vestingTerm;                 // duration in seconds (fixed-term)
+    uint40 public globalVestingTerm;           // duration in seconds (fixed-term)
 
     // bonds
     uint256 public numBonds;                   // total number of bonds that have been created
@@ -68,10 +68,11 @@ abstract contract BondTellerBase_V2 is IBondTeller_V2, ReentrancyGuard, Governab
     // UNSURE here - is it more gas efficient to store payoutAlreadyClaimed in a struct, or in a mapping
     struct Bond {
         address payoutToken;                   // solace or xsolace
+        uint40 vestingStart;                   // timestamp at which bond was minted
+        uint40 localVestingTerm;               // vesting term for this bond
         uint256 payoutAmount;                  // amount of solace or xsolace to be paid in total on the bond
         uint256 payoutAlreadyClaimed;          // amount of solace or xsolace that has already been claimed on the bond
         uint256 pricePaid;                     // measured in 'principal', for front end viewing
-        uint256 vestingStart;                  // timestamp at which bond was minted
     }
 
     mapping (uint256 => Bond) public bonds;    // mapping of bondID to Bond object
@@ -216,7 +217,7 @@ abstract contract BondTellerBase_V2 is IBondTeller_V2, ReentrancyGuard, Governab
         bonds[bondID].payoutAlreadyClaimed += eligiblePayout;
         
         // Burn bond if vesting completed
-        if (block.timestamp > bond.vestingStart + uint256(vestingTerm)) {
+        if (block.timestamp > bond.vestingStart + bond.localVestingTerm) {
             _burn(bondID);
             delete bonds[bondID];
             emit BurnBond(bondID, msg.sender, bond.payoutToken, bond.payoutAmount);
@@ -261,7 +262,7 @@ abstract contract BondTellerBase_V2 is IBondTeller_V2, ReentrancyGuard, Governab
     }
 
     /**
-     * @notice Calculates current eligible payout on a bond, based on vestingTerm and bonds[bondID].payoutAlreadyClaimed
+     * @notice Calculates current eligible payout on a bond, based on bond.localVestingTerm and bonds[bondID].payoutAlreadyClaimed
      * @param bondID The ID of the bond to calculate eligible payout on.
      * @return eligiblePayout Amount of SOLACE or xSOLACE that can be currently claimed for the bond
      */
@@ -272,13 +273,27 @@ abstract contract BondTellerBase_V2 is IBondTeller_V2, ReentrancyGuard, Governab
         require(bond.payoutAlreadyClaimed <= bond.payoutAmount, "?? payoutAlreadyClaimed > payoutAmount");
 
         // Calculation if still vesting
-        if (block.timestamp <= bond.vestingStart + uint256(vestingTerm)) {
-            eligiblePayout = ( ( bond.payoutAmount * ( block.timestamp - bond.vestingStart ) ) / uint256(vestingTerm) ) - bond.payoutAlreadyClaimed;
+        if (block.timestamp <= bond.vestingStart + bond.localVestingTerm) {
+            eligiblePayout = ( ( bond.payoutAmount * ( block.timestamp - bond.vestingStart ) ) / bond.localVestingTerm ) - bond.payoutAlreadyClaimed;
         } else {
             // Calculation if vesting completed
             eligiblePayout = bond.payoutAmount - bond.payoutAlreadyClaimed;
         }
+    }
 
+    /**
+     * @dev Returns the downcasted uint40 from uint256, reverting on
+     * overflow (when the input is greater than largest uint44).
+     *
+     * Counterpart to Solidity's `uint40` operator.
+     *
+     * Requirements:
+     *
+     * - input must fit into 40 bits
+     */
+    function toUint40(uint256 value) internal pure returns (uint40) {
+        require(value < 2**40, "SafeCast: value doesn\'t fit in 40 bits");
+        return uint40(value);
     }
 
     /***************************************
@@ -304,17 +319,17 @@ abstract contract BondTellerBase_V2 is IBondTeller_V2, ReentrancyGuard, Governab
     }
 
     struct Terms {
-        uint256 startPrice;     // The starting price, measured in `principal` for one **SOLACE**.
-        uint256 minimumPrice;   // The minimum price of a bond, measured in `principal` for one **SOLACE**.
-        uint256 maxPayout;      // The maximum **SOLACE** that can be sold in a single bond.
-        uint128 priceAdjNum;    // Used to calculate price increase after bond purchase.
-        uint128 priceAdjDenom;  // Used to calculate price increase after bond purchase.
-        uint256 capacity;       // The amount still sellable.
-        bool capacityIsPayout;  // True if `capacity_` is measured in **SOLACE**, false if measured in `principal`.
-        uint40 startTime;       // The time that purchases start.
-        uint40 endTime;         // The time that purchases end.
-        uint40 vestingTerm;     // The duration that users must wait to redeem bonds.
-        uint40 halfLife;        // Used to calculate price decay.
+        uint256 startPrice;       // The starting price, measured in `principal` for one **SOLACE**.
+        uint256 minimumPrice;     // The minimum price of a bond, measured in `principal` for one **SOLACE**.
+        uint256 maxPayout;        // The maximum **SOLACE** that can be sold in a single bond.
+        uint128 priceAdjNum;      // Used to calculate price increase after bond purchase.
+        uint128 priceAdjDenom;    // Used to calculate price increase after bond purchase.
+        uint256 capacity;         // The amount still sellable.
+        bool capacityIsPayout;    // True if `capacity_` is measured in **SOLACE**, false if measured in `principal`.
+        uint40 startTime;         // The time that purchases start.
+        uint40 endTime;           // The time that purchases end.
+        uint40 globalVestingTerm; // The duration that users must wait to redeem bonds.
+        uint40 halfLife;          // Used to calculate price decay.
     }
 
     /**
@@ -335,7 +350,7 @@ abstract contract BondTellerBase_V2 is IBondTeller_V2, ReentrancyGuard, Governab
         require(terms.startTime <= terms.endTime, "invalid dates");
         startTime = terms.startTime;
         endTime = terms.endTime;
-        vestingTerm = terms.vestingTerm;
+        globalVestingTerm = terms.globalVestingTerm;
         require(terms.halfLife > 0, "invalid halflife");
         halfLife = terms.halfLife;
         termsSet = true;

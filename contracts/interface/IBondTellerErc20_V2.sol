@@ -9,7 +9,7 @@ import "./IBondTeller_V2.sol";
  * @author solace.fi
  * @notice A bond teller that accepts an ERC20 as payment.
  *
- * The main difference between V1 and V2 SOLACE bonds, is that V1 SOLACE bonds can be redeemed for payout only after the vestingTerm, while V2 SOLACE bonds linearly vest over the vestingTerm.
+ * The main difference between V1 and V2 SOLACE bonds, is that V1 SOLACE bonds can be redeemed for payout only after the vestingTerm, while V2 SOLACE bonds linearly vest over the localVestingTerm.
  * `redeem()` in BondTellerBase.sol has been renamed to `claimPayout()` in BondTellerBase_V2.sol - to reduce confusion
  *
  * Users purchase SOLACE bonds from Bond Tellers, think of them as the merchant stores specialising in SOLACE protocol bonds
@@ -18,9 +18,9 @@ import "./IBondTeller_V2.sol";
  * Buying a bond from a Bond Teller will mint a `SPT V2` ERC721 to the user
  * Purchasers pay `principal` to the Bond Teller to purchase the bond, these payments are routed to the underwriting pool to help the SOLACE protocol back risk.
  * Buying a bond will entitle the purchaser to an amount of `payoutToken` - either [**SOLACE**](./SOLACE) or [**xSOLACE**](./xSOLACE)
- * Bonds will linearly vest over the `vestingTerm` (default 5-days or 432,000 seconds)
+ * Bonds will linearly vest over the `localVestingTerm` (default 5-days or 432,000 seconds)
  * Purchasers can `claimPayout` anytime after the `startTime`.
- * If `claimPayout` is called anytime after `vestingStart + vestingTerm`, then the `SPT V2` ERC721 is burned and the bond terms are completed.
+ * If `claimPayout` is called anytime after `vestingStart + localVestingTerm`, then the `SPT V2` ERC721 is burned and the bond terms are completed.
  * 
  * Most of the implementation details are in [`BondTellerBase`](./BondTellerBase_V2).
  */
