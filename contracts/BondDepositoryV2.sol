@@ -4,17 +4,15 @@ pragma solidity 0.8.6;
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./Factory.sol";
 import "./Governable.sol";
-import "./interface/IBondTeller_V2.sol";
-import "./interface/IBondDepository_V2.sol";
+import "./interface/IBondTellerV2.sol";
+import "./interface/IBondDepositoryV2.sol";
 
 /**
- * @title BondDepository_V2
+ * @title BondDepositoryV2
  * @author solace.fi
- * @dev We need to retire the original BondDepository contract, and deploy a V2, because the original contract is intertwined with the V1 BondTeller contracts
- * @dev Appended V2 to many `Bond...` variable and object names to minimise probability of pointing to a smart contract from the BondV1 system
- * @notice Factory and manager of [`Bond Tellers V2`](./BondTellerBase_V2).
+ * @notice Factory and registry of [`Bond Tellers`](./BondTellerBaseV2) contracts. Is also the SOLACE bank from which all Bond Tellers pull SOLACE from.
  */
-contract BondDepository_V2 is IBondDepository_V2, Factory, Governable {
+contract BondDepositoryV2 is IBondDepositoryV2, Factory, Governable {
 
     // pass these when initializing tellers
     address internal _solace;
@@ -26,7 +24,7 @@ contract BondDepository_V2 is IBondDepository_V2, Factory, Governable {
     mapping(address => bool) internal _isTeller;
 
     /**
-     * @notice Constructs the BondDepository_V2 contract.
+     * @notice Constructs the BondDepositoryV2 contract.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
      * @param solace_ Address of [**SOLACE**](./solace).
      * @param xsolace_ Address of [**xSOLACE**](./xsolace).
@@ -71,11 +69,11 @@ contract BondDepository_V2 is IBondDepository_V2, Factory, Governable {
     ***************************************/
 
     /**
-     * @notice Creates a new [`BondTeller`](./BondTellerBase_V2).
+     * @notice Creates a new [`BondTeller`](./BondTellerBaseV2).
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param name The name of the bond token.
      * @param governance The address of the teller's [governor](/docs/protocol/governance).
-     * @param impl The address of BondTeller_V2 implementation.
+     * @param impl The address of BondTellerV2 implementation.
      * @param principal address The ERC20 token that users give.
      * @return teller The address of the new teller.
      */
@@ -86,18 +84,18 @@ contract BondDepository_V2 is IBondDepository_V2, Factory, Governable {
         address principal
     ) external override onlyGovernance returns (address teller) {
         teller = _deployMinimalProxy(impl);
-        IBondTeller_V2(teller).initialize(name, governance, _solace, _xsolace, _pool, _dao, principal, address(this));
+        IBondTellerV2(teller).initialize(name, governance, _solace, _xsolace, _pool, _dao, principal, address(this));
         _isTeller[teller] = true;
         emit TellerAdded(teller);
         return teller;
     }
 
     /**
-     * @notice Creates a new [`BondTeller`](./BondTellerBase_V2).
+     * @notice Creates a new [`BondTeller`](./BondTellerBaseV2).
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param name The name of the bond token.
      * @param governance The address of the teller's [governor](/docs/protocol/governance).
-     * @param impl The address of BondTeller_V2 implementation.
+     * @param impl The address of BondTellerV2 implementation.
      * @param salt The salt for CREATE2.
      * @param principal address The ERC20 token that users give.
      * @return teller The address of the new teller.
@@ -110,7 +108,7 @@ contract BondDepository_V2 is IBondDepository_V2, Factory, Governable {
         address principal
     ) external override onlyGovernance returns (address teller) {
         teller = _deployMinimalProxy(impl, salt);
-        IBondTeller_V2(teller).initialize(name, governance, _solace, _xsolace, _pool, _dao, principal, address(this));
+        IBondTellerV2(teller).initialize(name, governance, _solace, _xsolace, _pool, _dao, principal, address(this));
         _isTeller[teller] = true;
         emit TellerAdded(teller);
         return teller;

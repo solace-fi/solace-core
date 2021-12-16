@@ -5,14 +5,14 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 
 /**
- * @title IBondTeller_V2
+ * @title IBondTellerV2
  * @author solace.fi
  * @notice Base type of Bond Tellers.
  *
  * The main difference between V1 and V2 SOLACE bonds, is that V1 SOLACE bonds can be redeemed for payout only after the vestingTerm, while V2 SOLACE bonds linearly vest over the localVestingTerm.
- * `redeem()` in BondTellerBase.sol has been renamed to `claimPayout()` in BondTellerBase_V2.sol - to reduce confusion
+ * `redeem()` in BondTellerBase.sol has been renamed to `claimPayout()` in BondTellerBaseV2.sol - to reduce confusion
  *
- * Users purchase SOLACE bonds from Bond Tellers, think of them as the merchant stores specialising in SOLACE protocol bonds
+ * Users purchase SOLACE bonds from Bond Tellers, think of them as the ATM (as in automated teller machine at your banking branch) specialising in SOLACE protocol bonds
  *
  * There is a separate Bond Teller for each type of bond; the Bond Teller sets all the terms for the bond
  * Buying a bond from a Bond Teller will mint a `SPT V2` ERC721 to the user
@@ -23,7 +23,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  * If `claimPayout` is called anytime after `vestingStart + localVestingTerm`, then the `SPT V2` ERC721 is burned and the bond terms are completed.
  * 
  */
-interface IBondTeller_V2 {
+interface IBondTellerV2 {
 
     /***************************************
     EVENTS
@@ -106,7 +106,7 @@ interface IBondTeller_V2 {
     /**
      * @notice Claim payout for a bond that the user holds.
      * User calling claimPayout() must be either the owner or approved for the entered bondID.
-     * @dev Renamed redeem() in BondTellerBase.sol to claimPayout() in BondTellerBase_V2.sol
+     * @dev Renamed redeem() in BondTellerBase.sol to claimPayout() in BondTellerBaseV2.sol
      * @param bondID The ID of the bond to redeem.
      */
     function claimPayout(uint256 bondID) external;

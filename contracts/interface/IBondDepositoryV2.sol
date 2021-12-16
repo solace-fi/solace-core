@@ -2,12 +2,11 @@
 pragma solidity 0.8.6;
 
 /**
- * @title BondDepository_V2
+ * @title BondDepositoryV2
  * @author solace.fi
- * @dev We need to retire the original BondDepository contract, and deploy a V2, because the original contract is intertwined with the V1 BondTeller contracts
- * @notice Factory and manager of [`Bond Tellers`](./BondTellerBase_V2).
+ * @notice Factory and registry of [`Bond Tellers`](./BondTellerBaseV2) contracts. Is also the SOLACE bank from which all Bond Tellers pull SOLACE from.
  */
-interface IBondDepository_V2 {
+interface IBondDepositoryV2 {
 
     /***************************************
     EVENTS
@@ -44,11 +43,11 @@ interface IBondDepository_V2 {
     ***************************************/
 
     /**
-     * @notice Creates a new [`BondTeller`](./IBondTeller_V2).
+     * @notice Creates a new [`BondTeller`](./IBondTellerV2).
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param name The name of the bond token.
      * @param governance The address of the teller's [governor](/docs/protocol/governance).
-     * @param impl The address of BondTeller_V2 implementation.
+     * @param impl The address of BondTellerV2 implementation.
      * @param principal address The ERC20 token that users give.
      * @return teller The address of the new teller.
      */
@@ -60,11 +59,11 @@ interface IBondDepository_V2 {
     ) external returns (address teller);
 
     /**
-     * @notice Creates a new [`BondTeller`](./IBondTeller_V2).
+     * @notice Creates a new [`BondTeller`](./IBondTellerV2).
      * @param name The name of the bond token.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param governance The address of the teller's [governor](/docs/protocol/governance).
-     * @param impl The address of BondTeller_V2 implementation.
+     * @param impl The address of BondTellerV2 implementation.
      * @param salt The salt for CREATE2.
      * @param principal address The ERC20 token that users give.
      * @return teller The address of the new teller.

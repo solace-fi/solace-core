@@ -60,6 +60,11 @@ export async function import_artifacts() {
   artifacts.BondTellerERC20 = await tryImport(`${artifact_dir}/BondTellerErc20.sol/BondTellerErc20.json`);
   artifacts.Faucet = await tryImport(`${artifact_dir}/Faucet.sol/Faucet.json`);
 
+  // bonding v2 (with linear vesting)
+  artifacts.BondDepositoryV2 = await tryImport(`${artifact_dir}/BondDepositoryV2.sol/BondDepositoryV2.json`);
+  artifacts.BondTellerEthV2 = await tryImport(`${artifact_dir}/BondTellerEthV2.sol/BondTellerEthV2.json`);
+  artifacts.BondTellerERC20V2 = await tryImport(`${artifact_dir}/BondTellerErc20V2.sol/BondTellerErc20V2.json`);
+
   // oracles
   artifacts.ExchangeQuoter1InchV1 = await tryImport(`${artifact_dir}/oracles/ExchangeQuoter1InchV1.sol/ExchangeQuoter1InchV1.json`);
   artifacts.ExchangeQuoterManual = await tryImport(`${artifact_dir}/oracles/ExchangeQuoterManual.sol/ExchangeQuoterManual.json`);

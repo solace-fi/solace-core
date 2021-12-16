@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
-import "./BondTellerBase_V2.sol";
-import "./interface/IBondTellerErc20_V2.sol";
+import "./BondTellerBaseV2.sol";
+import "./interface/IBondTellerErc20V2.sol";
 
 /**
- * @title BondTellerErc20_V2
+ * @title BondTellerErc20V2
  * @author solace.fi
  * @notice A bond teller that accepts an ERC20 as payment.
  *
  * The main difference between V1 and V2 SOLACE bonds, is that V1 SOLACE bonds can be redeemed for payout only after the vestingTerm, while V2 SOLACE bonds linearly vest over the localVestingTerm.
- * `redeem()` in BondTellerBase.sol has been renamed to `claimPayout()` in BondTellerBase_V2.sol - to reduce confusion
+ * `redeem()` in BondTellerBase.sol has been renamed to `claimPayout()` in BondTellerBaseV2.sol - to reduce confusion
  *
- * Users purchase SOLACE bonds from Bond Tellers, think of them as the merchant stores specialising in SOLACE protocol bonds
+ * Users purchase SOLACE bonds from Bond Tellers, think of them as the ATM (as in automated teller machine at your banking branch) specialising in SOLACE protocol bonds
  *
  * There is a separate Bond Teller for each type of bond; the Bond Teller sets all the terms for the bond
  * Buying a bond from a Bond Teller will mint a `SPT V2` ERC721 to the user
@@ -22,9 +22,9 @@ import "./interface/IBondTellerErc20_V2.sol";
  * Purchasers can `claimPayout` anytime after the `startTime`.
  * If `claimPayout` is called anytime after `vestingStart + localVestingTerm`, then the `SPT V2` ERC721 is burned and the bond terms are completed.
  * 
- * Most of the implementation details are in [`BondTellerBase`](./BondTellerBase_V2).
+ * Most of the implementation details are in [`BondTellerBase`](./BondTellerBaseV2).
  */
-contract BondTellerErc20_V2 is BondTellerBase_V2, IBondTellerErc20_V2 {
+contract BondTellerErc20V2 is BondTellerBaseV2, IBondTellerErc20V2 {
 
     /***************************************
     BONDER FUNCTIONS

@@ -11,19 +11,19 @@ import "./GovernableInitializable.sol";
 import "./ERC721EnhancedInitializable.sol";
 import "./interface/ISOLACE.sol";
 import "./interface/IxSOLACE.sol";
-import "./interface/IBondDepository_V2.sol";
-import "./interface/IBondTellerErc20_V2.sol";
+import "./interface/IBondDepositoryV2.sol";
+import "./interface/IBondTellerErc20V2.sol";
 
 
 /**
- * @title BondTellerBase_V2
+ * @title BondTellerBaseV2
  * @author solace.fi
  * @notice A base type for bond tellers.
  *
  * The main difference between V1 and V2 SOLACE bonds, is that V1 SOLACE bonds can be redeemed for payout only after the vestingTerm, while V2 SOLACE bonds linearly vest over the localVestingTerm.
- * `redeem()` in BondTellerBase.sol has been renamed to `claimPayout()` in BondTellerBase_V2.sol - to reduce confusion
+ * `redeem()` in BondTellerBase.sol has been renamed to `claimPayout()` in BondTellerBaseV2.sol - to reduce confusion
  *
- * Users purchase SOLACE bonds from Bond Tellers, think of them as the merchant stores specialising in SOLACE protocol bonds
+ * Users purchase SOLACE bonds from Bond Tellers, think of them as the ATM (as in automated teller machine at your banking branch) specialising in SOLACE protocol bonds
  *
  * There is a separate Bond Teller for each type of bond; the Bond Teller sets all the terms for the bond
  * Buying a bond from a Bond Teller will mint a `SPT V2` ERC721 to the user
@@ -34,7 +34,7 @@ import "./interface/IBondTellerErc20_V2.sol";
  * If `claimPayout` is called anytime after `vestingStart + localVestingTerm`, then the `SPT V2` ERC721 is burned and the bond terms are completed.
  * 
  */
-abstract contract BondTellerBase_V2 is IBondTeller_V2, ReentrancyGuard, GovernableInitializable, ERC721EnhancedInitializable {
+abstract contract BondTellerBaseV2 is IBondTellerV2, ReentrancyGuard, GovernableInitializable, ERC721EnhancedInitializable {
     using SafeERC20 for IERC20;
 
     /***************************************
@@ -83,7 +83,7 @@ abstract contract BondTellerBase_V2 is IBondTeller_V2, ReentrancyGuard, Governab
     IERC20 public principal;                   // token to accept as payment
     address public underwritingPool;           // the underwriting pool to back risks
     address public dao;                        // the dao
-    IBondDepository_V2 public bondDepo;       // the bond depository
+    IBondDepositoryV2 public bondDepo;       // the bond depository
 
     /***************************************
     INITIALIZER
@@ -204,7 +204,7 @@ abstract contract BondTellerBase_V2 is IBondTeller_V2, ReentrancyGuard, Governab
     /**
      * @notice Claim payout for a bond that the user holds.
      * User calling claimPayout() must be either the owner or approved for the entered bondID.
-     * @dev Renamed redeem() in BondTellerBase.sol to claimPayout() in BondTellerBase_V2.sol
+     * @dev Renamed redeem() in BondTellerBase.sol to claimPayout() in BondTellerBaseV2.sol
      * @param bondID The ID of the bond to redeem.
      */
     function claimPayout(uint256 bondID) external override nonReentrant tokenMustExist(bondID) {
@@ -422,7 +422,7 @@ abstract contract BondTellerBase_V2 is IBondTeller_V2, ReentrancyGuard, Governab
         underwritingPool = pool_;
         dao = dao_;
         principal = IERC20(principal_);
-        bondDepo = IBondDepository_V2(bondDepo_);
+        bondDepo = IBondDepositoryV2(bondDepo_);
         emit AddressesSet();
     }
 }
