@@ -33,7 +33,7 @@ const TEN_MILLION_ETHER = BN.from("10000000000000000000000000");
 const VESTING_START = 1638209176; // Unix timestamp for initial SOLACE add liquidity transaction - https://etherscan.io/tx/0x71f1de15ee75f414c454aec3612433d0123e44ec5987515fc3566795cd840bc3
 
 describe("TokenVesting", function () {
-    const [deployer, governor, investor1, investor2, investor3, randomGreedyPerson, investor1_new_account, recipient] = provider.getWallets();
+    const [deployer, governor, investor1, investor2, investor3, randomGreedyPerson, investor1_new_account, SOLACE_rescue_account] = provider.getWallets();
     let artifacts: ArtifactImports;
   
     before(async function () {
@@ -139,7 +139,7 @@ describe("TokenVesting", function () {
           await expect(tokenVesting.connect(investor3).setNewInvestorAddress(investor1.address, investor3.address)).to.be.revertedWith("!governance");
           await expect(tokenVesting.connect(randomGreedyPerson).setNewInvestorAddress(investor1.address, randomGreedyPerson.address)).to.be.revertedWith("!governance");
           await expect(tokenVesting.connect(investor1_new_account).setNewInvestorAddress(investor1.address, investor1_new_account.address)).to.be.revertedWith("!governance");
-          await expect(tokenVesting.connect(recipient).setNewInvestorAddress(investor1.address, recipient.address)).to.be.revertedWith("!governance");
+          await expect(tokenVesting.connect(SOLACE_rescue_account).setNewInvestorAddress(investor1.address, SOLACE_rescue_account.address)).to.be.revertedWith("!governance");
         })
         it("setNewInvestorAddress will revert when set to pre-existing investor", async function () {
           await expect(tokenVesting.connect(governor).setNewInvestorAddress(investor1.address, investor2.address)).to.be.revertedWith("Cannot set to a pre-existing address");
@@ -369,17 +369,17 @@ describe("TokenVesting", function () {
           expect(balance).to.equal(ONE_HUNDRED_THOUSAND_ETHER)
         })
         it("Only governance can rescueSOLACEtokens", async function () {
-          await expect(tokenVesting.connect(deployer).rescueSOLACEtokens(ONE_HUNDRED_THOUSAND_ETHER, recipient.address)).to.be.revertedWith("!governance");
-          await expect(tokenVesting.connect(investor1_new_account).rescueSOLACEtokens(ONE_HUNDRED_THOUSAND_ETHER, recipient.address)).to.be.revertedWith("!governance");
-          await expect(tokenVesting.connect(investor2).rescueSOLACEtokens(ONE_HUNDRED_THOUSAND_ETHER, recipient.address)).to.be.revertedWith("!governance");
-          await expect(tokenVesting.connect(investor3).rescueSOLACEtokens(ONE_HUNDRED_THOUSAND_ETHER, recipient.address)).to.be.revertedWith("!governance");
-          await expect(tokenVesting.connect(randomGreedyPerson).rescueSOLACEtokens(ONE_HUNDRED_THOUSAND_ETHER, recipient.address)).to.be.revertedWith("!governance");
-          await expect(tokenVesting.connect(recipient).rescueSOLACEtokens(ONE_HUNDRED_THOUSAND_ETHER, recipient.address)).to.be.revertedWith("!governance");
+          await expect(tokenVesting.connect(deployer).rescueSOLACEtokens(ONE_HUNDRED_THOUSAND_ETHER, SOLACE_rescue_account.address)).to.be.revertedWith("!governance");
+          await expect(tokenVesting.connect(investor1_new_account).rescueSOLACEtokens(ONE_HUNDRED_THOUSAND_ETHER, SOLACE_rescue_account.address)).to.be.revertedWith("!governance");
+          await expect(tokenVesting.connect(investor2).rescueSOLACEtokens(ONE_HUNDRED_THOUSAND_ETHER, SOLACE_rescue_account.address)).to.be.revertedWith("!governance");
+          await expect(tokenVesting.connect(investor3).rescueSOLACEtokens(ONE_HUNDRED_THOUSAND_ETHER, SOLACE_rescue_account.address)).to.be.revertedWith("!governance");
+          await expect(tokenVesting.connect(randomGreedyPerson).rescueSOLACEtokens(ONE_HUNDRED_THOUSAND_ETHER, SOLACE_rescue_account.address)).to.be.revertedWith("!governance");
+          await expect(tokenVesting.connect(SOLACE_rescue_account).rescueSOLACEtokens(ONE_HUNDRED_THOUSAND_ETHER, SOLACE_rescue_account.address)).to.be.revertedWith("!governance");
         })
-        it("Governance can rescue SOLACE tokens to desired recipient address", async function () {
+        it("Governance can rescue SOLACE tokens to desired SOLACE_rescue_account address", async function () {
           await expect(tokenVesting.connect(governor).rescueSOLACEtokens(ONE_HUNDRED_THOUSAND_ETHER, ZERO_ADDRESS)).to.be.revertedWith("zero address recipient");
-          let tx = await tokenVesting.connect(governor).rescueSOLACEtokens(ONE_HUNDRED_THOUSAND_ETHER, recipient.address);
-          await expect(tx).to.emit(solace, "Transfer").withArgs(tokenVesting.address, recipient.address, ONE_HUNDRED_THOUSAND_ETHER);
+          let tx = await tokenVesting.connect(governor).rescueSOLACEtokens(ONE_HUNDRED_THOUSAND_ETHER, SOLACE_rescue_account.address);
+          await expect(tx).to.emit(solace, "Transfer").withArgs(tokenVesting.address, SOLACE_rescue_account.address, ONE_HUNDRED_THOUSAND_ETHER);
         })
       })
 
