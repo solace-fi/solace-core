@@ -77,7 +77,6 @@ describe("BondDepository_V2", function() {
 
     // mint 1M SOLACE to the governor
     await solace.connect(governor).addMinter(governor.address);
-    await solace.connect(governor).mint(governor.address, ONE_MILLION_ETHER);
   });
 
   describe("deployment", function () {
@@ -325,47 +324,72 @@ describe("BondDepository_V2", function() {
       } else throw "no deployment";
       expect(teller_USDT.address).not.eq(teller_SCP.address);
       })
-
     });
 
+    describe("t = after Bond Teller contracts deployed", function () {
+      it("returnSolace cannot return more SOLACE than balance of BondDepository contract", async function () {
+        let bal = await solace.balanceOf(bondDepository.address);
+        await expect(bondDepository.connect(governor).returnSolace(governor.address, bal.add(1))).to.be.revertedWith("ERC20: transfer amount exceeds balance");
+      })
+      it("governor can call returnSOLACE", async function () {
+        await bondDepository.connect(governor).returnSolace(governor.address, ONE_MILLION_ETHER);
+        expect(await solace.balanceOf(bondDepository.address)).eq(0);
+        expect(await solace.balanceOf(governor.address)).eq(ONE_MILLION_ETHER);
+      })
+      it("governor cannot use setAddresses() to set a zero address", async function () {
+        await expect(bondDepository.connect(governor).setAddresses(ZERO_ADDRESS, xsolace.address, underwritingPool.address, dao.address)).to.be.revertedWith("zero address solace");
+        await expect(bondDepository.connect(governor).setAddresses(solace.address, ZERO_ADDRESS, underwritingPool.address, dao.address)).to.be.revertedWith("zero address xsolace");
+        await expect(bondDepository.connect(governor).setAddresses(solace.address, xsolace.address, ZERO_ADDRESS, dao.address)).to.be.revertedWith("zero address pool");
+        await expect(bondDepository.connect(governor).setAddresses(solace.address, xsolace.address, underwritingPool.address, ZERO_ADDRESS)).to.be.revertedWith("zero address dao");
+      })
+      it("governance can call setAddresses()", async function () {
+          let tx = await bondDepository.connect(governor).setAddresses(weth.address, dai.address, solace.address, xsolace.address);
+          expect(tx).to.emit(bondDepository, "ParamsSet").withArgs(weth.address, dai.address, solace.address, xsolace.address);
+          expect(await bondDepository.solace()).eq(weth.address);
+          expect(await bondDepository.xsolace()).eq(dai.address);
+          expect(await bondDepository.underwritingPool()).eq(solace.address);
+          expect(await bondDepository.dao()).eq(xsolace.address);
+      });
+    })
 
-  // describe("return solace", function () {
-  //   it("cannot be called by non governance", async function () {
-  //     await expect(bondDepo.connect(depositor).returnSolace(depositor.address, 1)).to.be.revertedWith("!governance");
-  //   });
-  //   it("cannot return more solace than balance", async function () {
-  //     let bal1 = await solace.balanceOf(bondDepo.address);
-  //     await expect(bondDepo.connect(governor).returnSolace(depositor.address, bal1.add(1))).to.be.revertedWith("ERC20: transfer amount exceeds balance");
-  //   });
-  //   it("can return solace", async function () {
-  //     let bal1 = await solace.balanceOf(bondDepo.address);
-  //     let depositAmount = bal1.div(2);
-  //     expect(depositAmount).gt(0);
-  //     await bondDepo.connect(governor).returnSolace(depositor.address, depositAmount);
-  //     let bal2 = await solace.balanceOf(bondDepo.address);
-  //     expect(bal1.sub(bal2)).eq(depositAmount);
-  //   });
-  // });
+    describe("Lock governance", async function() {
+      it("non governance cannot call lockGovernance()", async function () {
+          await expect(bondDepository.connect(deployer).lockGovernance()).to.be.revertedWith("!governance");
+          await expect(bondDepository.connect(mockTeller).lockGovernance()).to.be.revertedWith("!governance");
+          await expect(bondDepository.connect(dao).lockGovernance()).to.be.revertedWith("!governance");
+          await expect(bondDepository.connect(underwritingPool).lockGovernance()).to.be.revertedWith("!governance");
+          await expect(bondDepository.connect(bond_purchaser).lockGovernance()).to.be.revertedWith("!governance");
+          await expect(bondDepository.connect(randomGreedyPerson).lockGovernance()).to.be.revertedWith("!governance");
+      })
 
-  // describe("params", function () {
-  //   it("non governance cannot change params", async function () {
-  //     await expect(bondDepo.connect(depositor).setAddresses(solace.address, xsolace.address, underwritingPool.address, dao.address)).to.be.revertedWith("!governance")
-  //   });
-  //   it("cannot set to zero addresses", async function () {
-  //     await expect(bondDepo.connect(governor).setAddresses(ZERO_ADDRESS, xsolace.address, underwritingPool.address, dao.address)).to.be.revertedWith("zero address solace");
-  //     await expect(bondDepo.connect(governor).setAddresses(solace.address, ZERO_ADDRESS, underwritingPool.address, dao.address)).to.be.revertedWith("zero address xsolace");
-  //     await expect(bondDepo.connect(governor).setAddresses(solace.address, xsolace.address, ZERO_ADDRESS, dao.address)).to.be.revertedWith("zero address pool");
-  //     await expect(bondDepo.connect(governor).setAddresses(solace.address, xsolace.address, underwritingPool.address, ZERO_ADDRESS)).to.be.revertedWith("zero address dao");
-  //   });
-  //   it("governance can change params", async function () {
-  //     let tx = await bondDepo.connect(governor).setAddresses(weth.address, dai.address, solace.address, xsolace.address);
-  //     expect(tx).to.emit(bondDepo, "ParamsSet").withArgs(weth.address, dai.address, solace.address, xsolace.address);
-  //     expect(await bondDepo.solace()).eq(weth.address);
-  //     expect(await bondDepo.xsolace()).eq(dai.address);
-  //     expect(await bondDepo.underwritingPool()).eq(solace.address);
-  //     expect(await bondDepo.dao()).eq(xsolace.address);
-  //   });
-  // });
+      it("governance can call lockGovernance()", async function () {
+          let tx = await bondDepository.connect(governor).lockGovernance();
+          await expect(tx).to.emit(bondDepository, "GovernanceTransferred").withArgs(governor.address, "0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF");
+          await expect(tx).to.emit(bondDepository, "GovernanceLocked").withArgs();
+          expect(await bondDepository.governanceIsLocked()).to.be.true;
+          expect(await bondDepository.governance()).to.equal("0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF");
+          expect(await bondDepository.pendingGovernance()).to.equal("0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF");
+      });
 
+      it("governance can no longer call returnSolace", async function() {
+          await expect(bondDepository.connect(governor).returnSolace(governor.address, 1)).to.be.revertedWith("governance locked");
+      })
+
+      it("governance can no longer call setAddresses", async function() {
+          await expect(bondDepository.connect(governor).setAddresses(weth.address, dai.address, solace.address, xsolace.address)).to.be.revertedWith("governance locked");
+      })
+      it("governance can no longer call addTeller", async function() {
+          await expect(bondDepository.connect(governor).addTeller(weth.address)).to.be.revertedWith("governance locked");
+      })
+      it("governance can no longer call removeTeller", async function() {
+          await expect(bondDepository.connect(governor).removeTeller(weth.address)).to.be.revertedWith("governance locked");
+      })
+      it("governance can no longer call createBondTeller", async function() {
+          await expect(bondDepository.connect(governor).createBondTeller("Solace DAI Bond", governor.address, tellerErc20Implementation.address, dai.address)).to.be.revertedWith("governance locked");
+      })
+      it("governance can no longer call create2BondTeller", async function() {
+          await expect(bondDepository.connect(governor).create2BondTeller("Solace DAI Bond", governor.address, tellerErc20Implementation.address, toBytes32(7), dai.address)).to.be.revertedWith("governance locked");
+      })
+    })
 
 });
