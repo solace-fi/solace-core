@@ -1,5 +1,7 @@
-// ATTACK VECTOR THAT THIS TEST FILE DOESN'T COVER - IF THE 
-// Bond principal tokens = DAI, ETH, USDC, SOLACE-USDC SLP, SCP, WBTC, USDT => Should we have test more than just MockErc20 and Weth9 contracts here? Are we missing something by modelling every non-ETH token as a MockERC20 token?
+// Current bond principal tokens = DAI, ETH, USDC, SOLACE-USDC SLP, SCP, WBTC, USDT 
+// => Should we have test more than just MockErc20 and Weth9 contracts here? Are we missing something by modelling every non-ETH token as a MockERC20 token?
+// Probably not in BondDepositoyV2.test.ts, we only use the address of the deployed token contracts
+// However there may be more attack vectors revealed in BondTellerV2 when interacting with the principal tokens
 // Wtf is the SCP token?
 
 import hardhat from "hardhat";
@@ -374,7 +376,6 @@ describe("BondDepository_V2", function() {
       it("governance can no longer call returnSolace", async function() {
           await expect(bondDepository.connect(governor).returnSolace(governor.address, 1)).to.be.revertedWith("governance locked");
       })
-
       it("governance can no longer call setAddresses", async function() {
           await expect(bondDepository.connect(governor).setAddresses(weth.address, dai.address, solace.address, xsolace.address)).to.be.revertedWith("governance locked");
       })
