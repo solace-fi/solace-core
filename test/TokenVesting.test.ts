@@ -383,6 +383,39 @@ describe("TokenVesting", function () {
         })
       })
 
+      describe("Lock governance", async function() {
+        it("non governance cannot call lockGovernance()", async function () {
+            await expect(tokenVesting.connect(deployer).lockGovernance()).to.be.revertedWith("!governance");
+            await expect(tokenVesting.connect(investor1).lockGovernance()).to.be.revertedWith("!governance");
+            await expect(tokenVesting.connect(investor2).lockGovernance()).to.be.revertedWith("!governance");
+            await expect(tokenVesting.connect(investor3).lockGovernance()).to.be.revertedWith("!governance");
+            await expect(tokenVesting.connect(randomGreedyPerson).lockGovernance()).to.be.revertedWith("!governance");
+            await expect(tokenVesting.connect(investor1_new_account).lockGovernance()).to.be.revertedWith("!governance");
+            await expect(tokenVesting.connect(SOLACE_rescue_account).lockGovernance()).to.be.revertedWith("!governance");
+        })
+
+        it("governance can call lockGovernance()", async function () {
+            let tx = await tokenVesting.connect(governor).lockGovernance();
+            await expect(tx).to.emit(tokenVesting, "GovernanceTransferred").withArgs(governor.address, "0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF");
+            await expect(tx).to.emit(tokenVesting, "GovernanceLocked").withArgs();
+            expect(await tokenVesting.governanceIsLocked()).to.be.true;
+            expect(await tokenVesting.governance()).to.equal("0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF");
+            expect(await tokenVesting.pendingGovernance()).to.equal("0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF");
+        });
+  
+        it("governance can no longer call setNewInvestorAddress", async function() {
+            await expect(tokenVesting.connect(governor).setNewInvestorAddress(investor2.address, randomGreedyPerson.address)).to.be.revertedWith("governance locked");
+        })
+        it("governance can no longer call setTotalInvestorTokens", async function() {
+            await expect(tokenVesting.connect(governor).setTotalInvestorTokens([governor.address], [ONE_MILLION_ETHER])).to.be.revertedWith("governance locked");
+        })
+        it("governance can no longer call rescueSOLACEtokens", async function() {
+            await solace.connect(governor).mint(tokenVesting.address, ONE_HUNDRED_THOUSAND_ETHER)
+            await expect(tokenVesting.connect(governor).rescueSOLACEtokens(ONE_HUNDRED_THOUSAND_ETHER, governor.address)).to.be.revertedWith("governance locked");
+        })
+        // Technically should add unit tests here to test claimTokens() still works, but with this test script, claimTokens() will revert with reason "You cannot claim any tokens at the moment"
+      })
+
 })
 
 async function getCurrentTimestamp() {
