@@ -65,15 +65,14 @@ abstract contract BondTellerBaseV2 is IBondTellerV2, ReentrancyGuard, Governable
     // bonds
     uint256 public numBonds;                   // total number of bonds that have been created
 
-    // UNSURE here - is it more gas efficient to store payoutAlreadyClaimed in a struct, or in a mapping
-    struct Bond {
-        address payoutToken;                   // solace or xsolace
-        uint40 vestingStart;                   // timestamp at which bond was minted
-        uint40 localVestingTerm;               // vesting term for this bond
-        uint256 payoutAmount;                  // amount of solace or xsolace to be paid in total on the bond
-        uint256 payoutAlreadyClaimed;          // amount of solace or xsolace that has already been claimed on the bond
-        uint256 pricePaid;                     // measured in 'principal', for front end viewing
-    }
+    // struct Bond {
+    //     address payoutToken;                   // solace or xsolace
+    //     uint40 vestingStart;                   // timestamp at which bond was minted
+    //     uint40 localVestingTerm;               // vesting term for this bond
+    //     uint256 payoutAmount;                  // amount of solace or xsolace to be paid in total on the bond
+    //     uint256 payoutAlreadyClaimed;          // amount of solace or xsolace that has already been claimed on the bond
+    //     uint256 pricePaid;                     // measured in 'principal', for front end viewing
+    // }
 
     mapping (uint256 => Bond) public bonds;    // mapping of bondID to Bond object
 

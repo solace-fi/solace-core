@@ -30,7 +30,17 @@ interface IBondTellerV2 {
     ***************************************/
 
     /// @notice Emitted when a bond is created.
-    event CreateBond(uint256 bondID, uint256 principalAmount, address payoutToken, uint256 payoutAmount, uint256 vestingStart);
+    event CreateBond(uint256 bondID, uint256 principalAmount, address payoutToken, uint256 payoutAmount, uint40 vestingStart, uint40 vestingTime);
+
+    struct Bond {
+        address payoutToken;                   // solace or xsolace
+        uint40 vestingStart;                   // timestamp at which bond was minted
+        uint40 localVestingTerm;               // vesting term for this bond
+        uint256 payoutAmount;                  // amount of solace or xsolace to be paid in total on the bond
+        uint256 payoutAlreadyClaimed;          // amount of solace or xsolace that has already been claimed on the bond
+        uint256 pricePaid;                     // measured in 'principal', for front end viewing
+    }
+
     /// @notice Emitted when a bond is burned.
     event BurnBond(uint256 bondID, address recipient, address payoutToken, uint256 payoutAmount);
     /// @notice Emitted when deposits are paused.

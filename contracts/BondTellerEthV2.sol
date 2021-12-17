@@ -44,7 +44,7 @@ contract BondTellerEthV2 is BondTellerBaseV2, IBondTellerEthV2 {
         uint256 minAmountOut,
         address depositor,
         bool stake
-    ) external payable override returns (uint256 payout, uint256 bondID) {
+    ) external payable override nonReentrant returns (uint256 payout, uint256 bondID) {
         // accounting
         return _deposit(msg.value, minAmountOut, depositor, stake, false);
     }
@@ -65,7 +65,7 @@ contract BondTellerEthV2 is BondTellerBaseV2, IBondTellerEthV2 {
         uint256 minAmountOut,
         address depositor,
         bool stake
-    ) external override returns (uint256 payout, uint256 bondID) {
+    ) external override nonReentrant returns (uint256 payout, uint256 bondID) {
         (payout, bondID) = _deposit(amount, minAmountOut, depositor, stake, true);
         // pull tokens
         SafeERC20.safeTransferFrom(principal, msg.sender, address(this), amount);
@@ -96,7 +96,7 @@ contract BondTellerEthV2 is BondTellerBaseV2, IBondTellerEthV2 {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) external override returns (uint256 payout, uint256 bondID) {
+    ) external override nonReentrant returns (uint256 payout, uint256 bondID) {
         (payout, bondID) = _deposit(amount, minAmountOut, depositor, stake, true);
         // permit
         IERC20Permit(address(principal)).permit(depositor, address(this), amount, deadline, v, r, s);
@@ -177,7 +177,7 @@ contract BondTellerEthV2 is BondTellerBaseV2, IBondTellerEthV2 {
             pricePaid: amount
         });
         _mint(depositor, bondID);
-        emit CreateBond(bondID, amount, payoutToken, payout, vestingStart);
+        emit CreateBond(bondID, amount, payoutToken, payout, vestingStart, globalVestingTerm);
         return (payout, bondID);
     }
 

@@ -3,6 +3,7 @@ pragma solidity 0.8.6;
 
 import "./BondTellerBaseV2.sol";
 import "./interface/IBondTellerErc20V2.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 /**
  * @title BondTellerErc20V2
@@ -46,10 +47,13 @@ contract BondTellerErc20V2 is BondTellerBaseV2, IBondTellerErc20V2 {
         uint256 minAmountOut,
         address depositor,
         bool stake
-    ) external override returns (uint256 payout, uint256 bondID) {
-        (payout, bondID) = _deposit(amount, minAmountOut, depositor, stake);
-        // pull tokens
-        SafeERC20.safeTransferFrom(principal, msg.sender, address(this), amount);
+    ) external override nonReentrant returns (uint256 payout, uint256 bondID) {
+        uint256 daoFee;
+        (payout, bondID, daoFee) = _deposit(amount, minAmountOut, depositor, stake);
+
+        // route principal - put last as Checks-Effects-Interactions
+        if(daoFee > 0) SafeERC20.safeTransferFrom(principal, depositor, dao, daoFee);
+        SafeERC20.safeTransferFrom(principal, depositor, underwritingPool, amount - daoFee);
     }
 
     /**
@@ -57,6 +61,7 @@ contract BondTellerErc20V2 is BondTellerBaseV2, IBondTellerErc20V2 {
      * Principal will be transferred from `depositor` using `permit`.
      * Note that not all ERC20s have a permit function, in which case this function will revert.
      * @dev Switched order so that SafeERC20.safeTransferFrom occurs last to comply with Checks-Effects-Interactions
+     * @dev 
      * @param amount Amount of principal to deposit.
      * @param minAmountOut The minimum **SOLACE** or **xSOLACE** out.
      * @param depositor The bond recipient, default msg.sender.
@@ -77,29 +82,39 @@ contract BondTellerErc20V2 is BondTellerBaseV2, IBondTellerErc20V2 {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) external override returns (uint256 payout, uint256 bondID) {
-        (payout, bondID) = _deposit(amount, minAmountOut, depositor, stake);
-        // permit
-        IERC20Permit(address(principal)).permit(depositor, address(this), amount, deadline, v, r, s);
-        // pull tokens
-        SafeERC20.safeTransferFrom(principal, depositor, address(this), amount);
+    ) external override nonReentrant returns (uint256 payout, uint256 bondID) {
+        uint256 daoFee;
+        (payout, bondID, daoFee) = _deposit(amount, minAmountOut, depositor, stake);
+        
+        // route principal - put last as Checks-Effects-Interactions
+        if(daoFee > 0) {
+            // This is the victim of changing SafeERC20.safeTransferFrom placement - will need gas to pay for this tx
+            // Unless you can call more than one permit with the same 
+            // IERC20Permit(address(principal)).permit(depositor, address(this), daoFee, deadline, v, r, s);
+            SafeERC20.safeTransferFrom(principal, depositor, dao, daoFee);
+        }
+        IERC20Permit(address(principal)).permit(depositor, address(this), amount - daoFee, deadline, v, r, s);
+        SafeERC20.safeTransferFrom(principal, depositor, underwritingPool, amount - daoFee);
     }
 
     /**
      * @notice Create a bond by depositing `amount` of `principal`.
+     * @dev In V2 altered safeTransfer calls to safeTransferFrom calls, so that principal tokens transferred direct from depositor to dao & underwriting pool
+     * 
      * @param amount Amount of principal to deposit.
      * @param minAmountOut The minimum **SOLACE** or **xSOLACE** out.
      * @param depositor The bond recipient, default msg.sender.
      * @param stake True to stake, false to not stake.
      * @return payout The amount of SOLACE or xSOLACE in the bond.
      * @return bondID The ID of the newly created bond.
+     * @return daoFee Amount of principal paid to dao
      */
     function _deposit(
         uint256 amount,
         uint256 minAmountOut,
         address depositor,
         bool stake
-    ) internal returns (uint256 payout, uint256 bondID) {
+    ) internal returns (uint256 payout, uint256 bondID, uint256 daoFee) {
         require(depositor != address(0), "invalid address");
         require(!paused, "cannot deposit while paused");
 
@@ -121,17 +136,14 @@ contract BondTellerErc20V2 is BondTellerBaseV2, IBondTellerErc20V2 {
         }
         require(payout <= maxPayout, "bond too large");
 
-        // route principal
+        // calc daoFee and bondFee
         uint256 daoFee = amount * daoFeeBps / MAX_BPS;
-        if(daoFee > 0) SafeERC20.safeTransfer(principal, dao, daoFee);
-        SafeERC20.safeTransfer(principal, underwritingPool, amount - daoFee);
-        // route solace
-        bondDepo.pullSolace(payout);
         uint256 bondFee = payout * bondFeeBps / MAX_BPS;
-        if(bondFee > 0) {
-            SafeERC20.safeTransfer(solace, address(xsolace), bondFee);
-            payout -= bondFee;
-        }
+        payout -= bondFee;
+        
+        // route solace - interacting between trusted set of contracts - BondDepositoryV2.sol, this, xSOLACE.sol - so ok to keep this here
+        bondDepo.pullSolace(payout);
+        if(bondFee > 0) SafeERC20.safeTransfer(solace, address(xsolace), bondFee);
 
         // optionally stake
         address payoutToken;
@@ -156,7 +168,6 @@ contract BondTellerErc20V2 is BondTellerBaseV2, IBondTellerErc20V2 {
             pricePaid: amount
         });
         _mint(depositor, bondID);
-        emit CreateBond(bondID, amount, payoutToken, payout, vestingStart);
-        return (payout, bondID);
+        emit CreateBond(bondID, amount, payoutToken, payout, vestingStart, globalVestingTerm);
     }
 }

@@ -53,7 +53,7 @@ const ONE_HUNDRED_THOUSAND_ETHER = BN.from("100000000000000000000000");
 const NINE_HUNDRED_THOUSAND_ETHER = BN.from("900000000000000000000000");
 const ONE_MILLION_ETHER = BN.from("1000000000000000000000000");
 
-describe("BondDepository_V2", function() {
+describe("BondDepositoryV2", function() {
   let artifacts: ArtifactImports;
   const [deployer, governor, mockTeller, dao, underwritingPool, bond_purchaser, randomGreedyPerson] = provider.getWallets();
 
