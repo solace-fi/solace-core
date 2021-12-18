@@ -46,7 +46,12 @@ contract BondTellerEthV2 is BondTellerBaseV2, IBondTellerEthV2 {
         bool stake
     ) external payable override nonReentrant returns (uint256 payout, uint256 bondID) {
         // accounting
-        return _deposit(msg.value, minAmountOut, depositor, stake, false);
+        uint256 daoFee;
+        (payout, bondID, daoFee) = _deposit(msg.value, minAmountOut, depositor, stake);
+
+        // route principal - put last as Checks-Effects-Interactions
+        if(daoFee > 0) _transferEth(dao, daoFee, false);
+        _transferEth(underwritingPool, msg.value - daoFee, false);
     }
 
     /**
@@ -66,9 +71,14 @@ contract BondTellerEthV2 is BondTellerBaseV2, IBondTellerEthV2 {
         address depositor,
         bool stake
     ) external override nonReentrant returns (uint256 payout, uint256 bondID) {
-        (payout, bondID) = _deposit(amount, minAmountOut, depositor, stake, true);
-        // pull tokens
-        SafeERC20.safeTransferFrom(principal, msg.sender, address(this), amount);
+        // accounting
+        uint256 daoFee;
+        (payout, bondID, daoFee) = _deposit(amount, minAmountOut, depositor, stake);
+        
+        // route principal - put last as Checks-Effects-Interactions
+        SafeERC20.safeTransferFrom(principal, depositor, address(this), amount);
+        if(daoFee > 0) _transferEth(dao, daoFee, true);
+        _transferEth(underwritingPool, amount - daoFee, true);
     }
 
     /**
@@ -97,11 +107,17 @@ contract BondTellerEthV2 is BondTellerBaseV2, IBondTellerEthV2 {
         bytes32 r,
         bytes32 s
     ) external override nonReentrant returns (uint256 payout, uint256 bondID) {
-        (payout, bondID) = _deposit(amount, minAmountOut, depositor, stake, true);
+        // accounting
+        uint256 daoFee;
+        (payout, bondID, daoFee) = _deposit(amount, minAmountOut, depositor, stake);
+
         // permit
         IERC20Permit(address(principal)).permit(depositor, address(this), amount, deadline, v, r, s);
-        // pull tokens
+        // pull weth
         SafeERC20.safeTransferFrom(principal, depositor, address(this), amount);
+        // transfer weth to underwritingPool +/- dao
+        if(daoFee > 0) _transferEth(dao, daoFee, true);
+        _transferEth(underwritingPool, amount - daoFee, true);
     }
 
     /**
@@ -110,7 +126,6 @@ contract BondTellerEthV2 is BondTellerBaseV2, IBondTellerEthV2 {
      * @param minAmountOut The minimum **SOLACE** or **xSOLACE** out.
      * @param depositor The bond recipient, default msg.sender.
      * @param stake True to stake, false to not stake.
-     * @param isWrapped True if payment was made in **WETH**, false if made in **ETH**.
      * @return payout The amount of SOLACE or xSOLACE in the bond.
      * @return bondID The ID of the newly created bond.
      */
@@ -118,9 +133,8 @@ contract BondTellerEthV2 is BondTellerBaseV2, IBondTellerEthV2 {
         uint256 amount,
         uint256 minAmountOut,
         address depositor,
-        bool stake,
-        bool isWrapped
-    ) internal returns (uint256 payout, uint256 bondID) {
+        bool stake
+    ) internal returns (uint256 payout, uint256 bondID, uint256 daoFee) {
         require(depositor != address(0), "invalid address");
         require(!paused, "cannot deposit while paused");
 
@@ -142,17 +156,14 @@ contract BondTellerEthV2 is BondTellerBaseV2, IBondTellerEthV2 {
         }
         require(payout <= maxPayout, "bond too large");
 
-        // route principal
-        uint256 daoFee = amount * daoFeeBps / MAX_BPS;
-        if(daoFee > 0) _transferEth(dao, daoFee, isWrapped);
-        _transferEth(underwritingPool, amount - daoFee, isWrapped);
-        // route solace
-        bondDepo.pullSolace(payout);
+        // calc daoFee and bondFee
+        daoFee = amount * daoFeeBps / MAX_BPS;
         uint256 bondFee = payout * bondFeeBps / MAX_BPS;
-        if(bondFee > 0) {
-            SafeERC20.safeTransfer(solace, address(xsolace), bondFee);
-            payout -= bondFee;
-        }
+
+        // route solace - interacting between trusted set of contracts - BondDepositoryV2.sol, this, xSOLACE.sol - so ok to keep this here
+        bondDepo.pullSolace(payout);
+        payout -= bondFee;
+        if(bondFee > 0) SafeERC20.safeTransfer(solace, address(xsolace), bondFee);
 
         // optionally stake
         address payoutToken;
@@ -178,7 +189,6 @@ contract BondTellerEthV2 is BondTellerBaseV2, IBondTellerEthV2 {
         });
         _mint(depositor, bondID);
         emit CreateBond(bondID, amount, payoutToken, payout, vestingStart, globalVestingTerm);
-        return (payout, bondID);
     }
 
     /***************************************
@@ -205,14 +215,29 @@ contract BondTellerEthV2 is BondTellerBaseV2, IBondTellerEthV2 {
      * Deposits **ETH** and creates bond.
      */
     receive () external payable override nonReentrant {
-        _deposit(msg.value, 0, msg.sender, false, false);
+        uint256 daoFee;
+        uint256 bondID;
+        uint256 payout;
+        (payout, bondID, daoFee) = _deposit(msg.value, 0, msg.sender, false);
+        
+        // route principal - put last as Checks-Effects-Interactions
+        if(daoFee > 0) _transferEth(dao, daoFee, false);
+        _transferEth(underwritingPool, msg.value - daoFee, false);
     }
+
 
     /**
      * @notice Fallback function to allow contract to receive **ETH**.
      * Deposits **ETH** and creates bond.
      */
     fallback () external payable override nonReentrant {
-        _deposit(msg.value, 0, msg.sender, false, false);
+        uint256 daoFee;
+        uint256 bondID;
+        uint256 payout;
+        (payout, bondID, daoFee) = _deposit(msg.value, 0, msg.sender, false);
+        
+        // route principal - put last as Checks-Effects-Interactions
+        if(daoFee > 0) _transferEth(dao, daoFee, false);
+        _transferEth(underwritingPool, msg.value - daoFee, false);
     }
 }

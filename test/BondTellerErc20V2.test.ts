@@ -1,5 +1,4 @@
-import hardhat from "hardhat";
-import { waffle, ethers, upgrades } from "hardhat";
+import { waffle, ethers } from "hardhat";
 const { deployContract, solidity } = waffle;
 import { MockProvider } from "ethereum-waffle";
 const provider: MockProvider = waffle.provider;
@@ -13,7 +12,6 @@ import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer
 import { Solace, XSolace, MockErc20, MockErc20Permit, BondDepositoryV2, BondTellerErc20V2, Weth9 } from "../typechain";
 import { expectClose } from "./utilities/math";
 import { getERC20PermitSignature } from "./utilities/getERC20PermitSignature";
-import { zeroAddress } from "ethereumjs-util";
 
 // common tokens
 let weth: Weth9;
