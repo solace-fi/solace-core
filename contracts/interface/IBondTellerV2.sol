@@ -38,7 +38,7 @@ interface IBondTellerV2 {
         uint40 localVestingTerm;               // vesting term for this bond
         uint256 payoutAmount;                  // amount of solace or xsolace to be paid in total on the bond
         uint256 payoutAlreadyClaimed;          // amount of solace or xsolace that has already been claimed on the bond
-        uint256 pricePaid;                     // measured in 'principal', for front end viewing
+        uint256 principalPaid;                 // amount of principal paid for this bond
     }
 
     /// @notice Emitted when a bond is burned.

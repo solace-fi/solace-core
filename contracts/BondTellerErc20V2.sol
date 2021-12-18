@@ -137,12 +137,12 @@ contract BondTellerErc20V2 is BondTellerBaseV2, IBondTellerErc20V2 {
         require(payout <= maxPayout, "bond too large");
 
         // calc daoFee and bondFee
-        uint256 daoFee = amount * daoFeeBps / MAX_BPS;
+        daoFee = amount * daoFeeBps / MAX_BPS;
         uint256 bondFee = payout * bondFeeBps / MAX_BPS;
-        payout -= bondFee;
         
         // route solace - interacting between trusted set of contracts - BondDepositoryV2.sol, this, xSOLACE.sol - so ok to keep this here
         bondDepo.pullSolace(payout);
+        payout -= bondFee;
         if(bondFee > 0) SafeERC20.safeTransfer(solace, address(xsolace), bondFee);
 
         // optionally stake
@@ -165,9 +165,10 @@ contract BondTellerErc20V2 is BondTellerBaseV2, IBondTellerErc20V2 {
             localVestingTerm: globalVestingTerm,
             payoutAmount: payout,
             payoutAlreadyClaimed: 0,
-            pricePaid: amount
+            principalPaid: amount
         });
         _mint(depositor, bondID);
         emit CreateBond(bondID, amount, payoutToken, payout, vestingStart, globalVestingTerm);
+        // return(payout, bondID, daoFee);
     }
 }

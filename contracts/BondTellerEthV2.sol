@@ -174,7 +174,7 @@ contract BondTellerEthV2 is BondTellerBaseV2, IBondTellerEthV2 {
             localVestingTerm: globalVestingTerm,
             payoutAmount: payout,
             payoutAlreadyClaimed: 0,
-            pricePaid: amount
+            principalPaid: amount
         });
         _mint(depositor, bondID);
         emit CreateBond(bondID, amount, payoutToken, payout, vestingStart, globalVestingTerm);

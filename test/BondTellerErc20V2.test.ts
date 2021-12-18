@@ -385,8 +385,8 @@ describe("BondTellerERC20V2", function() {
       await teller2.connect(governor).setTerms(MODIFIED_BOND_TERMS);
 
       const blockTimestamp = await getCurrentTimestamp()
-      await provider.send("evm_mine", [blockTimestamp + 100000]);
-      expect(await getCurrentTimestamp()).to.equal(blockTimestamp + 100000);
+      await provider.send("evm_mine", [blockTimestamp + 60]);
+      expect(await getCurrentTimestamp()).to.equal(blockTimestamp + 60);
       expect(await teller1.bondPrice()).eq(0);
       expect(await teller2.bondPrice()).eq(0);
 
@@ -480,14 +480,13 @@ describe("BondTellerERC20V2", function() {
   })
 
   describe("deposit cases", function() {
-    it("test deposit 1 - deposit 3 DAI", async function () {
+    it("test deposit 1 - deposit 3 DAI, starting SOLACE price of 2 DAI", async function () {
       let MODIFIED_BOND_TERMS = {...DEFAULT_BOND_TERMS}
       MODIFIED_BOND_TERMS.startPrice = ONE_ETHER.mul(2)
       MODIFIED_BOND_TERMS.minimumPrice = 0
       await teller1.connect(governor).setTerms(MODIFIED_BOND_TERMS);
       await teller1.connect(governor).setFees(BOND_FEE, DAO_FEE)
       let balances_before_deposit = await getBalances(teller1, depositor1);
-      const blockTimestamp = await getCurrentTimestamp()
       let predictedAmountOut = await teller1.calculateAmountOut(ONE_ETHER.mul(3), false);
       let predictedAmountIn = await teller1.calculateAmountIn(predictedAmountOut, false);
 
@@ -498,223 +497,324 @@ describe("BondTellerERC20V2", function() {
       let bondID1 = await teller1.numBonds();
       expect(bondID1).eq(1);
       let bondInfo = await teller1.bonds(bondID1);
-      expect(tx1).to.emit(teller1, "CreateBond").withArgs(bondID1, bondInfo.pricePaid, bondInfo.payoutToken, bondInfo.payoutAmount, bondInfo.vestingStart, bondInfo.localVestingTerm);
+      expect(tx1).to.emit(teller1, "CreateBond").withArgs(bondID1, bondInfo.principalPaid, bondInfo.payoutToken, bondInfo.payoutAmount, bondInfo.vestingStart, bondInfo.localVestingTerm);
 
       // Confirm minted bond has desired parameters
-      expect(bondInfo.pricePaid).eq(ONE_ETHER.mul(3));
+      expect(bondInfo.principalPaid).eq(ONE_ETHER.mul(3));
       expect(bondInfo.payoutToken).eq(solace.address);
       expectClose(predictedAmountIn, ONE_ETHER.mul(3), 1e14);
       expectClose(predictedAmountOut, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
-      expectClose(bondInfo.payoutAmount, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
+      expectClose(bondInfo.payoutAmount, predictedAmountOut, 1e14);
+      expect(bondInfo.localVestingTerm).eq(await teller1.globalVestingTerm())
+      expect(bondInfo.payoutAlreadyClaimed).eq(0)
+ 
+      // Confirm balances
+      let balances_after_deposit = await getBalances(teller1, depositor1);
+      let change_in_balances = getBalancesDiff(balances_after_deposit, balances_before_deposit);
+
+      expect(change_in_balances.userSolace).eq(0);
+      expect(change_in_balances.userXSolace).eq(0);
+      expect(change_in_balances.vestingSolace).eq(bondInfo.payoutAmount);
+      expect(change_in_balances.vestingXSolace).eq(0);
+      expectClose(change_in_balances.stakingSolace, ONE_ETHER.mul(3).div(2).mul(BOND_FEE).div(MAX_BPS), 1e14);
+      expect(change_in_balances.totalXSolace).eq(0);
+      expect(change_in_balances.userDai).eq(ONE_ETHER.mul(-3));
+      expect(change_in_balances.userScp).eq(0);
+      expect(change_in_balances.daoDai).eq(ONE_ETHER.mul(3).mul(DAO_FEE).div(MAX_BPS));
+      expect(change_in_balances.daoScp).eq(0);
+      expect(change_in_balances.poolDai).eq(ONE_ETHER.mul(3).mul(MAX_BPS-DAO_FEE).div(MAX_BPS))
+      expect(change_in_balances.poolScp).eq(0);
+      expect(change_in_balances.userBonds).eq(1);
+      expect(change_in_balances.totalBonds).eq(1);
+      expect(await xsolace.solaceToXSolace(ONE_ETHER)).to.equal(ONE_ETHER);
+      expect(await xsolace.xSolaceToSolace(ONE_ETHER)).to.equal(ONE_ETHER);
+      expect(change_in_balances.tellerCapacity).eq(bondInfo.principalPaid.mul(-1));
+      expectClose(change_in_balances.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-BOND_FEE), 1e14);
     })
+    it("test deposit 2 - capacityIsPayout = true && stake = true, deposit 3 DAI, starting SOLACE price of 2 DAI", async function () {
+      let MODIFIED_BOND_TERMS = {...DEFAULT_BOND_TERMS}
+      MODIFIED_BOND_TERMS.startPrice = ONE_ETHER.mul(2)
+      MODIFIED_BOND_TERMS.minimumPrice = 0
+      MODIFIED_BOND_TERMS.capacityIsPayout = true;
+      await teller1.connect(governor).setTerms(MODIFIED_BOND_TERMS);
 
+      // Mint 1 SOLACE to xSOLACE          
+      await solace.connect(governor).addMinter(minter.address);
+      await solace.connect(minter).mint(xsolace.address, ONE_ETHER);
 
+      let balances_before_deposit = await getBalances(teller1, depositor1);
+      let predictedAmountOut = await teller1.calculateAmountOut(ONE_ETHER.mul(3), true);
+      let predictedAmountIn = await teller1.calculateAmountIn(predictedAmountOut, true);
 
-  //     expectClose(bondInfo.maturation, VESTING_TERM+blockTimestamp+1, 5);
-  //     let bal2 = await getBalances(teller1, depositor1);
-  //     let bal12 = getBalancesDiff(bal2, bal1);
-  //     expect(bal12.userSolace).eq(0);
-  //     expect(bal12.userXSolace).eq(0);
-  //     expect(bal12.vestingSolace).eq(bondInfo.payoutAmount);
-  //     expect(bal12.vestingXSolace).eq(0);
-  //     expectClose(bal12.stakingSolace, ONE_ETHER.mul(3).div(2).mul(BOND_FEE).div(MAX_BPS), 1e14);
-  //     expect(bal12.totalXSolace).eq(0);
-  //     expect(bal12.userdai).eq(ONE_ETHER.mul(-3));
-  //     expect(bal12.userTkn2).eq(0);
-  //     expect(bal12.daodai).eq(ONE_ETHER.mul(3).mul(DAO_FEE).div(MAX_BPS));
-  //     expect(bal12.daoTkn2).eq(0);
-  //     expect(bal12.pooldai).eq(ONE_ETHER.mul(3).mul(MAX_BPS-DAO_FEE).div(MAX_BPS));
-  //     expect(bal12.poolTkn2).eq(0);
-  //     expect(bal12.userBonds).eq(1);
-  //     expect(bal12.totalBonds).eq(1);
-  //     expect(await xsolace.solaceToXSolace(ONE_ETHER)).to.equal(ONE_ETHER);
-  //     expect(await xsolace.xSolaceToSolace(ONE_ETHER)).to.equal(ONE_ETHER);
-  //     expect(bal12.tellerCapacity).eq(bondInfo.pricePaid.mul(-1));
-  //     expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-BOND_FEE), 1e14);
+      // Deposit 
+      let tx1 = await teller1.connect(depositor1).deposit(ONE_ETHER.mul(3), ONE_ETHER, depositor1.address, true);
+
+      // Confirm bond parameters
+      let bondID = await teller1.numBonds();
+      expect(bondID).eq(2);
+      let bondInfo = await teller1.bonds(bondID);
+      expect(tx1).to.emit(teller1, "CreateBond").withArgs(bondID, bondInfo.principalPaid, bondInfo.payoutToken, bondInfo.payoutAmount, bondInfo.vestingStart, bondInfo.localVestingTerm);
+
+      expect(bondInfo.principalPaid).eq(ONE_ETHER.mul(3));
+      expect(bondInfo.payoutToken).eq(xsolace.address);
+      expectClose(predictedAmountIn, ONE_ETHER.mul(3), 1e14);
+      expectClose(predictedAmountOut, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
+      expectClose(bondInfo.payoutAmount, predictedAmountOut, 1e14);
+      expect(bondInfo.localVestingTerm).eq(await teller1.globalVestingTerm())
+      expect(bondInfo.payoutAlreadyClaimed).eq(0)
+
+      // Confirm balances
+      let balances_after_deposit = await getBalances(teller1, depositor1);
+      let change_in_balances = getBalancesDiff(balances_after_deposit, balances_before_deposit);
+
+      expect(change_in_balances.userSolace).eq(0);
+      expect(change_in_balances.userXSolace).eq(0);
+      expect(change_in_balances.vestingSolace).eq(0);
+      expect(change_in_balances.vestingXSolace).eq(bondInfo.payoutAmount);
+      expectClose(change_in_balances.stakingSolace, ONE_ETHER.mul(3).div(2), 1e14);
+      // Before this point xsolace.totalSupply() = 0 
+      // => amount of xSolace minted = amount of SOLACE staked
+      expectClose(change_in_balances.totalXSolace, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
+      expect(change_in_balances.userDai).eq(ONE_ETHER.mul(-3));
+      expect(change_in_balances.userScp).eq(0);
+      expect(change_in_balances.daoDai).eq(ONE_ETHER.mul(3).mul(DAO_FEE).div(MAX_BPS));
+      expect(change_in_balances.daoScp).eq(0);
+      expect(change_in_balances.poolDai).eq(ONE_ETHER.mul(3).mul(MAX_BPS-DAO_FEE).div(MAX_BPS))
+      expect(change_in_balances.poolScp).eq(0);
+      expect(change_in_balances.userBonds).eq(1);
+      expect(change_in_balances.totalBonds).eq(1);
+      expectClose(change_in_balances.tellerCapacity, bondInfo.principalPaid.mul(-1).div(2), 1e14);
+      expectClose(change_in_balances.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-BOND_FEE), 1e14)
+    });
+    it("test deposit 3 - deposit 3 DAI, set startPrice = 1 but minimumPrice = 2", async function() {
+      let MODIFIED_BOND_TERMS = {...DEFAULT_BOND_TERMS}
+      MODIFIED_BOND_TERMS.minimumPrice = ONE_ETHER.mul(2)
+      await teller1.connect(governor).setTerms(MODIFIED_BOND_TERMS);
+
+      let balances_before_deposit = await getBalances(teller1, depositor1);
+      let predictedAmountOut = await teller1.calculateAmountOut(ONE_ETHER.mul(3), false);
+      let predictedAmountIn = await teller1.calculateAmountIn(predictedAmountOut, false);
+
+      // Deposit 
+      let tx1 = await teller1.connect(depositor1).deposit(ONE_ETHER.mul(3), ONE_ETHER, depositor1.address, false);
+
+      // Confirm bond parameters
+      let bondID = await teller1.numBonds();
+      expect(bondID).eq(3);
+      let bondInfo = await teller1.bonds(bondID);
+      expect(tx1).to.emit(teller1, "CreateBond").withArgs(bondID, bondInfo.principalPaid, bondInfo.payoutToken, bondInfo.payoutAmount, bondInfo.vestingStart, bondInfo.localVestingTerm);
+      expect(bondInfo.principalPaid).eq(ONE_ETHER.mul(3));
+      expect(bondInfo.payoutToken).eq(solace.address);
+      expectClose(predictedAmountIn, ONE_ETHER.mul(3), 1e14);
+      expectClose(predictedAmountOut, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
+      expectClose(bondInfo.payoutAmount, predictedAmountOut, 1e14);
+      expect(bondInfo.localVestingTerm).eq(await teller1.globalVestingTerm())
+      expect(bondInfo.payoutAlreadyClaimed).eq(0)
+
+      // Confirm balances
+      let balances_after_deposit = await getBalances(teller1, depositor1);
+      let change_in_balances = getBalancesDiff(balances_after_deposit, balances_before_deposit);
+
+      expect(change_in_balances.userSolace).eq(0);
+      expect(change_in_balances.userXSolace).eq(0);
+      expect(change_in_balances.vestingSolace).eq(bondInfo.payoutAmount);
+      expect(change_in_balances.vestingXSolace).eq(0);
+      expectClose(change_in_balances.stakingSolace, ONE_ETHER.mul(3).div(2).mul(BOND_FEE).div(MAX_BPS), 1e14);
+      expect(change_in_balances.totalXSolace).eq(0)
+      expect(change_in_balances.userDai).eq(ONE_ETHER.mul(-3));
+      expect(change_in_balances.userScp).eq(0);
+      expect(change_in_balances.daoDai).eq(ONE_ETHER.mul(3).mul(DAO_FEE).div(MAX_BPS));
+      expect(change_in_balances.daoScp).eq(0);
+      expect(change_in_balances.poolDai).eq(ONE_ETHER.mul(3).mul(MAX_BPS-DAO_FEE).div(MAX_BPS))
+      expect(change_in_balances.poolScp).eq(0);
+      expect(change_in_balances.userBonds).eq(1);
+      expect(change_in_balances.totalBonds).eq(1);
+      expect(change_in_balances.tellerCapacity).eq(bondInfo.principalPaid.mul(-1));
+      expectClose(change_in_balances.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-BOND_FEE), 1e14)
+    })
+  })
+
+  describe("claimPayout", function() {
+    it("cannot claimPayout for a non-existent bondID", async function () {
+      await expect(teller1.connect(depositor1).claimPayout(999)).to.be.revertedWith("query for nonexistent token");
+    });
+    it("cannot claimPayout for a bondID that you are not that owner of, or are approved to transfer", async function () {
+      await expect(teller1.connect(randomGreedyPerson).claimPayout(1)).to.be.revertedWith("!bonder");
+    });
+    it("approves depositor2 to claimPayout on Bond 3 (which was minted by depositor)", async function() {
+      // We will be testing claimPayout with approval from an approved proxy account
+      // Replaces "can redeem with approval" unit test in original test script
+      const bondID = 3
+      await teller1.connect(depositor1).approve(depositor2.address, bondID);
+    })
+    it("t = 0, expect claimPayout will work but there will be miniscule payout", async function() {
+      // Query bond.payoutAlreadyClaimed values
+      let bondInfo_1 = await teller1.bonds(1);
+      let bondInfo_2 = await teller1.bonds(2);
+      let bondInfo_3 = await teller1.bonds(3);
+      expect(bondInfo_1.payoutAlreadyClaimed).eq(0)
+      expect(bondInfo_2.payoutAlreadyClaimed).eq(0)
+      expect(bondInfo_3.payoutAlreadyClaimed).eq(0)
+
+      let balances_before_claimpayout = await getBalances(teller1, depositor1)
+      let balances_before_claimpayout_depositor2 = await getBalances(teller1, depositor2)
+      await teller1.connect(depositor1).claimPayout(1)
+      await teller1.connect(depositor1).claimPayout(2)
+      await teller1.connect(depositor2).claimPayout(3)
+      let balances_after_claimpayout = await getBalances(teller1, depositor1);
+      let balances_after_claimpayout_depositor2 = await getBalances(teller1, depositor2);
+      let change_in_balances = getBalancesDiff(balances_after_claimpayout, balances_before_claimpayout);
+      let change_in_balances_depositor2 = getBalancesDiff(balances_after_claimpayout_depositor2, balances_before_claimpayout_depositor2);
+
+      // Query bond.payoutAlreadyClaimed values again
+      // Some time has passed from when we minted these bonds, so values will be non-zero
+      // We check that the claimed amount is less than 1/10000 of the total bond payout
+      bondInfo_1 = await teller1.bonds(1);
+      bondInfo_2 = await teller1.bonds(2);
+      bondInfo_3 = await teller1.bonds(3); 
+      expect(bondInfo_1.payoutAlreadyClaimed).to.be.below(bondInfo_1.payoutAmount.mul(1).div(10000))
+      expect(bondInfo_2.payoutAlreadyClaimed).to.be.below(bondInfo_2.payoutAmount.mul(1).div(10000))
+      expect(bondInfo_3.payoutAlreadyClaimed).to.be.below(bondInfo_3.payoutAmount.mul(1).div(10000))
+      
+      // Check change_in_balances for depositor1 and teller1
+      expectClose(change_in_balances.userSolace, 0, 1e14)
+      expectClose(change_in_balances.userXSolace, 0, 1e14)
+      expectClose(change_in_balances.vestingSolace, 0, 1e14)
+      expectClose(change_in_balances.vestingXSolace, 0, 1e14)
+      expect(change_in_balances.stakingSolace).to.eq(0)
+      expect(change_in_balances.totalXSolace).to.eq(0)
+      expect(change_in_balances.userDai).to.eq(0)
+      expect(change_in_balances.userScp).to.eq(0)
+      expect(change_in_balances.daoDai).to.eq(0)
+      expect(change_in_balances.daoScp).to.eq(0)
+      expect(change_in_balances.poolDai).to.eq(0)
+      expect(change_in_balances.poolScp).to.eq(0)
+      expect(change_in_balances.userBonds).to.eq(0)
+      expect(change_in_balances.totalBonds).to.eq(0)
+      expect(change_in_balances.tellerCapacity).to.eq(0)
+      // Don't care about change in bond price here
+
+      // Check change_in_balances for depositor2
+      expectClose(change_in_balances_depositor2.userSolace, 0, 1e14)
+      expect(change_in_balances_depositor2.userXSolace).eq(0)
+      expect(change_in_balances_depositor2.userDai).to.eq(0)
+      expect(change_in_balances_depositor2.userScp).to.eq(0)
+      expect(change_in_balances_depositor2.userBonds).to.eq(0)
+    })
+    it("t = halfway through vesting, expect half of tokens to be claimable", async function() {
+      let bondInfo_1 = await teller1.bonds(1);
+      let bondInfo_2 = await teller1.bonds(2);
+      let bondInfo_3 = await teller1.bonds(3);
+      expect(bondInfo_1.payoutAlreadyClaimed).to.be.below(bondInfo_1.payoutAmount.mul(1).div(10000))
+      expect(bondInfo_2.payoutAlreadyClaimed).to.be.below(bondInfo_2.payoutAmount.mul(1).div(10000))
+      expect(bondInfo_3.payoutAlreadyClaimed).to.be.below(bondInfo_3.payoutAmount.mul(1).div(10000))
+
+      // // Skip time to halfway through vesting
+      const blockTimestamp = await getCurrentTimestamp()
+      await provider.send("evm_mine", [blockTimestamp + VESTING_TERM/2]);
+
+      let balances_before_claimpayout = await getBalances(teller1, depositor1)
+      let balances_before_claimpayout_depositor2 = await getBalances(teller1, depositor2)
+      await teller1.connect(depositor1).claimPayout(1)
+      await teller1.connect(depositor1).claimPayout(2)
+      await teller1.connect(depositor2).claimPayout(3)
+      let balances_after_claimpayout = await getBalances(teller1, depositor1);
+      let balances_after_claimpayout_depositor2 = await getBalances(teller1, depositor2);
+      let change_in_balances = getBalancesDiff(balances_after_claimpayout, balances_before_claimpayout);
+      let change_in_balances_depositor2 = getBalancesDiff(balances_after_claimpayout_depositor2, balances_before_claimpayout_depositor2);
+
+      bondInfo_1 = await teller1.bonds(1);
+      bondInfo_2 = await teller1.bonds(2);
+      bondInfo_3 = await teller1.bonds(3); 
+      expectClose(bondInfo_1.payoutAlreadyClaimed, bondInfo_1.payoutAmount.mul(5000).div(10000), 1e14)
+      expectClose(bondInfo_2.payoutAlreadyClaimed, bondInfo_2.payoutAmount.mul(5000).div(10000), 1e14)
+      expectClose(bondInfo_3.payoutAlreadyClaimed, bondInfo_3.payoutAmount.mul(5000).div(10000), 1e14)
+
+      // Check change_in_balances for depositor1 and teller1
+      expectClose(change_in_balances.userSolace, bondInfo_1.payoutAmount.mul(5000).div(10000), 1e14)
+      expectClose(change_in_balances.userXSolace, bondInfo_2.payoutAmount.mul(5000).div(10000), 1e14)
+      expectClose(change_in_balances.vestingSolace, ((bondInfo_1.payoutAmount.mul(5000).div(10000)).add(bondInfo_3.payoutAmount.mul(5000).div(10000))).mul(-1), 1e14)
+      expectClose(change_in_balances.vestingXSolace, bondInfo_2.payoutAmount.mul(5000).div(10000).mul(-1), 1e14)
+      expect(change_in_balances.stakingSolace).to.eq(0)
+      expect(change_in_balances.totalXSolace).to.eq(0)
+      expect(change_in_balances.userDai).to.eq(0)
+      expect(change_in_balances.userScp).to.eq(0)
+      expect(change_in_balances.daoDai).to.eq(0)
+      expect(change_in_balances.daoScp).to.eq(0)
+      expect(change_in_balances.poolDai).to.eq(0)
+      expect(change_in_balances.poolScp).to.eq(0)
+      expect(change_in_balances.userBonds).to.eq(0)
+      expect(change_in_balances.totalBonds).to.eq(0)
+      expect(change_in_balances.tellerCapacity).to.eq(0)
+      // Don't care about change in bond price here
+
+      // Check change_in_balances for depositor2
+      expectClose(change_in_balances_depositor2.userSolace, bondInfo_3.payoutAmount.mul(5000).div(10000), 1e14)
+      expect(change_in_balances_depositor2.userXSolace).eq(0)
+      expect(change_in_balances_depositor2.userDai).to.eq(0)
+      expect(change_in_balances_depositor2.userScp).to.eq(0)
+      expect(change_in_balances_depositor2.userBonds).to.eq(0)
+    })
+    it("t=after vesting complete, expect all tokens claimed & bonds burned", async function() {
+      let bondInfo_1 = await teller1.bonds(1);
+      let bondInfo_2 = await teller1.bonds(2);
+      let bondInfo_3 = await teller1.bonds(3); 
+      expectClose(bondInfo_1.payoutAlreadyClaimed, bondInfo_1.payoutAmount.mul(5000).div(10000), 1e14)
+      expectClose(bondInfo_2.payoutAlreadyClaimed, bondInfo_2.payoutAmount.mul(5000).div(10000), 1e14)
+      expectClose(bondInfo_3.payoutAlreadyClaimed, bondInfo_3.payoutAmount.mul(5000).div(10000), 1e14)
+
+      // Skip time to after vesting completed
+      const blockTimestamp = await getCurrentTimestamp()
+      await provider.send("evm_mine", [blockTimestamp + VESTING_TERM + 1]);
+
+      let balances_before_claimpayout = await getBalances(teller1, depositor1)
+      let balances_before_claimpayout_depositor2 = await getBalances(teller1, depositor2)
+      let tx1 = await teller1.connect(depositor1).claimPayout(1)
+      let tx2 = await teller1.connect(depositor1).claimPayout(2)
+      let tx3 = await teller1.connect(depositor2).claimPayout(3)
+      expect(tx1).to.emit(teller1, "BurnBond").withArgs(1, depositor1.address, solace.address, bondInfo_1.payoutAmount);
+      expect(tx2).to.emit(teller1, "BurnBond").withArgs(2, depositor1.address, xsolace.address, bondInfo_2.payoutAmount);
+      expect(tx3).to.emit(teller1, "BurnBond").withArgs(3, depositor2.address, solace.address, bondInfo_3.payoutAmount);
+      let balances_after_claimpayout = await getBalances(teller1, depositor1);
+      let balances_after_claimpayout_depositor2 = await getBalances(teller1, depositor2);
+      let change_in_balances = getBalancesDiff(balances_after_claimpayout, balances_before_claimpayout);
+      let change_in_balances_depositor2 = getBalancesDiff(balances_after_claimpayout_depositor2, balances_before_claimpayout_depositor2);
+
+      // Check change_in_balances for depositor1 and teller1
+      expectClose(change_in_balances.userSolace, bondInfo_1.payoutAmount.mul(5000).div(10000), 1e14)
+      expectClose(change_in_balances.userXSolace, bondInfo_2.payoutAmount.mul(5000).div(10000), 1e14)
+      expectClose(change_in_balances.vestingSolace, ((bondInfo_1.payoutAmount.mul(5000).div(10000)).add(bondInfo_3.payoutAmount.mul(5000).div(10000))).mul(-1), 1e14)
+      expectClose(change_in_balances.vestingXSolace, bondInfo_2.payoutAmount.mul(5000).div(10000).mul(-1), 1e14)
+      expect(change_in_balances.stakingSolace).to.eq(0)
+      expect(change_in_balances.totalXSolace).to.eq(0)
+      expect(change_in_balances.userDai).to.eq(0)
+      expect(change_in_balances.userScp).to.eq(0)
+      expect(change_in_balances.daoDai).to.eq(0)
+      expect(change_in_balances.daoScp).to.eq(0)
+      expect(change_in_balances.poolDai).to.eq(0)
+      expect(change_in_balances.poolScp).to.eq(0)
+      expect(change_in_balances.userBonds).to.eq(-3)
+      expect(change_in_balances.totalBonds).to.eq(-3)
+      expect(change_in_balances.tellerCapacity).to.eq(0)
+      // Don't care about change in bond price here
+
+      // Check change_in_balances for depositor2
+      expectClose(change_in_balances_depositor2.userSolace, bondInfo_3.payoutAmount.mul(5000).div(10000), 1e14)
+      expect(change_in_balances_depositor2.userXSolace).eq(0)
+      expect(change_in_balances_depositor2.userDai).to.eq(0)
+      expect(change_in_balances_depositor2.userScp).to.eq(0)
+      expect(change_in_balances_depositor2.userBonds).to.eq(0)
+    })
+    it("claimPayout fails after BondBurned event", async function() {
+      await expect(teller1.connect(depositor1).claimPayout(1)).to.be.revertedWith("query for nonexistent token");
+      await expect(teller1.connect(depositor1).claimPayout(2)).to.be.revertedWith("query for nonexistent token");
+      await expect(teller1.connect(depositor2).claimPayout(3)).to.be.revertedWith("query for nonexistent token");
+    })
   })
 
 
 
-  //   it("can deposit", async function () {
-  //     await teller1.connect(governor).setTerms({startPrice: ONE_ETHER.mul(2), minimumPrice: 0, maxPayout: ONE_ETHER.mul(2), priceAdjNum: 1, priceAdjDenom: 10, capacity: ONE_ETHER.mul(10), capacityIsPayout: false, startTime: 0, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
-  //     await teller1.connect(governor).setFees(BOND_FEE, DAO_FEE);
-  //     let bal1 = await getBalances(teller1, depositor1);
-  //     const blockTimestamp = (await provider.getBlock('latest')).timestamp;
-  //     let predictedAmountOut = await teller1.calculateAmountOut(ONE_ETHER.mul(3), false);
-  //     let predictedAmountIn = await teller1.calculateAmountIn(predictedAmountOut, false);
-  //     let tx1 = await teller1.connect(depositor1).deposit(ONE_ETHER.mul(3), ONE_ETHER, depositor1.address, false);
-  //     let bondID1 = await teller1.numBonds();
-  //     expect(bondID1).eq(1);
-  //     let bondInfo = await teller1.bonds(bondID1);
-  //     expect(tx1).to.emit(teller1, "CreateBond").withArgs(bondID1, bondInfo.pricePaid, bondInfo.payoutToken, bondInfo.payoutAmount, bondInfo.maturation);
-  //     expect(bondInfo.pricePaid).eq(ONE_ETHER.mul(3));
-  //     expect(bondInfo.payoutToken).eq(solace.address);
-  //     expectClose(predictedAmountIn, ONE_ETHER.mul(3), 1e14);
-  //     expectClose(predictedAmountOut, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
-  //     expectClose(bondInfo.payoutAmount, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
-  //     expectClose(bondInfo.maturation, VESTING_TERM+blockTimestamp+1, 5);
-  //     let bal2 = await getBalances(teller1, depositor1);
-  //     let bal12 = getBalancesDiff(bal2, bal1);
-  //     expect(bal12.userSolace).eq(0);
-  //     expect(bal12.userXSolace).eq(0);
-  //     expect(bal12.vestingSolace).eq(bondInfo.payoutAmount);
-  //     expect(bal12.vestingXSolace).eq(0);
-  //     expectClose(bal12.stakingSolace, ONE_ETHER.mul(3).div(2).mul(BOND_FEE).div(MAX_BPS), 1e14);
-  //     expect(bal12.totalXSolace).eq(0);
-  //     expect(bal12.userdai).eq(ONE_ETHER.mul(-3));
-  //     expect(bal12.userTkn2).eq(0);
-  //     expect(bal12.daodai).eq(ONE_ETHER.mul(3).mul(DAO_FEE).div(MAX_BPS));
-  //     expect(bal12.daoTkn2).eq(0);
-  //     expect(bal12.pooldai).eq(ONE_ETHER.mul(3).mul(MAX_BPS-DAO_FEE).div(MAX_BPS));
-  //     expect(bal12.poolTkn2).eq(0);
-  //     expect(bal12.userBonds).eq(1);
-  //     expect(bal12.totalBonds).eq(1);
-  //     expect(await xsolace.solaceToXSolace(ONE_ETHER)).to.equal(ONE_ETHER);
-  //     expect(await xsolace.xSolaceToSolace(ONE_ETHER)).to.equal(ONE_ETHER);
-  //     expect(bal12.tellerCapacity).eq(bondInfo.pricePaid.mul(-1));
-  //     expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-BOND_FEE), 1e14);
-  //   });
-  //   it("can deposit and stake", async function () {
-  //     await teller1.connect(governor).setTerms({startPrice: ONE_ETHER.mul(2), minimumPrice: 0, maxPayout: ONE_ETHER.mul(2), priceAdjNum: 1, priceAdjDenom: 10, capacity: ONE_ETHER.mul(10), capacityIsPayout: true, startTime: 0, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
-  //     await solace.connect(governor).addMinter(minter.address);
-  //     await solace.connect(minter).mint(xsolace.address, ONE_ETHER);
-  //     let bal1 = await getBalances(teller1, depositor1);
-  //     const blockTimestamp = (await provider.getBlock('latest')).timestamp;
-  //     let predictedAmountOut = await teller1.calculateAmountOut(ONE_ETHER.mul(3), true);
-  //     let predictedAmountIn = await teller1.calculateAmountIn(predictedAmountOut, true);
-  //     let tx1 = await teller1.connect(depositor1).deposit(ONE_ETHER.mul(3), ONE_ETHER, depositor1.address, true);
-  //     let bondID1 = await teller1.numBonds();
-  //     expect(bondID1).eq(2);
-  //     let bondInfo = await teller1.bonds(bondID1);
-  //     expect(tx1).to.emit(teller1, "CreateBond").withArgs(bondID1, bondInfo.pricePaid, bondInfo.payoutToken, bondInfo.payoutAmount, bondInfo.maturation);
-  //     expect(bondInfo.pricePaid).eq(ONE_ETHER.mul(3));
-  //     expect(bondInfo.payoutToken).eq(xsolace.address);
-  //     expectClose(predictedAmountIn, ONE_ETHER.mul(3), 1e14);
-  //     expectClose(predictedAmountOut, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
-  //     expectClose(bondInfo.payoutAmount, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
-  //     expectClose(bondInfo.maturation, VESTING_TERM+blockTimestamp+1, 5);
-  //     let bal2 = await getBalances(teller1, depositor1);
-  //     let bal12 = getBalancesDiff(bal2, bal1);
-  //     expect(bal12.userSolace).eq(0);
-  //     expect(bal12.userXSolace).eq(0);
-  //     expect(bal12.vestingSolace).eq(0);
-  //     expect(bal12.vestingXSolace).eq(bondInfo.payoutAmount);
-  //     expectClose(bal12.totalXSolace, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
-  //     expectClose(bal12.stakingSolace, ONE_ETHER.mul(3).div(2), 1e14);
-  //     expect(bal12.userdai).eq(ONE_ETHER.mul(-3));
-  //     expect(bal12.userTkn2).eq(0);
-  //     expect(bal12.daodai).eq(ONE_ETHER.mul(3).mul(DAO_FEE).div(MAX_BPS));
-  //     expect(bal12.daoTkn2).eq(0);
-  //     expect(bal12.pooldai).eq(ONE_ETHER.mul(3).mul(MAX_BPS-DAO_FEE).div(MAX_BPS));
-  //     expect(bal12.poolTkn2).eq(0);
-  //     expect(bal12.userBonds).eq(1);
-  //     expect(bal12.totalBonds).eq(1);
-  //     expectClose(bal12.tellerCapacity, bondInfo.pricePaid.mul(-1).div(2), 1e14);
-  //     expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-BOND_FEE), 1e14);
-  //   });
-  //   it("deposits have minimum price", async function () {
-  //     await teller1.connect(governor).setTerms({startPrice: ONE_ETHER, minimumPrice: ONE_ETHER.mul(2), maxPayout: ONE_ETHER.mul(2), priceAdjNum: 1, priceAdjDenom: 10, capacity: ONE_ETHER.mul(10), capacityIsPayout: false, startTime: 0, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
-  //     let bal1 = await getBalances(teller1, depositor1);
-  //     const blockTimestamp = (await provider.getBlock('latest')).timestamp;
-  //     let predictedAmountOut = await teller1.calculateAmountOut(ONE_ETHER.mul(3), false);
-  //     let predictedAmountIn = await teller1.calculateAmountIn(predictedAmountOut, false);
-  //     let tx1 = await teller1.connect(depositor1).deposit(ONE_ETHER.mul(3), ONE_ETHER, depositor1.address, false);
-  //     let bondID1 = await teller1.numBonds();
-  //     expect(bondID1).eq(3);
-  //     let bondInfo = await teller1.bonds(bondID1);
-  //     expect(tx1).to.emit(teller1, "CreateBond").withArgs(bondID1, bondInfo.pricePaid, bondInfo.payoutToken, bondInfo.payoutAmount, bondInfo.maturation);
-  //     expect(bondInfo.pricePaid).eq(ONE_ETHER.mul(3));
-  //     expect(bondInfo.payoutToken).eq(solace.address);
-  //     expectClose(predictedAmountIn, ONE_ETHER.mul(3), 1e14);
-  //     expectClose(predictedAmountOut, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
-  //     expectClose(bondInfo.payoutAmount, ONE_ETHER.mul(3).div(2).mul(MAX_BPS-BOND_FEE).div(MAX_BPS), 1e14);
-  //     expectClose(bondInfo.maturation, VESTING_TERM+blockTimestamp+1, 5);
-  //     let bal2 = await getBalances(teller1, depositor1);
-  //     let bal12 = getBalancesDiff(bal2, bal1);
-  //     expect(bal12.userSolace).eq(0);
-  //     expect(bal12.userXSolace).eq(0);
-  //     expect(bal12.vestingSolace).eq(bondInfo.payoutAmount);
-  //     expect(bal12.vestingXSolace).eq(0);
-  //     expectClose(bal12.stakingSolace, ONE_ETHER.mul(3).div(2).mul(BOND_FEE).div(MAX_BPS), 1e14);
-  //     expect(bal12.totalXSolace).eq(0);
-  //     expect(bal12.userdai).eq(ONE_ETHER.mul(-3));
-  //     expect(bal12.userTkn2).eq(0);
-  //     expect(bal12.daodai).eq(ONE_ETHER.mul(3).mul(DAO_FEE).div(MAX_BPS));
-  //     expect(bal12.daoTkn2).eq(0);
-  //     expect(bal12.pooldai).eq(ONE_ETHER.mul(3).mul(MAX_BPS-DAO_FEE).div(MAX_BPS));
-  //     expect(bal12.poolTkn2).eq(0);
-  //     expect(bal12.userBonds).eq(1);
-  //     expect(bal12.totalBonds).eq(1);
-  //     expect(bal12.tellerCapacity).eq(bondInfo.pricePaid.mul(-1));
-  //     expectClose(bal12.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-BOND_FEE), 1e14);
-  //   });
-  // });
 
-  // describe("redeem", function () {
-  //   it("cannot redeem non existent token", async function () {
-  //     await expect(teller1.connect(depositor1).redeem(999)).to.be.revertedWith("query for nonexistent token");
-  //   });
-  //   it("cannot redeem not your token", async function () {
-  //     await expect(teller1.connect(depositor2).redeem(1)).to.be.revertedWith("!bonder");
-  //   });
-  //   it("cannot redeem before maturation", async function () {
-  //     await expect(teller1.connect(depositor1).redeem(1)).to.be.revertedWith("bond not yet redeemable");
-  //   });
-  //   it("can redeem", async function () {
-  //     let bal1 = await getBalances(teller1, depositor1);
-  //     const blockTimestamp = (await provider.getBlock('latest')).timestamp;
-  //     await provider.send("evm_setNextBlockTimestamp", [blockTimestamp + VESTING_TERM]);
-  //     await provider.send("evm_mine", []);
-  //     let bondInfo = await teller1.bonds(1);
-  //     let tx1 = await teller1.connect(depositor1).redeem(1);
-  //     expect(tx1).to.emit(teller1, "RedeemBond").withArgs(1, depositor1.address, solace.address, bondInfo.payoutAmount);
-  //     let bal2 = await getBalances(teller1, depositor1);
-  //     let bal12 = getBalancesDiff(bal2, bal1);
-  //     expect(bal12.userSolace).eq(bondInfo.payoutAmount);
-  //     expect(bal12.userXSolace).eq(0);
-  //     expect(bal12.vestingSolace).eq(bondInfo.payoutAmount.mul(-1));
-  //     expect(bal12.vestingXSolace).eq(0);
-  //     expect(bal12.stakingSolace).eq(0);
-  //     expect(bal12.totalXSolace).eq(0);
-  //     expect(bal12.userdai).eq(0);
-  //     expect(bal12.userTkn2).eq(0);
-  //     expect(bal12.daodai).eq(0);
-  //     expect(bal12.daoTkn2).eq(0);
-  //     expect(bal12.pooldai).eq(0);
-  //     expect(bal12.poolTkn2).eq(0);
-  //     expect(bal12.userBonds).eq(-1);
-  //     expect(bal12.totalBonds).eq(-1);
-  //   });
-  //   it("can redeem with approval", async function () {
-  //     let bal1 = await getBalances(teller1, depositor2);
-  //     let bondID = 2;
-  //     await teller1.connect(depositor1).approve(depositor2.address, bondID);
-  //     const blockTimestamp = (await provider.getBlock('latest')).timestamp;
-  //     await provider.send("evm_setNextBlockTimestamp", [blockTimestamp + VESTING_TERM]);
-  //     await provider.send("evm_mine", []);
-  //     let bondInfo = await teller1.bonds(bondID);
-  //     let tx1 = await teller1.connect(depositor2).redeem(bondID);
-  //     expect(tx1).to.emit(teller1, "RedeemBond").withArgs(bondID, depositor2.address, xsolace.address, bondInfo.payoutAmount);
-  //     let bal2 = await getBalances(teller1, depositor2);
-  //     let bal12 = getBalancesDiff(bal2, bal1);
-  //     expect(bal12.userSolace).eq(0);
-  //     expect(bal12.userXSolace).eq(bondInfo.payoutAmount);
-  //     expect(bal12.vestingSolace).eq(0);
-  //     expect(bal12.vestingXSolace).eq(bondInfo.payoutAmount.mul(-1));
-  //     expect(bal12.stakingSolace).eq(0);
-  //     expect(bal12.totalXSolace).eq(0);
-  //     expect(bal12.userdai).eq(0);
-  //     expect(bal12.userTkn2).eq(0);
-  //     expect(bal12.daodai).eq(0);
-  //     expect(bal12.daoTkn2).eq(0);
-  //     expect(bal12.pooldai).eq(0);
-  //     expect(bal12.poolTkn2).eq(0);
-  //     expect(bal12.userBonds).eq(0);
-  //     expect(bal12.totalBonds).eq(-1);
-  //   });
-  //   it("cannot double redeem", async function () {
-  //     await expect(teller1.connect(depositor1).redeem(1)).to.be.revertedWith("query for nonexistent token");
-  //   });
   // });
 
   // describe("deposit signed", function () {
@@ -849,6 +949,8 @@ describe("BondTellerERC20V2", function() {
   //   });
   // });
 
+
+
   // describe("set terms", async function () {
 
 
@@ -907,8 +1009,6 @@ describe("BondTellerERC20V2", function() {
   // });
 
   // describe("set fees", async function () {
-  //   let BOND_FEE = 300;
-  //   let DAO_FEE = 200;
 
   //   before("redeploy", async function () {
   //     solace = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
@@ -944,12 +1044,6 @@ describe("BondTellerERC20V2", function() {
   // });
 
   // describe("set addresses", function () {
-  //   let BOND_FEE = 300;
-  //   let DAO_FEE = 200;
-
-  //   let solace2: Solace;
-  //   let xsolace2: XSolace;
-  //   let bondDepository2: bondDepositorysitory;
 
   //   before("redeploy", async function () {
   //     solace2 = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
