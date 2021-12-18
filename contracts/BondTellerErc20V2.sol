@@ -61,7 +61,8 @@ contract BondTellerErc20V2 is BondTellerBaseV2, IBondTellerErc20V2 {
      * Principal will be transferred from `depositor` using `permit`.
      * Note that not all ERC20s have a permit function, in which case this function will revert.
      * @dev Switched order so that SafeERC20.safeTransferFrom occurs last to comply with Checks-Effects-Interactions
-     * @dev 
+     * @dev We need to route principal tokens from "depositor -> pool -> underwriting pool and/or dao" in depositSigned so that we only need a single permit
+     * @dev Routing tokens direct from "depositor -> underwriting pool and/or dao" as we do in deposit, would require two permits
      * @param amount Amount of principal to deposit.
      * @param minAmountOut The minimum **SOLACE** or **xSOLACE** out.
      * @param depositor The bond recipient, default msg.sender.
@@ -87,14 +88,16 @@ contract BondTellerErc20V2 is BondTellerBaseV2, IBondTellerErc20V2 {
         (payout, bondID, daoFee) = _deposit(amount, minAmountOut, depositor, stake);
         
         // route principal - put last as Checks-Effects-Interactions
-        if(daoFee > 0) {
-            // This is the victim of changing SafeERC20.safeTransferFrom placement - will need gas to pay for this tx
-            // Unless you can call more than one permit with the same 
-            // IERC20Permit(address(principal)).permit(depositor, address(this), daoFee, deadline, v, r, s);
-            SafeERC20.safeTransferFrom(principal, depositor, dao, daoFee);
-        }
-        IERC20Permit(address(principal)).permit(depositor, address(this), amount - daoFee, deadline, v, r, s);
-        SafeERC20.safeTransferFrom(principal, depositor, underwritingPool, amount - daoFee);
+
+        // permit
+        IERC20Permit(address(principal)).permit(depositor, address(this), amount, deadline, v, r, s);
+
+        // pull principal tokens from depositor to bond teller
+        SafeERC20.safeTransferFrom(principal, depositor, address(this), amount);
+
+        // transfer principal tokens from bond teller to dao and underwriting pool;
+        if(daoFee > 0) SafeERC20.safeTransfer(principal, dao, daoFee);
+        SafeERC20.safeTransfer(principal, underwritingPool, amount - daoFee);
     }
 
     /**
