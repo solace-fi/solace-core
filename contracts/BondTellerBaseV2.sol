@@ -272,7 +272,7 @@ abstract contract BondTellerBaseV2 is IBondTellerV2, ReentrancyGuard, Governable
 
     /**
      * @dev Returns the downcasted uint40 from uint256, reverting on
-     * overflow (when the input is greater than largest uint44).
+     * overflow (when the input is greater than largest uint40).
      *
      * Counterpart to Solidity's `uint40` operator.
      *
