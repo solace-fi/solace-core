@@ -686,6 +686,63 @@ describe("BondTellerEthV2", function() {
       expect(change_in_balances.tellerCapacity).eq(bondInfo.principalPaid.mul(-1));
       expectClose(change_in_balances.tellerBondPrice, bondInfo.payoutAmount.div(10).mul(MAX_BPS).div(MAX_BPS-BOND_FEE), 1e14)
     })
+    it("test depositEth 4 - set bondFee = 0, daoFee = 0, otherwise same as test deposit 1", async function() {
+      let MODIFIED_BOND_TERMS = {...DEFAULT_BOND_TERMS}
+      MODIFIED_BOND_TERMS.startPrice = ONE_ETHER.mul(2)
+      MODIFIED_BOND_TERMS.minimumPrice = 0
+      await teller1.connect(governor).setTerms(MODIFIED_BOND_TERMS);
+      await teller1.connect(governor).setFees(0, 0)
+      let balances_before_deposit = await getBalances(teller1, depositor1);
+      let predictedAmountOut = await teller1.calculateAmountOut(ONE_ETHER.mul(3), false);
+      let predictedAmountIn = await teller1.calculateAmountIn(predictedAmountOut, false);
+
+      // Tx to purchase bond
+      let tx1 = await teller1.connect(depositor1).depositEth(ONE_ETHER, depositor1.address, false, {value: ONE_ETHER.mul(3)});
+
+      // Confirm CreateBond event emitted
+      let bondID = await teller1.numBonds();
+      expect(bondID).eq(4);
+      let bondInfo = await teller1.bonds(bondID);
+      expect(tx1).to.emit(teller1, "CreateBond").withArgs(bondID, bondInfo.principalPaid, bondInfo.payoutToken, bondInfo.payoutAmount, bondInfo.vestingStart, bondInfo.localVestingTerm);
+
+      // // Confirm minted bond has desired parameters
+      expect(bondInfo.principalPaid).eq(ONE_ETHER.mul(3));
+      expect(bondInfo.payoutToken).eq(solace.address);
+      expectClose(predictedAmountIn, ONE_ETHER.mul(3), 1e14);
+      expectClose(predictedAmountOut, ONE_ETHER.mul(3).div(2), 1e14);
+      expectClose(bondInfo.payoutAmount, predictedAmountOut, 1e14);
+      expect(bondInfo.localVestingTerm).eq(await teller1.globalVestingTerm())
+      expect(bondInfo.payoutAlreadyClaimed).eq(0)
+ 
+      // // Confirm balances
+      let balances_after_deposit = await getBalances(teller1, depositor1);
+      let change_in_balances = getBalancesDiff(balances_after_deposit, balances_before_deposit);
+
+      expect(change_in_balances.userSolace).eq(0);
+      expect(change_in_balances.userXSolace).eq(0);
+      expect(change_in_balances.vestingSolace).eq(bondInfo.payoutAmount);
+      expect(change_in_balances.vestingXSolace).eq(0);
+      expect(change_in_balances.stakingSolace).eq(0)
+      expect(change_in_balances.totalXSolace).eq(0);
+
+      let receipt = await tx1.wait();
+      let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
+      expect(change_in_balances.userEth).eq(ONE_ETHER.mul(-3).sub(gasCost))
+
+      expect(change_in_balances.userWeth9).eq(0);
+      expect(change_in_balances.userWeth10).eq(0);
+      expect(change_in_balances.daoEth).eq(0);
+      expect(change_in_balances.daoWeth9).eq(0);
+      expect(change_in_balances.daoWeth10).eq(0);
+      expect(change_in_balances.poolEth).eq(ONE_ETHER.mul(3))
+      expect(change_in_balances.poolWeth9).eq(0);
+      expect(change_in_balances.poolWeth10).eq(0);
+
+      expect(change_in_balances.userBonds).eq(1);
+      expect(change_in_balances.totalBonds).eq(1);
+      expect(change_in_balances.tellerCapacity).eq(bondInfo.principalPaid.mul(-1));
+      expectClose(change_in_balances.tellerBondPrice, bondInfo.payoutAmount.div(10), 1e14); 
+    })
   })
 
   describe("claimPayout after depositEth cases", function() {
