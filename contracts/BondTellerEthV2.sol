@@ -228,6 +228,7 @@ contract BondTellerEthV2 is BondTellerBaseV2, IBondTellerEthV2 {
 
     /**
      * @notice Fallback function to allow contract to receive **ETH**.
+     * @dev fallback() will activate with non-empty calldata, receive() will activate with empty calldata
      * Deposits **ETH** and creates bond.
      */
     fallback () external payable override nonReentrant {

@@ -259,7 +259,7 @@ abstract contract BondTellerBaseV2 is IBondTellerV2, ReentrancyGuard, Governable
         Bond memory bond = bonds[bondID];
 
         // Sanity check
-        require(bond.payoutAlreadyClaimed <= bond.payoutAmount, "?? payoutAlreadyClaimed > payoutAmount");
+        assert(bond.payoutAlreadyClaimed <= bond.payoutAmount);
 
         // Calculation if still vesting
         if (block.timestamp <= bond.vestingStart + bond.localVestingTerm) {
