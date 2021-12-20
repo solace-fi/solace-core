@@ -135,7 +135,7 @@ abstract contract BondTellerBaseV2 is IBondTellerV2, ReentrancyGuard, Governable
         // exchange rate
         uint256 bondPrice_ = bondPrice();
         require(bondPrice_ > 0, "zero price");
-        amountOut = 1 ether * amountIn / bondPrice_; // 1 ether => 1 solace
+        amountOut = (1 ether * amountIn) / bondPrice_; // 1 ether => 1 solace
         // ensure there is remaining capacity for bond
         if (capacityIsPayout) {
             // capacity in payout terms
@@ -146,7 +146,7 @@ abstract contract BondTellerBaseV2 is IBondTellerV2, ReentrancyGuard, Governable
         }
         require(amountOut <= maxPayout, "bond too large");
         // route solace
-        uint256 bondFee = amountOut * bondFeeBps / MAX_BPS;
+        uint256 bondFee = (amountOut * bondFeeBps) / MAX_BPS;
         if(bondFee > 0) {
             amountOut -= bondFee;
         }
@@ -170,11 +170,11 @@ abstract contract BondTellerBaseV2 is IBondTellerV2, ReentrancyGuard, Governable
             amountOut = xsolace.xSolaceToSolace(amountOut);
         }
         // bond fee
-        amountOut = amountOut * MAX_BPS / (MAX_BPS - bondFeeBps);
+        amountOut = (amountOut * MAX_BPS) / (MAX_BPS - bondFeeBps);
         // exchange rate
         uint256 bondPrice_ = bondPrice();
         require(bondPrice_ > 0, "zero price");
-        amountIn = amountOut * bondPrice_ / 1 ether;
+        amountIn = (amountOut * bondPrice_) / 1 ether;
         // ensure there is remaining capacity for bond
         if (capacityIsPayout) {
             // capacity in payout terms
@@ -233,9 +233,9 @@ abstract contract BondTellerBaseV2 is IBondTellerV2, ReentrancyGuard, Governable
         require(price_ != 0, "invalid price");
         lastPriceUpdate = block.timestamp;
         // calculate amount out
-        amountOut = 1 ether * depositAmount / price_; // 1 ether => 1 solace
+        amountOut = (1 ether * depositAmount) / price_; // 1 ether => 1 solace
         // update next price
-        nextPrice = price_ + (amountOut * uint256(priceAdjNum) / uint256(priceAdjDenom));
+        nextPrice = price_ + ( (amountOut * uint256(priceAdjNum)) / uint256(priceAdjDenom));
     }
 
     /**
