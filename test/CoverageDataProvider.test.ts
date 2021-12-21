@@ -33,18 +33,18 @@ describe("CoverageDataProvider", function() {
 
   // vars
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-  const ONE_ETHER = BN.from("1000000000000000000");
+  const ONE_ETH = BN.from("1000000000000000000");
   const TOKEN0 = "0x501ace9c35e60f03a2af4d484f49f9b1efde9f40";
   const TOKEN1 = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
   const RESERVE0 = BN.from("13250148273341498385651903");
   const RESERVE1 = BN.from("1277929641956");
-  const ONE_SOLACE = ONE_ETHER;
-  const ONE_DAI = ONE_ETHER;
-  const ONE_WETH = ONE_ETHER;
+  const ONE_SOLACE = ONE_ETH;
+  const ONE_DAI = ONE_ETH;
+  const ONE_WETH = ONE_ETH;
   const ONE_WBTC = BN.from("100000000");
   const ONE_USDT = BN.from("1000000");
   const ONE_USDC = BN.from("1000000");
-  const ONE_SLP = ONE_ETHER;
+  const ONE_SLP = ONE_ETH;
 
   // mainnet addresses
   const ETH_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
@@ -75,7 +75,7 @@ describe("CoverageDataProvider", function() {
     wbtc = (await deployContract(deployer, artifacts.MockERC20Decimals, ["Wrapped BTC", "WBTC", ONE_WBTC.mul(1000000), 8])) as MockErc20Decimals;
     usdt = (await deployContract(deployer, artifacts.MockERC20Decimals, ["Tether USD", "USDT", ONE_USDT.mul(1000000), 6])) as MockErc20Decimals;
     usdc = (await deployContract(deployer, artifacts.MockERC20Decimals, ["USD Coin", "USDC", ONE_USDC.mul(1000000), 6])) as MockErc20Decimals;
-    solaceUsdcPool = (await deployContract(deployer, artifacts.MockSLP, ["SushiSwap LP Token", "SLP", ONE_ETHER.mul(1000000), TOKEN0, TOKEN1, RESERVE0, RESERVE1])) as MockSlp;
+    solaceUsdcPool = (await deployContract(deployer, artifacts.MockSLP, ["SushiSwap LP Token", "SLP", ONE_ETH.mul(1000000), TOKEN0, TOKEN1, RESERVE0, RESERVE1])) as MockSlp;
     // deploy registry
     registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
     weth9 = (await deployContract(deployer,artifacts.WETH)) as Weth9;
@@ -571,7 +571,7 @@ describe("CoverageDataProvider", function() {
 
       await weth.connect(deployer).transfer(underwritingPool.address, ONE_WETH);
       expect(await weth.balanceOf(underwritingPool.address)).to.be.equal(ONE_WETH);
-      underwritingPoolAmount = underwritingPoolAmount.add(ONE_ETHER);
+      underwritingPoolAmount = underwritingPoolAmount.add(ONE_ETH);
 
       await wbtc.connect(deployer).transfer(underwritingPool.address, ONE_WBTC);
       expect(await wbtc.balanceOf(underwritingPool.address)).to.be.equal(ONE_WBTC);

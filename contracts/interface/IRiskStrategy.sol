@@ -27,12 +27,6 @@ interface IRiskStrategy {
     
     /// @notice Emitted when a product's risk parameters are set at initialization.
     event ProductRiskParamsSet(address product, uint32 weight, uint24 price, uint16 divisor);
-    
-    /// @notice Emitted when strategy's allocation weight is set.
-    event WeightAllocationSet(uint32 weight);
-
-    /// @notice Emitted when strategy's status is set.
-    event StatusSet(bool status);
 
     /// @notice Emitted when governance adds a product.
     event ProductAddedByGovernance(address product, uint32 weight, uint24 price, uint16 divisor);
@@ -49,23 +43,6 @@ interface IRiskStrategy {
     /// @notice Emitted when RiskManager is set.
     event RiskManagerSet(address riskManager);
 
-    /***************************************
-      RISK STRATEGY MUTUATOR FUNCTIONS
-    ***************************************/
-
-    /**
-     * @notice Sets the weight of the `Risk Strategy`.
-     * Can only be called by the current [**Risk Manager**](./RiskManager).
-     * @param weight_ The value to set.
-    */
-    function setWeightAllocation(uint32 weight_) external;
-
-    /**
-     * @notice Sets the status of the `Risk Strategy`.
-     * Can only be called by the current [**Risk Manager**](./RiskManager).
-     * @param status_ True to activate, false otherwise.
-    */
-    function setStatus(bool status_) external;
 
     /***************************************
       RISK STRATEGY VIEW FUNCTIONS

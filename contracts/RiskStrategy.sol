@@ -36,19 +36,12 @@ contract RiskStrategy is IRiskStrategy, GovernableInitializable {
     /// @notice sum of the product weights in strategy
     uint32 internal _weightSum = 0;
 
-    /// @notice the allocation weight that is allocated by `Risk Manager`.
-    /// It defines how much amount the strategy can use for coverage. 
-    uint32 internal _weightAllocation = 0;
-
-    /// @notice the status of the risk strategy.
-    bool internal _status = false;
-
     /// @notice controls the access that for only risk manager can access.
     modifier onlyRiskManager() {
       require(msg.sender == address(_riskManager), "not risk manager");
       _;
     }
-
+    
     /**
      * @notice Constructs the `RiskStrategy` contract.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
@@ -73,38 +66,11 @@ contract RiskStrategy is IRiskStrategy, GovernableInitializable {
         _riskManager = IRiskManager(riskManager_);
         _strategist = strategist_;
         _weightSum = type(uint32).max;
-        _weightAllocation = type(uint32).max;
 
         // set strategy product risk params
         _initializeStrategyRiskParams(products_, weights_, prices_, divisors_); 
     }
 
-    /***************************************
-      RISK STRATEGY MUTUATOR FUNCTIONS
-    ***************************************/
-
-    /**
-     * @notice Sets the weight of the `Risk Strategy`.
-     * Can only be called by the current [**Risk Manager**](./RiskManager).
-     * @param weight_ The value to set.
-    */
-    function setWeightAllocation(uint32 weight_) external override onlyRiskManager {
-        require(_status, "strategy inactive");
-        require(weight_ > 0, "invalid weight!");
-        _weightAllocation = weight_;
-        emit WeightAllocationSet(weight_);
-    }
-
-    /**
-     * @notice Sets the status of the `Risk Strategy`.
-     * Can only be called by the current [**Risk Manager**](./RiskManager).
-     * @param status_ True to activate, false otherwise.
-    */
-    function setStatus(bool status_) external override onlyRiskManager {
-        _status = status_;
-        emit StatusSet(status_);
-    }
-    
     /***************************************
       RISK STRATEGY VIEW FUNCTIONS
     ***************************************/
@@ -121,7 +87,7 @@ contract RiskStrategy is IRiskStrategy, GovernableInitializable {
     * @return price The price in wei per 1e12 wei of coverage per block.
     */
     function assessRisk(address prod_, uint256 currentCover_, uint256 newCover_) external view override returns (bool acceptable, uint24 price) {
-        require(_status, "strategy inactive");
+        require(status(), "strategy inactive");
         require(_productToIndex[prod_] > 0, "invalid product");
 
         // max cover checks
@@ -147,7 +113,7 @@ contract RiskStrategy is IRiskStrategy, GovernableInitializable {
      * @return cover The max amount of cover in `wei`
     */
     function maxCover() public view override returns (uint256 cover) {
-        return (_riskManager.maxCover() * _weightAllocation) / _riskManager.weightSum();
+        return _riskManager.maxCoverPerStrategy(address(this));
     }
 
     /**
@@ -236,7 +202,7 @@ contract RiskStrategy is IRiskStrategy, GovernableInitializable {
      * @return weightAllocation_ The weight allocation.
     */
     function weightAllocation() external view override returns (uint32 weightAllocation_) {
-        return _weightAllocation;
+        return _riskManager.weightPerStrategy(address(this));
     }
 
     /**
@@ -252,7 +218,7 @@ contract RiskStrategy is IRiskStrategy, GovernableInitializable {
      * @return status_ True if strategy is active.
     */
     function status() public view override returns (bool status_) {
-        return _status;
+        return _riskManager.strategyIsActive(address(this));
     }
 
     /**

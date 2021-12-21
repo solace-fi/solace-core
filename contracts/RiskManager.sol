@@ -2,7 +2,6 @@
 pragma solidity 0.8.6;
 
 import "./Governable.sol";
-import "./RiskStrategy.sol";
 import "./interface/ICoverageDataProvider.sol";
 import "./interface/IRegistry.sol";
 import "./interface/IProduct.sol";
@@ -68,8 +67,6 @@ contract RiskManager is IRiskManager, Governable {
         uint256 strategyCount = _strategyCount;
         _strategies[strategy_] = Strategy({
             id: ++strategyCount,
-            strategy: strategy_,
-            strategist: IRiskStrategy(strategy_).strategist(),
             weight: 0,
             status: StrategyStatus.INACTIVE,
             timestamp: block.timestamp
@@ -90,11 +87,10 @@ contract RiskManager is IRiskManager, Governable {
     function setWeightAllocation(address strategy_, uint32 weight_) external override onlyGovernance {
         require(weight_ > 0, "invalid weight!");
         require(strategyIsActive(strategy_), "inactive strategy");
-        require(isValidWeightAllocation(strategy_, weight_), "invalid weight allocation");
+        require(validateAllocation(strategy_, weight_), "invalid weight allocation");
         Strategy storage riskStrategy = _strategies[strategy_];
         _weightSum = (_weightSum + weight_) - riskStrategy.weight;
         riskStrategy.weight = weight_;
-        IRiskStrategy(strategy_).setWeightAllocation(weight_);
         emit RiskStrategyWeightAllocationSet(strategy_, weight_);
     }
 
@@ -109,8 +105,6 @@ contract RiskManager is IRiskManager, Governable {
         require(_strategyToIndex[strategy_] > 0, "non-exist strategy");
         Strategy storage riskStrategy = _strategies[strategy_];
         riskStrategy.status = StrategyStatus(status_);
-        bool status = riskStrategy.status == StrategyStatus.ACTIVE ? true : false;
-        IRiskStrategy(strategy_).setStatus(status);
         emit StrategyStatusUpdated(strategy_, status_);
     }
 
@@ -145,16 +139,24 @@ contract RiskManager is IRiskManager, Governable {
      * @notice Returns the risk strategy information.
      * @param strategy_ The risk strategy.
      * @return id The id of the risk strategy.
-     * @return strategyAddress The address of the risk strategy.
-     * @return strategist The address of the creator of the risk strategy.
      * @return weight The risk strategy weight allocation.
      * @return status The status of risk strategy.
      * @return timestamp The added time of the risk strategy.
      *
     */
-    function strategyInfo(address strategy_) external view override returns (uint256 id, address strategyAddress, address strategist, uint32 weight, StrategyStatus status, uint256 timestamp) {
+    function strategyInfo(address strategy_) external view override returns (uint256 id, uint32 weight, StrategyStatus status, uint256 timestamp) {
         Strategy memory strategy = _strategies[strategy_];
-        return (strategy.id, strategy.strategy, strategy.strategist, strategy.weight, strategy.status, strategy.timestamp);
+        return (strategy.id, strategy.weight, strategy.status, strategy.timestamp);
+    }
+
+    /**
+     * @notice Returns the allocated weight for the risk strategy.
+     * @param strategy_ The risk strategy.
+     * @return weight The risk strategy weight allocation.
+    */
+    function weightPerStrategy(address strategy_) public view override returns (uint32 weight) {
+        Strategy memory strategy = _strategies[strategy_];
+        return strategy.weight;
     }
 
     /***************************************
@@ -170,10 +172,21 @@ contract RiskManager is IRiskManager, Governable {
     }
 
     /**
+     * @notice The maximum amount of cover for given strategy can sell.
+     * @return cover The max amount of cover in wei.
+     */
+     function maxCoverPerStrategy(address strategy_) public view override returns (uint256 cover) {
+        if (!strategyIsActive(strategy_)) return 0;
+        uint256 maxCoverage = maxCover();
+        uint32 weight = weightPerStrategy(strategy_);
+        return maxCoverage = (maxCoverage * weight) / weightSum();
+    }
+
+    /**
      * @notice Returns the sum of allocation weights for all strategies.
      * @return sum WeightSum.
      */
-    function weightSum() external view override returns (uint32 sum) {
+    function weightSum() public view override returns (uint32 sum) {
         return _weightSum == 0 ? type(uint32).max : _weightSum;
     }
 
@@ -224,7 +237,7 @@ contract RiskManager is IRiskManager, Governable {
      * @param weight_ The weight allocation to set.
      * @return status True if the weight allocation is valid.
     */
-    function isValidWeightAllocation(address strategy_, uint32 weight_) private view returns(bool status) {
+    function validateAllocation(address strategy_, uint32 weight_) private view returns(bool status) {
         Strategy memory riskStrategy = _strategies[strategy_];
         uint32 weightsum = _weightSum;
 

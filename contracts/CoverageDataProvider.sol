@@ -317,7 +317,7 @@ contract CoverageDataProvider is ICoverageDataProvider, Governable {
       }
       // get pool balance
       uint256 pools = numOfPools();
-      for (uint256 i = 0; i < pools; i++) {
+      for (uint256 i = pools; i > 0; i--) {
         cover += getPoolAmount(_indexToUnderwritingPool[i]);
       }
     }

@@ -26,8 +26,6 @@ interface IRiskManager {
 
     struct Strategy {
         uint256 id;
-        address strategy;
-        address strategist;
         uint32 weight;
         StrategyStatus status;
         uint256 timestamp;
@@ -108,14 +106,25 @@ interface IRiskManager {
      * @notice Returns the risk strategy information.
      * @param strategy_ The risk strategy.
      * @return id The id of the risk strategy.
-     * @return strategyAddress The address of the risk strategy.
-     * @return strategist The address of the creator of the risk strategy.
      * @return weight The risk strategy weight allocation.
      * @return status The status of risk strategy.
      * @return timestamp The added time of the risk strategy.
      *
     */
-    function strategyInfo(address strategy_) external view returns (uint256 id, address strategyAddress, address strategist, uint32 weight, StrategyStatus status, uint256 timestamp);
+    function strategyInfo(address strategy_) external view returns (uint256 id, uint32 weight, StrategyStatus status, uint256 timestamp);
+
+    /**
+     * @notice Returns the allocated weight for the risk strategy.
+     * @param strategy_ The risk strategy.
+     * @return weight The risk strategy weight allocation.
+    */
+    function weightPerStrategy(address strategy_) external view returns (uint32 weight);
+
+    /**
+     * @notice The maximum amount of cover for given strategy can sell.
+     * @return cover The max amount of cover in wei.
+     */
+    function maxCoverPerStrategy(address strategy_) external view returns (uint256 cover);
 
     /***************************************
     MAX COVER VIEW FUNCTIONS
