@@ -11,11 +11,11 @@ import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer
 import { burnBlocks, burnBlocksUntil } from "./utilities/time";
 import { encodeAddresses } from "./utilities/positionDescription";
 
-import { PolicyManager, MockProductV2, Treasury, Registry, RiskManager, PolicyDescriptorV2, Vault, Weth9, MockRiskStrategy, CoverageDataProvider, ProductFactory } from "../typechain";
+import { PolicyManager, MockProductV2, Treasury, Registry, RiskManager, PolicyDescriptorV2, Vault, Weth9, MockRiskStrategy, CoverageDataProvider, ProductFactory, SoteriaCoverageProduct } from "../typechain";
 
 describe("PolicyManager", function() {
   let artifacts: ArtifactImports;
-  const [deployer, governor, user, user2, walletProduct1, walletProduct2, walletProduct3, positionContract, solace, solaceUsdcPool, priceOracle] = provider.getWallets();
+  const [deployer, governor, user, user2, soteriaPolicyholder, walletProduct1, walletProduct2, walletProduct3, positionContract, solace, solaceUsdcPool, priceOracle] = provider.getWallets();
 
   // contracts
   let policyManager: PolicyManager;
@@ -35,7 +35,7 @@ describe("PolicyManager", function() {
   const name = "Solace Policy";
   const symbol = "SPT";
   const expirationBlock = 20000000;
-  const coverAmount = BN.from("100000000000000"); // 10 Ether in wei
+  const coverAmount = BN.from("100000000000000"); 
   const price = 11044; // price in wei for block/wei
   const chainId = 31337;
   const STRATEGY_STATUS_ACTIVE = 1;
@@ -80,6 +80,8 @@ describe("PolicyManager", function() {
     await registry.connect(governor).setPolicyManager(policyManager.address);
     await registry.connect(governor).setRiskManager(riskManager.address);
     await deployer.sendTransaction({ to: treasury.address, value: BN.from("10000000000000000") });
+    await governor.sendTransaction({ to: vault.address, value: BN.from("9000000000000000000000") });
+
     await vault.connect(governor).addRequestor(treasury.address);
     await registry.connect(governor).setCoverageDataProvider(coverageDataProvider.address);
 
@@ -559,4 +561,53 @@ describe("PolicyManager", function() {
       await expect(policyManager.tokenURI(1000)).to.be.revertedWith("query for nonexistent token");
     });
   });
+
+  describe("soteria", () => {
+    const SUBMIT_CLAIM_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("SoteriaCoverageProductSubmitClaim(uint256 policyID,address claimant,uint256 amountOut,uint256 deadline)"));
+    const DOMAIN_NAME = "Solace.fi-SoteriaCoverageProduct";
+    const VERSION = "1";
+    const COVER_AMOUNT = BN.from("1000000000000000000");
+    let soteriaProduct: SoteriaCoverageProduct;
+
+    before(async () => {
+      soteriaProduct = await deployContract(deployer, artifacts.SoteriaCoverageProduct, [governor.address, registry.address , SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, VERSION]) as SoteriaCoverageProduct;
+      // add Soteria to the risk manager and assign coverage allocation
+      await riskManager.connect(governor).addRiskStrategy(soteriaProduct.address);
+      await riskManager.connect(governor).setStrategyStatus(soteriaProduct.address, 1);
+      await riskManager.connect(governor).setWeightAllocation(soteriaProduct.address, 1000);
+    });
+
+    it("starts with no soteria product", async () => {
+      expect(await policyManager.getSoteriaProduct()).to.equal(ZERO_ADDRESS);
+    });
+
+    it("cannot call setSoteriaActiveCoverAmount if there is no soteria product", async () => {
+      await expect(policyManager.connect(soteriaProduct.signer).setSoteriaActiveCoverAmount(COVER_AMOUNT)).to.revertedWith("no soteria product");
+    });
+
+    it("cannot set zero address soteria product", async () => {
+        await expect(policyManager.connect(governor).setSoteriaProduct(ZERO_ADDRESS)).to.revertedWith("zero address soteria");
+    });
+
+    it("can set soteria product", async () => {
+       let tx = await policyManager.connect(governor).setSoteriaProduct(soteriaProduct.address);
+       await expect(tx).emit(policyManager, "SoteriaProductSet").withArgs(soteriaProduct.address);
+       expect(await policyManager.connect(governor).getSoteriaProduct()).to.equal(soteriaProduct.address);
+    });
+
+    it("cannot call setSoteriaActiveCoverAmount for non-soteria product caller", async () => {
+       await expect(policyManager.connect(governor).setSoteriaActiveCoverAmount(COVER_AMOUNT)).to.revertedWith("only soteria product");
+    });
+
+    it("active cover amount should be updated when soteria policy is sold", async () => {
+      let prevActiveCoverAmount = await policyManager.activeCoverAmount();
+      let prevSoteriaActiveCoverAmount = await policyManager.activeCoverAmountPerStrategy(soteriaProduct.address);
+      let tx = await soteriaProduct.connect(soteriaPolicyholder).buyPolicy(soteriaPolicyholder.address, COVER_AMOUNT, {value: COVER_AMOUNT});
+      await expect(tx).emit(soteriaProduct, "PolicyCreated").withArgs(BN.from("1"));
+
+      expect(await policyManager.activeCoverAmount()).to.equal(prevActiveCoverAmount.add(COVER_AMOUNT));
+      expect(await policyManager.activeCoverAmountPerStrategy(soteriaProduct.address)).to.equal(prevSoteriaActiveCoverAmount.add(COVER_AMOUNT));
+    });
+  });
+
 });

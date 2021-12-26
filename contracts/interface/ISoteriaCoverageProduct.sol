@@ -10,6 +10,15 @@ interface ISoteriaCoverageProduct {
     /// @notice Emitted when a new Policy is created.
     event PolicyCreated(uint256 policyID);
 
+    /// @notice Emitted when a Policy is updated.
+    event PolicyUpdated(uint256 policyID);
+
+    /// @notice Emitted when a Policy is closed.
+    event PolicyClosed(uint256 policyID);
+
+    /// @notice Emitted when a Policy ic canceled.
+    event PolicyCanceled(uint256 policyID);
+
     /// @notice Emitted when Registry address is updated.
     event RegistrySet(address registry);
 
@@ -21,6 +30,18 @@ interface ISoteriaCoverageProduct {
 
     /// @notice Emitted when premium is charged.
     event PremiumCharged(address policyholder, uint256 amount);
+
+    /// @notice Emitted when policy manager cover amount for soteria is updated.
+    event PolicyManagerUpdated(uint256 activeCoverAmount);
+
+    /// @notice Emitted when a claim signer is added.
+    event SignerAdded(address signer);
+
+    /// @notice Emitted when a claim signer is removed.
+    event SignerRemoved(address signer);
+
+    /// @notice Emitted when a claim is submitted.
+    event ClaimSubmitted(uint256 policyID);
 
     /***************************************
     POLICY FUNCTIONS
@@ -41,11 +62,43 @@ interface ISoteriaCoverageProduct {
     function deposit(address policyholder_) external payable;
 
     /**
+     * @notice Updates the cover amount of the policy.
+     * @param newCoverAmount_ The new value to cover in **ETH**.
+    */
+    function updateCoverAmount(uint256 newCoverAmount_) external;
+
+    /**
      * @notice Charge premiums for each policy holder.
      * @param holders_ The policy holders.
      * @param premiums_ The premium amounts in `wei` per policy holder.
     */
     function chargePremiums(address[] calldata holders_, uint256[] calldata premiums_) external payable;
+
+    /**
+     * @notice Cancel and burn a policy.
+     * User will receive their deposited funds.
+     * Can only be called by the policyholder.
+     * @param policyID_ The ID of the policy.
+    */
+    function cancelPolicy(uint256 policyID_) external;
+
+    /**
+     * @notice Submit a claim.
+     * The user can only submit one claim per policy and the claim must be signed by an authorized signer.
+     * If successful the policy is not burnt and a new claim is created.
+     * The new claim will be in [`ClaimsEscrow`](../ClaimsEscrow) and have the same ID as the policy.
+     * Can only be called by the policyholder.
+     * @param policyID_ The policy that suffered a loss.
+     * @param amountOut_ The amount the user will receive.
+     * @param deadline_ Transaction must execute before this timestamp.
+     * @param signature_ Signature from the signer.
+    */
+    function submitClaim(
+        uint256 policyID_,
+        uint256 amountOut_,
+        uint256 deadline_,
+        bytes calldata signature_
+    ) external;
 
     /***************************************
     VIEW FUNCTIONS
@@ -60,30 +113,30 @@ interface ISoteriaCoverageProduct {
     function assessRisk(uint256 currentCover_, uint256 newCover_) external view returns (bool acceptable);
     
     /**
-     * @notice Returns the policy holder fund amount.
-     * @param policyHolder_ The address of the policy holder.
+     * @notice Returns the policyholder fund amount.
+     * @param policyholder_ The address of the policyholder.
      * @return amount The amount of funds.    
     */
-    function funds(address policyHolder_) external view returns (uint256 amount);
+    function funds(address policyholder_) external view returns (uint256 amount);
    
     /**
-     * @notice Returns the policy holder's policy id.
-     * @param policyHolder_ The address of the policy holder.
+     * @notice Returns the policyholder's policy id.
+     * @param policyholder_ The address of the policyholder.
      * @return policyID The policy id.
     */
-    function policyByOwner(address policyHolder_) external view returns (uint256 policyID);
+    function policyByOwner(address policyholder_) external view returns (uint256 policyID);
 
     /**
-     * @notice Returns the policy holder debt amount.
-     * @param policyHolder_ The address of the policy holder.
-     * @return debt The amount of dept.    
+     * @notice Returns whether if the policy is active or not.
+     * @param policyID_ The id of the policy.
+     * @return status True if policy is active. False otherwise.
     */
-    function debts(address policyHolder_) external view returns (uint256 debt);
+    function policyStatus(uint256 policyID_) external view returns (bool status);
 
     /**
      * @notice Returns the policy owner policy for given policy id.
      * @param policyID_ The policy id.
-     * @return owner The address of the policy holder.
+     * @return owner The address of the policyholder.
     */
     function ownerOfPolicy(uint256 policyID_) external view returns (address owner);
 
@@ -136,6 +189,13 @@ interface ISoteriaCoverageProduct {
     */
     function coverAmountOf(uint256 policy_) external view returns (uint256 amount);
 
+    /**
+     * @notice Returns true if the given account is authorized to sign claims.
+     * @param account_ Potential signer to query.
+     * @return status True if is authorized signer.
+    */
+    function isAuthorizedSigner(address account_) external view returns (bool status);
+    
     /***************************************
     GOVERNANCE FUNCTIONS
     ***************************************/
@@ -153,6 +213,19 @@ interface ISoteriaCoverageProduct {
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param paused_ True to pause, false to unpause.
     */
-    function setPaused(bool paused_) external; 
+    function setPaused(bool paused_) external;
 
+    /**
+     * @notice Adds a new signer that can authorize claims.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param signer_ The signer to add.
+    */
+    function addSigner(address signer_) external;
+    
+    /**
+     * @notice Removes a signer.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param signer_ The signer to remove.
+    */
+    function removeSigner(address signer_) external;
 }

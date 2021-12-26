@@ -234,14 +234,10 @@ describe("RiskManager", function () {
 
     it("can get strategy info", async function() {
       let id = BN.from(1)
-      let strategyAddress = riskStrategy.address;
-      let strategist = deployer.address;
       let weight = BN.from(0);
       let status = STRATEGY_STATUS_INACTIVE;
       let info = await riskManager.connect(user).strategyInfo(riskStrategy.address);
       expect(info.id).to.eq(id);
-      expect(info.strategyAddress).to.equal(strategyAddress);
-      expect(info.strategist).to.equal(strategist);
       expect(info.weight).to.eq(weight);
       expect(info.status).to.eq(status);
       expect(info.timestamp).to.gt(0);

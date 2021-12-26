@@ -36,7 +36,7 @@ describe("RiskStrategy", function () {
 
   // vars
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-  const NO_WEIGHT = BN.from("4294967295"); // max uint32
+  const NO_WEIGHT = BN.from("0"); // max uint32
   const MAX_PRICE = BN.from("16777215"); // max uint24
   const SUBMIT_CLAIM_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("MockProductSubmitClaim(uint256 policyID,address claimant,uint256 amountOut,uint256 deadline)"));
   const DOMAIN_NAME = "Solace.fi-MockProduct"; 
@@ -396,7 +396,7 @@ describe("RiskStrategy", function () {
       await expect(riskStrategy.productRiskParams(product1.address)).to.be.revertedWith("product inactive");
       await expect(riskStrategy.productRiskParams(product2.address)).to.be.revertedWith("product inactive");
       await expect(riskStrategy.productRiskParams(product3.address)).to.be.revertedWith("product inactive");
-      expect(await riskStrategy.weightSum()).to.equal(NO_WEIGHT);
+      expect(await riskStrategy.weightSum()).to.equal(BN.from("4294967295"));
       expect(await riskStrategy.numProducts()).to.equal(0);
       expect(await riskStrategy.productIsActive(product1.address)).to.be.false;
       expect(await riskStrategy.productIsActive(product2.address)).to.be.false;
@@ -409,7 +409,6 @@ describe("RiskStrategy", function () {
       expect(await riskStrategy.productIsActive(product3.address)).to.be.true;
     });
   });
-
 
   describe("max cover amount", function () {
     before(async function() {

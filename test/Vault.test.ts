@@ -46,6 +46,7 @@ describe("Vault", function () {
   })
 
   beforeEach(async function () {
+
     registry = (await deployContract(owner, artifacts.Registry, [owner.address])) as Registry;
     weth = (await deployContract(owner,artifacts.WETH)) as Weth9;
     await registry.setWeth(weth.address);
@@ -58,9 +59,10 @@ describe("Vault", function () {
     riskManager = (await deployContract(owner, artifacts.RiskManager, [owner.address, registry.address])) as RiskManager;
     await registry.setRiskManager(riskManager.address);
     await registry.setSolace(solace.address);
-    coverageDataProvider = (await deployContract(owner, artifacts.CoverageDataProvider, [owner.address, registry.address, priceOracle, solaceUsdcPool])) as CoverageDataProvider;
+
+    coverageDataProvider = (await deployContract(owner, artifacts.CoverageDataProvider, [owner.address, registry.address, priceOracle.address, solaceUsdcPool.address])) as CoverageDataProvider;
     await registry.connect(owner).setCoverageDataProvider(coverageDataProvider.address);
-   
+
     // deploy product factory
     productFactory = (await deployContract(owner, artifacts.ProductFactory)) as ProductFactory;
 
@@ -72,7 +74,7 @@ describe("Vault", function () {
       let event1 = events1[0];
       mockProduct = await ethers.getContractAt(artifacts.MockProductV2.abi, event1?.args?.["deployment"]) as MockProductV2;
     } else throw "no deployment";
-    
+
     // deploy risk strategy factory
     let riskStrategyContractFactory = await ethers.getContractFactory("RiskStrategyFactory", owner);
     riskStrategyFactory = (await riskStrategyContractFactory.deploy(registry.address, owner.address));

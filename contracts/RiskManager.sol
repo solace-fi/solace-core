@@ -25,18 +25,22 @@ contract RiskManager is IRiskManager, Governable {
     GLOBAL VARIABLES
     ***************************************/
 
+    /// @notice Holds mapping strategy => inddex.
     mapping(address => uint256) internal _strategyToIndex;
+    /// @notice Holds mapping index => strategy.
     mapping(uint256 => address) internal _indexToStrategy;
+    /// @notice Holds strategies.
     mapping(address => Strategy) internal _strategies;
+    /// @notice The total strategy count.
     uint256 internal _strategyCount;
+    /// @notice The total weight sum of all strategies.
     uint32 internal _weightSum;
-
-    // Multiplier for minimum capital requirement in BPS.
+    /// @notice Multiplier for minimum capital requirement in BPS.
     uint16 internal _partialReservesFactor;
-    // 10k basis points (100%)
+    /// @notice 10k basis points (100%).
     uint16 internal constant MAX_BPS = 10000;
 
-    // Registry
+    /// @notice Registry contract.
     IRegistry internal _registry;
 
     /**
@@ -240,21 +244,22 @@ contract RiskManager is IRiskManager, Governable {
     function validateAllocation(address strategy_, uint32 weight_) private view returns(bool status) {
         Strategy memory riskStrategy = _strategies[strategy_];
         uint32 weightsum = _weightSum;
-
         // check if new allocation is valid for the strategy
         uint256 smcr = minCapitalRequirementPerStrategy(strategy_);
         uint256 mc = maxCover();
         weightsum = weightsum + weight_ - riskStrategy.weight;
         uint256 newAllocationAmount = (mc * weight_) / weightsum;
+
         if (newAllocationAmount < smcr) return false;
+
         // check other risk strategies
         uint256 strategyCount = _strategyCount;
         for (uint256 i = strategyCount; i > 0; i--) {
             address strategy = _indexToStrategy[i];
             riskStrategy = _strategies[strategy];
-            if (strategy == strategy_ || riskStrategy.weight == 0) continue;
-
             smcr = minCapitalRequirementPerStrategy(strategy);
+
+            if (strategy == strategy_ || riskStrategy.weight == 0 || smcr == 0) continue;
             newAllocationAmount = (mc * riskStrategy.weight) / weightsum;
             if (newAllocationAmount < smcr) return false;
         }

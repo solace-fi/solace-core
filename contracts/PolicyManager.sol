@@ -10,6 +10,7 @@ import "./ERC721Enhanced.sol";
 import "./interface/IProduct.sol";
 import "./interface/IPolicyManager.sol";
 import "./interface/IPolicyDescriptor.sol";
+import "./interface/ISoteriaCoverageProduct.sol";
 
 
 /**
@@ -31,6 +32,9 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
 
     /// @notice The address of the policy descriptor contract, which handles generating token URIs for policies.
     address internal _policyDescriptor;
+
+    /// @notice solace.fi Soteria coverage product.
+    ISoteriaCoverageProduct internal _soteriaCoverageProduct;
 
     /// @notice Set of products.
     EnumerableSet.AddressSet internal products;
@@ -358,6 +362,21 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
         _activeCoverAmount = activeCover;
     }
 
+    /**
+     * @notice Updates the active cover amount of the Soteria product.
+     * This function is only called by `SoteriaCoverageProduct` when a new policy is bought or updated.
+     * @param newCoverAmount The new cover amount.
+    */
+    function setSoteriaActiveCoverAmount(uint256 newCoverAmount) external override {
+        require(address(_soteriaCoverageProduct) != address(0x0), "no soteria product");
+        require(msg.sender == address(_soteriaCoverageProduct), "only soteria product");
+        uint256 coverAmount = _activeCoverAmount;
+        coverAmount = coverAmount + newCoverAmount - _activeCoverAmountPerStrategy[msg.sender];
+        _activeCoverAmountPerStrategy[msg.sender] = newCoverAmount;
+        _activeCoverAmount = coverAmount;
+        emit SoteriaProductCoverAmountUpdated(newCoverAmount);
+    }
+
     /***************************************
     PRODUCT VIEW FUNCTIONS
     ***************************************/
@@ -386,6 +405,14 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
      */
     function getProduct(uint256 productNum) external override view returns (address product) {
         return products.at(productNum);
+    }
+
+    /**
+     * @notice Returns `SoteriaCoverageProduct`.
+     * @return soteria The address of soteria product.
+    */
+    function getSoteriaProduct() external override view returns (address soteria) {
+        return address(_soteriaCoverageProduct);
     }
 
     /***************************************
@@ -422,6 +449,17 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
         require(product != address(0x0), "zero product");
         products.add(product);
         emit ProductAdded(product);
+    }
+
+    /**
+     * @notice Sets soteria product.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param soteria The `SoteriaCoverageProduct`.
+     */
+     function setSoteriaProduct(address soteria) external override onlyGovernance {
+        require(soteria != address(0x0), "zero address soteria");
+        _soteriaCoverageProduct = ISoteriaCoverageProduct(soteria);
+        emit SoteriaProductSet(soteria);
     }
 
     /**

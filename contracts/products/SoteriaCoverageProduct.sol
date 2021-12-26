@@ -10,9 +10,14 @@ import "../interface/ITreasury.sol";
 import "../interface/IPolicyManager.sol";
 import "../interface/IRegistry.sol";
 import "../interface/IRiskManager.sol";
+import "../interface/IClaimsEscrow.sol";
 import "../interface/ISoteriaCoverageProduct.sol";
-import "hardhat/console.sol";
 
+/**
+ * @title SoteriaCoverageProduct
+ * @author solace.fi
+ * @notice The smart contract implementation of **SoteriaCoverageProduct**.
+ */
 contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, ReentrancyGuard, Governable {
     using Address for address;
 
@@ -30,6 +35,9 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     /// @notice RiskManager contract
     IRiskManager internal _riskManager;
 
+    /// @notice PolicyManager contract
+    IPolicyManager internal _policyManager;
+
     /// @notice Cannot buy new policies while paused. (Default is False)
     bool internal _paused;
 
@@ -46,9 +54,6 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     /// @notice The policy holder funds.
     mapping(address => uint256) internal _funds;
 
-    /// @notice The policy holder debts.
-    mapping(address => uint256) internal _debts;
-
     /// @notice The policyholder => policyID.
     mapping(address => uint256) internal _ownerToPolicy;
 
@@ -58,9 +63,13 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     /// @notice The cover amount for each policy(policyID => coverAmount).
     mapping (uint256 => uint256) internal _coverAmountOf;
 
+    /// @notice The authorized signers.
+    mapping(address => bool) internal _isAuthorizedSigner;
+
     /***************************************
     MODIFIERS
     ***************************************/
+
     modifier whileUnpaused() {
         require(!_paused, "contract paused");
         _;
@@ -85,10 +94,13 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         require(registry_ != address(0x0), "zero address registry");
         _registry = IRegistry(registry_);
 
-        // set risk manager
+        // set riskmanager
         require(_registry.riskManager() != address(0x0), "zero address riskmanager");
         _riskManager = IRiskManager(_registry.riskManager());
 
+        // set policymanager
+        require(_registry.policyManager() != address(0x0), "zero address policymanager");
+        _policyManager = IPolicyManager(_registry.policyManager());
         _SUBMIT_CLAIM_TYPEHASH = typehash_;
     }
     
@@ -140,8 +152,28 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         _policyToOwner[policyID] = policyholder_;
         _mint(policyholder_, policyID);
 
+        // update policy manager active cover amount
+        _updatePolicyManager(_activeCoverAmount);
         emit PolicyCreated(policyID);
         return policyID;
+    }
+
+    /**
+     * @notice Updates the cover amount of the policy.
+     * @param newCoverAmount_ The new value to cover in **ETH**.
+    */
+    function updateCoverAmount(uint256 newCoverAmount_) external override nonReentrant whileUnpaused {
+        require(newCoverAmount_ > 0, "zero cover value");
+        uint256 policyID = policyByOwner(msg.sender);
+        require(policyID > 0, "invalid policy");
+        uint256 currentCoverAmount = coverAmountOf(policyID);
+        require(assessRisk(currentCoverAmount, newCoverAmount_), "cannot accept that risk");
+        uint256 coverAmount = activeCoverAmount();
+        coverAmount = coverAmount + newCoverAmount_ - currentCoverAmount;
+        _coverAmountOf[policyID] = newCoverAmount_;
+        _activeCoverAmount = coverAmount;
+        _updatePolicyManager(coverAmount);
+        emit PolicyUpdated(policyID);
     }
 
     /**
@@ -161,28 +193,83 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         uint256 count = holders_.length;
         require(count == premiums_.length, "length mismatch");
         require(count == policyCount(), "policy count mismatch");
-        
-        uint256 amountToPay = 0;
-        uint256 holderFunds = 0;
-        address holder = address(0);
+        uint256 amountToPayTreasury = 0;
+
         for (uint256 i = 0; i < count; i++) {
-            holder = holders_[i];
-            holderFunds = funds(holder);
-            amountToPay = debts(holder) + premiums_[i];
-            if (amountToPay >= holderFunds) {
-                _debts[holder] = amountToPay - holderFunds;
-                _funds[holder] = 0;
-                amountToPay = holderFunds;
-            } else {
-                _debts[holder] = 0;
-                _funds[holder] = holderFunds - amountToPay;
+            // Skip computation if policy inactive (coverAmount == 0)
+            if (_coverAmountOf[_ownerToPolicy[holders_[i]]] == 0) {
+                continue;
             }
-            // transfer premium to the treasury
-            ITreasury(payable(_registry.treasury())).routePremiums{value: amountToPay}();
-            emit PremiumCharged(holder, amountToPay);
+
+            if (_funds[holders_[i]] >= premiums_[i]) {
+                amountToPayTreasury += premiums_[i];
+                _funds[holders_[i]] -= premiums_[i];
+                emit PremiumCharged(holders_[i], premiums_[i]);
+            } else {
+                // Turn off the policy
+                _closePolicy(holders_[i]);
+            }   
         }
+        // transfer premium to the treasury
+        ITreasury(payable(_registry.treasury())).routePremiums{value: amountToPayTreasury}();
     }
 
+    /**
+     * @notice Cancel and burn a policy.
+     * User will receive their deposited funds.
+     * Can only be called by the policyholder.
+     * @param policyID_ The ID of the policy.
+     */
+     function cancelPolicy(uint256 policyID_) external override nonReentrant {
+        require(_exists(policyID_), "invalid policy");
+        require(ownerOfPolicy(policyID_) == msg.sender,"!policyholder");
+        uint256 refundAmount = funds(msg.sender);
+        _activeCoverAmount -= coverAmountOf(policyID_);
+        _coverAmountOf[policyID_] = 0;
+
+        // send deposited fund to the policyholder
+        if (refundAmount > 0) Address.sendValue(payable(msg.sender), refundAmount);
+        _updatePolicyManager(_activeCoverAmount);
+        emit PolicyCanceled(policyID_);
+    }
+
+    /**
+     * @notice Submit a claim.
+     * The user can only submit one claim per policy and the claim must be signed by an authorized signer.
+     * If successful the policy is not burnt and a new claim is created.
+     * The new claim will be in [`ClaimsEscrow`](../ClaimsEscrow) and have the same ID as the policy.
+     * Can only be called by the policyholder.
+     * @param policyID_ The policy that suffered a loss.
+     * @param amountOut_ The amount the user will receive.
+     * @param deadline_ Transaction must execute before this timestamp.
+     * @param signature_ Signature from the signer.
+     */
+     function submitClaim(
+        uint256 policyID_,
+        uint256 amountOut_,
+        uint256 deadline_,
+        bytes calldata signature_
+    ) external override nonReentrant {
+        // validate inputs
+        require(policyStatus(policyID_), "inactive policy");
+        // solhint-disable-next-line not-rely-on-time
+        require(block.timestamp <= deadline_, "expired deadline");
+        require(ownerOfPolicy(policyID_) == msg.sender, "!policyholder");
+        require(amountOut_ <= coverAmountOf(policyID_), "excessive amount out");
+        // verify signature
+        {
+        bytes32 structHash = keccak256(abi.encode(_SUBMIT_CLAIM_TYPEHASH, policyID_, msg.sender, amountOut_, deadline_));
+        bytes32 hash = _hashTypedDataV4(structHash);
+        address signer = ECDSA.recover(hash, signature_);
+        require(_isAuthorizedSigner[signer], "invalid signature");
+        }
+        _activeCoverAmount -= coverAmountOf(policyID_);
+        _coverAmountOf[policyID_] = 0;
+        _updatePolicyManager(_activeCoverAmount);
+        // submit claim to ClaimsEscrow
+        IClaimsEscrow(payable(_registry.claimsEscrow())).receiveClaim(policyID_, msg.sender, amountOut_);
+        emit ClaimSubmitted(policyID_);
+    }
 
     /***************************************
     VIEW FUNCTIONS
@@ -203,36 +290,37 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     }
 
     /**
-     * @notice Returns the policy holder fund amount.
-     * @param policyHolder_ The address of the policy holder.
+     * @notice Returns the policyholder fund amount.
+     * @param policyholder_ The address of the policyholder.
      * @return amount The amount of funds.    
     */
-    function funds(address policyHolder_) public view override returns (uint256 amount) {
-        return _funds[policyHolder_];
+    function funds(address policyholder_) public view override returns (uint256 amount) {
+        return _funds[policyholder_];
     }
 
     /**
-     * @notice Returns the policy holder debt amount.
-     * @param policyHolder_ The address of the policy holder.
-     * @return debt The amount of dept.    
+     * @notice Returns whether if the policy is active or not.
+     * @param policyID_ The id of the policy.
+     * @return status True if policy is active. False otherwise.
     */
-    function debts(address policyHolder_) public view override returns (uint256 debt) {
-        return _debts[policyHolder_];
+    function policyStatus(uint256 policyID_) public view override returns (bool status) {
+        require(_exists(policyID_), "invalid policy");
+        return coverAmountOf(policyID_) > 0 ? true : false;
     }
 
     /**
-     * @notice Returns the policy holder's policy id.
-     * @param policyHolder_ The address of the policy holder.
+     * @notice Returns the policyholder's policy id.
+     * @param policyholder_ The address of the policyholder.
      * @return policyID The policy id.
     */
-    function policyByOwner(address policyHolder_) public view override returns (uint256 policyID) {
-        return _ownerToPolicy[policyHolder_];
+    function policyByOwner(address policyholder_) public view override returns (uint256 policyID) {
+        return _ownerToPolicy[policyholder_];
     }
 
     /**
      * @notice Returns the policy owner policy for given policy id.
      * @param policyID_ The policy id.
-     * @return owner The address of the policy holder.
+     * @return owner The address of the policyholder.
     */
     function ownerOfPolicy(uint256 policyID_) public view override returns (address owner) {
         return _policyToOwner[policyID_];
@@ -308,6 +396,15 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         return _coverAmountOf[policy_];
     }
 
+    /**
+     * @notice Returns true if the given account is authorized to sign claims.
+     * @param account_ Potential signer to query.
+     * @return status True if is authorized signer.
+     */
+     function isAuthorizedSigner(address account_) external view override returns (bool status) {
+        return _isAuthorizedSigner[account_];
+    }
+
     /***************************************
     GOVERNANCE FUNCTIONS
     ***************************************/
@@ -322,6 +419,8 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         _registry = IRegistry(registry_);
         require(_registry.riskManager() != address(0x0), "zero address riskmanager");
         _riskManager = IRiskManager(_registry.riskManager());
+        require(_registry.policyManager() != address(0x0), "zero address policymanager");
+        _policyManager = IPolicyManager(_registry.policyManager());
         emit RegistrySet(registry_);
     }
 
@@ -336,9 +435,31 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         emit PauseSet(paused_);
     }
 
+    /**
+     * @notice Adds a new signer that can authorize claims.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param signer_ The signer to add.
+    */
+    function addSigner(address signer_) external override onlyGovernance {
+        require(signer_ != address(0x0), "zero address signer");
+        _isAuthorizedSigner[signer_] = true;
+        emit SignerAdded(signer_);
+    }
+
+    /**
+     * @notice Removes a signer.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param signer_ The signer to remove.
+    */
+    function removeSigner(address signer_) external override onlyGovernance {
+        _isAuthorizedSigner[signer_] = false;
+        emit SignerRemoved(signer_);
+    }
+
     /***************************************
     INTERNAL FUNCTIONS
     ***************************************/
+
     /**
      * @notice Adds funds to policy holder's balance.
      * @param policyholder The policy holder address.
@@ -347,6 +468,27 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     function _deposit(address policyholder, uint256 amount) internal whileUnpaused {
         _funds[policyholder] += amount;
         emit DepositMade(policyholder, amount);
+    }
+
+    /**
+     * @notice Closes the policy when user has no enough fund to pay premium.
+     * @param policyholder The address of the policy owner.
+    */
+    function _closePolicy(address policyholder) internal {
+        uint256 policyID = policyByOwner(policyholder);
+        _activeCoverAmount -= coverAmountOf(policyID);
+        _coverAmountOf[policyID] = 0;
+        _updatePolicyManager(_activeCoverAmount);
+        emit PolicyClosed(policyID);
+    }
+
+    /**
+     * @notice Updates policy manager's active cover amount.
+     * @param soteriaActiveCoverAmount The active cover amount of soteria product.
+    */
+    function _updatePolicyManager(uint256 soteriaActiveCoverAmount) internal {
+        _policyManager.setSoteriaActiveCoverAmount(soteriaActiveCoverAmount);
+        emit PolicyManagerUpdated(soteriaActiveCoverAmount);
     }
 
 }

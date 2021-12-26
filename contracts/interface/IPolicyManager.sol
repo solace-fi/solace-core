@@ -30,6 +30,10 @@ interface IPolicyManager is IERC721Enhanced {
     event ProductAdded(address product);
     /// @notice Emitted when a new product is removed.
     event ProductRemoved(address product);
+    /// @notice Emitted when soteria product is set.
+    event SoteriaProductSet(address soteria);
+    /// @notice Emitted when soteria active cover amount is updated.
+    event SoteriaProductCoverAmountUpdated(uint256 newCoverAmount);
 
     /***************************************
     POLICY VIEW FUNCTIONS
@@ -212,6 +216,13 @@ interface IPolicyManager is IERC721Enhanced {
      */
     function updateActivePolicies(uint256[] calldata policyIDs) external;
 
+    /**
+     * @notice Updates the active cover amount of the Soteria product.
+     * This function is only called by `SoteriaCoverageProduct` when a new policy is bought or updated.
+     * @param newCoverAmount The new cover amount.
+    */ 
+    function setSoteriaActiveCoverAmount(uint256 newCoverAmount) external; 
+
     /***************************************
     PRODUCT VIEW FUNCTIONS
     ***************************************/
@@ -235,6 +246,12 @@ interface IPolicyManager is IERC721Enhanced {
      * @return product The address of the product.
      */
     function getProduct(uint256 productNum) external view returns (address product);
+
+    /**
+     * @notice Returns `SoteriaCoverageProduct`.
+     * @return soteria The address of soteria product.
+    */
+    function getSoteriaProduct() external view returns (address soteria);
 
     /***************************************
     OTHER VIEW FUNCTIONS
@@ -263,6 +280,13 @@ interface IPolicyManager is IERC721Enhanced {
      * @param product the new product
      */
     function addProduct(address product) external;
+
+    /**
+     * @notice Sets soteria product.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param soteria The `SoteriaCoverageProduct`.
+     */
+    function setSoteriaProduct(address soteria) external; 
 
     /**
      * @notice Removes a product.
