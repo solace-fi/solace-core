@@ -1,63 +1,55 @@
 import hardhat from "hardhat";
 const { waffle, ethers } = hardhat;
-const { provider } = waffle;
+const { deployContract, provider } = waffle;
 const BN = ethers.BigNumber;
 import { config as dotenv_config } from "dotenv";
 dotenv_config();
-const deployer = new ethers.Wallet(JSON.parse(process.env.RINKEBY_ACCOUNTS || '[]')[0], provider);
-
-import { create2Contract } from "./create2Contract";
+const deployer = new ethers.Wallet(JSON.parse(process.env.LOCALHOST_ACCOUNTS || '[]')[0], provider);
 
 import { logContractAddress } from "./utils";
 
 import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_importer";
-import { Deployer, Solace, XSolace, BondDepository, BondTellerErc20, BondTellerEth, FarmRewards } from "../typechain";
+import { Solace, XSolace, BondDepository, BondTellerErc20, BondTellerEth, FarmRewards } from "../typechain";
 import { BytesLike, constants } from "ethers";
-import { readFileSync } from "fs";
-import { getERC20PermitSignature } from "../test/utilities/getERC20PermitSignature";
-
-const DEPLOYER_CONTRACT_ADDRESS    = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
 
 const BOND_START_TIME = BN.from("1638205200"); // 5 PM UTC November 29 2021
 const MAX_UINT40 = BN.from("1099511627775");
-const MAX_UINT128 = BN.from(1).shl(128).sub(1);
 const ONE_ETHER = BN.from("1000000000000000000");
 const VESTING_TERM = 432000; // 5 days
 const HALF_LIFE = 2592000; // 30 days
 const FIFTY_THOUSAND_SOLACE = BN.from("50000000000000000000000");
 
-const SOLACE_ADDRESS                = "0x501acE9c35E60f03A2af4d484f49F9B1EFde9f40";
-const XSOLACE_ADDRESS               = "0x501AcE5aC3Af20F49D53242B6D208f3B91cfc411";
-const UNDERWRITING_POOL_ADDRESS     = "0x5efC0d9ee3223229Ce3b53e441016efC5BA83435";
-const DAO_ADDRESS                   = "0xf075334df87f0a5d9fe6381b5035b60f384d6c2c";
-const BOND_DEPO_ADDRESS             = "0x501ACe81445C57fC438B358F861d3774199cE13c";
+const SOLACE_ADDRESS                = "";
+const XSOLACE_ADDRESS               = "";
+const UNDERWRITING_POOL_ADDRESS     = "0xBcd4042DE499D14e55001CcbB24a551F3b954096"; // hardhat node account #10
+const DAO_ADDRESS                   = "0x71bE63f3384f5fb98995898A86B02Fb2426c5788"; // hardhat node account #11
+const BOND_DEPO_ADDRESS             = "";
 
-const DAI_ADDRESS                   = "0x6B175474E89094C44Da98b954EedeAC495271d0F";
-const DAI_BOND_TELLER_ADDRESS       = "0x501AcE5FEe0337e13A442Cb5e15728EE0e8b3F29";
+const DAI_ADDRESS                   = "";
+const DAI_BOND_TELLER_ADDRESS       = "";
 
-const WETH_ADDRESS                  = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
-const ETH_BOND_TELLER_ADDRESS       = "0x501ace68E20c29629E690D86E54E79719e2Fc5e8";
+const WETH_ADDRESS                  = "";
+const ETH_BOND_TELLER_ADDRESS       = "";
 
-const USDC_ADDRESS                  = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
-const USDC_BOND_TELLER_ADDRESS      = "0x501aCE044AE4E11183026659EE3B0E3b0Df04d7F";
-const SLP_USDC_ADDRESS              = "0x9C051F8A6648a51eF324D30C235da74D060153aC";
-const SLP_USDC_BOND_TELLER_ADDRESS  = "0x501acEb253483BD58773365334DEf095304CddAE";
+const USDC_ADDRESS                  = "";
+const USDC_BOND_TELLER_ADDRESS      = "";
+const SLP_USDC_ADDRESS              = "";
+const SLP_USDC_BOND_TELLER_ADDRESS  = "";
 
-const WBTC_ADDRESS                  = "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599";
-const WBTC_BOND_TELLER_ADDRESS      = "0x501aCE2f3b5B8f645E67556Df77ac4c3081D84C7";
+const WBTC_ADDRESS                  = "";
+const WBTC_BOND_TELLER_ADDRESS      = "";
 
-const USDT_ADDRESS                  = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
-const USDT_BOND_TELLER_ADDRESS      = "0x501acE6061D6176Da12FCBa36Bc85B2fc3FFd5e3";
+const USDT_ADDRESS                  = "";
+const USDT_BOND_TELLER_ADDRESS      = "";
 
-const SCP_ADDRESS                   = "0x501AcEe83a6f269B77c167c6701843D454E2EFA0";
-const SCP_BOND_TELLER_ADDRESS       = "0x501aCE163FfaCDa6584D75b274eD23155BFf4812";
+const SCP_ADDRESS                   = "";
+const SCP_BOND_TELLER_ADDRESS       = "";
 
-const FRAX_ADDRESS                  = "0x853d955aCEf822Db058eb8505911ED77F175b99e";
+const FRAX_ADDRESS                  = "";
 
-const FARM_REWARDS_ADDRESS          = "0x501aCE3c1A6aA2f1C00A5A7F32B171e648e542F9";
+const FARM_REWARDS_ADDRESS          = "";
 
 let artifacts: ArtifactImports;
-let deployerContract: Deployer;
 
 let solace: Solace;
 let xsolace: XSolace;
@@ -76,19 +68,14 @@ let farmRewards: FarmRewards;
 let signerAddress: string;
 let tellerImplementationAddress: string;
 
+let tokenAddresses: any = {};
+
 async function main() {
   artifacts = await import_artifacts();
   signerAddress = await deployer.getAddress();
   console.log(`Using ${signerAddress} as deployer and governor`);
 
-  if((await provider.getNetwork()).chainId == 31337) { // testnet
-    console.log('funding')
-    var [funder] = await hardhat.ethers.getSigners();
-    let tx = await funder.sendTransaction({to: signerAddress, value: BN.from("100000000000000000000")});
-    await tx.wait();
-  }
-
-  deployerContract = (await ethers.getContractAt(artifacts.Deployer.abi, DEPLOYER_CONTRACT_ADDRESS)) as Deployer;
+  await deployTestnetTokens();
 
   // new underwriting
   await deploySOLACE();
@@ -115,17 +102,9 @@ async function deploySOLACE() {
     solace = (await ethers.getContractAt(artifacts.SOLACE.abi, SOLACE_ADDRESS)) as Solace;
   } else {
     console.log("Deploying SOLACE");
-    var res = await create2Contract(deployer,artifacts.SOLACE,[signerAddress], {}, "", deployerContract.address);
-    solace = (await ethers.getContractAt(artifacts.SOLACE.abi, res.address)) as Solace;
+    solace = (await deployContract(deployer, artifacts.SOLACE, [signerAddress])) as Solace;
     console.log(`Deployed SOLACE to ${solace.address}`);
   }
-  /*
-  if(!(await solace.isMinter(deployer.address)) && (await solace.governance()) == signerAddress) {
-    console.log("Adding deployer as SOLACE minter");
-    let tx = await solace.connect(deployer).addMinter(deployer.address);
-    await tx.wait();
-  }
-  */
 }
 
 async function deployXSOLACE() {
@@ -133,8 +112,7 @@ async function deployXSOLACE() {
     xsolace = (await ethers.getContractAt(artifacts.xSOLACE.abi, XSOLACE_ADDRESS)) as XSolace;
   } else {
     console.log("Deploying xSOLACE");
-    var res = await create2Contract(deployer, artifacts.xSOLACE, [signerAddress, solace.address], {}, "", deployerContract.address);
-    xsolace = (await ethers.getContractAt(artifacts.xSOLACE.abi, res.address)) as XSolace;
+    xsolace = (await deployContract(deployer, artifacts.xSOLACE, [signerAddress, solace.address])) as XSolace;
     console.log(`Deployed xSOLACE to ${xsolace.address}`);
   }
 }
@@ -144,8 +122,7 @@ async function deployBondDepo() {
     bondDepo = (await ethers.getContractAt(artifacts.BondDepository.abi, BOND_DEPO_ADDRESS)) as BondDepository;
   } else {
     console.log("Deploying BondDepository");
-    var res = await create2Contract(deployer,artifacts.BondDepository, [signerAddress, solace.address, xsolace.address, UNDERWRITING_POOL_ADDRESS, DAO_ADDRESS], {}, "", deployerContract.address);
-    bondDepo = (await ethers.getContractAt(artifacts.BondDepository.abi, res.address)) as BondDepository;
+    bondDepo = (await deployContract(deployer, artifacts.BondDepository, [signerAddress, solace.address, xsolace.address, UNDERWRITING_POOL_ADDRESS, DAO_ADDRESS])) as BondDepository;
     console.log(`Deployed BondDepository to ${bondDepo.address}`);
   }
 }
@@ -163,11 +140,10 @@ async function deployDaiTeller() {
     daiTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, DAI_BOND_TELLER_ADDRESS)) as BondTellerErc20;
   } else {
     console.log("DAI Teller - deploy");
-    var res = await create2Contract(deployer, artifacts.BondTellerERC20, [], {}, "", deployerContract.address);
-    daiTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, res.address)) as BondTellerErc20;
+    daiTeller = (await deployContract(deployer, artifacts.BondTellerERC20)) as BondTellerErc20;
     console.log(`DAI Teller - deployed to ${daiTeller.address}`);
     console.log('DAI teller - init');
-    let tx1 = await daiTeller.connect(deployer).initialize(NAME, signerAddress, solace.address, xsolace.address, UNDERWRITING_POOL_ADDRESS, DAO_ADDRESS, DAI_ADDRESS, bondDepo.address);
+    let tx1 = await daiTeller.connect(deployer).initialize(NAME, signerAddress, solace.address, xsolace.address, UNDERWRITING_POOL_ADDRESS, DAO_ADDRESS, tokenAddresses["DAI"], bondDepo.address);
     await tx1.wait();
     console.log('DAI teller - set terms');
     let tx2 = await daiTeller.connect(deployer).setTerms({startPrice: START_PRICE, minimumPrice: START_PRICE, maxPayout: MAX_PAYOUT, priceAdjNum: PRICE_ADJ_NUM, priceAdjDenom: PRICE_ADJ_DENOM, capacity: CAPACITY, capacityIsPayout: true, startTime: BOND_START_TIME, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
@@ -196,11 +172,10 @@ async function deployEthTeller() {
     ethTeller = (await ethers.getContractAt(artifacts.BondTellerETH.abi, ETH_BOND_TELLER_ADDRESS)) as BondTellerEth;
   } else {
     console.log("ETH Teller - deploy");
-    var res = await create2Contract(deployer, artifacts.BondTellerETH, [], {}, "", deployerContract.address);
-    ethTeller = (await ethers.getContractAt(artifacts.BondTellerETH.abi, res.address)) as BondTellerEth;
+    ethTeller = (await deployContract(deployer, artifacts.BondTellerETH)) as BondTellerEth;
     console.log(`ETH Teller - deployed to ${ethTeller.address}`);
     console.log('ETH teller - init');
-    let tx1 = await ethTeller.connect(deployer).initialize(NAME, signerAddress, solace.address, xsolace.address, UNDERWRITING_POOL_ADDRESS, DAO_ADDRESS, WETH_ADDRESS, bondDepo.address);
+    let tx1 = await ethTeller.connect(deployer).initialize(NAME, signerAddress, solace.address, xsolace.address, UNDERWRITING_POOL_ADDRESS, DAO_ADDRESS, tokenAddresses["WETH"], bondDepo.address);
     await tx1.wait();
     console.log('ETH teller - set terms');
     let tx2 = await ethTeller.connect(deployer).setTerms({startPrice: START_PRICE, minimumPrice: START_PRICE, maxPayout: MAX_PAYOUT, priceAdjNum: PRICE_ADJ_NUM, priceAdjDenom: PRICE_ADJ_DENOM, capacity: CAPACITY, capacityIsPayout: true, startTime: BOND_START_TIME, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
@@ -228,8 +203,7 @@ async function deployUsdcTeller() {
     usdcTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, USDC_BOND_TELLER_ADDRESS)) as BondTellerErc20;
   } else {
     console.log("USDC Teller - deploy");
-    var salt = "0x0000000000000000000000000000000000000000000000000000000000aed0a5";
-    usdcTeller = await deploy2ProxyTeller(NAME, tellerImplementationAddress, USDC_ADDRESS, salt);
+    usdcTeller = await deployProxyTeller(NAME, tellerImplementationAddress, tokenAddresses["USDC"]);
     console.log(`USDC Teller - deployed to ${usdcTeller.address}`);
     console.log('USDC Teller - set terms');
     let tx2 = await usdcTeller.connect(deployer).setTerms({startPrice: START_PRICE, minimumPrice: START_PRICE, maxPayout: MAX_PAYOUT, priceAdjNum: PRICE_ADJ_NUM, priceAdjDenom: PRICE_ADJ_DENOM, capacity: CAPACITY, capacityIsPayout: true, startTime: BOND_START_TIME, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
@@ -254,8 +228,7 @@ async function deploySlpUsdcTeller() {
     slpUsdcTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, SLP_USDC_BOND_TELLER_ADDRESS)) as BondTellerErc20;
   } else {
     console.log("SOLACE-USDC SLP Teller - deploy");
-    var salt = "0x000000000000000000000000000000000000000000000000000000000235ed01";
-    slpUsdcTeller = await deploy2ProxyTeller(NAME, tellerImplementationAddress, SLP_USDC_ADDRESS, salt);
+    slpUsdcTeller = await deployProxyTeller(NAME, tellerImplementationAddress, tokenAddresses["SLP"]);
     console.log(`SOLACE-USDC SLP Teller - deployed to ${slpUsdcTeller.address}`);
     console.log('SOLACE-USDC SLP Teller - set terms');
     let tx2 = await slpUsdcTeller.connect(deployer).setTerms({startPrice: START_PRICE, minimumPrice: START_PRICE, maxPayout: MAX_PAYOUT, priceAdjNum: PRICE_ADJ_NUM, priceAdjDenom: PRICE_ADJ_DENOM, capacity: CAPACITY, capacityIsPayout: true, startTime: BOND_START_TIME, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
@@ -281,8 +254,7 @@ async function deployWbtcTeller() {
     wbtcTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, WBTC_BOND_TELLER_ADDRESS)) as BondTellerErc20;
   } else {
     console.log("WBTC Teller - deploy");
-    var salt = "0x00000000000000000000000000000000000000000000000000000000025e61f1";
-    wbtcTeller = await deploy2ProxyTeller(NAME, tellerImplementationAddress, WBTC_ADDRESS, salt);
+    wbtcTeller = await deployProxyTeller(NAME, tellerImplementationAddress, tokenAddresses["WBTC"]);
     console.log(`WBTC Teller - deployed to ${wbtcTeller.address}`);
     console.log('WBTC Teller - set terms');
     let tx2 = await wbtcTeller.connect(deployer).setTerms({startPrice: START_PRICE, minimumPrice: START_PRICE, maxPayout: MAX_PAYOUT, priceAdjNum: PRICE_ADJ_NUM, priceAdjDenom: PRICE_ADJ_DENOM, capacity: CAPACITY, capacityIsPayout: true, startTime: BOND_START_TIME, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
@@ -307,8 +279,7 @@ async function deployUsdtTeller() {
     usdtTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, USDT_BOND_TELLER_ADDRESS)) as BondTellerErc20;
   } else {
     console.log("USDT Teller - deploy");
-    var salt = "0x0000000000000000000000000000000000000000000000000000000002988a69";
-    usdtTeller = await deploy2ProxyTeller(NAME, tellerImplementationAddress, USDT_ADDRESS, salt);
+    usdtTeller = await deployProxyTeller(NAME, tellerImplementationAddress, tokenAddresses["USDT"]);
     console.log(`USDT Teller - deployed to ${usdtTeller.address}`);
     console.log('USDT Teller - set terms');
     let tx2 = await usdtTeller.connect(deployer).setTerms({startPrice: START_PRICE, minimumPrice: START_PRICE, maxPayout: MAX_PAYOUT, priceAdjNum: PRICE_ADJ_NUM, priceAdjDenom: PRICE_ADJ_DENOM, capacity: CAPACITY, capacityIsPayout: true, startTime: BOND_START_TIME, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
@@ -333,8 +304,7 @@ async function deployScpTeller() {
     scpTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, SCP_BOND_TELLER_ADDRESS)) as BondTellerErc20;
   } else {
     console.log("SCP Teller - deploy");
-    var salt = "0x0000000000000000000000000000000000000000000000000000000006b38c98";
-    scpTeller = await deploy2ProxyTeller(NAME, tellerImplementationAddress, SCP_ADDRESS, salt);
+    scpTeller = await deployProxyTeller(NAME, tellerImplementationAddress, tokenAddresses["SCP"]);
     console.log(`SCP Teller - deployed to ${scpTeller.address}`);
     console.log('SCP Teller - set terms');
     let tx2 = await scpTeller.connect(deployer).setTerms({startPrice: START_PRICE, minimumPrice: START_PRICE, maxPayout: MAX_PAYOUT, priceAdjNum: PRICE_ADJ_NUM, priceAdjDenom: PRICE_ADJ_DENOM, capacity: CAPACITY, capacityIsPayout: false, startTime: BOND_START_TIME, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
@@ -373,40 +343,35 @@ async function deployFarmRewards() {
     farmRewards = (await ethers.getContractAt(artifacts.FarmRewards.abi, FARM_REWARDS_ADDRESS)) as FarmRewards;
   } else {
     console.log("Deploying FarmRewards");
-    let receiver = "0xc47911f768c6fE3a9fe076B95e93a33Ed45B7B34"; // mainnet core multisig
     let solacePerXSolace = BN.from("21338806133989362485"); // as of midnight before December 2, 2021
-    var res = await create2Contract(deployer, artifacts.FarmRewards, [signerAddress, xsolace.address, receiver, solacePerXSolace], {}, "", deployerContract.address);
-    farmRewards = (await ethers.getContractAt(artifacts.FarmRewards.abi, res.address)) as FarmRewards;
+    farmRewards = (await deployContract(deployer, artifacts.FarmRewards, [signerAddress, xsolace.address, DAO_ADDRESS, solacePerXSolace])) as FarmRewards;
     console.log(`Deployed FarmRewards to ${farmRewards.address}`);
+
+    console.log('adding stablecoin support')
+    let tx2 = await farmRewards.connect(deployer).supportTokens([tokenAddresses["DAI"], tokenAddresses["USDC"], tokenAddresses["USDT"], tokenAddresses["FRAX"]]);
+    await tx2.wait();
   }
-  let solaceAmount = BN.from("4250000000000000000000000");
-  let xsolaceAmount = BN.from("199167656021318753349893");
-  /*
-  console.log('minting solace')
-  let tx1 = await solace.connect(deployer).mint(signerAddress, solaceAmount);
-  await tx1.wait();
-  */
-  /*
-  console.log('approving solace')
-  let tx4 = await solace.connect(deployer).approve(xsolace.address, constants.MaxUint256);
-  await tx4.wait();
-  console.log('staking')
-  let tx5 = await xsolace.connect(deployer).stake(solaceAmount);
-  await tx5.wait();
-  */
-  /*
-  console.log('adding support')
-  let tx2 = await farmRewards.connect(deployer).supportTokens([DAI_ADDRESS, USDC_ADDRESS, USDT_ADDRESS, FRAX_ADDRESS]);
-  await tx2.wait();
-  console.log('writing farm rewards')
-  var farmers = JSON.parse(readFileSync("./stash/cp farmers.json").toString());
-  var rewards = JSON.parse(readFileSync("./stash/cp farm rewards.json").toString());
-  let tx8 = await farmRewards.connect(deployer).setFarmedRewards(farmers, rewards);
-  await tx8.wait();
-  console.log('transferring xsolace')
-  let tx6 = await xsolace.connect(deployer).transfer(farmRewards.address, xsolaceAmount);
-  await tx6.wait();
-  */
+}
+
+async function deployTestnetTokens() {
+  let tokens: any[] = [
+    {name: "Wrapped Ether", symbol: "WETH", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
+    {name: "Dai Stablecoin", symbol: "DAI", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: true},
+    {name: "USD Coin", symbol: "USDC", supply: BN.from("1000000000"), decimals: 6, permit: true},
+    {name: "Wrapped Bitcoin", symbol: "WBTC", supply: BN.from("1000000000"), decimals: 8, permit: false},
+    {name: "USD Token", symbol: "USDT", supply: BN.from("1000000000"), decimals: 6, permit: false},
+    {name: "Frax", symbol: "FRAX", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
+    {name: "Solace CP Token", symbol: "SCP", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: true},
+    {name: "SOLACE-USDC SLP", symbol: "SLP", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: true},
+  ];
+  for(var i = 0; i < tokens.length; ++i) {
+    let token = tokens[i];
+    console.log(`Deploying ${token.symbol}`);
+    let artifact = token.permit ? artifacts.MockERC20Permit : artifacts.MockERC20Decimals;
+    let tokenContract = await deployContract(deployer, artifact, [token.name, token.symbol, token.supply, token.decimals]);
+    tokenAddresses[token.symbol] = tokenContract.address;
+    console.log(`Deployed to ${tokenContract.address}`);
+  }
 }
 
 async function logAddresses() {
@@ -424,14 +389,16 @@ async function logAddresses() {
   logContractAddress("WBTC Bond Teller", wbtcTeller.address);
   logContractAddress("USDT Bond Teller", usdtTeller.address);
   logContractAddress("SCP Bond Teller", scpTeller.address);
-  logContractAddress("DAI", DAI_ADDRESS);
-  logContractAddress("WETH", WETH_ADDRESS);
-  logContractAddress("USDC", USDC_ADDRESS);
-  logContractAddress("SOLACE-USDC SLP", SLP_USDC_ADDRESS);
-  logContractAddress("WBTC", WBTC_ADDRESS);
-  logContractAddress("USDT", USDT_ADDRESS);
-  logContractAddress("SCP", SCP_ADDRESS);
-  logContractAddress("FRAX", FRAX_ADDRESS);
+  logContractAddress("DAI", tokenAddresses["DAI"]);
+  logContractAddress("WETH", tokenAddresses["WETH"]);
+  logContractAddress("USDC", tokenAddresses["USDC"]);
+  logContractAddress("SOLACE-USDC SLP", tokenAddresses["SLP"]);
+  logContractAddress("WBTC", tokenAddresses["WBTC"]);
+  logContractAddress("USDT", tokenAddresses["USDT"]);
+  logContractAddress("SCP", tokenAddresses["SCP"]);
+  logContractAddress("FRAX", tokenAddresses["FRAX"]);
+
+  console.log("\nnote that these token addresses may not be the same as the tokens deployed in part 1");
 }
 
 main()

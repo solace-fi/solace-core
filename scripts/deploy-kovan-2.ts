@@ -9,12 +9,12 @@ const deployer = new ethers.Wallet(JSON.parse(process.env.RINKEBY_ACCOUNTS || '[
 import { create2Contract } from "./create2Contract";
 
 import { logContractAddress } from "./utils";
-
 import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_importer";
-import { Deployer, Solace, XSolace, BondDepository, Faucet, BondTellerErc20, BondTellerEth } from "../typechain";
+import { Deployer, Solace, XSolace, BondDepository, Faucet, BondTellerErc20, BondTellerEth, FarmRewards } from "../typechain";
 import { deployContract } from "ethereum-waffle";
-import { BytesLike } from "ethers";
+import { BytesLike, constants } from "ethers";
 import { toBytes32 } from "../test/utilities/setStorage";
+import { readFileSync } from "fs";
 
 const DEPLOYER_CONTRACT_ADDRESS    = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
 
@@ -29,13 +29,15 @@ const DAO_ADDRESS                   = "0x501AcE0e8D16B92236763E2dEd7aE3bc2DFfA27
 const BOND_DEPO_ADDRESS             = "0x501ACe81445C57fC438B358F861d3774199cE13c";
 const FAUCET_ADDRESS                = "0x501AcE1396AD0Dd9067d36797cf734A2482Aa20b";
 
-const DAI_ADDRESS                   = "0xC56010E957c325b140f182b4FBEE61C2Fb95FDb3";
+//const DAI_ADDRESS                   = "0xC56010E957c325b140f182b4FBEE61C2Fb95FDb3";
+const DAI_ADDRESS                   = "0x31a1D59460a9619ec6965a5684C6d3Ae470D0fE5";
 const DAI_BOND_TELLER_ADDRESS       = "0x501AcE5FEe0337e13A442Cb5e15728EE0e8b3F29";
 
 const WETH_ADDRESS                  = "0xd0A1E359811322d97991E03f863a0C30C2cF029C";
 const ETH_BOND_TELLER_ADDRESS       = "0x501ace68E20c29629E690D86E54E79719e2Fc5e8";
 
-const USDC_ADDRESS                  = "0xeFD4E002d58A66E9ea53F9EbF0583Aecc6E183F0";
+//const USDC_ADDRESS                  = "0xeFD4E002d58A66E9ea53F9EbF0583Aecc6E183F0";
+const USDC_ADDRESS                  = "0x512d93ADc3DF4E24cb4b26c44A91682Ec073F559";
 const USDC_BOND_TELLER_ADDRESS      = "0x501aCE044AE4E11183026659EE3B0E3b0Df04d7F";
 const SLP_USDC_ADDRESS              = "0x13465D2d66be93764B33577C73FC2411917fE9e4";
 const SLP_USDC_BOND_TELLER_ADDRESS  = "0x501acEb253483BD58773365334DEf095304CddAE";
@@ -48,6 +50,10 @@ const USDT_BOND_TELLER_ADDRESS      = "0x501acE6061D6176Da12FCBa36Bc85B2fc3FFd5e
 
 const SCP_ADDRESS                   = "0x501AcEe83a6f269B77c167c6701843D454E2EFA0";
 const SCP_BOND_TELLER_ADDRESS       = "0x501aCE163FfaCDa6584D75b274eD23155BFf4812";
+
+const FRAX_ADDRESS                  = "0x58B23b32a9774153E1E344762751aDfdca2764DD";
+
+const FARM_REWARDS_ADDRESS          = "0x501aCE3c1A6aA2f1C00A5A7F32B171e648e542F9";
 
 let artifacts: ArtifactImports;
 let deployerContract: Deployer;
@@ -63,8 +69,9 @@ let usdcTeller: BondTellerErc20;
 let slpUsdcTeller: BondTellerErc20;
 let wbtcTeller: BondTellerErc20;
 let usdtTeller: BondTellerErc20;
-
 let scpTeller: BondTellerErc20;
+
+let farmRewards: FarmRewards;
 
 let signerAddress: string;
 let tellerImplementationAddress: string;
@@ -96,6 +103,8 @@ async function main() {
   await deployWbtcTeller();
   await deployUsdtTeller();
   await deployScpTeller();
+
+  await deployFarmRewards();
 
   //await deployTestnetTokens();
   await logAddresses();
@@ -168,12 +177,14 @@ async function deployFaucet() {
     faucet = (await ethers.getContractAt(artifacts.Faucet.abi, res.address)) as Faucet;
     console.log(`Deployed Faucet to ${faucet.address}`);
   }
+  /*
   if(!(await solace.isMinter(faucet.address)) && (await solace.governance()) == signerAddress) {
     console.log("Adding faucet as SOLACE minter");
     let tx = await solace.connect(deployer).addMinter(faucet.address);
     await tx.wait();
     console.log("Added faucet as SOLACE minter");
   }
+  */
 }
 
 async function deployDaiTeller() {
@@ -428,17 +439,89 @@ async function deploy2ProxyTeller(name: string, implAddress: string, tokenAddres
   return newTeller;
 }
 
+async function deployFarmRewards() {
+  if(!!FARM_REWARDS_ADDRESS) {
+    farmRewards = (await ethers.getContractAt(artifacts.FarmRewards.abi, FARM_REWARDS_ADDRESS)) as FarmRewards;
+  } else {
+    console.log("Deploying FarmRewards");
+    let receiver = "0xc47911f768c6fE3a9fe076B95e93a33Ed45B7B34"; // mainnet core multisig
+    let solacePerXSolace = BN.from("21338806133989362485"); // as of midnight before December 2, 2021
+    var res = await create2Contract(deployer, artifacts.FarmRewards, [signerAddress, xsolace.address, receiver, solacePerXSolace], {}, "", deployerContract.address);
+    farmRewards = (await ethers.getContractAt(artifacts.FarmRewards.abi, res.address)) as FarmRewards;
+    console.log(`Deployed FarmRewards to ${farmRewards.address}`);
+  }
+  /*
+  console.log('approving solace')
+  let tx4 = await solace.connect(deployer).approve(xsolace.address, constants.MaxUint256);
+  await tx4.wait();
+  console.log('staking')
+  let tx5 = await xsolace.connect(deployer).stake("500000000000000000000000"); // 500k
+  await tx5.wait();
+  let amount = BN.from("197940217416780371255812").sub("0")
+  console.log('transferring xsolace')
+  let tx6 = await xsolace.connect(deployer).transfer(farmRewards.address, amount)
+  await tx6.wait();
+  */
+  /*
+  console.log('adding support')
+  let tx2 = await farmRewards.connect(deployer).supportTokens([DAI_ADDRESS, USDC_ADDRESS, USDT_ADDRESS, FRAX_ADDRESS]);
+  await tx2.wait();
+  /*
+  console.log('approving solace')
+  let tx4 = await solace.connect(deployer).approve(xsolace.address, constants.MaxUint256);
+  await tx4.wait();
+  console.log('staking')
+  let tx5 = await xsolace.connect(deployer).stake("50000000000000000000000"); // 50k
+  await tx5.wait();
+  console.log('transferring xsolace')
+  let tx6 = await xsolace.connect(deployer).transfer(farmRewards.address, "47495250474952504749525")
+  await tx6.wait();
+  /*
+  let tx1 = await solace.connect(deployer).mint(farmRewards.address, ONE_ETHER.mul(1000000));
+  await tx1.wait();
+  console.log('adding support')
+  let tx2 = await farmRewards.connect(deployer).supportTokens([DAI_ADDRESS, USDC_ADDRESS, USDT_ADDRESS, FRAX_ADDRESS]);
+  await tx2.wait();
+  console.log('setting receiver')
+  let tx3 = await farmRewards.connect(deployer).setReceiver(UNDERWRITING_POOL_ADDRESS);
+  await tx3.wait();
+  console.log('approving solace')
+  let tx4 = await solace.connect(deployer).approve(xsolace.address, constants.MaxUint256);
+  await tx4.wait();
+  console.log('staking')
+  let tx5 = await xsolace.connect(deployer).stake("50000000000000000000000"); // 50k
+  await tx5.wait();
+  console.log('transferring xsolace')
+  let tx6 = await xsolace.connect(deployer).transfer(farmRewards.address, "47495250474952504749525")
+  await tx6.wait();
+  let tx7 = await farmRewards.connect(deployer).setFarmedRewards(["0x34Bb9e91dC8AC1E13fb42A0e23f7236999e063D4"],["10000000000000000000000"]);
+  await tx7.wait();
+  */
+  /*
+  console.log('writing farm rewards')
+  var farmers = JSON.parse(readFileSync("./stash/cp farmers.json").toString());
+  var rewards = JSON.parse(readFileSync("./stash/cp farm rewards.json").toString());
+  let tx8 = await farmRewards.connect(deployer).setFarmedRewards(farmers, rewards);
+  await tx8.wait();
+  */
+  console.log('minting solace')
+  let tx9 = await solace.connect(deployer).mint(xsolace.address, "11483642611514821820671113");
+  await tx9.wait();
+}
+
 async function deployTestnetTokens() {
-  let tokens = [
-    //{name: "Dai Stablecoin", symbol: "DAI", supply: ONE_ETHER.mul(1000000), decimals: 18},
-    //{name: "USD Coin", symbol: "USDC", supply: BN.from("1000000000"), decimals: 6},
-    //{name: "Wrapped Bitcoin", symbol: "WBTC", supply: BN.from("1000000000"), decimals: 8}
-    {name: "USD Token", symbol: "USDT", supply: BN.from("1000000000"), decimals: 6},
+  let tokens: any[] = [
+    //{name: "Dai Stablecoin", symbol: "DAI", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: true},
+    //{name: "USD Coin", symbol: "USDC", supply: BN.from("1000000000"), decimals: 6, permit: true},
+    //{name: "Wrapped Bitcoin", symbol: "WBTC", supply: BN.from("1000000000"), decimals: 8, permit: false},
+    //{name: "USD Token", symbol: "USDT", supply: BN.from("1000000000"), decimals: 6, permit: false},
+    //{name: "Frax", symbol: "FRAX", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
   ];
   for(var i = 0; i < tokens.length; ++i) {
     let token = tokens[i];
     console.log(`Deploying ${token.symbol}`);
-    let tokenContract = await deployContract(deployer, artifacts.MockERC20Decimals, [token.name, token.symbol, token.supply, token.decimals]);
+    let artifact = token.permit ? artifacts.MockERC20Permit : artifacts.MockERC20Decimals;
+    let tokenContract = await deployContract(deployer, artifact, [token.name, token.symbol, token.supply, token.decimals]);
     console.log(`Deployed to ${tokenContract.address}`);
   }
 }
@@ -449,8 +532,9 @@ async function logAddresses() {
   console.log("|------------------------------|----------------------------------------------|");
   logContractAddress("SOLACE", solace.address);
   logContractAddress("xSOLACE", xsolace.address);
-  logContractAddress("BondDepository", bondDepo.address);
+  logContractAddress("FarmRewards", farmRewards.address);
   logContractAddress("Faucet", faucet.address);
+  logContractAddress("BondDepository", bondDepo.address);
   logContractAddress("DAI Bond Teller", daiTeller.address);
   logContractAddress("ETH Bond Teller", ethTeller.address);
   logContractAddress("USDC Bond Teller", usdcTeller.address);
@@ -465,6 +549,7 @@ async function logAddresses() {
   logContractAddress("WBTC", WBTC_ADDRESS);
   logContractAddress("USDT", USDT_ADDRESS);
   logContractAddress("SCP", SCP_ADDRESS);
+  logContractAddress("FRAX", FRAX_ADDRESS);
 }
 
 main()
