@@ -128,30 +128,35 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     ***************************************/
 
     /**
-     * @notice  Purchases and mints a policy on the behalf of the policyholder.
+     * @notice Activates policy on the behalf of the policyholder.
      * @param policyholder_ Holder of the position to cover.
-     * @param coverAmount_ The value to cover in **ETH**
+     * @param coverAmount_ The value to cover in **ETH**.
+     * @param minFundAmount_ The minimum funding amount to pay weekly premium amount.
      * @return policyID The ID of newly created policy.
     */
-    function buyPolicy(address policyholder_, uint256 coverAmount_) external payable override whileUnpaused returns (uint256 policyID) {
+    function activatePolicy(address policyholder_, uint256 coverAmount_, uint256 minFundAmount_) external payable override whileUnpaused returns (uint256 policyID) {
         require(policyholder_ != address(0x0), "zero address policyholder");
         require(coverAmount_ > 0, "zero cover value");
-        require(funds(policyholder_) > 0 || msg.value > 0, "zero fund");
-        require(balanceOf(policyholder_) == 0, "already bought policy");
+        require(funds(policyholder_) + msg.value >= minFundAmount_, "insufficient fund");
+        
+        policyID = policyByOwner(policyholder_);
+        require(!policyStatus(policyID), "already bought policy");
         require(assessRisk(0, coverAmount_), "cannot accept that risk");
 
         // deposit funds
         _deposit(policyholder_, msg.value);
 
+        if (policyID == 0) {
+            policyID = ++_totalPolicyCount;
+            _ownerToPolicy[policyholder_] = policyID;
+            _policyToOwner[policyID] = policyholder_;
+            _mint(policyholder_, policyID);
+        }
+
         // update cover amount
         _activeCoverAmount += coverAmount_;
-
-        policyID = ++_totalPolicyCount;
-        _coverAmountOf[policyID] += coverAmount_;
-        _ownerToPolicy[policyholder_] = policyID;
-        _policyToOwner[policyID] = policyholder_;
-        _mint(policyholder_, policyID);
-
+        _coverAmountOf[policyID] = coverAmount_;
+       
         // update policy manager active cover amount
         _updatePolicyManager(_activeCoverAmount);
         emit PolicyCreated(policyID);
@@ -192,12 +197,12 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     function chargePremiums(address[] calldata holders_, uint256[] calldata premiums_) external payable override onlyGovernance whileUnpaused {
         uint256 count = holders_.length;
         require(count == premiums_.length, "length mismatch");
-        require(count == policyCount(), "policy count mismatch");
+        require(count <= policyCount(), "policy count exceeded");
         uint256 amountToPayTreasury = 0;
 
         for (uint256 i = 0; i < count; i++) {
-            // Skip computation if policy inactive (coverAmount == 0)
-            if (_coverAmountOf[_ownerToPolicy[holders_[i]]] == 0) {
+            // skip computation if policy inactive (coverAmount == 0)
+            if (coverAmountOf(policyByOwner(holders_[i])) == 0) {
                 continue;
             }
 
@@ -206,9 +211,13 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
                 _funds[holders_[i]] -= premiums_[i];
                 emit PremiumCharged(holders_[i], premiums_[i]);
             } else {
-                // Turn off the policy
+                uint256 partialPremium = _funds[holders_[i]];
+                amountToPayTreasury += partialPremium;
+                _funds[holders_[i]] = 0;
+                // turn off the policy
                 _closePolicy(holders_[i]);
-            }   
+                emit PremiumPartiallyCharged(holders_[i], premiums_[i], partialPremium);
+            }  
         }
         // transfer premium to the treasury
         ITreasury(payable(_registry.treasury())).routePremiums{value: amountToPayTreasury}();
@@ -222,13 +231,14 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      */
      function cancelPolicy(uint256 policyID_) external override nonReentrant {
         require(_exists(policyID_), "invalid policy");
-        require(ownerOfPolicy(policyID_) == msg.sender,"!policyholder");
+        require(ownerOfPolicy(policyID_) == msg.sender, "!policyholder");
         uint256 refundAmount = funds(msg.sender);
         _activeCoverAmount -= coverAmountOf(policyID_);
         _coverAmountOf[policyID_] = 0;
 
         // send deposited fund to the policyholder
         if (refundAmount > 0) Address.sendValue(payable(msg.sender), refundAmount);
+        _funds[msg.sender] = 0;
         _updatePolicyManager(_activeCoverAmount);
         emit PolicyCanceled(policyID_);
     }
@@ -304,7 +314,6 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      * @return status True if policy is active. False otherwise.
     */
     function policyStatus(uint256 policyID_) public view override returns (bool status) {
-        require(_exists(policyID_), "invalid policy");
         return coverAmountOf(policyID_) > 0 ? true : false;
     }
 

@@ -31,6 +31,9 @@ interface ISoteriaCoverageProduct {
     /// @notice Emitted when premium is charged.
     event PremiumCharged(address policyholder, uint256 amount);
 
+    /// @notice Emitted when premium is partially charged.
+    event PremiumPartiallyCharged(address policyholder, uint256 actualPremium, uint256 chargedPremium);
+
     /// @notice Emitted when policy manager cover amount for soteria is updated.
     event PolicyManagerUpdated(uint256 activeCoverAmount);
 
@@ -48,12 +51,13 @@ interface ISoteriaCoverageProduct {
     ***************************************/
 
     /**
-     * @notice  Purchases and mints a policy on the behalf of the policyholder.
+     * @notice Activates policy on the behalf of the policyholder.
      * @param policyholder_ Holder of the position to cover.
-     * @param coverAmount_ The value to cover in **ETH**
+     * @param coverAmount_ The value to cover in **ETH**.
+     * @param minFundAmount_ The minimum funding amount to pay weekly premium amount.
      * @return policyID The ID of newly created policy.
     */
-    function buyPolicy(address policyholder_, uint256 coverAmount_) external payable returns (uint256 policyID);
+    function activatePolicy(address policyholder_, uint256 coverAmount_, uint256 minFundAmount_) external payable returns (uint256 policyID);
 
     /**
      * @notice Deposits funds for policy holders.
