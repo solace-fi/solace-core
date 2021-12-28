@@ -602,7 +602,7 @@ describe("PolicyManager", function() {
     it("active cover amount should be updated when soteria policy is sold", async () => {
       let prevActiveCoverAmount = await policyManager.activeCoverAmount();
       let prevSoteriaActiveCoverAmount = await policyManager.activeCoverAmountPerStrategy(soteriaProduct.address);
-      let tx = await soteriaProduct.connect(soteriaPolicyholder).buyPolicy(soteriaPolicyholder.address, COVER_AMOUNT, {value: COVER_AMOUNT});
+      let tx = await soteriaProduct.connect(soteriaPolicyholder).activatePolicy(soteriaPolicyholder.address, COVER_AMOUNT, COVER_AMOUNT, {value: COVER_AMOUNT});
       await expect(tx).emit(soteriaProduct, "PolicyCreated").withArgs(BN.from("1"));
 
       expect(await policyManager.activeCoverAmount()).to.equal(prevActiveCoverAmount.add(COVER_AMOUNT));
