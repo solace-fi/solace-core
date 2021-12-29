@@ -152,6 +152,7 @@ describe("RiskManager", function () {
     it("no assets no cover", async function () {
       expect(await vault.totalAssets()).to.equal(0);
       expect(await riskManager.maxCover()).to.equal(0);
+      expect(await riskManager.maxCoverPerStrategy(riskStrategy.address)).to.equal(0);
     });
 
     it("can cover", async function () {
@@ -159,6 +160,7 @@ describe("RiskManager", function () {
       await vault.connect(user).depositEth({value:depositAmount});
       expect(await vault.totalAssets()).to.equal(depositAmount);
       expect(await riskManager.maxCover()).to.equal(depositAmount);
+      expect(await riskManager.maxCoverPerStrategy(riskStrategy.address)).to.equal(0);
     });
   });
 
@@ -248,6 +250,9 @@ describe("RiskManager", function () {
     before(async function() {
       await riskManager.connect(governor).setStrategyStatus(riskStrategy.address, STRATEGY_STATUS_INACTIVE);
       let vaultAmount = await vault.totalAssets();
+      expect(await riskManager.connect(user).weightSum()).eq(BN.from(2).pow(32).sub(1))
+      expect(await riskManager.connect(user).weightPerStrategy(riskStrategy.address)).eq(0)
+      expect(await riskManager.connect(user).maxCoverPerStrategy(riskStrategy.address)).eq(0)
     });
 
     it("cannot set weight by non governance", async function() {
@@ -266,6 +271,9 @@ describe("RiskManager", function () {
       await riskManager.connect(governor).setStrategyStatus(riskStrategy.address, STRATEGY_STATUS_ACTIVE);
       let tx = await riskManager.connect(governor).setWeightAllocation(riskStrategy.address, 1000);
       expect(tx).to.emit(riskManager, "RiskStrategyWeightAllocationSet").withArgs(riskStrategy.address, 1000);
+      expect(await riskManager.connect(user).weightSum()).eq(1000)
+      expect(await riskManager.connect(user).weightPerStrategy(riskStrategy.address)).eq(1000)
+      expect(await riskManager.connect(user).maxCoverPerStrategy(riskStrategy.address)).eq(await riskManager.connect(user).maxCover())
     });
 
     it("cannot set weight if allocation drops under the strategy mcr", async function() {
