@@ -449,13 +449,13 @@ describe("CoverageDataProvider", function() {
 
     it("should safely remove an asset that is not in the last index of _indexToAsset mapping", async function () {
       // OVERALL - Remove and re-add wBTC @ index 6
-      let removed_asset = await coverageDataProvider.connect(user).assetAt(6);
-      expect(removed_asset.asset_).to.be.equal(WBTC);
-      expect(removed_asset.assetType_).to.be.equal(ASSET_TYPE.ERC20);
+      let removedAsset = await coverageDataProvider.connect(user).assetAt(6);
+      expect(removedAsset.asset_).to.be.equal(WBTC);
+      expect(removedAsset.assetType_).to.be.equal(ASSET_TYPE.ERC20);
 
-      let last_index_asset = await coverageDataProvider.connect(user).assetAt(7);
-      expect(last_index_asset.asset_).to.be.equal(USDT);
-      expect(last_index_asset.assetType_).to.be.equal(ASSET_TYPE.ERC20);
+      let lastIndexAsset = await coverageDataProvider.connect(user).assetAt(7);
+      expect(lastIndexAsset.asset_).to.be.equal(USDT);
+      expect(lastIndexAsset.assetType_).to.be.equal(ASSET_TYPE.ERC20);
       
       // Remove WBTC from _indexToAsset
       let tx = await coverageDataProvider.connect(governor).removeAsset(WBTC);
@@ -463,9 +463,9 @@ describe("CoverageDataProvider", function() {
       expect(await coverageDataProvider.connect(user).numOfAssets()).to.be.equal(6);
 
       // Check that current index 6 is now the previous index 7 (USDT)
-      last_index_asset = await coverageDataProvider.connect(user).assetAt(6);
-      expect(last_index_asset.asset_).to.be.equal(USDT);
-      expect(last_index_asset.assetType_).to.be.equal(ASSET_TYPE.ERC20);
+      lastIndexAsset = await coverageDataProvider.connect(user).assetAt(6);
+      expect(lastIndexAsset.asset_).to.be.equal(USDT);
+      expect(lastIndexAsset.assetType_).to.be.equal(ASSET_TYPE.ERC20);
 
       // Restore state of _indexToAsset mapping to before unit test started
       await coverageDataProvider.connect(governor).removeAsset(USDT);
@@ -473,13 +473,13 @@ describe("CoverageDataProvider", function() {
       await coverageDataProvider.connect(governor).addAsset(USDT, ASSET_TYPE.ERC20);
       expect(await coverageDataProvider.connect(user).numOfAssets()).to.be.equal(7);
 
-      removed_asset = await coverageDataProvider.connect(user).assetAt(6);
-      expect(removed_asset.asset_).to.be.equal(WBTC);
-      expect(removed_asset.assetType_).to.be.equal(ASSET_TYPE.ERC20);
+      removedAsset = await coverageDataProvider.connect(user).assetAt(6);
+      expect(removedAsset.asset_).to.be.equal(WBTC);
+      expect(removedAsset.assetType_).to.be.equal(ASSET_TYPE.ERC20);
 
-      last_index_asset = await coverageDataProvider.connect(user).assetAt(7);
-      expect(last_index_asset.asset_).to.be.equal(USDT);
-      expect(last_index_asset.assetType_).to.be.equal(ASSET_TYPE.ERC20);
+      lastIndexAsset = await coverageDataProvider.connect(user).assetAt(7);
+      expect(lastIndexAsset.asset_).to.be.equal(USDT);
+      expect(lastIndexAsset.assetType_).to.be.equal(ASSET_TYPE.ERC20);
     })
   });
 

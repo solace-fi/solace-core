@@ -418,8 +418,8 @@ describe("PolicyManager", function() {
       let productFactory: ProductFactory;
 
       // Send extra ETH to governor to avoid insufficient funds error in `npx hardhat coverage --testfiles test/PolicyManager.test.ts`
-      const bal_priceOracle = await priceOracle.getBalance()
-      await priceOracle.sendTransaction({to: governor.address, value: bal_priceOracle.mul(999).div(1000)})
+      const balancePriceOracle = await priceOracle.getBalance()
+      await priceOracle.sendTransaction({to: governor.address, value: balancePriceOracle.mul(999).div(1000)})
 
       // deploy product factory
       productFactory = (await deployContract(deployer, artifacts.ProductFactory)) as ProductFactory;
