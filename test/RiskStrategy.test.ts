@@ -527,4 +527,32 @@ describe("RiskStrategy", function () {
       // TODO: test case where mc >= ac
     });
   });
+
+  describe("setRiskManager", function () {
+    let riskManager2: RiskManager;
+
+    before(async function () {
+      riskManager2 = await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address]) as RiskManager;
+      expect(await riskStrategy.connect(governor).riskManager()).eq(riskManager.address)
+    })
+    
+    it("should revert on zero address risk manager", async function () {
+      await expect(riskStrategy.connect(governor).setRiskManager(ZERO_ADDRESS)).to.be.revertedWith("zero address risk manager")
+    })
+
+    it("should reject setRiskManager by non-governance", async function () {
+      await expect(riskStrategy.connect(user).setRiskManager(riskManager2.address)).to.be.revertedWith("!governance")
+    })
+
+    it("should should setRiskManager", async function () {
+      let tx = await riskStrategy.connect(governor).setRiskManager(riskManager2.address);
+      expect(tx).emit(riskStrategy, "RiskManagerSet").withArgs(riskManager2.address);
+      expect(await riskStrategy.connect(governor).riskManager()).eq(riskManager2.address)
+    })
+
+    after(async function () {
+      await riskStrategy.connect(governor).setRiskManager(riskManager.address);
+      expect(await riskStrategy.connect(governor).riskManager()).eq(riskManager.address)
+    })
+  })
 });

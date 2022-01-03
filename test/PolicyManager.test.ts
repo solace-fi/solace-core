@@ -261,14 +261,17 @@ describe("PolicyManager", function() {
     });
     it("cannot update nonexistent policy", async function() {
       await expect(policyManager.setPolicyInfo(2, coverAmount, expirationBlock, price, positionContract.address, riskStrategy.address)).to.be.revertedWith("query for nonexistent token");
+      await expect(policyManager.updatePolicyInfo(2, coverAmount, expirationBlock, price, riskStrategy.address)).to.be.revertedWith("query for nonexistent token");
     });
     it("product cannot update other products policy", async function() {
       await expect(policyManager.setPolicyInfo(1, coverAmount, expirationBlock, price, positionContract.address, riskStrategy.address)).to.be.revertedWith("wrong product");
+      await expect(policyManager.updatePolicyInfo(1, coverAmount, expirationBlock, price, riskStrategy.address)).to.be.revertedWith("wrong product");
     });
     it("can set policy info", async function() {
       let policyDescription = "0xabcd1234";
       // users must provide valid risk strategy
-      await policyManager.connect(walletProduct2).setPolicyInfo(1, 1, 2, 3, policyDescription, riskStrategy.address);
+      let tx = await policyManager.connect(walletProduct2).setPolicyInfo(1, 1, 2, 3, policyDescription, riskStrategy.address);
+      expect(tx).to.emit(policyManager, "PolicyUpdated").withArgs(1);
       expect(await policyManager.getPolicyholder(1)).to.equal(user.address);
       expect(await policyManager.getPolicyProduct(1)).to.equal(walletProduct2.address);
       expect(await policyManager.getPositionDescription(1)).to.equal(policyDescription);
@@ -283,6 +286,22 @@ describe("PolicyManager", function() {
       expect(await policyManager.activeCoverAmountPerStrategy(riskStrategy.address)).to.equal(1);
       expect(await riskManager.minCapitalRequirementPerStrategy(riskStrategy.address)).to.equal(1);
     });
+    it("can update policy info with same parameters", async function () {
+      let tx = await policyManager.connect(walletProduct2).updatePolicyInfo(1, 1, 2, 3, riskStrategy.address);
+      expect(tx).to.emit(policyManager, "PolicyUpdated").withArgs(1);
+      expect(await policyManager.getPolicyholder(1)).to.equal(user.address);
+      expect(await policyManager.getPolicyProduct(1)).to.equal(walletProduct2.address);
+      expect(await policyManager.getPolicyCoverAmount(1)).to.equal(1);
+      expect(await policyManager.getPolicyExpirationBlock(1)).to.equal(2);
+      expect(await policyManager.getPolicyPrice(1)).to.equal(3);
+      expect(await policyManager.policyIsActive(1)).to.equal(false);
+      expect(await policyManager.exists(1)).to.equal(true);
+      expect(await policyManager.activeCoverAmount()).to.equal(1);
+      expect(await riskManager.minCapitalRequirement()).to.equal(1);
+      expect(await policyManager.getPolicyRiskStrategy(1)).to.equal(riskStrategy.address);
+      expect(await policyManager.activeCoverAmountPerStrategy(riskStrategy.address)).to.equal(1);
+      expect(await riskManager.minCapitalRequirementPerStrategy(riskStrategy.address)).to.equal(1);
+    })
     it("can list my policies", async function() {
       expect(await policyManager.listTokensOfOwner(deployer.address)).to.deep.equal([]);
       expect(await policyManager.listTokensOfOwner(user.address)).to.deep.equal([BN.from(1)]);
@@ -397,6 +416,10 @@ describe("PolicyManager", function() {
   describe("updateActivePolicies", async function() {
     before(async function() {
       let productFactory: ProductFactory;
+
+      // Send extra ETH to governor to avoid insufficient funds error in `npx hardhat coverage --testfiles test/PolicyManager.test.ts`
+      const balancePriceOracle = await priceOracle.getBalance()
+      await priceOracle.sendTransaction({to: governor.address, value: balancePriceOracle.mul(999).div(1000)})
 
       // deploy product factory
       productFactory = (await deployContract(deployer, artifacts.ProductFactory)) as ProductFactory;
@@ -604,6 +627,7 @@ describe("PolicyManager", function() {
       let prevSoteriaActiveCoverAmount = await policyManager.activeCoverAmountPerStrategy(soteriaProduct.address);
       let tx = await soteriaProduct.connect(soteriaPolicyholder).activatePolicy(soteriaPolicyholder.address, COVER_AMOUNT, COVER_AMOUNT, {value: COVER_AMOUNT});
       await expect(tx).emit(soteriaProduct, "PolicyCreated").withArgs(BN.from("1"));
+      await expect(tx).emit(policyManager, "SoteriaProductCoverAmountUpdated").withArgs(COVER_AMOUNT);
 
       expect(await policyManager.activeCoverAmount()).to.equal(prevActiveCoverAmount.add(COVER_AMOUNT));
       expect(await policyManager.activeCoverAmountPerStrategy(soteriaProduct.address)).to.equal(prevSoteriaActiveCoverAmount.add(COVER_AMOUNT));

@@ -243,7 +243,7 @@ describe("CoverageProduct", function () {
       await expect(product.connect(policyholder1).setMaxPeriod(maxPeriod1)).to.be.revertedWith("!governance");
     });
 
-    it("should revert setMaxPeriod if greater than maxPeriod", async function () {
+    it("should revert setMaxPeriod if lesser than minPeriod", async function () {
       let minPeriod = await product.minPeriod();
       await expect(product.connect(governor).setMaxPeriod(minPeriod - 1)).to.be.revertedWith("invalid period");
     });
@@ -470,7 +470,8 @@ describe("CoverageProduct", function () {
 
     it("can extend your policy after transfer", async function () {
       await policyManager.connect(policyholder1).transferFrom(policyholder1.address, policyholder2.address, policyID);
-      await product.connect(policyholder2).extendPolicy(policyID, extension, { value: quote });
+      let tx = await product.connect(policyholder2).extendPolicy(policyID, extension, { value: quote });
+      await expect(tx).to.emit(product, "PolicyExtended").withArgs(policyID);
       await policyManager.connect(policyholder2).transferFrom(policyholder2.address, policyholder1.address, policyID);
     });
   });
