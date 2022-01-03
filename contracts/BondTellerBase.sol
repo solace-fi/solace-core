@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./GovernableInitializable.sol";
 import "./ERC721EnhancedInitializable.sol";
 import "./interface/ISOLACE.sol";
-import "./interface/IxSOLACE.sol";
+import "./interface/IxSOLACEv1.sol";
 import "./interface/IBondDepository.sol";
 import "./interface/IBondTellerErc20.sol";
 
@@ -65,7 +65,7 @@ abstract contract BondTellerBase is IBondTeller, ReentrancyGuard, GovernableInit
 
     // addresses
     ISOLACE public solace;                     // solace native token
-    IxSOLACE public xsolace;                   // xsolace staking contract
+    IxSOLACEv1 public xsolace;                   // xsolace staking contract
     IERC20 public principal;                   // token to accept as payment
     address public underwritingPool;           // the underwriting pool to back risks
     address public dao;                        // the dao
@@ -361,7 +361,7 @@ abstract contract BondTellerBase is IBondTeller, ReentrancyGuard, GovernableInit
         require(principal_ != address(0x0), "zero address principal");
         require(bondDepo_ != address(0x0), "zero address bond depo");
         solace = ISOLACE(solace_);
-        xsolace = IxSOLACE(xsolace_);
+        xsolace = IxSOLACEv1(xsolace_);
         solace.approve(xsolace_, type(uint256).max);
         underwritingPool = pool_;
         dao = dao_;
