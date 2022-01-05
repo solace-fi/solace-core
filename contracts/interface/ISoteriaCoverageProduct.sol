@@ -25,8 +25,11 @@ interface ISoteriaCoverageProduct {
     /// @notice Emitted when pause is set.
     event PauseSet(bool pause);
 
-    /// @notice Emitted when a deposit mande.
+    /// @notice Emitted when a deposit is made.
     event DepositMade(address from, uint256 amount);
+
+    /// @notice Emitted when a withdraw is made.
+    event WithdrawMade(address policyholder, uint256 amount);
 
     /// @notice Emitted when premium is charged.
     event PremiumCharged(address policyholder, uint256 amount);
@@ -35,7 +38,7 @@ interface ISoteriaCoverageProduct {
     event PremiumPartiallyCharged(address policyholder, uint256 actualPremium, uint256 chargedPremium);
 
     /// @notice Emitted when policy manager cover amount for soteria is updated.
-    event PolicyManagerUpdated(uint256 activeCoverAmount);
+    event PolicyManagerUpdated(uint256 activeCoverLimit);
 
     /// @notice Emitted when a claim signer is added.
     event SignerAdded(address signer);
@@ -43,8 +46,11 @@ interface ISoteriaCoverageProduct {
     /// @notice Emitted when a claim signer is removed.
     event SignerRemoved(address signer);
 
-    /// @notice Emitted when a claim is submitted.
-    event ClaimSubmitted(uint256 policyID);
+    /// @notice Emitted when reward balance is gifted.
+    event MaxChargeablePremiumSet(uint256 maxChargeablePremium);
+
+    /// @notice Emitted when reward balance is gifted.
+    event RewardBalanceGifted(address policyholder, uint256 amountGifted);
 
     /***************************************
     POLICY FUNCTIONS
@@ -53,11 +59,10 @@ interface ISoteriaCoverageProduct {
     /**
      * @notice Activates policy on the behalf of the policyholder.
      * @param policyholder_ Holder of the position to cover.
-     * @param coverAmount_ The value to cover in **ETH**.
-     * @param minFundAmount_ The minimum funding amount to pay weekly premium amount.
+     * @param coverLimit_ The value to cover in **ETH**.
      * @return policyID The ID of newly created policy.
     */
-    function activatePolicy(address policyholder_, uint256 coverAmount_, uint256 minFundAmount_) external payable returns (uint256 policyID);
+    function activatePolicy(address policyholder_, uint256 coverLimit_) external payable returns (uint256 policyID);
 
     /**
      * @notice Deposits funds for policy holders.
@@ -66,10 +71,17 @@ interface ISoteriaCoverageProduct {
     function deposit(address policyholder_) external payable;
 
     /**
+     * @notice Withdraw ETH from Soteria account to user.
+     * @param amount_ Amount policyholder desires to withdraw
+     */
+    function withdraw(uint256 amount_) external;
+
+    /**
      * @notice Updates the cover amount of the policy.
-     * @param newCoverAmount_ The new value to cover in **ETH**.
+     * @param policyID_ The policy ID to update.
+     * @param newCoverLimit_ The new value to cover in **ETH**.
     */
-    function updateCoverAmount(uint256 newCoverAmount_) external;
+    function updateCoverLimit(uint256 policyID_, uint256 newCoverLimit_) external;
 
     /**
      * @notice Charge premiums for each policy holder.
@@ -86,49 +98,36 @@ interface ISoteriaCoverageProduct {
     */
     function cancelPolicy(uint256 policyID_) external;
 
-    /**
-     * @notice Submit a claim.
-     * The user can only submit one claim per policy and the claim must be signed by an authorized signer.
-     * If successful the policy is not burnt and a new claim is created.
-     * The new claim will be in [`ClaimsEscrow`](../ClaimsEscrow) and have the same ID as the policy.
-     * Can only be called by the policyholder.
-     * @param policyID_ The policy that suffered a loss.
-     * @param amountOut_ The amount the user will receive.
-     * @param deadline_ Transaction must execute before this timestamp.
-     * @param signature_ Signature from the signer.
-    */
-    function submitClaim(
-        uint256 policyID_,
-        uint256 amountOut_,
-        uint256 deadline_,
-        bytes calldata signature_
-    ) external;
-
     /***************************************
     VIEW FUNCTIONS
     ***************************************/
 
     /**
-    * @notice Given a request for coverage, determines if that risk is acceptable and if so at what price.
-    * @param currentCover_ If updating an existing policy's cover amount, the current cover amount, otherwise 0.
-    * @param newCover_ The cover amount requested.
-    * @return acceptable True if risk of the new cover is acceptable, false otherwise.
+    * @notice Determine available capacity for new cover.
+    * @return newCoverCapacity_ The amount of available capacity for new cover.
     */
-    function assessRisk(uint256 currentCover_, uint256 newCover_) external view returns (bool acceptable);
-    
+    function newCoverCapacity() external view returns (uint256 newCoverCapacity_);
+
+    /**
+    * @notice Return reward balance for a policyholder.
+    * @param policyholder_ The address of the policyholder.
+    * @return rewardBalance_ The reward balance for a policyholder.
+    */
+    function rewardBalanceOf(address policyholder_) external view returns (uint256 rewardBalance_);
+
     /**
      * @notice Returns the policyholder fund amount.
      * @param policyholder_ The address of the policyholder.
      * @return amount The amount of funds.    
     */
-    function funds(address policyholder_) external view returns (uint256 amount);
+    function soteriaAccountBalance(address policyholder_) external view returns (uint256 amount);
    
     /**
      * @notice Returns the policyholder's policy id.
      * @param policyholder_ The address of the policyholder.
      * @return policyID The policy id.
     */
-    function policyByOwner(address policyholder_) external view returns (uint256 policyID);
+    function policyIDOf(address policyholder_) external view returns (uint256 policyID);
 
     /**
      * @notice Returns whether if the policy is active or not.
@@ -136,19 +135,6 @@ interface ISoteriaCoverageProduct {
      * @return status True if policy is active. False otherwise.
     */
     function policyStatus(uint256 policyID_) external view returns (bool status);
-
-    /**
-     * @notice Returns the policy owner policy for given policy id.
-     * @param policyID_ The policy id.
-     * @return owner The address of the policyholder.
-    */
-    function ownerOfPolicy(uint256 policyID_) external view returns (address owner);
-
-    /**
-     * @notice Returns all policy holders.
-     * @return holders The array of policy holders.
-    */
-    function policyholders() external view returns (address[] memory holders);
 
     /**
      * @notice The maximum amount of cover that `Soteria Product` can be sold.
@@ -178,7 +164,7 @@ interface ISoteriaCoverageProduct {
      * @notice Returns active cover amount in `wei`.
      * @return amount The active cover amount.
     */
-    function activeCoverAmount() external view returns (uint256 amount);
+    function totalActiveCover() external view returns (uint256 amount);
 
     /**
      * @notice Returns the policy count.
@@ -187,11 +173,17 @@ interface ISoteriaCoverageProduct {
     function policyCount() external view returns (uint256 count);
 
     /**
+     * @notice Returns the max chargeable premium.
+     * @return maxChargeablePremium_ the max chargeable premium.
+    */
+    function maxChargeablePremium() external view returns (uint256 maxChargeablePremium_);
+
+    /**
      * @notice Returns cover amount of given policy id.
      * @param policy_ The policy id.
      * @return amount The cover amount for given policy.
     */
-    function coverAmountOf(uint256 policy_) external view returns (uint256 amount);
+    function coverLimitOf(uint256 policy_) external view returns (uint256 amount);
 
     /**
      * @notice Returns true if the given account is authorized to sign claims.
@@ -232,4 +224,19 @@ interface ISoteriaCoverageProduct {
      * @param signer_ The signer to remove.
     */
     function removeSigner(address signer_) external;
+
+    /**
+     * @notice set _maxChargeablePremium.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param maxChargeablePremium_ Desired maxChargeablePremium.
+    */
+    function setMaxChargeablePremium(uint256 maxChargeablePremium_) external;
+
+    /**
+     * @notice Enables governance to gift 'free' cover to specific addresses.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param policyholder_ The policy holder to gift reward balance to.
+     * @param amountRewardBalanceGift_ Amount of reward balance to gift.
+    */
+    function giftRewardBalance(address policyholder_, uint256 amountRewardBalanceGift_) external;
 }

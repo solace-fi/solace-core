@@ -367,7 +367,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
      * This function is only called by `SoteriaCoverageProduct` when a new policy is bought or updated.
      * @param newCoverAmount The new cover amount.
     */
-    function setSoteriaActiveCoverAmount(uint256 newCoverAmount) external override {
+    function setSoteriaActiveCoverLimit(uint256 newCoverAmount) external override {
         require(address(_soteriaCoverageProduct) != address(0x0), "no soteria product");
         require(msg.sender == address(_soteriaCoverageProduct), "only soteria product");
         uint256 coverAmount = _activeCoverAmount;
