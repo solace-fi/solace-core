@@ -46,16 +46,20 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     ***************************************/
 
     /// @notice The current amount covered (in wei).
-    uint256 internal _totalActiveCover;
+    uint256 internal _activeCoverLimit;
 
     /// @notice The total policy count.
     uint256 internal _totalPolicyCount;
 
-    /// @notice The maximum premium per 1 ETH of cover that can be charged in an epoch.
-    uint256 internal _maxChargeablePremium;
+    /// @notice The maximum rate charged per second per wei of coverLimit.
+    /// @dev For testing assuming _maxRate reflects 10% of coverLimit annually
+    uint256 internal _maxRate;
+
+    /// @notice Maximum epoch duration over which premiums are charged.
+    uint256 internal _chargeCycle;
 
     /// @notice The policyholder => Soteria account balance.
-    mapping(address => uint256) internal _soteriaAccountBalance;
+    mapping(address => uint256) internal _accountBalanceOf; // Considered _soteriaAccountBalance name
 
     /// @notice The policyholder => policyID.
     mapping(address => uint256) internal _policyID;
@@ -140,7 +144,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         policyID = policyIDOf(policyholder_);
         require(!policyStatus(policyID), "already bought policy");
         require(_canPurchaseNewCover(0, coverLimit_), "insufficient capacity for new cover");
-        require(msg.value > _maxChargeablePremium * coverLimit_, "insufficient deposit to meet maxChargeablePremium");
+        require(msg.value > _maxRate * _chargeCycle * coverLimit_, "insufficient deposit minimum required account balance");
 
         // deposit funds
         _deposit(policyholder_, msg.value);
@@ -153,11 +157,11 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         }
 
         // update cover amount
-        _totalActiveCover += coverLimit_;
+        _activeCoverLimit += coverLimit_;
         _coverLimitOf[policyID] = coverLimit_;
        
         // update policy manager active cover amount
-        _updatePolicyManager(_totalActiveCover);
+        _updatePolicyManager(_activeCoverLimit); // // Need to change to _updateRiskManager(_activeCoverLimit)
         emit PolicyCreated(policyID);
         return policyID;
     }
@@ -176,12 +180,12 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         require(this.governance() == msg.sender || ownerOf(policyID_) == msg.sender, "Not owner or governance");
         uint256 currentCoverLimit = coverLimitOf(policyID_);
         require(_canPurchaseNewCover(currentCoverLimit, newCoverLimit_), "insufficient capacity for new cover");
-        require(_soteriaAccountBalance[msg.sender] > newCoverLimit_ * _maxChargeablePremium, "insufficient account balance to meet maxChargeablePremium");
+        require(_accountBalanceOf[msg.sender] > _maxRate * _chargeCycle * newCoverLimit_, "insufficient deposit minimum required account balance");
         
         _coverLimitOf[policyID_] = newCoverLimit_;
-        uint256 newTotalActiveCover = totalActiveCover() + newCoverLimit_ - currentCoverLimit;
-        _totalActiveCover = newTotalActiveCover;
-        _updatePolicyManager(newTotalActiveCover);
+        uint256 newActiveCoverLimit = activeCoverLimit() + newCoverLimit_ - currentCoverLimit;
+        _activeCoverLimit = newActiveCoverLimit;
+        _updatePolicyManager(newActiveCoverLimit); // Need to change to _updateRiskManager(newActiveCoverLimit)
         emit PolicyUpdated(policyID_);
     }
 
@@ -196,61 +200,17 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     /**
      * @notice Withdraw ETH from Soteria account to user.
      * @param amount_ Amount policyholder desires to withdraw.
+     * User Soteria account must have > minAccountBalance (_maxRate * _chargeCycle * currentCoverLimit).
+     * Otherwise account will be deactivated.
      */
     function withdraw(uint256 amount_) external override nonReentrant whileUnpaused {
-      require(amount_ > 0, "cannot withdraw 0");
       uint256 currentCoverLimit = coverLimitOf(_policyID[msg.sender]);
-      require(_soteriaAccountBalance[msg.sender] - amount_ > _maxChargeablePremium * currentCoverLimit, "must cover next premium charge");
-      _soteriaAccountBalance[msg.sender] -= amount_;
-      Address.sendValue(payable(msg.sender), amount_);
-      emit WithdrawMade(msg.sender, amount_);
-    }
 
-    /**
-     * @notice Charge premiums for each policy holder.
-     * @param holders_ The policy holders.
-     * @param premiums_ The premium amounts in `wei` per policy holder.
-    */
-    function chargePremiums(address[] calldata holders_, uint256[] calldata premiums_) external payable override onlyGovernance whileUnpaused {
-        uint256 count = holders_.length;
-        require(count == premiums_.length, "length mismatch");
-        require(count <= policyCount(), "policy count exceeded");
-        uint256 amountToPayTreasury = 0;
-
-        for (uint256 i = 0; i < count; i++) {
-            // skip computation if policy inactive (coverLimit == 0)
-            if (coverLimitOf(policyIDOf(holders_[i])) == 0) {
-                continue;
-            }
-
-            require(premiums_[i] <= _maxChargeablePremium * coverLimitOf(_policyID[msg.sender]), "Charging more than maxChargeablePremium");
-
-            // If policy holder can pay for premium charged
-            if (_soteriaAccountBalance[holders_[i]] + _rewardPoints[holders_[i]] >= premiums_[i]) {
-                amountToPayTreasury += premiums_[i];
-
-                // If reward points can cover premium charged
-                if (_rewardPoints[holders_[i]] >= premiums_[i]) {
-                    _rewardPoints[holders_[i]] -= premiums_[i];
-                } else {
-                    uint256 amountDeductedFromSoteriaAccount = premiums_[i] - _rewardPoints[holders_[i]];
-                    _soteriaAccountBalance[holders_[i]] -= amountDeductedFromSoteriaAccount;
-                    _rewardPoints[holders_[i]] = 0;
-                }
-                
-                emit PremiumCharged(holders_[i], premiums_[i]);
-            } else {
-                uint256 partialPremium = _soteriaAccountBalance[holders_[i]] + _rewardPoints[holders_[i]];
-                amountToPayTreasury += partialPremium;
-                _rewardPoints[holders_[i]] = 0;
-                _soteriaAccountBalance[holders_[i]] = 0;
-                // turn off the policy
-                _closePolicy(holders_[i]);
-                emit PremiumPartiallyCharged(holders_[i], premiums_[i], partialPremium);
-            }  
-        }
-        // transfer premium to the treasury
-        ITreasury(payable(_registry.treasury())).routePremiums{value: amountToPayTreasury}();
+      if (_accountBalanceOf[msg.sender] - amount_ > _maxRate * _chargeCycle * currentCoverLimit) {
+          _withdraw(msg.sender, amount_);
+      } else {
+          deactivatePolicy(_policyID[msg.sender]);
+      }
     }
 
     /**
@@ -259,14 +219,16 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      * Can only be called by the policyholder.
      * @param policyID_ The ID of the policy.
      */
-     function deactivatePolicy(uint256 policyID_) external override nonReentrant {
+     function deactivatePolicy(uint256 policyID_) public override nonReentrant {
         require(_exists(policyID_), "invalid policy");
         require(ownerOf(policyID_) == msg.sender, "!policyholder");
-        uint256 refundAmount = soteriaAccountBalance(msg.sender);
-        _totalActiveCover -= coverLimitOf(policyID_);
+        uint256 refundAmount = accountBalanceOf(msg.sender);
+
+        // There is duplicate logic here and in _closePolicy(...), should we just make a call to _closePolicy() here and remove PolicyDeactivated event?
+        _activeCoverLimit -= coverLimitOf(policyID_);
         _coverLimitOf[policyID_] = 0;
-        _soteriaAccountBalance[msg.sender] = 0;
-        _updatePolicyManager(_totalActiveCover);
+        _accountBalanceOf[msg.sender] = 0;
+        _updatePolicyManager(_activeCoverLimit); // Need to change to _updateRiskManager(_activeCoverLimit)
 
         // send deposited fund to the policyholder
         if (refundAmount > 0) Address.sendValue(payable(msg.sender), refundAmount);
@@ -279,10 +241,10 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
 
     /**
     * @notice Determine available capacity for new cover.
-    * @return newCoverCapacity_ The amount of available capacity for new cover.
+    * @return availableCoverCapacity_ The amount of available capacity for new cover.
     */
-    function newCoverCapacity() public view override returns (uint256 newCoverCapacity_) {
-        newCoverCapacity_ = maxCover() - totalActiveCover();
+    function availableCoverCapacity() public view override returns (uint256 availableCoverCapacity_) {
+        availableCoverCapacity_ = maxCover() - activeCoverLimit();
     }
 
     /**
@@ -299,8 +261,8 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      * @param policyholder_ The address of the policyholder.
      * @return amount The amount of funds.    
     */
-    function soteriaAccountBalance(address policyholder_) public view override returns (uint256 amount) {
-        return _soteriaAccountBalance[policyholder_];
+    function accountBalanceOf(address policyholder_) public view override returns (uint256 amount) {
+        return _accountBalanceOf[policyholder_];
     }
 
     /**
@@ -354,11 +316,11 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     }
 
     /**
-     * @notice Returns active cover amount in `wei`.
-     * @return amount The active cover amount.
+     * @notice Returns active cover limit in `wei`.
+     * @return amount The active cover limit.
     */
-    function totalActiveCover() public view override returns (uint256 amount) {
-        return _totalActiveCover;
+    function activeCoverLimit() public view override returns (uint256 amount) {
+        return _activeCoverLimit;
     }
 
     /**
@@ -370,11 +332,19 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     }
 
     /**
-     * @notice Returns the max chargeable premium.
-     * @return maxChargeablePremium_ the max chargeable premium.
+     * @notice Returns the max rate.
+     * @return maxRate_ the max rate.
     */
-    function maxChargeablePremium() public view override returns (uint256 maxChargeablePremium_) {
-        return _maxChargeablePremium;
+    function maxRate() public view override returns (uint256 maxRate_) {
+        return _maxRate;
+    }
+
+    /**
+     * @notice Returns the charge cycle duration.
+     * @return chargeCycle_ the charge cycle duration.
+    */
+    function chargeCycle() public view override returns (uint256 chargeCycle_) {
+        return _chargeCycle;
     }
 
     /**
@@ -417,13 +387,23 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     }
 
     /**
-     * @notice set _maxChargeablePremium.
+     * @notice set _maxRate.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param maxChargeablePremium_ Desired maxChargeablePremium.
+     * @param maxRate_ Desired maxRate.
     */
-    function setMaxChargeablePremium(uint256 maxChargeablePremium_) external override onlyGovernance {
-        _maxChargeablePremium = maxChargeablePremium_;
-        emit MaxChargeablePremiumSet(maxChargeablePremium_);
+    function setMaxRate(uint256 maxRate_) external override onlyGovernance {
+        _maxRate = maxRate_;
+        emit MaxRateSet(maxRate_);
+    }
+
+    /**
+     * @notice set _chargeCycle.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param chargeCycle_ Desired chargeCycle.
+    */
+    function setChargeCycle(uint256 chargeCycle_) external override onlyGovernance {
+        _chargeCycle = chargeCycle_;
+        emit ChargeCycleSet(chargeCycle_);
     }
 
     /**
@@ -437,6 +417,53 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         emit RewardPointsGifted(policyholder_, pointsToGift_);
     }  
 
+    /**
+     * @notice Charge premiums for each policy holder.
+     * @param holders_ The policy holders.
+     * @param premiums_ The premium amounts in `wei` per policy holder.
+    */
+    function chargePremiums(address[] calldata holders_, uint256[] calldata premiums_) external payable override onlyGovernance whileUnpaused {
+        uint256 count = holders_.length;
+        require(count == premiums_.length, "length mismatch");
+        require(count <= policyCount(), "policy count exceeded");
+        uint256 amountToPayTreasury = 0;
+
+        for (uint256 i = 0; i < count; i++) {
+            // skip computation if policy inactive (coverLimit == 0)
+            if (coverLimitOf(policyIDOf(holders_[i])) == 0) {
+                continue;
+            }
+
+            require(premiums_[i] <= _maxRate * _chargeCycle * coverLimitOf(_policyID[msg.sender]), "Charging more than promised maximum rate");
+
+            // If policy holder can pay for premium charged
+            if (_accountBalanceOf[holders_[i]] + _rewardPoints[holders_[i]] >= premiums_[i]) {
+                amountToPayTreasury += premiums_[i];
+
+                // If reward points can cover premium charged
+                if (_rewardPoints[holders_[i]] >= premiums_[i]) {
+                    _rewardPoints[holders_[i]] -= premiums_[i];
+                } else {
+                    uint256 amountDeductedFromSoteriaAccount = premiums_[i] - _rewardPoints[holders_[i]];
+                    _accountBalanceOf[holders_[i]] -= amountDeductedFromSoteriaAccount;
+                    _rewardPoints[holders_[i]] = 0;
+                }
+                
+                emit PremiumCharged(holders_[i], premiums_[i]);
+            } else {
+                uint256 partialPremium = _accountBalanceOf[holders_[i]] + _rewardPoints[holders_[i]];
+                amountToPayTreasury += partialPremium;
+                _rewardPoints[holders_[i]] = 0;
+                _accountBalanceOf[holders_[i]] = 0;
+                // turn off the policy
+                _closePolicy(holders_[i]);
+                emit PremiumPartiallyCharged(holders_[i], premiums_[i], partialPremium);
+            }  
+        }
+        // transfer premium to the treasury
+        ITreasury(payable(_registry.treasury())).routePremiums{value: amountToPayTreasury}();
+    }
+
     /***************************************
     INTERNAL FUNCTIONS
     ***************************************/
@@ -449,7 +476,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     */
     function _canPurchaseNewCover(uint256 existingTotalCover_, uint256 newTotalCover_) internal view returns (bool acceptable) {
         uint256 changeInTotalCover = newTotalCover_ - existingTotalCover_;
-        if (changeInTotalCover < newCoverCapacity()) return true;
+        if (changeInTotalCover < availableCoverCapacity()) return true;
         else return false;
     }
 
@@ -459,8 +486,19 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      * @param amount The amount of fund to deposit.
     */
     function _deposit(address policyholder, uint256 amount) internal whileUnpaused {
-        _soteriaAccountBalance[policyholder] += amount;
+        _accountBalanceOf[policyholder] += amount;
         emit DepositMade(policyholder, amount);
+    }
+
+    /**
+     * @notice Withdraw funds from Soteria to policy holder.
+     * @param policyholder The policy holder address.
+     * @param amount The amount of fund to withdraw.
+    */
+    function _withdraw(address policyholder, uint256 amount) internal whileUnpaused {
+      _accountBalanceOf[policyholder] -= amount;
+      Address.sendValue(payable(policyholder), amount);
+      emit WithdrawMade(policyholder, amount);
     }
 
     /**
@@ -469,12 +507,13 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     */
     function _closePolicy(address policyholder) internal {
         uint256 policyID = policyIDOf(policyholder);
-        _totalActiveCover -= coverLimitOf(policyID);
+        _activeCoverLimit -= coverLimitOf(policyID);
         _coverLimitOf[policyID] = 0;
-        _updatePolicyManager(_totalActiveCover);
+        _updatePolicyManager(_activeCoverLimit); // Need to change to _updateRiskManager(_activeCoverLimit)
         emit PolicyClosed(policyID);
     }
 
+    // REQUIRE CHANGING PolicyManager.sol & RiskManager.sol so that RiskManager tracks the activeCoverLimit
     /**
      * @notice Updates policy manager's active cover amount.
      * @param soteriaActiveCoverLimit The active cover amount of soteria product.
@@ -482,5 +521,18 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     function _updatePolicyManager(uint256 soteriaActiveCoverLimit) internal {
         _policyManager.setSoteriaActiveCoverLimit(soteriaActiveCoverLimit);
         emit PolicyManagerUpdated(soteriaActiveCoverLimit);
+    }
+
+    /**
+     * @notice Use _beforeTokenTransfer hook from ERC721 standard to ensure Soteria policies are non-transferable, and only one can be minted per user
+     * @dev This hook is called on mint, transfer and burn
+     * @param from sending address.
+     * @param to receiving address.
+     * @param tokenId tokenId.
+    */
+    function _beforeTokenTransfer(address from, address to, uint256 tokenId) internal virtual override {
+        super._beforeTokenTransfer(from, to, tokenId);
+        require(from == address(0), "only minting permitted");
+        require(balanceOf(to) <= 1, "can only mint one SOPT");
     }
 }

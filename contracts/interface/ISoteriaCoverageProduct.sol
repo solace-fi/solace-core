@@ -40,8 +40,11 @@ interface ISoteriaCoverageProduct {
     /// @notice Emitted when policy manager cover amount for soteria is updated.
     event PolicyManagerUpdated(uint256 activeCoverLimit);
 
-    /// @notice Emitted when maxChargeablePremium is set.
-    event MaxChargeablePremiumSet(uint256 maxChargeablePremium);
+    /// @notice Emitted when maxRate is set.
+    event MaxRateSet(uint256 maxRate);
+
+    /// @notice Emitted when chargeCycle is set.
+    event ChargeCycleSet(uint256 chargeCycle);
 
     /// @notice Emitted when reward points are gifted.
     event RewardPointsGifted(address policyholder, uint256 amountGifted);
@@ -78,13 +81,6 @@ interface ISoteriaCoverageProduct {
     function updateCoverLimit(uint256 policyID_, uint256 newCoverLimit_) external;
 
     /**
-     * @notice Charge premiums for each policy holder.
-     * @param holders_ The policy holders.
-     * @param premiums_ The premium amounts in `wei` per policy holder.
-    */
-    function chargePremiums(address[] calldata holders_, uint256[] calldata premiums_) external payable;
-
-    /**
      * @notice Deactivate and burn a policy.
      * User will receive their deposited funds.
      * Can only be called by the policyholder.
@@ -98,9 +94,9 @@ interface ISoteriaCoverageProduct {
 
     /**
     * @notice Determine available capacity for new cover.
-    * @return newCoverCapacity_ The amount of available capacity for new cover.
+    * @return availableCoverCapacity_ The amount of available capacity for new cover.
     */
-    function newCoverCapacity() external view returns (uint256 newCoverCapacity_);
+    function availableCoverCapacity() external view returns (uint256 availableCoverCapacity_);
 
     /**
     * @notice Return reward points for a policyholder.
@@ -114,7 +110,7 @@ interface ISoteriaCoverageProduct {
      * @param policyholder_ The address of the policyholder.
      * @return amount The amount of funds.    
     */
-    function soteriaAccountBalance(address policyholder_) external view returns (uint256 amount);
+    function accountBalanceOf(address policyholder_) external view returns (uint256 amount);
    
     /**
      * @notice Returns the policyholder's policy id.
@@ -155,10 +151,10 @@ interface ISoteriaCoverageProduct {
     function paused() external view returns (bool status);
 
     /**
-     * @notice Returns active cover amount in `wei`.
-     * @return amount The active cover amount.
+     * @notice Returns active cover limit in `wei`.
+     * @return amount The active cover limit.
     */
-    function totalActiveCover() external view returns (uint256 amount);
+    function activeCoverLimit() external view returns (uint256 amount);
 
     /**
      * @notice Returns the policy count.
@@ -167,10 +163,16 @@ interface ISoteriaCoverageProduct {
     function policyCount() external view returns (uint256 count);
 
     /**
-     * @notice Returns the max chargeable premium.
-     * @return maxChargeablePremium_ the max chargeable premium.
+     * @notice Returns the max rate.
+     * @return maxRate_ the max rate.
     */
-    function maxChargeablePremium() external view returns (uint256 maxChargeablePremium_);
+    function maxRate() external view returns (uint256 maxRate_);
+
+    /**
+     * @notice Returns the charge cycle duration.
+     * @return chargeCycle_ the charge cycle duration.
+    */
+    function chargeCycle() external view returns (uint256 chargeCycle_);
 
     /**
      * @notice Returns cover amount of given policy id.
@@ -199,11 +201,18 @@ interface ISoteriaCoverageProduct {
     function setPaused(bool paused_) external;
 
     /**
-     * @notice set _maxChargeablePremium.
+     * @notice set _maxRatePremium.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param maxChargeablePremium_ Desired maxChargeablePremium.
+     * @param maxRate_ Desired maxRate.
     */
-    function setMaxChargeablePremium(uint256 maxChargeablePremium_) external;
+    function setMaxRate(uint256 maxRate_) external;
+
+    /**
+     * @notice set _chargeCycle.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param chargeCycle_ Desired chargeCycle.
+    */
+    function setChargeCycle(uint256 chargeCycle_) external;
 
     /**
      * @notice Enables governance to gift 'free' cover to specific addresses.
@@ -212,4 +221,11 @@ interface ISoteriaCoverageProduct {
      * @param pointsToGift_ Amount of reward points to gift.
     */
     function giftRewardPoints(address policyholder_, uint256 pointsToGift_) external;
+
+    /**
+     * @notice Charge premiums for each policy holder.
+     * @param holders_ The policy holders.
+     * @param premiums_ The premium amounts in `wei` per policy holder.
+    */
+    function chargePremiums(address[] calldata holders_, uint256[] calldata premiums_) external payable;
 }
