@@ -16,8 +16,8 @@ interface ISoteriaCoverageProduct {
     /// @notice Emitted when a Policy is closed.
     event PolicyClosed(uint256 policyID);
 
-    /// @notice Emitted when a Policy ic canceled.
-    event PolicyCanceled(uint256 policyID);
+    /// @notice Emitted when a Policy ic deactivated.
+    event PolicyDeactivated(uint256 policyID);
 
     /// @notice Emitted when Registry address is updated.
     event RegistrySet(address registry);
@@ -40,17 +40,11 @@ interface ISoteriaCoverageProduct {
     /// @notice Emitted when policy manager cover amount for soteria is updated.
     event PolicyManagerUpdated(uint256 activeCoverLimit);
 
-    /// @notice Emitted when a claim signer is added.
-    event SignerAdded(address signer);
-
-    /// @notice Emitted when a claim signer is removed.
-    event SignerRemoved(address signer);
-
-    /// @notice Emitted when reward balance is gifted.
+    /// @notice Emitted when maxChargeablePremium is set.
     event MaxChargeablePremiumSet(uint256 maxChargeablePremium);
 
-    /// @notice Emitted when reward balance is gifted.
-    event RewardBalanceGifted(address policyholder, uint256 amountGifted);
+    /// @notice Emitted when reward points are gifted.
+    event RewardPointsGifted(address policyholder, uint256 amountGifted);
 
     /***************************************
     POLICY FUNCTIONS
@@ -91,12 +85,12 @@ interface ISoteriaCoverageProduct {
     function chargePremiums(address[] calldata holders_, uint256[] calldata premiums_) external payable;
 
     /**
-     * @notice Cancel and burn a policy.
+     * @notice Deactivate and burn a policy.
      * User will receive their deposited funds.
      * Can only be called by the policyholder.
      * @param policyID_ The ID of the policy.
     */
-    function cancelPolicy(uint256 policyID_) external;
+    function deactivatePolicy(uint256 policyID_) external;
 
     /***************************************
     VIEW FUNCTIONS
@@ -109,11 +103,11 @@ interface ISoteriaCoverageProduct {
     function newCoverCapacity() external view returns (uint256 newCoverCapacity_);
 
     /**
-    * @notice Return reward balance for a policyholder.
+    * @notice Return reward points for a policyholder.
     * @param policyholder_ The address of the policyholder.
-    * @return rewardBalance_ The reward balance for a policyholder.
+    * @return rewardPoints_ The reward points for a policyholder.
     */
-    function rewardBalanceOf(address policyholder_) external view returns (uint256 rewardBalance_);
+    function rewardPointsOf(address policyholder_) external view returns (uint256 rewardPoints_);
 
     /**
      * @notice Returns the policyholder fund amount.
@@ -184,13 +178,6 @@ interface ISoteriaCoverageProduct {
      * @return amount The cover amount for given policy.
     */
     function coverLimitOf(uint256 policy_) external view returns (uint256 amount);
-
-    /**
-     * @notice Returns true if the given account is authorized to sign claims.
-     * @param account_ Potential signer to query.
-     * @return status True if is authorized signer.
-    */
-    function isAuthorizedSigner(address account_) external view returns (bool status);
     
     /***************************************
     GOVERNANCE FUNCTIONS
@@ -205,25 +192,11 @@ interface ISoteriaCoverageProduct {
 
     /**
      * @notice Pauses or unpauses buying and extending policies.
-     * Cancelling policies and submitting claims are unaffected by pause.
+     * Deactivating policies are unaffected by pause.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param paused_ True to pause, false to unpause.
     */
     function setPaused(bool paused_) external;
-
-    /**
-     * @notice Adds a new signer that can authorize claims.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param signer_ The signer to add.
-    */
-    function addSigner(address signer_) external;
-    
-    /**
-     * @notice Removes a signer.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param signer_ The signer to remove.
-    */
-    function removeSigner(address signer_) external;
 
     /**
      * @notice set _maxChargeablePremium.
@@ -235,8 +208,8 @@ interface ISoteriaCoverageProduct {
     /**
      * @notice Enables governance to gift 'free' cover to specific addresses.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param policyholder_ The policy holder to gift reward balance to.
-     * @param amountRewardBalanceGift_ Amount of reward balance to gift.
+     * @param policyholder_ The policy holder to gift reward points to.
+     * @param pointsToGift_ Amount of reward points to gift.
     */
-    function giftRewardBalance(address policyholder_, uint256 amountRewardBalanceGift_) external;
+    function giftRewardPoints(address policyholder_, uint256 pointsToGift_) external;
 }
