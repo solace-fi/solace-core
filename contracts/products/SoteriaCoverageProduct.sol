@@ -62,7 +62,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     mapping(address => uint256) internal _accountBalanceOf; // Considered _soteriaAccountBalance name
 
     /// @notice The policyholder => policyID.
-    mapping(address => uint256) internal _policyID;
+    mapping(address => uint256) internal _policyOf;
 
     /// @notice The cover limit for each policy(policyID => coverLimit).
     mapping (uint256 => uint256) internal _coverLimitOf;
@@ -141,10 +141,10 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         require(policyholder_ != address(0x0), "zero address policyholder");
         require(coverLimit_ > 0, "zero cover value");
         
-        policyID = policyIDOf(policyholder_);
+        policyID = policyOf(policyholder_);
         require(!policyStatus(policyID), "already bought policy");
         require(_canPurchaseNewCover(0, coverLimit_), "insufficient capacity for new cover");
-        require(msg.value > _maxRate * _chargeCycle * coverLimit_, "insufficient deposit minimum required account balance");
+        require(msg.value > _maxRate * _chargeCycle * coverLimit_, "insufficient deposit for minimum required account balance");
 
         // deposit funds
         _deposit(policyholder_, msg.value);
@@ -152,7 +152,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         // mint policy if doesn't currently exist
         if (policyID == 0) {
             policyID = ++_totalPolicyCount;
-            _policyID[policyholder_] = policyID;
+            policyOf[policyholder_] = policyID;
             _mint(policyholder_, policyID);
         }
 
@@ -180,7 +180,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         require(this.governance() == msg.sender || ownerOf(policyID_) == msg.sender, "Not owner or governance");
         uint256 currentCoverLimit = coverLimitOf(policyID_);
         require(_canPurchaseNewCover(currentCoverLimit, newCoverLimit_), "insufficient capacity for new cover");
-        require(_accountBalanceOf[msg.sender] > _maxRate * _chargeCycle * newCoverLimit_, "insufficient deposit minimum required account balance");
+        require(_accountBalanceOf[msg.sender] > _maxRate * _chargeCycle * newCoverLimit_, "insufficient deposit for minimum required account balance");
         
         _coverLimitOf[policyID_] = newCoverLimit_;
         uint256 newActiveCoverLimit = activeCoverLimit() + newCoverLimit_ - currentCoverLimit;
@@ -204,12 +204,12 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      * Otherwise account will be deactivated.
      */
     function withdraw(uint256 amount_) external override nonReentrant whileUnpaused {
-      uint256 currentCoverLimit = coverLimitOf(_policyID[msg.sender]);
+      uint256 currentCoverLimit = coverLimitOf(policyOf[msg.sender]);
 
       if (_accountBalanceOf[msg.sender] - amount_ > _maxRate * _chargeCycle * currentCoverLimit) {
           _withdraw(msg.sender, amount_);
       } else {
-          deactivatePolicy(_policyID[msg.sender]);
+          deactivatePolicy(policyOf[msg.sender]);
       }
     }
 
@@ -279,8 +279,8 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      * @param policyholder_ The address of the policyholder.
      * @return policyID The policy id.
     */
-    function policyIDOf(address policyholder_) public view override returns (uint256 policyID) {
-        return _policyID[policyholder_];
+    function policyOf(address policyholder_) public view override returns (uint256 policyID) {
+        return policyOf[policyholder_];
     }
 
     /**
@@ -430,11 +430,11 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
 
         for (uint256 i = 0; i < count; i++) {
             // skip computation if policy inactive (coverLimit == 0)
-            if (coverLimitOf(policyIDOf(holders_[i])) == 0) {
+            if (coverLimitOf(policyOf(holders_[i])) == 0) {
                 continue;
             }
 
-            require(premiums_[i] <= _maxRate * _chargeCycle * coverLimitOf(_policyID[msg.sender]), "Charging more than promised maximum rate");
+            require(premiums_[i] <= _maxRate * _chargeCycle * coverLimitOf(policyOf[msg.sender]), "Charging more than promised maximum rate");
 
             // If policy holder can pay for premium charged
             if (_accountBalanceOf[holders_[i]] + _rewardPoints[holders_[i]] >= premiums_[i]) {
@@ -506,7 +506,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      * @param policyholder The address of the policy owner.
     */
     function _closePolicy(address policyholder) internal {
-        uint256 policyID = policyIDOf(policyholder);
+        uint256 policyID = policyOf(policyholder);
         _activeCoverLimit -= coverLimitOf(policyID);
         _coverLimitOf[policyID] = 0;
         _updatePolicyManager(_activeCoverLimit); // Need to change to _updateRiskManager(_activeCoverLimit)
