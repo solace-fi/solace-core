@@ -13,9 +13,6 @@ interface ISoteriaCoverageProduct {
     /// @notice Emitted when a Policy is updated.
     event PolicyUpdated(uint256 policyID);
 
-    /// @notice Emitted when a Policy is closed.
-    event PolicyClosed(uint256 policyID);
-
     /// @notice Emitted when a Policy ic deactivated.
     event PolicyDeactivated(uint256 policyID);
 

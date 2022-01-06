@@ -226,15 +226,9 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         require(ownerOf(policyID_) == msg.sender, "!policyholder");
         uint256 refundAmount = accountBalanceOf(msg.sender);
 
-        // There is duplicate logic here and in _closePolicy(...), should we just make a call to _closePolicy() here and remove PolicyDeactivated event?
-        _activeCoverLimit -= _coverLimitOf[policyID_];
-        _coverLimitOf[policyID_] = 0;
-        _accountBalanceOf[msg.sender] = 0;
-        _updatePolicyManager(_activeCoverLimit); // Need to change to _updateRiskManager(_activeCoverLimit)
-
+        _deactivatePolicy(msg.sender);
         // send deposited fund to the policyholder
         if (refundAmount > 0) Address.sendValue(payable(msg.sender), refundAmount);
-        emit PolicyDeactivated(policyID_);
     }
 
     /***************************************
@@ -436,7 +430,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
                 continue;
             }
 
-            require(premiums_[i] <= _maxRate * _chargeCycle * coverLimitOf(policyOf(msg.sender)), "Charging more than promised maximum rate");
+            require(premiums_[i] <= _maxRate * _chargeCycle * coverLimitOf(policyOf(holders_[i])), "Charging more than promised maximum rate");
 
             // If policy holder can pay for premium charged in full
             if (_accountBalanceOf[holders_[i]] + _rewardPointsOf[holders_[i]] >= premiums_[i]) {
@@ -456,9 +450,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
                 uint256 partialPremium = _accountBalanceOf[holders_[i]] + _rewardPointsOf[holders_[i]];
                 amountToPayTreasury += partialPremium;
                 _rewardPointsOf[holders_[i]] = 0;
-                _accountBalanceOf[holders_[i]] = 0;
-                // turn off the policy
-                _closePolicy(holders_[i]);
+                _deactivatePolicy(holders_[i]); // Difference between manually calling deactivatePolicy() and having _deactivatePolicy() called here, is that the remaining account balance goes to Treasury here instead of being returned to the user
                 emit PremiumPartiallyCharged(holders_[i], premiums_[i], partialPremium);
             }  
         }
@@ -508,15 +500,16 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     }
 
     /**
-     * @notice Closes the policy when user has no enough fund to pay premium.
+     * @notice Deactivate the policy.
      * @param policyholder The address of the policy owner.
     */
-    function _closePolicy(address policyholder) internal {
+    function _deactivatePolicy(address policyholder) internal {
         uint256 policyID = _policyOf[policyholder];
         _activeCoverLimit -= _coverLimitOf[policyID];
         _coverLimitOf[policyID] = 0;
+        _accountBalanceOf[policyholder] = 0;
         _updatePolicyManager(_activeCoverLimit); // Need to change to _updateRiskManager(_activeCoverLimit)
-        emit PolicyClosed(policyID);
+        emit PolicyDeactivated(policyID);
     }
 
     // REQUIRE CHANGING PolicyManager.sol & RiskManager.sol so that RiskManager tracks the activeCoverLimit
