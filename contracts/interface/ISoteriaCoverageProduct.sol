@@ -37,8 +37,11 @@ interface ISoteriaCoverageProduct {
     /// @notice Emitted when policy manager cover amount for soteria is updated.
     event PolicyManagerUpdated(uint256 activeCoverLimit);
 
-    /// @notice Emitted when maxRate is set.
-    event MaxRateSet(uint256 maxRate);
+    /// @notice Emitted when maxRateNum is set.
+    event MaxRateNumSet(uint256 maxRateNum);
+
+    /// @notice Emitted when maxRateDenom is set.
+    event MaxRateDenomSet(uint256 maxRateDenom);
 
     /// @notice Emitted when chargeCycle is set.
     event ChargeCycleSet(uint256 chargeCycle);
@@ -160,11 +163,16 @@ interface ISoteriaCoverageProduct {
     function policyCount() external view returns (uint256 count);
 
     /**
-     * @notice Returns the max rate.
-     * @return maxRate_ the max rate.
+     * @notice Returns the max rate numerator.
+     * @return maxRateNum_ the max rate numerator.
     */
-    function maxRate() external view returns (uint256 maxRate_);
+    function maxRateNum() external view returns (uint256 maxRateNum_);
 
+    /**
+     * @notice Returns the max rate denominator.
+     * @return maxRateDenom_ the max rate denominator.
+    */
+    function maxRateDenom() external view returns (uint256 maxRateDenom_);
     /**
      * @notice Returns the charge cycle duration.
      * @return chargeCycle_ the charge cycle duration.
@@ -198,11 +206,18 @@ interface ISoteriaCoverageProduct {
     function setPaused(bool paused_) external;
 
     /**
-     * @notice set _maxRatePremium.
+     * @notice set _maxRateNum.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param maxRate_ Desired maxRate.
+     * @param maxRateNum_ Desired maxRateNum.
     */
-    function setMaxRate(uint256 maxRate_) external;
+    function setMaxRateNum(uint256 maxRateNum_) external;
+
+    /**
+     * @notice set _maxRateDenom.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param maxRateDenom_ Desired maxRateDenom.
+    */
+    function setMaxRateDenom(uint256 maxRateDenom_) external;
 
     /**
      * @notice set _chargeCycle.

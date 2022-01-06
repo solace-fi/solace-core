@@ -52,8 +52,11 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     uint256 internal _totalPolicyCount;
 
     /// @notice The maximum rate charged per second per wei of coverLimit.
-    /// @dev For testing assume _maxRate reflects 10% of coverLimit annually
-    uint256 internal _maxRate;
+    /// @dev Because Solidity cannot store fractions in a single variable, need two variables: one for numerator and one for divisor
+    /// @dev We also need to be careful to perform multiplication before division, as Solidity rounds down to 0
+    /// @dev For testing assume _maxRate reflects 10% of coverLimit annually = 1/315360000
+    uint256 internal _maxRateNum;
+    uint256 internal _maxRateDenom;
 
     /// @notice Maximum epoch duration over which premiums are charged.
     uint256 internal _chargeCycle;
@@ -144,7 +147,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         policyID = policyOf(policyholder_);
         require(!policyStatus(policyID), "already bought policy");
         require(_canPurchaseNewCover(0, coverLimit_), "insufficient capacity for new cover");
-        require(msg.value > _maxRate * _chargeCycle * coverLimit_, "insufficient deposit for minimum required account balance");
+        require(msg.value > ( _maxRateNum * _chargeCycle * coverLimit_ ) / _maxRateDenom, "insufficient deposit for minimum required account balance");
 
         // deposit funds
         _deposit(policyholder_, msg.value);
@@ -161,7 +164,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         _coverLimitOf[policyID] = coverLimit_;
        
         // update policy manager active cover amount
-        _updatePolicyManager(_activeCoverLimit); // // Need to change to _updateRiskManager(_activeCoverLimit)
+        _updatePolicyManager(_activeCoverLimit); // Need to change to _updateRiskManager(_activeCoverLimit)
         emit PolicyCreated(policyID);
         return policyID;
     }
@@ -180,7 +183,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         require(this.governance() == msg.sender || ownerOf(policyID_) == msg.sender, "Not owner or governance");
         uint256 currentCoverLimit = coverLimitOf(policyID_);
         require(_canPurchaseNewCover(currentCoverLimit, newCoverLimit_), "insufficient capacity for new cover");
-        require(_accountBalanceOf[msg.sender] > _maxRate * _chargeCycle * newCoverLimit_, "insufficient deposit for minimum required account balance");
+        require(_accountBalanceOf[msg.sender] > ( _maxRateNum * _chargeCycle * newCoverLimit_ ) / _maxRateDenom, "insufficient deposit for minimum required account balance");
         
         _coverLimitOf[policyID_] = newCoverLimit_;
         uint256 newActiveCoverLimit = activeCoverLimit() + newCoverLimit_ - currentCoverLimit;
@@ -200,7 +203,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     /**
      * @notice Withdraw ETH from Soteria account to user.
      * @param amount_ Amount policyholder desires to withdraw.
-     * User Soteria account must have > minAccountBalance (_maxRate * _chargeCycle * currentCoverLimit).
+     * User Soteria account must have > minAccountBalance.
      * Otherwise account will be deactivated.
      */
     function withdraw(uint256 amount_) external override nonReentrant whileUnpaused {
@@ -208,7 +211,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
       
       uint256 currentCoverLimit = _coverLimitOf[_policyOf[msg.sender]];
 
-      if (_accountBalanceOf[msg.sender] - amount_ > _maxRate * _chargeCycle * currentCoverLimit) {
+      if (_accountBalanceOf[msg.sender] - amount_ > ( _maxRateNum * _chargeCycle * currentCoverLimit ) / _maxRateDenom) {
           _withdraw(msg.sender, amount_);
       } else {
           deactivatePolicy(_policyOf[msg.sender]);
@@ -328,11 +331,19 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     }
 
     /**
-     * @notice Returns the max rate.
-     * @return maxRate_ the max rate.
+     * @notice Returns the max rate numerator.
+     * @return maxRateNum_ the max rate numerator.
     */
-    function maxRate() public view override returns (uint256 maxRate_) {
-        return _maxRate;
+    function maxRateNum() public view override returns (uint256 maxRateNum_) {
+        return _maxRateNum;
+    }
+
+    /**
+     * @notice Returns the max rate denominator.
+     * @return maxRateDenom_ the max rate denominator.
+    */
+    function maxRateDenom() public view override returns (uint256 maxRateDenom_) {
+        return _maxRateDenom;
     }
 
     /**
@@ -383,13 +394,23 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     }
 
     /**
-     * @notice set _maxRate.
+     * @notice set _maxRateNum.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param maxRate_ Desired maxRate.
+     * @param maxRateNum_ Desired maxRateNum.
     */
-    function setMaxRate(uint256 maxRate_) external override onlyGovernance {
-        _maxRate = maxRate_;
-        emit MaxRateSet(maxRate_);
+    function setMaxRateNum(uint256 maxRateNum_) external override onlyGovernance {
+        _maxRateNum = maxRateNum_;
+        emit MaxRateNumSet(maxRateNum_);
+    }
+
+    /**
+     * @notice set _maxRateDenom.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param maxRateDenom_ Desired maxRateDenom.
+    */
+    function setMaxRateDenom(uint256 maxRateDenom_) external override onlyGovernance {
+        _maxRateDenom = maxRateDenom_;
+        emit MaxRateDenomSet(maxRateDenom_);
     }
 
     /**
@@ -430,7 +451,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
                 continue;
             }
 
-            require(premiums_[i] <= _maxRate * _chargeCycle * coverLimitOf(policyOf(holders_[i])), "Charging more than promised maximum rate");
+            require(premiums_[i] <= ( _maxRateNum * _chargeCycle * coverLimitOf(policyOf(holders_[i])) ) / _maxRateDenom, "Charging more than promised maximum rate");
 
             // If policy holder can pay for premium charged in full
             if (_accountBalanceOf[holders_[i]] + _rewardPointsOf[holders_[i]] >= premiums_[i]) {
