@@ -52,7 +52,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     uint256 internal _totalPolicyCount;
 
     /// @notice The maximum rate charged per second per wei of coverLimit.
-    /// @dev For testing assuming _maxRate reflects 10% of coverLimit annually
+    /// @dev For testing assume _maxRate reflects 10% of coverLimit annually
     uint256 internal _maxRate;
 
     /// @notice Maximum epoch duration over which premiums are charged.
@@ -68,7 +68,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     mapping (uint256 => uint256) internal _coverLimitOf;
 
     /// @notice The policy holder => reward points. Having a reward points mechanism enables `free` cover gifts and discounts for referrals.
-    mapping (address => uint256) internal _rewardPoints;
+    mapping (address => uint256) internal _rewardPointsOf;
 
     /***************************************
     MODIFIERS
@@ -152,7 +152,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         // mint policy if doesn't currently exist
         if (policyID == 0) {
             policyID = ++_totalPolicyCount;
-            policyOf[policyholder_] = policyID;
+            _policyOf[policyholder_] = policyID;
             _mint(policyholder_, policyID);
         }
 
@@ -167,7 +167,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     }
 
     /**
-     * @notice Updates the cover amount of the policy.
+     * @notice Updates the cover amount of the policy, either governance or policyholder can do this.
      * @param policyID_ The policy ID to update.
      * @param newCoverLimit_ The new value to cover in **ETH**.
     */
@@ -204,12 +204,14 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      * Otherwise account will be deactivated.
      */
     function withdraw(uint256 amount_) external override nonReentrant whileUnpaused {
-      uint256 currentCoverLimit = coverLimitOf(policyOf[msg.sender]);
+      require(amount_ <= _accountBalanceOf[msg.sender], "cannot withdraw this amount");
+      
+      uint256 currentCoverLimit = _coverLimitOf[_policyOf[msg.sender]];
 
       if (_accountBalanceOf[msg.sender] - amount_ > _maxRate * _chargeCycle * currentCoverLimit) {
           _withdraw(msg.sender, amount_);
       } else {
-          deactivatePolicy(policyOf[msg.sender]);
+          deactivatePolicy(_policyOf[msg.sender]);
       }
     }
 
@@ -225,7 +227,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         uint256 refundAmount = accountBalanceOf(msg.sender);
 
         // There is duplicate logic here and in _closePolicy(...), should we just make a call to _closePolicy() here and remove PolicyDeactivated event?
-        _activeCoverLimit -= coverLimitOf(policyID_);
+        _activeCoverLimit -= _coverLimitOf[policyID_];
         _coverLimitOf[policyID_] = 0;
         _accountBalanceOf[msg.sender] = 0;
         _updatePolicyManager(_activeCoverLimit); // Need to change to _updateRiskManager(_activeCoverLimit)
@@ -253,7 +255,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     * @return rewardPoints_ The reward points for a policyholder.
     */
     function rewardPointsOf(address policyholder_) public view override returns (uint256 rewardPoints_) {
-        return _rewardPoints[policyholder_];
+        return _rewardPointsOf[policyholder_];
     }
 
     /**
@@ -280,7 +282,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      * @return policyID The policy id.
     */
     function policyOf(address policyholder_) public view override returns (uint256 policyID) {
-        return policyOf[policyholder_];
+        return _policyOf[policyholder_];
     }
 
     /**
@@ -407,14 +409,14 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     }
 
     /**
-     * @notice Enables governance to gift 'free' cover to specific addresses.
+     * @notice Enables governance to gift (and remove) 'free' cover to specific addresses.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param policyholder_ The policy holder to gift reward points to.
-     * @param pointsToGift_ Amount of reward points to gift.
+     * @param policyholder_ The policy holder to set reward points for.
+     * @param rewardPoints_ Desired amount of reward points.
     */
-    function giftRewardPoints(address policyholder_, uint256 pointsToGift_) external override onlyGovernance {
-        _rewardPoints[policyholder_] += pointsToGift_;
-        emit RewardPointsGifted(policyholder_, pointsToGift_);
+    function setRewardPoints(address policyholder_, uint256 rewardPoints_) external override onlyGovernance {
+        _rewardPointsOf[policyholder_] = rewardPoints_;
+        emit RewardPointsSet(policyholder_, rewardPoints_);
     }  
 
     /**
@@ -434,26 +436,26 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
                 continue;
             }
 
-            require(premiums_[i] <= _maxRate * _chargeCycle * coverLimitOf(policyOf[msg.sender]), "Charging more than promised maximum rate");
+            require(premiums_[i] <= _maxRate * _chargeCycle * coverLimitOf(policyOf(msg.sender)), "Charging more than promised maximum rate");
 
-            // If policy holder can pay for premium charged
-            if (_accountBalanceOf[holders_[i]] + _rewardPoints[holders_[i]] >= premiums_[i]) {
+            // If policy holder can pay for premium charged in full
+            if (_accountBalanceOf[holders_[i]] + _rewardPointsOf[holders_[i]] >= premiums_[i]) {
                 amountToPayTreasury += premiums_[i];
 
-                // If reward points can cover premium charged
-                if (_rewardPoints[holders_[i]] >= premiums_[i]) {
-                    _rewardPoints[holders_[i]] -= premiums_[i];
+                // If reward points can cover premium charged in full
+                if (_rewardPointsOf[holders_[i]] >= premiums_[i]) {
+                    _rewardPointsOf[holders_[i]] -= premiums_[i];
                 } else {
-                    uint256 amountDeductedFromSoteriaAccount = premiums_[i] - _rewardPoints[holders_[i]];
+                    uint256 amountDeductedFromSoteriaAccount = premiums_[i] - _rewardPointsOf[holders_[i]];
                     _accountBalanceOf[holders_[i]] -= amountDeductedFromSoteriaAccount;
-                    _rewardPoints[holders_[i]] = 0;
+                    _rewardPointsOf[holders_[i]] = 0;
                 }
                 
                 emit PremiumCharged(holders_[i], premiums_[i]);
             } else {
-                uint256 partialPremium = _accountBalanceOf[holders_[i]] + _rewardPoints[holders_[i]];
+                uint256 partialPremium = _accountBalanceOf[holders_[i]] + _rewardPointsOf[holders_[i]];
                 amountToPayTreasury += partialPremium;
-                _rewardPoints[holders_[i]] = 0;
+                _rewardPointsOf[holders_[i]] = 0;
                 _accountBalanceOf[holders_[i]] = 0;
                 // turn off the policy
                 _closePolicy(holders_[i]);
@@ -475,9 +477,13 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     * @return acceptable True there is sufficient capacity for requested new coverage amount, false otherwise.
     */
     function _canPurchaseNewCover(uint256 existingTotalCover_, uint256 newTotalCover_) internal view returns (bool acceptable) {
-        uint256 changeInTotalCover = newTotalCover_ - existingTotalCover_;
-        if (changeInTotalCover < availableCoverCapacity()) return true;
-        else return false;
+        // Redundant check if _activeCoverLimit will be lowered
+        if (newTotalCover_ < existingTotalCover_) return true;
+        else {
+            uint256 changeInTotalCover = newTotalCover_ - existingTotalCover_;
+            if (changeInTotalCover < availableCoverCapacity()) return true;
+            else return false;
+        }
     }
 
     /**
@@ -506,8 +512,8 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      * @param policyholder The address of the policy owner.
     */
     function _closePolicy(address policyholder) internal {
-        uint256 policyID = policyOf(policyholder);
-        _activeCoverLimit -= coverLimitOf(policyID);
+        uint256 policyID = _policyOf[policyholder];
+        _activeCoverLimit -= _coverLimitOf[policyID];
         _coverLimitOf[policyID] = 0;
         _updatePolicyManager(_activeCoverLimit); // Need to change to _updateRiskManager(_activeCoverLimit)
         emit PolicyClosed(policyID);

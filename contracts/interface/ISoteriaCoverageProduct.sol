@@ -46,8 +46,8 @@ interface ISoteriaCoverageProduct {
     /// @notice Emitted when chargeCycle is set.
     event ChargeCycleSet(uint256 chargeCycle);
 
-    /// @notice Emitted when reward points are gifted.
-    event RewardPointsGifted(address policyholder, uint256 amountGifted);
+    /// @notice Emitted when reward points are set.
+    event RewardPointsSet(address policyholder, uint256 amountGifted);
 
     /***************************************
     POLICY FUNCTIONS
@@ -117,7 +117,7 @@ interface ISoteriaCoverageProduct {
      * @param policyholder_ The address of the policyholder.
      * @return policyID The policy id.
     */
-    function policyIDOf(address policyholder_) external view returns (uint256 policyID);
+    function policyOf(address policyholder_) external view returns (uint256 policyID);
 
     /**
      * @notice Returns whether if the policy is active or not.
@@ -215,12 +215,12 @@ interface ISoteriaCoverageProduct {
     function setChargeCycle(uint256 chargeCycle_) external;
 
     /**
-     * @notice Enables governance to gift 'free' cover to specific addresses.
+     * @notice Enables governance to gift (and remove) 'free' cover to specific addresses.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param policyholder_ The policy holder to gift reward points to.
-     * @param pointsToGift_ Amount of reward points to gift.
+     * @param policyholder_ The policy holder to set reward points for.
+     * @param rewardPoints_ Desired amount of reward points.
     */
-    function giftRewardPoints(address policyholder_, uint256 pointsToGift_) external;
+    function setRewardPoints(address policyholder_, uint256 rewardPoints_) external;
 
     /**
      * @notice Charge premiums for each policy holder.
