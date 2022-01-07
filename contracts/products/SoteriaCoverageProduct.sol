@@ -147,7 +147,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         policyID = policyOf(policyholder_);
         require(!policyStatus(policyID), "already bought policy");
         require(_canPurchaseNewCover(0, coverLimit_), "insufficient capacity for new cover");
-        require(msg.value > ( _maxRateNum * _chargeCycle * coverLimit_ ) / _maxRateDenom, "insufficient deposit for minimum required account balance");
+        require(msg.value + _accountBalanceOf[policyholder_] > ( _maxRateNum * _chargeCycle * coverLimit_ ) / _maxRateDenom, "insufficient deposit for minimum required account balance");
 
         // deposit funds
         _deposit(policyholder_, msg.value);
@@ -179,11 +179,12 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         require(_exists(policyID_), "invalid policy");
         // These following 2 require's are awkward, we would ideally like a modifier or single require statement to evaluate `msg.sender == ownerOf(policyID_) || onlyGovernance modifier`
         // Require `this.` syntax to access external functions of inherited Governance.sol
+        address policyOwner = ownerOf(policyID_);
         require(!this.governanceIsLocked(), "permanently locked by governance");
-        require(this.governance() == msg.sender || ownerOf(policyID_) == msg.sender, "Not owner or governance");
+        require(this.governance() == msg.sender || policyOwner == msg.sender, "Not owner or governance");
         uint256 currentCoverLimit = coverLimitOf(policyID_);
         require(_canPurchaseNewCover(currentCoverLimit, newCoverLimit_), "insufficient capacity for new cover");
-        require(_accountBalanceOf[msg.sender] > ( _maxRateNum * _chargeCycle * newCoverLimit_ ) / _maxRateDenom, "insufficient deposit for minimum required account balance");
+        require(_accountBalanceOf[policyOwner] > ( _maxRateNum * _chargeCycle * newCoverLimit_ ) / _maxRateDenom, "insufficient deposit for minimum required account balance");
         
         _coverLimitOf[policyID_] = newCoverLimit_;
         uint256 newActiveCoverLimit = activeCoverLimit() + newCoverLimit_ - currentCoverLimit;
