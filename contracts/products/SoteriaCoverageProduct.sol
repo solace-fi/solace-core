@@ -214,7 +214,9 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
       if (_accountBalanceOf[msg.sender] - amount_ > ( _maxRateNum * _chargeCycle * currentCoverLimit ) / _maxRateDenom) {
           _withdraw(msg.sender, amount_);
       } else {
-          deactivatePolicy(_policyOf[msg.sender]);
+          uint256 accountBalance = _accountBalanceOf[msg.sender];
+          _deactivatePolicy(msg.sender);
+          Address.sendValue(payable(msg.sender), accountBalance);
       }
     }
 
