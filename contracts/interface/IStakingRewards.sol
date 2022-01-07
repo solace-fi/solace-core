@@ -11,6 +11,10 @@ import "./IxsListener.sol";
  */
 interface IStakingRewards is IxsListener {
 
+    /***************************************
+    EVENTS
+    ***************************************/
+
     /// @notice Emitted when the global information is updated.
     event Updated();
     /// @notice Emitted when a users information is updated.
@@ -20,10 +24,14 @@ interface IStakingRewards is IxsListener {
     /// @notice Emitted when the farm end is set.
     event FarmEndSet(uint256 endTime);
 
+    /***************************************
+    GLOBAL VARIABLES
+    ***************************************/
+
     /// @notice **SOLACE** token.
     function solace() external returns (address);
-    /// @notice **xSOLACE** token.
-    function xsolace() external returns (address);
+    /// @notice **xsLocker**.
+    function xsLocker() external returns (address);
     /// @notice Amount of SOLACE distributed per second.
     function rewardPerSecond() external returns (uint256);
     /// @notice When the farm will start.
@@ -57,7 +65,7 @@ interface IStakingRewards is IxsListener {
 
     /// @notice Information about each farmer.
     /// @dev user address => user info
-    //function userInfo(address user) external view returns (UserInfo memory);
+    function userInfo(address user) external view returns (UserInfo memory);
 
     /***************************************
     VIEW FUNCTIONS

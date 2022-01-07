@@ -12,7 +12,7 @@ import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 //import "@openzeppelin/contracts/proxy/Initializable.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "./Governable.sol";
-//import "./interface/IxsLocker.sol";
+import "./interface/IxsLocker.sol";
 import "./interface/IxsListener.sol";
 import "./interface/IxSOLACE.sol";
 
@@ -22,8 +22,12 @@ import "./interface/IxSOLACE.sol";
  * @author solace.fi
  * @notice V2 of the **SOLACE** staking contract.
  */
-contract xSOLACE is /*IxSOLACE,*/ ERC20, ReentrancyGuard, Governable {
+contract xSOLACE is IxSOLACE, ERC20, ReentrancyGuard, Governable {
     using EnumerableSet for EnumerableSet.AddressSet;
+
+    /***************************************
+    GLOBAL VARIABLES
+    ***************************************/
 
     uint256 public constant MAXTIME = 4 * (365 days);
     uint256 public constant MULTIPLIER = 1e18;
@@ -33,35 +37,124 @@ contract xSOLACE is /*IxSOLACE,*/ ERC20, ReentrancyGuard, Governable {
     Point[] public pointHistory;
     mapping(uint256 => Point[]) public lockPointHistory;
 
-    EnumerableSet.AddressSet private _listeners;
-
-    modifier onlyXSLock() {
-        require(
-            msg.sender == xsLocker,
-            "Only ve lock contract can call this."
-        );
-        _;
-    }
-
-    constructor(address governance_) ERC20("xsolace", "xSOLACE") Governable(governance_) {
-
-    }
-
-    function initialize(
-        address xsLocker_
-    ) public /*initializer*/ {
+    constructor(address governance_, address xsLocker_) ERC20("xsolace", "xSOLACE") Governable(governance_) {
+        require(xsLocker_ != address(0x0), "zero address locker");
         xsLocker = xsLocker_;
     }
 
-    function checkpoint(uint256 maxRecord) external {
+    /***************************************
+    VIEW FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Returns the user's **xSOLACE** balance.
+     * @param account The account to query.
+     * @return balance The user's balance.
+     */
+    function balanceOf(address account) public view override(ERC20, IxSOLACE) returns (uint256 balance) {
+        IxsLocker locker = IxsLocker(xsLocker);
+        //uint256 numOfLocks = IERC721Enumerable(xsLocker).balanceOf(account);
+        uint256 numOfLocks = locker.delegatedRights(account);
+        balance = 0;
+        for (uint256 i = 0; i < numOfLocks; i++) {
+            //uint256 xsLockID = IERC721Enumerable(xsLocker).tokenOfOwnerByIndex(account, i);
+            uint256 xsLockID = locker.delegatedRightByIndex(account, i);
+            balance += balanceOfLock(xsLockID);
+        }
+        return balance;
+    }
+
+    /**
+     * @notice Returns the user's **xSOLACE** balance at some point in the past.
+     * @param account The account to query.
+     * @param timestamp The time to query.
+     * @return balance The user's balance.
+     */
+    function balanceOfAt(address account, uint256 timestamp) public view override returns (uint256 balance) {
+        IxsLocker locker = IxsLocker(xsLocker);
+        //uint256 numOfLocks = IERC721Enumerable(xsLocker).balanceOf(account);
+        uint256 numOfLocks = locker.delegatedRights(account);
+        balance = 0;
+        for (uint256 i = 0; i < numOfLocks; i++) {
+            //uint256 xsLockID = IERC721Enumerable(xsLocker).tokenOfOwnerByIndex(account, i);
+            uint256 xsLockID = locker.delegatedRightByIndex(account, i);
+            balance += balanceOfLockAt(xsLockID, timestamp);
+        }
+        return balance;
+    }
+
+    /**
+     * @notice Returns the **xSOLACE** balance of a lock.
+     * @param xsLockID The lock to query.
+     * @return balance The locks's balance.
+     */
+    function balanceOfLock(uint256 xsLockID) public view override returns (uint256 balance) {
+        return balanceOfLockAt(xsLockID, block.timestamp);
+    }
+
+    /**
+     * @notice Returns the **xSOLACE** balance of a lock at some point in the past.
+     * @param xsLockID The lock to query.
+     * @param timestamp The time to query.
+     * @return balance The lock's balance.
+     */
+    function balanceOfLockAt(uint256 xsLockID, uint256 timestamp) public view override returns (uint256 balance) {
+        (bool success, Point memory point) =
+            _searchClosestPoint(lockPointHistory[xsLockID], timestamp);
+        if (success) {
+            int128 bal = point.bias - point.slope * (toInt128(timestamp) - toInt128(point.timestamp));
+            return bal > 0 ? toUint256(bal) : 0;
+        } else {
+            return 0;
+        }
+    }
+
+    /**
+     * @notice Returns the total supply of **xSOLACE**.
+     * @return supply The total supply.
+     */
+    function totalSupply() public view override(ERC20, IxSOLACE) returns (uint256 supply) {
+        return totalSupplyAt(block.timestamp);
+    }
+
+    /**
+     * @notice Returns the total supply of **xSOLACE** at some point in the past.
+     * @param timestamp The time to query.
+     * @return supply The total supply.
+     */
+    function totalSupplyAt(uint256 timestamp) public view override returns (uint256 supply) {
+        (bool success, Point memory point) =
+            _searchClosestPoint(pointHistory, timestamp);
+        if (success) {
+            return _computeSupplyFrom(point, timestamp);
+        } else {
+            return 0;
+        }
+    }
+
+    /***************************************
+    MUTATOR FUNCTIONS
+    ***************************************/
+
+    /**
+     *
+     */
+    function checkpoint(uint256 maxRecord) external override {
         _recordPointHistory(maxRecord);
     }
 
-    function checkpoint(
-        uint256 xsLockID,
-        Lock calldata oldLock,
-        Lock calldata newLock
-    ) external onlyXSLock {
+    /**
+     * @notice Called when an action is performed on a lock.
+     * @dev Called on transfer, mint, burn, and update.
+     * Either the owner will change or the lock will change, not both.
+     * @param xsLockID The ID of the lock that was altered.
+     * @param oldOwner The old owner of the lock.
+     * @param newOwner The new owner of the lock.
+     * @param oldLock The old lock data.
+     * @param newLock The new lock data.
+     */
+    function registerLockEvent(uint256 xsLockID, address oldOwner, address newOwner, Lock calldata oldLock, Lock calldata newLock) external override {
+        require(msg.sender == xsLocker, "Only xs lock contract can call this.");
         // Record history
         _recordPointHistory(0);
 
@@ -78,69 +171,11 @@ contract xSOLACE is /*IxSOLACE,*/ ERC20, ReentrancyGuard, Governable {
             oldLockPoint,
             newLockPoint
         );
-
-        // register action with listener
-        address owner = IERC721Enumerable(xsLocker).ownerOf(xsLockID);
-        uint256 balance = balanceOf(owner);
-        uint256 len = _listeners.length();
-        for(uint256 i = 0; i < len; i++) {
-            IxsListener(_listeners.at(i)).registerUserAction(owner, balance);
-        }
     }
 
-    // View functions
-
-    function balanceOf(address account) public view override returns (uint256 balance) {
-        uint256 numOfLocks = IERC721Enumerable(xsLocker).balanceOf(account);
-        balance = 0;
-        for (uint256 i = 0; i < numOfLocks; i++) {
-            uint256 xsLockID = IERC721Enumerable(xsLocker).tokenOfOwnerByIndex(account, i);
-            balance += balanceOfLock(xsLockID);
-        }
-        return balance;
-    }
-
-    function balanceOfAt(address account, uint256 timestamp) public view returns (uint256 balance) {
-        uint256 numOfLocks = IERC721Enumerable(xsLocker).balanceOf(account);
-        balance = 0;
-        for (uint256 i = 0; i < numOfLocks; i++) {
-            uint256 xsLockID = IERC721Enumerable(xsLocker).tokenOfOwnerByIndex(account, i);
-            balance += balanceOfLockAt(xsLockID, timestamp);
-        }
-        return balance;
-    }
-
-    function balanceOfLock(uint256 xsLockID) public view returns (uint256 balance) {
-        return balanceOfLockAt(xsLockID, block.timestamp);
-    }
-
-    function balanceOfLockAt(uint256 xsLockID, uint256 timestamp) public view returns (uint256 balance) {
-        (bool success, Point memory point) =
-            _searchClosestPoint(lockPointHistory[xsLockID], timestamp);
-        if (success) {
-            int128 bal =
-                point.bias -
-                    point.slope *
-                    (toInt128(timestamp) - toInt128(point.timestamp));
-            return bal > 0 ? toUint256(bal) : 0;
-        } else {
-            return 0;
-        }
-    }
-
-    function totalSupply() public view override returns (uint256 supply) {
-        return totalSupplyAt(block.timestamp);
-    }
-
-    function totalSupplyAt(uint256 timestamp) public view returns (uint256 supply) {
-        (bool success, Point memory point) =
-            _searchClosestPoint(pointHistory, timestamp);
-        if (success) {
-            return _computeSupplyFrom(point, timestamp);
-        } else {
-            return 0;
-        }
-    }
+    /***************************************
+    HELPER FUNCTIONS
+    ***************************************/
 
     // checkpoint() should be called if it emits out of gas error.
     function _computeSupplyFrom(Point memory point, uint256 timestamp) internal view returns (uint256 supply) {
@@ -165,15 +200,11 @@ contract xSOLACE is /*IxSOLACE,*/ ERC20, ReentrancyGuard, Governable {
     function _computePointsFromLocks(Lock memory oldLock, Lock memory newLock) internal view returns (Point memory oldPoint, Point memory newPoint) {
         if (oldLock.end > block.timestamp && oldLock.amount > 0) {
             oldPoint.slope = toInt128(oldLock.amount / MAXTIME);
-            oldPoint.bias =
-                oldPoint.slope *
-                toInt128(oldLock.end - block.timestamp);
+            oldPoint.bias = oldPoint.slope * toInt128(oldLock.end - block.timestamp);
         }
         if (newLock.end > block.timestamp && newLock.amount > 0) {
             newPoint.slope = toInt128(newLock.amount / MAXTIME);
-            newPoint.bias =
-                newPoint.slope *
-                toInt128((newLock.end - block.timestamp));
+            newPoint.bias = newPoint.slope * toInt128((newLock.end - block.timestamp));
         }
     }
 
@@ -308,11 +339,10 @@ contract xSOLACE is /*IxSOLACE,*/ ERC20, ReentrancyGuard, Governable {
         return (true, history[min]);
     }
 
-    function _beforeTokenTransfer(
-        address,
-        address,
-        uint256
-    ) internal pure override {
+    /**
+     * @notice Stops ERC20 transfer.
+     */
+    function _beforeTokenTransfer(address, address, uint256) internal pure override {
         revert("Non-transferrable. You can only transfer locks.");
     }
 
@@ -332,13 +362,5 @@ contract xSOLACE is /*IxSOLACE,*/ ERC20, ReentrancyGuard, Governable {
      */
     function toUint256(int128 numIn) internal pure returns (uint256 numOut) {
         return SafeCast.toUint256(int256(numIn));
-    }
-
-    function addListener(address listener) external onlyGovernance {
-        _listeners.add(listener);
-    }
-
-    function removeListener(address listener) external onlyGovernance {
-        _listeners.remove(listener);
     }
 }

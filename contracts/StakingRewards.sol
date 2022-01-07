@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "./Governable.sol";
-import "./interface/IxSOLACE.sol";
+import "./interface/IxsLocker.sol";
 import "./interface/IStakingRewards.sol";
 
 
@@ -17,10 +17,14 @@ import "./interface/IStakingRewards.sol";
  */
 contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
 
+    /***************************************
+    GLOBAL VARIABLES
+    ***************************************/
+
     /// @notice **SOLACE** token.
     address public override solace;
-    /// @notice **xSOLACE** token.
-    address public override xsolace;
+    /// @notice **xsLocker**.
+    address public override xsLocker;
     /// @notice Amount of SOLACE distributed per second.
     uint256 public override rewardPerSecond;
     /// @notice When the farm will start.
@@ -36,7 +40,11 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
 
     /// @notice Information about each farmer.
     /// @dev user address => user info
-    mapping(address => UserInfo) public userInfo;
+    mapping(address => UserInfo) private _userInfo;
+
+    uint256 public constant MAX_LOCK_DURATION = 4 * 365 days; // 4 years
+    uint256 public constant MAX_LOCK_MULTIPLIER_BPS = 25000;  // 2.5X
+    uint256 internal constant MAX_BPS = 10000;
 
     /**
      * @notice Constructs the StakingRewards contract.
@@ -48,15 +56,15 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
     constructor(
         address governance_,
         address solace_,
-        address xsolace_,
+        address xsLocker_,
         uint256 startTime_,
         uint256 endTime_,
         uint256 rewardPerSecond_
     ) Governable(governance_) {
         require(solace_ != address(0x0), "zero address solace");
         solace = solace_;
-        require(xsolace_ != address(0x0), "zero address xsolace");
-        xsolace = xsolace_;
+        require(xsLocker_ != address(0x0), "zero address xslocker");
+        xsLocker = xsLocker_;
         require(startTime_ <= endTime_, "invalid window");
         startTime = startTime_;
         endTime = endTime_;
@@ -67,6 +75,12 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
     VIEW FUNCTIONS
     ***************************************/
 
+    /// @notice Information about each farmer.
+    /// @dev user address => user info
+    function userInfo(address user) external view override returns (UserInfo memory) {
+        return _userInfo[user];
+    }
+
     /**
      * @notice Calculates the accumulated balance of [**SOLACE**](./SOLACE) for specified user.
      * @param user The user for whom unclaimed tokens will be shown.
@@ -74,7 +88,7 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
      */
     function pendingRewards(address user) external view override returns (uint256 reward) {
         // get farmer information
-        UserInfo storage userInfo_ = userInfo[user];
+        UserInfo storage userInfo_ = _userInfo[user];
         // math
         uint256 accRewardPerShare_ = accRewardPerShare;
         if (block.timestamp > lastRewardTime && valueStaked != 0) {
@@ -99,26 +113,66 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
         return (to - from) * rewardPerSecond;
     }
 
+    function calculateUserStake(address user) public view returns (uint256 stake) {
+        IxsLocker locker = IxsLocker(xsLocker);
+        uint256 numOfLocks = locker.balanceOf(user);
+        stake = 0;
+        for (uint256 i = 0; i < numOfLocks; i++) {
+            uint256 xsLockID = locker.tokenOfOwnerByIndex(user, i);
+            Lock memory lock = locker.locks(xsLockID);
+            uint256 lockValue = (lock.end <= block.timestamp)
+                ? lock.amount
+                : lock.amount * (lock.end - block.timestamp) * MAX_LOCK_MULTIPLIER_BPS / (MAX_LOCK_DURATION * MAX_BPS);
+        }
+        return stake;
+    }
+
     /***************************************
     MUTATOR FUNCTIONS
     ***************************************/
 
     /**
-     * @notice Called when an action is performed in **xSOLACE**.
-     * @param user The user that performed the action.
-     * @param stake The new amount of tokens that the user has staked.
+     * @notice Called when an action is performed on a lock.
+     * @dev Called on transfer, mint, burn, and update.
+     * Either the owner will change or the lock will change, not both.
+     * @param xsLockID The ID of the lock that was altered.
+     * @param oldOwner The old owner of the lock.
+     * @param newOwner The new owner of the lock.
+     * @param oldLock The old lock data.
+     * @param newLock The new lock data.
      */
-    function registerUserAction(address user, uint256 stake) external override nonReentrant {
-        require(msg.sender == xsolace, "StakingRewards: can only be called by xsolace");
+    function registerLockEvent(uint256 xsLockID, address oldOwner, address newOwner, Lock calldata oldLock, Lock calldata newLock) external override {
+        require(msg.sender == xsLocker, "Only xs lock contract can call this.");
         // get farmer information
         _harvest(user);
-        UserInfo storage userInfo_ = userInfo[user];
+        UserInfo storage userInfo_ = _userInfo[user];
         // accounting
         uint256 oldValue = userInfo_.value;
-        userInfo_.value = stake;
-        userInfo_.rewardDebt = stake * accRewardPerShare / 1e12;
-        valueStaked = valueStaked - oldValue + stake;
+        uint256 newValue = calculateUserStake(user);
+        userInfo_.value = newValue;
+        userInfo_.rewardDebt = newValue * accRewardPerShare / 1e12;
+        valueStaked = valueStaked - oldValue + newValue;
         emit UserUpdated(user);
+    }
+
+    // used to decay user stake
+    function updateUsers(address[] calldata users) external nonReentrant {
+        update();
+        uint256 accRewardPerShare_ = accRewardPerShare;
+        for(uint256 i = 0; i < users.length; i++) {
+            // get farmer information
+            address user = users[i];
+            UserInfo memory userInfo_ = _userInfo[user];
+            // accumulate unpaid rewards
+            userInfo_.unpaidRewards += userInfo_.value * accRewardPerShare_ / 1e12 - userInfo_.rewardDebt;
+            // accounting
+            uint256 oldValue = userInfo_.value;
+            uint256 newValue = calculateUserStake(user);
+            userInfo_.value = newValue;
+            userInfo_.rewardDebt = newValue * accRewardPerShare / 1e12;
+            valueStaked = valueStaked - oldValue + newValue;
+            emit UserUpdated(user);
+        }
     }
 
     /**
@@ -159,7 +213,7 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
         // update farm
         update();
         // get farmer information
-        UserInfo storage userInfo_ = userInfo[user];
+        UserInfo storage userInfo_ = _userInfo[user];
         // accumulate unpaid rewards
         uint256 unpaidRewards = userInfo_.value * accRewardPerShare / 1e12 - userInfo_.rewardDebt + userInfo_.unpaidRewards;
         uint256 balance = IERC20(solace).balanceOf(address(this));
