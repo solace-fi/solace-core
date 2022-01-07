@@ -176,7 +176,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     */
     function updateCoverLimit(uint256 policyID_, uint256 newCoverLimit_) external override nonReentrant whileUnpaused {
         require(newCoverLimit_ > 0, "zero cover value");
-        require(policyID_ > 0, "invalid policy");
+        require(_exists(policyID_), "invalid policy");
         // These following 2 require's are awkward, we would ideally like a modifier or single require statement to evaluate `msg.sender == ownerOf(policyID_) || onlyGovernance modifier`
         // Require `this.` syntax to access external functions of inherited Governance.sol
         require(!this.governanceIsLocked(), "permanently locked by governance");
@@ -221,19 +221,21 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     }
 
     /**
-     * @notice Deactivate a policy.
-     * User will receive their deposited funds.
-     * Can only be called by the policyholder.
-     * @param policyID_ The ID of the policy.
+     * @notice Deactivate a user's own policy.
+     * @param policyID_ The policy ID to update.
+     * User will receive their entire Soteria account balance.
      */
      function deactivatePolicy(uint256 policyID_) public override nonReentrant {
-        require(_exists(policyID_), "invalid policy");
-        require(ownerOf(policyID_) == msg.sender, "!policyholder");
-        uint256 refundAmount = accountBalanceOf(msg.sender);
+        require(policyStatus(policyID_), "invalid policy");
+        // These following 2 require's are awkward, we would ideally like a modifier or single require statement to evaluate `msg.sender == ownerOf(policyID_) || onlyGovernance modifier`
+        // Require `this.` syntax to access external functions of inherited Governance.sol
+        address policyOwner = ownerOf(policyID_);
+        require(!this.governanceIsLocked(), "permanently locked by governance");
+        require(this.governance() == msg.sender || policyOwner == msg.sender, "Not owner or governance");
 
-        _deactivatePolicy(msg.sender);
-        // send deposited fund to the policyholder
-        if (refundAmount > 0) Address.sendValue(payable(msg.sender), refundAmount);
+        uint256 refundAmount = accountBalanceOf(policyOwner);
+        _deactivatePolicy(policyOwner);
+        if (refundAmount > 0) Address.sendValue(payable(policyOwner), refundAmount);
     }
 
     /***************************************

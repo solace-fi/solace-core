@@ -13,7 +13,7 @@ interface ISoteriaCoverageProduct {
     /// @notice Emitted when a Policy is updated.
     event PolicyUpdated(uint256 policyID);
 
-    /// @notice Emitted when a Policy ic deactivated.
+    /// @notice Emitted when a Policy is deactivated.
     event PolicyDeactivated(uint256 policyID);
 
     /// @notice Emitted when Registry address is updated.
@@ -81,12 +81,11 @@ interface ISoteriaCoverageProduct {
     function updateCoverLimit(uint256 policyID_, uint256 newCoverLimit_) external;
 
     /**
-     * @notice Deactivate and burn a policy.
-     * User will receive their deposited funds.
-     * Can only be called by the policyholder.
-     * @param policyID_ The ID of the policy.
-    */
-    function deactivatePolicy(uint256 policyID_) external;
+     * @notice Deactivate a user's own policy.
+     * @param policyID_ The policy ID to update.
+     * User will receive their entire Soteria account balance.
+     */
+     function deactivatePolicy(uint256 policyID_) external;
 
     /***************************************
     VIEW FUNCTIONS
