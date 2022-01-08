@@ -177,10 +177,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     function updateCoverLimit(uint256 policyID_, uint256 newCoverLimit_) external override nonReentrant whileUnpaused {
         require(newCoverLimit_ > 0, "zero cover value");
         require(_exists(policyID_), "invalid policy");
-        // These following 2 require's are awkward, we would ideally like a modifier or single require statement to evaluate `msg.sender == ownerOf(policyID_) || onlyGovernance modifier`
-        // Require `this.` syntax to access external functions of inherited Governance.sol
         address policyOwner = ownerOf(policyID_);
-        require(!this.governanceIsLocked(), "permanently locked by governance");
         require(this.governance() == msg.sender || policyOwner == msg.sender, "Not owner or governance");
         uint256 currentCoverLimit = coverLimitOf(policyID_);
         require(_canPurchaseNewCover(currentCoverLimit, newCoverLimit_), "insufficient capacity for new cover");
@@ -228,10 +225,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      */
      function deactivatePolicy(uint256 policyID_) public override nonReentrant {
         require(policyStatus(policyID_), "invalid policy");
-        // These following 2 require's are awkward, we would ideally like a modifier or single require statement to evaluate `msg.sender == ownerOf(policyID_) || onlyGovernance modifier`
-        // Require `this.` syntax to access external functions of inherited Governance.sol
         address policyOwner = ownerOf(policyID_);
-        require(!this.governanceIsLocked(), "permanently locked by governance");
         require(this.governance() == msg.sender || policyOwner == msg.sender, "Not owner or governance");
 
         uint256 refundAmount = accountBalanceOf(policyOwner);
@@ -457,13 +451,13 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
 
             // If policy holder can pay for premium charged in full
             if (_accountBalanceOf[holders_[i]] + _rewardPointsOf[holders_[i]] >= premiums_[i]) {
-                amountToPayTreasury += premiums_[i];
-
+                
                 // If reward points can cover premium charged in full
                 if (_rewardPointsOf[holders_[i]] >= premiums_[i]) {
                     _rewardPointsOf[holders_[i]] -= premiums_[i];
                 } else {
                     uint256 amountDeductedFromSoteriaAccount = premiums_[i] - _rewardPointsOf[holders_[i]];
+                    amountToPayTreasury += amountDeductedFromSoteriaAccount;
                     _accountBalanceOf[holders_[i]] -= amountDeductedFromSoteriaAccount;
                     _rewardPointsOf[holders_[i]] = 0;
                 }
@@ -471,7 +465,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
                 emit PremiumCharged(holders_[i], premiums_[i]);
             } else {
                 uint256 partialPremium = _accountBalanceOf[holders_[i]] + _rewardPointsOf[holders_[i]];
-                amountToPayTreasury += partialPremium;
+                amountToPayTreasury += _accountBalanceOf[holders_[i]];
                 _rewardPointsOf[holders_[i]] = 0;
                 _deactivatePolicy(holders_[i]); // Difference between manually calling deactivatePolicy() and having _deactivatePolicy() called here, is that the remaining account balance goes to Treasury here instead of being returned to the user
                 emit PremiumPartiallyCharged(holders_[i], premiums_[i], partialPremium);

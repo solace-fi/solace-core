@@ -847,6 +847,7 @@ describe("SoteriaCoverageProduct", function() {
             // single weekly premium should be sent to treasury
             expect(await provider.getBalance(vault.address)).to.equal(initialVaultBalance.add(WEEKLY_MAX_PREMIUM));
         });
+        
         it("will correctly charge premiums with reward points", async () => {
             // CASE 4 - Charge weekly premium for three active policies
             // Policy 1: reward points can pay for premium in full
@@ -893,12 +894,53 @@ describe("SoteriaCoverageProduct", function() {
             let initialPMCoverAmount = await policyManager.activeCoverAmount();
             let initialPMSoteriaCoverAmount = await policyManager.activeCoverAmountPerStrategy(soteriaCoverageProduct.address);
 
+            tx = await soteriaCoverageProduct.connect(governor).chargePremiums([policyholder1.address, policyholder2.address, policyholder3.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM])
+            expect(tx).to.emit(soteriaCoverageProduct, "PremiumCharged").withArgs(policyholder1.address, WEEKLY_MAX_PREMIUM);
+            expect(tx).to.emit(soteriaCoverageProduct, "PremiumCharged").withArgs(policyholder2.address, WEEKLY_MAX_PREMIUM);
+            expect(tx).to.emit(soteriaCoverageProduct, "PremiumPartiallyCharged").withArgs(policyholder3.address, WEEKLY_MAX_PREMIUM, initialHolder3AccountBalance.add(initialRewardPoints3));
+            expect(tx).to.emit(soteriaCoverageProduct, "PremiumDeactivated").withArgs(POLICY_ID_3);
 
-            // Difficult and time-wasting to keep track of policy states up to this point, so let's do a complete reset
+            // Confirm state is what we expect after charging premium
 
+            // Check reward points
+            expect(await soteriaCoverageProduct.rewardPointsOf(policyholder1.address)).eq(initialRewardPoints1.sub(WEEKLY_MAX_PREMIUM))            
+            expect(await soteriaCoverageProduct.rewardPointsOf(policyholder2.address)).eq(0)          
+            expect(await soteriaCoverageProduct.rewardPointsOf(policyholder2.address)).eq(0)          
+
+            // Check account balances
+            expect(await soteriaCoverageProduct.accountBalanceOf(policyholder1.address)).eq(initialHolder1AccountBalance)
+            expect(await soteriaCoverageProduct.accountBalanceOf(policyholder2.address)).eq(initialHolder2AccountBalance.sub(WEEKLY_MAX_PREMIUM).add(initialRewardPoints2))
+            expect(await soteriaCoverageProduct.accountBalanceOf(policyholder3.address)).eq(0)
+
+            // Check cover limits
+            expect(await soteriaCoverageProduct.coverLimitOf(POLICY_ID_1)).eq(initialPolicy1CoverLimit)
+            expect(await soteriaCoverageProduct.coverLimitOf(POLICY_ID_2)).eq(initialPolicy2CoverLimit)
+            expect(await soteriaCoverageProduct.coverLimitOf(POLICY_ID_3)).eq(0)
+
+            // Check policy status
+            expect(await soteriaCoverageProduct.policyStatus(POLICY_ID_1)).eq(true)
+            expect(await soteriaCoverageProduct.policyStatus(POLICY_ID_2)).eq(true)
+            expect(await soteriaCoverageProduct.policyStatus(POLICY_ID_3)).eq(false)
+
+            // Soteria balance check
+            let accountBalanceDeductedForHolder1 = BN.from("0");
+            let accountBalanceDeductedForHolder2 = WEEKLY_MAX_PREMIUM.sub(initialRewardPoints2);
+            let accountBalanceDeductedForHolder3 = initialHolder3AccountBalance;
+            let expectedSoteriaBalanceChange = accountBalanceDeductedForHolder1.add(accountBalanceDeductedForHolder2).add(accountBalanceDeductedForHolder3)
+            expect(await provider.getBalance(soteriaCoverageProduct.address)).eq(initialSoteriaBalance.sub(expectedSoteriaBalanceChange))
+
+            // Vault balance check
+            expect(await provider.getBalance(vault.address)).eq(initialVaultBalance.add(expectedSoteriaBalanceChange))
+
+            // Soteria active cover limit check - policy 3 deactivated
+            expect(await soteriaCoverageProduct.activeCoverLimit()).eq(initialActiveCoverLimit.sub(initialPolicy3CoverLimit))
+            expect(await policyManager.activeCoverAmount()).eq(initialPMCoverAmount.sub(initialPolicy3CoverLimit))
+            expect(await policyManager.activeCoverAmountPerStrategy(soteriaCoverageProduct.address)).eq(initialPMSoteriaCoverAmount.sub(initialPolicy3CoverLimit))
+            
+            // Cover capacity check - maxCover() increased by vault deposits, active cover limit decreased by policy 3 initial cover limit
+            expect(await soteriaCoverageProduct.availableCoverCapacity()).eq(initialAvailableCoverCapacity.add(expectedSoteriaBalanceChange).add(initialPolicy3CoverLimit))
         })
 
-    // Test for rewardPoints
     // Test for maxing out users
 
     });
