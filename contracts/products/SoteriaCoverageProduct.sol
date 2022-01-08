@@ -145,7 +145,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         require(coverLimit_ > 0, "zero cover value");
         
         policyID = policyOf(policyholder_);
-        require(!policyStatus(policyID), "already bought policy");
+        require(!policyStatus(policyID), "policy already activated");
         require(_canPurchaseNewCover(0, coverLimit_), "insufficient capacity for new cover");
         require(msg.value + _accountBalanceOf[policyholder_] > ( _maxRateNum * _chargeCycle * coverLimit_ ) / _maxRateDenom, "insufficient deposit for minimum required account balance");
 
@@ -451,11 +451,8 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         uint256 amountToPayTreasury = 0;
 
         for (uint256 i = 0; i < count; i++) {
-            // skip computation if policy inactive (coverLimit == 0)
-            if (coverLimitOf(policyOf(holders_[i])) == 0) {
-                continue;
-            }
-
+            // skip computation if policy inactive
+            if ( !policyStatus(_policyOf[holders_[i]]) ) continue;
             require(premiums_[i] <= ( _maxRateNum * _chargeCycle * coverLimitOf(policyOf(holders_[i])) ) / _maxRateDenom, "Charging more than promised maximum rate");
 
             // If policy holder can pay for premium charged in full
@@ -544,7 +541,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      * @param soteriaActiveCoverLimit The active cover amount of soteria product.
     */
     function _updatePolicyManager(uint256 soteriaActiveCoverLimit) internal {
-        _policyManager.setSoteriaActiveCoverLimit(soteriaActiveCoverLimit);
+        _policyManager.setSoteriaActiveCoverAmount(soteriaActiveCoverLimit);
         emit PolicyManagerUpdated(soteriaActiveCoverLimit);
     }
 

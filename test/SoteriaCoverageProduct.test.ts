@@ -40,7 +40,8 @@ describe("SoteriaCoverageProduct", function() {
     const ONE_ETH = BN.from("1000000000000000000"); // 1 eth
     const TWO_ETH = BN.from("2000000000000000000"); // 1 eth
     const ZERO_AMOUNT = BN.from("0");
-    const PREMIUM_AMOUNT = BN.from("100000000000000000"); // 0.1 eth
+    const ANNUAL_MAX_PREMIUM = INITIAL_COVER_LIMIT.div(10); // 0.1 eth, for testing we assume max annual rate of 10% of cover limit
+    const WEEKLY_MAX_PREMIUM = ANNUAL_MAX_PREMIUM.div(366).mul(7);
     const TOKEN0 = "0x501ace9c35e60f03a2af4d484f49f9b1efde9f40"; // SOLACE.sol
     const TOKEN1 = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"; // USDC.sol
     const RESERVE0 = BN.from("13250148273341498385651903");
@@ -359,8 +360,8 @@ describe("SoteriaCoverageProduct", function() {
         });
 
         it("cannot purchase more than one policy for a single address", async () => {
-            await expect(soteriaCoverageProduct.connect(policyholder1).activatePolicy(policyholder1.address, ONE_ETH, {value: ONE_ETH})).to.be.revertedWith("already bought policy")
-            await expect(soteriaCoverageProduct.connect(policyholder2).activatePolicy(policyholder1.address, ONE_ETH, {value: ONE_ETH})).to.be.revertedWith("already bought policy")
+            await expect(soteriaCoverageProduct.connect(policyholder1).activatePolicy(policyholder1.address, ONE_ETH, {value: ONE_ETH})).to.be.revertedWith("policy already activated")
+            await expect(soteriaCoverageProduct.connect(policyholder2).activatePolicy(policyholder1.address, ONE_ETH, {value: ONE_ETH})).to.be.revertedWith("policy already activated")
         })
         
         it("cannot transfer policy", async () => {
@@ -721,104 +722,185 @@ describe("SoteriaCoverageProduct", function() {
         });
     });
 
-    // describe("chargePremiums", () => {
-    //     it("cannot charge premiums by non-governance", async () => {
-    //         await expect(soteriaCoverageProduct.connect(policyholder1).chargePremiums([policyholder1.address, policyholder2.address], [PREMIUM_AMOUNT, PREMIUM_AMOUNT])).to.revertedWith("!governance");
-    //     });
+    describe("chargePremiums", () => {
+        it("cannot charge premiums by non-governance", async () => {
+            await expect(soteriaCoverageProduct.connect(policyholder1).chargePremiums([policyholder1.address, policyholder2.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM])).to.revertedWith("!governance");
+        });
 
-    //     it("cannot charge premiums if argument lenghts are mismatched", async () => {
-    //         await expect(soteriaCoverageProduct.connect(governor).chargePremiums([policyholder1.address, policyholder2.address, policyholder3.address], [PREMIUM_AMOUNT, PREMIUM_AMOUNT])).to.revertedWith("length mismatch");
-    //     });
+        it("cannot charge premiums if argument lenghts are mismatched", async () => {
+            await expect(soteriaCoverageProduct.connect(governor).chargePremiums([policyholder1.address, policyholder2.address, policyholder3.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM])).to.revertedWith("length mismatch");
+        });
 
-    //     it("cannot charge premiums if policy count is exceeded", async () => {
-    //         await expect(soteriaCoverageProduct.connect(governor).chargePremiums([policyholder1.address, policyholder2.address, policyholder3.address, policyholder4.address], [PREMIUM_AMOUNT, PREMIUM_AMOUNT, PREMIUM_AMOUNT, PREMIUM_AMOUNT])).to.revertedWith("policy count exceeded");
-    //     });
+        it("cannot charge premiums if policy count is exceeded", async () => {
+            await expect(soteriaCoverageProduct.connect(governor).chargePremiums([policyholder1.address, policyholder2.address, policyholder3.address, policyholder4.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM])).to.revertedWith("policy count exceeded");
+        });
 
-    //     it("can charge premiums", async () => {
-    //         // premiums are routed to the vault in treasury!
-    //         let soteriaBalance = await provider.getBalance(soteriaCoverageProduct.address);
-    //         let vaultBalance = await provider.getBalance(vault.address);
-    //         let holderFunds = await soteriaCoverageProduct.connect(policyholder1).funds(policyholder1.address);
+        it("cannot charge more than max rate", async () => {
+            await expect(soteriaCoverageProduct.connect(governor).chargePremiums([policyholder1.address, policyholder2.address], [WEEKLY_MAX_PREMIUM.mul(11).div(10), WEEKLY_MAX_PREMIUM.mul(11).div(10)])).to.revertedWith("Charging more than promised maximum rate");
+        })
 
-    //         // charge premiums
-    //         let tx = soteriaCoverageProduct.connect(governor).chargePremiums([policyholder1.address], [PREMIUM_AMOUNT]);
-    //         await expect(tx).emit(soteriaCoverageProduct, "PremiumCharged").withArgs(policyholder1.address, PREMIUM_AMOUNT);
-         
-    //         // funds should be decreased
-    //         expect(await soteriaCoverageProduct.connect(policyholder1).funds(policyholder1.address)).to.equal(holderFunds.sub(PREMIUM_AMOUNT));
-    //         // soteria balance should be decreased
-    //         expect(await provider.getBalance(soteriaCoverageProduct.address)).to.equal(soteriaBalance.sub(PREMIUM_AMOUNT));
-    //         // premium should be sent to treasury
-    //         expect(await provider.getBalance(vault.address)).to.equal(vaultBalance.add(PREMIUM_AMOUNT));
-    //     });
-
-    //     it("can partially charge premiums if the fund is insufficient", async () => {
-    //         // buy  new policy with 0.1 eth funding
-    //         let fundingAmount = PREMIUM_AMOUNT;
-    //         let tx = await soteriaCoverageProduct.connect(policyholder4).activatePolicy(policyholder4.address, INITIAL_COVER_LIMIT, PREMIUM_AMOUNT, {value: fundingAmount});
-    //         await expect(tx).emit(soteriaCoverageProduct, "PolicyCreated").withArgs(POLICY_ID_4);
-
-    //         // premiums are routed to the vault in treasury!
-    //         let soteriaBalance = await provider.getBalance(soteriaCoverageProduct.address);
-    //         let vaultBalance = await provider.getBalance(vault.address);
-    //         let holderFunds = await soteriaCoverageProduct.connect(policyholder4).funds(policyholder4.address);
-    //         let activeCoverAmount = await soteriaCoverageProduct.connect(policyholder4).activeCoverAmount();
-    //         let policyCoverAmount = await soteriaCoverageProduct.connect(policyholder4).coverLimitOf(POLICY_ID_4);
-    //         let pmCoverAmount = await policyManager.connect(policyholder4).activeCoverAmount();
-    //         let pmSoteriaCoverAmount = await policyManager.connect(policyholder4).activeCoverAmountPerStrategy(soteriaCoverageProduct.address);
-
-    //         // charge premiums
-    //         tx = await soteriaCoverageProduct.connect(governor).chargePremiums([policyholder4.address], [PREMIUM_AMOUNT.mul(2)]);
-    //         await expect(tx).emit(soteriaCoverageProduct, "PremiumPartiallyCharged").withArgs(policyholder4.address, PREMIUM_AMOUNT.mul(2), fundingAmount);
-           
-    //         // policy should be closed
-    //         await expect(tx).emit(soteriaCoverageProduct, "PolicyClosed").withArgs(POLICY_ID_4);
-
-    //         // active cover amount should be updated
-    //         expect(await soteriaCoverageProduct.connect(user).activeCoverAmount()).to.equal(activeCoverAmount.sub(policyCoverAmount));
-
-    //         // policy's cover amount should be zero
-    //         expect(await soteriaCoverageProduct.connect(user).coverLimitOf(POLICY_ID_4)).to.equal(ZERO_AMOUNT);
-
-    //         // policy manager should be updated
-    //         expect(await policyManager.connect(user).activeCoverAmount()).to.equal(pmCoverAmount.sub(policyCoverAmount));
-    //         expect(await policyManager.connect(user).activeCoverAmountPerStrategy(soteriaCoverageProduct.address)).to.equal(pmSoteriaCoverAmount.sub(policyCoverAmount));
-    //         expect(await policyManager.connect(user).activeCoverAmountPerStrategy(soteriaCoverageProduct.address)).to.equal(activeCoverAmount.sub(policyCoverAmount));
-
-    //         // policyholder funds should be zero
-    //         expect(await soteriaCoverageProduct.connect(user).funds(policyholder4.address)).to.equal(holderFunds.sub(fundingAmount));
-    //         expect(await soteriaCoverageProduct.connect(user).funds(policyholder4.address)).to.equal(ZERO_AMOUNT);
-
-    //         // soteria balance should be decreased
-    //         expect(await provider.getBalance(soteriaCoverageProduct.address)).to.equal(soteriaBalance.sub(fundingAmount));
+        it("can charge premiums", async () => {
+            // CASE 1 - Charge weekly premium for two policyholders, no reward points involved
             
-    //         // premium should be sent to treasury
-    //         expect(await provider.getBalance(vault.address)).to.equal(vaultBalance.add(fundingAmount));
-    //     });
+            // premiums are routed to the vault in treasury!
+            let soteriaBalance = await provider.getBalance(soteriaCoverageProduct.address);
+            let vaultBalance = await provider.getBalance(vault.address);
+            let policyholder1AccountBalance = await soteriaCoverageProduct.connect(policyholder1).accountBalanceOf(policyholder1.address);
+            let policyholder2AccountBalance = await soteriaCoverageProduct.connect(policyholder1).accountBalanceOf(policyholder2.address);
+            let initialCoverLimit1 = await soteriaCoverageProduct.coverLimitOf(POLICY_ID_1);
+            let initialCoverLimit2 = await soteriaCoverageProduct.coverLimitOf(POLICY_ID_2);
+            let initialActiveCoverLimit = await soteriaCoverageProduct.activeCoverLimit();
+            let initialActiveCoverCapacity = await soteriaCoverageProduct.availableCoverCapacity();
 
-    //     it("can charge premiums for only active policies", async () => {
-    //         // premiums are routed to the vault in treasury!
-    //         let soteriaBalance = await provider.getBalance(soteriaCoverageProduct.address);
-    //         let vaultBalance = await provider.getBalance(vault.address);
-    //         let holderFunds = await soteriaCoverageProduct.connect(policyholder2).funds(policyholder2.address);
+            // charge premiums
+            let tx = soteriaCoverageProduct.connect(governor).chargePremiums([policyholder1.address, policyholder2.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM]);
+            await expect(tx).emit(soteriaCoverageProduct, "PremiumCharged").withArgs(policyholder1.address, WEEKLY_MAX_PREMIUM);
+            await expect(tx).emit(soteriaCoverageProduct, "PremiumCharged").withArgs(policyholder2.address, WEEKLY_MAX_PREMIUM);
+         
+            // Soteria account balance should be decreased
+            expect(await soteriaCoverageProduct.accountBalanceOf(policyholder1.address)).to.equal(policyholder1AccountBalance.sub(WEEKLY_MAX_PREMIUM));
+            expect(await soteriaCoverageProduct.accountBalanceOf(policyholder2.address)).to.equal(policyholder2AccountBalance.sub(WEEKLY_MAX_PREMIUM));
 
-    //         // charge premiums
-    //         let tx = soteriaCoverageProduct.connect(governor).chargePremiums([policyholder2.address, policyholder4.address], [PREMIUM_AMOUNT, PREMIUM_AMOUNT]);
-    //         await expect(tx).emit(soteriaCoverageProduct, "PremiumCharged").withArgs(policyholder2.address, PREMIUM_AMOUNT);
+            // soteria balance should be decreased
+            expect(await provider.getBalance(soteriaCoverageProduct.address)).to.equal(soteriaBalance.sub(WEEKLY_MAX_PREMIUM.mul(2)));
+
+            // premium should be sent to treasury
+            expect(await provider.getBalance(vault.address)).to.equal(vaultBalance.add(WEEKLY_MAX_PREMIUM.mul(2)));
+            expect(await soteriaCoverageProduct.availableCoverCapacity()).eq(initialActiveCoverCapacity.add(WEEKLY_MAX_PREMIUM.mul(2)))
+
+            // following mappings should be unchanged
+            expect(await soteriaCoverageProduct.coverLimitOf(POLICY_ID_1)).eq(initialCoverLimit1)
+            expect(await soteriaCoverageProduct.coverLimitOf(POLICY_ID_2)).eq(initialCoverLimit2)
+            expect(await soteriaCoverageProduct.activeCoverLimit()).eq(initialActiveCoverLimit)
+        });
+
+        it("can partially charge premiums if the fund is insufficient", async () => {
+            // CASE 2 - Activate new policy for new policyholder. Deposit 1.1x WEEKLY_MAX_PREMIUM.
+            // We cannot reach PremiumPartiallyCharged branch within a single chargePremium() call, due to require(minAccountBalance) checks in activatePolicy, updateCoverLimit and chargePremium
+            // So aim to activate it on second chargePremium() call
+
+            let depositAmount = WEEKLY_MAX_PREMIUM.mul(11).div(10)
+
+            let tx = await soteriaCoverageProduct.connect(policyholder4).activatePolicy(policyholder4.address, INITIAL_COVER_LIMIT, {value: depositAmount});
+            await expect(tx).emit(soteriaCoverageProduct, "PolicyCreated").withArgs(POLICY_ID_4);
+
+            let initialSoteriaBalance = await provider.getBalance(soteriaCoverageProduct.address);
+            let initialVaultBalance = await provider.getBalance(vault.address);
+            let initialHolderAccountBalance = await soteriaCoverageProduct.connect(policyholder4).accountBalanceOf(policyholder4.address);
+            let initialActiveCoverLimit = await soteriaCoverageProduct.connect(policyholder4).activeCoverLimit();
+            let initialPolicyCoverLimit = await soteriaCoverageProduct.connect(policyholder4).coverLimitOf(POLICY_ID_4);
+            let initialAvailableCoverCapacity = await soteriaCoverageProduct.connect(policyholder4).availableCoverCapacity();
+            let initialPMCoverAmount = await policyManager.connect(policyholder4).activeCoverAmount();
+            let initialPMSoteriaCoverAmount = await policyManager.connect(policyholder4).activeCoverAmountPerStrategy(soteriaCoverageProduct.address);
+
+            // we cannot reach the PremiumPartiallyCharged branch within a single chargePremiums() call
+            await soteriaCoverageProduct.connect(governor).chargePremiums([policyholder4.address], [WEEKLY_MAX_PREMIUM]);
+            expect(await soteriaCoverageProduct.accountBalanceOf(policyholder4.address)).eq(WEEKLY_MAX_PREMIUM.div(10))
+            tx = await soteriaCoverageProduct.connect(governor).chargePremiums([policyholder4.address], [WEEKLY_MAX_PREMIUM]);
+            await expect(tx).emit(soteriaCoverageProduct, "PremiumPartiallyCharged").withArgs(policyholder4.address, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM.div(10));
+           
+            // policy should be deactivated
+            await expect(tx).emit(soteriaCoverageProduct, "PolicyDeactivated").withArgs(POLICY_ID_4);
+            expect(await soteriaCoverageProduct.connect(user).policyStatus(POLICY_ID_4)).to.equal(false);
+
+            // active cover amount should be updated
+            expect(await soteriaCoverageProduct.connect(user).activeCoverLimit()).to.equal(initialActiveCoverLimit.sub(initialPolicyCoverLimit));
+            expect(await soteriaCoverageProduct.connect(policyholder4).availableCoverCapacity()).eq(initialAvailableCoverCapacity.add(depositAmount).add(initialPolicyCoverLimit))
+
+            // policy's cover amount should be zero
+            expect(await soteriaCoverageProduct.connect(user).coverLimitOf(POLICY_ID_4)).to.equal(ZERO_AMOUNT);
+
+            // policy manager should be updated
+            expect(await policyManager.connect(user).activeCoverAmount()).to.equal(initialPMCoverAmount.sub(initialPolicyCoverLimit));
+            expect(await policyManager.connect(user).activeCoverAmountPerStrategy(soteriaCoverageProduct.address)).to.equal(initialPMSoteriaCoverAmount.sub(initialPolicyCoverLimit));
+            expect(await policyManager.connect(user).activeCoverAmountPerStrategy(soteriaCoverageProduct.address)).to.equal(initialActiveCoverLimit.sub(initialPolicyCoverLimit));
+
+            // policyholder funds should be zero
+            expect(await soteriaCoverageProduct.connect(user).accountBalanceOf(policyholder4.address)).to.equal(ZERO_AMOUNT);
+
+            // soteria balance should be decreased
+            expect(await provider.getBalance(soteriaCoverageProduct.address)).to.equal(initialSoteriaBalance.sub(depositAmount));
+            
+            // premium should be sent to treasury
+            expect(await provider.getBalance(vault.address)).to.equal(initialVaultBalance.add(depositAmount));
+        });
+
+        it("will skip charging premium for inactive accounts", async () => {
+            // CASE 3 - Charge weekly premium for one active, and one inactive account (made inactive in CASE 2)
+
+            let initialSoteriaBalance = await provider.getBalance(soteriaCoverageProduct.address);
+            let initialVaultBalance = await provider.getBalance(vault.address);
+            let initialHolderFunds = await soteriaCoverageProduct.connect(policyholder2).accountBalanceOf(policyholder2.address);
+
+            expect(await soteriaCoverageProduct.policyStatus(POLICY_ID_4)).to.equal(false);
+            expect(await soteriaCoverageProduct.policyStatus(POLICY_ID_2)).to.equal(true);
+
+            // charge premiums
+            let tx = soteriaCoverageProduct.connect(governor).chargePremiums([policyholder2.address, policyholder4.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM]);
+            await expect(tx).emit(soteriaCoverageProduct, "PremiumCharged").withArgs(policyholder2.address, WEEKLY_MAX_PREMIUM);
          
-    //         // funds should be decreased
-    //         expect(await soteriaCoverageProduct.connect(policyholder2).funds(policyholder2.address)).to.equal(holderFunds.sub(PREMIUM_AMOUNT));
+            expect(await soteriaCoverageProduct.connect(policyholder2).accountBalanceOf(policyholder2.address)).to.equal(initialHolderFunds.sub(WEEKLY_MAX_PREMIUM));
          
-    //         // soteria balance should be decreased
-    //         expect(await provider.getBalance(soteriaCoverageProduct.address)).to.equal(soteriaBalance.sub(PREMIUM_AMOUNT));
+            // soteria balance should be decreased by single weekly premium
+            expect(await provider.getBalance(soteriaCoverageProduct.address)).to.equal(initialSoteriaBalance.sub(WEEKLY_MAX_PREMIUM));
           
-    //         // premium should be sent to treasury
-    //         expect(await provider.getBalance(vault.address)).to.equal(vaultBalance.add(PREMIUM_AMOUNT));
-    //     });
+            // single weekly premium should be sent to treasury
+            expect(await provider.getBalance(vault.address)).to.equal(initialVaultBalance.add(WEEKLY_MAX_PREMIUM));
+        });
+        it("will correctly charge premiums with reward points", async () => {
+            // CASE 4 - Charge weekly premium for three active policies
+            // Policy 1: reward points can pay for premium in full
+            // Policy 2: reward points can partially pay for premium, rest will come from account balance
+            // Policy 3: reward points + account balance unable to fully pay for premium
+
+            // Set up reward points for policy 1 and 2
+            let EXCESS_REWARD_POINTS = WEEKLY_MAX_PREMIUM.mul(2)
+            let INSUFFICIENT_REWARD_POINTS = WEEKLY_MAX_PREMIUM.div(10)
+
+            let tx = await soteriaCoverageProduct.connect(governor).setRewardPoints(policyholder1.address, EXCESS_REWARD_POINTS)
+            expect(tx).to.emit(soteriaCoverageProduct, "RewardPointsSet").withArgs(policyholder1.address, EXCESS_REWARD_POINTS);
+            let initialRewardPoints1 = await soteriaCoverageProduct.rewardPointsOf(policyholder1.address)
+            expect(initialRewardPoints1).eq(EXCESS_REWARD_POINTS)
+
+            tx = await soteriaCoverageProduct.connect(governor).setRewardPoints(policyholder2.address, INSUFFICIENT_REWARD_POINTS)
+            expect(tx).to.emit(soteriaCoverageProduct, "RewardPointsSet").withArgs(policyholder2.address, INSUFFICIENT_REWARD_POINTS);
+            let initialRewardPoints2 = await soteriaCoverageProduct.rewardPointsOf(policyholder2.address)
+            expect(initialRewardPoints2).eq(INSUFFICIENT_REWARD_POINTS)
+
+            // Set up policy 3 (remember we need minimum 2 chargePremium calls to reach PremiumsPartiallySet branch, so we will do the first call to setup)
+            await soteriaCoverageProduct.connect(policyholder3).deactivatePolicy(POLICY_ID_3);
+            let depositAmount = WEEKLY_MAX_PREMIUM.mul(11).div(10)
+            await soteriaCoverageProduct.connect(policyholder3).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, {value: depositAmount});
+            await soteriaCoverageProduct.connect(governor).chargePremiums([policyholder3.address], [WEEKLY_MAX_PREMIUM]);
+            expect(await soteriaCoverageProduct.accountBalanceOf(policyholder3.address)).eq(WEEKLY_MAX_PREMIUM.div(10))
+
+            tx = await soteriaCoverageProduct.connect(governor).setRewardPoints(policyholder3.address, INSUFFICIENT_REWARD_POINTS)
+            expect(tx).to.emit(soteriaCoverageProduct, "RewardPointsSet").withArgs(policyholder3.address, INSUFFICIENT_REWARD_POINTS);
+            let initialRewardPoints3 = await soteriaCoverageProduct.rewardPointsOf(policyholder3.address)
+            expect(initialRewardPoints3).eq(INSUFFICIENT_REWARD_POINTS)
+
+            // Get initial state variable values
+            let initialSoteriaBalance = await provider.getBalance(soteriaCoverageProduct.address);
+            let initialVaultBalance = await provider.getBalance(vault.address);
+            let initialHolder1AccountBalance = await soteriaCoverageProduct.accountBalanceOf(policyholder1.address);
+            let initialHolder2AccountBalance = await soteriaCoverageProduct.accountBalanceOf(policyholder2.address);
+            let initialHolder3AccountBalance = await soteriaCoverageProduct.accountBalanceOf(policyholder3.address);
+            let initialActiveCoverLimit = await soteriaCoverageProduct.activeCoverLimit();
+            let initialPolicy1CoverLimit = await soteriaCoverageProduct.coverLimitOf(POLICY_ID_1);
+            let initialPolicy2CoverLimit = await soteriaCoverageProduct.coverLimitOf(POLICY_ID_2);
+            let initialPolicy3CoverLimit = await soteriaCoverageProduct.coverLimitOf(POLICY_ID_3);
+            let initialAvailableCoverCapacity = await soteriaCoverageProduct.availableCoverCapacity();
+            let initialPMCoverAmount = await policyManager.activeCoverAmount();
+            let initialPMSoteriaCoverAmount = await policyManager.activeCoverAmountPerStrategy(soteriaCoverageProduct.address);
+
+
+            // Difficult and time-wasting to keep track of policy states up to this point, so let's do a complete reset
+
+        })
 
     // Test for rewardPoints
     // Test for maxing out users
 
-    // });
+    });
 
 });

@@ -221,7 +221,7 @@ interface IPolicyManager is IERC721Enhanced {
      * This function is only called by `SoteriaCoverageProduct` when a new policy is bought or updated.
      * @param newCoverAmount The new cover amount.
     */ 
-    function setSoteriaActiveCoverLimit(uint256 newCoverAmount) external; 
+    function setSoteriaActiveCoverAmount(uint256 newCoverAmount) external; 
 
     /***************************************
     PRODUCT VIEW FUNCTIONS
