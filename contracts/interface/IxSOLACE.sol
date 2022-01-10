@@ -1,43 +1,28 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./IxsLocker.sol";
-import "./IxsListener.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-struct Point {
-    int128 bias;
-    int128 slope;
-    uint256 timestamp;
-}
 
-interface IxSOLACE is IERC20, IxsListener {
+interface IxSOLACE is IERC20Metadata {
+
+    /***************************************
+    GLOBAL VARIABLES
+    ***************************************/
+
+    /// @notice The maximum duration of a lock in seconds.
+    function MAX_LOCK_DURATION() external view returns (uint256);
+    /// @notice The vote power multiplier at max lock in bps.
+    function MAX_LOCK_MULTIPLIER_BPS() external view returns (uint256);
+    /// @notice The vote power multiplier when unlocked in bps.
+    function UNLOCKED_MULTIPLIER_BPS() external view returns (uint256);
+
+    /// @notice The [**xsLocker**](./xsLocker) contract.
+    function xsLocker() external view returns (address);
 
     /***************************************
     VIEW FUNCTIONS
     ***************************************/
-
-    /**
-     * @notice Returns the amount of **SOLACE** the user has staked.
-     * @param account The account to query.
-     * @return balance The user's balance.
-     */
-    function stakedBalance(address account) external view returns (uint256 balance);
-
-    /**
-     * @notice Returns the user's **xSOLACE** balance.
-     * @param account The account to query.
-     * @return balance The user's balance.
-     */
-    function balanceOf(address account) external view override returns (uint256 balance);
-
-    /**
-     * @notice Returns the user's **xSOLACE** balance at some point in the past.
-     * @param account The account to query.
-     * @param timestamp The time to query.
-     * @return balance The user's balance.
-     */
-    function balanceOfAt(address account, uint256 timestamp) external view returns (uint256 balance);
 
     /**
      * @notice Returns the **xSOLACE** balance of a lock.
@@ -46,33 +31,25 @@ interface IxSOLACE is IERC20, IxsListener {
      */
     function balanceOfLock(uint256 xsLockID) external view returns (uint256 balance);
 
-    /**
-     * @notice Returns the **xSOLACE** balance of a lock at some point in the past.
-     * @param xsLockID The lock to query.
-     * @param timestamp The time to query.
-     * @return balance The lock's balance.
-     */
-    function balanceOfLockAt(uint256 xsLockID, uint256 timestamp) external view returns (uint256 balance);
-
-    /**
-     * @notice Returns the total supply of **xSOLACE**.
-     * @return supply The total supply.
-     */
-    function totalSupply() external view override returns (uint256 supply);
-
-    /**
-     * @notice Returns the total supply of **xSOLACE** at some point in the past.
-     * @param timestamp The time to query.
-     * @return supply The total supply.
-     */
-    function totalSupplyAt(uint256 timestamp) external view returns (uint256 supply);
-
     /***************************************
     MUTATOR FUNCTIONS
     ***************************************/
 
     /**
-     *
+     * @notice In a normal ERC20 contract this would increase the allowance of `spender` over the caller's tokens by `addedValue`.
+     * This version reverts because **xSOLACE** is non-transferrable.
+     * @param spender The user to increase allowance.
+     * @param addedValue The amount to increase allowance.
+     * @return success False.
      */
-    function checkpoint(uint256 maxRecord) external;
+    function increaseAllowance(address spender, uint256 addedValue) external returns (bool success);
+
+    /**
+     * @notice In a normal ERC20 contract this would decrease the allowance of `spender` over the caller's tokens by `subtractedValue`.
+     * This version reverts because **xSOLACE** is non-transferrable.
+     * @param spender The user to decrease allowance.
+     * @param subtractedValue The amount to decrease allowance.
+     * @return success False.
+     */
+    function decreaseAllowance(address spender, uint256 subtractedValue) external returns (bool success);
 }

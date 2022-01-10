@@ -1,44 +1,40 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Enumerable.sol";
-import "@openzeppelin/contracts/utils/Address.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/math/Math.sol";
-import "@openzeppelin/contracts/utils/math/SafeCast.sol";
-//import "@openzeppelin/contracts/proxy/Initializable.sol";
-import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import "./Governable.sol";
 import "./interface/IxsLocker.sol";
-import "./interface/IxsListener.sol";
 import "./interface/IxSOLACE.sol";
 
 
 /**
  * @title xSolace Token (xSOLACE)
  * @author solace.fi
- * @notice V2 of the **SOLACE** staking contract.
+ * @notice V2 of the [**SOLACE**](./SOLACE) staking contract.
  */
-contract xSOLACE is IxSOLACE, ERC20, ReentrancyGuard, Governable {
-    using EnumerableSet for EnumerableSet.AddressSet;
+contract xSOLACE is IxSOLACE {
 
     /***************************************
     GLOBAL VARIABLES
     ***************************************/
 
-    uint256 public constant MAXTIME = 4 * (365 days);
-    uint256 public constant MULTIPLIER = 1e18;
+    /// @notice The maximum duration of a lock in seconds.
+    uint256 public constant override MAX_LOCK_DURATION = 4 * 365 days; // 4 years
+    /// @notice The vote power multiplier at max lock in bps.
+    uint256 public constant override MAX_LOCK_MULTIPLIER_BPS = 40000;  // 4X
+    /// @notice The vote power multiplier when unlocked in bps.
+    uint256 public constant override UNLOCK_MULTIPLIER_BPS = 10000; // 1X
+    // 1 bps = 1/10000
+    uint256 internal constant MAX_BPS = 10000;
 
-    address public xsLocker;
-    mapping(uint256 => int128) public slopeChanges;
-    Point[] public pointHistory;
-    mapping(uint256 => Point[]) public lockPointHistory;
+    /// @notice The [**xsLocker**](./xsLocker) contract.
+    address public override xsLocker;
 
-    constructor(address governance_, address xsLocker_) ERC20("xsolace", "xSOLACE") Governable(governance_) {
-        require(xsLocker_ != address(0x0), "zero address locker");
+    /**
+     * @notice Constructs the **xSOLACE** contract.
+     * @param xsLocker_ The [**xsLocker**](./xsLocker) contract.
+     */
+    constructor(address xsLocker_) {
+        require(xsLocker_ != address(0x0), "zero address xslocker");
         xsLocker = xsLocker_;
     }
 
@@ -51,34 +47,13 @@ contract xSOLACE is IxSOLACE, ERC20, ReentrancyGuard, Governable {
      * @param account The account to query.
      * @return balance The user's balance.
      */
-    function balanceOf(address account) public view override(ERC20, IxSOLACE) returns (uint256 balance) {
-        IxsLocker locker = IxsLocker(xsLocker);
-        //uint256 numOfLocks = IERC721Enumerable(xsLocker).balanceOf(account);
-        uint256 numOfLocks = locker.delegatedRights(account);
+    function balanceOf(address account) external view override returns (uint256 balance) {
+        IERC721Enumerable locker = IERC721Enumerable(xsLocker);
+        uint256 numOfLocks = locker.balanceOf(account);
         balance = 0;
         for (uint256 i = 0; i < numOfLocks; i++) {
-            //uint256 xsLockID = IERC721Enumerable(xsLocker).tokenOfOwnerByIndex(account, i);
-            uint256 xsLockID = locker.delegatedRightByIndex(account, i);
+            uint256 xsLockID = locker.tokenOfOwnerByIndex(account, i);
             balance += balanceOfLock(xsLockID);
-        }
-        return balance;
-    }
-
-    /**
-     * @notice Returns the user's **xSOLACE** balance at some point in the past.
-     * @param account The account to query.
-     * @param timestamp The time to query.
-     * @return balance The user's balance.
-     */
-    function balanceOfAt(address account, uint256 timestamp) public view override returns (uint256 balance) {
-        IxsLocker locker = IxsLocker(xsLocker);
-        //uint256 numOfLocks = IERC721Enumerable(xsLocker).balanceOf(account);
-        uint256 numOfLocks = locker.delegatedRights(account);
-        balance = 0;
-        for (uint256 i = 0; i < numOfLocks; i++) {
-            //uint256 xsLockID = IERC721Enumerable(xsLocker).tokenOfOwnerByIndex(account, i);
-            uint256 xsLockID = locker.delegatedRightByIndex(account, i);
-            balance += balanceOfLockAt(xsLockID, timestamp);
         }
         return balance;
     }
@@ -89,47 +64,56 @@ contract xSOLACE is IxSOLACE, ERC20, ReentrancyGuard, Governable {
      * @return balance The locks's balance.
      */
     function balanceOfLock(uint256 xsLockID) public view override returns (uint256 balance) {
-        return balanceOfLockAt(xsLockID, block.timestamp);
-    }
-
-    /**
-     * @notice Returns the **xSOLACE** balance of a lock at some point in the past.
-     * @param xsLockID The lock to query.
-     * @param timestamp The time to query.
-     * @return balance The lock's balance.
-     */
-    function balanceOfLockAt(uint256 xsLockID, uint256 timestamp) public view override returns (uint256 balance) {
-        (bool success, Point memory point) =
-            _searchClosestPoint(lockPointHistory[xsLockID], timestamp);
-        if (success) {
-            int128 bal = point.bias - point.slope * (toInt128(timestamp) - toInt128(point.timestamp));
-            return bal > 0 ? toUint256(bal) : 0;
-        } else {
-            return 0;
-        }
+        IxsLocker locker = IxsLocker(xsLocker);
+        Lock memory lock = locker.locks(xsLockID);
+        uint256 base = lock.amount * UNLOCK_MULTIPLIER_BPS / MAX_BPS;
+        uint256 bonus = (lock.end <= block.timestamp)
+            ? 0 // unlocked
+            : lock.amount * (block.timestamp - lock.end) * (MAX_LOCK_MULTIPLIER_BPS - UNLOCK_MULTIPLIER_BPS) / (MAX_LOCK_DURATION * MAX_BPS); // locked
+        return base + bonus;
     }
 
     /**
      * @notice Returns the total supply of **xSOLACE**.
      * @return supply The total supply.
      */
-    function totalSupply() public view override(ERC20, IxSOLACE) returns (uint256 supply) {
-        return totalSupplyAt(block.timestamp);
+    function totalSupply() external view override returns (uint256 supply) {
+        IERC721Enumerable locker = IERC721Enumerable(xsLocker);
+        uint256 numOfLocks = locker.totalSupply();
+        supply = 0;
+        for (uint256 i = 0; i < numOfLocks; i++) {
+            uint256 xsLockID = locker.tokenByIndex(i);
+            supply += balanceOfLock(xsLockID);
+        }
+        return supply;
     }
 
     /**
-     * @notice Returns the total supply of **xSOLACE** at some point in the past.
-     * @param timestamp The time to query.
-     * @return supply The total supply.
+     * @notice Returns the name of the token.
      */
-    function totalSupplyAt(uint256 timestamp) public view override returns (uint256 supply) {
-        (bool success, Point memory point) =
-            _searchClosestPoint(pointHistory, timestamp);
-        if (success) {
-            return _computeSupplyFrom(point, timestamp);
-        } else {
-            return 0;
-        }
+    function name() external view override returns (string memory) {
+        return "xsolace";
+    }
+
+    /**
+     * @notice Returns the symbol of the token.
+     */
+    function symbol() external view override returns (string memory) {
+        return "xSOLACE";
+    }
+
+    /**
+     * @notice Returns the number of decimals used to get its user representation.
+     */
+    function decimals() external view override returns (uint8) {
+        return 18;
+    }
+
+    /**
+     * @notice Returns the remaining number of tokens that `spender` will be allowed to spend on behalf of `owner` through `transferFrom`.
+     */
+    function allowance(address owner, address spender) external view override returns (uint256) {
+        return 0;
     }
 
     /***************************************
@@ -137,230 +121,62 @@ contract xSOLACE is IxSOLACE, ERC20, ReentrancyGuard, Governable {
     ***************************************/
 
     /**
-     *
+     * @notice In a normal ERC20 contract this would move `amount` tokens from the caller's account to `recipient`.
+     * This version reverts because **xSOLACE** is non-transferrable.
+     * @param recipient The user to send tokens to.
+     * @param amount The amount of tokens to send.
+     * @return success False.
      */
-    function checkpoint(uint256 maxRecord) external override {
-        _recordPointHistory(maxRecord);
+    function transfer(address recipient, uint256 amount) external override returns (bool success) {
+        revert("xSOLACE transfer not allowed");
+        return false;
     }
 
     /**
-     * @notice Called when an action is performed on a lock.
-     * @dev Called on transfer, mint, burn, and update.
-     * Either the owner will change or the lock will change, not both.
-     * @param xsLockID The ID of the lock that was altered.
-     * @param oldOwner The old owner of the lock.
-     * @param newOwner The new owner of the lock.
-     * @param oldLock The old lock data.
-     * @param newLock The new lock data.
+     * @notice In a normal ERC20 contract this would move `amount` tokens from `sender` to `recipient` using allowance.
+     * This version reverts because **xSOLACE** is non-transferrable.
+     * @param recipient The user to send tokens to.
+     * @param amount The amount of tokens to send.
+     * @return success False.
      */
-    function registerLockEvent(uint256 xsLockID, address oldOwner, address newOwner, Lock calldata oldLock, Lock calldata newLock) external override {
-        require(msg.sender == xsLocker, "Only xs lock contract can call this.");
-        // Record history
-        _recordPointHistory(0);
-
-        // Compute points
-        (Point memory oldLockPoint, Point memory newLockPoint) =
-            _computePointsFromLocks(oldLock, newLock);
-
-        _updateLastPoint(oldLockPoint, newLockPoint);
-
-        _recordLockPointHistory(
-            xsLockID,
-            oldLock,
-            newLock,
-            oldLockPoint,
-            newLockPoint
-        );
-    }
-
-    /***************************************
-    HELPER FUNCTIONS
-    ***************************************/
-
-    // checkpoint() should be called if it emits out of gas error.
-    function _computeSupplyFrom(Point memory point, uint256 timestamp) internal view returns (uint256 supply) {
-        require(point.timestamp <= timestamp, "scan only to the rightward");
-        Point memory point_ = point;
-        uint256 x = (point.timestamp / 1 weeks) * 1 weeks;
-
-        // find the closest point
-        do {
-            x = Math.min(x + 1 weeks, timestamp);
-            uint256 delta = x - point.timestamp; // always greater than 0
-            point_.timestamp = x;
-            point_.bias -= (point_.slope) * toInt128(delta);
-            point_.slope += slopeChanges[x];
-            if(point_.bias < 0) point_.bias = 0;
-            if(point_.slope < 0) point_.slope = 0;
-        } while (timestamp != x);
-        int128 y = point_.bias - point_.slope * toInt128(timestamp - x);
-        return y > 0 ? toUint256(y) : 0;
-    }
-
-    function _computePointsFromLocks(Lock memory oldLock, Lock memory newLock) internal view returns (Point memory oldPoint, Point memory newPoint) {
-        if (oldLock.end > block.timestamp && oldLock.amount > 0) {
-            oldPoint.slope = toInt128(oldLock.amount / MAXTIME);
-            oldPoint.bias = oldPoint.slope * toInt128(oldLock.end - block.timestamp);
-        }
-        if (newLock.end > block.timestamp && newLock.amount > 0) {
-            newPoint.slope = toInt128(newLock.amount / MAXTIME);
-            newPoint.bias = newPoint.slope * toInt128((newLock.end - block.timestamp));
-        }
-    }
-
-    function _recordPointHistory(uint256 maxRecord) internal {
-        // last_point: Point = Point({bias: 0, slope: 0, ts: block.timestamp})
-        Point memory point_;
-        // Get the latest right most point
-        if (pointHistory.length > 0) {
-            point_ = pointHistory[pointHistory.length - 1];
-        } else {
-            point_ = Point({bias: 0, slope: 0, timestamp: block.timestamp});
-        }
-
-        // fill history
-        uint256 timestamp = block.timestamp;
-        uint256 x = (point_.timestamp / 1 weeks) * 1 weeks;
-        // record intermediate histories
-        uint256 i = 0;
-        do {
-            x = Math.min(x + 1 weeks, timestamp);
-            uint256 delta = Math.min(timestamp - x, 1 weeks);
-            point_.timestamp = x;
-            point_.bias -= (point_.slope) * toInt128(delta);
-            point_.slope += slopeChanges[x];
-            if(point_.bias < 0) point_.bias = 0;
-            if(point_.slope < 0) point_.slope = 0;
-            pointHistory.push(point_);
-            i++;
-        } while (timestamp != x && i != maxRecord);
-    }
-
-    function _recordLockPointHistory(
-        uint256 xsLockID,
-        Lock memory oldLock,
-        Lock memory newLock,
-        Point memory oldPoint,
-        Point memory newPoint
-    ) internal {
-        require(
-            (oldLock.end / 1 weeks) * 1 weeks == oldLock.end,
-            "should be exact epoch timestamp"
-        );
-        require(
-            (newLock.end / 1 weeks) * 1 weeks == newLock.end,
-            "should be exact epoch timestamp"
-        );
-        int128 oldSlope = slopeChanges[oldLock.end];
-        int128 newSlope;
-        if (newLock.end != 0) {
-            if (newLock.end == oldLock.end) {
-                newSlope = oldSlope;
-            } else {
-                newSlope = slopeChanges[newLock.end];
-            }
-        }
-        if (oldLock.end > block.timestamp) {
-            oldSlope += oldPoint.slope;
-            if (newLock.end == oldLock.end) {
-                oldSlope -= newPoint.slope;
-            }
-            slopeChanges[oldLock.end] = oldSlope;
-        }
-        if (newLock.end > block.timestamp) {
-            if (newLock.end > oldLock.end) {
-                newSlope -= newPoint.slope;
-                slopeChanges[newLock.end] = newSlope;
-            }
-        }
-        newPoint.timestamp = block.timestamp;
-        lockPointHistory[xsLockID].push(newPoint);
-    }
-
-    function _updateLastPoint(
-        Point memory oldLockPoint,
-        Point memory newLockPoint
-    ) internal {
-        if (pointHistory.length == 0) {
-            pointHistory.push(
-                Point({bias: 0, slope: 0, timestamp: block.timestamp})
-            );
-        }
-        Point memory newLastPoint =
-            _computeTheLatestSupplyGraphPoint(
-                oldLockPoint,
-                newLockPoint,
-                pointHistory[pointHistory.length - 1]
-            );
-        pointHistory[pointHistory.length - 1] = newLastPoint;
-    }
-
-    function _computeTheLatestSupplyGraphPoint(
-        Point memory oldLockPoint,
-        Point memory newLockPoint,
-        Point memory lastPoint
-    ) internal pure returns (Point memory newLastPoint) {
-        newLastPoint = lastPoint;
-        newLastPoint.slope += (newLockPoint.slope - oldLockPoint.slope);
-        newLastPoint.bias += (newLockPoint.bias - oldLockPoint.bias);
-        if (newLastPoint.slope < 0) {
-            newLastPoint.slope = 0;
-        }
-        if (newLastPoint.bias < 0) {
-            newLastPoint.bias = 0;
-        }
-    }
-
-    function _searchClosestPoint(Point[] storage history, uint256 timestamp) internal view returns (bool success, Point memory point) {
-        require(timestamp <= block.timestamp, "Only past blocks");
-        if (history.length == 0) {
-            return (false, point);
-        } else if (timestamp < history[0].timestamp) {
-            // block num is before the first lock
-            return (false, point);
-        } else if (timestamp == block.timestamp) {
-            return (true, history[history.length - 1]);
-        }
-        // binary search
-        uint256 min = 0;
-        uint256 max = history.length - 1;
-        uint256 mid;
-        for (uint256 i = 0; i < 128; i++) {
-            if (min >= max) {
-                break;
-            }
-            mid = (min + max + 1) / 2;
-            if (history[mid].timestamp <= timestamp) {
-                min = mid;
-            } else {
-                max = mid - 1;
-            }
-        }
-        return (true, history[min]);
+    function transferFrom(address sender, address recipient, uint256 amount) external override returns (bool success) {
+        revert("xSOLACE transfer not allowed");
+        return false;
     }
 
     /**
-     * @notice Stops ERC20 transfer.
+     * @notice In a normal ERC20 contract this would set `amount` as the allowance of `spender` over the caller's tokens.
+     * This version reverts because **xSOLACE** is non-transferrable.
+     * @param spender The user to assign allowance.
+     * @param amount The amount of tokens to send.
+     * @return success False.
      */
-    function _beforeTokenTransfer(address, address, uint256) internal pure override {
-        revert("Non-transferrable. You can only transfer locks.");
+    function approve(address spender, uint256 amount) external override returns (bool success) {
+        revert("xSOLACE transfer not allowed");
+        return false;
     }
 
     /**
-     * @notice Safely casts a uint256 to an int128.
-     * @param numIn The number to cast.
-     * @return numOut The casted number.
+     * @notice In a normal ERC20 contract this would increase the allowance of `spender` over the caller's tokens by `addedValue`.
+     * This version reverts because **xSOLACE** is non-transferrable.
+     * @param spender The user to increase allowance.
+     * @param addedValue The amount to increase allowance.
+     * @return success False.
      */
-    function toInt128(uint256 numIn) internal pure returns (int128 numOut) {
-        return SafeCast.toInt128(SafeCast.toInt256(numIn));
+    function increaseAllowance(address spender, uint256 addedValue) external override returns (bool success) {
+        revert("xSOLACE transfer not allowed");
+        return false;
     }
 
     /**
-     * @notice Safely casts an int128 to a uint256.
-     * @param numIn The number to cast.
-     * @return numOut The casted number.
+     * @notice In a normal ERC20 contract this would decrease the allowance of `spender` over the caller's tokens by `subtractedValue`.
+     * This version reverts because **xSOLACE** is non-transferrable.
+     * @param spender The user to decrease allowance.
+     * @param subtractedValue The amount to decrease allowance.
+     * @return success False.
      */
-    function toUint256(int128 numIn) internal pure returns (uint256 numOut) {
-        return SafeCast.toUint256(int256(numIn));
+    function decreaseAllowance(address spender, uint256 subtractedValue) external override returns (bool success) {
+        revert("xSOLACE transfer not allowed");
+        return false;
     }
 }
