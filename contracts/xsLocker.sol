@@ -3,56 +3,59 @@ pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
-
-import "./ERC721Enhanced.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
-//import "@openzeppelin/contracts/proxy/Initializable.sol";
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
-
-//import "../../../core/governance/Governed.sol";
-//import "../../../core/governance/libraries/VotingEscrowToken.sol";
-//import "../../../core/governance/interfaces/IVotingEscrowLock.sol";
+import "./ERC721Enhanced2.sol";
 import "./Governable.sol";
-import "./interface/IxSOLACE.sol";
+import "./interface/IxsListener.sol";
 import "./interface/IxsLocker.sol";
 
-contract xsLocker is IxsLocker, ERC721Enhanced, EIP712, ReentrancyGuard, /*Initializable,*/ Governable {
-    using EnumerableSet for EnumerableSet.UintSet;
-    using EnumerableMap for EnumerableMap.UintToAddressMap;
+
+/**
+ * @title xsLocker
+ * @author solace.fi
+ * @notice Stake your [**SOLACE**](./SOLACE) to receive voting rights, [**SOLACE**](./SOLACE) rewards, and more.
+ *
+ * Locks are ERC721s. Each lock has an `amount` of [**SOLACE**](./SOLACE) and an `end` timestamp and cannot be transferred or withdrawn from before it unlocks.
+ *
+ * Users can create locks via [`createLock()`](#createlock) or [`createLockSigned()`](#createlocksigned), deposit more [**SOLACE**](./SOLACE) into a lock via [`increaseAmount()`](#increaseamount) or [`increaseAmountSigned()`](#increaseamountsigned), extend a lock via [`extendLock()`](#extendlock), and withdraw via [`withdraw()`](#withdraw), [`withdrawInPart()`](#withdrawinpart), or [`withdrawMany()`](#withdrawmany).
+ *
+ * Users and contracts (eg BondTellers) may deposit on behalf of another user or contract.
+ *
+ * Any time a lock is updated it will notify the listener contracts (eg StakingRewards).
+ */
+contract xsLocker is IxsLocker, ERC721Enhanced2, ReentrancyGuard, Governable {
+    using EnumerableSet for EnumerableSet.AddressSet;
 
     /***************************************
     GLOBAL VARIABLES
     ***************************************/
 
-    uint256 public constant MAXTIME = 4 * (365 days);
-
+    /// @notice [**SOLACE**](./SOLACE) token.
     address public override solace;
-    address public override xsolace;
-    uint256 public override totalLockedSupply;
 
+    /// @notice The maximum time into the future that a lock can expire.
+    uint256 public constant override MAX_LOCK_DURATION = 4 * (365 days);
+
+    /// @notice The total number of locks that have been created.
+    uint256 public override totalNumLocks;
+
+    // Info on locks
     mapping(uint256 => Lock) private _locks;
 
-    mapping(address => EnumerableSet.UintSet) private _delegated;
-    EnumerableMap.UintToAddressMap private _rightOwners;
+    // Contracts that listen for lock changes
+    EnumerableSet.AddressSet private _xsLockListeners;
 
-    EnumerableSet.AddressSet private _listeners;
-
-    bytes32 public constant LOCK_TYPEHASH = keccak256("xSOLACE(address account,uint256 end,uint256 deadline)");
-
-    modifier onlyOwner(uint256 xsLockID) {
-        require(
-            ownerOf(xsLockID) == msg.sender,
-            "Only the owner can call this function"
-        );
-        _;
-    }
-
+    /**
+     * @notice Construct the xsLocker contract.
+     * @param governance_ The address of the [governor](/docs/protocol/governance).
+     * @param solace_ Address of [**SOLACE**](./SOLACE).
+     */
     constructor(address governance_, address solace_)
-        ERC721Enhanced("xsolace lock", "xsLOCK")
-        EIP712("Solace.fi-xsLocker", "1")
+        ERC721Enhanced2("xsolace lock", "xsLOCK")
         Governable(governance_)
     {
         require(solace_ != address(0x0), "zero address solace");
@@ -63,16 +66,21 @@ contract xsLocker is IxsLocker, ERC721Enhanced, EIP712, ReentrancyGuard, /*Initi
     VIEW FUNCTIONS
     ***************************************/
 
-    function locks(uint256 xsLockID) external view override returns (Lock memory) {
+    /**
+     * @notice Information about a lock.
+     * @param xsLockID The ID of the lock to query.
+     * @return lock_ Information about the lock.
+     */
+    function locks(uint256 xsLockID) external view override tokenMustExist(xsLockID) returns (Lock memory lock_) {
         return _locks[xsLockID];
     }
 
     /**
-     * @notice Returns the amount of **SOLACE** the user has staked.
+     * @notice Returns the amount of [**SOLACE**](./SOLACE) the user has staked.
      * @param account The account to query.
      * @return balance The user's balance.
      */
-    function stakedBalance(address account) public view override returns (uint256 balance) {
+    function stakedBalance(address account) external view override returns (uint256 balance) {
         uint256 numOfLocks = balanceOf(account);
         balance = 0;
         for (uint256 i = 0; i < numOfLocks; i++) {
@@ -82,33 +90,15 @@ contract xsLocker is IxsLocker, ERC721Enhanced, EIP712, ReentrancyGuard, /*Initi
         return balance;
     }
 
-    function delegateeOf(uint256 xsLockID) external view returns (address) {
-        if (!_exists(xsLockID)) return address(0);
-        (bool delegated_, address delegatee) = _rightOwners.tryGet(xsLockID);
-        return delegated_ ? delegatee : ownerOf(xsLockID);
-    }
-
-    function delegatedRights(address voter) external view returns (uint256 length) {
-        require(
-            voter != address(0),
-            "VotingEscrowLock: delegate query for the zero address"
-        );
-        return _delegated[voter].length();
-    }
-
-    function delegatedRightByIndex(address voter, uint256 idx) external view returns (uint256 xsLockID) {
-        require(
-            voter != address(0),
-            "VotingEscrowLock: delegate query for the zero address"
-        );
-        return _delegated[voter].at(idx);
-    }
-
-    function listeners() external view returns (address[] memory listeners_) {
-        uint256 len = _listeners.length();
+    /**
+     * @notice The list of contracts that are listening to lock updates.
+     * @return listeners_ The list as an array.
+     */
+    function getXsLockListeners() external view override returns (address[] memory listeners_) {
+        uint256 len = _xsLockListeners.length();
         listeners_ = new address[](len);
         for(uint256 index = 0; index < len; index++) {
-            listeners_[index] = _listeners.at(index);
+            listeners_[index] = _xsLockListeners.at(index);
         }
         return listeners_;
     }
@@ -117,28 +107,51 @@ contract xsLocker is IxsLocker, ERC721Enhanced, EIP712, ReentrancyGuard, /*Initi
     MUTATOR FUNCTIONS
     ***************************************/
 
-    // deposit using approve-transfer. creates a new lock. optionally credited to another user
-    // use end=0 to deposit without lock
-    function createLock(address recipient, uint256 amount, uint256 end) external nonReentrant returns (uint256 xsLockID) {
+    /**
+     * @notice Deposit [**SOLACE**](./SOLACE) to create a new lock.
+     * @dev [**SOLACE**](./SOLACE) is transferred from msg.sender, assumes its already approved.
+     * @dev use end=0 to initialize as unlocked.
+     * @param recipient The account that will receive the lock.
+     * @param amount The amount of [**SOLACE**](./SOLACE) to deposit.
+     * @param end The timestamp the lock will unlock.
+     * @return xsLockID The ID of the newly created lock.
+     */
+    function createLock(address recipient, uint256 amount, uint256 end) external override nonReentrant returns (uint256 xsLockID) {
         // pull solace
         SafeERC20.safeTransferFrom(IERC20(solace), msg.sender, address(this), amount);
         // accounting
         return _createLock(recipient, amount, end);
     }
 
-    // deposit using permit. creates a new lock
-    // use end=0 to deposit without lock
-    function createLock(address depositor, uint256 amount, uint256 end, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external nonReentrant returns (uint256 xsLockID) {
+    /**
+     * @notice Deposit [**SOLACE**](./SOLACE) to create a new lock.
+     * @dev [**SOLACE**](./SOLACE) is transferred from msg.sender using ERC20Permit.
+     * @dev use end=0 to initialize as unlocked.
+     * @dev recipient = msg.sender
+     * @param amount The amount of [**SOLACE**](./SOLACE) to deposit.
+     * @param end The timestamp the lock will unlock.
+     * @param deadline Time the transaction must go through before.
+     * @param v secp256k1 signature
+     * @param r secp256k1 signature
+     * @param s secp256k1 signature
+     * @return xsLockID The ID of the newly created lock.
+     */
+    function createLockSigned(uint256 amount, uint256 end, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external override nonReentrant returns (uint256 xsLockID) {
         // permit
-        IERC20Permit(solace).permit(depositor, address(this), amount, deadline, v, r, s);
+        IERC20Permit(solace).permit(msg.sender, address(this), amount, deadline, v, r, s);
         // pull solace
-        SafeERC20.safeTransferFrom(IERC20(solace), depositor, address(this), amount);
+        SafeERC20.safeTransferFrom(IERC20(solace), msg.sender, address(this), amount);
         // accounting
-        return _createLock(depositor, amount, end);
+        return _createLock(msg.sender, amount, end);
     }
 
-    // deposit using approve-transfer. increments an existing lock. optionally credited to another user
-    function increaseAmount(uint256 xsLockID, uint256 amount, uint256 end) external nonReentrant {
+    /**
+     * @notice Deposit [**SOLACE**](./SOLACE) to increase the value of an existing lock.
+     * @dev [**SOLACE**](./SOLACE) is transferred from msg.sender, assumes its already approved.
+     * @param xsLockID The ID of the lock to update.
+     * @param amount The amount of [**SOLACE**](./SOLACE) to deposit.
+     */
+    function increaseAmount(uint256 xsLockID, uint256 amount) external override nonReentrant tokenMustExist(xsLockID) {
         // pull solace
         SafeERC20.safeTransferFrom(IERC20(solace), msg.sender, address(this), amount);
         // accounting
@@ -146,111 +159,185 @@ contract xsLocker is IxsLocker, ERC721Enhanced, EIP712, ReentrancyGuard, /*Initi
         _updateLock(xsLockID, newAmount, _locks[xsLockID].end);
     }
 
-    // deposit using permit. increments an existing lock. optionally credited to another user
-    function increaseAmount(address depositor, uint256 xsLockID, uint256 amount, uint256 end, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external nonReentrant {
+    /**
+     * @notice Deposit [**SOLACE**](./SOLACE) to increase the value of an existing lock.
+     * @dev [**SOLACE**](./SOLACE) is transferred from msg.sender using ERC20Permit.
+     * @param xsLockID The ID of the lock to update.
+     * @param amount The amount of [**SOLACE**](./SOLACE) to deposit.
+     * @param deadline Time the transaction must go through before.
+     * @param v secp256k1 signature
+     * @param r secp256k1 signature
+     * @param s secp256k1 signature
+     */
+    function increaseAmountSigned(uint256 xsLockID, uint256 amount, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external override nonReentrant tokenMustExist(xsLockID) {
         // permit
-        IERC20Permit(solace).permit(depositor, address(this), amount, deadline, v, r, s);
+        IERC20Permit(solace).permit(msg.sender, address(this), amount, deadline, v, r, s);
         // pull solace
-        SafeERC20.safeTransferFrom(IERC20(solace), depositor, address(this), amount);
+        SafeERC20.safeTransferFrom(IERC20(solace), msg.sender, address(this), amount);
         // accounting
         uint256 newAmount = _locks[xsLockID].amount + amount;
         _updateLock(xsLockID, newAmount, _locks[xsLockID].end);
     }
 
-    function extendLock(uint256 xsLockID, uint256 end) external onlyOwner(xsLockID) {
+    /**
+     * @notice Extend a lock's duration.
+     * @dev Can only be called by the lock owner or approved.
+     * @param xsLockID The ID of the lock to update.
+     * @param end The new time for the lock to unlock.
+     */
+    function extendLock(uint256 xsLockID, uint256 end) external override nonReentrant onlyOwnerOrApproved(xsLockID) {
+        require(end <= block.timestamp + MAX_LOCK_DURATION, "Max lock is 4 years");
+        require(_locks[xsLockID].end <= end, "new end timestamp should be greater than before");
         _updateLock(xsLockID, _locks[xsLockID].amount, end);
     }
 
-    // withdraw in full. optionally credited to another user
-    function withdraw(uint256 xsLockID, address recipient) external onlyOwner(xsLockID) {
-        require(block.timestamp >= _locks[xsLockID].end, "locked");
-        _withdraw(xsLockID, _locks[xsLockID].amount);
+    /**
+     * @notice Withdraw from a lock in full.
+     * @dev Can only be called by the lock owner or approved.
+     * @dev Can only be called if unlocked.
+     * @param xsLockID The ID of the lock to withdraw from.
+     * @param recipient The user to receive the lock's [**SOLACE**](./SOLACE).
+     */
+    function withdraw(uint256 xsLockID, address recipient) external override nonReentrant onlyOwnerOrApproved(xsLockID) {
+        uint256 amount = _locks[xsLockID].amount;
+        _withdraw(xsLockID, amount);
+        // transfer solace
+        SafeERC20.safeTransfer(IERC20(solace), recipient, amount);
     }
 
-    // withdraw in part. optionally credited to another user
-    function withdraw(uint256 xsLockID, address recipient, uint256 amount) external onlyOwner(xsLockID) {
-        require(block.timestamp >= _locks[xsLockID].end, "locked");
-        require(amount <= lock.amount, "excess withdraw");
-        _withdraw(xsLockID, _amount);
+    /**
+     * @notice Withdraw from a lock in part.
+     * @dev Can only be called by the lock owner or approved.
+     * @dev Can only be called if unlocked.
+     * @param xsLockID The ID of the lock to withdraw from.
+     * @param recipient The user to receive the lock's [**SOLACE**](./SOLACE).
+     * @param amount The amount of [**SOLACE**](./SOLACE) to withdraw.
+     */
+    function withdrawInPart(uint256 xsLockID, address recipient, uint256 amount) external override nonReentrant onlyOwnerOrApproved(xsLockID) {
+        require(amount <= _locks[xsLockID].amount, "excess withdraw");
+        _withdraw(xsLockID, amount);
+        // transfer solace
+        SafeERC20.safeTransfer(IERC20(solace), recipient, amount);
     }
 
-    function delegate(uint256 xsLockID, address to) external onlyOwner(xsLockID) {
-        _delegate(xsLockID, to);
+    /**
+     * @notice Withdraw from multiple locks in full.
+     * @dev Can only be called by the lock owner or approved.
+     * @dev Can only be called if unlocked.
+     * @param xsLockIDs The ID of the locks to withdraw from.
+     * @param recipient The user to receive the lock's [**SOLACE**](./SOLACE).
+     */
+    function withdrawMany(uint256[] calldata xsLockIDs, address recipient) external override nonReentrant {
+        uint256 len = xsLockIDs.length;
+        uint256 amount = 0;
+        for(uint256 i = 0; i < len; i++) {
+            uint256 xsLockID = xsLockIDs[i];
+            require(_isApprovedOrOwner(msg.sender, xsLockID), "only owner or approved");
+            uint256 amount_ = _locks[xsLockID].amount;
+            amount += amount_;
+            _withdraw(xsLockID, amount_);
+        }
+        // transfer solace
+        SafeERC20.safeTransfer(IERC20(solace), recipient, amount);
     }
 
     /***************************************
     HELPER FUNCTIONS
     ***************************************/
 
+    /**
+     * @notice Creates a new lock.
+     * @param recipient The user that the lock will be minted to.
+     * @param amount The amount of [**SOLACE**](./SOLACE) in the lock.
+     * @param end The end of the lock.
+     * @param xsLockID The ID of the new lock.
+     */
     function _createLock(address recipient, uint256 amount, uint256 end) internal returns (uint256 xsLockID) {
         xsLockID = ++totalNumLocks;
-        Lock memory newLock = Lock(amount, (end / 1 weeks) * 1 weeks);
-        require(newLock.end <= block.timestamp + MAXTIME, "Max lock is 4 years");
+        Lock memory newLock = Lock(amount, end);
+        require(newLock.end <= block.timestamp + MAX_LOCK_DURATION, "Max lock is 4 years");
         // accounting
-        totalLockedSupply = totalLockedSupply + amount;
         _locks[xsLockID] = newLock;
-        IxSOLACE(xsolace).checkpoint(xsLockID, prevLock, newLock);
         _safeMint(recipient, xsLockID);
         emit LockCreated(xsLockID);
     }
 
+    /**
+     * @notice Updates an existing lock.
+     * @param xsLockID The ID of the lock to update.
+     * @param amount The amount of [**SOLACE**](./SOLACE) now in the lock.
+     * @param end The end of the lock.
+     */
     function _updateLock(uint256 xsLockID, uint256 amount, uint256 end) internal {
         // checks
         Lock memory prevLock = _locks[xsLockID];
-        Lock memory newLock = Lock(amount, (end / 1 weeks) * 1 weeks);
-        require(newLock.end <= block.timestamp + MAXTIME, "Max lock is 4 years");
-        require(prevLock.end <= newLock.end, "new end timestamp should be greater than before");
+        Lock memory newLock = Lock(amount, end); // end was sanitized before passed in
         // accounting
-        totalLockedSupply = totalLockedSupply - prevLock.amount + amount;
         _locks[xsLockID] = newLock;
         address owner = ownerOf(xsLockID);
         _notify(xsLockID, owner, owner, prevLock, newLock);
         emit LockUpdated(xsLockID, amount, newLock.end);
     }
 
+    /**
+     * @notice Withdraws from a lock.
+     * @param xsLockID The ID of the lock to withdraw from.
+     * @param amount The amount of [**SOLACE**](./SOLACE) to withdraw.
+     */
     function _withdraw(uint256 xsLockID, uint256 amount) internal {
+        require(_locks[xsLockID].end <= block.timestamp, "locked"); // cannot withdraw while locked
         // accounting
-        totalLockedSupply -= amount;
-        if(amount == lock.amount) {
+        if(amount == _locks[xsLockID].amount) {
             _burn(xsLockID);
             delete _locks[xsLockID];
         }
         else {
             Lock memory oldLock = _locks[xsLockID];
-            Lock memory newLock = Lock(oldLock.amount-amount, lock.end);
+            Lock memory newLock = Lock(oldLock.amount-amount, oldLock.end);
             _locks[xsLockID].amount -= amount;
             address owner = ownerOf(xsLockID);
             _notify(xsLockID, owner, owner, oldLock, newLock);
         }
-        // transfer
-        SafeERC20.safeTransfer(IERC20(solace), msg.sender, amount);
-        emit Withdraw(xsLockID, amount);
+        emit Withdrawl(xsLockID, amount);
     }
 
-    function _delegate(uint256 xsLockID, address to) internal {
-        address voter = delegateeOf(xsLockID);
-        _delegated[voter].remove(xsLockID);
-        _delegated[to].add(xsLockID);
-        _rightOwners.set(xsLockID, to);
-        emit VoteDelegated(xsLockID, to);
-    }
-
+    /**
+     * @notice Hook that is called before any token transfer. This includes minting and burning.
+     * @param from The user that sends the token, or zero if minting.
+     * @param to The zero that receives the token, or zero if burning.
+     * @param xsLockID The ID of the token being transferred.
+     */
     function _beforeTokenTransfer(
         address from,
         address to,
         uint256 xsLockID
     ) internal override {
         super._beforeTokenTransfer(from, to, xsLockID);
-        _delegate(xsLockID, to);
         Lock memory lock = _locks[xsLockID];
-        _notify(xsLockID, from, to, lock, lock);
+        // notify listeners
+        if(from == address(0x0)) _notify(xsLockID, from, to, Lock(0, 0), lock); // mint
+        else if(to == address(0x0)) _notify(xsLockID, from, to, lock, Lock(0, 0)); // burn
+        else { // transfer
+            require(lock.end <= block.timestamp, "locked"); // cannot transfer while locked
+            _notify(xsLockID, from, to, lock, lock);
+        }
     }
 
-    function _notify(uint256 xsLockID, address oldOwner, address newOwner, Lock calldata oldLock, Lock calldata newLock) internal {
+    /**
+     * @notice Notify the listeners of any updates.
+     * @dev Called on transfer, mint, burn, and update.
+     * Either the owner will change or the lock will change, not both.
+     * @param xsLockID The ID of the lock that was altered.
+     * @param oldOwner The old owner of the lock.
+     * @param newOwner The new owner of the lock.
+     * @param oldLock The old lock data.
+     * @param newLock The new lock data.
+     */
+    function _notify(uint256 xsLockID, address oldOwner, address newOwner, Lock memory oldLock, Lock memory newLock) internal {
         // register action with listener
-        uint256 len = _listeners.length();
+        uint256 len = _xsLockListeners.length();
         for(uint256 i = 0; i < len; i++) {
-            IxsListener(_listeners.at(i)).registerLockEvent(xsLockID, oldOwner, newOwner, oldLock, newLock);
+            IxsListener(_xsLockListeners.at(i)).registerLockEvent(xsLockID, oldOwner, newOwner, oldLock, newLock);
         }
     }
 
@@ -263,9 +350,9 @@ contract xsLocker is IxsLocker, ERC721Enhanced, EIP712, ReentrancyGuard, /*Initi
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param listener The listener to add.
      */
-    function addListener(address listener) external onlyGovernance {
-        _listeners.add(listener);
-        emit ListenerAdded(listener);
+    function addXsLockListener(address listener) external override onlyGovernance {
+        _xsLockListeners.add(listener);
+        emit xsLockListenerAdded(listener);
     }
 
     /**
@@ -273,9 +360,9 @@ contract xsLocker is IxsLocker, ERC721Enhanced, EIP712, ReentrancyGuard, /*Initi
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param listener The listener to remove.
      */
-    function removeListener(address listener) external onlyGovernance {
-        _listeners.remove(listener);
-        emit ListenerRemoved(listener);
+    function removeXsLockListener(address listener) external override onlyGovernance {
+        _xsLockListeners.remove(listener);
+        emit xsLockListenerRemoved(listener);
     }
 
     /**
@@ -283,7 +370,7 @@ contract xsLocker is IxsLocker, ERC721Enhanced, EIP712, ReentrancyGuard, /*Initi
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param baseURI_ The new base URI.
      */
-    function setBaseURI(string memory baseURI_) external onlyGovernance {
+    function setBaseURI(string memory baseURI_) external override onlyGovernance {
         _setBaseURI(baseURI_);
     }
 }

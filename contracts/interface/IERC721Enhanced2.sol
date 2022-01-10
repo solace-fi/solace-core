@@ -80,7 +80,14 @@ interface IERC721Enhanced2 is IERC721Enumerable {
     function DOMAIN_SEPARATOR() external view returns (bytes32 seperator);
 
     /***************************************
-    BETTER ENUMERATION
+    CHANGEABLE URIS
+    ***************************************/
+
+    /// @notice Emitted when the base URI is set.
+    event BaseURISet(string baseURI);
+
+    /***************************************
+    MISC
     ***************************************/
 
     /**
@@ -89,11 +96,4 @@ interface IERC721Enhanced2 is IERC721Enumerable {
      * @return status True if the token exists, false if it doesn't.
      */
     function exists(uint256 tokenID) external view returns (bool status);
-
-    /***************************************
-    CHANGEABLE URIS
-    ***************************************/
-
-    /// @notice Emitted when the base URI is set.
-    event BaseURISet(string baseURI);
 }

@@ -5,6 +5,7 @@ pragma solidity 0.8.6;
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 import "./interface/IERC1271.sol";
 import "./interface/IERC721Enhanced2.sol";
 
@@ -16,6 +17,7 @@ import "./interface/IERC721Enhanced2.sol";
  * The base is OpenZeppelin's `ERC721Enumerable` which also includes the `Metadata` extension. This extension includes simpler transfers, gasless approvals, and changeable URIs.
  */
 abstract contract ERC721Enhanced2 is ERC721Enumerable, IERC721Enhanced2, EIP712 {
+    using Strings for uint256;
 
     /// @dev The nonces used in the permit signature verification.
     /// tokenID => nonce
@@ -24,7 +26,7 @@ abstract contract ERC721Enhanced2 is ERC721Enumerable, IERC721Enhanced2, EIP712 
     /// @dev Value is equal to keccak256("Permit(address spender,uint256 tokenID,uint256 nonce,uint256 deadline)");
     bytes32 private immutable _PERMIT_TYPEHASH = 0x137406564cdcf9b40b1700502a9241e87476728da7ae3d0edfcf0541e5b49b3e;
 
-    string private baseURI;
+    string public baseURI;
 
     /**
      * @notice Constructs the `ERC721Enhanced` contract.
@@ -140,52 +142,16 @@ abstract contract ERC721Enhanced2 is ERC721Enumerable, IERC721Enhanced2, EIP712 
     }
 
     /***************************************
-    BETTER ENUMERATION
-    ***************************************/
-
-    /**
-     * @notice Lists all tokens.
-     * Order not specified.
-     * @dev This function is more useful off chain than on chain.
-     * @return tokenIDs The list of token IDs.
-     */
-    function listTokens() public view override returns (uint256[] memory tokenIDs) {
-        uint256 tokenCount = totalSupply();
-        tokenIDs = new uint256[](tokenCount);
-        for(uint256 index = 0; index < tokenCount; index++) {
-            tokenIDs[index] = tokenByIndex(index);
-        }
-        return tokenIDs;
-    }
-
-    /**
-     * @notice Lists the tokens owned by `owner`.
-     * Order not specified.
-     * @dev This function is more useful off chain than on chain.
-     * @return tokenIDs The list of token IDs.
-     */
-    function listTokensOfOwner(address owner) public view override returns (uint256[] memory tokenIDs) {
-        require(owner != address(0x0), "zero address owner");
-        uint256 tokenCount = balanceOf(owner);
-        tokenIDs = new uint256[](tokenCount);
-        for(uint256 index = 0; index < tokenCount; index++) {
-            tokenIDs[index] = tokenOfOwnerByIndex(owner, index);
-        }
-        return tokenIDs;
-    }
-
-    /**
-     * @notice Determines if a token exists or not.
-     * @param tokenID The ID of the token to query.
-     * @return status True if the token exists, false if it doesn't.
-     */
-    function exists(uint256 tokenID) external view override returns (bool status) {
-        return _exists(tokenID);
-    }
-
-    /***************************************
     CHANGEABLE URIS
     ***************************************/
+
+    /**
+     * @notice Returns the Uniform Resource Identifier (URI) for `tokenID` token.
+     */
+    function tokenURI(uint256 tokenID) public view virtual override tokenMustExist(tokenID) returns (string memory) {
+        string memory baseURI_ = baseURI;
+        return string(abi.encodePacked(baseURI_, tokenID.toString()));
+    }
 
     /**
      * @notice Base URI for computing `tokenURI`. If set, the resulting URI for each
@@ -216,9 +182,30 @@ abstract contract ERC721Enhanced2 is ERC721Enumerable, IERC721Enhanced2, EIP712 
         _;
     }
 
-    // Call will revert if not made by owner or approved
+    // Call will revert if not made by owner.
+    // Call will revert if the token does not exist.
+    modifier onlyOwner(uint256 tokenID) {
+        require(ownerOf(tokenID) == msg.sender, "only owner");
+        _;
+    }
+
+    // Call will revert if not made by owner or approved.
+    // Call will revert if the token does not exist.
     modifier onlyOwnerOrApproved(uint256 tokenID) {
         require(_isApprovedOrOwner(msg.sender, tokenID), "only owner or approved");
         _;
+    }
+
+    /***************************************
+    MISC
+    ***************************************/
+
+    /**
+     * @notice Determines if a token exists or not.
+     * @param tokenID The ID of the token to query.
+     * @return status True if the token exists, false if it doesn't.
+     */
+    function exists(uint256 tokenID) external view override returns (bool status) {
+        return _exists(tokenID);
     }
 }

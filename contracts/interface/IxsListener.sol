@@ -19,5 +19,5 @@ interface IxsListener {
      * @param oldLock The old lock data.
      * @param newLock The new lock data.
      */
-    function registerLockEvent(uint256 xsLockID, address oldOwner, address newOwner, Lock calldata oldLock, Lock calldata newLock) external;
+    function registerLockEvent(uint256 xsLockID, address oldOwner, address newOwner, Lock memory oldLock, Lock memory newLock) external;
 }

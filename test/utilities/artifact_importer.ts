@@ -54,7 +54,9 @@ export async function import_artifacts() {
   artifacts.MockProductV2 = await tryImport(`${artifact_dir}/mocks/MockProductV2.sol/MockProductV2.json`);
   // investing v2
   artifacts.SOLACE = await tryImport(`${artifact_dir}/SOLACE.sol/SOLACE.json`);
+  artifacts.xsLocker = await tryImport(`${artifact_dir}/xsLocker.sol/xsLocker.json`);
   artifacts.xSOLACE = await tryImport(`${artifact_dir}/xSOLACE.sol/xSOLACE.json`);
+  artifacts.MockListener = await tryImport(`${artifact_dir}/mocks/MockListener.sol/MockListener.json`);
   artifacts.xSolaceMigrator = await tryImport(`${artifact_dir}/xSolaceMigrator.sol/xSolaceMigrator.json`);
   artifacts.BondDepository = await tryImport(`${artifact_dir}/BondDepository.sol/BondDepository.json`);
   artifacts.BondTellerETH = await tryImport(`${artifact_dir}/BondTellerEth.sol/BondTellerEth.json`);
