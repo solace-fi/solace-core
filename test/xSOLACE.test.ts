@@ -1,287 +1,200 @@
-import chai from "chai";
 import { ethers, waffle, upgrades } from "hardhat";
-import { BigNumber as BN, BigNumberish, constants, Wallet } from "ethers";
-const { expect } = chai;
 const { deployContract, solidity } = waffle;
-const provider = waffle.provider;
+import { MockProvider } from "ethereum-waffle";
+const provider: MockProvider = waffle.provider;
+import { Transaction, BigNumber as BN, Contract, constants, BigNumberish, Wallet, utils } from "ethers";
+import chai from "chai";
+const { expect } = chai;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Solace, XSolace } from "../typechain";
-import { getERC20PermitSignature } from "./utilities/getERC20PermitSignature";
+import { Solace, XsLocker, XSolace } from "../typechain";
+import { expectClose } from "./utilities/math";
+
+// contracts
+let solace: Solace;
+let xslocker: XsLocker;
+let xsolace: XSolace;
+
+// vars
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const ONE_ETHER = BN.from("1000000000000000000");
+const ONE_YEAR = 31536000; // in seconds
+const ONE_WEEK = 604800; // in seconds
+const PRECISION = 1e12;
+
+const MAX_LOCK_DURATION = 126144000; // 60*60*24*365*4 = 4 years in seconds
+const MAX_LOCK_MULTIPLIER_BPS = 40000;  // 4X
+const UNLOCKED_MULTIPLIER_BPS = 10000; // 1X
+const MAX_BPS = 10000;
+
+const TOKEN_NAME = "xsolace";
+const TOKEN_SYMBOL = "xSOLACE";
 
 describe("xSOLACE", function () {
+  const [deployer, governor, user1, user2, user3] = provider.getWallets();
   let artifacts: ArtifactImports;
-  let solace: Solace;
-  let xsolace: XSolace;
-
-  const [deployer, governor, depositor1, depositor2, minter] = provider.getWallets();
-  const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-  const ONE_ETHER = BN.from("1000000000000000000");
-  const deadline = constants.MaxUint256;
 
   before(async function () {
     artifacts = await import_artifacts();
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
 
     solace = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
+    await solace.connect(governor).addMinter(governor.address);
+    xslocker = (await deployContract(deployer, artifacts.xsLocker, [governor.address, solace.address])) as unknown as XsLocker;
+
+    await solace.connect(governor).mint(user1.address, ONE_ETHER.mul(100));
+    await solace.connect(governor).mint(user2.address, ONE_ETHER.mul(100));
+    await solace.connect(governor).mint(user3.address, ONE_ETHER.mul(100));
+    await solace.connect(user1).approve(xslocker.address, constants.MaxUint256);
+    await solace.connect(user2).approve(xslocker.address, constants.MaxUint256);
+    await solace.connect(user3).approve(xslocker.address, constants.MaxUint256);
   });
 
   describe("deployment", function () {
-    it("reverts if zero governance", async function () {
-      await expect(deployContract(deployer, artifacts.xSOLACE, [ZERO_ADDRESS, solace.address])).to.be.revertedWith("zero address governance");
-    });
-    it("reverts if zero solace", async function () {
-      await expect(deployContract(deployer, artifacts.xSOLACE, [governor.address, ZERO_ADDRESS])).to.be.revertedWith("zero address solace");
+    it("reverts if zero xslocker", async function () {
+      await expect(deployContract(deployer, artifacts.xSOLACE, [ZERO_ADDRESS])).to.be.revertedWith("zero address xslocker");
     });
     it("deploys", async function () {
-      xsolace = (await deployContract(deployer, artifacts.xSOLACE, [governor.address, solace.address])) as XSolace;
+      xsolace = (await deployContract(deployer, artifacts.xSOLACE, [xslocker.address])) as XSolace;
     });
-    it("starts with correct solace", async function () {
-      expect(await xsolace.solace()).eq(solace.address);
-    });
-  });
-
-  describe("stake 1:1", function () {
-    it("cannot stake without balance", async function () {
-      await expect(xsolace.connect(depositor1).stake(ONE_ETHER)).to.be.revertedWith("ERC20: transfer amount exceeds balance");
-    });
-    it("cannot stake without approval", async function () {
-      await solace.connect(governor).addMinter(minter.address);
-      await solace.connect(minter).mint(depositor1.address, ONE_ETHER.mul(10));
-      await expect(xsolace.connect(depositor1).stake(ONE_ETHER)).to.be.revertedWith("ERC20: transfer amount exceeds allowance");
-    });
-    it("can stake", async function () {
-      await solace.connect(depositor1).approve(xsolace.address, ONE_ETHER.mul(2));
-      let bal1 = await getBalances(depositor1);
-      expect(bal1.totalSolace).eq(ONE_ETHER.mul(10));
-      expect(bal1.totalXSolace).eq(0);
-      expect(bal1.userSolace).eq(ONE_ETHER.mul(10));
-      expect(bal1.userXSolace).eq(0);
-      expect(bal1.stakingSolace).eq(0);
-      expect(bal1.stakingXSolace).eq(0);
-      expect(bal1.allowanceSolace).eq(ONE_ETHER.mul(2));
-      expect(bal1.allowanceXSolace).eq(0);
-      let amountXSolace1 = await xsolace.connect(depositor1).callStatic.stake(ONE_ETHER);
-      expect(amountXSolace1).eq(ONE_ETHER);
-      let tx1 = await xsolace.connect(depositor1).stake(ONE_ETHER);
-      expect(tx1).to.emit(xsolace, "Staked").withArgs(depositor1.address, ONE_ETHER, ONE_ETHER);
-      let bal2 = await getBalances(depositor1);
-      expect(bal2.totalSolace).eq(ONE_ETHER.mul(10));
-      expect(bal2.totalXSolace).eq(ONE_ETHER);
-      expect(bal2.userSolace).eq(ONE_ETHER.mul(9));
-      expect(bal2.userXSolace).eq(ONE_ETHER);
-      expect(bal2.stakingSolace).eq(ONE_ETHER);
-      expect(bal2.stakingXSolace).eq(0);
-      expect(bal2.allowanceSolace).eq(ONE_ETHER);
-      expect(bal2.allowanceXSolace).eq(0);
-      let amountXSolace2 = await xsolace.connect(depositor1).callStatic.stake(ONE_ETHER);
-      expect(amountXSolace2).eq(ONE_ETHER);
-      let tx2 = await xsolace.connect(depositor1).stake(ONE_ETHER);
-      expect(tx2).to.emit(xsolace, "Staked").withArgs(depositor1.address, ONE_ETHER, ONE_ETHER);
-      let bal3 = await getBalances(depositor1);
-      expect(bal3.totalSolace).eq(ONE_ETHER.mul(10));
-      expect(bal3.totalXSolace).eq(ONE_ETHER.mul(2));
-      expect(bal3.userSolace).eq(ONE_ETHER.mul(8));
-      expect(bal3.userXSolace).eq(ONE_ETHER.mul(2));
-      expect(bal3.stakingSolace).eq(ONE_ETHER.mul(2));
-      expect(bal3.stakingXSolace).eq(0);
-      expect(bal3.allowanceSolace).eq(0);
-      expect(bal3.allowanceXSolace).eq(0);
-    });
-    it("can deposit solace with permit", async function () {
-      let { v, r, s } = await getERC20PermitSignature(depositor1, xsolace.address, solace, ONE_ETHER);
-      let tx1 = await xsolace.connect(depositor2).stakeSigned(depositor1.address, ONE_ETHER, deadline, v, r, s);
-      expect(tx1).to.emit(xsolace, "Staked").withArgs(depositor1.address, ONE_ETHER, ONE_ETHER);
-      let bal1 = await getBalances(depositor1);
-      expect(bal1.totalSolace).eq(ONE_ETHER.mul(10));
-      expect(bal1.totalXSolace).eq(ONE_ETHER.mul(3));
-      expect(bal1.userSolace).eq(ONE_ETHER.mul(7));
-      expect(bal1.userXSolace).eq(ONE_ETHER.mul(3));
-      expect(bal1.stakingSolace).eq(ONE_ETHER.mul(3));
-      expect(bal1.stakingXSolace).eq(0);
-      expect(bal1.allowanceSolace).eq(0);
-      expect(bal1.allowanceXSolace).eq(0);
-    });
-    it("cannot unstake without balance", async function () {
-      await expect(xsolace.connect(depositor2).unstake(ONE_ETHER)).to.be.revertedWith("ERC20: burn amount exceeds balance");
-    });
-    it("can unstake", async function () {
-      await xsolace.connect(depositor1).transfer(depositor2.address, ONE_ETHER.mul(3));
-      let bal1 = await getBalances(depositor2);
-      expect(bal1.totalSolace).eq(ONE_ETHER.mul(10));
-      expect(bal1.totalXSolace).eq(ONE_ETHER.mul(3));
-      expect(bal1.userSolace).eq(0);
-      expect(bal1.userXSolace).eq(ONE_ETHER.mul(3));
-      expect(bal1.stakingSolace).eq(ONE_ETHER.mul(3));
-      expect(bal1.stakingXSolace).eq(0);
-      expect(bal1.allowanceSolace).eq(0);
-      expect(bal1.allowanceXSolace).eq(0);
-      let amountSolace = await xsolace.connect(depositor2).callStatic.unstake(ONE_ETHER);
-      expect(amountSolace).eq(ONE_ETHER);
-      let tx1 = await xsolace.connect(depositor2).unstake(ONE_ETHER);
-      expect(tx1).to.emit(xsolace, "Unstaked").withArgs(depositor2.address, ONE_ETHER, ONE_ETHER);
-      let bal2 = await getBalances(depositor2);
-      expect(bal2.totalSolace).eq(ONE_ETHER.mul(10));
-      expect(bal2.totalXSolace).eq(ONE_ETHER.mul(2));
-      expect(bal2.userSolace).eq(ONE_ETHER);
-      expect(bal2.userXSolace).eq(ONE_ETHER.mul(2));
-      expect(bal2.stakingSolace).eq(ONE_ETHER.mul(2));
-      expect(bal2.stakingXSolace).eq(0);
-      expect(bal2.allowanceSolace).eq(0);
-      expect(bal2.allowanceXSolace).eq(0);
+    it("initializes properly", async function () {
+      expect(await xsolace.MAX_LOCK_DURATION()).eq(MAX_LOCK_DURATION);
+      expect(await xsolace.MAX_LOCK_MULTIPLIER_BPS()).eq(MAX_LOCK_MULTIPLIER_BPS);
+      expect(await xsolace.UNLOCKED_MULTIPLIER_BPS()).eq(UNLOCKED_MULTIPLIER_BPS);
+      expect(await xsolace.name()).eq(TOKEN_NAME);
+      expect(await xsolace.symbol()).eq(TOKEN_SYMBOL);
+      expect(await xsolace.decimals()).eq(18);
+      expect(await xsolace.allowance(user1.address, user2.address)).eq(0);
     });
   });
 
-  describe("stake uneven", function () {
-    before(async function () {
-      solace = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
-      xsolace = (await deployContract(deployer, artifacts.xSOLACE, [governor.address, solace.address])) as XSolace;
-      await solace.connect(governor).addMinter(minter.address);
+  describe("cannot be transferred", function () {
+    it("cannot transfer", async function () {
+      await expect(xsolace.connect(user1).transfer(user2.address, 1)).to.be.revertedWith("xSOLACE transfer not allowed");
     });
-    it("should initially return 1:1 SOLACE:xSOLACE", async function () {
-      expect(await xsolace.solaceToXSolace(ONE_ETHER)).to.equal(ONE_ETHER);
-      expect(await xsolace.xSolaceToSolace(ONE_ETHER)).to.equal(ONE_ETHER);
+    it("cannot transferFrom", async function () {
+      await expect(xsolace.connect(user1).transferFrom(user1.address, user2.address, 1)).to.be.revertedWith("xSOLACE transfer not allowed");
     });
-    it("should return 1:1 with only solace", async function () {
-      await solace.connect(minter).mint(xsolace.address, ONE_ETHER.mul(10));
-      expect(await xsolace.solaceToXSolace(ONE_ETHER)).to.equal(ONE_ETHER);
-      expect(await xsolace.xSolaceToSolace(ONE_ETHER)).to.equal(ONE_ETHER);
-    });
-    it("should change with uneven amounts", async function () {
-      await solace.connect(minter).mint(depositor1.address, ONE_ETHER.mul(10));
-      await solace.connect(depositor1).approve(xsolace.address, ONE_ETHER.mul(10));
-      let amountXSolace = await xsolace.connect(depositor1).callStatic.stake(ONE_ETHER.mul(5));
-      expect(amountXSolace).eq(ONE_ETHER.mul(5));
-      let tx1 = await xsolace.connect(depositor1).stake(ONE_ETHER.mul(5));
-      expect(tx1).to.emit(xsolace, "Staked").withArgs(depositor1.address, ONE_ETHER.mul(5), ONE_ETHER.mul(5));
-      let bal1 = await getBalances(depositor1);
-      expect(bal1.totalSolace).eq(ONE_ETHER.mul(20));
-      expect(bal1.totalXSolace).eq(ONE_ETHER.mul(5));
-      expect(bal1.userSolace).eq(ONE_ETHER.mul(5));
-      expect(bal1.userXSolace).eq(ONE_ETHER.mul(5));
-      expect(bal1.stakingSolace).eq(ONE_ETHER.mul(15));
-      expect(bal1.stakingXSolace).eq(0);
-      expect(bal1.allowanceSolace).eq(ONE_ETHER.mul(5));
-      expect(bal1.allowanceXSolace).eq(0);
-      expect(await xsolace.solaceToXSolace(ONE_ETHER.mul(6))).to.equal(ONE_ETHER.mul(2));
-      expect(await xsolace.xSolaceToSolace(ONE_ETHER.mul(4))).to.equal(ONE_ETHER.mul(12));
-    });
-    it("staking should maintain ratio", async function () {
-      await solace.connect(minter).mint(depositor2.address, ONE_ETHER.mul(20));
-      await solace.connect(depositor2).approve(xsolace.address, ONE_ETHER.mul(20));
-      let amountXSolace = await xsolace.connect(depositor2).callStatic.stake(ONE_ETHER.mul(9));
-      expect(amountXSolace).eq(ONE_ETHER.mul(3));
-      let tx1 = await xsolace.connect(depositor2).stake(ONE_ETHER.mul(9));
-      expect(tx1).to.emit(xsolace, "Staked").withArgs(depositor2.address, ONE_ETHER.mul(9), ONE_ETHER.mul(3));
-      let bal1 = await getBalances(depositor2);
-      expect(bal1.totalSolace).eq(ONE_ETHER.mul(40));
-      expect(bal1.totalXSolace).eq(ONE_ETHER.mul(8));
-      expect(bal1.userSolace).eq(ONE_ETHER.mul(11));
-      expect(bal1.userXSolace).eq(ONE_ETHER.mul(3));
-      expect(bal1.stakingSolace).eq(ONE_ETHER.mul(24));
-      expect(bal1.stakingXSolace).eq(0);
-      expect(bal1.allowanceSolace).eq(ONE_ETHER.mul(11));
-      expect(bal1.allowanceXSolace).eq(0);
-      expect(await xsolace.solaceToXSolace(ONE_ETHER.mul(6))).to.equal(ONE_ETHER.mul(2));
-      expect(await xsolace.xSolaceToSolace(ONE_ETHER.mul(4))).to.equal(ONE_ETHER.mul(12));
-    });
-    it("solace rewards should change ratio", async function () {
-      await solace.connect(minter).mint(xsolace.address, ONE_ETHER.mul(8));
-      let bal1 = await getBalances(depositor2);
-      expect(bal1.totalSolace).eq(ONE_ETHER.mul(48));
-      expect(bal1.totalXSolace).eq(ONE_ETHER.mul(8));
-      expect(bal1.userSolace).eq(ONE_ETHER.mul(11));
-      expect(bal1.userXSolace).eq(ONE_ETHER.mul(3));
-      expect(bal1.stakingSolace).eq(ONE_ETHER.mul(32));
-      expect(bal1.stakingXSolace).eq(0);
-      expect(bal1.allowanceSolace).eq(ONE_ETHER.mul(11));
-      expect(bal1.allowanceXSolace).eq(0);
-      expect(await xsolace.solaceToXSolace(ONE_ETHER.mul(8))).to.equal(ONE_ETHER.mul(2));
-      expect(await xsolace.xSolaceToSolace(ONE_ETHER.mul(4))).to.equal(ONE_ETHER.mul(16));
-    });
-    it("unstaking should maintain ratio", async function () {
-      let amountSolace = await xsolace.connect(depositor1).callStatic.unstake(ONE_ETHER.mul(2));
-      expect(amountSolace).eq(ONE_ETHER.mul(8));
-      let tx1 = await xsolace.connect(depositor2).unstake(ONE_ETHER.mul(2));
-      expect(tx1).to.emit(xsolace, "Unstaked").withArgs(depositor2.address, ONE_ETHER.mul(8), ONE_ETHER.mul(2));
-      let bal1 = await getBalances(depositor2);
-      expect(bal1.totalSolace).eq(ONE_ETHER.mul(48));
-      expect(bal1.totalXSolace).eq(ONE_ETHER.mul(6));
-      expect(bal1.userSolace).eq(ONE_ETHER.mul(19));
-      expect(bal1.userXSolace).eq(ONE_ETHER.mul(1));
-      expect(bal1.stakingSolace).eq(ONE_ETHER.mul(24));
-      expect(bal1.stakingXSolace).eq(0);
-      expect(bal1.allowanceSolace).eq(ONE_ETHER.mul(11));
-      expect(bal1.allowanceXSolace).eq(0);
-      expect(await xsolace.solaceToXSolace(ONE_ETHER.mul(8))).to.equal(ONE_ETHER.mul(2));
-      expect(await xsolace.xSolaceToSolace(ONE_ETHER.mul(4))).to.equal(ONE_ETHER.mul(16));
-    });
-    it("burning xsolace should change ratio", async function () {
-      await xsolace.connect(depositor1).burn(ONE_ETHER.mul(3));
-      let bal1 = await getBalances(depositor1);
-      expect(bal1.totalSolace).eq(ONE_ETHER.mul(48));
-      expect(bal1.totalXSolace).eq(ONE_ETHER.mul(3));
-      expect(bal1.userSolace).eq(ONE_ETHER.mul(5));
-      expect(bal1.userXSolace).eq(ONE_ETHER.mul(2));
-      expect(bal1.stakingSolace).eq(ONE_ETHER.mul(24));
-      expect(bal1.stakingXSolace).eq(0);
-      expect(bal1.allowanceSolace).eq(ONE_ETHER.mul(5));
-      expect(bal1.allowanceXSolace).eq(0);
-      expect(await xsolace.solaceToXSolace(ONE_ETHER.mul(16))).to.equal(ONE_ETHER.mul(2));
-      expect(await xsolace.xSolaceToSolace(ONE_ETHER.mul(4))).to.equal(ONE_ETHER.mul(32));
+    it("cannot approve", async function () {
+      await expect(xsolace.connect(user1).approve(user2.address, 1)).to.be.revertedWith("xSOLACE transfer not allowed");
     });
   });
 
-  describe("burn", function () {
-    it("anyone can burn", async function () {
-      let bal1 = await xsolace.balanceOf(depositor1.address);
-      expect(bal1).gt(0);
-      await xsolace.connect(depositor1).burn(bal1);
-      let bal2 = await xsolace.balanceOf(depositor1.address);
-      expect(bal2).eq(0);
+  describe("accounts correctly", function () {
+    it("starts zero", async function () {
+      expect(await xsolace.balanceOf(user1.address)).eq(0);
+      expect(await xsolace.totalSupply()).eq(0);
+      await expect(xsolace.balanceOfLock(0)).to.be.revertedWith("query for nonexistent token");
+      await checkConsistancy();
     });
-    it("cannot burn more than balance", async function () {
-      let bal1 = await xsolace.balanceOf(depositor2.address);
-      expect(bal1).gt(0);
-      await expect(xsolace.connect(depositor2).burn(bal1.add(1))).to.be.revertedWith("ERC20: burn amount exceeds balance");
+    it("accounts for unlocked stake", async function () {
+      // deposit 1: unlocked
+      await xslocker.connect(user1).createLock(user2.address, ONE_ETHER, 0);
+      expect(await xsolace.balanceOfLock(1)).eq(ONE_ETHER);
+      expect(await xsolace.balanceOf(user1.address)).eq(0);
+      expect(await xsolace.balanceOf(user2.address)).eq(ONE_ETHER);
+      expect(await xsolace.balanceOf(user3.address)).eq(0);
+      expect(await xsolace.totalSupply()).eq(ONE_ETHER);
+      await checkConsistancy();
+      // deposit 2: unlocked
+      await xslocker.connect(user1).createLock(user3.address, ONE_ETHER.mul(2), 0);
+      expect(await xsolace.balanceOfLock(2)).eq(ONE_ETHER.mul(2));
+      expect(await xsolace.balanceOf(user1.address)).eq(0);
+      expect(await xsolace.balanceOf(user2.address)).eq(ONE_ETHER);
+      expect(await xsolace.balanceOf(user3.address)).eq(ONE_ETHER.mul(2));
+      expect(await xsolace.totalSupply()).eq(ONE_ETHER.mul(3));
+      await checkConsistancy();
+    });
+    it("accounts for unlocked stake", async function () {
+      // deposit 3: locked 4 years, 4x multiplier
+      let block = await provider.getBlock('latest');
+      let timestamp1 = block.timestamp + ONE_YEAR*4 + 1;
+      await xslocker.connect(user1).createLock(user1.address, ONE_ETHER, timestamp1);
+      expect(await xsolace.balanceOfLock(3)).eq(ONE_ETHER.mul(4));
+      expect(await xsolace.balanceOf(user1.address)).eq(ONE_ETHER.mul(4));
+      expect(await xsolace.balanceOf(user2.address)).eq(ONE_ETHER);
+      expect(await xsolace.balanceOf(user3.address)).eq(ONE_ETHER.mul(2));
+      expect(await xsolace.totalSupply()).eq(ONE_ETHER.mul(7));
+      await checkConsistancy();
+      // deposit 4: locked 1 year, 1.75x multiplier
+      // y = (3x/4 + 1)*amount. x = 12, y = 21
+      let timestamp2 = block.timestamp + ONE_YEAR + 2;
+      await xslocker.connect(user1).createLock(user2.address, ONE_ETHER.mul(12), timestamp2);
+      expect(await xsolace.balanceOfLock(4)).eq(ONE_ETHER.mul(21));
+      expectClose(await xsolace.balanceOf(user1.address), ONE_ETHER.mul(4), PRECISION);
+      expect(await xsolace.balanceOf(user2.address)).eq(ONE_ETHER.mul(22));
+      expect(await xsolace.balanceOf(user3.address)).eq(ONE_ETHER.mul(2));
+      expectClose(await xsolace.totalSupply(), ONE_ETHER.mul(28), PRECISION);
+      await checkConsistancy();
+    });
+    it("accounts for time", async function () {
+      let timestamp = (await provider.getBlock('latest')).timestamp + ONE_YEAR*2;
+      await provider.send("evm_setNextBlockTimestamp", [timestamp]);
+      await provider.send("evm_mine", []);
+      expect(await xsolace.balanceOfLock(1)).eq(ONE_ETHER); // never locked
+      expect(await xsolace.balanceOfLock(2)).eq(ONE_ETHER.mul(2)); // never locked
+      expectClose(await xsolace.balanceOfLock(3), ONE_ETHER.mul(5).div(2), PRECISION); // still locked
+      expect(await xsolace.balanceOfLock(4)).eq(ONE_ETHER.mul(12)); // became unlocked
+      expectClose(await xsolace.balanceOf(user1.address), ONE_ETHER.mul(5).div(2), PRECISION);
+      expect(await xsolace.balanceOf(user2.address)).eq(ONE_ETHER.mul(13));
+      expect(await xsolace.balanceOf(user3.address)).eq(ONE_ETHER.mul(2));
+      expectClose(await xsolace.totalSupply(), ONE_ETHER.mul(35).div(2), PRECISION);
+      await checkConsistancy();
+    });
+    it("accounts for withdraw", async function () {
+      await xslocker.connect(user2).withdraw(1, user2.address);
+      await expect(xsolace.balanceOfLock(1)).to.be.revertedWith("query for nonexistent token");
+      expect(await xsolace.balanceOfLock(2)).eq(ONE_ETHER.mul(2)); // never locked
+      expectClose(await xsolace.balanceOfLock(3), ONE_ETHER.mul(5).div(2), PRECISION); // still locked
+      expect(await xsolace.balanceOfLock(4)).eq(ONE_ETHER.mul(12)); // became unlocked
+      expectClose(await xsolace.balanceOf(user1.address), ONE_ETHER.mul(5).div(2), PRECISION);
+      expect(await xsolace.balanceOf(user2.address)).eq(ONE_ETHER.mul(12));
+      expect(await xsolace.balanceOf(user3.address)).eq(ONE_ETHER.mul(2));
+      expectClose(await xsolace.totalSupply(), ONE_ETHER.mul(33).div(2), PRECISION);
+      await checkConsistancy();
     });
   });
 
-  interface Balances {
-    userSolace: BN;
-    userXSolace: BN;
-    stakingSolace: BN;
-    stakingXSolace: BN;
-    totalSolace: BN;
-    totalXSolace: BN;
-    allowanceSolace: BN;
-    allowanceXSolace: BN;
+  // tests each lock is close to predicted value
+  // each user's xsolace is the sum of their xslocks
+  // total xsolace is the sum of all xslocks
+  async function checkConsistancy() {
+    let predXsolaceUserBalances = new Map<string, BN>();
+    let predXsolaceTotalSupply = BN.from(0);
+    let xslockerTotalSupply = (await xslocker.totalSupply()).toNumber();
+    for(let i = 0; i < xslockerTotalSupply; ++i) {
+      let xsLockID = await xslocker.tokenByIndex(i);
+      let realXsolaceValue = await xsolace.balanceOfLock(xsLockID);
+      let predXsolaceValue = await predictBalanceOfLock(xsLockID);
+      expectClose(realXsolaceValue, predXsolaceValue, PRECISION);
+      predXsolaceTotalSupply = predXsolaceTotalSupply.add(realXsolaceValue);
+      let owner = await xslocker.ownerOf(xsLockID);
+      if(!predXsolaceUserBalances.has(owner)) predXsolaceUserBalances.set(owner, BN.from(0));
+      let predBalance = predXsolaceUserBalances.get(owner) ?? BN.from(0);
+      predXsolaceUserBalances.set(owner, predBalance.add(realXsolaceValue));
+    }
+    let realXsolaceTotalSupply = await xsolace.totalSupply();
+    expect(realXsolaceTotalSupply).eq(predXsolaceTotalSupply);
+    predXsolaceUserBalances.forEach(async (predBalance, user) => {
+      let realXsolaceUserBalance = await xsolace.balanceOf(user);
+      expect(realXsolaceUserBalance).eq(predBalance);
+    });
   }
 
-  async function getBalances(user: Wallet): Promise<Balances> {
-    return {
-      userSolace: await solace.balanceOf(user.address),
-      userXSolace: await xsolace.balanceOf(user.address),
-      stakingSolace: await solace.balanceOf(xsolace.address),
-      stakingXSolace: await xsolace.balanceOf(xsolace.address),
-      totalSolace: await solace.totalSupply(),
-      totalXSolace: await xsolace.totalSupply(),
-      allowanceSolace: await solace.allowance(user.address, xsolace.address),
-      allowanceXSolace: await xsolace.allowance(user.address, xsolace.address)
-    };
-  }
-
-  function getBalancesDiff(balances1: Balances, balances2: Balances): Balances {
-    return {
-      userSolace: balances1.userSolace.sub(balances2.userSolace),
-      userXSolace: balances1.userXSolace.sub(balances2.userXSolace),
-      stakingSolace: balances1.stakingSolace.sub(balances2.stakingSolace),
-      stakingXSolace: balances1.stakingXSolace.sub(balances2.stakingXSolace),
-      totalSolace: balances1.totalSolace.sub(balances2.totalSolace),
-      totalXSolace: balances1.totalXSolace.sub(balances2.totalXSolace),
-      allowanceSolace: balances1.allowanceSolace.sub(balances2.allowanceSolace),
-      allowanceXSolace: balances1.allowanceXSolace.sub(balances2.allowanceXSolace)
-    };
+  async function predictBalanceOfLock(xsLockID: BigNumberish) {
+    let exists = await xslocker.exists(xsLockID);
+    if(!exists) {
+      await expect(xsolace.balanceOfLock(xsLockID)).to.be.revertedWith("query for nonexistent token");
+      return -1;
+    }
+    let block = await provider.getBlock('latest');
+    let lock = await xslocker.locks(xsLockID);
+    let base = lock.amount.mul(UNLOCKED_MULTIPLIER_BPS).div(MAX_BPS);
+    let bonus = (lock.end.lte(block.timestamp))
+      ? 0 // unlocked
+      : lock.amount.mul(lock.end.toNumber() - block.timestamp).mul(MAX_LOCK_MULTIPLIER_BPS - UNLOCKED_MULTIPLIER_BPS).div(MAX_LOCK_DURATION * MAX_BPS); // locked
+    let expectedAmount = base.add(bonus);
+    return expectedAmount;
   }
 });

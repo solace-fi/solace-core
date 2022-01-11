@@ -4,6 +4,19 @@ pragma solidity 0.8.6;
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 
+/**
+ * @title xSolace Token (xSOLACE)
+ * @author solace.fi
+ * @notice The vote token of the Solace DAO.
+ *
+ * xSOLACE is the vote token of the Solace DAO. It masquerades as an ERC20 but cannot be transferred, minted, or burned, and thus has no economic value outside of voting.
+ *
+ * Balances are calculated based on **Locks** in [`xsLocker`](../xsLocker). The base value of a lock is its `amount` of [**SOLACE**](../SOLACE). Its multiplier is 4x when `end` is 4 years from now, 1x when unlocked, and linearly decreasing between the two. The balance of a lock is its base value times its multiplier.
+ *
+ * [`balanceOf(user)`](#balanceof) is calculated as the sum of the balances of the user's locks. [`totalSupply()`] is calculated as the sum of the balances of all locks. These functions should not be called on-chain as they are gas intensive.
+ *
+ * Voting will occur off chain.
+ */
 interface IxSOLACE is IERC20Metadata {
 
     /***************************************
@@ -17,7 +30,7 @@ interface IxSOLACE is IERC20Metadata {
     /// @notice The vote power multiplier when unlocked in bps.
     function UNLOCKED_MULTIPLIER_BPS() external view returns (uint256);
 
-    /// @notice The [**xsLocker**](./xsLocker) contract.
+    /// @notice The [**xsLocker**](../xsLocker) contract.
     function xsLocker() external view returns (address);
 
     /***************************************
@@ -30,26 +43,4 @@ interface IxSOLACE is IERC20Metadata {
      * @return balance The locks's balance.
      */
     function balanceOfLock(uint256 xsLockID) external view returns (uint256 balance);
-
-    /***************************************
-    MUTATOR FUNCTIONS
-    ***************************************/
-
-    /**
-     * @notice In a normal ERC20 contract this would increase the allowance of `spender` over the caller's tokens by `addedValue`.
-     * This version reverts because **xSOLACE** is non-transferrable.
-     * @param spender The user to increase allowance.
-     * @param addedValue The amount to increase allowance.
-     * @return success False.
-     */
-    function increaseAllowance(address spender, uint256 addedValue) external returns (bool success);
-
-    /**
-     * @notice In a normal ERC20 contract this would decrease the allowance of `spender` over the caller's tokens by `subtractedValue`.
-     * This version reverts because **xSOLACE** is non-transferrable.
-     * @param spender The user to decrease allowance.
-     * @param subtractedValue The amount to decrease allowance.
-     * @return success False.
-     */
-    function decreaseAllowance(address spender, uint256 subtractedValue) external returns (bool success);
 }

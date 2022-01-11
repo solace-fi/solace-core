@@ -947,7 +947,7 @@ describe("xsLocker", function () {
     });
   });
 
-  describe("lock", function () {
+  describe("lock transfer", function () {
     it("cannot transfer when locked", async function () {
       let timestamp = (await provider.getBlock('latest')).timestamp + ONE_YEAR;
       await xslocker.connect(user1).createLock(user1.address, 1, timestamp);
@@ -975,6 +975,66 @@ describe("xsLocker", function () {
       await xslocker.connect(user1)['safeTransferFrom(address,address,uint256)'](user2.address, user1.address, xsLockID);
       expect(await xslocker.ownerOf(xsLockID)).eq(user1.address);
       await xslocker.connect(user1).withdraw(xsLockID, user2.address);
+    });
+  });
+
+  describe("lock view", function () {
+    it("nonexistent", async function () {
+      await expect(xslocker.ownerOf(999)).to.be.revertedWith("query for nonexistent token");
+      await expect(xslocker.locks(999)).to.be.revertedWith("query for nonexistent token");
+      await expect(xslocker.isLocked(999)).to.be.revertedWith("query for nonexistent token");
+      await expect(xslocker.timeLeft(999)).to.be.revertedWith("query for nonexistent token");
+    });
+    it("unlocked", async function () {
+      // end = 0
+      await xslocker.connect(user1).createLock(user1.address, 123, 0);
+      let xsLockID = await xslocker.totalNumLocks();
+      expect(await xslocker.ownerOf(xsLockID)).eq(user1.address);
+      let lock = await xslocker.locks(xsLockID)
+      expect(lock.amount).eq(123);
+      expect(lock.end).eq(0);
+      expect(await xslocker.isLocked(xsLockID)).eq(false);
+      expect(await xslocker.timeLeft(xsLockID)).eq(0);
+      // end in past
+      await xslocker.connect(user1).createLock(user1.address, 456, 789);
+      xsLockID = await xslocker.totalNumLocks();
+      expect(await xslocker.ownerOf(xsLockID)).eq(user1.address);
+      lock = await xslocker.locks(xsLockID)
+      expect(lock.amount).eq(456);
+      expect(lock.end).eq(789);
+      expect(await xslocker.isLocked(xsLockID)).eq(false);
+      expect(await xslocker.timeLeft(xsLockID)).eq(0);
+    });
+    it("locked", async function () {
+      // end in future
+      let block = await provider.getBlock('latest');
+      let end = block.timestamp + ONE_YEAR + 1;
+      await xslocker.connect(user1).createLock(user1.address, 123, end);
+      let xsLockID = await xslocker.totalNumLocks();
+      expect(await xslocker.ownerOf(xsLockID)).eq(user1.address);
+      let lock = await xslocker.locks(xsLockID)
+      expect(lock.amount).eq(123);
+      expect(lock.end).eq(end);
+      expect(await xslocker.isLocked(xsLockID)).eq(true);
+      expect(await xslocker.timeLeft(xsLockID)).eq(ONE_YEAR);
+      // still before end
+      await provider.send("evm_setNextBlockTimestamp", [block.timestamp+ONE_WEEK+1]);
+      await provider.send("evm_mine", []);
+      expect(await xslocker.ownerOf(xsLockID)).eq(user1.address);
+      lock = await xslocker.locks(xsLockID)
+      expect(lock.amount).eq(123);
+      expect(lock.end).eq(end);
+      expect(await xslocker.isLocked(xsLockID)).eq(true);
+      expect(await xslocker.timeLeft(xsLockID)).eq(ONE_YEAR-ONE_WEEK);
+      // after end
+      await provider.send("evm_setNextBlockTimestamp", [end]);
+      await provider.send("evm_mine", []);
+      expect(await xslocker.ownerOf(xsLockID)).eq(user1.address);
+      lock = await xslocker.locks(xsLockID)
+      expect(lock.amount).eq(123);
+      expect(lock.end).eq(end);
+      expect(await xslocker.isLocked(xsLockID)).eq(false);
+      expect(await xslocker.timeLeft(xsLockID)).eq(0);
     });
   });
 

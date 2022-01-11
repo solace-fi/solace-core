@@ -17,7 +17,7 @@ struct Lock {
  * @author solace.fi
  * @notice Stake your [**SOLACE**](../SOLACE) to receive voting rights, [**SOLACE**](../SOLACE) rewards, and more.
  *
- * Locks are ERC721s. Each lock has an `amount` of [**SOLACE**](../SOLACE) and an `end` timestamp and cannot be transferred or withdrawn from before it unlocks.
+ * Locks are ERC721s and can be viewed with [`locks()`](#locks). Each lock has an `amount` of [**SOLACE**](../SOLACE) and an `end` timestamp and cannot be transferred or withdrawn from before it unlocks. Locks have a maximum duration of four years.
  *
  * Users can create locks via [`createLock()`](#createlock) or [`createLockSigned()`](#createlocksigned), deposit more [**SOLACE**](../SOLACE) into a lock via [`increaseAmount()`](#increaseamount) or [`increaseAmountSigned()`](#increaseamountsigned), extend a lock via [`extendLock()`](#extendlock), and withdraw via [`withdraw()`](#withdraw), [`withdrawInPart()`](#withdrawinpart), or [`withdrawMany()`](#withdrawmany).
  *
@@ -65,6 +65,20 @@ interface IxsLocker is IERC721Enhanced2 {
      * @return lock_ Information about the lock.
      */
     function locks(uint256 xsLockID) external view returns (Lock memory lock_);
+
+    /**
+     * @notice Determines if the lock is locked.
+     * @param xsLockID The ID of the lock to query.
+     * @return locked True if the lock is locked, false if unlocked.
+     */
+    function isLocked(uint256 xsLockID) external view returns (bool locked);
+
+    /**
+     * @notice Determines the time left until the lock unlocks.
+     * @param xsLockID The ID of the lock to query.
+     * @return time The time left in seconds, 0 if unlocked.
+     */
+    function timeLeft(uint256 xsLockID) external view returns (uint256 time);
 
     /**
      * @notice Returns the amount of [**SOLACE**](../SOLACE) the user has staked.

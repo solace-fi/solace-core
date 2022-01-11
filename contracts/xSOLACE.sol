@@ -9,7 +9,15 @@ import "./interface/IxSOLACE.sol";
 /**
  * @title xSolace Token (xSOLACE)
  * @author solace.fi
- * @notice V2 of the [**SOLACE**](./SOLACE) staking contract.
+ * @notice The vote token of the Solace DAO.
+ *
+ * xSOLACE is the vote token of the Solace DAO. It masquerades as an ERC20 but cannot be transferred, minted, or burned, and thus has no economic value outside of voting.
+ *
+ * Balances are calculated based on **Locks** in [`xsLocker`](./xsLocker). The base value of a lock is its `amount` of [**SOLACE**](./SOLACE). Its multiplier is 4x when `end` is 4 years from now, 1x when unlocked, and linearly decreasing between the two. The balance of a lock is its base value times its multiplier.
+ *
+ * [`balanceOf(user)`](#balanceof) is calculated as the sum of the balances of the user's locks. [`totalSupply()`] is calculated as the sum of the balances of all locks. These functions should not be called on-chain as they are gas intensive.
+ *
+ * Voting will occur off chain.
  */
 contract xSOLACE is IxSOLACE {
 
@@ -22,7 +30,7 @@ contract xSOLACE is IxSOLACE {
     /// @notice The vote power multiplier at max lock in bps.
     uint256 public constant override MAX_LOCK_MULTIPLIER_BPS = 40000;  // 4X
     /// @notice The vote power multiplier when unlocked in bps.
-    uint256 public constant override UNLOCK_MULTIPLIER_BPS = 10000; // 1X
+    uint256 public constant override UNLOCKED_MULTIPLIER_BPS = 10000; // 1X
     // 1 bps = 1/10000
     uint256 internal constant MAX_BPS = 10000;
 
@@ -66,10 +74,10 @@ contract xSOLACE is IxSOLACE {
     function balanceOfLock(uint256 xsLockID) public view override returns (uint256 balance) {
         IxsLocker locker = IxsLocker(xsLocker);
         Lock memory lock = locker.locks(xsLockID);
-        uint256 base = lock.amount * UNLOCK_MULTIPLIER_BPS / MAX_BPS;
+        uint256 base = lock.amount * UNLOCKED_MULTIPLIER_BPS / MAX_BPS;
         uint256 bonus = (lock.end <= block.timestamp)
             ? 0 // unlocked
-            : lock.amount * (block.timestamp - lock.end) * (MAX_LOCK_MULTIPLIER_BPS - UNLOCK_MULTIPLIER_BPS) / (MAX_LOCK_DURATION * MAX_BPS); // locked
+            : lock.amount * (lock.end - block.timestamp) * (MAX_LOCK_MULTIPLIER_BPS - UNLOCKED_MULTIPLIER_BPS) / (MAX_LOCK_DURATION * MAX_BPS); // locked
         return base + bonus;
     }
 
@@ -91,28 +99,28 @@ contract xSOLACE is IxSOLACE {
     /**
      * @notice Returns the name of the token.
      */
-    function name() external view override returns (string memory) {
+    function name() external pure override returns (string memory) {
         return "xsolace";
     }
 
     /**
      * @notice Returns the symbol of the token.
      */
-    function symbol() external view override returns (string memory) {
+    function symbol() external pure override returns (string memory) {
         return "xSOLACE";
     }
 
     /**
      * @notice Returns the number of decimals used to get its user representation.
      */
-    function decimals() external view override returns (uint8) {
+    function decimals() external pure override returns (uint8) {
         return 18;
     }
 
     /**
      * @notice Returns the remaining number of tokens that `spender` will be allowed to spend on behalf of `owner` through `transferFrom`.
      */
-    function allowance(address owner, address spender) external view override returns (uint256) {
+    function allowance(address owner, address spender) external pure override returns (uint256) {
         return 0;
     }
 
@@ -129,7 +137,6 @@ contract xSOLACE is IxSOLACE {
      */
     function transfer(address recipient, uint256 amount) external override returns (bool success) {
         revert("xSOLACE transfer not allowed");
-        return false;
     }
 
     /**
@@ -141,7 +148,6 @@ contract xSOLACE is IxSOLACE {
      */
     function transferFrom(address sender, address recipient, uint256 amount) external override returns (bool success) {
         revert("xSOLACE transfer not allowed");
-        return false;
     }
 
     /**
@@ -153,30 +159,5 @@ contract xSOLACE is IxSOLACE {
      */
     function approve(address spender, uint256 amount) external override returns (bool success) {
         revert("xSOLACE transfer not allowed");
-        return false;
-    }
-
-    /**
-     * @notice In a normal ERC20 contract this would increase the allowance of `spender` over the caller's tokens by `addedValue`.
-     * This version reverts because **xSOLACE** is non-transferrable.
-     * @param spender The user to increase allowance.
-     * @param addedValue The amount to increase allowance.
-     * @return success False.
-     */
-    function increaseAllowance(address spender, uint256 addedValue) external override returns (bool success) {
-        revert("xSOLACE transfer not allowed");
-        return false;
-    }
-
-    /**
-     * @notice In a normal ERC20 contract this would decrease the allowance of `spender` over the caller's tokens by `subtractedValue`.
-     * This version reverts because **xSOLACE** is non-transferrable.
-     * @param spender The user to decrease allowance.
-     * @param subtractedValue The amount to decrease allowance.
-     * @return success False.
-     */
-    function decreaseAllowance(address spender, uint256 subtractedValue) external override returns (bool success) {
-        revert("xSOLACE transfer not allowed");
-        return false;
     }
 }
