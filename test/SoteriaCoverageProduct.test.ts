@@ -1,6 +1,6 @@
 import { waffle, ethers } from "hardhat";
 import { MockProvider } from "ethereum-waffle";
-import { BigNumber as BN, utils, Contract } from "ethers";
+import { BigNumber as BN, utils, Contract, Wallet } from "ethers";
 import chai from "chai";
 import { config as dotenv_config } from "dotenv";
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
@@ -553,7 +553,7 @@ describe("SoteriaCoverageProduct", function() {
         });
 
         it("cannot update if non-governance or not own policy", async () => {
-            await expect(soteriaCoverageProduct.connect(deployer).updateCoverLimit(POLICY_ID_1, NEW_COVER_LIMIT)).to.revertedWith("Not owner or governance");
+            await expect(soteriaCoverageProduct.connect(deployer).updateCoverLimit(POLICY_ID_1, NEW_COVER_LIMIT)).to.revertedWith("not owner or governance");
         })
 
         it("cannot update if max cover is exceeded", async () => {
@@ -626,7 +626,7 @@ describe("SoteriaCoverageProduct", function() {
         });
 
         it("cannot deactivate someone else's policy", async () => {
-            await expect(soteriaCoverageProduct.connect(policyholder3).deactivatePolicy(POLICY_ID_1)).to.revertedWith("Not owner or governance");
+            await expect(soteriaCoverageProduct.connect(policyholder3).deactivatePolicy(POLICY_ID_1)).to.revertedWith("not owner or governance");
         });
 
         it("policy owner can deactivate policy", async () => {
@@ -736,7 +736,7 @@ describe("SoteriaCoverageProduct", function() {
         });
 
         it("cannot charge more than max rate", async () => {
-            await expect(soteriaCoverageProduct.connect(governor).chargePremiums([policyholder1.address, policyholder2.address], [WEEKLY_MAX_PREMIUM.mul(11).div(10), WEEKLY_MAX_PREMIUM.mul(11).div(10)])).to.revertedWith("Charging more than promised maximum rate");
+            await expect(soteriaCoverageProduct.connect(governor).chargePremiums([policyholder1.address, policyholder2.address], [WEEKLY_MAX_PREMIUM.mul(11).div(10), WEEKLY_MAX_PREMIUM.mul(11).div(10)])).to.revertedWith("charging more than promised maximum rate");
         })
 
         it("can charge premiums", async () => {
@@ -847,7 +847,7 @@ describe("SoteriaCoverageProduct", function() {
             // single weekly premium should be sent to treasury
             expect(await provider.getBalance(vault.address)).to.equal(initialVaultBalance.add(WEEKLY_MAX_PREMIUM));
         });
-        
+
         it("will correctly charge premiums with reward points", async () => {
             // CASE 4 - Charge weekly premium for three active policies
             // Policy 1: reward points can pay for premium in full
@@ -898,7 +898,7 @@ describe("SoteriaCoverageProduct", function() {
             expect(tx).to.emit(soteriaCoverageProduct, "PremiumCharged").withArgs(policyholder1.address, WEEKLY_MAX_PREMIUM);
             expect(tx).to.emit(soteriaCoverageProduct, "PremiumCharged").withArgs(policyholder2.address, WEEKLY_MAX_PREMIUM);
             expect(tx).to.emit(soteriaCoverageProduct, "PremiumPartiallyCharged").withArgs(policyholder3.address, WEEKLY_MAX_PREMIUM, initialHolder3AccountBalance.add(initialRewardPoints3));
-            expect(tx).to.emit(soteriaCoverageProduct, "PremiumDeactivated").withArgs(POLICY_ID_3);
+            expect(tx).to.emit(soteriaCoverageProduct, "PolicyDeactivated").withArgs(POLICY_ID_3);
 
             // Confirm state is what we expect after charging premium
 
@@ -941,6 +941,39 @@ describe("SoteriaCoverageProduct", function() {
             expect(await soteriaCoverageProduct.availableCoverCapacity()).eq(initialAvailableCoverCapacity.add(expectedSoteriaBalanceChange).add(initialPolicy3CoverLimit))
         })
 
+        it("will charge for 100 users in one call", async() => {
+            // Create 100 test wallets
+            // 100 wallets -> 1.6M gas
+            // 1000 wallets -> 16M gas
+            let numberWallets = 100 // Change this number to whatever number of wallets you want to test for
+
+            let users:(Wallet)[] = [];
+            for (let i = 0; i < numberWallets; i++) {
+                users.push(provider.createEmptyWallet())
+            }
+            // Activate policies for each user, 1 ETH cover limit with 0.1 ETH deposit
+            for (let user of users) {
+                await soteriaCoverageProduct.connect(governor).activatePolicy(user.address, ONE_ETH, {value:ONE_ETH.div(10)})
+            }
+            // Gift 0 reward points to one-third of users, half-weekly premium to one-third, and full weekly premium to remaining third
+            for (let user of users) {
+                if ( Math.floor(Math.random() * 3) == 0 ) {
+                    await soteriaCoverageProduct.connect(governor).setRewardPoints(user.address, WEEKLY_MAX_PREMIUM.div(2))
+                } else if ( Math.floor(Math.random() * 3) == 1 ) {
+                    await soteriaCoverageProduct.connect(governor).setRewardPoints(user.address, WEEKLY_MAX_PREMIUM)
+                }
+            }
+            // Create arrays for chargePremium parameter
+            let PREMIUM_ARRAY:BN[] = []
+            let ADDRESS_ARRAY:string[] = []
+            for (let user of users) {
+                ADDRESS_ARRAY.push(user.address)
+                PREMIUM_ARRAY.push(WEEKLY_MAX_PREMIUM)
+            }
+
+            // Charge premiums
+            await soteriaCoverageProduct.connect(governor).chargePremiums(ADDRESS_ARRAY, PREMIUM_ARRAY);
+        })
     // Test for maxing out users
 
     });
