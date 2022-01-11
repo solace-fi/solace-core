@@ -10,7 +10,8 @@ import "./ERC721Enhanced.sol";
 import "./interface/IProduct.sol";
 import "./interface/IPolicyManager.sol";
 import "./interface/IPolicyDescriptor.sol";
-import "./interface/ISoteriaCoverageProduct.sol";
+import "./interface/IRegistry.sol";
+import "./interface/IRiskManager.sol";
 
 
 /**
@@ -29,18 +30,14 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
     /***************************************
     GLOBAL VARIABLES
     ***************************************/
+    /// @notice The Registry contract.
+    IRegistry internal _registry;
 
     /// @notice The address of the policy descriptor contract, which handles generating token URIs for policies.
     address internal _policyDescriptor;
 
-    /// @notice solace.fi Soteria coverage product.
-    ISoteriaCoverageProduct internal _soteriaCoverageProduct;
-
     /// @notice Set of products.
     EnumerableSet.AddressSet internal products;
-
-    // The current amount covered (in wei).
-    uint256 internal _activeCoverAmount;
 
     /// @notice Total policy count.
     uint256 internal _totalPolicyCount = 0;
@@ -48,14 +45,14 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
     /// @notice Policy info (policy ID => policy info).
     mapping(uint256 => PolicyInfo) internal _policyInfo;
 
-    /// @notice The current amount covered (in wei) per strategy;
-    mapping(address => uint256) internal _activeCoverAmountPerStrategy;
-
     /**
      * @notice Constructs the `PolicyManager`.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
      */
-    constructor(address governance_) ERC721Enhanced("Solace Policy", "SPT") Governable(governance_) { }
+    constructor(address governance_, address registry_) ERC721Enhanced("Solace Policy", "SPT") Governable(governance_) { 
+        require(address(registry_) != address(0x0), "zero address registry");
+        _registry = IRegistry(registry_);
+    }
 
     /***************************************
     POLICY VIEW FUNCTIONS
@@ -209,6 +206,14 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
         return IPolicyDescriptor(_policyDescriptor).tokenURI(this, policyID);
     }
 
+   /**
+     * @notice Returns [`Registry`](./Registry) contract address.
+     * @return registry_ The `Registry` address.
+    */
+    function registry() external view override returns (address registry_) {
+        return address(_registry);
+    }
+
     /***************************************
     POLICY MUTATIVE FUNCTIONS
     ***************************************/
@@ -242,10 +247,10 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
             riskStrategy: riskStrategy
         });
         policyID = ++_totalPolicyCount; // starts at 1
-        _activeCoverAmount += coverAmount;
-        _activeCoverAmountPerStrategy[riskStrategy] += coverAmount;
         _policyInfo[policyID] = info;
         _mint(policyholder, policyID);
+        // update active cover limit
+        IRiskManager(_registry.riskManager()).updateActiveCoverLimitForStrategy(riskStrategy, 0, coverAmount);
         emit PolicyCreated(policyID);
         return policyID;
     }
@@ -271,8 +276,10 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
         external override tokenMustExist(policyID)
     {
         require(_policyInfo[policyID].product == msg.sender, "wrong product");
-        _activeCoverAmount = _activeCoverAmount - _policyInfo[policyID].coverAmount + coverAmount;
-        _activeCoverAmountPerStrategy[riskStrategy] = _activeCoverAmountPerStrategy[riskStrategy] - _policyInfo[policyID].coverAmount + coverAmount;
+       
+        // update active cover limit
+        IRiskManager(_registry.riskManager()).updateActiveCoverLimitForStrategy(riskStrategy, _policyInfo[policyID].coverAmount, coverAmount);
+        
         PolicyInfo memory info = PolicyInfo({
             product: msg.sender,
             positionDescription: positionDescription,
@@ -304,8 +311,10 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
         external override tokenMustExist(policyID)
     {
         require(_policyInfo[policyID].product == msg.sender, "wrong product");
-        _activeCoverAmount = _activeCoverAmount - _policyInfo[policyID].coverAmount + coverAmount;
-        _activeCoverAmountPerStrategy[riskStrategy] = _activeCoverAmountPerStrategy[riskStrategy] - _policyInfo[policyID].coverAmount + coverAmount;
+
+        // update active cover limit
+        IRiskManager(_registry.riskManager()).updateActiveCoverLimitForStrategy(riskStrategy, _policyInfo[policyID].coverAmount, coverAmount);
+       
         PolicyInfo memory info = PolicyInfo({
             product: msg.sender,
             positionDescription: _policyInfo[policyID].positionDescription,
@@ -334,8 +343,8 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
      */
     function _burn(uint256 policyID) internal override {
         super._burn(policyID);
-        _activeCoverAmount -= _policyInfo[policyID].coverAmount;
-        _activeCoverAmountPerStrategy[_policyInfo[policyID].riskStrategy] -=  _policyInfo[policyID].coverAmount;
+        // update active cover limit
+        IRiskManager(_registry.riskManager()).updateActiveCoverLimitForStrategy(_policyInfo[policyID].riskStrategy, _policyInfo[policyID].coverAmount, 0);
         delete _policyInfo[policyID];
         emit PolicyBurned(policyID);
     }
@@ -345,7 +354,6 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
      * @param policyIDs The list of expired policies.
      */
     function updateActivePolicies(uint256[] calldata policyIDs) external override {
-        uint256 activeCover = _activeCoverAmount;
 
         for(uint256 i = 0; i < policyIDs.length; i++) {
             uint256 policyID = policyIDs[i];
@@ -353,29 +361,15 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
             if (policyHasExpired(policyID)) {
                 address product = _policyInfo[policyID].product;
                 uint256 coverAmount = _policyInfo[policyID].coverAmount;
-                activeCover -= coverAmount;
-                _activeCoverAmountPerStrategy[_policyInfo[policyID].riskStrategy] -= coverAmount;
+                // update active cover limit
+                IRiskManager(_registry.riskManager()).updateActiveCoverLimitForStrategy(_policyInfo[policyID].riskStrategy,_policyInfo[policyID].coverAmount,0);
                 IProduct(product).updateActiveCoverAmount(-SafeCast.toInt256(coverAmount));
                 super._burn(policyID);
             }
         }
-        _activeCoverAmount = activeCover;
     }
 
-    /**
-     * @notice Updates the active cover amount of the Soteria product.
-     * This function is only called by `SoteriaCoverageProduct` when a new policy is bought or updated.
-     * @param newCoverAmount The new cover amount.
-    */
-    function setSoteriaActiveCoverAmount(uint256 newCoverAmount) external override {
-        require(address(_soteriaCoverageProduct) != address(0x0), "no soteria product");
-        require(msg.sender == address(_soteriaCoverageProduct), "only soteria product");
-        uint256 coverAmount = _activeCoverAmount;
-        coverAmount = coverAmount + newCoverAmount - _activeCoverAmountPerStrategy[msg.sender];
-        _activeCoverAmountPerStrategy[msg.sender] = newCoverAmount;
-        _activeCoverAmount = coverAmount;
-        emit SoteriaProductCoverAmountUpdated(newCoverAmount);
-    }
+ 
 
     /***************************************
     PRODUCT VIEW FUNCTIONS
@@ -407,35 +401,6 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
         return products.at(productNum);
     }
 
-    /**
-     * @notice Returns `SoteriaCoverageProduct`.
-     * @return soteria The address of soteria product.
-    */
-    function getSoteriaProduct() external override view returns (address soteria) {
-        return address(_soteriaCoverageProduct);
-    }
-
-    /***************************************
-    OTHER VIEW FUNCTIONS
-    ***************************************/
-
-    /**
-     * @notice Returns the current amount covered (in wei).
-     * @return amount The covered amount (in wei).
-    */
-    function activeCoverAmount() external view override returns (uint256 amount) {
-        return _activeCoverAmount;
-    }
-
-    /**
-     * @notice Returns the current amount covered (in wei).
-     * @param riskStrategy The risk strategy address.
-     * @return amount The covered amount (in wei).
-    */
-    function activeCoverAmountPerStrategy(address riskStrategy) external view override returns (uint256 amount) {
-        return _activeCoverAmountPerStrategy[riskStrategy];
-    }
-
     /***************************************
     GOVERNANCE FUNCTIONS
     ***************************************/
@@ -449,17 +414,6 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
         require(product != address(0x0), "zero product");
         products.add(product);
         emit ProductAdded(product);
-    }
-
-    /**
-     * @notice Sets soteria product.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param soteria The `SoteriaCoverageProduct`.
-     */
-     function setSoteriaProduct(address soteria) external override onlyGovernance {
-        require(soteria != address(0x0), "zero address soteria");
-        _soteriaCoverageProduct = ISoteriaCoverageProduct(soteria);
-        emit SoteriaProductSet(soteria);
     }
 
     /**
@@ -480,5 +434,16 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
     function setPolicyDescriptor(address policyDescriptor_) external override onlyGovernance {
         _policyDescriptor = policyDescriptor_;
         emit PolicyDescriptorSet(policyDescriptor_);
+    }
+
+    /**
+     * @notice Sets the [`Registry`](./Registry) contract address.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param registry_ The address of `Registry` contract.
+    */
+    function setRegistry(address registry_) external override onlyGovernance {
+        require(registry_ != address(0x0), "zero address registry");
+        _registry = IRegistry(registry_);
+        emit RegistrySet(registry_);
     }
 }

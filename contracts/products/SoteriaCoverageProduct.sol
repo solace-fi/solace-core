@@ -45,9 +45,6 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     BOOK-KEEPING VARIABLES
     ***************************************/
 
-    /// @notice The current amount covered (in wei).
-    uint256 internal _activeCoverLimit;
-
     /// @notice The total policy count.
     uint256 internal _totalPolicyCount;
 
@@ -158,13 +155,10 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
             _policyOf[policyholder_] = policyID;
             _mint(policyholder_, policyID);
         }
-
-        // update cover amount
-        _activeCoverLimit += coverLimit_;
+        
         _coverLimitOf[policyID] = coverLimit_;
-       
         // update policy manager active cover amount
-        _updatePolicyManager(_activeCoverLimit); // Need to change to _updateRiskManager(_activeCoverLimit)
+        _updateActiveCoverLimit(0, coverLimit_);
         emit PolicyCreated(policyID);
         return policyID;
     }
@@ -184,9 +178,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         require(_accountBalanceOf[policyOwner] > ( _maxRateNum * _chargeCycle * newCoverLimit_ ) / _maxRateDenom, "insufficient deposit for minimum required account balance");
         
         _coverLimitOf[policyID_] = newCoverLimit_;
-        uint256 newActiveCoverLimit = activeCoverLimit() + newCoverLimit_ - currentCoverLimit;
-        _activeCoverLimit = newActiveCoverLimit;
-        _updatePolicyManager(newActiveCoverLimit); // Need to change to _updateRiskManager(newActiveCoverLimit)
+        _updateActiveCoverLimit(currentCoverLimit, newCoverLimit_); // Need to change to _updateRiskManager(newActiveCoverLimit)
         emit PolicyUpdated(policyID_);
     }
 
@@ -318,7 +310,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      * @return amount The active cover limit.
     */
     function activeCoverLimit() public view override returns (uint256 amount) {
-        return _activeCoverLimit;
+        return _riskManager.activeCoverLimitPerStrategy(address(this));
     }
 
     /**
@@ -522,21 +514,20 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     */
     function _deactivatePolicy(address policyholder) internal {
         uint256 policyID = _policyOf[policyholder];
-        _activeCoverLimit -= _coverLimitOf[policyID];
         _coverLimitOf[policyID] = 0;
         _accountBalanceOf[policyholder] = 0;
-        _updatePolicyManager(_activeCoverLimit); // Need to change to _updateRiskManager(_activeCoverLimit)
+        // update active cover limit
+        _updateActiveCoverLimit(_coverLimitOf[policyID], 0);
         emit PolicyDeactivated(policyID);
     }
 
-    // REQUIRE CHANGING PolicyManager.sol & RiskManager.sol so that RiskManager tracks the activeCoverLimit
     /**
-     * @notice Updates policy manager's active cover amount.
-     * @param soteriaActiveCoverLimit The active cover amount of soteria product.
+     * @notice Updates active cover limit of `Soteria`.
+     * @param currentCoverLimit The current cover limit of the policy.
+     * @param newCoverLimit The new cover limit of the policy.
     */
-    function _updatePolicyManager(uint256 soteriaActiveCoverLimit) internal {
-        _policyManager.setSoteriaActiveCoverAmount(soteriaActiveCoverLimit);
-        emit PolicyManagerUpdated(soteriaActiveCoverLimit);
+    function _updateActiveCoverLimit(uint256 currentCoverLimit, uint256 newCoverLimit) internal {
+        IRiskManager(_registry.riskManager()).updateActiveCoverLimitForStrategy(address(this), currentCoverLimit, newCoverLimit);
     }
 
     /**

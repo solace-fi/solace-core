@@ -53,6 +53,9 @@ interface IRiskManager {
     /// @notice Emitted when the partial reserves factor is set.
     event PartialReservesFactorSet(uint16 partialReservesFactor);
 
+    /// @notice Emitted when the cover limit amount of the strategy is updated.
+    event ActiveCoverLimitUpdated(address strategy, uint256 oldCoverLimit, uint256 newCoverLimit);
+
     /***************************************
     RISK STRATEGY FUNCTIONS
     ***************************************/
@@ -96,6 +99,16 @@ interface IRiskManager {
     */
     function setStrategyStatus(address strategy_, uint8 status_) external;
 
+   /**
+     * @notice Updates the active cover limit amount for the given strategy. 
+     * This function is only called by valid requesters when a new policy is bought or updated.
+     * @dev The policy manager and soteria will call this function for now.
+     * @param strategy The strategy address to add cover limit.
+     * @param currentCoverLimit The current cover limit amount of the strategy's product.
+     * @param newCoverLimit The new cover limit amount of the strategy's product.
+    */
+    function updateActiveCoverLimitForStrategy(address strategy, uint256 currentCoverLimit, uint256 newCoverLimit) external;
+
     /**
      * @notice Returns the number of registered strategies..
      * @return count The number of strategies.
@@ -125,6 +138,19 @@ interface IRiskManager {
      * @return cover The max amount of cover in wei.
      */
     function maxCoverPerStrategy(address strategy_) external view returns (uint256 cover);
+
+    /**
+     * @notice Returns the current amount covered (in wei).
+     * @return amount The covered amount (in wei).
+    */
+    function activeCoverLimit() external view returns (uint256 amount);
+
+    /**
+     * @notice Returns the current amount covered (in wei).
+     * @param riskStrategy The risk strategy address.
+     * @return amount The covered amount (in wei).
+    */
+    function activeCoverLimitPerStrategy(address riskStrategy) external view returns (uint256 amount);
 
     /***************************************
     MAX COVER VIEW FUNCTIONS

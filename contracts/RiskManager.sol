@@ -5,7 +5,6 @@ import "./Governable.sol";
 import "./interface/ICoverageDataProvider.sol";
 import "./interface/IRegistry.sol";
 import "./interface/IProduct.sol";
-import "./interface/IPolicyManager.sol";
 import "./interface/IRiskManager.sol";
 
 /**
@@ -15,7 +14,7 @@ import "./interface/IRiskManager.sol";
  *
  * The total amount of sellable coverage is proportional to the assets in the [**risk backing capital pool**](./Vault). The max cover is split amongst products in a weighting system. [**Governance**](/docs/protocol/governance) can change these weights and with it each product's sellable cover.
  *
- * The minimum capital requirement is proportional to the amount of cover sold to [active policies](./PolicyManager).
+ * The minimum capital requirement is proportional to the amount of cover sold to active policies.
  *
  * Solace can use leverage to sell more cover than the available capital. The amount of leverage is stored as [`partialReservesFactor`](#partialreservesfactor) and is settable by [**governance**](/docs/protocol/governance).
  */
@@ -26,22 +25,28 @@ contract RiskManager is IRiskManager, Governable {
     ***************************************/
 
     /// @notice Holds mapping strategy => inddex.
-    mapping(address => uint256) internal _strategyToIndex;
+    mapping(address => uint256) private _strategyToIndex;
     /// @notice Holds mapping index => strategy.
-    mapping(uint256 => address) internal _indexToStrategy;
+    mapping(uint256 => address) private _indexToStrategy;
     /// @notice Holds strategies.
-    mapping(address => Strategy) internal _strategies;
+    mapping(address => Strategy) private _strategies;
+    /// @notice Returns true if the caller valid cover limit updater.
+    mapping(address => bool) internal _canUpdateCoverLimit;
+    // The current amount covered (in wei).
+    uint256 internal _activeCoverLimit;
+    /// @notice The current amount covered (in wei) per strategy;
+    mapping(address => uint256) internal _activeCoverLimitPerStrategy;
     /// @notice The total strategy count.
-    uint256 internal _strategyCount;
+    uint256 private _strategyCount;
     /// @notice The total weight sum of all strategies.
-    uint32 internal _weightSum;
+    uint32 private _weightSum;
     /// @notice Multiplier for minimum capital requirement in BPS.
-    uint16 internal _partialReservesFactor;
+    uint16 private _partialReservesFactor;
     /// @notice 10k basis points (100%).
-    uint16 internal constant MAX_BPS = 10000;
+    uint16 private constant MAX_BPS = 10000;
 
     /// @notice Registry contract.
-    IRegistry internal _registry;
+    IRegistry private _registry;
 
     /**
      * @notice Constructs the RiskManager contract.
@@ -163,6 +168,25 @@ contract RiskManager is IRiskManager, Governable {
         return strategy.weight;
     }
 
+   /**
+     * @notice Updates the active cover limit amount for the given strategy. 
+     * This function is only called by valid requesters when a new policy is bought or updated.
+     * @dev The policy manager and soteria will call this function for now.
+     * @param strategy The strategy address to add cover limit.
+     * @param currentCoverLimit The current cover limit amount of the strategy's product.
+     * @param newCoverLimit The new cover limit amount of the strategy's product.
+    */
+    function updateActiveCoverLimitForStrategy(address strategy, uint256 currentCoverLimit, uint256 newCoverLimit) external override {
+        require(_canUpdateCoverLimit[msg.sender], "unauthorized caller");
+        require(strategyIsActive(strategy), "inactive strategy");
+
+        uint256 oldCoverLimitOfStrategy = _activeCoverLimitPerStrategy[strategy];
+        _activeCoverLimit = _activeCoverLimit - currentCoverLimit + newCoverLimit;
+        uint256 newCoverLimitOfStrategy = oldCoverLimitOfStrategy - currentCoverLimit + newCoverLimit;
+        _activeCoverLimitPerStrategy[strategy] = newCoverLimitOfStrategy;
+        emit ActiveCoverLimitUpdated(strategy, oldCoverLimitOfStrategy, newCoverLimitOfStrategy);
+    }
+
     /***************************************
     RISK MANAGER VIEW FUNCTIONS
     ***************************************/
@@ -194,6 +218,23 @@ contract RiskManager is IRiskManager, Governable {
         return _weightSum == 0 ? type(uint32).max : _weightSum;
     }
 
+    /**
+     * @notice Returns the current amount covered (in wei).
+     * @return amount The covered amount (in wei).
+    */
+    function activeCoverLimit() public view override returns (uint256 amount) {
+        return _activeCoverLimit;
+    }
+
+    /**
+     * @notice Returns the current amount covered (in wei).
+     * @param riskStrategy The risk strategy address.
+     * @return amount The covered amount (in wei).
+    */
+    function activeCoverLimitPerStrategy(address riskStrategy) public view override returns (uint256 amount) {
+        return _activeCoverLimitPerStrategy[riskStrategy];
+    }
+
     /***************************************
     MIN CAPITAL VIEW FUNCTIONS
     ***************************************/
@@ -203,7 +244,7 @@ contract RiskManager is IRiskManager, Governable {
      * @return mcr The minimum capital requirement.
      */
     function minCapitalRequirement() external view override returns (uint256 mcr) {
-        return IPolicyManager(_registry.policyManager()).activeCoverAmount() * _partialReservesFactor / MAX_BPS;
+        return activeCoverLimit() * _partialReservesFactor / MAX_BPS;
     }
 
     /**
@@ -214,7 +255,7 @@ contract RiskManager is IRiskManager, Governable {
      * @return smcr The strategy minimum capital requirement.
      */
     function minCapitalRequirementPerStrategy(address strategy) public view override returns (uint256 smcr) {
-        return IPolicyManager(_registry.policyManager()).activeCoverAmountPerStrategy(strategy) * _partialReservesFactor / MAX_BPS;
+        return activeCoverLimitPerStrategy(strategy) * _partialReservesFactor / MAX_BPS;
     }
 
     /**
