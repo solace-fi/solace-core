@@ -144,7 +144,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         policyID = policyOf(policyholder_);
         require(!policyStatus(policyID), "policy already activated");
         require(_canPurchaseNewCover(0, coverLimit_), "insufficient capacity for new cover");
-        require(msg.value + _accountBalanceOf[policyholder_] > ( _maxRateNum * _chargeCycle * coverLimit_ ) / _maxRateDenom, "insufficient deposit for minimum required account balance");
+        require(msg.value + _accountBalanceOf[policyholder_] > _minRequiredAccountBalance(coverLimit_), "insufficient deposit for minimum required account balance");
 
         // deposit funds
         _deposit(policyholder_, msg.value);
@@ -172,10 +172,10 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         require(newCoverLimit_ > 0, "zero cover value");
         require(_exists(policyID_), "invalid policy");
         address policyOwner = ownerOf(policyID_);
-        require(this.governance() == msg.sender || policyOwner == msg.sender, "Not owner or governance");
+        require(this.governance() == msg.sender || policyOwner == msg.sender, "not owner or governance");
         uint256 currentCoverLimit = coverLimitOf(policyID_);
         require(_canPurchaseNewCover(currentCoverLimit, newCoverLimit_), "insufficient capacity for new cover");
-        require(_accountBalanceOf[policyOwner] > ( _maxRateNum * _chargeCycle * newCoverLimit_ ) / _maxRateDenom, "insufficient deposit for minimum required account balance");
+        require(_accountBalanceOf[policyOwner] > _minRequiredAccountBalance(newCoverLimit_), "insufficient deposit for minimum required account balance");
         
         _coverLimitOf[policyID_] = newCoverLimit_;
         _updateActiveCoverLimit(currentCoverLimit, newCoverLimit_); // Need to change to _updateRiskManager(newActiveCoverLimit)
@@ -201,7 +201,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
       
       uint256 currentCoverLimit = _coverLimitOf[_policyOf[msg.sender]];
 
-      if (_accountBalanceOf[msg.sender] - amount_ > ( _maxRateNum * _chargeCycle * currentCoverLimit ) / _maxRateDenom) {
+      if (_accountBalanceOf[msg.sender] - amount_ > _minRequiredAccountBalance(currentCoverLimit)) {
           _withdraw(msg.sender, amount_);
       } else {
           uint256 accountBalance = _accountBalanceOf[msg.sender];
@@ -218,7 +218,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      function deactivatePolicy(uint256 policyID_) public override nonReentrant {
         require(policyStatus(policyID_), "invalid policy");
         address policyOwner = ownerOf(policyID_);
-        require(this.governance() == msg.sender || policyOwner == msg.sender, "Not owner or governance");
+        require(this.governance() == msg.sender || policyOwner == msg.sender, "not owner or governance");
 
         uint256 refundAmount = accountBalanceOf(policyOwner);
         _deactivatePolicy(policyOwner);
@@ -439,7 +439,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         for (uint256 i = 0; i < count; i++) {
             // skip computation if policy inactive
             if ( !policyStatus(_policyOf[holders_[i]]) ) continue;
-            require(premiums_[i] <= ( _maxRateNum * _chargeCycle * coverLimitOf(policyOf(holders_[i])) ) / _maxRateDenom, "Charging more than promised maximum rate");
+            require(premiums_[i] <= _minRequiredAccountBalance(coverLimitOf(policyOf(holders_[i]))), "charging more than promised maximum rate");
 
             // If policy holder can pay for premium charged in full
             if (_accountBalanceOf[holders_[i]] + _rewardPointsOf[holders_[i]] >= premiums_[i]) {
@@ -528,6 +528,14 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     */
     function _updateActiveCoverLimit(uint256 currentCoverLimit, uint256 newCoverLimit) internal {
         IRiskManager(_registry.riskManager()).updateActiveCoverLimitForStrategy(address(this), currentCoverLimit, newCoverLimit);
+    }
+
+    /**
+     * @notice Calculate minimum required account balance for a given cover limit
+     * @param coverLimit cover limit.
+    */
+    function _minRequiredAccountBalance(uint256 coverLimit) internal returns (uint256 minRequiredAccountBalance) {
+        minRequiredAccountBalance = ( _maxRateNum * _chargeCycle * coverLimit ) / _maxRateDenom;
     }
 
     /**
