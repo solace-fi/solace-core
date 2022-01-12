@@ -16,7 +16,6 @@ export async function import_artifacts() {
   let artifacts: ArtifactImports = {};
 
   let artifact_dir = process.env.USE_PROCESSED_FILES === "true" ? "../../artifacts/contracts_processed" : "../../artifacts/contracts";
-  artifacts.Registry = await tryImport(`${artifact_dir}/Registry.sol/Registry.json`);
   artifacts.WETH = await tryImport(`${artifact_dir}/WETH9.sol/WETH9.json`);
   artifacts.SOLACE = await tryImport(`${artifact_dir}/SOLACE.sol/SOLACE.json`);
   // staking
@@ -32,7 +31,10 @@ export async function import_artifacts() {
   artifacts.BondTellerETH = await tryImport(`${artifact_dir}/bonds/BondTellerEth.sol/BondTellerEth.json`);
   artifacts.BondTellerERC20 = await tryImport(`${artifact_dir}/bonds/BondTellerErc20.sol/BondTellerErc20.json`);
   artifacts.Faucet = await tryImport(`${artifact_dir}/Faucet.sol/Faucet.json`);
-
+  // utils
+  artifacts.Registry = await tryImport(`${artifact_dir}/utils/Registry.sol/Registry.json`);
+  artifacts.SingletonFactory = await tryImport(`${artifact_dir}/interface/ISingletonFactory.sol/ISingletonFactory.json`);
+  artifacts.Deployer = await tryImport(`${artifact_dir}/utils/Deployer.sol/Deployer.json`);
   // generic imports
   artifacts.ERC20 = await tryImport(`${artifact_dir}/SOLACE.sol/ERC20.json`);
   if(!artifacts.ERC20) artifacts.ERC20 = await tryImport(`../../artifacts/@openzeppelin/contracts/token/ERC20/ERC20.sol/ERC20.json`);
@@ -45,9 +47,6 @@ export async function import_artifacts() {
   artifacts.MockGovernableInitializable = await tryImport(`${artifact_dir}/mocks/MockGovernableInitializable.sol/MockGovernableInitializable.json`);
   artifacts.MockFaultyReceiver = await tryImport(`${artifact_dir}/mocks/MockFaultyReceiver.sol/MockFaultyReceiver.json`);
   artifacts.GasGriefer = await tryImport(`${artifact_dir}/mocks/GasGriefer.sol/GasGriefer.json`);
-  artifacts.Blacklist = await tryImport(`${artifact_dir}/interface/IBlacklist.sol/IBlacklist.json`);
-  artifacts.SingletonFactory = await tryImport(`${artifact_dir}/interface/ISingletonFactory.sol/ISingletonFactory.json`);
-  artifacts.Deployer = await tryImport(`${artifact_dir}/utils/Deployer.sol/Deployer.json`);
 
   return artifacts;
 }
