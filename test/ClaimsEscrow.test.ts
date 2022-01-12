@@ -50,7 +50,7 @@ describe("ClaimsEscrow", function () {
     await registry.connect(governor).setVault(vault.address);
     claimsEscrow = (await deployContract(deployer, artifacts.ClaimsEscrow, [governor.address, registry.address])) as ClaimsEscrow;
     await registry.connect(governor).setClaimsEscrow(claimsEscrow.address);
-    policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
+    policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address, registry.address])) as PolicyManager;
     await registry.connect(governor).setPolicyManager(policyManager.address);
 
     await policyManager.connect(governor).addProduct(mockProduct.address);

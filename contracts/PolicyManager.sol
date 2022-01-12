@@ -13,7 +13,6 @@ import "./interface/IPolicyDescriptor.sol";
 import "./interface/IRegistry.sol";
 import "./interface/IRiskManager.sol";
 
-
 /**
  * @title PolicyManager
  * @author solace.fi
@@ -251,6 +250,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
         _mint(policyholder, policyID);
         // update active cover limit
         IRiskManager(_registry.riskManager()).updateActiveCoverLimitForStrategy(riskStrategy, 0, coverAmount);
+
         emit PolicyCreated(policyID);
         return policyID;
     }
@@ -314,7 +314,6 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
 
         // update active cover limit
         IRiskManager(_registry.riskManager()).updateActiveCoverLimitForStrategy(riskStrategy, _policyInfo[policyID].coverAmount, coverAmount);
-       
         PolicyInfo memory info = PolicyInfo({
             product: msg.sender,
             positionDescription: _policyInfo[policyID].positionDescription,

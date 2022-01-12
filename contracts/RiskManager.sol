@@ -31,7 +31,7 @@ contract RiskManager is IRiskManager, Governable {
     /// @notice Holds strategies.
     mapping(address => Strategy) private _strategies;
     /// @notice Returns true if the caller valid cover limit updater.
-    mapping(address => bool) internal _canUpdateCoverLimit;
+    mapping(address => bool) public canUpdateCoverLimit;
     // The current amount covered (in wei).
     uint256 internal _activeCoverLimit;
     /// @notice The current amount covered (in wei) per strategy;
@@ -57,10 +57,11 @@ contract RiskManager is IRiskManager, Governable {
         require(registry_ != address(0x0), "zero address registry");
         _registry = IRegistry(registry_);
         _partialReservesFactor = MAX_BPS;
+        canUpdateCoverLimit[_registry.policyManager()] = true;
     }
 
     /***************************************
-    RISK STRATEGY FUNCTIONS
+    RISK MANAGER MUTUATOR FUNCTIONS
     ***************************************/
 
     /**
@@ -117,6 +118,49 @@ contract RiskManager is IRiskManager, Governable {
         emit StrategyStatusUpdated(strategy_, status_);
     }
 
+   /**
+     * @notice Updates the active cover limit amount for the given strategy. 
+     * This function is only called by valid requesters when a new policy is bought or updated.
+     * @dev The policy manager and soteria will call this function for now.
+     * @param strategy The strategy address to add cover limit.
+     * @param currentCoverLimit The current cover limit amount of the strategy's product.
+     * @param newCoverLimit The new cover limit amount of the strategy's product.
+    */
+    function updateActiveCoverLimitForStrategy(address strategy, uint256 currentCoverLimit, uint256 newCoverLimit) external override {
+        require(canUpdateCoverLimit[msg.sender], "unauthorized caller");
+        require(strategyIsActive(strategy), "inactive strategy");
+        uint256 oldCoverLimitOfStrategy = _activeCoverLimitPerStrategy[strategy];
+        _activeCoverLimit = _activeCoverLimit - currentCoverLimit + newCoverLimit;
+        uint256 newCoverLimitOfStrategy = oldCoverLimitOfStrategy - currentCoverLimit + newCoverLimit;
+        _activeCoverLimitPerStrategy[strategy] = newCoverLimitOfStrategy;
+        emit ActiveCoverLimitUpdated(strategy, oldCoverLimitOfStrategy, newCoverLimitOfStrategy);
+    }
+
+    /**
+     * @notice Adds new address to allow updating cover limit amounts.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param updater The address that can update cover limit.
+    */
+    function addCoverLimitUpdater(address updater) external override onlyGovernance {
+        require(updater != address(0x0), "zero address coverlimit updater");
+        canUpdateCoverLimit[updater] = true;
+        emit CoverLimitUpdaterAdded(updater);
+    }
+
+    /**
+     * @notice Removes the cover limit updater.
+     * @param updater The address of updater to remove.
+    */
+    function removeCoverLimitUpdater(address updater) external override onlyGovernance {
+        require(updater != address(0x0), "zero address coverlimit updater");
+        delete canUpdateCoverLimit[updater];
+        emit CoverLimitUpdaterDeleted(updater);
+    }
+
+    /***************************************
+    RISK MANAGER VIEW FUNCTIONS
+    ***************************************/
+
     /**
      * @notice Checks if the given risk strategy is active.
      * @param strategy_ The risk strategy.
@@ -167,29 +211,6 @@ contract RiskManager is IRiskManager, Governable {
         Strategy memory strategy = _strategies[strategy_];
         return strategy.weight;
     }
-
-   /**
-     * @notice Updates the active cover limit amount for the given strategy. 
-     * This function is only called by valid requesters when a new policy is bought or updated.
-     * @dev The policy manager and soteria will call this function for now.
-     * @param strategy The strategy address to add cover limit.
-     * @param currentCoverLimit The current cover limit amount of the strategy's product.
-     * @param newCoverLimit The new cover limit amount of the strategy's product.
-    */
-    function updateActiveCoverLimitForStrategy(address strategy, uint256 currentCoverLimit, uint256 newCoverLimit) external override {
-        require(_canUpdateCoverLimit[msg.sender], "unauthorized caller");
-        require(strategyIsActive(strategy), "inactive strategy");
-
-        uint256 oldCoverLimitOfStrategy = _activeCoverLimitPerStrategy[strategy];
-        _activeCoverLimit = _activeCoverLimit - currentCoverLimit + newCoverLimit;
-        uint256 newCoverLimitOfStrategy = oldCoverLimitOfStrategy - currentCoverLimit + newCoverLimit;
-        _activeCoverLimitPerStrategy[strategy] = newCoverLimitOfStrategy;
-        emit ActiveCoverLimitUpdated(strategy, oldCoverLimitOfStrategy, newCoverLimitOfStrategy);
-    }
-
-    /***************************************
-    RISK MANAGER VIEW FUNCTIONS
-    ***************************************/
 
     /**
      * @notice The maximum amount of cover that Solace as a whole can sell.

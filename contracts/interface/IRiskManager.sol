@@ -56,8 +56,14 @@ interface IRiskManager {
     /// @notice Emitted when the cover limit amount of the strategy is updated.
     event ActiveCoverLimitUpdated(address strategy, uint256 oldCoverLimit, uint256 newCoverLimit);
 
+    /// @notice Emitted when the cover limit updater is set.
+    event CoverLimitUpdaterAdded(address updater);
+
+    /// @notice Emitted when the cover limit updater is removed.
+    event CoverLimitUpdaterDeleted(address updater);
+
     /***************************************
-    RISK STRATEGY FUNCTIONS
+    RISK MANAGER MUTUTATOR FUNCTIONS
     ***************************************/
 
     /**
@@ -67,21 +73,6 @@ interface IRiskManager {
      * @return index The index of the risk strategy.
     */
     function addRiskStrategy(address strategy_) external returns (uint256 index);
-
-    /**
-     * @notice Checks is an address is an active strategy.
-     * @param strategy_ The risk strategy.
-     * @return status True if the strategy is active.
-    */
-    function strategyIsActive(address strategy_) external view returns (bool status);
-
-     /**
-      * @notice Return the strategy at an index.
-      * @dev Enumerable `[1, numStrategies]`.
-      * @param index_ Index to query.
-      * @return strategy The product address.
-    */
-    function strategyAt(uint256 index_) external view returns (address strategy);
 
     /**
      * @notice Sets the weight of the `Risk Strategy`.
@@ -108,6 +99,38 @@ interface IRiskManager {
      * @param newCoverLimit The new cover limit amount of the strategy's product.
     */
     function updateActiveCoverLimitForStrategy(address strategy, uint256 currentCoverLimit, uint256 newCoverLimit) external;
+
+    /**
+     * @notice Adds new address to allow updating cover limit amounts.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param updater The address that can update cover limit.
+    */
+    function addCoverLimitUpdater(address updater) external ;
+
+    /**
+     * @notice Removes the cover limit updater.
+     * @param updater The address of updater to remove.
+    */
+    function removeCoverLimitUpdater(address updater) external;
+
+    /***************************************
+    RISK MANAGER VIEW FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Checks is an address is an active strategy.
+     * @param strategy_ The risk strategy.
+     * @return status True if the strategy is active.
+    */
+    function strategyIsActive(address strategy_) external view returns (bool status);
+
+     /**
+      * @notice Return the strategy at an index.
+      * @dev Enumerable `[1, numStrategies]`.
+      * @param index_ Index to query.
+      * @return strategy The product address.
+    */
+    function strategyAt(uint256 index_) external view returns (address strategy);
 
     /**
      * @notice Returns the number of registered strategies..

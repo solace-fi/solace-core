@@ -69,7 +69,7 @@ describe("CoverageProduct", function () {
     await registry.connect(governor).setClaimsEscrow(claimsEscrow.address);
     treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, registry.address])) as Treasury;
     await registry.connect(governor).setTreasury(treasury.address);
-    policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
+    policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address, registry.address])) as PolicyManager;
     await registry.connect(governor).setPolicyManager(policyManager.address);
     riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
     await registry.connect(governor).setRiskManager(riskManager.address);
