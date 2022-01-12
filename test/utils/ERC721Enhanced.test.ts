@@ -12,7 +12,7 @@ import { import_artifacts, ArtifactImports } from "./../utilities/artifact_impor
 import { MockErc721, MockErc1271 } from "./../../typechain";
 import { getPermitErc721EnhancedSignature, getPermitErc721EnhancedDigest, getDomainSeparator, assembleRSV } from "./../utilities/getPermitNFTSignature";
 
-describe("ERC721Enhanced", function() {
+describe("ERC721Enhancedv1", function() {
   let artifacts: ArtifactImports;
   const [deployer, user1, user2, user3] = provider.getWallets();
 

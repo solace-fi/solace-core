@@ -8,16 +8,16 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
 import "./../interfaces/utils/IERC1271.sol";
-import "./../interfaces/utils/IERC721EnhancedInitializable.sol";
+import "./../interfaces/utils/IERC721Enhancedv1Initializable.sol";
 
 /**
- * @title ERC721Enhanced
+ * @title ERC721Enhancedv1
  * @author solace.fi
  * @notice An extension of `ERC721`.
  *
  * The base is OpenZeppelin's `ERC721Enumerable` which also includes the `Metadata` extension. This extension includes simpler transfers, gasless approvals, and better enumeration.
  */
-abstract contract ERC721EnhancedInitializable is IERC721EnhancedInitializable, ERC721EnumerableUpgradeable, EIP712Upgradeable {
+abstract contract ERC721Enhancedv1Initializable is IERC721Enhancedv1Initializable, ERC721EnumerableUpgradeable, EIP712Upgradeable {
 
     /// @dev The nonces used in the permit signature verification.
     /// tokenID => nonce
@@ -28,17 +28,17 @@ abstract contract ERC721EnhancedInitializable is IERC721EnhancedInitializable, E
 
 
     /**
-    * @notice Initializes the `ERC721Enhanced` contract.
+    * @notice Initializes the `ERC721Enhancedv1` contract.
     * @param name The name of the token.
     * @param symbol The symbol of the token.
     */
-    function __ERC721Enhanced_init(string memory name, string memory symbol) internal initializer {
+    function __ERC721Enhancedv1_init(string memory name, string memory symbol) internal initializer {
         __ERC721_init(name, symbol);
         __ERC721Enumerable_init_unchained();
         __EIP712_init_unchained(name, "1");
     }
 
-    function __ERC721Enhanced_init_unchained() internal initializer { }
+    function __ERC721Enhancedv1_init_unchained() internal initializer { }
 
     /***************************************
     SIMPLER TRANSFERS

@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./../utils/GovernableInitializable.sol";
-import "./../utils/ERC721EnhancedInitializable.sol";
+import "./../utils/ERC721Enhancedv1Initializable.sol";
 import "./../interfaces/ISOLACE.sol";
 import "./../interfaces/staking/IxSOLACEV1.sol";
 import "./../interfaces/bonds/IBondDepository.sol";
@@ -23,7 +23,7 @@ import "./../interfaces/bonds/IBondTellerErc20.sol";
  *
  * Bonds are represented as ERC721s, can be viewed with [`bonds()`](#bonds), and redeemed with [`redeem()`](#redeem).
  */
-abstract contract BondTellerBase is IBondTeller, ReentrancyGuard, GovernableInitializable, ERC721EnhancedInitializable {
+abstract contract BondTellerBase is IBondTeller, ReentrancyGuard, GovernableInitializable, ERC721Enhancedv1Initializable {
     using SafeERC20 for IERC20;
 
     /***************************************
@@ -98,7 +98,7 @@ abstract contract BondTellerBase is IBondTeller, ReentrancyGuard, GovernableInit
     ) external override initializer {
         __Governable_init(governance_);
         string memory symbol = "SBT";
-        __ERC721Enhanced_init(name_, symbol);
+        __ERC721Enhancedv1_init(name_, symbol);
         _setAddresses(solace_, xsolace_, pool_, dao_, principal_, bondDepo_);
     }
 

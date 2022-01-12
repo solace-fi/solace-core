@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
-import "./../utils/ERC721Enhanced2.sol";
+import "./../utils/ERC721Enhanced.sol";
 import "./../utils/Governable.sol";
 import "./../interfaces/staking/IxsListener.sol";
 import "./../interfaces/staking/IxsLocker.sol";
@@ -29,7 +29,7 @@ import "./../interfaces/staking/IxsLocker.sol";
  *
  * Note that transferring [**SOLACE**](./SOLACE) to this contract will not give you any rewards. You should deposit your [**SOLACE**](./SOLACE) via [`createLock()`](#createlock) or [`createLockSigned()`](#createlocksigned).
  */
-contract xsLocker is IxsLocker, ERC721Enhanced2, ReentrancyGuard, Governable {
+contract xsLocker is IxsLocker, ERC721Enhanced, ReentrancyGuard, Governable {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     /***************************************
@@ -57,7 +57,7 @@ contract xsLocker is IxsLocker, ERC721Enhanced2, ReentrancyGuard, Governable {
      * @param solace_ Address of [**SOLACE**](./SOLACE).
      */
     constructor(address governance_, address solace_)
-        ERC721Enhanced2("xsolace lock", "xsLOCK")
+        ERC721Enhanced("xsolace lock", "xsLOCK")
         Governable(governance_)
     {
         require(solace_ != address(0x0), "zero address solace");

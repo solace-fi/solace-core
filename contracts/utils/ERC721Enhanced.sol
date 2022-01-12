@@ -5,17 +5,19 @@ pragma solidity 0.8.6;
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 import "./../interfaces/utils/IERC1271.sol";
 import "./../interfaces/utils/IERC721Enhanced.sol";
 
 /**
- * @title ERC721Enhanced
+ * @title ERC721Enhancedv1
  * @author solace.fi
  * @notice An extension of `ERC721`.
  *
- * The base is OpenZeppelin's `ERC721Enumerable` which also includes the `Metadata` extension. This extension includes simpler transfers, gasless approvals, and better enumeration.
+ * The base is OpenZeppelin's `ERC721Enumerable` which also includes the `Metadata` extension. This extension includes simpler transfers, gasless approvals, and changeable URIs.
  */
 abstract contract ERC721Enhanced is ERC721Enumerable, IERC721Enhanced, EIP712 {
+    using Strings for uint256;
 
     /// @dev The nonces used in the permit signature verification.
     /// tokenID => nonce
@@ -24,15 +26,19 @@ abstract contract ERC721Enhanced is ERC721Enumerable, IERC721Enhanced, EIP712 {
     /// @dev Value is equal to keccak256("Permit(address spender,uint256 tokenID,uint256 nonce,uint256 deadline)");
     bytes32 private immutable _PERMIT_TYPEHASH = 0x137406564cdcf9b40b1700502a9241e87476728da7ae3d0edfcf0541e5b49b3e;
 
+    string public baseURI;
+
     /**
-     * @notice Constructs the `ERC721Enhanced` contract.
+     * @notice Constructs the `ERC721Enhancedv1` contract.
      * @param name_ The name of the token.
      * @param symbol_ The symbol of the token.
      */
      constructor(
          string memory name_,
          string memory symbol_
-     ) ERC721(name_, symbol_) EIP712(name_, "1") { }
+     ) ERC721(name_, symbol_) EIP712(name_, "1") {
+         baseURI = "";
+     }
 
     /***************************************
     SIMPLER TRANSFERS
@@ -136,47 +142,34 @@ abstract contract ERC721Enhanced is ERC721Enumerable, IERC721Enhanced, EIP712 {
     }
 
     /***************************************
-    BETTER ENUMERATION
+    CHANGEABLE URIS
     ***************************************/
 
     /**
-     * @notice Lists all tokens.
-     * Order not specified.
-     * @dev This function is more useful off chain than on chain.
-     * @return tokenIDs The list of token IDs.
+     * @notice Returns the Uniform Resource Identifier (URI) for `tokenID` token.
      */
-    function listTokens() public view override returns (uint256[] memory tokenIDs) {
-        uint256 tokenCount = totalSupply();
-        tokenIDs = new uint256[](tokenCount);
-        for(uint256 index = 0; index < tokenCount; index++) {
-            tokenIDs[index] = tokenByIndex(index);
-        }
-        return tokenIDs;
+    function tokenURI(uint256 tokenID) public view virtual override tokenMustExist(tokenID) returns (string memory) {
+        string memory baseURI_ = baseURI;
+        return string(abi.encodePacked(baseURI_, tokenID.toString()));
     }
 
     /**
-     * @notice Lists the tokens owned by `owner`.
-     * Order not specified.
-     * @dev This function is more useful off chain than on chain.
-     * @return tokenIDs The list of token IDs.
+     * @notice Base URI for computing `tokenURI`. If set, the resulting URI for each
+     * token will be the concatenation of the `baseURI` and the `tokenID`. Empty
+     * by default, can be overriden in child contracts.
      */
-    function listTokensOfOwner(address owner) public view override returns (uint256[] memory tokenIDs) {
-        require(owner != address(0x0), "zero address owner");
-        uint256 tokenCount = balanceOf(owner);
-        tokenIDs = new uint256[](tokenCount);
-        for(uint256 index = 0; index < tokenCount; index++) {
-            tokenIDs[index] = tokenOfOwnerByIndex(owner, index);
-        }
-        return tokenIDs;
+    function _baseURI() internal view virtual override returns (string memory baseURI_) {
+        return baseURI;
     }
 
     /**
-     * @notice Determines if a token exists or not.
-     * @param tokenID The ID of the token to query.
-     * @return status True if the token exists, false if it doesn't.
+     * @notice Sets the base URI for computing `tokenURI`.
+     * @dev Remember to add access control to inheriting contracts.
+     * @param baseURI_ The new base URI.
      */
-    function exists(uint256 tokenID) external view override returns (bool status) {
-        return _exists(tokenID);
+    function _setBaseURI(string memory baseURI_) internal {
+        baseURI = baseURI_;
+        emit BaseURISet(baseURI_);
     }
 
     /***************************************
@@ -187,5 +180,83 @@ abstract contract ERC721Enhanced is ERC721Enumerable, IERC721Enhanced, EIP712 {
     modifier tokenMustExist(uint256 tokenID) {
         require(_exists(tokenID), "query for nonexistent token");
         _;
+    }
+
+    // Call will revert if not made by owner.
+    // Call will revert if the token does not exist.
+    modifier onlyOwner(uint256 tokenID) {
+        require(ownerOf(tokenID) == msg.sender, "only owner");
+        _;
+    }
+
+    // Call will revert if not made by owner or approved.
+    // Call will revert if the token does not exist.
+    modifier onlyOwnerOrApproved(uint256 tokenID) {
+        require(_isApprovedOrOwner(msg.sender, tokenID), "only owner or approved");
+        _;
+    }
+
+    /***************************************
+    MORE HOOKS
+    ***************************************/
+
+    /**
+     * @notice Mints `tokenID` and transfers it to `to`.
+     * @param to The receiver of the token.
+     * @param tokenID The ID of the token to mint.
+     */
+    function _mint(address to, uint256 tokenID) internal virtual override {
+        super._mint(to, tokenID);
+        _afterTokenTransfer(address(0), to, tokenID);
+    }
+
+    /**
+     * @notice Destroys `tokenID`.
+     * @param tokenID The ID of the token to burn.
+     */
+    function _burn(uint256 tokenID) internal virtual override {
+        address owner = ERC721.ownerOf(tokenID);
+        super._burn(tokenID);
+        _afterTokenTransfer(owner, address(0), tokenID);
+    }
+
+    /**
+     * @notice Transfers `tokenID` from `from` to `to`.
+     * @param from The account to transfer the token from.
+     * @param to The account to transfer the token to.
+     * @param tokenID The ID of the token to transfer.
+     */
+    function _transfer(
+        address from,
+        address to,
+        uint256 tokenID
+    ) internal virtual override {
+        super._transfer(from, to, tokenID);
+        _afterTokenTransfer(from, to, tokenID);
+    }
+
+    /**
+     * @notice Hook that is called after any token transfer. This includes minting and burning.
+     * @param from The user that sends the token, or zero if minting.
+     * @param to The zero that receives the token, or zero if burning.
+     * @param tokenID The ID of the token being transferred.
+     */
+    function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 tokenID
+    ) internal virtual {}
+
+    /***************************************
+    MISC
+    ***************************************/
+
+    /**
+     * @notice Determines if a token exists or not.
+     * @param tokenID The ID of the token to query.
+     * @return status True if the token exists, false if it doesn't.
+     */
+    function exists(uint256 tokenID) external view override returns (bool status) {
+        return _exists(tokenID);
     }
 }

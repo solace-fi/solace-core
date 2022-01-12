@@ -6,13 +6,13 @@ import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/IERC721Enume
 
 
 /**
- * @title ERC721Enhanced
+ * @title ERC721Enhancedv1
  * @author solace.fi
  * @notice An extension of `ERC721`.
  *
  * The base is OpenZeppelin's `ERC721Enumerable` which also includes the `Metadata` extension. This extension includes simpler transfers, gasless approvals, and better enumeration.
  */
-interface IERC721EnhancedInitializable is IERC721EnumerableUpgradeable {
+interface IERC721Enhancedv1Initializable is IERC721EnumerableUpgradeable {
 
     /***************************************
     SIMPLER TRANSFERS

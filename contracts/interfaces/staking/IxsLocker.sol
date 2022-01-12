@@ -4,7 +4,7 @@ pragma solidity 0.8.6;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
-import "./../utils/IERC721Enhanced2.sol";
+import "./../utils/IERC721Enhanced.sol";
 
 struct Lock {
     uint256 amount;
@@ -27,7 +27,7 @@ struct Lock {
  *
  * Note that transferring [**SOLACE**](../SOLACE) to this contract will not give you any rewards. You should deposit your [**SOLACE**](../SOLACE) via [`createLock()`](#createlock) or [`createLockSigned()`](#createlocksigned).
  */
-interface IxsLocker is IERC721Enhanced2 {
+interface IxsLocker is IERC721Enhanced {
 
     /***************************************
     EVENTS
