@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.6;
 
-import "../interface/IxsListener.sol";
+import "./../interfaces/staking/IxsListener.sol";
 
 /**
  * @title MockListener

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Unlicense
 pragma solidity 0.8.6;
 
-import "./interface/ISOLACE.sol";
-import "./interface/IFaucet.sol";
+import "./interfaces/ISOLACE.sol";
+import "./interfaces/IFaucet.sol";
 
 /**
  * @title Faucet
  * @author solace.fi
- * @notice Drips **SOLACE**.
+ * @notice Drips [**SOLACE**](./SOLACE).
  */
 contract Faucet is IFaucet {
 
@@ -16,7 +16,7 @@ contract Faucet is IFaucet {
 
     /**
      * @notice Constructs the faucet.
-     * @param solace_ Address of the **SOLACE** contract.
+     * @param solace_ Address of the [**SOLACE**](./SOLACE) contract.
      */
     constructor(address solace_) {
         require(solace_ != address(0x0), "zero address solace");
@@ -24,11 +24,11 @@ contract Faucet is IFaucet {
     }
 
     /**
-     * @notice Drips **SOLACE** to msg.sender.
+     * @notice Drips [**SOLACE**](./SOLACE) to msg.sender.
      */
     function drip() external override {
-        require(lastPull[msg.sender] + 86400 <= block.timestamp, "well dry");
-        solace.mint(msg.sender, 10 ether);
+        require(lastPull[msg.sender] + 86400 <= block.timestamp, "the well is dry");
+        solace.mint(msg.sender, 1000 ether);
         lastPull[msg.sender] = block.timestamp;
     }
 }

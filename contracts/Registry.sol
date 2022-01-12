@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
-import "./Governable.sol";
-import "./interface/IRegistry.sol";
+import "./utils/Governable.sol";
+import "./interfaces/IRegistry.sol";
 
 /**
  * @title Registry

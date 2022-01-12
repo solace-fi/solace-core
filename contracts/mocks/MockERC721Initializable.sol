@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Unlicense
 pragma solidity 0.8.6;
 
-import "../ERC721EnhancedInitializable.sol";
+import "./../utils/ERC721EnhancedInitializable.sol";
 
 
 /**

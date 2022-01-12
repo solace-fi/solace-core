@@ -7,7 +7,7 @@ const provider = waffle.provider;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Solace } from "../typechain";
+import { Solace } from "./../typechain";
 
 const ONE_BILLION = BN.from("1000000000000000000000000000");
 const TWO_BILLION = BN.from("2000000000000000000000000000");

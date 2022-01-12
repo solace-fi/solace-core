@@ -1,11 +1,11 @@
-// SPDX-License-Identifier: Unlicense
+// SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
-import "./Governable.sol";
-import "./interface/ISOLACE.sol";
+import "./utils/Governable.sol";
+import "./interfaces/ISOLACE.sol";
 
 /**
  * @title Solace Token (SOLACE)
@@ -26,7 +26,7 @@ contract SOLACE is ISOLACE, ERC20Permit, Governable {
     constructor(address governance_) ERC20("solace", "SOLACE") ERC20Permit("solace") Governable(governance_) { }
 
     /**
-     * @notice Returns true if `account` is authorized to mint **SOLACE**.
+     * @notice Returns true if `account` is authorized to mint [**SOLACE**](./SOLACE).
      * @param account Account to query.
      * @return status True if `account` can mint, false otherwise.
      */
@@ -35,7 +35,7 @@ contract SOLACE is ISOLACE, ERC20Permit, Governable {
     }
 
     /**
-     * @notice Mints new **SOLACE** to the receiver account.
+     * @notice Mints new [**SOLACE**](./SOLACE) to the receiver account.
      * Can only be called by authorized minters.
      * @param account The receiver of new tokens.
      * @param amount The number of new tokens.
@@ -48,7 +48,7 @@ contract SOLACE is ISOLACE, ERC20Permit, Governable {
     }
 
     /**
-     * @notice Burns **SOLACE** from msg.sender.
+     * @notice Burns [**SOLACE**](./SOLACE) from msg.sender.
      * @param amount Amount to burn.
      */
     function burn(uint256 amount) external override {

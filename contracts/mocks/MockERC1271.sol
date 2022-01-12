@@ -2,7 +2,7 @@
 // code borrowed from @uniswap/v3-periphery
 pragma solidity 0.8.6;
 
-import "../interface/IERC1271.sol";
+import "./../interfaces/utils/IERC1271.sol";
 
 
 /// @title Interface for verifying contract-based account signatures

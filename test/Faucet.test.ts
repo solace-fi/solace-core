@@ -7,9 +7,9 @@ const provider = waffle.provider;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Solace, Faucet } from "../typechain";
+import { Solace, Faucet } from "./../typechain";
 
-const TEN_ETHER = BN.from("10000000000000000000")
+const DRIP_AMOUNT = BN.from("1000000000000000000000")
 
 describe("Faucet", function () {
   let solace: Solace;
@@ -36,15 +36,15 @@ describe("Faucet", function () {
     let bal1 = await solace.balanceOf(receiver1.address);
     await faucet.connect(receiver1).drip();
     let bal2 = await solace.balanceOf(receiver1.address);
-    expect(bal2.sub(bal1)).eq(TEN_ETHER)
+    expect(bal2.sub(bal1)).eq(DRIP_AMOUNT)
 
     let bal3 = await solace.balanceOf(receiver2.address);
     await faucet.connect(receiver2).drip();
     let bal4 = await solace.balanceOf(receiver2.address);
-    expect(bal4.sub(bal3)).eq(TEN_ETHER)
+    expect(bal4.sub(bal3)).eq(DRIP_AMOUNT)
   });
   it("cant mint again soon", async function () {
-    await expect(faucet.connect(receiver1).drip()).to.be.revertedWith("well dry");
+    await expect(faucet.connect(receiver1).drip()).to.be.revertedWith("the well is dry");
   });
   it("can mint again later", async function () {
     let timeStamp = (await provider.getBlock('latest')).timestamp;
@@ -54,11 +54,11 @@ describe("Faucet", function () {
     let bal1 = await solace.balanceOf(receiver1.address);
     await faucet.connect(receiver1).drip();
     let bal2 = await solace.balanceOf(receiver1.address);
-    expect(bal2.sub(bal1)).eq(TEN_ETHER)
+    expect(bal2.sub(bal1)).eq(DRIP_AMOUNT)
 
     let bal3 = await solace.balanceOf(receiver2.address);
     await faucet.connect(receiver2).drip();
     let bal4 = await solace.balanceOf(receiver2.address);
-    expect(bal4.sub(bal3)).eq(TEN_ETHER)
+    expect(bal4.sub(bal3)).eq(DRIP_AMOUNT)
   });
 });
