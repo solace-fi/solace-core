@@ -17,8 +17,8 @@ interface IStakingRewards is IxsListener {
 
     /// @notice Emitted when the global information is updated.
     event Updated();
-    /// @notice Emitted when a users information is updated.
-    event UserUpdated(address indexed user);
+    /// @notice Emitted when a locks information is updated.
+    event LockUpdated(uint256 indexed xsLockID);
     /// @notice Emitted when the reward rate is set.
     event RewardsSet(uint256 rewardPerSecond);
     /// @notice Emitted when the farm end is set.
@@ -28,55 +28,69 @@ interface IStakingRewards is IxsListener {
     GLOBAL VARIABLES
     ***************************************/
 
-    /// @notice **SOLACE** token.
-    function solace() external returns (address);
-    /// @notice **xsLocker**.
-    function xsLocker() external returns (address);
+    /// @notice The maximum duration of a lock in seconds.
+    function MAX_LOCK_DURATION() external view returns (uint256);
+    /// @notice The vote power multiplier at max lock in bps.
+    function MAX_LOCK_MULTIPLIER_BPS() external view returns (uint256);
+    /// @notice The vote power multiplier when unlocked in bps.
+    function UNLOCKED_MULTIPLIER_BPS() external view returns (uint256);
+    /// @notice [**SOLACE**](../SOLACE) token.
+    function solace() external view returns (address);
+    /// @notice The [**xsLocker**](../xsLocker) contract.
+    function xsLocker() external view returns (address);
     /// @notice Amount of SOLACE distributed per second.
-    function rewardPerSecond() external returns (uint256);
+    function rewardPerSecond() external view returns (uint256);
     /// @notice When the farm will start.
-    function startTime() external returns (uint256);
+    function startTime() external view returns (uint256);
     /// @notice When the farm will end.
-    function endTime() external returns (uint256);
+    function endTime() external view returns (uint256);
     /// @notice Last time rewards were distributed or farm was updated.
-    function lastRewardTime() external returns (uint256);
+    function lastRewardTime() external view returns (uint256);
     /// @notice Accumulated rewards per share, times 1e12.
-    function accRewardPerShare() external returns (uint256);
+    function accRewardPerShare() external view returns (uint256);
     /// @notice Value of tokens staked by all farmers.
-    function valueStaked() external returns (uint256);
+    function valueStaked() external view returns (uint256);
 
-    // Info of each user.
-    struct UserInfo {
+    // Info of each lock.
+    struct StakedLockInfo {
         uint256 value;         // Value of user provided tokens.
         uint256 rewardDebt;    // Reward debt. See explanation below.
         uint256 unpaidRewards; // Rewards that have not been paid.
+        address owner;         // Account that owns the lock.
         //
         // We do some fancy math here. Basically, any point in time, the amount of reward token
-        // entitled to a user but is pending to be distributed is:
+        // entitled to the owner of a lock but is pending to be distributed is:
         //
-        //   pending reward = (user.value * accRewardPerShare) - user.rewardDebt + user.unpaidRewards
+        //   pending reward = (lockInfo.value * accRewardPerShare) - lockInfo.rewardDebt + lockInfo.unpaidRewards
         //
-        // Whenever a user deposits or withdraws CP tokens to a farm. Here's what happens:
+        // Whenever a user updates a lock, here's what happens:
         //   1. The farm's `accRewardPerShare` and `lastRewardTime` gets updated.
         //   2. Users pending rewards accumulate in `unpaidRewards`.
         //   3. User's `value` gets updated.
         //   4. User's `rewardDebt` gets updated.
     }
 
-    /// @notice Information about each farmer.
-    /// @dev user address => user info
-    function userInfo(address user) external view returns (UserInfo memory);
-
     /***************************************
     VIEW FUNCTIONS
     ***************************************/
+
+    /// @notice Information about each lock.
+    /// @dev lock id => lock info
+    function stakedLockInfo(uint256 xsLockID) external view returns (StakedLockInfo memory);
 
     /**
      * @notice Calculates the accumulated balance of [**SOLACE**](./SOLACE) for specified user.
      * @param user The user for whom unclaimed tokens will be shown.
      * @return reward Total amount of withdrawable reward tokens.
      */
-    function pendingRewards(address user) external view returns (uint256 reward);
+    function pendingRewardsOfUser(address user) external view returns (uint256 reward);
+
+    /**
+     * @notice Calculates the accumulated balance of [**SOLACE**](./SOLACE) for specified lock.
+     * @param xsLockID The ID of the lock to query rewards for.
+     * @return reward Total amount of withdrawable reward tokens.
+     */
+    function pendingRewardsOfLock(uint256 xsLockID) external view returns (uint256 reward);
 
     /**
      * @notice Calculates the reward amount distributed between two timestamps.
@@ -99,14 +113,26 @@ interface IStakingRewards is IxsListener {
      * @notice Updates and sends a user's rewards.
      * @param user User to process rewards for.
      */
-    function harvest(address user) external;
+    function harvestUser(address user) external;
+
+    /**
+     * @notice Updates and sends a lock's rewards.
+     * @param xsLockID The ID of the lock to process rewards for.
+     */
+    function harvestLock(uint256 xsLockID) external;
+
+    /**
+     * @notice Updates and sends multiple lock's rewards.
+     * @param xsLockIDs The IDs of the locks to process rewards for.
+     */
+    function harvestLocks(uint256[] memory xsLockIDs) external;
 
     /***************************************
     GOVERNANCE FUNCTIONS
     ***************************************/
 
     /**
-     * @notice Sets the amount of [**SOLACE**](./SOLACE) to distribute per second.
+     * @notice Sets the amount of [**SOLACE**](../SOLACE) to distribute per second.
      * Only affects future rewards.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param rewardPerSecond_ Amount to distribute per second.

@@ -86,7 +86,7 @@ describe("xSOLACE", function () {
       expect(await xsolace.balanceOf(user1.address)).eq(0);
       expect(await xsolace.totalSupply()).eq(0);
       await expect(xsolace.balanceOfLock(0)).to.be.revertedWith("query for nonexistent token");
-      await checkConsistancy();
+      await checkConsistency();
     });
     it("accounts for unlocked stake", async function () {
       // deposit 1: unlocked
@@ -96,7 +96,7 @@ describe("xSOLACE", function () {
       expect(await xsolace.balanceOf(user2.address)).eq(ONE_ETHER);
       expect(await xsolace.balanceOf(user3.address)).eq(0);
       expect(await xsolace.totalSupply()).eq(ONE_ETHER);
-      await checkConsistancy();
+      await checkConsistency();
       // deposit 2: unlocked
       await xslocker.connect(user1).createLock(user3.address, ONE_ETHER.mul(2), 0);
       expect(await xsolace.balanceOfLock(2)).eq(ONE_ETHER.mul(2));
@@ -104,7 +104,7 @@ describe("xSOLACE", function () {
       expect(await xsolace.balanceOf(user2.address)).eq(ONE_ETHER);
       expect(await xsolace.balanceOf(user3.address)).eq(ONE_ETHER.mul(2));
       expect(await xsolace.totalSupply()).eq(ONE_ETHER.mul(3));
-      await checkConsistancy();
+      await checkConsistency();
     });
     it("accounts for unlocked stake", async function () {
       // deposit 3: locked 4 years, 4x multiplier
@@ -116,7 +116,7 @@ describe("xSOLACE", function () {
       expect(await xsolace.balanceOf(user2.address)).eq(ONE_ETHER);
       expect(await xsolace.balanceOf(user3.address)).eq(ONE_ETHER.mul(2));
       expect(await xsolace.totalSupply()).eq(ONE_ETHER.mul(7));
-      await checkConsistancy();
+      await checkConsistency();
       // deposit 4: locked 1 year, 1.75x multiplier
       // y = (3x/4 + 1)*amount. x = 12, y = 21
       let timestamp2 = block.timestamp + ONE_YEAR + 2;
@@ -126,7 +126,7 @@ describe("xSOLACE", function () {
       expect(await xsolace.balanceOf(user2.address)).eq(ONE_ETHER.mul(22));
       expect(await xsolace.balanceOf(user3.address)).eq(ONE_ETHER.mul(2));
       expectClose(await xsolace.totalSupply(), ONE_ETHER.mul(28), PRECISION);
-      await checkConsistancy();
+      await checkConsistency();
     });
     it("accounts for time", async function () {
       let timestamp = (await provider.getBlock('latest')).timestamp + ONE_YEAR*2;
@@ -140,7 +140,7 @@ describe("xSOLACE", function () {
       expect(await xsolace.balanceOf(user2.address)).eq(ONE_ETHER.mul(13));
       expect(await xsolace.balanceOf(user3.address)).eq(ONE_ETHER.mul(2));
       expectClose(await xsolace.totalSupply(), ONE_ETHER.mul(35).div(2), PRECISION);
-      await checkConsistancy();
+      await checkConsistency();
     });
     it("accounts for withdraw", async function () {
       await xslocker.connect(user2).withdraw(1, user2.address);
@@ -152,14 +152,14 @@ describe("xSOLACE", function () {
       expect(await xsolace.balanceOf(user2.address)).eq(ONE_ETHER.mul(12));
       expect(await xsolace.balanceOf(user3.address)).eq(ONE_ETHER.mul(2));
       expectClose(await xsolace.totalSupply(), ONE_ETHER.mul(33).div(2), PRECISION);
-      await checkConsistancy();
+      await checkConsistency();
     });
   });
 
   // tests each lock is close to predicted value
   // each user's xsolace is the sum of their xslocks
   // total xsolace is the sum of all xslocks
-  async function checkConsistancy() {
+  async function checkConsistency() {
     let predXsolaceUserBalances = new Map<string, BN>();
     let predXsolaceTotalSupply = BN.from(0);
     let xslockerTotalSupply = (await xslocker.totalSupply()).toNumber();
@@ -176,10 +176,13 @@ describe("xSOLACE", function () {
     }
     let realXsolaceTotalSupply = await xsolace.totalSupply();
     expect(realXsolaceTotalSupply).eq(predXsolaceTotalSupply);
-    predXsolaceUserBalances.forEach(async (predBalance, user) => {
-      let realXsolaceUserBalance = await xsolace.balanceOf(user);
-      expect(realXsolaceUserBalance).eq(predBalance);
-    });
+    let users = predXsolaceUserBalances.keys();
+    for(var i = 0; i < predXsolaceUserBalances.size; ++i) {
+      let user = users.next().value;
+      let realBalance = await xsolace.balanceOf(user);
+      let predBalance = predXsolaceUserBalances.get(user);
+      expect(realBalance).eq(predBalance);
+    }
   }
 
   async function predictBalanceOfLock(xsLockID: BigNumberish) {

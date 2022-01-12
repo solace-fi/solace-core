@@ -26,6 +26,8 @@ import "./interface/IxsLocker.sol";
  * Users and contracts (eg BondTellers) may deposit on behalf of another user or contract.
  *
  * Any time a lock is updated it will notify the listener contracts (eg StakingRewards).
+ *
+ * Note that transferring [**SOLACE**](./SOLACE) to this contract will not give you any rewards. You should deposit your [**SOLACE**](./SOLACE) via [`createLock()`](#createlock) or [`createLockSigned()`](#createlocksigned).
  */
 contract xsLocker is IxsLocker, ERC721Enhanced2, ReentrancyGuard, Governable {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -322,17 +324,17 @@ contract xsLocker is IxsLocker, ERC721Enhanced2, ReentrancyGuard, Governable {
     }
 
     /**
-     * @notice Hook that is called before any token transfer. This includes minting and burning.
+     * @notice Hook that is called after any token transfer. This includes minting and burning.
      * @param from The user that sends the token, or zero if minting.
      * @param to The zero that receives the token, or zero if burning.
      * @param xsLockID The ID of the token being transferred.
      */
-    function _beforeTokenTransfer(
+    function _afterTokenTransfer(
         address from,
         address to,
         uint256 xsLockID
     ) internal override {
-        super._beforeTokenTransfer(from, to, xsLockID);
+        super._afterTokenTransfer(from, to, xsLockID);
         Lock memory lock = _locks[xsLockID];
         // notify listeners
         if(from == address(0x0)) _notify(xsLockID, from, to, Lock(0, 0), lock); // mint

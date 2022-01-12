@@ -5,25 +5,46 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "./Governable.sol";
 import "./interface/IxsLocker.sol";
 import "./interface/IStakingRewards.sol";
 
 
 /**
- * @title
+ * @title Staking Rewards
  * @author solace.fi
- * @notice
+ * @notice Rewards users for staking in [`xsLocker`](./xsLocker).
+ *
+ * Deposits and withdrawls are made to [`xsLocker`](./xsLocker) and rewards come from `StakingRewards`. All three are paid in [**SOLACE**](./SOLACE). `StakingRewards` will be registered as an [`xsListener`](./interface/IxsListener). Any time a lock is updated [`registerLockEvent()`](#registerlockevent) will be called and the staking information of that lock will be updated.
+ *
+ * Over the course of `startTime` to `endTime`, the farm distributes `rewardPerSecond` [**SOLACE**](./SOLACE) to all lock holders split relative to the value of their locks. The base value of a lock is its `amount` of [**SOLACE**](./SOLACE). Its multiplier is 2.5x when `end` is 4 years from now, 1x when unlocked, and linearly decreasing between the two. The value of a lock is its base value times its multiplier.
+ *
+ * Note that transferring [**SOLACE**](./SOLACE) to this contract will not give you any rewards. You should deposit your [**SOLACE**](./SOLACE) into [`xsLocker`](./xsLocker) via `createLock()`.
+ *
+ * @dev Lock information is stored in [`xsLocker`](./xsLocker) and mirrored here for bookkeeping and efficiency. Should that information differ, [`xsLocker`](./xsLocker) is the ground truth and this contract will attempt to sync with it.
  */
 contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
+    using EnumerableSet for EnumerableSet.UintSet;
 
     /***************************************
     GLOBAL VARIABLES
     ***************************************/
 
-    /// @notice **SOLACE** token.
+    /// @notice The maximum duration of a lock in seconds.
+    uint256 public constant override MAX_LOCK_DURATION = 4 * 365 days; // 4 years
+    /// @notice The vote power multiplier at max lock in bps.
+    uint256 public constant override MAX_LOCK_MULTIPLIER_BPS = 25000;  // 2.5X
+    /// @notice The vote power multiplier when unlocked in bps.
+    uint256 public constant override UNLOCKED_MULTIPLIER_BPS = 10000; // 1X
+    // 1 bps = 1/10000
+    uint256 internal constant MAX_BPS = 10000;
+    // multiplier to increase precision
+    uint256 internal constant Q12 = 1e12;
+
+    /// @notice [**SOLACE**](./SOLACE) token.
     address public override solace;
-    /// @notice **xsLocker**.
+    /// @notice The [**xsLocker**](../xsLocker) contract.
     address public override xsLocker;
     /// @notice Amount of SOLACE distributed per second.
     uint256 public override rewardPerSecond;
@@ -38,13 +59,12 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
     /// @notice Value of tokens staked by all farmers.
     uint256 public override valueStaked;
 
-    /// @notice Information about each farmer.
-    /// @dev user address => user info
-    mapping(address => UserInfo) private _userInfo;
+    // tokens that a user owns
+    mapping(address => EnumerableSet.UintSet) private _tokensOfOwner;
 
-    uint256 public constant MAX_LOCK_DURATION = 4 * 365 days; // 4 years
-    uint256 public constant MAX_LOCK_MULTIPLIER_BPS = 25000;  // 2.5X
-    uint256 internal constant MAX_BPS = 10000;
+    /// @notice Information about each lock.
+    /// @dev lock id => lock info
+    mapping(uint256 => StakedLockInfo) private _lockInfo;
 
     /**
      * @notice Constructs the StakingRewards contract.
@@ -75,10 +95,10 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
     VIEW FUNCTIONS
     ***************************************/
 
-    /// @notice Information about each farmer.
-    /// @dev user address => user info
-    function userInfo(address user) external view override returns (UserInfo memory) {
-        return _userInfo[user];
+    /// @notice Information about each lock.
+    /// @dev lock id => lock info
+    function stakedLockInfo(uint256 xsLockID) external view override returns (StakedLockInfo memory) {
+        return _lockInfo[xsLockID];
     }
 
     /**
@@ -86,16 +106,40 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
      * @param user The user for whom unclaimed tokens will be shown.
      * @return reward Total amount of withdrawable reward tokens.
      */
-    function pendingRewards(address user) external view override returns (uint256 reward) {
-        // get farmer information
-        UserInfo storage userInfo_ = _userInfo[user];
+    function pendingRewardsOfUser(address user) external view override returns (uint256 reward) {
         // math
         uint256 accRewardPerShare_ = accRewardPerShare;
         if (block.timestamp > lastRewardTime && valueStaked != 0) {
             uint256 tokenReward = getRewardAmountDistributed(lastRewardTime, block.timestamp);
-            accRewardPerShare_ += tokenReward * 1e12 / valueStaked;
+            accRewardPerShare_ += tokenReward * Q12 / valueStaked;
         }
-        return userInfo_.value * accRewardPerShare_ / 1e12 - userInfo_.rewardDebt + userInfo_.unpaidRewards;
+        // iterate over locks
+        EnumerableSet.UintSet storage tokens = _tokensOfOwner[user];
+        uint256 len = tokens.length();
+        reward = 0;
+        for(uint256 i = 0; i < len; i++) {
+            uint256 xsLockID = tokens.at(i);
+            StakedLockInfo storage lockInfo = _lockInfo[xsLockID];
+            reward += lockInfo.value * accRewardPerShare_ / Q12 - lockInfo.rewardDebt + lockInfo.unpaidRewards;
+        }
+        return reward;
+    }
+
+    /**
+     * @notice Calculates the accumulated balance of [**SOLACE**](./SOLACE) for specified lock.
+     * @param xsLockID The ID of the lock to query rewards for.
+     * @return reward Total amount of withdrawable reward tokens.
+     */
+    function pendingRewardsOfLock(uint256 xsLockID) external view override returns (uint256 reward) {
+        // get lock information
+        StakedLockInfo storage lockInfo = _lockInfo[xsLockID];
+        // math
+        uint256 accRewardPerShare_ = accRewardPerShare;
+        if (block.timestamp > lastRewardTime && valueStaked != 0) {
+            uint256 tokenReward = getRewardAmountDistributed(lastRewardTime, block.timestamp);
+            accRewardPerShare_ += tokenReward * Q12 / valueStaked;
+        }
+        return lockInfo.value * accRewardPerShare_ / Q12 - lockInfo.rewardDebt + lockInfo.unpaidRewards;
     }
 
     /**
@@ -113,20 +157,6 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
         return (to - from) * rewardPerSecond;
     }
 
-    function calculateUserStake(address user) public view returns (uint256 stake) {
-        IxsLocker locker = IxsLocker(xsLocker);
-        uint256 numOfLocks = locker.balanceOf(user);
-        stake = 0;
-        for (uint256 i = 0; i < numOfLocks; i++) {
-            uint256 xsLockID = locker.tokenOfOwnerByIndex(user, i);
-            Lock memory lock = locker.locks(xsLockID);
-            uint256 lockValue = (lock.end <= block.timestamp)
-                ? lock.amount
-                : lock.amount * (lock.end - block.timestamp) * MAX_LOCK_MULTIPLIER_BPS / (MAX_LOCK_DURATION * MAX_BPS);
-        }
-        return stake;
-    }
-
     /***************************************
     MUTATOR FUNCTIONS
     ***************************************/
@@ -141,44 +171,17 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
      * @param oldLock The old lock data.
      * @param newLock The new lock data.
      */
-    function registerLockEvent(uint256 xsLockID, address oldOwner, address newOwner, Lock calldata oldLock, Lock calldata newLock) external override {
-        require(msg.sender == xsLocker, "Only xs lock contract can call this.");
-        // get farmer information
-        _harvest(user);
-        UserInfo storage userInfo_ = _userInfo[user];
-        // accounting
-        uint256 oldValue = userInfo_.value;
-        uint256 newValue = calculateUserStake(user);
-        userInfo_.value = newValue;
-        userInfo_.rewardDebt = newValue * accRewardPerShare / 1e12;
-        valueStaked = valueStaked - oldValue + newValue;
-        emit UserUpdated(user);
-    }
-
-    // used to decay user stake
-    function updateUsers(address[] calldata users) external nonReentrant {
+    function registerLockEvent(uint256 xsLockID, address oldOwner, address newOwner, Lock calldata oldLock, Lock calldata newLock) external override nonReentrant {
         update();
-        uint256 accRewardPerShare_ = accRewardPerShare;
-        for(uint256 i = 0; i < users.length; i++) {
-            // get farmer information
-            address user = users[i];
-            UserInfo memory userInfo_ = _userInfo[user];
-            // accumulate unpaid rewards
-            userInfo_.unpaidRewards += userInfo_.value * accRewardPerShare_ / 1e12 - userInfo_.rewardDebt;
-            // accounting
-            uint256 oldValue = userInfo_.value;
-            uint256 newValue = calculateUserStake(user);
-            userInfo_.value = newValue;
-            userInfo_.rewardDebt = newValue * accRewardPerShare / 1e12;
-            valueStaked = valueStaked - oldValue + newValue;
-            emit UserUpdated(user);
-        }
+        _harvest(xsLockID);
     }
 
     /**
      * @notice Updates staking information.
      */
     function update() public override {
+        // emit event regardless if any changes were made
+        emit Updated();
         // dont update needlessly
         if (block.timestamp <= lastRewardTime) return;
         if (valueStaked == 0) {
@@ -187,18 +190,42 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
         }
         // update math
         uint256 tokenReward = getRewardAmountDistributed(lastRewardTime, block.timestamp);
-        accRewardPerShare += tokenReward * 1e12 / valueStaked;
+        accRewardPerShare += tokenReward * Q12 / valueStaked;
         lastRewardTime = Math.min(block.timestamp, endTime);
-        emit Updated();
     }
 
     /**
      * @notice Updates and sends a user's rewards.
      * @param user User to process rewards for.
      */
-    function harvest(address user) external override nonReentrant {
-        _harvest(user);
-        emit UserUpdated(user);
+    function harvestUser(address user) external override nonReentrant {
+        update();
+        EnumerableSet.UintSet storage tokens = _tokensOfOwner[user];
+        uint256 len = tokens.length();
+        for(uint256 i = 0; i < len; i++) {
+            _harvest(tokens.at(i));
+        }
+    }
+
+    /**
+     * @notice Updates and sends a lock's rewards.
+     * @param xsLockID The ID of the lock to process rewards for.
+     */
+    function harvestLock(uint256 xsLockID) external override nonReentrant {
+        update();
+        _harvest(xsLockID);
+    }
+
+    /**
+     * @notice Updates and sends multiple lock's rewards.
+     * @param xsLockIDs The IDs of the locks to process rewards for.
+     */
+    function harvestLocks(uint256[] memory xsLockIDs) external override nonReentrant {
+        update();
+        uint256 len = xsLockIDs.length;
+        for(uint256 i = 0; i < len; i++) {
+            _harvest(xsLockIDs[i]);
+        }
     }
 
     /***************************************
@@ -206,20 +233,75 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
     ***************************************/
 
     /**
-     * @notice Updates and sends a user's rewards.
-     * @param user User to process rewards for.
+     * @notice Updates and sends a lock's rewards.
+     * @param xsLockID The ID of the lock to process rewards for.
      */
-    function _harvest(address user) internal {
-        // update farm
-        update();
-        // get farmer information
-        UserInfo storage userInfo_ = _userInfo[user];
-        // accumulate unpaid rewards
-        uint256 unpaidRewards = userInfo_.value * accRewardPerShare / 1e12 - userInfo_.rewardDebt + userInfo_.unpaidRewards;
-        uint256 balance = IERC20(solace).balanceOf(address(this));
-        uint256 transferAmount = Math.min(unpaidRewards, balance);
-        userInfo_.unpaidRewards = unpaidRewards - transferAmount;
-        SafeERC20.safeTransfer(IERC20(solace), user, transferAmount);
+    function _harvest(uint256 xsLockID) internal {
+        // math
+        uint256 accRewardPerShare_ = accRewardPerShare;
+        // get lock information
+        StakedLockInfo memory lockInfo = _lockInfo[xsLockID];
+        (bool exists, address owner, Lock memory lock) = _fetchLockInfo(xsLockID);
+        // accumulate and transfer unpaid rewards
+        lockInfo.unpaidRewards += lockInfo.value * accRewardPerShare_ / Q12 - lockInfo.rewardDebt;
+        if(lockInfo.owner != address(0x0)){
+            uint256 balance = IERC20(solace).balanceOf(address(this));
+            uint256 transferAmount = Math.min(lockInfo.unpaidRewards, balance);
+            lockInfo.unpaidRewards -= transferAmount;
+            SafeERC20.safeTransfer(IERC20(solace), lockInfo.owner, transferAmount);
+        }
+        // update lock value
+        uint256 oldValue = lockInfo.value;
+        uint256 newValue = _calculateLockValue(lock.amount, lock.end);
+        lockInfo.value = newValue;
+        lockInfo.rewardDebt = newValue * accRewardPerShare_ / Q12;
+        if(oldValue != newValue) valueStaked = valueStaked - oldValue + newValue;
+        // update lock owner
+        if(owner != lockInfo.owner) {
+            _tokensOfOwner[lockInfo.owner].remove(xsLockID);
+            if(exists) {
+                _tokensOfOwner[owner].add(xsLockID);
+                lockInfo.owner = owner;
+            }
+            // maintain pre-burn owner in case of unpaid rewards
+        }
+        _lockInfo[xsLockID] = lockInfo;
+        emit LockUpdated(xsLockID);
+    }
+
+    /**
+     * @notice Fetches up to date information about a lock.
+     * @param xsLockID The ID of the lock to query.
+     * @return exists True if the lock exists.
+     * @return owner The owner of the lock or the zero address if it doesn't exist.
+     * @return lock The lock itself.
+     */
+    function _fetchLockInfo(uint256 xsLockID) internal view returns (bool exists, address owner, Lock memory lock) {
+        IxsLocker locker = IxsLocker(xsLocker);
+        exists = locker.exists(xsLockID);
+        if(exists) {
+            owner = locker.ownerOf(xsLockID);
+            lock = locker.locks(xsLockID);
+        } else {
+            owner = address(0x0);
+            lock = Lock(0, 0);
+        }
+        return (exists, owner, lock);
+    }
+
+    /**
+     * @notice Calculates the value of a lock.
+     * The base value of a lock is its `amount` of [**SOLACE**](./SOLACE). Its multiplier is 2.5x when `end` is 4 years from now, 1x when unlocked, and linearly decreasing between the two. The value of a lock is its base value times its multiplier.
+     * @param amount The amount of [**SOLACE**](./SOLACE) in the lock.
+     * @param end The unlock timestamp of the lock.
+     * @return value The boosted value of the lock.
+     */
+    function _calculateLockValue(uint256 amount, uint256 end) internal view returns (uint256 value) {
+        uint256 base = amount * UNLOCKED_MULTIPLIER_BPS / MAX_BPS;
+        uint256 bonus = (end <= block.timestamp)
+            ? 0 // unlocked
+            : amount * (end - block.timestamp) * (MAX_LOCK_MULTIPLIER_BPS - UNLOCKED_MULTIPLIER_BPS) / (MAX_LOCK_DURATION * MAX_BPS); // locked
+        return base + bonus;
     }
 
     /***************************************
@@ -233,7 +315,7 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
      * @param rewardPerSecond_ Amount to distribute per second.
      */
     function setRewards(uint256 rewardPerSecond_) external override onlyGovernance {
-        rewardPerSecond = rewardPerSecond;
+        rewardPerSecond = rewardPerSecond_;
         emit RewardsSet(rewardPerSecond_);
     }
 

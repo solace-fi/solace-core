@@ -197,6 +197,57 @@ abstract contract ERC721Enhanced2 is ERC721Enumerable, IERC721Enhanced2, EIP712 
     }
 
     /***************************************
+    MORE HOOKS
+    ***************************************/
+
+    /**
+     * @notice Mints `tokenID` and transfers it to `to`.
+     * @param to The receiver of the token.
+     * @param tokenID The ID of the token to mint.
+     */
+    function _mint(address to, uint256 tokenID) internal virtual override {
+        super._mint(to, tokenID);
+        _afterTokenTransfer(address(0), to, tokenID);
+    }
+
+    /**
+     * @notice Destroys `tokenID`.
+     * @param tokenID The ID of the token to burn.
+     */
+    function _burn(uint256 tokenID) internal virtual override {
+        address owner = ERC721.ownerOf(tokenID);
+        super._burn(tokenID);
+        _afterTokenTransfer(owner, address(0), tokenID);
+    }
+
+    /**
+     * @notice Transfers `tokenID` from `from` to `to`.
+     * @param from The account to transfer the token from.
+     * @param to The account to transfer the token to.
+     * @param tokenID The ID of the token to transfer.
+     */
+    function _transfer(
+        address from,
+        address to,
+        uint256 tokenID
+    ) internal virtual override {
+        super._transfer(from, to, tokenID);
+        _afterTokenTransfer(from, to, tokenID);
+    }
+
+    /**
+     * @notice Hook that is called after any token transfer. This includes minting and burning.
+     * @param from The user that sends the token, or zero if minting.
+     * @param to The zero that receives the token, or zero if burning.
+     * @param tokenID The ID of the token being transferred.
+     */
+    function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 tokenID
+    ) internal virtual {}
+
+    /***************************************
     MISC
     ***************************************/
 

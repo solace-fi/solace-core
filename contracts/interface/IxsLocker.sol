@@ -24,6 +24,8 @@ struct Lock {
  * Users and contracts (eg BondTellers) may deposit on behalf of another user or contract.
  *
  * Any time a lock is updated it will notify the listener contracts (eg StakingRewards).
+ *
+ * Note that transferring [**SOLACE**](../SOLACE) to this contract will not give you any rewards. You should deposit your [**SOLACE**](../SOLACE) via [`createLock()`](#createlock) or [`createLockSigned()`](#createlocksigned).
  */
 interface IxsLocker is IERC721Enhanced2 {
 

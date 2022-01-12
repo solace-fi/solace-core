@@ -18,6 +18,8 @@ import "./interface/IxSOLACE.sol";
  * [`balanceOf(user)`](#balanceof) is calculated as the sum of the balances of the user's locks. [`totalSupply()`] is calculated as the sum of the balances of all locks. These functions should not be called on-chain as they are gas intensive.
  *
  * Voting will occur off chain.
+ *
+ * Note that transferring [**SOLACE**](./SOLACE) to this contract will not give you any **xSOLACE**. You should deposit your [**SOLACE**](./SOLACE) into [`xsLocker`](./xsLocker) via `createLock()`.
  */
 contract xSOLACE is IxSOLACE {
 
