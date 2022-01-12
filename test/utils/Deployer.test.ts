@@ -173,7 +173,6 @@ describe("Deployer", function () {
       // deploy with create
       registry = (await deployContract(owner, artifacts.Registry, [owner.address])) as Registry;
       weth = (await deployContract(owner,artifacts.WETH)) as Weth9;
-      await registry.setWeth(weth.address);
       // deploy with create2
       let contracts = [registry, weth];
       let initcodes = contracts.map((contract: Contract) => { return contract.deployTransaction.data; });

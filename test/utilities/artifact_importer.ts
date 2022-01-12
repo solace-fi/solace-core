@@ -33,7 +33,7 @@ export async function import_artifacts() {
   artifacts.Faucet = await tryImport(`${artifact_dir}/Faucet.sol/Faucet.json`);
   // utils
   artifacts.Registry = await tryImport(`${artifact_dir}/utils/Registry.sol/Registry.json`);
-  artifacts.SingletonFactory = await tryImport(`${artifact_dir}/interface/ISingletonFactory.sol/ISingletonFactory.json`);
+  artifacts.SingletonFactory = await tryImport(`${artifact_dir}/interfaces/utils/ISingletonFactory.sol/ISingletonFactory.json`);
   artifacts.Deployer = await tryImport(`${artifact_dir}/utils/Deployer.sol/Deployer.json`);
   // generic imports
   artifacts.ERC20 = await tryImport(`${artifact_dir}/SOLACE.sol/ERC20.json`);

@@ -8,7 +8,7 @@ const { expect } = chai;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./../utilities/artifact_importer";
-import { Registry, Weth9 } from "./../../typechain-types";
+import { Registry, Weth9 } from "./../../typechain";
 
 describe("Registry", function() {
   let artifacts: ArtifactImports;
