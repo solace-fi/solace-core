@@ -19,8 +19,23 @@ interface ISoteriaCoverageProduct {
     /// @notice Emitted when Registry address is updated.
     event RegistrySet(address registry);
 
+    /// @notice Emitted when Premium Pool address is updated.
+    event PremiumPoolSet(address premiumPool);
+
+    /// @notice Emitted when Premium Collector address is updated.
+    event PremiumCollectorSet(address premiumCollector);
+
     /// @notice Emitted when pause is set.
     event PauseSet(bool pause);
+
+    /// @notice Emitted when a user enters cooldown mode.
+    event CooldownStarted(address policyholder, uint256 startTime);
+
+    /// @notice Emitted when a user leaves cooldown mode.
+    event CooldownStopped(address policyholder);
+
+    /// @notice Emitted when the cooldown period is set.
+    event CooldownPeriodSet(uint256 cooldownPeriod);
 
     /// @notice Emitted when a deposit is made.
     event DepositMade(address from, uint256 amount);
@@ -33,6 +48,9 @@ interface ISoteriaCoverageProduct {
 
     /// @notice Emitted when premium is partially charged.
     event PremiumPartiallyCharged(address policyholder, uint256 actualPremium, uint256 chargedPremium);
+
+    /// @notice Emitted when policy manager cover amount for soteria is updated.
+    event PolicyManagerUpdated(uint256 activeCoverLimit);
 
     /// @notice Emitted when maxRateNum is set.
     event MaxRateNumSet(uint256 maxRateNum);
@@ -72,17 +90,15 @@ interface ISoteriaCoverageProduct {
 
     /**
      * @notice Updates the cover amount of the policy.
-     * @param policyID_ The policy ID to update.
      * @param newCoverLimit_ The new value to cover in **ETH**.
     */
-    function updateCoverLimit(uint256 policyID_, uint256 newCoverLimit_) external;
+    function updateCoverLimit(uint256 newCoverLimit_) external;
 
     /**
      * @notice Deactivate a user's own policy.
-     * @param policyID_ The policy ID to update.
      * User will receive their entire Soteria account balance.
      */
-     function deactivatePolicy(uint256 policyID_) external;
+     function deactivatePolicy() external;
 
     /***************************************
     VIEW FUNCTIONS
@@ -141,6 +157,18 @@ interface ISoteriaCoverageProduct {
     function riskManager() external view returns (address riskManager_);
 
     /**
+     * @notice Returns Premium Pool contract address.
+     * @return premiumPool_ The Premium Pool address.
+    */
+    function premiumPool() external view returns (address premiumPool_);
+
+    /**
+     * @notice Returns Premium Collector contract address.
+     * @return premiumCollector_ The Premium Collector address.
+    */
+    function premiumCollector() external view returns (address premiumCollector_);
+
+    /**
      * @notice Returns whether or not product is currently in paused state.
      * @return status True if product is paused.
     */
@@ -181,7 +209,20 @@ interface ISoteriaCoverageProduct {
      * @return amount The cover amount for given policy.
     */
     function coverLimitOf(uint256 policy_) external view returns (uint256 amount);
-    
+
+    /**
+     * @notice The minimum amount of time a user must wait to withdraw funds.
+     * @return cooldownPeriod_ The cooldown period in seconds.
+     */
+    function cooldownPeriod() external view returns (uint256 cooldownPeriod_);
+
+    /**
+     * @notice The timestamp that a depositor's cooldown started.
+     * @param policyholder_ The policy holder
+     * @return cooldownStart_ The cooldown period start expressed as Unix timestamp
+     */
+    function cooldownStart(address policyholder_) external view returns (uint256 cooldownStart_);
+
     /***************************************
     GOVERNANCE FUNCTIONS
     ***************************************/
@@ -194,12 +235,29 @@ interface ISoteriaCoverageProduct {
     function setRegistry(address registry_) external;
 
     /**
+     * @notice Sets the Premium Pool contract address.
+    */
+    function setPremiumPool(address premiumPool_) external;
+
+    /**
+     * @notice Sets the Premium Collector contract address.
+    */
+    function setPremiumCollector(address premiumCollector_) external;
+
+    /**
      * @notice Pauses or unpauses buying and extending policies.
      * Deactivating policies are unaffected by pause.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param paused_ True to pause, false to unpause.
     */
     function setPaused(bool paused_) external;
+
+    /**
+     * @notice Sets the cooldown period that a user must wait after deactivating their policy, to withdraw funds from their Soteria account.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param cooldownPeriod_ Cooldown period in seconds.
+     */
+    function setCooldownPeriod(uint256 cooldownPeriod_) external;
 
     /**
      * @notice set _maxRateNum.
