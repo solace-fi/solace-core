@@ -156,7 +156,7 @@ describe("Registry", function() {
 
   describe("policyManager", function() {
     before(async function () {
-      policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
+      policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address, registry.address])) as PolicyManager;
     });
     it("starts as the zero address", async function() {
       expect(await registry.policyManager()).to.equal(ZERO_ADDRESS);

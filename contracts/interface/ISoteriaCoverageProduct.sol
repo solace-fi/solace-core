@@ -34,9 +34,6 @@ interface ISoteriaCoverageProduct {
     /// @notice Emitted when premium is partially charged.
     event PremiumPartiallyCharged(address policyholder, uint256 actualPremium, uint256 chargedPremium);
 
-    /// @notice Emitted when policy manager cover amount for soteria is updated.
-    event PolicyManagerUpdated(uint256 activeCoverLimit);
-
     /// @notice Emitted when maxRateNum is set.
     event MaxRateNumSet(uint256 maxRateNum);
 

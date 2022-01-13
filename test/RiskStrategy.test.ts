@@ -50,7 +50,7 @@ describe("RiskStrategy", function () {
     await registry.connect(governor).setWeth(weth.address);
     vault = (await deployContract(deployer,artifacts.Vault,[deployer.address,registry.address])) as Vault;
     await registry.connect(governor).setVault(vault.address);
-    policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
+    policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address, registry.address])) as PolicyManager;
     await registry.connect(governor).setPolicyManager(policyManager.address);
     await registry.connect(governor).setSolace(solace.address);
     coverageDataProvider = (await deployContract(deployer, artifacts.CoverageDataProvider, [governor.address, registry.address, priceOracle.address, solaceUsdcPool.address])) as CoverageDataProvider;
@@ -411,15 +411,6 @@ describe("RiskStrategy", function () {
   });
 
   describe("max cover amount", function () {
-    before(async function() {
-      // add and enable risk strategy
-      await riskManager.connect(governor).addRiskStrategy(riskStrategy.address);
-      await riskManager.connect(governor).setStrategyStatus(riskStrategy.address, 1);
-      await riskManager.connect(governor).setWeightAllocation(riskStrategy.address, 10000);
-      expect(await riskStrategy.weightAllocation()).to.equal(10000);
-      expect(await riskStrategy.status()).to.be.true;
-    });
-
     it("no assets no cover", async function () {
       expect(await vault.totalAssets()).to.equal(0);
       expect(await riskStrategy.maxCover()).to.equal(0);
@@ -430,6 +421,13 @@ describe("RiskStrategy", function () {
     it("can cover", async function () {
       let depositAmount = BN.from("1000000000000000000");
       await vault.connect(user).depositEth({value:depositAmount});
+        // add and enable risk strategy
+      await riskManager.connect(governor).addRiskStrategy(riskStrategy.address);
+      await riskManager.connect(governor).setStrategyStatus(riskStrategy.address, 1);
+      await riskManager.connect(governor).setWeightAllocation(riskStrategy.address, 10000);
+      expect(await riskStrategy.weightAllocation()).to.equal(10000);
+      expect(await riskStrategy.status()).to.be.true;
+
       expect(await vault.totalAssets()).to.equal(depositAmount);
       expect(await riskStrategy.maxCover()).to.equal(depositAmount);
       expect(await riskStrategy.maxCoverPerProduct(product1.address)).to.equal(0);

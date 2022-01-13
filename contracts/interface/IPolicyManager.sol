@@ -30,10 +30,8 @@ interface IPolicyManager is IERC721Enhanced {
     event ProductAdded(address product);
     /// @notice Emitted when a new product is removed.
     event ProductRemoved(address product);
-    /// @notice Emitted when soteria product is set.
-    event SoteriaProductSet(address soteria);
-    /// @notice Emitted when soteria active cover amount is updated.
-    event SoteriaProductCoverAmountUpdated(uint256 newCoverAmount);
+    /// @notice Emitted when registry is set.
+    event RegistrySet(address registry);
 
     /***************************************
     POLICY VIEW FUNCTIONS
@@ -155,6 +153,12 @@ interface IPolicyManager is IERC721Enhanced {
 
     /// @notice The address of the [`PolicyDescriptor`](./PolicyDescriptor) contract.
     function policyDescriptor() external view returns (address);
+   
+    /**
+     * @notice Returns [`Registry`](./Registry) contract address.
+     * @return registry_ The `Registry` address.
+    */
+    function registry() external view returns (address registry_);
 
     /***************************************
     POLICY MUTATIVE FUNCTIONS
@@ -216,13 +220,6 @@ interface IPolicyManager is IERC721Enhanced {
      */
     function updateActivePolicies(uint256[] calldata policyIDs) external;
 
-    /**
-     * @notice Updates the active cover amount of the Soteria product.
-     * This function is only called by `SoteriaCoverageProduct` when a new policy is bought or updated.
-     * @param newCoverAmount The new cover amount.
-    */ 
-    function setSoteriaActiveCoverAmount(uint256 newCoverAmount) external; 
-
     /***************************************
     PRODUCT VIEW FUNCTIONS
     ***************************************/
@@ -247,29 +244,6 @@ interface IPolicyManager is IERC721Enhanced {
      */
     function getProduct(uint256 productNum) external view returns (address product);
 
-    /**
-     * @notice Returns `SoteriaCoverageProduct`.
-     * @return soteria The address of soteria product.
-    */
-    function getSoteriaProduct() external view returns (address soteria);
-
-    /***************************************
-    OTHER VIEW FUNCTIONS
-    ***************************************/
-
-    /**
-     * @notice Returns the current amount covered (in wei).
-     * @return amount The covered amount (in wei).
-    */
-    function activeCoverAmount() external view returns (uint256 amount);
-
-    /**
-     * @notice Returns the current amount covered (in wei).
-     * @param riskStrategy The risk strategy address.
-     * @return amount The covered amount (in wei).
-    */
-    function activeCoverAmountPerStrategy(address riskStrategy) external view returns (uint256 amount);
-
     /***************************************
     GOVERNANCE FUNCTIONS
     ***************************************/
@@ -282,19 +256,11 @@ interface IPolicyManager is IERC721Enhanced {
     function addProduct(address product) external;
 
     /**
-     * @notice Sets soteria product.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param soteria The `SoteriaCoverageProduct`.
-     */
-    function setSoteriaProduct(address soteria) external; 
-
-    /**
      * @notice Removes a product.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param product the product to remove
      */
     function removeProduct(address product) external;
-
 
     /**
      * @notice Set the token descriptor.
@@ -302,4 +268,11 @@ interface IPolicyManager is IERC721Enhanced {
      * @param policyDescriptor The new token descriptor address.
      */
     function setPolicyDescriptor(address policyDescriptor) external;
+
+    /**
+     * @notice Sets the [`Registry`](./Registry) contract address.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param registry_ The address of `Registry` contract.
+    */
+    function setRegistry(address registry_) external;
 }

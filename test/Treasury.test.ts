@@ -97,7 +97,7 @@ describe("Treasury", function() {
     await registry.connect(governor).setTreasury(treasury.address);
 
     // deploy policy manager
-    policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
+    policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address, registry.address])) as PolicyManager;
     await registry.connect(governor).setPolicyManager(policyManager.address);
 
     // transfer tokens
