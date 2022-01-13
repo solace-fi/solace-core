@@ -13,7 +13,6 @@ const provider: MockProvider = waffle.provider;
 dotenv_config();
 chai.use(solidity)
 
-const SUBMIT_CLAIM_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("SoteriaCoverageProductSubmitClaim(uint256 policyID,address claimant,uint256 amountOut,uint256 deadline)"));
 const DOMAIN_NAME = "Solace.fi-SoteriaCoverageProduct";
 const VERSION = "1";
 
@@ -67,16 +66,22 @@ describe("SoteriaCoverageProduct", function() {
 
         solace = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
         await registry.connect(governor).setSolace(solace.address);
+
         weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
         await registry.connect(governor).setWeth(weth.address);
+
         vault = (await deployContract(deployer, artifacts.Vault, [governor.address, registry.address])) as Vault;
         await registry.connect(governor).setVault(vault.address);
+
         claimsEscrow = (await deployContract(deployer, artifacts.ClaimsEscrow, [governor.address, registry.address])) as ClaimsEscrow;
         await registry.connect(governor).setClaimsEscrow(claimsEscrow.address);
+
         treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, registry.address])) as Treasury;
         await registry.connect(governor).setTreasury(treasury.address);
-        policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
+
+        policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address, registry.address])) as PolicyManager;
         await registry.connect(governor).setPolicyManager(policyManager.address);
+
         riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
         await registry.connect(governor).setRiskManager(riskManager.address);
        
@@ -85,37 +90,29 @@ describe("SoteriaCoverageProduct", function() {
   
         coverageDataProvider = (await deployContract(deployer, artifacts.CoverageDataProvider, [governor.address, registry.address, priceOracle.address, solaceUsdcPool.address])) as CoverageDataProvider;
         await registry.connect(governor).setCoverageDataProvider(coverageDataProvider.address);
-
-
-        await vault.connect(governor).addRequestor(claimsEscrow.address);
-        await vault.connect(governor).addRequestor(treasury.address);
     });
 
     describe("deployment", () => {
         let mockRegistry: Registry;
+        
         before(async () => {
             mockRegistry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
         });
 
         it("reverts for zero address registry", async () => {
-            await expect(deployContract(deployer, artifacts.SoteriaCoverageProduct, [governor.address, ZERO_ADDRESS, SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, VERSION])).to.be.revertedWith("zero address registry");
+            await expect(deployContract(deployer, artifacts.SoteriaCoverageProduct, [governor.address, ZERO_ADDRESS, DOMAIN_NAME, VERSION])).to.be.revertedWith("zero address registry");
         });
 
         it("reverts for zero address riskmanager", async () => {
-            await expect(deployContract(deployer, artifacts.SoteriaCoverageProduct, [governor.address, mockRegistry.address, SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, VERSION])).to.be.revertedWith("zero address riskmanager");
-        });
-
-        it("reverts for zero address policymanager", async () => {
-            await mockRegistry.connect(governor).setRiskManager(riskManager.address);
-            await expect(deployContract(deployer, artifacts.SoteriaCoverageProduct, [governor.address, mockRegistry.address, SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, VERSION])).to.be.revertedWith("zero address policymanager");
+            await expect(deployContract(deployer, artifacts.SoteriaCoverageProduct, [governor.address, mockRegistry.address, DOMAIN_NAME, VERSION])).to.be.revertedWith("zero address riskmanager");
         });
 
         it("reverts for zero address governance", async () => {
-            await expect(deployContract(deployer, artifacts.SoteriaCoverageProduct, [ZERO_ADDRESS, registry.address , SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, VERSION])).to.be.revertedWith("zero address governance");
+            await expect(deployContract(deployer, artifacts.SoteriaCoverageProduct, [ZERO_ADDRESS, registry.address , DOMAIN_NAME, VERSION])).to.be.revertedWith("zero address governance");
         });
 
         it("can deploy", async () => {
-            soteriaCoverageProduct = await deployContract(deployer, artifacts.SoteriaCoverageProduct, [governor.address, registry.address , SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, VERSION]) as SoteriaCoverageProduct;
+            soteriaCoverageProduct = await deployContract(deployer, artifacts.SoteriaCoverageProduct, [governor.address, registry.address , DOMAIN_NAME, VERSION]) as SoteriaCoverageProduct;
             expect(soteriaCoverageProduct.address).to.not.undefined;
         });
     });
@@ -182,12 +179,10 @@ describe("SoteriaCoverageProduct", function() {
     describe("registry", () => {
         let registry2: Registry;
         let riskManager2: RiskManager;
-        let policyManager2: PolicyManager;
 
         before(async () => {
             registry2 =  (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
             riskManager2 = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
-            policyManager2 = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
         });
 
         after(async () => {
@@ -215,13 +210,8 @@ describe("SoteriaCoverageProduct", function() {
             await expect(soteriaCoverageProduct.connect(governor).setRegistry(registry2.address)).to.revertedWith("zero address riskmanager");
         });
 
-        it("reverts for zero address policymanager", async () => {
-            await registry2.connect(governor).setRiskManager(riskManager2.address);
-            await expect(soteriaCoverageProduct.connect(governor).setRegistry(registry2.address)).to.revertedWith("zero address policymanager");
-        });
-
         it("governance can set registry", async () => {
-            await registry2.connect(governor).setPolicyManager(policyManager2.address);
+            await registry2.connect(governor).setRiskManager(riskManager2.address);
             let tx = await soteriaCoverageProduct.connect(governor).setRegistry(registry2.address);
             expect(tx).emit(soteriaCoverageProduct, "RegistrySet").withArgs(registry2.address);
             expect(await soteriaCoverageProduct.connect(policyholder1).riskManager()).to.equal(riskManager2.address);
@@ -321,17 +311,17 @@ describe("SoteriaCoverageProduct", function() {
     })
 
     describe("activatePolicy", () => {
-        let pmActiveCoverAmount:BN;
-        let pmSoteriaActiveCoverAmount: BN;
+        let rmActiveCoverLimit:BN;
+        let rmSoteriaactiveCoverLimit: BN;
         let mcr: BN;
         let mcrps: BN;
 
         before(async () => {
-            // policy manager active cover amount and active cover amount for soteria.
-            await policyManager.connect(governor).setSoteriaProduct(soteriaCoverageProduct.address);
-            expect(await policyManager.connect(governor).getSoteriaProduct()).to.equal(soteriaCoverageProduct.address);
-            pmActiveCoverAmount = await policyManager.connect(governor).activeCoverAmount();
-            pmSoteriaActiveCoverAmount = await policyManager.connect(governor).activeCoverAmountPerStrategy(soteriaCoverageProduct.address);
+            await riskManager.connect(governor).addCoverLimitUpdater(soteriaCoverageProduct.address);
+            
+            // risk manager active cover amount and active cover amount for soteria.
+            rmActiveCoverLimit = await riskManager.connect(governor).activeCoverLimit();
+            rmSoteriaactiveCoverLimit = await riskManager.connect(governor).activeCoverLimitPerStrategy(soteriaCoverageProduct.address);
 
             // risk manager min. capital requirement and min. capital requirement for soteria
             mcr = await riskManager.connect(governor).minCapitalRequirement();
@@ -391,6 +381,7 @@ describe("SoteriaCoverageProduct", function() {
 
             await expect(tx).emit(soteriaCoverageProduct, "PolicyCreated").withArgs(POLICY_ID_1);
             await expect(tx).emit(soteriaCoverageProduct, "Transfer").withArgs(ZERO_ADDRESS, policyholder1.address, POLICY_ID_1);
+            await expect(tx).emit(riskManager, "ActiveCoverLimitUpdated").withArgs(soteriaCoverageProduct.address, rmActiveCoverLimit, ONE_ETH);
 
             expect (await soteriaCoverageProduct.rewardPointsOf(policyholder1.address)).eq(0)
             expect (await soteriaCoverageProduct.accountBalanceOf(policyholder1.address)).eq(ONE_ETH)
@@ -398,6 +389,7 @@ describe("SoteriaCoverageProduct", function() {
             expect (await soteriaCoverageProduct.policyOf(policyholder1.address)).eq(POLICY_ID_1)
             expect (await soteriaCoverageProduct.ownerOf(POLICY_ID_1)).eq(policyholder1.address)
             expect (await soteriaCoverageProduct.activeCoverLimit()).eq(ONE_ETH)
+            expect (await riskManager.activeCoverLimitPerStrategy(soteriaCoverageProduct.address)).eq(ONE_ETH)
             expect (await soteriaCoverageProduct.policyCount()).eq(1)
             expect (await soteriaCoverageProduct.coverLimitOf(POLICY_ID_1)).eq(ONE_ETH)
             expect(await provider.getBalance(soteriaCoverageProduct.address)).to.equal(ONE_ETH);
@@ -420,6 +412,7 @@ describe("SoteriaCoverageProduct", function() {
 
             await expect(tx).emit(soteriaCoverageProduct, "PolicyCreated").withArgs(POLICY_ID_2);
             await expect(tx).emit(soteriaCoverageProduct, "Transfer").withArgs(ZERO_ADDRESS, policyholder2.address, POLICY_ID_2);
+            await expect(tx).emit(riskManager, "ActiveCoverLimitUpdated").withArgs(soteriaCoverageProduct.address, ONE_ETH, ONE_ETH.add(ONE_ETH));
 
             expect (await soteriaCoverageProduct.rewardPointsOf(policyholder2.address)).eq(0)
             expect (await soteriaCoverageProduct.accountBalanceOf(policyholder1.address)).eq(ONE_ETH)
@@ -428,6 +421,7 @@ describe("SoteriaCoverageProduct", function() {
             expect (await soteriaCoverageProduct.policyOf(policyholder2.address)).eq(POLICY_ID_2)
             expect (await soteriaCoverageProduct.ownerOf(POLICY_ID_2)).eq(policyholder2.address)
             expect (await soteriaCoverageProduct.activeCoverLimit()).eq(ONE_ETH.mul(2))
+            expect (await riskManager.activeCoverLimitPerStrategy(soteriaCoverageProduct.address)).eq(ONE_ETH.mul(2))
             expect (await soteriaCoverageProduct.policyCount()).eq(2)
             expect (await soteriaCoverageProduct.coverLimitOf(POLICY_ID_2)).eq(ONE_ETH)
             expect (await provider.getBalance(soteriaCoverageProduct.address)).to.equal(ONE_ETH.mul(2));
@@ -437,10 +431,10 @@ describe("SoteriaCoverageProduct", function() {
             expect(await soteriaCoverageProduct.connect(policyholder1).balanceOf(policyholder1.address)).to.equal(1);
             expect(await soteriaCoverageProduct.connect(policyholder2).balanceOf(policyholder2.address)).to.equal(1);
         });
-        it("should update policy manager active cover amount", async () => {
+        it("should update risk manager active cover amount", async () => {
             let activeCoverLimit = await soteriaCoverageProduct.activeCoverLimit();
-            expect(await policyManager.connect(governor).activeCoverAmount()).to.equal(pmActiveCoverAmount.add(activeCoverLimit));
-            expect(await policyManager.connect(governor).activeCoverAmountPerStrategy(soteriaCoverageProduct.address)).to.equal(pmSoteriaActiveCoverAmount.add(activeCoverLimit));
+            expect(await riskManager.connect(governor).activeCoverLimit()).to.equal(rmActiveCoverLimit.add(activeCoverLimit));
+            expect(await riskManager.connect(governor).activeCoverLimitPerStrategy(soteriaCoverageProduct.address)).to.equal(rmSoteriaactiveCoverLimit.add(activeCoverLimit));
         });
         it("should update risk manager mcr", async () => {
             let activeCoverLimit = await soteriaCoverageProduct.connect(governor).activeCoverLimit();
@@ -502,15 +496,15 @@ describe("SoteriaCoverageProduct", function() {
         });
     });
 
-    describe("updateCoverAmount", () => {
+    describe("updateCoverLimit", () => {
         let maxCover: BN;
         let maxCoverPerStrategy: BN;
         let initialMCRForSoteria: BN;
         let initialMCR: BN; // min. capital requirement
         let initialSoteriaActiveCoverLimit: BN;
         let initialPolicyCoverLimit: BN;
-        let initialPMActiveCoverLimit: BN; // policy manager active cover amount
-        let initialPMActiveCoverLimitForSoteria: BN; // policy manager active cover amount for soteria
+        let initialRMActiveCoverLimit: BN; // risk manager active cover amount
+        let initialRMActiveCoverLimitForSoteria: BN; // risk manager active cover amount for soteria
 
         before(async () => {
             maxCover = await riskManager.connect(governor).maxCover();
@@ -520,9 +514,9 @@ describe("SoteriaCoverageProduct", function() {
             initialMCR = await riskManager.connect(governor).minCapitalRequirement();
             initialMCRForSoteria = await riskManager.connect(governor).minCapitalRequirementPerStrategy(soteriaCoverageProduct.address);
             
-            // policy manager current values
-            initialPMActiveCoverLimit = await policyManager.connect(governor).activeCoverAmount();
-            initialPMActiveCoverLimitForSoteria = await policyManager.connect(governor).activeCoverAmountPerStrategy(soteriaCoverageProduct.address);
+            // risk manager current values
+            initialRMActiveCoverLimit = await riskManager.connect(governor).activeCoverLimit();
+            initialRMActiveCoverLimitForSoteria = await riskManager.connect(governor).activeCoverLimitPerStrategy(soteriaCoverageProduct.address);
 
             initialSoteriaActiveCoverLimit = await soteriaCoverageProduct.connect(policyholder1).activeCoverLimit();
             initialPolicyCoverLimit = await soteriaCoverageProduct.connect(policyholder1).coverLimitOf(POLICY_ID_1);
@@ -567,17 +561,17 @@ describe("SoteriaCoverageProduct", function() {
             let tx = await soteriaCoverageProduct.connect(policyholder1).updateCoverLimit(NEW_COVER_LIMIT);
 
             await expect(tx).emit(soteriaCoverageProduct, "PolicyUpdated").withArgs(POLICY_ID_1);
-            await expect(tx).emit(soteriaCoverageProduct, "PolicyManagerUpdated").withArgs(activeCoverLimit);
+            await expect(tx).emit(riskManager, "ActiveCoverLimitUpdated").withArgs(soteriaCoverageProduct.address, initialRMActiveCoverLimit, initialRMActiveCoverLimit.add(NEW_COVER_LIMIT).sub(initialPolicyCoverLimit));
             expect(await soteriaCoverageProduct.connect(policyholder1).activeCoverLimit()).to.equal(activeCoverLimit);
             expect(await soteriaCoverageProduct.connect(policyholder1).coverLimitOf(POLICY_ID_1)).to.equal(NEW_COVER_LIMIT);
         });
 
-        it("should update policy manager active cover limit", async () => {
-            let amount1 = initialPMActiveCoverLimit.add(NEW_COVER_LIMIT).sub(initialPolicyCoverLimit);
-            let amount2 = initialPMActiveCoverLimitForSoteria.add(NEW_COVER_LIMIT).sub(initialPolicyCoverLimit);
+        it("should update risk manager active cover limit", async () => {
+            let amount1 = initialRMActiveCoverLimit.add(NEW_COVER_LIMIT).sub(initialPolicyCoverLimit);
+            let amount2 = initialRMActiveCoverLimitForSoteria.add(NEW_COVER_LIMIT).sub(initialPolicyCoverLimit);
 
-            expect(await policyManager.connect(governor).activeCoverAmount()).to.equal(amount1);
-            expect(await policyManager.connect(governor).activeCoverAmountPerStrategy(soteriaCoverageProduct.address)).to.equal(amount2);
+            expect(await riskManager.connect(governor).activeCoverLimit()).to.equal(amount1);
+            expect(await riskManager.connect(governor).activeCoverLimitPerStrategy(soteriaCoverageProduct.address)).to.equal(amount2);
         });
 
         it("should update risk manager mcr", async () => {         
@@ -612,15 +606,15 @@ describe("SoteriaCoverageProduct", function() {
             let initialPolicyCoverLimit = await soteriaCoverageProduct.connect(policyholder3).coverLimitOf(POLICY_ID_3);
             let initialActiveCoverLimit = await soteriaCoverageProduct.connect(policyholder3).activeCoverLimit();
             let initialAvailableCoverCapacity = await soteriaCoverageProduct.availableCoverCapacity();
-            let initialPMActiveCoverAmount = await policyManager.connect(policyholder3).activeCoverAmount();
-            let initialPMActiveCoverAmountForSoteria = await policyManager.connect(policyholder3).activeCoverAmountPerStrategy(soteriaCoverageProduct.address);
+            let initialRMActiveCoverLimit = await riskManager.connect(policyholder3).activeCoverLimit();
+            let initialRMActiveCoverLimitForSoteria = await riskManager.connect(policyholder3).activeCoverLimitPerStrategy(soteriaCoverageProduct.address);
             expect(await soteriaCoverageProduct.cooldownStart(policyholder3.address)).eq(0)
 
             // deactivate policy
             tx = await soteriaCoverageProduct.connect(policyholder3).deactivatePolicy();
             await expect(tx).emit(soteriaCoverageProduct, "PolicyDeactivated").withArgs(POLICY_ID_3);
-            await expect(tx).emit(soteriaCoverageProduct, "PolicyManagerUpdated").withArgs(initialActiveCoverLimit.sub(initialPolicyCoverLimit));
-
+            await expect(tx).emit(riskManager, "ActiveCoverLimitUpdated").withArgs(soteriaCoverageProduct.address, initialRMActiveCoverLimit, initialRMActiveCoverLimit.sub(initialPolicyCoverLimit));
+            
             // user balance should not change
             let receipt = await tx.wait();
             let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
@@ -638,9 +632,9 @@ describe("SoteriaCoverageProduct", function() {
             expect(await soteriaCoverageProduct.policyStatus(POLICY_ID_3)).to.be.false;
             expect(await soteriaCoverageProduct.policyCount()).eq(3)
 
-            // policy manager active cover amount and active cover amount for soteria should be decreased
-            expect(await policyManager.connect(policyholder3).activeCoverAmount()).to.equal(initialPMActiveCoverAmount.sub(initialPolicyCoverLimit));
-            expect(await policyManager.connect(policyholder3).activeCoverAmountPerStrategy(soteriaCoverageProduct.address)).to.equal(initialPMActiveCoverAmountForSoteria.sub(initialPolicyCoverLimit));
+            // risk manager active cover amount and active cover amount for soteria should be decreased
+            expect(await riskManager.connect(policyholder3).activeCoverLimit()).to.equal(initialRMActiveCoverLimit.sub(initialPolicyCoverLimit));
+            expect(await riskManager.connect(policyholder3).activeCoverLimitPerStrategy(soteriaCoverageProduct.address)).to.equal(initialRMActiveCoverLimitForSoteria.sub(initialPolicyCoverLimit));
 
             // cooldown should be set
             expect(await soteriaCoverageProduct.cooldownStart(policyholder3.address)).gt(0)
@@ -652,6 +646,11 @@ describe("SoteriaCoverageProduct", function() {
         let initialPolicyCover:BN;
         let initialPolicyholderETHBalance: BN;
         let initialSoteriaETHBalance: BN;
+        let initialActiveCoverLimit: BN;
+        let initialAvailableCoverCapacity: BN;
+        let initialRMActiveCoverLimit: BN;
+        let initialRMActiveCoverLimitForSoteria: BN;
+
         let maxRateNum: BN;
         let maxRateDenom: BN;
         let chargeCycle: BN;
@@ -665,6 +664,11 @@ describe("SoteriaCoverageProduct", function() {
             initialPolicyCover = await soteriaCoverageProduct.coverLimitOf(POLICY_ID_3);
             initialPolicyholderETHBalance = await provider.getBalance(policyholder3.address)
             initialSoteriaETHBalance = await provider.getBalance(soteriaCoverageProduct.address)
+            initialActiveCoverLimit = await soteriaCoverageProduct.connect(policyholder3).activeCoverLimit();
+            initialAvailableCoverCapacity = await soteriaCoverageProduct.availableCoverCapacity();
+            initialRMActiveCoverLimit = await riskManager.connect(policyholder3).activeCoverLimit();
+            initialRMActiveCoverLimitForSoteria = await riskManager.connect(policyholder3).activeCoverLimitPerStrategy(soteriaCoverageProduct.address);
+
             maxRateNum = await soteriaCoverageProduct.maxRateNum();
             maxRateDenom = await soteriaCoverageProduct.maxRateDenom();
             chargeCycle = await soteriaCoverageProduct.chargeCycle();
@@ -721,14 +725,12 @@ describe("SoteriaCoverageProduct", function() {
             expect(await provider.getBalance(policyholder3.address)).eq(policyholderETHBalance.add(withdrawAmount).sub(gasCost))
             expect(await provider.getBalance(soteriaCoverageProduct.address)).eq(initialSoteriaETHBalance.sub(initialAccountBalance))
         })
-
-        // after(async () => {
-        //     // let tx = await soteriaCoverageProduct.connect(policyholder3).activatePolicy(policyholder3.address, initialPolicyCover, {value: initialPolicyCover})
-        //     // // let tx2 = await policyholder3.sendTransaction({ to: soteriaCoverageProduct.address, value: initialAccountBalance.sub(initialPolicyCover)});
-        //     // expect(await soteriaCoverageProduct.accountBalanceOf(policyholder3.address)).eq(initialAccountBalance);
-        //     // expect(await soteriaCoverageProduct.coverLimitOf(POLICY_ID_3)).eq(initialPolicyCover)
-        //     // expect (await soteriaCoverageProduct.policyStatus(POLICY_ID_3)).eq(true)
-        // })
+        after(async () => {
+            expect(await soteriaCoverageProduct.connect(policyholder3).activeCoverLimit()).eq(initialActiveCoverLimit)
+            expect(await soteriaCoverageProduct.availableCoverCapacity()).eq(initialAvailableCoverCapacity)
+            expect(await riskManager.connect(policyholder3).activeCoverLimit()).eq(initialRMActiveCoverLimit)
+            expect(await riskManager.connect(policyholder3).activeCoverLimitPerStrategy(soteriaCoverageProduct.address)).eq(initialRMActiveCoverLimitForSoteria)
+        })
     });
 
     describe("chargePremiums", () => {
@@ -751,7 +753,7 @@ describe("SoteriaCoverageProduct", function() {
         it("can charge premiums", async () => {
             // CASE 1 - Charge weekly premium for two policyholders, no reward points involved
             
-            // premiums are routed to the vault in premium pool!
+            // premiums are routed to the premium pool!
             let soteriaBalance = await provider.getBalance(soteriaCoverageProduct.address);
             let premiumPoolBalance = await provider.getBalance(premiumPool.address);
             let policyholder1AccountBalance = await soteriaCoverageProduct.connect(policyholder1).accountBalanceOf(policyholder1.address);
@@ -799,8 +801,8 @@ describe("SoteriaCoverageProduct", function() {
             let initialActiveCoverLimit = await soteriaCoverageProduct.connect(policyholder4).activeCoverLimit();
             let initialPolicyCoverLimit = await soteriaCoverageProduct.connect(policyholder4).coverLimitOf(POLICY_ID_4);
             let initialAvailableCoverCapacity = await soteriaCoverageProduct.connect(policyholder4).availableCoverCapacity();
-            let initialPMCoverAmount = await policyManager.connect(policyholder4).activeCoverAmount();
-            let initialPMSoteriaCoverAmount = await policyManager.connect(policyholder4).activeCoverAmountPerStrategy(soteriaCoverageProduct.address);
+            let initialPMCoverAmount = await riskManager.connect(policyholder4).activeCoverLimit();
+            let initialPMSoteriaCoverAmount = await riskManager.connect(policyholder4).activeCoverLimitPerStrategy(soteriaCoverageProduct.address);
 
             // we cannot reach the PremiumPartiallyCharged branch within a single chargePremiums() call
             await soteriaCoverageProduct.connect(premiumCollector).chargePremiums([policyholder4.address], [WEEKLY_MAX_PREMIUM]);
@@ -810,6 +812,7 @@ describe("SoteriaCoverageProduct", function() {
            
             // policy should be deactivated
             await expect(tx).emit(soteriaCoverageProduct, "PolicyDeactivated").withArgs(POLICY_ID_4);
+            await expect(tx).emit(riskManager, "ActiveCoverLimitUpdated").withArgs(soteriaCoverageProduct.address, initialActiveCoverLimit, initialActiveCoverLimit.sub(initialPolicyCoverLimit));
             expect(await soteriaCoverageProduct.policyStatus(POLICY_ID_4)).to.equal(false);
 
             // active cover amount should be updated
@@ -819,10 +822,10 @@ describe("SoteriaCoverageProduct", function() {
             // policy's cover amount should be zero
             expect(await soteriaCoverageProduct.coverLimitOf(POLICY_ID_4)).to.equal(ZERO_AMOUNT);
 
-            // policy manager should be updated
-            expect(await policyManager.activeCoverAmount()).to.equal(initialPMCoverAmount.sub(initialPolicyCoverLimit));
-            expect(await policyManager.activeCoverAmountPerStrategy(soteriaCoverageProduct.address)).to.equal(initialPMSoteriaCoverAmount.sub(initialPolicyCoverLimit));
-            expect(await policyManager.activeCoverAmountPerStrategy(soteriaCoverageProduct.address)).to.equal(initialActiveCoverLimit.sub(initialPolicyCoverLimit));
+            // risk manager should be updated
+            expect(await riskManager.activeCoverLimit()).to.equal(initialPMCoverAmount.sub(initialPolicyCoverLimit));
+            expect(await riskManager.activeCoverLimitPerStrategy(soteriaCoverageProduct.address)).to.equal(initialPMSoteriaCoverAmount.sub(initialPolicyCoverLimit));
+            expect(await riskManager.activeCoverLimitPerStrategy(soteriaCoverageProduct.address)).to.equal(initialActiveCoverLimit.sub(initialPolicyCoverLimit));
 
             // policyholder account balance should be depleted
             expect(await soteriaCoverageProduct.accountBalanceOf(policyholder4.address)).to.equal(0);
@@ -900,15 +903,16 @@ describe("SoteriaCoverageProduct", function() {
             let initialPolicy2CoverLimit = await soteriaCoverageProduct.coverLimitOf(POLICY_ID_2);
             let initialPolicy3CoverLimit = await soteriaCoverageProduct.coverLimitOf(POLICY_ID_3);
             let initialAvailableCoverCapacity = await soteriaCoverageProduct.availableCoverCapacity();
-            let initialPMCoverAmount = await policyManager.activeCoverAmount();
-            let initialPMSoteriaCoverAmount = await policyManager.activeCoverAmountPerStrategy(soteriaCoverageProduct.address);
+            let initialPMCoverAmount = await riskManager.activeCoverLimit();
+            let initialPMSoteriaCoverAmount = await riskManager.activeCoverLimitPerStrategy(soteriaCoverageProduct.address);
 
             tx = await soteriaCoverageProduct.connect(premiumCollector).chargePremiums([policyholder1.address, policyholder2.address, policyholder3.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM])
             expect(tx).to.emit(soteriaCoverageProduct, "PremiumCharged").withArgs(policyholder1.address, WEEKLY_MAX_PREMIUM);
             expect(tx).to.emit(soteriaCoverageProduct, "PremiumCharged").withArgs(policyholder2.address, WEEKLY_MAX_PREMIUM);
             expect(tx).to.emit(soteriaCoverageProduct, "PremiumPartiallyCharged").withArgs(policyholder3.address, WEEKLY_MAX_PREMIUM, initialHolder3AccountBalance.add(initialRewardPoints3));
             expect(tx).to.emit(soteriaCoverageProduct, "PolicyDeactivated").withArgs(POLICY_ID_3);
-
+            await expect(tx).emit(riskManager, "ActiveCoverLimitUpdated").withArgs(soteriaCoverageProduct.address, initialActiveCoverLimit, initialActiveCoverLimit.sub(initialPolicy3CoverLimit));
+            
             // Confirm state is what we expect after charging premium
 
             // Check reward points
@@ -943,8 +947,8 @@ describe("SoteriaCoverageProduct", function() {
 
             // Soteria active cover limit check - policy 3 deactivated
             expect(await soteriaCoverageProduct.activeCoverLimit()).eq(initialActiveCoverLimit.sub(initialPolicy3CoverLimit))
-            expect(await policyManager.activeCoverAmount()).eq(initialPMCoverAmount.sub(initialPolicy3CoverLimit))
-            expect(await policyManager.activeCoverAmountPerStrategy(soteriaCoverageProduct.address)).eq(initialPMSoteriaCoverAmount.sub(initialPolicy3CoverLimit))
+            expect(await riskManager.activeCoverLimit()).eq(initialPMCoverAmount.sub(initialPolicy3CoverLimit))
+            expect(await riskManager.activeCoverLimitPerStrategy(soteriaCoverageProduct.address)).eq(initialPMSoteriaCoverAmount.sub(initialPolicy3CoverLimit))
             
             // Cover capacity check - should be increased by policy 3 initial cover limit
             expect(await soteriaCoverageProduct.availableCoverCapacity()).eq(initialAvailableCoverCapacity.add(initialPolicy3CoverLimit))
