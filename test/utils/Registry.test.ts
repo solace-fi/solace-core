@@ -36,7 +36,7 @@ describe("Registry", function() {
     });
     it("can set new governance", async function() {
       let tx = await registry.connect(governor).setPendingGovernance(deployer.address);
-      expect(tx).to.emit(registry, "GovernancePending").withArgs(deployer.address);
+      await expect(tx).to.emit(registry, "GovernancePending").withArgs(deployer.address);
       expect(await registry.governance()).to.equal(governor.address);
       expect(await registry.pendingGovernance()).to.equal(deployer.address);
     });

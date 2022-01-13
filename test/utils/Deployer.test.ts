@@ -79,7 +79,7 @@ describe("Deployer", function () {
       let tx = await deployerContract.deploy(initcode, toBytes32(0), {gasLimit: 10000000});
       //let gasUsed = (await tx.wait()).gasUsed;
       //console.log('gas used:', gasUsed.toNumber());
-      expect(tx).to.emit(deployerContract, "ContractDeployed").withArgs(predictedAddress);
+      await expect(tx).to.emit(deployerContract, "ContractDeployed").withArgs(predictedAddress);
       solaceAddress = predictedAddress;
     });
     it("can manipulate contract address", async function () {
@@ -95,7 +95,7 @@ describe("Deployer", function () {
       let tx = await deployerContract.deploy(initcode, toBytes32(1), {gasLimit: 10000000});
       //let gasUsed = (await tx.wait()).gasUsed;
       //console.log('gas used:', gasUsed.toNumber());
-      expect(tx).to.emit(deployerContract, "ContractDeployed").withArgs(predictedAddress);
+      await expect(tx).to.emit(deployerContract, "ContractDeployed").withArgs(predictedAddress);
       solaceAddress = predictedAddress;
       solace = (await ethers.getContractAt(artifacts.SOLACE.abi, predictedAddress)) as Solace;
     });

@@ -123,7 +123,7 @@ describe("BondTellerERC20", function() {
     });
     it("can set new governance", async function() {
       let tx = await teller1.connect(governor).setPendingGovernance(deployer.address);
-      expect(tx).to.emit(teller1, "GovernancePending").withArgs(deployer.address);
+      await expect(tx).to.emit(teller1, "GovernancePending").withArgs(deployer.address);
       expect(await teller1.governance()).to.equal(governor.address);
       expect(await teller1.pendingGovernance()).to.equal(deployer.address);
     });
@@ -151,16 +151,16 @@ describe("BondTellerERC20", function() {
     it("governance can pause and unpause", async function () {
       expect(await teller1.paused()).to.be.false;
       let tx1 = await teller1.connect(governor).pause();
-      expect(tx1).to.emit(teller1, "Paused");
+      await expect(tx1).to.emit(teller1, "Paused");
       expect(await teller1.paused()).to.be.true;
       let tx2 = await teller1.connect(governor).pause();
-      expect(tx2).to.emit(teller1, "Paused");
+      await expect(tx2).to.emit(teller1, "Paused");
       expect(await teller1.paused()).to.be.true;
       let tx3 = await teller1.connect(governor).unpause();
-      expect(tx3).to.emit(teller1, "Unpaused");
+      await expect(tx3).to.emit(teller1, "Unpaused");
       expect(await teller1.paused()).to.be.false;
       let tx4 = await teller1.connect(governor).unpause();
-      expect(tx4).to.emit(teller1, "Unpaused");
+      await expect(tx4).to.emit(teller1, "Unpaused");
       expect(await teller1.paused()).to.be.false;
     });
   });
@@ -270,7 +270,7 @@ describe("BondTellerERC20", function() {
       let bondID1 = await teller1.numBonds();
       expect(bondID1).eq(1);
       let bondInfo = await teller1.bonds(bondID1);
-      expect(tx1).to.emit(teller1, "CreateBond").withArgs(bondID1, bondInfo.pricePaid, bondInfo.payoutToken, bondInfo.payoutAmount, bondInfo.maturation);
+      await expect(tx1).to.emit(teller1, "CreateBond").withArgs(bondID1, bondInfo.pricePaid, bondInfo.payoutToken, bondInfo.payoutAmount, bondInfo.maturation);
       expect(bondInfo.pricePaid).eq(ONE_ETHER.mul(3));
       expect(bondInfo.payoutToken).eq(solace.address);
       expectClose(predictedAmountIn, ONE_ETHER.mul(3), 1e14);
@@ -310,7 +310,7 @@ describe("BondTellerERC20", function() {
       let bondID1 = await teller1.numBonds();
       expect(bondID1).eq(2);
       let bondInfo = await teller1.bonds(bondID1);
-      expect(tx1).to.emit(teller1, "CreateBond").withArgs(bondID1, bondInfo.pricePaid, bondInfo.payoutToken, bondInfo.payoutAmount, bondInfo.maturation);
+      await expect(tx1).to.emit(teller1, "CreateBond").withArgs(bondID1, bondInfo.pricePaid, bondInfo.payoutToken, bondInfo.payoutAmount, bondInfo.maturation);
       expect(bondInfo.pricePaid).eq(ONE_ETHER.mul(3));
       expect(bondInfo.payoutToken).eq(xsolace.address);
       expectClose(predictedAmountIn, ONE_ETHER.mul(3), 1e14);
@@ -346,7 +346,7 @@ describe("BondTellerERC20", function() {
       let bondID1 = await teller1.numBonds();
       expect(bondID1).eq(3);
       let bondInfo = await teller1.bonds(bondID1);
-      expect(tx1).to.emit(teller1, "CreateBond").withArgs(bondID1, bondInfo.pricePaid, bondInfo.payoutToken, bondInfo.payoutAmount, bondInfo.maturation);
+      await expect(tx1).to.emit(teller1, "CreateBond").withArgs(bondID1, bondInfo.pricePaid, bondInfo.payoutToken, bondInfo.payoutAmount, bondInfo.maturation);
       expect(bondInfo.pricePaid).eq(ONE_ETHER.mul(3));
       expect(bondInfo.payoutToken).eq(solace.address);
       expectClose(predictedAmountIn, ONE_ETHER.mul(3), 1e14);
@@ -391,7 +391,7 @@ describe("BondTellerERC20", function() {
       await provider.send("evm_mine", []);
       let bondInfo = await teller1.bonds(1);
       let tx1 = await teller1.connect(depositor1).redeem(1);
-      expect(tx1).to.emit(teller1, "RedeemBond").withArgs(1, depositor1.address, solace.address, bondInfo.payoutAmount);
+      await expect(tx1).to.emit(teller1, "RedeemBond").withArgs(1, depositor1.address, solace.address, bondInfo.payoutAmount);
       let bal2 = await getBalances(teller1, depositor1);
       let bal12 = getBalancesDiff(bal2, bal1);
       expect(bal12.userSolace).eq(bondInfo.payoutAmount);
@@ -418,7 +418,7 @@ describe("BondTellerERC20", function() {
       await provider.send("evm_mine", []);
       let bondInfo = await teller1.bonds(bondID);
       let tx1 = await teller1.connect(depositor2).redeem(bondID);
-      expect(tx1).to.emit(teller1, "RedeemBond").withArgs(bondID, depositor2.address, xsolace.address, bondInfo.payoutAmount);
+      await expect(tx1).to.emit(teller1, "RedeemBond").withArgs(bondID, depositor2.address, xsolace.address, bondInfo.payoutAmount);
       let bal2 = await getBalances(teller1, depositor2);
       let bal12 = getBalancesDiff(bal2, bal1);
       expect(bal12.userSolace).eq(0);
@@ -467,7 +467,7 @@ describe("BondTellerERC20", function() {
       let bondID1 = await teller2.numBonds();
       expect(bondID1).eq(1);
       let bondInfo = await teller2.bonds(bondID1);
-      expect(tx1).to.emit(teller2, "CreateBond").withArgs(bondID1, bondInfo.pricePaid, bondInfo.payoutToken, bondInfo.payoutAmount, bondInfo.maturation);
+      await expect(tx1).to.emit(teller2, "CreateBond").withArgs(bondID1, bondInfo.pricePaid, bondInfo.payoutToken, bondInfo.payoutAmount, bondInfo.maturation);
       expect(bondInfo.pricePaid).eq(ONE_ETHER.mul(3));
       expect(bondInfo.payoutToken).eq(solace.address);
       expectClose(predictedAmountIn, ONE_ETHER.mul(3), 1e14);
@@ -509,7 +509,7 @@ describe("BondTellerERC20", function() {
       let bondID1 = await teller2.numBonds();
       expect(bondID1).eq(2);
       let bondInfo = await teller2.bonds(bondID1);
-      expect(tx1).to.emit(teller2, "CreateBond").withArgs(bondID1, bondInfo.pricePaid, bondInfo.payoutToken, bondInfo.payoutAmount, bondInfo.maturation);
+      await expect(tx1).to.emit(teller2, "CreateBond").withArgs(bondID1, bondInfo.pricePaid, bondInfo.payoutToken, bondInfo.payoutAmount, bondInfo.maturation);
       expect(bondInfo.pricePaid).eq(ONE_ETHER.mul(3));
       expect(bondInfo.payoutToken).eq(xsolace.address);
       expectClose(predictedAmountIn, ONE_ETHER.mul(3), 1e14);
@@ -546,7 +546,7 @@ describe("BondTellerERC20", function() {
       let bondID1 = await teller2.numBonds();
       expect(bondID1).eq(3);
       let bondInfo = await teller2.bonds(bondID1);
-      expect(tx1).to.emit(teller2, "CreateBond").withArgs(bondID1, bondInfo.pricePaid, bondInfo.payoutToken, bondInfo.payoutAmount, bondInfo.maturation);
+      await expect(tx1).to.emit(teller2, "CreateBond").withArgs(bondID1, bondInfo.pricePaid, bondInfo.payoutToken, bondInfo.payoutAmount, bondInfo.maturation);
       expect(bondInfo.pricePaid).eq(ONE_ETHER.mul(3));
       expect(bondInfo.payoutToken).eq(solace.address);
       expectClose(predictedAmountIn, ONE_ETHER.mul(3), 1e14);
@@ -613,7 +613,7 @@ describe("BondTellerERC20", function() {
     });
     it("can set terms", async function () {
       let tx = await teller2.connect(governor).setTerms({startPrice: 1, minimumPrice: 2, maxPayout: 3, priceAdjNum: 5, priceAdjDenom: 6, capacity: 7, capacityIsPayout: true, startTime: 8, endTime: 9, vestingTerm: 10, halfLife: 11});
-      expect(tx).to.emit(teller2, "TermsSet");
+      await expect(tx).to.emit(teller2, "TermsSet");
       const blockTimestamp = (await provider.getBlock('latest')).timestamp;
       expect(await teller2.bondPrice()).eq(2);
       expect(await teller2.nextPrice()).eq(1);
@@ -657,13 +657,13 @@ describe("BondTellerERC20", function() {
     });
     it("can set fees", async function () {
       let tx = teller2.connect(governor).setFees(BOND_FEE, DAO_FEE);
-      expect(tx).to.emit(teller2, "FeesSet");
+      await expect(tx).to.emit(teller2, "FeesSet");
       expect(await teller2.bondFeeBps()).eq(BOND_FEE);
       expect(await teller2.daoFeeBps()).eq(DAO_FEE);
     });
     it("can set to zero", async function () {
       let tx = teller2.connect(governor).setFees(0, 0);
-      expect(tx).to.emit(teller2, "FeesSet");
+      await expect(tx).to.emit(teller2, "FeesSet");
       expect(await teller2.bondFeeBps()).eq(0);
       expect(await teller2.daoFeeBps()).eq(0);
     });
@@ -698,7 +698,7 @@ describe("BondTellerERC20", function() {
     })
     it("governance can set addresses", async function () {
       let tx = await teller1.connect(governor).setAddresses(solace2.address, xsolace2.address, underwritingPool2.address, dao2.address, tkn2.address, bondDepo2.address);
-      expect(tx).to.emit(teller1, "AddressesSet");
+      await expect(tx).to.emit(teller1, "AddressesSet");
       expect(await teller1.solace()).eq(solace2.address);
       expect(await teller1.xsolace()).eq(xsolace2.address);
       expect(await teller1.underwritingPool()).eq(underwritingPool2.address);
@@ -718,7 +718,7 @@ describe("BondTellerERC20", function() {
       let bondID1 = await teller1.numBonds();
       expect(bondID1).eq(4);
       let bondInfo = await teller1.bonds(bondID1);
-      expect(tx1).to.emit(teller1, "CreateBond").withArgs(bondID1, bondInfo.pricePaid, bondInfo.payoutToken, bondInfo.payoutAmount, bondInfo.maturation);
+      await expect(tx1).to.emit(teller1, "CreateBond").withArgs(bondID1, bondInfo.pricePaid, bondInfo.payoutToken, bondInfo.payoutAmount, bondInfo.maturation);
       expect(bondInfo.pricePaid).eq(ONE_ETHER.mul(3));
       expect(bondInfo.payoutToken).eq(solace2.address);
       expectClose(predictedAmountIn, ONE_ETHER.mul(3), 1e14);

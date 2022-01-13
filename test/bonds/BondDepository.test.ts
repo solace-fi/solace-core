@@ -84,7 +84,7 @@ describe("BondDepository", function() {
     });
     it("can set new governance", async function() {
       let tx = await bondDepo.connect(governor).setPendingGovernance(deployer.address);
-      expect(tx).to.emit(bondDepo, "GovernancePending").withArgs(deployer.address);
+      await expect(tx).to.emit(bondDepo, "GovernancePending").withArgs(deployer.address);
       expect(await bondDepo.governance()).to.equal(governor.address);
       expect(await bondDepo.pendingGovernance()).to.equal(deployer.address);
     });
@@ -111,10 +111,10 @@ describe("BondDepository", function() {
     it("governance can add tellers", async function () {
       expect(await bondDepo.isTeller(mockTeller.address)).to.be.false;
       let tx1 = await bondDepo.connect(governor).addTeller(mockTeller.address);
-      expect(tx1).to.emit(bondDepo, "TellerAdded").withArgs(mockTeller.address);
+      await expect(tx1).to.emit(bondDepo, "TellerAdded").withArgs(mockTeller.address);
       expect(await bondDepo.isTeller(mockTeller.address)).to.be.true;
       let tx2 = await bondDepo.connect(governor).addTeller(mockTeller.address);
-      expect(tx2).to.emit(bondDepo, "TellerAdded").withArgs(mockTeller.address);
+      await expect(tx2).to.emit(bondDepo, "TellerAdded").withArgs(mockTeller.address);
       expect(await bondDepo.isTeller(mockTeller.address)).to.be.true;
     });
     it("non governance cannot remove tellers", async function () {
@@ -123,10 +123,10 @@ describe("BondDepository", function() {
     it("governance can remove tellers", async function () {
       expect(await bondDepo.isTeller(mockTeller.address)).to.be.true;
       let tx1 = await bondDepo.connect(governor).removeTeller(mockTeller.address);
-      expect(tx1).to.emit(bondDepo, "TellerRemoved").withArgs(mockTeller.address);
+      await expect(tx1).to.emit(bondDepo, "TellerRemoved").withArgs(mockTeller.address);
       expect(await bondDepo.isTeller(mockTeller.address)).to.be.false;
       let tx2 = await bondDepo.connect(governor).removeTeller(mockTeller.address);
-      expect(tx2).to.emit(bondDepo, "TellerRemoved").withArgs(mockTeller.address);
+      await expect(tx2).to.emit(bondDepo, "TellerRemoved").withArgs(mockTeller.address);
       expect(await bondDepo.isTeller(mockTeller.address)).to.be.false;
     });
     it("non tellers cannot pull solace", async function () {
@@ -241,7 +241,7 @@ describe("BondDepository", function() {
     });
     it("governance can change params", async function () {
       let tx = await bondDepo.connect(governor).setAddresses(weth.address, dai.address, solace.address, xsolace.address);
-      expect(tx).to.emit(bondDepo, "ParamsSet").withArgs(weth.address, dai.address, solace.address, xsolace.address);
+      await expect(tx).to.emit(bondDepo, "ParamsSet").withArgs(weth.address, dai.address, solace.address, xsolace.address);
       expect(await bondDepo.solace()).eq(weth.address);
       expect(await bondDepo.xsolace()).eq(dai.address);
       expect(await bondDepo.underwritingPool()).eq(solace.address);

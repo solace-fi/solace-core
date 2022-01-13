@@ -75,7 +75,7 @@ describe("GovernableInitializable", function() {
     });
     it("can set new governance", async function() {
       let tx = await governable.connect(governor).setPendingGovernance(deployer.address);
-      expect(tx).to.emit(governable, "GovernancePending").withArgs(deployer.address);
+      await expect(tx).to.emit(governable, "GovernancePending").withArgs(deployer.address);
       expect(await governable.governance()).to.equal(governor.address);
       expect(await governable.pendingGovernance()).to.equal(deployer.address);
       await expect(governable.connect(governor).doThing()).to.not.be.reverted;
@@ -121,8 +121,8 @@ describe("GovernableInitializable", function() {
     it("can lock governance", async function () {
       expect(await governable.governanceIsLocked()).to.equal(false);
       let tx = await governable.connect(governor).lockGovernance();
-      expect(tx).to.emit(governable, "GovernanceTransferred").withArgs(governor.address, MAX_ADDRESS);
-      expect(tx).to.emit(governable, "GovernanceLocked");
+      await expect(tx).to.emit(governable, "GovernanceTransferred").withArgs(governor.address, MAX_ADDRESS);
+      await expect(tx).to.emit(governable, "GovernanceLocked");
       expect(await governable.governanceIsLocked()).to.equal(true);
       expect(await governable.governance()).to.equal(MAX_ADDRESS);
     });

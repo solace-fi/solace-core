@@ -65,7 +65,7 @@ describe("xSOLACEv1", function () {
       let amountXSolace1 = await xsolace.connect(depositor1).callStatic.stake(ONE_ETHER);
       expect(amountXSolace1).eq(ONE_ETHER);
       let tx1 = await xsolace.connect(depositor1).stake(ONE_ETHER);
-      expect(tx1).to.emit(xsolace, "Staked").withArgs(depositor1.address, ONE_ETHER, ONE_ETHER);
+      await expect(tx1).to.emit(xsolace, "Staked").withArgs(depositor1.address, ONE_ETHER, ONE_ETHER);
       let bal2 = await getBalances(depositor1);
       expect(bal2.totalSolace).eq(ONE_ETHER.mul(10));
       expect(bal2.totalXSolace).eq(ONE_ETHER);
@@ -78,7 +78,7 @@ describe("xSOLACEv1", function () {
       let amountXSolace2 = await xsolace.connect(depositor1).callStatic.stake(ONE_ETHER);
       expect(amountXSolace2).eq(ONE_ETHER);
       let tx2 = await xsolace.connect(depositor1).stake(ONE_ETHER);
-      expect(tx2).to.emit(xsolace, "Staked").withArgs(depositor1.address, ONE_ETHER, ONE_ETHER);
+      await expect(tx2).to.emit(xsolace, "Staked").withArgs(depositor1.address, ONE_ETHER, ONE_ETHER);
       let bal3 = await getBalances(depositor1);
       expect(bal3.totalSolace).eq(ONE_ETHER.mul(10));
       expect(bal3.totalXSolace).eq(ONE_ETHER.mul(2));
@@ -92,7 +92,7 @@ describe("xSOLACEv1", function () {
     it("can deposit solace with permit", async function () {
       let { v, r, s } = await getERC20PermitSignature(depositor1, xsolace.address, solace, ONE_ETHER);
       let tx1 = await xsolace.connect(depositor2).stakeSigned(depositor1.address, ONE_ETHER, deadline, v, r, s);
-      expect(tx1).to.emit(xsolace, "Staked").withArgs(depositor1.address, ONE_ETHER, ONE_ETHER);
+      await expect(tx1).to.emit(xsolace, "Staked").withArgs(depositor1.address, ONE_ETHER, ONE_ETHER);
       let bal1 = await getBalances(depositor1);
       expect(bal1.totalSolace).eq(ONE_ETHER.mul(10));
       expect(bal1.totalXSolace).eq(ONE_ETHER.mul(3));
@@ -120,7 +120,7 @@ describe("xSOLACEv1", function () {
       let amountSolace = await xsolace.connect(depositor2).callStatic.unstake(ONE_ETHER);
       expect(amountSolace).eq(ONE_ETHER);
       let tx1 = await xsolace.connect(depositor2).unstake(ONE_ETHER);
-      expect(tx1).to.emit(xsolace, "Unstaked").withArgs(depositor2.address, ONE_ETHER, ONE_ETHER);
+      await expect(tx1).to.emit(xsolace, "Unstaked").withArgs(depositor2.address, ONE_ETHER, ONE_ETHER);
       let bal2 = await getBalances(depositor2);
       expect(bal2.totalSolace).eq(ONE_ETHER.mul(10));
       expect(bal2.totalXSolace).eq(ONE_ETHER.mul(2));
@@ -154,7 +154,7 @@ describe("xSOLACEv1", function () {
       let amountXSolace = await xsolace.connect(depositor1).callStatic.stake(ONE_ETHER.mul(5));
       expect(amountXSolace).eq(ONE_ETHER.mul(5));
       let tx1 = await xsolace.connect(depositor1).stake(ONE_ETHER.mul(5));
-      expect(tx1).to.emit(xsolace, "Staked").withArgs(depositor1.address, ONE_ETHER.mul(5), ONE_ETHER.mul(5));
+      await expect(tx1).to.emit(xsolace, "Staked").withArgs(depositor1.address, ONE_ETHER.mul(5), ONE_ETHER.mul(5));
       let bal1 = await getBalances(depositor1);
       expect(bal1.totalSolace).eq(ONE_ETHER.mul(20));
       expect(bal1.totalXSolace).eq(ONE_ETHER.mul(5));
@@ -173,7 +173,7 @@ describe("xSOLACEv1", function () {
       let amountXSolace = await xsolace.connect(depositor2).callStatic.stake(ONE_ETHER.mul(9));
       expect(amountXSolace).eq(ONE_ETHER.mul(3));
       let tx1 = await xsolace.connect(depositor2).stake(ONE_ETHER.mul(9));
-      expect(tx1).to.emit(xsolace, "Staked").withArgs(depositor2.address, ONE_ETHER.mul(9), ONE_ETHER.mul(3));
+      await expect(tx1).to.emit(xsolace, "Staked").withArgs(depositor2.address, ONE_ETHER.mul(9), ONE_ETHER.mul(3));
       let bal1 = await getBalances(depositor2);
       expect(bal1.totalSolace).eq(ONE_ETHER.mul(40));
       expect(bal1.totalXSolace).eq(ONE_ETHER.mul(8));
@@ -204,7 +204,7 @@ describe("xSOLACEv1", function () {
       let amountSolace = await xsolace.connect(depositor1).callStatic.unstake(ONE_ETHER.mul(2));
       expect(amountSolace).eq(ONE_ETHER.mul(8));
       let tx1 = await xsolace.connect(depositor2).unstake(ONE_ETHER.mul(2));
-      expect(tx1).to.emit(xsolace, "Unstaked").withArgs(depositor2.address, ONE_ETHER.mul(8), ONE_ETHER.mul(2));
+      await expect(tx1).to.emit(xsolace, "Unstaked").withArgs(depositor2.address, ONE_ETHER.mul(8), ONE_ETHER.mul(2));
       let bal1 = await getBalances(depositor2);
       expect(bal1.totalSolace).eq(ONE_ETHER.mul(48));
       expect(bal1.totalXSolace).eq(ONE_ETHER.mul(6));

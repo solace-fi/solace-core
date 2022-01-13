@@ -92,12 +92,12 @@ describe("SOLACE", function () {
     });
     it("can add minters", async function (){
       let tx = await solace.connect(governor).addMinter(minter.address);
-      expect(tx).to.emit(solace, "MinterAdded").withArgs(minter.address);
+      await expect(tx).to.emit(solace, "MinterAdded").withArgs(minter.address);
       expect(await solace.isMinter(minter.address)).to.equal(true);
     });
     it("can remove minters", async function () {
       let tx = await solace.connect(governor).removeMinter(minter.address);
-      expect(tx).to.emit(solace, "MinterRemoved").withArgs(minter.address);
+      await expect(tx).to.emit(solace, "MinterRemoved").withArgs(minter.address);
       expect(await solace.isMinter(minter.address)).to.equal(false);
     });
     it("reverts when !governance adds / removes minters", async function () {
@@ -138,7 +138,7 @@ describe("SOLACE", function () {
     it("can transfer governance", async function () {
       expect(await solace.governance()).to.equal(governor.address);
       let tx1 = await solace.connect(governor).setPendingGovernance(owner.address);
-      expect(tx1).to.emit(solace, "GovernancePending").withArgs(owner.address);
+      await expect(tx1).to.emit(solace, "GovernancePending").withArgs(owner.address);
       expect(await solace.governance()).to.equal(governor.address);
       expect(await solace.pendingGovernance()).to.equal(owner.address);
       let tx2 = await solace.connect(owner).acceptGovernance();

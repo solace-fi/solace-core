@@ -91,8 +91,8 @@ describe("xsLocker", function () {
       let tx = await xslocker.connect(user1).createLock(user2.address, depositAmount, 0);
       let xsLockID = await xslocker.totalNumLocks();
       expect(xsLockID).eq(1);
-      expect(tx).to.emit(xslocker, "LockCreated").withArgs(xsLockID);
-      expect(tx).to.emit(xslocker, "Transfer").withArgs(ZERO_ADDRESS, user2.address, xsLockID)
+      await expect(tx).to.emit(xslocker, "LockCreated").withArgs(xsLockID);
+      await expect(tx).to.emit(xslocker, "Transfer").withArgs(ZERO_ADDRESS, user2.address, xsLockID)
       let balancesAfter = await getBalances();
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       expect(balancesDiff.user1Solace).eq(depositAmount.mul(-1));
@@ -117,8 +117,8 @@ describe("xsLocker", function () {
       let tx = await xslocker.connect(user1).createLock(user2.address, depositAmount, timestamp);
       let xsLockID = await xslocker.totalNumLocks();
       expect(xsLockID).eq(2);
-      expect(tx).to.emit(xslocker, "LockCreated").withArgs(xsLockID);
-      expect(tx).to.emit(xslocker, "Transfer").withArgs(ZERO_ADDRESS, user2.address, xsLockID)
+      await expect(tx).to.emit(xslocker, "LockCreated").withArgs(xsLockID);
+      await expect(tx).to.emit(xslocker, "Transfer").withArgs(ZERO_ADDRESS, user2.address, xsLockID)
       let balancesAfter = await getBalances();
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       expect(balancesDiff.user1Solace).eq(depositAmount.mul(-1));
@@ -161,8 +161,8 @@ describe("xsLocker", function () {
       let tx = await xslocker.connect(user3).createLockSigned(depositAmount, 0, deadline, v, r, s);
       let xsLockID = await xslocker.totalNumLocks();
       expect(xsLockID).eq(3);
-      expect(tx).to.emit(xslocker, "LockCreated").withArgs(xsLockID);
-      expect(tx).to.emit(xslocker, "Transfer").withArgs(ZERO_ADDRESS, user3.address, xsLockID)
+      await expect(tx).to.emit(xslocker, "LockCreated").withArgs(xsLockID);
+      await expect(tx).to.emit(xslocker, "Transfer").withArgs(ZERO_ADDRESS, user3.address, xsLockID)
       let balancesAfter = await getBalances();
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       expect(balancesDiff.user3Solace).eq(depositAmount.mul(-1));
@@ -185,8 +185,8 @@ describe("xsLocker", function () {
       let tx = await xslocker.connect(user3).createLockSigned(depositAmount, timestamp, deadline, v, r, s);
       let xsLockID = await xslocker.totalNumLocks();
       expect(xsLockID).eq(4);
-      expect(tx).to.emit(xslocker, "LockCreated").withArgs(xsLockID);
-      expect(tx).to.emit(xslocker, "Transfer").withArgs(ZERO_ADDRESS, user3.address, xsLockID)
+      await expect(tx).to.emit(xslocker, "LockCreated").withArgs(xsLockID);
+      await expect(tx).to.emit(xslocker, "Transfer").withArgs(ZERO_ADDRESS, user3.address, xsLockID)
       let balancesAfter = await getBalances();
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       expect(balancesDiff.user3Solace).eq(depositAmount.mul(-1));
@@ -222,7 +222,7 @@ describe("xsLocker", function () {
       let xsLockID = 1;
       await solace.connect(user1).approve(xslocker.address, ONE_ETHER.mul(10));
       let tx = await xslocker.connect(user1).increaseAmount(xsLockID, depositAmount);
-      expect(tx).to.emit(xslocker, "LockUpdated").withArgs(xsLockID, expectedAmount, 0);
+      await expect(tx).to.emit(xslocker, "LockUpdated").withArgs(xsLockID, expectedAmount, 0);
       let balancesAfter = await getBalances();
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       expect(balancesDiff.user1Solace).eq(depositAmount.mul(-1));
@@ -265,7 +265,7 @@ describe("xsLocker", function () {
       let xsLockID = 3;
       await solace.connect(user3).approve(xslocker.address, ONE_ETHER.mul(10));
       let tx = await xslocker.connect(user3).increaseAmountSigned(xsLockID, depositAmount, deadline, v, r, s);
-      expect(tx).to.emit(xslocker, "LockUpdated").withArgs(xsLockID, expectedAmount, 0);
+      await expect(tx).to.emit(xslocker, "LockUpdated").withArgs(xsLockID, expectedAmount, 0);
       let balancesAfter = await getBalances();
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       expect(balancesDiff.user3Solace).eq(depositAmount.mul(-1));
@@ -307,7 +307,7 @@ describe("xsLocker", function () {
       let balancesBefore = await getBalances();
       let amount = (await xslocker.locks(xsLockID)).amount;
       let tx = await xslocker.connect(user1).withdraw(xsLockID, user2.address);
-      expect(tx).to.emit(xslocker, "Withdrawl").withArgs(xsLockID, amount);
+      await expect(tx).to.emit(xslocker, "Withdrawl").withArgs(xsLockID, amount);
       let balancesAfter = await getBalances();
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       expect(balancesDiff.user1Solace).eq(0);
@@ -329,7 +329,7 @@ describe("xsLocker", function () {
       await provider.send("evm_mine", []);
       let amount = (await xslocker.locks(xsLockID)).amount;
       let tx = await xslocker.connect(user1).withdraw(xsLockID, user2.address);
-      expect(tx).to.emit(xslocker, "Withdrawl").withArgs(xsLockID, amount);
+      await expect(tx).to.emit(xslocker, "Withdrawl").withArgs(xsLockID, amount);
       let balancesAfter = await getBalances();
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       expect(balancesDiff.user1Solace).eq(0);
@@ -349,7 +349,7 @@ describe("xsLocker", function () {
       await xslocker.connect(user1).approve(user3.address, xsLockID);
       let amount = (await xslocker.locks(xsLockID)).amount;
       let tx = await xslocker.connect(user3).withdraw(xsLockID, user2.address);
-      expect(tx).to.emit(xslocker, "Withdrawl").withArgs(xsLockID, amount);
+      await expect(tx).to.emit(xslocker, "Withdrawl").withArgs(xsLockID, amount);
       let balancesAfter = await getBalances();
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       expect(balancesDiff.user1Solace).eq(0);
@@ -372,7 +372,7 @@ describe("xsLocker", function () {
       await xslocker.connect(user1).setApprovalForAll(user3.address, true);
       let amount = (await xslocker.locks(xsLockID)).amount;
       let tx = await xslocker.connect(user3).withdraw(xsLockID, user2.address);
-      expect(tx).to.emit(xslocker, "Withdrawl").withArgs(xsLockID, amount);
+      await expect(tx).to.emit(xslocker, "Withdrawl").withArgs(xsLockID, amount);
       let balancesAfter = await getBalances();
       let balancesDiff = getBalancesDiff(balancesAfter, balancesBefore);
       expect(balancesDiff.user1Solace).eq(0);
@@ -423,7 +423,7 @@ describe("xsLocker", function () {
       let withdrawAmount2 = amount.sub(withdrawAmount1);
       let balances1 = await getBalances();
       let tx1 = await xslocker.connect(user1).withdrawInPart(xsLockID, user2.address, withdrawAmount1);
-      expect(tx1).to.emit(xslocker, "Withdrawl").withArgs(xsLockID, withdrawAmount1);
+      await expect(tx1).to.emit(xslocker, "Withdrawl").withArgs(xsLockID, withdrawAmount1);
       let balances2 = await getBalances();
       let balances12 = getBalancesDiff(balances2, balances1);
       expect(balances12.user1Solace).eq(0);
@@ -440,7 +440,7 @@ describe("xsLocker", function () {
       expect(lock.end).eq(0);
       // in full
       let tx2 = await xslocker.connect(user1).withdrawInPart(xsLockID, user2.address, withdrawAmount2);
-      expect(tx2).to.emit(xslocker, "Withdrawl").withArgs(xsLockID, withdrawAmount2);
+      await expect(tx2).to.emit(xslocker, "Withdrawl").withArgs(xsLockID, withdrawAmount2);
       let balances3 = await getBalances();
       let balances23 = getBalancesDiff(balances3, balances2);
       expect(balances23.user1Solace).eq(0);
@@ -465,7 +465,7 @@ describe("xsLocker", function () {
       let withdrawAmount2 = amount.sub(withdrawAmount1);
       let balances1 = await getBalances();
       let tx1 = await xslocker.connect(user1).withdrawInPart(xsLockID, user2.address, withdrawAmount1);
-      expect(tx1).to.emit(xslocker, "Withdrawl").withArgs(xsLockID, withdrawAmount1);
+      await expect(tx1).to.emit(xslocker, "Withdrawl").withArgs(xsLockID, withdrawAmount1);
       let balances2 = await getBalances();
       let balances12 = getBalancesDiff(balances2, balances1);
       expect(balances12.user1Solace).eq(0);
@@ -482,7 +482,7 @@ describe("xsLocker", function () {
       expect(lock.end).eq(end);
       // in full
       let tx2 = await xslocker.connect(user1).withdrawInPart(xsLockID, user2.address, withdrawAmount2);
-      expect(tx2).to.emit(xslocker, "Withdrawl").withArgs(xsLockID, withdrawAmount2);
+      await expect(tx2).to.emit(xslocker, "Withdrawl").withArgs(xsLockID, withdrawAmount2);
       let balances3 = await getBalances();
       let balances23 = getBalancesDiff(balances3, balances2);
       expect(balances23.user1Solace).eq(0);
@@ -505,7 +505,7 @@ describe("xsLocker", function () {
       let withdrawAmount2 = amount.sub(withdrawAmount1);
       let balances1 = await getBalances();
       let tx1 = await xslocker.connect(user3).withdrawInPart(xsLockID, user2.address, withdrawAmount1);
-      expect(tx1).to.emit(xslocker, "Withdrawl").withArgs(xsLockID, withdrawAmount1);
+      await expect(tx1).to.emit(xslocker, "Withdrawl").withArgs(xsLockID, withdrawAmount1);
       let balances2 = await getBalances();
       let balances12 = getBalancesDiff(balances2, balances1);
       expect(balances12.user1Solace).eq(0);
@@ -525,7 +525,7 @@ describe("xsLocker", function () {
       expect(lock.end).eq(0);
       // in full
       let tx2 = await xslocker.connect(user1).withdrawInPart(xsLockID, user2.address, withdrawAmount2);
-      expect(tx2).to.emit(xslocker, "Withdrawl").withArgs(xsLockID, withdrawAmount2);
+      await expect(tx2).to.emit(xslocker, "Withdrawl").withArgs(xsLockID, withdrawAmount2);
       let balances3 = await getBalances();
       let balances23 = getBalancesDiff(balances3, balances2);
       expect(balances23.user1Solace).eq(0);
@@ -551,7 +551,7 @@ describe("xsLocker", function () {
       let withdrawAmount2 = amount.sub(withdrawAmount1);
       let balances1 = await getBalances();
       let tx1 = await xslocker.connect(user3).withdrawInPart(xsLockID, user2.address, withdrawAmount1);
-      expect(tx1).to.emit(xslocker, "Withdrawl").withArgs(xsLockID, withdrawAmount1);
+      await expect(tx1).to.emit(xslocker, "Withdrawl").withArgs(xsLockID, withdrawAmount1);
       let balances2 = await getBalances();
       let balances12 = getBalancesDiff(balances2, balances1);
       expect(balances12.user1Solace).eq(0);
@@ -571,7 +571,7 @@ describe("xsLocker", function () {
       expect(lock.end).eq(0);
       // in full
       let tx2 = await xslocker.connect(user1).withdrawInPart(xsLockID, user2.address, withdrawAmount2);
-      expect(tx2).to.emit(xslocker, "Withdrawl").withArgs(xsLockID, withdrawAmount2);
+      await expect(tx2).to.emit(xslocker, "Withdrawl").withArgs(xsLockID, withdrawAmount2);
       let balances3 = await getBalances();
       let balances23 = getBalancesDiff(balances3, balances2);
       expect(balances23.user1Solace).eq(0);
@@ -683,7 +683,7 @@ describe("xsLocker", function () {
       let lock1 = await xslocker.locks(xsLockID);
       let newEnd = lock1.end.add(ONE_YEAR);
       let tx = await xslocker.connect(user1).extendLock(xsLockID, newEnd);
-      expect(tx).to.emit(xslocker, "LockUpdated").withArgs(xsLockID, lock1.amount, newEnd);
+      await expect(tx).to.emit(xslocker, "LockUpdated").withArgs(xsLockID, lock1.amount, newEnd);
       let lock2 = await xslocker.locks(xsLockID);
       expect(lock2.amount).eq(lock1.amount);
       expect(lock2.end).eq(newEnd);
@@ -694,14 +694,14 @@ describe("xsLocker", function () {
       let lock1 = await xslocker.locks(xsLockID);
       let newEnd2 = lock1.end.add(ONE_YEAR * 20);
       let tx2 = await xslocker.connect(user1).extendLock(xsLockID, newEnd2);
-      expect(tx2).to.emit(xslocker, "LockUpdated").withArgs(xsLockID, lock1.amount, newEnd2);
+      await expect(tx2).to.emit(xslocker, "LockUpdated").withArgs(xsLockID, lock1.amount, newEnd2);
       let lock3 = await xslocker.locks(xsLockID);
       expect(lock3.amount).eq(lock1.amount);
       expect(lock3.end).eq(newEnd2);
       // extend to some time in the future
       let newEnd3 = (await provider.getBlock('latest')).timestamp + ONE_YEAR;
       let tx3 = await xslocker.connect(user1).extendLock(xsLockID, newEnd3);
-      expect(tx3).to.emit(xslocker, "LockUpdated").withArgs(xsLockID, lock1.amount, newEnd3);
+      await expect(tx3).to.emit(xslocker, "LockUpdated").withArgs(xsLockID, lock1.amount, newEnd3);
       let lock4 = await xslocker.locks(xsLockID);
       expect(lock4.amount).eq(lock1.amount);
       expect(lock4.end).eq(newEnd3);
@@ -712,7 +712,7 @@ describe("xsLocker", function () {
       let newEnd = (await provider.getBlock('latest')).timestamp + ONE_YEAR * 2;
       let lock1 = await xslocker.locks(xsLockID);
       let tx1 = await xslocker.connect(user1).extendLock(xsLockID, newEnd);
-      expect(tx1).to.emit(xslocker, "LockUpdated").withArgs(xsLockID, lock1.amount, newEnd);
+      await expect(tx1).to.emit(xslocker, "LockUpdated").withArgs(xsLockID, lock1.amount, newEnd);
       let lock2 = await xslocker.locks(xsLockID);
       expect(lock2.amount).eq(lock1.amount);
       expect(lock2.end).eq(newEnd);
@@ -727,16 +727,16 @@ describe("xsLocker", function () {
     it("governor can add and remove listeners", async function () {
       expect(await xslocker.getXsLockListeners()).deep.eq([]);
       let tx1 = await xslocker.connect(governor).addXsLockListener(listener1.address);
-      expect(tx1).to.emit(xslocker, "xsLockListenerAdded").withArgs(listener1.address);
+      await expect(tx1).to.emit(xslocker, "xsLockListenerAdded").withArgs(listener1.address);
       expect(await xslocker.getXsLockListeners()).deep.eq([listener1.address]);
       let tx2 = await xslocker.connect(governor).addXsLockListener(listener2.address);
-      expect(tx2).to.emit(xslocker, "xsLockListenerAdded").withArgs(listener2.address);
+      await expect(tx2).to.emit(xslocker, "xsLockListenerAdded").withArgs(listener2.address);
       expect(await xslocker.getXsLockListeners()).deep.eq([listener1.address, listener2.address]);
       let tx3 = await xslocker.connect(governor).addXsLockListener(listener3.address);
-      expect(tx3).to.emit(xslocker, "xsLockListenerAdded").withArgs(listener3.address);
+      await expect(tx3).to.emit(xslocker, "xsLockListenerAdded").withArgs(listener3.address);
       expect(await xslocker.getXsLockListeners()).deep.eq([listener1.address, listener2.address, listener3.address]);
       let tx4 = await xslocker.connect(governor).removeXsLockListener(listener3.address);
-      expect(tx4).to.emit(xslocker, "xsLockListenerRemoved").withArgs(listener3.address);
+      await expect(tx4).to.emit(xslocker, "xsLockListenerRemoved").withArgs(listener3.address);
       expect(await xslocker.getXsLockListeners()).deep.eq([listener1.address, listener2.address]);
     });
     it("listeners hear mint", async function () {
@@ -1052,7 +1052,7 @@ describe("xsLocker", function () {
     it("governor can set base uri", async function () {
       let base = "https://solace.fi/xsLocks?xsLockID=";
       let tx = await xslocker.connect(governor).setBaseURI(base);
-      expect(tx).to.emit(xslocker, "BaseURISet").withArgs(base);
+      await expect(tx).to.emit(xslocker, "BaseURISet").withArgs(base);
       expect(await xslocker.baseURI()).eq(base);
       expect(await xslocker.tokenURI(4)).eq(base+"4");
     });

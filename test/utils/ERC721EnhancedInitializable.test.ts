@@ -118,7 +118,7 @@ describe("ERC721Enhancedv1Initializable", function() {
       let ts1 = await token.totalSupply();
       expect(await token.ownerOf(tokenID)).to.equal(user1.address);
       let tx = await token.connect(user1).transfer(user2.address, tokenID);
-      expect(tx).to.emit(token, "Transfer").withArgs(user1.address, user2.address, tokenID);
+      await expect(tx).to.emit(token, "Transfer").withArgs(user1.address, user2.address, tokenID);
       let bal21 = await token.balanceOf(user1.address);
       let bal22 = await token.balanceOf(user2.address);
       let ts2 = await token.totalSupply();
@@ -143,7 +143,7 @@ describe("ERC721Enhancedv1Initializable", function() {
       let ts1 = await token.totalSupply();
       expect(await token.ownerOf(tokenID)).to.equal(user1.address);
       let tx = await token.connect(user1).safeTransfer(user2.address, tokenID);
-      expect(tx).to.emit(token, "Transfer").withArgs(user1.address, user2.address, tokenID);
+      await expect(tx).to.emit(token, "Transfer").withArgs(user1.address, user2.address, tokenID);
       let bal21 = await token.balanceOf(user1.address);
       let bal22 = await token.balanceOf(user2.address);
       let ts2 = await token.totalSupply();
@@ -164,7 +164,7 @@ describe("ERC721Enhancedv1Initializable", function() {
       let ts1 = await token.totalSupply();
       expect(await token.ownerOf(tokenID)).to.equal(user2.address);
       let tx = await token.connect(user2).safeTransfer(user1.address, tokenID);
-      expect(tx).to.emit(token, "Transfer").withArgs(user2.address, user1.address, tokenID);
+      await expect(tx).to.emit(token, "Transfer").withArgs(user2.address, user1.address, tokenID);
       let bal21 = await token.balanceOf(user1.address);
       let bal22 = await token.balanceOf(user2.address);
       let ts2 = await token.totalSupply();
@@ -242,7 +242,7 @@ describe("ERC721Enhancedv1Initializable", function() {
       // permit
       const { v, r, s } = await getPermitErc721EnhancedSignature(user1, token, user2.address, tokenID);
       let tx = await token.permit(user2.address, tokenID, deadline, v, r, s);
-      expect(tx).to.emit(token, "Approval").withArgs(user1.address, user2.address, tokenID);
+      await expect(tx).to.emit(token, "Approval").withArgs(user1.address, user2.address, tokenID);
       // effects
       expect(await token.getApproved(tokenID)).to.equal(user2.address);
       await token.connect(user2).transferFrom(user1.address, user2.address, tokenID);
@@ -261,7 +261,7 @@ describe("ERC721Enhancedv1Initializable", function() {
       // permit
       const { v, r, s } = await getPermitErc721EnhancedSignature(user2, token, user3.address, tokenID, deadline, 1);
       let tx = await token.permit(user3.address, tokenID, deadline, v, r, s);
-      expect(tx).to.emit(token, "Approval").withArgs(user2.address, user3.address, tokenID);
+      await expect(tx).to.emit(token, "Approval").withArgs(user2.address, user3.address, tokenID);
       // effects
       expect(await token.getApproved(tokenID)).to.equal(user3.address);
       await token.connect(user3).transferFrom(user2.address, user3.address, tokenID);
@@ -282,7 +282,7 @@ describe("ERC721Enhancedv1Initializable", function() {
       const signature = assembleRSV(r, s, v);
       await signerContract.setSignature(digest, signature, true);
       let tx = await token.permit(user3.address, tokenID4, deadline, v, r, s);
-      expect(tx).to.emit(token, "Approval").withArgs(signerContract.address, user3.address, tokenID4);
+      await expect(tx).to.emit(token, "Approval").withArgs(signerContract.address, user3.address, tokenID4);
       // effects
       expect(await token.getApproved(tokenID4)).to.equal(user3.address);
       await token.connect(user3).transferFrom(signerContract.address, user3.address, tokenID4);

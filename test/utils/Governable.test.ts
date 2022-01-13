@@ -77,7 +77,7 @@ describe("Governance", function() {
     });
     it("can set new governance", async function() {
       let tx = await solace.connect(governor).setPendingGovernance(deployer.address);
-      expect(tx).to.emit(solace, "GovernancePending").withArgs(deployer.address);
+      await expect(tx).to.emit(solace, "GovernancePending").withArgs(deployer.address);
       expect(await solace.governance()).to.equal(governor.address);
       expect(await solace.pendingGovernance()).to.equal(deployer.address);
       await expect(solace.connect(governor).addMinter(governor.address)).to.not.be.reverted;
@@ -123,8 +123,8 @@ describe("Governance", function() {
     it("can lock governance", async function () {
       expect(await solace.governanceIsLocked()).to.equal(false);
       let tx = await solace.connect(governor).lockGovernance();
-      expect(tx).to.emit(solace, "GovernanceTransferred").withArgs(governor.address, MAX_ADDRESS);
-      expect(tx).to.emit(solace, "GovernanceLocked");
+      await expect(tx).to.emit(solace, "GovernanceTransferred").withArgs(governor.address, MAX_ADDRESS);
+      await expect(tx).to.emit(solace, "GovernanceLocked");
       expect(await solace.governanceIsLocked()).to.equal(true);
       expect(await solace.governance()).to.equal(MAX_ADDRESS);
     });
