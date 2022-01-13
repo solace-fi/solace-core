@@ -13,13 +13,13 @@ import "./../interfaces/staking/IxSOLACE.sol";
  *
  * xSOLACE is the vote token of the Solace DAO. It masquerades as an ERC20 but cannot be transferred, minted, or burned, and thus has no economic value outside of voting.
  *
- * Balances are calculated based on **Locks** in [`xsLocker`](./xsLocker). The base value of a lock is its `amount` of [**SOLACE**](./SOLACE). Its multiplier is 4x when `end` is 4 years from now, 1x when unlocked, and linearly decreasing between the two. The balance of a lock is its base value times its multiplier.
+ * Balances are calculated based on **Locks** in [`xsLocker`](./xsLocker). The base value of a lock is its `amount` of [**SOLACE**](./../SOLACE). Its multiplier is 4x when `end` is 4 years from now, 1x when unlocked, and linearly decreasing between the two. The balance of a lock is its base value times its multiplier.
  *
- * [`balanceOf(user)`](#balanceof) is calculated as the sum of the balances of the user's locks. [`totalSupply()`] is calculated as the sum of the balances of all locks. These functions should not be called on-chain as they are gas intensive.
+ * [`balanceOf(user)`](#balanceof) is calculated as the sum of the balances of the user's locks. [`totalSupply()`](#totalsupply) is calculated as the sum of the balances of all locks. These functions should not be called on-chain as they are gas intensive.
  *
  * Voting will occur off chain.
  *
- * Note that transferring [**SOLACE**](./SOLACE) to this contract will not give you any **xSOLACE**. You should deposit your [**SOLACE**](./SOLACE) into [`xsLocker`](./xsLocker) via `createLock()`.
+ * Note that transferring [**SOLACE**](./../SOLACE) to this contract will not give you any **xSOLACE**. You should deposit your [**SOLACE**](./../SOLACE) into [`xsLocker`](./xsLocker) via `createLock()`.
  */
 // solhint-disable-next-line contract-name-camelcase
 contract xSOLACE is IxSOLACE {

@@ -12,9 +12,9 @@ import "./../interfaces/staking/IxSOLACEV1.sol";
 /**
  * @title xSolace Token (xSOLACE)
  * @author solace.fi
- * @notice The [**SOLACE**](./SOLACE) staking contract.
+ * @notice The [**SOLACE**](./../SOLACE) staking contract.
  *
- * Users can stake their [**SOLACE**](./SOLACE) and receive **xSOLACE**. **xSOLACE** is designed to be a safe up-only contract that allows users to enter or leave at any time. The value of **xSOLACE** relative to [**SOLACE**](./SOLACE) will increase when [**SOLACE**](./SOLACE) is sent to this contract, namely from premiums from coverage polices.
+ * Users can stake their [**SOLACE**](./../SOLACE) and receive **xSOLACE**. **xSOLACE** is designed to be a safe up-only contract that allows users to enter or leave at any time. The value of **xSOLACE** relative to [**SOLACE**](./../SOLACE) will increase when [**SOLACE**](./../SOLACE) is sent to this contract, namely from premiums from coverage polices.
  */
 // solhint-disable-next-line contract-name-camelcase
 contract xSOLACEV1 is IxSOLACEV1, ERC20Permit, ReentrancyGuard, Governable {
@@ -26,7 +26,7 @@ contract xSOLACEV1 is IxSOLACEV1, ERC20Permit, ReentrancyGuard, Governable {
     /**
      * @notice Constructs the xSOLACE Token contract.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
-     * @param solace_ Address of the [**SOLACE**](./SOLACE) contract.
+     * @param solace_ Address of the [**SOLACE**](./../SOLACE) contract.
      */
     constructor(address governance_, address solace_) ERC20("xsolace", "xSOLACE") ERC20Permit("xsolace") Governable(governance_) {
         require(solace_ != address(0x0), "zero address solace");
@@ -73,7 +73,7 @@ contract xSOLACEV1 is IxSOLACEV1, ERC20Permit, ReentrancyGuard, Governable {
     ***************************************/
 
     /**
-     * @notice Allows a user to stake [**SOLACE**](./SOLACE).
+     * @notice Allows a user to stake [**SOLACE**](./../SOLACE).
      * Shares of the pool (xSOLACE) are minted to msg.sender.
      * @param amountSolace Amount of solace to deposit.
      * @return amountXSolace The amount of xsolace minted.
@@ -86,7 +86,7 @@ contract xSOLACEV1 is IxSOLACEV1, ERC20Permit, ReentrancyGuard, Governable {
     }
 
     /**
-     * @notice Allows a user to stake [**SOLACE**](./SOLACE).
+     * @notice Allows a user to stake [**SOLACE**](./../SOLACE).
      * Shares of the pool (xSOLACE) are minted to msg.sender.
      * @param depositor The depositing user.
      * @param amountSolace The deposit amount.
@@ -107,7 +107,7 @@ contract xSOLACEV1 is IxSOLACEV1, ERC20Permit, ReentrancyGuard, Governable {
 
     /**
      * @notice Allows a user to unstake **xSOLACE**.
-     * Burns **xSOLACE** tokens and transfers [**SOLACE**](./SOLACE) to msg.sender.
+     * Burns **xSOLACE** tokens and transfers [**SOLACE**](./../SOLACE) to msg.sender.
      * @param amountXSolace Amount of xSOLACE.
      * @return amountSolace Amount of SOLACE returned.
      */

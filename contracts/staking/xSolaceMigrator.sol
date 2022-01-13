@@ -13,7 +13,7 @@ import "./../interfaces/staking/IxSolaceMigrator.sol";
 /**
  * @title xSolace Migrator
  * @author solace.fi
- * @notice Helps migrate [**xSOLACE**](./xSOLACE) from V1 to V2.
+ * @notice Helps migrate from [**xSOLACEV1**](./xSOLACEV1) to [**xsLocker**](./xsLocker).
  */
 // solhint-disable-next-line contract-name-camelcase
 contract xSolaceMigrator is IxSolaceMigrator, ReentrancyGuard {
@@ -24,27 +24,27 @@ contract xSolaceMigrator is IxSolaceMigrator, ReentrancyGuard {
 
     /// @notice Address of the [**SOLACE**](./../SOLACE) contract.
     address public override solace;
-    /// @notice Address of the V1 [**xSOLACE**](./xSOLACEV1) contract.
+    /// @notice Address of the [**xSOLACEV1**](./xSOLACEV1) contract.
     // solhint-disable-next-line var-name-mixedcase
     address public override xsolace_v1;
     /// @notice Address of the [**xsLocker**](./xsLocker) contract.
-    address public override xslocker;
+    address public override xsLocker;
 
     /**
-     * @notice Constructs the xSOLACE Token contract.
+     * @notice Constructs the xSolaceMigrator contract.
      * @param solace_ Address of the [**SOLACE**](./../SOLACE) contract.
-     * @param xsolace_v1_ Address of the V1 [**xSOLACE**](./xSOLACE) contract.
-     * @param xslocker_ Address of the [**xsLocker**](./xsLocker) contract.
+     * @param xsolace_v1_ Address of the [**xSOLACEV1**](./xSOLACEV1) contract.
+     * @param xsLocker_ Address of the [**xsLocker**](./xsLocker) contract.
      */
     // solhint-disable-next-line var-name-mixedcase
-    constructor(address solace_, address xsolace_v1_, address xslocker_) {
+    constructor(address solace_, address xsolace_v1_, address xsLocker_) {
         require(solace_ != address(0x0), "zero address solace");
         solace = solace_;
         require(xsolace_v1_ != address(0x0), "zero address xsolace v1");
         xsolace_v1 = xsolace_v1_;
-        require(xslocker_ != address(0x0), "zero address xslocker");
-        xslocker = xslocker_;
-        IERC20(solace_).approve(xslocker_, type(uint256).max);
+        require(xsLocker_ != address(0x0), "zero address xslocker");
+        xsLocker = xsLocker_;
+        IERC20(solace_).approve(xsLocker_, type(uint256).max);
     }
 
     /***************************************
@@ -52,8 +52,8 @@ contract xSolaceMigrator is IxSolaceMigrator, ReentrancyGuard {
     ***************************************/
 
     /**
-     * @notice Migrate from the [**xSOLACEv1**](./xSOLACEv1) contract and create a new [**Lock**](./xsLocker).
-     * @param amount The amount of [**xSOLACEv1**](./xSOLACEv1) to migrate.
+     * @notice Migrate from the [**xSOLACEv1**](./xSOLACEV1) contract and create a new [**Lock**](./xsLocker).
+     * @param amount The amount of [**xSOLACEv1**](./xSOLACEV1) to migrate.
      * @param lockEnd The timestamp that the lock will unlock.
      */
     function migrate(uint256 amount, uint256 lockEnd) external override nonReentrant {
@@ -64,8 +64,8 @@ contract xSolaceMigrator is IxSolaceMigrator, ReentrancyGuard {
     }
 
     /**
-     * @notice Migrate from the [**xSOLACEv1**](./xSOLACEv1) contract and create a new [**Lock**](./xsLocker).
-     * @param amount The amount of [**xSOLACEv1**](./xSOLACEv1) to migrate.
+     * @notice Migrate from the [**xSOLACEv1**](./xSOLACEV1) contract and create a new [**Lock**](./xsLocker).
+     * @param amount The amount of [**xSOLACEv1**](./xSOLACEV1) to migrate.
      * @param lockEnd The timestamp that the lock will unlock.
      * @param deadline Time the transaction must go through before.
      * @param v secp256k1 signature
@@ -86,7 +86,7 @@ contract xSolaceMigrator is IxSolaceMigrator, ReentrancyGuard {
     ***************************************/
 
     /**
-     * @notice Migrate from the [**xSOLACEv1**](./xSOLACEv1) contract and create a new [**Lock**](./xsLocker).
+     * @notice Migrate from the [**xSOLACEv1**](./xSOLACEV1) contract and create a new [**Lock**](./xsLocker).
      * @param depositor The depositing user.
      * @param amount The deposit amount.
      * @param lockEnd The timestamp that the lock will unlock.
@@ -94,7 +94,7 @@ contract xSolaceMigrator is IxSolaceMigrator, ReentrancyGuard {
     function _migrate(address depositor, uint256 amount, uint256 lockEnd) internal {
         IxSOLACEV1 xsolace = IxSOLACEV1(xsolace_v1);
         uint256 amountSolace = xsolace.unstake(amount);
-        IxsLocker locker = IxsLocker(xslocker);
+        IxsLocker locker = IxsLocker(xsLocker);
         locker.createLock(depositor, amountSolace, lockEnd);
     }
 }

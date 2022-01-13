@@ -15,17 +15,17 @@ struct Lock {
 /**
  * @title IxsLocker
  * @author solace.fi
- * @notice Stake your [**SOLACE**](../SOLACE) to receive voting rights, [**SOLACE**](../SOLACE) rewards, and more.
+ * @notice Stake your [**SOLACE**](./../../SOLACE) to receive voting rights, [**SOLACE**](./../../SOLACE) rewards, and more.
  *
- * Locks are ERC721s and can be viewed with [`locks()`](#locks). Each lock has an `amount` of [**SOLACE**](../SOLACE) and an `end` timestamp and cannot be transferred or withdrawn from before it unlocks. Locks have a maximum duration of four years.
+ * Locks are ERC721s and can be viewed with [`locks()`](#locks). Each lock has an `amount` of [**SOLACE**](./../../SOLACE) and an `end` timestamp and cannot be transferred or withdrawn from before it unlocks. Locks have a maximum duration of four years.
  *
- * Users can create locks via [`createLock()`](#createlock) or [`createLockSigned()`](#createlocksigned), deposit more [**SOLACE**](../SOLACE) into a lock via [`increaseAmount()`](#increaseamount) or [`increaseAmountSigned()`](#increaseamountsigned), extend a lock via [`extendLock()`](#extendlock), and withdraw via [`withdraw()`](#withdraw), [`withdrawInPart()`](#withdrawinpart), or [`withdrawMany()`](#withdrawmany).
+ * Users can create locks via [`createLock()`](#createlock) or [`createLockSigned()`](#createlocksigned), deposit more [**SOLACE**](./../../SOLACE) into a lock via [`increaseAmount()`](#increaseamount) or [`increaseAmountSigned()`](#increaseamountsigned), extend a lock via [`extendLock()`](#extendlock), and withdraw via [`withdraw()`](#withdraw), [`withdrawInPart()`](#withdrawinpart), or [`withdrawMany()`](#withdrawmany).
  *
  * Users and contracts (eg BondTellers) may deposit on behalf of another user or contract.
  *
  * Any time a lock is updated it will notify the listener contracts (eg StakingRewards).
  *
- * Note that transferring [**SOLACE**](../SOLACE) to this contract will not give you any rewards. You should deposit your [**SOLACE**](../SOLACE) via [`createLock()`](#createlock) or [`createLockSigned()`](#createlocksigned).
+ * Note that transferring [**SOLACE**](./../../SOLACE) to this contract will not give you any rewards. You should deposit your [**SOLACE**](./../../SOLACE) via [`createLock()`](#createlock) or [`createLockSigned()`](#createlocksigned).
  */
 interface IxsLocker is IERC721Enhanced {
 
@@ -48,7 +48,7 @@ interface IxsLocker is IERC721Enhanced {
     GLOBAL VARIABLES
     ***************************************/
 
-    /// @notice [**SOLACE**](../SOLACE) token.
+    /// @notice [**SOLACE**](./../../SOLACE) token.
     function solace() external view returns (address);
 
     /// @notice The maximum time into the future that a lock can expire.
@@ -83,7 +83,7 @@ interface IxsLocker is IERC721Enhanced {
     function timeLeft(uint256 xsLockID) external view returns (uint256 time);
 
     /**
-     * @notice Returns the amount of [**SOLACE**](../SOLACE) the user has staked.
+     * @notice Returns the amount of [**SOLACE**](./../../SOLACE) the user has staked.
      * @param account The account to query.
      * @return balance The user's balance.
      */
@@ -100,22 +100,22 @@ interface IxsLocker is IERC721Enhanced {
     ***************************************/
 
     /**
-     * @notice Deposit [**SOLACE**](../SOLACE) to create a new lock.
-     * @dev [**SOLACE**](../SOLACE) is transferred from msg.sender, assumes its already approved.
+     * @notice Deposit [**SOLACE**](./../../SOLACE) to create a new lock.
+     * @dev [**SOLACE**](./../../SOLACE) is transferred from msg.sender, assumes its already approved.
      * @dev use end=0 to initialize as unlocked.
      * @param recipient The account that will receive the lock.
-     * @param amount The amount of [**SOLACE**](../SOLACE) to deposit.
+     * @param amount The amount of [**SOLACE**](./../../SOLACE) to deposit.
      * @param end The timestamp the lock will unlock.
      * @return xsLockID The ID of the newly created lock.
      */
     function createLock(address recipient, uint256 amount, uint256 end) external returns (uint256 xsLockID);
 
     /**
-     * @notice Deposit [**SOLACE**](../SOLACE) to create a new lock.
-     * @dev [**SOLACE**](../SOLACE) is transferred from msg.sender using ERC20Permit.
+     * @notice Deposit [**SOLACE**](./../../SOLACE) to create a new lock.
+     * @dev [**SOLACE**](./../../SOLACE) is transferred from msg.sender using ERC20Permit.
      * @dev use end=0 to initialize as unlocked.
      * @dev recipient = msg.sender
-     * @param amount The amount of [**SOLACE**](../SOLACE) to deposit.
+     * @param amount The amount of [**SOLACE**](./../../SOLACE) to deposit.
      * @param end The timestamp the lock will unlock.
      * @param deadline Time the transaction must go through before.
      * @param v secp256k1 signature
@@ -126,18 +126,18 @@ interface IxsLocker is IERC721Enhanced {
     function createLockSigned(uint256 amount, uint256 end, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external returns (uint256 xsLockID);
 
     /**
-     * @notice Deposit [**SOLACE**](../SOLACE) to increase the value of an existing lock.
-     * @dev [**SOLACE**](../SOLACE) is transferred from msg.sender, assumes its already approved.
+     * @notice Deposit [**SOLACE**](./../../SOLACE) to increase the value of an existing lock.
+     * @dev [**SOLACE**](./../../SOLACE) is transferred from msg.sender, assumes its already approved.
      * @param xsLockID The ID of the lock to update.
-     * @param amount The amount of [**SOLACE**](../SOLACE) to deposit.
+     * @param amount The amount of [**SOLACE**](./../../SOLACE) to deposit.
      */
     function increaseAmount(uint256 xsLockID, uint256 amount) external;
 
     /**
-     * @notice Deposit [**SOLACE**](../SOLACE) to increase the value of an existing lock.
-     * @dev [**SOLACE**](../SOLACE) is transferred from msg.sender using ERC20Permit.
+     * @notice Deposit [**SOLACE**](./../../SOLACE) to increase the value of an existing lock.
+     * @dev [**SOLACE**](./../../SOLACE) is transferred from msg.sender using ERC20Permit.
      * @param xsLockID The ID of the lock to update.
-     * @param amount The amount of [**SOLACE**](../SOLACE) to deposit.
+     * @param amount The amount of [**SOLACE**](./../../SOLACE) to deposit.
      * @param deadline Time the transaction must go through before.
      * @param v secp256k1 signature
      * @param r secp256k1 signature
@@ -158,7 +158,7 @@ interface IxsLocker is IERC721Enhanced {
      * @dev Can only be called by the lock owner or approved.
      * @dev Can only be called if unlocked.
      * @param xsLockID The ID of the lock to withdraw from.
-     * @param recipient The user to receive the lock's [**SOLACE**](../SOLACE).
+     * @param recipient The user to receive the lock's [**SOLACE**](./../../SOLACE).
      */
     function withdraw(uint256 xsLockID, address recipient) external;
 
@@ -167,8 +167,8 @@ interface IxsLocker is IERC721Enhanced {
      * @dev Can only be called by the lock owner or approved.
      * @dev Can only be called if unlocked.
      * @param xsLockID The ID of the lock to withdraw from.
-     * @param recipient The user to receive the lock's [**SOLACE**](../SOLACE).
-     * @param amount The amount of [**SOLACE**](../SOLACE) to withdraw.
+     * @param recipient The user to receive the lock's [**SOLACE**](./../../SOLACE).
+     * @param amount The amount of [**SOLACE**](./../../SOLACE) to withdraw.
      */
     function withdrawInPart(uint256 xsLockID, address recipient, uint256 amount) external;
 
@@ -177,7 +177,7 @@ interface IxsLocker is IERC721Enhanced {
      * @dev Can only be called by the lock owner or approved.
      * @dev Can only be called if unlocked.
      * @param xsLockIDs The ID of the locks to withdraw from.
-     * @param recipient The user to receive the lock's [**SOLACE**](../SOLACE).
+     * @param recipient The user to receive the lock's [**SOLACE**](./../../SOLACE).
      */
     function withdrawMany(uint256[] calldata xsLockIDs, address recipient) external;
 

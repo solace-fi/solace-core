@@ -8,9 +8,9 @@ import "@openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol";
 /**
  * @title xSolace Token (xSOLACE)
  * @author solace.fi
- * @notice The [**SOLACE**](../SOLACE) staking contract.
+ * @notice The [**SOLACE**](./../../SOLACE) staking contract.
  *
- * Users can stake their [**SOLACE**](../SOLACE) and receive **xSOLACE**. **xSOLACE** is designed to be a safe up-only contract that allows users to enter or leave at any time. The value of **xSOLACE** relative to [**SOLACE**](../SOLACE) will increase when [**SOLACE**](../SOLACE) is sent to this contract, namely from premiums from coverage polices.
+ * Users can stake their [**SOLACE**](./../../SOLACE) and receive **xSOLACE**. **xSOLACE** is designed to be a safe up-only contract that allows users to enter or leave at any time. The value of **xSOLACE** relative to [**SOLACE**](./../../SOLACE) will increase when [**SOLACE**](./../../SOLACE) is sent to this contract, namely from premiums from coverage polices.
  */
 interface IxSOLACEV1 is IERC20, IERC20Permit {
 
@@ -18,9 +18,9 @@ interface IxSOLACEV1 is IERC20, IERC20Permit {
     EVENTS
     ***************************************/
 
-    /// @notice Emitted when SOLACE is staked.
+    /// @notice Emitted when [**SOLACE**](./../../SOLACE) is staked.
     event Staked(address user, uint256 amountSolace, uint256 amountXSolace);
-    /// @notice Emitted when SOLACE is unstaked.
+    /// @notice Emitted when [**SOLACE**](./../../SOLACE) is unstaked.
     event Unstaked(address user, uint256 amountSolace, uint256 amountXSolace);
 
     /***************************************
@@ -49,7 +49,7 @@ interface IxSOLACEV1 is IERC20, IERC20Permit {
     ***************************************/
 
     /**
-     * @notice Allows a user to stake [**SOLACE**](../SOLACE).
+     * @notice Allows a user to stake [**SOLACE**](./../../SOLACE).
      * Shares of the pool (xSOLACE) are minted to msg.sender.
      * @param amountSolace Amount of solace to deposit.
      * @return amountXSolace The amount of xsolace minted.
@@ -57,7 +57,7 @@ interface IxSOLACEV1 is IERC20, IERC20Permit {
     function stake(uint256 amountSolace) external returns (uint256 amountXSolace);
 
     /**
-     * @notice Allows a user to stake [**SOLACE**](../SOLACE).
+     * @notice Allows a user to stake [**SOLACE**](./../../SOLACE).
      * Shares of the pool (xSOLACE) are minted to msg.sender.
      * @param depositor The depositing user.
      * @param amountSolace The deposit amount.
@@ -71,9 +71,9 @@ interface IxSOLACEV1 is IERC20, IERC20Permit {
 
     /**
      * @notice Allows a user to unstake **xSOLACE**.
-     * Burns **xSOLACE** tokens and transfers [**SOLACE**](../SOLACE) to msg.sender.
+     * Burns **xSOLACE** tokens and transfers [**SOLACE**](./../../SOLACE) to msg.sender.
      * @param amountXSolace Amount of xSOLACE.
-     * @return amountSolace Amount of SOLACE returned.
+     * @return amountSolace Amount of [**SOLACE**](./../../SOLACE) returned.
      */
     function unstake(uint256 amountXSolace) external returns (uint256 amountSolace);
 

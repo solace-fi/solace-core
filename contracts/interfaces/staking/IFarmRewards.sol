@@ -5,9 +5,9 @@ pragma solidity 0.8.6;
 /**
  * @title IFarmRewards
  * @author solace.fi
- * @notice Rewards farmers with [**SOLACE**](../SOLACE).
+ * @notice Rewards farmers with [**SOLACE**](./../../SOLACE).
  *
- * Rewards were accumulated by farmers for participating in farms. Rewards will be unlocked linearly over six months and can be redeemed for [**SOLACE**](../SOLACE) by paying $0.03/[**SOLACE**](../SOLACE).
+ * Rewards were accumulated by farmers for participating in farms. Rewards will be unlocked linearly over six months and can be redeemed for [**SOLACE**](./../../SOLACE) by paying $0.03/[**SOLACE**](./../../SOLACE).
  */
 interface IFarmRewards {
 
@@ -21,7 +21,7 @@ interface IFarmRewards {
     GLOBAL VARIABLES
     ***************************************/
 
-    /// @notice xSOLACE Token.
+    /// @notice [**xSOLACE**](./../../staking/xSOLACEV1) Token.
     function xsolace() external view returns (address);
 
     /// @notice receiver for payments
@@ -49,26 +49,26 @@ interface IFarmRewards {
     ***************************************/
 
     /**
-     * @notice Calculates the amount of token in needed for an amount of [**xSOLACE**](../xSOLACEV1) out.
+     * @notice Calculates the amount of token in needed for an amount of [**xSOLACE**](./../../staking/xSOLACEV1) out.
      * @param tokenIn The token to pay with.
-     * @param amountOut The amount of [**xSOLACE**](../xSOLACEV1) wanted.
+     * @param amountOut The amount of [**xSOLACE**](./../../staking/xSOLACEV1) wanted.
      * @return amountIn The amount of `tokenIn` needed.
      */
     function calculateAmountIn(address tokenIn, uint256 amountOut) external view returns (uint256 amountIn);
 
     /**
-     * @notice Calculates the amount of [**xSOLACE**](../xSOLACEV1) out for an amount of token in.
+     * @notice Calculates the amount of [**xSOLACE**](./../../staking/xSOLACEV1) out for an amount of token in.
      * @param tokenIn The token to pay with.
      * @param amountIn The amount of `tokenIn` in.
-     * @return amountOut The amount of [**xSOLACE**](../xSOLACEV1) out.
+     * @return amountOut The amount of [**xSOLACE**](./../../staking/xSOLACEV1) out.
      */
     function calculateAmountOut(address tokenIn, uint256 amountIn) external view returns (uint256 amountOut);
 
     /**
-     * @notice The amount of [**xSOLACE**](../xSOLACEV1) that a farmer has vested.
+     * @notice The amount of [**xSOLACE**](./../../staking/xSOLACEV1) that a farmer has vested.
      * Does not include the amount they've already redeemed.
      * @param farmer The farmer to query.
-     * @return amount The amount of vested [**xSOLACE**](../xSOLACEV1).
+     * @return amount The amount of vested [**xSOLACE**](./../../staking/xSOLACEV1).
      */
     function purchaseableVestedXSolace(address farmer) external view returns (uint256 amount);
 
@@ -114,7 +114,7 @@ interface IFarmRewards {
     function setReceiver(address payable receiver_) external;
 
     /**
-     * @notice Returns excess [**xSOLACE**](../xSOLACEV1).
+     * @notice Returns excess [**xSOLACE**](./../../staking/xSOLACEV1).
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param amount Amount to send. Will be sent from this contract to `receiver`.
      */

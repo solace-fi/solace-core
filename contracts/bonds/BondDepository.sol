@@ -26,8 +26,8 @@ contract BondDepository is IBondDepository, Factory, Governable {
     /**
      * @notice Constructs the BondDepository contract.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
-     * @param solace_ Address of [**SOLACE**](./SOLACE).
-     * @param xsolace_ Address of [**xSOLACE**](./xSOLACEV1).
+     * @param solace_ Address of [**SOLACE**](./../SOLACE).
+     * @param xsolace_ Address of [**xSOLACE**](./../staking/xSOLACEV1).
      * @param pool_ Address of underwriting pool.
      * @param dao_ Address of the DAO.
      */
@@ -39,12 +39,12 @@ contract BondDepository is IBondDepository, Factory, Governable {
     VIEW FUNCTIONS
     ***************************************/
 
-    /// @notice Native [**SOLACE**](./SOLACE) Token.
+    /// @notice Native [**SOLACE**](./../SOLACE) Token.
     function solace() external view override returns (address solace_) {
         return _solace;
     }
 
-    /// @notice [**xSOLACE**](./xSOLACE) Token.
+    /// @notice [**xSOLACE**](./../staking/xSOLACE) Token.
     function xsolace() external view override returns (address xsolace_) {
         return _xsolace;
     }
@@ -137,8 +137,8 @@ contract BondDepository is IBondDepository, Factory, Governable {
     /**
      * @notice Sets the parameters to pass to new tellers.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param solace_ Address of [**SOLACE**](./SOLACE).
-     * @param xsolace_ Address of [**xSOLACE**](./xSOLACEV1).
+     * @param solace_ Address of [**SOLACE**](./../SOLACE).
+     * @param xsolace_ Address of [**xSOLACE**](./../staking/xSOLACEV1).
      * @param pool_ Address of underwriting pool.
      * @param dao_ Address of the DAO.
      */
@@ -148,8 +148,8 @@ contract BondDepository is IBondDepository, Factory, Governable {
 
     /**
      * @notice Sets the parameters to pass to new tellers.
-     * @param solace_ Address of [**SOLACE**](./SOLACE).
-     * @param xsolace_ Address of [**xSOLACE**](./xSOLACEV1).
+     * @param solace_ Address of [**SOLACE**](./../SOLACE).
+     * @param xsolace_ Address of [**xSOLACE**](./../staking/xSOLACEV1).
      * @param pool_ Address of underwriting pool.
      * @param dao_ Address of the DAO.
      */
@@ -170,9 +170,9 @@ contract BondDepository is IBondDepository, Factory, Governable {
     ***************************************/
 
     /**
-     * @notice Sends [**SOLACE**](./SOLACE) to the teller.
+     * @notice Sends [**SOLACE**](./../SOLACE) to the teller.
      * Can only be called by tellers.
-     * @param amount The amount of [**SOLACE**](./SOLACE) to send.
+     * @param amount The amount of [**SOLACE**](./../SOLACE) to send.
      */
     function pullSolace(uint256 amount) external override {
         // this contract must hold solace
@@ -183,10 +183,10 @@ contract BondDepository is IBondDepository, Factory, Governable {
     }
 
     /**
-     * @notice Sends [**SOLACE**](./SOLACE) to an address.
+     * @notice Sends [**SOLACE**](./../SOLACE) to an address.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param dst Destination to send [**SOLACE**](./SOLACE).
-     * @param amount The amount of [**SOLACE**](./SOLACE) to send.
+     * @param dst Destination to send [**SOLACE**](./../SOLACE).
+     * @param amount The amount of [**SOLACE**](./../SOLACE) to send.
      */
     function returnSolace(address dst, uint256 amount) external override onlyGovernance {
         SafeERC20.safeTransfer(IERC20(_solace), dst, amount);

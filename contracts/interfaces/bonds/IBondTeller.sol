@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  * @author solace.fi
  * @notice Base type of Bond Tellers.
  *
- * Bond tellers allow users to buy bonds. After vesting for `vestingTerm`, bonds can be redeemed for [**SOLACE**](../SOLACE) or [**xSOLACE**](../xSOLACE). Payments are made in `principal` which is sent to the underwriting pool and used to back risk.
+ * Bond tellers allow users to buy bonds. After vesting for `vestingTerm`, bonds can be redeemed for [**SOLACE**](./../../SOLACE) or [**xSOLACEV1**](./../../staking/xSOLACEV1). Payments are made in `principal` which is sent to the underwriting pool and used to back risk.
  *
  * Bonds are represented as ERC721s, can be viewed with [`bonds()`](#bonds), and redeemed with [`redeem()`](#redeem).
  */
@@ -74,16 +74,16 @@ interface IBondTeller {
     function bondPrice() external view returns (uint256 price_);
 
     /**
-     * @notice Calculate the amount of [**SOLACE**](../SOLACE) or [**xSOLACEV1**](../xSOLACEV1) out for an amount of `principal`.
+     * @notice Calculate the amount of [**SOLACE**](./../../SOLACE) or [**xSOLACEV1**](./../../staking/xSOLACEV1) out for an amount of `principal`.
      * @param amountIn Amount of principal to deposit.
      * @param stake True to stake, false to not stake.
-     * @return amountOut Amount of [**SOLACE**](../SOLACE) or [**xSOLACEV1**](../xSOLACEV1) out.
+     * @return amountOut Amount of [**SOLACE**](./../../SOLACE) or [**xSOLACEV1**](./../../staking/xSOLACEV1) out.
      */
     function calculateAmountOut(uint256 amountIn, bool stake) external view returns (uint256 amountOut);
 
     /**
-     * @notice Calculate the amount of `principal` in for an amount of [**SOLACE**](../SOLACE) or [**xSOLACEV1**](../xSOLACEV1) out.
-     * @param amountOut Amount of [**SOLACE**](../SOLACE) or [**xSOLACEV1**](../xSOLACEV1) out.
+     * @notice Calculate the amount of `principal` in for an amount of [**SOLACE**](./../../SOLACE) or [**xSOLACEV1**](./../../staking/xSOLACEV1) out.
+     * @param amountOut Amount of [**SOLACE**](./../../SOLACE) or [**xSOLACEV1**](./../../staking/xSOLACEV1) out.
      * @param stake True to stake, false to not stake.
      * @return amountIn Amount of principal to deposit.
      */

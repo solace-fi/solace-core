@@ -23,10 +23,10 @@ interface IBondDepository {
     VIEW FUNCTIONS
     ***************************************/
 
-    /// @notice Native [**SOLACE**](../SOLACE) Token.
+    /// @notice Native [**SOLACE**](./../../SOLACE) Token.
     function solace() external view returns (address solace_);
 
-    /// @notice [**xSOLACE**](../xSOLACEV1) Token.
+    /// @notice [**xSOLACEV1**](./../../staking/xSOLACEV1) Token.
     function xsolace() external view returns (address xsolace_);
 
     /// @notice Underwriting pool contract.
@@ -60,9 +60,9 @@ interface IBondDepository {
 
     /**
      * @notice Creates a new [`BondTeller`](./IBondTeller).
-     * @param name The name of the bond token.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param governance The address of the teller's [governor](/docs/protocol/governance).
+     * @param name The name of the bond token.
+     * @param governance The address of the teller's [**governor**](/docs/protocol/governance).
      * @param impl The address of BondTeller implementation.
      * @param salt The salt for CREATE2.
      * @param principal address The ERC20 token that users give.
@@ -93,8 +93,8 @@ interface IBondDepository {
     /**
      * @notice Sets the parameters to pass to new tellers.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param solace_ Address of [**SOLACE**](../SOLACE).
-     * @param xsolace_ Address of [**xSOLACE**](../xSOLACEV1).
+     * @param solace_ Address of [**SOLACE**](./../../SOLACE).
+     * @param xsolace_ Address of [**xSOLACEV1**](./../../staking/xSOLACEV1).
      * @param pool_ Address of underwriting pool.
      * @param dao_ Address of the DAO.
      */
@@ -105,17 +105,17 @@ interface IBondDepository {
     ***************************************/
 
     /**
-     * @notice Sends [**SOLACE**](../SOLACE) to the teller.
+     * @notice Sends [**SOLACE**](./../../SOLACE) to the teller.
      * Can only be called by tellers.
-     * @param amount The amount of [**SOLACE**](../SOLACE) to send.
+     * @param amount The amount of [**SOLACE**](./../../SOLACE) to send.
      */
     function pullSolace(uint256 amount) external;
 
     /**
-     * @notice Sends [**SOLACE**](../SOLACE) to an address.
+     * @notice Sends [**SOLACE**](./../../SOLACE) to an address.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param dst Destination to send [**SOLACE**](../SOLACE).
-     * @param amount The amount of [**SOLACE**](../SOLACE) to send.
+     * @param dst Destination to send [**SOLACE**](./../../SOLACE).
+     * @param amount The amount of [**SOLACE**](./../../SOLACE) to send.
      */
     function returnSolace(address dst, uint256 amount) external;
 }

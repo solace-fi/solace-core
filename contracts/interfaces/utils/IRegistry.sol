@@ -31,7 +31,7 @@ interface IRegistry {
      * @notice Gets the `value` of a given `key`.
      * Reverts if the key is not in the mapping.
      * @param key The key to query.
-     * @param value The value of the key
+     * @param value The value of the key.
      */
     function get(string calldata key) external view returns (address value);
 

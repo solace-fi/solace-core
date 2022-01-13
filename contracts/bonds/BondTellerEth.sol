@@ -10,7 +10,7 @@ import "./../interfaces/bonds/IBondTellerEth.sol";
  * @author solace.fi
  * @notice A bond teller that accepts **ETH** and **WETH** as payment.
  *
- * Bond tellers allow users to buy bonds. After vesting for `vestingTerm`, bonds can be redeemed for [**SOLACE**](./SOLACE) or [**xSOLACE**](./xSOLACE). Payments are made in **ETH** or **WETH** which is sent to the underwriting pool and used to back risk.
+ * Bond tellers allow users to buy bonds. After vesting for `vestingTerm`, bonds can be redeemed for [**SOLACE**](./../SOLACE) or [**xSOLACEV1**](./../staking/xSOLACEV1). Payments are made in **ETH** or **WETH** which is sent to the underwriting pool and used to back risk.
  *
  * Bonds can be purchased via [`depositEth()`](#depositeth), [`depositWeth()`](#depositweth), or [`depositWethSigned()`](#depositwethsigned). Bonds are represented as ERC721s, can be viewed with [`bonds()`](#bonds), and redeemed with [`redeem()`](#redeem).
  *
@@ -25,10 +25,10 @@ contract BondTellerEth is BondTellerBase, IBondTellerEth {
     /**
      * @notice Create a bond by depositing **ETH**.
      * Principal will be transferred from `msg.sender` using `allowance`.
-     * @param minAmountOut The minimum [**SOLACE**](./SOLACE) or [**xSOLACEV1**](./xSOLACEV1) out.
+     * @param minAmountOut The minimum [**SOLACE**](./../SOLACE) or [**xSOLACEV1**](./../staking/xSOLACEV1) out.
      * @param depositor The bond recipient, default msg.sender.
      * @param stake True to stake, false to not stake.
-     * @return payout The amount of SOLACE or xSOLACE in the bond.
+     * @return payout The amount of [**SOLACE**](./../SOLACE) or [**xSOLACEV1**](./../staking/xSOLACEV1) in the bond.
      * @return bondID The ID of the newly created bond.
      */
     function depositEth(
@@ -44,10 +44,10 @@ contract BondTellerEth is BondTellerBase, IBondTellerEth {
      * @notice Create a bond by depositing `amount` **WETH**.
      * **WETH** will be transferred from `msg.sender` using `allowance`.
      * @param amount Amount of **WETH** to deposit.
-     * @param minAmountOut The minimum [**SOLACE**](./SOLACE) or [**xSOLACEV1**](./xSOLACEV1) out.
+     * @param minAmountOut The minimum [**SOLACE**](./../SOLACE) or [**xSOLACEV1**](./../staking/xSOLACEV1) out.
      * @param depositor The bond recipient, default msg.sender.
      * @param stake True to stake, false to not stake.
-     * @return payout The amount of SOLACE or xSOLACE in the bond.
+     * @return payout The amount of [**SOLACE**](./../SOLACE) or [**xSOLACEV1**](./../staking/xSOLACEV1) in the bond.
      * @return bondID The ID of the newly created bond.
      */
     function depositWeth(
@@ -67,14 +67,14 @@ contract BondTellerEth is BondTellerBase, IBondTellerEth {
      * **WETH** will be transferred from `depositor` using `permit`.
      * Note that not all **WETH**s have a permit function, in which case this function will revert.
      * @param amount Amount of **WETH** to deposit.
-     * @param minAmountOut The minimum [**SOLACE**](./SOLACE) or [**xSOLACEV1**](./xSOLACEV1) out.
+     * @param minAmountOut The minimum [**SOLACE**](./../SOLACE) or [**xSOLACEV1**](./../staking/xSOLACEV1) out.
      * @param depositor The bond recipient, default msg.sender.
      * @param stake True to stake, false to not stake.
      * @param deadline Time the transaction must go through before.
      * @param v secp256k1 signature
      * @param r secp256k1 signature
      * @param s secp256k1 signature
-     * @return payout The amount of SOLACE or xSOLACE in the bond.
+     * @return payout The amount of [**SOLACE**](./../SOLACE) or [**xSOLACEV1**](./../staking/xSOLACEV1) in the bond.
      * @return bondID The ID of the newly created bond.
      */
     function depositWethSigned(
@@ -98,11 +98,11 @@ contract BondTellerEth is BondTellerBase, IBondTellerEth {
     /**
      * @notice Create a bond by depositing `amount` of `principal`.
      * @param amount Amount of principal to deposit.
-     * @param minAmountOut The minimum [**SOLACE**](./SOLACE) or [**xSOLACEV1**](./xSOLACEV1) out.
+     * @param minAmountOut The minimum [**SOLACE**](./../SOLACE) or [**xSOLACEV1**](./../staking/xSOLACEV1) out.
      * @param depositor The bond recipient, default msg.sender.
      * @param stake True to stake, false to not stake.
      * @param isWrapped True if payment was made in **WETH**, false if made in **ETH**.
-     * @return payout The amount of SOLACE or xSOLACE in the bond.
+     * @return payout The amount of [**SOLACE**](./../SOLACE) or [**xSOLACEV1**](./../staking/xSOLACEV1) in the bond.
      * @return bondID The ID of the newly created bond.
      */
     function _deposit(
@@ -192,7 +192,7 @@ contract BondTellerEth is BondTellerBase, IBondTellerEth {
     ***************************************/
 
     /**
-     * @notice Fallback function to allow contract to receive *ETH*.
+     * @notice Fallback function to allow contract to receive **ETH**.
      * Deposits **ETH** and creates bond.
      */
     receive () external payable override nonReentrant {

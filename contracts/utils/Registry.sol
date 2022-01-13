@@ -48,7 +48,7 @@ contract Registry is IRegistry, Governable {
      * @notice Gets the `value` of a given `key`.
      * Reverts if the key is not in the mapping.
      * @param key The key to query.
-     * @param value The value of the key
+     * @param value The value of the key.
      */
     function get(string calldata key) external view override returns (address value) {
         RegistryEntry memory entry = _addresses[key];

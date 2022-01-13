@@ -16,11 +16,11 @@ import "./../interfaces/staking/IStakingRewards.sol";
  * @author solace.fi
  * @notice Rewards users for staking in [`xsLocker`](./xsLocker).
  *
- * Deposits and withdrawls are made to [`xsLocker`](./xsLocker) and rewards come from `StakingRewards`. All three are paid in [**SOLACE**](./SOLACE). `StakingRewards` will be registered as an [`xsListener`](./interfaces/IxsListener). Any time a lock is updated [`registerLockEvent()`](#registerlockevent) will be called and the staking information of that lock will be updated.
+ * Deposits and withdrawls are made to [`xsLocker`](./xsLocker) and rewards come from `StakingRewards`. All three are paid in [**SOLACE**](./../SOLACE). `StakingRewards` will be registered as an [`xsListener`](./../interfaces/staking/IxsListener). Any time a lock is updated [`registerLockEvent()`](#registerlockevent) will be called and the staking information of that lock will be updated.
  *
- * Over the course of `startTime` to `endTime`, the farm distributes `rewardPerSecond` [**SOLACE**](./SOLACE) to all lock holders split relative to the value of their locks. The base value of a lock is its `amount` of [**SOLACE**](./SOLACE). Its multiplier is 2.5x when `end` is 4 years from now, 1x when unlocked, and linearly decreasing between the two. The value of a lock is its base value times its multiplier.
+ * Over the course of `startTime` to `endTime`, the farm distributes `rewardPerSecond` [**SOLACE**](./../SOLACE) to all lock holders split relative to the value of their locks. The base value of a lock is its `amount` of [**SOLACE**](./../SOLACE). Its multiplier is 2.5x when `end` is 4 years from now, 1x when unlocked, and linearly decreasing between the two. The value of a lock is its base value times its multiplier.
  *
- * Note that transferring [**SOLACE**](./SOLACE) to this contract will not give you any rewards. You should deposit your [**SOLACE**](./SOLACE) into [`xsLocker`](./xsLocker) via `createLock()`.
+ * Note that transferring [**SOLACE**](./../SOLACE) to this contract will not give you any rewards. You should deposit your [**SOLACE**](./../SOLACE) into [`xsLocker`](./xsLocker) via `createLock()`.
  *
  * @dev Lock information is stored in [`xsLocker`](./xsLocker) and mirrored here for bookkeeping and efficiency. Should that information differ, [`xsLocker`](./xsLocker) is the ground truth and this contract will attempt to sync with it.
  */
@@ -42,7 +42,7 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
     // multiplier to increase precision
     uint256 internal constant Q12 = 1e12;
 
-    /// @notice [**SOLACE**](./SOLACE) token.
+    /// @notice [**SOLACE**](./../SOLACE) token.
     address public override solace;
     /// @notice The [**xsLocker**](../xsLocker) contract.
     address public override xsLocker;
@@ -69,9 +69,11 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
     /**
      * @notice Constructs the StakingRewards contract.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
-
+     * @param solace_ Address of [**SOLACE**](./../SOLACE).
+     * @param xsLocker_ Address of the [**xsLocker**](./xsLocker) contract.
      * @param startTime_ When farming will begin.
      * @param endTime_ When farming will end.
+     * @param rewardPerSecond_ The amount of [**SOLACE**](./../SOLACE) to distribute per second.
      */
     constructor(
         address governance_,
@@ -102,7 +104,7 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
     }
 
     /**
-     * @notice Calculates the accumulated balance of [**SOLACE**](./SOLACE) for specified user.
+     * @notice Calculates the accumulated balance of [**SOLACE**](./../SOLACE) for specified user.
      * @param user The user for whom unclaimed tokens will be shown.
      * @return reward Total amount of withdrawable reward tokens.
      */
@@ -128,7 +130,7 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
     }
 
     /**
-     * @notice Calculates the accumulated balance of [**SOLACE**](./SOLACE) for specified lock.
+     * @notice Calculates the accumulated balance of [**SOLACE**](./../SOLACE) for specified lock.
      * @param xsLockID The ID of the lock to query rewards for.
      * @return reward Total amount of withdrawable reward tokens.
      */
@@ -300,8 +302,8 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
 
     /**
      * @notice Calculates the value of a lock.
-     * The base value of a lock is its `amount` of [**SOLACE**](./SOLACE). Its multiplier is 2.5x when `end` is 4 years from now, 1x when unlocked, and linearly decreasing between the two. The value of a lock is its base value times its multiplier.
-     * @param amount The amount of [**SOLACE**](./SOLACE) in the lock.
+     * The base value of a lock is its `amount` of [**SOLACE**](./../SOLACE). Its multiplier is 2.5x when `end` is 4 years from now, 1x when unlocked, and linearly decreasing between the two. The value of a lock is its base value times its multiplier.
+     * @param amount The amount of [**SOLACE**](./../SOLACE) in the lock.
      * @param end The unlock timestamp of the lock.
      * @return value The boosted value of the lock.
      */
@@ -320,7 +322,7 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
     ***************************************/
 
     /**
-     * @notice Sets the amount of [**SOLACE**](./SOLACE) to distribute per second.
+     * @notice Sets the amount of [**SOLACE**](./../SOLACE) to distribute per second.
      * Only affects future rewards.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param rewardPerSecond_ Amount to distribute per second.

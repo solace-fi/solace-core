@@ -9,7 +9,7 @@ import "./IBondTeller.sol";
  * @author solace.fi
  * @notice A bond teller that accepts an ERC20 as payment.
  *
- * Bond tellers allow users to buy bonds. After vesting for `vestingTerm`, bonds can be redeemed for [**SOLACE**](../SOLACE) or [**xSOLACE**](../xSOLACE). Payments are made in `principal` which is sent to the underwriting pool and used to back risk.
+ * Bond tellers allow users to buy bonds. After vesting for `vestingTerm`, bonds can be redeemed for [**SOLACE**](./../../SOLACE) or [**xSOLACEV1**](./../../staking/xSOLACEV1). Payments are made in `principal` which is sent to the underwriting pool and used to back risk.
  *
  * Bonds can be purchased via [`deposit()`](#deposit) or [`depositSigned()`](#depositsigned). Bonds are represented as ERC721s, can be viewed with [`bonds()`](#bonds), and redeemed with [`redeem()`](#redeem).
  */
@@ -19,10 +19,10 @@ interface IBondTellerErc20 is IBondTeller {
      * @notice Create a bond by depositing `amount` of `principal`.
      * Principal will be transferred from `msg.sender` using `allowance`.
      * @param amount Amount of principal to deposit.
-     * @param minAmountOut The minimum [**SOLACE**](../SOLACE) or [**xSOLACEV1**](../xSOLACEV1) out.
+     * @param minAmountOut The minimum [**SOLACE**](./../../SOLACE) or [**xSOLACEV1**](./../../staking/xSOLACEV1) out.
      * @param depositor The bond recipient, default msg.sender.
      * @param stake True to stake, false to not stake.
-     * @return payout The amount of SOLACE or xSOLACE in the bond.
+     * @return payout The amount of [**SOLACE**](./../../SOLACE) or [**xSOLACEV1**](./../../staking/xSOLACEV1) in the bond.
      * @return bondID The ID of the newly created bond.
      */
     function deposit(
@@ -37,14 +37,14 @@ interface IBondTellerErc20 is IBondTeller {
      * Principal will be transferred from `depositor` using `permit`.
      * Note that not all ERC20s have a permit function, in which case this function will revert.
      * @param amount Amount of principal to deposit.
-     * @param minAmountOut The minimum [**SOLACE**](../SOLACE) or [**xSOLACEV1**](../xSOLACEV1) out.
+     * @param minAmountOut The minimum [**SOLACE**](./../../SOLACE) or [**xSOLACEV1**](./../../staking/xSOLACEV1) out.
      * @param depositor The bond recipient, default msg.sender.
      * @param stake True to stake, false to not stake.
      * @param deadline Time the transaction must go through before.
      * @param v secp256k1 signature
      * @param r secp256k1 signature
      * @param s secp256k1 signature
-     * @return payout The amount of SOLACE or xSOLACE in the bond.
+     * @return payout The amount of [**SOLACE**](./../../SOLACE) or [**xSOLACEV1**](./../../staking/xSOLACEV1) in the bond.
      * @return bondID The ID of the newly created bond.
      */
     function depositSigned(

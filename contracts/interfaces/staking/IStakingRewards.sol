@@ -7,15 +7,15 @@ import "./IxsListener.sol";
 /**
  * @title Staking Rewards
  * @author solace.fi
- * @notice Rewards users for staking in [`xsLocker`](./xsLocker).
+ * @notice Rewards users for staking in [`xsLocker`](./../../staking/xsLocker).
  *
- * Deposits and withdrawls are made to [`xsLocker`](./xsLocker) and rewards come from `StakingRewards`. All three are paid in [**SOLACE**](./SOLACE). `StakingRewards` will be registered as an [`xsListener`](./interfaces/IxsListener). Any time a lock is updated [`registerLockEvent()`](#registerlockevent) will be called and the staking information of that lock will be updated.
+ * Deposits and withdrawls are made to [`xsLocker`](./../../staking/xsLocker) and rewards come from `StakingRewards`. All three are paid in [**SOLACE**](./../../SOLACE). `StakingRewards` will be registered as an [`xsListener`](./IxsListener). Any time a lock is updated [`registerLockEvent()`](#registerlockevent) will be called and the staking information of that lock will be updated.
  *
- * Over the course of `startTime` to `endTime`, the farm distributes `rewardPerSecond` [**SOLACE**](./SOLACE) to all lock holders split relative to the value of their locks. The base value of a lock is its `amount` of [**SOLACE**](./SOLACE). Its multiplier is 2.5x when `end` is 4 years from now, 1x when unlocked, and linearly decreasing between the two. The value of a lock is its base value times its multiplier.
+ * Over the course of `startTime` to `endTime`, the farm distributes `rewardPerSecond` [**SOLACE**](./../../SOLACE) to all lock holders split relative to the value of their locks. The base value of a lock is its `amount` of [**SOLACE**](./../../SOLACE). Its multiplier is 2.5x when `end` is 4 years from now, 1x when unlocked, and linearly decreasing between the two. The value of a lock is its base value times its multiplier.
  *
- * Note that transferring [**SOLACE**](./SOLACE) to this contract will not give you any rewards. You should deposit your [**SOLACE**](./SOLACE) into [`xsLocker`](./xsLocker) via `createLock()`.
+ * Note that transferring [**SOLACE**](./../../SOLACE) to this contract will not give you any rewards. You should deposit your [**SOLACE**](./../../SOLACE) into [`xsLocker`](./../../staking/xsLocker) via `createLock()`.
  *
- * @dev Lock information is stored in [`xsLocker`](./xsLocker) and mirrored here for bookkeeping and efficiency. Should that information differ, [`xsLocker`](./xsLocker) is the ground truth and this contract will attempt to sync with it.
+ * @dev Lock information is stored in [`xsLocker`](./../../staking/xsLocker) and mirrored here for bookkeeping and efficiency. Should that information differ, [`xsLocker`](./../../staking/xsLocker) is the ground truth and this contract will attempt to sync with it.
  */
 interface IStakingRewards is IxsListener {
 
@@ -42,11 +42,11 @@ interface IStakingRewards is IxsListener {
     function MAX_LOCK_MULTIPLIER_BPS() external view returns (uint256);
     /// @notice The vote power multiplier when unlocked in bps.
     function UNLOCKED_MULTIPLIER_BPS() external view returns (uint256);
-    /// @notice [**SOLACE**](../SOLACE) token.
+    /// @notice [**SOLACE**](./../../SOLACE) token.
     function solace() external view returns (address);
-    /// @notice The [**xsLocker**](../xsLocker) contract.
+    /// @notice The [`xsLocker`](./../../staking/xsLocker) contract.
     function xsLocker() external view returns (address);
-    /// @notice Amount of SOLACE distributed per second.
+    /// @notice Amount of [**SOLACE**](./../../SOLACE) distributed per second.
     function rewardPerSecond() external view returns (uint256);
     /// @notice When the farm will start.
     function startTime() external view returns (uint256);
@@ -87,14 +87,14 @@ interface IStakingRewards is IxsListener {
     function stakedLockInfo(uint256 xsLockID) external view returns (StakedLockInfo memory);
 
     /**
-     * @notice Calculates the accumulated balance of [**SOLACE**](./SOLACE) for specified user.
+     * @notice Calculates the accumulated balance of [**SOLACE**](./../../SOLACE) for specified user.
      * @param user The user for whom unclaimed tokens will be shown.
      * @return reward Total amount of withdrawable reward tokens.
      */
     function pendingRewardsOfUser(address user) external view returns (uint256 reward);
 
     /**
-     * @notice Calculates the accumulated balance of [**SOLACE**](./SOLACE) for specified lock.
+     * @notice Calculates the accumulated balance of [**SOLACE**](./../../SOLACE) for specified lock.
      * @param xsLockID The ID of the lock to query rewards for.
      * @return reward Total amount of withdrawable reward tokens.
      */
@@ -140,7 +140,7 @@ interface IStakingRewards is IxsListener {
     ***************************************/
 
     /**
-     * @notice Sets the amount of [**SOLACE**](../SOLACE) to distribute per second.
+     * @notice Sets the amount of [**SOLACE**](./../../SOLACE) to distribute per second.
      * Only affects future rewards.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param rewardPerSecond_ Amount to distribute per second.

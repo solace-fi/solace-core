@@ -13,9 +13,9 @@ import "./../interfaces/staking/IFarmRewards.sol";
 /**
  * @title FarmRewards
  * @author solace.fi
- * @notice Rewards farmers with [**SOLACE**](./SOLACE).
+ * @notice Rewards farmers with [**SOLACE**](./../SOLACE).
  *
- * Rewards were accumulated by farmers for participating in farms. Rewards will be unlocked linearly over six months and can be redeemed for [**SOLACE**](./SOLACE) by paying $0.03/[**SOLACE**](./SOLACE).
+ * Rewards were accumulated by farmers for participating in farms. Rewards will be unlocked linearly over six months and can be redeemed for [**SOLACE**](./../SOLACE) by paying $0.03/[**SOLACE**](./../SOLACE).
  */
 contract FarmRewards is IFarmRewards, ReentrancyGuard, Governable {
 
@@ -47,7 +47,7 @@ contract FarmRewards is IFarmRewards, ReentrancyGuard, Governable {
      * @param governance_ The address of the [governor](/docs/protocol/governance).
      * @param xsolace_ Address of [**xSOLACE**](./xSOLACE).
      * @param receiver_ Address to send proceeds.
-     * @param solacePerXSolace_ The amount of [**SOLACE**](./SOLACE) for one [**xSOLACE**](./xSOLACE).
+     * @param solacePerXSolace_ The amount of [**SOLACE**](./../SOLACE) for one [**xSOLACE**](./xSOLACE).
      */
     constructor(address governance_, address xsolace_, address receiver_, uint256 solacePerXSolace_) Governable(governance_) {
         require(xsolace_ != address(0x0), "zero address xsolace");

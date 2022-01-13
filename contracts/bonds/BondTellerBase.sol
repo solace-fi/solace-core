@@ -19,7 +19,7 @@ import "./../interfaces/bonds/IBondTellerErc20.sol";
  * @author solace.fi
  * @notice A base type for bond tellers.
  *
- * Bond tellers allow users to buy bonds. After vesting for `vestingTerm`, bonds can be redeemed for [**SOLACE**](./SOLACE) or [**xSOLACE**](./xSOLACE). Payments are made in `principal` which is sent to the underwriting pool and used to back risk.
+ * Bond tellers allow users to buy bonds. After vesting for `vestingTerm`, bonds can be redeemed for [**SOLACE**](./../SOLACE) or [**xSOLACEV1**](./../staking/xSOLACEV1). Payments are made in `principal` which is sent to the underwriting pool and used to back risk.
  *
  * Bonds are represented as ERC721s, can be viewed with [`bonds()`](#bonds), and redeemed with [`redeem()`](#redeem).
  */
@@ -80,8 +80,8 @@ abstract contract BondTellerBase is IBondTeller, ReentrancyGuard, GovernableInit
      * @notice Initializes the teller.
      * @param name_ The name of the bond token.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
-     * @param solace_ The SOLACE token.
-     * @param xsolace_ The xSOLACE token.
+     * @param solace_ The [**SOLACE**](./../SOLACE) token.
+     * @param xsolace_ The [**xSOLACEV1**](./../staking/xSOLACEV1) token.
      * @param pool_ The underwriting pool.
      * @param dao_ The DAO.
      * @param principal_ address The ERC20 token that users deposit.
@@ -111,7 +111,7 @@ abstract contract BondTellerBase is IBondTeller, ReentrancyGuard, GovernableInit
 
     /**
      * @notice Calculate the current price of a bond.
-     * Assumes 1 SOLACE payout.
+     * Assumes 1 [**SOLACE**](./../SOLACE) payout.
      * @return price_ The price of the bond measured in `principal`.
      */
     function bondPrice() public view override returns (uint256 price_) {
@@ -124,10 +124,10 @@ abstract contract BondTellerBase is IBondTeller, ReentrancyGuard, GovernableInit
     }
 
     /**
-     * @notice Calculate the amount of [**SOLACE**](./SOLACE) or [**xSOLACEV1**](./xSOLACEV1) out for an amount of `principal`.
+     * @notice Calculate the amount of [**SOLACE**](./../SOLACE) or [**xSOLACEV1**](./../staking/xSOLACEV1) out for an amount of `principal`.
      * @param amountIn Amount of principal to deposit.
      * @param stake True to stake, false to not stake.
-     * @return amountOut Amount of [**SOLACE**](./SOLACE) or [**xSOLACEV1**](./xSOLACEV1) out.
+     * @return amountOut Amount of [**SOLACE**](./../SOLACE) or [**xSOLACEV1**](./../staking/xSOLACEV1) out.
      */
     function calculateAmountOut(uint256 amountIn, bool stake) external view override returns (uint256 amountOut) {
         require(termsSet, "not initialized");
@@ -157,8 +157,8 @@ abstract contract BondTellerBase is IBondTeller, ReentrancyGuard, GovernableInit
     }
 
     /**
-     * @notice Calculate the amount of `principal` in for an amount of [**SOLACE**](./SOLACE) or [**xSOLACEV1**](./xSOLACEV1) out.
-     * @param amountOut Amount of [**SOLACE**](./SOLACE) or [**xSOLACEV1**](./xSOLACEV1) out.
+     * @notice Calculate the amount of `principal` in for an amount of [**SOLACE**](./../SOLACE) or [**xSOLACEV1**](./../staking/xSOLACEV1) out.
+     * @param amountOut Amount of [**SOLACE**](./../SOLACE) or [**xSOLACEV1**](./../staking/xSOLACEV1) out.
      * @param stake True to stake, false to not stake.
      * @return amountIn Amount of principal to deposit.
      */
@@ -214,9 +214,9 @@ abstract contract BondTellerBase is IBondTeller, ReentrancyGuard, GovernableInit
     ***************************************/
 
     /**
-     * @notice Calculate the payout in [**SOLACE**](./SOLACE) and update the current price of a bond.
-     * @param depositAmount asdf
-     * @return amountOut asdf
+     * @notice Calculate the payout in [**SOLACE**](./../SOLACE) and update the current price of a bond.
+     * @param depositAmount The amount of `principal` to deposit.
+     * @return amountOut The amount of [**SOLACE**](./../SOLACE) out.
      */
     function _calculatePayout(uint256 depositAmount) internal returns (uint256 amountOut) {
         // calculate this price
@@ -268,13 +268,13 @@ abstract contract BondTellerBase is IBondTeller, ReentrancyGuard, GovernableInit
     }
 
     struct Terms {
-        uint256 startPrice;     // The starting price, measured in `principal` for one [**SOLACE**](./SOLACE).
-        uint256 minimumPrice;   // The minimum price of a bond, measured in `principal` for one [**SOLACE**](./SOLACE).
-        uint256 maxPayout;      // The maximum [**SOLACE**](./SOLACE) that can be sold in a single bond.
+        uint256 startPrice;     // The starting price, measured in `principal` for one [**SOLACE**](./../SOLACE).
+        uint256 minimumPrice;   // The minimum price of a bond, measured in `principal` for one [**SOLACE**](./../SOLACE).
+        uint256 maxPayout;      // The maximum [**SOLACE**](./../SOLACE) that can be sold in a single bond.
         uint128 priceAdjNum;    // Used to calculate price increase after bond purchase.
         uint128 priceAdjDenom;  // Used to calculate price increase after bond purchase.
         uint256 capacity;       // The amount still sellable.
-        bool capacityIsPayout;  // True if `capacity_` is measured in [**SOLACE**](./SOLACE), false if measured in `principal`.
+        bool capacityIsPayout;  // True if `capacity_` is measured in [**SOLACE**](./../SOLACE), false if measured in `principal`.
         uint40 startTime;       // The time that purchases start.
         uint40 endTime;         // The time that purchases end.
         uint40 vestingTerm;     // The duration that users must wait to redeem bonds.
@@ -310,7 +310,7 @@ abstract contract BondTellerBase is IBondTeller, ReentrancyGuard, GovernableInit
 
     /**
      * @notice Sets the bond fees.
-     * @param bondFee The fraction of [**SOLACE**](./SOLACE) that will be sent to stakers measured in BPS.
+     * @param bondFee The fraction of [**SOLACE**](./../SOLACE) that will be sent to stakers measured in BPS.
      * @param daoFee The fraction of `principal` that will be sent to the dao measured in BPS.
      */
     function setFees(uint256 bondFee, uint256 daoFee) external onlyGovernance {
@@ -324,11 +324,11 @@ abstract contract BondTellerBase is IBondTeller, ReentrancyGuard, GovernableInit
     /**
      * @notice Sets the addresses to call out.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param solace_ The SOLACE token.
-     * @param xsolace_ The xSOLACE token.
+     * @param solace_ The [**SOLACE**](./../SOLACE) token.
+     * @param xsolace_ The [**xSOLACEV1**](./../staking/xSOLACEV1) token.
      * @param pool_ The underwriting pool.
      * @param dao_ The DAO.
-     * @param principal_ address The ERC20 token that users deposit.
+     * @param principal_ The ERC20 token that users deposit.
      * @param bondDepo_ The bond depository.
      */
     function setAddresses(
@@ -345,8 +345,8 @@ abstract contract BondTellerBase is IBondTeller, ReentrancyGuard, GovernableInit
     /**
      * @notice Sets the addresses to call out.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param solace_ The SOLACE token.
-     * @param xsolace_ The xSOLACE token.
+     * @param solace_ The [**SOLACE**](./../SOLACE) token.
+     * @param xsolace_ The [**xSOLACEV1**](./../staking/xSOLACEV1) token.
      * @param pool_ The underwriting pool.
      * @param dao_ The DAO.
      * @param principal_ address The ERC20 token that users deposit.
