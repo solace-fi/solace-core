@@ -801,8 +801,8 @@ describe("SoteriaCoverageProduct", function() {
             let initialActiveCoverLimit = await soteriaCoverageProduct.connect(policyholder4).activeCoverLimit();
             let initialPolicyCoverLimit = await soteriaCoverageProduct.connect(policyholder4).coverLimitOf(POLICY_ID_4);
             let initialAvailableCoverCapacity = await soteriaCoverageProduct.connect(policyholder4).availableCoverCapacity();
-            let initialPMCoverAmount = await riskManager.connect(policyholder4).activeCoverLimit();
-            let initialPMSoteriaCoverAmount = await riskManager.connect(policyholder4).activeCoverLimitPerStrategy(soteriaCoverageProduct.address);
+            let initialRMCoverAmount = await riskManager.connect(policyholder4).activeCoverLimit();
+            let initialRMSoteriaCoverAmount = await riskManager.connect(policyholder4).activeCoverLimitPerStrategy(soteriaCoverageProduct.address);
 
             // we cannot reach the PremiumPartiallyCharged branch within a single chargePremiums() call
             await soteriaCoverageProduct.connect(premiumCollector).chargePremiums([policyholder4.address], [WEEKLY_MAX_PREMIUM]);
@@ -823,8 +823,8 @@ describe("SoteriaCoverageProduct", function() {
             expect(await soteriaCoverageProduct.coverLimitOf(POLICY_ID_4)).to.equal(ZERO_AMOUNT);
 
             // risk manager should be updated
-            expect(await riskManager.activeCoverLimit()).to.equal(initialPMCoverAmount.sub(initialPolicyCoverLimit));
-            expect(await riskManager.activeCoverLimitPerStrategy(soteriaCoverageProduct.address)).to.equal(initialPMSoteriaCoverAmount.sub(initialPolicyCoverLimit));
+            expect(await riskManager.activeCoverLimit()).to.equal(initialRMCoverAmount.sub(initialPolicyCoverLimit));
+            expect(await riskManager.activeCoverLimitPerStrategy(soteriaCoverageProduct.address)).to.equal(initialRMSoteriaCoverAmount.sub(initialPolicyCoverLimit));
             expect(await riskManager.activeCoverLimitPerStrategy(soteriaCoverageProduct.address)).to.equal(initialActiveCoverLimit.sub(initialPolicyCoverLimit));
 
             // policyholder account balance should be depleted
@@ -903,8 +903,8 @@ describe("SoteriaCoverageProduct", function() {
             let initialPolicy2CoverLimit = await soteriaCoverageProduct.coverLimitOf(POLICY_ID_2);
             let initialPolicy3CoverLimit = await soteriaCoverageProduct.coverLimitOf(POLICY_ID_3);
             let initialAvailableCoverCapacity = await soteriaCoverageProduct.availableCoverCapacity();
-            let initialPMCoverAmount = await riskManager.activeCoverLimit();
-            let initialPMSoteriaCoverAmount = await riskManager.activeCoverLimitPerStrategy(soteriaCoverageProduct.address);
+            let initialRMCoverAmount = await riskManager.activeCoverLimit();
+            let initialRMSoteriaCoverAmount = await riskManager.activeCoverLimitPerStrategy(soteriaCoverageProduct.address);
 
             tx = await soteriaCoverageProduct.connect(premiumCollector).chargePremiums([policyholder1.address, policyholder2.address, policyholder3.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM])
             expect(tx).to.emit(soteriaCoverageProduct, "PremiumCharged").withArgs(policyholder1.address, WEEKLY_MAX_PREMIUM);
@@ -947,8 +947,8 @@ describe("SoteriaCoverageProduct", function() {
 
             // Soteria active cover limit check - policy 3 deactivated
             expect(await soteriaCoverageProduct.activeCoverLimit()).eq(initialActiveCoverLimit.sub(initialPolicy3CoverLimit))
-            expect(await riskManager.activeCoverLimit()).eq(initialPMCoverAmount.sub(initialPolicy3CoverLimit))
-            expect(await riskManager.activeCoverLimitPerStrategy(soteriaCoverageProduct.address)).eq(initialPMSoteriaCoverAmount.sub(initialPolicy3CoverLimit))
+            expect(await riskManager.activeCoverLimit()).eq(initialRMCoverAmount.sub(initialPolicy3CoverLimit))
+            expect(await riskManager.activeCoverLimitPerStrategy(soteriaCoverageProduct.address)).eq(initialRMSoteriaCoverAmount.sub(initialPolicy3CoverLimit))
             
             // Cover capacity check - should be increased by policy 3 initial cover limit
             expect(await soteriaCoverageProduct.availableCoverCapacity()).eq(initialAvailableCoverCapacity.add(initialPolicy3CoverLimit))
