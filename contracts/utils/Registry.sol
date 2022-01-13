@@ -37,6 +37,7 @@ contract Registry is IRegistry, Governable {
      * @notice Constructs the registry contract.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
      */
+    // solhint-disable-next-line no-empty-blocks
     constructor(address governance_) Governable(governance_) { }
 
     /***************************************

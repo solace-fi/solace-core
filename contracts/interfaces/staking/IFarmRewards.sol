@@ -28,10 +28,10 @@ interface IFarmRewards {
     function receiver() external view returns (address);
 
     /// @notice timestamp that rewards start vesting
-    function vestingStart() external view returns (uint256);
+    function VESTING_START() external view returns (uint256);
 
     /// @notice timestamp that rewards finish vesting
-    function vestingEnd() external view returns (uint256);
+    function VESTING_END() external view returns (uint256);
 
     function solacePerXSolace() external view returns (uint256);
 

@@ -116,7 +116,9 @@ contract BondTellerEth is BondTellerBase, IBondTellerEth {
         require(!paused, "cannot deposit while paused");
 
         require(termsSet, "not initialized");
+        // solhint-disable-next-line not-rely-on-time
         require(block.timestamp >= uint256(startTime), "bond not yet started");
+        // solhint-disable-next-line not-rely-on-time
         require(block.timestamp <= uint256(endTime), "bond concluded");
 
         payout = _calculatePayout(amount);
@@ -133,6 +135,7 @@ contract BondTellerEth is BondTellerBase, IBondTellerEth {
         }
         require(payout <= maxPayout, "bond too large");
 
+        // solhint-disable-next-line not-rely-on-time
         uint256 maturation = vestingTerm + block.timestamp;
         // route principal
         uint256 daoFee = amount * daoFeeBps / MAX_BPS;
@@ -154,7 +157,7 @@ contract BondTellerEth is BondTellerBase, IBondTellerEth {
         } else {
             payoutToken = address(solace);
         }
-        require(minAmountOut <= payout, "slippage protection: insufficient output");
+        require(minAmountOut <= payout, "slippage protection");
 
         // record bond info
         bondID = ++numBonds;

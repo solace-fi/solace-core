@@ -29,6 +29,7 @@ import "./../interfaces/staking/IxsLocker.sol";
  *
  * Note that transferring [**SOLACE**](./SOLACE) to this contract will not give you any rewards. You should deposit your [**SOLACE**](./SOLACE) via [`createLock()`](#createlock) or [`createLockSigned()`](#createlocksigned).
  */
+// solhint-disable-next-line contract-name-camelcase
 contract xsLocker is IxsLocker, ERC721Enhanced, ReentrancyGuard, Governable {
     using EnumerableSet for EnumerableSet.AddressSet;
 
@@ -83,6 +84,7 @@ contract xsLocker is IxsLocker, ERC721Enhanced, ReentrancyGuard, Governable {
      * @return locked True if the lock is locked, false if unlocked.
      */
     function isLocked(uint256 xsLockID) external view override tokenMustExist(xsLockID) returns (bool locked) {
+        // solhint-disable-next-line not-rely-on-time
         return _locks[xsLockID].end > block.timestamp;
     }
 
@@ -92,7 +94,9 @@ contract xsLocker is IxsLocker, ERC721Enhanced, ReentrancyGuard, Governable {
      * @return time The time left in seconds, 0 if unlocked.
      */
     function timeLeft(uint256 xsLockID) external view override tokenMustExist(xsLockID) returns (uint256 time) {
+        // solhint-disable-next-line not-rely-on-time
         return (_locks[xsLockID].end > block.timestamp)
+            // solhint-disable-next-line not-rely-on-time
             ? _locks[xsLockID].end - block.timestamp // locked
             : 0; // unlocked
     }
@@ -208,8 +212,9 @@ contract xsLocker is IxsLocker, ERC721Enhanced, ReentrancyGuard, Governable {
      * @param end The new time for the lock to unlock.
      */
     function extendLock(uint256 xsLockID, uint256 end) external override nonReentrant onlyOwnerOrApproved(xsLockID) {
+        // solhint-disable-next-line not-rely-on-time
         require(end <= block.timestamp + MAX_LOCK_DURATION, "Max lock is 4 years");
-        require(_locks[xsLockID].end <= end, "new end timestamp should be greater than before");
+        require(_locks[xsLockID].end <= end, "not extended");
         _updateLock(xsLockID, _locks[xsLockID].amount, end);
     }
 
@@ -277,6 +282,7 @@ contract xsLocker is IxsLocker, ERC721Enhanced, ReentrancyGuard, Governable {
     function _createLock(address recipient, uint256 amount, uint256 end) internal returns (uint256 xsLockID) {
         xsLockID = ++totalNumLocks;
         Lock memory newLock = Lock(amount, end);
+        // solhint-disable-next-line not-rely-on-time
         require(newLock.end <= block.timestamp + MAX_LOCK_DURATION, "Max lock is 4 years");
         // accounting
         _locks[xsLockID] = newLock;
@@ -307,6 +313,7 @@ contract xsLocker is IxsLocker, ERC721Enhanced, ReentrancyGuard, Governable {
      * @param amount The amount of [**SOLACE**](./SOLACE) to withdraw.
      */
     function _withdraw(uint256 xsLockID, uint256 amount) internal {
+        // solhint-disable-next-line not-rely-on-time
         require(_locks[xsLockID].end <= block.timestamp, "locked"); // cannot withdraw while locked
         // accounting
         if(amount == _locks[xsLockID].amount) {
@@ -340,6 +347,7 @@ contract xsLocker is IxsLocker, ERC721Enhanced, ReentrancyGuard, Governable {
         if(from == address(0x0)) _notify(xsLockID, from, to, Lock(0, 0), lock); // mint
         else if(to == address(0x0)) _notify(xsLockID, from, to, lock, Lock(0, 0)); // burn
         else { // transfer
+            // solhint-disable-next-line not-rely-on-time
             require(lock.end <= block.timestamp, "locked"); // cannot transfer while locked
             _notify(xsLockID, from, to, lock, lock);
         }

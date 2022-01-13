@@ -23,6 +23,7 @@ import "./../interfaces/bonds/IBondTellerErc20.sol";
  *
  * Bonds are represented as ERC721s, can be viewed with [`bonds()`](#bonds), and redeemed with [`redeem()`](#redeem).
  */
+// solhint-disable max-states-count
 abstract contract BondTellerBase is IBondTeller, ReentrancyGuard, GovernableInitializable, ERC721Enhancedv1Initializable {
     using SafeERC20 for IERC20;
 
@@ -114,6 +115,7 @@ abstract contract BondTellerBase is IBondTeller, ReentrancyGuard, GovernableInit
      * @return price_ The price of the bond measured in `principal`.
      */
     function bondPrice() public view override returns (uint256 price_) {
+        // solhint-disable-next-line not-rely-on-time
         uint256 timeSinceLast = block.timestamp - lastPriceUpdate;
         price_ = exponentialDecay(nextPrice, timeSinceLast);
         if (price_ < minimumPrice) {
@@ -197,6 +199,7 @@ abstract contract BondTellerBase is IBondTeller, ReentrancyGuard, GovernableInit
         // checks
         Bond memory bond = bonds[bondID];
         require(_isApprovedOrOwner(msg.sender, bondID), "!bonder");
+        // solhint-disable-next-line not-rely-on-time
         require(block.timestamp >= bond.maturation, "bond not yet redeemable");
         // send payout
         SafeERC20.safeTransfer(IERC20(bond.payoutToken), msg.sender, bond.payoutAmount);
@@ -217,10 +220,12 @@ abstract contract BondTellerBase is IBondTeller, ReentrancyGuard, GovernableInit
      */
     function _calculatePayout(uint256 depositAmount) internal returns (uint256 amountOut) {
         // calculate this price
+        // solhint-disable-next-line not-rely-on-time
         uint256 timeSinceLast = block.timestamp - lastPriceUpdate;
         uint256 price_ = exponentialDecay(nextPrice, timeSinceLast);
         if(price_ < minimumPrice) price_ = minimumPrice;
         require(price_ != 0, "invalid price");
+        // solhint-disable-next-line not-rely-on-time
         lastPriceUpdate = block.timestamp;
         // calculate amount out
         amountOut = 1 ether * depositAmount / price_; // 1 ether => 1 solace
@@ -298,6 +303,7 @@ abstract contract BondTellerBase is IBondTeller, ReentrancyGuard, GovernableInit
         require(terms.halfLife > 0, "invalid halflife");
         halfLife = terms.halfLife;
         termsSet = true;
+        // solhint-disable-next-line not-rely-on-time
         lastPriceUpdate = block.timestamp;
         emit TermsSet();
     }

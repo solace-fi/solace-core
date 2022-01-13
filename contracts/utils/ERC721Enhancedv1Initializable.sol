@@ -24,20 +24,23 @@ abstract contract ERC721Enhancedv1Initializable is IERC721Enhancedv1Initializabl
     mapping(uint256 => uint256) private _nonces;
 
     /// @dev Value is equal to keccak256("Permit(address spender,uint256 tokenID,uint256 nonce,uint256 deadline)");
+    // solhint-disable-next-line var-name-mixedcase
     bytes32 private immutable _PERMIT_TYPEHASH = 0x137406564cdcf9b40b1700502a9241e87476728da7ae3d0edfcf0541e5b49b3e;
 
 
     /**
-    * @notice Initializes the `ERC721Enhancedv1` contract.
-    * @param name The name of the token.
-    * @param symbol The symbol of the token.
-    */
+     * @notice Initializes the `ERC721Enhancedv1` contract.
+     * @param name The name of the token.
+     * @param symbol The symbol of the token.
+     */
+    // solhint-disable-next-line func-name-mixedcase
     function __ERC721Enhancedv1_init(string memory name, string memory symbol) internal initializer {
         __ERC721_init(name, symbol);
         __ERC721Enumerable_init_unchained();
         __EIP712_init_unchained(name, "1");
     }
 
+    // solhint-disable-next-line no-empty-blocks, func-name-mixedcase
     function __ERC721Enhancedv1_init_unchained() internal initializer { }
 
     /***************************************
@@ -86,6 +89,7 @@ abstract contract ERC721Enhancedv1Initializable is IERC721Enhancedv1Initializabl
         bytes32 s
     ) external override {
         require(_exists(tokenID), "query for nonexistent token");
+        // solhint-disable-next-line not-rely-on-time
         require(block.timestamp <= deadline, "permit expired");
 
         uint256 nonce = _nonces[tokenID]++; // get then increment

@@ -22,6 +22,7 @@ abstract contract ERC721Enhancedv1 is ERC721Enumerable, IERC721Enhancedv1, EIP71
     mapping(uint256 => uint256) private _nonces;
 
     /// @dev Value is equal to keccak256("Permit(address spender,uint256 tokenID,uint256 nonce,uint256 deadline)");
+    // solhint-disable-next-line var-name-mixedcase
     bytes32 private immutable _PERMIT_TYPEHASH = 0x137406564cdcf9b40b1700502a9241e87476728da7ae3d0edfcf0541e5b49b3e;
 
     /**
@@ -29,10 +30,11 @@ abstract contract ERC721Enhancedv1 is ERC721Enumerable, IERC721Enhancedv1, EIP71
      * @param name_ The name of the token.
      * @param symbol_ The symbol of the token.
      */
-     constructor(
-         string memory name_,
-         string memory symbol_
-     ) ERC721(name_, symbol_) EIP712(name_, "1") { }
+    constructor(
+        string memory name_,
+        string memory symbol_
+    // solhint-disable-next-line no-empty-blocks
+    ) ERC721(name_, symbol_) EIP712(name_, "1") { }
 
     /***************************************
     SIMPLER TRANSFERS
@@ -80,6 +82,7 @@ abstract contract ERC721Enhancedv1 is ERC721Enumerable, IERC721Enhancedv1, EIP71
         bytes32 s
     ) external override {
         require(_exists(tokenID), "query for nonexistent token");
+        // solhint-disable-next-line not-rely-on-time
         require(block.timestamp <= deadline, "permit expired");
 
         uint256 nonce = _nonces[tokenID]++; // get then increment

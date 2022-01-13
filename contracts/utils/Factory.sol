@@ -66,6 +66,7 @@ abstract contract Factory {
      * @return deployment address of deployed contract
      */
     function _deploy(bytes memory initCode) internal returns (address deployment) {
+        // solhint-disable-next-line no-inline-assembly
         assembly {
             let encoded_data := add(0x20, initCode)
             let encoded_size := mload(initCode)
@@ -83,6 +84,7 @@ abstract contract Factory {
      * @return deployment address of deployed contract
      */
     function _deploy(bytes memory initCode, bytes32 salt) internal returns (address deployment) {
+        // solhint-disable-next-line no-inline-assembly
         assembly {
             let encoded_data := add(0x20, initCode)
             let encoded_size := mload(initCode)

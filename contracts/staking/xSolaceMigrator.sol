@@ -15,6 +15,7 @@ import "./../interfaces/staking/IxSolaceMigrator.sol";
  * @author solace.fi
  * @notice Helps migrate [**xSOLACE**](./xSOLACE) from V1 to V2.
  */
+// solhint-disable-next-line contract-name-camelcase
 contract xSolaceMigrator is IxSolaceMigrator, ReentrancyGuard {
 
     /***************************************
@@ -24,6 +25,7 @@ contract xSolaceMigrator is IxSolaceMigrator, ReentrancyGuard {
     /// @notice Address of the [**SOLACE**](./../SOLACE) contract.
     address public override solace;
     /// @notice Address of the V1 [**xSOLACE**](./xSOLACEV1) contract.
+    // solhint-disable-next-line var-name-mixedcase
     address public override xsolace_v1;
     /// @notice Address of the [**xsLocker**](./xsLocker) contract.
     address public override xslocker;
@@ -34,6 +36,7 @@ contract xSolaceMigrator is IxSolaceMigrator, ReentrancyGuard {
      * @param xsolace_v1_ Address of the V1 [**xSOLACE**](./xSOLACE) contract.
      * @param xslocker_ Address of the [**xsLocker**](./xsLocker) contract.
      */
+    // solhint-disable-next-line var-name-mixedcase
     constructor(address solace_, address xsolace_v1_, address xslocker_) {
         require(solace_ != address(0x0), "zero address solace");
         solace = solace_;

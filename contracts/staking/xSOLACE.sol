@@ -21,6 +21,7 @@ import "./../interfaces/staking/IxSOLACE.sol";
  *
  * Note that transferring [**SOLACE**](./SOLACE) to this contract will not give you any **xSOLACE**. You should deposit your [**SOLACE**](./SOLACE) into [`xsLocker`](./xsLocker) via `createLock()`.
  */
+// solhint-disable-next-line contract-name-camelcase
 contract xSOLACE is IxSOLACE {
 
     /***************************************
@@ -77,8 +78,10 @@ contract xSOLACE is IxSOLACE {
         IxsLocker locker = IxsLocker(xsLocker);
         Lock memory lock = locker.locks(xsLockID);
         uint256 base = lock.amount * UNLOCKED_MULTIPLIER_BPS / MAX_BPS;
+        // solhint-disable-next-line not-rely-on-time
         uint256 bonus = (lock.end <= block.timestamp)
             ? 0 // unlocked
+            // solhint-disable-next-line not-rely-on-time
             : lock.amount * (lock.end - block.timestamp) * (MAX_LOCK_MULTIPLIER_BPS - UNLOCKED_MULTIPLIER_BPS) / (MAX_LOCK_DURATION * MAX_BPS); // locked
         return base + bonus;
     }
@@ -122,6 +125,7 @@ contract xSOLACE is IxSOLACE {
     /**
      * @notice Returns the remaining number of tokens that `spender` will be allowed to spend on behalf of `owner` through `transferFrom`.
      */
+    // solhint-disable-next-line no-unused-vars
     function allowance(address owner, address spender) external pure override returns (uint256) {
         return 0;
     }
@@ -137,6 +141,7 @@ contract xSOLACE is IxSOLACE {
      * @param amount The amount of tokens to send.
      * @return success False.
      */
+    // solhint-disable-next-line no-unused-vars
     function transfer(address recipient, uint256 amount) external override returns (bool success) {
         revert("xSOLACE transfer not allowed");
     }
@@ -148,6 +153,7 @@ contract xSOLACE is IxSOLACE {
      * @param amount The amount of tokens to send.
      * @return success False.
      */
+    // solhint-disable-next-line no-unused-vars
     function transferFrom(address sender, address recipient, uint256 amount) external override returns (bool success) {
         revert("xSOLACE transfer not allowed");
     }
@@ -159,6 +165,7 @@ contract xSOLACE is IxSOLACE {
      * @param amount The amount of tokens to send.
      * @return success False.
      */
+    // solhint-disable-next-line no-unused-vars
     function approve(address spender, uint256 amount) external override returns (bool success) {
         revert("xSOLACE transfer not allowed");
     }

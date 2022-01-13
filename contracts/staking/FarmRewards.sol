@@ -26,10 +26,10 @@ contract FarmRewards is IFarmRewards, ReentrancyGuard, Governable {
     address public override receiver;
 
     /// @notice timestamp that rewards start vesting
-    uint256 constant public override vestingStart = 1638316800; // midnight UTC before December 1, 2021
+    uint256 constant public override VESTING_START = 1638316800; // midnight UTC before December 1, 2021
 
     /// @notice timestamp that rewards finish vesting
-    uint256 constant public override vestingEnd = 1651363200; // midnight UTC before May 1, 2022
+    uint256 constant public override VESTING_END = 1651363200; // midnight UTC before May 1, 2022
 
     uint256 public override solacePerXSolace;
 
@@ -100,11 +100,12 @@ contract FarmRewards is IFarmRewards, ReentrancyGuard, Governable {
      * @return amount The amount of vested [**xSOLACE**](./xSOLACE).
      */
     function purchaseableVestedXSolace(address farmer) public view override returns (uint256 amount) {
+        // solhint-disable-next-line not-rely-on-time
         uint256 timestamp = block.timestamp;
         uint256 totalRewards = farmedRewards[farmer];
-        uint256 totalVestedAmount = (timestamp >= vestingEnd)
+        uint256 totalVestedAmount = (timestamp >= VESTING_END)
             ? totalRewards // fully vested
-            : (totalRewards * (timestamp - vestingStart) / (vestingEnd - vestingStart)); // partially vested
+            : (totalRewards * (timestamp - VESTING_START) / (VESTING_END - VESTING_START)); // partially vested
         amount = totalVestedAmount - redeemedRewards[farmer];
         return amount;
     }

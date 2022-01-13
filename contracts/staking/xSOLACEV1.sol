@@ -16,6 +16,7 @@ import "./../interfaces/staking/IxSOLACEV1.sol";
  *
  * Users can stake their [**SOLACE**](./SOLACE) and receive **xSOLACE**. **xSOLACE** is designed to be a safe up-only contract that allows users to enter or leave at any time. The value of **xSOLACE** relative to [**SOLACE**](./SOLACE) will increase when [**SOLACE**](./SOLACE) is sent to this contract, namely from premiums from coverage polices.
  */
+// solhint-disable-next-line contract-name-camelcase
 contract xSOLACEV1 is IxSOLACEV1, ERC20Permit, ReentrancyGuard, Governable {
     using SafeERC20 for IERC20;
     using Address for address;

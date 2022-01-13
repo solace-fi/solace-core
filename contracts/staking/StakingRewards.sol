@@ -109,7 +109,9 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
     function pendingRewardsOfUser(address user) external view override returns (uint256 reward) {
         // math
         uint256 accRewardPerShare_ = accRewardPerShare;
+        // solhint-disable-next-line not-rely-on-time
         if (block.timestamp > lastRewardTime && valueStaked != 0) {
+            // solhint-disable-next-line not-rely-on-time
             uint256 tokenReward = getRewardAmountDistributed(lastRewardTime, block.timestamp);
             accRewardPerShare_ += tokenReward * Q12 / valueStaked;
         }
@@ -135,7 +137,9 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
         StakedLockInfo storage lockInfo = _lockInfo[xsLockID];
         // math
         uint256 accRewardPerShare_ = accRewardPerShare;
+        // solhint-disable-next-line not-rely-on-time
         if (block.timestamp > lastRewardTime && valueStaked != 0) {
+            // solhint-disable-next-line not-rely-on-time
             uint256 tokenReward = getRewardAmountDistributed(lastRewardTime, block.timestamp);
             accRewardPerShare_ += tokenReward * Q12 / valueStaked;
         }
@@ -171,6 +175,7 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
      * @param oldLock The old lock data.
      * @param newLock The new lock data.
      */
+    // solhint-disable-next-line no-unused-vars
     function registerLockEvent(uint256 xsLockID, address oldOwner, address newOwner, Lock calldata oldLock, Lock calldata newLock) external override nonReentrant {
         update();
         _harvest(xsLockID);
@@ -183,14 +188,18 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
         // emit event regardless if any changes were made
         emit Updated();
         // dont update needlessly
+        // solhint-disable-next-line not-rely-on-time
         if (block.timestamp <= lastRewardTime) return;
         if (valueStaked == 0) {
+            // solhint-disable-next-line not-rely-on-time
             lastRewardTime = Math.min(block.timestamp, endTime);
             return;
         }
         // update math
+        // solhint-disable-next-line not-rely-on-time
         uint256 tokenReward = getRewardAmountDistributed(lastRewardTime, block.timestamp);
         accRewardPerShare += tokenReward * Q12 / valueStaked;
+        // solhint-disable-next-line not-rely-on-time
         lastRewardTime = Math.min(block.timestamp, endTime);
     }
 
@@ -298,8 +307,10 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
      */
     function _calculateLockValue(uint256 amount, uint256 end) internal view returns (uint256 value) {
         uint256 base = amount * UNLOCKED_MULTIPLIER_BPS / MAX_BPS;
+        // solhint-disable-next-line not-rely-on-time
         uint256 bonus = (end <= block.timestamp)
             ? 0 // unlocked
+            // solhint-disable-next-line not-rely-on-time
             : amount * (end - block.timestamp) * (MAX_LOCK_MULTIPLIER_BPS - UNLOCKED_MULTIPLIER_BPS) / (MAX_LOCK_DURATION * MAX_BPS); // locked
         return base + bonus;
     }

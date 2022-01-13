@@ -5,9 +5,17 @@ import "./IxsListener.sol";
 
 
 /**
- * @title
+ * @title Staking Rewards
  * @author solace.fi
- * @notice
+ * @notice Rewards users for staking in [`xsLocker`](./xsLocker).
+ *
+ * Deposits and withdrawls are made to [`xsLocker`](./xsLocker) and rewards come from `StakingRewards`. All three are paid in [**SOLACE**](./SOLACE). `StakingRewards` will be registered as an [`xsListener`](./interfaces/IxsListener). Any time a lock is updated [`registerLockEvent()`](#registerlockevent) will be called and the staking information of that lock will be updated.
+ *
+ * Over the course of `startTime` to `endTime`, the farm distributes `rewardPerSecond` [**SOLACE**](./SOLACE) to all lock holders split relative to the value of their locks. The base value of a lock is its `amount` of [**SOLACE**](./SOLACE). Its multiplier is 2.5x when `end` is 4 years from now, 1x when unlocked, and linearly decreasing between the two. The value of a lock is its base value times its multiplier.
+ *
+ * Note that transferring [**SOLACE**](./SOLACE) to this contract will not give you any rewards. You should deposit your [**SOLACE**](./SOLACE) into [`xsLocker`](./xsLocker) via `createLock()`.
+ *
+ * @dev Lock information is stored in [`xsLocker`](./xsLocker) and mirrored here for bookkeeping and efficiency. Should that information differ, [`xsLocker`](./xsLocker) is the ground truth and this contract will attempt to sync with it.
  */
 interface IStakingRewards is IxsListener {
 

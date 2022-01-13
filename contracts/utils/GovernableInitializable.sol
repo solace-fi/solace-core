@@ -32,6 +32,7 @@ contract GovernableInitializable is IGovernable, Initializable {
      * @notice Initializes the governable contract.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
      */
+    // solhint-disable-next-line func-name-mixedcase
     function __Governable_init(address governance_) internal initializer {
         require(governance_ != address(0x0), "zero address governance");
         _governance = governance_;

@@ -46,6 +46,7 @@ contract Deployer is IDeployer {
      * @return createdContract Created contract address.
      */
     function _deploy(bytes memory initcode, bytes32 salt) internal returns (address payable createdContract) {
+        // solhint-disable-next-line no-inline-assembly
         assembly {
             createdContract := create2(0, add(initcode, 0x20), mload(initcode), salt)
         }

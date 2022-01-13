@@ -248,10 +248,10 @@ describe("BondTellerERC20", function() {
       await teller1.connect(governor).setTerms({startPrice: ONE_ETHER.mul(2), minimumPrice: 0, maxPayout: ONE_ETHER.mul(2), priceAdjNum: 1, priceAdjDenom: 10, capacity: ONE_ETHER.mul(10), capacityIsPayout: false, startTime: 0, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
       expect(await teller1.calculateAmountIn(ONE_ETHER.mul(3).div(2), false)).eq(ONE_ETHER.mul(3));
       expect(await teller1.calculateAmountOut(ONE_ETHER.mul(3), false)).eq(ONE_ETHER.mul(3).div(2));
-      await expect(teller1.connect(depositor1).deposit(ONE_ETHER.mul(3), ONE_ETHER.mul(2), depositor1.address, false)).to.be.revertedWith("slippage protection: insufficient output");
+      await expect(teller1.connect(depositor1).deposit(ONE_ETHER.mul(3), ONE_ETHER.mul(2), depositor1.address, false)).to.be.revertedWith("slippage protection");
       expect(await teller1.calculateAmountIn(ONE_ETHER.mul(3).div(2), true)).eq(ONE_ETHER.mul(3));
       expect(await teller1.calculateAmountOut(ONE_ETHER.mul(3), true)).eq(ONE_ETHER.mul(3).div(2));
-      await expect(teller1.connect(depositor1).deposit(ONE_ETHER.mul(3), ONE_ETHER.mul(2), depositor1.address, true)).to.be.revertedWith("slippage protection: insufficient output");
+      await expect(teller1.connect(depositor1).deposit(ONE_ETHER.mul(3), ONE_ETHER.mul(2), depositor1.address, true)).to.be.revertedWith("slippage protection");
     });
     it("cannot deposit with insufficient bond depo solace", async function () {
       let bal1 = await solace.balanceOf(bondDepo.address);

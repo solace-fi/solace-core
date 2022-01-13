@@ -676,7 +676,7 @@ describe("xsLocker", function () {
     });
     it("cannot take time off", async function () {
       let end = (await xslocker.locks(18)).end;
-      await expect(xslocker.connect(user1).extendLock(18, end.sub(1))).to.be.revertedWith("new end timestamp should be greater than before");
+      await expect(xslocker.connect(user1).extendLock(18, end.sub(1))).to.be.revertedWith("not extended");
     });
     it("can extend lock", async function () {
       let xsLockID = 18;

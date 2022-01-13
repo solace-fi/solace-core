@@ -96,7 +96,9 @@ contract BondTellerErc20 is BondTellerBase, IBondTellerErc20 {
         require(!paused, "cannot deposit while paused");
 
         require(termsSet, "not initialized");
+        // solhint-disable-next-line not-rely-on-time
         require(block.timestamp >= uint256(startTime), "bond not yet started");
+        // solhint-disable-next-line not-rely-on-time
         require(block.timestamp <= uint256(endTime), "bond concluded");
 
         payout = _calculatePayout(amount);
@@ -113,6 +115,7 @@ contract BondTellerErc20 is BondTellerBase, IBondTellerErc20 {
         }
         require(payout <= maxPayout, "bond too large");
 
+        // solhint-disable-next-line not-rely-on-time
         uint256 maturation = vestingTerm + block.timestamp;
         // route principal
         uint256 daoFee = amount * daoFeeBps / MAX_BPS;
@@ -134,7 +137,7 @@ contract BondTellerErc20 is BondTellerBase, IBondTellerErc20 {
         } else {
             payoutToken = address(solace);
         }
-        require(minAmountOut <= payout, "slippage protection: insufficient output");
+        require(minAmountOut <= payout, "slippage protection");
 
         // record bond info
         bondID = ++numBonds;
