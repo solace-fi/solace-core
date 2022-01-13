@@ -38,12 +38,6 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     /// @notice PolicyManager contract
     IPolicyManager internal _policyManager;
 
-    /// @notice Premium pool address to which charged premiums will be sent
-    address internal _premiumPool;
-
-    /// @notice Premium collector who has the exclusive privilege of calling chargePremiums() function
-    address internal _premiumCollector;
-
     /// @notice Cannot buy new policies while paused. (Default is False)
     bool internal _paused;
 
@@ -66,21 +60,6 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
 
     /// @notice Maximum epoch duration over which premiums are charged.
     uint256 internal _chargeCycle;
-
-    /**
-     * @notice The cooldown period
-     * Withdrawing total soteria account balance is a two-step process
-     * i.) Call deactivatePolicy(), which sets cover limit to 0 and begins a cooldown time
-     * ii.) After the cooldown period has been completed, the policy holder can then withdraw funds
-     * @dev We could use uint40 to store time, I thought it easier to just use uint256s in this contract. We're also not packing structs in this contract.
-     */
-    uint256 internal _cooldownPeriod;
-
-    /**
-     * @notice Policy holder address => Timestamp that a depositor's cooldown started
-     * @dev this is set to 0 to reset (default value is 0 in Solidity anyway)
-     */
-    mapping(address => uint256) internal _cooldownStart;
 
     /// @notice The policyholder => Soteria account balance.
     mapping(address => uint256) internal _accountBalanceOf; // Considered _soteriaAccountBalance name
@@ -170,9 +149,6 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         require(_canPurchaseNewCover(0, coverLimit_), "insufficient capacity for new cover");
         require(msg.value + _accountBalanceOf[policyholder_] > _minRequiredAccountBalance(coverLimit_), "insufficient deposit for minimum required account balance");
 
-        // Exit cooldown
-        _exitCooldown(policyholder_);
-        
         // deposit funds
         _deposit(policyholder_, msg.value);
 
@@ -194,23 +170,24 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     }
 
     /**
-     * @notice Updates the cover amount of your policy
-     * @notice If you update the cover limit for your policy, you will exit the cooldown process if you already started it. This means that if you want to withdraw all your funds, you have to redo the 'deactivatePolicy() => withdraw()' process
+     * @notice Updates the cover amount of the policy, either governance or policyholder can do this.
+     * @param policyID_ The policy ID to update.
      * @param newCoverLimit_ The new value to cover in **ETH**.
     */
-    function updateCoverLimit(uint256 newCoverLimit_) external override nonReentrant whileUnpaused {
+    function updateCoverLimit(uint256 policyID_, uint256 newCoverLimit_) external override nonReentrant whileUnpaused {
         require(newCoverLimit_ > 0, "zero cover value");
-        uint256 policyID = _policyOf[msg.sender];
-        require(_exists(policyID), "invalid policy");
-        uint256 currentCoverLimit = coverLimitOf(policyID);
+        require(_exists(policyID_), "invalid policy");
+        address policyOwner = ownerOf(policyID_);
+        require(this.governance() == msg.sender || policyOwner == msg.sender, "not owner or governance");
+        uint256 currentCoverLimit = coverLimitOf(policyID_);
         require(_canPurchaseNewCover(currentCoverLimit, newCoverLimit_), "insufficient capacity for new cover");
-        require(_accountBalanceOf[msg.sender] > _minRequiredAccountBalance(newCoverLimit_), "insufficient deposit for minimum required account balance");
+        require(_accountBalanceOf[policyOwner] > _minRequiredAccountBalance(newCoverLimit_), "insufficient deposit for minimum required account balance");
         
-        _exitCooldown(msg.sender); // Reset cooldown
-        _coverLimitOf[policyID] = newCoverLimit_;
-        _activeCoverLimit = _activeCoverLimit + newCoverLimit_ - currentCoverLimit;
-        _updatePolicyManager(_activeCoverLimit); // Need to change to _updateRiskManager(newActiveCoverLimit)
-        emit PolicyUpdated(policyID);
+        _coverLimitOf[policyID_] = newCoverLimit_;
+        uint256 newActiveCoverLimit = activeCoverLimit() + newCoverLimit_ - currentCoverLimit;
+        _activeCoverLimit = newActiveCoverLimit;
+        _updatePolicyManager(newActiveCoverLimit); // Need to change to _updateRiskManager(newActiveCoverLimit)
+        emit PolicyUpdated(policyID_);
     }
 
     /**
@@ -223,32 +200,37 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
 
     /**
      * @notice Withdraw ETH from Soteria account to user.
-     * @notice If cooldown has not passed, the user can only withdraw down to minRequiredAccountBalance
-     * @notice If cooldown has passed, the user can withdraw any amount
      * @param amount_ Amount policyholder desires to withdraw.
      * User Soteria account must have > minAccountBalance.
      * Otherwise account will be deactivated.
      */
     function withdraw(uint256 amount_) external override nonReentrant whileUnpaused {
-      require(amount_ <= _accountBalanceOf[msg.sender], "cannot withdraw > account balance");      
+      require(amount_ <= _accountBalanceOf[msg.sender], "cannot withdraw this amount");
+      
       uint256 currentCoverLimit = _coverLimitOf[_policyOf[msg.sender]];
 
-      if ( _hasCooldownPassed(msg.sender) ) {
-          require(_accountBalanceOf[msg.sender] - amount_ > _minRequiredAccountBalance(currentCoverLimit), "must have > minRequiredAccountbalance");
+      if (_accountBalanceOf[msg.sender] - amount_ > _minRequiredAccountBalance(currentCoverLimit)) {
           _withdraw(msg.sender, amount_);
       } else {
-          _withdraw(msg.sender, amount_);
+          uint256 accountBalance = _accountBalanceOf[msg.sender];
+          _deactivatePolicy(msg.sender);
+          Address.sendValue(payable(msg.sender), accountBalance);
       }
     }
 
     /**
-     * @notice Deactivate a policy holder's own policy.
-     * Policy holder's cover will be set to 0, and cooldown timer will start
-     * Policy holder must wait out the cooldown, and then he/she will be able to withdraw their entire account balance
+     * @notice Deactivate a user's own policy.
+     * @param policyID_ The policy ID to update.
+     * User will receive their entire Soteria account balance.
      */
-     function deactivatePolicy() public override nonReentrant {
-        require(policyStatus(_policyOf[msg.sender]), "invalid policy");
-        _deactivatePolicy(msg.sender);
+     function deactivatePolicy(uint256 policyID_) public override nonReentrant {
+        require(policyStatus(policyID_), "invalid policy");
+        address policyOwner = ownerOf(policyID_);
+        require(this.governance() == msg.sender || policyOwner == msg.sender, "not owner or governance");
+
+        uint256 refundAmount = accountBalanceOf(policyOwner);
+        _deactivatePolicy(policyOwner);
+        if (refundAmount > 0) Address.sendValue(payable(policyOwner), refundAmount);
     }
 
     /***************************************
@@ -324,22 +306,6 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     }
 
     /**
-     * @notice Returns Premium Pool contract address.
-     * @return premiumPool_ The Premium Pool address.
-    */
-    function premiumPool() external view override returns (address premiumPool_) {
-        return _premiumPool;
-    }
-
-    /**
-     * @notice Returns Premium Collector contract address.
-     * @return premiumCollector_ The Premium Collector address.
-    */
-    function premiumCollector() external view override returns (address premiumCollector_) {
-        return _premiumCollector;
-    }
-
-    /**
      * @notice Returns whether or not product is currently in paused state.
      * @return status True if product is paused.
     */
@@ -396,23 +362,6 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         return _coverLimitOf[policy_];
     }
 
-    /**
-     * @notice The minimum amount of time a user must wait to withdraw funds.
-     * @return cooldownPeriod_ The cooldown period in seconds.
-     */
-    function cooldownPeriod() external view override returns (uint256 cooldownPeriod_) {
-        return _cooldownPeriod;
-    }
-
-    /**
-     * @notice The timestamp that a depositor's cooldown started.
-     * @param policyholder_ The policy holder
-     * @return cooldownStart_ The cooldown period start expressed as Unix timestamp
-     */
-    function cooldownStart(address policyholder_) external view override returns (uint256 cooldownStart_) {
-        return _cooldownStart[policyholder_];
-    }
-
     /***************************************
     GOVERNANCE FUNCTIONS
     ***************************************/
@@ -433,24 +382,6 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     }
 
     /**
-     * @notice Sets the Premium Pool contract address.
-    */
-    function setPremiumPool(address premiumPool_) external override onlyGovernance {
-        require(premiumPool_ != address(0x0), "zero address premium pool");
-        _premiumPool = premiumPool_;
-        emit PremiumPoolSet(premiumPool_);
-    }
-
-    /**
-     * @notice Sets the Premium Collector contract address.
-    */
-    function setPremiumCollector(address premiumCollector_) external override onlyGovernance {
-        require(premiumCollector_ != address(0x0), "zero address premium collector");
-        _premiumCollector = premiumCollector_;
-        emit PremiumCollectorSet(premiumCollector_);
-    }
-
-    /**
      * @notice Pauses or unpauses buying and extending policies.
      * Deactivating policies are unaffected by pause.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
@@ -459,16 +390,6 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     function setPaused(bool paused_) external override onlyGovernance {
         _paused = paused_;
         emit PauseSet(paused_);
-    }
-
-    /**
-     * @notice Sets the cooldown period that a user must wait after deactivating their policy, to withdraw funds from their Soteria account.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param cooldownPeriod_ Cooldown period in seconds.
-     */
-    function setCooldownPeriod(uint256 cooldownPeriod_) external override onlyGovernance {
-        _cooldownPeriod = cooldownPeriod_;
-        emit CooldownPeriodSet(cooldownPeriod_);
     }
 
     /**
@@ -517,12 +438,11 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      * @param holders_ The policy holders.
      * @param premiums_ The premium amounts in `wei` per policy holder.
     */
-    function chargePremiums(address[] calldata holders_, uint256[] calldata premiums_) external payable override whileUnpaused {
+    function chargePremiums(address[] calldata holders_, uint256[] calldata premiums_) external payable override onlyGovernance whileUnpaused {
         uint256 count = holders_.length;
-        require(msg.sender == _premiumCollector, "not premium collector");
         require(count == premiums_.length, "length mismatch");
         require(count <= policyCount(), "policy count exceeded");
-        uint256 amountToPayPremiumPool = 0;
+        uint256 amountToPayTreasury = 0;
 
         for (uint256 i = 0; i < count; i++) {
             // skip computation if policy inactive
@@ -537,7 +457,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
                     _rewardPointsOf[holders_[i]] -= premiums_[i];
                 } else {
                     uint256 amountDeductedFromSoteriaAccount = premiums_[i] - _rewardPointsOf[holders_[i]];
-                    amountToPayPremiumPool += amountDeductedFromSoteriaAccount;
+                    amountToPayTreasury += amountDeductedFromSoteriaAccount;
                     _accountBalanceOf[holders_[i]] -= amountDeductedFromSoteriaAccount;
                     _rewardPointsOf[holders_[i]] = 0;
                 }
@@ -545,14 +465,14 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
                 emit PremiumCharged(holders_[i], premiums_[i]);
             } else {
                 uint256 partialPremium = _accountBalanceOf[holders_[i]] + _rewardPointsOf[holders_[i]];
-                amountToPayPremiumPool += _accountBalanceOf[holders_[i]];
+                amountToPayTreasury += _accountBalanceOf[holders_[i]];
                 _rewardPointsOf[holders_[i]] = 0;
                 _deactivatePolicy(holders_[i]); // Difference between manually calling deactivatePolicy() and having _deactivatePolicy() called here, is that the remaining account balance goes to Treasury here instead of being returned to the user
                 emit PremiumPartiallyCharged(holders_[i], premiums_[i], partialPremium);
             }  
         }
-        // single transfer to the premium pool
-        Address.sendValue(payable(_premiumPool), amountToPayPremiumPool);
+        // transfer premium to the treasury
+        ITreasury(payable(_registry.treasury())).routePremiums{value: amountToPayTreasury}();
     }
 
     /***************************************
@@ -579,8 +499,6 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      * @notice Adds funds to policy holder's balance.
      * @param policyholder The policy holder address.
      * @param amount The amount of fund to deposit.
-     * @dev Explicit decision that _deposit() will not affect, nor be affected by the cooldown mechanic. 
-     * Rationale: _deposit() doesn't affect cover limit, and cooldown mechanic is to protect protocol from manipulated cover limit
     */
     function _deposit(address policyholder, uint256 amount) internal whileUnpaused {
         _accountBalanceOf[policyholder] += amount;
@@ -603,7 +521,6 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      * @param policyholder The address of the policy owner.
     */
     function _deactivatePolicy(address policyholder) internal {
-        _startCooldown(policyholder);
         uint256 policyID = _policyOf[policyholder];
         _activeCoverLimit -= _coverLimitOf[policyID];
         _coverLimitOf[policyID] = 0;
@@ -641,32 +558,5 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         super._beforeTokenTransfer(from, to, tokenId);
         require(from == address(0), "only minting permitted");
         require(balanceOf(to) <= 1, "can only mint one SOPT");
-    }
-
-    /**
-     * @notice Starts the **cooldown** period for the user.
-     */
-    function _startCooldown(address policyholder) internal {
-        _cooldownStart[policyholder] = block.timestamp;
-        emit CooldownStarted(policyholder, _cooldownStart[policyholder]);
-    }
-
-    /**
-     * @notice Abandons the **cooldown** period for the user.
-     * @dev Original name for this function from the deprecated Vault.sol was stopCooldown()
-     * @dev Renamed this to _exitCooldown because "reset" gives the impression that you are starting the cooldown again, and "stop" gives the impression you are stopping the cooldown for it to pick up again later from where you stopped it
-     * @dev I thought "exit" gives the imagery that you are exitting the process, and you will need to restart it manually later (which is more accurate, if user calls updateCoverLimit(), they then need to redo 'deactivatePolicy() => withdraw()' to get their entire funds back)
-     */
-    function _exitCooldown(address policyholder) internal {
-        _cooldownStart[policyholder] = 0;
-        emit CooldownStopped(policyholder);
-    }
-
-    /**
-     * @notice Determine if cooldown has passed for a policy holder
-     * @return True if cooldown has passed, false if not
-     */
-    function _hasCooldownPassed(address policyholder) internal returns (bool) {
-        return block.timestamp >= _cooldownStart[policyholder] + _cooldownPeriod;
     }
 }
