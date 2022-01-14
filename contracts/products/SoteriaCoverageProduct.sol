@@ -34,6 +34,9 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     /// @notice Premium collector who has the exclusive privilege of calling chargePremiums() function
     address internal _premiumCollector;
 
+    /// @notice Cover promotion admin who has the exclusive privilege of calling setRewardPoints() function
+    address internal _coverPromotionAdmin;
+
     /// @notice Cannot buy new policies while paused. (Default is False)
     bool internal _paused;
 
@@ -44,10 +47,12 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     /// @notice The total policy count.
     uint256 internal _totalPolicyCount;
 
-    /// @notice The maximum rate charged per second per wei of coverLimit.
-    /// @dev Because Solidity cannot store fractions in a single variable, need two variables: one for numerator and one for divisor
-    /// @dev We also need to be careful to perform multiplication before division, as Solidity rounds down to 0
-    /// @dev For testing assume _maxRate reflects 10% of coverLimit annually = 1/315360000
+    /**
+     * @notice The maximum rate charged per second per wei of coverLimit.
+     * @dev Because Solidity cannot store fractions in a single variable, need two variables: one for numerator and one for divisor
+     * @dev We also need to be careful to perform multiplication before division, as Solidity rounds down to 0
+     * @dev For testing assume _maxRate reflects 10% of coverLimit annually = 1/315360000
+     */
     uint256 internal _maxRateNum;
     uint256 internal _maxRateDenom;
 
@@ -62,6 +67,12 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      * @dev We could use uint40 to store time, I thought it easier to just use uint256s in this contract. We're also not packing structs in this contract.
      */
     uint256 internal _cooldownPeriod;
+
+    /**
+     * @notice Percentage of cover limit purchased, that will be rewarded for using a referral code
+     * @dev In units of bps, or out of 10,000 parts. Default is 5% or _referralRewardPercentage = 500.
+     */
+    uint256 internal _referralRewardPercentage;
 
     /**
      * @notice Policy holder address => Timestamp that a depositor's cooldown started
@@ -84,6 +95,9 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
 
     /// @notice The policy holder => reward points. Having a reward points mechanism enables `free` cover gifts and discounts for referrals.
     mapping (address => uint256) internal _rewardPointsOf;
+
+    /// @notice PolicyID => Has referral code been used for this policyID?
+    mapping (uint256 => bool) internal _isReferralCodeUsed;
 
     /***************************************
     MODIFIERS
@@ -139,9 +153,10 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      * @notice Activates policy on the behalf of the policyholder.
      * @param policyholder_ Holder of the position to cover.
      * @param coverLimit_ The value to cover in **ETH**.
+     * @param referralCode_ Referral code
      * @return policyID The ID of newly created policy.
     */
-    function activatePolicy(address policyholder_, uint256 coverLimit_) external payable override whileUnpaused returns (uint256 policyID) {
+    function activatePolicy(address policyholder_, uint256 coverLimit_, uint256 referralCode_) external payable override whileUnpaused returns (uint256 policyID) {
         require(policyholder_ != address(0x0), "zero address policyholder");
         require(coverLimit_ > 0, "zero cover value");
         
@@ -318,6 +333,14 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     }
 
     /**
+     * @notice Returns Cover promotion admin address
+     * @return coverPromotionAdmin_ The Cover promotion admin address.
+    */
+    function coverPromotionAdmin() external view override returns (address coverPromotionAdmin_) {
+        return _coverPromotionAdmin;
+    }
+
+    /**
      * @notice Returns whether or not product is currently in paused state.
      * @return status True if product is paused.
     */
@@ -391,6 +414,15 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         return _cooldownStart[policyholder_];
     }
 
+    /**
+     * @notice Gets the unique referral code for a user.
+     * @param user_ The user.
+     * @return referralCode_ The referral code.
+     */
+    function getReferralCode(address user_) external view override returns (uint256 referralCode_) {
+        return _getReferralCode(user_);
+    }
+
     /***************************************
     GOVERNANCE FUNCTIONS
     ***************************************/
@@ -423,6 +455,15 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         require(premiumCollector_ != address(0x0), "zero address premium collector");
         _premiumCollector = premiumCollector_;
         emit PremiumCollectorSet(premiumCollector_);
+    }
+
+    /**
+     * @notice Sets the Cover promotion admin contract address.
+    */
+    function setCoverPromotionAdmin(address coverPromotionAdmin_) external override onlyGovernance {
+        require(coverPromotionAdmin_ != address(0x0), "zero address cover promotion admin");
+        _coverPromotionAdmin = coverPromotionAdmin_;
+        emit CoverPromotionAdminSet(coverPromotionAdmin_);
     }
 
     /**
@@ -477,12 +518,28 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     }
 
     /**
-     * @notice Enables governance to gift (and remove) 'free' cover to specific addresses.
+     * @notice set _referralRewardPercentage
      * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param referralRewardPercentage_ Desired referralRewardPercentage.
+    */
+    function setReferralRewardPercentage(uint256 referralRewardPercentage_) external override onlyGovernance {
+        require(referralRewardPercentage_ <= 10000, "cannot set over 100%");
+        _referralRewardPercentage = referralRewardPercentage_;
+        emit ReferralRewardPercentageSet(referralRewardPercentage_);
+    }
+
+    /***************************************
+    COVER PROMOTION ADMIN FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Enables cover promotion admin to gift (and remove) 'free' cover to specific addresses.
+     * Can only be called by the current cover promotion admin.
      * @param policyholder_ The policy holder to set reward points for.
      * @param rewardPoints_ Desired amount of reward points.
     */
-    function setRewardPoints(address policyholder_, uint256 rewardPoints_) external override onlyGovernance {
+    function setRewardPoints(address policyholder_, uint256 rewardPoints_) external override {
+        require(msg.sender == _coverPromotionAdmin, "not cover promotion admin");
         _rewardPointsOf[policyholder_] = rewardPoints_;
         emit RewardPointsSet(policyholder_, rewardPoints_);
     }  
@@ -642,5 +699,35 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     function _hasCooldownPassed(address policyholder) internal returns (bool) {
         if (_cooldownStart[policyholder] == 0) {return false;}
         else {return block.timestamp >= _cooldownStart[policyholder] + _cooldownPeriod;}
+    }
+
+    /**
+     * @notice Gets the unique referral code for a user.
+     * @param user_ The user.
+     * @return referralCode_ The referral code.
+     */
+    function _getReferralCode(address user_) internal view returns (uint256 referralCode_) {
+        return uint256(uint160(user_));
+    }
+
+    /**
+     * @notice Internal function to process referral code
+     * @param policyholder_ Policy holder
+     * @param coverLimit_ Cover limit
+     * @param referralCode_ Referral code
+     */
+    function _processReferralCode(address policyholder_, uint256 coverLimit_, uint256 referralCode_) internal {
+        address referrer = address(uint160(referralCode_));
+        require(referrer != address(0), "cannot have zero address referrer");
+        require(referrer != policyholder_, "cannot refer to self");
+        require (!_isReferralCodeUsed[_policyOf[policyholder_]], "cannot use referral code again");
+        
+        uint256 rewardPointsEarned = (coverLimit_ * _referralRewardPercentage) / 10000;
+        _isReferralCodeUsed[_policyOf[policyholder_]] = true;
+        _rewardPointsOf[policyholder_] += rewardPointsEarned;
+        _rewardPointsOf[referrer] += rewardPointsEarned;
+
+        emit ReferralRewardsEarned(policyholder_, rewardPointsEarned);
+        emit ReferralRewardsEarned(referrer, rewardPointsEarned);
     }
 }

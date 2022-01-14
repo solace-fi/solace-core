@@ -25,6 +25,9 @@ interface ISoteriaCoverageProduct {
     /// @notice Emitted when Premium Collector address is updated.
     event PremiumCollectorSet(address premiumCollector);
 
+    /// @notice Emitted when Cover promotion admin address is updated.
+    event CoverPromotionAdminSet(address coverPromotionAdmin);
+
     /// @notice Emitted when pause is set.
     event PauseSet(bool pause);
 
@@ -64,6 +67,12 @@ interface ISoteriaCoverageProduct {
     /// @notice Emitted when reward points are set.
     event RewardPointsSet(address policyholder, uint256 amountGifted);
 
+    /// @notice Emitted when referralRewardPercentage is set.
+    event ReferralRewardPercentageSet(uint256 referralRewardPercentage);
+
+    /// @notice Emitted when referral rewards are earned;
+    event ReferralRewardsEarned(address rewardEarner, uint256 rewardPointsEarned);
+
     /***************************************
     POLICY FUNCTIONS
     ***************************************/
@@ -72,9 +81,10 @@ interface ISoteriaCoverageProduct {
      * @notice Activates policy on the behalf of the policyholder.
      * @param policyholder_ Holder of the position to cover.
      * @param coverLimit_ The value to cover in **ETH**.
+     * @param referralCode_ Referral code
      * @return policyID The ID of newly created policy.
     */
-    function activatePolicy(address policyholder_, uint256 coverLimit_) external payable returns (uint256 policyID);
+    function activatePolicy(address policyholder_, uint256 coverLimit_, uint256 referralCode_) external payable returns (uint256 policyID);
 
     /**
      * @notice Deposits funds for policy holders.
@@ -169,6 +179,12 @@ interface ISoteriaCoverageProduct {
     function premiumCollector() external view returns (address premiumCollector_);
 
     /**
+     * @notice Returns Cover promotion admin address
+     * @return coverPromotionAdmin_ The Cover promotion admin address.
+    */
+    function coverPromotionAdmin() external view returns (address coverPromotionAdmin_);
+
+    /**
      * @notice Returns whether or not product is currently in paused state.
      * @return status True if product is paused.
     */
@@ -223,6 +239,13 @@ interface ISoteriaCoverageProduct {
      */
     function cooldownStart(address policyholder_) external view returns (uint256 cooldownStart_);
 
+    /**
+     * @notice Gets the unique referral code for a user.
+     * @param user_ The user.
+     * @return referralCode_ The referral code.
+     */
+    function getReferralCode(address user_) external view returns (uint256 referralCode_);
+
     /***************************************
     GOVERNANCE FUNCTIONS
     ***************************************/
@@ -243,6 +266,11 @@ interface ISoteriaCoverageProduct {
      * @notice Sets the Premium Collector contract address.
     */
     function setPremiumCollector(address premiumCollector_) external;
+
+    /**
+     * @notice Sets the Cover promotion admin contract address.
+    */
+    function setCoverPromotionAdmin(address coverPromotionAdmin_) external;
 
     /**
      * @notice Pauses or unpauses buying and extending policies.
@@ -281,8 +309,19 @@ interface ISoteriaCoverageProduct {
     function setChargeCycle(uint256 chargeCycle_) external;
 
     /**
-     * @notice Enables governance to gift (and remove) 'free' cover to specific addresses.
+     * @notice set _referralRewardPercentage
      * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param referralRewardPercentage_ Desired referralRewardPercentage.
+    */
+    function setReferralRewardPercentage(uint256 referralRewardPercentage_) external;
+
+    /***************************************
+    COVER PROMOTION ADMIN FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Enables cover promotion admin to gift (and remove) 'free' cover to specific addresses.
+     * Can only be called by the current cover promotion admin.
      * @param policyholder_ The policy holder to set reward points for.
      * @param rewardPoints_ Desired amount of reward points.
     */
