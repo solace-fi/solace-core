@@ -16,7 +16,7 @@ interface IxSolaceMigrator {
     /// @notice Address of the [**SOLACE**](./../../SOLACE) contract.
     function solace() external view returns (address);
     /// @notice Address of the V1 [**xSOLACE**](./../../staking/xSOLACEV1) contract.
-    function xsolace_v1() external view returns (address);
+    function xsolacev1() external view returns (address);
     /// @notice Address of the [**xsLocker**](./../../staking/xsLocker) contract.
     function xsLocker() external view returns (address);
 

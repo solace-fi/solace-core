@@ -25,23 +25,21 @@ contract xSolaceMigrator is IxSolaceMigrator, ReentrancyGuard {
     /// @notice Address of the [**SOLACE**](./../SOLACE) contract.
     address public override solace;
     /// @notice Address of the [**xSOLACEV1**](./xSOLACEV1) contract.
-    // solhint-disable-next-line var-name-mixedcase
-    address public override xsolace_v1;
+    address public override xsolacev1;
     /// @notice Address of the [**xsLocker**](./xsLocker) contract.
     address public override xsLocker;
 
     /**
      * @notice Constructs the xSolaceMigrator contract.
      * @param solace_ Address of the [**SOLACE**](./../SOLACE) contract.
-     * @param xsolace_v1_ Address of the [**xSOLACEV1**](./xSOLACEV1) contract.
+     * @param xsolacev1_ Address of the [**xSOLACEV1**](./xSOLACEV1) contract.
      * @param xsLocker_ Address of the [**xsLocker**](./xsLocker) contract.
      */
-    // solhint-disable-next-line var-name-mixedcase
-    constructor(address solace_, address xsolace_v1_, address xsLocker_) {
+    constructor(address solace_, address xsolacev1_, address xsLocker_) {
         require(solace_ != address(0x0), "zero address solace");
         solace = solace_;
-        require(xsolace_v1_ != address(0x0), "zero address xsolace v1");
-        xsolace_v1 = xsolace_v1_;
+        require(xsolacev1_ != address(0x0), "zero address xsolace v1");
+        xsolacev1 = xsolacev1_;
         require(xsLocker_ != address(0x0), "zero address xslocker");
         xsLocker = xsLocker_;
         IERC20(solace_).approve(xsLocker_, type(uint256).max);
@@ -58,7 +56,7 @@ contract xSolaceMigrator is IxSolaceMigrator, ReentrancyGuard {
      */
     function migrate(uint256 amount, uint256 lockEnd) external override nonReentrant {
         // pull xsolace
-        SafeERC20.safeTransferFrom(IERC20(xsolace_v1), msg.sender, address(this), amount);
+        SafeERC20.safeTransferFrom(IERC20(xsolacev1), msg.sender, address(this), amount);
         // accounting
         return _migrate(msg.sender, amount, lockEnd);
     }
@@ -74,9 +72,9 @@ contract xSolaceMigrator is IxSolaceMigrator, ReentrancyGuard {
      */
     function migrateSigned(uint256 amount, uint256 lockEnd, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external override nonReentrant {
         // permit
-        IERC20Permit(xsolace_v1).permit(msg.sender, address(this), amount, deadline, v, r, s);
+        IERC20Permit(xsolacev1).permit(msg.sender, address(this), amount, deadline, v, r, s);
         // pull xsolace
-        SafeERC20.safeTransferFrom(IERC20(xsolace_v1), msg.sender, address(this), amount);
+        SafeERC20.safeTransferFrom(IERC20(xsolacev1), msg.sender, address(this), amount);
         // accounting
         _migrate(msg.sender, amount, lockEnd);
     }
@@ -92,7 +90,7 @@ contract xSolaceMigrator is IxSolaceMigrator, ReentrancyGuard {
      * @param lockEnd The timestamp that the lock will unlock.
      */
     function _migrate(address depositor, uint256 amount, uint256 lockEnd) internal {
-        IxSOLACEV1 xsolace = IxSOLACEV1(xsolace_v1);
+        IxSOLACEV1 xsolace = IxSOLACEV1(xsolacev1);
         uint256 amountSolace = xsolace.unstake(amount);
         IxsLocker locker = IxsLocker(xsLocker);
         locker.createLock(depositor, amountSolace, lockEnd);

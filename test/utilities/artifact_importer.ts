@@ -26,6 +26,7 @@ export async function import_artifacts() {
   artifacts.StakingRewards = await tryImport(`${artifact_dir}/staking/StakingRewards.sol/StakingRewards.json`);
   artifacts.xSolaceMigrator = await tryImport(`${artifact_dir}/staking/xSolaceMigrator.sol/xSolaceMigrator.json`);
   artifacts.FarmRewards = await tryImport(`${artifact_dir}/staking/FarmRewards.sol/FarmRewards.json`);
+  artifacts.FarmRewardsV2 = await tryImport(`${artifact_dir}/staking/FarmRewardsV2.sol/FarmRewardsV2.json`);
   // bonds
   artifacts.BondDepository = await tryImport(`${artifact_dir}/bonds/BondDepository.sol/BondDepository.json`);
   artifacts.BondTellerETH = await tryImport(`${artifact_dir}/bonds/BondTellerEth.sol/BondTellerEth.json`);

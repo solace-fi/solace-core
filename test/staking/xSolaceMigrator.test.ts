@@ -64,7 +64,7 @@ describe("xSolaceMigrator", function () {
     });
     it("initializes properly", async function () {
       expect(await migrator.solace()).eq(solace.address);
-      expect(await migrator.xsolace_v1()).eq(xsolace.address);
+      expect(await migrator.xsolacev1()).eq(xsolace.address);
       expect(await migrator.xsLocker()).eq(xslocker.address);
     });
   });
