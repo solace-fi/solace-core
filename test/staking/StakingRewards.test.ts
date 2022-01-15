@@ -9,7 +9,7 @@ chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./../utilities/artifact_importer";
 import { Solace, XsLocker, StakingRewards } from "./../../typechain";
-import { bnMulDiv, expectClose } from "./../utilities/math";
+import { bnAddSub, bnMulDiv, expectClose } from "./../utilities/math";
 
 // contracts
 let solace: Solace;
@@ -22,7 +22,7 @@ const ONE_ETHER = BN.from("1000000000000000000");
 const ONE_YEAR = 31536000; // in seconds
 const ONE_WEEK = 604800; // in seconds
 const Q12 = BN.from(10).pow(12);
-const PRECISION = BN.from(10).pow(12);
+const PRECISION = BN.from(10).pow(13);
 const REWARD_DEBT_PRECISION = BN.from(10).pow(30);
 
 const MAX_LOCK_DURATION = 126144000; // 60*60*24*365*4 = 4 years in seconds
@@ -62,19 +62,16 @@ describe("StakingRewards", function () {
       endTime = block.timestamp + 200;
     });
     it("reverts if zero governance", async function () {
-      await expect(deployContract(deployer, artifacts.StakingRewards, [ZERO_ADDRESS, solace.address, xslocker.address, startTime, endTime, solacePerSecond])).to.be.revertedWith("zero address governance");
+      await expect(deployContract(deployer, artifacts.StakingRewards, [ZERO_ADDRESS, solace.address, xslocker.address, solacePerSecond])).to.be.revertedWith("zero address governance");
     });
     it("reverts if zero solace", async function () {
-      await expect(deployContract(deployer, artifacts.StakingRewards, [governor.address, ZERO_ADDRESS, xslocker.address, startTime, endTime, solacePerSecond])).to.be.revertedWith("zero address solace");
+      await expect(deployContract(deployer, artifacts.StakingRewards, [governor.address, ZERO_ADDRESS, xslocker.address, solacePerSecond])).to.be.revertedWith("zero address solace");
     });
     it("reverts if zero xslocker", async function () {
-      await expect(deployContract(deployer, artifacts.StakingRewards, [governor.address, solace.address, ZERO_ADDRESS, startTime, endTime, solacePerSecond])).to.be.revertedWith("zero address xslocker");
-    });
-    it("reverts if invalid times", async function () {
-      await expect(deployContract(deployer, artifacts.StakingRewards, [governor.address, solace.address, xslocker.address, 3, 2, solacePerSecond])).to.be.revertedWith("invalid window");
+      await expect(deployContract(deployer, artifacts.StakingRewards, [governor.address, solace.address, ZERO_ADDRESS, solacePerSecond])).to.be.revertedWith("zero address xslocker");
     });
     it("deploys", async function () {
-      stakingRewards = (await deployContract(deployer, artifacts.StakingRewards, [governor.address, solace.address, xslocker.address, startTime, endTime, solacePerSecond])) as StakingRewards;
+      stakingRewards = (await deployContract(deployer, artifacts.StakingRewards, [governor.address, solace.address, xslocker.address, solacePerSecond])) as StakingRewards;
     });
     it("initializes properly", async function () {
       expect(await stakingRewards.MAX_LOCK_DURATION()).eq(MAX_LOCK_DURATION);
@@ -83,8 +80,8 @@ describe("StakingRewards", function () {
       expect(await stakingRewards.solace()).eq(solace.address);
       expect(await stakingRewards.xsLocker()).eq(xslocker.address);
       expect(await stakingRewards.rewardPerSecond()).eq(solacePerSecond);
-      expect(await stakingRewards.startTime()).eq(startTime);
-      expect(await stakingRewards.endTime()).eq(endTime);
+      expect(await stakingRewards.startTime()).eq(0);
+      expect(await stakingRewards.endTime()).eq(0);
       expect(await stakingRewards.lastRewardTime()).eq(0);
       expect(await stakingRewards.accRewardPerShare()).eq(0);
       expect(await stakingRewards.valueStaked()).eq(0);
@@ -94,7 +91,6 @@ describe("StakingRewards", function () {
       expect(lockInfo.rewardDebt).eq(0);
       expect(lockInfo.unpaidRewards).eq(0);
       expect(lockInfo.owner).eq(ZERO_ADDRESS);
-      expect(await stakingRewards.pendingRewardsOfUser(user1.address)).eq(0);
       expect(await stakingRewards.pendingRewardsOfLock(0)).eq(0);
     });
   });
@@ -106,7 +102,8 @@ describe("StakingRewards", function () {
       let block = await provider.getBlock('latest');
       startTime = block.timestamp;
       endTime = block.timestamp + 200;
-      stakingRewards = (await deployContract(deployer, artifacts.StakingRewards, [governor.address, solace.address, xslocker.address, startTime, endTime, solacePerSecond])) as StakingRewards;
+      stakingRewards = (await deployContract(deployer, artifacts.StakingRewards, [governor.address, solace.address, xslocker.address, solacePerSecond])) as StakingRewards;
+      await stakingRewards.connect(governor).setTimes(startTime, endTime);
       await solace.connect(governor).mint(stakingRewards.address, ONE_ETHER.mul(1000000));
     });
     it("does not hear updates when not registered", async function () {
@@ -210,34 +207,111 @@ describe("StakingRewards", function () {
     });
   });
 
+  describe("rewards outside start and end", function () {
+    let startTime: number;
+    let endTime: number;
+    before(async function () {
+      xslocker = (await deployContract(deployer, artifacts.xsLocker, [governor.address, solace.address])) as unknown as XsLocker;
+      await solace.connect(user1).approve(xslocker.address, constants.MaxUint256);
+      await solace.connect(user2).approve(xslocker.address, constants.MaxUint256);
+      await solace.connect(user3).approve(xslocker.address, constants.MaxUint256);
+      stakingRewards = (await deployContract(deployer, artifacts.StakingRewards, [governor.address, solace.address, xslocker.address, solacePerSecond])) as StakingRewards;
+      await solace.connect(governor).mint(stakingRewards.address, ONE_ETHER.mul(1000000000));
+      await xslocker.connect(governor).addXsLockListener(stakingRewards.address);
+      await solace.connect(user1).approve(xslocker.address, ONE_ETHER);
+      await xslocker.connect(user1).createLock(user1.address, ONE_ETHER, 0);
+      let block = await provider.getBlock('latest');
+      await provider.send("evm_setNextBlockTimestamp", [block.timestamp + 20]);
+      await provider.send("evm_mine", []);
+    });
+    it("no times set", async function () {
+      expect(await stakingRewards.pendingRewardsOfLock(0)).eq(0);
+      expect(await stakingRewards.getRewardAmountDistributed(0, 0)).eq(0);
+      let balances2 = await getBalances();
+      await stakingRewards.connect(user1).harvestLock(1);
+      let balances3 = await getBalances();
+      expect(balances2).deep.eq(balances3);
+      await stakingRewards.connect(user1).harvestLocks([1,2,3]);
+      let balances4 = await getBalances();
+      expect(balances2).deep.eq(balances4);
+    });
+    it("times set", async function () {
+      let block = await provider.getBlock('latest');
+      startTime = block.timestamp + 5;
+      endTime = block.timestamp + 20;
+      await stakingRewards.connect(governor).setTimes(startTime, endTime);
+      expect(await stakingRewards.pendingRewardsOfLock(1)).eq(0);
+      expect(await stakingRewards.getRewardAmountDistributed(0, startTime)).eq(0);
+      expect(await stakingRewards.getRewardAmountDistributed(startTime, endTime)).eq(solacePerSecond.mul(15));
+      let balances1 = await getBalances();
+      await provider.send("evm_setNextBlockTimestamp", [block.timestamp + 10]);
+      await provider.send("evm_mine", []);
+      await checkConsistency();
+      expectClose(await stakingRewards.pendingRewardsOfLock(1), solacePerSecond.mul(5), PRECISION);
+      await stakingRewards.connect(user1).harvestLock(1);
+      let balances2 = await getBalances();
+      let balances12 = getBalancesDiff(balances2, balances1);
+      expectClose(balances12.user1Solace, solacePerSecond.mul(6), PRECISION);
+      expect(await stakingRewards.pendingRewardsOfLock(1)).eq(0);
+    });
+    it("time extended", async function () {
+      endTime += 30;
+      await stakingRewards.connect(governor).setTimes(startTime, endTime);
+      expect(await stakingRewards.getRewardAmountDistributed(startTime, endTime)).eq(solacePerSecond.mul(45));
+      let balances1 = await getBalances();
+      await provider.send("evm_setNextBlockTimestamp", [endTime - 10]);
+      await provider.send("evm_mine", []);
+      await checkConsistency();
+      expectClose(await stakingRewards.pendingRewardsOfLock(1), solacePerSecond.mul(29), PRECISION);
+      await stakingRewards.connect(user1).harvestLock(1);
+      let balances2 = await getBalances();
+      let balances12 = getBalancesDiff(balances2, balances1);
+      expectClose(balances12.user1Solace, solacePerSecond.mul(30), PRECISION);
+      expect(await stakingRewards.pendingRewardsOfLock(1)).eq(0);
+    });
+    it("after end time", async function () {
+      await provider.send("evm_setNextBlockTimestamp", [endTime + 10]);
+      await provider.send("evm_mine", []);
+      expectClose(await stakingRewards.pendingRewardsOfLock(1), solacePerSecond.mul(9), PRECISION);
+      await checkConsistency();
+      let balances1 = await getBalances();
+      await stakingRewards.connect(user1).harvestLock(1);
+      let balances2 = await getBalances();
+      let balances12 = getBalancesDiff(balances2, balances1);
+      expectClose(balances12.user1Solace, solacePerSecond.mul(9), PRECISION);
+      expect(await stakingRewards.pendingRewardsOfLock(1)).eq(0);
+    });
+    after(async function () {
+      await xslocker.connect(governor).removeXsLockListener(stakingRewards.address);
+    });
+  });
+
   describe("rewards before start no locks", function () {
     let startTime: number;
     let endTime: number;
     before(async function () {
+      xslocker = (await deployContract(deployer, artifacts.xsLocker, [governor.address, solace.address])) as unknown as XsLocker;
       let block = await provider.getBlock('latest');
       startTime = block.timestamp + 100;
       endTime = block.timestamp + 200;
-      stakingRewards = (await deployContract(deployer, artifacts.StakingRewards, [governor.address, solace.address, xslocker.address, startTime, endTime, solacePerSecond])) as StakingRewards;
+      stakingRewards = (await deployContract(deployer, artifacts.StakingRewards, [governor.address, solace.address, xslocker.address, solacePerSecond])) as StakingRewards;
+      await stakingRewards.connect(governor).setTimes(startTime, endTime);
       await xslocker.connect(governor).addXsLockListener(stakingRewards.address);
     });
     it("pending rewards are zero", async function () {
       expect(await stakingRewards.pendingRewardsOfLock(0)).eq(0);
-      expect(await stakingRewards.pendingRewardsOfUser(user1.address)).eq(0);
     });
     it("rewards distributed is zero", async function () {
       expect(await stakingRewards.getRewardAmountDistributed(0, startTime)).eq(0);
     });
     it("harvest does nothing", async function () {
-      let balances1 = await getBalances();
-      await stakingRewards.connect(user1).harvestUser(user1.address);
       let balances2 = await getBalances();
-      expect(balances1).deep.eq(balances2);
       await stakingRewards.connect(user1).harvestLock(1);
       let balances3 = await getBalances();
-      expect(balances1).deep.eq(balances3);
+      expect(balances2).deep.eq(balances3);
       await stakingRewards.connect(user1).harvestLocks([1,2,3]);
       let balances4 = await getBalances();
-      expect(balances1).deep.eq(balances4);
+      expect(balances2).deep.eq(balances4);
     });
     after(async function () {
       await xslocker.connect(governor).removeXsLockListener(stakingRewards.address);
@@ -249,10 +323,16 @@ describe("StakingRewards", function () {
     let endTime: number;
     let numLocks: BN;
     before(async function () {
+      xslocker = (await deployContract(deployer, artifacts.xsLocker, [governor.address, solace.address])) as unknown as XsLocker;
+      await solace.connect(user1).approve(xslocker.address, constants.MaxUint256);
+      await solace.connect(user2).approve(xslocker.address, constants.MaxUint256);
+      await solace.connect(user3).approve(xslocker.address, constants.MaxUint256);
       let block = await provider.getBlock('latest');
       startTime = block.timestamp + 100;
       endTime = block.timestamp + 200;
-      stakingRewards = (await deployContract(deployer, artifacts.StakingRewards, [governor.address, solace.address, xslocker.address, startTime, endTime, solacePerSecond])) as StakingRewards;
+      stakingRewards = (await deployContract(deployer, artifacts.StakingRewards, [governor.address, solace.address, xslocker.address, solacePerSecond])) as StakingRewards;
+      await solace.connect(governor).mint(stakingRewards.address, ONE_ETHER.mul(1000000000));
+      await stakingRewards.connect(governor).setTimes(startTime, endTime);
       await xslocker.connect(governor).addXsLockListener(stakingRewards.address);
       numLocks = await xslocker.totalNumLocks();
       await xslocker.connect(user1).createLock(user1.address, 1, 0);
@@ -261,22 +341,18 @@ describe("StakingRewards", function () {
     it("pending rewards are zero", async function () {
       expect(await stakingRewards.pendingRewardsOfLock(numLocks.add(1))).eq(0);
       expect(await stakingRewards.pendingRewardsOfLock(numLocks.add(2))).eq(0);
-      expect(await stakingRewards.pendingRewardsOfUser(user1.address)).eq(0);
     });
     it("rewards distributed is zero", async function () {
       expect(await stakingRewards.getRewardAmountDistributed(0, startTime)).eq(0);
     });
     it("harvest does nothing", async function () {
-      let balances1 = await getBalances();
-      await stakingRewards.connect(user1).harvestUser(user1.address);
       let balances2 = await getBalances();
-      expect(balances1).deep.eq(balances2);
       await stakingRewards.connect(user1).harvestLock(numLocks.add(1));
       let balances3 = await getBalances();
-      expect(balances1).deep.eq(balances3);
+      expect(balances2).deep.eq(balances3);
       await stakingRewards.connect(user1).harvestLocks([numLocks.add(1), numLocks.add(2), 999]);
       let balances4 = await getBalances();
-      expect(balances1).deep.eq(balances4);
+      expect(balances2).deep.eq(balances4);
     });
     after(async function () {
       await xslocker.connect(governor).removeXsLockListener(stakingRewards.address);
@@ -294,7 +370,8 @@ describe("StakingRewards", function () {
       await solace.connect(user1).approve(xslocker.address, constants.MaxUint256);
       await solace.connect(user2).approve(xslocker.address, constants.MaxUint256);
       await solace.connect(user3).approve(xslocker.address, constants.MaxUint256);
-      stakingRewards = (await deployContract(deployer, artifacts.StakingRewards, [governor.address, solace.address, xslocker.address, startTime, endTime, solacePerSecond])) as StakingRewards;
+      stakingRewards = (await deployContract(deployer, artifacts.StakingRewards, [governor.address, solace.address, xslocker.address, solacePerSecond])) as StakingRewards;
+      await stakingRewards.connect(governor).setTimes(startTime, endTime);
       await xslocker.connect(governor).addXsLockListener(stakingRewards.address);
       await xslocker.connect(user1).createLock(user1.address, ONE_ETHER, 0); // xsLockID 1 value 1
       await xslocker.connect(user1).createLock(user1.address, ONE_ETHER.mul(2), block.timestamp+ONE_YEAR*4); // xsLockID 2 value 5
@@ -327,7 +404,7 @@ describe("StakingRewards", function () {
       expectClose(balances23.user1Solace, bnMulDiv([solacePerSecond, 1, 30], [9]), PRECISION);
       // 50 blocks
       await provider.send("evm_setNextBlockTimestamp", [startTime + 50]);
-      await stakingRewards.connect(user3).harvestUser(user1.address);
+      await stakingRewards.connect(user3).harvestLocks([1,2]);
       await checkConsistency();
       expect(await stakingRewards.pendingRewardsOfLock(1)).eq(0);
       expect(await stakingRewards.pendingRewardsOfLock(2)).eq(0);
@@ -346,7 +423,7 @@ describe("StakingRewards", function () {
       }
     });
     it("after end", async function () {
-      await stakingRewards.connect(user3).harvestUser(user1.address);
+      await stakingRewards.connect(user3).harvestLocks([1,2]);
       await stakingRewards.connect(user3).harvestLock(3);
       expect(await stakingRewards.pendingRewardsOfLock(1)).eq(0);
       expect(await stakingRewards.pendingRewardsOfLock(2)).eq(0);
@@ -375,7 +452,8 @@ describe("StakingRewards", function () {
       await solace.connect(user1).approve(xslocker.address, constants.MaxUint256);
       await solace.connect(user2).approve(xslocker.address, constants.MaxUint256);
       await solace.connect(user3).approve(xslocker.address, constants.MaxUint256);
-      stakingRewards = (await deployContract(deployer, artifacts.StakingRewards, [governor.address, solace.address, xslocker.address, startTime, endTime, solacePerSecond])) as StakingRewards;
+      stakingRewards = (await deployContract(deployer, artifacts.StakingRewards, [governor.address, solace.address, xslocker.address, solacePerSecond])) as StakingRewards;
+      await stakingRewards.connect(governor).setTimes(startTime, endTime);
       await xslocker.connect(governor).addXsLockListener(stakingRewards.address);
       await xslocker.connect(user1).createLock(user1.address, ONE_ETHER, 0); // xsLockID 1 value 1
       await xslocker.connect(user1).createLock(user1.address, ONE_ETHER.mul(2), block.timestamp+ONE_YEAR*4); // xsLockID 2 value 5
@@ -406,7 +484,7 @@ describe("StakingRewards", function () {
       expect(balances2).deep.eq(balances3);
       // 50 blocks
       await provider.send("evm_setNextBlockTimestamp", [startTime + 50]);
-      await stakingRewards.connect(user3).harvestUser(user1.address);
+      await stakingRewards.connect(user3).harvestLocks([1,2]);
       await checkConsistency();
       expectClose(await stakingRewards.pendingRewardsOfLock(1), bnMulDiv([solacePerSecond, 1, 50], [9]), PRECISION);
       expectClose(await stakingRewards.pendingRewardsOfLock(2), bnMulDiv([solacePerSecond, 5, 50], [9]), PRECISION);
@@ -423,34 +501,23 @@ describe("StakingRewards", function () {
       }
     });
     it("after end", async function () {
-      await stakingRewards.connect(user3).harvestUser(user1.address);
+      await stakingRewards.connect(user3).harvestLocks([1,2]);
       await stakingRewards.connect(user3).harvestLock(3);
       await checkConsistency();
-      let pru1 = await stakingRewards.pendingRewardsOfUser(user1.address);
-      let pru2 = await stakingRewards.pendingRewardsOfUser(user2.address);
       let prl1 = await stakingRewards.pendingRewardsOfLock(1);
       let prl2 = await stakingRewards.pendingRewardsOfLock(2);
       let prl3 = await stakingRewards.pendingRewardsOfLock(3);
       let block = await provider.getBlock('latest');
       await provider.send("evm_setNextBlockTimestamp", [startTime + block.timestamp+ONE_YEAR]);
       await provider.send("evm_mine", []);
-      expect(await stakingRewards.pendingRewardsOfUser(user1.address)).eq(pru1);
-      expect(await stakingRewards.pendingRewardsOfUser(user2.address)).eq(pru2);
       expect(await stakingRewards.pendingRewardsOfLock(1)).eq(prl1);
       expect(await stakingRewards.pendingRewardsOfLock(2)).eq(prl2);
       expect(await stakingRewards.pendingRewardsOfLock(3)).eq(prl3);
-      let balances1 = await getBalances();
       // now with solace
       await solace.connect(governor).mint(stakingRewards.address, ONE_ETHER.mul(1000000000));
-      await stakingRewards.connect(user3).harvestUser(user1.address);
+      await stakingRewards.connect(user3).harvestLocks([1,2]);
       await stakingRewards.connect(user3).harvestLock(3);
       await checkConsistency();
-      let balances2 = await getBalances();
-      let balancesDiff = getBalancesDiff(balances2, balances1);
-      expect(balancesDiff.user1Solace).eq(pru1)
-      expect(balancesDiff.user2Solace).eq(pru2)
-      expect(await stakingRewards.pendingRewardsOfUser(user1.address)).eq(0);
-      expect(await stakingRewards.pendingRewardsOfUser(user2.address)).eq(0);
       expect(await stakingRewards.pendingRewardsOfLock(1)).eq(0);
       expect(await stakingRewards.pendingRewardsOfLock(2)).eq(0);
       expect(await stakingRewards.pendingRewardsOfLock(3)).eq(0);
@@ -471,7 +538,8 @@ describe("StakingRewards", function () {
       await solace.connect(user1).approve(xslocker.address, constants.MaxUint256);
       await solace.connect(user2).approve(xslocker.address, constants.MaxUint256);
       await solace.connect(user3).approve(xslocker.address, constants.MaxUint256);
-      stakingRewards = (await deployContract(deployer, artifacts.StakingRewards, [governor.address, solace.address, xslocker.address, startTime, endTime, solacePerSecond])) as StakingRewards;
+      stakingRewards = (await deployContract(deployer, artifacts.StakingRewards, [governor.address, solace.address, xslocker.address, solacePerSecond])) as StakingRewards;
+      await stakingRewards.connect(governor).setTimes(startTime, endTime);
       await xslocker.connect(governor).addXsLockListener(stakingRewards.address);
       await xslocker.connect(user1).createLock(user1.address, ONE_ETHER.mul(10), block.timestamp+ONE_YEAR*4); // xsLockID 1
     });
@@ -502,6 +570,133 @@ describe("StakingRewards", function () {
     });
   });
 
+  describe("compound", function () {
+    let startTime: number;
+    let endTime: number;
+    before(async function () {
+      let block = await provider.getBlock('latest');
+      startTime = block.timestamp + 10;
+      endTime = block.timestamp + ONE_YEAR*10;
+      xslocker = (await deployContract(deployer, artifacts.xsLocker, [governor.address, solace.address])) as unknown as XsLocker;
+      await solace.connect(user1).approve(xslocker.address, constants.MaxUint256);
+      await solace.connect(user2).approve(xslocker.address, constants.MaxUint256);
+      await solace.connect(user3).approve(xslocker.address, constants.MaxUint256);
+      stakingRewards = (await deployContract(deployer, artifacts.StakingRewards, [governor.address, solace.address, xslocker.address, solacePerSecond])) as StakingRewards;
+      await stakingRewards.connect(governor).setTimes(startTime, endTime);
+      await xslocker.connect(governor).addXsLockListener(stakingRewards.address);
+      await xslocker.connect(user1).createLock(user1.address, ONE_ETHER, 0); // xsLockID 1 value 1
+      await xslocker.connect(user1).createLock(user1.address, ONE_ETHER.mul(2), block.timestamp+ONE_YEAR*4); // xsLockID 2 value 5
+      await xslocker.connect(user2).createLock(user2.address, ONE_ETHER.mul(3), 0); // xsLockID 3 value 3
+      await solace.connect(governor).mint(stakingRewards.address, ONE_ETHER.mul(1000000000));
+    });
+    it("before start", async function () {
+      await checkConsistency();
+    });
+    it("after start", async function () {
+      let balances1 = await getBalances();
+      let expectedRewards1 = BN.from(0);
+      let expectedRewards2 = BN.from(0);
+      let expectedRewards3 = BN.from(0);
+      let lockAmount1 = (await stakingRewards.stakedLockInfo(1)).value;
+      let lockAmount2 = (await stakingRewards.stakedLockInfo(2)).value;
+      let lockAmount3 = (await stakingRewards.stakedLockInfo(3)).value;
+      let lockAmountSum = bnAddSub([lockAmount1, lockAmount2, lockAmount3]);
+      // 20 blocks
+      await provider.send("evm_setNextBlockTimestamp", [startTime + 20]);
+      await provider.send("evm_mine", []);
+      await checkConsistency();
+      expectedRewards1 = expectedRewards1.add(bnMulDiv([solacePerSecond, lockAmount1, 20], [lockAmountSum]));
+      expectedRewards2 = expectedRewards2.add(bnMulDiv([solacePerSecond, lockAmount2, 20], [lockAmountSum]));
+      expectedRewards3 = expectedRewards3.add(bnMulDiv([solacePerSecond, lockAmount3, 20], [lockAmountSum]));
+      expectClose(await stakingRewards.pendingRewardsOfLock(1), expectedRewards1, PRECISION);
+      expectClose(await stakingRewards.pendingRewardsOfLock(2), expectedRewards2, PRECISION);
+      expectClose(await stakingRewards.pendingRewardsOfLock(3), expectedRewards3, PRECISION);
+      let balances2 = await getBalances();
+      expect(balances1).deep.eq(balances2);
+      let lock11 = await xslocker.locks(1);
+      // 30 blocks
+      await provider.send("evm_setNextBlockTimestamp", [startTime + 30]);
+      await stakingRewards.connect(user1).compoundLock(1);
+      await checkConsistency();
+      expectedRewards1 = BN.from(0);
+      expectedRewards2 = expectedRewards2.add(bnMulDiv([solacePerSecond, lockAmount2, 10], [lockAmountSum]));
+      expectedRewards3 = expectedRewards3.add(bnMulDiv([solacePerSecond, lockAmount3, 10], [lockAmountSum]));
+      expect(await stakingRewards.pendingRewardsOfLock(1)).eq(expectedRewards1);
+      expectClose(await stakingRewards.pendingRewardsOfLock(2), expectedRewards2, PRECISION);
+      expectClose(await stakingRewards.pendingRewardsOfLock(3), expectedRewards3, PRECISION);
+      let balances3 = await getBalances();
+      let balances23 = getBalancesDiff(balances3, balances2);
+      expect(balances23.user1Solace).eq(0);
+      let lock12 = await xslocker.locks(1);
+      expectClose(lock12.amount.sub(lock11.amount), bnMulDiv([solacePerSecond, 1, 30], [9]), PRECISION);
+      // 50 blocks
+      lockAmount1 = (await stakingRewards.stakedLockInfo(1)).value;
+      lockAmount2 = (await stakingRewards.stakedLockInfo(2)).value;
+      lockAmount3 = (await stakingRewards.stakedLockInfo(3)).value;
+      await provider.send("evm_setNextBlockTimestamp", [startTime + 50]);
+      await stakingRewards.connect(user1).compoundLocks([1,2], 1);
+      await checkConsistency();
+      lockAmountSum = bnAddSub([lockAmount1, lockAmount2, lockAmount3]);
+      expectedRewards1 = expectedRewards1.add(bnMulDiv([solacePerSecond, lockAmount1, 20], [lockAmountSum]));
+      expectedRewards2 = expectedRewards2.add(bnMulDiv([solacePerSecond, lockAmount2, 20], [lockAmountSum]))
+      expectedRewards3 = expectedRewards3.add(bnMulDiv([solacePerSecond, lockAmount3, 20], [lockAmountSum]));
+      expect(await stakingRewards.pendingRewardsOfLock(1)).eq(0);
+      expect(await stakingRewards.pendingRewardsOfLock(2)).eq(0);
+      expectClose(await stakingRewards.pendingRewardsOfLock(3), expectedRewards3, PRECISION);
+      let balances4 = await getBalances();
+      let balances34 = getBalancesDiff(balances4, balances3);
+      //let expectedRewards34 = bnMulDiv([solacePerSecond, 1, 20], [9]).add(bnMulDiv([solacePerSecond, 5, 50], [9]));
+      expect(balances34.user1Solace).eq(0);
+      let lock13 = await xslocker.locks(1);
+      expectClose(lock13.amount.sub(lock12.amount), expectedRewards1.add(expectedRewards2), PRECISION);
+      // next 11 years
+      for(var i = 1; i <= 11; ++i) {
+        await provider.send("evm_setNextBlockTimestamp", [startTime + ONE_YEAR*i]);
+        await stakingRewards.connect(user1).compoundLock(1);
+        await stakingRewards.connect(user1).compoundLock(2);
+        await stakingRewards.connect(user2).compoundLock(3);
+        await checkConsistency();
+      }
+    });
+    it("after end", async function () {
+      let lock11 = await xslocker.locks(1);
+      let lock21 = await xslocker.locks(2);
+      let lock31 = await xslocker.locks(3);
+      await stakingRewards.connect(user1).compoundLocks([1,2],1);
+      await stakingRewards.connect(user2).compoundLock(3);
+      expect(await stakingRewards.pendingRewardsOfLock(1)).eq(0);
+      expect(await stakingRewards.pendingRewardsOfLock(2)).eq(0);
+      expect(await stakingRewards.pendingRewardsOfLock(3)).eq(0);
+      await checkConsistency();
+      expect(await stakingRewards.pendingRewardsOfLock(1)).eq(0);
+      expect(await stakingRewards.pendingRewardsOfLock(2)).eq(0);
+      expect(await stakingRewards.pendingRewardsOfLock(3)).eq(0);
+      await stakingRewards.connect(user1).compoundLocks([1,2],1);
+      await stakingRewards.connect(user2).compoundLock(3);
+      expect(await stakingRewards.pendingRewardsOfLock(1)).eq(0);
+      expect(await stakingRewards.pendingRewardsOfLock(2)).eq(0);
+      expect(await stakingRewards.pendingRewardsOfLock(3)).eq(0);
+      let lock12 = await xslocker.locks(1);
+      let lock22 = await xslocker.locks(2);
+      let lock32 = await xslocker.locks(3);
+      expect(lock11).deep.eq(lock12);
+      expect(lock21).deep.eq(lock22);
+      expect(lock31).deep.eq(lock32);
+    });
+    it("cannot compound not your lock", async function () {
+      await stakingRewards.connect(governor).setTimes(startTime, endTime + ONE_YEAR*5);
+      await expect(stakingRewards.connect(user1).compoundLock(3)).to.be.revertedWith("not owner");
+      await expect(stakingRewards.connect(user1).compoundLock(999)).to.be.revertedWith("ERC721: owner query for nonexistent token");
+      await expect(stakingRewards.connect(user1).compoundLocks([3], 3)).to.be.revertedWith("not owner");
+      await expect(stakingRewards.connect(user1).compoundLocks([999], 999)).to.be.revertedWith("ERC721: owner query for nonexistent token");
+      await expect(stakingRewards.connect(user1).compoundLocks([3], 999)).to.be.revertedWith("not owner");
+      await expect(stakingRewards.connect(user1).compoundLocks([1], 999)).to.be.revertedWith("query for nonexistent token");
+    });
+    after(async function () {
+      await xslocker.connect(governor).removeXsLockListener(stakingRewards.address);
+    });
+  });
+
   describe("set rewards", function () {
     it("cannot be set by non governance", async function () {
       await expect(stakingRewards.connect(user1).setRewards(constants.MaxUint256)).to.be.revertedWith("!governance");
@@ -513,20 +708,24 @@ describe("StakingRewards", function () {
     });
   });
 
-  describe("set end", function () {
+  describe("set times", function () {
     it("cannot be set by non governance", async function () {
-      await expect(stakingRewards.connect(user1).setEnd(constants.MaxUint256)).to.be.revertedWith("!governance");
+      await expect(stakingRewards.connect(user1).setTimes(0, constants.MaxUint256)).to.be.revertedWith("!governance");
+    });
+    it("cannot be set to invalid window", async function () {
+      await expect(stakingRewards.connect(governor).setTimes(2, 1)).to.be.revertedWith("invalid window");
     });
     it("can be set by governance", async function () {
-      let tx = await stakingRewards.connect(governor).setEnd(456);
-      await expect(tx).to.emit(stakingRewards, "FarmEndSet").withArgs(456);
+      let tx = await stakingRewards.connect(governor).setTimes(123, 456);
+      await expect(tx).to.emit(stakingRewards, "FarmTimesSet").withArgs(123, 456);
+      expect(await stakingRewards.startTime()).eq(123);
       expect(await stakingRewards.endTime()).eq(456);
     });
   });
 
   describe("rescue tokens", function () {
     before(async function () {
-      stakingRewards = (await deployContract(deployer, artifacts.StakingRewards, [governor.address, solace.address, xslocker.address, 1, 2, solacePerSecond])) as StakingRewards;
+      stakingRewards = (await deployContract(deployer, artifacts.StakingRewards, [governor.address, solace.address, xslocker.address, solacePerSecond])) as StakingRewards;
     });
     it("cannot be called by non governance", async function () {
       await expect(stakingRewards.connect(user1).rescueTokens(solace.address, constants.MaxUint256, user1.address)).to.be.revertedWith("!governance");
@@ -558,7 +757,7 @@ describe("StakingRewards", function () {
       let lockInfo = await stakingRewards.stakedLockInfo(xsLockID);
       let realValue = lockInfo.value;
       let predValue = await predictValueOfLock(xsLockID);
-      expectClose(realValue, predValue, PRECISION);
+      expectClose(realValue, predValue, ONE_ETHER);
       predValueStaked = predValueStaked.add(realValue);
       //let owner = await xslocker.ownerOf(xsLockID);
       let owner2 = lockInfo.owner;
@@ -573,10 +772,35 @@ describe("StakingRewards", function () {
     let users = predUserPendingRewards.keys();
     for(var i = 0; i < predUserPendingRewards.size; ++i) {
       let user = users.next().value;
-      let realPendingRewards = await stakingRewards.pendingRewardsOfUser(user);
+      //let realPendingRewards = await stakingRewards.pendingRewardsOfUser(user);
+      let realPendingRewards = await predictPendingRewardsOfUser(xslocker, user);
       let predPendingRewards = predUserPendingRewards.get(user);
       expect(realPendingRewards).eq(predPendingRewards);
     }
+  }
+
+  async function predictPendingRewardsOfUser(xslocker: Contract, user: string) {
+    let pendingRewards = BN.from(0);
+    let numlocks = await xslocker.balanceOf(user);
+    let indices = range(0, numlocks.toNumber());
+    let xsLockIDs = await Promise.all(indices.map(async (index) => {
+      return await xslocker.tokenOfOwnerByIndex(user, index);
+    }));
+    let rewards = await Promise.all(xsLockIDs.map(async (xsLockID) => {
+      return await stakingRewards.pendingRewardsOfLock(xsLockID);
+    }));
+    rewards.forEach((reward) => {
+      pendingRewards = pendingRewards.add(reward);
+    });
+    return pendingRewards;
+  }
+
+  function range(start: number, stop: number) {
+    let arr = [];
+    for(var i = start; i < stop; ++i) {
+      arr.push(i);
+    }
+    return arr;
   }
 
   async function predictValueOfLock(xsLockID: BigNumberish) {

@@ -59,9 +59,6 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
     /// @notice Value of tokens staked by all farmers.
     uint256 public override valueStaked;
 
-    // tokens that a user owns
-    mapping(address => EnumerableSet.UintSet) private _tokensOfOwner;
-
     /// @notice Information about each lock.
     /// @dev lock id => lock info
     mapping(uint256 => StakedLockInfo) private _lockInfo;
@@ -71,26 +68,20 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
      * @param governance_ The address of the [governor](/docs/protocol/governance).
      * @param solace_ Address of [**SOLACE**](./../SOLACE).
      * @param xsLocker_ Address of the [**xsLocker**](./xsLocker) contract.
-     * @param startTime_ When farming will begin.
-     * @param endTime_ When farming will end.
      * @param rewardPerSecond_ The amount of [**SOLACE**](./../SOLACE) to distribute per second.
      */
     constructor(
         address governance_,
         address solace_,
         address xsLocker_,
-        uint256 startTime_,
-        uint256 endTime_,
         uint256 rewardPerSecond_
     ) Governable(governance_) {
         require(solace_ != address(0x0), "zero address solace");
         solace = solace_;
         require(xsLocker_ != address(0x0), "zero address xslocker");
         xsLocker = xsLocker_;
-        require(startTime_ <= endTime_, "invalid window");
-        startTime = startTime_;
-        endTime = endTime_;
         rewardPerSecond = rewardPerSecond_;
+        IERC20(solace_).approve(xsLocker_, type(uint256).max);
     }
 
     /***************************************
@@ -101,32 +92,6 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
     /// @dev lock id => lock info
     function stakedLockInfo(uint256 xsLockID) external view override returns (StakedLockInfo memory) {
         return _lockInfo[xsLockID];
-    }
-
-    /**
-     * @notice Calculates the accumulated balance of [**SOLACE**](./../SOLACE) for specified user.
-     * @param user The user for whom unclaimed tokens will be shown.
-     * @return reward Total amount of withdrawable reward tokens.
-     */
-    function pendingRewardsOfUser(address user) external view override returns (uint256 reward) {
-        // math
-        uint256 accRewardPerShare_ = accRewardPerShare;
-        // solhint-disable-next-line not-rely-on-time
-        if (block.timestamp > lastRewardTime && valueStaked != 0) {
-            // solhint-disable-next-line not-rely-on-time
-            uint256 tokenReward = getRewardAmountDistributed(lastRewardTime, block.timestamp);
-            accRewardPerShare_ += tokenReward * Q12 / valueStaked;
-        }
-        // iterate over locks
-        EnumerableSet.UintSet storage tokens = _tokensOfOwner[user];
-        uint256 len = tokens.length();
-        reward = 0;
-        for(uint256 i = 0; i < len; i++) {
-            uint256 xsLockID = tokens.at(i);
-            StakedLockInfo storage lockInfo = _lockInfo[xsLockID];
-            reward += lockInfo.value * accRewardPerShare_ / Q12 - lockInfo.rewardDebt + lockInfo.unpaidRewards;
-        }
-        return reward;
     }
 
     /**
@@ -206,19 +171,6 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
     }
 
     /**
-     * @notice Updates and sends a user's rewards.
-     * @param user User to process rewards for.
-     */
-    function harvestUser(address user) external override nonReentrant {
-        update();
-        EnumerableSet.UintSet storage tokens = _tokensOfOwner[user];
-        uint256 len = tokens.length();
-        for(uint256 i = 0; i < len; i++) {
-            _harvest(tokens.at(i));
-        }
-    }
-
-    /**
      * @notice Updates and sends a lock's rewards.
      * @param xsLockID The ID of the lock to process rewards for.
      */
@@ -239,6 +191,39 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
         }
     }
 
+    /**
+     * @notice Withdraws a lock's rewards and deposits it back into the lock.
+     * Can only be called by the owner of the lock.
+     * @param xsLockID The ID of the lock to compound.
+     */
+    function compoundLock(uint256 xsLockID) external override {
+        IxsLocker locker = IxsLocker(xsLocker);
+        require(msg.sender == locker.ownerOf(xsLockID), "not owner");
+        update();
+        (uint256 transferAmount, ) = _updateLock(xsLockID);
+        if(transferAmount != 0) locker.increaseAmount(xsLockID, transferAmount);
+    }
+
+    /**
+     * @notice Withdraws multiple lock's rewards and deposits it into lock.
+     * Can only be called by the owner of the locks.
+     * @param xsLockIDs The ID of the locks to compound.
+     * @param increasedLockID The ID of the lock to deposit into.
+     */
+    function compoundLocks(uint256[] calldata xsLockIDs, uint256 increasedLockID) external override {
+        update();
+        IxsLocker locker = IxsLocker(xsLocker);
+        uint256 len = xsLockIDs.length;
+        uint256 transferAmount = 0;
+        for(uint256 i = 0; i < len; i++) {
+            uint256 xsLockID = xsLockIDs[i];
+            require(msg.sender == locker.ownerOf(xsLockID), "not owner");
+            (uint256 ta, ) = _updateLock(xsLockID);
+            transferAmount += ta;
+        }
+        if(transferAmount != 0) locker.increaseAmount(increasedLockID, transferAmount);
+    }
+
     /***************************************
     HELPER FUNCTIONS
     ***************************************/
@@ -248,6 +233,17 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
      * @param xsLockID The ID of the lock to process rewards for.
      */
     function _harvest(uint256 xsLockID) internal {
+        (uint256 transferAmount, address receiver) = _updateLock(xsLockID);
+        if(receiver != address(0x0) && transferAmount != 0) SafeERC20.safeTransfer(IERC20(solace), receiver, transferAmount);
+    }
+
+    /**
+     * @notice Updates and returns a lock's rewards.
+     * @param xsLockID The ID of the lock to process rewards for.
+     * @return transferAmount The amount of [**SOLACE**](./../SOLACE) to transfer to the receiver.
+     * @return receiver The user to receive the [**SOLACE**](./../SOLACE).
+     */
+    function _updateLock(uint256 xsLockID) internal returns (uint256 transferAmount, address receiver) {
         // math
         uint256 accRewardPerShare_ = accRewardPerShare;
         // get lock information
@@ -257,9 +253,8 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
         lockInfo.unpaidRewards += lockInfo.value * accRewardPerShare_ / Q12 - lockInfo.rewardDebt;
         if(lockInfo.owner != address(0x0)){
             uint256 balance = IERC20(solace).balanceOf(address(this));
-            uint256 transferAmount = Math.min(lockInfo.unpaidRewards, balance);
+            transferAmount = Math.min(lockInfo.unpaidRewards, balance);
             lockInfo.unpaidRewards -= transferAmount;
-            SafeERC20.safeTransfer(IERC20(solace), lockInfo.owner, transferAmount);
         }
         // update lock value
         uint256 oldValue = lockInfo.value;
@@ -267,17 +262,14 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
         lockInfo.value = newValue;
         lockInfo.rewardDebt = newValue * accRewardPerShare_ / Q12;
         if(oldValue != newValue) valueStaked = valueStaked - oldValue + newValue;
-        // update lock owner
-        if(owner != lockInfo.owner) {
-            _tokensOfOwner[lockInfo.owner].remove(xsLockID);
-            if(exists) {
-                _tokensOfOwner[owner].add(xsLockID);
-                lockInfo.owner = owner;
-            }
-            // maintain pre-burn owner in case of unpaid rewards
+        // update lock owner. maintain pre-burn owner in case of unpaid rewards
+        if(owner != lockInfo.owner && exists) {
+            lockInfo.owner = owner;
         }
         _lockInfo[xsLockID] = lockInfo;
         emit LockUpdated(xsLockID);
+        receiver = (lockInfo.owner == address(0x0)) ? owner : lockInfo.owner;
+        return (transferAmount, receiver);
     }
 
     /**
@@ -328,18 +320,23 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard, Governable {
      * @param rewardPerSecond_ Amount to distribute per second.
      */
     function setRewards(uint256 rewardPerSecond_) external override onlyGovernance {
+        update();
         rewardPerSecond = rewardPerSecond_;
         emit RewardsSet(rewardPerSecond_);
     }
 
     /**
-     * @notice Sets the farm's end time. Used to extend the duration.
+     * @notice Sets the farm's start and end time. Used to extend the duration.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param startTime_ The new start time.
      * @param endTime_ The new end time.
      */
-    function setEnd(uint256 endTime_) external override onlyGovernance {
+    function setTimes(uint256 startTime_, uint256 endTime_) external override onlyGovernance {
+        require(startTime_ <= endTime_, "invalid window");
+        startTime = startTime_;
         endTime = endTime_;
-        emit FarmEndSet(endTime_);
+        emit FarmTimesSet(startTime_, endTime_);
+        update();
     }
 
     /**

@@ -29,8 +29,8 @@ interface IStakingRewards is IxsListener {
     event LockUpdated(uint256 indexed xsLockID);
     /// @notice Emitted when the reward rate is set.
     event RewardsSet(uint256 rewardPerSecond);
-    /// @notice Emitted when the farm end is set.
-    event FarmEndSet(uint256 endTime);
+    /// @notice Emitted when the farm times are set.
+    event FarmTimesSet(uint256 startTime, uint256 endTime);
 
     /***************************************
     GLOBAL VARIABLES
@@ -87,13 +87,6 @@ interface IStakingRewards is IxsListener {
     function stakedLockInfo(uint256 xsLockID) external view returns (StakedLockInfo memory);
 
     /**
-     * @notice Calculates the accumulated balance of [**SOLACE**](./../../SOLACE) for specified user.
-     * @param user The user for whom unclaimed tokens will be shown.
-     * @return reward Total amount of withdrawable reward tokens.
-     */
-    function pendingRewardsOfUser(address user) external view returns (uint256 reward);
-
-    /**
      * @notice Calculates the accumulated balance of [**SOLACE**](./../../SOLACE) for specified lock.
      * @param xsLockID The ID of the lock to query rewards for.
      * @return reward Total amount of withdrawable reward tokens.
@@ -118,12 +111,6 @@ interface IStakingRewards is IxsListener {
     function update() external;
 
     /**
-     * @notice Updates and sends a user's rewards.
-     * @param user User to process rewards for.
-     */
-    function harvestUser(address user) external;
-
-    /**
      * @notice Updates and sends a lock's rewards.
      * @param xsLockID The ID of the lock to process rewards for.
      */
@@ -134,6 +121,21 @@ interface IStakingRewards is IxsListener {
      * @param xsLockIDs The IDs of the locks to process rewards for.
      */
     function harvestLocks(uint256[] memory xsLockIDs) external;
+
+    /**
+     * @notice Withdraws a lock's rewards and deposits it back into the lock.
+     * Can only be called by the owner of the lock.
+     * @param xsLockID The ID of the lock to compound.
+     */
+    function compoundLock(uint256 xsLockID) external;
+
+    /**
+     * @notice Withdraws multiple lock's rewards and deposits it into lock.
+     * Can only be called by the owner of the locks.
+     * @param xsLockIDs The ID of the locks to compound.
+     * @param increasedLockID The ID of the lock to deposit into.
+     */
+    function compoundLocks(uint256[] calldata xsLockIDs, uint256 increasedLockID) external;
 
     /***************************************
     GOVERNANCE FUNCTIONS
@@ -148,11 +150,12 @@ interface IStakingRewards is IxsListener {
     function setRewards(uint256 rewardPerSecond_) external;
 
     /**
-     * @notice Sets the farm's end time. Used to extend the duration.
+     * @notice Sets the farm's start and end time. Used to extend the duration.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param startTime_ The new start time.
      * @param endTime_ The new end time.
      */
-    function setEnd(uint256 endTime_) external;
+    function setTimes(uint256 startTime_, uint256 endTime_) external;
 
     /**
      * @notice Rescues tokens that may have been accidentally transferred in.
