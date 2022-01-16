@@ -99,10 +99,12 @@ interface ISoteriaCoverageProduct {
     function withdraw(uint256 amount_) external;
 
     /**
-     * @notice Updates the cover amount of the policy.
+     * @notice Updates the cover amount of your policy
+     * @notice If you update the cover limit for your policy, you will exit the cooldown process if you already started it. This means that if you want to withdraw all your funds, you have to redo the 'deactivatePolicy() => withdraw()' process
      * @param newCoverLimit_ The new value to cover in **ETH**.
+     * @param referralCode_ Referral code
     */
-    function updateCoverLimit(uint256 newCoverLimit_) external;
+    function updateCoverLimit(uint256 newCoverLimit_, uint256 referralCode_) external;
 
     /**
      * @notice Deactivate a user's own policy.
@@ -239,6 +241,11 @@ interface ISoteriaCoverageProduct {
      */
     function cooldownStart(address policyholder_) external view returns (uint256 cooldownStart_);
 
+    /**
+     * @notice Gets the referral reward percentage in bps
+     * @return referralRewardPercentage_ The referral reward percentage
+     */
+    function referralRewardPercentage() external view returns (uint256 referralRewardPercentage_);
     /**
      * @notice Gets the unique referral code for a user.
      * @param user_ The user.

@@ -178,6 +178,8 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
             _mint(policyholder_, policyID);
         }
 
+        if (referralCode_ != 0) _processReferralCode(policyholder_, coverLimit_, referralCode_);
+
         // update cover amount
         _updateActiveCoverLimit(0, coverLimit_);
         _coverLimitOf[policyID] = coverLimit_;
@@ -190,8 +192,9 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      * @notice Updates the cover amount of your policy
      * @notice If you update the cover limit for your policy, you will exit the cooldown process if you already started it. This means that if you want to withdraw all your funds, you have to redo the 'deactivatePolicy() => withdraw()' process
      * @param newCoverLimit_ The new value to cover in **ETH**.
+     * @param referralCode_ Referral code
     */
-    function updateCoverLimit(uint256 newCoverLimit_) external override nonReentrant whileUnpaused {
+    function updateCoverLimit(uint256 newCoverLimit_, uint256 referralCode_) external override nonReentrant whileUnpaused {
         require(newCoverLimit_ > 0, "zero cover value");
         uint256 policyID = _policyOf[msg.sender];
         require(_exists(policyID), "invalid policy");
@@ -199,6 +202,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         require(_canPurchaseNewCover(currentCoverLimit, newCoverLimit_), "insufficient capacity for new cover");
         require(_accountBalanceOf[msg.sender] > _minRequiredAccountBalance(newCoverLimit_), "insufficient deposit for minimum required account balance");
         
+        if (referralCode_ != 0) _processReferralCode(msg.sender, newCoverLimit_, referralCode_);
         _exitCooldown(msg.sender); // Reset cooldown
         _coverLimitOf[policyID] = newCoverLimit_;
         _preDeactivateCoverLimitOf[policyID] = newCoverLimit_;
@@ -412,6 +416,14 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      */
     function cooldownStart(address policyholder_) external view override returns (uint256 cooldownStart_) {
         return _cooldownStart[policyholder_];
+    }
+
+    /**
+     * @notice Gets the referral reward percentage in bps
+     * @return referralRewardPercentage_ The referral reward percentage
+     */
+    function referralRewardPercentage() external view override returns (uint256 referralRewardPercentage_) {
+        return _referralRewardPercentage;
     }
 
     /**
