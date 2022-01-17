@@ -331,6 +331,9 @@ describe("SoteriaCoverageProduct", function() {
         it("cannot be set by non governance", async () => {
             await expect(soteriaCoverageProduct.connect(policyholder1).setReferralRewardPercentage(REFERRAL_REWARD_PERCENTAGE)).to.revertedWith("!governance");
         });
+        it("cannot be over 10000", async () => {
+            await expect(soteriaCoverageProduct.connect(governor).setReferralRewardPercentage(BN.from("10001"))).to.revertedWith("cannot set over 100%");
+        });
         it("can be set", async () => {
             let tx = await soteriaCoverageProduct.connect(governor).setReferralRewardPercentage(REFERRAL_REWARD_PERCENTAGE)
             expect(tx).emit(soteriaCoverageProduct, "ReferralRewardPercentageSet").withArgs(REFERRAL_REWARD_PERCENTAGE);
