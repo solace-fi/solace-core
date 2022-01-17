@@ -682,7 +682,6 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     function _beforeTokenTransfer(address from, address to, uint256 tokenId) internal virtual override {
         super._beforeTokenTransfer(from, to, tokenId);
         require(from == address(0), "only minting permitted");
-        require(balanceOf(to) <= 1, "can only mint one SOPT");
     }
 
     /**
@@ -730,7 +729,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      */
     function _processReferralCode(address policyholder_, uint256 coverLimit_, uint256 referralCode_) internal {
         address referrer = address(uint160(referralCode_));
-        require(referrer != address(0), "cannot have zero address referrer");
+        // require(referrer != address(0), "cannot have zero address referrer"); // Redundant because we cannot call _processReferralCode with referralCode_ = 0
         require(referrer != policyholder_, "cannot refer to self");
         require (!_isReferralCodeUsed[_policyOf[policyholder_]], "cannot use referral code again");
         
