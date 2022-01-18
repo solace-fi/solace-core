@@ -9,16 +9,16 @@ chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./../utilities/artifact_importer";
 
-import { MockErc721, MockErc1271 } from "./../../typechain";
+import { MockErc721V1, MockErc1271 } from "./../../typechain";
 import { getPermitErc721EnhancedSignature, getPermitErc721EnhancedDigest, getDomainSeparator, assembleRSV } from "./../utilities/getPermitNFTSignature";
 
-describe("ERC721Enhanced", function() {
+describe("ERC721Enhancedv1", function() {
   let artifacts: ArtifactImports;
   const [deployer, user1, user2, user3] = provider.getWallets();
 
   // contracts
-  let token: MockErc721;
-  let token2: MockErc721;
+  let token: MockErc721V1;
+  let token2: MockErc721V1;
   let signerContract: MockErc1271;
 
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
@@ -37,7 +37,7 @@ describe("ERC721Enhanced", function() {
 
   describe("deployment", async function () {
     before(async function () {
-      token = (await deployContract(deployer, artifacts.MockERC721, [name, symbol])) as MockErc721;
+      token = (await deployContract(deployer, artifacts.MockERC721v1, [name, symbol])) as MockErc721V1;
     });
     it("has a correct name", async function() {
       expect(await token.name()).to.equal(name);
@@ -48,11 +48,13 @@ describe("ERC721Enhanced", function() {
     it("should start with zero supply", async function () {
       expect(await token.totalSupply()).to.equal(0);
       expect(await token.tokenCount()).eq(0);
+      expect(await token.listTokens()).to.deep.equal([]);
       expect(await token.exists(0)).to.be.false;
       expect(await token.exists(1)).to.be.false;
     });
     it("should start with zero balance", async function () {
       expect(await token.balanceOf(user1.address)).to.equal(0);
+      expect(await token.listTokensOfOwner(user1.address)).to.deep.equal([]);
     });
   });
 
@@ -70,6 +72,10 @@ describe("ERC721Enhanced", function() {
     it("should exist", async function () {
       expect(await token.exists(1)).to.be.true;
     });
+    it("should be listed", async function () {
+      expect(await token.listTokens()).to.deep.equal([BN.from(1)]);
+      expect(await token.listTokensOfOwner(user1.address)).to.deep.equal([BN.from(1)]);
+    });
     it("should mint another token", async function () {
       await token.mint(user1.address);
     });
@@ -79,6 +85,10 @@ describe("ERC721Enhanced", function() {
     });
     it("should increment balance", async function () {
       expect(await token.balanceOf(user1.address)).to.equal(2);
+    });
+    it("should be listed", async function () {
+      expect(await token.listTokens()).to.deep.equal([BN.from(1),BN.from(2)]);
+      expect(await token.listTokensOfOwner(user1.address)).to.deep.equal([BN.from(1),BN.from(2)]);
     });
   });
 
@@ -104,6 +114,9 @@ describe("ERC721Enhanced", function() {
       expect(bal11.sub(bal21)).to.equal(1);
       expect(bal22.sub(bal12)).to.equal(1);
       expect(ts1).to.equal(ts2);
+      expect(await token.listTokens()).to.deep.equal([BN.from(1),BN.from(2)]);
+      expect(await token.listTokensOfOwner(user1.address)).to.deep.equal([BN.from(1)]);
+      expect(await token.listTokensOfOwner(user2.address)).to.deep.equal([BN.from(2)]);
     });
     it("should reject safeTransfer of nonexistent token", async function () {
       await expect(token.connect(user2).safeTransfer(user1.address, 99)).to.be.revertedWith("ERC721: operator query for nonexistent token");
@@ -126,6 +139,9 @@ describe("ERC721Enhanced", function() {
       expect(bal11.sub(bal21)).to.equal(1);
       expect(bal22.sub(bal12)).to.equal(1);
       expect(ts1).to.equal(ts2);
+      expect(await token.listTokens()).to.deep.equal([BN.from(1),BN.from(2)]);
+      expect(await token.listTokensOfOwner(user1.address)).to.deep.equal([]);
+      expect(await token.listTokensOfOwner(user2.address)).to.deep.equal([BN.from(2),BN.from(1)]);
     });
     it("should clear approvals", async function () {
       tokenID = 1;
@@ -144,6 +160,9 @@ describe("ERC721Enhanced", function() {
       expect(bal21.sub(bal11)).to.equal(1);
       expect(bal12.sub(bal22)).to.equal(1);
       expect(ts1).to.equal(ts2);
+      expect(await token.listTokens()).to.deep.equal([BN.from(1),BN.from(2)]);
+      expect(await token.listTokensOfOwner(user1.address)).to.deep.equal([BN.from(1)]);
+      expect(await token.listTokensOfOwner(user2.address)).to.deep.equal([BN.from(2)]);
       expect(await token.getApproved(tokenID)).to.equal(ZERO_ADDRESS);
     });
   });
@@ -192,7 +211,7 @@ describe("ERC721Enhanced", function() {
       await expect(token.permit(user3.address, tokenID2, deadline, v, r, s)).to.be.revertedWith("unauthorized");
     });
     it("cannot use signature for another contract", async function () {
-      token2 = (await deployContract(deployer, artifacts.MockERC721, ["", ""])) as MockErc721;
+      token2 = (await deployContract(deployer, artifacts.MockERC721v1, ["", ""])) as MockErc721V1;
       await token2.mint(user1.address);
       const { v, r, s } = await getPermitErc721EnhancedSignature(user1, token2, user2.address, tokenID);
       await expect(token.permit(user2.address, tokenID, deadline, v, r, s)).to.be.revertedWith("unauthorized");
@@ -259,93 +278,18 @@ describe("ERC721Enhanced", function() {
     });
   });
 
+  describe("listTokensOfOwner", function () {
+    it("reverts zero address lookup", async function () {
+      await expect(token.listTokensOfOwner(ZERO_ADDRESS)).to.be.revertedWith("zero address owner");
+    });
+  });
+
   describe("token must exist", function () {
     it("cannot do things to non tokens", async function () {
-      await expect(token.doThing1(999)).to.be.revertedWith("query for nonexistent token");
+      await expect(token.doThing(999)).to.be.revertedWith("query for nonexistent token");
     });
     it("can do things to tokens", async function () {
-      await token.doThing1(1);
-    });
-  });
-
-  describe("only owner", function () {
-    let tokenID: BN;
-    before("mint", async function () {
-      await token.mint(user1.address);
-      tokenID = await token.tokenCount();
-    });
-    it("cannot do things to not your token", async function () {
-      await expect(token.connect(user2).doThing2(tokenID)).to.be.revertedWith("only owner");
-    });
-    it("can do things to your token", async function () {
-      await token.connect(user1).doThing2(tokenID);
-    });
-  });
-
-  describe("only owner or approved", function () {
-    let tokenID: BN;
-    before("mint", async function () {
-      await token.mint(user1.address);
-      tokenID = await token.tokenCount();
-    });
-    it("cannot do things to not your token", async function () {
-      await expect(token.connect(user2).doThing3(tokenID)).to.be.revertedWith("only owner or approved");
-    });
-    it("can do things to your token", async function () {
-      await token.connect(user1).doThing3(tokenID);
-    });
-    it("can do things to token if approved for one", async function () {
-      await token.connect(user1).approve(user2.address, tokenID);
-      await token.connect(user2).doThing3(tokenID);
-    });
-    it("can do things to token if approved for all", async function () {
-      await token.connect(user1).setApprovalForAll(user3.address, true);
-      await token.connect(user3).doThing3(tokenID);
-    });
-  });
-
-  describe("uri", function () {
-    it("cannot get the uri of non existant token", async function () {
-      await expect(token.tokenURI(999)).to.be.revertedWith("query for nonexistent token");
-    });
-    it("starts simple", async function () {
-      expect(await token.baseURI()).eq("");
-      expect(await token.getBaseURI()).eq("");
-      expect(await token.tokenURI(4)).eq("4");
-    });
-    it("governor can set base uri", async function () {
-      let base = "https://solace.fi/tokens?tokenID=";
-      let tx = await token.setBaseURI(base);
-      await expect(tx).to.emit(token, "BaseURISet").withArgs(base);
-      expect(await token.baseURI()).eq(base);
-      expect(await token.getBaseURI()).eq(base);
-      expect(await token.tokenURI(4)).eq(base+"4");
-    });
-  });
-
-  describe("_afterTokenTransfer", function () {
-    let tokenID: BN;
-    it("hears mint", async function () {
-      await token.mint(user1.address);
-      tokenID = await token.tokenCount();
-      let afterTransfer = await token.lastTransfer();
-      expect(afterTransfer.from).eq(ZERO_ADDRESS);
-      expect(afterTransfer.to).eq(user1.address);
-      expect(afterTransfer.tokenID).eq(tokenID);
-    });
-    it("hears transfer", async function () {
-      await token.connect(user1).transfer(user2.address, tokenID);
-      let afterTransfer = await token.lastTransfer();
-      expect(afterTransfer.from).eq(user1.address);
-      expect(afterTransfer.to).eq(user2.address);
-      expect(afterTransfer.tokenID).eq(tokenID);
-    });
-    it("hears burn", async function () {
-      await token.connect(user2).burn(tokenID);
-      let afterTransfer = await token.lastTransfer();
-      expect(afterTransfer.from).eq(user2.address);
-      expect(afterTransfer.to).eq(ZERO_ADDRESS);
-      expect(afterTransfer.tokenID).eq(tokenID);
+      await token.doThing(1);
     });
   });
 });
