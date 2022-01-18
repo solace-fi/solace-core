@@ -25,7 +25,7 @@ describe("Vault", function () {
   let mockRiskStrategy: MockRiskStrategy;
   let productFactory: ProductFactory;
 
-  const [owner, newOwner, depositor1, depositor2, mockEscrow, solace, solaceUsdcPool, priceOracle ] = provider.getWallets();
+  const [owner, newOwner, depositor1, depositor2, mockEscrow, solace, solaceUsdcPool, priceOracle, underwritingPool] = provider.getWallets();
   const tokenName = "Solace CP Token";
   const tokenSymbol = "SCP";
   const testDepositAmount1 = BN.from("1000000000000000000"); // one eth
@@ -54,7 +54,7 @@ describe("Vault", function () {
     await registry.setVault(vault.address);
     claimsEscrow = (await deployContract(owner,artifacts.ClaimsEscrow,[owner.address,registry.address])) as ClaimsEscrow;
     await registry.setClaimsEscrow(claimsEscrow.address);
-    policyManager = (await deployContract(owner,artifacts.PolicyManager,[owner.address])) as PolicyManager;
+    policyManager = (await deployContract(owner,artifacts.PolicyManager,[owner.address, registry.address])) as PolicyManager;
     await registry.setPolicyManager(policyManager.address);
     riskManager = (await deployContract(owner, artifacts.RiskManager, [owner.address, registry.address])) as RiskManager;
     await registry.setRiskManager(riskManager.address);

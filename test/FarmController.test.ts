@@ -65,7 +65,7 @@ describe("FarmController", function () {
     await registry.connect(governor).setWeth(weth.address);
     vault = (await deployContract(deployer, artifacts.Vault, [governor.address, registry.address])) as Vault;
     await registry.connect(governor).setVault(vault.address);
-    policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
+    policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address, registry.address])) as PolicyManager;
     await registry.connect(governor).setPolicyManager(policyManager.address);
     riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
     await registry.connect(governor).setRiskManager(riskManager.address);

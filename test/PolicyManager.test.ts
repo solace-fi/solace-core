@@ -11,7 +11,7 @@ import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer
 import { burnBlocks, burnBlocksUntil } from "./utilities/time";
 import { encodeAddresses } from "./utilities/positionDescription";
 
-import { PolicyManager, MockProductV2, Treasury, Registry, RiskManager, PolicyDescriptorV2, Vault, Weth9, MockRiskStrategy, CoverageDataProvider, ProductFactory, SoteriaCoverageProduct } from "../typechain";
+import { PolicyManager, MockProductV2, Treasury, Registry, RiskManager, PolicyDescriptorV2, Vault, Weth9, MockRiskStrategy, CoverageDataProvider, ProductFactory } from "../typechain";
 
 describe("PolicyManager", function() {
   let artifacts: ArtifactImports;
@@ -47,11 +47,11 @@ describe("PolicyManager", function() {
     artifacts = await import_artifacts();
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
 
-    // deploy policy manager
-    policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
-
     // deploy registry contract
     registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
+  
+    // deploy policy manager
+    policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address, registry.address])) as PolicyManager;
 
     // deploy weth
     weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
@@ -105,7 +105,7 @@ describe("PolicyManager", function() {
     await riskManager.connect(governor).addRiskStrategy(riskStrategy.address);
     await riskManager.connect(governor).setStrategyStatus(riskStrategy.address, STRATEGY_STATUS_ACTIVE);
     await riskManager.connect(governor).setWeightAllocation(riskStrategy.address, STRATEGY_WEIGHT_ALLOCATION);
-
+    await riskManager.connect(governor).addCoverLimitUpdater(policyManager.address);
   });
 
   it("has a correct name", async function() {
@@ -213,8 +213,8 @@ describe("PolicyManager", function() {
     it("can create policy", async function() {
       let tx = await policyManager.connect(walletProduct2).createPolicy(user.address, coverAmount, expirationBlock, price, positionDescription, riskStrategy.address);
       expect(tx).to.emit(policyManager, "PolicyCreated").withArgs(1);
-      expect(await policyManager.activeCoverAmountPerStrategy(riskStrategy.address)).to.eq(coverAmount);
-      expect(await policyManager.activeCoverAmount()).to.equal(coverAmount);
+      expect(await riskManager.activeCoverLimitPerStrategy(riskStrategy.address)).to.eq(coverAmount);
+      expect(await riskManager.activeCoverLimit()).to.equal(coverAmount);
       expect(await riskManager.minCapitalRequirement()).to.equal(coverAmount);
       expect(await riskManager.minCapitalRequirementPerStrategy(riskStrategy.address)).to.equal(coverAmount);
     });
@@ -280,10 +280,10 @@ describe("PolicyManager", function() {
       expect(await policyManager.getPolicyPrice(1)).to.equal(3);
       expect(await policyManager.policyIsActive(1)).to.equal(false);
       expect(await policyManager.exists(1)).to.equal(true);
-      expect(await policyManager.activeCoverAmount()).to.equal(1);
+      expect(await riskManager.activeCoverLimit()).to.equal(1);
       expect(await riskManager.minCapitalRequirement()).to.equal(1);
       expect(await policyManager.getPolicyRiskStrategy(1)).to.equal(riskStrategy.address);
-      expect(await policyManager.activeCoverAmountPerStrategy(riskStrategy.address)).to.equal(1);
+      expect(await riskManager.activeCoverLimitPerStrategy(riskStrategy.address)).to.equal(1);
       expect(await riskManager.minCapitalRequirementPerStrategy(riskStrategy.address)).to.equal(1);
     });
     it("can update policy info with same parameters", async function () {
@@ -296,10 +296,10 @@ describe("PolicyManager", function() {
       expect(await policyManager.getPolicyPrice(1)).to.equal(3);
       expect(await policyManager.policyIsActive(1)).to.equal(false);
       expect(await policyManager.exists(1)).to.equal(true);
-      expect(await policyManager.activeCoverAmount()).to.equal(1);
+      expect(await riskManager.activeCoverLimit()).to.equal(1);
       expect(await riskManager.minCapitalRequirement()).to.equal(1);
       expect(await policyManager.getPolicyRiskStrategy(1)).to.equal(riskStrategy.address);
-      expect(await policyManager.activeCoverAmountPerStrategy(riskStrategy.address)).to.equal(1);
+      expect(await riskManager.activeCoverLimitPerStrategy(riskStrategy.address)).to.equal(1);
       expect(await riskManager.minCapitalRequirementPerStrategy(riskStrategy.address)).to.equal(1);
     })
     it("can list my policies", async function() {
@@ -307,9 +307,9 @@ describe("PolicyManager", function() {
       expect(await policyManager.listTokensOfOwner(user.address)).to.deep.equal([BN.from(1)]);
       await policyManager.connect(walletProduct2).createPolicy(user.address, coverAmount, expirationBlock, price, positionContract.address, riskStrategy.address);
       expect(await policyManager.listTokensOfOwner(user.address)).to.deep.equal([BN.from(1), BN.from(2)]);
-      expect(await policyManager.activeCoverAmount()).to.equal(coverAmount.add(1));
+      expect(await riskManager.activeCoverLimit()).to.equal(coverAmount.add(1));
       expect(await riskManager.minCapitalRequirement()).to.equal(coverAmount.add(1));
-      expect(await policyManager.activeCoverAmountPerStrategy(riskStrategy.address)).to.equal(coverAmount.add(1));
+      expect(await riskManager.activeCoverLimitPerStrategy(riskStrategy.address)).to.equal(coverAmount.add(1));
       expect(await riskManager.minCapitalRequirementPerStrategy(riskStrategy.address)).to.equal(coverAmount.add(1));
     });
     it("cannot directly burn policy", async function() {
@@ -319,22 +319,22 @@ describe("PolicyManager", function() {
     it("can burn policy via product", async function() {
       let tx = await policyManager.connect(walletProduct2).createPolicy(user.address, coverAmount, expirationBlock, price, positionContract.address, riskStrategy.address);
       expect(tx).to.emit(policyManager, "PolicyCreated").withArgs(3);
-      expect(await policyManager.activeCoverAmount()).to.equal(coverAmount.mul(2).add(1));
+      expect(await riskManager.activeCoverLimit()).to.equal(coverAmount.mul(2).add(1));
       expect(await riskManager.minCapitalRequirement()).to.equal(coverAmount.mul(2).add(1));
-      expect(await policyManager.activeCoverAmountPerStrategy(riskStrategy.address)).to.equal(coverAmount.mul(2).add(1));
+      expect(await riskManager.activeCoverLimitPerStrategy(riskStrategy.address)).to.equal(coverAmount.mul(2).add(1));
       expect(await riskManager.minCapitalRequirementPerStrategy(riskStrategy.address)).to.equal(coverAmount.mul(2).add(1));
 
       await policyManager.connect(walletProduct2).burn(1); // burn tokenID 1
       expect(await policyManager.exists(1)).to.equal(false);
-      expect(await policyManager.activeCoverAmount()).to.equal(coverAmount.mul(2));
+      expect(await riskManager.activeCoverLimit()).to.equal(coverAmount.mul(2));
       expect(await riskManager.minCapitalRequirement()).to.equal(coverAmount.mul(2));
-      expect(await policyManager.activeCoverAmountPerStrategy(riskStrategy.address)).to.equal(coverAmount.mul(2));
+      expect(await riskManager.activeCoverLimitPerStrategy(riskStrategy.address)).to.equal(coverAmount.mul(2));
       expect(await riskManager.minCapitalRequirementPerStrategy(riskStrategy.address)).to.equal(coverAmount.mul(2));
       await policyManager.connect(walletProduct2).burn(2); // burn tokenID 2
       expect(await policyManager.exists(2)).to.equal(false);
-      expect(await policyManager.activeCoverAmount()).to.equal(coverAmount);
+      expect(await riskManager.activeCoverLimit()).to.equal(coverAmount);
       expect(await riskManager.minCapitalRequirement()).to.equal(coverAmount);
-      expect(await policyManager.activeCoverAmountPerStrategy(riskStrategy.address)).to.equal(coverAmount);
+      expect(await riskManager.activeCoverLimitPerStrategy(riskStrategy.address)).to.equal(coverAmount);
       expect(await riskManager.minCapitalRequirementPerStrategy(riskStrategy.address)).to.equal(coverAmount);
       let totalPolicyCount = await policyManager.totalPolicyCount();
       expect(totalPolicyCount).to.equal(3);
@@ -386,9 +386,9 @@ describe("PolicyManager", function() {
       expect(await policyManager.exists(policyID)).to.be.true;
       expect(await policyManager.policyIsActive(policyID)).to.be.true;
       expect(await policyManager.policyHasExpired(policyID)).to.be.false;
-      expect(await policyManager.activeCoverAmount()).to.equal(coverAmount.mul(2));
+      expect(await riskManager.activeCoverLimit()).to.equal(coverAmount.mul(2));
       expect(await riskManager.minCapitalRequirement()).to.equal(coverAmount.mul(2));
-      expect(await policyManager.activeCoverAmountPerStrategy(riskStrategy.address)).to.equal(coverAmount.mul(2));
+      expect(await riskManager.activeCoverLimitPerStrategy(riskStrategy.address)).to.equal(coverAmount.mul(2));
       expect(await riskManager.minCapitalRequirementPerStrategy(riskStrategy.address)).to.equal(coverAmount.mul(2));
     });
     it("post-expiration", async function() {
@@ -396,9 +396,9 @@ describe("PolicyManager", function() {
       expect(await policyManager.exists(policyID)).to.be.true;
       expect(await policyManager.policyIsActive(policyID)).to.be.false;
       expect(await policyManager.policyHasExpired(policyID)).to.be.true;
-      expect(await policyManager.activeCoverAmount()).to.equal(coverAmount.mul(2));
+      expect(await riskManager.activeCoverLimit()).to.equal(coverAmount.mul(2));
       expect(await riskManager.minCapitalRequirement()).to.equal(coverAmount.mul(2));
-      expect(await policyManager.activeCoverAmountPerStrategy(riskStrategy.address)).to.equal(coverAmount.mul(2));
+      expect(await riskManager.activeCoverLimitPerStrategy(riskStrategy.address)).to.equal(coverAmount.mul(2));
       expect(await riskManager.minCapitalRequirementPerStrategy(riskStrategy.address)).to.equal(coverAmount.mul(2));
     });
     it("post-burn", async function() {
@@ -406,9 +406,9 @@ describe("PolicyManager", function() {
       expect(await policyManager.exists(policyID)).to.be.false;
       expect(await policyManager.policyIsActive(policyID)).to.be.false;
       expect(await policyManager.policyHasExpired(policyID)).to.be.false;
-      expect(await policyManager.activeCoverAmount()).to.equal(coverAmount);
+      expect(await riskManager.activeCoverLimit()).to.equal(coverAmount);
       expect(await riskManager.minCapitalRequirement()).to.equal(coverAmount);
-      expect(await policyManager.activeCoverAmountPerStrategy(riskStrategy.address)).to.equal(coverAmount);
+      expect(await riskManager.activeCoverLimitPerStrategy(riskStrategy.address)).to.equal(coverAmount);
       expect(await riskManager.minCapitalRequirementPerStrategy(riskStrategy.address)).to.equal(coverAmount);
     });
   });
@@ -427,8 +427,12 @@ describe("PolicyManager", function() {
       // deploy base product
       let coverageProduct = (await deployContract(deployer, artifacts.MockProductV2)) as MockProductV2;
      
+      // redeploy risk manager
+      riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
+      await registry.connect(governor).setRiskManager(riskManager.address);
+
       // redeploy policy manager
-      policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
+      policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address, registry.address])) as PolicyManager;
       await registry.connect(governor).setPolicyManager(policyManager.address);
 
       // add products
@@ -456,51 +460,53 @@ describe("PolicyManager", function() {
       await riskManager.connect(governor).addRiskStrategy(riskStrategy.address);
       await riskManager.connect(governor).setStrategyStatus(riskStrategy.address, STRATEGY_STATUS_ACTIVE);
       await riskManager.connect(governor).setWeightAllocation(riskStrategy.address, STRATEGY_WEIGHT_ALLOCATION);
+      await riskManager.connect(governor).addCoverLimitUpdater(policyManager.address);
+
     });
 
     it("can update active policies", async function() {
       // create policies
       // policy 1 expires
       await mockProduct.connect(user)._buyPolicy(user.address, 0b00001, 110, positionContract.address, riskStrategy.address);
-      expect(await policyManager.activeCoverAmount()).to.equal(0b00001);
-      expect(await policyManager.activeCoverAmountPerStrategy(riskStrategy.address)).to.equal(0b00001);
+      expect(await riskManager.activeCoverLimit()).to.equal(0b00001);
+      expect(await riskManager.activeCoverLimitPerStrategy(riskStrategy.address)).to.equal(0b00001);
       expect(await riskManager.minCapitalRequirement()).to.equal(0b00001);
       expect(await riskManager.minCapitalRequirementPerStrategy(riskStrategy.address)).to.equal(0b00001);
 
       // policy 2 expires
       await mockProduct.connect(user)._buyPolicy(user.address, 0b00010, 120, positionContract.address, riskStrategy.address);
-      expect(await policyManager.activeCoverAmount()).to.equal(0b00011);
+      expect(await riskManager.activeCoverLimit()).to.equal(0b00011);
       expect(await riskManager.minCapitalRequirement()).to.equal(0b00011);
-      expect(await policyManager.activeCoverAmountPerStrategy(riskStrategy.address)).to.equal(0b00011);
+      expect(await riskManager.activeCoverLimitPerStrategy(riskStrategy.address)).to.equal(0b00011);
       expect(await riskManager.minCapitalRequirementPerStrategy(riskStrategy.address)).to.equal(0b00011);
 
       // policy 3 expires but is not updated
       await mockProduct.connect(user)._buyPolicy(user.address, 0b00100, 130, positionContract.address, riskStrategy.address);
-      expect(await policyManager.activeCoverAmount()).to.equal(0b00111);
+      expect(await riskManager.activeCoverLimit()).to.equal(0b00111);
       expect(await riskManager.minCapitalRequirement()).to.equal(0b00111);
-      expect(await policyManager.activeCoverAmountPerStrategy(riskStrategy.address)).to.equal(0b00111);
+      expect(await riskManager.activeCoverLimitPerStrategy(riskStrategy.address)).to.equal(0b00111);
       expect(await riskManager.minCapitalRequirementPerStrategy(riskStrategy.address)).to.equal(0b00111);
 
       // policy 4 does not expire
       await mockProduct.connect(user)._buyPolicy(user.address, 0b01000, 200, positionContract.address, riskStrategy.address);
-      expect(await policyManager.activeCoverAmount()).to.equal(0b01111);
+      expect(await riskManager.activeCoverLimit()).to.equal(0b01111);
       expect(await riskManager.minCapitalRequirement()).to.equal(0b01111);
-      expect(await policyManager.activeCoverAmountPerStrategy(riskStrategy.address)).to.equal(0b01111);
+      expect(await riskManager.activeCoverLimitPerStrategy(riskStrategy.address)).to.equal(0b01111);
       expect(await riskManager.minCapitalRequirementPerStrategy(riskStrategy.address)).to.equal(0b01111);
 
       // policy 5 is canceled
       await mockProduct.connect(user)._buyPolicy(user.address, 0b10000, 300, positionContract.address, riskStrategy.address);
-      expect(await policyManager.activeCoverAmount()).to.equal(0b11111);
+      expect(await riskManager.activeCoverLimit()).to.equal(0b11111);
       expect(await riskManager.minCapitalRequirement()).to.equal(0b11111);
-      expect(await policyManager.activeCoverAmountPerStrategy(riskStrategy.address)).to.equal(0b11111);
+      expect(await riskManager.activeCoverLimitPerStrategy(riskStrategy.address)).to.equal(0b11111);
       expect(await riskManager.minCapitalRequirementPerStrategy(riskStrategy.address)).to.equal(0b11111);
 
       // pass time
       await burnBlocks(150);
       await mockProduct.connect(user).cancelPolicy(5);
-      expect(await policyManager.activeCoverAmount()).to.equal(0b01111);
+      expect(await riskManager.activeCoverLimit()).to.equal(0b01111);
       expect(await riskManager.minCapitalRequirement()).to.equal(0b01111);
-      expect(await policyManager.activeCoverAmountPerStrategy(riskStrategy.address)).to.equal(0b01111);
+      expect(await riskManager.activeCoverLimitPerStrategy(riskStrategy.address)).to.equal(0b01111);
       expect(await riskManager.minCapitalRequirementPerStrategy(riskStrategy.address)).to.equal(0b01111);
 
       // update policies
@@ -511,7 +517,7 @@ describe("PolicyManager", function() {
       expect(await policyManager.exists(4)).to.be.true;
       expect(await policyManager.exists(5)).to.be.false;
       expect(await mockProduct.activeCoverAmount()).to.equal(0b01100);
-      expect(await policyManager.activeCoverAmount()).to.equal(0b01100);
+      expect(await riskManager.activeCoverLimit()).to.equal(0b01100);
       expect(await riskManager.minCapitalRequirement()).to.equal(0b01100);
     });
   });
@@ -527,8 +533,12 @@ describe("PolicyManager", function() {
         // deploy base product
         let coverageProduct = (await deployContract(deployer, artifacts.MockProductV2)) as MockProductV2;
       
+        // redeploy risk manager
+        riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
+        await registry.connect(governor).setRiskManager(riskManager.address);
+      
         // redeploy policy manager
-        policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address])) as PolicyManager;
+        policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address, registry.address])) as PolicyManager;
         await registry.connect(governor).setPolicyManager(policyManager.address);
 
         // add products
@@ -556,7 +566,7 @@ describe("PolicyManager", function() {
         await riskManager.connect(governor).addRiskStrategy(riskStrategy.address);
         await riskManager.connect(governor).setStrategyStatus(riskStrategy.address, STRATEGY_STATUS_ACTIVE);
         await riskManager.connect(governor).setWeightAllocation(riskStrategy.address, STRATEGY_WEIGHT_ALLOCATION);
-
+        await riskManager.connect(governor).addCoverLimitUpdater(policyManager.address);
         await policyManager.connect(governor).setPolicyDescriptor(policyDescriptor.address);
         await mockProduct.connect(user)._buyPolicy(user.address, 5000, 110, positionContract.address,riskStrategy.address);
         policyId = await policyManager.totalPolicyCount();
@@ -584,54 +594,4 @@ describe("PolicyManager", function() {
       await expect(policyManager.tokenURI(1000)).to.be.revertedWith("query for nonexistent token");
     });
   });
-
-  describe("soteria", () => {
-    const SUBMIT_CLAIM_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("SoteriaCoverageProductSubmitClaim(uint256 policyID,address claimant,uint256 amountOut,uint256 deadline)"));
-    const DOMAIN_NAME = "Solace.fi-SoteriaCoverageProduct";
-    const VERSION = "1";
-    const COVER_AMOUNT = BN.from("1000000000000000000");
-    let soteriaProduct: SoteriaCoverageProduct;
-
-    before(async () => {
-      soteriaProduct = await deployContract(deployer, artifacts.SoteriaCoverageProduct, [governor.address, registry.address , SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, VERSION]) as SoteriaCoverageProduct;
-      // add Soteria to the risk manager and assign coverage allocation
-      await riskManager.connect(governor).addRiskStrategy(soteriaProduct.address);
-      await riskManager.connect(governor).setStrategyStatus(soteriaProduct.address, 1);
-      await riskManager.connect(governor).setWeightAllocation(soteriaProduct.address, 1000);
-    });
-
-    it("starts with no soteria product", async () => {
-      expect(await policyManager.getSoteriaProduct()).to.equal(ZERO_ADDRESS);
-    });
-
-    it("cannot call setSoteriaActiveCoverAmount if there is no soteria product", async () => {
-      await expect(policyManager.connect(soteriaProduct.signer).setSoteriaActiveCoverAmount(COVER_AMOUNT)).to.revertedWith("no soteria product");
-    });
-
-    it("cannot set zero address soteria product", async () => {
-        await expect(policyManager.connect(governor).setSoteriaProduct(ZERO_ADDRESS)).to.revertedWith("zero address soteria");
-    });
-
-    it("can set soteria product", async () => {
-       let tx = await policyManager.connect(governor).setSoteriaProduct(soteriaProduct.address);
-       await expect(tx).emit(policyManager, "SoteriaProductSet").withArgs(soteriaProduct.address);
-       expect(await policyManager.connect(governor).getSoteriaProduct()).to.equal(soteriaProduct.address);
-    });
-
-    it("cannot call setSoteriaActiveCoverAmount for non-soteria product caller", async () => {
-       await expect(policyManager.connect(governor).setSoteriaActiveCoverAmount(COVER_AMOUNT)).to.revertedWith("only soteria product");
-    });
-
-    it("active cover amount should be updated when soteria policy is sold", async () => {
-      let prevActiveCoverAmount = await policyManager.activeCoverAmount();
-      let prevSoteriaActiveCoverAmount = await policyManager.activeCoverAmountPerStrategy(soteriaProduct.address);
-      let tx = await soteriaProduct.connect(soteriaPolicyholder).activatePolicy(soteriaPolicyholder.address, COVER_AMOUNT, COVER_AMOUNT, {value: COVER_AMOUNT});
-      await expect(tx).emit(soteriaProduct, "PolicyCreated").withArgs(BN.from("1"));
-      await expect(tx).emit(policyManager, "SoteriaProductCoverAmountUpdated").withArgs(COVER_AMOUNT);
-
-      expect(await policyManager.activeCoverAmount()).to.equal(prevActiveCoverAmount.add(COVER_AMOUNT));
-      expect(await policyManager.activeCoverAmountPerStrategy(soteriaProduct.address)).to.equal(prevSoteriaActiveCoverAmount.add(COVER_AMOUNT));
-    });
-  });
-
 });

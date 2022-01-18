@@ -185,7 +185,7 @@ describe("Deployer", function () {
       await registry.setClaimsEscrow(claimsEscrow.address);
       treasury = (await deployContract(owner, artifacts.Treasury, [governor.address, registry.address])) as Treasury;
       await registry.setTreasury(treasury.address);
-      policyManager = (await deployContract(owner,artifacts.PolicyManager,[owner.address])) as PolicyManager;
+      policyManager = (await deployContract(owner,artifacts.PolicyManager,[owner.address, registry.address])) as PolicyManager;
       await registry.setPolicyManager(policyManager.address);
       riskManager = (await deployContract(owner, artifacts.RiskManager, [owner.address, registry.address])) as RiskManager;
       await registry.setRiskManager(riskManager.address);
