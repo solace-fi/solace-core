@@ -8,13 +8,46 @@ const { expect } = chai;
 chai.use(solidity);
 
 
-import { import_artifacts, ArtifactImports } from "./../utilities/artifact_importer";
-import { Weth9 } from "./../../typechain";
-
-const ONE_ETHER = BN.from("1000000000000000000");
+import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
+import { Solace, FarmController, OptionsFarming, PolicyManager, RiskManager, Registry, MockProductV2, Weth9, Treasury } from "../typechain";
+import { burnBlocks } from "./utilities/time";
 
 // contracts
+let solace: Solace;
+let farmController: FarmController;
+let optionsFarming: OptionsFarming;
 let weth: Weth9;
+let registry: Registry;
+let treasury: Treasury;
+let policyManager: PolicyManager;
+let riskManager: RiskManager;
+let product: MockProductV2;
+
+// uniswap contracts
+let uniswapFactory: Contract;
+let uniswapRouter: Contract;
+let lpToken: Contract;
+
+// pools
+let solaceEthPool: Contract;
+
+// vars
+let solacePerSecond = BN.from("100000000000000000000"); // 100 e18
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const ONE_ETHER = BN.from("1000000000000000000");
+const TEN_ETHER = BN.from("10000000000000000000");
+const FIFTY_THOUSAND_ETHER = BN.from("50000000000000000000000");
+const ONE_MILLION_ETHER = BN.from("1000000000000000000000000");
+const ONE_YEAR = 31536000; // in seconds
+let timestamp: number;
+let initTime: number;
+let startTime: number;
+let endTime: number;
+let sptFarmType = 3;
+const price = 10000;
+const duration = 1000;
+const chainID = 31337;
+const deadline = constants.MaxUint256;
 
 describe("Overrides", function () {
   const [deployer, governor] = provider.getWallets();

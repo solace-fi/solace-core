@@ -39,7 +39,7 @@ const PRICE_DAI = BN.from("30000000000000000").mul(SOLACE_PER_XSOLACE); // 3 cen
 const deadline = constants.MaxUint256;
 
 describe("FarmRewards", function () {
-  const [deployer, governor, farmer1, farmer2, trader, receiver] = provider.getWallets();
+  const [deployer, governor, farmer1, farmer2, trader, receiver, user] = provider.getWallets();
   let artifacts: ArtifactImports;
 
   before(async function () {
@@ -204,7 +204,7 @@ describe("FarmRewards", function () {
       await xsolace.connect(governor).transfer(farmRewards.address, ONE_MILLION_ETHER);
     });
     it("non farmer should not be eligible for rewards", async function () {
-      expect(await farmRewards.purchaseableVestedXSolace(trader.address)).eq(0);
+      expect(await farmRewards.purchaseableVestedXSolace(user.address)).eq(0);
     });
     it("farmer should be eligible for rewards", async function () {
       expect(await farmRewards.purchaseableVestedXSolace(farmer1.address)).gt(0);
