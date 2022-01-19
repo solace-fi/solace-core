@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
-import "./Governable.sol";
-import "./Factory.sol";
+import "../utils/Governable.sol";
+import "../utils/Factory.sol";
 import "./RiskStrategy.sol";
 import "./RiskManager.sol";
-import "./interface/IRiskStrategyFactory.sol";
+import "../interfaces/risk/IRiskStrategyFactory.sol";
 
 /**
  * @title RiskStrategyFactory
@@ -47,7 +47,7 @@ contract RiskStrategyFactory is Factory, IRiskStrategyFactory, Governable {
         strategy = _deployMinimalProxy(base_);
         RiskStrategy(strategy).initialize(
             this.governance(),
-            _registry.riskManager(),
+            _registry.get("riskManager"),
             msg.sender,
             products_,
             weights_,
@@ -80,7 +80,7 @@ contract RiskStrategyFactory is Factory, IRiskStrategyFactory, Governable {
         strategy = _deployMinimalProxy(base_, salt_);                                                                                                                
         RiskStrategy(strategy).initialize(
             this.governance(),
-            _registry.riskManager(),
+            _registry.get("riskManager"),
             msg.sender,
             products_,
             weights_,

@@ -5,13 +5,12 @@ import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "../Governable.sol";
-import "../interface/ITreasury.sol";
-import "../interface/IPolicyManager.sol";
-import "../interface/IRegistry.sol";
-import "../interface/IRiskManager.sol";
-import "../interface/IClaimsEscrow.sol";
-import "../interface/ISoteriaCoverageProduct.sol";
+import "../utils/Governable.sol";
+import "../interfaces/utils/ITreasury.sol";
+import "../interfaces/risk/IPolicyManager.sol";
+import "../interfaces/utils/IRegistry.sol";
+import "../interfaces/risk/IRiskManager.sol";
+import "../interfaces/products/ISoteriaCoverageProduct.sol";
 
 /**
  * @title SoteriaCoverageProduct
@@ -123,7 +122,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     ) ERC721("Soteria Policy", "SOPT") Governable(governance_) EIP712(domain_, version_) {
         require(registry_ != address(0x0), "zero address registry");
         _registry = IRegistry(registry_);
-        require(_registry.riskManager() != address(0x0), "zero address riskmanager");
+        require(_registry.get("riskManager") != address(0x0), "zero address riskmanager");
     }
     
     /***************************************
@@ -301,7 +300,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      * @return cover The max amount of cover in `wei`
     */
     function maxCover() public view override returns (uint256 cover) {
-        return IRiskManager(_registry.riskManager()).maxCoverPerStrategy(address(this));
+        return IRiskManager(_registry.get("riskManager")).maxCoverPerStrategy(address(this));
     }
 
     /**
@@ -317,7 +316,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      * @return riskManager_ The `RiskManager` address.
     */
     function riskManager() external view override returns (address riskManager_) {
-        return address(_registry.riskManager());
+        return address(_registry.get("riskManager"));
     }
 
     /**
@@ -357,7 +356,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      * @return amount The active cover limit.
     */
     function activeCoverLimit() public view override returns (uint256 amount) {
-        return IRiskManager(_registry.riskManager()).activeCoverLimitPerStrategy(address(this));
+        return IRiskManager(_registry.get("riskManager")).activeCoverLimitPerStrategy(address(this));
     }
 
     /**
@@ -447,7 +446,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     function setRegistry(address registry_) external override onlyGovernance {
         require(registry_ != address(0x0), "zero address registry");
         _registry = IRegistry(registry_);
-        require(_registry.riskManager() != address(0x0), "zero address riskmanager");
+        require(_registry.get("riskManager") != address(0x0), "zero address riskmanager");
         emit RegistrySet(registry_);
     }
 
@@ -661,7 +660,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      * @param newCoverLimit The new cover limit of the policy.
     */
     function _updateActiveCoverLimit(uint256 currentCoverLimit, uint256 newCoverLimit) internal {
-        IRiskManager(_registry.riskManager()).updateActiveCoverLimitForStrategy(address(this), currentCoverLimit, newCoverLimit);
+        IRiskManager(_registry.get("riskManager")).updateActiveCoverLimitForStrategy(address(this), currentCoverLimit, newCoverLimit);
     }
 
     /**

@@ -5,13 +5,13 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/utils/math/SafeCast.sol";
-import "./Governable.sol";
-import "./ERC721Enhanced.sol";
-import "./interface/IProduct.sol";
-import "./interface/IPolicyManager.sol";
-import "./interface/IPolicyDescriptor.sol";
-import "./interface/IRegistry.sol";
-import "./interface/IRiskManager.sol";
+import "../utils/Governable.sol";
+import "../utils/ERC721Enhanced.sol";
+import "../interfaces/products/IProduct.sol";
+import "../interfaces/risk/IPolicyManager.sol";
+import "../interfaces/risk/IPolicyDescriptor.sol";
+import "../interfaces/utils/IRegistry.sol";
+import "../interfaces/risk/IRiskManager.sol";
 
 /**
  * @title PolicyManager
@@ -201,7 +201,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
      * @param policyID The policy ID.
      * @return description The human readable description of the policy.
      */
-    function tokenURI(uint256 policyID) public view override(ERC721) tokenMustExist(policyID) returns (string memory description) {
+    function tokenURI(uint256 policyID) public view override tokenMustExist(policyID) returns (string memory description) {
         return IPolicyDescriptor(_policyDescriptor).tokenURI(this, policyID);
     }
 
@@ -249,7 +249,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
         _policyInfo[policyID] = info;
         _mint(policyholder, policyID);
         // update active cover limit
-        IRiskManager(_registry.riskManager()).updateActiveCoverLimitForStrategy(riskStrategy, 0, coverAmount);
+        IRiskManager(_registry.get("riskManager")).updateActiveCoverLimitForStrategy(riskStrategy, 0, coverAmount);
 
         emit PolicyCreated(policyID);
         return policyID;
@@ -278,7 +278,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
         require(_policyInfo[policyID].product == msg.sender, "wrong product");
        
         // update active cover limit
-        IRiskManager(_registry.riskManager()).updateActiveCoverLimitForStrategy(riskStrategy, _policyInfo[policyID].coverAmount, coverAmount);
+        IRiskManager(_registry.get("riskManager")).updateActiveCoverLimitForStrategy(riskStrategy, _policyInfo[policyID].coverAmount, coverAmount);
         
         PolicyInfo memory info = PolicyInfo({
             product: msg.sender,
@@ -313,7 +313,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
         require(_policyInfo[policyID].product == msg.sender, "wrong product");
 
         // update active cover limit
-        IRiskManager(_registry.riskManager()).updateActiveCoverLimitForStrategy(riskStrategy, _policyInfo[policyID].coverAmount, coverAmount);
+        IRiskManager(_registry.get("riskManager")).updateActiveCoverLimitForStrategy(riskStrategy, _policyInfo[policyID].coverAmount, coverAmount);
         PolicyInfo memory info = PolicyInfo({
             product: msg.sender,
             positionDescription: _policyInfo[policyID].positionDescription,
@@ -343,7 +343,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
     function _burn(uint256 policyID) internal override {
         super._burn(policyID);
         // update active cover limit
-        IRiskManager(_registry.riskManager()).updateActiveCoverLimitForStrategy(_policyInfo[policyID].riskStrategy, _policyInfo[policyID].coverAmount, 0);
+        IRiskManager(_registry.get("riskManager")).updateActiveCoverLimitForStrategy(_policyInfo[policyID].riskStrategy, _policyInfo[policyID].coverAmount, 0);
         delete _policyInfo[policyID];
         emit PolicyBurned(policyID);
     }
@@ -361,7 +361,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
                 address product = _policyInfo[policyID].product;
                 uint256 coverAmount = _policyInfo[policyID].coverAmount;
                 // update active cover limit
-                IRiskManager(_registry.riskManager()).updateActiveCoverLimitForStrategy(_policyInfo[policyID].riskStrategy,_policyInfo[policyID].coverAmount,0);
+                IRiskManager(_registry.get("riskManager")).updateActiveCoverLimitForStrategy(_policyInfo[policyID].riskStrategy,_policyInfo[policyID].coverAmount,0);
                 IProduct(product).updateActiveCoverAmount(-SafeCast.toInt256(coverAmount));
                 super._burn(policyID);
             }

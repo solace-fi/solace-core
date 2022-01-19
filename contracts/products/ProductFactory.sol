@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
-import "./products/CoverageProduct.sol";
-import "./Factory.sol";
-import "./interface/IProductFactory.sol";
+import "./CoverageProduct.sol";
+import "../utils/Factory.sol";
+import "../interfaces/products/IProductFactory.sol";
 
 /**
  * @title ProductFactory

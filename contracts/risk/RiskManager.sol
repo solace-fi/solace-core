@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
-import "./Governable.sol";
-import "./interface/ICoverageDataProvider.sol";
-import "./interface/IRegistry.sol";
-import "./interface/IProduct.sol";
-import "./interface/IRiskManager.sol";
+import "../utils/Governable.sol";
+import "../interfaces/risk/ICoverageDataProvider.sol";
+import "../interfaces/utils/IRegistry.sol";
+import "../interfaces/products/IProduct.sol";
+import "../interfaces/risk/IRiskManager.sol";
 
 /**
  * @title RiskManager
@@ -57,7 +57,7 @@ contract RiskManager is IRiskManager, Governable {
         require(registry_ != address(0x0), "zero address registry");
         _registry = IRegistry(registry_);
         _partialReservesFactor = MAX_BPS;
-        canUpdateCoverLimit[_registry.policyManager()] = true;
+        canUpdateCoverLimit[_registry.get("policyManager")] = true;
     }
 
     /***************************************
@@ -217,7 +217,7 @@ contract RiskManager is IRiskManager, Governable {
      * @return cover The max amount of cover in wei.
      */
     function maxCover() public view override returns (uint256 cover) {
-        return ICoverageDataProvider(_registry.coverageDataProvider()).maxCover() * MAX_BPS / _partialReservesFactor;
+        return ICoverageDataProvider(_registry.get("coverageDataProvider")).maxCover() * MAX_BPS / _partialReservesFactor;
     }
 
     /**

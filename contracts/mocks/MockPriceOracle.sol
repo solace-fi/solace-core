@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: Unlicense
 pragma solidity 0.8.6;
 
-import "../interface/AaveV2/IAavePriceOracle.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
+interface IAavePriceOracle {
+    function getAssetPrice(address _asset) external view returns(uint256);
+}
 
 /**
  * @title Mock Price Oracle

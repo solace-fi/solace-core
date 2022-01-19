@@ -4,14 +4,16 @@ pragma solidity 0.8.6;
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/cryptography/draft-EIP712Upgradeable.sol";
-import "../GovernableInitializable.sol";
-import "../interface/IPolicyManager.sol";
-import "../interface/IRiskManager.sol";
-import "../interface/IRiskStrategy.sol";
-import "../interface/ITreasury.sol";
-import "../interface/IClaimsEscrow.sol";
-import "../interface/IRegistry.sol";
-import "../interface/IProduct.sol";
+
+
+import "../utils/GovernableInitializable.sol";
+import "../interfaces/risk/IPolicyManager.sol";
+import "../interfaces/risk/IRiskManager.sol";
+import "../interfaces/risk/IRiskStrategy.sol";
+import "../interfaces/utils/ITreasury.sol";
+import "../interfaces/utils/IClaimsEscrow.sol";
+import "../interfaces/utils/IRegistry.sol";
+import "../interfaces/products/IProduct.sol";
 
 /**
  * @title CoverageProduct
@@ -102,7 +104,7 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
         __ReentrancyGuard_init();
         require(address(registry_) != address(0x0), "zero address registry");
         _registry = registry_;
-        _policyManager = IPolicyManager(IRegistry(registry_).policyManager());
+        _policyManager = IPolicyManager(IRegistry(registry_).get("policyManager"));
         require(address(_policyManager) != address(0x0), "zero address policymanager");
         require(minPeriod_ <= maxPeriod_, "invalid period");
         _minPeriod = minPeriod_;
@@ -144,7 +146,7 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
         // return excess payment
         if(msg.value > premium) Address.sendValue(payable(msg.sender), msg.value - premium);
         // transfer premium to the treasury
-        ITreasury(payable(_registry.treasury())).routePremiums{value: premium}();
+        ITreasury(payable(_registry.get("treasury"))).routePremiums{value: premium}();
         emit PolicyCreated(policyID);
         return policyID;
     }
@@ -182,11 +184,11 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
             require(msg.value >= premium, "insufficient payment");
             if(msg.value > premium) Address.sendValue(payable(msg.sender), msg.value - premium);
             // transfer premium to the treasury
-            ITreasury(payable(_registry.treasury())).routePremiums{value: premium}();
+            ITreasury(payable(_registry.get("treasury"))).routePremiums{value: premium}();
         } else {
             if(msg.value > 0) Address.sendValue(payable(msg.sender), msg.value);
             uint256 refundAmount = paidPremium - newPremium;
-            ITreasury(payable(_registry.treasury())).refund(msg.sender, refundAmount);
+            ITreasury(payable(_registry.get("treasury"))).refund(msg.sender, refundAmount);
         }
         // update policy's URI and emit event
         _policyManager.setPolicyInfo(policyID, coverAmount, expirationBlock, price, positionDescription, riskStrategy);
@@ -214,7 +216,7 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
         require(msg.value >= premium, "insufficient payment");
         if(msg.value > premium) Address.sendValue(payable(msg.sender), msg.value - premium);
         // transfer premium to the treasury
-        ITreasury(payable(_registry.treasury())).routePremiums{value: premium}();
+        ITreasury(payable(_registry.get("treasury"))).routePremiums{value: premium}();
         // check that the buyer provided valid period
         uint40 newExpirationBlock = expirationBlock + extension;
         uint40 duration = newExpirationBlock - uint40(block.number);
@@ -259,11 +261,11 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
             uint256 premium = newPremium - paidPremium;
             require(msg.value >= premium, "insufficient payment");
             if(msg.value > premium) Address.sendValue(payable(msg.sender), msg.value - premium);
-            ITreasury(payable(_registry.treasury())).routePremiums{value: premium}();
+            ITreasury(payable(_registry.get("treasury"))).routePremiums{value: premium}();
         } else {
             if(msg.value > 0) Address.sendValue(payable(msg.sender), msg.value);
             uint256 refund = paidPremium - newPremium;
-            ITreasury(payable(_registry.treasury())).refund(msg.sender, refund);
+            ITreasury(payable(_registry.get("treasury"))).refund(msg.sender, refund);
         }
         emit PolicyUpdated(policyID);
     }
@@ -281,7 +283,7 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
         uint40 blocksLeft = expirationBlock - uint40(block.number);
         uint256 refundAmount = blocksLeft * coverAmount * purchasePrice / Q12;
         _policyManager.burn(policyID);
-        ITreasury(payable(_registry.treasury())).refund(msg.sender, refundAmount);
+        ITreasury(payable(_registry.get("treasury"))).refund(msg.sender, refundAmount);
         _activeCoverAmount -= coverAmount;
         _activeCoverAmountPerStrategy[riskStrategy] -= coverAmount;
         emit PolicyCanceled(policyID);
@@ -323,7 +325,7 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
         // burn policy
         _policyManager.burn(policyID);
         // submit claim to ClaimsEscrow
-        IClaimsEscrow(payable(_registry.claimsEscrow())).receiveClaim(policyID, policyholder, amountOut);
+        IClaimsEscrow(payable(_registry.get("claimsEscrow"))).receiveClaim(policyID, policyholder, amountOut);
         emit ClaimSubmitted(policyID);
     }
 

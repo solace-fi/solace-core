@@ -3,13 +3,13 @@ pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-import "./interface/ICoverageDataProvider.sol";
-import "./interface/IRegistry.sol";
-import "./interface/IVault.sol";
-import "./interface/ISOLACE.sol";
-import "./interface/AaveV2/IAavePriceOracle.sol";
-import "./interface/Sushiswap/ISushiswapLPToken.sol";
-import "./Governable.sol";
+import "../interfaces/risk/ICoverageDataProvider.sol";
+import "../interfaces/utils/IRegistry.sol";
+import "../interfaces/utils/IVault.sol";
+import "../interfaces/ISOLACE.sol";
+import "../interfaces/utils/Aave/IAavePriceOracle.sol";
+import "../interfaces/utils/Sushiswap/ISushiswapLPToken.sol";
+import "../utils/Governable.sol";
 
 /**
  * @title  CoverageDataProvider
@@ -69,11 +69,11 @@ contract CoverageDataProvider is ICoverageDataProvider, Governable {
       require(aaveV2PriceOracle_ != address(0x0), "zero address oracle");
       require(solaceUsdcPool_ != address(0x0), "zero address pool");
       _registry = IRegistry(registry_);
-      require(_registry.solace() != address(0x0), "zero address solace");
+      require(_registry.get("solace") != address(0x0), "zero address solace");
 
       _priceOracle = IAavePriceOracle(aaveV2PriceOracle_);
       _solaceUsdcPool = ISushiswapLPToken(solaceUsdcPool_);
-      _solace = ISOLACE(_registry.solace());
+      _solace = ISOLACE(_registry.get("solace"));
 
       // SOLACE
       _addAsset(address(_solace), AssetType.SOLACE);
@@ -188,8 +188,8 @@ contract CoverageDataProvider is ICoverageDataProvider, Governable {
     function setRegistry(address registry_) external override onlyGovernance {
       require(registry_ != address(0x0), "zero address registry");
       _registry = IRegistry(registry_);
-      require(_registry.solace() != address(0x0), "zero address solace");
-      _solace = ISOLACE(_registry.solace());
+      require(_registry.get("solace") != address(0x0), "zero address solace");
+      _solace = ISOLACE(_registry.get("solace"));
       emit RegistryUpdated(registry_);
       emit SolaceUpdated(address(_solace));
     }
@@ -311,7 +311,7 @@ contract CoverageDataProvider is ICoverageDataProvider, Governable {
     */
     function maxCover() external view override returns (uint256 cover) {
       // get vault balance
-      address vault = _registry.vault();
+      address vault = _registry.get("vault");
       if (vault != address(0x0)) {
         cover += IVault(payable(vault)).totalAssets();
       }
