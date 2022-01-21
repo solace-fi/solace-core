@@ -7,11 +7,11 @@ import chai from "chai";
 const { expect } = chai;
 chai.use(solidity);
 
-import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { burnBlocks, burnBlocksUntil } from "./utilities/time";
-import { encodeAddresses } from "./utilities/positionDescription";
+import { import_artifacts, ArtifactImports } from "../utilities/artifact_importer";
+import { burnBlocks, burnBlocksUntil } from "../utilities/time";
+import { encodeAddresses } from "../utilities/positionDescription";
 
-import { PolicyManager, MockProductV2, Treasury, Registry, RiskManager, PolicyDescriptorV2, Vault, Weth9, MockRiskStrategy, CoverageDataProvider, ProductFactory } from "../typechain";
+import { PolicyManager, Registry, RiskManager, Vault, Weth9, MockRiskStrategy, CoverageDataProvider, SoteriaCoverageProduct } from "../../typechain";
 
 describe("PolicyManager", function() {
   let artifacts: ArtifactImports;
@@ -19,8 +19,6 @@ describe("PolicyManager", function() {
 
   // contracts
   let policyManager: PolicyManager;
-  let mockProduct: MockProductV2;
-  let treasury: Treasury;
   let vault: Vault;
   let registry: Registry;
   let coverageDataProvider: CoverageDataProvider;
@@ -28,8 +26,8 @@ describe("PolicyManager", function() {
   let riskStrategy: MockRiskStrategy;
   let baseRiskStrategy: MockRiskStrategy;
   let riskStrategyFactory: Contract;
-  let policyDescriptor: PolicyDescriptorV2;
   let weth: Weth9;
+  let soteriaCoverageProduct: SoteriaCoverageProduct;
 
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
   const name = "Solace Policy";
@@ -55,10 +53,7 @@ describe("PolicyManager", function() {
 
     // deploy weth
     weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
-    await registry.connect(governor).setWeth(weth.address);
-
-    // deploy treasury contract
-    treasury = (await deployContract(deployer, artifacts.Treasury, [governor.address, registry.address])) as Treasury;
+    await registry.connect(governor).set(["weth"], [weth.address]);
 
     // deploy vault contract
     vault = (await deployContract(deployer,artifacts.Vault,[governor.address,registry.address])) as Vault;
@@ -66,24 +61,17 @@ describe("PolicyManager", function() {
     // deploy risk manager contract
     riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
 
-    // deploy nft descriptor
-    policyDescriptor = (await deployContract(deployer, artifacts.PolicyDescriptorV2, [governor.address])) as PolicyDescriptorV2;
-
     // deploy coverage provider contract
     await registry.connect(governor).setPolicyManager(policyManager.address);
     await registry.connect(governor).setSolace(solace.address);
 
     coverageDataProvider = (await deployContract(deployer, artifacts.CoverageDataProvider, [governor.address, registry.address, priceOracle.address, solaceUsdcPool.address])) as CoverageDataProvider;
 
-    await registry.connect(governor).setTreasury(treasury.address);
-    await registry.connect(governor).setVault(vault.address);
-    await registry.connect(governor).setPolicyManager(policyManager.address);
-    await registry.connect(governor).setRiskManager(riskManager.address);
-    await deployer.sendTransaction({ to: treasury.address, value: BN.from("10000000000000000") });
+    await registry.connect(governor).set(["vault"], [vault.address])
+    await registry.connect(governor).set(["policyManager"], [policyManager.address])
+    await registry.connect(governor).set(["riskManager"], [riskManager.address])
     await governor.sendTransaction({ to: vault.address, value: BN.from("9000000000000000000000") });
-
-    await vault.connect(governor).addRequestor(treasury.address);
-    await registry.connect(governor).setCoverageDataProvider(coverageDataProvider.address);
+    await registry.connect(governor).set(["coverageDataProvider"], [coverageDataProvider.address])
 
     // deploy risk strategy factory
     let riskStrategyContractFactory = await ethers.getContractFactory("RiskStrategyFactory", deployer);
@@ -152,14 +140,14 @@ describe("PolicyManager", function() {
       await policyManager.connect(governor).acceptGovernance();
     });
 
-    it("rejects setting new nft token descriptor by non governor", async function() {
-      await expect(policyManager.connect(user).setPolicyDescriptor(policyDescriptor.address)).to.be.revertedWith("!governance");
-    });
-    it("can set new nft token descriptor", async function() {
-      let tx = await policyManager.connect(governor).setPolicyDescriptor(policyDescriptor.address);
-      expect(tx).to.emit(policyManager, "PolicyDescriptorSet").withArgs(policyDescriptor.address);
-      expect(await policyManager.connect(governor).policyDescriptor()).to.equal(policyDescriptor.address);
-    });
+    // it("rejects setting new nft token descriptor by non governor", async function() {
+    //   await expect(policyManager.connect(user).setPolicyDescriptor(policyDescriptor.address)).to.be.revertedWith("!governance");
+    // });
+    // it("can set new nft token descriptor", async function() {
+    //   let tx = await policyManager.connect(governor).setPolicyDescriptor(policyDescriptor.address);
+    //   expect(tx).to.emit(policyManager, "PolicyDescriptorSet").withArgs(policyDescriptor.address);
+    //   expect(await policyManager.connect(governor).policyDescriptor()).to.equal(policyDescriptor.address);
+    // });
   });
 
   describe("products", function() {

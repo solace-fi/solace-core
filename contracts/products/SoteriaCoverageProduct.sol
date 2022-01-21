@@ -6,8 +6,6 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "../utils/Governable.sol";
-import "../interfaces/utils/ITreasury.sol";
-import "../interfaces/risk/IPolicyManager.sol";
 import "../interfaces/utils/IRegistry.sol";
 import "../interfaces/risk/IRiskManager.sol";
 import "../interfaces/products/ISoteriaCoverageProduct.sol";
@@ -26,15 +24,6 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
 
     /// @notice Registry contract.
     IRegistry internal _registry;
-
-    /// @notice Premium pool address to which charged premiums will be sent
-    address internal _premiumPool;
-
-    /// @notice Premium collector who has the exclusive privilege of calling chargePremiums() function
-    address internal _premiumCollector;
-
-    /// @notice Cover promotion admin who has the exclusive privilege of calling setRewardPoints() function
-    address internal _coverPromotionAdmin;
 
     /// @notice Cannot buy new policies while paused. (Default is False)
     bool internal _paused;
@@ -320,30 +309,6 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     }
 
     /**
-     * @notice Returns Premium Pool contract address.
-     * @return premiumPool_ The Premium Pool address.
-    */
-    function premiumPool() external view override returns (address premiumPool_) {
-        return _premiumPool;
-    }
-
-    /**
-     * @notice Returns Premium Collector contract address.
-     * @return premiumCollector_ The Premium Collector address.
-    */
-    function premiumCollector() external view override returns (address premiumCollector_) {
-        return _premiumCollector;
-    }
-
-    /**
-     * @notice Returns Cover promotion admin address
-     * @return coverPromotionAdmin_ The Cover promotion admin address.
-    */
-    function coverPromotionAdmin() external view override returns (address coverPromotionAdmin_) {
-        return _coverPromotionAdmin;
-    }
-
-    /**
      * @notice Returns whether or not product is currently in paused state.
      * @return status True if product is paused.
     */
@@ -451,33 +416,6 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     }
 
     /**
-     * @notice Sets the Premium Pool contract address.
-    */
-    function setPremiumPool(address premiumPool_) external override onlyGovernance {
-        require(premiumPool_ != address(0x0), "zero address premium pool");
-        _premiumPool = premiumPool_;
-        emit PremiumPoolSet(premiumPool_);
-    }
-
-    /**
-     * @notice Sets the Premium Collector contract address.
-    */
-    function setPremiumCollector(address premiumCollector_) external override onlyGovernance {
-        require(premiumCollector_ != address(0x0), "zero address premium collector");
-        _premiumCollector = premiumCollector_;
-        emit PremiumCollectorSet(premiumCollector_);
-    }
-
-    /**
-     * @notice Sets the Cover promotion admin contract address.
-    */
-    function setCoverPromotionAdmin(address coverPromotionAdmin_) external override onlyGovernance {
-        require(coverPromotionAdmin_ != address(0x0), "zero address cover promotion admin");
-        _coverPromotionAdmin = coverPromotionAdmin_;
-        emit CoverPromotionAdminSet(coverPromotionAdmin_);
-    }
-
-    /**
      * @notice Pauses or unpauses buying and extending policies.
      * Deactivating policies are unaffected by pause.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
@@ -550,7 +488,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      * @param rewardPoints_ Desired amount of reward points.
     */
     function setRewardPoints(address policyholder_, uint256 rewardPoints_) external override {
-        require(msg.sender == _coverPromotionAdmin, "not cover promotion admin");
+        require(msg.sender == _registry.get("coverPromotionAdmin"), "not cover promotion admin");
         _rewardPointsOf[policyholder_] = rewardPoints_;
         emit RewardPointsSet(policyholder_, rewardPoints_);
     }  
@@ -566,7 +504,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     */
     function chargePremiums(address[] calldata holders_, uint256[] calldata premiums_) external payable override whileUnpaused {
         uint256 count = holders_.length;
-        require(msg.sender == _premiumCollector, "not premium collector");
+        require(msg.sender == _registry.get("premiumCollector"), "not premium collector");
         require(count == premiums_.length, "length mismatch");
         require(count <= policyCount(), "policy count exceeded");
         uint256 amountToPayPremiumPool = 0;
@@ -600,7 +538,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
             }  
         }
         // single transfer to the premium pool
-        Address.sendValue(payable(_premiumPool), amountToPayPremiumPool);
+        Address.sendValue(payable(_registry.get("premiumPool")), amountToPayPremiumPool);
     }
 
     /***************************************

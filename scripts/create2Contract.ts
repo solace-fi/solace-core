@@ -59,7 +59,7 @@ async function _initCodeGetter(wallet: Signer, factoryOrContractJson: ContractJS
   let contract;
   try {
     contract = await deployContract(failDeployer, factoryOrContractJson, args, overrideOptions);
-  } catch(e) {
+  } catch(e: any) {
     //console.error(e);
     return e.tx.data;
   }

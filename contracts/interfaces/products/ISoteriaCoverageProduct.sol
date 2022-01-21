@@ -19,15 +19,6 @@ interface ISoteriaCoverageProduct {
     /// @notice Emitted when Registry address is updated.
     event RegistrySet(address registry);
 
-    /// @notice Emitted when Premium Pool address is updated.
-    event PremiumPoolSet(address premiumPool);
-
-    /// @notice Emitted when Premium Collector address is updated.
-    event PremiumCollectorSet(address premiumCollector);
-
-    /// @notice Emitted when Cover promotion admin address is updated.
-    event CoverPromotionAdminSet(address coverPromotionAdmin);
-
     /// @notice Emitted when pause is set.
     event PauseSet(bool pause);
 
@@ -169,24 +160,6 @@ interface ISoteriaCoverageProduct {
     function riskManager() external view returns (address riskManager_);
 
     /**
-     * @notice Returns Premium Pool contract address.
-     * @return premiumPool_ The Premium Pool address.
-    */
-    function premiumPool() external view returns (address premiumPool_);
-
-    /**
-     * @notice Returns Premium Collector contract address.
-     * @return premiumCollector_ The Premium Collector address.
-    */
-    function premiumCollector() external view returns (address premiumCollector_);
-
-    /**
-     * @notice Returns Cover promotion admin address
-     * @return coverPromotionAdmin_ The Cover promotion admin address.
-    */
-    function coverPromotionAdmin() external view returns (address coverPromotionAdmin_);
-
-    /**
      * @notice Returns whether or not product is currently in paused state.
      * @return status True if product is paused.
     */
@@ -263,21 +236,6 @@ interface ISoteriaCoverageProduct {
      * @param registry_ The address of `Registry` contract.
     */
     function setRegistry(address registry_) external;
-
-    /**
-     * @notice Sets the Premium Pool contract address.
-    */
-    function setPremiumPool(address premiumPool_) external;
-
-    /**
-     * @notice Sets the Premium Collector contract address.
-    */
-    function setPremiumCollector(address premiumCollector_) external;
-
-    /**
-     * @notice Sets the Cover promotion admin contract address.
-    */
-    function setCoverPromotionAdmin(address coverPromotionAdmin_) external;
 
     /**
      * @notice Pauses or unpauses buying and extending policies.

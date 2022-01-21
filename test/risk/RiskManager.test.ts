@@ -8,8 +8,8 @@ import chai from "chai";
 const { expect } = chai;
 chai.use(solidity);
 
-import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { RiskManager, Registry, Vault, Weth9, PolicyManager, MockProductV2, CoverageDataProvider, ProductFactory, RiskStrategy, MockRiskStrategy } from "../typechain";
+import { import_artifacts, ArtifactImports } from "../utilities/artifact_importer";
+import { RiskManager, Registry, Vault, Weth9, PolicyManager, MockProductV2, CoverageDataProvider, ProductFactory, RiskStrategy, MockRiskStrategy } from "../../typechain";
 
 const SUBMIT_CLAIM_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("MockProductSubmitClaim(uint256 policyID,address claimant,uint256 amountOut,uint256 deadline)"));
 const DOMAIN_NAME = "Solace.fi-MockProduct";
@@ -44,16 +44,16 @@ describe("RiskManager", function () {
 
     registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
     weth = (await deployContract(deployer,artifacts.WETH)) as Weth9;
-    await registry.connect(governor).setWeth(weth.address);
+    await registry.connect(governor).set(["weth"], [weth.address])
     vault = (await deployContract(deployer,artifacts.Vault,[deployer.address,registry.address])) as Vault;
-    await registry.connect(governor).setVault(vault.address);
+    await registry.connect(governor).set(["vault"], [vault.address])
     policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address, registry.address])) as PolicyManager;
-    await registry.connect(governor).setPolicyManager(policyManager.address);
-    await registry.connect(governor).setSolace(solace.address);
+    await registry.connect(governor).set(["policyManager"], [policyManager.address])
+    await registry.connect(governor).set(["solace"], [solace.address])
     coverageDataProvider = (await deployContract(deployer, artifacts.CoverageDataProvider, [governor.address, registry.address, priceOracle.address, solaceUsdcPool.address])) as CoverageDataProvider;
-    await registry.connect(governor).setCoverageDataProvider(coverageDataProvider.address);
+    await registry.connect(governor).set(["coverageDataProvider"], [coverageDataProvider.address])
     riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
-    await registry.connect(governor).setRiskManager(riskManager.address);
+    await registry.connect(governor).set(["riskManager"], [riskManager.address])
 
     // deploy product factory
     productFactory = (await deployContract(deployer, artifacts.ProductFactory)) as ProductFactory;

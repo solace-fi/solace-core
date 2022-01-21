@@ -4,8 +4,6 @@ pragma solidity 0.8.6;
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/cryptography/draft-EIP712Upgradeable.sol";
-
-
 import "../utils/GovernableInitializable.sol";
 import "../interfaces/risk/IPolicyManager.sol";
 import "../interfaces/risk/IRiskManager.sol";

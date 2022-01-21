@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
-import "../utils/GovernableInitializable.sol";
+import "../utils//GovernableInitializable.sol";
 import "../interfaces/products/IProduct.sol";
 import "../interfaces/risk/IRiskManager.sol";
 import "../interfaces/risk/IRiskStrategy.sol";

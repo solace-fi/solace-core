@@ -4,14 +4,13 @@ pragma solidity 0.8.6;
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
-import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "../utils/Governable.sol";
 import "../utils/ERC721Enhanced.sol";
-import "../interfaces/products/IProduct.sol";
 import "../interfaces/risk/IPolicyManager.sol";
 import "../interfaces/risk/IPolicyDescriptor.sol";
 import "../interfaces/utils/IRegistry.sol";
 import "../interfaces/risk/IRiskManager.sol";
+import "../interfaces/products/ISoteriaCoverageProduct.sol";
 
 /**
  * @title PolicyManager
@@ -362,7 +361,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
                 uint256 coverAmount = _policyInfo[policyID].coverAmount;
                 // update active cover limit
                 IRiskManager(_registry.get("riskManager")).updateActiveCoverLimitForStrategy(_policyInfo[policyID].riskStrategy,_policyInfo[policyID].coverAmount,0);
-                IProduct(product).updateActiveCoverAmount(-SafeCast.toInt256(coverAmount));
+                ISoteriaCoverageProduct(product).updateCoverLimit(0, 0);
                 super._burn(policyID);
             }
         }

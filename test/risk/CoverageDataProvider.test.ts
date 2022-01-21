@@ -9,8 +9,8 @@ import chai from "chai";
 const { expect } = chai;
 chai.use(solidity);
 
-import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Solace, MockErc20, MockSlp, CoverageDataProvider, Registry, MockErc20Decimals, Vault, Weth9, MockPriceOracle } from "../typechain";
+import { import_artifacts, ArtifactImports } from "../utilities/artifact_importer";
+import { Solace, MockErc20, MockSlp, CoverageDataProvider, Registry, MockErc20Decimals, Vault, Weth9, MockPriceOracle } from "../../typechain";
 import { emit } from "process";
 
 describe("CoverageDataProvider", function() {
@@ -79,10 +79,10 @@ describe("CoverageDataProvider", function() {
     // deploy registry
     registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
     weth9 = (await deployContract(deployer,artifacts.WETH)) as Weth9;
-    await registry.connect(governor).setWeth(weth9.address); 
+    await registry.connect(governor).set(["weth"], [weth9.address]); 
     vault = (await deployContract(deployer,artifacts.Vault,[deployer.address,registry.address])) as Vault;
-    await registry.connect(governor).setVault(vault.address);
-    await registry.connect(governor).setSolace(solace.address);
+    await registry.connect(governor).set(["vault"], [vault.address]); 
+    await registry.connect(governor).set(["solace"], [solace.address]); 
 
   });
 
@@ -105,7 +105,7 @@ describe("CoverageDataProvider", function() {
 
     it("should revert if SOLACE is zero address", async function () {
       let registry2 = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
-      await expect(deployContract(deployer, artifacts.CoverageDataProvider, [governor.address, registry2.address, AAVE_PRICE_ORACLE, SOLACE_USDC_POOL])).to.be.revertedWith("zero address solace");
+      await expect(deployContract(deployer, artifacts.CoverageDataProvider, [governor.address, registry2.address, AAVE_PRICE_ORACLE, SOLACE_USDC_POOL])).to.be.revertedWith("key not in mapping");
     });
 
     it("should deploy", async function () {
@@ -253,11 +253,11 @@ describe("CoverageDataProvider", function() {
     });
 
     it("should revert for zero address solace", async function() {
-      await expect(coverageDataProvider.connect(governor).setRegistry(registry2.address)).to.be.revertedWith("zero address solace");
+      await expect(coverageDataProvider.connect(governor).setRegistry(registry2.address)).to.be.revertedWith("key not in mapping");
     });
 
     it("should set registry", async function() {
-      await registry2.connect(governor).setSolace(solace.address);
+      await registry2.connect(governor).set(["solace"], [solace.address]);
       let tx = await coverageDataProvider.connect(governor).setRegistry(registry2.address);
       await expect(tx).emit(coverageDataProvider, "RegistryUpdated").withArgs(registry2.address);
     });
@@ -355,7 +355,7 @@ describe("CoverageDataProvider", function() {
 
     it("should start with SOLACE", async function() {
       const asset = await coverageDataProvider.connect(user).assetAt(1);
-      expect(asset.asset_).to.be.equal(await registry.solace());
+      expect(asset.asset_).to.be.equal(await registry.get("solace"));
       expect(asset.assetType_).to.be.equal(ASSET_TYPE.SOLACE);
     });
 

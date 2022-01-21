@@ -173,17 +173,6 @@ describe("Deployer", function () {
       // deploy with create
       registry = (await deployContract(owner, artifacts.Registry, [owner.address])) as Registry;
       weth = (await deployContract(owner,artifacts.WETH)) as Weth9;
-      await registry.setWeth(weth.address);
-      vault = (await deployContract(owner,artifacts.Vault,[owner.address,registry.address])) as Vault;
-      await registry.setVault(vault.address);
-      claimsEscrow = (await deployContract(owner,artifacts.ClaimsEscrow,[owner.address,registry.address])) as ClaimsEscrow;
-      await registry.setClaimsEscrow(claimsEscrow.address);
-      treasury = (await deployContract(owner, artifacts.Treasury, [governor.address, registry.address])) as Treasury;
-      await registry.setTreasury(treasury.address);
-      policyManager = (await deployContract(owner,artifacts.PolicyManager,[owner.address, registry.address])) as PolicyManager;
-      await registry.setPolicyManager(policyManager.address);
-      riskManager = (await deployContract(owner, artifacts.RiskManager, [owner.address, registry.address])) as RiskManager;
-      await registry.setRiskManager(riskManager.address);
       // deploy with create2
       let contracts = [registry, weth];
       let initcodes = contracts.map((contract: Contract) => { return contract.deployTransaction.data; });

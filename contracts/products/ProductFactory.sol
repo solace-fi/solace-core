@@ -2,7 +2,7 @@
 pragma solidity 0.8.6;
 
 import "./CoverageProduct.sol";
-import "../utils/Factory.sol";
+import "../utils//Factory.sol";
 import "../interfaces/products/IProductFactory.sol";
 
 /**

@@ -4,14 +4,14 @@ import { MockProvider } from "ethereum-waffle";
 const provider: MockProvider = waffle.provider;
 import { BigNumber as BN, BigNumberish, constants, Wallet , utils} from "ethers";
 import { Contract, ContractFactory } from "@ethersproject/contracts";
-import { toBytes32 } from "./utilities/setStorage";
+import { toBytes32 } from "../utilities/setStorage";
 
 import chai from "chai";
 const { expect } = chai;
 chai.use(solidity);
 
-import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { RiskManager, Registry, Vault, Weth9, PolicyManager, MockProductV2, MockRiskStrategy, CoverageDataProvider, ProductFactory, RiskStrategy } from "../typechain";
+import { import_artifacts, ArtifactImports } from "../utilities/artifact_importer";
+import { RiskManager, Registry, Vault, Weth9, PolicyManager, MockRiskStrategy, CoverageDataProvider, RiskStrategy, SoteriaCoverageProduct } from "../../typechain";
 
 describe("RiskStrategy", function () {
   let artifacts: ArtifactImports;
@@ -27,10 +27,10 @@ describe("RiskStrategy", function () {
   let riskStrategyFactory: Contract;
   let riskStrategyContractFactory: ContractFactory;
   let coverageDataProvider: CoverageDataProvider;
-  let productFactory: ProductFactory;
-  let product4: MockProductV2;
-  let product5: MockProductV2;
-  let product6: MockProductV2;
+  let soteriaCoverageProduct: SoteriaCoverageProduct;
+  let product4: SoteriaCoverageProduct
+  let product5: SoteriaCoverageProduct
+  let product6: SoteriaCoverageProduct
 
   let weth: Weth9;
 
@@ -40,54 +40,34 @@ describe("RiskStrategy", function () {
   const MAX_PRICE = BN.from("16777215"); // max uint24
   const SUBMIT_CLAIM_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("MockProductSubmitClaim(uint256 policyID,address claimant,uint256 amountOut,uint256 deadline)"));
   const DOMAIN_NAME = "Solace.fi-MockProduct"; 
+  const VERSION = "1";
 
   before(async function () {
     artifacts = await import_artifacts();
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
 
     registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
-    weth = (await deployContract(deployer,artifacts.WETH)) as Weth9;
-    await registry.connect(governor).setWeth(weth.address);
-    vault = (await deployContract(deployer,artifacts.Vault,[deployer.address,registry.address])) as Vault;
-    await registry.connect(governor).setVault(vault.address);
+    await registry.connect(governor).set(["solace"], [solace.address])
+    weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
+    await registry.connect(governor).set(["weth"], [weth.address])
+    vault = (await deployContract(deployer, artifacts.Vault, [governor.address, registry.address])) as Vault;
+    await registry.connect(governor).set(["vault"], [vault.address])
     policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address, registry.address])) as PolicyManager;
-    await registry.connect(governor).setPolicyManager(policyManager.address);
-    await registry.connect(governor).setSolace(solace.address);
-    coverageDataProvider = (await deployContract(deployer, artifacts.CoverageDataProvider, [governor.address, registry.address, priceOracle.address, solaceUsdcPool.address])) as CoverageDataProvider;
-    await registry.connect(governor).setCoverageDataProvider(coverageDataProvider.address);
+    await registry.connect(governor).set(["policyManager"], [policyManager.address])
     riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
-    await registry.connect(governor).setRiskManager(riskManager.address);
+    await registry.connect(governor).set(["riskManager"], [riskManager.address])
+    coverageDataProvider = (await deployContract(deployer, artifacts.CoverageDataProvider, [governor.address, registry.address, priceOracle.address, solaceUsdcPool.address])) as CoverageDataProvider;
+    await registry.connect(governor).set(["coverageDataProvider"], [coverageDataProvider.address])
 
-    // deploy product factory
-    productFactory = (await deployContract(deployer, artifacts.ProductFactory)) as ProductFactory;
-
-    // create product4
-    let baseProduct4 = (await deployContract(deployer, artifacts.MockProductV2)) as MockProductV2;
-    let tx1 = await productFactory.createProduct(baseProduct4.address, governor.address, registry.address, 0, 1000, SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, "1");
-    let events1 = (await tx1.wait())?.events;
-    if(events1 && events1.length > 0) {
-      let event1 = events1[0];
-      product4 = await ethers.getContractAt(artifacts.MockProductV2.abi, event1?.args?.["deployment"]) as MockProductV2;
-    } else throw "no deployment";
-
-    // create product5
-    let baseProduct5 = (await deployContract(deployer, artifacts.MockProductV2)) as MockProductV2;
-    let tx2 = await productFactory.createProduct(baseProduct5.address, governor.address, registry.address, 0, 1000, SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, "1");
-    let events2 = (await tx2.wait())?.events;
-    if(events2 && events2.length > 0) {
-      let event2 = events2[0];
-      product5 = await ethers.getContractAt(artifacts.MockProductV2.abi, event2?.args?.["deployment"]) as MockProductV2;
-    } else throw "no deployment";
-
-    // create product6
-    let baseProduct6 = (await deployContract(deployer, artifacts.MockProductV2)) as MockProductV2;
-    let tx3 = await productFactory.createProduct(baseProduct6.address, governor.address, registry.address, 0, 1000, SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, "1");
-    let events3 = (await tx3.wait())?.events;
-    if(events3 && events3.length > 0) {
-      let event3 = events3[0];
-      product6 = await ethers.getContractAt(artifacts.MockProductV2.abi, event3?.args?.["deployment"]) as MockProductV2;
-    } else throw "no deployment";
+    // deploy soteria coverage product
+    soteriaCoverageProduct = await deployContract(deployer, artifacts.SoteriaCoverageProduct, [governor.address, registry.address , DOMAIN_NAME, VERSION]) as SoteriaCoverageProduct;
+    expect(soteriaCoverageProduct.address).to.not.undefined;
  
+    // deploy products 4, 5, and 6
+    product4 = await deployContract(deployer, artifacts.SoteriaCoverageProduct, [governor.address, registry.address , DOMAIN_NAME, VERSION]) as SoteriaCoverageProduct;
+    product5 = await deployContract(deployer, artifacts.SoteriaCoverageProduct, [governor.address, registry.address , DOMAIN_NAME, VERSION]) as SoteriaCoverageProduct;
+    product6 = await deployContract(deployer, artifacts.SoteriaCoverageProduct, [governor.address, registry.address , DOMAIN_NAME, VERSION]) as SoteriaCoverageProduct;
+
     // create base risk strategy
     baseRiskStrategy = (await deployContract(deployer, artifacts.MockRiskStrategy)) as MockRiskStrategy;
 
@@ -97,6 +77,7 @@ describe("RiskStrategy", function () {
     await policyManager.connect(governor).addProduct(product4.address);
     await policyManager.connect(governor).addProduct(product5.address);
     await policyManager.connect(governor).addProduct(product6.address);
+    await policyManager.connect(governor).addProduct(soteriaCoverageProduct.address);
   });
 
   describe("deployment", function () {
@@ -106,8 +87,8 @@ describe("RiskStrategy", function () {
     before(async function() {
       // deploy mock registry
       mockRegistry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
-      expect(await mockRegistry.policyManager()).to.equal(ZERO_ADDRESS);
-
+      await expect(mockRegistry.get("policyManager")).to.be.revertedWith("key not in mapping")
+      
       // get risk strategy factory contract
       riskStrategyContractFactory = await ethers.getContractFactory("RiskStrategyFactory", deployer);
 
@@ -129,15 +110,15 @@ describe("RiskStrategy", function () {
     });
 
     it("cannot create if risk manager is zero address", async function () {
-      await expect(mockStrategyFactory.createRiskStrategy(baseRiskStrategy.address, [product1.address],[1],[10000],[1])).to.be.revertedWith("zero address risk manager");
+      await expect(mockStrategyFactory.createRiskStrategy(baseRiskStrategy.address, [product1.address],[1],[10000],[1])).to.be.revertedWith("key not in mapping");
     });
 
     it("cannot create2 if risk manager is zero address", async function () {
-      await expect(mockStrategyFactory.create2RiskStrategy(baseRiskStrategy.address,toBytes32(0), [product1.address],[1],[10000],[1])).to.be.revertedWith("zero address risk manager");
+      await expect(mockStrategyFactory.create2RiskStrategy(baseRiskStrategy.address,toBytes32(0), [product1.address],[1],[10000],[1])).to.be.revertedWith("key not in mapping");
     });
 
     it("can deploy with create", async function () {
-      let tx = await riskStrategyFactory.createRiskStrategy(baseRiskStrategy.address, [product4.address, product5.address, product6.address],[1,2,3],[10000,10000,10000],[1,1,1]);
+      let tx = await riskStrategyFactory.createRiskStrategy(baseRiskStrategy.address, [soteriaCoverageProduct.address],[1],[10000],[1]);
 
       let events = (await tx.wait())?.events;
       if (events && events.length > 0) {
@@ -147,8 +128,8 @@ describe("RiskStrategy", function () {
         throw "no risk strategy deployment!";
       }
       expect(tx).emit(riskStrategyFactory, "StrategyCreated").withArgs(events[0]["args"]["deployment"], deployer.address);
-      expect(await riskStrategy.connect(user).numProducts()).to.eq(3);
-      expect(await riskStrategy.connect(user).product(1)).to.equal(product4.address);
+      expect(await riskStrategy.connect(user).numProducts()).to.eq(1);
+      expect(await riskStrategy.connect(user).product(1)).to.equal(soteriaCoverageProduct.address);
     });
 
     it("can deploy with create2", async function () {
@@ -217,7 +198,7 @@ describe("RiskStrategy", function () {
       riskStrategyFactory = await riskStrategyContractFactory.deploy(registry.address, governor.address);
       expect(riskStrategyFactory.connect(user).bytecode).to.not.null;
 
-      let tx = await riskStrategyFactory.createRiskStrategy(baseRiskStrategy.address, [product4.address, product5.address, product6.address],[1,2,3],[10000,10000,10000],[1,1,1]);
+      let tx = await riskStrategyFactory.createRiskStrategy(baseRiskStrategy.address, [soteriaCoverageProduct.address],[1],[10000],[1]);
       let events = (await tx.wait())?.events;
       if (events && events.length > 0) {
         let event = events[0];
@@ -231,15 +212,16 @@ describe("RiskStrategy", function () {
     it("should start with defaults", async function () {
       expect(await riskStrategy.status()).to.be.false;
       expect(await riskStrategy.strategist()).to.equal(deployer.address);
-      expect(await riskStrategy.numProducts()).to.equal(3);
+      expect(await riskStrategy.numProducts()).to.equal(1);
       expect(await riskStrategy.product(0)).to.equal(ZERO_ADDRESS);
       await expect(riskStrategy.productRiskParams(product1.address)).to.be.revertedWith("product inactive");
-      expect(await riskStrategy.weightSum()).to.equal(6);
+      expect(await riskStrategy.weightSum()).to.equal(1);
       expect(await riskStrategy.weightAllocation()).to.equal(NO_WEIGHT);
       expect(await riskStrategy.productIsActive(ZERO_ADDRESS)).to.be.false;
   
-      let products = [product4.address, product5.address, product6.address];
-      for (let i = 1; i < 3; i++) {
+      let products = [soteriaCoverageProduct.address];
+
+      for (let i = 1; i < 1; i++) {
         expect(await riskStrategy.productIsActive(products[i-1])).to.be.true;
         expect(await riskStrategy.product(i)).to.equal(products[i-1]);
         let params = await riskStrategy.productRiskParams(products[i-1]);
@@ -451,7 +433,7 @@ describe("RiskStrategy", function () {
     it("can accept risk at max cover per product", async function () {
       // new policy
       let mc = await riskStrategy.maxCoverPerProduct(product4.address);
-      let ac = await product4.activeCoverAmount();
+      let ac = await product4.activeCoverLimit();
       expect(mc).to.be.gt(ac);
       let diff = mc.sub(ac);
       let risk = await riskStrategy.assessRisk(product4.address, 0, diff);
@@ -466,7 +448,7 @@ describe("RiskStrategy", function () {
     it("cannot accept risk over max cover per product", async function () {
       // new policy
       let mc = await riskStrategy.maxCoverPerProduct(product4.address);
-      let ac = await product4.activeCoverAmount();
+      let ac = await product4.activeCoverLimit();
       expect(mc).to.be.gt(ac);
       let diff = mc.sub(ac);
       let risk = await riskStrategy.assessRisk(product4.address, 0, diff.add(1));
@@ -517,7 +499,7 @@ describe("RiskStrategy", function () {
     });
     it("should return correct amount", async function () {
       let mc = await riskStrategy.maxCoverPerProduct(product4.address);
-      let ac = await product4.activeCoverAmount();
+      let ac = await product4.activeCoverLimit();
       expect(mc).to.be.gt(ac);
       let diff = mc.sub(ac);
       let sc = await riskStrategy.sellableCoverPerProduct(product4.address);

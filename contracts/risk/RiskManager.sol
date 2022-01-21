@@ -4,7 +4,6 @@ pragma solidity 0.8.6;
 import "../utils/Governable.sol";
 import "../interfaces/risk/ICoverageDataProvider.sol";
 import "../interfaces/utils/IRegistry.sol";
-import "../interfaces/products/IProduct.sol";
 import "../interfaces/risk/IRiskManager.sol";
 
 /**
