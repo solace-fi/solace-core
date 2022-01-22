@@ -5,7 +5,7 @@ pragma solidity 0.8.6;
 import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Enumerable.sol";
 
 /**
- * @title ERC721Enhancedv1
+ * @title ERC721Enhanced
  * @author solace.fi
  * @notice An extension of `ERC721`.
  *

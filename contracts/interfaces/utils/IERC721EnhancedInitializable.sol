@@ -6,13 +6,13 @@ import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/IERC721Enume
 
 
 /**
- * @title ERC721Enhancedv1
+ * @title ERC721Enhanced
  * @author solace.fi
  * @notice An extension of `ERC721`.
  *
  * The base is OpenZeppelin's `ERC721Enumerable` which also includes the `Metadata` extension. This extension includes simpler transfers, gasless approvals, and better enumeration.
  */
-interface IERC721Enhancedv1Initializable is IERC721EnumerableUpgradeable {
+interface IERC721EnhancedInitializable is IERC721EnumerableUpgradeable {
 
     /***************************************
     SIMPLER TRANSFERS
@@ -81,24 +81,15 @@ interface IERC721Enhancedv1Initializable is IERC721EnumerableUpgradeable {
     function DOMAIN_SEPARATOR() external view returns (bytes32 seperator);
 
     /***************************************
-    BETTER ENUMERATION
+    CHANGEABLE URIS
     ***************************************/
 
-    /**
-     * @notice Lists all tokens.
-     * Order not specified.
-     * @dev This function is more useful off chain than on chain.
-     * @return tokenIDs The list of token IDs.
-     */
-    function listTokens() external view returns (uint256[] memory tokenIDs);
+    /// @notice Emitted when the base URI is set.
+    event BaseURISet(string baseURI);
 
-    /**
-     * @notice Lists the tokens owned by `owner`.
-     * Order not specified.
-     * @dev This function is more useful off chain than on chain.
-     * @return tokenIDs The list of token IDs.
-     */
-    function listTokensOfOwner(address owner) external view returns (uint256[] memory tokenIDs);
+    /***************************************
+    MISC
+    ***************************************/
 
     /**
      * @notice Determines if a token exists or not.

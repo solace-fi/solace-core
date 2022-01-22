@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Unlicense
 pragma solidity 0.8.6;
 
-import "./../utils/ERC721Enhancedv1.sol";
+import "./../utils/ERC721Enhanced.sol";
 
 
 /**
@@ -9,7 +9,7 @@ import "./../utils/ERC721Enhancedv1.sol";
  * @author solace.fi
  * @notice Mock ERC721 is only used to test other contracts.
  */
-contract MockERC721v1 is ERC721Enhancedv1 {
+contract MockERC721 is ERC721Enhanced {
 
     // Count of all tokens created.
     uint256 internal _tokenCount = 0;
@@ -24,7 +24,7 @@ contract MockERC721v1 is ERC721Enhancedv1 {
         string memory symbol
     )
     // solhint-disable-next-line no-empty-blocks
-    ERC721Enhancedv1(name, symbol) { }
+    ERC721Enhanced(name, symbol) { }
 
     /**
      * @notice Mints a new token.
