@@ -30,6 +30,10 @@ interface IProduct {
     event PauseSet(bool paused);
     /// @notice Emitted when PolicyManager is set.
     event PolicyManagerSet(address policyManager);
+    /// @notice Emitted when Deposit into premium pool is made
+    event DepositMade(uint256 depositAmount); 
+    /// @notice Emitted when withdraw from premium pool is made
+    event WithdrawMade(uint256 withdrawAmount); 
 
     /***************************************
     POLICYHOLDER FUNCTIONS
@@ -39,22 +43,22 @@ interface IProduct {
      * @notice Purchases and mints a policy on the behalf of the policyholder.
      * User will need to pay **ETH**.
      * @param policyholder Holder of the position(s) to cover.
-     * @param coverAmount The value to cover in **ETH**.
+     * @param coverLimit The value to cover in **ETH**.
      * @param blocks The length (in blocks) for policy.
      * @param positionDescription A byte encoded description of the position(s) to cover.
      * @param riskStrategy The risk strategy of the product to cover.
      * @return policyID The ID of newly created policy.
      */
-    function buyPolicy(address policyholder, uint256 coverAmount, uint40 blocks, bytes memory positionDescription, address riskStrategy) external payable returns (uint256 policyID);
+    function buyPolicy(address policyholder, uint256 coverLimit, uint40 blocks, bytes memory positionDescription, address riskStrategy) external payable returns (uint256 policyID);
 
     /**
-     * @notice Increase or decrease the cover amount of the policy.
-     * User may need to pay **ETH** for increased cover amount or receive a refund for decreased cover amount.
+     * @notice Increase or decrease the cover limit of the policy.
+     * User may need to pay **ETH** for increased cover limit or receive a refund for decreased cover limit.
      * Can only be called by the policyholder.
      * @param policyID The ID of the policy.
-     * @param newCoverAmount The new value to cover in **ETH**.
+     * @param newCoverLimit The new value to cover in **ETH**.
      */
-    function updateCoverAmount(uint256 policyID, uint256 newCoverAmount) external payable;
+    function updateCoverLimit(uint256 policyID, uint256 newCoverLimit) external payable;
 
     /**
      * @notice Extend a policy.
@@ -66,14 +70,14 @@ interface IProduct {
     function extendPolicy(uint256 policyID, uint40 extension) external payable;
 
     /**
-     * @notice Extend a policy and update its cover amount.
-     * User may need to pay **ETH** for increased cover amount or receive a refund for decreased cover amount.
+     * @notice Extend a policy and update its cover limit.
+     * User may need to pay **ETH** for increased cover limit or receive a refund for decreased cover limit.
      * Can only be called by the policyholder.
      * @param policyID The ID of the policy.
-     * @param newCoverAmount The new value to cover in **ETH**.
+     * @param newCoverLimit The new value to cover in **ETH**.
      * @param extension The length of extension in blocks.
      */
-    function updatePolicy(uint256 policyID, uint256 newCoverAmount, uint40 extension) external payable;
+    function updatePolicy(uint256 policyID, uint256 newCoverLimit, uint40 extension) external payable;
 
     /**
      * @notice Cancel and burn a policy.
@@ -89,12 +93,12 @@ interface IProduct {
 
     /**
      * @notice Calculate a premium quote for a policy.
-     * @param coverAmount The value to cover in **ETH**.
+     * @param coverLimit The value to cover in **ETH**.
      * @param blocks The duration of the policy in blocks.
      * @param riskStrategy The risk strategy address.
      * @return premium The quote for their policy in **ETH**.
      */
-    function getQuote(uint256 coverAmount, uint40 blocks, address riskStrategy) external view returns (uint256 premium);
+    function getQuote(uint256 coverLimit, uint40 blocks, address riskStrategy) external view returns (uint256 premium);
 
     /***************************************
     GLOBAL VIEW FUNCTIONS
@@ -116,14 +120,14 @@ interface IProduct {
      * @notice Returns the current amount covered (in wei).
      * @return amount The current amount.
     */
-    function activeCoverAmount() external view returns (uint256 amount);
+    function activeCoverLimit() external view returns (uint256 amount);
 
     /**
      * @notice Returns the current amount covered (in wei) per risk strategy.
      * @param riskStrategy The risk strategy address.
      * @return amount The current amount.
     */
-    function activeCoverAmountPerStrategy(address riskStrategy) external view returns (uint256 amount);
+    function activeCoverLimitPerStrategy(address riskStrategy) external view returns (uint256 amount);
 
     /**
      * @notice Returns whether or not product is currently in paused state.
@@ -157,9 +161,9 @@ interface IProduct {
     /**
      * @notice Updates the product's book-keeping variables.
      * Can only be called by the [`PolicyManager`](../PolicyManager).
-     * @param coverDiff The change in active cover amount.
+     * @param coverDiff The change in active cover limit.
      */
-    function updateActiveCoverAmount(int256 coverDiff) external;
+    function updateActiveCoverLimit(int256 coverDiff) external;
 
     /***************************************
     GOVERNANCE FUNCTIONS
@@ -177,10 +181,12 @@ interface IProduct {
      */
     function setMaxPeriod(uint40 maxPeriod_) external;
 
+    /***************************************
+    MISC
+    ***************************************/
+
     /**
-     * @notice Changes the policy manager.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param policyManager_ The new policy manager.
+     * @notice Fallback function to receive ETH
      */
-    function setPolicyManager(address policyManager_) external;
+    receive() external payable;
 }

@@ -8,10 +8,10 @@ import "../utils/GovernableInitializable.sol";
 import "../interfaces/risk/IPolicyManager.sol";
 import "../interfaces/risk/IRiskManager.sol";
 import "../interfaces/risk/IRiskStrategy.sol";
-import "../interfaces/utils/ITreasury.sol";
 import "../interfaces/utils/IClaimsEscrow.sol";
 import "../interfaces/utils/IRegistry.sol";
 import "../interfaces/products/IProduct.sol";
+import "../interfaces/IWETH9.sol";
 
 /**
  * @title CoverageProduct
@@ -27,9 +27,6 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
     /***************************************
     GLOBAL VARIABLES
     ***************************************/
-
-    /// @notice PolicyManager contract.
-    IPolicyManager internal _policyManager; // Policy manager ERC721 contract
 
     /// @notice Registry contract.
     IRegistry internal _registry;
@@ -47,10 +44,10 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
         Book-Keeping Variables
     ****/
     /// @notice The current amount covered (in wei).
-    uint256 internal _activeCoverAmount;
+    uint256 internal _activeCoverLimit;
 
     /// @notice The current amount covered (in wei) per strategy.
-    mapping(address => uint256) internal _activeCoverAmountPerStrategy;
+    mapping(address => uint256) internal _activeCoverLimitPerStrategy;
 
     /// @notice The authorized signers.
     mapping(address => bool) internal _isAuthorizedSigner;
@@ -102,8 +99,8 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
         __ReentrancyGuard_init();
         require(address(registry_) != address(0x0), "zero address registry");
         _registry = registry_;
-        _policyManager = IPolicyManager(IRegistry(registry_).get("policyManager"));
-        require(address(_policyManager) != address(0x0), "zero address policymanager");
+        require(_registry.get("policyManager") != address(0x0), "zero address policy manager");
+        require(_registry.get("premiumPool") != address(0x0), "zero address premium pool");
         require(minPeriod_ <= maxPeriod_, "invalid period");
         _minPeriod = minPeriod_;
         _maxPeriod = maxPeriod_;
@@ -118,47 +115,47 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
      * @notice Purchases and mints a policy on the behalf of the policyholder.
      * User will need to pay **ETH**.
      * @param policyholder Holder of the position(s) to cover.
-     * @param coverAmount The value to cover in **ETH**.
+     * @param coverLimit The value to cover in **ETH**.
      * @param blocks The length (in blocks) for policy.
      * @param positionDescription A byte encoded description of the position(s) to cover.
      * @param riskStrategy The risk strategy of the product to cover.
      * @return policyID The ID of newly created policy.
      */
-    function buyPolicy(address policyholder, uint256 coverAmount, uint40 blocks, bytes memory positionDescription, address riskStrategy) external payable override nonReentrant whileUnpaused returns (uint256 policyID) {
+    function buyPolicy(address policyholder, uint256 coverLimit, uint40 blocks, bytes memory positionDescription, address riskStrategy) external payable override nonReentrant whileUnpaused returns (uint256 policyID) {
         require(policyholder != address(0x0), "zero address");
-        require(coverAmount > 0, "zero cover value");
+        require(coverLimit > 0, "zero cover value");
         // check that the product can provide coverage for this policy
-        (bool acceptable, uint24 price) = IRiskStrategy(riskStrategy).assessRisk(address(this), 0, coverAmount);
+        (bool acceptable, uint24 price) = IRiskStrategy(riskStrategy).assessRisk(address(this), 0, coverLimit);
         require(acceptable, "cannot accept that risk");
         // check that the buyer has paid the correct premium
-        uint256 premium = coverAmount * blocks * price / Q12;
+        uint256 premium = coverLimit * blocks * price / Q12;
         require(msg.value >= premium && premium != 0, "insufficient payment");
         // check that the buyer provided valid period
         require(blocks >= _minPeriod && blocks <= _maxPeriod, "invalid period");
         // create the policy
         uint40 expirationBlock = uint40(block.number + blocks);
-        policyID = _policyManager.createPolicy(policyholder, coverAmount, expirationBlock, price, positionDescription, riskStrategy);
+        policyID = IPolicyManager(_registry.get("policyManager")).createPolicy(policyholder, coverLimit, expirationBlock, price, positionDescription, riskStrategy);
         // update local book-keeping variables
-        _activeCoverAmount += coverAmount;
-        _activeCoverAmountPerStrategy[riskStrategy] += coverAmount;
+        _activeCoverLimit += coverLimit;
+        _activeCoverLimitPerStrategy[riskStrategy] += coverLimit;
         // return excess payment
         if(msg.value > premium) Address.sendValue(payable(msg.sender), msg.value - premium);
-        // transfer premium to the treasury
-        ITreasury(payable(_registry.get("treasury"))).routePremiums{value: premium}();
+        // transfer premium to the premium pool
+        _deposit(premium);
         emit PolicyCreated(policyID);
         return policyID;
     }
 
     /**
-     * @notice Increase or decrease the cover amount of the policy.
-     * User may need to pay **ETH** for increased cover amount or receive a refund for decreased cover amount.
+     * @notice Increase or decrease the cover limit of the policy.
+     * User may need to pay **ETH** for increased cover limit or receive a refund for decreased cover limit.
      * Can only be called by the policyholder.
      * @param policyID The ID of the policy.
-     * @param coverAmount The new value to cover in **ETH**.
+     * @param coverLimit The new value to cover in **ETH**.
      */
-    function updateCoverAmount(uint256 policyID, uint256 coverAmount) external payable override nonReentrant whileUnpaused {
-        require(coverAmount > 0, "zero cover value");
-        (address policyholder, address product, uint256 previousCoverAmount, uint40 expirationBlock, uint24 purchasePrice, bytes memory positionDescription, address riskStrategy) = _policyManager.getPolicyInfo(policyID);
+    function updateCoverLimit(uint256 policyID, uint256 coverLimit) external payable override nonReentrant whileUnpaused {
+        require(coverLimit > 0, "zero cover value");
+        (address policyholder, address product, uint256 previousCoverLimit, uint40 expirationBlock, uint24 purchasePrice, bytes memory positionDescription, address riskStrategy) = IPolicyManager(_registry.get("policyManager")).getPolicyInfo(policyID);
         // check msg.sender is policyholder
         require(policyholder == msg.sender, "!policyholder");
         // check for correct product
@@ -166,30 +163,30 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
         // check for policy expiration
         require(expirationBlock >= block.number, "policy is expired");
         // check that the product can provide coverage for this policy
-        (bool acceptable, uint24 price) = IRiskStrategy(riskStrategy).assessRisk(address(this), previousCoverAmount, coverAmount);
+        (bool acceptable, uint24 price) = IRiskStrategy(riskStrategy).assessRisk(address(this), previousCoverLimit, coverLimit);
         require(acceptable, "cannot accept that risk");
         // update local book-keeping variables
-        _activeCoverAmount = _activeCoverAmount + coverAmount - previousCoverAmount;
-        _activeCoverAmountPerStrategy[riskStrategy] = _activeCoverAmountPerStrategy[riskStrategy] + coverAmount - previousCoverAmount;
-        // calculate premium needed for new cover amount as if policy is bought now
+        _activeCoverLimit = _activeCoverLimit + coverLimit - previousCoverLimit;
+        _activeCoverLimitPerStrategy[riskStrategy] = _activeCoverLimitPerStrategy[riskStrategy] + coverLimit - previousCoverLimit;
+        // calculate premium needed for new cover limit as if policy is bought now
         uint256 remainingBlocks = expirationBlock - block.number;
-        uint256 newPremium = coverAmount * remainingBlocks * price / Q12;
+        uint256 newPremium = coverLimit * remainingBlocks * price / Q12;
         // calculate premium already paid based on current policy
-        uint256 paidPremium = previousCoverAmount * remainingBlocks * purchasePrice / Q12;
+        uint256 paidPremium = previousCoverLimit * remainingBlocks * purchasePrice / Q12;
         if (newPremium >= paidPremium) {
             uint256 premium = newPremium - paidPremium;
             // check that the buyer has paid the correct premium
             require(msg.value >= premium, "insufficient payment");
             if(msg.value > premium) Address.sendValue(payable(msg.sender), msg.value - premium);
-            // transfer premium to the treasury
-            ITreasury(payable(_registry.get("treasury"))).routePremiums{value: premium}();
+            // transfer premium to the premium pool
+            _deposit(premium);
         } else {
             if(msg.value > 0) Address.sendValue(payable(msg.sender), msg.value);
             uint256 refundAmount = paidPremium - newPremium;
-            ITreasury(payable(_registry.get("treasury"))).refund(msg.sender, refundAmount);
+            _withdraw(refundAmount);
         }
         // update policy's URI and emit event
-        _policyManager.setPolicyInfo(policyID, coverAmount, expirationBlock, price, positionDescription, riskStrategy);
+        IPolicyManager(_registry.get("policyManager")).setPolicyInfo(policyID, coverLimit, expirationBlock, price, positionDescription, riskStrategy);
         emit PolicyUpdated(policyID);
     }
 
@@ -202,44 +199,44 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
      */
     function extendPolicy(uint256 policyID, uint40 extension) external payable override nonReentrant whileUnpaused {
         // check that the msg.sender is the policyholder
-        (address policyholder, address product, uint256 coverAmount, uint40 expirationBlock, uint24 purchasePrice, bytes memory positionDescription, address riskStrategy) = _policyManager.getPolicyInfo(policyID);
+        (address policyholder, address product, uint256 coverLimit, uint40 expirationBlock, uint24 purchasePrice, bytes memory positionDescription, address riskStrategy) = IPolicyManager(_registry.get("policyManager")).getPolicyInfo(policyID);
         require(policyholder == msg.sender,"!policyholder");
         require(product == address(this), "wrong product");
         require(expirationBlock >= block.number, "policy is expired");
         require(IRiskStrategy(riskStrategy).status(), "strategy inactive");
        
         // compute the premium
-        uint256 premium = coverAmount * extension * purchasePrice / Q12;
+        uint256 premium = coverLimit * extension * purchasePrice / Q12;
         // check that the buyer has paid the correct premium
         require(msg.value >= premium, "insufficient payment");
         if(msg.value > premium) Address.sendValue(payable(msg.sender), msg.value - premium);
-        // transfer premium to the treasury
-        ITreasury(payable(_registry.get("treasury"))).routePremiums{value: premium}();
+        // transfer premium to the premium pool
+        _deposit(premium);
         // check that the buyer provided valid period
         uint40 newExpirationBlock = expirationBlock + extension;
         uint40 duration = newExpirationBlock - uint40(block.number);
         require(duration >= _minPeriod && duration <= _maxPeriod, "invalid period");
         // update the policy's URI
-        _policyManager.setPolicyInfo(policyID, coverAmount, newExpirationBlock, purchasePrice, positionDescription, riskStrategy);
+        IPolicyManager(_registry.get("policyManager")).setPolicyInfo(policyID, coverLimit, newExpirationBlock, purchasePrice, positionDescription, riskStrategy);
         emit PolicyExtended(policyID);
     }
 
     /**
-     * @notice Extend a policy and update its cover amount.
-     * User may need to pay **ETH** for increased cover amount or receive a refund for decreased cover amount.
+     * @notice Extend a policy and update its cover limit.
+     * User may need to pay **ETH** for increased cover limit or receive a refund for decreased cover limit.
      * Can only be called by the policyholder.
      * @param policyID The ID of the policy.
-     * @param coverAmount The new value to cover in **ETH**.
+     * @param coverLimit The new value to cover in **ETH**.
      * @param extension The length of extension in blocks.
      */
-    function updatePolicy(uint256 policyID, uint256 coverAmount, uint40 extension) external payable override nonReentrant whileUnpaused {
-        require(coverAmount > 0, "zero cover value");
-        (address policyholder, address product, uint256 previousCoverAmount, uint40 previousExpirationBlock, uint24 purchasePrice, , address riskStrategy) = _policyManager.getPolicyInfo(policyID);
+    function updatePolicy(uint256 policyID, uint256 coverLimit, uint40 extension) external payable override nonReentrant whileUnpaused {
+        require(coverLimit > 0, "zero cover value");
+        (address policyholder, address product, uint256 previousCoverLimit, uint40 previousExpirationBlock, uint24 purchasePrice, , address riskStrategy) = IPolicyManager(_registry.get("policyManager")).getPolicyInfo(policyID);
         require(policyholder == msg.sender,"!policyholder");
         require(product == address(this), "wrong product");
         require(previousExpirationBlock >= block.number, "policy is expired");
         // check that the product can provide coverage for this policy
-        (bool acceptable, uint24 price) = IRiskStrategy(riskStrategy).assessRisk(address(this), previousCoverAmount, coverAmount);
+        (bool acceptable, uint24 price) = IRiskStrategy(riskStrategy).assessRisk(address(this), previousCoverLimit, coverLimit);
         require(acceptable, "cannot accept that risk");
         // add new block extension
         uint40 newExpirationBlock = previousExpirationBlock + extension;
@@ -247,23 +244,23 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
         uint40 duration = newExpirationBlock - uint40(block.number);
         require(duration >= _minPeriod && duration <= _maxPeriod, "invalid period");
         // update local book-keeping variables
-        _activeCoverAmount = _activeCoverAmount + coverAmount - previousCoverAmount;
-        _activeCoverAmountPerStrategy[riskStrategy] = _activeCoverAmountPerStrategy[riskStrategy] + coverAmount - previousCoverAmount;
+        _activeCoverLimit = _activeCoverLimit + coverLimit - previousCoverLimit;
+        _activeCoverLimitPerStrategy[riskStrategy] = _activeCoverLimitPerStrategy[riskStrategy] + coverLimit - previousCoverLimit;
         // update policy info
-        _policyManager.setPolicyInfo(policyID, coverAmount, newExpirationBlock, price, "", riskStrategy);
-        // calculate premium needed for new cover amount as if policy is bought now
-        uint256 newPremium = coverAmount * duration * price / Q12;
+        IPolicyManager(_registry.get("policyManager")).setPolicyInfo(policyID, coverLimit, newExpirationBlock, price, "", riskStrategy);
+        // calculate premium needed for new cover limit as if policy is bought now
+        uint256 newPremium = coverLimit * duration * price / Q12;
         // calculate premium already paid based on current policy
-        uint256 paidPremium = previousCoverAmount * (previousExpirationBlock - uint40(block.number)) * purchasePrice / Q12;
+        uint256 paidPremium = previousCoverLimit * (previousExpirationBlock - uint40(block.number)) * purchasePrice / Q12;
         if (newPremium >= paidPremium) {
             uint256 premium = newPremium - paidPremium;
             require(msg.value >= premium, "insufficient payment");
             if(msg.value > premium) Address.sendValue(payable(msg.sender), msg.value - premium);
-            ITreasury(payable(_registry.get("treasury"))).routePremiums{value: premium}();
+            _deposit(premium);
         } else {
             if(msg.value > 0) Address.sendValue(payable(msg.sender), msg.value);
             uint256 refund = paidPremium - newPremium;
-            ITreasury(payable(_registry.get("treasury"))).refund(msg.sender, refund);
+            _withdraw(refund);
         }
         emit PolicyUpdated(policyID);
     }
@@ -275,15 +272,15 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
      * @param policyID The ID of the policy.
      */
     function cancelPolicy(uint256 policyID) external override nonReentrant {
-        (address policyholder, address product, uint256 coverAmount, uint40 expirationBlock, uint24 purchasePrice, , address riskStrategy) = _policyManager.getPolicyInfo(policyID);
+        (address policyholder, address product, uint256 coverLimit, uint40 expirationBlock, uint24 purchasePrice, , address riskStrategy) = IPolicyManager(_registry.get("policyManager")).getPolicyInfo(policyID);
         require(policyholder == msg.sender,"!policyholder");
         require(product == address(this), "wrong product");
         uint40 blocksLeft = expirationBlock - uint40(block.number);
-        uint256 refundAmount = blocksLeft * coverAmount * purchasePrice / Q12;
-        _policyManager.burn(policyID);
-        ITreasury(payable(_registry.get("treasury"))).refund(msg.sender, refundAmount);
-        _activeCoverAmount -= coverAmount;
-        _activeCoverAmountPerStrategy[riskStrategy] -= coverAmount;
+        uint256 refundAmount = blocksLeft * coverLimit * purchasePrice / Q12;
+        IPolicyManager(_registry.get("policyManager")).burn(policyID);
+        _withdraw(refundAmount);
+        _activeCoverLimit -= coverLimit;
+        _activeCoverLimitPerStrategy[riskStrategy] -= coverLimit;
         emit PolicyCanceled(policyID);
     }
 
@@ -307,10 +304,10 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
         // validate inputs
         // solhint-disable-next-line not-rely-on-time
         require(block.timestamp <= deadline, "expired deadline");
-        (address policyholder, address product, uint256 coverAmount, , , ,) = _policyManager.getPolicyInfo(policyID);
+        (address policyholder, address product, uint256 coverLimit, , , ,) = IPolicyManager(_registry.get("policyManager")).getPolicyInfo(policyID);
         require(policyholder == msg.sender, "!policyholder");
         require(product == address(this), "wrong product");
-        require(amountOut <= coverAmount, "excessive amount out");
+        require(amountOut <= coverLimit, "excessive amount out");
         // verify signature
         {
         bytes32 structHash = keccak256(abi.encode(_SUBMIT_CLAIM_TYPEHASH, policyID, msg.sender, amountOut, deadline));
@@ -319,9 +316,9 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
         require(_isAuthorizedSigner[signer], "invalid signature");
         }
         // update local book-keeping variables
-        _activeCoverAmount -= coverAmount;
+        _activeCoverLimit -= coverLimit;
         // burn policy
-        _policyManager.burn(policyID);
+        IPolicyManager(_registry.get("policyManager")).burn(policyID);
         // submit claim to ClaimsEscrow
         IClaimsEscrow(payable(_registry.get("claimsEscrow"))).receiveClaim(policyID, policyholder, amountOut);
         emit ClaimSubmitted(policyID);
@@ -333,14 +330,14 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
 
     /**
      * @notice Calculate a premium quote for a policy.
-     * @param coverAmount The value to cover in **ETH**.
+     * @param coverLimit The value to cover in **ETH**.
      * @param blocks The duration of the policy in blocks.
      * @param riskStrategy The risk strategy address.
      * @return premium The quote for their policy in **ETH**.
      */
-    function getQuote(uint256 coverAmount, uint40 blocks, address riskStrategy) external view override returns (uint256 premium) {
+    function getQuote(uint256 coverLimit, uint40 blocks, address riskStrategy) external view override returns (uint256 premium) {
         (, uint24 price, ) = IRiskStrategy(riskStrategy).productRiskParams(address(this));
-        return coverAmount * blocks * price / Q12;
+        return coverLimit * blocks * price / Q12;
     }
 
     /***************************************
@@ -367,8 +364,8 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
      * @notice Returns the current amount covered (in wei).
      * @return amount The current amount.
     */
-    function activeCoverAmount() external view override returns (uint256 amount) {
-        return _activeCoverAmount;
+    function activeCoverLimit() external view override returns (uint256 amount) {
+        return _activeCoverLimit;
     }
 
     /**
@@ -376,8 +373,8 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
      * @param riskStrategy The risk strategy address.
      * @return amount The current amount.
     */
-    function activeCoverAmountPerStrategy(address riskStrategy) external view override returns (uint256 amount) {
-        return _activeCoverAmountPerStrategy[riskStrategy];
+    function activeCoverLimitPerStrategy(address riskStrategy) external view override returns (uint256 amount) {
+        return _activeCoverLimitPerStrategy[riskStrategy];
     }
 
     /**
@@ -393,7 +390,7 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
      * @return policymanager The policy manager address.
     */
     function policyManager() external view override returns (address policymanager) {
-        return address(_policyManager);
+        return _registry.get("policyManager");
     }
 
     /**
@@ -420,11 +417,11 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
     /**
      * @notice Updates the product's book-keeping variables.
      * Can only be called by the [`PolicyManager`](../PolicyManager).
-     * @param coverDiff The change in active cover amount.
+     * @param coverDiff The change in active cover limit.
      */
-    function updateActiveCoverAmount(int256 coverDiff) external override {
-        require(msg.sender == address(_policyManager), "!policymanager");
-        _activeCoverAmount = add(_activeCoverAmount, coverDiff);
+    function updateActiveCoverLimit(int256 coverDiff) external override {
+        require(msg.sender == _registry.get("policyManager"), "!policymanager");
+        _activeCoverLimit = _add(_activeCoverLimit, coverDiff);
     }
 
     /***************************************
@@ -484,20 +481,36 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
         emit PauseSet(paused_);
     }
 
+    /***************************************
+    INTERNAL FUNCTIONS
+    ***************************************/
+
     /**
-     * @notice Changes the policy manager.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param policyManager_ The new policy manager.
+     * @notice Wraps ETH into wETH, and sends it to the premium pool
+     * @param amount amount to send to premium pool
      */
-    function setPolicyManager(address policyManager_) external override onlyGovernance {
-        require(policyManager_ != address(0x0), "zero address policymanager");
-        _policyManager = IPolicyManager(policyManager_);
-        emit PolicyManagerSet(policyManager_);
+    function _deposit(uint256 amount) internal {
+        // Wrap ETH into wETH
+        IWETH9(payable(_registry.get("weth"))).deposit{value: amount}();
+        // Send wETH to premium pool
+        IWETH9(payable(_registry.get("weth"))).transfer(_registry.get("premiumPool"), amount);
+        emit DepositMade(amount);
     }
 
-    /***************************************
-    HELPER FUNCTIONS
-    ***************************************/
+    /**
+     * @notice Withdraw wETH from premium pool, and send it to the user
+     * @param amount amount to send to premium pool
+     */
+    function _withdraw(uint256 amount) internal {
+        // Pull wETH from premium pool
+        IWETH9(payable(_registry.get("weth"))).transferFrom(_registry.get("premiumPool"), address(this), amount);
+        // Unwrap wETH
+        IWETH9(payable(_registry.get("weth"))).withdraw(uint(amount));
+        // Send ETH to msg.sender
+        Address.sendValue(payable(msg.sender), amount);
+        emit WithdrawMade(amount);
+    }
+
 
     /**
      * @notice Adds two numbers.
@@ -505,9 +518,18 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
      * @param b The second number as an int256.
      * @return c The sum as a uint256.
      */
-    function add(uint256 a, int256 b) internal pure returns (uint256 c) {
+    function _add(uint256 a, int256 b) internal pure returns (uint256 c) {
         return (b > 0)
             ? a + uint256(b)
             : a - uint256(-b);
     }
+
+    /***************************************
+    MISC
+    ***************************************/
+
+    /**
+     * @notice Fallback function to receive ETH
+     */
+    receive() external payable override {}
 }

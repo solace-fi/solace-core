@@ -39,7 +39,7 @@ interface IPolicyManager is IERC721Enhanced {
 
     /// @notice PolicyInfo struct.
     struct PolicyInfo {
-        uint256 coverAmount;
+        uint256 coverLimit;
         address product;
         uint40 expirationBlock;
         uint24 price;
@@ -59,13 +59,13 @@ interface IPolicyManager is IERC721Enhanced {
      * @param policyID The policy ID to return info.
      * @return policyholder The address of the policy holder.
      * @return product The product of the policy.
-     * @return coverAmount The amount covered for the policy.
+     * @return coverLimit The amount covered for the policy.
      * @return expirationBlock The expiration block of the policy.
      * @return price The price of the policy.
      * @return positionDescription The description of the covered position(s).
      * @return riskStrategy The risk strategy of the covered product.
      */
-    function getPolicyInfo(uint256 policyID) external view returns (address policyholder, address product, uint256 coverAmount, uint40 expirationBlock, uint24 price, bytes calldata positionDescription, address riskStrategy);
+    function getPolicyInfo(uint256 policyID) external view returns (address policyholder, address product, uint256 coverLimit, uint40 expirationBlock, uint24 price, bytes calldata positionDescription, address riskStrategy);
 
     /**
      * @notice The holder of the policy.
@@ -89,11 +89,11 @@ interface IPolicyManager is IERC721Enhanced {
     function getPolicyExpirationBlock(uint256 policyID) external view returns (uint40 expirationBlock);
 
     /**
-     * @notice The cover amount of the policy.
+     * @notice The cover limit of the policy.
      * @param policyID The policy ID.
-     * @return coverAmount The cover amount of the policy.
+     * @return coverLimit The cover limit of the policy.
      */
-    function getPolicyCoverAmount(uint256 policyID) external view returns (uint256 coverAmount);
+    function getPolicyCoverLimit(uint256 policyID) external view returns (uint256 coverLimit);
 
     /**
      * @notice The cover price in wei per block per wei multiplied by 1e12.
@@ -168,7 +168,7 @@ interface IPolicyManager is IERC721Enhanced {
      * @notice Creates a new policy.
      * Can only be called by **products**.
      * @param policyholder The receiver of new policy token.
-     * @param coverAmount The policy coverage amount (in wei).
+     * @param coverLimit The policy coverage amount (in wei).
      * @param expirationBlock The policy expiration block number.
      * @param price The coverage price.
      * @param positionDescription The description of the covered position(s).
@@ -177,7 +177,7 @@ interface IPolicyManager is IERC721Enhanced {
      */
     function createPolicy(
         address policyholder,
-        uint256 coverAmount,
+        uint256 coverLimit,
         uint40 expirationBlock,
         uint24 price,
         bytes calldata positionDescription,
@@ -188,24 +188,24 @@ interface IPolicyManager is IERC721Enhanced {
      * @notice Modifies a policy.
      * Can only be called by **products**.
      * @param policyID The policy ID.
-     * @param coverAmount The policy coverage amount (in wei).
+     * @param coverLimit The policy coverage amount (in wei).
      * @param expirationBlock The policy expiration block number.
      * @param price The coverage price.
      * @param positionDescription The description of the covered position(s).
      * @param riskStrategy The risk strategy of the covered positions(s).
      */
-    function setPolicyInfo(uint256 policyID, uint256 coverAmount, uint40 expirationBlock, uint24 price, bytes calldata positionDescription, address riskStrategy) external;
+    function setPolicyInfo(uint256 policyID, uint256 coverLimit, uint40 expirationBlock, uint24 price, bytes calldata positionDescription, address riskStrategy) external;
 
     /**
      * @notice Modifies a policy without position description value.
      * Can only be called by **products**.
      * @param policyID The policy ID.
-     * @param coverAmount The policy coverage amount (in wei).
+     * @param coverLimit The policy coverage amount (in wei).
      * @param expirationBlock The policy expiration block number.
      * @param price The coverage price.
      * @param riskStrategy The risk strategy of the covered positions(s).
      */
-     function updatePolicyInfo(uint256 policyID, uint256 coverAmount, uint40 expirationBlock, uint24 price, address riskStrategy) external;
+     function updatePolicyInfo(uint256 policyID, uint256 coverLimit, uint40 expirationBlock, uint24 price, address riskStrategy) external;
 
     /**
      * @notice Burns expired or cancelled policies.

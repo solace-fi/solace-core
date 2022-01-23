@@ -4,13 +4,14 @@ pragma solidity 0.8.6;
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
+import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "../utils/Governable.sol";
 import "../utils/ERC721Enhanced.sol";
 import "../interfaces/risk/IPolicyManager.sol";
-import "../interfaces/risk/IPolicyDescriptor.sol";
+import "../interfaces/utils/IPolicyDescriptorV2.sol";
 import "../interfaces/utils/IRegistry.sol";
 import "../interfaces/risk/IRiskManager.sol";
-import "../interfaces/products/ISoteriaCoverageProduct.sol";
+import "../interfaces/products/IProduct.sol";
 
 /**
  * @title PolicyManager
@@ -71,15 +72,15 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
      * @param policyID The policy ID to return info.
      * @return policyholder The address of the policy holder.
      * @return product The product of the policy.
-     * @return coverAmount The amount covered for the policy.
+     * @return coverLimit The amount covered for the policy.
      * @return expirationBlock The expiration block of the policy.
      * @return price The price of the policy.
      * @return positionDescription The description of the covered position(s).
      * @return riskStrategy The risk strategy of the covered product.
      */
-    function getPolicyInfo(uint256 policyID) external view override tokenMustExist(policyID) returns (address policyholder, address product, uint256 coverAmount, uint40 expirationBlock, uint24 price, bytes memory positionDescription, address riskStrategy) {
+    function getPolicyInfo(uint256 policyID) external view override tokenMustExist(policyID) returns (address policyholder, address product, uint256 coverLimit, uint40 expirationBlock, uint24 price, bytes memory positionDescription, address riskStrategy) {
         PolicyInfo memory info = _policyInfo[policyID];
-        return (ownerOf(policyID), info.product, info.coverAmount, info.expirationBlock, info.price, info.positionDescription, info.riskStrategy);
+        return (ownerOf(policyID), info.product, info.coverLimit, info.expirationBlock, info.price, info.positionDescription, info.riskStrategy);
     }
 
     /**
@@ -110,12 +111,12 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
     }
 
     /**
-     * @notice The cover amount of the policy.
+     * @notice The cover limit of the policy.
      * @param policyID The policy ID.
-     * @return coverAmount The cover amount of the policy.
+     * @return coverLimit The cover limit of the policy.
      */
-    function getPolicyCoverAmount(uint256 policyID) external view override tokenMustExist(policyID) returns (uint256 coverAmount) {
-        return _policyInfo[policyID].coverAmount;
+    function getPolicyCoverLimit(uint256 policyID) external view override tokenMustExist(policyID) returns (uint256 coverLimit) {
+        return _policyInfo[policyID].coverLimit;
     }
 
     /**
@@ -201,7 +202,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
      * @return description The human readable description of the policy.
      */
     function tokenURI(uint256 policyID) public view override tokenMustExist(policyID) returns (string memory description) {
-        return IPolicyDescriptor(_policyDescriptor).tokenURI(this, policyID);
+        return IPolicyDescriptorV2(_policyDescriptor).tokenURI(this, policyID);
     }
 
    /**
@@ -220,7 +221,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
      * @notice Creates a new policy.
      * Can only be called by **products**.
      * @param policyholder The receiver of new policy token.
-     * @param coverAmount The policy coverage amount (in wei).
+     * @param coverLimit The policy coverage amount (in wei).
      * @param expirationBlock The policy expiration block number.
      * @param price The coverage price.
      * @param positionDescription The byte encoded description of the covered position(s).
@@ -229,7 +230,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
      */
     function createPolicy(
         address policyholder,
-        uint256 coverAmount,
+        uint256 coverLimit,
         uint40 expirationBlock,
         uint24 price,
         bytes calldata positionDescription,
@@ -240,7 +241,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
             product: msg.sender,
             positionDescription: positionDescription,
             expirationBlock: expirationBlock,
-            coverAmount: coverAmount,
+            coverLimit: coverLimit,
             price: price,
             riskStrategy: riskStrategy
         });
@@ -248,7 +249,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
         _policyInfo[policyID] = info;
         _mint(policyholder, policyID);
         // update active cover limit
-        IRiskManager(_registry.get("riskManager")).updateActiveCoverLimitForStrategy(riskStrategy, 0, coverAmount);
+        IRiskManager(_registry.get("riskManager")).updateActiveCoverLimitForStrategy(riskStrategy, 0, coverLimit);
 
         emit PolicyCreated(policyID);
         return policyID;
@@ -258,7 +259,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
      * @notice Modifies a policy.
      * Can only be called by **products**.
      * @param policyID The policy ID.
-     * @param coverAmount The policy coverage amount (in wei).
+     * @param coverLimit The policy coverage amount (in wei).
      * @param expirationBlock The policy expiration block number.
      * @param price The coverage price.
      * @param positionDescription The byte encoded description of the covered position(s).
@@ -266,7 +267,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
      */
     function setPolicyInfo(
         uint256 policyID,
-        uint256 coverAmount,
+        uint256 coverLimit,
         uint40 expirationBlock,
         uint24 price,
         bytes calldata positionDescription,
@@ -277,13 +278,13 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
         require(_policyInfo[policyID].product == msg.sender, "wrong product");
        
         // update active cover limit
-        IRiskManager(_registry.get("riskManager")).updateActiveCoverLimitForStrategy(riskStrategy, _policyInfo[policyID].coverAmount, coverAmount);
+        IRiskManager(_registry.get("riskManager")).updateActiveCoverLimitForStrategy(riskStrategy, _policyInfo[policyID].coverLimit, coverLimit);
         
         PolicyInfo memory info = PolicyInfo({
             product: msg.sender,
             positionDescription: positionDescription,
             expirationBlock: expirationBlock,
-            coverAmount: coverAmount,
+            coverLimit: coverLimit,
             price: price,
             riskStrategy: riskStrategy
         });
@@ -295,14 +296,14 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
      * @notice Modifies a policy without position description value.
      * Can only be called by **products**.
      * @param policyID The policy ID.
-     * @param coverAmount The policy coverage amount (in wei).
+     * @param coverLimit The policy coverage amount (in wei).
      * @param expirationBlock The policy expiration block number.
      * @param price The coverage price.
      * @param riskStrategy The risk strategy of the covered positions(s).
      */
      function updatePolicyInfo(
         uint256 policyID,
-        uint256 coverAmount,
+        uint256 coverLimit,
         uint40 expirationBlock,
         uint24 price,
         address riskStrategy
@@ -312,12 +313,12 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
         require(_policyInfo[policyID].product == msg.sender, "wrong product");
 
         // update active cover limit
-        IRiskManager(_registry.get("riskManager")).updateActiveCoverLimitForStrategy(riskStrategy, _policyInfo[policyID].coverAmount, coverAmount);
+        IRiskManager(_registry.get("riskManager")).updateActiveCoverLimitForStrategy(riskStrategy, _policyInfo[policyID].coverLimit, coverLimit);
         PolicyInfo memory info = PolicyInfo({
             product: msg.sender,
             positionDescription: _policyInfo[policyID].positionDescription,
             expirationBlock: expirationBlock,
-            coverAmount: coverAmount,
+            coverLimit: coverLimit,
             price: price,
             riskStrategy: riskStrategy
         });
@@ -342,7 +343,7 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
     function _burn(uint256 policyID) internal override {
         super._burn(policyID);
         // update active cover limit
-        IRiskManager(_registry.get("riskManager")).updateActiveCoverLimitForStrategy(_policyInfo[policyID].riskStrategy, _policyInfo[policyID].coverAmount, 0);
+        IRiskManager(_registry.get("riskManager")).updateActiveCoverLimitForStrategy(_policyInfo[policyID].riskStrategy, _policyInfo[policyID].coverLimit, 0);
         delete _policyInfo[policyID];
         emit PolicyBurned(policyID);
     }
@@ -358,10 +359,10 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
             // dont burn active or nonexistent policies
             if (policyHasExpired(policyID)) {
                 address product = _policyInfo[policyID].product;
-                uint256 coverAmount = _policyInfo[policyID].coverAmount;
+                uint256 coverLimit = _policyInfo[policyID].coverLimit;
                 // update active cover limit
-                IRiskManager(_registry.get("riskManager")).updateActiveCoverLimitForStrategy(_policyInfo[policyID].riskStrategy,_policyInfo[policyID].coverAmount,0);
-                ISoteriaCoverageProduct(product).updateCoverLimit(0, 0);
+                IRiskManager(_registry.get("riskManager")).updateActiveCoverLimitForStrategy(_policyInfo[policyID].riskStrategy,_policyInfo[policyID].coverLimit,0);
+                IProduct(payable(product)).updateActiveCoverLimit(-SafeCast.toInt256(coverLimit));
                 super._burn(policyID);
             }
         }

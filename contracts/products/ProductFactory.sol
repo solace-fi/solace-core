@@ -33,7 +33,7 @@ contract ProductFactory is Factory, IProductFactory {
         string memory version_
     ) external override returns (address product) {
         product = _deployMinimalProxy(base_);
-        CoverageProduct(product).initialize(
+        CoverageProduct(payable(product)).initialize(
             governance_,
             registry_,
             minPeriod_,
@@ -70,7 +70,7 @@ contract ProductFactory is Factory, IProductFactory {
         string memory version_
     ) external override returns (address product) {
         product = _deployMinimalProxy(base_, salt_);
-        CoverageProduct(product).initialize(
+        CoverageProduct(payable(product)).initialize(
             governance_,
             registry_,
             minPeriod_,

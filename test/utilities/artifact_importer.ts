@@ -20,6 +20,7 @@ export async function import_artifacts() {
   artifacts.Vault = await tryImport(`${artifact_dir}/utils/Vault.sol/Vault.json`);
   artifacts.Treasury = await tryImport (`${artifact_dir}/utils/Treasury.sol/Treasury.json`);
   artifacts.PolicyManager = await tryImport(`${artifact_dir}/risk/PolicyManager.sol/PolicyManager.json`);
+  artifacts.PolicyDescriptorV2 = await tryImport(`${artifact_dir}/utils/PolicyDescriptorV2.sol/PolicyDescriptorV2.json`);
   artifacts.RiskManager = await tryImport(`${artifact_dir}/risk/RiskManager.sol/RiskManager.json`);
   artifacts.MockGovernableInitializable = await tryImport(`${artifact_dir}/mocks/MockGovernableInitializable.sol/MockGovernableInitializable.json`);
   // farms (deprecated)

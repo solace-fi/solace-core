@@ -16,7 +16,7 @@ const DOMAIN_NAME = "Solace.fi-MockProduct";
 
 describe("RiskManager", function () {
   let artifacts: ArtifactImports;
-  const [deployer, governor, user, product1, product2, product3, solace, solaceUsdcPool, priceOracle] = provider.getWallets();
+  const [deployer, governor, user, product1, product2, product3, solace, solaceUsdcPool, priceOracle, premiumPool] = provider.getWallets();
 
   // solace contracts
   let registry: Registry;
@@ -43,6 +43,7 @@ describe("RiskManager", function () {
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
 
     registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
+    await registry.connect(governor).set(["premiumPool"],[premiumPool.address])
     weth = (await deployContract(deployer,artifacts.WETH)) as Weth9;
     await registry.connect(governor).set(["weth"], [weth.address])
     vault = (await deployContract(deployer,artifacts.Vault,[deployer.address,registry.address])) as Vault;

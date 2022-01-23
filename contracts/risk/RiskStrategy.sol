@@ -96,10 +96,10 @@ contract RiskStrategy is IRiskStrategy, GovernableInitializable {
 
         // must be less than maxCoverPerProduct
         mc = mc * params.weight / _weightSum;
-        uint256 productActiveCoverAmount = IProduct(prod_).activeCoverAmountPerStrategy(address(this));
-        productActiveCoverAmount = productActiveCoverAmount + newCover_ - currentCover_;
+        uint256 productActiveCoverLimit = IProduct(payable(prod_)).activeCoverLimitPerStrategy(address(this));
+        productActiveCoverLimit = productActiveCoverLimit + newCover_ - currentCover_;
     
-        if (productActiveCoverAmount > mc) return (false, params.price);
+        if (productActiveCoverLimit > mc) return (false, params.price);
         // must be less than maxCoverPerPolicy
         mc = mc / params.divisor;
 
@@ -134,7 +134,7 @@ contract RiskStrategy is IRiskStrategy, GovernableInitializable {
         // max cover per product
         uint256 mc = maxCoverPerProduct(prod_);
         // active cover for product
-        uint256 ac = IProduct(prod_).activeCoverAmountPerStrategy(address(this));
+        uint256 ac = IProduct(payable(prod_)).activeCoverLimitPerStrategy(address(this));
         return (mc < ac) ? 0 : (mc - ac);
     }
 
