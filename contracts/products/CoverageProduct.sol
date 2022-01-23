@@ -16,6 +16,7 @@ import "../interfaces/IWETH9.sol";
 /**
  * @title CoverageProduct
  * @author solace.fi
+ * @dev For withdrawals to work, the premium pool must call weth.approve(address (CoverageProduct.sol) , UINT_256_MAX)
  * @notice The abstract smart contract that is inherited by every concrete individual **Product** contract.
  *
  * It is required to extend [`IProduct`](../interface/IProduct) and recommended to extend `BaseProduct`. `BaseProduct` extends [`IProduct`](../interface/IProduct) and takes care of the heavy lifting; new products simply need to set some variables in the constructor. It has some helpful functionality not included in [`IProduct`](../interface/IProduct) including claim signers.
@@ -100,7 +101,6 @@ contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradea
         require(address(registry_) != address(0x0), "zero address registry");
         _registry = registry_;
         require(_registry.get("policyManager") != address(0x0), "zero address policy manager");
-        require(_registry.get("premiumPool") != address(0x0), "zero address premium pool");
         require(minPeriod_ <= maxPeriod_, "invalid period");
         _minPeriod = minPeriod_;
         _maxPeriod = maxPeriod_;
