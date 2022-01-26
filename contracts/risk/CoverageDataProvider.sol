@@ -5,7 +5,6 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import "../interfaces/risk/ICoverageDataProvider.sol";
 import "../interfaces/utils/IRegistry.sol";
-import "../interfaces/utils/IVault.sol";
 import "../interfaces/ISOLACE.sol";
 import "../interfaces/utils/Aave/IAavePriceOracle.sol";
 import "../interfaces/utils/Sushiswap/ISushiswapLPToken.sol";
@@ -310,11 +309,6 @@ contract CoverageDataProvider is ICoverageDataProvider, Governable {
      * @return cover The max amount of cover in wei.
     */
     function maxCover() external view override returns (uint256 cover) {
-      // get vault balance
-      address vault = _registry.get("vault");
-      if (vault != address(0x0)) {
-        cover += IVault(payable(vault)).totalAssets();
-      }
       // get pool balance
       uint256 pools = numOfPools();
       for (uint256 i = pools; i > 0; i--) {

@@ -10,7 +10,7 @@ const { expect } = chai;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "../utilities/artifact_importer";
-import { Solace, MockErc20, MockSlp, CoverageDataProvider, Registry, MockErc20Decimals, Vault, Weth9, MockPriceOracle } from "../../typechain";
+import { Solace, MockErc20, MockSlp, CoverageDataProvider, Registry, MockErc20Decimals, Weth9, MockPriceOracle } from "../../typechain";
 import { emit } from "process";
 
 describe("CoverageDataProvider", function() {
@@ -19,7 +19,6 @@ describe("CoverageDataProvider", function() {
 
   let coverageDataProvider: CoverageDataProvider;
   let registry: Registry;
-  let vault: Vault;
   let weth9: Weth9;
 
   // assets
@@ -80,8 +79,6 @@ describe("CoverageDataProvider", function() {
     registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
     weth9 = (await deployContract(deployer,artifacts.WETH)) as Weth9;
     await registry.connect(governor).set(["weth"], [weth9.address]); 
-    vault = (await deployContract(deployer,artifacts.Vault,[deployer.address,registry.address])) as Vault;
-    await registry.connect(governor).set(["vault"], [vault.address]); 
     await registry.connect(governor).set(["solace"], [solace.address]); 
 
   });
