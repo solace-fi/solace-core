@@ -16,11 +16,13 @@ const USE_PROCESSED_FILES = process.env.USE_PROCESSED_FILES === "true";
 const mainnet_fork = { url: process.env.MAINNET_URL || '', blockNumber: 13741230 };
 const rinkeby_fork = { url: process.env.RINKEBY_URL || '', blockNumber: 9757125 };
 const kovan_fork = { url: process.env.KOVAN_URL || '', blockNumber: 28627875 };
+const goerli_fork = { url: process.env.GOERLI_URL || '', blockNumber: 6267645 };
 const no_fork = undefined;
 const forking = (
-    process.env.FORK_NETWORK === "mainnet" ? mainnet_fork
-  : process.env.FORK_NETWORK === "rinkeby" ? rinkeby_fork
-  : process.env.FORK_NETWORK === "kovan"   ? kovan_fork
+    process.env.FORK_NETWORK === "mainnet"        ? mainnet_fork
+  : process.env.FORK_NETWORK === "rinkeby"        ? rinkeby_fork
+  : process.env.FORK_NETWORK === "kovan"          ? kovan_fork
+  : process.env.FORK_NETWORK === "goerli"         ? goerli_fork
   : no_fork
 );
 const hardhat_network = process.env.FORK_NETWORK ? {forking} : {};
@@ -44,7 +46,12 @@ const config: HardhatUserConfig = {
       url: process.env.KOVAN_URL || '',
       chainId: 42,
       accounts: JSON.parse(process.env.KOVAN_ACCOUNTS || '[]')
-    }
+    },
+    goerli: {
+      url: process.env.GOERLI_URL || '',
+      chainId: 5,
+      accounts: JSON.parse(process.env.GOERLI_ACCOUNTS || '[]')
+    },
   },
   solidity: {
     compilers: [

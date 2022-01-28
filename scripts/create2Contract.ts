@@ -47,7 +47,9 @@ export async function create2Contract(wallet: Signer, factoryOrContractJson: Con
 async function _init() {
   if(initialized) return;
   artifacts = await import_artifacts();
-  knownHashes = JSON.parse(readFileSync("stash/scripts/knownHashes.json").toString());
+  try {
+    knownHashes = JSON.parse(readFileSync("stash/scripts/knownHashes.json").toString());
+  } catch(e) {}
   initialized = true;
 }
 
@@ -59,8 +61,8 @@ async function _initCodeGetter(wallet: Signer, factoryOrContractJson: ContractJS
   let contract;
   try {
     contract = await deployContract(failDeployer, factoryOrContractJson, args, overrideOptions);
-  } catch(e) {
-    //console.error(e);
+  } catch(e: any) {
+    if(!e.tx || !e.tx.data) console.error(e);
     return e.tx.data;
   }
   console.log(contract);
@@ -118,11 +120,19 @@ async function _exists(address: string, factoryOrContractJson: ContractJSON) {
 
 // deploy the contract
 async function _deployer(wallet: Signer, initCode: string, salt: string, deployerAddress: string) {
-  let deployerContract = await ethers.getContractAt(artifacts.SingletonFactory.abi, deployerAddress);
-  let tx = await deployerContract.connect(wallet).deploy(initCode, salt, {gasLimit: 5000000});
-  let receipt = await tx.wait();
-  return [tx.data, receipt.gasUsed.toString()]
-  //return ["", "0"];
+  const ONE_GWEI = 1000000000;
+  const gas = 100 * ONE_GWEI;
+  try {
+    let deployerContract = await ethers.getContractAt(artifacts.SingletonFactory.abi, deployerAddress);
+    let tx = await deployerContract.connect(wallet).deploy(initCode, salt, {gasLimit: 6000000, maxFeePerGas: gas});
+    let receipt = await tx.wait();
+    return [tx.data, receipt.gasUsed.toString()]
+    //return ["", "0"];
+  } catch(e) {
+    console.error("error in create2Contract._deployer");
+    console.error(e);
+    return ["0x0", "0"];
+  }
 }
 
 // verify on etherscan
