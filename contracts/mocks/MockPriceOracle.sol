@@ -33,7 +33,7 @@ contract MockPriceOracle  {
     */
     function getAssetPrice(address _asset) external view returns (uint256 price) {
         ERC20 token = ERC20(_asset);
-        string memory name = token.name();
+        string memory name = token.symbol();
         if (keccak256(bytes(name)) == keccak256(bytes("DAI"))) {
            return _priceOracle.getAssetPrice(DAI);
         } else if (keccak256(bytes(name)) == keccak256(bytes("USDC"))) {
