@@ -40,7 +40,7 @@ contract BondTellerEth is IBondTellerEth, ReentrancyGuard, ERC721EnhancedInitial
     uint256 public lastPriceUpdate;            // last timestamp price was updated
     uint256 public maxPayout;                  // max payout in a single bond measured in principal
     uint256 internal constant MAX_BPS = 10000; // 10k basis points (100%)
-    uint256 public daoFeeBps;                  // portion of principal that is sent to the dao, the rest to the pool
+    uint256 public protocolFeeBps;             // portion of principal that is sent to the dao, the rest to the pool
     bool public termsSet;                      // have terms been set
     bool public capacityIsPayout;              // capacity limit is for payout vs principal
     bool public paused;                        // pauses deposits
@@ -65,12 +65,12 @@ contract BondTellerEth is IBondTellerEth, ReentrancyGuard, ERC721EnhancedInitial
 
     // addresses
     address public solace;                     // solace native token
-    address public xsLocker;                  // xsLocker staking contract
-    address public principal;                   // token to accept as payment
+    address public xsLocker;                   // xsLocker staking contract
+    address public principal;                  // token to accept as payment
     bool public isPermittable;                 // true if principal supports EIP2612.
     address public underwritingPool;           // the underwriting pool to back risks
     address public dao;                        // the dao
-    address public bondDepo;           // the bond depository
+    address public bondDepo;                   // the bond depository
 
     /***************************************
     INITIALIZER
@@ -192,11 +192,11 @@ contract BondTellerEth is IBondTellerEth, ReentrancyGuard, ERC721EnhancedInitial
         bool stake
     ) public payable override nonReentrant returns (uint256 payout, uint256 tokenID) {
         // accounting
-        uint256 daoFee;
-        (payout, tokenID, daoFee) = _deposit(msg.value, minAmountOut, depositor, stake);
+        uint256 protocolFee;
+        (payout, tokenID, protocolFee) = _deposit(msg.value, minAmountOut, depositor, stake);
         // route principal - put last as Checks-Effects-Interactions
-        if(daoFee > 0) Address.sendValue(payable(dao), daoFee);
-        Address.sendValue(payable(underwritingPool), msg.value - daoFee);
+        if(protocolFee > 0) Address.sendValue(payable(dao), protocolFee);
+        Address.sendValue(payable(underwritingPool), msg.value - protocolFee);
     }
 
     /**
@@ -216,11 +216,11 @@ contract BondTellerEth is IBondTellerEth, ReentrancyGuard, ERC721EnhancedInitial
         bool stake
     ) external override nonReentrant returns (uint256 payout, uint256 tokenID) {
         // accounting
-        uint256 daoFee;
-        (payout, tokenID, daoFee) = _deposit(amount, minAmountOut, depositor, stake);
+        uint256 protocolFee;
+        (payout, tokenID, protocolFee) = _deposit(amount, minAmountOut, depositor, stake);
         // route principal - put last as Checks-Effects-Interactions
-        if(daoFee > 0) SafeERC20.safeTransferFrom(IERC20(principal), depositor, dao, daoFee);
-        SafeERC20.safeTransferFrom(IERC20(principal), depositor, underwritingPool, amount - daoFee);
+        if(protocolFee > 0) SafeERC20.safeTransferFrom(IERC20(principal), depositor, dao, protocolFee);
+        SafeERC20.safeTransferFrom(IERC20(principal), depositor, underwritingPool, amount - protocolFee);
     }
 
     /**
@@ -252,11 +252,11 @@ contract BondTellerEth is IBondTellerEth, ReentrancyGuard, ERC721EnhancedInitial
         require(isPermittable, "principal does not support permit");
         IERC20Permit(address(principal)).permit(depositor, address(this), amount, deadline, v, r, s);
         // accounting
-        uint256 daoFee;
-        (payout, tokenID, daoFee) = _deposit(amount, minAmountOut, depositor, stake);
+        uint256 protocolFee;
+        (payout, tokenID, protocolFee) = _deposit(amount, minAmountOut, depositor, stake);
         // route principal - put last as Checks-Effects-Interactions
-        if(daoFee > 0) SafeERC20.safeTransferFrom(IERC20(principal), depositor, dao, daoFee);
-        SafeERC20.safeTransferFrom(IERC20(principal), depositor, underwritingPool, amount - daoFee);
+        if(protocolFee > 0) SafeERC20.safeTransferFrom(IERC20(principal), depositor, dao, protocolFee);
+        SafeERC20.safeTransferFrom(IERC20(principal), depositor, underwritingPool, amount - protocolFee);
     }
 
     /***************************************
@@ -278,6 +278,7 @@ contract BondTellerEth is IBondTellerEth, ReentrancyGuard, ERC721EnhancedInitial
         bonds[bondID].payoutAlreadyClaimed += eligiblePayout;
 
         // Burn bond if vesting completed
+        // solhint-disable-next-line not-rely-on-time
         if (block.timestamp > bond.vestingStart + bond.localVestingTerm) {
             _burn(bondID);
             delete bonds[bondID];
@@ -300,14 +301,14 @@ contract BondTellerEth is IBondTellerEth, ReentrancyGuard, ERC721EnhancedInitial
      * @param stake True to stake, false to not stake.
      * @return payout The amount of [**SOLACE**](./../SOLACE) or [**xSOLACEV1**](./../staking/xSOLACEV1) in the bond.
      * @return tokenID The ID of the newly created bond or lock.
-     * @return daoFee Amount of principal paid to dao
+     * @return protocolFee Amount of principal paid to dao
      */
     function _deposit(
         uint256 amount,
         uint256 minAmountOut,
         address depositor,
         bool stake
-    ) internal returns (uint256 payout, uint256 tokenID, uint256 daoFee) {
+    ) internal returns (uint256 payout, uint256 tokenID, uint256 protocolFee) {
         require(depositor != address(0), "invalid address");
         require(!paused, "cannot deposit while paused");
 
@@ -322,12 +323,14 @@ contract BondTellerEth is IBondTellerEth, ReentrancyGuard, ERC721EnhancedInitial
         // ensure there is remaining capacity for bond
         if (capacityIsPayout) {
             // capacity in payout terms
-            require(capacity >= payout, "bond at capacity");
-            capacity = capacity - payout;
+            uint256 cap = capacity;
+            require(cap >= payout, "bond at capacity");
+            capacity = cap - payout;
         } else {
             // capacity in principal terms
-            require(capacity >= amount, "bond at capacity");
-            capacity = capacity - amount;
+            uint256 cap = capacity;
+            require(cap >= amount, "bond at capacity");
+            capacity = cap - amount;
         }
         require(payout <= maxPayout, "bond too large");
         require(minAmountOut <= payout, "slippage protection");
@@ -336,10 +339,12 @@ contract BondTellerEth is IBondTellerEth, ReentrancyGuard, ERC721EnhancedInitial
         IBondDepository(bondDepo).pullSolace(payout);
         // optionally stake
         if(stake) {
-            tokenID = IxsLocker(xsLocker).createLock(depositor, payout, 0); // TODO: lock end
+            // solhint-disable-next-line not-rely-on-time
+            tokenID = IxsLocker(xsLocker).createLock(depositor, payout, block.timestamp+globalVestingTerm);
         } else {
           // record bond info
           tokenID = ++numBonds;
+          // solhint-disable-next-line not-rely-on-time
           uint40 vestingStart = toUint40(block.timestamp);
           uint40 vestingTerm = globalVestingTerm;
           bonds[tokenID] = Bond({
@@ -353,7 +358,8 @@ contract BondTellerEth is IBondTellerEth, ReentrancyGuard, ERC721EnhancedInitial
           emit CreateBond(tokenID, amount, payout, vestingStart, vestingTerm);
         }
 
-        return (payout, tokenID, daoFee);
+        protocolFee = amount * protocolFeeBps / MAX_BPS;
+        return (payout, tokenID, protocolFee);
     }
 
     /***************************************
@@ -367,10 +373,12 @@ contract BondTellerEth is IBondTellerEth, ReentrancyGuard, ERC721EnhancedInitial
      */
     function _calculateTotalPayout(uint256 depositAmount) internal returns (uint256 amountOut) {
         // calculate this price
+        // solhint-disable-next-line not-rely-on-time
         uint256 timeSinceLast = block.timestamp - lastPriceUpdate;
         uint256 price_ = exponentialDecay(nextPrice, timeSinceLast);
         if(price_ < minimumPrice) price_ = minimumPrice;
         require(price_ != 0, "invalid price");
+        // solhint-disable-next-line not-rely-on-time
         lastPriceUpdate = block.timestamp;
         // calculate amount out
         amountOut = (1 ether * depositAmount) / price_; // 1 ether => 1 solace
@@ -390,7 +398,9 @@ contract BondTellerEth is IBondTellerEth, ReentrancyGuard, ERC721EnhancedInitial
         assert(bond.payoutAlreadyClaimed <= bond.payoutAmount);
 
         // Calculation if still vesting
+        // solhint-disable-next-line not-rely-on-time
         if (block.timestamp <= bond.vestingStart + bond.localVestingTerm) {
+            // solhint-disable-next-line not-rely-on-time
             eligiblePayout = ( ( bond.payoutAmount * ( block.timestamp - bond.vestingStart ) ) / bond.localVestingTerm ) - bond.payoutAlreadyClaimed;
         } else {
             // Calculation if vesting completed
@@ -490,11 +500,11 @@ contract BondTellerEth is IBondTellerEth, ReentrancyGuard, ERC721EnhancedInitial
 
     /**
      * @notice Sets the bond fees.
-     * @param daoFee The fraction of `principal` that will be sent to the dao measured in BPS.
+     * @param protocolFee The fraction of `principal` that will be sent to the dao measured in BPS.
      */
-    function setFees(uint256 daoFee) external onlyGovernance {
-        require(daoFee <= MAX_BPS, "invalid dao fee");
-        daoFeeBps = daoFee;
+    function setFees(uint256 protocolFee) external onlyGovernance {
+        require(protocolFee <= MAX_BPS, "invalid protocol fee");
+        protocolFeeBps = protocolFee;
         emit FeesSet();
     }
 

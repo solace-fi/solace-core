@@ -4,11 +4,13 @@
 pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol";
+import "./IERC3156FlashLender.sol";
 
 /// @dev Wrapped Ether v10 (WETH10) is an Ether (ETH) ERC-20 wrapper. You can `deposit` ETH and obtain a WETH10 balance which can then be operated as an ERC-20 token. You can
 /// `withdraw` ETH from WETH10, which will then burn WETH10 token in your wallet. The amount of WETH10 token in any wallet is always identical to the
 /// balance of ETH deposited minus the ETH withdrawn with that specific wallet.
-interface IWETH10 is IERC20 {
+interface IWETH10 is IERC20, IERC20Permit, IERC3156FlashLender {
 
     /// @dev Returns current amount of flash-minted WETH10 token.
     function flashMinted() external view returns(uint256);
