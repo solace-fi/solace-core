@@ -78,7 +78,7 @@ interface ISoteriaCoverageProduct {
      * @param referralCode_ Referral code
      * @return policyID The ID of newly created policy.
     */
-    function activatePolicy(address policyholder_, uint256 coverLimit_, uint256 referralCode_) external payable returns (uint256 policyID);
+    function activatePolicy(address policyholder_, uint256 coverLimit_, bytes calldata referralCode_) external payable returns (uint256 policyID);
 
     /**
      * @notice Deposits funds for policy holders.
@@ -99,7 +99,7 @@ interface ISoteriaCoverageProduct {
      * @param newCoverLimit_ The new value to cover in **ETH**.
      * @param referralCode_ Referral code
     */
-    function updateCoverLimit(uint256 newCoverLimit_, uint256 referralCode_) external;
+    function updateCoverLimit(uint256 newCoverLimit_, bytes calldata referralCode_) external;
 
     /**
      * @notice Deactivate a user's own policy.
@@ -229,13 +229,6 @@ interface ISoteriaCoverageProduct {
      * @return isReferralOn_ True if referral campaign active, false if not
      */
     function isReferralOn() external view returns (bool isReferralOn_);
-
-    /**
-     * @notice Gets the unique referral code for a user.
-     * @param user_ The user.
-     * @return referralCode_ The referral code.
-     */
-    function getReferralCode(address user_) external view returns (uint256 referralCode_);
 
     /***************************************
     GOVERNANCE FUNCTIONS

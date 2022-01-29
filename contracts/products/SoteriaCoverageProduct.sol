@@ -5,11 +5,13 @@ import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "../utils/Governable.sol";
 import "../interfaces/utils/IRegistry.sol";
 import "../interfaces/risk/IRiskManager.sol";
 import "../interfaces/products/ISoteriaCoverageProduct.sol";
- 
+import "hardhat/console.sol";
+
 /**
  * @title SoteriaCoverageProduct
  * @author solace.fi
@@ -27,6 +29,12 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
 
     /// @notice Cannot buy new policies while paused. (Default is False)
     bool internal _paused;
+
+    /**
+     * @notice Referral typehash
+     */
+    // solhint-disable-next-line var-name-mixedcase
+    bytes32 private constant _REFERRAL_TYPEHASH = keccak256("SoteriaReferral(uint256 version)");
 
     /***************************************
     BOOK-KEEPING VARIABLES
@@ -117,10 +125,11 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         _registry = IRegistry(registry_);
         require(_registry.get("riskManager") != address(0x0), "zero address riskmanager");
 
-        // Set default values - charge cycle of one week, max premium rate of 10% of cover limit per annum, referral program active
+        // Set default values - charge cycle of one week, max premium rate of 10% of cover limit per annum, 0.01 ether referral reward, referral program active
         _maxRateNum = 1;
         _maxRateDenom = 315360000;
         _chargeCycle = 604800;
+        _referralReward = 0.01 ether;
         _isReferralOn = true;
     }
     
@@ -154,7 +163,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      * @param referralCode_ Referral code
      * @return policyID The ID of newly created policy.
     */
-    function activatePolicy(address policyholder_, uint256 coverLimit_, uint256 referralCode_) external payable override whileUnpaused returns (uint256 policyID) {
+    function activatePolicy(address policyholder_, uint256 coverLimit_, bytes calldata referralCode_) external payable override nonReentrant whileUnpaused returns (uint256 policyID) {
         require(policyholder_ != address(0x0), "zero address policyholder");
         require(coverLimit_ > 0, "zero cover value");
         
@@ -176,7 +185,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
             _mint(policyholder_, policyID);
         }
 
-        if (referralCode_ != 0 && _isReferralOn) _processReferralCode(policyholder_, referralCode_);
+        _processReferralCode(policyholder_, referralCode_);
 
         // update cover amount
         _updateActiveCoverLimit(0, coverLimit_);
@@ -192,7 +201,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      * @param newCoverLimit_ The new value to cover in **ETH**.
      * @param referralCode_ Referral code
     */
-    function updateCoverLimit(uint256 newCoverLimit_, uint256 referralCode_) external override nonReentrant whileUnpaused {
+    function updateCoverLimit(uint256 newCoverLimit_, bytes calldata referralCode_) external override nonReentrant whileUnpaused {
         require(newCoverLimit_ > 0, "zero cover value");
         uint256 policyID = _policyOf[msg.sender];
         require(_exists(policyID), "invalid policy");
@@ -200,7 +209,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         require(_canPurchaseNewCover(currentCoverLimit, newCoverLimit_), "insufficient capacity for new cover");
         require(_accountBalanceOf[msg.sender] > _minRequiredAccountBalance(newCoverLimit_), "insufficient deposit for minimum required account balance");
         
-        if (referralCode_ != 0 && _isReferralOn) _processReferralCode(msg.sender, referralCode_);
+        _processReferralCode(msg.sender, referralCode_);
         _exitCooldown(msg.sender); // Reset cooldown
         _coverLimitOf[policyID] = newCoverLimit_;
         _preDeactivateCoverLimitOf[policyID] = newCoverLimit_;
@@ -212,7 +221,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      * @notice Deposits funds for policy holders.
      * @param policyholder_ The holder of the policy.
     */
-    function deposit(address policyholder_) external payable override whileUnpaused {
+    function deposit(address policyholder_) external payable override nonReentrant whileUnpaused {
         _deposit(policyholder_, msg.value);
     }
 
@@ -401,15 +410,6 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      */
     function isReferralOn() external view override returns (bool isReferralOn_) {
         return _isReferralOn;
-    }
-
-    /**
-     * @notice Gets the unique referral code for a user.
-     * @param user_ The user.
-     * @return referralCode_ The referral code.
-     */
-    function getReferralCode(address user_) external view override returns (uint256 referralCode_) {
-        return _getReferralCode(user_);
     }
 
     /***************************************
@@ -680,31 +680,49 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     }
 
     /**
-     * @notice Gets the unique referral code for a user.
-     * @param user_ The user.
-     * @return referralCode_ The referral code.
-     */
-    function _getReferralCode(address user_) internal view returns (uint256 referralCode_) {
-        return uint256(uint160(user_));
-    }
-
-    /**
      * @notice Internal function to process referral code
      * @param policyholder_ Policy holder
      * @param referralCode_ Referral code
      */
-    function _processReferralCode(address policyholder_, uint256 referralCode_) internal {
-        address referrer = address(uint160(referralCode_));
+    function _processReferralCode(address policyholder_, bytes calldata referralCode_) internal {
+        
+        // Skip processing referring code, if empty referral code argument or referral campaign switched off
+        if ( !_isReferralOn || _isEmptyReferralCode(referralCode_) ) return;
+        
         // require(referrer != address(0), "cannot have zero address referrer"); // Redundant because we cannot call _processReferralCode with referralCode_ = 0
+        address referrer = ECDSA.recover(_getEIP712Hash(), referralCode_);
         require(referrer != policyholder_, "cannot refer to self");
         require(policyStatus(_policyOf[referrer]), "referrer must be active policy holder");
         require (!_isReferralCodeUsed[_policyOf[policyholder_]], "cannot use referral code again");
 
         _isReferralCodeUsed[_policyOf[policyholder_]] = true;
-        _rewardPointsOf[policyholder_] += 0.01 ether;
-        _rewardPointsOf[referrer] += 0.01 ether;
+        _rewardPointsOf[policyholder_] += _referralReward;
+        _rewardPointsOf[referrer] += _referralReward;
 
         emit ReferralRewardsEarned(policyholder_, _referralReward);
         emit ReferralRewardsEarned(referrer, _referralReward);
+    }
+
+    /**
+     * @notice Internal helper function to determine if referralCode_ is an empty bytes value
+     * @param referralCode_ Referral code
+     */
+    function _isEmptyReferralCode(bytes calldata referralCode_) internal returns (bool) {
+        return (keccak256(abi.encodePacked(referralCode_)) == keccak256(abi.encodePacked("")));
+    }
+
+    function _getEIP712Hash() internal returns (bytes32) {
+        bytes32 digest = 
+            ECDSA.toTypedDataHash(
+                _domainSeparatorV4(),
+                keccak256(
+                    abi.encode(
+                        _REFERRAL_TYPEHASH,
+                        1
+                    )
+                )
+            );
+
+        return digest;
     }
 }
