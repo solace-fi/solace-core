@@ -56,7 +56,6 @@ contract RiskManager is IRiskManager, Governable {
         require(registry_ != address(0x0), "zero address registry");
         _registry = IRegistry(registry_);
         _partialReservesFactor = MAX_BPS;
-        canUpdateCoverLimit[_registry.get("policyManager")] = true;
     }
 
     /***************************************

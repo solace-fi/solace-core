@@ -9,7 +9,7 @@ import "../utils/Governable.sol";
 import "../interfaces/utils/IRegistry.sol";
 import "../interfaces/risk/IRiskManager.sol";
 import "../interfaces/products/ISoteriaCoverageProduct.sol";
-
+ 
 /**
  * @title SoteriaCoverageProduct
  * @author solace.fi
@@ -57,10 +57,14 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     uint256 internal _cooldownPeriod;
 
     /**
-     * @notice Percentage of cover limit purchased, that will be rewarded for using a referral code
-     * @dev In units of bps, or out of 10,000 parts. Default is 5% or _referralRewardPercentage = 500.
+     * @notice The reward points earned (to both the referee and referrer) for succcessful referral
      */
-    uint256 internal _referralRewardPercentage;
+    uint256 internal _referralReward;
+
+    /**
+     * @notice Switch controlling whether referral campaign is active or not
+     */
+    bool internal _isReferralOn;
 
     /**
      * @notice Policy holder address => Timestamp that a depositor's cooldown started
@@ -112,6 +116,12 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         require(registry_ != address(0x0), "zero address registry");
         _registry = IRegistry(registry_);
         require(_registry.get("riskManager") != address(0x0), "zero address riskmanager");
+
+        // Set default values - charge cycle of one week, max premium rate of 10% of cover limit per annum, referral program active
+        _maxRateNum = 1;
+        _maxRateDenom = 315360000;
+        _chargeCycle = 604800;
+        _isReferralOn = true;
     }
     
     /***************************************
@@ -166,7 +176,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
             _mint(policyholder_, policyID);
         }
 
-        if (referralCode_ != 0) _processReferralCode(policyholder_, coverLimit_, referralCode_);
+        if (referralCode_ != 0 && _isReferralOn) _processReferralCode(policyholder_, referralCode_);
 
         // update cover amount
         _updateActiveCoverLimit(0, coverLimit_);
@@ -190,7 +200,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         require(_canPurchaseNewCover(currentCoverLimit, newCoverLimit_), "insufficient capacity for new cover");
         require(_accountBalanceOf[msg.sender] > _minRequiredAccountBalance(newCoverLimit_), "insufficient deposit for minimum required account balance");
         
-        if (referralCode_ != 0) _processReferralCode(msg.sender, newCoverLimit_, referralCode_);
+        if (referralCode_ != 0 && _isReferralOn) _processReferralCode(msg.sender, referralCode_);
         _exitCooldown(msg.sender); // Reset cooldown
         _coverLimitOf[policyID] = newCoverLimit_;
         _preDeactivateCoverLimitOf[policyID] = newCoverLimit_;
@@ -207,22 +217,17 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     }
 
     /**
-     * @notice Withdraw ETH from Soteria account to user.
-     * @notice If cooldown has passed, the user can withdraw any amount
-     * @notice If cooldown has not passed, the user can only withdraw down to minRequiredAccountBalance
-     * @param amount_ Amount policyholder desires to withdraw.
-     * User Soteria account must have > minAccountBalance.
-     * Otherwise account will be deactivated.
+     * @notice Withdraw maximum available ETH from Soteria account to user.
+     * If cooldown has passed, the user will withdraw entire balance of their Soteria account
+     * If cooldown has not passed, the user will withdraw such that minRequiredAccountBalance is left in their Soteria account
      */
-    function withdraw(uint256 amount_) external override nonReentrant whileUnpaused {
-      require(amount_ <= _accountBalanceOf[msg.sender], "cannot withdraw > account balance");      
-      uint256 preDeactivateCoverLimit = _preDeactivateCoverLimitOf[_policyOf[msg.sender]];
-
+    function withdraw() external override nonReentrant whileUnpaused {
       if ( _hasCooldownPassed(msg.sender) ) {
-        _withdraw(msg.sender, amount_);
+        _withdraw(msg.sender, _accountBalanceOf[msg.sender]);
+        _preDeactivateCoverLimitOf[_policyOf[msg.sender]] = 0;
       } else {
-        require(_accountBalanceOf[msg.sender] - amount_ > _minRequiredAccountBalance(preDeactivateCoverLimit), "must have > minRequiredAccountbalance");
-        _withdraw(msg.sender, amount_);
+        uint256 preDeactivateCoverLimit = _preDeactivateCoverLimitOf[_policyOf[msg.sender]];
+        _withdraw(msg.sender, _accountBalanceOf[msg.sender] - _minRequiredAccountBalance(preDeactivateCoverLimit));
       }
     }
 
@@ -383,11 +388,19 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     }
 
     /**
-     * @notice Gets the referral reward percentage in bps
-     * @return referralRewardPercentage_ The referral reward percentage
+     * @notice Gets the referral reward
+     * @return referralReward_ The referral reward
      */
-    function referralRewardPercentage() external view override returns (uint256 referralRewardPercentage_) {
-        return _referralRewardPercentage;
+    function referralReward() external view override returns (uint256 referralReward_) {
+        return _referralReward;
+    }
+
+    /**
+     * @notice Gets whether the referral campaign is active or not
+     * @return isReferralOn_ True if referral campaign active, false if not
+     */
+    function isReferralOn() external view override returns (bool isReferralOn_) {
+        return _isReferralOn;
     }
 
     /**
@@ -467,14 +480,23 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     }
 
     /**
-     * @notice set _referralRewardPercentage
+     * @notice set _referralReward
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param referralRewardPercentage_ Desired referralRewardPercentage.
+     * @param referralReward_ Desired referralReward.
     */
-    function setReferralRewardPercentage(uint256 referralRewardPercentage_) external override onlyGovernance {
-        require(referralRewardPercentage_ <= 10000, "cannot set over 100%");
-        _referralRewardPercentage = referralRewardPercentage_;
-        emit ReferralRewardPercentageSet(referralRewardPercentage_);
+    function setReferralReward(uint256 referralReward_) external override onlyGovernance {
+        _referralReward = referralReward_;
+        emit ReferralRewardSet(referralReward_);
+    }
+
+    /**
+     * @notice set _isReferralOn
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param isReferralOn_ Desired state of referral campaign.
+    */
+    function setIsReferralOn(bool isReferralOn_) external override onlyGovernance {
+        _isReferralOn = isReferralOn_;
+        emit IsReferralOnSet(isReferralOn_);
     }
 
     /***************************************
@@ -510,9 +532,17 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         uint256 amountToPayPremiumPool = 0;
 
         for (uint256 i = 0; i < count; i++) {
-            // skip computation if policy inactive
-            if ( !policyStatus(_policyOf[holders_[i]]) ) continue;
-            require(premiums_[i] <= _minRequiredAccountBalance(coverLimitOf(policyOf(holders_[i]))), "charging more than promised maximum rate");
+            // Skip computation if the account is deactivated, but we need to circumvent the following edge case:
+            // Premium collector should be able to charge policy holders that have deactivated their policy within the last epoch
+            // I.e. a policy holder should not be able to the following: Activate a policy, then deactivate their policy just prior to premiums being charged, and get free cover
+
+            // This does however bring up an additional edge case: the premium collector can charge a deactivated account more than once. 
+            // We are trusting that the premium collector does not do this.
+            // So in effect this will only skip computation if the policyholder has withdrawn their entire account balance
+            if ( _preDeactivateCoverLimitOf[_policyOf[holders_[i]]] == 0) continue;
+
+            // require(premiums_[i] <= _minRequiredAccountBalance(coverLimitOf(policyOf(holders_[i]))), "charging more than promised maximum rate");
+            require(premiums_[i] <= _minRequiredAccountBalance(_preDeactivateCoverLimitOf[_policyOf[holders_[i]]]), "charging more than promised maximum rate");
 
             // If policy holder can pay for premium charged in full
             if (_accountBalanceOf[holders_[i]] + _rewardPointsOf[holders_[i]] >= premiums_[i]) {
@@ -661,21 +691,20 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     /**
      * @notice Internal function to process referral code
      * @param policyholder_ Policy holder
-     * @param coverLimit_ Cover limit
      * @param referralCode_ Referral code
      */
-    function _processReferralCode(address policyholder_, uint256 coverLimit_, uint256 referralCode_) internal {
+    function _processReferralCode(address policyholder_, uint256 referralCode_) internal {
         address referrer = address(uint160(referralCode_));
         // require(referrer != address(0), "cannot have zero address referrer"); // Redundant because we cannot call _processReferralCode with referralCode_ = 0
         require(referrer != policyholder_, "cannot refer to self");
+        require(policyStatus(_policyOf[referrer]), "referrer must be active policy holder");
         require (!_isReferralCodeUsed[_policyOf[policyholder_]], "cannot use referral code again");
-        
-        uint256 rewardPointsEarned = (coverLimit_ * _referralRewardPercentage) / 10000;
-        _isReferralCodeUsed[_policyOf[policyholder_]] = true;
-        _rewardPointsOf[policyholder_] += rewardPointsEarned;
-        _rewardPointsOf[referrer] += rewardPointsEarned;
 
-        emit ReferralRewardsEarned(policyholder_, rewardPointsEarned);
-        emit ReferralRewardsEarned(referrer, rewardPointsEarned);
+        _isReferralCodeUsed[_policyOf[policyholder_]] = true;
+        _rewardPointsOf[policyholder_] += 0.01 ether;
+        _rewardPointsOf[referrer] += 0.01 ether;
+
+        emit ReferralRewardsEarned(policyholder_, _referralReward);
+        emit ReferralRewardsEarned(referrer, _referralReward);
     }
 }

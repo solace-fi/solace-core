@@ -58,8 +58,11 @@ interface ISoteriaCoverageProduct {
     /// @notice Emitted when reward points are set.
     event RewardPointsSet(address policyholder, uint256 amountGifted);
 
-    /// @notice Emitted when referralRewardPercentage is set.
-    event ReferralRewardPercentageSet(uint256 referralRewardPercentage);
+    /// @notice Emitted when isReferralOn is set
+    event IsReferralOnSet(bool isReferralOn);
+
+    /// @notice Emitted when referralReward is set.
+    event ReferralRewardSet(uint256 referralReward);
 
     /// @notice Emitted when referral rewards are earned;
     event ReferralRewardsEarned(address rewardEarner, uint256 rewardPointsEarned);
@@ -84,10 +87,11 @@ interface ISoteriaCoverageProduct {
     function deposit(address policyholder_) external payable;
 
     /**
-     * @notice Withdraw ETH from Soteria account to user.
-     * @param amount_ Amount policyholder desires to withdraw
+     * @notice Withdraw maximum available ETH from Soteria account to user.
+     * If cooldown has passed, the user will withdraw entire balance of their Soteria account
+     * If cooldown has not passed, the user will withdraw such that minRequiredAccountBalance is left in their Soteria account
      */
-    function withdraw(uint256 amount_) external;
+    function withdraw() external;
 
     /**
      * @notice Updates the cover amount of your policy
@@ -215,10 +219,17 @@ interface ISoteriaCoverageProduct {
     function cooldownStart(address policyholder_) external view returns (uint256 cooldownStart_);
 
     /**
-     * @notice Gets the referral reward percentage in bps
-     * @return referralRewardPercentage_ The referral reward percentage
+     * @notice Gets the referral reward
+     * @return referralReward_ The referral reward
      */
-    function referralRewardPercentage() external view returns (uint256 referralRewardPercentage_);
+    function referralReward() external view returns (uint256 referralReward_);
+
+    /**
+     * @notice Gets whether the referral campaign is active or not
+     * @return isReferralOn_ True if referral campaign active, false if not
+     */
+    function isReferralOn() external view returns (bool isReferralOn_);
+
     /**
      * @notice Gets the unique referral code for a user.
      * @param user_ The user.
@@ -274,11 +285,18 @@ interface ISoteriaCoverageProduct {
     function setChargeCycle(uint256 chargeCycle_) external;
 
     /**
-     * @notice set _referralRewardPercentage
+     * @notice set _referralReward
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param referralRewardPercentage_ Desired referralRewardPercentage.
+     * @param referralReward_ Desired referralReward.
     */
-    function setReferralRewardPercentage(uint256 referralRewardPercentage_) external;
+    function setReferralReward(uint256 referralReward_) external;
+
+    /**
+     * @notice set _isReferralOn
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param isReferralOn_ Desired state of referral campaign.
+    */
+    function setIsReferralOn(bool isReferralOn_) external;
 
     /***************************************
     COVER PROMOTION ADMIN FUNCTIONS
