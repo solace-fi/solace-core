@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
-import "./CoverageProduct.sol";
+import "./SolaceMarketProduct.sol";
 import "../utils//Factory.sol";
 import "../interfaces/products/IProductFactory.sol";
 
@@ -33,7 +33,7 @@ contract ProductFactory is Factory, IProductFactory {
         string memory version_
     ) external override returns (address product) {
         product = _deployMinimalProxy(base_);
-        CoverageProduct(payable(product)).initialize(
+        SolaceMarketProduct(payable(product)).initialize(
             governance_,
             registry_,
             minPeriod_,
@@ -70,7 +70,7 @@ contract ProductFactory is Factory, IProductFactory {
         string memory version_
     ) external override returns (address product) {
         product = _deployMinimalProxy(base_, salt_);
-        CoverageProduct(payable(product)).initialize(
+        SolaceMarketProduct(payable(product)).initialize(
             governance_,
             registry_,
             minPeriod_,

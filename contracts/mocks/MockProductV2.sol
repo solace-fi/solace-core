@@ -2,14 +2,14 @@
 
 pragma solidity 0.8.6;
 
-import "../products/CoverageProduct.sol";
+import "../products/SolaceMarketProduct.sol";
 
 /**
  * @title MockProductV2
  * @author solace.fi
  * @notice Mock product for testing purposes.
  */
-contract MockProductV2 is CoverageProduct {
+contract MockProductV2 is SolaceMarketProduct {
 
     uint24 private _price;
 
