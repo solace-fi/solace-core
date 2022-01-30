@@ -14,7 +14,7 @@ let artifacts: ArtifactImports;
 
 let initialized = false;
 const SINGLETON_FACTORY_ADDRESS = "0xce0042B868300000d44A59004Da54A005ffdcf9f";
-let knownHashes: any = {"0x0": {"address": "0x0", "salt": "0x0"} };
+let knownHashes: any = {"0x0": {"0x0": {"address": "0x0", "salt": "0x0"}}}; // initcode -> deployer contract -> address, salt
 
 // deploys a new contract using CREATE2
 // call like you would waffle.deployContract
@@ -72,8 +72,8 @@ async function _initCodeGetter(wallet: Signer, factoryOrContractJson: ContractJS
 // test salts until one results in an acceptable address
 function _hasher(initCode: string, deployerAddress: string): [string, string] {
   // read known hashes from cache
-  if(Object.keys(knownHashes).includes(initCode)) {
-    var res: any = knownHashes[initCode];
+  if(Object.keys(knownHashes).includes(initCode) && Object.keys(knownHashes[initCode]).includes(deployerAddress)) {
+    var res: any = knownHashes[initCode][deployerAddress];
     return [res.address, res.salt];
   }
   // 0xff ++ deployingAddress is fixed:
@@ -104,7 +104,8 @@ function _hasher(initCode: string, deployerAddress: string): [string, string] {
       console.log(`${i} -> ${address}`);
       var salt = '0x'+saltToBytes;
       // 6. Write hash to cache and return
-      knownHashes[initCode] = {"address": address, "salt": salt};
+      if(!Object.keys(knownHashes).includes(initCode)) knownHashes[initCode] = {};
+      knownHashes[initCode][deployerAddress] = {"address": address, "salt": salt};
       writeFileSync("stash/scripts/knownHashes.json", JSON.stringify(knownHashes));
       return [address, salt];
     }

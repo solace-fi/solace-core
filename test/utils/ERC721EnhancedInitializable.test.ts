@@ -11,6 +11,7 @@ import { import_artifacts, ArtifactImports } from "./../utilities/artifact_impor
 
 import { MockErc721Initializable, MockErc1271 } from "./../../typechain";
 import { getPermitErc721EnhancedSignature, getPermitErc721EnhancedDigest, getDomainSeparator, assembleRSV } from "./../utilities/getPermitNFTSignature";
+import { expectDeployed } from "../utilities/expectDeployed";
 
 describe("ERC721EnhancedInitializable", function() {
   let artifacts: ArtifactImports;
@@ -38,6 +39,7 @@ describe("ERC721EnhancedInitializable", function() {
   describe("deployment", async function () {
     before(async function () {
       token = (await deployContract(deployer, artifacts.MockERC721Initializable)) as MockErc721Initializable;
+      await expectDeployed(token.address);
     });
     it("starts with no name", async function() {
       expect(await token.name()).to.equal("");

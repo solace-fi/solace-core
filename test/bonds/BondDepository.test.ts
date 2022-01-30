@@ -13,6 +13,7 @@ chai.use(solidity);
 import { import_artifacts, ArtifactImports } from "./../utilities/artifact_importer";
 import { Solace, XSolacev1, MockErc20, Weth9, Registry, BondDepository, BondTellerErc20, BondTellerEth } from "./../../typechain";
 import { toBytes32 } from "./../utilities/setStorage";
+import { expectDeployed } from "../utilities/expectDeployed";
 
 describe("BondDepository", function() {
   let artifacts: ArtifactImports;
@@ -51,6 +52,7 @@ describe("BondDepository", function() {
     });
     it("deploys", async function () {
       bondDepo = (await deployContract(deployer, artifacts.BondDepository, [governor.address, solace.address])) as BondDepository;
+      await expectDeployed(bondDepo.address);
     });
     it("starts with correct solace", async function () {
       expect(await bondDepo.solace()).eq(solace.address);

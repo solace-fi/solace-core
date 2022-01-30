@@ -11,6 +11,7 @@ import { import_artifacts, ArtifactImports } from "./../utilities/artifact_impor
 
 import { MockCloneable } from "./../../typechain";
 import { toBytes32 } from "../utilities/setStorage";
+import { expectDeployed } from "../utilities/expectDeployed";
 
 describe("Cloneable", function() {
   let artifacts: ArtifactImports;
@@ -33,6 +34,7 @@ describe("Cloneable", function() {
   describe("deployment", async function () {
     it("deploys", async function () {
       cloneable1 = (await deployContract(deployer, artifacts.MockCloneable)) as MockCloneable;
+      await expectDeployed(cloneable1.address);
     });
     it("reverts zero address governor", async function () {
       await expect(cloneable1.initialize("aaaa", ZERO_ADDRESS)).to.be.revertedWith("zero address governance");
@@ -60,7 +62,7 @@ describe("Cloneable", function() {
         let event1 = events1[0];
         cloneable2 = await ethers.getContractAt(artifacts.MockCloneable.abi, event1?.args?.["deployment"]) as MockCloneable;
       } else throw "no deployment";
-      expect(cloneable2.address).not.eq(ZERO_ADDRESS);
+      await expectDeployed(cloneable2.address);
       expect(await cloneable1.message()).eq("bbbb");
       expect(await cloneable1.governance()).eq(governor.address);
       expect(await cloneable2.message()).eq("cccc");
@@ -87,7 +89,7 @@ describe("Cloneable", function() {
         let event1 = events1[0];
         cloneable4 = await ethers.getContractAt(artifacts.MockCloneable.abi, event1?.args?.["deployment"]) as MockCloneable;
       } else throw "no deployment";
-      expect(cloneable4.address).not.eq(ZERO_ADDRESS);
+      await expectDeployed(cloneable4.address);
       expect(await cloneable2.message()).eq("dddd");
       expect(await cloneable2.governance()).eq(governor2.address);
       expect(await cloneable4.message()).eq("qqqq");
@@ -112,6 +114,7 @@ describe("Cloneable", function() {
       let predAddr = await cloneable1.calculateMinimalProxyDeploymentAddress(salt);
       await cloneable1.clone2("cccc", governor2.address, salt);
       cloneable3 = (await ethers.getContractAt(artifacts.MockCloneable.abi, predAddr)) as MockCloneable;
+      await expectDeployed(cloneable3.address);
       expect(await cloneable1.message()).eq("bbbb");
       expect(await cloneable1.governance()).eq(governor.address);
       expect(await cloneable3.message()).eq("cccc");
@@ -139,6 +142,7 @@ describe("Cloneable", function() {
       let predAddr = await cloneable3.calculateMinimalProxyDeploymentAddress(salt);
       await cloneable3.clone2("zzzz", governor.address, salt);
       cloneable5 = (await ethers.getContractAt(artifacts.MockCloneable.abi, predAddr)) as MockCloneable;
+      await expectDeployed(cloneable5.address);
       expect(await cloneable3.message()).eq("dddd");
       expect(await cloneable3.governance()).eq(governor2.address);
       expect(await cloneable5.message()).eq("zzzz");

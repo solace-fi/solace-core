@@ -14,6 +14,7 @@ import { Solace, XsLocker, MockErc20, MockErc20Permit, BondDepository, BondTelle
 import { expectClose } from "./../utilities/math";
 import { getERC20PermitSignature } from "./../utilities/getERC20PermitSignature";
 import { toBytes32 } from "../utilities/setStorage";
+import { expectDeployed } from "../utilities/expectDeployed";
 
 const deadline = constants.MaxUint256;
 const VESTING_TERM = 432000; // 5 days
@@ -87,6 +88,7 @@ describe("BondTellerERC20", function() {
   describe("before initialization", function () {
     it("can deploy implementation", async function () {
       teller1 = (await deployContract(deployer, artifacts.BondTellerERC20)) as BondTellerErc20;
+      await expectDeployed(teller1.address);
       await bondDepo.connect(governor).addTeller(teller1.address);
     });
     it("starts with no name, symbol, or supply", async function () {
@@ -149,6 +151,7 @@ describe("BondTellerERC20", function() {
   describe("clone", function () {
     it("can deploy proxy", async function () {
       teller2 = await cloneTeller(teller1, "Solace USDC Bond", usdc.address, true);
+      await expectDeployed(teller2.address);
       await bondDepo.connect(governor).addTeller(teller2.address);
     });
     it("inits with a name and symbol", async function () {

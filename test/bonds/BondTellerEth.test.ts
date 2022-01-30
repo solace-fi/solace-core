@@ -13,6 +13,7 @@ import { import_artifacts, ArtifactImports } from "./../utilities/artifact_impor
 import { Solace, XsLocker, Weth9, Weth10, BondDepository, BondTellerEth } from "./../../typechain";
 import { expectClose } from "./../utilities/math";
 import { getERC20PermitSignature } from "./../utilities/getERC20PermitSignature";
+import { expectDeployed } from "../utilities/expectDeployed";
 
 const deadline = constants.MaxUint256;
 const VESTING_TERM = 432000; // 5 days
@@ -86,8 +87,10 @@ describe("BondTellerETH", function() {
   describe("before initialization", function () {
     it("can deploy implementation", async function () {
       teller1 = (await deployContract(deployer, artifacts.BondTellerETH)) as BondTellerEth;
+      await expectDeployed(teller1.address);
       await bondDepo.connect(governor).addTeller(teller1.address);
       teller2 = (await deployContract(deployer, artifacts.BondTellerETH)) as BondTellerEth;
+      await expectDeployed(teller2.address);
       await bondDepo.connect(governor).addTeller(teller2.address);
     });
     it("starts with no name, symbol, or supply", async function () {

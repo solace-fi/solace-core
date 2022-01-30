@@ -11,6 +11,7 @@ import { getERC20PermitSignature } from "./../utilities/getERC20PermitSignature"
 
 import { import_artifacts, ArtifactImports } from "./../utilities/artifact_importer";
 import { Solace, XSolacev1, XsLocker, XSolaceMigrator } from "./../../typechain";
+import { expectDeployed } from "../utilities/expectDeployed";
 
 // contracts
 let solace: Solace;
@@ -61,6 +62,7 @@ describe("xSolaceMigrator", function () {
     });
     it("deploys", async function () {
       migrator = (await deployContract(deployer, artifacts.xSolaceMigrator, [solace.address, xsolace.address, xslocker.address])) as XSolaceMigrator;
+      await expectDeployed(migrator.address);
     });
     it("initializes properly", async function () {
       expect(await migrator.solace()).eq(solace.address);

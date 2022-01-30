@@ -8,6 +8,7 @@ chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
 import { Solace, Faucet } from "./../typechain";
+import { expectDeployed } from "./utilities/expectDeployed";
 
 const DRIP_AMOUNT = BN.from("1000000000000000000000")
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
@@ -30,6 +31,7 @@ describe("Faucet", function () {
     });
     it("deploys successfully", async function () {
       faucet = (await deployContract(deployer, artifacts.Faucet, [solace.address])) as Faucet;
+      await expectDeployed(faucet.address);
     });
   })
 
