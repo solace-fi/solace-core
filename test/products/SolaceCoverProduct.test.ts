@@ -4,7 +4,7 @@ import { BigNumber as BN, utils, Contract, Wallet } from "ethers";
 import chai from "chai";
 import { config as dotenv_config } from "dotenv";
 import { import_artifacts, ArtifactImports } from "../utilities/artifact_importer";
-import { PolicyManager, Registry, Vault, RiskManager, SoteriaCoverageProduct, Weth9, CoverageDataProvider, Solace, MockPriceOracle, MockSlp } from "../../typechain";
+import { PolicyManager, Registry, Vault, RiskManager, SolaceCoverProduct, Weth9, CoverageDataProvider, Solace, MockPriceOracle, MockSlp } from "../../typechain";
 
 const { expect } = chai;
 const { deployContract, solidity} = waffle;
@@ -13,16 +13,16 @@ const provider: MockProvider = waffle.provider;
 dotenv_config();
 chai.use(solidity)
 
-const DOMAIN_NAME = "Solace.fi-SoteriaCoverageProduct";
+const DOMAIN_NAME = "Solace.fi-SolaceCoverProduct";
 const VERSION = "1";
 
-describe("SoteriaCoverageProduct", function() {
+describe("SolaceCoverProduct", function() {
     let artifacts: ArtifactImports;
     let registry: Registry;
     let policyManager: PolicyManager;
     let riskManager: RiskManager;
     let solace: Solace;
-    let soteriaCoverageProduct: SoteriaCoverageProduct;
+    let soteriaCoverageProduct: SolaceCoverProduct;
     let weth: Weth9;
     let vault: Vault;
     let priceOracle: MockPriceOracle;

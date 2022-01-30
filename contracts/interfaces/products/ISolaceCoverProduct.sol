@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
-interface ISoteriaCoverageProduct {
-
+interface ISolaceCoverProduct {
     /***************************************
     EVENTS
     ***************************************/
@@ -32,16 +31,25 @@ interface ISoteriaCoverageProduct {
     event CooldownPeriodSet(uint256 cooldownPeriod);
 
     /// @notice Emitted when a deposit is made.
-    event DepositMade(address from, uint256 amount);
+    event DepositMade(
+        address from,
+        address policyholder,
+        uint256 amount,
+        address asset
+    );
 
     /// @notice Emitted when a withdraw is made.
-    event WithdrawMade(address policyholder, uint256 amount);
+    event WithdrawMade(address policyholder, uint256 amount, address asset);
 
     /// @notice Emitted when premium is charged.
     event PremiumCharged(address policyholder, uint256 amount);
 
     /// @notice Emitted when premium is partially charged.
-    event PremiumPartiallyCharged(address policyholder, uint256 actualPremium, uint256 chargedPremium);
+    event PremiumPartiallyCharged(
+        address policyholder,
+        uint256 actualPremium,
+        uint256 chargedPremium
+    );
 
     /// @notice Emitted when policy manager cover amount for soteria is updated.
     event PolicyManagerUpdated(uint256 activeCoverLimit);
@@ -62,7 +70,16 @@ interface ISoteriaCoverageProduct {
     event ReferralRewardPercentageSet(uint256 referralRewardPercentage);
 
     /// @notice Emitted when referral rewards are earned;
-    event ReferralRewardsEarned(address rewardEarner, uint256 rewardPointsEarned);
+    event ReferralRewardsEarned(
+        address rewardEarner,
+        uint256 rewardPointsEarned
+    );
+
+    /// @notice Emitted when a new asset is added.
+    event AssetAdded(address asset);
+
+    /// @notice Emitted when an asset is removed.
+    event AssetRemoved(address asset);
 
     /***************************************
     POLICY FUNCTIONS
@@ -71,135 +88,188 @@ interface ISoteriaCoverageProduct {
     /**
      * @notice Activates policy on the behalf of the policyholder.
      * @param policyholder_ Holder of the position to cover.
-     * @param coverLimit_ The value to cover in **ETH**.
+     * @param coverLimit_ The value to cover in **USD**.
      * @param referralCode_ Referral code
+     * @param amount_ The amount to deposit in order to activate the policy.
+     * @param asset_ The asset address to deposit from.
      * @return policyID The ID of newly created policy.
-    */
-    function activatePolicy(address policyholder_, uint256 coverLimit_, uint256 referralCode_) external payable returns (uint256 policyID);
+     */
+    function activatePolicy(
+        address policyholder_,
+        uint256 coverLimit_,
+        uint256 referralCode_,
+        uint256 amount_,
+        address asset_
+    ) external returns (uint256 policyID);
 
     /**
      * @notice Deposits funds for policy holders.
-     * @param policyholder_ The holder of the policy.
-    */
-    function deposit(address policyholder_) external payable;
+     * @param policyholder The holder of the policy.
+     * @param amount The amount to deposit.
+     * @param asset The asset address to deposit from.
+     */
+    function deposit(address policyholder, uint256 amount, address asset) external;
 
     /**
-     * @notice Withdraw ETH from Soteria account to user.
-     * @param amount_ Amount policyholder desires to withdraw
+     * @notice Withdraw funds from Soteria account to user.
+     * @param amount_ Amount policyholder desires to withdraw.
+     * @param asset_ The asset to withdraw from.
+     * 
      */
-    function withdraw(uint256 amount_) external;
+    function withdraw(uint256 amount_, address asset_) external;
 
     /**
      * @notice Updates the cover amount of your policy
      * @notice If you update the cover limit for your policy, you will exit the cooldown process if you already started it. This means that if you want to withdraw all your funds, you have to redo the 'deactivatePolicy() => withdraw()' process
-     * @param newCoverLimit_ The new value to cover in **ETH**.
+     * @param newCoverLimit_ The new value to cover in **USD**.
      * @param referralCode_ Referral code
-    */
-    function updateCoverLimit(uint256 newCoverLimit_, uint256 referralCode_) external;
+     */
+    function updateCoverLimit(uint256 newCoverLimit_, uint256 referralCode_)
+        external;
 
     /**
      * @notice Deactivate a user's own policy.
      * User will receive their entire Soteria account balance.
      */
-     function deactivatePolicy() external;
+    function deactivatePolicy() external;
 
     /***************************************
     VIEW FUNCTIONS
     ***************************************/
 
     /**
-    * @notice Determine available capacity for new cover.
-    * @return availableCoverCapacity_ The amount of available capacity for new cover.
-    */
-    function availableCoverCapacity() external view returns (uint256 availableCoverCapacity_);
+     * @notice Returns the user balance in `USD`.
+     * @param policyholder The address to get balance.
+     * @return balance The user balance in `USD`.
+     */
+    function accountBalanceOf(address policyholder) external view returns (uint256 balance);
 
     /**
-    * @notice Return reward points for a policyholder.
-    * @param policyholder_ The address of the policyholder.
-    * @return rewardPoints_ The reward points for a policyholder.
-    */
-    function rewardPointsOf(address policyholder_) external view returns (uint256 rewardPoints_);
+     * @notice Returns asset balance amount of the user.
+     * @param asset The asset to get balance from.
+     * @param policyholder The address to get balance.
+     * @return balance The user balance for the asset.
+     */
+    function assetBalanceOf(address asset, address policyholder)
+        external
+        view
+        returns (uint256 balance);
 
     /**
-     * @notice Returns the policyholder fund amount.
+     * @notice Returns the asset count.
+     * @return count The number of.
+     */
+    function numOfAssets() external view returns (uint256 count);
+
+    /**
+     * @notice Returns the asset for the given index.
+     * @param index The asset index.
+     * @return asset The asset.
+     */
+    function assetAt(uint256 index) external view returns (address asset);
+
+    /**
+     * @notice Determine available capacity for new cover.
+     * @return availableCoverCapacity_ The amount of available capacity for new cover.
+     */
+    function availableCoverCapacity()
+        external
+        view
+        returns (uint256 availableCoverCapacity_);
+
+    /**
+     * @notice Return reward points for a policyholder.
      * @param policyholder_ The address of the policyholder.
-     * @return amount The amount of funds.    
-    */
-    function accountBalanceOf(address policyholder_) external view returns (uint256 amount);
-   
+     * @return rewardPoints_ The reward points for a policyholder.
+     */
+    function rewardPointsOf(address policyholder_)
+        external
+        view
+        returns (uint256 rewardPoints_);
+
     /**
      * @notice Returns the policyholder's policy id.
      * @param policyholder_ The address of the policyholder.
      * @return policyID The policy id.
-    */
-    function policyOf(address policyholder_) external view returns (uint256 policyID);
+     */
+    function policyOf(address policyholder_)
+        external
+        view
+        returns (uint256 policyID);
 
     /**
      * @notice Returns whether if the policy is active or not.
      * @param policyID_ The id of the policy.
      * @return status True if policy is active. False otherwise.
-    */
-    function policyStatus(uint256 policyID_) external view returns (bool status);
+     */
+    function policyStatus(uint256 policyID_)
+        external
+        view
+        returns (bool status);
 
     /**
      * @notice The maximum amount of cover that `Soteria Product` can be sold.
      * @return cover The max amount of cover in `wei`
-    */
+     */
     function maxCover() external view returns (uint256 cover);
 
     /**
      * @notice Returns  [`Registry`](./Registry) contract address.
      * @return registry_ The `Registry` address.
-    */
+     */
     function registry() external view returns (address registry_);
 
     /**
      * @notice Returns [`RiskManager`](./RiskManager) contract address.
      * @return riskManager_ The `RiskManager` address.
-    */
+     */
     function riskManager() external view returns (address riskManager_);
 
     /**
      * @notice Returns whether or not product is currently in paused state.
      * @return status True if product is paused.
-    */
+     */
     function paused() external view returns (bool status);
 
     /**
      * @notice Returns active cover limit in `wei`.
      * @return amount The active cover limit.
-    */
+     */
     function activeCoverLimit() external view returns (uint256 amount);
 
     /**
      * @notice Returns the policy count.
      * @return count The policy count.
-    */
+     */
     function policyCount() external view returns (uint256 count);
 
     /**
      * @notice Returns the max rate numerator.
      * @return maxRateNum_ the max rate numerator.
-    */
+     */
     function maxRateNum() external view returns (uint256 maxRateNum_);
 
     /**
      * @notice Returns the max rate denominator.
      * @return maxRateDenom_ the max rate denominator.
-    */
+     */
     function maxRateDenom() external view returns (uint256 maxRateDenom_);
+
     /**
      * @notice Returns the charge cycle duration.
      * @return chargeCycle_ the charge cycle duration.
-    */
+     */
     function chargeCycle() external view returns (uint256 chargeCycle_);
 
     /**
      * @notice Returns cover amount of given policy id.
      * @param policy_ The policy id.
      * @return amount The cover amount for given policy.
-    */
-    function coverLimitOf(uint256 policy_) external view returns (uint256 amount);
+     */
+    function coverLimitOf(uint256 policy_)
+        external
+        view
+        returns (uint256 amount);
 
     /**
      * @notice The minimum amount of time a user must wait to withdraw funds.
@@ -212,19 +282,29 @@ interface ISoteriaCoverageProduct {
      * @param policyholder_ The policy holder
      * @return cooldownStart_ The cooldown period start expressed as Unix timestamp
      */
-    function cooldownStart(address policyholder_) external view returns (uint256 cooldownStart_);
+    function cooldownStart(address policyholder_)
+        external
+        view
+        returns (uint256 cooldownStart_);
 
     /**
      * @notice Gets the referral reward percentage in bps
      * @return referralRewardPercentage_ The referral reward percentage
      */
-    function referralRewardPercentage() external view returns (uint256 referralRewardPercentage_);
+    function referralRewardPercentage()
+        external
+        view
+        returns (uint256 referralRewardPercentage_);
+
     /**
      * @notice Gets the unique referral code for a user.
      * @param user_ The user.
      * @return referralCode_ The referral code.
      */
-    function getReferralCode(address user_) external view returns (uint256 referralCode_);
+    function getReferralCode(address user_)
+        external
+        view
+        returns (uint256 referralCode_);
 
     /***************************************
     GOVERNANCE FUNCTIONS
@@ -234,7 +314,7 @@ interface ISoteriaCoverageProduct {
      * @notice Sets the [`Registry`](./Registry) contract address.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param registry_ The address of `Registry` contract.
-    */
+     */
     function setRegistry(address registry_) external;
 
     /**
@@ -242,7 +322,7 @@ interface ISoteriaCoverageProduct {
      * Deactivating policies are unaffected by pause.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param paused_ True to pause, false to unpause.
-    */
+     */
     function setPaused(bool paused_) external;
 
     /**
@@ -256,29 +336,48 @@ interface ISoteriaCoverageProduct {
      * @notice set _maxRateNum.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param maxRateNum_ Desired maxRateNum.
-    */
+     */
     function setMaxRateNum(uint256 maxRateNum_) external;
 
     /**
      * @notice set _maxRateDenom.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param maxRateDenom_ Desired maxRateDenom.
-    */
+     */
     function setMaxRateDenom(uint256 maxRateDenom_) external;
 
     /**
      * @notice set _chargeCycle.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param chargeCycle_ Desired chargeCycle.
-    */
+     */
     function setChargeCycle(uint256 chargeCycle_) external;
 
     /**
      * @notice set _referralRewardPercentage
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param referralRewardPercentage_ Desired referralRewardPercentage.
-    */
-    function setReferralRewardPercentage(uint256 referralRewardPercentage_) external;
+     */
+    function setReferralRewardPercentage(uint256 referralRewardPercentage_)
+        external;
+
+    /**
+     * @notice Adds a new asset.
+     * @param asset The asset address.
+     */
+    function addAsset(address asset) external;
+
+    /**
+     * @notice Removes an asset.
+     * @param asset The asset to remove.
+     */
+    function removeAsset(address asset) external;
+
+    /**
+     * @notice Sets the pools and assets. Removes the current assets.
+     * @param assets The assets to set.
+     */
+    function setAssets(address[] calldata assets) external;
 
     /***************************************
     COVER PROMOTION ADMIN FUNCTIONS
@@ -289,13 +388,17 @@ interface ISoteriaCoverageProduct {
      * Can only be called by the current cover promotion admin.
      * @param policyholder_ The policy holder to set reward points for.
      * @param rewardPoints_ Desired amount of reward points.
-    */
-    function setRewardPoints(address policyholder_, uint256 rewardPoints_) external;
+     */
+    function setRewardPoints(address policyholder_, uint256 rewardPoints_)
+        external;
 
     /**
      * @notice Charge premiums for each policy holder.
      * @param holders_ The policy holders.
      * @param premiums_ The premium amounts in `wei` per policy holder.
-    */
-    function chargePremiums(address[] calldata holders_, uint256[] calldata premiums_) external payable;
+     */
+    function chargePremiums(
+        address[] calldata holders_,
+        uint256[] calldata premiums_
+    ) external;
 }

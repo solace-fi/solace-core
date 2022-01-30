@@ -14,15 +14,15 @@ import "../interfaces/products/IProduct.sol";
 import "../interfaces/IWETH9.sol";
 
 /**
- * @title CoverageProduct
+ * @title SolaceMarketProduct
  * @author solace.fi
- * @dev For withdrawals to work, the premium pool must call weth.approve(address (CoverageProduct.sol) , UINT_256_MAX)
+ * @dev For withdrawals to work, the premium pool must call weth.approve(address (SolaceMarketProduct.sol) , UINT_256_MAX)
  * @notice The abstract smart contract that is inherited by every concrete individual **Product** contract.
  *
  * It is required to extend [`IProduct`](../interface/IProduct) and recommended to extend `BaseProduct`. `BaseProduct` extends [`IProduct`](../interface/IProduct) and takes care of the heavy lifting; new products simply need to set some variables in the constructor. It has some helpful functionality not included in [`IProduct`](../interface/IProduct) including claim signers.
  */
-//contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradeable, GovernableInitializable, Initializable {
-contract CoverageProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradeable, GovernableInitializable {
+//contract SolaceMarketProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradeable, GovernableInitializable, Initializable {
+contract SolaceMarketProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradeable, GovernableInitializable {
     using Address for address;
 
     /***************************************
