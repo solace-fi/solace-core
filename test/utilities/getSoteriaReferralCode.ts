@@ -1,6 +1,4 @@
 import { Signature, Wallet, Contract, utils } from "ethers";
-import { ethers } from "hardhat";
-import { experimentalAddHardhatNetworkMessageTraceHook } from "hardhat/config";
 
 export async function getSoteriaReferralCode(
   referrer: Wallet | Contract,
@@ -14,6 +12,7 @@ export async function getSoteriaReferralCode(
     verifyingContract: soteriaCoverageProtocol.address
   };
 
+  // Unsure why, but using a struct with a single "string" could not return a valid EIP712 signature
   const types = {
     SoteriaReferral: [
         { name: "version", type: "uint256" }

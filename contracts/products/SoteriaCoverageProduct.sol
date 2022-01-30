@@ -3,6 +3,7 @@ pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
@@ -29,6 +30,14 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
 
     /// @notice Cannot buy new policies while paused. (Default is False)
     bool internal _paused;
+
+    /**
+     * @notice List of accepted stablecoins
+     * @dev Use array here instead of mapping, to enable easy retrieval of what should be a small list
+     * As a public variable, will create its own getter function
+     * Default will contain DAI
+     */
+    address[] public acceptedStablecoinList;
 
     /**
      * @notice Referral typehash
@@ -125,12 +134,14 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         _registry = IRegistry(registry_);
         require(_registry.get("riskManager") != address(0x0), "zero address riskmanager");
 
-        // Set default values - charge cycle of one week, max premium rate of 10% of cover limit per annum, 0.01 ether referral reward, referral program active
+        // Set default values - charge cycle of one week, max premium rate of 10% of cover limit per annum, 50 DAI referral reward, referral program active
         _maxRateNum = 1;
         _maxRateDenom = 315360000;
         _chargeCycle = 604800;
-        _referralReward = 0.01 ether;
+        _referralReward = 50e18; // 50 DAI
         _isReferralOn = true;
+
+        _addToAcceptedStablecoinList(0x6B175474E89094C44Da98b954EedeAC495271d0F); // DAI
     }
     
     /***************************************
@@ -138,18 +149,18 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     ***************************************/
 
     /**
-     * @notice Fallback function to allow contract to receive *ETH*.
+     * @notice Fallback function will send back ETH
     */
     // solhint-disable-next-line 
     receive() external payable nonReentrant {
-        _deposit(msg.sender, msg.value);
+        Address.sendValue(payable(msg.sender), msg.value);
     }
 
     /**
-     * @notice Fallback function to allow contract to receive *ETH*.
+     * @notice Fallback function will send back ETH
     */
     fallback() external payable nonReentrant {
-        _deposit(msg.sender, msg.value);
+        Address.sendValue(payable(msg.sender), msg.value);
     }
 
     /***************************************
@@ -159,24 +170,26 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     /**
      * @notice Activates policy on the behalf of the policyholder.
      * @param policyholder_ Holder of the position to cover.
-     * @param coverLimit_ The value to cover in **ETH**.
+     * @param coverLimit_ The value to cover in **USD**.
+     * @param stablecoinIndex_ Index of deposited stablecoin in the accepted stablecoin list
+     * @param depositAmount_ Deposit into Soteria account in **USD**
      * @param referralCode_ Referral code
      * @return policyID The ID of newly created policy.
     */
-    function activatePolicy(address policyholder_, uint256 coverLimit_, bytes calldata referralCode_) external payable override nonReentrant whileUnpaused returns (uint256 policyID) {
+    function activatePolicy(address policyholder_, uint256 coverLimit_, uint256 stablecoinIndex_, uint256 depositAmount_, bytes calldata referralCode_) external override nonReentrant whileUnpaused returns (uint256 policyID) {
         require(policyholder_ != address(0x0), "zero address policyholder");
         require(coverLimit_ > 0, "zero cover value");
         
         policyID = policyOf(policyholder_);
         require(!policyStatus(policyID), "policy already activated");
         require(_canPurchaseNewCover(0, coverLimit_), "insufficient capacity for new cover");
-        require(msg.value + _accountBalanceOf[policyholder_] > _minRequiredAccountBalance(coverLimit_), "insufficient deposit for minimum required account balance");
+        require(depositAmount_ + _accountBalanceOf[policyholder_] > _minRequiredAccountBalance(coverLimit_), "insufficient deposit for minimum required account balance");
 
         // Exit cooldown
         _exitCooldown(policyholder_);
         
         // deposit funds
-        _deposit(policyholder_, msg.value);
+        _deposit(policyholder_, stablecoinIndex_, depositAmount_);
 
         // mint policy if doesn't currently exist
         if (policyID == 0) {
@@ -220,23 +233,26 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     /**
      * @notice Deposits funds for policy holders.
      * @param policyholder_ The holder of the policy.
+     * @param stablecoinIndex_ Index of deposited stablecoin in the accepted stablecoin list
+     * @param depositAmount_ Deposit into Soteria account in **USD**
     */
-    function deposit(address policyholder_) external payable override nonReentrant whileUnpaused {
-        _deposit(policyholder_, msg.value);
+    function deposit(address policyholder_, uint256 stablecoinIndex_, uint256 depositAmount_) external override nonReentrant whileUnpaused {
+        _deposit(policyholder_, stablecoinIndex_, depositAmount_);
     }
 
     /**
-     * @notice Withdraw maximum available ETH from Soteria account to user.
+     * @notice Withdraw maximum available stablecoin from Soteria account to user.
      * If cooldown has passed, the user will withdraw entire balance of their Soteria account
      * If cooldown has not passed, the user will withdraw such that minRequiredAccountBalance is left in their Soteria account
+     * @param stablecoinIndex_ Index of withdrawn stablecoin in the accepted stablecoin list
      */
-    function withdraw() external override nonReentrant whileUnpaused {
+    function withdraw(uint256 stablecoinIndex_) external override nonReentrant whileUnpaused {
       if ( _hasCooldownPassed(msg.sender) ) {
-        _withdraw(msg.sender, _accountBalanceOf[msg.sender]);
+        _withdraw(msg.sender, stablecoinIndex_, _accountBalanceOf[msg.sender]);
         _preDeactivateCoverLimitOf[_policyOf[msg.sender]] = 0;
       } else {
         uint256 preDeactivateCoverLimit = _preDeactivateCoverLimitOf[_policyOf[msg.sender]];
-        _withdraw(msg.sender, _accountBalanceOf[msg.sender] - _minRequiredAccountBalance(preDeactivateCoverLimit));
+        _withdraw(msg.sender, stablecoinIndex_, _accountBalanceOf[msg.sender] - _minRequiredAccountBalance(preDeactivateCoverLimit));
       }
     }
 
@@ -412,6 +428,25 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         return _isReferralOn;
     }
 
+    /**
+     * @notice Returns the index for a stablecoin within the accepted stablecoin list
+     * @param stablecoin stablecoin
+     * @return index
+     */
+    function getIndexOfStablecoin(address stablecoin) external view override returns (uint256 index) {
+        bool stablecoinFound = false;
+        uint256 index;
+        for (uint256 i = 0; i < acceptedStablecoinList.length; i++) {
+            if (acceptedStablecoinList[i] == stablecoin) {
+                stablecoinFound = true;
+                index = i;
+                break;
+            }
+        }
+        require (stablecoinFound, "stablecoin not in list");
+        return index;
+    }
+
     /***************************************
     GOVERNANCE FUNCTIONS
     ***************************************/
@@ -499,6 +534,27 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         emit IsReferralOnSet(isReferralOn_);
     }
 
+    /**
+    * @dev remove a stablecoin from the list of accepted stablecoins
+    * Can only be called by the current [**governor**](/docs/protocol/governance).
+    * @param _index index of stablecoin to remove in the accepted stablecoin list
+    **/
+    function removeFromAcceptedStablecoinList(uint256 _index) external override onlyGovernance {
+        address stablecoinToRemove = acceptedStablecoinList[_index];
+        acceptedStablecoinList[_index] = acceptedStablecoinList[acceptedStablecoinList.length - 1];
+        acceptedStablecoinList.pop();
+        emit StablecoinRemoved(stablecoinToRemove);
+    }
+
+    /**
+    * @dev adds a stablecoin to the list of accepted stablecoins
+    * Can only be called by the current [**governor**](/docs/protocol/governance).
+    * @param _stablecoin desired stablecoin to add to accepted stablecoin list
+    **/
+    function addToAcceptedStablecoinList(address _stablecoin) external override onlyGovernance {
+        _addToAcceptedStablecoinList(_stablecoin);
+    }
+
     /***************************************
     COVER PROMOTION ADMIN FUNCTIONS
     ***************************************/
@@ -523,12 +579,17 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      * @notice Charge premiums for each policy holder.
      * @param holders_ The policy holders.
      * @param premiums_ The premium amounts in `wei` per policy holder.
+     * @param stablecoinIndex_ Index of stablecoin to charge (does imply that the premium collector needs to calls this function separately to charge for each stablecoin)
+     * Only one possible parameter when the contract defaults with only DAI in the accepted stablecoin list, however currently unhandled edge cases emerge when more than one accepted stablecoin
+     * E.g. what if a policy holder has half their account balance in DAI, and the other half in FRAX? This will make accounting complicated for the premium charger.
     */
-    function chargePremiums(address[] calldata holders_, uint256[] calldata premiums_) external payable override whileUnpaused {
+    function chargePremiums(address[] calldata holders_, uint256[] calldata premiums_, uint256 stablecoinIndex_) external override whileUnpaused {
         uint256 count = holders_.length;
         require(msg.sender == _registry.get("premiumCollector"), "not premium collector");
         require(count == premiums_.length, "length mismatch");
         require(count <= policyCount(), "policy count exceeded");
+        address stablecoin = acceptedStablecoinList[stablecoinIndex_]; // Should revert if invalid index
+
         uint256 amountToPayPremiumPool = 0;
 
         for (uint256 i = 0; i < count; i++) {
@@ -568,7 +629,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
             }  
         }
         // single transfer to the premium pool
-        Address.sendValue(payable(_registry.get("premiumPool")), amountToPayPremiumPool);
+        IERC20(stablecoin).transfer(_registry.get("premiumPool"), amountToPayPremiumPool);
     }
 
     /***************************************
@@ -590,23 +651,28 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     /**
      * @notice Adds funds to policy holder's balance.
      * @param policyholder The policy holder address.
+     * @param stablecoinIndex Index of deposited stablecoin in the accepted stablecoin list
      * @param amount The amount of fund to deposit.
      * @dev Explicit decision that _deposit() will not affect, nor be affected by the cooldown mechanic. 
      * Rationale: _deposit() doesn't affect cover limit, and cooldown mechanic is to protect protocol from manipulated cover limit
     */
-    function _deposit(address policyholder, uint256 amount) internal whileUnpaused {
+    function _deposit(address policyholder, uint256 stablecoinIndex, uint256 amount) internal whileUnpaused {
+        address stablecoin = acceptedStablecoinList[stablecoinIndex]; // Should revert if invalid index
         _accountBalanceOf[policyholder] += amount;
+        IERC20(stablecoin).transferFrom(msg.sender, address(this), amount);
         emit DepositMade(policyholder, amount);
     }
 
     /**
      * @notice Withdraw funds from Soteria to policy holder.
      * @param policyholder The policy holder address.
+     * @param stablecoinIndex Index of withdrawn stablecoin in the accepted stablecoin list
      * @param amount The amount of fund to withdraw.
     */
-    function _withdraw(address policyholder, uint256 amount) internal whileUnpaused {
+    function _withdraw(address policyholder, uint256 stablecoinIndex, uint256 amount) internal whileUnpaused {
+      address stablecoin = acceptedStablecoinList[stablecoinIndex]; // Should revert if invalid index
       _accountBalanceOf[policyholder] -= amount;
-      Address.sendValue(payable(policyholder), amount);
+      IERC20(stablecoin).transfer(msg.sender, amount);
       emit WithdrawMade(policyholder, amount);
     }
 
@@ -686,7 +752,7 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      */
     function _processReferralCode(address policyholder_, bytes calldata referralCode_) internal {
         
-        // Skip processing referring code, if empty referral code argument or referral campaign switched off
+        // Skip processing referral code, if referral campaign switched off or empty referral code argument
         if ( !_isReferralOn || _isEmptyReferralCode(referralCode_) ) return;
         
         // require(referrer != address(0), "cannot have zero address referrer"); // Redundant because we cannot call _processReferralCode with referralCode_ = 0
@@ -711,6 +777,9 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
         return (keccak256(abi.encodePacked(referralCode_)) == keccak256(abi.encodePacked("")));
     }
 
+    /**
+     * @notice Internal helper function to get EIP712-compliant hash for referral code verification
+     */
     function _getEIP712Hash() internal returns (bytes32) {
         bytes32 digest = 
             ECDSA.toTypedDataHash(
@@ -725,4 +794,21 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
 
         return digest;
     }
+
+    /**
+    * @dev adds a stablecoin to the list of accepted stablecoins
+    * Can only be called by the current [**governor**](/docs/protocol/governance).
+    * @param _stablecoin desired stablecoin to add to accepted stablecoin list
+    **/
+    function _addToAcceptedStablecoinList(address _stablecoin) internal {
+        bool stablecoinAlreadyAdded = false;
+        for (uint256 i = 0; i < acceptedStablecoinList.length; i++) {
+            if (acceptedStablecoinList[i] == _stablecoin) stablecoinAlreadyAdded = true;
+        }
+        if (!stablecoinAlreadyAdded) {
+            acceptedStablecoinList.push(_stablecoin);
+            emit StablecoinAdded(_stablecoin);
+        }
+    }
+
 }

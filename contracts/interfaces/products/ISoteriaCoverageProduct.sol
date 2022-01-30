@@ -67,6 +67,12 @@ interface ISoteriaCoverageProduct {
     /// @notice Emitted when referral rewards are earned;
     event ReferralRewardsEarned(address rewardEarner, uint256 rewardPointsEarned);
 
+    /// @notice Emitted when stablecoin is added to accepted stablecoin list
+    event StablecoinAdded(address stablecoin);
+
+    /// @notice Emitted when stablecoin is removed from accepted stablecoin list
+    event StablecoinRemoved(address stablecoin);
+
     /***************************************
     POLICY FUNCTIONS
     ***************************************/
@@ -74,24 +80,13 @@ interface ISoteriaCoverageProduct {
     /**
      * @notice Activates policy on the behalf of the policyholder.
      * @param policyholder_ Holder of the position to cover.
-     * @param coverLimit_ The value to cover in **ETH**.
+     * @param coverLimit_ The value to cover in **USD**.
+     * @param depositedStablecoinIndex_ Index of deposited stablecoin in the accepted stablecoin list
+     * @param depositAmount_ Deposit into Soteria account in **USD**
      * @param referralCode_ Referral code
      * @return policyID The ID of newly created policy.
     */
-    function activatePolicy(address policyholder_, uint256 coverLimit_, bytes calldata referralCode_) external payable returns (uint256 policyID);
-
-    /**
-     * @notice Deposits funds for policy holders.
-     * @param policyholder_ The holder of the policy.
-    */
-    function deposit(address policyholder_) external payable;
-
-    /**
-     * @notice Withdraw maximum available ETH from Soteria account to user.
-     * If cooldown has passed, the user will withdraw entire balance of their Soteria account
-     * If cooldown has not passed, the user will withdraw such that minRequiredAccountBalance is left in their Soteria account
-     */
-    function withdraw() external;
+    function activatePolicy(address policyholder_, uint256 coverLimit_, uint256 depositedStablecoinIndex_, uint256 depositAmount_, bytes calldata referralCode_) external returns (uint256 policyID);
 
     /**
      * @notice Updates the cover amount of your policy
@@ -100,6 +95,22 @@ interface ISoteriaCoverageProduct {
      * @param referralCode_ Referral code
     */
     function updateCoverLimit(uint256 newCoverLimit_, bytes calldata referralCode_) external;
+
+    /**
+     * @notice Deposits funds for policy holders.
+     * @param policyholder_ The holder of the policy.
+     * @param stablecoinIndex_ Index of deposited stablecoin in the accepted stablecoin list
+     * @param depositAmount_ Deposit into Soteria account in **USD**
+    */
+    function deposit(address policyholder_, uint256 stablecoinIndex_, uint256 depositAmount_) external;
+
+    /**
+     * @notice Withdraw maximum available stablecoin from Soteria account to user.
+     * If cooldown has passed, the user will withdraw entire balance of their Soteria account
+     * If cooldown has not passed, the user will withdraw such that minRequiredAccountBalance is left in their Soteria account
+     * @param stablecoinIndex_ Index of withdrawn stablecoin in the accepted stablecoin list
+     */
+    function withdraw(uint256 stablecoinIndex_) external;
 
     /**
      * @notice Deactivate a user's own policy.
@@ -230,6 +241,13 @@ interface ISoteriaCoverageProduct {
      */
     function isReferralOn() external view returns (bool isReferralOn_);
 
+    /**
+     * @notice Returns the index for a stablecoin within the accepted stablecoin list
+     * @param stablecoin stablecoin
+     * @return index
+     */
+    function getIndexOfStablecoin(address stablecoin) external view returns (uint256 index);
+
     /***************************************
     GOVERNANCE FUNCTIONS
     ***************************************/
@@ -291,6 +309,20 @@ interface ISoteriaCoverageProduct {
     */
     function setIsReferralOn(bool isReferralOn_) external;
 
+    /**
+    * @dev remove a stablecoin from the list of accepted stablecoins
+    * Can only be called by the current [**governor**](/docs/protocol/governance).
+    * @param _index index of stablecoin to remove in the accepted stablecoin list
+    **/
+    function removeFromAcceptedStablecoinList(uint256 _index) external;
+
+    /**
+    * @dev adds a stablecoin to the list of accepted stablecoins
+    * Can only be called by the current [**governor**](/docs/protocol/governance).
+    * @param _stablecoin desired stablecoin to add to accepted stablecoin list
+    **/
+    function addToAcceptedStablecoinList(address _stablecoin) external;
+
     /***************************************
     COVER PROMOTION ADMIN FUNCTIONS
     ***************************************/
@@ -303,10 +335,17 @@ interface ISoteriaCoverageProduct {
     */
     function setRewardPoints(address policyholder_, uint256 rewardPoints_) external;
 
+    /***************************************
+    PREMIUM COLLECTOR FUNCTIONS
+    ***************************************/
+
     /**
      * @notice Charge premiums for each policy holder.
      * @param holders_ The policy holders.
      * @param premiums_ The premium amounts in `wei` per policy holder.
+     * @param stablecoinIndex_ Index of stablecoin to charge (does imply that the premium collector needs to calls this function separately to charge for each stablecoin)
+     * Only one possible parameter when the contract defaults with only DAI in the accepted stablecoin list, however currently unhandled edge cases emerge when more than one accepted stablecoin
+     * E.g. what if a policy holder has half their account balance in DAI, and the other half in FRAX? This will make accounting complicated for the premium charger.
     */
-    function chargePremiums(address[] calldata holders_, uint256[] calldata premiums_) external payable;
+    function chargePremiums(address[] calldata holders_, uint256[] calldata premiums_, uint256 stablecoinIndex_) external;
 }

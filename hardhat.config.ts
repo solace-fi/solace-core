@@ -23,7 +23,12 @@ const forking = (
   : process.env.FORK_NETWORK === "kovan"   ? kovan_fork
   : no_fork
 );
-const hardhat_network = process.env.FORK_NETWORK ? {forking} : {};
+
+const accounts = {
+  accountsBalance: "2000000000000000000000000" // Default to start with 2,000,000 ether in each Hardhat provided wallet. Needed increase from default of 10000 ether because unit tests in SoteriaCoverageProduct failing with maxCover being denominated in ETH and rest of contract in DAI
+}
+
+const hardhat_network = process.env.FORK_NETWORK ? {forking, accounts} : {};
 
 const config: HardhatUserConfig = {
   defaultNetwork: "hardhat",

@@ -1,11 +1,12 @@
 import { waffle, ethers } from "hardhat";
 import { MockProvider } from "ethereum-waffle";
-import { BigNumber as BN, utils, Contract, Wallet } from "ethers";
+import { BigNumber as BN, utils, Contract, Wallet, constants } from "ethers";
 import chai from "chai";
 import { config as dotenv_config } from "dotenv";
 import { import_artifacts, ArtifactImports } from "../utilities/artifact_importer";
 import { getSoteriaReferralCode } from "../utilities/getSoteriaReferralCode"
-import { Registry, RiskManager, SoteriaCoverageProduct, Weth9, CoverageDataProvider, Solace, MockPriceOracle, MockSlp } from "../../typechain";
+import { Registry, RiskManager, SoteriaCoverageProduct, Weth9, CoverageDataProvider, Solace, MockPriceOracle, MockSlp, MockErc20Permit } from "../../typechain";
+import { Console } from "console";
 
 const { expect } = chai;
 const { deployContract, solidity} = waffle;
@@ -24,16 +25,18 @@ describe("SoteriaCoverageProduct", function() {
     let solace: Solace;
     let soteriaCoverageProduct: SoteriaCoverageProduct;
     let weth: Weth9;
+    let dai: MockErc20Permit;
     let priceOracle: MockPriceOracle;
     let solaceUsdcPool: MockSlp;
     let coverageDataProvider: CoverageDataProvider;
 
     const [deployer, governor, newGovernor, policyholder1, policyholder2, policyholder3, policyholder4, policyholder5, underwritingPool, premiumPool, premiumCollector, coverPromotionAdmin] = provider.getWallets();
     const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-    const INITIAL_COVER_LIMIT = BN.from("1000000000000000000"); // 1 eth
-    const NEW_COVER_LIMIT = BN.from("2000000000000000000"); // 2 eth
-    const ONE_TENTH_ETH = BN.from("100000000000000000"); // 0.1 eth
     const ONE_ETH = BN.from("1000000000000000000"); // 1 eth
+    const INITIAL_DEPOSIT = ONE_ETH.mul(1000); // 1000 DAI
+    const INITIAL_COVER_LIMIT = ONE_ETH.mul(10000); // 10000 DAI
+    const NEW_COVER_LIMIT = INITIAL_COVER_LIMIT.mul(2); // 20000 DAI
+    const ONE_TENTH_ETH = BN.from("100000000000000000"); // 0.1 eth
     const TWO_ETH = BN.from("2000000000000000000"); // 1 eth
     const ZERO_AMOUNT = BN.from("0");
     const ANNUAL_MAX_PREMIUM = INITIAL_COVER_LIMIT.div(10); // 0.1 eth, for testing we assume max annual rate of 10% of cover limit
@@ -55,7 +58,10 @@ describe("SoteriaCoverageProduct", function() {
     const ONE_WEEK = BN.from("604800");
     const maxRateNum = BN.from("1");
     const maxRateDenom = BN.from("315360000"); // We are testing with maxRateNum and maxRateDenom that gives us an annual max rate of 10% coverLimit
-    const REFERRAL_REWARD = ONE_ETH.div(100) // 0.01 ETH
+    const REFERRAL_REWARD = ONE_ETH.mul(50) // 50 DAI
+
+    const DAI_ADDRESS = "0x6B175474E89094C44Da98b954EedeAC495271d0F"
+    const WETH_ADDRESS = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
 
     before( async () => {
         artifacts = await import_artifacts();
@@ -66,8 +72,10 @@ describe("SoteriaCoverageProduct", function() {
         solace = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
         await registry.connect(governor).set(["solace"], [solace.address])
 
-        weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
-        await registry.connect(governor).set(["weth"], [weth.address])
+        const Weth = await ethers.getContractFactory("WETH9")
+        weth = await Weth.attach(DAI_ADDRESS) as Weth9
+        // weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
+        // await registry.connect(governor).set(["weth"], [weth.address])
 
         riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
         await registry.connect(governor).set(["riskManager"], [riskManager.address])
@@ -108,7 +116,21 @@ describe("SoteriaCoverageProduct", function() {
             expect(await soteriaCoverageProduct.maxRateDenom()).eq(maxRateDenom)
             expect(await soteriaCoverageProduct.chargeCycle()).eq(ONE_WEEK)
         })
+
+        it("completes DAI setup", async() => {
+            const Dai = await ethers.getContractFactory("MockERC20Permit");
+            dai = await Dai.attach(DAI_ADDRESS) as MockErc20Permit
+            
+            // Give 10,000 DAI to all active test wallets
+            await manipulateDAIbalance(policyholder1, ONE_ETH.mul(10000))
+            await manipulateDAIbalance(governor, ONE_ETH.mul(10000))
+
+            // Grant infinite ERC20 allowance from active test wallets to Soteria
+            await dai.connect(policyholder1).approve(soteriaCoverageProduct.address, constants.MaxUint256)
+            await dai.connect(governor).approve(soteriaCoverageProduct.address, constants.MaxUint256)
+        })
     });
+
 
     describe("governance", () => {
         it("starts with the correct governor", async () => {
@@ -352,6 +374,72 @@ describe("SoteriaCoverageProduct", function() {
         })
     })
 
+    describe("getIndexOfStablecoin", () => {
+        it("should default with DAI in accepted stablecoin list", async () => {
+            expect(await soteriaCoverageProduct.getIndexOfStablecoin(DAI_ADDRESS)).eq(0)
+            expect(await soteriaCoverageProduct.acceptedStablecoinList(0)).eq(DAI_ADDRESS)
+        })
+
+        it("should revert on attempting to search for unaccepted stablecoin", async () => {
+            await expect(soteriaCoverageProduct.getIndexOfStablecoin(ZERO_ADDRESS)).to.revertedWith("stablecoin not in list");
+            await expect(soteriaCoverageProduct.acceptedStablecoinList(1)).to.reverted;
+        })
+    })
+
+    describe("addToAcceptedStablecoinList", () => {
+        it("cannot be added by non governance", async () => {
+            const MOCK_STABLE_ADDRESS = (await provider.createEmptyWallet()).address
+            await expect(soteriaCoverageProduct.connect(policyholder1).addToAcceptedStablecoinList(MOCK_STABLE_ADDRESS)).to.revertedWith("!governance");
+        });
+        it("can be added", async () => {
+            const MOCK_STABLE_ADDRESS_1 = (await provider.createEmptyWallet()).address
+            const MOCK_STABLE_ADDRESS_2 = (await provider.createEmptyWallet()).address
+
+            let tx = await soteriaCoverageProduct.connect(governor).addToAcceptedStablecoinList(MOCK_STABLE_ADDRESS_1)
+            expect(tx).emit(soteriaCoverageProduct, "StablecoinAdded").withArgs(MOCK_STABLE_ADDRESS_1);
+            tx = await soteriaCoverageProduct.connect(governor).addToAcceptedStablecoinList(MOCK_STABLE_ADDRESS_2)
+            expect(tx).emit(soteriaCoverageProduct, "StablecoinAdded").withArgs(MOCK_STABLE_ADDRESS_2);
+
+            expect(await soteriaCoverageProduct.getIndexOfStablecoin(MOCK_STABLE_ADDRESS_1)).eq(1)
+            expect(await soteriaCoverageProduct.acceptedStablecoinList(1)).eq(MOCK_STABLE_ADDRESS_1)
+            expect(await soteriaCoverageProduct.getIndexOfStablecoin(MOCK_STABLE_ADDRESS_2)).eq(2)
+            expect(await soteriaCoverageProduct.acceptedStablecoinList(2)).eq(MOCK_STABLE_ADDRESS_2)
+        })
+    })
+
+    describe("removeFromAcceptedStablecoinList", () => {
+        it("cannot be removed by non governance", async () => {
+            await expect(soteriaCoverageProduct.connect(policyholder1).removeFromAcceptedStablecoinList(0)).to.revertedWith("!governance");
+        });
+        it("can be removed", async () => {
+            const MOCK_STABLE_ADDRESS_1 = await soteriaCoverageProduct.acceptedStablecoinList(1)
+            const MOCK_STABLE_ADDRESS_2 = await soteriaCoverageProduct.acceptedStablecoinList(2)
+
+            let tx = await soteriaCoverageProduct.connect(governor).removeFromAcceptedStablecoinList(0)
+            expect(tx).emit(soteriaCoverageProduct, "StablecoinRemoved").withArgs(DAI_ADDRESS);
+
+            // Check state variables
+            expect(await soteriaCoverageProduct.getIndexOfStablecoin(MOCK_STABLE_ADDRESS_2)).eq(0)
+            expect(await soteriaCoverageProduct.acceptedStablecoinList(0)).eq(MOCK_STABLE_ADDRESS_2)
+            expect(await soteriaCoverageProduct.getIndexOfStablecoin(MOCK_STABLE_ADDRESS_1)).eq(1)
+            expect(await soteriaCoverageProduct.acceptedStablecoinList(1)).eq(MOCK_STABLE_ADDRESS_1)
+            await expect(soteriaCoverageProduct.getIndexOfStablecoin(DAI_ADDRESS)).to.revertedWith("stablecoin not in list");
+        })
+        after(async () => {
+            // Remove mock stablecoins
+            await soteriaCoverageProduct.connect(governor).removeFromAcceptedStablecoinList(1)
+            await soteriaCoverageProduct.connect(governor).removeFromAcceptedStablecoinList(0)
+            await expect(soteriaCoverageProduct.acceptedStablecoinList(0)).to.reverted;
+
+            // Add DAI back as sole element of accepted stablecoin list
+            let tx = await soteriaCoverageProduct.connect(governor).addToAcceptedStablecoinList(DAI_ADDRESS)
+            expect(tx).emit(soteriaCoverageProduct, "StablecoinAdded").withArgs(DAI_ADDRESS);
+            expect(await soteriaCoverageProduct.getIndexOfStablecoin(DAI_ADDRESS)).eq(0)
+            expect(await soteriaCoverageProduct.acceptedStablecoinList(0)).eq(DAI_ADDRESS)
+            await expect(soteriaCoverageProduct.acceptedStablecoinList(1)).to.reverted;
+        })
+    })
+
     describe("activatePolicy", () => {
         let rmActiveCoverLimit:BN;
         let rmSoteriaactiveCoverLimit: BN;
@@ -371,25 +459,25 @@ describe("SoteriaCoverageProduct", function() {
         });
 
         it("cannot activate policy when zero address policy holder is provided", async () => {
-            await expect(soteriaCoverageProduct.connect(policyholder1).activatePolicy(ZERO_ADDRESS, INITIAL_COVER_LIMIT, [])).to.revertedWith("zero address policyholder");
+            await expect(soteriaCoverageProduct.connect(policyholder1).activatePolicy(ZERO_ADDRESS, INITIAL_COVER_LIMIT, 0, INITIAL_DEPOSIT, [])).to.revertedWith("zero address policyholder");
         });
 
         it("cannot buy policy when zero cover amount value is provided", async () => {
-            await expect(soteriaCoverageProduct.connect(policyholder1).activatePolicy(policyholder1.address, ZERO_AMOUNT, [])).to.revertedWith("zero cover value");
+            await expect(soteriaCoverageProduct.connect(policyholder1).activatePolicy(policyholder1.address, ZERO_AMOUNT, 0, INITIAL_DEPOSIT, [])).to.revertedWith("zero cover value");
         });
 
         it("cannot buy policy when contract is paused", async () => {
             await soteriaCoverageProduct.connect(governor).setPaused(true);
-            await expect(soteriaCoverageProduct.connect(policyholder1).activatePolicy(policyholder1.address, INITIAL_COVER_LIMIT, [], {value: ONE_ETH})).to.revertedWith("contract paused");
+            await expect(soteriaCoverageProduct.connect(policyholder1).activatePolicy(policyholder1.address, INITIAL_COVER_LIMIT, 0, INITIAL_DEPOSIT, [])).to.revertedWith("contract paused");
             await soteriaCoverageProduct.connect(governor).setPaused(false);
         });
 
         it("cannot purchase a policy before Coverage Data Provider and Risk Manager are set up (maxCover = 0)", async () => {
             expect (await soteriaCoverageProduct.maxCover()).eq(0)
-            await expect(soteriaCoverageProduct.connect(policyholder1).activatePolicy(policyholder1.address, INITIAL_COVER_LIMIT, [], {value: ZERO_AMOUNT})).to.revertedWith("insufficient capacity for new cover");
+            await expect(soteriaCoverageProduct.connect(policyholder1).activatePolicy(policyholder1.address, INITIAL_COVER_LIMIT, 0, INITIAL_DEPOSIT, [])).to.revertedWith("insufficient capacity for new cover");
         })
 
-        it("can setup Coverage Data Provider and Risk Manager", async () => {
+        it("NEED USD SETUP FOR COVERAGE DATA PROVIDER - can setup Coverage Data Provider and Risk Manager", async () => {
             // add underwriting pool to the coverage data provider
             let maxCover1 = await riskManager.maxCover();
             expect(maxCover1).to.equal(0)
@@ -409,38 +497,38 @@ describe("SoteriaCoverageProduct", function() {
             expect(await riskManager.maxCoverPerStrategy(soteriaCoverageProduct.address)).to.equal(await soteriaCoverageProduct.maxCover());
         })
 
-        it("cannot buy policy when max cover exceeded", async () => {
+        it("NEED USD SETUP FOR COVERAGE DATA PROVIDER - cannot buy policy when max cover exceeded", async () => {
             let maxCover = await soteriaCoverageProduct.maxCover();
-            await expect(soteriaCoverageProduct.connect(policyholder1).activatePolicy(policyholder1.address, maxCover.add(1), [], {value: ONE_ETH})).to.revertedWith("insufficient capacity for new cover");
+            await expect(soteriaCoverageProduct.connect(policyholder1).activatePolicy(policyholder1.address, maxCover.add(1), 0, INITIAL_DEPOSIT, [])).to.revertedWith("insufficient capacity for new cover");
         });
 
         it("cannot buy policy when insufficient deposit provided", async () => {
-            await expect(soteriaCoverageProduct.connect(policyholder1).activatePolicy(policyholder1.address, ONE_ETH, [], {value: ZERO_AMOUNT})).to.revertedWith("insufficient deposit for minimum required account balance");
+            await expect(soteriaCoverageProduct.connect(policyholder1).activatePolicy(policyholder1.address, ONE_ETH, 0, 0, [])).to.revertedWith("insufficient deposit for minimum required account balance");
         });
 
-        it("can activate policy - 1 ETH cover with 1 ETH deposit", async () => {
-            let tx = await soteriaCoverageProduct.connect(policyholder1).activatePolicy(policyholder1.address, ONE_ETH, [], {value: ONE_ETH});
+        it("can activate policy - 10000 DAI cover with 1000 DAI deposit", async () => {
+            let tx = await soteriaCoverageProduct.connect(policyholder1).activatePolicy(policyholder1.address, INITIAL_COVER_LIMIT, 0, INITIAL_DEPOSIT, []);
 
             await expect(tx).emit(soteriaCoverageProduct, "PolicyCreated").withArgs(POLICY_ID_1);
             await expect(tx).emit(soteriaCoverageProduct, "Transfer").withArgs(ZERO_ADDRESS, policyholder1.address, POLICY_ID_1);
-            await expect(tx).emit(riskManager, "ActiveCoverLimitUpdated").withArgs(soteriaCoverageProduct.address, rmActiveCoverLimit, ONE_ETH);
+            await expect(tx).emit(riskManager, "ActiveCoverLimitUpdated").withArgs(soteriaCoverageProduct.address, rmActiveCoverLimit, INITIAL_COVER_LIMIT);
 
             expect (await soteriaCoverageProduct.rewardPointsOf(policyholder1.address)).eq(0)
-            expect (await soteriaCoverageProduct.accountBalanceOf(policyholder1.address)).eq(ONE_ETH)
+            expect (await soteriaCoverageProduct.accountBalanceOf(policyholder1.address)).eq(INITIAL_DEPOSIT)
             expect (await soteriaCoverageProduct.policyStatus(POLICY_ID_1)).eq(true)
             expect (await soteriaCoverageProduct.policyOf(policyholder1.address)).eq(POLICY_ID_1)
             expect (await soteriaCoverageProduct.ownerOf(POLICY_ID_1)).eq(policyholder1.address)
-            expect (await soteriaCoverageProduct.activeCoverLimit()).eq(ONE_ETH)
-            expect (await riskManager.activeCoverLimitPerStrategy(soteriaCoverageProduct.address)).eq(ONE_ETH)
+            expect (await soteriaCoverageProduct.activeCoverLimit()).eq(INITIAL_COVER_LIMIT)
+            expect (await riskManager.activeCoverLimitPerStrategy(soteriaCoverageProduct.address)).eq(INITIAL_COVER_LIMIT)
             expect (await soteriaCoverageProduct.policyCount()).eq(1)
-            expect (await soteriaCoverageProduct.coverLimitOf(POLICY_ID_1)).eq(ONE_ETH)
-            expect(await provider.getBalance(soteriaCoverageProduct.address)).to.equal(ONE_ETH);
+            expect (await soteriaCoverageProduct.coverLimitOf(POLICY_ID_1)).eq(INITIAL_COVER_LIMIT)
+            expect(await dai.balanceOf(soteriaCoverageProduct.address)).to.equal(INITIAL_DEPOSIT);
             expect (await soteriaCoverageProduct.cooldownStart(policyholder1.address)).eq(0)
         });
 
         it("cannot purchase more than one policy for a single address", async () => {
-            await expect(soteriaCoverageProduct.connect(policyholder1).activatePolicy(policyholder1.address, ONE_ETH, [], {value: ONE_ETH})).to.be.revertedWith("policy already activated")
-            await expect(soteriaCoverageProduct.connect(policyholder2).activatePolicy(policyholder1.address, ONE_ETH, [], {value: ONE_ETH})).to.be.revertedWith("policy already activated")
+            await expect(soteriaCoverageProduct.connect(policyholder1).activatePolicy(policyholder1.address, INITIAL_COVER_LIMIT, 0, INITIAL_DEPOSIT, [])).to.be.revertedWith("policy already activated")
+            await expect(soteriaCoverageProduct.connect(policyholder2).activatePolicy(policyholder1.address, INITIAL_COVER_LIMIT, 0, INITIAL_DEPOSIT, [])).to.be.revertedWith("policy already activated")
         })
         
         it("cannot transfer policy", async () => {
@@ -449,24 +537,24 @@ describe("SoteriaCoverageProduct", function() {
             // TO-DO, test ERC721.safeTransferFrom() => TypeError: soteriaCoverageProduct.connect(...).safeTransferFrom is not a function
         })
 
-        it("can activate policy for another address - 1 ETH cover with 1 ETH deposit", async () => {
-            let tx = await soteriaCoverageProduct.connect(policyholder1).activatePolicy(policyholder2.address, ONE_ETH, [], {value: ONE_ETH});
+        it("can activate policy for another address - 10000 DAI cover with 1000 DAI deposit", async () => {
+            let tx = await soteriaCoverageProduct.connect(policyholder1).activatePolicy(policyholder2.address, INITIAL_COVER_LIMIT, 0, INITIAL_DEPOSIT, []);
 
             await expect(tx).emit(soteriaCoverageProduct, "PolicyCreated").withArgs(POLICY_ID_2);
             await expect(tx).emit(soteriaCoverageProduct, "Transfer").withArgs(ZERO_ADDRESS, policyholder2.address, POLICY_ID_2);
-            await expect(tx).emit(riskManager, "ActiveCoverLimitUpdated").withArgs(soteriaCoverageProduct.address, ONE_ETH, ONE_ETH.add(ONE_ETH));
+            await expect(tx).emit(riskManager, "ActiveCoverLimitUpdated").withArgs(soteriaCoverageProduct.address, INITIAL_COVER_LIMIT, INITIAL_COVER_LIMIT.add(INITIAL_COVER_LIMIT));
 
             expect (await soteriaCoverageProduct.rewardPointsOf(policyholder2.address)).eq(0)
-            expect (await soteriaCoverageProduct.accountBalanceOf(policyholder1.address)).eq(ONE_ETH)
-            expect (await soteriaCoverageProduct.accountBalanceOf(policyholder2.address)).eq(ONE_ETH)
+            expect (await soteriaCoverageProduct.accountBalanceOf(policyholder1.address)).eq(INITIAL_DEPOSIT)
+            expect (await soteriaCoverageProduct.accountBalanceOf(policyholder2.address)).eq(INITIAL_DEPOSIT)
             expect (await soteriaCoverageProduct.policyStatus(POLICY_ID_2)).eq(true)
             expect (await soteriaCoverageProduct.policyOf(policyholder2.address)).eq(POLICY_ID_2)
             expect (await soteriaCoverageProduct.ownerOf(POLICY_ID_2)).eq(policyholder2.address)
-            expect (await soteriaCoverageProduct.activeCoverLimit()).eq(ONE_ETH.mul(2))
-            expect (await riskManager.activeCoverLimitPerStrategy(soteriaCoverageProduct.address)).eq(ONE_ETH.mul(2))
+            expect (await soteriaCoverageProduct.activeCoverLimit()).eq(INITIAL_COVER_LIMIT.mul(2))
+            expect (await riskManager.activeCoverLimitPerStrategy(soteriaCoverageProduct.address)).eq(INITIAL_COVER_LIMIT.mul(2))
             expect (await soteriaCoverageProduct.policyCount()).eq(2)
-            expect (await soteriaCoverageProduct.coverLimitOf(POLICY_ID_2)).eq(ONE_ETH)
-            expect (await provider.getBalance(soteriaCoverageProduct.address)).to.equal(ONE_ETH.mul(2));
+            expect (await soteriaCoverageProduct.coverLimitOf(POLICY_ID_2)).eq(INITIAL_COVER_LIMIT)
+            expect(await dai.balanceOf(soteriaCoverageProduct.address)).to.equal(INITIAL_DEPOSIT.mul(2));
             expect (await soteriaCoverageProduct.cooldownStart(policyholder2.address)).eq(0)
         });
         it("policy holder should have policy nft after buying coverage", async () => {
@@ -489,13 +577,13 @@ describe("SoteriaCoverageProduct", function() {
             // deactivatePolicy() is the only way to start cooldown
             await soteriaCoverageProduct.connect(policyholder1).deactivatePolicy();
             expect (await soteriaCoverageProduct.cooldownStart(policyholder1.address)).gt(0)
-            await soteriaCoverageProduct.connect(policyholder1).activatePolicy(policyholder1.address, initialCoverLimit, []);
+            await soteriaCoverageProduct.connect(policyholder1).activatePolicy(policyholder1.address, initialCoverLimit, 0, 0, []);
             expect (await soteriaCoverageProduct.cooldownStart(policyholder1.address)).eq(0)
         })
         it("cannot use own referral code", async () => {
             // Create new wallet just for this unit test scope, to avoid creating side effects that impact other unit tests. It's a headfuck to work that out.
             const ownReferralCode = await getSoteriaReferralCode(policyholder3, soteriaCoverageProduct)
-            await expect(soteriaCoverageProduct.connect(governor).activatePolicy(policyholder3.address, ONE_ETH, ownReferralCode, {value: ONE_ETH})).to.revertedWith("cannot refer to self");
+            await expect(soteriaCoverageProduct.connect(governor).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, 0, INITIAL_DEPOSIT, ownReferralCode)).to.revertedWith("cannot refer to self");
         })
         it("will not give reward points if isReferralOn == false", async () => {
             // Set isReferralOn to false
@@ -508,7 +596,7 @@ describe("SoteriaCoverageProduct", function() {
             let coverLimit = await soteriaCoverageProduct.coverLimitOf(POLICY_ID_2);
 
             // Attempt to use referral code
-            let tx = await soteriaCoverageProduct.connect(governor).activatePolicy(policyholder3.address, ONE_ETH, referralCode, {value: ONE_ETH});
+            let tx = await soteriaCoverageProduct.connect(governor).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, 0, INITIAL_DEPOSIT, referralCode);
             await expect(tx).emit(soteriaCoverageProduct, "PolicyCreated").withArgs(POLICY_ID_3);
 
             // Prove that no reward points were rewarded
@@ -524,7 +612,7 @@ describe("SoteriaCoverageProduct", function() {
             let referralCode = await getSoteriaReferralCode(policyholder1, soteriaCoverageProduct)
 
             await soteriaCoverageProduct.connect(policyholder3).deactivatePolicy();
-            let tx = await soteriaCoverageProduct.connect(governor).activatePolicy(policyholder3.address, ONE_ETH, referralCode, {value: ONE_ETH});
+            let tx = await soteriaCoverageProduct.connect(governor).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, 0, INITIAL_DEPOSIT, referralCode);
             await expect(tx).emit(soteriaCoverageProduct, "PolicyCreated").withArgs(POLICY_ID_3);
             await expect(tx).emit(soteriaCoverageProduct, "ReferralRewardsEarned").withArgs(policyholder1.address, REFERRAL_REWARD);
             await expect(tx).emit(soteriaCoverageProduct, "ReferralRewardsEarned").withArgs(policyholder3.address, REFERRAL_REWARD);
@@ -534,7 +622,7 @@ describe("SoteriaCoverageProduct", function() {
             // Attempt to use another referral code, via activePolicy()
             await soteriaCoverageProduct.connect(policyholder3).deactivatePolicy();
             referralCode = await getSoteriaReferralCode(policyholder2, soteriaCoverageProduct)
-            await expect(soteriaCoverageProduct.connect(governor).activatePolicy(policyholder3.address, ONE_ETH, referralCode)).to.revertedWith("cannot use referral code again");
+            await expect(soteriaCoverageProduct.connect(governor).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, 0, 0, referralCode)).to.revertedWith("cannot use referral code again");
 
             // Reset state to avoid side effects impacting consequent unit tests
             await soteriaCoverageProduct.connect(coverPromotionAdmin).setRewardPoints(policyholder1.address, 0);
@@ -547,43 +635,53 @@ describe("SoteriaCoverageProduct", function() {
     describe("deposit", () => {
         it("can deposit", async () => {
             let accountBalance = await soteriaCoverageProduct.accountBalanceOf(policyholder1.address);
-            let soteriaContractETHbalance = await provider.getBalance(soteriaCoverageProduct.address);
-            let tx = await soteriaCoverageProduct.connect(policyholder1).deposit(policyholder1.address, { value: ONE_ETH });
-            await expect(tx).emit(soteriaCoverageProduct, "DepositMade").withArgs(policyholder1.address, ONE_ETH);
-            expect(await soteriaCoverageProduct.accountBalanceOf(policyholder1.address)).to.equal(accountBalance.add(ONE_ETH));
-            expect(await provider.getBalance(soteriaCoverageProduct.address)).to.equal(soteriaContractETHbalance.add(ONE_ETH));
+            let soteriaContractDAIbalance = await dai.balanceOf(soteriaCoverageProduct.address)
+            let tx = await soteriaCoverageProduct.connect(policyholder1).deposit(policyholder1.address, 0, INITIAL_DEPOSIT);
+            await expect(tx).emit(soteriaCoverageProduct, "DepositMade").withArgs(policyholder1.address, INITIAL_DEPOSIT);
+            expect(await soteriaCoverageProduct.accountBalanceOf(policyholder1.address)).to.equal(accountBalance.add(INITIAL_DEPOSIT));
+            expect(await dai.balanceOf(soteriaCoverageProduct.address)).to.equal(soteriaContractDAIbalance.add(INITIAL_DEPOSIT));
         });
 
         it("can deposit on behalf of policy holder", async () => {
             let accountBalance = await soteriaCoverageProduct.accountBalanceOf(policyholder2.address);
-            let soteriaContractETHbalance = await provider.getBalance(soteriaCoverageProduct.address);
-            let tx = await soteriaCoverageProduct.connect(policyholder1).deposit(policyholder2.address, { value: ONE_ETH });
-            await expect(tx).emit(soteriaCoverageProduct, "DepositMade").withArgs(policyholder2.address, ONE_ETH);
-            expect(await soteriaCoverageProduct.accountBalanceOf(policyholder2.address)).to.equal(accountBalance.add(ONE_ETH));
-            expect(await provider.getBalance(soteriaCoverageProduct.address)).to.equal(soteriaContractETHbalance.add(ONE_ETH));
+            let soteriaContractDAIbalance = await dai.balanceOf(soteriaCoverageProduct.address)
+            let tx = await soteriaCoverageProduct.connect(policyholder1).deposit(policyholder2.address, 0, INITIAL_DEPOSIT);
+            await expect(tx).emit(soteriaCoverageProduct, "DepositMade").withArgs(policyholder2.address, INITIAL_DEPOSIT);
+            expect(await soteriaCoverageProduct.accountBalanceOf(policyholder2.address)).to.equal(accountBalance.add(INITIAL_DEPOSIT));
+            expect(await dai.balanceOf(soteriaCoverageProduct.address)).to.equal(soteriaContractDAIbalance.add(INITIAL_DEPOSIT));
         });
 
-        it("can deposit via fallback", async () => {
-            let accountBalance = await soteriaCoverageProduct.accountBalanceOf(policyholder2.address);
-            let soteriaContractETHbalance = await provider.getBalance(soteriaCoverageProduct.address);
-            let tx = await policyholder1.sendTransaction({ to: soteriaCoverageProduct.address, value: ONE_ETH });
-            await expect(tx).emit(soteriaCoverageProduct, "DepositMade").withArgs(policyholder1.address, ONE_ETH);
-            expect(await soteriaCoverageProduct.accountBalanceOf(policyholder1.address)).to.equal(accountBalance.add(ONE_ETH));
-            expect(await provider.getBalance(soteriaCoverageProduct.address)).to.equal(soteriaContractETHbalance.add(ONE_ETH));
-        });
-
-        it("can deposit via receive", async () => {
+        it("fallback will send ETH back", async () => {
             let accountBalance = await soteriaCoverageProduct.accountBalanceOf(policyholder1.address);
             let soteriaContractETHbalance = await provider.getBalance(soteriaCoverageProduct.address);
-            let tx = await policyholder1.sendTransaction({ to: soteriaCoverageProduct.address, value: ONE_ETH, data:"0x00"});
-            await expect(tx).emit(soteriaCoverageProduct, "DepositMade").withArgs(policyholder1.address, ONE_ETH);
-            expect(await soteriaCoverageProduct.accountBalanceOf(policyholder1.address)).to.equal(accountBalance.add(ONE_ETH));
-            expect(await provider.getBalance(soteriaCoverageProduct.address)).to.equal(soteriaContractETHbalance.add(ONE_ETH));
+            let initialDepositorETHbalance = await provider.getBalance(policyholder1.address)
+
+            let tx = await policyholder1.sendTransaction({ to: soteriaCoverageProduct.address, value: ONE_ETH });
+            let receipt = await tx.wait();
+            let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
+
+            expect(await soteriaCoverageProduct.accountBalanceOf(policyholder1.address)).eq(accountBalance)
+            expect(await provider.getBalance(soteriaCoverageProduct.address)).to.equal(soteriaContractETHbalance);
+            expect(await provider.getBalance(policyholder1.address)).to.equal(initialDepositorETHbalance.sub(gasCost));
+        });
+
+        it("receive will send ETH back", async () => {
+            let accountBalance = await soteriaCoverageProduct.accountBalanceOf(policyholder1.address);
+            let soteriaContractETHbalance = await provider.getBalance(soteriaCoverageProduct.address);
+            let initialDepositorETHbalance = await provider.getBalance(policyholder1.address)
+
+            let tx = await policyholder1.sendTransaction({ to: soteriaCoverageProduct.address, value: ONE_ETH, data:"0x00" });
+            let receipt = await tx.wait();
+            let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
+
+            expect(await soteriaCoverageProduct.accountBalanceOf(policyholder1.address)).eq(accountBalance)
+            expect(await provider.getBalance(soteriaCoverageProduct.address)).to.equal(soteriaContractETHbalance);
+            expect(await provider.getBalance(policyholder1.address)).to.equal(initialDepositorETHbalance.sub(gasCost));
         });
 
         it("cannot deposit while paused", async () => {
             await soteriaCoverageProduct.connect(governor).setPaused(true);
-            await expect(soteriaCoverageProduct.connect(policyholder1).deposit(policyholder1.address, { value: ONE_ETH })).to.revertedWith("contract paused");
+            await expect(soteriaCoverageProduct.connect(policyholder1).deposit(policyholder1.address, 0, INITIAL_DEPOSIT)).to.revertedWith("contract paused");
             await soteriaCoverageProduct.connect(governor).setPaused(false);
         });
     });
@@ -673,7 +771,7 @@ describe("SoteriaCoverageProduct", function() {
             expect(await riskManager.minCapitalRequirementPerStrategy(soteriaCoverageProduct.address)).to.equal(amount2);
         });
 
-        it("will exit cooldown when cover limited updated", async () => {
+        it("will exit cooldown when cover limit updated", async () => {
             let initialCoverLimit = await soteriaCoverageProduct.coverLimitOf(POLICY_ID_1);
             expect (await soteriaCoverageProduct.cooldownStart(policyholder1.address)).eq(0)
             // deactivatePolicy() is the only way to start cooldown
@@ -724,7 +822,7 @@ describe("SoteriaCoverageProduct", function() {
             expect (await soteriaCoverageProduct.rewardPointsOf(policyholder2.address)).eq(REFERRAL_REWARD)
 
             // Attempt to use another referral code
-            tx = await soteriaCoverageProduct.connect(policyholder3).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, [], {value: ONE_ETH});
+            tx = await soteriaCoverageProduct.connect(policyholder3).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, 0, 0, []);
             await expect(tx).emit(soteriaCoverageProduct, "PolicyCreated").withArgs(POLICY_ID_3);
             referralCode = await getSoteriaReferralCode(policyholder3, soteriaCoverageProduct)
             await expect(soteriaCoverageProduct.connect(policyholder2).updateCoverLimit(coverLimit, referralCode)).to.revertedWith("cannot use referral code again");
@@ -789,8 +887,8 @@ describe("SoteriaCoverageProduct", function() {
     describe("withdraw", () => {
         let initialAccountBalance: BN;
         let initialPolicyCover:BN;
-        let initialPolicyholderETHBalance: BN;
-        let initialSoteriaETHBalance: BN;
+        let initialPolicyholderDAIBalance: BN;
+        let initialSoteriaDAIBalance: BN;
         let initialActiveCoverLimit: BN;
         let initialAvailableCoverCapacity: BN;
         let initialRMActiveCoverLimit: BN;
@@ -807,8 +905,10 @@ describe("SoteriaCoverageProduct", function() {
         before(async () => {
             initialAccountBalance = await soteriaCoverageProduct.accountBalanceOf(policyholder3.address);
             initialPolicyCover = await soteriaCoverageProduct.coverLimitOf(POLICY_ID_3);
-            initialPolicyholderETHBalance = await provider.getBalance(policyholder3.address)
-            initialSoteriaETHBalance = await provider.getBalance(soteriaCoverageProduct.address)
+
+            initialPolicyholderDAIBalance = await dai.balanceOf(policyholder3.address)
+            initialSoteriaDAIBalance = await dai.balanceOf(soteriaCoverageProduct.address)
+
             initialActiveCoverLimit = await soteriaCoverageProduct.connect(policyholder3).activeCoverLimit();
             initialAvailableCoverCapacity = await soteriaCoverageProduct.availableCoverCapacity();
             initialRMActiveCoverLimit = await riskManager.activeCoverLimit();
@@ -824,7 +924,7 @@ describe("SoteriaCoverageProduct", function() {
         
         it("cannot withdraw while paused", async () => {
             await soteriaCoverageProduct.connect(governor).setPaused(true);
-            await expect(soteriaCoverageProduct.connect(policyholder3).withdraw()).to.revertedWith("contract paused");
+            await expect(soteriaCoverageProduct.connect(policyholder3).withdraw(0)).to.revertedWith("contract paused");
             await soteriaCoverageProduct.connect(governor).setPaused(false);
         });
         it("before cooldown complete, will withdraw such that remaining balance = minRequiredAccountBalance", async () => {
@@ -835,15 +935,13 @@ describe("SoteriaCoverageProduct", function() {
             
             withdrawAmount = initialAccountBalance.sub(minRequiredAccountBalance)
 
-            let tx = await soteriaCoverageProduct.connect(policyholder3).withdraw();
-            let receipt = await tx.wait();
-            let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);            
+            let tx = await soteriaCoverageProduct.connect(policyholder3).withdraw(0);          
             await expect(tx).emit(soteriaCoverageProduct, "WithdrawMade").withArgs(policyholder3.address, withdrawAmount);
 
             expect(initialAccountBalance).gt(await soteriaCoverageProduct.accountBalanceOf(policyholder3.address))
             expect(await soteriaCoverageProduct.accountBalanceOf(policyholder3.address)).eq(minRequiredAccountBalance)
-            expect(await provider.getBalance(policyholder3.address)).eq(initialPolicyholderETHBalance.add(withdrawAmount).sub(gasCost))
-            expect(await provider.getBalance(soteriaCoverageProduct.address)).eq(initialSoteriaETHBalance.sub(withdrawAmount))
+            expect(await dai.balanceOf(policyholder3.address)).eq(initialPolicyholderDAIBalance.add(withdrawAmount))
+            expect(await dai.balanceOf(soteriaCoverageProduct.address)).eq(initialSoteriaDAIBalance.sub(withdrawAmount))
         })
         it("after cooldown complete, can withdraw entire account balance", async () => {
             const initialTimestamp = (await provider.getBlock('latest')).timestamp
@@ -851,16 +949,15 @@ describe("SoteriaCoverageProduct", function() {
             expect(BN.from(postCooldownTimestamp)).gt(cooldownStart.add(cooldownPeriod))
             await provider.send("evm_mine", [postCooldownTimestamp])
             
-            let policyholderETHBalance = await provider.getBalance(policyholder3.address)
+            let policyholderDAIBalance = await dai.balanceOf(policyholder3.address)
+            let soteriaDAIBalance = await dai.balanceOf(soteriaCoverageProduct.address)
             let accountBalance = await soteriaCoverageProduct.accountBalanceOf(policyholder3.address)
-            let tx = await soteriaCoverageProduct.connect(policyholder3).withdraw();
-            let receipt = await tx.wait();
-            let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
+            let tx = await soteriaCoverageProduct.connect(policyholder3).withdraw(0);
             await expect(tx).emit(soteriaCoverageProduct, "WithdrawMade").withArgs(policyholder3.address, accountBalance);
 
             expect(await soteriaCoverageProduct.accountBalanceOf(policyholder3.address)).eq(0);
-            expect(await provider.getBalance(policyholder3.address)).eq(policyholderETHBalance.add(accountBalance).sub(gasCost))
-            expect(await provider.getBalance(soteriaCoverageProduct.address)).eq(initialSoteriaETHBalance.sub(initialAccountBalance))
+            expect(await dai.balanceOf(policyholder3.address)).eq(policyholderDAIBalance.add(accountBalance))
+            expect(await dai.balanceOf(soteriaCoverageProduct.address)).eq(soteriaDAIBalance.sub(accountBalance))
         })
         after(async () => {
             expect(await soteriaCoverageProduct.connect(policyholder3).activeCoverLimit()).eq(initialActiveCoverLimit)
@@ -872,27 +969,27 @@ describe("SoteriaCoverageProduct", function() {
 
     describe("chargePremiums", () => {
         it("cannot charge premiums by non premium collector", async () => {
-            await expect(soteriaCoverageProduct.connect(policyholder1).chargePremiums([policyholder1.address, policyholder2.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM])).to.revertedWith("not premium collector");
+            await expect(soteriaCoverageProduct.connect(policyholder1).chargePremiums([policyholder1.address, policyholder2.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM], 0)).to.revertedWith("not premium collector");
         });
 
         it("cannot charge premiums if argument lengths are mismatched", async () => {
-            await expect(soteriaCoverageProduct.connect(premiumCollector).chargePremiums([policyholder1.address, policyholder2.address, policyholder3.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM])).to.revertedWith("length mismatch");
+            await expect(soteriaCoverageProduct.connect(premiumCollector).chargePremiums([policyholder1.address, policyholder2.address, policyholder3.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM], 0)).to.revertedWith("length mismatch");
         });
 
         it("cannot charge premiums if policy count is exceeded", async () => {
-            await expect(soteriaCoverageProduct.connect(premiumCollector).chargePremiums([policyholder1.address, policyholder2.address, policyholder3.address, policyholder4.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM])).to.revertedWith("policy count exceeded");
+            await expect(soteriaCoverageProduct.connect(premiumCollector).chargePremiums([policyholder1.address, policyholder2.address, policyholder3.address, policyholder4.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM], 0)).to.revertedWith("policy count exceeded");
         });
 
         it("cannot charge more than max rate", async () => {
-            await expect(soteriaCoverageProduct.connect(premiumCollector).chargePremiums([policyholder1.address, policyholder2.address], [WEEKLY_MAX_PREMIUM.mul(11).div(10), WEEKLY_MAX_PREMIUM.mul(11).div(10)])).to.revertedWith("charging more than promised maximum rate");
+            await expect(soteriaCoverageProduct.connect(premiumCollector).chargePremiums([policyholder1.address, policyholder2.address], [WEEKLY_MAX_PREMIUM.mul(11).div(10), WEEKLY_MAX_PREMIUM.mul(11).div(10)], 0)).to.revertedWith("charging more than promised maximum rate");
         })
 
         it("can charge premiums", async () => {
             // CASE 1 - Charge weekly premium for two policyholders, no reward points involved
             
             // premiums are routed to the premium pool!
-            let soteriaBalance = await provider.getBalance(soteriaCoverageProduct.address);
-            let premiumPoolBalance = await provider.getBalance(premiumPool.address);
+            let soteriaBalance = await dai.balanceOf(soteriaCoverageProduct.address);
+            let premiumPoolBalance = await dai.balanceOf(premiumPool.address);
             let policyholder1AccountBalance = await soteriaCoverageProduct.connect(policyholder1).accountBalanceOf(policyholder1.address);
             let policyholder2AccountBalance = await soteriaCoverageProduct.connect(policyholder1).accountBalanceOf(policyholder2.address);
             let initialCoverLimit1 = await soteriaCoverageProduct.coverLimitOf(POLICY_ID_1);
@@ -901,7 +998,7 @@ describe("SoteriaCoverageProduct", function() {
             let initialActiveCoverCapacity = await soteriaCoverageProduct.availableCoverCapacity();
 
             // charge premiums
-            let tx = soteriaCoverageProduct.connect(premiumCollector).chargePremiums([policyholder1.address, policyholder2.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM]);
+            let tx = soteriaCoverageProduct.connect(premiumCollector).chargePremiums([policyholder1.address, policyholder2.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM], 0);
             await expect(tx).emit(soteriaCoverageProduct, "PremiumCharged").withArgs(policyholder1.address, WEEKLY_MAX_PREMIUM);
             await expect(tx).emit(soteriaCoverageProduct, "PremiumCharged").withArgs(policyholder2.address, WEEKLY_MAX_PREMIUM);
          
@@ -910,10 +1007,10 @@ describe("SoteriaCoverageProduct", function() {
             expect(await soteriaCoverageProduct.accountBalanceOf(policyholder2.address)).to.equal(policyholder2AccountBalance.sub(WEEKLY_MAX_PREMIUM));
 
             // soteria balance should be decreased
-            expect(await provider.getBalance(soteriaCoverageProduct.address)).to.equal(soteriaBalance.sub(WEEKLY_MAX_PREMIUM.mul(2)));
+            expect(await dai.balanceOf(soteriaCoverageProduct.address)).to.equal(soteriaBalance.sub(WEEKLY_MAX_PREMIUM.mul(2)));
 
             // premium should be sent to premium pool
-            expect(await provider.getBalance(premiumPool.address)).to.equal(premiumPoolBalance.add(WEEKLY_MAX_PREMIUM.mul(2)));
+            expect(await dai.balanceOf(premiumPool.address)).to.equal(premiumPoolBalance.add(WEEKLY_MAX_PREMIUM.mul(2)));
             expect(await soteriaCoverageProduct.availableCoverCapacity()).eq(initialActiveCoverCapacity)
 
             // following mappings should be unchanged
@@ -929,11 +1026,11 @@ describe("SoteriaCoverageProduct", function() {
 
             let depositAmount = WEEKLY_MAX_PREMIUM.mul(11).div(10)
 
-            let tx = await soteriaCoverageProduct.connect(policyholder4).activatePolicy(policyholder4.address, INITIAL_COVER_LIMIT, [], {value: depositAmount});
+            let tx = await soteriaCoverageProduct.connect(governor).activatePolicy(policyholder4.address, INITIAL_COVER_LIMIT, 0, depositAmount, []);
             await expect(tx).emit(soteriaCoverageProduct, "PolicyCreated").withArgs(POLICY_ID_4);
 
-            let initialSoteriaBalance = await provider.getBalance(soteriaCoverageProduct.address);
-            let initialPremiumPoolBalance = await provider.getBalance(premiumPool.address);
+            let initialSoteriaBalance = await dai.balanceOf(soteriaCoverageProduct.address);
+            let initialPremiumPoolBalance = await dai.balanceOf(premiumPool.address);
             let initialHolderAccountBalance = await soteriaCoverageProduct.connect(policyholder4).accountBalanceOf(policyholder4.address);
             let initialActiveCoverLimit = await soteriaCoverageProduct.connect(policyholder4).activeCoverLimit();
             let initialPolicyCoverLimit = await soteriaCoverageProduct.connect(policyholder4).coverLimitOf(POLICY_ID_4);
@@ -942,9 +1039,9 @@ describe("SoteriaCoverageProduct", function() {
             let initialRMSoteriaCoverAmount = await riskManager.activeCoverLimitPerStrategy(soteriaCoverageProduct.address);
 
             // we cannot reach the PremiumPartiallyCharged branch within a single chargePremiums() call
-            await soteriaCoverageProduct.connect(premiumCollector).chargePremiums([policyholder4.address], [WEEKLY_MAX_PREMIUM]);
+            await soteriaCoverageProduct.connect(premiumCollector).chargePremiums([policyholder4.address], [WEEKLY_MAX_PREMIUM], 0);
             expect(await soteriaCoverageProduct.accountBalanceOf(policyholder4.address)).eq(WEEKLY_MAX_PREMIUM.div(10))
-            tx = await soteriaCoverageProduct.connect(premiumCollector).chargePremiums([policyholder4.address], [WEEKLY_MAX_PREMIUM]);
+            tx = await soteriaCoverageProduct.connect(premiumCollector).chargePremiums([policyholder4.address], [WEEKLY_MAX_PREMIUM], 0);
             await expect(tx).emit(soteriaCoverageProduct, "PremiumPartiallyCharged").withArgs(policyholder4.address, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM.div(10));
            
             // policy should be deactivated
@@ -968,41 +1065,42 @@ describe("SoteriaCoverageProduct", function() {
             expect(await soteriaCoverageProduct.accountBalanceOf(policyholder4.address)).to.equal(0);
 
             // soteria balance should be decreased
-            expect(await provider.getBalance(soteriaCoverageProduct.address)).to.equal(initialSoteriaBalance.sub(depositAmount));
+            expect(await dai.balanceOf(soteriaCoverageProduct.address)).to.equal(initialSoteriaBalance.sub(depositAmount));
             
             // premium should be sent to premium pool
-            expect(await provider.getBalance(premiumPool.address)).to.equal(initialPremiumPoolBalance.add(depositAmount));
+            expect(await dai.balanceOf(premiumPool.address)).to.equal(initialPremiumPoolBalance.add(depositAmount));
         });
 
         it("will be able to charge premiums for accounts that have been deactivated in the last epoch", async () => {
             // CASE 3 - Create a new account, deactivate it, then charge premium on this newly deactivated account
             
             // Create a new account, then deactivate it
-            await soteriaCoverageProduct.connect(governor).activatePolicy(policyholder5.address, INITIAL_COVER_LIMIT, [], {value: ONE_ETH})
+            await soteriaCoverageProduct.connect(governor).activatePolicy(policyholder5.address, INITIAL_COVER_LIMIT, 0, INITIAL_DEPOSIT, [])
             expect(await soteriaCoverageProduct.policyStatus(POLICY_ID_5)).to.equal(true);
             await soteriaCoverageProduct.connect(policyholder5).deactivatePolicy()
             expect(await soteriaCoverageProduct.policyStatus(POLICY_ID_5)).to.equal(false);
 
             // Get initial balances
-            let initialSoteriaBalance = await provider.getBalance(soteriaCoverageProduct.address);
-            let initialPremiumPoolBalance = await provider.getBalance(premiumPool.address);
+            let initialSoteriaBalance = await dai.balanceOf(soteriaCoverageProduct.address);
+            let initialPremiumPoolBalance = await dai.balanceOf(premiumPool.address);
             let initialHolderFunds = await soteriaCoverageProduct.accountBalanceOf(policyholder5.address);
 
             // Charge premiums
-            let tx = await soteriaCoverageProduct.connect(premiumCollector).chargePremiums([policyholder5.address], [WEEKLY_MAX_PREMIUM]);
+            let tx = await soteriaCoverageProduct.connect(premiumCollector).chargePremiums([policyholder5.address], [WEEKLY_MAX_PREMIUM], 0);
             await expect(tx).emit(soteriaCoverageProduct, "PremiumCharged").withArgs(policyholder5.address, WEEKLY_MAX_PREMIUM);
          
             // Check balances
             expect(await soteriaCoverageProduct.accountBalanceOf(policyholder5.address)).to.equal(initialHolderFunds.sub(WEEKLY_MAX_PREMIUM));
-            expect(await provider.getBalance(soteriaCoverageProduct.address)).to.equal(initialSoteriaBalance.sub(WEEKLY_MAX_PREMIUM));
-            expect(await provider.getBalance(premiumPool.address)).to.equal(initialPremiumPoolBalance.add(WEEKLY_MAX_PREMIUM));
+            expect(await dai.balanceOf(soteriaCoverageProduct.address)).to.equal(initialSoteriaBalance.sub(WEEKLY_MAX_PREMIUM));
+            expect(await dai.balanceOf(premiumPool.address)).to.equal(initialPremiumPoolBalance.add(WEEKLY_MAX_PREMIUM));
         })
 
-        // it("will skip charging premium for inactive accounts", async () => {
+        // it("REDUNDANT FOR NOW - will skip charging premium for inactive accounts", async () => {
             // CASE 4 (REUNDANT FOR NOW) - Policy holder 5 withdraws, then premium is charged twice
+            // Redundant because we allow the edge case of premium collector charging a deactivated account more than once
 
-            // let initialSoteriaBalance = await provider.getBalance(soteriaCoverageProduct.address);
-            // let initialPremiumPoolBalance = await provider.getBalance(premiumPool.address);
+            // let initialSoteriaBalance = await dai.balanceOf(soteriaCoverageProduct.address);
+            // let initialPremiumPoolBalance = await dai.balanceOf(premiumPool.address);
             // let initialHolderFunds = await soteriaCoverageProduct.accountBalanceOf(policyholder5.address);
 
             // // Policy holder 5 withdraw
@@ -1024,10 +1122,10 @@ describe("SoteriaCoverageProduct", function() {
             // expect(await soteriaCoverageProduct.connect(policyholder2).accountBalanceOf(policyholder2.address)).to.equal(initialHolderFunds.sub(WEEKLY_MAX_PREMIUM));
          
             // // soteria balance should be decreased by single weekly premium
-            // expect(await provider.getBalance(soteriaCoverageProduct.address)).to.equal(initialSoteriaBalance.sub(WEEKLY_MAX_PREMIUM));
+            // expect(await dai.balanceOf(soteriaCoverageProduct.address)).to.equal(initialSoteriaBalance.sub(WEEKLY_MAX_PREMIUM));
           
             // // single weekly premium should be sent to premium pool
-            // expect(await provider.getBalance(premiumPool.address)).to.equal(initialPremiumPoolBalance.add(WEEKLY_MAX_PREMIUM));
+            // expect(await dai.balanceOf(premiumPool.address)).to.equal(initialPremiumPoolBalance.add(WEEKLY_MAX_PREMIUM));
         // });
 
         it("will correctly charge premiums with reward points", async () => {
@@ -1056,8 +1154,8 @@ describe("SoteriaCoverageProduct", function() {
             // Set up policy 3 (remember we need minimum 2 chargePremium calls to reach PremiumsPartiallySet branch, so we will do the first call to setup)
             // Also remember that we deactivated and did a complete withdrawal of amount in policyholder3's account in withdraw() unit test
             let depositAmount = WEEKLY_MAX_PREMIUM.mul(11).div(10)
-            await soteriaCoverageProduct.connect(policyholder3).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, [], {value: depositAmount});
-            await soteriaCoverageProduct.connect(premiumCollector).chargePremiums([policyholder3.address], [WEEKLY_MAX_PREMIUM]);
+            await soteriaCoverageProduct.connect(governor).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, 0, depositAmount, []);
+            await soteriaCoverageProduct.connect(premiumCollector).chargePremiums([policyholder3.address], [WEEKLY_MAX_PREMIUM], 0);
             expect(await soteriaCoverageProduct.accountBalanceOf(policyholder3.address)).eq(WEEKLY_MAX_PREMIUM.div(10))
             tx = await soteriaCoverageProduct.connect(coverPromotionAdmin).setRewardPoints(policyholder3.address, INSUFFICIENT_REWARD_POINTS)
             expect(tx).to.emit(soteriaCoverageProduct, "RewardPointsSet").withArgs(policyholder3.address, INSUFFICIENT_REWARD_POINTS);
@@ -1065,8 +1163,8 @@ describe("SoteriaCoverageProduct", function() {
             expect(initialRewardPoints3).eq(INSUFFICIENT_REWARD_POINTS)
 
             // Get initial state variable values
-            let initialSoteriaBalance = await provider.getBalance(soteriaCoverageProduct.address);
-            let initialPremiumPoolBalance = await provider.getBalance(premiumPool.address);
+            let initialSoteriaBalance = await dai.balanceOf(soteriaCoverageProduct.address);
+            let initialPremiumPoolBalance = await dai.balanceOf(premiumPool.address);
             let initialHolder1AccountBalance = await soteriaCoverageProduct.accountBalanceOf(policyholder1.address);
             let initialHolder2AccountBalance = await soteriaCoverageProduct.accountBalanceOf(policyholder2.address);
             let initialHolder3AccountBalance = await soteriaCoverageProduct.accountBalanceOf(policyholder3.address);
@@ -1078,7 +1176,7 @@ describe("SoteriaCoverageProduct", function() {
             let initialRMCoverAmount = await riskManager.activeCoverLimit();
             let initialRMSoteriaCoverAmount = await riskManager.activeCoverLimitPerStrategy(soteriaCoverageProduct.address);
 
-            tx = await soteriaCoverageProduct.connect(premiumCollector).chargePremiums([policyholder1.address, policyholder2.address, policyholder3.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM])
+            tx = await soteriaCoverageProduct.connect(premiumCollector).chargePremiums([policyholder1.address, policyholder2.address, policyholder3.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM], 0)
             expect(tx).to.emit(soteriaCoverageProduct, "PremiumCharged").withArgs(policyholder1.address, WEEKLY_MAX_PREMIUM);
             expect(tx).to.emit(soteriaCoverageProduct, "PremiumCharged").withArgs(policyholder2.address, WEEKLY_MAX_PREMIUM);
             expect(tx).to.emit(soteriaCoverageProduct, "PremiumPartiallyCharged").withArgs(policyholder3.address, WEEKLY_MAX_PREMIUM, initialHolder3AccountBalance.add(initialRewardPoints3));
@@ -1112,10 +1210,10 @@ describe("SoteriaCoverageProduct", function() {
             let accountBalanceDeductedForHolder2 = WEEKLY_MAX_PREMIUM.sub(initialRewardPoints2);
             let accountBalanceDeductedForHolder3 = initialHolder3AccountBalance;
             let expectedSoteriaBalanceChange = accountBalanceDeductedForHolder1.add(accountBalanceDeductedForHolder2).add(accountBalanceDeductedForHolder3)
-            expect(await provider.getBalance(soteriaCoverageProduct.address)).eq(initialSoteriaBalance.sub(expectedSoteriaBalanceChange))
+            expect(await dai.balanceOf(soteriaCoverageProduct.address)).eq(initialSoteriaBalance.sub(expectedSoteriaBalanceChange))
 
             // Premium pool balance check
-            expect(await provider.getBalance(premiumPool.address)).eq(initialPremiumPoolBalance.add(expectedSoteriaBalanceChange))
+            expect(await dai.balanceOf(premiumPool.address)).eq(initialPremiumPoolBalance.add(expectedSoteriaBalanceChange))
 
             // Soteria active cover limit check - policy 3 deactivated
             expect(await soteriaCoverageProduct.activeCoverLimit()).eq(initialActiveCoverLimit.sub(initialPolicy3CoverLimit))
@@ -1131,14 +1229,18 @@ describe("SoteriaCoverageProduct", function() {
             // 100 wallets -> 1.6M gas
             // 1000 wallets -> 16M gas
             let numberWallets = 100 // Change this number to whatever number of wallets you want to test for
-
             let users:(Wallet)[] = [];
             for (let i = 0; i < numberWallets; i++) {
                 users.push(provider.createEmptyWallet())
             }
-            // Activate policies for each user, 1 ETH cover limit with 0.1 ETH deposit
+
+            let coverLimit = BN.from(100);
+            let depositAmount = BN.from(10);
+            let WEEKLY_MAX_PREMIUM = coverLimit.div(10).mul(604800).div(31536000) // Override global WEEKLY_MAX_PREMIUM variable
+
+            // Activate policies for each user, 100 DAI cover limit with 10 DAI deposit
             for (let user of users) {
-                await soteriaCoverageProduct.connect(governor).activatePolicy(user.address, ONE_ETH, [], {value:ONE_ETH.div(10)})
+                await soteriaCoverageProduct.connect(governor).activatePolicy(user.address, coverLimit, 0, depositAmount, [])
             }
             // Gift 0 reward points to one-third of users, half-weekly premium to one-third, and full weekly premium to remaining third
             for (let user of users) {
@@ -1157,9 +1259,27 @@ describe("SoteriaCoverageProduct", function() {
             }
 
             // Charge premiums
-            await soteriaCoverageProduct.connect(premiumCollector).chargePremiums(ADDRESS_ARRAY, PREMIUM_ARRAY);
+            await soteriaCoverageProduct.connect(premiumCollector).chargePremiums(ADDRESS_ARRAY, PREMIUM_ARRAY, 0);
         })
 
     });
 
+    async function manipulateDAIbalance(wallet: Wallet, desiredBalance: BN) {
+        const DAI_BALANCEOF_SLOT = 2;
+        // Get storage slot index
+        const index = utils.solidityKeccak256(
+            ["uint256", "uint256"],
+            [wallet.address, DAI_BALANCEOF_SLOT] // key, slot
+          );
+
+        // Manipulate local balance (needs to be bytes32 string)
+        await provider.send("hardhat_setStorageAt", [DAI_ADDRESS, index.toString(), toBytes32(desiredBalance).toString()])
+        await provider.send("evm_mine", []) // Mine the next block
+    }
+
+    function toBytes32 (bn: BN) {
+        return utils.hexlify(utils.zeroPad(bn.toHexString(), 32));
+    };
+
 });
+
