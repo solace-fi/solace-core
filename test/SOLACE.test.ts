@@ -8,6 +8,7 @@ chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
 import { Solace } from "./../typechain";
+import { expectDeployed } from "./utilities/expectDeployed";
 
 const ONE_BILLION = BN.from("1000000000000000000000000000");
 const TWO_BILLION = BN.from("2000000000000000000000000000");
@@ -27,6 +28,7 @@ describe("SOLACE", function () {
     artifacts = await import_artifacts();
     await owner.sendTransaction({to:owner.address}); // for some reason this helps solidity-coverage
     solace = (await deployContract(owner, artifacts.SOLACE, [governor.address])) as Solace;
+    await expectDeployed(solace.address);
   });
 
   describe("deployment", function () {

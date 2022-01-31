@@ -12,6 +12,7 @@ import { logContractAddress } from "./utils";
 
 import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_importer";
 import { Deployer, Solace, XsLocker, XSolace, StakingRewards, XSolaceMigrator, FarmRewards, FarmRewardsV2 } from "../typechain";
+import { isDeployed } from "../test/utilities/expectDeployed";
 
 const DEPLOYER_CONTRACT_ADDRESS    = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
 
@@ -63,7 +64,7 @@ async function main() {
 }
 
 async function deployXSLocker() {
-  if(!!XSLOCKER_ADDRESS) {
+  if(await isDeployed(XSLOCKER_ADDRESS)) {
     xslocker = (await ethers.getContractAt(artifacts.xsLocker.abi, XSLOCKER_ADDRESS)) as unknown as XsLocker;
   } else {
     console.log("Deploying xsLocker");
@@ -79,7 +80,7 @@ async function deployStakingRewards() {
   const solacePerYear = BN.from("10000000000000000000000000"); // 10M/yr
   const solacePerSecond = BN.from("317097919837645865");
 
-  if(!!STAKING_REWARDS_ADDRESS) {
+  if(await isDeployed(STAKING_REWARDS_ADDRESS)) {
     stakingRewards = (await ethers.getContractAt(artifacts.StakingRewards.abi, STAKING_REWARDS_ADDRESS)) as StakingRewards;
   } else {
     console.log("Deploying StakingRewards");
@@ -91,17 +92,23 @@ async function deployStakingRewards() {
   let tx1 = await xslocker.connect(deployer).addXsLockListener(stakingRewards.address);
   await tx1.wait();
   /*
+  console.log("staking rewards - registering in xslocker");
+  let tx1 = await xslocker.connect(deployer).addXsLockListener(stakingRewards.address);
+  await tx1.wait();
   console.log("staking rewards - set rewards");
-  let tx2 = await solace.connect(deployer).mint(stakingRewards.address, solacePerYear);
+  let tx2 = await stakingRewards.connect(deployer).setRewards(solacePerSecond);
   await tx2.wait();
   console.log("staking rewards - set times");
   let tx3 = await stakingRewards.connect(deployer).setTimes(startTime, endTime);
   await tx3.wait();
+  console.log("staking rewards - minting solace");
+  let tx4 = await solace.connect(deployer).mint(stakingRewards.address, solacePerYear);
+  await tx4.wait();
   */
 }
 
 async function deployXSOLACE() {
-  if(!!XSOLACE_ADDRESS) {
+  if(await isDeployed(XSOLACE_ADDRESS)) {
     xsolace = (await ethers.getContractAt(artifacts.xSOLACE.abi, XSOLACE_ADDRESS)) as XSolace;
   } else {
     console.log("Deploying xSOLACE");
@@ -112,7 +119,7 @@ async function deployXSOLACE() {
 }
 
 async function deployMigrator() {
-  if(!!XSOLACE_MIGRATOR_ADDRESS) {
+  if(await isDeployed(XSOLACE_MIGRATOR_ADDRESS)) {
     migrator = (await ethers.getContractAt(artifacts.xSolaceMigrator.abi, XSOLACE_MIGRATOR_ADDRESS)) as XSolaceMigrator;
   } else {
     console.log("Deploying xSOLACE Migrator");
@@ -124,7 +131,7 @@ async function deployMigrator() {
 
 async function deployFarmRewards() {
   farmRewards = (await ethers.getContractAt(artifacts.FarmRewards.abi, FARM_REWARDS_V1_ADDRESS)) as FarmRewards;
-  if(!!FARM_REWARDS_V2_ADDRESS) {
+  if(await isDeployed(FARM_REWARDS_V2_ADDRESS)) {
     farmRewardsv2 = (await ethers.getContractAt(artifacts.FarmRewardsV2.abi, FARM_REWARDS_V2_ADDRESS)) as FarmRewardsV2;
   } else {
     console.log("Deploying FarmRewardsV2");

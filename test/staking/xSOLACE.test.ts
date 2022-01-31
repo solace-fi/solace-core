@@ -10,6 +10,7 @@ chai.use(solidity);
 import { import_artifacts, ArtifactImports } from "./../utilities/artifact_importer";
 import { Solace, XsLocker, XSolace } from "./../../typechain";
 import { expectClose } from "./../utilities/math";
+import { expectDeployed } from "../utilities/expectDeployed";
 
 // contracts
 let solace: Solace;
@@ -57,6 +58,7 @@ describe("xSOLACE", function () {
     });
     it("deploys", async function () {
       xsolace = (await deployContract(deployer, artifacts.xSOLACE, [xslocker.address])) as XSolace;
+      await expectDeployed(xsolace.address);
     });
     it("initializes properly", async function () {
       expect(await xsolace.MAX_LOCK_DURATION()).eq(MAX_LOCK_DURATION);

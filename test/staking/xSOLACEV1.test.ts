@@ -9,6 +9,7 @@ chai.use(solidity);
 import { import_artifacts, ArtifactImports } from "./../utilities/artifact_importer";
 import { Solace, XSolacev1 } from "./../../typechain";
 import { getERC20PermitSignature } from "./../utilities/getERC20PermitSignature";
+import { expectDeployed } from "../utilities/expectDeployed";
 
 describe("xSOLACEv1", function () {
   let artifacts: ArtifactImports;
@@ -36,6 +37,7 @@ describe("xSOLACEv1", function () {
     });
     it("deploys", async function () {
       xsolace = (await deployContract(deployer, artifacts.xSOLACEV1, [governor.address, solace.address])) as XSolacev1;
+      await expectDeployed(xsolace.address);
     });
     it("starts with correct solace", async function () {
       expect(await xsolace.solace()).eq(solace.address);

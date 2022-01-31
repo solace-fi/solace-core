@@ -13,6 +13,7 @@ chai.use(solidity);
 import { import_artifacts, ArtifactImports } from "./../utilities/artifact_importer";
 import { Solace, XSolacev1, MockErc20, Weth9, Registry, BondDepository, BondTellerErc20, BondTellerEth } from "./../../typechain";
 import { toBytes32 } from "./../utilities/setStorage";
+import { expectDeployed } from "../utilities/expectDeployed";
 
 describe("BondDepository", function() {
   let artifacts: ArtifactImports;
@@ -44,34 +45,17 @@ describe("BondDepository", function() {
 
   describe("deployment", function () {
     it("reverts if zero governor", async function () {
-      await expect(deployContract(deployer, artifacts.BondDepository, [ZERO_ADDRESS, solace.address, xsolace.address, underwritingPool.address, dao.address])).to.be.revertedWith("zero address governance");
+      await expect(deployContract(deployer, artifacts.BondDepository, [ZERO_ADDRESS, solace.address])).to.be.revertedWith("zero address governance");
     });
     it("reverts if zero solace", async function () {
-      await expect(deployContract(deployer, artifacts.BondDepository, [governor.address, ZERO_ADDRESS, xsolace.address, underwritingPool.address, dao.address])).to.be.revertedWith("zero address solace");
-    });
-    it("reverts if zero xsolace", async function () {
-      await expect(deployContract(deployer, artifacts.BondDepository, [governor.address, solace.address, ZERO_ADDRESS, underwritingPool.address, dao.address])).to.be.revertedWith("zero address xsolace");
-    });
-    it("reverts if zero pool", async function () {
-      await expect(deployContract(deployer, artifacts.BondDepository, [governor.address, solace.address, xsolace.address, ZERO_ADDRESS, dao.address])).to.be.revertedWith("zero address pool");
-    });
-    it("reverts if zero dao", async function () {
-      await expect(deployContract(deployer, artifacts.BondDepository, [governor.address, solace.address, xsolace.address, underwritingPool.address, ZERO_ADDRESS])).to.be.revertedWith("zero address dao");
+      await expect(deployContract(deployer, artifacts.BondDepository, [governor.address, ZERO_ADDRESS])).to.be.revertedWith("zero address solace");
     });
     it("deploys", async function () {
-      bondDepo = (await deployContract(deployer, artifacts.BondDepository, [governor.address, solace.address, xsolace.address, underwritingPool.address, dao.address])) as BondDepository;
+      bondDepo = (await deployContract(deployer, artifacts.BondDepository, [governor.address, solace.address])) as BondDepository;
+      await expectDeployed(bondDepo.address);
     });
     it("starts with correct solace", async function () {
       expect(await bondDepo.solace()).eq(solace.address);
-    });
-    it("starts with correct xsolace", async function () {
-      expect(await bondDepo.xsolace()).eq(xsolace.address);
-    });
-    it("starts with correct pool", async function () {
-      expect(await bondDepo.underwritingPool()).eq(underwritingPool.address);
-    });
-    it("starts with correct dao", async function () {
-      expect(await bondDepo.dao()).eq(dao.address);
     });
   });
 
@@ -135,22 +119,23 @@ describe("BondDepository", function() {
     it("tellers should not mint directly via solace", async function () {
       await expect(solace.connect(mockTeller).mint(mockTeller.address, 1)).to.be.revertedWith("!minter");
     });
-    it("will fail without solace balance", async function () {
+    it("will fail if depo is not minter", async function () {
       await bondDepo.connect(governor).addTeller(mockTeller.address);
-      await expect(bondDepo.connect(mockTeller).pullSolace(1)).to.be.revertedWith("ERC20: transfer amount exceeds balance");
+      await expect(bondDepo.connect(mockTeller).pullSolace(1)).to.be.revertedWith("!minter");
     });
     it("tellers can pull solace", async function () {
       expect(await solace.balanceOf(bondDepo.address)).eq(0);
-      await solace.connect(minter).mint(bondDepo.address, 10);
       expect(await solace.balanceOf(mockTeller.address)).eq(0);
+      await solace.connect(governor).addMinter(bondDepo.address);
       await bondDepo.connect(mockTeller).pullSolace(1);
+      expect(await solace.balanceOf(bondDepo.address)).eq(0);
       expect(await solace.balanceOf(mockTeller.address)).eq(1);
       await bondDepo.connect(mockTeller).pullSolace(2);
+      expect(await solace.balanceOf(bondDepo.address)).eq(0);
       expect(await solace.balanceOf(mockTeller.address)).eq(3);
-      expect(await solace.balanceOf(bondDepo.address)).eq(7);
     });
   });
-
+  /*
   describe("create teller", function () {
     let tellerErc20Impl: BondTellerErc20;
     let tellerEthImpl: BondTellerEth;
@@ -210,42 +195,5 @@ describe("BondDepository", function() {
       expect(teller5.address).not.eq(teller4.address);
     });
   });
-
-  describe("return solace", function () {
-    it("cannot be called by non governance", async function () {
-      await expect(bondDepo.connect(depositor).returnSolace(depositor.address, 1)).to.be.revertedWith("!governance");
-    });
-    it("cannot return more solace than balance", async function () {
-      let bal1 = await solace.balanceOf(bondDepo.address);
-      await expect(bondDepo.connect(governor).returnSolace(depositor.address, bal1.add(1))).to.be.revertedWith("ERC20: transfer amount exceeds balance");
-    });
-    it("can return solace", async function () {
-      let bal1 = await solace.balanceOf(bondDepo.address);
-      let depositAmount = bal1.div(2);
-      expect(depositAmount).gt(0);
-      await bondDepo.connect(governor).returnSolace(depositor.address, depositAmount);
-      let bal2 = await solace.balanceOf(bondDepo.address);
-      expect(bal1.sub(bal2)).eq(depositAmount);
-    });
-  });
-
-  describe("params", function () {
-    it("non governance cannot change params", async function () {
-      await expect(bondDepo.connect(depositor).setAddresses(solace.address, xsolace.address, underwritingPool.address, dao.address)).to.be.revertedWith("!governance")
-    });
-    it("cannot set to zero addresses", async function () {
-      await expect(bondDepo.connect(governor).setAddresses(ZERO_ADDRESS, xsolace.address, underwritingPool.address, dao.address)).to.be.revertedWith("zero address solace");
-      await expect(bondDepo.connect(governor).setAddresses(solace.address, ZERO_ADDRESS, underwritingPool.address, dao.address)).to.be.revertedWith("zero address xsolace");
-      await expect(bondDepo.connect(governor).setAddresses(solace.address, xsolace.address, ZERO_ADDRESS, dao.address)).to.be.revertedWith("zero address pool");
-      await expect(bondDepo.connect(governor).setAddresses(solace.address, xsolace.address, underwritingPool.address, ZERO_ADDRESS)).to.be.revertedWith("zero address dao");
-    });
-    it("governance can change params", async function () {
-      let tx = await bondDepo.connect(governor).setAddresses(weth.address, dai.address, solace.address, xsolace.address);
-      await expect(tx).to.emit(bondDepo, "ParamsSet").withArgs(weth.address, dai.address, solace.address, xsolace.address);
-      expect(await bondDepo.solace()).eq(weth.address);
-      expect(await bondDepo.xsolace()).eq(dai.address);
-      expect(await bondDepo.underwritingPool()).eq(solace.address);
-      expect(await bondDepo.dao()).eq(xsolace.address);
-    });
-  });
+  */
 });

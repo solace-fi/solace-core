@@ -11,6 +11,7 @@ import { Solace, XSolacev1, FarmRewards, MockErc20Decimals, MockErc20Permit } fr
 import { bnAddSub, bnMulDiv, expectClose } from "./../utilities/math";
 import { getERC20PermitSignature } from "./../utilities/getERC20PermitSignature";
 import { readFileSync } from "fs";
+import { expectDeployed } from "../utilities/expectDeployed";
 
 chai.use(solidity);
 
@@ -78,6 +79,7 @@ describe("FarmRewards", function () {
     });
     it("deploys successfully", async function () {
       farmRewards = (await deployContract(deployer, artifacts.FarmRewards, [governor.address, xsolace.address, receiver.address, SOLACE_PER_XSOLACE_FULL])) as FarmRewards;
+      await expectDeployed(farmRewards.address);
       await solace.connect(governor).mint(farmRewards.address, ONE_MILLION_ETHER);
     });
     it("returns correct values", async function () {

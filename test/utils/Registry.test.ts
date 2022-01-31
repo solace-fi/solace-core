@@ -9,6 +9,7 @@ chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./../utilities/artifact_importer";
 import { Registry, Weth9 } from "./../../typechain";
+import { expectDeployed } from "../utilities/expectDeployed";
 
 describe("Registry", function() {
   let artifacts: ArtifactImports;
@@ -24,6 +25,7 @@ describe("Registry", function() {
     artifacts = await import_artifacts();
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
     registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
+    await expectDeployed(registry.address);
     weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
   });
 
