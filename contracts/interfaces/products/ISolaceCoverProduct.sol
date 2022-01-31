@@ -34,12 +34,11 @@ interface ISolaceCoverProduct {
     event DepositMade(
         address from,
         address policyholder,
-        uint256 amount,
-        address asset
+        uint256 amount
     );
 
     /// @notice Emitted when a withdraw is made.
-    event WithdrawMade(address policyholder, uint256 amount, address asset);
+    event WithdrawMade(address policyholder, uint256 amount);
 
     /// @notice Emitted when premium is charged.
     event PremiumCharged(address policyholder, uint256 amount);
@@ -75,12 +74,6 @@ interface ISolaceCoverProduct {
         uint256 rewardPointsEarned
     );
 
-    /// @notice Emitted when a new asset is added.
-    event AssetAdded(address asset);
-
-    /// @notice Emitted when an asset is removed.
-    event AssetRemoved(address asset);
-
     /***************************************
     POLICY FUNCTIONS
     ***************************************/
@@ -91,32 +84,27 @@ interface ISolaceCoverProduct {
      * @param coverLimit_ The value to cover in **USD**.
      * @param referralCode_ Referral code
      * @param amount_ The amount to deposit in order to activate the policy.
-     * @param asset_ The asset address to deposit from.
      * @return policyID The ID of newly created policy.
      */
     function activatePolicy(
         address policyholder_,
         uint256 coverLimit_,
         uint256 referralCode_,
-        uint256 amount_,
-        address asset_
+        uint256 amount_
     ) external returns (uint256 policyID);
 
     /**
      * @notice Deposits funds for policy holders.
      * @param policyholder The holder of the policy.
      * @param amount The amount to deposit.
-     * @param asset The asset address to deposit from.
      */
-    function deposit(address policyholder, uint256 amount, address asset) external;
+    function deposit(address policyholder, uint256 amount) external;
 
     /**
      * @notice Withdraw funds from Soteria account to user.
      * @param amount_ Amount policyholder desires to withdraw.
-     * @param asset_ The asset to withdraw from.
-     * 
      */
-    function withdraw(uint256 amount_, address asset_) external;
+    function withdraw(uint256 amount_) external;
 
     /**
      * @notice Updates the cover amount of your policy
@@ -143,30 +131,6 @@ interface ISolaceCoverProduct {
      * @return balance The user balance in `USD`.
      */
     function accountBalanceOf(address policyholder) external view returns (uint256 balance);
-
-    /**
-     * @notice Returns asset balance amount of the user.
-     * @param asset The asset to get balance from.
-     * @param policyholder The address to get balance.
-     * @return balance The user balance for the asset.
-     */
-    function assetBalanceOf(address asset, address policyholder)
-        external
-        view
-        returns (uint256 balance);
-
-    /**
-     * @notice Returns the asset count.
-     * @return count The number of.
-     */
-    function numOfAssets() external view returns (uint256 count);
-
-    /**
-     * @notice Returns the asset for the given index.
-     * @param index The asset index.
-     * @return asset The asset.
-     */
-    function assetAt(uint256 index) external view returns (address asset);
 
     /**
      * @notice Determine available capacity for new cover.
@@ -360,24 +324,6 @@ interface ISolaceCoverProduct {
      */
     function setReferralRewardPercentage(uint256 referralRewardPercentage_)
         external;
-
-    /**
-     * @notice Adds a new asset.
-     * @param asset The asset address.
-     */
-    function addAsset(address asset) external;
-
-    /**
-     * @notice Removes an asset.
-     * @param asset The asset to remove.
-     */
-    function removeAsset(address asset) external;
-
-    /**
-     * @notice Sets the pools and assets. Removes the current assets.
-     * @param assets The assets to set.
-     */
-    function setAssets(address[] calldata assets) external;
 
     /***************************************
     COVER PROMOTION ADMIN FUNCTIONS

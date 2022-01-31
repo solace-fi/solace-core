@@ -87,22 +87,8 @@ contract SolaceCoverProduct is
     /// @notice PolicyID => Has referral code been used for this policyID?
     mapping(uint256 => bool) internal _isReferralCodeUsed;
 
-    /// @notice Keeps balances per asset for the policyholders.
-    mapping(address => mapping(address => uint256)) private _assetBalanceOf;
-
     /// @notice Keeps total balances(in USD) per policyholder.
     mapping(address => uint256) private _accountBalanceOf;
-
-    /// @notice The asset to index mapping.
-    /// @dev The assets must be stable coins.
-    /// @dev Map enumeration [1, numOfAssets]
-    mapping(address => uint256) private _assetToIndex;
-
-    /// @notice The index to asset mapping.
-    mapping(uint256 => address) private _indexToAsset;
-
-    /// @notice The asset count.
-    uint256 private _assetCount;
 
     /***************************************
     MODIFIERS
@@ -132,10 +118,8 @@ contract SolaceCoverProduct is
     {
         require(registry_ != address(0x0), "zero address registry");
         _registry = IRegistry(registry_);
-        require(
-            _registry.get("riskManager") != address(0x0),
-            "zero address riskmanager"
-        );
+        require(_registry.get("riskManager") != address(0x0), "zero address riskmanager");
+        require(_registry.get("dai") != address(0x0), "zero address dai");
     }
 
     /***************************************
@@ -147,37 +131,28 @@ contract SolaceCoverProduct is
      * @param policyholder_ Holder of the position to cover.
      * @param coverLimit_ The value to cover in **USD**.
      * @param referralCode_ Referral code
-     * @param amount_ The amount to deposit in order to activate the policy.
-     * @param asset_ The asset address to deposit from.
+     * @param amount_ The amount in **USD** to deposit in order to activate the policy.
      * @return policyID The ID of newly created policy.
      */
     function activatePolicy(
         address policyholder_,
         uint256 coverLimit_,
         uint256 referralCode_,
-        uint256 amount_,
-        address asset_
+        uint256 amount_
     ) external override whileUnpaused returns (uint256 policyID) {
         require(policyholder_ != address(0x0), "zero address policyholder");
         require(coverLimit_ > 0, "zero cover value");
 
         policyID = policyOf(policyholder_);
         require(!policyStatus(policyID), "policy already activated");
-        require(
-            _canPurchaseNewCover(0, coverLimit_),
-            "insufficient capacity for new cover"
-        );
-        require(
-            amount_ + accountBalanceOf(policyholder_) >
-                _minRequiredAccountBalance(coverLimit_),
-            "insufficient deposit for minimum required account balance"
-        );
+        require(_canPurchaseNewCover(0, coverLimit_), "insufficient capacity for new cover");
+        require(amount_ + accountBalanceOf(policyholder_) > _minRequiredAccountBalance(coverLimit_), "insufficient deposit for minimum required account balance");
 
         // Exit cooldown
         _exitCooldown(policyholder_);
 
         // deposit funds
-        _deposit(msg.sender, policyholder_, amount_, asset_);
+        _deposit(msg.sender, policyholder_, amount_);
 
         // mint policy if doesn't currently exist
         if (policyID == 0) {
@@ -196,7 +171,7 @@ contract SolaceCoverProduct is
         emit PolicyCreated(policyID);
         return policyID;
     }
-
+    
     /**
      * @notice Updates the cover amount of your policy
      * @notice If you update the cover limit for your policy, you will exit the cooldown process if you already started it. This means that if you want to withdraw all your funds, you have to redo the 'deactivatePolicy() => withdraw()' process
@@ -218,13 +193,13 @@ contract SolaceCoverProduct is
             "insufficient capacity for new cover"
         );
         require(
-            _accountBalanceOf[msg.sender] >
-                _minRequiredAccountBalance(newCoverLimit_),
+            _accountBalanceOf[msg.sender] > _minRequiredAccountBalance(newCoverLimit_),
             "insufficient deposit for minimum required account balance"
         );
 
         if (referralCode_ != 0)
             _processReferralCode(msg.sender, newCoverLimit_, referralCode_);
+
         _exitCooldown(msg.sender); // Reset cooldown
         _coverLimitOf[policyID] = newCoverLimit_;
         _preDeactivateCoverLimitOf[policyID] = newCoverLimit_;
@@ -236,44 +211,39 @@ contract SolaceCoverProduct is
      * @notice Deposits funds for policy holders.
      * @param policyholder The holder of the policy.
      * @param amount The amount to deposit.
-     * @param asset The asset address to deposit from.
      */
     function deposit(
         address policyholder,
-        uint256 amount,
-        address asset
+        uint256 amount
     ) external override nonReentrant whileUnpaused {
-        _deposit(msg.sender, policyholder, amount, asset);
+        _deposit(msg.sender, policyholder, amount);
     }
 
     /**
      * @notice Withdraw funds from Soteria account to user.
      * @notice If cooldown has passed, the user can withdraw any amount
      * @notice If cooldown has not passed, the user can only withdraw down to minRequiredAccountBalance
-     * @param amount Amount policyholder desires to withdraw.
-     * @param asset The asset to withdraw from.
+     * @param amount The amount in `USD` policyholder desires to withdraw.
      * User Soteria account must have > minAccountBalance.
      * Otherwise account will be deactivated.
      */
-    function withdraw(uint256 amount, address asset)
+    function withdraw(uint256 amount)
         external
         override
         nonReentrant
         whileUnpaused
     {
         require(amount <= accountBalanceOf(msg.sender), "cannot withdraw > account balance");
-
         uint256 preDeactivateCoverLimit = _preDeactivateCoverLimitOf[_policyOf[msg.sender]];
 
         if (_hasCooldownPassed(msg.sender)) {
-            _withdraw(msg.sender, amount, asset);
+            _withdraw(msg.sender, amount);
         } else {
             require(
-                accountBalanceOf(msg.sender) - amount >
-                    _minRequiredAccountBalance(preDeactivateCoverLimit),
+                accountBalanceOf(msg.sender) - amount > _minRequiredAccountBalance(preDeactivateCoverLimit),
                 "must have > minRequiredAccountbalance"
             );
-            _withdraw(msg.sender, amount, asset);
+            _withdraw(msg.sender, amount);
         }
     }
 
@@ -351,10 +321,7 @@ contract SolaceCoverProduct is
      * @return cover The max amount of cover in `wei`
      */
     function maxCover() public view override returns (uint256 cover) {
-        return
-            IRiskManager(_registry.get("riskManager")).maxCoverPerStrategy(
-                address(this)
-            );
+        return IRiskManager(_registry.get("riskManager")).maxCoverPerStrategy(address(this));
     }
 
     /**
@@ -391,9 +358,7 @@ contract SolaceCoverProduct is
      * @return amount The active cover limit.
      */
     function activeCoverLimit() public view override returns (uint256 amount) {
-        return
-            IRiskManager(_registry.get("riskManager"))
-                .activeCoverLimitPerStrategy(address(this));
+        return IRiskManager(_registry.get("riskManager")).activeCoverLimitPerStrategy(address(this));
     }
 
     /**
@@ -502,21 +467,6 @@ contract SolaceCoverProduct is
     }
 
     /**
-     * @notice Returns asset balance amount of the user.
-     * @param asset The asset to get balance from.
-     * @param policyholder The address to get balance.
-     * @return balance The user balance for the asset.
-     */
-    function assetBalanceOf(address asset, address policyholder)
-        public
-        view
-        override
-        returns (uint256 balance)
-    {
-        return _assetBalanceOf[asset][policyholder];
-    }
-
-    /**
      * @notice Returns the user balance in `USD`.
      * @param policyholder The address to get balance.
      * @return balance The user balance in `USD`.
@@ -528,28 +478,6 @@ contract SolaceCoverProduct is
         returns (uint256 balance)
     {
         return _accountBalanceOf[policyholder];
-    }
-
-    /**
-     * @notice Returns the asset count.
-     * @return count The number of.
-     */
-    function numOfAssets() public view override returns (uint256 count) {
-        return _assetCount;
-    }
-
-    /**
-     * @notice Returns the asset for the given index.
-     * @param index The asset index.
-     * @return asset The asset.
-     */
-    function assetAt(uint256 index)
-        external
-        view
-        override
-        returns (address asset)
-    {
-        return _indexToAsset[index];
     }
 
     /***************************************
@@ -564,10 +492,9 @@ contract SolaceCoverProduct is
     function setRegistry(address registry_) external override onlyGovernance {
         require(registry_ != address(0x0), "zero address registry");
         _registry = IRegistry(registry_);
-        require(
-            _registry.get("riskManager") != address(0x0),
-            "zero address riskmanager"
-        );
+        
+        require(_registry.get("riskManager") != address(0x0), "zero address riskmanager");
+        require(_registry.get("dai") != address(0x0), "zero address dai");
         emit RegistrySet(registry_);
     }
 
@@ -653,66 +580,6 @@ contract SolaceCoverProduct is
         emit ReferralRewardPercentageSet(referralRewardPercentage_);
     }
 
-   /**
-     * @notice Adds a new asset.
-     * @param asset The asset address.
-    */
-    function addAsset(address asset) public override onlyGovernance {
-        require(asset != address(0x0), "zero address asset");
-        uint256 index = _assetToIndex[asset];
-        if (index > 0) return;
-  
-        index = _assetCount;
-        _assetToIndex[asset] = ++index;
-        _indexToAsset[index] = asset;
-        _assetCount = index;
-        emit AssetAdded(asset);
-    }
-
-    /**
-     * @notice Removes an asset.
-     * @param asset The asset to remove.
-    */
-    function removeAsset(address asset) external override onlyGovernance {
-        uint256 index = _assetToIndex[asset];
-        if (index == 0) return;
-  
-        uint256 assetCount = _assetCount;
-        if (assetCount == 0) return;
-  
-        if (index != assetCount) {
-          address lastAsset = _indexToAsset[assetCount];
-          _assetToIndex[lastAsset] = index;
-          _indexToAsset[index] = lastAsset; 
-        }
-
-        delete _assetToIndex[asset];
-        delete _indexToAsset[assetCount];
-        _assetCount = assetCount - 1;
-        emit AssetRemoved(asset);
-    }
-
-    /**
-     * @notice Sets the pools and assets. Removes the current assets.
-     * @param assets The assets to set.
-    */
-    function setAssets(address[] calldata assets) external override onlyGovernance {
-        require(assets.length > 0, "empty assets");
-        // delete current assets
-        uint256 assetCount = _assetCount;
-        for (uint256 i = assetCount; i > 0; i--) {
-          address asset = _indexToAsset[i];
-          delete _assetToIndex[asset];
-          delete _indexToAsset[i];
-          emit AssetRemoved(asset);
-        }
-
-        // add new assets
-        _assetCount = 0;
-        for (uint256 i = 0; i < assets.length; i++) {
-          addAsset(assets[i]);
-        }
-    }
     /***************************************
     COVER PROMOTION ADMIN FUNCTIONS
     ***************************************/
@@ -741,71 +608,53 @@ contract SolaceCoverProduct is
 
     /**
      * @notice Charge premiums for each policy holder.
-     * @param holders_ The policy holders.
-     * @param premiums_ The premium amounts in `wei` per policy holder.
+     * @param holders The policy holders.
+     * @param premiums The premium amounts in `wei` per policy holder.
      */
-    function chargePremiums(
-        address[] calldata holders_,
-        uint256[] calldata premiums_
-    ) external override whileUnpaused {
-        uint256 count = holders_.length;
-        require(
-            msg.sender == _registry.get("premiumCollector"),
-            "not premium collector"
-        );
-        require(count == premiums_.length, "length mismatch");
+    function chargePremiums(address[] calldata holders, uint256[] calldata premiums) external override whileUnpaused {
+        uint256 count = holders.length;
+        require(msg.sender == _registry.get("premiumCollector"), "not premium collector");
+        require(count == premiums.length, "length mismatch");
         require(count <= policyCount(), "policy count exceeded");
         uint256 amountToPayPremiumPool = 0;
 
         for (uint256 i = 0; i < count; i++) {
             // skip computation if policy inactive
-            if (!policyStatus(_policyOf[holders_[i]])) continue;
-            require(
-                premiums_[i] <=
-                    _minRequiredAccountBalance(
-                        coverLimitOf(policyOf(holders_[i]))
-                    ),
-                "charging more than promised maximum rate"
-            );
+            if (!policyStatus(_policyOf[holders[i]])) continue;
+        
+            uint256 premium = premiums[i];
+            if (premium > _minRequiredAccountBalance(coverLimitOf(policyOf(holders[i])))) {
+                premium = _minRequiredAccountBalance(coverLimitOf(policyOf(holders[i])));
+            }
 
-            // If policy holder can pay for premium charged in full
-            if (
-                _accountBalanceOf[holders_[i]] + _rewardPointsOf[holders_[i]] >=
-                premiums_[i]
-            ) {
-                // If reward points can cover premium charged in full
-                if (_rewardPointsOf[holders_[i]] >= premiums_[i]) {
-                    _rewardPointsOf[holders_[i]] -= premiums_[i];
+            // if policy holder can pay for premium charged in full
+            if (_accountBalanceOf[holders[i]] + _rewardPointsOf[holders[i]] >= premium) {
+                // if reward points can cover premium charged in full
+                if (_rewardPointsOf[holders[i]] >= premium) {
+                    _rewardPointsOf[holders[i]] -= premium;
                 } else {
-                    uint256 amountDeductedFromSoteriaAccount = premiums_[i] -
-                        _rewardPointsOf[holders_[i]];
+                    uint256 amountDeductedFromSoteriaAccount = premium - _rewardPointsOf[holders[i]];
                     amountToPayPremiumPool += amountDeductedFromSoteriaAccount;
-                    _accountBalanceOf[
-                        holders_[i]
-                    ] -= amountDeductedFromSoteriaAccount;
-                    _rewardPointsOf[holders_[i]] = 0;
+                    _accountBalanceOf[holders[i]] -= amountDeductedFromSoteriaAccount;
+                    _rewardPointsOf[holders[i]] = 0;
                 }
-
-                emit PremiumCharged(holders_[i], premiums_[i]);
+                emit PremiumCharged(holders[i], premium);
             } else {
-                uint256 partialPremium = _accountBalanceOf[holders_[i]] +
-                    _rewardPointsOf[holders_[i]];
-                amountToPayPremiumPool += _accountBalanceOf[holders_[i]];
-                _accountBalanceOf[holders_[i]] = 0;
-                _rewardPointsOf[holders_[i]] = 0;
-                _deactivatePolicy(holders_[i]);
+                uint256 partialPremium = _accountBalanceOf[holders[i]] + _rewardPointsOf[holders[i]];
+                amountToPayPremiumPool += _accountBalanceOf[holders[i]];
+                _accountBalanceOf[holders[i]] = 0;
+                _rewardPointsOf[holders[i]] = 0;
+                _deactivatePolicy(holders[i]);
                 emit PremiumPartiallyCharged(
-                    holders_[i],
-                    premiums_[i],
+                    holders[i],
+                    premium,
                     partialPremium
                 );
             }
         }
+
         // single transfer to the premium pool
-        Address.sendValue(
-            payable(_registry.get("premiumPool")),
-            amountToPayPremiumPool
-        );
+        SafeERC20.safeTransferFrom(getAsset(), address(this), _registry.get("premiumPool"), amountToPayPremiumPool);
     }
 
     /***************************************
@@ -837,33 +686,22 @@ contract SolaceCoverProduct is
     function _deposit(
         address from,
         address policyholder,
-        uint256 amount,
-        address asset
+        uint256 amount
     ) internal whileUnpaused {
-        require(_assetToIndex[asset] > 0, "asset not supported");
-        SafeERC20.safeTransferFrom(IERC20(asset), from, address(this), amount);
-        _assetBalanceOf[asset][policyholder] += amount;
-        _accountBalanceOf[policyholder] += amount / ERC20(asset).decimals();
-        emit DepositMade(from, policyholder, amount, asset);
+        SafeERC20.safeTransferFrom(getAsset(), from, address(this), amount);
+        _accountBalanceOf[policyholder] += amount;
+        emit DepositMade(from, policyholder, amount);
     }
 
     /**
      * @notice Withdraw funds from Soteria to policy holder.
      * @param policyholder The policy holder address.
      * @param amount The amount of fund to withdraw.
-     * @param asset The asset address to withdraw.
      */
-    function _withdraw(address policyholder, uint256 amount, address asset)
-        internal
-        whileUnpaused
-    {
-        require(_assetToIndex[asset] > 0, "asset not supported");
-        require(assetBalanceOf(asset, msg.sender) >= amount, "insufficient asset amount");
-
-        SafeERC20.safeTransferFrom(IERC20(asset), address(this), policyholder, amount);
-        _assetBalanceOf[asset][policyholder] -= amount;
-        _accountBalanceOf[policyholder] -= amount / ERC20(asset).decimals();
-        emit WithdrawMade(policyholder, amount, asset);
+    function _withdraw(address policyholder, uint256 amount) internal whileUnpaused {
+        SafeERC20.safeTransferFrom(getAsset(), address(this), policyholder, amount);
+        _accountBalanceOf[policyholder] -= amount;
+        emit WithdrawMade(policyholder, amount);
     }
 
     /**
@@ -901,11 +739,10 @@ contract SolaceCoverProduct is
      */
     function _minRequiredAccountBalance(uint256 coverLimit)
         internal
+        view
         returns (uint256 minRequiredAccountBalance)
     {
-        minRequiredAccountBalance =
-            (_maxRateNum * _chargeCycle * coverLimit) /
-            _maxRateDenom;
+        minRequiredAccountBalance = (_maxRateNum * _chargeCycle * coverLimit) / _maxRateDenom;
     }
 
     /**
@@ -951,9 +788,7 @@ contract SolaceCoverProduct is
         if (_cooldownStart[policyholder] == 0) {
             return false;
         } else {
-            return
-                block.timestamp >=
-                _cooldownStart[policyholder] + _cooldownPeriod;
+            return block.timestamp >= _cooldownStart[policyholder] + _cooldownPeriod;
         }
     }
 
@@ -984,18 +819,22 @@ contract SolaceCoverProduct is
         address referrer = address(uint160(referralCode_));
         // require(referrer != address(0), "cannot have zero address referrer"); // Redundant because we cannot call _processReferralCode with referralCode_ = 0
         require(referrer != policyholder_, "cannot refer to self");
-        require(
-            !_isReferralCodeUsed[_policyOf[policyholder_]],
-            "cannot use referral code again"
-        );
+        require(!_isReferralCodeUsed[_policyOf[policyholder_]], "cannot use referral code again");
 
-        uint256 rewardPointsEarned = (coverLimit_ * _referralRewardPercentage) /
-            10000;
+        uint256 rewardPointsEarned = (coverLimit_ * _referralRewardPercentage) / 10000;
         _isReferralCodeUsed[_policyOf[policyholder_]] = true;
         _rewardPointsOf[policyholder_] += rewardPointsEarned;
         _rewardPointsOf[referrer] += rewardPointsEarned;
 
         emit ReferralRewardsEarned(policyholder_, rewardPointsEarned);
         emit ReferralRewardsEarned(referrer, rewardPointsEarned);
+    }
+
+    /**
+     * @notice Returns the underlying principal asset for `Solace Cover Product`.
+     * @return asset The underlying asset.
+    */
+    function getAsset() internal view returns (IERC20 asset){
+        return IERC20(_registry.get("dai"));
     }
 }
