@@ -10,6 +10,7 @@ const { waffle, ethers } = hardhat;
 const { provider } = waffle;
 
 import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_importer";
+import { isDeployed } from "../test/utilities/expectDeployed";
 let artifacts: ArtifactImports;
 
 let initialized = false;
@@ -22,11 +23,15 @@ export async function create2Contract(wallet: Signer, factoryOrContractJson: Con
   _init();
   var initCode = await _initCodeGetter(wallet, factoryOrContractJson, args, overrideOptions);
   var [address, salt] = _hasher(initCode, deployerAddress);
-  //var exists = await _exists(address, factoryOrContractJson);
-  //if(!exists) await _deployer(wallet, initCode, salt);
-  console.log("deploying to", address);
+
   let deploy = true;
-  if(deploy) var [deployCode, gasUsed] = await _deployer(wallet, initCode, salt, deployerAddress);
+  var alreadyDeployed = await isDeployed(address);
+  if(alreadyDeployed) console.log(`already deployed to ${address}, skipping`);
+  else if(!deploy) console.log('skipping deployment');
+  else {
+    console.log(`deploying to ${address}`);
+    var [deployCode, gasUsed] = await _deployer(wallet, initCode, salt, deployerAddress);
+  }
   await _verifier(address, args, contractPath);
   if(deploy) {
     return {
@@ -113,16 +118,10 @@ function _hasher(initCode: string, deployerAddress: string): [string, string] {
   throw "no solution found";
 }
 
-// returns true if a contract already exists at that address
-async function _exists(address: string, factoryOrContractJson: ContractJSON) {
-  //var contract = await ethers.getContractAt(factoryOrContractJson.abi, address);
-  return false;
-}
-
 // deploy the contract
 async function _deployer(wallet: Signer, initCode: string, salt: string, deployerAddress: string) {
   const ONE_GWEI = 1000000000;
-  const gas = 100 * ONE_GWEI;
+  const gas = 80 * ONE_GWEI;
   try {
     let deployerContract = await ethers.getContractAt(artifacts.SingletonFactory.abi, deployerAddress);
     let tx = await deployerContract.connect(wallet).deploy(initCode, salt, {gasLimit: 6000000, maxFeePerGas: gas});

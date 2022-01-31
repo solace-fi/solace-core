@@ -6,7 +6,13 @@ const provider = waffle.provider;
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 export async function expectDeployed(address: string) {
-  expect(address.length).eq(42);
-  expect(address).not.eq(ZERO_ADDRESS);
-  expect((await provider.getCode(address)).length).gt(2);
+  expect(await isDeployed(address)).to.be.true;
+}
+
+export async function isDeployed(address: string) {
+  if(address === undefined || address === null) return false;
+  if(address.length !== 42) return false;
+  if(address == ZERO_ADDRESS) return false;
+  if((await provider.getCode(address)).length <= 2) return false;
+  return true;
 }

@@ -14,7 +14,7 @@ import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_
 import { Deployer, Solace, XsLocker, BondDepository, Faucet, BondTellerErc20, BondTellerEth, MockErc20, Weth9 } from "../typechain";
 import { BytesLike, constants } from "ethers";
 import { deployContract } from "ethereum-waffle";
-import { expectDeployed } from "../test/utilities/expectDeployed";
+import { expectDeployed, isDeployed } from "../test/utilities/expectDeployed";
 
 const DEPLOYER_CONTRACT_ADDRESS    = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
 
@@ -28,7 +28,7 @@ const XSLOCKER_ADDRESS              = "0x501Ace47c5b0C2099C4464f681c3fa2ECD3146C
 const UNDERWRITING_POOL_ADDRESS     = "0x9Fec1Bb252e20bFB7C492beeEe70314DDfe89c55";
 const DAO_ADDRESS                   = "0x9Fec1Bb252e20bFB7C492beeEe70314DDfe89c55";
 const BOND_DEPO_ADDRESS             = "0x501ACe2f00EC599D4FDeA408680e192f88D94D0D";
-const FAUCET_ADDRESS                = "0x501ACeBCDDB3E78299B3db45262EcC788e29060c";
+const FAUCET_ADDRESS                = "0x501AcE6547eCd722EEa4a89d08b040ed09E955a4";
 
 const DAI_ADDRESS                   = "0xE28bEf39f41c63B66cFD97BFfDB6Defc915B3C88";
 const DAI_BOND_TELLER_ADDRESS       = "0x501ACe677634Fd09A876E88126076933b686967a";
@@ -111,7 +111,7 @@ async function main() {
 }
 
 async function deployBondDepo() {
-  if(!!BOND_DEPO_ADDRESS) {
+  if(await isDeployed(BOND_DEPO_ADDRESS)) {
     bondDepo = (await ethers.getContractAt(artifacts.BondDepository.abi, BOND_DEPO_ADDRESS)) as BondDepository;
   } else {
     console.log("Deploying BondDepository");
@@ -130,7 +130,7 @@ async function deployBondDepo() {
 }
 
 async function deployFaucet() {
-  if(!!FAUCET_ADDRESS) {
+  if(await isDeployed(FAUCET_ADDRESS)) {
     faucet = (await ethers.getContractAt(artifacts.Faucet.abi, FAUCET_ADDRESS)) as Faucet;
   } else {
     console.log("Deploying Faucet");
@@ -149,20 +149,22 @@ async function deployFaucet() {
 }
 
 async function deployDaiTeller() {
+  const NAME = "Solace DAI Bond";
   //const VESTING_TERM = 604800; // 7 days
   const VESTING_TERM = 600; // 10 minutes
   const HALF_LIFE = 2592000; // 30 days
   const ONE_CENT_IN_DAI = BN.from("10000000000000000");
-  const FIFTY_THOUSAND_SOLACE = BN.from("50000000000000000000000");
-  if(ONE_CENT_IN_DAI.gt(MAX_UINT128) || FIFTY_THOUSAND_SOLACE.gt(MAX_UINT128)) throw `Uint128 too large: ${ONE_CENT_IN_DAI.toString()} | ${FIFTY_THOUSAND_SOLACE.toString()} > ${MAX_UINT128.toString()}`;
-  const START_PRICE = ONE_CENT_IN_DAI.mul(10); // 10 cents
-  const MAX_PAYOUT = BN.from("1000000000000000000000000") // 1 million SOLACE max single bond
-  const CAPACITY = BN.from("10000000000000000000000000"); // 10 million SOLACE max over lifetime
-  const PRICE_ADJ_NUM = ONE_CENT_IN_DAI; // every 50,000 SOLACE bonded raises the price one cent
-  const PRICE_ADJ_DENOM = FIFTY_THOUSAND_SOLACE;
-  const NAME = "Solace DAI Bond";
+  const ONE_TENTH_CENT_IN_DAI = BN.from("1000000000000000");
 
-  if(!!DAI_BOND_TELLER_ADDRESS) {
+  const START_PRICE = ONE_CENT_IN_DAI.mul(8); // 8 cents
+  const MAX_PAYOUT = BN.from("10000000000000000000000000") // 10 million SOLACE max single bond
+  const CAPACITY = BN.from("100000000000000000000000000"); // 100 million SOLACE max over lifetime
+  // every 50,000 SOLACE bonded raises the price one tenth of a cent
+  const PRICE_ADJ_NUM = ONE_TENTH_CENT_IN_DAI; // tenth of a cent in FRAX
+  const PRICE_ADJ_DENOM = BN.from("50000000000000000000000"); // 50,000 SOLACE
+  if(PRICE_ADJ_NUM.gt(MAX_UINT128) || PRICE_ADJ_DENOM.gt(MAX_UINT128)) throw `Uint128 too large: ${PRICE_ADJ_NUM.toString()} | ${PRICE_ADJ_DENOM.toString()} > ${MAX_UINT128.toString()}`;
+
+  if(await isDeployed(DAI_BOND_TELLER_ADDRESS)) {
     daiTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, DAI_BOND_TELLER_ADDRESS)) as BondTellerErc20;
   } else {
     console.log("DAI Teller - deploy");
@@ -191,18 +193,18 @@ async function deployEthTeller() {
   //const VESTING_TERM = 604800; // 7 days
   const VESTING_TERM = 600; // 10 minutes
   const HALF_LIFE = 2592000; // 30 days
-  const ONE_CENT_IN_ETH = BN.from("333333333333333"); // @ 1 eth = $3000
-  const ONE_TENTH_CENT_IN_ETH = BN.from("33333333333333");
+  const ONE_CENT_IN_ETH = BN.from("3968253968253"); // @ 1 eth = $2520
+  const ONE_TENTH_CENT_IN_ETH = BN.from("396825396825");
 
   const START_PRICE = ONE_CENT_IN_ETH.mul(8); // 8 cents
-  const MAX_PAYOUT = BN.from("1000000000000000000000000") // 1 million SOLACE max single bond
+  const MAX_PAYOUT = BN.from("10000000000000000000000000") // 10 million SOLACE max single bond
   const CAPACITY = BN.from("100000000000000000000000000"); // 100 million SOLACE max over lifetime
   // every 50,000 SOLACE bonded raises the price one tenth of a cent
   const PRICE_ADJ_NUM = ONE_TENTH_CENT_IN_ETH; // tenth of a cent in DAI
   const PRICE_ADJ_DENOM = BN.from("50000000000000000000000"); // 50,000 SOLACE
   if(PRICE_ADJ_NUM.gt(MAX_UINT128) || PRICE_ADJ_DENOM.gt(MAX_UINT128)) throw `Uint128 too large: ${PRICE_ADJ_NUM.toString()} | ${PRICE_ADJ_DENOM.toString()} > ${MAX_UINT128.toString()}`;
 
-  if(!!ETH_BOND_TELLER_ADDRESS) {
+  if(await isDeployed(ETH_BOND_TELLER_ADDRESS)) {
     ethTeller = (await ethers.getContractAt(artifacts.BondTellerETH.abi, ETH_BOND_TELLER_ADDRESS)) as BondTellerEth;
   } else {
     console.log("ETH Teller - deploy");
@@ -231,18 +233,18 @@ async function deployUsdcTeller() {
   //const VESTING_TERM = 604800; // 7 days
   const VESTING_TERM = 600; // 10 minutes
   const HALF_LIFE = 2592000; // 30 days
-  const ONE_CENT_IN_ETH = BN.from("10000"); // @ 1 eth = $4000
-  const ONE_TENTH_CENT_IN_ETH = BN.from("1000");
+  const ONE_CENT_IN_USDC = BN.from("10000");
+  const ONE_TENTH_CENT_IN_USDC = BN.from("1000");
 
-  const START_PRICE = ONE_CENT_IN_ETH.mul(8); // 8 cents
-  const MAX_PAYOUT = BN.from("1000000000000000000000000") // 1 million SOLACE max single bond
+  const START_PRICE = ONE_CENT_IN_USDC.mul(8); // 8 cents
+  const MAX_PAYOUT = BN.from("10000000000000000000000000") // 10 million SOLACE max single bond
   const CAPACITY = BN.from("100000000000000000000000000"); // 100 million SOLACE max over lifetime
   // every 50,000 SOLACE bonded raises the price one tenth of a cent
-  const PRICE_ADJ_NUM = ONE_TENTH_CENT_IN_ETH; // tenth of a cent in DAI
+  const PRICE_ADJ_NUM = ONE_TENTH_CENT_IN_USDC; // tenth of a cent in DAI
   const PRICE_ADJ_DENOM = BN.from("50000000000000000000000"); // 50,000 SOLACE
   if(PRICE_ADJ_NUM.gt(MAX_UINT128) || PRICE_ADJ_DENOM.gt(MAX_UINT128)) throw `Uint128 too large: ${PRICE_ADJ_NUM.toString()} | ${PRICE_ADJ_DENOM.toString()} > ${MAX_UINT128.toString()}`;
 
-  if(!!USDC_BOND_TELLER_ADDRESS) {
+  if(await isDeployed(USDC_BOND_TELLER_ADDRESS)) {
     usdcTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, USDC_BOND_TELLER_ADDRESS)) as BondTellerErc20;
   } else {
     console.log("USDC Teller - deploy");
@@ -267,19 +269,18 @@ async function deployWbtcTeller() {
   //const VESTING_TERM = 604800; // 7 days
   const VESTING_TERM = 600; // 10 minutes
   const HALF_LIFE = 2592000; // 30 days
+  const ONE_DOLLAR_IN_WBTC = BN.from("2697"); // @ BTC = $37077
+  const TEN_CENTS_IN_WBTC = BN.from("269");
 
-  const ONE_HUNDRETH_CENT_IN_WBTC = BN.from("2500"); // @ BTC ~= 40K
-  const ONE_THOUSANDTH_CENT_IN_WBTC = BN.from("250");
-
-  const START_PRICE = ONE_HUNDRETH_CENT_IN_WBTC.mul(800); // 8 cents
-  const MAX_PAYOUT = BN.from("1000000000000000000000000") // 1 million SOLACE max single bond
+  const START_PRICE = ONE_DOLLAR_IN_WBTC.mul(8).div(100); // 8 cents
+  const MAX_PAYOUT = BN.from("10000000000000000000000000") // 10 million SOLACE max single bond
   const CAPACITY = BN.from("100000000000000000000000000"); // 100 million SOLACE max over lifetime
   // every 50,000 SOLACE bonded raises the price one tenth of a cent
-  const PRICE_ADJ_NUM = ONE_THOUSANDTH_CENT_IN_WBTC;
-  const PRICE_ADJ_DENOM = BN.from("5000000000000000000000000"); // 5,000,000 SOLACE
+  const PRICE_ADJ_NUM = ONE_DOLLAR_IN_WBTC.div(10); // ten cents in DAI
+  const PRICE_ADJ_DENOM = BN.from("5000000000000000000000000"); //  5000,000 SOLACE
   if(PRICE_ADJ_NUM.gt(MAX_UINT128) || PRICE_ADJ_DENOM.gt(MAX_UINT128)) throw `Uint128 too large: ${PRICE_ADJ_NUM.toString()} | ${PRICE_ADJ_DENOM.toString()} > ${MAX_UINT128.toString()}`;
 
-  if(!!WBTC_BOND_TELLER_ADDRESS) {
+  if(await isDeployed(WBTC_BOND_TELLER_ADDRESS)) {
     wbtcTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, WBTC_BOND_TELLER_ADDRESS)) as BondTellerErc20;
   } else {
     console.log("WBTC Teller - deploy");
@@ -308,14 +309,14 @@ async function deployUsdtTeller() {
   const ONE_TENTH_CENT_IN_USDT = BN.from("1000");
 
   const START_PRICE = ONE_CENT_IN_USDT.mul(8); // 8 cents
-  const MAX_PAYOUT = BN.from("1000000000000000000000000") // 1 million SOLACE max single bond
+  const MAX_PAYOUT = BN.from("10000000000000000000000000") // 10 million SOLACE max single bond
   const CAPACITY = BN.from("100000000000000000000000000"); // 100 million SOLACE max over lifetime
   // every 50,000 SOLACE bonded raises the price one tenth of a cent
   const PRICE_ADJ_NUM = ONE_TENTH_CENT_IN_USDT; // tenth of a cent in USDT
   const PRICE_ADJ_DENOM = BN.from("50000000000000000000000"); // 50,000 SOLACE
   if(PRICE_ADJ_NUM.gt(MAX_UINT128) || PRICE_ADJ_DENOM.gt(MAX_UINT128)) throw `Uint128 too large: ${PRICE_ADJ_NUM.toString()} | ${PRICE_ADJ_DENOM.toString()} > ${MAX_UINT128.toString()}`;
 
-  if(!!USDT_BOND_TELLER_ADDRESS) {
+  if(await isDeployed(USDT_BOND_TELLER_ADDRESS)) {
     usdtTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, USDT_BOND_TELLER_ADDRESS)) as BondTellerErc20;
   } else {
     console.log("USDT Teller - deploy");
@@ -340,18 +341,18 @@ async function deployScpTeller() {
   //const VESTING_TERM = 604800; // 7 days
   const VESTING_TERM = 600; // 10 minutes
   const HALF_LIFE = 2592000; // 30 days
-  const ONE_CENT_IN_SCP = BN.from("333333333333333"); // @ 1 eth = $3000
-  const ONE_TENTH_CENT_IN_SCP = BN.from("33333333333333");
+  const ONE_CENT_IN_SCP = BN.from("3968253968253"); // @ 1 eth = $2520
+  const ONE_TENTH_CENT_IN_SCP = BN.from("396825396825");
 
   const START_PRICE = ONE_CENT_IN_SCP.mul(8); // 8 cents
-  const MAX_PAYOUT = BN.from("1000000000000000000000000") // 1 million SOLACE max single bond
+  const MAX_PAYOUT = BN.from("10000000000000000000000000") // 10 million SOLACE max single bond
   const CAPACITY = BN.from("100000000000000000000000000"); // 100 million SOLACE max over lifetime
   // every 50,000 SOLACE bonded raises the price one tenth of a cent
   const PRICE_ADJ_NUM = ONE_TENTH_CENT_IN_SCP; // tenth of a cent in SCP
   const PRICE_ADJ_DENOM = BN.from("50000000000000000000000"); // 50,000 SOLACE
   if(PRICE_ADJ_NUM.gt(MAX_UINT128) || PRICE_ADJ_DENOM.gt(MAX_UINT128)) throw `Uint128 too large: ${PRICE_ADJ_NUM.toString()} | ${PRICE_ADJ_DENOM.toString()} > ${MAX_UINT128.toString()}`;
 
-  if(!!SCP_BOND_TELLER_ADDRESS) {
+  if(await isDeployed(SCP_BOND_TELLER_ADDRESS)) {
     scpTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, SCP_BOND_TELLER_ADDRESS)) as BondTellerErc20;
   } else {
     console.log("SCP Teller - deploy");
@@ -377,7 +378,7 @@ async function deployFraxTeller() {
   const ONE_TENTH_CENT_IN_FRAX = BN.from("1000000000000000");
 
   const START_PRICE = ONE_CENT_IN_FRAX.mul(8); // 8 cents
-  const MAX_PAYOUT = BN.from("1000000000000000000000000") // 1 million SOLACE max single bond
+  const MAX_PAYOUT = BN.from("10000000000000000000000000") // 10 million SOLACE max single bond
   const CAPACITY = BN.from("100000000000000000000000000"); // 100 million SOLACE max over lifetime
   // every 50,000 SOLACE bonded raises the price one tenth of a cent
   const PRICE_ADJ_NUM = ONE_TENTH_CENT_IN_FRAX; // tenth of a cent in FRAX
@@ -385,7 +386,7 @@ async function deployFraxTeller() {
   if(PRICE_ADJ_NUM.gt(MAX_UINT128) || PRICE_ADJ_DENOM.gt(MAX_UINT128)) throw `Uint128 too large: ${PRICE_ADJ_NUM.toString()} | ${PRICE_ADJ_DENOM.toString()} > ${MAX_UINT128.toString()}`;
 
 
-  if(!!FRAX_BOND_TELLER_ADDRESS) {
+  if(await isDeployed(FRAX_BOND_TELLER_ADDRESS)) {
     fraxTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, FRAX_BOND_TELLER_ADDRESS)) as BondTellerErc20;
   } else {
     console.log("FRAX Teller - deploy");
