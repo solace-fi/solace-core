@@ -2,19 +2,19 @@ import { Signature, Wallet, Contract, utils } from "ethers";
 
 export async function getSoteriaReferralCode(
   referrer: Wallet | Contract,
-  soteriaCoverageProtocol: Contract
+  solaceCoverProduct: Contract
 ): Promise<string> {
 
   const domain = {
-    name: "Solace.fi-SoteriaCoverageProduct",
+    name: "Solace.fi-SolaceCoverProduct",
     version: "1",
     chainId: await referrer.getChainId(),
-    verifyingContract: soteriaCoverageProtocol.address
+    verifyingContract: solaceCoverProduct.address
   };
 
   // Unsure why, but using a struct with a single "string" could not return a valid EIP712 signature
   const types = {
-    SoteriaReferral: [
+    SolaceReferral: [
         { name: "version", type: "uint256" }
       ]
   };

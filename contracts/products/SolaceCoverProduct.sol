@@ -42,7 +42,7 @@ contract SolaceCoverProduct is
      * @notice Referral typehash
      */
     // solhint-disable-next-line var-name-mixedcase
-    bytes32 private constant _REFERRAL_TYPEHASH = keccak256("SoteriaReferral(uint256 version)");
+    bytes32 private constant _REFERRAL_TYPEHASH = keccak256("SolaceReferral(uint256 version)");
 
     /***************************************
     BOOK-KEEPING VARIABLES
