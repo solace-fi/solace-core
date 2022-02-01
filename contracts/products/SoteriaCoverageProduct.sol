@@ -3,6 +3,8 @@ pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -19,6 +21,7 @@ import "hardhat/console.sol";
  * @notice The smart contract implementation of **SoteriaCoverageProduct**.
  */
 contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, ReentrancyGuard, Governable {
+    using SafeERC20 for IERC20;
     using Address for address;
 
     /***************************************
@@ -89,8 +92,8 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      */
     mapping(address => uint256) internal _cooldownStart;
 
-    /// @notice The policyholder => Soteria account balance.
-    mapping(address => uint256) internal _accountBalanceOf; // Considered _soteriaAccountBalance name
+    /// @notice The policyholder => Total Soteria account balance in USD (to 18 decimals)
+    mapping(address => uint256) internal _accountBalanceOf;
 
     /// @notice The policyholder => policyID.
     mapping(address => uint256) internal _policyOf;
@@ -177,13 +180,16 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
      * @return policyID The ID of newly created policy.
     */
     function activatePolicy(address policyholder_, uint256 coverLimit_, uint256 stablecoinIndex_, uint256 depositAmount_, bytes calldata referralCode_) external override nonReentrant whileUnpaused returns (uint256 policyID) {
+
         require(policyholder_ != address(0x0), "zero address policyholder");
         require(coverLimit_ > 0, "zero cover value");
         
         policyID = policyOf(policyholder_);
         require(!policyStatus(policyID), "policy already activated");
         require(_canPurchaseNewCover(0, coverLimit_), "insufficient capacity for new cover");
-        require(depositAmount_ + _accountBalanceOf[policyholder_] > _minRequiredAccountBalance(coverLimit_), "insufficient deposit for minimum required account balance");
+        
+        address stablecoin = acceptedStablecoinList[stablecoinIndex_]; // Should revert if invalid index
+        require(depositAmount_ * _ERC20DecimalsAdjust(stablecoin) + _accountBalanceOf[policyholder_] > _minRequiredAccountBalance(coverLimit_), "insufficient deposit for minimum required account balance");
 
         // Exit cooldown
         _exitCooldown(policyholder_);
@@ -578,18 +584,13 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     /**
      * @notice Charge premiums for each policy holder.
      * @param holders_ The policy holders.
-     * @param premiums_ The premium amounts in `wei` per policy holder.
-     * @param stablecoinIndex_ Index of stablecoin to charge (does imply that the premium collector needs to calls this function separately to charge for each stablecoin)
-     * Only one possible parameter when the contract defaults with only DAI in the accepted stablecoin list, however currently unhandled edge cases emerge when more than one accepted stablecoin
-     * E.g. what if a policy holder has half their account balance in DAI, and the other half in FRAX? This will make accounting complicated for the premium charger.
+     * @param premiums_ The premium amounts in `USD` per policy holder. NOTE: This must be to 18 decimal places
     */
-    function chargePremiums(address[] calldata holders_, uint256[] calldata premiums_, uint256 stablecoinIndex_) external override whileUnpaused {
+    function chargePremiums(address[] calldata holders_, uint256[] calldata premiums_) external override whileUnpaused {
         uint256 count = holders_.length;
         require(msg.sender == _registry.get("premiumCollector"), "not premium collector");
         require(count == premiums_.length, "length mismatch");
         require(count <= policyCount(), "policy count exceeded");
-        address stablecoin = acceptedStablecoinList[stablecoinIndex_]; // Should revert if invalid index
-
         uint256 amountToPayPremiumPool = 0;
 
         for (uint256 i = 0; i < count; i++) {
@@ -628,8 +629,6 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
                 emit PremiumPartiallyCharged(holders_[i], premiums_[i], partialPremium);
             }  
         }
-        // single transfer to the premium pool
-        IERC20(stablecoin).transfer(_registry.get("premiumPool"), amountToPayPremiumPool);
     }
 
     /***************************************
@@ -658,8 +657,9 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     */
     function _deposit(address policyholder, uint256 stablecoinIndex, uint256 amount) internal whileUnpaused {
         address stablecoin = acceptedStablecoinList[stablecoinIndex]; // Should revert if invalid index
-        _accountBalanceOf[policyholder] += amount;
-        IERC20(stablecoin).transferFrom(msg.sender, address(this), amount);
+        _accountBalanceOf[policyholder] += amount * _ERC20DecimalsAdjust(stablecoin);
+        SafeERC20.safeTransferFrom(IERC20(stablecoin), msg.sender, address(this), amount);
+        // IERC20(stablecoin).transferFrom(msg.sender, address(this), amount);
         emit DepositMade(policyholder, amount);
     }
 
@@ -672,7 +672,8 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
     function _withdraw(address policyholder, uint256 stablecoinIndex, uint256 amount) internal whileUnpaused {
       address stablecoin = acceptedStablecoinList[stablecoinIndex]; // Should revert if invalid index
       _accountBalanceOf[policyholder] -= amount;
-      IERC20(stablecoin).transfer(msg.sender, amount);
+      SafeERC20.safeTransfer(IERC20(stablecoin), policyholder, amount / _ERC20DecimalsAdjust(stablecoin));
+    //   IERC20(stablecoin).transfer(msg.sender, amount);
       emit WithdrawMade(policyholder, amount);
     }
 
@@ -809,6 +810,11 @@ contract SoteriaCoverageProduct is ISoteriaCoverageProduct, ERC721, EIP712, Reen
             acceptedStablecoinList.push(_stablecoin);
             emit StablecoinAdded(_stablecoin);
         }
+    }
+
+    /// @dev find factor to adjust to the standard 18 decimal places for different ERC20 tokens
+    function _ERC20DecimalsAdjust(address token) internal returns (uint256) {
+        return 10**(18 - ERC20(token).decimals());
     }
 
 }

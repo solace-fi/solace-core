@@ -343,9 +343,6 @@ interface ISoteriaCoverageProduct {
      * @notice Charge premiums for each policy holder.
      * @param holders_ The policy holders.
      * @param premiums_ The premium amounts in `wei` per policy holder.
-     * @param stablecoinIndex_ Index of stablecoin to charge (does imply that the premium collector needs to calls this function separately to charge for each stablecoin)
-     * Only one possible parameter when the contract defaults with only DAI in the accepted stablecoin list, however currently unhandled edge cases emerge when more than one accepted stablecoin
-     * E.g. what if a policy holder has half their account balance in DAI, and the other half in FRAX? This will make accounting complicated for the premium charger.
     */
-    function chargePremiums(address[] calldata holders_, uint256[] calldata premiums_, uint256 stablecoinIndex_) external;
+    function chargePremiums(address[] calldata holders_, uint256[] calldata premiums_) external;
 }
