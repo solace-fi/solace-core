@@ -5,8 +5,12 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "../utils/Governable.sol";
 import "../interfaces/utils/IRegistry.sol";
 import "../interfaces/risk/IRiskManager.sol";
@@ -37,6 +41,16 @@ contract SolaceCoverProduct is
     /// @notice Cannot buy new policies while paused. (Default is False)
     bool internal _paused;
 
+    /**
+     * @notice Referral typehash
+     */
+    // solhint-disable-next-line var-name-mixedcase
+    bytes32 private constant _REFERRAL_TYPEHASH = keccak256("SoteriaReferral(uint256 version)");
+
+    /***************************************
+    BOOK-KEEPING VARIABLES
+    ***************************************/
+
     /// @notice The total policy count.
     uint256 internal _totalPolicyCount;
 
@@ -60,10 +74,14 @@ contract SolaceCoverProduct is
     uint256 internal _cooldownPeriod;
 
     /**
-     * @notice Percentage of cover limit purchased, that will be rewarded for using a referral code
-     * @dev In units of bps, or out of 10,000 parts. Default is 5% or _referralRewardPercentage = 500.
+     * @notice The reward points earned (to both the referee and referrer) for succcessful referral
      */
-    uint256 internal _referralRewardPercentage;
+    uint256 internal _referralReward;
+
+    /**
+     * @notice Switch controlling whether referral campaign is active or not
+     */
+    bool internal _isReferralOn;
 
     /**
      * @notice Policy holder address => Timestamp that a depositor's cooldown started
@@ -87,7 +105,7 @@ contract SolaceCoverProduct is
     /// @notice PolicyID => Has referral code been used for this policyID?
     mapping(uint256 => bool) internal _isReferralCodeUsed;
 
-    /// @notice Keeps total balances(in USD) per policyholder.
+    /// @notice Keeps total balances (in USD, to 18 decimal places) per policyholder.
     mapping(address => uint256) private _accountBalanceOf;
 
     /***************************************
@@ -120,6 +138,32 @@ contract SolaceCoverProduct is
         _registry = IRegistry(registry_);
         require(_registry.get("riskManager") != address(0x0), "zero address riskmanager");
         require(_registry.get("dai") != address(0x0), "zero address dai");
+
+        // Set default values - charge cycle of one week, max premium rate of 10% of cover limit per annum, 50 DAI referral reward, referral program active
+        _maxRateNum = 1;
+        _maxRateDenom = 315360000;
+        _chargeCycle = 604800;
+        _referralReward = 50e18; // 50 DAI
+        _isReferralOn = true;
+    }
+    
+    /***************************************
+    FALLBACK FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Fallback function will send back ETH
+    */
+    // solhint-disable-next-line 
+    receive() external payable nonReentrant {
+        Address.sendValue(payable(msg.sender), msg.value);
+    }
+
+    /**
+     * @notice Fallback function will send back ETH
+    */
+    fallback() external payable nonReentrant {
+        Address.sendValue(payable(msg.sender), msg.value);
     }
 
     /***************************************
@@ -130,16 +174,16 @@ contract SolaceCoverProduct is
      * @notice Activates policy on the behalf of the policyholder.
      * @param policyholder_ Holder of the position to cover.
      * @param coverLimit_ The value to cover in **USD**.
-     * @param referralCode_ Referral code
      * @param amount_ The amount in **USD** to deposit in order to activate the policy.
+     * @param referralCode_ Referral code
      * @return policyID The ID of newly created policy.
      */
     function activatePolicy(
         address policyholder_,
         uint256 coverLimit_,
-        uint256 referralCode_,
-        uint256 amount_
-    ) external override whileUnpaused returns (uint256 policyID) {
+        uint256 amount_,
+        bytes calldata referralCode_
+    ) external override nonReentrant whileUnpaused returns (uint256 policyID) {
         require(policyholder_ != address(0x0), "zero address policyholder");
         require(coverLimit_ > 0, "zero cover value");
 
@@ -161,8 +205,7 @@ contract SolaceCoverProduct is
             _mint(policyholder_, policyID);
         }
 
-        if (referralCode_ != 0)
-            _processReferralCode(policyholder_, coverLimit_, referralCode_);
+        _processReferralCode(policyholder_, referralCode_);
 
         // update cover amount
         _updateActiveCoverLimit(0, coverLimit_);
@@ -178,7 +221,7 @@ contract SolaceCoverProduct is
      * @param newCoverLimit_ The new value to cover in **USD**.
      * @param referralCode_ Referral code
      */
-    function updateCoverLimit(uint256 newCoverLimit_, uint256 referralCode_)
+    function updateCoverLimit(uint256 newCoverLimit_, bytes calldata referralCode_)
         external
         override
         nonReentrant
@@ -197,8 +240,7 @@ contract SolaceCoverProduct is
             "insufficient deposit for minimum required account balance"
         );
 
-        if (referralCode_ != 0)
-            _processReferralCode(msg.sender, newCoverLimit_, referralCode_);
+        _processReferralCode(msg.sender, referralCode_);
 
         _exitCooldown(msg.sender); // Reset cooldown
         _coverLimitOf[policyID] = newCoverLimit_;
@@ -223,28 +265,23 @@ contract SolaceCoverProduct is
      * @notice Withdraw funds from Soteria account to user.
      * @notice If cooldown has passed, the user can withdraw any amount
      * @notice If cooldown has not passed, the user can only withdraw down to minRequiredAccountBalance
-     * @param amount The amount in `USD` policyholder desires to withdraw.
      * User Soteria account must have > minAccountBalance.
      * Otherwise account will be deactivated.
      */
-    function withdraw(uint256 amount)
+    function withdraw()
         external
         override
         nonReentrant
         whileUnpaused
     {
-        require(amount <= accountBalanceOf(msg.sender), "cannot withdraw > account balance");
-        uint256 preDeactivateCoverLimit = _preDeactivateCoverLimitOf[_policyOf[msg.sender]];
-
-        if (_hasCooldownPassed(msg.sender)) {
-            _withdraw(msg.sender, amount);
+        if ( _hasCooldownPassed(msg.sender) ) {
+          _withdraw(msg.sender, _accountBalanceOf[msg.sender]);
+          _preDeactivateCoverLimitOf[_policyOf[msg.sender]] = 0;
         } else {
-            require(
-                accountBalanceOf(msg.sender) - amount > _minRequiredAccountBalance(preDeactivateCoverLimit),
-                "must have > minRequiredAccountbalance"
-            );
-            _withdraw(msg.sender, amount);
+          uint256 preDeactivateCoverLimit = _preDeactivateCoverLimitOf[_policyOf[msg.sender]];
+          _withdraw(msg.sender, _accountBalanceOf[msg.sender] - _minRequiredAccountBalance(preDeactivateCoverLimit));
         }
+
     }
 
     /**
@@ -440,30 +477,19 @@ contract SolaceCoverProduct is
     }
 
     /**
-     * @notice Gets the referral reward percentage in bps
-     * @return referralRewardPercentage_ The referral reward percentage
+     * @notice Gets the referral reward
+     * @return referralReward_ The referral reward
      */
-    function referralRewardPercentage()
-        external
-        view
-        override
-        returns (uint256 referralRewardPercentage_)
-    {
-        return _referralRewardPercentage;
+    function referralReward() external view override returns (uint256 referralReward_) {
+        return _referralReward;
     }
 
     /**
-     * @notice Gets the unique referral code for a user.
-     * @param user_ The user.
-     * @return referralCode_ The referral code.
+     * @notice Gets whether the referral campaign is active or not
+     * @return isReferralOn_ True if referral campaign active, false if not
      */
-    function getReferralCode(address user_)
-        external
-        view
-        override
-        returns (uint256 referralCode_)
-    {
-        return _getReferralCode(user_);
+    function isReferralOn() external view override returns (bool isReferralOn_) {
+        return _isReferralOn;
     }
 
     /**
@@ -566,18 +592,23 @@ contract SolaceCoverProduct is
     }
 
     /**
-     * @notice set _referralRewardPercentage
+     * @notice set _referralReward
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param referralRewardPercentage_ Desired referralRewardPercentage.
-     */
-    function setReferralRewardPercentage(uint256 referralRewardPercentage_)
-        external
-        override
-        onlyGovernance
-    {
-        require(referralRewardPercentage_ <= 10000, "cannot set over 100%");
-        _referralRewardPercentage = referralRewardPercentage_;
-        emit ReferralRewardPercentageSet(referralRewardPercentage_);
+     * @param referralReward_ Desired referralReward.
+    */
+    function setReferralReward(uint256 referralReward_) external override onlyGovernance {
+        _referralReward = referralReward_;
+        emit ReferralRewardSet(referralReward_);
+    }
+
+    /**
+     * @notice set _isReferralOn
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param isReferralOn_ Desired state of referral campaign.
+    */
+    function setIsReferralOn(bool isReferralOn_) external override onlyGovernance {
+        _isReferralOn = isReferralOn_;
+        emit IsReferralOnSet(isReferralOn_);
     }
 
     /***************************************
@@ -619,19 +650,26 @@ contract SolaceCoverProduct is
         uint256 amountToPayPremiumPool = 0;
 
         for (uint256 i = 0; i < count; i++) {
-            // skip computation if policy inactive
-            if (!policyStatus(_policyOf[holders[i]])) continue;
-        
+            // Skip computation if the account is deactivated, but we need to circumvent the following edge case:
+            // Premium collector should be able to charge policy holders that have deactivated their policy within the last epoch
+            // I.e. a policy holder should not be able to the following: Activate a policy, then deactivate their policy just prior to premiums being charged, and get free cover
+
+            // This does however bring up an additional edge case: the premium collector can charge a deactivated account more than once. 
+            // We are trusting that the premium collector does not do this.
+            // So in effect this will only skip computation if the policyholder has withdrawn their entire account balance
+            if ( _preDeactivateCoverLimitOf[_policyOf[holders[i]]] == 0) continue;
+
             uint256 premium = premiums[i];
             if (premium > _minRequiredAccountBalance(coverLimitOf(policyOf(holders[i])))) {
                 premium = _minRequiredAccountBalance(coverLimitOf(policyOf(holders[i])));
             }
 
-            // if policy holder can pay for premium charged in full
-            if (_accountBalanceOf[holders[i]] + _rewardPointsOf[holders[i]] >= premium) {
-                // if reward points can cover premium charged in full
-                if (_rewardPointsOf[holders[i]] >= premium) {
-                    _rewardPointsOf[holders[i]] -= premium;
+            // If policy holder can pay for premium charged in full
+            if (_accountBalanceOf[holders[i]] + _rewardPointsOf[holders[i]] >= premiums[i]) {
+                
+                // If reward points can cover premium charged in full
+                if (_rewardPointsOf[holders[i]] >= premiums[i]) {
+                    _rewardPointsOf[holders[i]] -= premiums[i];
                 } else {
                     uint256 amountDeductedFromSoteriaAccount = premium - _rewardPointsOf[holders[i]];
                     amountToPayPremiumPool += amountDeductedFromSoteriaAccount;
@@ -678,6 +716,7 @@ contract SolaceCoverProduct is
 
     /**
      * @notice Adds funds to policy holder's balance.
+     * @param from from
      * @param policyholder The policy holder address.
      * @param amount The amount of fund to deposit.
      * @dev Explicit decision that _deposit() will not affect, nor be affected by the cooldown mechanic.
@@ -793,41 +832,29 @@ contract SolaceCoverProduct is
     }
 
     /**
-     * @notice Gets the unique referral code for a user.
-     * @param user_ The user.
-     * @return referralCode_ The referral code.
-     */
-    function _getReferralCode(address user_)
-        internal
-        view
-        returns (uint256 referralCode_)
-    {
-        return uint256(uint160(user_));
-    }
-
-    /**
      * @notice Internal function to process referral code
      * @param policyholder_ Policy holder
-     * @param coverLimit_ Cover limit
      * @param referralCode_ Referral code
      */
     function _processReferralCode(
         address policyholder_,
-        uint256 coverLimit_,
-        uint256 referralCode_
+        bytes calldata referralCode_
     ) internal {
-        address referrer = address(uint160(referralCode_));
+        // Skip processing referral code, if referral campaign switched off or empty referral code argument
+        if ( !_isReferralOn || _isEmptyReferralCode(referralCode_) ) return;
+        
         // require(referrer != address(0), "cannot have zero address referrer"); // Redundant because we cannot call _processReferralCode with referralCode_ = 0
+        address referrer = ECDSA.recover(_getEIP712Hash(), referralCode_);
         require(referrer != policyholder_, "cannot refer to self");
-        require(!_isReferralCodeUsed[_policyOf[policyholder_]], "cannot use referral code again");
+        require(policyStatus(_policyOf[referrer]), "referrer must be active policy holder");
+        require (!_isReferralCodeUsed[_policyOf[policyholder_]], "cannot use referral code again");
 
-        uint256 rewardPointsEarned = (coverLimit_ * _referralRewardPercentage) / 10000;
         _isReferralCodeUsed[_policyOf[policyholder_]] = true;
-        _rewardPointsOf[policyholder_] += rewardPointsEarned;
-        _rewardPointsOf[referrer] += rewardPointsEarned;
+        _rewardPointsOf[policyholder_] += _referralReward;
+        _rewardPointsOf[referrer] += _referralReward;
 
-        emit ReferralRewardsEarned(policyholder_, rewardPointsEarned);
-        emit ReferralRewardsEarned(referrer, rewardPointsEarned);
+        emit ReferralRewardsEarned(policyholder_, _referralReward);
+        emit ReferralRewardsEarned(referrer, _referralReward);
     }
 
     /**
@@ -836,5 +863,31 @@ contract SolaceCoverProduct is
     */
     function getAsset() internal view returns (IERC20 asset){
         return IERC20(_registry.get("dai"));
+    }
+
+    /**
+     * @notice Internal helper function to determine if referralCode_ is an empty bytes value
+     * @param referralCode_ Referral code
+     */
+    function _isEmptyReferralCode(bytes calldata referralCode_) internal returns (bool) {
+        return (keccak256(abi.encodePacked(referralCode_)) == keccak256(abi.encodePacked("")));
+    }
+
+    /**
+     * @notice Internal helper function to get EIP712-compliant hash for referral code verification
+     */
+    function _getEIP712Hash() internal returns (bytes32) {
+        bytes32 digest = 
+            ECDSA.toTypedDataHash(
+                _domainSeparatorV4(),
+                keccak256(
+                    abi.encode(
+                        _REFERRAL_TYPEHASH,
+                        1
+                    )
+                )
+            );
+
+        return digest;
     }
 }

@@ -65,14 +65,23 @@ interface ISolaceCoverProduct {
     /// @notice Emitted when reward points are set.
     event RewardPointsSet(address policyholder, uint256 amountGifted);
 
-    /// @notice Emitted when referralRewardPercentage is set.
-    event ReferralRewardPercentageSet(uint256 referralRewardPercentage);
+    /// @notice Emitted when isReferralOn is set
+    event IsReferralOnSet(bool isReferralOn);
+
+    /// @notice Emitted when referralReward is set.
+    event ReferralRewardSet(uint256 referralReward);
 
     /// @notice Emitted when referral rewards are earned;
     event ReferralRewardsEarned(
         address rewardEarner,
         uint256 rewardPointsEarned
     );
+
+    /// @notice Emitted when stablecoin is added to accepted stablecoin list
+    event StablecoinAdded(address stablecoin);
+
+    /// @notice Emitted when stablecoin is removed from accepted stablecoin list
+    event StablecoinRemoved(address stablecoin);
 
     /***************************************
     POLICY FUNCTIONS
@@ -89,8 +98,8 @@ interface ISolaceCoverProduct {
     function activatePolicy(
         address policyholder_,
         uint256 coverLimit_,
-        uint256 referralCode_,
-        uint256 amount_
+        uint256 amount_,
+        bytes calldata referralCode_
     ) external returns (uint256 policyID);
 
     /**
@@ -102,9 +111,8 @@ interface ISolaceCoverProduct {
 
     /**
      * @notice Withdraw funds from Soteria account to user.
-     * @param amount_ Amount policyholder desires to withdraw.
      */
-    function withdraw(uint256 amount_) external;
+    function withdraw() external;
 
     /**
      * @notice Updates the cover amount of your policy
@@ -112,7 +120,7 @@ interface ISolaceCoverProduct {
      * @param newCoverLimit_ The new value to cover in **USD**.
      * @param referralCode_ Referral code
      */
-    function updateCoverLimit(uint256 newCoverLimit_, uint256 referralCode_)
+    function updateCoverLimit(uint256 newCoverLimit_, bytes calldata referralCode_)
         external;
 
     /**
@@ -252,23 +260,16 @@ interface ISolaceCoverProduct {
         returns (uint256 cooldownStart_);
 
     /**
-     * @notice Gets the referral reward percentage in bps
-     * @return referralRewardPercentage_ The referral reward percentage
+     * @notice Gets the referral reward
+     * @return referralReward_ The referral reward
      */
-    function referralRewardPercentage()
-        external
-        view
-        returns (uint256 referralRewardPercentage_);
+    function referralReward() external view returns (uint256 referralReward_);
 
     /**
-     * @notice Gets the unique referral code for a user.
-     * @param user_ The user.
-     * @return referralCode_ The referral code.
+     * @notice Gets whether the referral campaign is active or not
+     * @return isReferralOn_ True if referral campaign active, false if not
      */
-    function getReferralCode(address user_)
-        external
-        view
-        returns (uint256 referralCode_);
+    function isReferralOn() external view returns (bool isReferralOn_);
 
     /***************************************
     GOVERNANCE FUNCTIONS
@@ -318,12 +319,18 @@ interface ISolaceCoverProduct {
     function setChargeCycle(uint256 chargeCycle_) external;
 
     /**
-     * @notice set _referralRewardPercentage
+     * @notice set _referralReward
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param referralRewardPercentage_ Desired referralRewardPercentage.
-     */
-    function setReferralRewardPercentage(uint256 referralRewardPercentage_)
-        external;
+     * @param referralReward_ Desired referralReward.
+    */
+    function setReferralReward(uint256 referralReward_) external;
+
+    /**
+     * @notice set _isReferralOn
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param isReferralOn_ Desired state of referral campaign.
+    */
+    function setIsReferralOn(bool isReferralOn_) external;
 
     /***************************************
     COVER PROMOTION ADMIN FUNCTIONS
@@ -337,6 +344,10 @@ interface ISolaceCoverProduct {
      */
     function setRewardPoints(address policyholder_, uint256 rewardPoints_)
         external;
+
+    /***************************************
+    PREMIUM COLLECTOR FUNCTIONS
+    ***************************************/
 
     /**
      * @notice Charge premiums for each policy holder.
