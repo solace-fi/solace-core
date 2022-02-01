@@ -4,7 +4,7 @@ import { BigNumber as BN, utils, Contract, Wallet, constants } from "ethers";
 import chai from "chai";
 import { config as dotenv_config } from "dotenv";
 import { import_artifacts, ArtifactImports } from "../utilities/artifact_importer";
-import { getSoteriaReferralCode } from "../utilities/getSoteriaReferralCode"
+import { getSolaceReferralCode } from "../utilities/getSolaceReferralCode"
 import { Registry, RiskManager, SolaceCoverProduct, CoverageDataProvider, Solace, MockPriceOracle, MockSlp, MockErc20Permit } from "../../typechain";
 import { Console } from "console";
 import { expectClose } from "./../utilities/math";
@@ -528,409 +528,414 @@ describe("SolaceCoverProduct", function() {
         })
         it("cannot use own referral code", async () => {
             // Create new wallet just for this unit test scope, to avoid creating side effects that impact other unit tests. It's a headfuck to work that out.
-            const ownReferralCode = await getSoteriaReferralCode(policyholder3, solaceCoverProduct)
+            const ownReferralCode = await getSolaceReferralCode(policyholder3, solaceCoverProduct)
             await expect(solaceCoverProduct.connect(governor).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, INITIAL_DEPOSIT, ownReferralCode)).to.revertedWith("cannot refer to self");
         })
-    //     it("will not give reward points if isReferralOn == false", async () => {
-    //         // Set isReferralOn to false
-    //         await solaceCoverProduct.connect(governor).setIsReferralOn(false);
-    //         expect(await solaceCoverProduct.isReferralOn()).eq(false)
+        it("will not give reward points if isReferralOn == false", async () => {
+            // Set isReferralOn to false
+            await solaceCoverProduct.connect(governor).setIsReferralOn(false);
+            expect(await solaceCoverProduct.isReferralOn()).eq(false)
 
-    //         // Get valid referral code (we know it is valid, because it works in the next unit test)
+            // Get valid referral code (we know it is valid, because it works in the next unit test)
             
-    //         let referralCode = await getSoteriaReferralCode(policyholder1, solaceCoverProduct)
-    //         let coverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_2);
+            let referralCode = await getSolaceReferralCode(policyholder1, solaceCoverProduct)
+            let coverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_2);
 
-    //         // Attempt to use referral code
-    //         let tx = await solaceCoverProduct.connect(governor).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, 0, INITIAL_DEPOSIT, referralCode);
-    //         await expect(tx).emit(solaceCoverProduct, "PolicyCreated").withArgs(POLICY_ID_3);
+            // Attempt to use referral code
+            let tx = await solaceCoverProduct.connect(governor).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, INITIAL_DEPOSIT, referralCode);
+            await expect(tx).emit(solaceCoverProduct, "PolicyCreated").withArgs(POLICY_ID_3);
 
-    //         // Prove that no reward points were rewarded
-    //         expect (await solaceCoverProduct.rewardPointsOf(policyholder1.address)).eq(0)
-    //         expect (await solaceCoverProduct.rewardPointsOf(policyholder2.address)).eq(0)
+            // Prove that no reward points were rewarded
+            expect (await solaceCoverProduct.rewardPointsOf(policyholder1.address)).eq(0)
+            expect (await solaceCoverProduct.rewardPointsOf(policyholder2.address)).eq(0)
 
-    //         // Set isReferralOn back to true (default)
-    //         await solaceCoverProduct.connect(governor).setIsReferralOn(true);
-    //         expect(await solaceCoverProduct.isReferralOn()).eq(true)
-    //     })
+            // Set isReferralOn back to true (default)
+            await solaceCoverProduct.connect(governor).setIsReferralOn(true);
+            expect(await solaceCoverProduct.isReferralOn()).eq(true)
+        })
 
-    //     it("can use referral code only once", async () => {
-    //         let referralCode = await getSoteriaReferralCode(policyholder1, solaceCoverProduct)
+        it("can use referral code only once", async () => {
+            let referralCode = await getSolaceReferralCode(policyholder1, solaceCoverProduct)
 
-    //         await solaceCoverProduct.connect(policyholder3).deactivatePolicy();
-    //         let tx = await solaceCoverProduct.connect(governor).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, 0, INITIAL_DEPOSIT, referralCode);
-    //         await expect(tx).emit(solaceCoverProduct, "PolicyCreated").withArgs(POLICY_ID_3);
-    //         await expect(tx).emit(solaceCoverProduct, "ReferralRewardsEarned").withArgs(policyholder1.address, REFERRAL_REWARD);
-    //         await expect(tx).emit(solaceCoverProduct, "ReferralRewardsEarned").withArgs(policyholder3.address, REFERRAL_REWARD);
-    //         expect (await solaceCoverProduct.rewardPointsOf(policyholder1.address)).eq(REFERRAL_REWARD)
-    //         expect (await solaceCoverProduct.rewardPointsOf(policyholder3.address)).eq(REFERRAL_REWARD)
+            await solaceCoverProduct.connect(policyholder3).deactivatePolicy();
+            let tx = await solaceCoverProduct.connect(governor).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, INITIAL_DEPOSIT, referralCode);
+            await expect(tx).emit(solaceCoverProduct, "PolicyCreated").withArgs(POLICY_ID_3);
+            await expect(tx).emit(solaceCoverProduct, "ReferralRewardsEarned").withArgs(policyholder1.address, REFERRAL_REWARD);
+            await expect(tx).emit(solaceCoverProduct, "ReferralRewardsEarned").withArgs(policyholder3.address, REFERRAL_REWARD);
+            expect (await solaceCoverProduct.rewardPointsOf(policyholder1.address)).eq(REFERRAL_REWARD)
+            expect (await solaceCoverProduct.rewardPointsOf(policyholder3.address)).eq(REFERRAL_REWARD)
 
-    //         // Attempt to use another referral code, via activePolicy()
-    //         await solaceCoverProduct.connect(policyholder3).deactivatePolicy();
-    //         referralCode = await getSoteriaReferralCode(policyholder2, solaceCoverProduct)
-    //         await expect(solaceCoverProduct.connect(governor).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, 0, 0, referralCode)).to.revertedWith("cannot use referral code again");
+            // Attempt to use another referral code, via activePolicy()
+            await solaceCoverProduct.connect(policyholder3).deactivatePolicy();
+            referralCode = await getSolaceReferralCode(policyholder2, solaceCoverProduct)
+            await expect(solaceCoverProduct.connect(governor).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, 0, referralCode)).to.revertedWith("cannot use referral code again");
 
-    //         // Reset state to avoid side effects impacting consequent unit tests
-    //         await solaceCoverProduct.connect(coverPromotionAdmin).setRewardPoints(policyholder1.address, 0);
-    //         await solaceCoverProduct.connect(coverPromotionAdmin).setRewardPoints(policyholder3.address, 0);
-    //         expect(await solaceCoverProduct.rewardPointsOf(policyholder1.address)).eq(0)
-    //         expect(await solaceCoverProduct.rewardPointsOf(policyholder3.address)).eq(0)
-    //     })
+            // Reset state to avoid side effects impacting consequent unit tests
+            await solaceCoverProduct.connect(coverPromotionAdmin).setRewardPoints(policyholder1.address, 0);
+            await solaceCoverProduct.connect(coverPromotionAdmin).setRewardPoints(policyholder3.address, 0);
+            expect(await solaceCoverProduct.rewardPointsOf(policyholder1.address)).eq(0)
+            expect(await solaceCoverProduct.rewardPointsOf(policyholder3.address)).eq(0)
+        })
     });
 
-    // describe("deposit", () => {
-    //     it("can deposit", async () => {
-    //         let accountBalance = await solaceCoverProduct.accountBalanceOf(policyholder1.address);
-    //         let soteriaContractDAIbalance = await dai.balanceOf(solaceCoverProduct.address)
-    //         let tx = await solaceCoverProduct.connect(policyholder1).deposit(policyholder1.address, 0, INITIAL_DEPOSIT);
-    //         await expect(tx).emit(solaceCoverProduct, "DepositMade").withArgs(policyholder1.address, INITIAL_DEPOSIT);
-    //         expect(await solaceCoverProduct.accountBalanceOf(policyholder1.address)).to.equal(accountBalance.add(INITIAL_DEPOSIT));
-    //         expect(await dai.balanceOf(solaceCoverProduct.address)).to.equal(soteriaContractDAIbalance.add(INITIAL_DEPOSIT));
-    //     });
+    describe("deposit", () => {
+        it("can deposit", async () => {
+            let accountBalance = await solaceCoverProduct.accountBalanceOf(policyholder1.address);
+            let soteriaContractDAIbalance = await dai.balanceOf(solaceCoverProduct.address)
+            let tx = await solaceCoverProduct.connect(policyholder1).deposit(policyholder1.address, INITIAL_DEPOSIT);
+            await expect(tx).emit(solaceCoverProduct, "DepositMade").withArgs(policyholder1.address, policyholder1.address, INITIAL_DEPOSIT);
+            expect(await solaceCoverProduct.accountBalanceOf(policyholder1.address)).to.equal(accountBalance.add(INITIAL_DEPOSIT));
+            expect(await dai.balanceOf(solaceCoverProduct.address)).to.equal(soteriaContractDAIbalance.add(INITIAL_DEPOSIT));
+        });
 
-    //     it("can deposit on behalf of policy holder", async () => {
-    //         let accountBalance = await solaceCoverProduct.accountBalanceOf(policyholder2.address);
-    //         let soteriaContractDAIbalance = await dai.balanceOf(solaceCoverProduct.address)
-    //         let tx = await solaceCoverProduct.connect(policyholder1).deposit(policyholder2.address, 0, INITIAL_DEPOSIT);
-    //         await expect(tx).emit(solaceCoverProduct, "DepositMade").withArgs(policyholder2.address, INITIAL_DEPOSIT);
-    //         expect(await solaceCoverProduct.accountBalanceOf(policyholder2.address)).to.equal(accountBalance.add(INITIAL_DEPOSIT));
-    //         expect(await dai.balanceOf(solaceCoverProduct.address)).to.equal(soteriaContractDAIbalance.add(INITIAL_DEPOSIT));
-    //     });
+        it("can deposit on behalf of policy holder", async () => {
+            let accountBalance = await solaceCoverProduct.accountBalanceOf(policyholder2.address);
+            let soteriaContractDAIbalance = await dai.balanceOf(solaceCoverProduct.address)
+            let tx = await solaceCoverProduct.connect(policyholder1).deposit(policyholder2.address, INITIAL_DEPOSIT);
+            await expect(tx).emit(solaceCoverProduct, "DepositMade").withArgs(policyholder1.address, policyholder2.address, INITIAL_DEPOSIT);
+            expect(await solaceCoverProduct.accountBalanceOf(policyholder2.address)).to.equal(accountBalance.add(INITIAL_DEPOSIT));
+            expect(await dai.balanceOf(solaceCoverProduct.address)).to.equal(soteriaContractDAIbalance.add(INITIAL_DEPOSIT));
+        });
 
-    //     it("fallback will send ETH back", async () => {
-    //         let accountBalance = await solaceCoverProduct.accountBalanceOf(policyholder1.address);
-    //         let soteriaContractETHbalance = await provider.getBalance(solaceCoverProduct.address);
-    //         let initialDepositorETHbalance = await provider.getBalance(policyholder1.address)
+        it("fallback will send ETH back", async () => {
+            let accountBalance = await solaceCoverProduct.accountBalanceOf(policyholder1.address);
+            let soteriaContractETHbalance = await provider.getBalance(solaceCoverProduct.address);
+            let initialDepositorETHbalance = await provider.getBalance(policyholder1.address)
 
-    //         let tx = await policyholder1.sendTransaction({ to: solaceCoverProduct.address, value: ONE_ETH });
-    //         let receipt = await tx.wait();
-    //         let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
+            let tx = await policyholder1.sendTransaction({ to: solaceCoverProduct.address, value: ONE_ETH });
+            let receipt = await tx.wait();
+            let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
 
-    //         expect(await solaceCoverProduct.accountBalanceOf(policyholder1.address)).eq(accountBalance)
-    //         expect(await provider.getBalance(solaceCoverProduct.address)).to.equal(soteriaContractETHbalance);
-    //         expect(await provider.getBalance(policyholder1.address)).to.equal(initialDepositorETHbalance.sub(gasCost));
-    //     });
+            expect(await solaceCoverProduct.accountBalanceOf(policyholder1.address)).eq(accountBalance)
+            expect(await provider.getBalance(solaceCoverProduct.address)).to.equal(soteriaContractETHbalance);
+            expect(await provider.getBalance(policyholder1.address)).to.equal(initialDepositorETHbalance.sub(gasCost));
+        });
 
-    //     it("receive will send ETH back", async () => {
-    //         let accountBalance = await solaceCoverProduct.accountBalanceOf(policyholder1.address);
-    //         let soteriaContractETHbalance = await provider.getBalance(solaceCoverProduct.address);
-    //         let initialDepositorETHbalance = await provider.getBalance(policyholder1.address)
+        it("receive will send ETH back", async () => {
+            let accountBalance = await solaceCoverProduct.accountBalanceOf(policyholder1.address);
+            let soteriaContractETHbalance = await provider.getBalance(solaceCoverProduct.address);
+            let initialDepositorETHbalance = await provider.getBalance(policyholder1.address)
 
-    //         let tx = await policyholder1.sendTransaction({ to: solaceCoverProduct.address, value: ONE_ETH, data:"0x00" });
-    //         let receipt = await tx.wait();
-    //         let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
+            let tx = await policyholder1.sendTransaction({ to: solaceCoverProduct.address, value: ONE_ETH, data:"0x00" });
+            let receipt = await tx.wait();
+            let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
 
-    //         expect(await solaceCoverProduct.accountBalanceOf(policyholder1.address)).eq(accountBalance)
-    //         expect(await provider.getBalance(solaceCoverProduct.address)).to.equal(soteriaContractETHbalance);
-    //         expect(await provider.getBalance(policyholder1.address)).to.equal(initialDepositorETHbalance.sub(gasCost));
-    //     });
+            expect(await solaceCoverProduct.accountBalanceOf(policyholder1.address)).eq(accountBalance)
+            expect(await provider.getBalance(solaceCoverProduct.address)).to.equal(soteriaContractETHbalance);
+            expect(await provider.getBalance(policyholder1.address)).to.equal(initialDepositorETHbalance.sub(gasCost));
+        });
 
-    //     it("cannot deposit while paused", async () => {
-    //         await solaceCoverProduct.connect(governor).setPaused(true);
-    //         await expect(solaceCoverProduct.connect(policyholder1).deposit(policyholder1.address, 0, INITIAL_DEPOSIT)).to.revertedWith("contract paused");
-    //         await solaceCoverProduct.connect(governor).setPaused(false);
-    //     });
+        it("cannot deposit while paused", async () => {
+            await solaceCoverProduct.connect(governor).setPaused(true);
+            await expect(solaceCoverProduct.connect(policyholder1).deposit(policyholder1.address, INITIAL_DEPOSIT)).to.revertedWith("contract paused");
+            await solaceCoverProduct.connect(governor).setPaused(false);
+        });
 
-    // });
+    });
 
-    // describe("updateCoverLimit", () => {
-    //     let maxCover: BN;
-    //     let maxCoverPerStrategy: BN;
-    //     let initialMCRForSoteria: BN;
-    //     let initialMCR: BN; // min. capital requirement
-    //     let initialSoteriaActiveCoverLimit: BN;
-    //     let initialPolicyCoverLimit: BN;
-    //     let initialRMActiveCoverLimit: BN; // risk manager active cover amount
-    //     let initialRMActiveCoverLimitForSoteria: BN; // risk manager active cover amount for soteria
+    describe("updateCoverLimit", () => {
+        let maxCover: BN;
+        let maxCoverPerStrategy: BN;
+        let initialMCRForSoteria: BN;
+        let initialMCR: BN; // min. capital requirement
+        let initialSoteriaActiveCoverLimit: BN;
+        let initialPolicyCoverLimit: BN;
+        let initialRMActiveCoverLimit: BN; // risk manager active cover amount
+        let initialRMActiveCoverLimitForSoteria: BN; // risk manager active cover amount for soteria
 
-    //     before(async () => {
-    //         maxCover = await riskManager.maxCover();
-    //         maxCoverPerStrategy = await riskManager.maxCoverPerStrategy(solaceCoverProduct.address);
+        before(async () => {
+            maxCover = await riskManager.maxCover();
+            maxCoverPerStrategy = await riskManager.maxCoverPerStrategy(solaceCoverProduct.address);
 
-    //         // risk manager current values
-    //         initialMCR = await riskManager.minCapitalRequirement();
-    //         initialMCRForSoteria = await riskManager.minCapitalRequirementPerStrategy(solaceCoverProduct.address);
+            // risk manager current values
+            initialMCR = await riskManager.minCapitalRequirement();
+            initialMCRForSoteria = await riskManager.minCapitalRequirementPerStrategy(solaceCoverProduct.address);
             
-    //         // risk manager current values
-    //         initialRMActiveCoverLimit = await riskManager.activeCoverLimit();
-    //         initialRMActiveCoverLimitForSoteria = await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address);
+            // risk manager current values
+            initialRMActiveCoverLimit = await riskManager.activeCoverLimit();
+            initialRMActiveCoverLimitForSoteria = await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address);
 
-    //         initialSoteriaActiveCoverLimit = await solaceCoverProduct.connect(policyholder1).activeCoverLimit();
-    //         initialPolicyCoverLimit = await solaceCoverProduct.connect(policyholder1).coverLimitOf(POLICY_ID_1);
+            initialSoteriaActiveCoverLimit = await solaceCoverProduct.connect(policyholder1).activeCoverLimit();
+            initialPolicyCoverLimit = await solaceCoverProduct.connect(policyholder1).coverLimitOf(POLICY_ID_1);
 
-    //         expect(await solaceCoverProduct.connect(policyholder1).ownerOf(POLICY_ID_1)).to.equal(policyholder1.address);
-    //     });
+            expect(await solaceCoverProduct.connect(policyholder1).ownerOf(POLICY_ID_1)).to.equal(policyholder1.address);
+        });
 
-    //     it("cannot update for zero cover amount", async () => {
-    //         await expect(solaceCoverProduct.connect(policyholder1).updateCoverLimit(ZERO_AMOUNT, [])).to.revertedWith("zero cover value");
-    //     });
+        it("cannot update for zero cover amount", async () => {
+            await expect(solaceCoverProduct.connect(policyholder1).updateCoverLimit(ZERO_AMOUNT, [])).to.revertedWith("zero cover value");
+        });
 
-    //     it("cannot update for invalid policy", async () => {
-    //         await expect(solaceCoverProduct.connect(policyholder4).updateCoverLimit(NEW_COVER_LIMIT, [])).to.revertedWith("invalid policy");
-    //     });
+        it("cannot update for invalid policy", async () => {
+            await expect(solaceCoverProduct.connect(policyholder4).updateCoverLimit(NEW_COVER_LIMIT, [])).to.revertedWith("invalid policy");
+        });
 
-    //     it("cannot update while paused", async () => {
-    //         await solaceCoverProduct.connect(governor).setPaused(true);
-    //         await expect(solaceCoverProduct.connect(policyholder1).updateCoverLimit(NEW_COVER_LIMIT, [])).to.revertedWith("contract paused");
-    //         await solaceCoverProduct.connect(governor).setPaused(false);
-    //     });
+        it("cannot update while paused", async () => {
+            await solaceCoverProduct.connect(governor).setPaused(true);
+            await expect(solaceCoverProduct.connect(policyholder1).updateCoverLimit(NEW_COVER_LIMIT, [])).to.revertedWith("contract paused");
+            await solaceCoverProduct.connect(governor).setPaused(false);
+        });
 
-    //     it("cannot update if max cover is exceeded", async () => {
-    //         await expect(solaceCoverProduct.connect(policyholder1).updateCoverLimit(maxCover.add(1), [])).to.revertedWith("insufficient capacity for new cover");
-    //     });
+        it("cannot update if max cover is exceeded", async () => {
+            await expect(solaceCoverProduct.connect(policyholder1).updateCoverLimit(maxCover.add(1), [])).to.revertedWith("insufficient capacity for new cover");
+        });
 
-    //     it("cannot update if max cover for the strategy is exceeded", async () => {
-    //         await expect(solaceCoverProduct.connect(policyholder1).updateCoverLimit(maxCoverPerStrategy.add(1), [])).to.revertedWith("insufficient capacity for new cover");
-    //     });
+        it("cannot update if max cover for the strategy is exceeded", async () => {
+            await expect(solaceCoverProduct.connect(policyholder1).updateCoverLimit(maxCoverPerStrategy.add(1), [])).to.revertedWith("insufficient capacity for new cover");
+        });
 
-    //     it("cannot update if below minimum required account balance for newCoverLimit", async () => {
-    //         let maxRateNum = await solaceCoverProduct.maxRateNum();
-    //         let maxRateDenom = await solaceCoverProduct.maxRateDenom();
-    //         let chargeCycle = await solaceCoverProduct.chargeCycle();
-    //         let accountBalance = await solaceCoverProduct.accountBalanceOf(policyholder1.address)
-    //         let maxPermissibleNewCoverLimit = accountBalance.mul(maxRateDenom).div(maxRateNum).div(chargeCycle)
-    //         await expect(solaceCoverProduct.connect(policyholder1).updateCoverLimit(maxPermissibleNewCoverLimit.add(ONE_ETH), [])).to.revertedWith("insufficient deposit for minimum required account balance");
-    //     })
-
-    //     it("policy owner can update policy", async () => {
-    //         let activeCoverLimit = initialSoteriaActiveCoverLimit.add(NEW_COVER_LIMIT).sub(initialPolicyCoverLimit);
+        it("cannot update if below minimum required account balance for newCoverLimit", async () => {
+            let maxRateNum = await solaceCoverProduct.maxRateNum();
+            let maxRateDenom = await solaceCoverProduct.maxRateDenom();
+            let chargeCycle = await solaceCoverProduct.chargeCycle();
+            let accountBalance = await solaceCoverProduct.accountBalanceOf(policyholder1.address)
+            let maxPermissibleNewCoverLimit = accountBalance.mul(maxRateDenom).div(maxRateNum).div(chargeCycle)
             
-    //         let tx = await solaceCoverProduct.connect(policyholder1).updateCoverLimit(NEW_COVER_LIMIT, []);
+            // Temporarily increase underwriting pool balance to avoid running into "insufficient capacity for new cover" revert
+            await coverageDataProvider.connect(governor).set("underwritingPool", ONE_MILLION_DAI.mul(1000000));
+            await expect(solaceCoverProduct.connect(policyholder1).updateCoverLimit(maxPermissibleNewCoverLimit.add(ONE_ETH), [])).to.revertedWith("insufficient deposit for minimum required account balance");
+            await coverageDataProvider.connect(governor).set("underwritingPool", ONE_MILLION_DAI);
 
-    //         await expect(tx).emit(solaceCoverProduct, "PolicyUpdated").withArgs(POLICY_ID_1);
-    //         await expect(tx).emit(riskManager, "ActiveCoverLimitUpdated").withArgs(solaceCoverProduct.address, initialRMActiveCoverLimit, initialRMActiveCoverLimit.add(NEW_COVER_LIMIT).sub(initialPolicyCoverLimit));
-    //         expect(await solaceCoverProduct.connect(policyholder1).activeCoverLimit()).to.equal(activeCoverLimit);
-    //         expect(await solaceCoverProduct.connect(policyholder1).coverLimitOf(POLICY_ID_1)).to.equal(NEW_COVER_LIMIT);
-    //     });
+        })
 
-    //     it("should update risk manager active cover limit", async () => {
-    //         let amount1 = initialRMActiveCoverLimit.add(NEW_COVER_LIMIT).sub(initialPolicyCoverLimit);
-    //         let amount2 = initialRMActiveCoverLimitForSoteria.add(NEW_COVER_LIMIT).sub(initialPolicyCoverLimit);
-
-    //         expect(await riskManager.activeCoverLimit()).to.equal(amount1);
-    //         expect(await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address)).to.equal(amount2);
-    //     });
-
-    //     it("should update risk manager mcr", async () => {         
-    //         let amount1 = initialMCR.add(NEW_COVER_LIMIT).sub(initialPolicyCoverLimit);
-    //         let amount2 = initialMCRForSoteria.add(NEW_COVER_LIMIT).sub(initialPolicyCoverLimit);
-    //         expect(await riskManager.minCapitalRequirement()).to.equal(amount1);
-    //         expect(await riskManager.minCapitalRequirementPerStrategy(solaceCoverProduct.address)).to.equal(amount2);
-    //     });
-
-    //     it("will exit cooldown when cover limit updated", async () => {
-    //         let initialCoverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_1);
-    //         expect (await solaceCoverProduct.cooldownStart(policyholder1.address)).eq(0)
-    //         // deactivatePolicy() is the only way to start cooldown
-    //         await solaceCoverProduct.connect(policyholder1).deactivatePolicy();
-    //         expect (await solaceCoverProduct.cooldownStart(policyholder1.address)).gt(0)
-    //         await solaceCoverProduct.connect(policyholder1).updateCoverLimit(initialCoverLimit, []);
-    //         expect (await solaceCoverProduct.cooldownStart(policyholder1.address)).eq(0)
-    //     })
-    //     it("cannot use own referral code", async () => {
-    //         let ownReferralCode = await getSoteriaReferralCode(policyholder1, solaceCoverProduct)
-    //         let coverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_1);
-    //         await expect(solaceCoverProduct.connect(policyholder1).updateCoverLimit(coverLimit, ownReferralCode)).to.revertedWith("cannot refer to self");
-    //     })
-    //     it("cannot use referral code of an inactive policy holder", async () => {
-    //         expect(await solaceCoverProduct.policyStatus(POLICY_ID_3)).eq(false)
-    //         let referralCode = await getSoteriaReferralCode(policyholder3, solaceCoverProduct)
-    //         let coverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_2);
-    //         await expect(solaceCoverProduct.connect(policyholder2).updateCoverLimit(coverLimit, referralCode)).to.revertedWith("referrer must be active policy holder");
-    //     })
-    //     it("will not give reward points if isReferralOn == false", async () => {
-    //         // Set isReferralOn to false
-    //         await solaceCoverProduct.connect(governor).setIsReferralOn(false);
-    //         expect(await solaceCoverProduct.isReferralOn()).eq(false)
-
-    //         // Get valid referral code (we know it is valid, because it works in the next unit test)
-    //         let referralCode = await getSoteriaReferralCode(policyholder1, solaceCoverProduct)
-    //         let coverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_2);
-
-    //         // Attempt to use referral code
-    //         let tx = await solaceCoverProduct.connect(policyholder2).updateCoverLimit(coverLimit, referralCode);
-
-    //         // Prove that no reward points were rewarded
-    //         expect (await solaceCoverProduct.rewardPointsOf(policyholder1.address)).eq(0)
-    //         expect (await solaceCoverProduct.rewardPointsOf(policyholder2.address)).eq(0)
-
-    //         // Set isReferralOn back to true (default)
-    //         await solaceCoverProduct.connect(governor).setIsReferralOn(true);
-    //         expect(await solaceCoverProduct.isReferralOn()).eq(true)
-    //     })
-    //     it("can use referral code only once", async () => {
-    //         let referralCode = await getSoteriaReferralCode(policyholder1, solaceCoverProduct)
-    //         let coverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_2);
-
-    //         let tx = await solaceCoverProduct.connect(policyholder2).updateCoverLimit(coverLimit, referralCode);
-    //         await expect(tx).emit(solaceCoverProduct, "ReferralRewardsEarned").withArgs(policyholder1.address, REFERRAL_REWARD);
-    //         await expect(tx).emit(solaceCoverProduct, "ReferralRewardsEarned").withArgs(policyholder2.address, REFERRAL_REWARD);
-    //         expect (await solaceCoverProduct.rewardPointsOf(policyholder1.address)).eq(REFERRAL_REWARD)
-    //         expect (await solaceCoverProduct.rewardPointsOf(policyholder2.address)).eq(REFERRAL_REWARD)
-
-    //         // Attempt to use another referral code
-    //         tx = await solaceCoverProduct.connect(policyholder3).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, 0, 0, []);
-    //         await expect(tx).emit(solaceCoverProduct, "PolicyCreated").withArgs(POLICY_ID_3);
-    //         referralCode = await getSoteriaReferralCode(policyholder3, solaceCoverProduct)
-    //         await expect(solaceCoverProduct.connect(policyholder2).updateCoverLimit(coverLimit, referralCode)).to.revertedWith("cannot use referral code again");
-
-    //         // Reset state to avoid side effects impacting consequent unit tests
-    //         await solaceCoverProduct.connect(coverPromotionAdmin).setRewardPoints(policyholder1.address, 0);
-    //         await solaceCoverProduct.connect(coverPromotionAdmin).setRewardPoints(policyholder2.address, 0);
-    //         expect(await solaceCoverProduct.rewardPointsOf(policyholder1.address)).eq(0)
-    //         expect(await solaceCoverProduct.rewardPointsOf(policyholder2.address)).eq(0)
-    //     })
-    // });
-
-    // describe("deactivatePolicy", () => {
-    //     it("cannot deactivate an invalid policy", async () => {
-    //         await expect(solaceCoverProduct.connect(policyholder4).deactivatePolicy()).to.revertedWith("invalid policy");
-    //     });
-
-    //     it("policy owner can deactivate policy", async () => {
-    //         // let tx = await solaceCoverProduct.connect(policyholder3).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, 0, {value: ONE_ETH});
-    //         // await expect(tx).emit(solaceCoverProduct, "PolicyCreated").withArgs(POLICY_ID_3);
-
-    //         let initialPolicyholderETHBalance = await policyholder3.getBalance();
-    //         let initialPolicyholderAccountBalance = await solaceCoverProduct.accountBalanceOf(policyholder3.address)
-    //         let initialPolicyCoverLimit = await solaceCoverProduct.connect(policyholder3).coverLimitOf(POLICY_ID_3);
-    //         let initialActiveCoverLimit = await solaceCoverProduct.connect(policyholder3).activeCoverLimit();
-    //         let initialAvailableCoverCapacity = await solaceCoverProduct.availableCoverCapacity();
-    //         let initialRMActiveCoverLimit = await riskManager.activeCoverLimit();
-    //         let initialRMActiveCoverLimitForSoteria = await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address);
-    //         expect(await solaceCoverProduct.cooldownStart(policyholder3.address)).eq(0)
-
-    //         // deactivate policy
-    //         let tx = await solaceCoverProduct.connect(policyholder3).deactivatePolicy();
-    //         await expect(tx).emit(solaceCoverProduct, "PolicyDeactivated").withArgs(POLICY_ID_3);
-    //         await expect(tx).emit(riskManager, "ActiveCoverLimitUpdated").withArgs(solaceCoverProduct.address, initialRMActiveCoverLimit, initialRMActiveCoverLimit.sub(initialPolicyCoverLimit));
+        it("policy owner can update policy", async () => {
+            let activeCoverLimit = initialSoteriaActiveCoverLimit.add(NEW_COVER_LIMIT).sub(initialPolicyCoverLimit);
             
-    //         // user balance should not change
-    //         let receipt = await tx.wait();
-    //         let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
-    //         expect(await policyholder3.getBalance()).eq(initialPolicyholderETHBalance.sub(gasCost))
-    //         expect(await solaceCoverProduct.accountBalanceOf(policyholder3.address)).to.equal(initialPolicyholderAccountBalance);
+            let tx = await solaceCoverProduct.connect(policyholder1).updateCoverLimit(NEW_COVER_LIMIT, []);
 
-    //         // soteria active cover amount should be decreased
-    //         expect(await solaceCoverProduct.activeCoverLimit()).to.equal(initialActiveCoverLimit.sub(initialPolicyCoverLimit));
+            await expect(tx).emit(solaceCoverProduct, "PolicyUpdated").withArgs(POLICY_ID_1);
+            await expect(tx).emit(riskManager, "ActiveCoverLimitUpdated").withArgs(solaceCoverProduct.address, initialRMActiveCoverLimit, initialRMActiveCoverLimit.add(NEW_COVER_LIMIT).sub(initialPolicyCoverLimit));
+            expect(await solaceCoverProduct.connect(policyholder1).activeCoverLimit()).to.equal(activeCoverLimit);
+            expect(await solaceCoverProduct.connect(policyholder1).coverLimitOf(POLICY_ID_1)).to.equal(NEW_COVER_LIMIT);
+        });
 
-    //         // cover limit should be zero
-    //         expect(await solaceCoverProduct.coverLimitOf(POLICY_ID_3)).to.equal(ZERO_AMOUNT);
-    //         expect(await solaceCoverProduct.availableCoverCapacity()).eq(initialAvailableCoverCapacity.add(initialPolicyCoverLimit))
+        it("should update risk manager active cover limit", async () => {
+            let amount1 = initialRMActiveCoverLimit.add(NEW_COVER_LIMIT).sub(initialPolicyCoverLimit);
+            let amount2 = initialRMActiveCoverLimitForSoteria.add(NEW_COVER_LIMIT).sub(initialPolicyCoverLimit);
 
-    //         // policy status should be inactive
-    //         expect(await solaceCoverProduct.policyStatus(POLICY_ID_3)).to.be.false;
+            expect(await riskManager.activeCoverLimit()).to.equal(amount1);
+            expect(await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address)).to.equal(amount2);
+        });
 
-    //         // risk manager active cover amount and active cover amount for soteria should be decreased
-    //         expect(await riskManager.activeCoverLimit()).to.equal(initialRMActiveCoverLimit.sub(initialPolicyCoverLimit));
-    //         expect(await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address)).to.equal(initialRMActiveCoverLimitForSoteria.sub(initialPolicyCoverLimit));
+        it("should update risk manager mcr", async () => {         
+            let amount1 = initialMCR.add(NEW_COVER_LIMIT).sub(initialPolicyCoverLimit);
+            let amount2 = initialMCRForSoteria.add(NEW_COVER_LIMIT).sub(initialPolicyCoverLimit);
+            expect(await riskManager.minCapitalRequirement()).to.equal(amount1);
+            expect(await riskManager.minCapitalRequirementPerStrategy(solaceCoverProduct.address)).to.equal(amount2);
+        });
 
-    //         // cooldown should be set
-    //         expect(await solaceCoverProduct.cooldownStart(policyholder3.address)).gt(0)
-    //     });
-    // });
+        it("will exit cooldown when cover limit updated", async () => {
+            let initialCoverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_1);
+            expect (await solaceCoverProduct.cooldownStart(policyholder1.address)).eq(0)
+            // deactivatePolicy() is the only way to start cooldown
+            await solaceCoverProduct.connect(policyholder1).deactivatePolicy();
+            expect (await solaceCoverProduct.cooldownStart(policyholder1.address)).gt(0)
+            await solaceCoverProduct.connect(policyholder1).updateCoverLimit(initialCoverLimit, []);
+            expect (await solaceCoverProduct.cooldownStart(policyholder1.address)).eq(0)
+        })
+        it("cannot use own referral code", async () => {
+            let ownReferralCode = await getSolaceReferralCode(policyholder1, solaceCoverProduct)
+            let coverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_1);
+            await expect(solaceCoverProduct.connect(policyholder1).updateCoverLimit(coverLimit, ownReferralCode)).to.revertedWith("cannot refer to self");
+        })
+        it("cannot use referral code of an inactive policy holder", async () => {
+            expect(await solaceCoverProduct.policyStatus(POLICY_ID_3)).eq(false)
+            let referralCode = await getSolaceReferralCode(policyholder3, solaceCoverProduct)
+            let coverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_2);
+            await expect(solaceCoverProduct.connect(policyholder2).updateCoverLimit(coverLimit, referralCode)).to.revertedWith("referrer must be active policy holder");
+        })
+        it("will not give reward points if isReferralOn == false", async () => {
+            // Set isReferralOn to false
+            await solaceCoverProduct.connect(governor).setIsReferralOn(false);
+            expect(await solaceCoverProduct.isReferralOn()).eq(false)
 
-    // describe("withdraw", () => {
-    //     let initialAccountBalance: BN;
-    //     let initialAccountDAIBalance: BN;
-    //     let initialPolicyCover:BN;
-    //     let initialPolicyholderDAIBalance: BN;
-    //     let initialSoteriaDAIBalance: BN;
-    //     let initialActiveCoverLimit: BN;
-    //     let initialAvailableCoverCapacity: BN;
-    //     let initialRMActiveCoverLimit: BN;
-    //     let initialRMActiveCoverLimitForSoteria: BN;
+            // Get valid referral code (we know it is valid, because it works in the next unit test)
+            let referralCode = await getSolaceReferralCode(policyholder1, solaceCoverProduct)
+            let coverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_2);
 
-    //     let maxRateNum: BN;
-    //     let maxRateDenom: BN;
-    //     let chargeCycle: BN;
-    //     let minRequiredAccountBalance: BN;
-    //     let withdrawAmount: BN;
-    //     let cooldownStart: BN;
-    //     let cooldownPeriod: BN;
+            // Attempt to use referral code
+            let tx = await solaceCoverProduct.connect(policyholder2).updateCoverLimit(coverLimit, referralCode);
 
-    //     before(async () => {
-    //         initialAccountBalance = await solaceCoverProduct.accountBalanceOf(policyholder3.address);
-    //         initialPolicyCover = await solaceCoverProduct.coverLimitOf(POLICY_ID_3);
+            // Prove that no reward points were rewarded
+            expect (await solaceCoverProduct.rewardPointsOf(policyholder1.address)).eq(0)
+            expect (await solaceCoverProduct.rewardPointsOf(policyholder2.address)).eq(0)
 
-    //         initialPolicyholderDAIBalance = await dai.balanceOf(policyholder3.address)
-    //         initialSoteriaDAIBalance = await dai.balanceOf(solaceCoverProduct.address)
+            // Set isReferralOn back to true (default)
+            await solaceCoverProduct.connect(governor).setIsReferralOn(true);
+            expect(await solaceCoverProduct.isReferralOn()).eq(true)
+        })
+        it("can use referral code only once", async () => {
+            let referralCode = await getSolaceReferralCode(policyholder1, solaceCoverProduct)
+            let coverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_2);
 
-    //         initialActiveCoverLimit = await solaceCoverProduct.connect(policyholder3).activeCoverLimit();
-    //         initialAvailableCoverCapacity = await solaceCoverProduct.availableCoverCapacity();
-    //         initialRMActiveCoverLimit = await riskManager.activeCoverLimit();
-    //         initialRMActiveCoverLimitForSoteria = await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address);
+            let tx = await solaceCoverProduct.connect(policyholder2).updateCoverLimit(coverLimit, referralCode);
+            await expect(tx).emit(solaceCoverProduct, "ReferralRewardsEarned").withArgs(policyholder1.address, REFERRAL_REWARD);
+            await expect(tx).emit(solaceCoverProduct, "ReferralRewardsEarned").withArgs(policyholder2.address, REFERRAL_REWARD);
+            expect (await solaceCoverProduct.rewardPointsOf(policyholder1.address)).eq(REFERRAL_REWARD)
+            expect (await solaceCoverProduct.rewardPointsOf(policyholder2.address)).eq(REFERRAL_REWARD)
 
-    //         maxRateNum = await solaceCoverProduct.maxRateNum();
-    //         maxRateDenom = await solaceCoverProduct.maxRateDenom();
-    //         chargeCycle = await solaceCoverProduct.chargeCycle();
-    //         minRequiredAccountBalance = maxRateNum.mul(chargeCycle).mul(INITIAL_COVER_LIMIT).div(maxRateDenom)
-    //         cooldownStart =  await solaceCoverProduct.cooldownStart(policyholder3.address)
-    //         cooldownPeriod = await solaceCoverProduct.cooldownPeriod()
-    //     })
+            // Attempt to use another referral code
+            tx = await solaceCoverProduct.connect(policyholder3).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, 0, []);
+            await expect(tx).emit(solaceCoverProduct, "PolicyCreated").withArgs(POLICY_ID_3);
+            referralCode = await getSolaceReferralCode(policyholder3, solaceCoverProduct)
+            await expect(solaceCoverProduct.connect(policyholder2).updateCoverLimit(coverLimit, referralCode)).to.revertedWith("cannot use referral code again");
+
+            // Reset state to avoid side effects impacting consequent unit tests
+            await solaceCoverProduct.connect(coverPromotionAdmin).setRewardPoints(policyholder1.address, 0);
+            await solaceCoverProduct.connect(coverPromotionAdmin).setRewardPoints(policyholder2.address, 0);
+            expect(await solaceCoverProduct.rewardPointsOf(policyholder1.address)).eq(0)
+            expect(await solaceCoverProduct.rewardPointsOf(policyholder2.address)).eq(0)
+        })
+    });
+
+    describe("deactivatePolicy", () => {
+        it("cannot deactivate an invalid policy", async () => {
+            await expect(solaceCoverProduct.connect(policyholder4).deactivatePolicy()).to.revertedWith("invalid policy");
+        });
+
+        it("policy owner can deactivate policy", async () => {
+            // let tx = await solaceCoverProduct.connect(policyholder3).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, 0, {value: ONE_ETH});
+            // await expect(tx).emit(solaceCoverProduct, "PolicyCreated").withArgs(POLICY_ID_3);
+
+            let initialPolicyholderETHBalance = await policyholder3.getBalance();
+            let initialPolicyholderAccountBalance = await solaceCoverProduct.accountBalanceOf(policyholder3.address)
+            let initialPolicyCoverLimit = await solaceCoverProduct.connect(policyholder3).coverLimitOf(POLICY_ID_3);
+            let initialActiveCoverLimit = await solaceCoverProduct.connect(policyholder3).activeCoverLimit();
+            let initialAvailableCoverCapacity = await solaceCoverProduct.availableCoverCapacity();
+            let initialRMActiveCoverLimit = await riskManager.activeCoverLimit();
+            let initialRMActiveCoverLimitForSoteria = await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address);
+            expect(await solaceCoverProduct.cooldownStart(policyholder3.address)).eq(0)
+
+            // deactivate policy
+            let tx = await solaceCoverProduct.connect(policyholder3).deactivatePolicy();
+            await expect(tx).emit(solaceCoverProduct, "PolicyDeactivated").withArgs(POLICY_ID_3);
+            await expect(tx).emit(riskManager, "ActiveCoverLimitUpdated").withArgs(solaceCoverProduct.address, initialRMActiveCoverLimit, initialRMActiveCoverLimit.sub(initialPolicyCoverLimit));
+            
+            // user balance should not change
+            let receipt = await tx.wait();
+            let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
+            expect(await policyholder3.getBalance()).eq(initialPolicyholderETHBalance.sub(gasCost))
+            expect(await solaceCoverProduct.accountBalanceOf(policyholder3.address)).to.equal(initialPolicyholderAccountBalance);
+
+            // soteria active cover amount should be decreased
+            expect(await solaceCoverProduct.activeCoverLimit()).to.equal(initialActiveCoverLimit.sub(initialPolicyCoverLimit));
+
+            // cover limit should be zero
+            expect(await solaceCoverProduct.coverLimitOf(POLICY_ID_3)).to.equal(ZERO_AMOUNT);
+            expect(await solaceCoverProduct.availableCoverCapacity()).eq(initialAvailableCoverCapacity.add(initialPolicyCoverLimit))
+
+            // policy status should be inactive
+            expect(await solaceCoverProduct.policyStatus(POLICY_ID_3)).to.be.false;
+
+            // risk manager active cover amount and active cover amount for soteria should be decreased
+            expect(await riskManager.activeCoverLimit()).to.equal(initialRMActiveCoverLimit.sub(initialPolicyCoverLimit));
+            expect(await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address)).to.equal(initialRMActiveCoverLimitForSoteria.sub(initialPolicyCoverLimit));
+
+            // cooldown should be set
+            expect(await solaceCoverProduct.cooldownStart(policyholder3.address)).gt(0)
+        });
+    });
+
+    describe("withdraw", () => {
+        let initialAccountBalance: BN;
+        let initialAccountDAIBalance: BN;
+        let initialPolicyCover:BN;
+        let initialPolicyholderDAIBalance: BN;
+        let initialSoteriaDAIBalance: BN;
+        let initialActiveCoverLimit: BN;
+        let initialAvailableCoverCapacity: BN;
+        let initialRMActiveCoverLimit: BN;
+        let initialRMActiveCoverLimitForSoteria: BN;
+
+        let maxRateNum: BN;
+        let maxRateDenom: BN;
+        let chargeCycle: BN;
+        let minRequiredAccountBalance: BN;
+        let withdrawAmount: BN;
+        let cooldownStart: BN;
+        let cooldownPeriod: BN;
+
+        before(async () => {
+            initialAccountBalance = await solaceCoverProduct.accountBalanceOf(policyholder3.address);
+            initialPolicyCover = await solaceCoverProduct.coverLimitOf(POLICY_ID_3);
+
+            initialPolicyholderDAIBalance = await dai.balanceOf(policyholder3.address)
+            initialSoteriaDAIBalance = await dai.balanceOf(solaceCoverProduct.address)
+
+            initialActiveCoverLimit = await solaceCoverProduct.connect(policyholder3).activeCoverLimit();
+            initialAvailableCoverCapacity = await solaceCoverProduct.availableCoverCapacity();
+            initialRMActiveCoverLimit = await riskManager.activeCoverLimit();
+            initialRMActiveCoverLimitForSoteria = await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address);
+
+            maxRateNum = await solaceCoverProduct.maxRateNum();
+            maxRateDenom = await solaceCoverProduct.maxRateDenom();
+            chargeCycle = await solaceCoverProduct.chargeCycle();
+            minRequiredAccountBalance = maxRateNum.mul(chargeCycle).mul(INITIAL_COVER_LIMIT).div(maxRateDenom)
+            cooldownStart =  await solaceCoverProduct.cooldownStart(policyholder3.address)
+            cooldownPeriod = await solaceCoverProduct.cooldownPeriod()
+        })
         
-    //     it("cannot withdraw while paused", async () => {
-    //         await solaceCoverProduct.connect(governor).setPaused(true);
-    //         await expect(solaceCoverProduct.connect(policyholder3).withdraw(0)).to.revertedWith("contract paused");
-    //         await solaceCoverProduct.connect(governor).setPaused(false);
-    //     });
-    //     it("before cooldown complete, will withdraw such that remaining balance = minRequiredAccountBalance", async () => {
-    //         // Ensure we are before cooldown completion
-    //         const currentTimestamp = (await provider.getBlock('latest')).timestamp
-    //         expect(cooldownStart).gt(0)
-    //         expect(currentTimestamp).lt(cooldownStart.add(cooldownPeriod))
+        it("cannot withdraw while paused", async () => {
+            await solaceCoverProduct.connect(governor).setPaused(true);
+            await expect(solaceCoverProduct.connect(policyholder3).withdraw()).to.revertedWith("contract paused");
+            await solaceCoverProduct.connect(governor).setPaused(false);
+        });
+        it("before cooldown complete, will withdraw such that remaining balance = minRequiredAccountBalance", async () => {
+            // Ensure we are before cooldown completion
+            const currentTimestamp = (await provider.getBlock('latest')).timestamp
+            expect(cooldownStart).gt(0)
+            expect(currentTimestamp).lt(cooldownStart.add(cooldownPeriod))
             
-    //         withdrawAmount = initialAccountBalance.sub(minRequiredAccountBalance)
+            withdrawAmount = initialAccountBalance.sub(minRequiredAccountBalance)
 
-    //         let tx = await solaceCoverProduct.connect(policyholder3).withdraw(0);          
-    //         await expect(tx).emit(solaceCoverProduct, "WithdrawMade").withArgs(policyholder3.address, withdrawAmount);
+            let tx = await solaceCoverProduct.connect(policyholder3).withdraw();          
+            await expect(tx).emit(solaceCoverProduct, "WithdrawMade").withArgs(policyholder3.address, withdrawAmount);
 
-    //         expect(initialAccountBalance).gt(await solaceCoverProduct.accountBalanceOf(policyholder3.address))
-    //         expect(await solaceCoverProduct.accountBalanceOf(policyholder3.address)).eq(minRequiredAccountBalance)
-    //         expect(await dai.balanceOf(policyholder3.address)).eq(initialPolicyholderDAIBalance.add(withdrawAmount))
-    //         expect(await dai.balanceOf(solaceCoverProduct.address)).eq(initialSoteriaDAIBalance.sub(withdrawAmount))
-    //     })
-    //     it("after cooldown complete, can withdraw entire account balance", async () => {
-    //         const initialTimestamp = (await provider.getBlock('latest')).timestamp
-    //         const postCooldownTimestamp = initialTimestamp + cooldownPeriod.toNumber()
-    //         expect(BN.from(postCooldownTimestamp)).gt(cooldownStart.add(cooldownPeriod))
-    //         await provider.send("evm_mine", [postCooldownTimestamp])
+            expect(initialAccountBalance).gt(await solaceCoverProduct.accountBalanceOf(policyholder3.address))
+            expect(await solaceCoverProduct.accountBalanceOf(policyholder3.address)).eq(minRequiredAccountBalance)
+            expect(await dai.balanceOf(policyholder3.address)).eq(initialPolicyholderDAIBalance.add(withdrawAmount))
+            expect(await dai.balanceOf(solaceCoverProduct.address)).eq(initialSoteriaDAIBalance.sub(withdrawAmount))
+        })
+        it("after cooldown complete, can withdraw entire account balance", async () => {
+            const initialTimestamp = (await provider.getBlock('latest')).timestamp
+            const postCooldownTimestamp = initialTimestamp + cooldownPeriod.toNumber()
+            expect(BN.from(postCooldownTimestamp)).gt(cooldownStart.add(cooldownPeriod))
+            await provider.send("evm_mine", [postCooldownTimestamp])
             
-    //         let policyholderDAIBalance = await dai.balanceOf(policyholder3.address)
-    //         let soteriaDAIBalance = await dai.balanceOf(solaceCoverProduct.address)
-    //         let accountBalance = await solaceCoverProduct.accountBalanceOf(policyholder3.address)
-    //         let tx = await solaceCoverProduct.connect(policyholder3).withdraw(0);
-    //         await expect(tx).emit(solaceCoverProduct, "WithdrawMade").withArgs(policyholder3.address, accountBalance);
+            let policyholderDAIBalance = await dai.balanceOf(policyholder3.address)
+            let soteriaDAIBalance = await dai.balanceOf(solaceCoverProduct.address)
+            let accountBalance = await solaceCoverProduct.accountBalanceOf(policyholder3.address)
+            let tx = await solaceCoverProduct.connect(policyholder3).withdraw();
+            await expect(tx).emit(solaceCoverProduct, "WithdrawMade").withArgs(policyholder3.address, accountBalance);
 
-    //         expect(await solaceCoverProduct.accountBalanceOf(policyholder3.address)).eq(0);
-    //         expect(await dai.balanceOf(policyholder3.address)).eq(policyholderDAIBalance.add(accountBalance))
-    //         expect(await dai.balanceOf(solaceCoverProduct.address)).eq(soteriaDAIBalance.sub(accountBalance))
-    //     })
+            expect(await solaceCoverProduct.accountBalanceOf(policyholder3.address)).eq(0);
+            expect(await dai.balanceOf(policyholder3.address)).eq(policyholderDAIBalance.add(accountBalance))
+            expect(await dai.balanceOf(solaceCoverProduct.address)).eq(soteriaDAIBalance.sub(accountBalance))
+        })
 
-    //     after(async () => {
-    //         expect(await solaceCoverProduct.connect(policyholder3).activeCoverLimit()).eq(initialActiveCoverLimit)
-    //         expect(await solaceCoverProduct.availableCoverCapacity()).eq(initialAvailableCoverCapacity)
-    //         expect(await riskManager.activeCoverLimit()).eq(initialRMActiveCoverLimit)
-    //         expect(await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address)).eq(initialRMActiveCoverLimitForSoteria)
-    //     })
-    // });
+        after(async () => {
+            expect(await solaceCoverProduct.connect(policyholder3).activeCoverLimit()).eq(initialActiveCoverLimit)
+            expect(await solaceCoverProduct.availableCoverCapacity()).eq(initialAvailableCoverCapacity)
+            expect(await riskManager.activeCoverLimit()).eq(initialRMActiveCoverLimit)
+            expect(await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address)).eq(initialRMActiveCoverLimitForSoteria)
+        })
+    });
 
-    // describe("chargePremiums", () => {
-    //     it("cannot charge premiums by non premium collector", async () => {
-    //         await expect(solaceCoverProduct.connect(policyholder1).chargePremiums([policyholder1.address, policyholder2.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM])).to.revertedWith("not premium collector");
-    //     });
+    describe("chargePremiums", () => {
+        it("cannot charge premiums by non premium collector", async () => {
+            await expect(solaceCoverProduct.connect(policyholder1).chargePremiums([policyholder1.address, policyholder2.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM])).to.revertedWith("not premium collector");
+        });
 
-    //     it("cannot charge premiums if argument lengths are mismatched", async () => {
-    //         await expect(solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder1.address, policyholder2.address, policyholder3.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM])).to.revertedWith("length mismatch");
-    //     });
+        it("cannot charge premiums if argument lengths are mismatched", async () => {
+            await expect(solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder1.address, policyholder2.address, policyholder3.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM])).to.revertedWith("length mismatch");
+        });
 
-    //     it("cannot charge premiums if policy count is exceeded", async () => {
-    //         await expect(solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder1.address, policyholder2.address, policyholder3.address, policyholder4.address, policyholder5.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM])).to.revertedWith("policy count exceeded");
-    //     });
+        it("cannot charge premiums if policy count is exceeded", async () => {
+            await expect(solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder1.address, policyholder2.address, policyholder3.address, policyholder4.address, policyholder5.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM])).to.revertedWith("policy count exceeded");
+        });
 
-    //     it("cannot charge more than max rate", async () => {
-    //         await expect(solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder1.address, policyholder2.address], [WEEKLY_MAX_PREMIUM.mul(11).div(10), WEEKLY_MAX_PREMIUM.mul(11).div(10)])).to.revertedWith("charging more than promised maximum rate");
-    //     })
+        // it("cannot charge more than max rate", async () => {
+        //     await expect(solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder1.address, policyholder2.address], [WEEKLY_MAX_PREMIUM.mul(11).div(10), WEEKLY_MAX_PREMIUM.mul(11).div(10)])).to.revertedWith("charging more than promised maximum rate");
+        // })
 
     //     it("can charge premiums", async () => {
     //         // CASE 1 - Charge weekly premium for two policyholders, no reward points involved
@@ -1067,7 +1072,7 @@ describe("SolaceCoverProduct", function() {
     //         let EXCESS_REWARD_POINTS = WEEKLY_MAX_PREMIUM.mul(2)
     //         let INSUFFICIENT_REWARD_POINTS = WEEKLY_MAX_PREMIUM.div(10)
 
-    //         let referralCode = await getSoteriaReferralCode(policyholder2, solaceCoverProduct)
+    //         let referralCode = await getSolaceReferralCode(policyholder2, solaceCoverProduct)
     //         let coverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_1);
     //         let tx = await solaceCoverProduct.connect(policyholder1).updateCoverLimit(coverLimit, referralCode);
     //         let initialRewardPoints1 = await solaceCoverProduct.rewardPointsOf(policyholder1.address)
@@ -1183,7 +1188,7 @@ describe("SolaceCoverProduct", function() {
     //     //     await solaceCoverProduct.connect(premiumCollector).chargePremiums(ADDRESS_ARRAY, PREMIUM_ARRAY, 0);
     //     // })
 
-    // });
+    });
 
     // describe("USDC accounting with 6 decimal places", () => {
 

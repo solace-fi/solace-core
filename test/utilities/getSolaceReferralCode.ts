@@ -1,6 +1,6 @@
 import { Signature, Wallet, Contract, utils } from "ethers";
 
-export async function getSoteriaReferralCode(
+export async function getSolaceReferralCode(
   referrer: Wallet | Contract,
   solaceCoverProduct: Contract
 ): Promise<string> {
