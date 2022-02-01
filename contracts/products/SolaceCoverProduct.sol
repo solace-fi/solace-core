@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -221,12 +218,10 @@ contract SolaceCoverProduct is
      * @param newCoverLimit_ The new value to cover in **USD**.
      * @param referralCode_ Referral code
      */
-    function updateCoverLimit(uint256 newCoverLimit_, bytes calldata referralCode_)
-        external
-        override
-        nonReentrant
-        whileUnpaused
-    {
+    function updateCoverLimit(
+        uint256 newCoverLimit_, 
+        bytes calldata referralCode_
+    ) external override nonReentrant whileUnpaused {
         require(newCoverLimit_ > 0, "zero cover value");
         uint256 policyID = _policyOf[msg.sender];
         require(_exists(policyID), "invalid policy");
@@ -268,12 +263,7 @@ contract SolaceCoverProduct is
      * User Soteria account must have > minAccountBalance.
      * Otherwise account will be deactivated.
      */
-    function withdraw()
-        external
-        override
-        nonReentrant
-        whileUnpaused
-    {
+    function withdraw() external override nonReentrant whileUnpaused {
         if ( _hasCooldownPassed(msg.sender) ) {
           _withdraw(msg.sender, _accountBalanceOf[msg.sender]);
           _preDeactivateCoverLimitOf[_policyOf[msg.sender]] = 0;
@@ -281,7 +271,6 @@ contract SolaceCoverProduct is
           uint256 preDeactivateCoverLimit = _preDeactivateCoverLimitOf[_policyOf[msg.sender]];
           _withdraw(msg.sender, _accountBalanceOf[msg.sender] - _minRequiredAccountBalance(preDeactivateCoverLimit));
         }
-
     }
 
     /**
@@ -302,12 +291,7 @@ contract SolaceCoverProduct is
      * @notice Determine available capacity for new cover.
      * @return availableCoverCapacity_ The amount of available capacity for new cover.
      */
-    function availableCoverCapacity()
-        public
-        view
-        override
-        returns (uint256 availableCoverCapacity_)
-    {
+    function availableCoverCapacity() public view override returns (uint256 availableCoverCapacity_) {
         availableCoverCapacity_ = maxCover() - activeCoverLimit();
     }
 
@@ -316,12 +300,7 @@ contract SolaceCoverProduct is
      * @param policyholder_ The address of the policyholder.
      * @return rewardPoints_ The reward points for a policyholder.
      */
-    function rewardPointsOf(address policyholder_)
-        public
-        view
-        override
-        returns (uint256 rewardPoints_)
-    {
+    function rewardPointsOf(address policyholder_) public view override returns (uint256 rewardPoints_) {
         return _rewardPointsOf[policyholder_];
     }
 
@@ -330,12 +309,7 @@ contract SolaceCoverProduct is
      * @param policyID_ The id of the policy.
      * @return status True if policy is active. False otherwise.
      */
-    function policyStatus(uint256 policyID_)
-        public
-        view
-        override
-        returns (bool status)
-    {
+    function policyStatus(uint256 policyID_) public view override returns (bool status) {
         return coverLimitOf(policyID_) > 0 ? true : false;
     }
 
@@ -344,12 +318,7 @@ contract SolaceCoverProduct is
      * @param policyholder_ The address of the policyholder.
      * @return policyID The policy id.
      */
-    function policyOf(address policyholder_)
-        public
-        view
-        override
-        returns (uint256 policyID)
-    {
+    function policyOf(address policyholder_) public view override returns (uint256 policyID) {
         return _policyOf[policyholder_];
     }
 
@@ -373,12 +342,7 @@ contract SolaceCoverProduct is
      * @notice Returns [`RiskManager`](./RiskManager) contract address.
      * @return riskManager_ The `RiskManager` address.
      */
-    function riskManager()
-        external
-        view
-        override
-        returns (address riskManager_)
-    {
+    function riskManager() external view override returns (address riskManager_) {
         return address(_registry.get("riskManager"));
     }
 
@@ -440,12 +404,7 @@ contract SolaceCoverProduct is
      * @param policy_ The policy id.
      * @return amount The cover amount for given policy.
      */
-    function coverLimitOf(uint256 policy_)
-        public
-        view
-        override
-        returns (uint256 amount)
-    {
+    function coverLimitOf(uint256 policy_) public view override returns (uint256 amount) {
         return _coverLimitOf[policy_];
     }
 
@@ -453,12 +412,7 @@ contract SolaceCoverProduct is
      * @notice The minimum amount of time a user must wait to withdraw funds.
      * @return cooldownPeriod_ The cooldown period in seconds.
      */
-    function cooldownPeriod()
-        external
-        view
-        override
-        returns (uint256 cooldownPeriod_)
-    {
+    function cooldownPeriod() external view override returns (uint256 cooldownPeriod_) {
         return _cooldownPeriod;
     }
 
@@ -467,12 +421,7 @@ contract SolaceCoverProduct is
      * @param policyholder_ The policy holder
      * @return cooldownStart_ The cooldown period start expressed as Unix timestamp
      */
-    function cooldownStart(address policyholder_)
-        external
-        view
-        override
-        returns (uint256 cooldownStart_)
-    {
+    function cooldownStart(address policyholder_) external view override returns (uint256 cooldownStart_) {
         return _cooldownStart[policyholder_];
     }
 
@@ -497,12 +446,7 @@ contract SolaceCoverProduct is
      * @param policyholder The address to get balance.
      * @return balance The user balance in `USD`.
      */
-    function accountBalanceOf(address policyholder)
-        public
-        view
-        override
-        returns (uint256 balance)
-    {
+    function accountBalanceOf(address policyholder) public view override returns (uint256 balance) {
         return _accountBalanceOf[policyholder];
     }
 
@@ -540,11 +484,7 @@ contract SolaceCoverProduct is
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param cooldownPeriod_ Cooldown period in seconds.
      */
-    function setCooldownPeriod(uint256 cooldownPeriod_)
-        external
-        override
-        onlyGovernance
-    {
+    function setCooldownPeriod(uint256 cooldownPeriod_) external override onlyGovernance {
         _cooldownPeriod = cooldownPeriod_;
         emit CooldownPeriodSet(cooldownPeriod_);
     }
@@ -554,11 +494,7 @@ contract SolaceCoverProduct is
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param maxRateNum_ Desired maxRateNum.
      */
-    function setMaxRateNum(uint256 maxRateNum_)
-        external
-        override
-        onlyGovernance
-    {
+    function setMaxRateNum(uint256 maxRateNum_) external override onlyGovernance {
         _maxRateNum = maxRateNum_;
         emit MaxRateNumSet(maxRateNum_);
     }
@@ -568,11 +504,7 @@ contract SolaceCoverProduct is
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param maxRateDenom_ Desired maxRateDenom.
      */
-    function setMaxRateDenom(uint256 maxRateDenom_)
-        external
-        override
-        onlyGovernance
-    {
+    function setMaxRateDenom(uint256 maxRateDenom_) external override onlyGovernance {
         _maxRateDenom = maxRateDenom_;
         emit MaxRateDenomSet(maxRateDenom_);
     }
@@ -582,11 +514,7 @@ contract SolaceCoverProduct is
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param chargeCycle_ Desired chargeCycle.
      */
-    function setChargeCycle(uint256 chargeCycle_)
-        external
-        override
-        onlyGovernance
-    {
+    function setChargeCycle(uint256 chargeCycle_) external override onlyGovernance {
         _chargeCycle = chargeCycle_;
         emit ChargeCycleSet(chargeCycle_);
     }
@@ -621,14 +549,8 @@ contract SolaceCoverProduct is
      * @param policyholder_ The policy holder to set reward points for.
      * @param rewardPoints_ Desired amount of reward points.
      */
-    function setRewardPoints(address policyholder_, uint256 rewardPoints_)
-        external
-        override
-    {
-        require(
-            msg.sender == _registry.get("coverPromotionAdmin"),
-            "not cover promotion admin"
-        );
+    function setRewardPoints(address policyholder_, uint256 rewardPoints_) external override {
+        require(msg.sender == _registry.get("coverPromotionAdmin"), "not cover promotion admin");
         _rewardPointsOf[policyholder_] = rewardPoints_;
         emit RewardPointsSet(policyholder_, rewardPoints_);
     }
@@ -642,7 +564,10 @@ contract SolaceCoverProduct is
      * @param holders The policy holders.
      * @param premiums The premium amounts in `wei` per policy holder.
      */
-    function chargePremiums(address[] calldata holders, uint256[] calldata premiums) external override whileUnpaused {
+    function chargePremiums(
+        address[] calldata holders, 
+        uint256[] calldata premiums
+    ) external override whileUnpaused {
         uint256 count = holders.length;
         require(msg.sender == _registry.get("premiumCollector"), "not premium collector");
         require(count == premiums.length, "length mismatch");
@@ -737,7 +662,10 @@ contract SolaceCoverProduct is
      * @param policyholder The policy holder address.
      * @param amount The amount of fund to withdraw.
      */
-    function _withdraw(address policyholder, uint256 amount) internal whileUnpaused {
+    function _withdraw(
+        address policyholder, 
+        uint256 amount
+    ) internal whileUnpaused {
         SafeERC20.safeTransferFrom(getAsset(), address(this), policyholder, amount);
         _accountBalanceOf[policyholder] -= amount;
         emit WithdrawMade(policyholder, amount);
@@ -776,11 +704,7 @@ contract SolaceCoverProduct is
      * @notice Calculate minimum required account balance for a given cover limit
      * @param coverLimit cover limit.
      */
-    function _minRequiredAccountBalance(uint256 coverLimit)
-        internal
-        view
-        returns (uint256 minRequiredAccountBalance)
-    {
+    function _minRequiredAccountBalance(uint256 coverLimit) internal view returns (uint256 minRequiredAccountBalance) {
         minRequiredAccountBalance = (_maxRateNum * _chargeCycle * coverLimit) / _maxRateDenom;
     }
 
@@ -861,7 +785,7 @@ contract SolaceCoverProduct is
      * @notice Returns the underlying principal asset for `Solace Cover Product`.
      * @return asset The underlying asset.
     */
-    function getAsset() internal view returns (IERC20 asset){
+    function getAsset() internal view returns (IERC20 asset) {
         return IERC20(_registry.get("dai"));
     }
 
@@ -887,7 +811,6 @@ contract SolaceCoverProduct is
                     )
                 )
             );
-
         return digest;
     }
 }

@@ -91,8 +91,8 @@ interface ISolaceCoverProduct {
      * @notice Activates policy on the behalf of the policyholder.
      * @param policyholder_ Holder of the position to cover.
      * @param coverLimit_ The value to cover in **USD**.
-     * @param referralCode_ Referral code
      * @param amount_ The amount to deposit in order to activate the policy.
+     * @param referralCode_ Referral code
      * @return policyID The ID of newly created policy.
      */
     function activatePolicy(
@@ -107,7 +107,10 @@ interface ISolaceCoverProduct {
      * @param policyholder The holder of the policy.
      * @param amount The amount to deposit.
      */
-    function deposit(address policyholder, uint256 amount) external;
+    function deposit(
+        address policyholder, 
+        uint256 amount
+    ) external;
 
     /**
      * @notice Withdraw funds from Soteria account to user.
@@ -120,8 +123,10 @@ interface ISolaceCoverProduct {
      * @param newCoverLimit_ The new value to cover in **USD**.
      * @param referralCode_ Referral code
      */
-    function updateCoverLimit(uint256 newCoverLimit_, bytes calldata referralCode_)
-        external;
+    function updateCoverLimit(
+        uint256 newCoverLimit_, 
+        bytes calldata referralCode_
+    ) external;
 
     /**
      * @notice Deactivate a user's own policy.
@@ -144,40 +149,28 @@ interface ISolaceCoverProduct {
      * @notice Determine available capacity for new cover.
      * @return availableCoverCapacity_ The amount of available capacity for new cover.
      */
-    function availableCoverCapacity()
-        external
-        view
-        returns (uint256 availableCoverCapacity_);
+    function availableCoverCapacity() external view returns (uint256 availableCoverCapacity_);
 
     /**
      * @notice Return reward points for a policyholder.
      * @param policyholder_ The address of the policyholder.
      * @return rewardPoints_ The reward points for a policyholder.
      */
-    function rewardPointsOf(address policyholder_)
-        external
-        view
-        returns (uint256 rewardPoints_);
+    function rewardPointsOf(address policyholder_) external view returns (uint256 rewardPoints_);
 
     /**
      * @notice Returns the policyholder's policy id.
      * @param policyholder_ The address of the policyholder.
      * @return policyID The policy id.
      */
-    function policyOf(address policyholder_)
-        external
-        view
-        returns (uint256 policyID);
+    function policyOf(address policyholder_) external view returns (uint256 policyID);
 
     /**
      * @notice Returns whether if the policy is active or not.
      * @param policyID_ The id of the policy.
      * @return status True if policy is active. False otherwise.
      */
-    function policyStatus(uint256 policyID_)
-        external
-        view
-        returns (bool status);
+    function policyStatus(uint256 policyID_) external view returns (bool status);
 
     /**
      * @notice The maximum amount of cover that `Soteria Product` can be sold.
@@ -238,10 +231,7 @@ interface ISolaceCoverProduct {
      * @param policy_ The policy id.
      * @return amount The cover amount for given policy.
      */
-    function coverLimitOf(uint256 policy_)
-        external
-        view
-        returns (uint256 amount);
+    function coverLimitOf(uint256 policy_) external view returns (uint256 amount);
 
     /**
      * @notice The minimum amount of time a user must wait to withdraw funds.
@@ -254,10 +244,7 @@ interface ISolaceCoverProduct {
      * @param policyholder_ The policy holder
      * @return cooldownStart_ The cooldown period start expressed as Unix timestamp
      */
-    function cooldownStart(address policyholder_)
-        external
-        view
-        returns (uint256 cooldownStart_);
+    function cooldownStart(address policyholder_) external view returns (uint256 cooldownStart_);
 
     /**
      * @notice Gets the referral reward
@@ -342,8 +329,10 @@ interface ISolaceCoverProduct {
      * @param policyholder_ The policy holder to set reward points for.
      * @param rewardPoints_ Desired amount of reward points.
      */
-    function setRewardPoints(address policyholder_, uint256 rewardPoints_)
-        external;
+    function setRewardPoints(
+        address policyholder_, 
+        uint256 rewardPoints_
+    ) external;
 
     /***************************************
     PREMIUM COLLECTOR FUNCTIONS
