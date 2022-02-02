@@ -19,11 +19,9 @@ import "./../interfaces/bonds/IBondTellerErc20.sol";
  * @author solace.fi
  * @notice A bond teller that accepts an ERC20 as payment.
  *
- * Bond tellers allow users to buy bonds. After vesting for `vestingTerm`, bonds can be redeemed for [**SOLACE**](./../SOLACE) or [**xSOLACEV1**](./../staking/xSOLACEV1). Payments are made in `principal` which is sent to the underwriting pool and used to back risk.
+ * Bond tellers allow users to buy bonds. Payments are made in `principal` which is sent to the underwriting pool and used to back risk. Users will receive [**SOLACE**](./../SOLACE) but it must be bonded or staked. If bonded, the [**SOLACE**](./../SOLACE) will be vested linearly and redeemed over time. If staked, the [**SOLACE**](./../SOLACE) only be withdrawable after the lock expires but will give the user extra [**SOLACE**](./../SOLACE) rewards and voting rights.
  *
- * Bonds can be purchased via [`deposit()`](#deposit) or [`depositSigned()`](#depositsigned). Bonds are represented as ERC721s, can be viewed with [`bonds()`](#bonds), and redeemed with [`redeem()`](#redeem).
- *
- * Most of the implementation details are in [`BondTellerBase`](./BondTellerBase).
+ * Bonds can be purchased via [`deposit()`](#deposit) or [`depositSigned()`](#depositsigned). Bonds are represented as ERC721s, can be viewed with [`bonds()`](#bonds), and redeemed with [`claimRewards()`](#claimrewards). If staked, an [`xsLocker`](./../staking/xsLocker) lock is created instead of a bond.
  */
 contract BondTellerErc20 is IBondTellerErc20, ReentrancyGuard, ERC721EnhancedInitializable, Cloneable, GovernableInitializable {
 
@@ -79,10 +77,9 @@ contract BondTellerErc20 is IBondTellerErc20, ReentrancyGuard, ERC721EnhancedIni
 
     /**
      * @notice Creates a new `BondTellerERC20`. The new teller will be a minimal proxy to this instance.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param name_ The name of the bond token.
      * @param governance_ The address of the teller's [governor](/docs/protocol/governance).
-     * @param principal_ address The ERC20 token that users give.
+     * @param principal_ The ERC20 token that users give.
      * @param isPermittable_ True if `principal` supports `EIP2612`.
      * @param salt_ Input for deterministic address calculation.
      * @return teller The address of the new teller.
@@ -107,7 +104,7 @@ contract BondTellerErc20 is IBondTellerErc20, ReentrancyGuard, ERC721EnhancedIni
      * @param xsLocker_ The [**xsLocker**](./../staking/xsLocker) contract.
      * @param pool_ The underwriting pool.
      * @param dao_ The DAO.
-     * @param principal_ address The ERC20 token that users deposit.
+     * @param principal_ The ERC20 token that users deposit.
      * @param isPermittable_ True if `principal` supports `EIP2612`.
      * @param bondDepo_ The bond depository.
      */
@@ -204,10 +201,10 @@ contract BondTellerErc20 is IBondTellerErc20, ReentrancyGuard, ERC721EnhancedIni
      * @notice Create a bond by depositing `amount` of `principal`.
      * Principal will be transferred from `msg.sender` using `allowance`.
      * @param amount Amount of principal to deposit.
-     * @param minAmountOut The minimum [**SOLACE**](./../SOLACE) or [**xSOLACEV1**](./../staking/xSOLACEV1) out.
+     * @param minAmountOut The minimum [**SOLACE**](./../SOLACE) out.
      * @param depositor The bond recipient, default msg.sender.
      * @param stake True to stake, false to not stake.
-     * @return payout The amount of [**SOLACE**](./../SOLACE) or [**xSOLACEV1**](./../staking/xSOLACEV1) in the bond.
+     * @return payout The amount of [**SOLACE**](./../SOLACE) in the bond.
      * @return tokenID The ID of the newly created bond or lock.
      */
     function deposit(
@@ -229,14 +226,14 @@ contract BondTellerErc20 is IBondTellerErc20, ReentrancyGuard, ERC721EnhancedIni
      * Principal will be transferred from `depositor` using `permit`.
      * Note that not all ERC20s have a permit function, in which case this function will revert.
      * @param amount Amount of principal to deposit.
-     * @param minAmountOut The minimum [**SOLACE**](./../SOLACE) or [**xSOLACEV1**](./../staking/xSOLACEV1) out.
+     * @param minAmountOut The minimum [**SOLACE**](./../SOLACE) out.
      * @param depositor The bond recipient, default msg.sender.
      * @param stake True to stake, false to not stake.
      * @param deadline Time the transaction must go through before.
      * @param v secp256k1 signature
      * @param r secp256k1 signature
      * @param s secp256k1 signature
-     * @return payout The amount of [**SOLACE**](./../SOLACE) or [**xSOLACEV1**](./../staking/xSOLACEV1) in the bond.
+     * @return payout The amount of [**SOLACE**](./../SOLACE) in the bond.
      * @return tokenID The ID of the newly created bond or lock.
      */
     function depositSigned(
@@ -293,10 +290,10 @@ contract BondTellerErc20 is IBondTellerErc20, ReentrancyGuard, ERC721EnhancedIni
     /**
      * @notice Create a bond by depositing `amount` of `principal`.
      * @param amount Amount of principal to deposit.
-     * @param minAmountOut The minimum [**SOLACE**](./../SOLACE) or [**xSOLACEV1**](./../staking/xSOLACEV1) out.
+     * @param minAmountOut The minimum [**SOLACE**](./../SOLACE) out.
      * @param depositor The bond recipient, default msg.sender.
      * @param stake True to stake, false to not stake.
-     * @return payout The amount of [**SOLACE**](./../SOLACE) or [**xSOLACEV1**](./../staking/xSOLACEV1) in the bond.
+     * @return payout The amount of [**SOLACE**](./../SOLACE) in the bond.
      * @return tokenID The ID of the newly created bond or lock.
      * @return protocolFee Amount of principal paid to dao
      */
@@ -531,7 +528,7 @@ contract BondTellerErc20 is IBondTellerErc20, ReentrancyGuard, ERC721EnhancedIni
      * @param xsLocker_ The [**xsLocker**](./../staking/xsLocker) contract.
      * @param pool_ The underwriting pool.
      * @param dao_ The DAO.
-     * @param principal_ address The ERC20 token that users deposit.
+     * @param principal_ The ERC20 token that users deposit.
      * @param isPermittable_ True if `principal` supports `EIP2612`.
      * @param bondDepo_ The bond depository.
      */
