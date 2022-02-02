@@ -28,7 +28,7 @@ export async function import_artifacts() {
 
   // product v2
   artifacts.ProductFactory = await tryImport(`${artifact_dir}/products/ProductFactory.sol/ProductFactory.json`);
-  artifacts.CoverageProduct = await tryImport(`${artifact_dir}/products/CoverageProduct.sol/CoverageProduct.json`);
+  artifacts.SolaceMarketProduct = await tryImport(`${artifact_dir}/products/SolaceMarketProduct.sol/SolaceMarketProduct.json`);
   artifacts.MockProductV2 = await tryImport(`${artifact_dir}/mocks/MockProductV2.sol/MockProductV2.json`);
   // investing v2
   artifacts.SOLACE = await tryImport(`${artifact_dir}/SOLACE.sol/SOLACE.json`);

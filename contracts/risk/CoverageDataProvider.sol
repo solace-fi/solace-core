@@ -33,6 +33,14 @@ contract CoverageDataProvider is ICoverageDataProvider, Governable {
     /// @notice The underwriting pool count
     uint256 public numOfPools;
 
+    /// @notice The pool updater.
+    address private _uwpUpdater;
+
+    modifier canUpdate() {
+      require(msg.sender == super.governance() || msg.sender == _uwpUpdater, "!governance");
+      _;
+    }
+
     /**
      * @notice Constructs the `CoverageDataProvider` contract.
      * @param governance The address of the [governor](/docs/protocol/governance).
@@ -49,7 +57,7 @@ contract CoverageDataProvider is ICoverageDataProvider, Governable {
       * @param uwpNames The underwriting pool values to set.
       * @param amounts The underwriting pool balances in `USD`.
     */
-    function reset(string[] calldata uwpNames, uint256[] calldata amounts) external override onlyGovernance {
+    function reset(string[] calldata uwpNames, uint256[] calldata amounts) external override canUpdate {
       require(uwpNames.length == amounts.length, "length mismatch");
       // delete current underwriting pools
       uint256 poolCount = numOfPools;
@@ -73,7 +81,7 @@ contract CoverageDataProvider is ICoverageDataProvider, Governable {
      * @param uwpName The underwriting pool name to set balance.
      * @param amount The balance of the underwriting pool in `USD`.
     */
-    function set(string calldata uwpName, uint256 amount) public override onlyGovernance {
+    function set(string calldata uwpName, uint256 amount) public override canUpdate {
       require(bytes(uwpName).length > 0, "empty underwriting pool name");
      
       _uwpBalanceOf[uwpName] = amount;
@@ -90,7 +98,7 @@ contract CoverageDataProvider is ICoverageDataProvider, Governable {
      * @notice Removes the given underwriting pool.
      * @param uwpName The underwriting pool name to remove.
     */
-    function remove(string calldata uwpName) external override onlyGovernance {
+    function remove(string calldata uwpName) external override canUpdate {
       uint256 index = _uwpToIndex[uwpName];
       if (index == 0) return;
 
@@ -142,5 +150,27 @@ contract CoverageDataProvider is ICoverageDataProvider, Governable {
     */
     function poolOf(uint256 index) external view override returns (string memory uwpName) {
       return _indexToUwp[index];
+    }
+
+    /**
+     * @notice Returns the underwriting pool bot updater address.
+     * @return uwpUpdater The bot address.
+    */
+    function getUwpUpdater() external view override returns (address uwpUpdater) {
+      return _uwpUpdater;
+    }
+
+    /***************************************
+     GOVERNANCE FUNCTIONS
+    ***************************************/
+    
+    /**
+     * @notice Sets the underwriting pool bot updater.
+     * @param uwpUpdater The bot address to set.
+    */
+    function setUwpUpdater(address uwpUpdater) external override onlyGovernance {
+      require(uwpUpdater != address(0x0), "zero address uwp updater");
+      _uwpUpdater = uwpUpdater;
+      emit UwpUpdaterSet(uwpUpdater);
     }
 }

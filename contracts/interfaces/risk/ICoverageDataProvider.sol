@@ -17,6 +17,9 @@ interface ICoverageDataProvider {
     /// @notice Emitted when underwriting pool is removed.
     event UnderwritingPoolRemoved(string uwpName);
 
+    /// @notice Emitted when underwriting pool updater is set.
+    event UwpUpdaterSet(address uwpUpdater);
+
     /***************************************
      MUTUATOR FUNCTIONS
     ***************************************/
@@ -65,4 +68,19 @@ interface ICoverageDataProvider {
     */
     function poolOf(uint256 index) external view returns (string memory uwpName);
 
+    /**
+     * @notice Returns the underwriting pool bot updater address.
+     * @return uwpUpdater The bot address.
+    */
+    function getUwpUpdater() external view returns (address uwpUpdater);
+
+    /***************************************
+     GOVERNANCE FUNCTIONS
+    ***************************************/
+    
+    /**
+     * @notice Sets the underwriting pool bot updater.
+     * @param uwpUpdater The bot address to set.
+    */
+    function setUwpUpdater(address uwpUpdater) external;
 }
