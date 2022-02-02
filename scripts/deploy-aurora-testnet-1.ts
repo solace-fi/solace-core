@@ -11,7 +11,7 @@ import { create2ContractAuroraTestnet } from "./create2ContractAuroraTestnet";
 import { logContractAddress } from "./utils";
 
 import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_importer";
-import { Deployer, Solace, Faucet, XsLocker, XSolace, StakingRewards } from "../typechain";
+import { Deployer, Solace, Faucet, XsLocker, XSolace, StakingRewards, BridgeWrapper } from "../typechain";
 import { expectDeployed, isDeployed } from "../test/utilities/expectDeployed";
 
 const SINGLETON_FACTORY_ADDRESS     = "0x941F6f17Eade71E88D926FD9ca020dB535bDe573";
@@ -21,6 +21,8 @@ const FAUCET_ADDRESS                = "0x501acEC6005979Be31C0c1d962A922c3a609C71
 const XSLOCKER_ADDRESS              = "0x501ACebF0918c99546b65cEdCD430e0D4A8E9167";
 const STAKING_REWARDS_ADDRESS       = "0x501ACe4D89f596296C66f14D087a4BbB53Ed2049";
 const XSOLACE_ADDRESS               = "0x501ACEF0358fb055027A89AE46387a53C75498e0";
+const BSOLACE_ADDRESS               = "0x38373AEF7C0ebaF67530A46e49981e77c68A829F";
+const BRIDGE_WRAPPER_ADDRESS        = "0x501ACeed7aae8875aC8bb881e6849979f91Ea160";
 
 let artifacts: ArtifactImports;
 let deployerContract: Deployer;
@@ -29,6 +31,7 @@ let faucet: Faucet;
 let xslocker: XsLocker;
 let xsolace: XSolace;
 let stakingRewards: StakingRewards;
+let wrapper: BridgeWrapper;
 
 let signerAddress: string;
 //let multisigAddress = "0xc47911f768c6fE3a9fe076B95e93a33Ed45B7B34";
@@ -47,6 +50,7 @@ async function main() {
   await deployXSLocker();
   await deployStakingRewards();
   await deployXSOLACE();
+  await deployBridgeWrapper();
 
   await logAddresses();
 }
@@ -161,6 +165,32 @@ async function deployXSOLACE() {
   }
 }
 
+async function deployBridgeWrapper() {
+  await expectDeployed(solace.address);
+  await expectDeployed(BSOLACE_ADDRESS);
+  if(await isDeployed(BRIDGE_WRAPPER_ADDRESS)) {
+    wrapper = (await ethers.getContractAt(artifacts.BridgeWrapper.abi, BRIDGE_WRAPPER_ADDRESS)) as BridgeWrapper;
+  } else {
+    console.log("Deploying Bridge Wrapper");
+    var res = await create2ContractAuroraTestnet(deployer, artifacts.BridgeWrapper, [SOLACE_ADDRESS, BSOLACE_ADDRESS], {}, "", deployerContract.address);
+    wrapper = (await ethers.getContractAt(artifacts.BridgeWrapper.abi, res.address)) as BridgeWrapper;
+    await expectDeployed(wrapper.address);
+    console.log(`Deployed Bridge Wrapper to ${wrapper.address}`);
+    console.log("Adding BridgeWrapper as SOLACE minter");
+    let tx1 = await solace.connect(deployer).addMinter(wrapper.address);
+    await tx1.wait(10);
+    console.log("Added BridgeWrapper as SOLACE minter");
+  }
+  console.log('Unwrapping bSOLACE');
+  let tx1 = await wrapper.connect(deployer).bsolaceToSolace(0, signerAddress);
+  await tx1.wait(10);
+  console.log('Unwrapped bSOLACE');
+  console.log('Wrapping bSOLACE');
+  let tx2 = await wrapper.connect(deployer).solaceToBSolace(0, signerAddress);
+  await tx2.wait(10);
+  console.log('Wrapped bSOLACE');
+}
+
 async function logAddresses() {
   console.log("");
   console.log("| Contract Name                | Address                                      |");
@@ -172,6 +202,8 @@ async function logAddresses() {
   logContractAddress("xsLocker", xslocker.address);
   logContractAddress("StakingRewards", stakingRewards.address);
   logContractAddress("xSOLACE", xsolace.address);
+  logContractAddress("bSOLACE", BSOLACE_ADDRESS);
+  logContractAddress("Bridge Wrapper", wrapper.address);
 
   console.log(``);
   console.log(`Copy and paste this into the .env file in the frontend client.`)

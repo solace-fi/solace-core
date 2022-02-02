@@ -11,8 +11,8 @@ import { create2ContractAurora } from "./create2ContractAurora";
 import { logContractAddress } from "./utils";
 
 import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_importer";
-import { Deployer, Solace, XsLocker, XSolace, StakingRewards } from "../typechain";
-import { isDeployed } from "../test/utilities/expectDeployed";
+import { Deployer, Solace, XsLocker, XSolace, StakingRewards, BridgeWrapper } from "../typechain";
+import { expectDeployed, isDeployed } from "../test/utilities/expectDeployed";
 
 const SINGLETON_FACTORY_ADDRESS     = "0xce0042B868300000d44A59004Da54A005ffdcf9f";
 const DEPLOYER_CONTRACT_ADDRESS     = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
@@ -20,6 +20,8 @@ const SOLACE_ADDRESS                = "0x501acE9c35E60f03A2af4d484f49F9B1EFde9f4
 const XSLOCKER_ADDRESS              = "0x501Ace47c5b0C2099C4464f681c3fa2ECD3146C1";
 const STAKING_REWARDS_ADDRESS       = "0x501ace3D42f9c8723B108D4fBE29989060a91411";
 const XSOLACE_ADDRESS               = "0x501ACe802447B1Ed4Aae36EA830BFBde19afbbF9";
+const BSOLACE_ADDRESS               = "0x1BDA7007C9e3Bc33267E883864137aF8eb53CC2D";
+const BRIDGE_WRAPPER_ADDRESS        = "0x501ACE45014539C5574055794d8a82A3d31fcb54,";
 
 let artifacts: ArtifactImports;
 let deployerContract: Deployer;
@@ -27,6 +29,7 @@ let solace: Solace;
 let xslocker: XsLocker;
 let xsolace: XSolace;
 let stakingRewards: StakingRewards;
+let wrapper: BridgeWrapper;
 
 let signerAddress: string;
 //let multisigAddress = "0xc47911f768c6fE3a9fe076B95e93a33Ed45B7B34";
@@ -41,9 +44,9 @@ async function main() {
   await deployDeployerContract();
   await deploySOLACE();
   await deployXSLocker();
-
   await deployStakingRewards();
   await deployXSOLACE();
+  await deployBridgeWrapper();
 
   await logAddresses();
 }
@@ -121,6 +124,38 @@ async function deployStakingRewards() {
   let tx4 = await solace.connect(deployer).mint(stakingRewards.address, solacePerYear);
   await tx4.wait(10);
   */
+
+  /*
+  let tenMil = BN.from("10000000000000000000000000");
+  let bal1 = await solace.balanceOf(stakingRewards.address);
+  console.log(bal1.toString());
+  console.log(bal1.div(ONE_ETHER).toString())
+  console.log(bal1.div(ONE_ETHER).div(1000000).toString())
+
+  let bal2 = await solace.balanceOf(signerAddress);
+  console.log(bal2.toString());
+  console.log(bal2.div(ONE_ETHER).toString())
+  console.log(bal2.div(ONE_ETHER).div(1000000).toString())
+
+  if(bal1.gt(tenMil)) {
+    console.log('rescuing tokens');
+    let tx1 = await stakingRewards.connect(deployer).rescueTokens(solace.address, tenMil, signerAddress);
+    await tx1.wait(10);
+    console.log('burning tokens');
+    let tx2 = await solace.connect(deployer).burn(tenMil);
+    await tx2.wait(10);
+  }
+
+  bal1 = await solace.balanceOf(stakingRewards.address);
+  console.log(bal1.toString());
+  console.log(bal1.div(ONE_ETHER).toString())
+  console.log(bal1.div(ONE_ETHER).div(1000000).toString())
+
+  bal2 = await solace.balanceOf(signerAddress);
+  console.log(bal2.toString());
+  console.log(bal2.div(ONE_ETHER).toString())
+  console.log(bal2.div(ONE_ETHER).div(1000000).toString())
+  */
 }
 
 async function deployXSOLACE() {
@@ -135,6 +170,32 @@ async function deployXSOLACE() {
   }
 }
 
+async function deployBridgeWrapper() {
+  await expectDeployed(solace.address);
+  await expectDeployed(BSOLACE_ADDRESS);
+  if(await isDeployed(BRIDGE_WRAPPER_ADDRESS)) {
+    wrapper = (await ethers.getContractAt(artifacts.BridgeWrapper.abi, BRIDGE_WRAPPER_ADDRESS)) as BridgeWrapper;
+  } else {
+    console.log("Deploying Bridge Wrapper");
+    var res = await create2ContractAurora(deployer, artifacts.BridgeWrapper, [SOLACE_ADDRESS, BSOLACE_ADDRESS], {}, "", deployerContract.address);
+    wrapper = (await ethers.getContractAt(artifacts.BridgeWrapper.abi, res.address)) as BridgeWrapper;
+    await expectDeployed(wrapper.address);
+    console.log(`Deployed Bridge Wrapper to ${wrapper.address}`);
+    console.log("Adding BridgeWrapper as SOLACE minter");
+    let tx1 = await solace.connect(deployer).addMinter(wrapper.address);
+    await tx1.wait(10);
+    console.log("Added BridgeWrapper as SOLACE minter");
+  }
+  console.log('Unwrapping bSOLACE');
+  let tx1 = await wrapper.connect(deployer).bsolaceToSolace(0, signerAddress);
+  await tx1.wait(10);
+  console.log('Unwrapped bSOLACE');
+  console.log('Wrapping bSOLACE');
+  let tx2 = await wrapper.connect(deployer).solaceToBSolace(0, signerAddress);
+  await tx2.wait(10);
+  console.log('Wrapped bSOLACE');
+}
+
 async function logAddresses() {
   console.log("");
   console.log("| Contract Name                | Address                                      |");
@@ -145,6 +206,8 @@ async function logAddresses() {
   logContractAddress("xsLocker", xslocker.address);
   logContractAddress("StakingRewards", stakingRewards.address);
   logContractAddress("xSOLACE", xsolace.address);
+  logContractAddress("bSOLACE", BSOLACE_ADDRESS);
+  logContractAddress("Bridge Wrapper", wrapper.address);
 
   console.log(``);
   console.log(`Copy and paste this into the .env file in the frontend client.`)
