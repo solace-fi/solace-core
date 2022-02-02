@@ -13,16 +13,20 @@ import { config as dotenv_config } from "dotenv";
 dotenv_config();
 const USE_PROCESSED_FILES = process.env.USE_PROCESSED_FILES === "true";
 
-const mainnet_fork = { url: process.env.MAINNET_URL || '', blockNumber: 13741230 };
-const rinkeby_fork = { url: process.env.RINKEBY_URL || '', blockNumber: 9757125 };
+const mainnet_fork = { url: process.env.MAINNET_URL || '', blockNumber: 14111407 };
+const rinkeby_fork = { url: process.env.RINKEBY_URL || '', blockNumber: 10069000 };
 const kovan_fork = { url: process.env.KOVAN_URL || '', blockNumber: 28627875 };
 const goerli_fork = { url: process.env.GOERLI_URL || '', blockNumber: 6267645 };
+const aurora_fork = { url: process.env.AURORA_URL || '' };
+const aurora_testnet_fork = { url: process.env.AURORA_TESTNET_URL || '' };
 const no_fork = undefined;
 const forking = (
     process.env.FORK_NETWORK === "mainnet"        ? mainnet_fork
   : process.env.FORK_NETWORK === "rinkeby"        ? rinkeby_fork
   : process.env.FORK_NETWORK === "kovan"          ? kovan_fork
   : process.env.FORK_NETWORK === "goerli"         ? goerli_fork
+  : process.env.FORK_NETWORK === "aurora"         ? aurora_fork
+  : process.env.FORK_NETWORK === "aurora_testnet" ? aurora_testnet_fork
   : no_fork
 );
 const hardhat_network = process.env.FORK_NETWORK ? {forking} : {};
@@ -51,6 +55,16 @@ const config: HardhatUserConfig = {
       url: process.env.GOERLI_URL || '',
       chainId: 5,
       accounts: JSON.parse(process.env.GOERLI_ACCOUNTS || '[]')
+    },
+    aurora: {
+      url: process.env.AURORA_URL || '',
+      chainId: 1313161554,
+      accounts: JSON.parse(process.env.AURORA_ACCOUNTS || '[]')
+    },
+    aurora_testnet: {
+      url: process.env.AURORA_TESTNET_URL || '',
+      chainId: 1313161555,
+      accounts: JSON.parse(process.env.AURORA_TESTNET_ACCOUNTS || '[]')
     },
   },
   solidity: {
