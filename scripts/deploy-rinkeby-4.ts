@@ -11,7 +11,7 @@ import { create2Contract } from "./create2Contract";
 import { logContractAddress } from "./utils";
 
 import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_importer";
-import { Deployer, Solace, XsLocker, XSolace, StakingRewards, XSolaceMigrator, FarmRewards, FarmRewardsV2, CoverageDataProvider, Registry, RiskManager, SolaceCoverProduct } from "../typechain";
+import { Deployer, CoverageDataProvider, Registry, RiskManager, SolaceCoverProduct } from "../typechain";
 
 const DEPLOYER_CONTRACT_ADDRESS    = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
 
