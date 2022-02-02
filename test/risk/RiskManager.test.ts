@@ -37,6 +37,7 @@ describe("RiskManager", function () {
   const STRATEGY_STATUS_ACTIVE = 1;
   const STRATEGY_STATUS_INACTIVE = 0;
   const ONE_ETH = BN.from("1000000000000000000");
+  const TEN_THOUSAND_DAI = ONE_ETH.mul(10000); // 10000 DAI
 
   before(async function () {
     artifacts = await import_artifacts();
@@ -51,7 +52,7 @@ describe("RiskManager", function () {
     policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address, registry.address])) as PolicyManager;
     await registry.connect(governor).set(["policyManager"], [policyManager.address])
     await registry.connect(governor).set(["solace"], [solace.address])
-    coverageDataProvider = (await deployContract(deployer, artifacts.CoverageDataProvider, [governor.address, registry.address, priceOracle.address, solaceUsdcPool.address])) as CoverageDataProvider;
+    coverageDataProvider = (await deployContract(deployer, artifacts.CoverageDataProvider, [governor.address])) as CoverageDataProvider;
     await registry.connect(governor).set(["coverageDataProvider"], [coverageDataProvider.address])
     riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
     await registry.connect(governor).set(["riskManager"], [riskManager.address])
@@ -282,6 +283,7 @@ describe("RiskManager", function () {
     });
 
     it("cannot set weight if allocation drops under the strategy mcr", async function() {
+      await coverageDataProvider.connect(governor).set("underwritingPool", TEN_THOUSAND_DAI);
       let maxCover = await riskManager.connect(governor).maxCover();
       let maxCoverPerStrategy = await riskManager.connect(governor).maxCoverPerStrategy(riskStrategy.address);
       expect(maxCover).to.gt(0);
@@ -297,9 +299,8 @@ describe("RiskManager", function () {
 
   describe("max cover amount", function () {
     it("can cover", async function () {
-      expect(await vault.totalAssets()).to.equal(ONE_ETH);
-      expect(await riskManager.maxCover()).to.equal(ONE_ETH);
-      expect(await riskManager.maxCoverPerStrategy(riskStrategy.address)).to.equal(ONE_ETH);
+      expect(await riskManager.maxCover()).to.equal(TEN_THOUSAND_DAI);
+      expect(await riskManager.maxCoverPerStrategy(riskStrategy.address)).to.equal(TEN_THOUSAND_DAI);
     });
   });
 
