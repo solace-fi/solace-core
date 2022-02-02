@@ -9,6 +9,7 @@ chai.use(solidity);
 import { import_artifacts, ArtifactImports } from "./../utilities/artifact_importer";
 import { Registry, Solace, Weth9, MockErc20, Deployer } from "./../../typechain";
 import { toBytes32 } from "./../utilities/setStorage";
+import { expectDeployed } from "../utilities/expectDeployed";
 
 describe("Deployer", function () {
 
@@ -25,6 +26,7 @@ describe("Deployer", function () {
     artifacts = await import_artifacts();
     await owner.sendTransaction({to:owner.address}); // for some reason this helps solidity-coverage
     deployerContract = (await deployContract(owner, artifacts.Deployer)) as Deployer;
+    await expectDeployed(deployerContract.address);
   });
 
   describe("CREATE", async function () {
@@ -81,6 +83,7 @@ describe("Deployer", function () {
       //console.log('gas used:', gasUsed.toNumber());
       await expect(tx).to.emit(deployerContract, "ContractDeployed").withArgs(predictedAddress);
       solaceAddress = predictedAddress;
+      await expectDeployed(predictedAddress);
     });
     it("can manipulate contract address", async function () {
       // predict deployment
@@ -98,6 +101,7 @@ describe("Deployer", function () {
       await expect(tx).to.emit(deployerContract, "ContractDeployed").withArgs(predictedAddress);
       solaceAddress = predictedAddress;
       solace = (await ethers.getContractAt(artifacts.SOLACE.abi, predictedAddress)) as Solace;
+      await expectDeployed(predictedAddress);
     });
     it("can brute force a desired address", async function () {
       // to brute force an exact address would cost $10B
@@ -118,6 +122,7 @@ describe("Deployer", function () {
       expect(found).eq(true);
       await deployerContract.deploy(initcode, toBytes32(salt), {gasLimit: 10000000});
       solace = (await ethers.getContractAt(artifacts.SOLACE.abi, predictedAddress)) as Solace;
+      await expectDeployed(predictedAddress);
       */
     });
     it("contract works", async function () {
@@ -142,7 +147,11 @@ describe("Deployer", function () {
       let saltBytes = salts.map(toBytes32);
       let predictedAddresses = await deployerContract.callStatic.deployMultiple(initcodes, saltBytes);
       let tx = await deployerContract.deployMultiple(initcodes, saltBytes);
-      predictedAddresses.forEach((addr: any) => { expect(tx).to.emit(deployerContract, "ContractDeployed").withArgs(addr); });
+      for(var i = 0; i < predictedAddresses.length; ++i) {
+        let addr = predictedAddresses[i];
+        await expect(tx).to.emit(deployerContract, "ContractDeployed").withArgs(addr);
+        await expectDeployed(addr);
+      }
       //let gasUsed = (await tx.wait()).gasUsed;
       //console.log('gas used:', gasUsed.toNumber());
     });
@@ -152,7 +161,11 @@ describe("Deployer", function () {
       let saltBytes = salts.map(toBytes32);
       let predictedAddresses = await deployerContract.callStatic.deployMultiple(initcodes, saltBytes);
       let tx = await deployerContract.deployMultiple(initcodes, saltBytes);
-      predictedAddresses.forEach((addr: any) => { expect(tx).to.emit(deployerContract, "ContractDeployed").withArgs(addr); });
+      for(var i = 0; i < predictedAddresses.length; ++i) {
+        let addr = predictedAddresses[i];
+        await expect(tx).to.emit(deployerContract, "ContractDeployed").withArgs(addr);
+        await expectDeployed(addr);
+      }
       //let gasUsed = (await tx.wait()).gasUsed;
       //console.log('gas used:', gasUsed.toNumber());
     });
@@ -162,7 +175,11 @@ describe("Deployer", function () {
       let saltBytes = salts.map(toBytes32);
       let predictedAddresses = await deployerContract.callStatic.deployMultiple(initcodes, saltBytes);
       let tx = await deployerContract.deployMultiple(initcodes, saltBytes);
-      predictedAddresses.forEach((addr: any) => { expect(tx).to.emit(deployerContract, "ContractDeployed").withArgs(addr); });
+      for(var i = 0; i < predictedAddresses.length; ++i) {
+        let addr = predictedAddresses[i];
+        await expect(tx).to.emit(deployerContract, "ContractDeployed").withArgs(addr);
+        await expectDeployed(addr);
+      }
       //let gasUsed = (await tx.wait()).gasUsed;
       //console.log('gas used:', gasUsed.toNumber());
     });
@@ -179,7 +196,11 @@ describe("Deployer", function () {
       let saltBytes = fill(contracts.length, toBytes32(0));
       let predictedAddresses = await deployerContract.callStatic.deployMultiple(initcodes, saltBytes);
       let tx = await deployerContract.deployMultiple(initcodes, saltBytes);
-      predictedAddresses.forEach((addr: any) => { expect(tx).to.emit(deployerContract, "ContractDeployed").withArgs(addr); });
+      for(var i = 0; i < predictedAddresses.length; ++i) {
+        let addr = predictedAddresses[i];
+        await expect(tx).to.emit(deployerContract, "ContractDeployed").withArgs(addr);
+        await expectDeployed(addr);
+      }
       //let gasUsed = (await tx.wait()).gasUsed;
       //console.log('gas used:', gasUsed.toNumber());
     });

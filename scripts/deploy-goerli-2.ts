@@ -30,25 +30,22 @@ const UNDERWRITING_POOL_ADDRESS     = "0x501ace27A074471F099ffFeC008Bd1b151c7F7d
 const BOND_DEPO_ADDRESS             = "0x501ACe2f00EC599D4FDeA408680e192f88D94D0D";
 const FAUCET_ADDRESS                = "0x501AcE6547eCd722EEa4a89d08b040ed09E955a4";
 
-const DAI_ADDRESS                   = "0x31a1D59460a9619ec6965a5684C6d3Ae470D0fE5";
+const DAI_ADDRESS                   = "0x6a49238e4d0fA003BA07fbd5ec8B6b045f980574";
 const DAI_BOND_TELLER_ADDRESS       = "0x501ACe677634Fd09A876E88126076933b686967a";
 
-const WETH_ADDRESS                  = "0xd0A1E359811322d97991E03f863a0C30C2cF029C";
+const WETH_ADDRESS                  = "0x714ECD380a9700086eadAc03297027bAf4686276";
 const ETH_BOND_TELLER_ADDRESS       = "0x501ACe95141F3eB59970dD64af0405f6056FB5d8";
 
-const USDC_ADDRESS                  = "0x512d93ADc3DF4E24cb4b26c44A91682Ec073F559";
+const USDC_ADDRESS                  = "0x995714E92a094Ea9b50e9F23934C36F86136A46c";
 const USDC_BOND_TELLER_ADDRESS      = "0x501ACE7E977e06A3Cb55f9c28D5654C9d74d5cA9";
 
-const WBTC_ADDRESS                  = "0x1063bf969F8D3D7296a2A94274D3df9202da2A3A";
+const WBTC_ADDRESS                  = "0xD129f9A01Eb0d41302A2F808e9Ebfd5eB92cE17C";
 const WBTC_BOND_TELLER_ADDRESS      = "0x501aCEF0d0c73BD103337e6E9Fd49d58c426dC27";
 
-const USDT_ADDRESS                  = "0xAEA2B0F4763c8Ffc33A4c454CD08F803B02B6B53";
+const USDT_ADDRESS                  = "0x92f2F8d238183f678a5652a04EDa83eD7BCfa99e";
 const USDT_BOND_TELLER_ADDRESS      = "0x501ACe5CeEc693Df03198755ee80d4CE0b5c55fE";
 
-const SCP_ADDRESS                   = "0x501AcEe83a6f269B77c167c6701843D454E2EFA0";
-const SCP_BOND_TELLER_ADDRESS       = "0x501ACe00FD8e5dB7C3be5e6D254ba4995e1B45b7";
-
-const FRAX_ADDRESS                  = "0x58B23b32a9774153E1E344762751aDfdca2764DD";
+const FRAX_ADDRESS                  = "0xA542486E4Dc48580fFf76B75b5c406C211218AE2";
 const FRAX_BOND_TELLER_ADDRESS      = "0x501aCef4F8397413C33B13cB39670aD2f17BfE62";
 
 let artifacts: ArtifactImports;
@@ -64,7 +61,6 @@ let weth: Weth9;
 let usdc: MockErc20;
 let wbtc: MockErc20;
 let usdt: MockErc20;
-let scp: any;
 let frax: MockErc20;
 
 let daiTeller: BondTellerErc20;
@@ -72,7 +68,6 @@ let ethTeller: BondTellerEth;
 let usdcTeller: BondTellerErc20;
 let wbtcTeller: BondTellerErc20;
 let usdtTeller: BondTellerErc20;
-let scpTeller: BondTellerErc20;
 let fraxTeller: BondTellerErc20;
 
 let signerAddress: string;
@@ -98,14 +93,13 @@ async function main() {
 
   // new underwriting
   await deployBondDepo();
-  await deployFaucet();
+  //await deployFaucet();
 
   await deployDaiTeller();
   await deployEthTeller();
   await deployUsdcTeller();
   await deployWbtcTeller();
   await deployUsdtTeller();
-  await deployScpTeller();
   await deployFraxTeller();
 
   await logAddresses();
@@ -194,8 +188,8 @@ async function deployEthTeller() {
   //const VESTING_TERM = 604800; // 7 days
   const VESTING_TERM = 600; // 10 minutes
   const HALF_LIFE = 2592000; // 30 days
-  const ONE_CENT_IN_ETH = BN.from("333333333333333"); // @ 1 eth = $3000
-  const ONE_TENTH_CENT_IN_ETH = BN.from("33333333333333");
+  const ONE_CENT_IN_ETH = BN.from("3968253968253"); // @ 1 eth = $2520
+  const ONE_TENTH_CENT_IN_ETH = BN.from("396825396825");
 
   const START_PRICE = ONE_CENT_IN_ETH.mul(8); // 8 cents
   const MAX_PAYOUT = BN.from("10000000000000000000000000") // 10 million SOLACE max single bond
@@ -271,15 +265,15 @@ async function deployWbtcTeller() {
   const VESTING_TERM = 600; // 10 minutes
   const HALF_LIFE = 2592000; // 30 days
 
-  const ONE_DOLLAR_IN_WBTC = BN.from("2697"); // @ BTC = $37077
-  const TEN_CENTS_IN_WBTC = BN.from("269");
+  const ONE_HUNDRETH_CENT_IN_WBTC = BN.from("2500"); // @ BTC ~= 40K
+  const ONE_THOUSANDTH_CENT_IN_WBTC = BN.from("250");
 
-  const START_PRICE = ONE_DOLLAR_IN_WBTC.mul(8).div(100); // 8 cents
+  const START_PRICE = ONE_HUNDRETH_CENT_IN_WBTC.mul(800); // 8 cents
   const MAX_PAYOUT = BN.from("10000000000000000000000000") // 10 million SOLACE max single bond
   const CAPACITY = BN.from("100000000000000000000000000"); // 100 million SOLACE max over lifetime
   // every 50,000 SOLACE bonded raises the price one tenth of a cent
-  const PRICE_ADJ_NUM = ONE_DOLLAR_IN_WBTC.div(10); // ten cents in DAI
-  const PRICE_ADJ_DENOM = BN.from("5000000000000000000000000"); //  5000,000 SOLACE
+  const PRICE_ADJ_NUM = ONE_THOUSANDTH_CENT_IN_WBTC;
+  const PRICE_ADJ_DENOM = BN.from("5000000000000000000000000"); // 5,000,000 SOLACE
   if(PRICE_ADJ_NUM.gt(MAX_UINT128) || PRICE_ADJ_DENOM.gt(MAX_UINT128)) throw `Uint128 too large: ${PRICE_ADJ_NUM.toString()} | ${PRICE_ADJ_DENOM.toString()} > ${MAX_UINT128.toString()}`;
 
   if(await isDeployed(WBTC_BOND_TELLER_ADDRESS)) {
@@ -335,39 +329,6 @@ async function deployUsdtTeller() {
     let tx4 = await usdtTeller.connect(deployer).setFees(500);
     await tx4.wait();
     console.log('USDT Teller - done');
-  }
-}
-
-async function deployScpTeller() {
-  const NAME = "Solace SCP Bond";
-  //const VESTING_TERM = 604800; // 7 days
-  const VESTING_TERM = 600; // 10 minutes
-  const HALF_LIFE = 2592000; // 30 days
-  const ONE_CENT_IN_SCP = BN.from("3968253968253"); // @ 1 eth = $2520
-  const ONE_TENTH_CENT_IN_SCP = BN.from("396825396825");
-
-  const START_PRICE = ONE_CENT_IN_SCP.mul(8); // 8 cents
-  const MAX_PAYOUT = BN.from("10000000000000000000000000") // 10 million SOLACE max single bond
-  const CAPACITY = BN.from("100000000000000000000000000"); // 100 million SOLACE max over lifetime
-  // every 50,000 SOLACE bonded raises the price one tenth of a cent
-  const PRICE_ADJ_NUM = ONE_TENTH_CENT_IN_SCP; // tenth of a cent in SCP
-  const PRICE_ADJ_DENOM = BN.from("50000000000000000000000"); // 50,000 SOLACE
-  if(PRICE_ADJ_NUM.gt(MAX_UINT128) || PRICE_ADJ_DENOM.gt(MAX_UINT128)) throw `Uint128 too large: ${PRICE_ADJ_NUM.toString()} | ${PRICE_ADJ_DENOM.toString()} > ${MAX_UINT128.toString()}`;
-
-  if(await isDeployed(SCP_BOND_TELLER_ADDRESS)) {
-    scpTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, SCP_BOND_TELLER_ADDRESS)) as BondTellerErc20;
-  } else {
-    console.log("SCP Teller - deploy");
-    var salt = "0x000000000000000000000000000000000000000000000000000000000244cea9";
-    scpTeller = await cloneTeller(daiTeller, NAME, SCP_ADDRESS, true, salt);
-    console.log(`SCP Teller - deployed to ${scpTeller.address}`);
-    console.log('SCP Teller - set terms');
-    let tx2 = await scpTeller.connect(deployer).setTerms({startPrice: START_PRICE, minimumPrice: START_PRICE, maxPayout: MAX_PAYOUT, priceAdjNum: PRICE_ADJ_NUM, priceAdjDenom: PRICE_ADJ_DENOM, capacity: CAPACITY, capacityIsPayout: true, startTime: BOND_START_TIME, endTime: MAX_UINT40, globalVestingTerm: VESTING_TERM, halfLife: HALF_LIFE}, {gasLimit: 300000});
-    await tx2.wait();
-    console.log('SCP teller - add to bond depo');
-    let tx3 = await bondDepo.connect(deployer).addTeller(scpTeller.address);
-    await tx3.wait();
-    console.log('SCP Teller - done');
   }
 }
 
@@ -496,14 +457,12 @@ async function logAddresses() {
   logContractAddress("USDC Bond Teller", usdcTeller.address);
   logContractAddress("WBTC Bond Teller", wbtcTeller.address);
   logContractAddress("USDT Bond Teller", usdtTeller.address);
-  logContractAddress("SCP Bond Teller", scpTeller.address);
   logContractAddress("FRAX Bond Teller", fraxTeller.address);
   logContractAddress("DAI", DAI_ADDRESS);
   logContractAddress("WETH", WETH_ADDRESS);
   logContractAddress("USDC", USDC_ADDRESS);
   logContractAddress("WBTC", WBTC_ADDRESS);
   logContractAddress("USDT", USDT_ADDRESS);
-  logContractAddress("SCP", SCP_ADDRESS);
   logContractAddress("FRAX", FRAX_ADDRESS);
 }
 

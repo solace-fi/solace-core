@@ -13,6 +13,7 @@ chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./../utilities/artifact_importer";
 import { MockGovernableInitializable } from "./../../typechain";
+import { expectDeployed } from "../utilities/expectDeployed";
 
 describe("GovernableInitializable", function() {
   let artifacts: ArtifactImports;
@@ -41,6 +42,7 @@ describe("GovernableInitializable", function() {
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
 
     governable = (await deployContract(deployer, artifacts.MockGovernableInitializable, [governor.address])) as MockGovernableInitializable;
+    await expectDeployed(governable.address);
   });
 
   describe("deployment", function () {

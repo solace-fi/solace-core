@@ -14,12 +14,12 @@ import { isDeployed } from "../test/utilities/expectDeployed";
 let artifacts: ArtifactImports;
 
 let initialized = false;
-const SINGLETON_FACTORY_ADDRESS = "0xce0042B868300000d44A59004Da54A005ffdcf9f";
+const SINGLETON_FACTORY_ADDRESS = "0x941F6f17Eade71E88D926FD9ca020dB535bDe573";
 let knownHashes: any = {"0x0": {"0x0": {"address": "0x0", "salt": "0x0"}}}; // initcode -> deployer contract -> address, salt
 
 // deploys a new contract using CREATE2
 // call like you would waffle.deployContract
-export async function create2Contract(wallet: Signer, factoryOrContractJson: ContractJSON, args: any[] | undefined = [], overrideOptions = {}, contractPath: string = "", deployerAddress: string = SINGLETON_FACTORY_ADDRESS) {
+export async function create2ContractAuroraTestnet(wallet: Signer, factoryOrContractJson: ContractJSON, args: any[] | undefined = [], overrideOptions = {}, contractPath: string = "", deployerAddress: string = SINGLETON_FACTORY_ADDRESS) {
   _init();
   var initCode = await _initCodeGetter(wallet, factoryOrContractJson, args, overrideOptions);
   var [address, salt] = _hasher(initCode, deployerAddress);
@@ -67,6 +67,11 @@ async function _initCodeGetter(wallet: Signer, factoryOrContractJson: ContractJS
   try {
     contract = await deployContract(failDeployer, factoryOrContractJson, args, overrideOptions);
   } catch(e: any) {
+    //console.log('create2Contract._initCodeGetter');
+    //console.log(e)
+    // reason: 'AlchemyProvider does not currently support EIP-1559',
+    // code: 'UNSUPPORTED_OPERATION',
+    // operation: 'estimateGas'
     if(!e.tx || !e.tx.data) console.error(e);
     return e.tx.data;
   }
@@ -83,17 +88,11 @@ function _hasher(initCode: string, deployerAddress: string): [string, string] {
   }
   // 0xff ++ deployingAddress is fixed:
   var string1 = '0xff'.concat(deployerAddress.substring(2));
-  //var string1 = '0xffce0042B868300000d44A59004Da54A005ffdcf9f'
   // hash the initCode
   var string2 = keccak256(Buffer.from(initCode.substring(2), 'hex')).toString('hex');
-  //console.log(`hashing\n${string1}\n${string2}`);
   // In each loop, i is the value of the salt we are checking
-  for (var i = 0; i < 72057594037927936; i++) {
-  //for (var i =    6440000; i < 72057594037927936; i++) {
-  //for (var i =  8821000; i < 72057594037927936; i++) {
-  //for (var i = 27000000; i < 72057594037927936; i++) {
-  //for (var i = 100000000; i < 72057594037927936; i++) {
-    //if(i % 1000000 == 0) console.log(i.toLocaleString('en-US'));
+  //for (var i = 0; i < 72057594037927936; i++) {
+  for (var i = 210000000; i < 72057594037927936; i++) {
     // 1. Convert i to hex, and it pad to 32 bytes:
     var saltToBytes = i.toString(16).padStart(64, '0');
     // 2. Concatenate this between the other 2 strings
@@ -121,15 +120,15 @@ function _hasher(initCode: string, deployerAddress: string): [string, string] {
 // deploy the contract
 async function _deployer(wallet: Signer, initCode: string, salt: string, deployerAddress: string) {
   const ONE_GWEI = 1000000000;
-  const gas = 80 * ONE_GWEI;
+  const gas = 100 * ONE_GWEI;
   try {
     let deployerContract = await ethers.getContractAt(artifacts.SingletonFactory.abi, deployerAddress);
-    let tx = await deployerContract.connect(wallet).deploy(initCode, salt, {gasLimit: 6000000, maxFeePerGas: gas});
+    let tx = await deployerContract.connect(wallet).deploy(initCode, salt, {gasLimit: 6000000, type: 0});
     let receipt = await tx.wait();
     return [tx.data, receipt.gasUsed.toString()]
     //return ["", "0"];
   } catch(e) {
-    console.error("error in create2Contract._deployer");
+    console.error("error in create2ContractAuroraTestnet._deployer");
     console.error(e);
     return ["0x0", "0"];
   }

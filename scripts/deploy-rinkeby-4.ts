@@ -189,7 +189,6 @@ async function deploySolaceCoverProduct() {
   await tx.wait();
 }
 
-
 async function logAddresses() {
   console.log("");
   console.log("| Contract Name                | Address                                      |");

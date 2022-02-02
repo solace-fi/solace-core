@@ -11,6 +11,7 @@ import { getERC20PermitSignature } from "./../utilities/getERC20PermitSignature"
 
 import { import_artifacts, ArtifactImports } from "./../utilities/artifact_importer";
 import { Solace, XsLocker, MockListener } from "./../../typechain";
+import { expectDeployed } from "../utilities/expectDeployed";
 
 // contracts
 let solace: Solace;
@@ -55,6 +56,7 @@ describe("xsLocker", function () {
     });
     it("deploys", async function () {
       xslocker = (await deployContract(deployer, artifacts.xsLocker, [governor.address, solace.address])) as XsLocker;
+      await expectDeployed(xslocker.address);
     });
     it("initializes properly", async function () {
       expect(await xslocker.MAX_LOCK_DURATION()).eq(60*60*24*365*4);

@@ -19,7 +19,7 @@ let knownHashes: any = {"0x0": {"0x0": {"address": "0x0", "salt": "0x0"}}}; // i
 
 // deploys a new contract using CREATE2
 // call like you would waffle.deployContract
-export async function create2Contract(wallet: Signer, factoryOrContractJson: ContractJSON, args: any[] | undefined = [], overrideOptions = {}, contractPath: string = "", deployerAddress: string = SINGLETON_FACTORY_ADDRESS) {
+export async function create2ContractAurora(wallet: Signer, factoryOrContractJson: ContractJSON, args: any[] | undefined = [], overrideOptions = {}, contractPath: string = "", deployerAddress: string = SINGLETON_FACTORY_ADDRESS) {
   _init();
   var initCode = await _initCodeGetter(wallet, factoryOrContractJson, args, overrideOptions);
   var [address, salt] = _hasher(initCode, deployerAddress);
@@ -124,12 +124,12 @@ async function _deployer(wallet: Signer, initCode: string, salt: string, deploye
   const gas = 80 * ONE_GWEI;
   try {
     let deployerContract = await ethers.getContractAt(artifacts.SingletonFactory.abi, deployerAddress);
-    let tx = await deployerContract.connect(wallet).deploy(initCode, salt, {gasLimit: 6000000, maxFeePerGas: gas});
+    let tx = await deployerContract.connect(wallet).deploy(initCode, salt, {gasLimit: 6000000});
     let receipt = await tx.wait();
     return [tx.data, receipt.gasUsed.toString()]
     //return ["", "0"];
   } catch(e) {
-    console.error("error in create2Contract._deployer");
+    console.error("error in create2ContractAurora._deployer");
     console.error(e);
     return ["0x0", "0"];
   }

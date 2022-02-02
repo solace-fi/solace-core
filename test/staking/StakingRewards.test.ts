@@ -10,6 +10,7 @@ chai.use(solidity);
 import { import_artifacts, ArtifactImports } from "./../utilities/artifact_importer";
 import { Solace, XsLocker, StakingRewards } from "./../../typechain";
 import { bnAddSub, bnMulDiv, expectClose } from "./../utilities/math";
+import { expectDeployed } from "../utilities/expectDeployed";
 
 // contracts
 let solace: Solace;
@@ -72,6 +73,7 @@ describe("StakingRewards", function () {
     });
     it("deploys", async function () {
       stakingRewards = (await deployContract(deployer, artifacts.StakingRewards, [governor.address, solace.address, xslocker.address, solacePerSecond])) as StakingRewards;
+      await expectDeployed(stakingRewards.address);
     });
     it("initializes properly", async function () {
       expect(await stakingRewards.MAX_LOCK_DURATION()).eq(MAX_LOCK_DURATION);

@@ -13,6 +13,7 @@ chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./../utilities/artifact_importer";
 import { Solace } from "./../../typechain";
+import { expectDeployed } from "../utilities/expectDeployed";
 
 describe("Governance", function() {
   let artifacts: ArtifactImports;
@@ -43,6 +44,7 @@ describe("Governance", function() {
 
     // deploy solace
     solace = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
+    await expectDeployed(solace.address);
   });
 
   describe("deployment", function () {

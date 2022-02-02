@@ -31,6 +31,7 @@ export async function import_artifacts() {
   artifacts.SolaceMarketProduct = await tryImport(`${artifact_dir}/products/SolaceMarketProduct.sol/SolaceMarketProduct.json`);
   artifacts.MockProductV2 = await tryImport(`${artifact_dir}/mocks/MockProductV2.sol/MockProductV2.json`);
   // investing v2
+  artifacts.WETH10 = await tryImport(`${artifact_dir}/WETH10.sol/WETH10.json`);
   artifacts.SOLACE = await tryImport(`${artifact_dir}/SOLACE.sol/SOLACE.json`);
   // staking
   artifacts.xSOLACEV1 = await tryImport(`${artifact_dir}/staking/xSOLACEV1.sol/xSOLACEV1.json`);
@@ -50,16 +51,18 @@ export async function import_artifacts() {
   artifacts.Registry = await tryImport(`${artifact_dir}/utils/Registry.sol/Registry.json`);
   artifacts.SingletonFactory = await tryImport(`${artifact_dir}/interfaces/utils/ISingletonFactory.sol/ISingletonFactory.json`);
   artifacts.Deployer = await tryImport(`${artifact_dir}/utils/Deployer.sol/Deployer.json`);
+  // cross chain
+  artifacts.BridgeWrapper = await tryImport(`${artifact_dir}/BridgeWrapper.sol/BridgeWrapper.json`);
   // generic imports
   artifacts.ERC20 = await tryImport(`${artifact_dir}/SOLACE.sol/ERC20.json`);
   if(!artifacts.ERC20) artifacts.ERC20 = await tryImport(`../../artifacts/@openzeppelin/contracts/token/ERC20/ERC20.sol/ERC20.json`);
   artifacts.MockERC20 = await tryImport(`${artifact_dir}/mocks/MockERC20.sol/MockERC20.json`);
   artifacts.MockERC20Permit = await tryImport(`${artifact_dir}/mocks/MockERC20Permit.sol/MockERC20Permit.json`);
   artifacts.MockERC20Decimals = await tryImport(`${artifact_dir}/mocks/MockERC20Decimals.sol/MockERC20Decimals.json`);
-  artifacts.MockERC721v1 = await tryImport(`${artifact_dir}/mocks/MockERC721v1.sol/MockERC721v1.json`);
   artifacts.MockERC721 = await tryImport(`${artifact_dir}/mocks/MockERC721.sol/MockERC721.json`);
   artifacts.MockERC721Initializable = await tryImport(`${artifact_dir}/mocks/MockERC721Initializable.sol/MockERC721Initializable.json`);
   artifacts.MockERC1271 = await tryImport(`${artifact_dir}/mocks/MockERC1271.sol/MockERC1271.json`);
+  artifacts.MockCloneable = await tryImport(`${artifact_dir}/mocks/MockCloneable.sol/MockCloneable.json`);
   artifacts.MockGovernableInitializable = await tryImport(`${artifact_dir}/mocks/MockGovernableInitializable.sol/MockGovernableInitializable.json`);
   artifacts.MockFaultyReceiver = await tryImport(`${artifact_dir}/mocks/MockFaultyReceiver.sol/MockFaultyReceiver.json`);
   artifacts.GasGriefer = await tryImport(`${artifact_dir}/mocks/GasGriefer.sol/GasGriefer.json`);

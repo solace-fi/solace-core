@@ -11,402 +11,364 @@ import { create2Contract } from "./create2Contract";
 import { logContractAddress } from "./utils";
 
 import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_importer";
-import { Deployer, Solace, XSolace, BondDepository, BondTellerErc20, BondTellerEth, FarmRewards } from "../typechain";
+import { Deployer, Solace, BondDepository, BondTellerErc20, BondTellerEth, XsLocker } from "../typechain";
 import { BytesLike, constants } from "ethers";
-import { readFileSync } from "fs";
-import { getERC20PermitSignature } from "../test/utilities/getERC20PermitSignature";
+import { expectDeployed, isDeployed } from "../test/utilities/expectDeployed";
 
 const DEPLOYER_CONTRACT_ADDRESS    = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
 
-const BOND_START_TIME = BN.from("1638205200"); // 5 PM UTC November 29 2021
+const BOND_START_TIME = BN.from("1643655600"); // 11 AM PST / 7 PM UTC January 31 2022
 const MAX_UINT40 = BN.from("1099511627775");
 const MAX_UINT128 = BN.from(1).shl(128).sub(1);
 const ONE_ETHER = BN.from("1000000000000000000");
-const VESTING_TERM = 432000; // 5 days
-const HALF_LIFE = 2592000; // 30 days
-const FIFTY_THOUSAND_SOLACE = BN.from("50000000000000000000000");
+
+const ONE_GWEI = 1000000000;
+const MAX_FEE_PER_GAS = 100 * ONE_GWEI;
 
 const SOLACE_ADDRESS                = "0x501acE9c35E60f03A2af4d484f49F9B1EFde9f40";
-const XSOLACE_ADDRESS               = "0x501AcE5aC3Af20F49D53242B6D208f3B91cfc411";
+const XSLOCKER_ADDRESS              = "0x501Ace47c5b0C2099C4464f681c3fa2ECD3146C1";
 const UNDERWRITING_POOL_ADDRESS     = "0x5efC0d9ee3223229Ce3b53e441016efC5BA83435";
-const DAO_ADDRESS                   = "0xf075334df87f0a5d9fe6381b5035b60f384d6c2c";
-const BOND_DEPO_ADDRESS             = "0x501ACe81445C57fC438B358F861d3774199cE13c";
+const DAO_ADDRESS                   = "0xc47911f768c6fE3a9fe076B95e93a33Ed45B7B34";
+const BOND_DEPO_ADDRESS             = "0x501ACe2f00EC599D4FDeA408680e192f88D94D0D";
 
 const DAI_ADDRESS                   = "0x6B175474E89094C44Da98b954EedeAC495271d0F";
-const DAI_BOND_TELLER_ADDRESS       = "0x501AcE5FEe0337e13A442Cb5e15728EE0e8b3F29";
+const DAI_BOND_TELLER_ADDRESS       = "0x501ACe677634Fd09A876E88126076933b686967a";
 
 const WETH_ADDRESS                  = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
-const ETH_BOND_TELLER_ADDRESS       = "0x501ace68E20c29629E690D86E54E79719e2Fc5e8";
+const ETH_BOND_TELLER_ADDRESS       = "0x501ACe95141F3eB59970dD64af0405f6056FB5d8";
 
 const USDC_ADDRESS                  = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
-const USDC_BOND_TELLER_ADDRESS      = "0x501aCE044AE4E11183026659EE3B0E3b0Df04d7F";
-const SLP_USDC_ADDRESS              = "0x9C051F8A6648a51eF324D30C235da74D060153aC";
-const SLP_USDC_BOND_TELLER_ADDRESS  = "0x501acEb253483BD58773365334DEf095304CddAE";
+const USDC_BOND_TELLER_ADDRESS      = "0x501ACE7E977e06A3Cb55f9c28D5654C9d74d5cA9";
 
 const WBTC_ADDRESS                  = "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599";
-const WBTC_BOND_TELLER_ADDRESS      = "0x501aCE2f3b5B8f645E67556Df77ac4c3081D84C7";
+const WBTC_BOND_TELLER_ADDRESS      = "0x501aCEF0d0c73BD103337e6E9Fd49d58c426dC27";
 
 const USDT_ADDRESS                  = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
-const USDT_BOND_TELLER_ADDRESS      = "0x501acE6061D6176Da12FCBa36Bc85B2fc3FFd5e3";
+const USDT_BOND_TELLER_ADDRESS      = "0x501ACe5CeEc693Df03198755ee80d4CE0b5c55fE";
 
 const SCP_ADDRESS                   = "0x501AcEe83a6f269B77c167c6701843D454E2EFA0";
-const SCP_BOND_TELLER_ADDRESS       = "0x501aCE163FfaCDa6584D75b274eD23155BFf4812";
+const SCP_BOND_TELLER_ADDRESS       = "0x501ACe00FD8e5dB7C3be5e6D254ba4995e1B45b7";
 
 const FRAX_ADDRESS                  = "0x853d955aCEf822Db058eb8505911ED77F175b99e";
-
-const FARM_REWARDS_ADDRESS          = "0x501aCE3c1A6aA2f1C00A5A7F32B171e648e542F9";
+const FRAX_BOND_TELLER_ADDRESS      = "0x501aCef4F8397413C33B13cB39670aD2f17BfE62";
 
 let artifacts: ArtifactImports;
 let deployerContract: Deployer;
 
 let solace: Solace;
-let xsolace: XSolace;
+let xslocker: XsLocker;
 let bondDepo: BondDepository;
 
 let daiTeller: BondTellerErc20;
 let ethTeller: BondTellerEth;
 let usdcTeller: BondTellerErc20;
-let slpUsdcTeller: BondTellerErc20;
 let wbtcTeller: BondTellerErc20;
 let usdtTeller: BondTellerErc20;
 let scpTeller: BondTellerErc20;
-
-let farmRewards: FarmRewards;
+let fraxTeller: BondTellerErc20;
 
 let signerAddress: string;
-let tellerImplementationAddress: string;
 
 async function main() {
   artifacts = await import_artifacts();
   signerAddress = await deployer.getAddress();
   console.log(`Using ${signerAddress} as deployer and governor`);
 
-  if((await provider.getNetwork()).chainId == 31337) { // testnet
-    console.log('funding')
-    var [funder] = await hardhat.ethers.getSigners();
-    let tx = await funder.sendTransaction({to: signerAddress, value: BN.from("100000000000000000000")});
-    await tx.wait();
-  }
-
   deployerContract = (await ethers.getContractAt(artifacts.Deployer.abi, DEPLOYER_CONTRACT_ADDRESS)) as Deployer;
+  solace = (await ethers.getContractAt(artifacts.SOLACE.abi, SOLACE_ADDRESS)) as Solace;
+  xslocker = (await ethers.getContractAt(artifacts.xsLocker.abi, XSLOCKER_ADDRESS)) as XsLocker;
 
   // new underwriting
-  await deploySOLACE();
-  await deployXSOLACE();
-
   await deployBondDepo();
 
   await deployDaiTeller();
   await deployEthTeller();
 
   await deployUsdcTeller();
-  await deploySlpUsdcTeller();
   await deployWbtcTeller();
   await deployUsdtTeller();
   await deployScpTeller();
-
-  await deployFarmRewards();
+  await deployFraxTeller();
 
   await logAddresses();
 }
 
-async function deploySOLACE() {
-  if(!!SOLACE_ADDRESS) {
-    solace = (await ethers.getContractAt(artifacts.SOLACE.abi, SOLACE_ADDRESS)) as Solace;
-  } else {
-    console.log("Deploying SOLACE");
-    var res = await create2Contract(deployer,artifacts.SOLACE,[signerAddress], {}, "", deployerContract.address);
-    solace = (await ethers.getContractAt(artifacts.SOLACE.abi, res.address)) as Solace;
-    console.log(`Deployed SOLACE to ${solace.address}`);
-  }
-  /*
-  if(!(await solace.isMinter(deployer.address)) && (await solace.governance()) == signerAddress) {
-    console.log("Adding deployer as SOLACE minter");
-    let tx = await solace.connect(deployer).addMinter(deployer.address);
-    await tx.wait();
-  }
-  */
-}
-
-async function deployXSOLACE() {
-  if(!!XSOLACE_ADDRESS) {
-    xsolace = (await ethers.getContractAt(artifacts.xSOLACE.abi, XSOLACE_ADDRESS)) as XSolace;
-  } else {
-    console.log("Deploying xSOLACE");
-    var res = await create2Contract(deployer, artifacts.xSOLACE, [signerAddress, solace.address], {}, "", deployerContract.address);
-    xsolace = (await ethers.getContractAt(artifacts.xSOLACE.abi, res.address)) as XSolace;
-    console.log(`Deployed xSOLACE to ${xsolace.address}`);
-  }
-}
-
 async function deployBondDepo() {
-  if(!!BOND_DEPO_ADDRESS) {
+  console.log(`Bond Depo ${await isDeployed(BOND_DEPO_ADDRESS) ? "is" : "is not"} deployed`);
+  if(await isDeployed(BOND_DEPO_ADDRESS)) {
     bondDepo = (await ethers.getContractAt(artifacts.BondDepository.abi, BOND_DEPO_ADDRESS)) as BondDepository;
   } else {
     console.log("Deploying BondDepository");
-    var res = await create2Contract(deployer,artifacts.BondDepository, [signerAddress, solace.address, xsolace.address, UNDERWRITING_POOL_ADDRESS, DAO_ADDRESS], {}, "", deployerContract.address);
+    var res = await create2Contract(deployer,artifacts.BondDepository, [signerAddress, solace.address], {}, "", deployerContract.address);
     bondDepo = (await ethers.getContractAt(artifacts.BondDepository.abi, res.address)) as BondDepository;
     console.log(`Deployed BondDepository to ${bondDepo.address}`);
   }
 }
 
 async function deployDaiTeller() {
-  const ONE_CENT_IN_DAI = BN.from("10000000000000000");
-  const START_PRICE = ONE_CENT_IN_DAI.mul(10); // 10 cents
-  const MAX_PAYOUT = BN.from("1000000000000000000000000") // 1 million SOLACE max single bond
-  const CAPACITY = BN.from("10000000000000000000000000"); // 10 million SOLACE max over lifetime
-  const PRICE_ADJ_NUM = ONE_CENT_IN_DAI; // every 50,000 SOLACE bonded raises the price one cent
-  const PRICE_ADJ_DENOM = FIFTY_THOUSAND_SOLACE;
   const NAME = "Solace DAI Bond";
+  const VESTING_TERM = 604800; // 7 days
+  const HALF_LIFE = 2592000; // 30 days
+  const ONE_CENT_IN_DAI = BN.from("10000000000000000");
+  const ONE_TENTH_CENT_IN_DAI = BN.from("1000000000000000");
 
-  if(!!DAI_BOND_TELLER_ADDRESS) {
+  const START_PRICE = ONE_CENT_IN_DAI.mul(8); // 8 cents
+  const MAX_PAYOUT = BN.from("10000000000000000000000000") // 10 million SOLACE max single bond
+  const CAPACITY = BN.from("100000000000000000000000000"); // 100 million SOLACE max over lifetime
+  // every 50,000 SOLACE bonded raises the price one tenth of a cent
+  const PRICE_ADJ_NUM = ONE_TENTH_CENT_IN_DAI; // tenth of a cent in FRAX
+  const PRICE_ADJ_DENOM = BN.from("50000000000000000000000"); // 50,000 SOLACE
+  if(PRICE_ADJ_NUM.gt(MAX_UINT128) || PRICE_ADJ_DENOM.gt(MAX_UINT128)) throw `Uint128 too large: ${PRICE_ADJ_NUM.toString()} | ${PRICE_ADJ_DENOM.toString()} > ${MAX_UINT128.toString()}`;
+
+  console.log(`DAI teller ${await isDeployed(DAI_BOND_TELLER_ADDRESS) ? "is" : "is not"} deployed`);
+  if(await isDeployed(DAI_BOND_TELLER_ADDRESS)) {
     daiTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, DAI_BOND_TELLER_ADDRESS)) as BondTellerErc20;
   } else {
     console.log("DAI Teller - deploy");
     var res = await create2Contract(deployer, artifacts.BondTellerERC20, [], {}, "", deployerContract.address);
     daiTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, res.address)) as BondTellerErc20;
     console.log(`DAI Teller - deployed to ${daiTeller.address}`);
+    await expectDeployed(daiTeller.address);
     console.log('DAI teller - init');
-    let tx1 = await daiTeller.connect(deployer).initialize(NAME, signerAddress, solace.address, xsolace.address, UNDERWRITING_POOL_ADDRESS, DAO_ADDRESS, DAI_ADDRESS, bondDepo.address);
+    let tx1 = await daiTeller.connect(deployer).initialize(NAME, signerAddress, solace.address, xslocker.address, UNDERWRITING_POOL_ADDRESS, DAO_ADDRESS, DAI_ADDRESS, false, bondDepo.address, {maxFeePerGas: MAX_FEE_PER_GAS});
     await tx1.wait();
     console.log('DAI teller - set terms');
-    let tx2 = await daiTeller.connect(deployer).setTerms({startPrice: START_PRICE, minimumPrice: START_PRICE, maxPayout: MAX_PAYOUT, priceAdjNum: PRICE_ADJ_NUM, priceAdjDenom: PRICE_ADJ_DENOM, capacity: CAPACITY, capacityIsPayout: true, startTime: BOND_START_TIME, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
+    let tx2 = await daiTeller.connect(deployer).setTerms({startPrice: START_PRICE, minimumPrice: START_PRICE, maxPayout: MAX_PAYOUT, priceAdjNum: PRICE_ADJ_NUM, priceAdjDenom: PRICE_ADJ_DENOM, capacity: CAPACITY, capacityIsPayout: true, startTime: BOND_START_TIME, endTime: MAX_UINT40, globalVestingTerm: VESTING_TERM, halfLife: HALF_LIFE}, {gasLimit: 300000});
     await tx2.wait();
     console.log('DAI teller - add to bond depo');
-    let tx3 = await bondDepo.connect(deployer).addTeller(daiTeller.address);
+    let tx3 = await bondDepo.connect(deployer).addTeller(daiTeller.address, {maxFeePerGas: MAX_FEE_PER_GAS});
     await tx3.wait();
     console.log('DAI teller - set fees');
-    let tx4 = await daiTeller.connect(deployer).setFees(500, 500);
+    let tx4 = await daiTeller.connect(deployer).setFees(500, {maxFeePerGas: MAX_FEE_PER_GAS});
     await tx4.wait();
     console.log('DAI teller - done');
   }
-  tellerImplementationAddress = daiTeller.address;
 }
 
 async function deployEthTeller() {
-  const ONE_CENT_IN_ETH = BN.from("2500000000000"); // @ 1 eth = $4000
-  const START_PRICE = ONE_CENT_IN_ETH.mul(10); // 10 cents
-  const MAX_PAYOUT = BN.from("1000000000000000000000000") // 1 million SOLACE max single bond
-  const CAPACITY = BN.from("10000000000000000000000000"); // 10 million SOLACE max over lifetime
-  const PRICE_ADJ_NUM = ONE_CENT_IN_ETH; // every 50,000 SOLACE bonded raises the price one cent
-  const PRICE_ADJ_DENOM = FIFTY_THOUSAND_SOLACE;
   const NAME = "Solace ETH Bond";
+  const VESTING_TERM = 604800; // 7 days
+  const HALF_LIFE = 2592000; // 30 days
+  const ONE_CENT_IN_ETH = BN.from("3968253968253"); // @ 1 eth = $2520
+  const ONE_TENTH_CENT_IN_ETH = BN.from("396825396825");
 
-  if(!!ETH_BOND_TELLER_ADDRESS) {
+  const START_PRICE = ONE_CENT_IN_ETH.mul(8); // 8 cents
+  const MAX_PAYOUT = BN.from("10000000000000000000000000") // 10 million SOLACE max single bond
+  const CAPACITY = BN.from("100000000000000000000000000"); // 100 million SOLACE max over lifetime
+  // every 50,000 SOLACE bonded raises the price one tenth of a cent
+  const PRICE_ADJ_NUM = ONE_TENTH_CENT_IN_ETH; // tenth of a cent in DAI
+  const PRICE_ADJ_DENOM = BN.from("50000000000000000000000"); // 50,000 SOLACE
+  if(PRICE_ADJ_NUM.gt(MAX_UINT128) || PRICE_ADJ_DENOM.gt(MAX_UINT128)) throw `Uint128 too large: ${PRICE_ADJ_NUM.toString()} | ${PRICE_ADJ_DENOM.toString()} > ${MAX_UINT128.toString()}`;
+
+  console.log(`ETH teller ${await isDeployed(ETH_BOND_TELLER_ADDRESS) ? "is" : "is not"} deployed`);
+  if(await isDeployed(ETH_BOND_TELLER_ADDRESS)) {
     ethTeller = (await ethers.getContractAt(artifacts.BondTellerETH.abi, ETH_BOND_TELLER_ADDRESS)) as BondTellerEth;
   } else {
     console.log("ETH Teller - deploy");
     var res = await create2Contract(deployer, artifacts.BondTellerETH, [], {}, "", deployerContract.address);
     ethTeller = (await ethers.getContractAt(artifacts.BondTellerETH.abi, res.address)) as BondTellerEth;
     console.log(`ETH Teller - deployed to ${ethTeller.address}`);
+    await expectDeployed(ethTeller.address);
     console.log('ETH teller - init');
-    let tx1 = await ethTeller.connect(deployer).initialize(NAME, signerAddress, solace.address, xsolace.address, UNDERWRITING_POOL_ADDRESS, DAO_ADDRESS, WETH_ADDRESS, bondDepo.address);
+    let tx1 = await ethTeller.connect(deployer).initialize(NAME, signerAddress, solace.address, xslocker.address, UNDERWRITING_POOL_ADDRESS, DAO_ADDRESS, WETH_ADDRESS, false, bondDepo.address, {maxFeePerGas: MAX_FEE_PER_GAS});
     await tx1.wait();
     console.log('ETH teller - set terms');
-    let tx2 = await ethTeller.connect(deployer).setTerms({startPrice: START_PRICE, minimumPrice: START_PRICE, maxPayout: MAX_PAYOUT, priceAdjNum: PRICE_ADJ_NUM, priceAdjDenom: PRICE_ADJ_DENOM, capacity: CAPACITY, capacityIsPayout: true, startTime: BOND_START_TIME, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
+    let tx2 = await ethTeller.connect(deployer).setTerms({startPrice: START_PRICE, minimumPrice: START_PRICE, maxPayout: MAX_PAYOUT, priceAdjNum: PRICE_ADJ_NUM, priceAdjDenom: PRICE_ADJ_DENOM, capacity: CAPACITY, capacityIsPayout: true, startTime: BOND_START_TIME, endTime: MAX_UINT40, globalVestingTerm: VESTING_TERM, halfLife: HALF_LIFE}, {gasLimit: 300000});
     await tx2.wait();
     console.log('ETH teller - add to bond depo');
-    let tx3 = await bondDepo.connect(deployer).addTeller(ethTeller.address);
+    let tx3 = await bondDepo.connect(deployer).addTeller(ethTeller.address, {maxFeePerGas: MAX_FEE_PER_GAS});
     await tx3.wait();
     console.log('ETH teller - set fees');
-    let tx4 = await ethTeller.connect(deployer).setFees(500, 500);
+    let tx4 = await ethTeller.connect(deployer).setFees(500, {maxFeePerGas: MAX_FEE_PER_GAS});
     await tx4.wait();
     console.log('ETH teller - done');
   }
 }
 
 async function deployUsdcTeller() {
-  const ONE_CENT_IN_USDC = BN.from("10000");
-  const START_PRICE = ONE_CENT_IN_USDC.mul(10); // 10 cents
-  const MAX_PAYOUT = BN.from("1000000000000000000000000") // 1 million SOLACE max single bond
-  const CAPACITY = BN.from("10000000000000000000000000"); // 10 million SOLACE max over lifetime
-  const PRICE_ADJ_NUM = ONE_CENT_IN_USDC; // every 50,000 SOLACE bonded raises the price one cent
-  const PRICE_ADJ_DENOM = FIFTY_THOUSAND_SOLACE;
   const NAME = "Solace USDC Bond";
+  const VESTING_TERM = 604800; // 7 days
+  const HALF_LIFE = 2592000; // 30 days
+  const ONE_CENT_IN_ETH = BN.from("10000"); // @ 1 eth = $4000
+  const ONE_TENTH_CENT_IN_ETH = BN.from("1000");
 
-  if(!!USDC_BOND_TELLER_ADDRESS) {
+  const START_PRICE = ONE_CENT_IN_ETH.mul(8); // 8 cents
+  const MAX_PAYOUT = BN.from("10000000000000000000000000") // 10 million SOLACE max single bond
+  const CAPACITY = BN.from("100000000000000000000000000"); // 100 million SOLACE max over lifetime
+  // every 50,000 SOLACE bonded raises the price one tenth of a cent
+  const PRICE_ADJ_NUM = ONE_TENTH_CENT_IN_ETH; // tenth of a cent in DAI
+  const PRICE_ADJ_DENOM = BN.from("50000000000000000000000"); // 50,000 SOLACE
+  if(PRICE_ADJ_NUM.gt(MAX_UINT128) || PRICE_ADJ_DENOM.gt(MAX_UINT128)) throw `Uint128 too large: ${PRICE_ADJ_NUM.toString()} | ${PRICE_ADJ_DENOM.toString()} > ${MAX_UINT128.toString()}`;
+
+  console.log(`USDC teller ${await isDeployed(USDC_BOND_TELLER_ADDRESS) ? "is" : "is not"} deployed`);
+  if(await isDeployed(USDC_BOND_TELLER_ADDRESS)) {
     usdcTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, USDC_BOND_TELLER_ADDRESS)) as BondTellerErc20;
   } else {
     console.log("USDC Teller - deploy");
-    var salt = "0x0000000000000000000000000000000000000000000000000000000000aed0a5";
-    usdcTeller = await deploy2ProxyTeller(NAME, tellerImplementationAddress, USDC_ADDRESS, salt);
+    var salt = "0x00000000000000000000000000000000000000000000000000000000019004c0";
+    usdcTeller = await cloneTeller(daiTeller, NAME, USDC_ADDRESS, true, salt);
     console.log(`USDC Teller - deployed to ${usdcTeller.address}`);
     console.log('USDC Teller - set terms');
-    let tx2 = await usdcTeller.connect(deployer).setTerms({startPrice: START_PRICE, minimumPrice: START_PRICE, maxPayout: MAX_PAYOUT, priceAdjNum: PRICE_ADJ_NUM, priceAdjDenom: PRICE_ADJ_DENOM, capacity: CAPACITY, capacityIsPayout: true, startTime: BOND_START_TIME, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
+    let tx2 = await usdcTeller.connect(deployer).setTerms({startPrice: START_PRICE, minimumPrice: START_PRICE, maxPayout: MAX_PAYOUT, priceAdjNum: PRICE_ADJ_NUM, priceAdjDenom: PRICE_ADJ_DENOM, capacity: CAPACITY, capacityIsPayout: true, startTime: BOND_START_TIME, endTime: MAX_UINT40, globalVestingTerm: VESTING_TERM, halfLife: HALF_LIFE}, {gasLimit: 300000});
     await tx2.wait();
+    console.log('USDC teller - add to bond depo');
+    let tx3 = await bondDepo.connect(deployer).addTeller(usdcTeller.address, {maxFeePerGas: MAX_FEE_PER_GAS});
+    await tx3.wait();
     console.log('USDC Teller - set fees');
-    let tx4 = await usdcTeller.connect(deployer).setFees(500, 500);
+    let tx4 = await usdcTeller.connect(deployer).setFees(500, {maxFeePerGas: MAX_FEE_PER_GAS});
     await tx4.wait();
     console.log('USDC Teller - done');
   }
 }
 
-async function deploySlpUsdcTeller() {
-  const ONE_CENT_IN_SLP = BN.from("28867513000");
-  const START_PRICE = ONE_CENT_IN_SLP.mul(10); // 10 cents
-  const MAX_PAYOUT = BN.from("1000000000000000000000000") // 1 million SOLACE max single bond
-  const CAPACITY = BN.from("10000000000000000000000000"); // 10 million SOLACE max over lifetime
-  const PRICE_ADJ_NUM = ONE_CENT_IN_SLP; // every 50,000 SOLACE bonded raises the price one cent
-  const PRICE_ADJ_DENOM = FIFTY_THOUSAND_SOLACE;
-  const NAME = "Solace SOLACE-USDC SLP Bond";
-
-  if(!!SLP_USDC_BOND_TELLER_ADDRESS) {
-    slpUsdcTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, SLP_USDC_BOND_TELLER_ADDRESS)) as BondTellerErc20;
-  } else {
-    console.log("SOLACE-USDC SLP Teller - deploy");
-    var salt = "0x000000000000000000000000000000000000000000000000000000000235ed01";
-    slpUsdcTeller = await deploy2ProxyTeller(NAME, tellerImplementationAddress, SLP_USDC_ADDRESS, salt);
-    console.log(`SOLACE-USDC SLP Teller - deployed to ${slpUsdcTeller.address}`);
-    console.log('SOLACE-USDC SLP Teller - set terms');
-    let tx2 = await slpUsdcTeller.connect(deployer).setTerms({startPrice: START_PRICE, minimumPrice: START_PRICE, maxPayout: MAX_PAYOUT, priceAdjNum: PRICE_ADJ_NUM, priceAdjDenom: PRICE_ADJ_DENOM, capacity: CAPACITY, capacityIsPayout: true, startTime: BOND_START_TIME, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
-    await tx2.wait();
-    console.log('SOLACE-USDC SLP Teller - set fees');
-    let tx4 = await slpUsdcTeller.connect(deployer).setFees(500, 0);
-    await tx4.wait();
-    console.log('SOLACE-USDC SLP Teller - done');
-  }
-}
-
 async function deployWbtcTeller() {
-  const TEN_CENTS_IN_WBTC = BN.from("170"); // @ BTC ~= 58K
-  const FIVE_HUNDRED_THOUSAND_SOLACE = BN.from("500000000000000000000000");
-  const START_PRICE = TEN_CENTS_IN_WBTC; // 10 cents
-  const MAX_PAYOUT = BN.from("1000000000000000000000000") // 1 million SOLACE max single bond
-  const CAPACITY = BN.from("10000000000000000000000000"); // 10 million SOLACE max over lifetime
-  const PRICE_ADJ_NUM = TEN_CENTS_IN_WBTC; // every 50,000 SOLACE bonded raises the price one cent
-  const PRICE_ADJ_DENOM = FIVE_HUNDRED_THOUSAND_SOLACE;
   const NAME = "Solace WBTC Bond";
+  const VESTING_TERM = 604800; // 7 days
+  const HALF_LIFE = 2592000; // 30 days
 
-  if(!!WBTC_BOND_TELLER_ADDRESS) {
+  const ONE_DOLLAR_IN_WBTC = BN.from("2697"); // @ BTC = $37077
+  const TEN_CENTS_IN_WBTC = BN.from("269");
+
+  const START_PRICE = ONE_DOLLAR_IN_WBTC.mul(8).div(100); // 8 cents
+  const MAX_PAYOUT = BN.from("10000000000000000000000000") // 10 million SOLACE max single bond
+  const CAPACITY = BN.from("100000000000000000000000000"); // 100 million SOLACE max over lifetime
+  // every 50,000 SOLACE bonded raises the price one tenth of a cent
+  const PRICE_ADJ_NUM = ONE_DOLLAR_IN_WBTC.div(10); // ten cents in DAI
+  const PRICE_ADJ_DENOM = BN.from("5000000000000000000000000"); //  5000,000 SOLACE
+  if(PRICE_ADJ_NUM.gt(MAX_UINT128) || PRICE_ADJ_DENOM.gt(MAX_UINT128)) throw `Uint128 too large: ${PRICE_ADJ_NUM.toString()} | ${PRICE_ADJ_DENOM.toString()} > ${MAX_UINT128.toString()}`;
+
+  console.log(`WBTC teller ${await isDeployed(WBTC_BOND_TELLER_ADDRESS) ? "is" : "is not"} deployed`);
+  if(await isDeployed(WBTC_BOND_TELLER_ADDRESS)) {
     wbtcTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, WBTC_BOND_TELLER_ADDRESS)) as BondTellerErc20;
   } else {
     console.log("WBTC Teller - deploy");
-    var salt = "0x00000000000000000000000000000000000000000000000000000000025e61f1";
-    wbtcTeller = await deploy2ProxyTeller(NAME, tellerImplementationAddress, WBTC_ADDRESS, salt);
+    var salt = "0x0000000000000000000000000000000000000000000000000000000001f0cd1b";
+    wbtcTeller = await cloneTeller(daiTeller, NAME, WBTC_ADDRESS, false, salt);
     console.log(`WBTC Teller - deployed to ${wbtcTeller.address}`);
     console.log('WBTC Teller - set terms');
-    let tx2 = await wbtcTeller.connect(deployer).setTerms({startPrice: START_PRICE, minimumPrice: START_PRICE, maxPayout: MAX_PAYOUT, priceAdjNum: PRICE_ADJ_NUM, priceAdjDenom: PRICE_ADJ_DENOM, capacity: CAPACITY, capacityIsPayout: true, startTime: BOND_START_TIME, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
+    let tx2 = await wbtcTeller.connect(deployer).setTerms({startPrice: START_PRICE, minimumPrice: START_PRICE, maxPayout: MAX_PAYOUT, priceAdjNum: PRICE_ADJ_NUM, priceAdjDenom: PRICE_ADJ_DENOM, capacity: CAPACITY, capacityIsPayout: true, startTime: BOND_START_TIME, endTime: MAX_UINT40, globalVestingTerm: VESTING_TERM, halfLife: HALF_LIFE}, {gasLimit: 300000});
     await tx2.wait();
+    console.log('WBTC teller - add to bond depo');
+    let tx3 = await bondDepo.connect(deployer).addTeller(wbtcTeller.address, {maxFeePerGas: MAX_FEE_PER_GAS});
+    await tx3.wait();
     console.log('WBTC Teller - set fees');
-    let tx4 = await wbtcTeller.connect(deployer).setFees(500, 500);
+    let tx4 = await wbtcTeller.connect(deployer).setFees(500, {maxFeePerGas: MAX_FEE_PER_GAS});
     await tx4.wait();
     console.log('WBTC Teller - done');
   }
 }
 
 async function deployUsdtTeller() {
-  const ONE_CENT_IN_USDT = BN.from("10000");
-  const START_PRICE = ONE_CENT_IN_USDT.mul(10); // 10 cents
-  const MAX_PAYOUT = BN.from("1000000000000000000000000") // 1 million SOLACE max single bond
-  const CAPACITY = BN.from("10000000000000000000000000"); // 10 million SOLACE max over lifetime
-  const PRICE_ADJ_NUM = ONE_CENT_IN_USDT; // every 50,000 SOLACE bonded raises the price one cent
-  const PRICE_ADJ_DENOM = FIFTY_THOUSAND_SOLACE;
   const NAME = "Solace USDT Bond";
+  const VESTING_TERM = 604800; // 7 days
+  const HALF_LIFE = 2592000; // 30 days
+  const ONE_CENT_IN_USDT = BN.from("10000");
+  const ONE_TENTH_CENT_IN_USDT = BN.from("1000");
 
-  if(!!USDT_BOND_TELLER_ADDRESS) {
+  const START_PRICE = ONE_CENT_IN_USDT.mul(8); // 8 cents
+  const MAX_PAYOUT = BN.from("10000000000000000000000000") // 10 million SOLACE max single bond
+  const CAPACITY = BN.from("100000000000000000000000000"); // 100 million SOLACE max over lifetime
+  // every 50,000 SOLACE bonded raises the price one tenth of a cent
+  const PRICE_ADJ_NUM = ONE_TENTH_CENT_IN_USDT; // tenth of a cent in USDT
+  const PRICE_ADJ_DENOM = BN.from("50000000000000000000000"); // 50,000 SOLACE
+  if(PRICE_ADJ_NUM.gt(MAX_UINT128) || PRICE_ADJ_DENOM.gt(MAX_UINT128)) throw `Uint128 too large: ${PRICE_ADJ_NUM.toString()} | ${PRICE_ADJ_DENOM.toString()} > ${MAX_UINT128.toString()}`;
+
+  console.log(`USDT teller ${await isDeployed(USDT_BOND_TELLER_ADDRESS) ? "is" : "is not"} deployed`);
+  if(await isDeployed(USDT_BOND_TELLER_ADDRESS)) {
     usdtTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, USDT_BOND_TELLER_ADDRESS)) as BondTellerErc20;
   } else {
     console.log("USDT Teller - deploy");
-    var salt = "0x0000000000000000000000000000000000000000000000000000000002988a69";
-    usdtTeller = await deploy2ProxyTeller(NAME, tellerImplementationAddress, USDT_ADDRESS, salt);
+    var salt = "0x0000000000000000000000000000000000000000000000000000000002153a56";
+    usdtTeller = await cloneTeller(daiTeller, NAME, USDT_ADDRESS, false, salt);
     console.log(`USDT Teller - deployed to ${usdtTeller.address}`);
     console.log('USDT Teller - set terms');
-    let tx2 = await usdtTeller.connect(deployer).setTerms({startPrice: START_PRICE, minimumPrice: START_PRICE, maxPayout: MAX_PAYOUT, priceAdjNum: PRICE_ADJ_NUM, priceAdjDenom: PRICE_ADJ_DENOM, capacity: CAPACITY, capacityIsPayout: true, startTime: BOND_START_TIME, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
+    let tx2 = await usdtTeller.connect(deployer).setTerms({startPrice: START_PRICE, minimumPrice: START_PRICE, maxPayout: MAX_PAYOUT, priceAdjNum: PRICE_ADJ_NUM, priceAdjDenom: PRICE_ADJ_DENOM, capacity: CAPACITY, capacityIsPayout: true, startTime: BOND_START_TIME, endTime: MAX_UINT40, globalVestingTerm: VESTING_TERM, halfLife: HALF_LIFE}, {gasLimit: 300000});
     await tx2.wait();
+    console.log('USDT teller - add to bond depo');
+    let tx3 = await bondDepo.connect(deployer).addTeller(usdtTeller.address, {maxFeePerGas: MAX_FEE_PER_GAS});
+    await tx3.wait();
     console.log('USDT Teller - set fees');
-    let tx4 = await usdtTeller.connect(deployer).setFees(500, 500);
+    let tx4 = await usdtTeller.connect(deployer).setFees(500, {maxFeePerGas: MAX_FEE_PER_GAS});
     await tx4.wait();
     console.log('USDT Teller - done');
   }
 }
 
 async function deployScpTeller() {
-  const ONE_CENT_IN_SCP = BN.from("2500000000000"); // @ 1 eth = $4000
-  const START_PRICE = ONE_CENT_IN_SCP.mul(10); // 10 cents
-  const MAX_PAYOUT = BN.from("1000000000000000000000000") // 1 million SOLACE max single bond
-  const CAPACITY = BN.from("573380511154278202017"); // SCP total supply
-  const PRICE_ADJ_NUM = ONE_CENT_IN_SCP; // every 50,000 SOLACE bonded raises the price one cent
-  const PRICE_ADJ_DENOM = FIFTY_THOUSAND_SOLACE;
   const NAME = "Solace SCP Bond";
+  const VESTING_TERM = 604800; // 7 days
+  const HALF_LIFE = 2592000; // 30 days
+  const ONE_CENT_IN_SCP = BN.from("3968253968253"); // @ 1 eth = $2520
+  const ONE_TENTH_CENT_IN_SCP = BN.from("396825396825");
 
-  if(!!SCP_BOND_TELLER_ADDRESS) {
+  const START_PRICE = ONE_CENT_IN_SCP.mul(8); // 8 cents
+  const MAX_PAYOUT = BN.from("10000000000000000000000000") // 10 million SOLACE max single bond
+  const CAPACITY = BN.from("100000000000000000000000000"); // 100 million SOLACE max over lifetime
+  // every 50,000 SOLACE bonded raises the price one tenth of a cent
+  const PRICE_ADJ_NUM = ONE_TENTH_CENT_IN_SCP; // tenth of a cent in SCP
+  const PRICE_ADJ_DENOM = BN.from("50000000000000000000000"); // 50,000 SOLACE
+  if(PRICE_ADJ_NUM.gt(MAX_UINT128) || PRICE_ADJ_DENOM.gt(MAX_UINT128)) throw `Uint128 too large: ${PRICE_ADJ_NUM.toString()} | ${PRICE_ADJ_DENOM.toString()} > ${MAX_UINT128.toString()}`;
+
+  console.log(`SCP teller ${await isDeployed(SCP_BOND_TELLER_ADDRESS) ? "is" : "is not"} deployed`);
+  if(await isDeployed(SCP_BOND_TELLER_ADDRESS)) {
     scpTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, SCP_BOND_TELLER_ADDRESS)) as BondTellerErc20;
   } else {
     console.log("SCP Teller - deploy");
-    var salt = "0x0000000000000000000000000000000000000000000000000000000006b38c98";
-    scpTeller = await deploy2ProxyTeller(NAME, tellerImplementationAddress, SCP_ADDRESS, salt);
+    var salt = "0x000000000000000000000000000000000000000000000000000000000244cea9";
+    scpTeller = await cloneTeller(daiTeller, NAME, SCP_ADDRESS, true, salt);
     console.log(`SCP Teller - deployed to ${scpTeller.address}`);
     console.log('SCP Teller - set terms');
-    let tx2 = await scpTeller.connect(deployer).setTerms({startPrice: START_PRICE, minimumPrice: START_PRICE, maxPayout: MAX_PAYOUT, priceAdjNum: PRICE_ADJ_NUM, priceAdjDenom: PRICE_ADJ_DENOM, capacity: CAPACITY, capacityIsPayout: false, startTime: BOND_START_TIME, endTime: MAX_UINT40, vestingTerm: VESTING_TERM, halfLife: HALF_LIFE});
+    let tx2 = await scpTeller.connect(deployer).setTerms({startPrice: START_PRICE, minimumPrice: START_PRICE, maxPayout: MAX_PAYOUT, priceAdjNum: PRICE_ADJ_NUM, priceAdjDenom: PRICE_ADJ_DENOM, capacity: CAPACITY, capacityIsPayout: true, startTime: BOND_START_TIME, endTime: MAX_UINT40, globalVestingTerm: VESTING_TERM, halfLife: HALF_LIFE}, {gasLimit: 300000});
     await tx2.wait();
-    console.log('SCP Teller - set fees');
-    let tx4 = await scpTeller.connect(deployer).setFees(500, 0);
-    await tx4.wait();
+    console.log('SCP teller - add to bond depo');
+    let tx3 = await bondDepo.connect(deployer).addTeller(scpTeller.address, {maxFeePerGas: MAX_FEE_PER_GAS});
+    await tx3.wait();
     console.log('SCP Teller - done');
   }
 }
 
-async function deployProxyTeller(name: string, implAddress: string, tokenAddress: string) {
-  let newTeller;
-  let tx = await bondDepo.connect(deployer).createBondTeller(name, signerAddress, implAddress, tokenAddress);
-  let events = (await tx.wait())?.events;
-  if(events && events.length > 0) {
-    let event = events[0];
-    newTeller = await ethers.getContractAt(artifacts.BondTellerERC20.abi, event?.args?.["deployment"]) as BondTellerErc20;
-  } else throw "no deployment";
-  return newTeller;
-}
+async function deployFraxTeller() {
+  const NAME = "Solace FRAX Bond";
+  const VESTING_TERM = 604800; // 7 days
+  const HALF_LIFE = 2592000; // 30 days
+  const ONE_CENT_IN_FRAX = BN.from("10000000000000000");
+  const ONE_TENTH_CENT_IN_FRAX = BN.from("1000000000000000");
 
-async function deploy2ProxyTeller(name: string, implAddress: string, tokenAddress: string, salt: BytesLike) {
-  let newTeller;
-  let tx = await bondDepo.connect(deployer).create2BondTeller(name, signerAddress, implAddress, salt, tokenAddress);
-  let events = (await tx.wait())?.events;
-  if(events && events.length > 0) {
-    let event = events[0];
-    newTeller = await ethers.getContractAt(artifacts.BondTellerERC20.abi, event?.args?.["deployment"]) as BondTellerErc20;
-  } else throw "no deployment";
-  return newTeller;
-}
+  const START_PRICE = ONE_CENT_IN_FRAX.mul(8); // 8 cents
+  const MAX_PAYOUT = BN.from("10000000000000000000000000") // 10 million SOLACE max single bond
+  const CAPACITY = BN.from("100000000000000000000000000"); // 100 million SOLACE max over lifetime
+  // every 50,000 SOLACE bonded raises the price one tenth of a cent
+  const PRICE_ADJ_NUM = ONE_TENTH_CENT_IN_FRAX; // tenth of a cent in FRAX
+  const PRICE_ADJ_DENOM = BN.from("50000000000000000000000"); // 50,000 SOLACE
+  if(PRICE_ADJ_NUM.gt(MAX_UINT128) || PRICE_ADJ_DENOM.gt(MAX_UINT128)) throw `Uint128 too large: ${PRICE_ADJ_NUM.toString()} | ${PRICE_ADJ_DENOM.toString()} > ${MAX_UINT128.toString()}`;
 
-async function deployFarmRewards() {
-  if(!!FARM_REWARDS_ADDRESS) {
-    farmRewards = (await ethers.getContractAt(artifacts.FarmRewards.abi, FARM_REWARDS_ADDRESS)) as FarmRewards;
+  console.log(`FRAX teller ${await isDeployed(FRAX_BOND_TELLER_ADDRESS) ? "is" : "is not"} deployed`);
+  if(await isDeployed(FRAX_BOND_TELLER_ADDRESS)) {
+    fraxTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, FRAX_BOND_TELLER_ADDRESS)) as BondTellerErc20;
   } else {
-    console.log("Deploying FarmRewards");
-    let receiver = "0xc47911f768c6fE3a9fe076B95e93a33Ed45B7B34"; // mainnet core multisig
-    let solacePerXSolace = BN.from("21338806133989362485"); // as of midnight before December 2, 2021
-    var res = await create2Contract(deployer, artifacts.FarmRewards, [signerAddress, xsolace.address, receiver, solacePerXSolace], {}, "", deployerContract.address);
-    farmRewards = (await ethers.getContractAt(artifacts.FarmRewards.abi, res.address)) as FarmRewards;
-    console.log(`Deployed FarmRewards to ${farmRewards.address}`);
+    console.log("FRAX Teller - deploy");
+    var salt = "0x0000000000000000000000000000000000000000000000000000000002e3569f";
+    fraxTeller = await cloneTeller(daiTeller, NAME, FRAX_ADDRESS, false, salt);
+    console.log(`FRAX Teller - deployed to ${fraxTeller.address}`);
+    console.log('FRAX Teller - set terms');
+    let tx2 = await fraxTeller.connect(deployer).setTerms({startPrice: START_PRICE, minimumPrice: START_PRICE, maxPayout: MAX_PAYOUT, priceAdjNum: PRICE_ADJ_NUM, priceAdjDenom: PRICE_ADJ_DENOM, capacity: CAPACITY, capacityIsPayout: true, startTime: BOND_START_TIME, endTime: MAX_UINT40, globalVestingTerm: VESTING_TERM, halfLife: HALF_LIFE}, {gasLimit: 300000});
+    await tx2.wait();
+    console.log('FRAX teller - add to bond depo');
+    let tx3 = await bondDepo.connect(deployer).addTeller(fraxTeller.address, {maxFeePerGas: MAX_FEE_PER_GAS});
+    await tx3.wait();
+    console.log('FRAX Teller - set fees');
+    let tx4 = await fraxTeller.connect(deployer).setFees(500, {maxFeePerGas: MAX_FEE_PER_GAS});
+    await tx4.wait();
+    console.log('FRAX Teller - done');
   }
-  let solaceAmount = BN.from("4250000000000000000000000");
-  let xsolaceAmount = BN.from("199167656021318753349893");
-  /*
-  console.log('minting solace')
-  let tx1 = await solace.connect(deployer).mint(signerAddress, solaceAmount);
-  await tx1.wait();
-  */
-  /*
-  console.log('approving solace')
-  let tx4 = await solace.connect(deployer).approve(xsolace.address, constants.MaxUint256);
-  await tx4.wait();
-  console.log('staking')
-  let tx5 = await xsolace.connect(deployer).stake(solaceAmount);
-  await tx5.wait();
-  */
-  /*
-  console.log('adding support')
-  let tx2 = await farmRewards.connect(deployer).supportTokens([DAI_ADDRESS, USDC_ADDRESS, USDT_ADDRESS, FRAX_ADDRESS]);
-  await tx2.wait();
-  console.log('writing farm rewards')
-  var farmers = JSON.parse(readFileSync("./stash/cp farmers.json").toString());
-  var rewards = JSON.parse(readFileSync("./stash/cp farm rewards.json").toString());
-  let tx8 = await farmRewards.connect(deployer).setFarmedRewards(farmers, rewards);
-  await tx8.wait();
-  console.log('transferring xsolace')
-  let tx6 = await xsolace.connect(deployer).transfer(farmRewards.address, xsolaceAmount);
-  await tx6.wait();
-  */
+}
+
+async function cloneTeller(sourceTeller: BondTellerErc20, name: string, principal: string, isPermittable: boolean, salt: BytesLike) {
+  let addr = await sourceTeller.calculateMinimalProxyDeploymentAddress(salt);
+  let tx = await sourceTeller.clone(name, signerAddress, principal, isPermittable, salt, {gasLimit: 500000, maxFeePerGas: MAX_FEE_PER_GAS});
+  let receipt = await tx.wait(1);
+  let newTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, addr)) as BondTellerErc20;
+  return newTeller;
 }
 
 async function logAddresses() {
@@ -414,20 +376,18 @@ async function logAddresses() {
   console.log("| Contract Name                | Address                                      |");
   console.log("|------------------------------|----------------------------------------------|");
   logContractAddress("SOLACE", solace.address);
-  logContractAddress("xSOLACE", xsolace.address);
-  logContractAddress("FarmRewards", farmRewards.address);
+  logContractAddress("xsLocker", xslocker.address);
   logContractAddress("BondDepository", bondDepo.address);
   logContractAddress("DAI Bond Teller", daiTeller.address);
   logContractAddress("ETH Bond Teller", ethTeller.address);
   logContractAddress("USDC Bond Teller", usdcTeller.address);
-  logContractAddress("SOLACE-USDC SLP Bond Teller", slpUsdcTeller.address);
   logContractAddress("WBTC Bond Teller", wbtcTeller.address);
   logContractAddress("USDT Bond Teller", usdtTeller.address);
   logContractAddress("SCP Bond Teller", scpTeller.address);
+  logContractAddress("FRAX Bond Teller", fraxTeller.address);
   logContractAddress("DAI", DAI_ADDRESS);
   logContractAddress("WETH", WETH_ADDRESS);
   logContractAddress("USDC", USDC_ADDRESS);
-  logContractAddress("SOLACE-USDC SLP", SLP_USDC_ADDRESS);
   logContractAddress("WBTC", WBTC_ADDRESS);
   logContractAddress("USDT", USDT_ADDRESS);
   logContractAddress("SCP", SCP_ADDRESS);
