@@ -933,99 +933,127 @@ describe("SolaceCoverProduct", function() {
             await expect(solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder1.address, policyholder2.address, policyholder3.address, policyholder4.address, policyholder5.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM])).to.revertedWith("policy count exceeded");
         });
 
-        // it("cannot charge more than max rate", async () => {
-        //     await expect(solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder1.address, policyholder2.address], [WEEKLY_MAX_PREMIUM.mul(11).div(10), WEEKLY_MAX_PREMIUM.mul(11).div(10)])).to.revertedWith("charging more than promised maximum rate");
-        // })
-
-    //     it("can charge premiums", async () => {
-    //         // CASE 1 - Charge weekly premium for two policyholders, no reward points involved
+        it("can charge premiums", async () => {
+            // CASE 1 - Charge weekly premium for two policyholders, no reward points involved
             
-    //         let policyholder1AccountBalance = await solaceCoverProduct.connect(policyholder1).accountBalanceOf(policyholder1.address);
-    //         let policyholder2AccountBalance = await solaceCoverProduct.connect(policyholder1).accountBalanceOf(policyholder2.address);
-    //         let initialCoverLimit1 = await solaceCoverProduct.coverLimitOf(POLICY_ID_1);
-    //         let initialCoverLimit2 = await solaceCoverProduct.coverLimitOf(POLICY_ID_2);
-    //         let initialActiveCoverLimit = await solaceCoverProduct.activeCoverLimit();
-    //         let initialActiveCoverCapacity = await solaceCoverProduct.availableCoverCapacity();
+            let policyholder1AccountBalance = await solaceCoverProduct.connect(policyholder1).accountBalanceOf(policyholder1.address);
+            let policyholder2AccountBalance = await solaceCoverProduct.connect(policyholder1).accountBalanceOf(policyholder2.address);
+            let initialContractDAIBalance = await dai.balanceOf(solaceCoverProduct.address)
+            let initialPremiumPoolDAIBalance = await dai.balanceOf(premiumPool.address)
+            let initialCoverLimit1 = await solaceCoverProduct.coverLimitOf(POLICY_ID_1);
+            let initialCoverLimit2 = await solaceCoverProduct.coverLimitOf(POLICY_ID_2);
+            let initialActiveCoverLimit = await solaceCoverProduct.activeCoverLimit();
+            let initialActiveCoverCapacity = await solaceCoverProduct.availableCoverCapacity();
 
-    //         // charge premiums
-    //         let tx = solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder1.address, policyholder2.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM]);
-    //         await expect(tx).emit(solaceCoverProduct, "PremiumCharged").withArgs(policyholder1.address, WEEKLY_MAX_PREMIUM);
-    //         await expect(tx).emit(solaceCoverProduct, "PremiumCharged").withArgs(policyholder2.address, WEEKLY_MAX_PREMIUM);
+            // charge premiums
+            let tx = solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder1.address, policyholder2.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM]);
+            await expect(tx).emit(solaceCoverProduct, "PremiumCharged").withArgs(policyholder1.address, WEEKLY_MAX_PREMIUM);
+            await expect(tx).emit(solaceCoverProduct, "PremiumCharged").withArgs(policyholder2.address, WEEKLY_MAX_PREMIUM);
          
-    //         // Soteria account balance should be decreased
-    //         expect(await solaceCoverProduct.accountBalanceOf(policyholder1.address)).to.equal(policyholder1AccountBalance.sub(WEEKLY_MAX_PREMIUM));
-    //         expect(await solaceCoverProduct.accountBalanceOf(policyholder2.address)).to.equal(policyholder2AccountBalance.sub(WEEKLY_MAX_PREMIUM));
+            // premiums should be transferred to premium pool
+            expect(await dai.balanceOf(solaceCoverProduct.address)).eq(initialContractDAIBalance.sub(WEEKLY_MAX_PREMIUM.mul(2)))
+            expect(await dai.balanceOf(premiumPool.address)).eq(initialPremiumPoolDAIBalance.add(WEEKLY_MAX_PREMIUM.mul(2)))
 
-    //         expect(await solaceCoverProduct.availableCoverCapacity()).eq(initialActiveCoverCapacity)
+            // Soteria account balance should be decreased
+            expect(await solaceCoverProduct.accountBalanceOf(policyholder1.address)).to.equal(policyholder1AccountBalance.sub(WEEKLY_MAX_PREMIUM));
+            expect(await solaceCoverProduct.accountBalanceOf(policyholder2.address)).to.equal(policyholder2AccountBalance.sub(WEEKLY_MAX_PREMIUM));
 
-    //         // following mappings should be unchanged
-    //         expect(await solaceCoverProduct.coverLimitOf(POLICY_ID_1)).eq(initialCoverLimit1)
-    //         expect(await solaceCoverProduct.coverLimitOf(POLICY_ID_2)).eq(initialCoverLimit2)
-    //         expect(await solaceCoverProduct.activeCoverLimit()).eq(initialActiveCoverLimit)
-    //     });
+            // following mappings should be unchanged
+            expect(await solaceCoverProduct.availableCoverCapacity()).eq(initialActiveCoverCapacity)
+            expect(await solaceCoverProduct.coverLimitOf(POLICY_ID_1)).eq(initialCoverLimit1)
+            expect(await solaceCoverProduct.coverLimitOf(POLICY_ID_2)).eq(initialCoverLimit2)
+            expect(await solaceCoverProduct.activeCoverLimit()).eq(initialActiveCoverLimit)
+        });
 
-    //     it("can partially charge premiums if the fund is insufficient", async () => {
-    //         // CASE 2 - Activate new policy for new policyholder. Deposit 1.1x WEEKLY_MAX_PREMIUM.
-    //         // We cannot reach PremiumPartiallyCharged branch within a single chargePremium() call, due to require(minAccountBalance) checks in activatePolicy, updateCoverLimit and chargePremium
-    //         // So aim to activate it on second chargePremium() call
+        it("will only charge minRequiredAccountBalance, if premium > minRequiredAccountBalance", async () => {
+            // CASE 2 - Charge more than minRequiredAccountBalance to a policyholder
+            let policyholder1AccountBalance = await solaceCoverProduct.connect(policyholder1).accountBalanceOf(policyholder1.address);
+            let initialCoverLimit1 = await solaceCoverProduct.coverLimitOf(POLICY_ID_1);
+            let initialContractDAIBalance = await dai.balanceOf(solaceCoverProduct.address)
+            let initialPremiumPoolDAIBalance = await dai.balanceOf(premiumPool.address)
+            let minRequiredAccountBalance = maxRateNum.mul(ONE_WEEK).mul(initialCoverLimit1).div(maxRateDenom);
 
-    //         let depositAmount = WEEKLY_MAX_PREMIUM.mul(11).div(10)
+            // charge premiums
+            let tx = solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder1.address], [minRequiredAccountBalance.mul(2)]);
+            await expect(tx).emit(solaceCoverProduct, "PremiumCharged").withArgs(policyholder1.address, minRequiredAccountBalance);
 
-    //         let tx = await solaceCoverProduct.connect(governor).activatePolicy(policyholder4.address, INITIAL_COVER_LIMIT, 0, depositAmount, []);
-    //         await expect(tx).emit(solaceCoverProduct, "PolicyCreated").withArgs(POLICY_ID_4);
+            expect(await solaceCoverProduct.accountBalanceOf(policyholder1.address)).to.equal(policyholder1AccountBalance.sub(minRequiredAccountBalance));
+            expect(await dai.balanceOf(solaceCoverProduct.address)).eq(initialContractDAIBalance.sub(minRequiredAccountBalance))
+            expect(await dai.balanceOf(premiumPool.address)).eq(initialPremiumPoolDAIBalance.add(minRequiredAccountBalance))
+        })
 
-    //         let initialActiveCoverLimit = await solaceCoverProduct.connect(policyholder4).activeCoverLimit();
-    //         let initialPolicyCoverLimit = await solaceCoverProduct.connect(policyholder4).coverLimitOf(POLICY_ID_4);
-    //         let initialAvailableCoverCapacity = await solaceCoverProduct.connect(policyholder4).availableCoverCapacity();
-    //         let initialRMCoverAmount = await riskManager.activeCoverLimit();
-    //         let initialRMSoteriaCoverAmount = await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address);
+        it("can partially charge premiums if the fund is insufficient", async () => {
+            // CASE 3 - Activate new policy for new policyholder. Deposit 1.1x WEEKLY_MAX_PREMIUM.
+            // We cannot reach PremiumPartiallyCharged branch within a single chargePremium() call, due to require(minAccountBalance) checks in activatePolicy, updateCoverLimit and chargePremium
+            // So aim to activate it on second chargePremium() call
 
-    //         // we cannot reach the PremiumPartiallyCharged branch within a single chargePremiums() call
-    //         await solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder4.address], [WEEKLY_MAX_PREMIUM]);
-    //         expect(await solaceCoverProduct.accountBalanceOf(policyholder4.address)).eq(WEEKLY_MAX_PREMIUM.div(10))
-    //         tx = await solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder4.address], [WEEKLY_MAX_PREMIUM]);
-    //         await expect(tx).emit(solaceCoverProduct, "PremiumPartiallyCharged").withArgs(policyholder4.address, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM.div(10));
+            let depositAmount = WEEKLY_MAX_PREMIUM.mul(11).div(10)
+
+            let tx = await solaceCoverProduct.connect(governor).activatePolicy(policyholder4.address, INITIAL_COVER_LIMIT, depositAmount, []);
+            await expect(tx).emit(solaceCoverProduct, "PolicyCreated").withArgs(POLICY_ID_4);
+
+            let initialActiveCoverLimit = await solaceCoverProduct.connect(policyholder4).activeCoverLimit();
+            let initialPolicyCoverLimit = await solaceCoverProduct.connect(policyholder4).coverLimitOf(POLICY_ID_4);
+            let initialAvailableCoverCapacity = await solaceCoverProduct.connect(policyholder4).availableCoverCapacity();
+            let initialRMCoverAmount = await riskManager.activeCoverLimit();
+            let initialRMSoteriaCoverAmount = await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address);
+            let initialContractDAIBalance = await dai.balanceOf(solaceCoverProduct.address)
+            let initialPremiumPoolDAIBalance = await dai.balanceOf(premiumPool.address)
+
+            // we cannot reach the PremiumPartiallyCharged branch within a single chargePremiums() call
+            await solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder4.address], [WEEKLY_MAX_PREMIUM]);
+            expect(await solaceCoverProduct.accountBalanceOf(policyholder4.address)).eq(WEEKLY_MAX_PREMIUM.div(10))
+            tx = await solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder4.address], [WEEKLY_MAX_PREMIUM]);
+            await expect(tx).emit(solaceCoverProduct, "PremiumPartiallyCharged").withArgs(policyholder4.address, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM.div(10));
            
-    //         // policy should be deactivated
-    //         await expect(tx).emit(solaceCoverProduct, "PolicyDeactivated").withArgs(POLICY_ID_4);
-    //         await expect(tx).emit(riskManager, "ActiveCoverLimitUpdated").withArgs(solaceCoverProduct.address, initialActiveCoverLimit, initialActiveCoverLimit.sub(initialPolicyCoverLimit));
-    //         expect(await solaceCoverProduct.policyStatus(POLICY_ID_4)).to.equal(false);
+            // policy should be deactivated
+            await expect(tx).emit(solaceCoverProduct, "PolicyDeactivated").withArgs(POLICY_ID_4);
+            await expect(tx).emit(riskManager, "ActiveCoverLimitUpdated").withArgs(solaceCoverProduct.address, initialActiveCoverLimit, initialActiveCoverLimit.sub(initialPolicyCoverLimit));
+            expect(await solaceCoverProduct.policyStatus(POLICY_ID_4)).to.equal(false);
 
-    //         // active cover amount should be updated
-    //         expect(await solaceCoverProduct.activeCoverLimit()).to.equal(initialActiveCoverLimit.sub(initialPolicyCoverLimit));
-    //         expect(await solaceCoverProduct.connect(policyholder4).availableCoverCapacity()).eq(initialAvailableCoverCapacity.add(initialPolicyCoverLimit))
+            // active cover amount should be updated
+            expect(await solaceCoverProduct.activeCoverLimit()).to.equal(initialActiveCoverLimit.sub(initialPolicyCoverLimit));
+            expect(await solaceCoverProduct.connect(policyholder4).availableCoverCapacity()).eq(initialAvailableCoverCapacity.add(initialPolicyCoverLimit))
 
-    //         // policy's cover amount should be zero
-    //         expect(await solaceCoverProduct.coverLimitOf(POLICY_ID_4)).to.equal(ZERO_AMOUNT);
+            // policy's cover amount should be zero
+            expect(await solaceCoverProduct.coverLimitOf(POLICY_ID_4)).to.equal(ZERO_AMOUNT);
 
-    //         // risk manager should be updated
-    //         expect(await riskManager.activeCoverLimit()).to.equal(initialRMCoverAmount.sub(initialPolicyCoverLimit));
-    //         expect(await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address)).to.equal(initialRMSoteriaCoverAmount.sub(initialPolicyCoverLimit));
-    //         expect(await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address)).to.equal(initialActiveCoverLimit.sub(initialPolicyCoverLimit));
+            // risk manager should be updated
+            expect(await riskManager.activeCoverLimit()).to.equal(initialRMCoverAmount.sub(initialPolicyCoverLimit));
+            expect(await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address)).to.equal(initialRMSoteriaCoverAmount.sub(initialPolicyCoverLimit));
+            expect(await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address)).to.equal(initialActiveCoverLimit.sub(initialPolicyCoverLimit));
 
-    //         // policyholder account balance should be depleted
-    //         expect(await solaceCoverProduct.accountBalanceOf(policyholder4.address)).to.equal(0);
-    //     });
+            // policyholder account balance should be depleted
+            expect(await solaceCoverProduct.accountBalanceOf(policyholder4.address)).to.equal(0);
 
-    //     it("will be able to charge premiums for accounts that have been deactivated in the last epoch", async () => {
-    //         // CASE 3 - Create a new account, deactivate it, then charge premium on this newly deactivated account
+            // dai should be transferred to premium pool
+            expect(await dai.balanceOf(solaceCoverProduct.address)).eq(initialContractDAIBalance.sub(depositAmount))
+            expect(await dai.balanceOf(premiumPool.address)).eq(initialPremiumPoolDAIBalance.add(depositAmount))
+        });
+
+        it("will be able to charge premiums for accounts that have been deactivated in the last epoch", async () => {
+            // CASE 4 - Create a new account, deactivate it, then charge premium on this newly deactivated account
             
-    //         // Create a new account, then deactivate it
-    //         await solaceCoverProduct.connect(governor).activatePolicy(policyholder5.address, INITIAL_COVER_LIMIT, 0, INITIAL_DEPOSIT, [])
-    //         expect(await solaceCoverProduct.policyStatus(POLICY_ID_5)).to.equal(true);
-    //         await solaceCoverProduct.connect(policyholder5).deactivatePolicy()
-    //         expect(await solaceCoverProduct.policyStatus(POLICY_ID_5)).to.equal(false);
+            // Create a new account, then deactivate it
+            await solaceCoverProduct.connect(governor).activatePolicy(policyholder5.address, INITIAL_COVER_LIMIT, INITIAL_DEPOSIT, [])
+            expect(await solaceCoverProduct.policyStatus(POLICY_ID_5)).to.equal(true);
+            await solaceCoverProduct.connect(policyholder5).deactivatePolicy()
+            expect(await solaceCoverProduct.policyStatus(POLICY_ID_5)).to.equal(false);
 
-    //         // Get initial balances
-    //         let initialHolderFunds = await solaceCoverProduct.accountBalanceOf(policyholder5.address);
+            // Get initial balances
+            let initialHolderFunds = await solaceCoverProduct.accountBalanceOf(policyholder5.address);
+            let initialContractDAIBalance = await dai.balanceOf(solaceCoverProduct.address)
+            let initialPremiumPoolDAIBalance = await dai.balanceOf(premiumPool.address)
 
-    //         // Charge premiums
-    //         let tx = await solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder5.address], [WEEKLY_MAX_PREMIUM]);
-    //         await expect(tx).emit(solaceCoverProduct, "PremiumCharged").withArgs(policyholder5.address, WEEKLY_MAX_PREMIUM);
+            // Charge premiums
+            let tx = await solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder5.address], [WEEKLY_MAX_PREMIUM]);
+            await expect(tx).emit(solaceCoverProduct, "PremiumCharged").withArgs(policyholder5.address, WEEKLY_MAX_PREMIUM);
          
-    //         // Check balances
-    //         expect(await solaceCoverProduct.accountBalanceOf(policyholder5.address)).to.equal(initialHolderFunds.sub(WEEKLY_MAX_PREMIUM));
-    //     })
+            // Check balances
+            expect(await solaceCoverProduct.accountBalanceOf(policyholder5.address)).to.equal(initialHolderFunds.sub(WEEKLY_MAX_PREMIUM));
+            expect(await dai.balanceOf(solaceCoverProduct.address)).eq(initialContractDAIBalance.sub(WEEKLY_MAX_PREMIUM))
+            expect(await dai.balanceOf(premiumPool.address)).eq(initialPremiumPoolDAIBalance.add(WEEKLY_MAX_PREMIUM))
+        })
 
     //     // it("REDUNDANT FOR NOW - will skip charging premium for inactive accounts", async () => {
     //         // CASE 4 (REUNDANT FOR NOW) - Policy holder 5 withdraws, then premium is charged twice
@@ -1060,133 +1088,137 @@ describe("SolaceCoverProduct", function() {
     //         // expect(await dai.balanceOf(premiumPool.address)).to.equal(initialPremiumPoolBalance.add(WEEKLY_MAX_PREMIUM));
     //     // });
 
-    //     it("will correctly charge premiums with reward points", async () => {
-    //         // CASE 4 - Charge weekly premium for three active policies
-    //         // Policy 1: reward points can pay for premium in full
-    //         // Policy 2: reward points can partially pay for premium, rest will come from account balance
-    //         // Policy 3: reward points + account balance unable to fully pay for premium
+        it("will correctly charge premiums with reward points", async () => {
+            // CASE 5 - Charge weekly premium for three active policies
+            // Policy 1: reward points can pay for premium in full
+            // Policy 2: reward points can partially pay for premium, rest will come from account balance
+            // Policy 3: reward points + account balance unable to fully pay for premium
 
-    //         // Set up reward points for policy 1 and 2
-    //         // Use referral code to set up reward points for policy 1
-    //         // Use setRewardPoints() method to set up reward points for policy 2
-    //         let EXCESS_REWARD_POINTS = WEEKLY_MAX_PREMIUM.mul(2)
-    //         let INSUFFICIENT_REWARD_POINTS = WEEKLY_MAX_PREMIUM.div(10)
+            // Set up reward points for policy 1 and 2
+            // Use referral code to set up reward points for policy 1
+            // Use setRewardPoints() method to set up reward points for policy 2
+            let EXCESS_REWARD_POINTS = WEEKLY_MAX_PREMIUM.mul(2)
+            let INSUFFICIENT_REWARD_POINTS = WEEKLY_MAX_PREMIUM.div(10)
 
-    //         let referralCode = await getSolaceReferralCode(policyholder2, solaceCoverProduct)
-    //         let coverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_1);
-    //         let tx = await solaceCoverProduct.connect(policyholder1).updateCoverLimit(coverLimit, referralCode);
-    //         let initialRewardPoints1 = await solaceCoverProduct.rewardPointsOf(policyholder1.address)
-    //         expect(initialRewardPoints1).gt(EXCESS_REWARD_POINTS)
+            let referralCode = await getSolaceReferralCode(policyholder2, solaceCoverProduct)
+            let coverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_1);
+            let tx = await solaceCoverProduct.connect(policyholder1).updateCoverLimit(coverLimit, referralCode);
+            let initialRewardPoints1 = await solaceCoverProduct.rewardPointsOf(policyholder1.address)
+            expect(initialRewardPoints1).gt(EXCESS_REWARD_POINTS)
 
-    //         tx = await solaceCoverProduct.connect(coverPromotionAdmin).setRewardPoints(policyholder2.address, INSUFFICIENT_REWARD_POINTS)
-    //         expect(tx).to.emit(solaceCoverProduct, "RewardPointsSet").withArgs(policyholder2.address, INSUFFICIENT_REWARD_POINTS);
-    //         let initialRewardPoints2 = await solaceCoverProduct.rewardPointsOf(policyholder2.address)
-    //         expect(initialRewardPoints2).eq(INSUFFICIENT_REWARD_POINTS)
+            tx = await solaceCoverProduct.connect(coverPromotionAdmin).setRewardPoints(policyholder2.address, INSUFFICIENT_REWARD_POINTS)
+            expect(tx).to.emit(solaceCoverProduct, "RewardPointsSet").withArgs(policyholder2.address, INSUFFICIENT_REWARD_POINTS);
+            let initialRewardPoints2 = await solaceCoverProduct.rewardPointsOf(policyholder2.address)
+            expect(initialRewardPoints2).eq(INSUFFICIENT_REWARD_POINTS)
 
-    //         // Set up policy 3 (remember we need minimum 2 chargePremium calls to reach PremiumsPartiallySet branch, so we will do the first call to setup)
-    //         // Also remember that we deactivated and did a complete withdrawal of amount in policyholder3's account in withdraw() unit test
-    //         let depositAmount = WEEKLY_MAX_PREMIUM.mul(11).div(10)
-    //         await solaceCoverProduct.connect(governor).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, 0, depositAmount, []);
-    //         await solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder3.address], [WEEKLY_MAX_PREMIUM]);
-    //         expect(await solaceCoverProduct.accountBalanceOf(policyholder3.address)).eq(WEEKLY_MAX_PREMIUM.div(10))
-    //         tx = await solaceCoverProduct.connect(coverPromotionAdmin).setRewardPoints(policyholder3.address, INSUFFICIENT_REWARD_POINTS)
-    //         expect(tx).to.emit(solaceCoverProduct, "RewardPointsSet").withArgs(policyholder3.address, INSUFFICIENT_REWARD_POINTS);
-    //         let initialRewardPoints3 = await solaceCoverProduct.rewardPointsOf(policyholder3.address)
-    //         expect(initialRewardPoints3).eq(INSUFFICIENT_REWARD_POINTS)
+            // Set up policy 3 (remember we need minimum 2 chargePremium calls to reach PremiumsPartiallySet branch, so we will do the first call to setup)
+            // Also remember that we deactivated and did a complete withdrawal of amount in policyholder3's account in withdraw() unit test
+            let depositAmount = WEEKLY_MAX_PREMIUM.mul(11).div(10)
+            await solaceCoverProduct.connect(governor).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, depositAmount, []);
+            await solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder3.address], [WEEKLY_MAX_PREMIUM]);
+            expect(await solaceCoverProduct.accountBalanceOf(policyholder3.address)).eq(WEEKLY_MAX_PREMIUM.div(10))
+            tx = await solaceCoverProduct.connect(coverPromotionAdmin).setRewardPoints(policyholder3.address, INSUFFICIENT_REWARD_POINTS)
+            expect(tx).to.emit(solaceCoverProduct, "RewardPointsSet").withArgs(policyholder3.address, INSUFFICIENT_REWARD_POINTS);
+            let initialRewardPoints3 = await solaceCoverProduct.rewardPointsOf(policyholder3.address)
+            expect(initialRewardPoints3).eq(INSUFFICIENT_REWARD_POINTS)
 
-    //         // Get initial state variable values
-    //         let initialHolder1AccountBalance = await solaceCoverProduct.accountBalanceOf(policyholder1.address);
-    //         let initialHolder2AccountBalance = await solaceCoverProduct.accountBalanceOf(policyholder2.address);
-    //         let initialHolder3AccountBalance = await solaceCoverProduct.accountBalanceOf(policyholder3.address);
-    //         let initialActiveCoverLimit = await solaceCoverProduct.activeCoverLimit();
-    //         let initialPolicy1CoverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_1);
-    //         let initialPolicy2CoverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_2);
-    //         let initialPolicy3CoverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_3);
-    //         let initialAvailableCoverCapacity = await solaceCoverProduct.availableCoverCapacity();
-    //         let initialRMCoverAmount = await riskManager.activeCoverLimit();
-    //         let initialRMSoteriaCoverAmount = await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address);
+            // Get initial state variable values
+            let initialHolder1AccountBalance = await solaceCoverProduct.accountBalanceOf(policyholder1.address);
+            let initialHolder2AccountBalance = await solaceCoverProduct.accountBalanceOf(policyholder2.address);
+            let initialHolder3AccountBalance = await solaceCoverProduct.accountBalanceOf(policyholder3.address);
+            let initialActiveCoverLimit = await solaceCoverProduct.activeCoverLimit();
+            let initialPolicy1CoverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_1);
+            let initialPolicy2CoverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_2);
+            let initialPolicy3CoverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_3);
+            let initialAvailableCoverCapacity = await solaceCoverProduct.availableCoverCapacity();
+            let initialRMCoverAmount = await riskManager.activeCoverLimit();
+            let initialRMSoteriaCoverAmount = await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address);
+            let initialContractDAIBalance = await dai.balanceOf(solaceCoverProduct.address)
+            let initialPremiumPoolDAIBalance = await dai.balanceOf(premiumPool.address)
 
-    //         tx = await solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder1.address, policyholder2.address, policyholder3.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM])
-    //         expect(tx).to.emit(solaceCoverProduct, "PremiumCharged").withArgs(policyholder1.address, WEEKLY_MAX_PREMIUM);
-    //         expect(tx).to.emit(solaceCoverProduct, "PremiumCharged").withArgs(policyholder2.address, WEEKLY_MAX_PREMIUM);
-    //         expect(tx).to.emit(solaceCoverProduct, "PremiumPartiallyCharged").withArgs(policyholder3.address, WEEKLY_MAX_PREMIUM, initialHolder3AccountBalance.add(initialRewardPoints3));
-    //         expect(tx).to.emit(solaceCoverProduct, "PolicyDeactivated").withArgs(POLICY_ID_3);
-    //         await expect(tx).emit(riskManager, "ActiveCoverLimitUpdated").withArgs(solaceCoverProduct.address, initialActiveCoverLimit, initialActiveCoverLimit.sub(initialPolicy3CoverLimit));
+            tx = await solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder1.address, policyholder2.address, policyholder3.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM])
+            expect(tx).to.emit(solaceCoverProduct, "PremiumCharged").withArgs(policyholder1.address, WEEKLY_MAX_PREMIUM);
+            expect(tx).to.emit(solaceCoverProduct, "PremiumCharged").withArgs(policyholder2.address, WEEKLY_MAX_PREMIUM);
+            expect(tx).to.emit(solaceCoverProduct, "PremiumPartiallyCharged").withArgs(policyholder3.address, WEEKLY_MAX_PREMIUM, initialHolder3AccountBalance.add(initialRewardPoints3));
+            expect(tx).to.emit(solaceCoverProduct, "PolicyDeactivated").withArgs(POLICY_ID_3);
+            await expect(tx).emit(riskManager, "ActiveCoverLimitUpdated").withArgs(solaceCoverProduct.address, initialActiveCoverLimit, initialActiveCoverLimit.sub(initialPolicy3CoverLimit));
             
-    //         // Confirm state is what we expect after charging premium
+            // Confirm state is what we expect after charging premium
 
-    //         // Check reward points
-    //         expect(await solaceCoverProduct.rewardPointsOf(policyholder1.address)).eq(initialRewardPoints1.sub(WEEKLY_MAX_PREMIUM))            
-    //         expect(await solaceCoverProduct.rewardPointsOf(policyholder2.address)).eq(0)          
-    //         expect(await solaceCoverProduct.rewardPointsOf(policyholder3.address)).eq(0)          
+            // Check reward points
+            expect(await solaceCoverProduct.rewardPointsOf(policyholder1.address)).eq(initialRewardPoints1.sub(WEEKLY_MAX_PREMIUM))            
+            expect(await solaceCoverProduct.rewardPointsOf(policyholder2.address)).eq(0)          
+            expect(await solaceCoverProduct.rewardPointsOf(policyholder3.address)).eq(0)          
 
-    //         // Check account balances
-    //         expect(await solaceCoverProduct.accountBalanceOf(policyholder1.address)).eq(initialHolder1AccountBalance)
-    //         expect(await solaceCoverProduct.accountBalanceOf(policyholder2.address)).eq(initialHolder2AccountBalance.sub(WEEKLY_MAX_PREMIUM).add(initialRewardPoints2))
-    //         expect(await solaceCoverProduct.accountBalanceOf(policyholder3.address)).eq(0)
+            // Check account balances
+            expect(await solaceCoverProduct.accountBalanceOf(policyholder1.address)).eq(initialHolder1AccountBalance)
+            expect(await solaceCoverProduct.accountBalanceOf(policyholder2.address)).eq(initialHolder2AccountBalance.sub(WEEKLY_MAX_PREMIUM).add(initialRewardPoints2))
+            expect(await solaceCoverProduct.accountBalanceOf(policyholder3.address)).eq(0)
 
-    //         // Check cover limits
-    //         expect(await solaceCoverProduct.coverLimitOf(POLICY_ID_1)).eq(initialPolicy1CoverLimit)
-    //         expect(await solaceCoverProduct.coverLimitOf(POLICY_ID_2)).eq(initialPolicy2CoverLimit)
-    //         expect(await solaceCoverProduct.coverLimitOf(POLICY_ID_3)).eq(0)
+            // Check cover limits
+            expect(await solaceCoverProduct.coverLimitOf(POLICY_ID_1)).eq(initialPolicy1CoverLimit)
+            expect(await solaceCoverProduct.coverLimitOf(POLICY_ID_2)).eq(initialPolicy2CoverLimit)
+            expect(await solaceCoverProduct.coverLimitOf(POLICY_ID_3)).eq(0)
 
-    //         // Check policy status
-    //         expect(await solaceCoverProduct.policyStatus(POLICY_ID_1)).eq(true)
-    //         expect(await solaceCoverProduct.policyStatus(POLICY_ID_2)).eq(true)
-    //         expect(await solaceCoverProduct.policyStatus(POLICY_ID_3)).eq(false)
+            // Check policy status
+            expect(await solaceCoverProduct.policyStatus(POLICY_ID_1)).eq(true)
+            expect(await solaceCoverProduct.policyStatus(POLICY_ID_2)).eq(true)
+            expect(await solaceCoverProduct.policyStatus(POLICY_ID_3)).eq(false)
 
-    //         // Soteria balance check
-    //         let accountBalanceDeductedForHolder1 = BN.from("0");
-    //         let accountBalanceDeductedForHolder2 = WEEKLY_MAX_PREMIUM.sub(initialRewardPoints2);
-    //         let accountBalanceDeductedForHolder3 = initialHolder3AccountBalance;
-    //         let expectedSoteriaBalanceChange = accountBalanceDeductedForHolder1.add(accountBalanceDeductedForHolder2).add(accountBalanceDeductedForHolder3)
+            // Soteria balance check
+            let accountBalanceDeductedForHolder1 = BN.from("0");
+            let accountBalanceDeductedForHolder2 = WEEKLY_MAX_PREMIUM.sub(initialRewardPoints2);
+            let accountBalanceDeductedForHolder3 = initialHolder3AccountBalance;
+            let expectedSoteriaBalanceChange = accountBalanceDeductedForHolder1.add(accountBalanceDeductedForHolder2).add(accountBalanceDeductedForHolder3)
+            expect(await dai.balanceOf(solaceCoverProduct.address)).eq(initialContractDAIBalance.sub(expectedSoteriaBalanceChange))
+            expect(await dai.balanceOf(premiumPool.address)).eq(initialPremiumPoolDAIBalance.add(expectedSoteriaBalanceChange))
 
-    //         // Soteria active cover limit check - policy 3 deactivated
-    //         expect(await solaceCoverProduct.activeCoverLimit()).eq(initialActiveCoverLimit.sub(initialPolicy3CoverLimit))
-    //         expect(await riskManager.activeCoverLimit()).eq(initialRMCoverAmount.sub(initialPolicy3CoverLimit))
-    //         expect(await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address)).eq(initialRMSoteriaCoverAmount.sub(initialPolicy3CoverLimit))
+            // Soteria active cover limit check - policy 3 deactivated
+            expect(await solaceCoverProduct.activeCoverLimit()).eq(initialActiveCoverLimit.sub(initialPolicy3CoverLimit))
+            expect(await riskManager.activeCoverLimit()).eq(initialRMCoverAmount.sub(initialPolicy3CoverLimit))
+            expect(await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address)).eq(initialRMSoteriaCoverAmount.sub(initialPolicy3CoverLimit))
             
-    //         // Cover capacity check - should be increased by policy 3 initial cover limit
-    //         expect(await solaceCoverProduct.availableCoverCapacity()).eq(initialAvailableCoverCapacity.add(initialPolicy3CoverLimit))
-    //     })
+            // Cover capacity check - should be increased by policy 3 initial cover limit
+            expect(await solaceCoverProduct.availableCoverCapacity()).eq(initialAvailableCoverCapacity.add(initialPolicy3CoverLimit))
+        })
 
-    //     // it("will charge for 100 users in one call", async() => {
-    //     //     // Create 100 test wallets
-    //     //     // 100 wallets -> 1.6M gas
-    //     //     // 1000 wallets -> 16M gas
-    //     //     let numberWallets = 100 // Change this number to whatever number of wallets you want to test for
-    //     //     let users:(Wallet)[] = [];
-    //     //     for (let i = 0; i < numberWallets; i++) {
-    //     //         users.push(provider.createEmptyWallet())
-    //     //     }
+        it("will charge for 100 users in one call", async() => {
+            // Create 100 test wallets
+            // 100 wallets -> 1.6M gas
+            // 1000 wallets -> 16M gas
+            let numberWallets = 100 // Change this number to whatever number of wallets you want to test for
+            let users:(Wallet)[] = [];
+            for (let i = 0; i < numberWallets; i++) {
+                users.push(provider.createEmptyWallet())
+            }
 
-    //     //     let coverLimit = BN.from(100);
-    //     //     let depositAmount = BN.from(10);
-    //     //     let WEEKLY_MAX_PREMIUM = coverLimit.div(10).mul(604800).div(31536000) // Override global WEEKLY_MAX_PREMIUM variable
+            let coverLimit = BN.from(100);
+            let depositAmount = BN.from(10);
+            let WEEKLY_MAX_PREMIUM = coverLimit.div(10).mul(604800).div(31536000) // Override global WEEKLY_MAX_PREMIUM variable
 
-    //     //     // Activate policies for each user, 100 DAI cover limit with 10 DAI deposit
-    //     //     for (let user of users) {
-    //     //         await solaceCoverProduct.connect(governor).activatePolicy(user.address, coverLimit, 0, depositAmount, [])
-    //     //     }
-    //     //     // Gift 0 reward points to one-third of users, half-weekly premium to one-third, and full weekly premium to remaining third
-    //     //     for (let user of users) {
-    //     //         if ( Math.floor(Math.random() * 3) == 0 ) {
-    //     //             await solaceCoverProduct.connect(coverPromotionAdmin).setRewardPoints(user.address, WEEKLY_MAX_PREMIUM.div(2))
-    //     //         } else if ( Math.floor(Math.random() * 3) == 1 ) {
-    //     //             await solaceCoverProduct.connect(coverPromotionAdmin).setRewardPoints(user.address, WEEKLY_MAX_PREMIUM)
-    //     //         }
-    //     //     }
-    //     //     // Create arrays for chargePremium parameter
-    //     //     let PREMIUM_ARRAY:BN[] = []
-    //     //     let ADDRESS_ARRAY:string[] = []
-    //     //     for (let user of users) {
-    //     //         ADDRESS_ARRAY.push(user.address)
-    //     //         PREMIUM_ARRAY.push(WEEKLY_MAX_PREMIUM)
-    //     //     }
+            // Activate policies for each user, 100 DAI cover limit with 10 DAI deposit
+            for (let user of users) {
+                await solaceCoverProduct.connect(governor).activatePolicy(user.address, coverLimit, depositAmount, [])
+            }
+            // Gift 0 reward points to one-third of users, half-weekly premium to one-third, and full weekly premium to remaining third
+            for (let user of users) {
+                if ( Math.floor(Math.random() * 3) == 0 ) {
+                    await solaceCoverProduct.connect(coverPromotionAdmin).setRewardPoints(user.address, WEEKLY_MAX_PREMIUM.div(2))
+                } else if ( Math.floor(Math.random() * 3) == 1 ) {
+                    await solaceCoverProduct.connect(coverPromotionAdmin).setRewardPoints(user.address, WEEKLY_MAX_PREMIUM)
+                }
+            }
+            // Create arrays for chargePremium parameter
+            let PREMIUM_ARRAY:BN[] = []
+            let ADDRESS_ARRAY:string[] = []
+            for (let user of users) {
+                ADDRESS_ARRAY.push(user.address)
+                PREMIUM_ARRAY.push(WEEKLY_MAX_PREMIUM)
+            }
 
-    //     //     // Charge premiums
-    //     //     await solaceCoverProduct.connect(premiumCollector).chargePremiums(ADDRESS_ARRAY, PREMIUM_ARRAY, 0);
-    //     // })
+            // Charge premiums
+            await solaceCoverProduct.connect(premiumCollector).chargePremiums(ADDRESS_ARRAY, PREMIUM_ARRAY);
+        })
 
     });
 

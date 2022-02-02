@@ -563,6 +563,7 @@ contract SolaceCoverProduct is
      * @notice Charge premiums for each policy holder.
      * @param holders The policy holders.
      * @param premiums The premium amounts in `wei` per policy holder.
+     * @dev cheaper to load variables directly from calldata, rather than copying to memory
      */
     function chargePremiums(
         address[] calldata holders, 
@@ -582,19 +583,21 @@ contract SolaceCoverProduct is
             // This does however bring up an additional edge case: the premium collector can charge a deactivated account more than once. 
             // We are trusting that the premium collector does not do this.
             // So in effect this will only skip computation if the policyholder has withdrawn their entire account balance
-            if ( _preDeactivateCoverLimitOf[_policyOf[holders[i]]] == 0) continue;
+            
+            uint256 preDeactiveCoverLimit = _preDeactivateCoverLimitOf[_policyOf[holders[i]]];
+            if ( preDeactiveCoverLimit == 0) continue;
 
             uint256 premium = premiums[i];
-            if (premium > _minRequiredAccountBalance(coverLimitOf(policyOf(holders[i])))) {
-                premium = _minRequiredAccountBalance(coverLimitOf(policyOf(holders[i])));
+            if (premiums[i] > _minRequiredAccountBalance(preDeactiveCoverLimit)) {
+                premium = _minRequiredAccountBalance(preDeactiveCoverLimit);
             }
 
             // If policy holder can pay for premium charged in full
-            if (_accountBalanceOf[holders[i]] + _rewardPointsOf[holders[i]] >= premiums[i]) {
+            if (_accountBalanceOf[holders[i]] + _rewardPointsOf[holders[i]] >= premium) {
                 
                 // If reward points can cover premium charged in full
-                if (_rewardPointsOf[holders[i]] >= premiums[i]) {
-                    _rewardPointsOf[holders[i]] -= premiums[i];
+                if (_rewardPointsOf[holders[i]] >= premium) {
+                    _rewardPointsOf[holders[i]] -= premium;
                 } else {
                     uint256 amountDeductedFromSoteriaAccount = premium - _rewardPointsOf[holders[i]];
                     amountToPayPremiumPool += amountDeductedFromSoteriaAccount;
@@ -615,7 +618,7 @@ contract SolaceCoverProduct is
                 );
             }
         }
-
+  
         // single transfer to the premium pool
         SafeERC20.safeTransferFrom(getAsset(), address(this), _registry.get("premiumPool"), amountToPayPremiumPool);
     }
