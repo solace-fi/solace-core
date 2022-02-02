@@ -116,10 +116,11 @@ describe("SolaceCoverProduct", function() {
             expect(solaceCoverProduct.address).to.not.undefined;
         });
 
-        it("default values for maxRateNum, maxRateDenom, chargeCycle, referralReward and isReferralOn should be set by constructor", async () => {
+        it("default values for maxRateNum, maxRateDenom, chargeCycle, cooldownPeriod, referralReward and isReferralOn should be set by constructor", async () => {
             expect(await solaceCoverProduct.maxRateNum()).eq(maxRateNum)
             expect(await solaceCoverProduct.maxRateDenom()).eq(maxRateDenom)
             expect(await solaceCoverProduct.chargeCycle()).eq(ONE_WEEK)
+            expect(await solaceCoverProduct.cooldownPeriod()).eq(ONE_WEEK)
             expect(await solaceCoverProduct.referralReward()).eq(ONE_ETH.mul(50))
             expect(await solaceCoverProduct.isReferralOn()).eq(true);
         })

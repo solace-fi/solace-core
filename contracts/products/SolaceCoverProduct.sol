@@ -140,6 +140,7 @@ contract SolaceCoverProduct is
         _maxRateNum = 1;
         _maxRateDenom = 315360000;
         _chargeCycle = 604800;
+        _cooldownPeriod = 604800;
         _referralReward = 50e18; // 50 DAI
         _isReferralOn = true;
     }
