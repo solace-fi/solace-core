@@ -15,14 +15,13 @@ import { Deployer, CoverageDataProvider, Registry, RiskManager, SolaceCoverProdu
 
 const DEPLOYER_CONTRACT_ADDRESS    = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
 
-const SOLACE_ADDRESS                    = "0x501acE9c35E60f03A2af4d484f49F9B1EFde9f40";
-const DAI_ADDRESS                       = "0x6B175474E89094C44Da98b954EedeAC495271d0F";
+const DAI_ADDRESS                  = "0x5592ec0cfb4dbc12d3ab100b257153436a1f0fea"; // testnet
 
 // wallet addresses
-const COVERAGE_DATA_PROVIDER_UPDATER_ADDRESS  = ""; // the bot address to update underwriting pool values
-const PREMIUM_POOL_ADDRESS                    = ""; // will be set in registry
-const COVER_PROMOTION_ADMIN_ADDRESS           = ""; // will be set in registry
-const PREMIUM_COLLECTOR_ADDRESS               = ""; // the bot address that will be set in registry
+let   COVERAGE_DATA_PROVIDER_UPDATER_ADDRESS  = "0xc5683ea4888DadfdE421a1E593DfbD36290D63AB"; // the bot address to update underwriting pool values
+const PREMIUM_POOL_ADDRESS                    = "0x86392998F4c8950b312137E8d635b0cB003E92EA"; // will be set in registry
+let   COVER_PROMOTION_ADMIN_ADDRESS           = "0x4770becA2628685F7C45102c7a649F921df71C70"; // will be set in registry
+const PREMIUM_COLLECTOR_ADDRESS               = "0xF321be3577B1AcB436869493862bA18bDde6fc39"; // the bot address that will be set in registry
 
 // contract addresses
 const REGISTRY_V2_ADDRESS               = "";
@@ -46,6 +45,16 @@ async function main() {
   artifacts = await import_artifacts();
   signerAddress = await deployer.getAddress();
   console.log(`Using ${signerAddress} as deployer and governor`);
+
+  if (!!COVERAGE_DATA_PROVIDER_ADDRESS) {
+    console.log(`Using ${signerAddress} as COVERAGE_DATA_PROVIDER_UPDATER_ADDRESS`);
+    COVERAGE_DATA_PROVIDER_UPDATER_ADDRESS = signerAddress;
+  }
+
+  if (!!COVER_PROMOTION_ADMIN_ADDRESS) {
+    console.log(`Using ${signerAddress} as COVER_PROMOTION_ADMIN_ADDRESS`);
+    COVER_PROMOTION_ADMIN_ADDRESS = signerAddress;
+  }
 
   if ((await provider.getNetwork()).chainId == 31337) { // testnet
     console.log('funding')
