@@ -585,12 +585,12 @@ contract SolaceCoverProduct is
             // We are trusting that the premium collector does not do this.
             // So in effect this will only skip computation if the policyholder has withdrawn their entire account balance
             
-            uint256 preDeactiveCoverLimit = _preDeactivateCoverLimitOf[_policyOf[holders[i]]];
-            if ( preDeactiveCoverLimit == 0) continue;
+            uint256 preDeactivateCoverLimit = _preDeactivateCoverLimitOf[_policyOf[holders[i]]];
+            if ( preDeactivateCoverLimit == 0) continue;
 
             uint256 premium = premiums[i];
-            if (premiums[i] > _minRequiredAccountBalance(preDeactiveCoverLimit)) {
-                premium = _minRequiredAccountBalance(preDeactiveCoverLimit);
+            if (premiums[i] > _minRequiredAccountBalance(preDeactivateCoverLimit)) {
+                premium = _minRequiredAccountBalance(preDeactivateCoverLimit);
             }
 
             // If policy holder can pay for premium charged in full
