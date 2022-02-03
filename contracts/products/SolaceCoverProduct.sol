@@ -144,25 +144,6 @@ contract SolaceCoverProduct is
         _referralReward = 50e18; // 50 DAI
         _isReferralOn = true;
     }
-    
-    /***************************************
-    FALLBACK FUNCTIONS
-    ***************************************/
-
-    /**
-     * @notice Fallback function will send back ETH
-    */
-    // solhint-disable-next-line 
-    receive() external payable nonReentrant {
-        Address.sendValue(payable(msg.sender), msg.value);
-    }
-
-    /**
-     * @notice Fallback function will send back ETH
-    */
-    fallback() external payable nonReentrant {
-        Address.sendValue(payable(msg.sender), msg.value);
-    }
 
     /***************************************
     POLICYHOLDER FUNCTIONS
@@ -751,7 +732,7 @@ contract SolaceCoverProduct is
      * @notice Determine if cooldown has passed for a policy holder
      * @return True if cooldown has passed, false if not
      */
-    function _hasCooldownPassed(address policyholder) internal returns (bool) {
+    function _hasCooldownPassed(address policyholder) internal view returns (bool) {
         if (_cooldownStart[policyholder] == 0) {
             return false;
         } else {
@@ -797,14 +778,14 @@ contract SolaceCoverProduct is
      * @notice Internal helper function to determine if referralCode_ is an empty bytes value
      * @param referralCode_ Referral code
      */
-    function _isEmptyReferralCode(bytes calldata referralCode_) internal returns (bool) {
+    function _isEmptyReferralCode(bytes calldata referralCode_) internal pure returns (bool) {
         return (keccak256(abi.encodePacked(referralCode_)) == keccak256(abi.encodePacked("")));
     }
 
     /**
      * @notice Internal helper function to get EIP712-compliant hash for referral code verification
      */
-    function _getEIP712Hash() internal returns (bytes32) {
+    function _getEIP712Hash() internal view returns (bytes32) {
         bytes32 digest = 
             ECDSA.toTypedDataHash(
                 _domainSeparatorV4(),
