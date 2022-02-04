@@ -767,12 +767,14 @@ describe("SolaceCoverProduct", function() {
         it("can use referral code only once", async () => {
             let referralCode = await getSolaceReferralCode(policyholder1, solaceCoverProduct)
             let coverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_2);
+            expect(await solaceCoverProduct.isReferralCodeUsed(policyholder2.address)).eq(false)
 
             let tx = await solaceCoverProduct.connect(policyholder2).updateCoverLimit(coverLimit, referralCode);
             await expect(tx).emit(solaceCoverProduct, "ReferralRewardsEarned").withArgs(policyholder1.address, REFERRAL_REWARD);
             await expect(tx).emit(solaceCoverProduct, "ReferralRewardsEarned").withArgs(policyholder2.address, REFERRAL_REWARD);
             expect (await solaceCoverProduct.rewardPointsOf(policyholder1.address)).eq(REFERRAL_REWARD)
             expect (await solaceCoverProduct.rewardPointsOf(policyholder2.address)).eq(REFERRAL_REWARD)
+            expect(await solaceCoverProduct.isReferralCodeUsed(policyholder2.address)).eq(true)
 
             // Attempt to use another referral code
             tx = await solaceCoverProduct.connect(policyholder3).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, 0, []);

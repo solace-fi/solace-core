@@ -258,6 +258,13 @@ interface ISolaceCoverProduct {
      */
     function isReferralOn() external view returns (bool isReferralOn_);
 
+    /**
+     * @notice Gets whether a policyholder has used a valid referral code or not.
+     * After using a valid referral code, a policyholder is no longer eligible to receive any further rewards from additional referral codes
+     * @return isReferralCodeUsed_ True if the policyholder has used a valid referral code, false if not
+     */
+    function isReferralCodeUsed(address policyholder) external view returns (bool isReferralCodeUsed_);
+
     /***************************************
     GOVERNANCE FUNCTIONS
     ***************************************/
