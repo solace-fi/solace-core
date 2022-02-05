@@ -149,20 +149,20 @@ contract SolaceCoverProduct is
     FALLBACK FUNCTIONS
     ***************************************/
 
-    /**
-     * @notice Fallback function will send back ETH
-    */
-    // solhint-disable-next-line 
-    receive() external payable nonReentrant {
-        Address.sendValue(payable(msg.sender), msg.value);
-    }
+    // /**
+    //  * @notice Fallback function will send back ETH
+    // */
+    // // solhint-disable-next-line 
+    // receive() external payable nonReentrant {
+    //     Address.sendValue(payable(msg.sender), msg.value);
+    // }
 
-    /**
-     * @notice Fallback function will send back ETH
-    */
-    fallback() external payable nonReentrant {
-        Address.sendValue(payable(msg.sender), msg.value);
-    }
+    // /**
+    //  * @notice Fallback function will send back ETH
+    // */
+    // fallback() external payable nonReentrant {
+    //     Address.sendValue(payable(msg.sender), msg.value);
+    // }
 
     /***************************************
     POLICYHOLDER FUNCTIONS

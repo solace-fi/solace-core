@@ -598,33 +598,33 @@ describe("SolaceCoverProduct", function() {
             expect(await dai.balanceOf(solaceCoverProduct.address)).to.equal(soteriaContractDAIbalance.add(INITIAL_DEPOSIT));
         });
 
-        it("fallback will send ETH back", async () => {
-            let accountBalance = await solaceCoverProduct.accountBalanceOf(policyholder1.address);
-            let soteriaContractETHbalance = await provider.getBalance(solaceCoverProduct.address);
-            let initialDepositorETHbalance = await provider.getBalance(policyholder1.address)
+        // it("fallback will send ETH back", async () => {
+        //     let accountBalance = await solaceCoverProduct.accountBalanceOf(policyholder1.address);
+        //     let soteriaContractETHbalance = await provider.getBalance(solaceCoverProduct.address);
+        //     let initialDepositorETHbalance = await provider.getBalance(policyholder1.address)
 
-            let tx = await policyholder1.sendTransaction({ to: solaceCoverProduct.address, value: ONE_ETH });
-            let receipt = await tx.wait();
-            let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
+        //     let tx = await policyholder1.sendTransaction({ to: solaceCoverProduct.address, value: ONE_ETH });
+        //     let receipt = await tx.wait();
+        //     let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
 
-            expect(await solaceCoverProduct.accountBalanceOf(policyholder1.address)).eq(accountBalance)
-            expect(await provider.getBalance(solaceCoverProduct.address)).to.equal(soteriaContractETHbalance);
-            expect(await provider.getBalance(policyholder1.address)).to.equal(initialDepositorETHbalance.sub(gasCost));
-        });
+        //     expect(await solaceCoverProduct.accountBalanceOf(policyholder1.address)).eq(accountBalance)
+        //     expect(await provider.getBalance(solaceCoverProduct.address)).to.equal(soteriaContractETHbalance);
+        //     expect(await provider.getBalance(policyholder1.address)).to.equal(initialDepositorETHbalance.sub(gasCost));
+        // });
 
-        it("receive will send ETH back", async () => {
-            let accountBalance = await solaceCoverProduct.accountBalanceOf(policyholder1.address);
-            let soteriaContractETHbalance = await provider.getBalance(solaceCoverProduct.address);
-            let initialDepositorETHbalance = await provider.getBalance(policyholder1.address)
+        // it("receive will send ETH back", async () => {
+        //     let accountBalance = await solaceCoverProduct.accountBalanceOf(policyholder1.address);
+        //     let soteriaContractETHbalance = await provider.getBalance(solaceCoverProduct.address);
+        //     let initialDepositorETHbalance = await provider.getBalance(policyholder1.address)
 
-            let tx = await policyholder1.sendTransaction({ to: solaceCoverProduct.address, value: ONE_ETH, data:"0x00" });
-            let receipt = await tx.wait();
-            let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
+        //     let tx = await policyholder1.sendTransaction({ to: solaceCoverProduct.address, value: ONE_ETH, data:"0x00" });
+        //     let receipt = await tx.wait();
+        //     let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
 
-            expect(await solaceCoverProduct.accountBalanceOf(policyholder1.address)).eq(accountBalance)
-            expect(await provider.getBalance(solaceCoverProduct.address)).to.equal(soteriaContractETHbalance);
-            expect(await provider.getBalance(policyholder1.address)).to.equal(initialDepositorETHbalance.sub(gasCost));
-        });
+        //     expect(await solaceCoverProduct.accountBalanceOf(policyholder1.address)).eq(accountBalance)
+        //     expect(await provider.getBalance(solaceCoverProduct.address)).to.equal(soteriaContractETHbalance);
+        //     expect(await provider.getBalance(policyholder1.address)).to.equal(initialDepositorETHbalance.sub(gasCost));
+        // });
 
         it("cannot deposit while paused", async () => {
             await solaceCoverProduct.connect(governor).setPaused(true);
