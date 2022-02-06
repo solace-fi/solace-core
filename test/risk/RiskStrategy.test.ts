@@ -11,15 +11,14 @@ const { expect } = chai;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "../utilities/artifact_importer";
-import { RiskManager, Registry, Vault, Weth9, PolicyManager, MockProductV2, MockRiskStrategy, CoverageDataProvider, ProductFactory, RiskStrategy } from "../../typechain";
+import { RiskManager, Registry, PolicyManager, MockProductV2, MockRiskStrategy, CoverageDataProvider, ProductFactory, RiskStrategy } from "../../typechain";
 
 describe("RiskStrategy", function () {
   let artifacts: ArtifactImports;
-  const [deployer, governor, user, product1, product2, product3, solace, solaceUsdcPool, priceOracle, premiumPool] = provider.getWallets();
+  const [deployer, governor, user, product1, product2, product3, solace, premiumPool] = provider.getWallets();
 
   // solace contracts
   let registry: Registry;
-  let vault: Vault;
   let policyManager: PolicyManager;
   let riskManager: RiskManager;
   let riskStrategy: RiskStrategy;
@@ -32,32 +31,37 @@ describe("RiskStrategy", function () {
   let product5: MockProductV2;
   let product6: MockProductV2;
 
-  let weth: Weth9;
-
   // vars
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
   const NO_WEIGHT = BN.from("0"); // max uint32
   const MAX_PRICE = BN.from("16777215"); // max uint24
   const SUBMIT_CLAIM_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("MockProductSubmitClaim(uint256 policyID,address claimant,uint256 amountOut,uint256 deadline)"));
-  const DOMAIN_NAME = "Solace.fi-MockProduct"; 
+  const DOMAIN_NAME = "Solace.fi-MockProduct";
+  const ONE_DAI = BN.from("1000000000000000000");
+  const UWP_AMOUNT = ONE_DAI.mul(1000000); // 1M USD(DAI)
 
   before(async function () {
     artifacts = await import_artifacts();
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
 
+    // deploy registry
     registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
-    await registry.connect(governor).set(["premiumPool"],[premiumPool.address])
-    weth = (await deployContract(deployer,artifacts.WETH)) as Weth9;
-    await registry.connect(governor).set(["weth"], [weth.address])
-    vault = (await deployContract(deployer,artifacts.Vault,[deployer.address,registry.address])) as Vault;
-    await registry.connect(governor).set(["vault"], [vault.address])
+    await registry.connect(governor).set(["premiumPool"],[premiumPool.address]);
+
+    // deploy policy manager
     policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address, registry.address])) as PolicyManager;
-    await registry.connect(governor).set(["policyManager"], [policyManager.address])
-    await registry.connect(governor).set(["solace"], [solace.address])    
-    coverageDataProvider = (await deployContract(deployer, artifacts.CoverageDataProvider, [governor.address, registry.address, priceOracle.address, solaceUsdcPool.address])) as CoverageDataProvider;
-    await registry.connect(governor).set(["coverageDataProvider"], [coverageDataProvider.address])
+    await registry.connect(governor).set(["policyManager"], [policyManager.address]);
+
+    // solace
+    await registry.connect(governor).set(["solace"], [solace.address]);
+
+    // deploy coverage data provider
+    coverageDataProvider = (await deployContract(deployer, artifacts.CoverageDataProvider, [governor.address])) as CoverageDataProvider;
+    await registry.connect(governor).set(["coverageDataProvider"], [coverageDataProvider.address]);
+
+    // deploy risk manager
     riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
-    await registry.connect(governor).set(["riskManager"], [riskManager.address])
+    await registry.connect(governor).set(["riskManager"], [riskManager.address]);
     
     // deploy product factory
     productFactory = (await deployContract(deployer, artifacts.ProductFactory)) as ProductFactory;
@@ -413,30 +417,28 @@ describe("RiskStrategy", function () {
 
   describe("max cover amount", function () {
     it("no assets no cover", async function () {
-      expect(await vault.totalAssets()).to.equal(0);
       expect(await riskStrategy.maxCover()).to.equal(0);
       expect(await riskStrategy.maxCoverPerProduct(product2.address)).to.equal(0);
       expect(await riskStrategy.maxCoverPerPolicy(product2.address)).to.equal(0);
     });
 
     it("can cover", async function () {
-      let depositAmount = BN.from("1000000000000000000");
-      await vault.connect(user).depositEth({value:depositAmount});
-        // add and enable risk strategy
+      await coverageDataProvider.connect(governor).set("underwritingPool", UWP_AMOUNT);
+      // add and enable risk strategy
       await riskManager.connect(governor).addRiskStrategy(riskStrategy.address);
       await riskManager.connect(governor).setStrategyStatus(riskStrategy.address, 1);
       await riskManager.connect(governor).setWeightAllocation(riskStrategy.address, 10000);
       expect(await riskStrategy.weightAllocation()).to.equal(10000);
       expect(await riskStrategy.status()).to.be.true;
 
-      expect(await vault.totalAssets()).to.equal(depositAmount);
-      expect(await riskStrategy.maxCover()).to.equal(depositAmount);
+      expect(await coverageDataProvider.maxCover()).to.equal(UWP_AMOUNT);
+      expect(await riskStrategy.maxCover()).to.equal(UWP_AMOUNT);
       expect(await riskStrategy.maxCoverPerProduct(product1.address)).to.equal(0);
-      expect(await riskStrategy.maxCoverPerProduct(product2.address)).to.equal(depositAmount.mul(7).div(16));
-      expect(await riskStrategy.maxCoverPerProduct(product3.address)).to.equal(depositAmount.mul(9).div(16));
+      expect(await riskStrategy.maxCoverPerProduct(product2.address)).to.equal(UWP_AMOUNT.mul(7).div(16));
+      expect(await riskStrategy.maxCoverPerProduct(product3.address)).to.equal(UWP_AMOUNT.mul(9).div(16));
       await expect(riskStrategy.maxCoverPerPolicy(product1.address)).be.revertedWith("product inactive");
-      expect(await riskStrategy.maxCoverPerPolicy(product2.address)).to.equal(depositAmount.mul(7).div(16).div(10));
-      expect(await riskStrategy.maxCoverPerPolicy(product3.address)).to.equal(depositAmount.mul(9).div(16).div(20));
+      expect(await riskStrategy.maxCoverPerPolicy(product2.address)).to.equal(UWP_AMOUNT.mul(7).div(16).div(10));
+      expect(await riskStrategy.maxCoverPerPolicy(product3.address)).to.equal(UWP_AMOUNT.mul(9).div(16).div(20));
     });
   });
 
@@ -536,22 +538,22 @@ describe("RiskStrategy", function () {
     })
     
     it("should revert on zero address risk manager", async function () {
-      await expect(riskStrategy.connect(governor).setRiskManager(ZERO_ADDRESS)).to.be.revertedWith("zero address risk manager")
+      await expect(riskStrategy.connect(governor).setRiskManager(ZERO_ADDRESS)).to.be.revertedWith("zero address risk manager");
     })
 
     it("should reject setRiskManager by non-governance", async function () {
-      await expect(riskStrategy.connect(user).setRiskManager(riskManager2.address)).to.be.revertedWith("!governance")
+      await expect(riskStrategy.connect(user).setRiskManager(riskManager2.address)).to.be.revertedWith("!governance");
     })
 
     it("should should setRiskManager", async function () {
       let tx = await riskStrategy.connect(governor).setRiskManager(riskManager2.address);
       expect(tx).emit(riskStrategy, "RiskManagerSet").withArgs(riskManager2.address);
-      expect(await riskStrategy.connect(governor).riskManager()).eq(riskManager2.address)
+      expect(await riskStrategy.connect(governor).riskManager()).eq(riskManager2.address);
     })
 
     after(async function () {
       await riskStrategy.connect(governor).setRiskManager(riskManager.address);
-      expect(await riskStrategy.connect(governor).riskManager()).eq(riskManager.address)
+      expect(await riskStrategy.connect(governor).riskManager()).eq(riskManager.address);
     })
   })
 });

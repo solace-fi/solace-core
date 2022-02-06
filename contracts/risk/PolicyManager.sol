@@ -299,28 +299,27 @@ contract PolicyManager is ERC721Enhanced, IPolicyManager, Governable {
      * @param coverLimit The policy coverage amount (in wei).
      * @param expirationBlock The policy expiration block number.
      * @param price The coverage price.
-     * @param riskStrategy The risk strategy of the covered positions(s).
      */
      function updatePolicyInfo(
         uint256 policyID,
         uint256 coverLimit,
         uint40 expirationBlock,
-        uint24 price,
-        address riskStrategy
+        uint24 price
         )
         external override tokenMustExist(policyID)
     {
         require(_policyInfo[policyID].product == msg.sender, "wrong product");
-
+        // strategy
+        address strategy = _policyInfo[policyID].riskStrategy;
         // update active cover limit
-        IRiskManager(_registry.get("riskManager")).updateActiveCoverLimitForStrategy(riskStrategy, _policyInfo[policyID].coverLimit, coverLimit);
+        IRiskManager(_registry.get("riskManager")).updateActiveCoverLimitForStrategy(strategy, _policyInfo[policyID].coverLimit, coverLimit);
         PolicyInfo memory info = PolicyInfo({
             product: msg.sender,
             positionDescription: _policyInfo[policyID].positionDescription,
             expirationBlock: expirationBlock,
             coverLimit: coverLimit,
             price: price,
-            riskStrategy: riskStrategy
+            riskStrategy: strategy
         });
         _policyInfo[policyID] = info;
         emit PolicyUpdated(policyID);

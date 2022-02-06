@@ -9,18 +9,17 @@ const { expect } = chai;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "../utilities/artifact_importer";
-import { RiskManager, Registry, Vault, Weth9, PolicyManager, MockProductV2, CoverageDataProvider, ProductFactory, RiskStrategy, MockRiskStrategy } from "../../typechain";
+import { RiskManager, Registry, PolicyManager, MockProductV2, CoverageDataProvider, ProductFactory, RiskStrategy, MockRiskStrategy, MockErc20 } from "../../typechain";
 
 const SUBMIT_CLAIM_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("MockProductSubmitClaim(uint256 policyID,address claimant,uint256 amountOut,uint256 deadline)"));
 const DOMAIN_NAME = "Solace.fi-MockProduct";
 
 describe("RiskManager", function () {
   let artifacts: ArtifactImports;
-  const [deployer, governor, user, product1, product2, product3, solace, solaceUsdcPool, priceOracle, premiumPool] = provider.getWallets();
+  const [deployer, governor, user, product1, product2, product3, solace, premiumPool] = provider.getWallets();
 
   // solace contracts
   let registry: Registry;
-  let vault: Vault;
   let policyManager: PolicyManager;
   let riskManager: RiskManager;
   let riskStrategy: RiskStrategy;
@@ -30,30 +29,40 @@ describe("RiskManager", function () {
   let product4: MockProductV2;
   let product5: MockProductV2;
   let product6: MockProductV2;
-  let weth: Weth9;
+  let dai: MockErc20;
 
-  // vars
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
   const STRATEGY_STATUS_ACTIVE = 1;
   const STRATEGY_STATUS_INACTIVE = 0;
-  const ONE_ETH = BN.from("1000000000000000000");
-  const TEN_THOUSAND_DAI = ONE_ETH.mul(10000); // 10000 DAI
+  const ONE_DAI = BN.from("1000000000000000000");
+  const TEN_THOUSAND_DAI = ONE_DAI.mul(10000); // 10000 DAI
+  const ONE_MILLION_DAI = ONE_DAI.mul(1000000); // 1M USD(DAI)
 
   before(async function () {
     artifacts = await import_artifacts();
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
 
+    // deploy registry
     registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
     await registry.connect(governor).set(["premiumPool"],[premiumPool.address])
-    weth = (await deployContract(deployer,artifacts.WETH)) as Weth9;
-    await registry.connect(governor).set(["weth"], [weth.address])
-    vault = (await deployContract(deployer,artifacts.Vault,[deployer.address,registry.address])) as Vault;
-    await registry.connect(governor).set(["vault"], [vault.address])
+    
+    // deploy policy manager
     policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address, registry.address])) as PolicyManager;
     await registry.connect(governor).set(["policyManager"], [policyManager.address])
-    await registry.connect(governor).set(["solace"], [solace.address])
+    
+    // solace
+    await registry.connect(governor).set(["solace"], [solace.address]);
+
+    // deploy mock DAI
+    dai = (await deployContract(deployer, artifacts.MockERC20, ["Dai Stablecoin", "DAI", ONE_DAI.mul(1000000)])) as MockErc20;
+    await registry.connect(governor).set(["dai"], [dai.address]);
+
+    // deploy coverate data provider
     coverageDataProvider = (await deployContract(deployer, artifacts.CoverageDataProvider, [governor.address])) as CoverageDataProvider;
-    await registry.connect(governor).set(["coverageDataProvider"], [coverageDataProvider.address])
+    await coverageDataProvider.connect(governor).set("underwritingPool", ONE_MILLION_DAI);
+    await registry.connect(governor).set(["coverageDataProvider"], [coverageDataProvider.address]);
+  
+    // deploy risk manager
     riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
     await registry.connect(governor).set(["riskManager"], [riskManager.address])
 
@@ -92,7 +101,6 @@ describe("RiskManager", function () {
       product6 = await ethers.getContractAt(artifacts.MockProductV2.abi, event3?.args?.["deployment"]) as MockProductV2;
     } else throw "no deployment";
 
-
     // create risk strategy for products
     let baseRiskStrategy = (await deployContract(deployer, artifacts.MockRiskStrategy)) as MockRiskStrategy;
     let tx = await riskStrategyFactory.createRiskStrategy(baseRiskStrategy.address, [product4.address, product5.address, product6.address],[1,2,3],[10000,10000,10000],[1,1,1]);
@@ -105,15 +113,12 @@ describe("RiskManager", function () {
       throw "no risk strategy deployment!";
     }
 
-
     await policyManager.connect(governor).addProduct(product1.address);
     await policyManager.connect(governor).addProduct(product2.address);
     await policyManager.connect(governor).addProduct(product3.address);
     await policyManager.connect(governor).addProduct(product4.address);
     await policyManager.connect(governor).addProduct(product5.address);
     await policyManager.connect(governor).addProduct(product6.address);
-
-    await deployer.sendTransaction({to: vault.address, value: ONE_ETH });
 
   });
 
@@ -337,7 +342,7 @@ describe("RiskManager", function () {
       await policyManager.connect(product3).createPolicy(user.address, 2, 0, 0, ZERO_ADDRESS, riskStrategy.address);
       expect(await riskManager.minCapitalRequirement()).to.equal(3);
 
-      await policyManager.connect(product3).updatePolicyInfo(3, 4, 0, 0, riskStrategy.address);
+      await policyManager.connect(product3).updatePolicyInfo(3, 4, 0, 0);
       expect(await riskManager.minCapitalRequirement()).to.equal(5);
      
       await policyManager.connect(product2).burn(2);

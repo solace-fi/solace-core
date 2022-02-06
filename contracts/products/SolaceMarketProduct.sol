@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
-import "@openzeppelin/contracts/utils/Address.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/cryptography/draft-EIP712Upgradeable.sol";
 import "../utils/GovernableInitializable.sol";
@@ -11,7 +12,7 @@ import "../interfaces/risk/IRiskStrategy.sol";
 import "../interfaces/utils/IClaimsEscrow.sol";
 import "../interfaces/utils/IRegistry.sol";
 import "../interfaces/products/IProduct.sol";
-import "../interfaces/IWETH9.sol";
+
 
 /**
  * @title SolaceMarketProduct
@@ -23,7 +24,7 @@ import "../interfaces/IWETH9.sol";
  */
 //contract SolaceMarketProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradeable, GovernableInitializable, Initializable {
 contract SolaceMarketProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgradeable, GovernableInitializable {
-    using Address for address;
+    using SafeERC20 for IERC20;
 
     /***************************************
     GLOBAL VARIABLES
@@ -113,15 +114,15 @@ contract SolaceMarketProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgr
 
     /**
      * @notice Purchases and mints a policy on the behalf of the policyholder.
-     * User will need to pay **ETH**.
+     * User will need to pay **USD**.
      * @param policyholder Holder of the position(s) to cover.
-     * @param coverLimit The value to cover in **ETH**.
+     * @param coverLimit The value to cover in **USD**.
      * @param blocks The length (in blocks) for policy.
      * @param positionDescription A byte encoded description of the position(s) to cover.
      * @param riskStrategy The risk strategy of the product to cover.
      * @return policyID The ID of newly created policy.
      */
-    function buyPolicy(address policyholder, uint256 coverLimit, uint40 blocks, bytes memory positionDescription, address riskStrategy) external payable override nonReentrant whileUnpaused returns (uint256 policyID) {
+    function buyPolicy(address policyholder, uint256 coverLimit, uint40 blocks, bytes memory positionDescription, address riskStrategy) external override nonReentrant whileUnpaused returns (uint256 policyID) {
         require(policyholder != address(0x0), "zero address");
         require(coverLimit > 0, "zero cover value");
         // check that the product can provide coverage for this policy
@@ -129,7 +130,7 @@ contract SolaceMarketProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgr
         require(acceptable, "cannot accept that risk");
         // check that the buyer has paid the correct premium
         uint256 premium = coverLimit * blocks * price / Q12;
-        require(msg.value >= premium && premium != 0, "insufficient payment");
+        require(IERC20(getAsset()).balanceOf(msg.sender) >= premium && premium != 0, "insufficient payment");
         // check that the buyer provided valid period
         require(blocks >= _minPeriod && blocks <= _maxPeriod, "invalid period");
         // create the policy
@@ -138,8 +139,6 @@ contract SolaceMarketProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgr
         // update local book-keeping variables
         _activeCoverLimit += coverLimit;
         _activeCoverLimitPerStrategy[riskStrategy] += coverLimit;
-        // return excess payment
-        if(msg.value > premium) Address.sendValue(payable(msg.sender), msg.value - premium);
         // transfer premium to the premium pool
         _deposit(premium);
         emit PolicyCreated(policyID);
@@ -148,14 +147,14 @@ contract SolaceMarketProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgr
 
     /**
      * @notice Increase or decrease the cover limit of the policy.
-     * User may need to pay **ETH** for increased cover limit or receive a refund for decreased cover limit.
+     * User may need to pay **USD** for increased cover limit or receive a refund for decreased cover limit.
      * Can only be called by the policyholder.
      * @param policyID The ID of the policy.
-     * @param coverLimit The new value to cover in **ETH**.
+     * @param coverLimit The new value to cover in **USD**.
      */
-    function updateCoverLimit(uint256 policyID, uint256 coverLimit) external payable override nonReentrant whileUnpaused {
+    function updateCoverLimit(uint256 policyID, uint256 coverLimit) external override nonReentrant whileUnpaused {
         require(coverLimit > 0, "zero cover value");
-        (address policyholder, address product, uint256 previousCoverLimit, uint40 expirationBlock, uint24 purchasePrice, bytes memory positionDescription, address riskStrategy) = IPolicyManager(_registry.get("policyManager")).getPolicyInfo(policyID);
+        (address policyholder, address product, uint256 previousCoverLimit, uint40 expirationBlock, uint24 purchasePrice, , address riskStrategy) = IPolicyManager(_registry.get("policyManager")).getPolicyInfo(policyID);
         // check msg.sender is policyholder
         require(policyholder == msg.sender, "!policyholder");
         // check for correct product
@@ -176,28 +175,25 @@ contract SolaceMarketProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgr
         if (newPremium >= paidPremium) {
             uint256 premium = newPremium - paidPremium;
             // check that the buyer has paid the correct premium
-            require(msg.value >= premium, "insufficient payment");
-            if(msg.value > premium) Address.sendValue(payable(msg.sender), msg.value - premium);
+            require(IERC20(getAsset()).balanceOf(msg.sender) >= premium, "insufficient payment");
             // transfer premium to the premium pool
             _deposit(premium);
         } else {
-            if(msg.value > 0) Address.sendValue(payable(msg.sender), msg.value);
-            uint256 refundAmount = paidPremium - newPremium;
-            _withdraw(refundAmount);
+            _withdraw(paidPremium - newPremium);
         }
         // update policy's URI and emit event
-        IPolicyManager(_registry.get("policyManager")).setPolicyInfo(policyID, coverLimit, expirationBlock, price, positionDescription, riskStrategy);
+        IPolicyManager(_registry.get("policyManager")).updatePolicyInfo(policyID, coverLimit, expirationBlock, price);
         emit PolicyUpdated(policyID);
     }
 
     /**
      * @notice Extend a policy.
-     * User will need to pay **ETH**.
+     * User will need to pay **USD**.
      * Can only be called by the policyholder.
      * @param policyID The ID of the policy.
      * @param extension The length of extension in blocks.
      */
-    function extendPolicy(uint256 policyID, uint40 extension) external payable override nonReentrant whileUnpaused {
+    function extendPolicy(uint256 policyID, uint40 extension) external override nonReentrant whileUnpaused {
         // check that the msg.sender is the policyholder
         (address policyholder, address product, uint256 coverLimit, uint40 expirationBlock, uint24 purchasePrice, bytes memory positionDescription, address riskStrategy) = IPolicyManager(_registry.get("policyManager")).getPolicyInfo(policyID);
         require(policyholder == msg.sender,"!policyholder");
@@ -208,8 +204,7 @@ contract SolaceMarketProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgr
         // compute the premium
         uint256 premium = coverLimit * extension * purchasePrice / Q12;
         // check that the buyer has paid the correct premium
-        require(msg.value >= premium, "insufficient payment");
-        if(msg.value > premium) Address.sendValue(payable(msg.sender), msg.value - premium);
+        require(IERC20(getAsset()).balanceOf(msg.sender) >= premium, "insufficient payment");
         // transfer premium to the premium pool
         _deposit(premium);
         // check that the buyer provided valid period
@@ -223,13 +218,13 @@ contract SolaceMarketProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgr
 
     /**
      * @notice Extend a policy and update its cover limit.
-     * User may need to pay **ETH** for increased cover limit or receive a refund for decreased cover limit.
+     * User may need to pay **USD** for increased cover limit or receive a refund for decreased cover limit.
      * Can only be called by the policyholder.
      * @param policyID The ID of the policy.
-     * @param coverLimit The new value to cover in **ETH**.
+     * @param coverLimit The new value to cover in **USD**.
      * @param extension The length of extension in blocks.
      */
-    function updatePolicy(uint256 policyID, uint256 coverLimit, uint40 extension) external payable override nonReentrant whileUnpaused {
+    function updatePolicy(uint256 policyID, uint256 coverLimit, uint40 extension) external override nonReentrant whileUnpaused {
         require(coverLimit > 0, "zero cover value");
         (address policyholder, address product, uint256 previousCoverLimit, uint40 previousExpirationBlock, uint24 purchasePrice, , address riskStrategy) = IPolicyManager(_registry.get("policyManager")).getPolicyInfo(policyID);
         require(policyholder == msg.sender,"!policyholder");
@@ -238,31 +233,12 @@ contract SolaceMarketProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgr
         // check that the product can provide coverage for this policy
         (bool acceptable, uint24 price) = IRiskStrategy(riskStrategy).assessRisk(address(this), previousCoverLimit, coverLimit);
         require(acceptable, "cannot accept that risk");
-        // add new block extension
-        uint40 newExpirationBlock = previousExpirationBlock + extension;
-        // check if duration is valid
-        uint40 duration = newExpirationBlock - uint40(block.number);
-        require(duration >= _minPeriod && duration <= _maxPeriod, "invalid period");
-        // update local book-keeping variables
+        // update active cover limit values
         _activeCoverLimit = _activeCoverLimit + coverLimit - previousCoverLimit;
         _activeCoverLimitPerStrategy[riskStrategy] = _activeCoverLimitPerStrategy[riskStrategy] + coverLimit - previousCoverLimit;
-        // update policy info
-        IPolicyManager(_registry.get("policyManager")).setPolicyInfo(policyID, coverLimit, newExpirationBlock, price, "", riskStrategy);
-        // calculate premium needed for new cover limit as if policy is bought now
-        uint256 newPremium = coverLimit * duration * price / Q12;
-        // calculate premium already paid based on current policy
-        uint256 paidPremium = previousCoverLimit * (previousExpirationBlock - uint40(block.number)) * purchasePrice / Q12;
-        if (newPremium >= paidPremium) {
-            uint256 premium = newPremium - paidPremium;
-            require(msg.value >= premium, "insufficient payment");
-            if(msg.value > premium) Address.sendValue(payable(msg.sender), msg.value - premium);
-            _deposit(premium);
-        } else {
-            if(msg.value > 0) Address.sendValue(payable(msg.sender), msg.value);
-            uint256 refund = paidPremium - newPremium;
-            _withdraw(refund);
-        }
-        emit PolicyUpdated(policyID);
+        // update policy
+        _updatePolicy(policyID, coverLimit, previousCoverLimit, extension, previousExpirationBlock, price, purchasePrice);
+
     }
 
     /**
@@ -330,10 +306,10 @@ contract SolaceMarketProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgr
 
     /**
      * @notice Calculate a premium quote for a policy.
-     * @param coverLimit The value to cover in **ETH**.
+     * @param coverLimit The value to cover in **USD**.
      * @param blocks The duration of the policy in blocks.
      * @param riskStrategy The risk strategy address.
-     * @return premium The quote for their policy in **ETH**.
+     * @return premium The quote for their policy in **USD**.
      */
     function getQuote(uint256 coverLimit, uint40 blocks, address riskStrategy) external view override returns (uint256 premium) {
         (, uint24 price, ) = IRiskStrategy(riskStrategy).productRiskParams(address(this));
@@ -406,9 +382,9 @@ contract SolaceMarketProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgr
      * @param account Potential signer to query.
      * @return status True if is authorized signer.
      */
-     function isAuthorizedSigner(address account) external view override returns (bool status) {
+    function isAuthorizedSigner(address account) external view override returns (bool status) {
         return _isAuthorizedSigner[account];
-     }
+    }
 
     /***************************************
     MUTATOR FUNCTIONS
@@ -486,31 +462,73 @@ contract SolaceMarketProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgr
     ***************************************/
 
     /**
-     * @notice Wraps ETH into wETH, and sends it to the premium pool
+     * @notice Internal function that updates the policy.
+     * @param policyID The ID of the policy.
+     * @param newCoverLimit The new value to cover in **USD**.
+     * @param prevCoverLimit The new value to cover in **USD**.
+     * @param extension The length of extension in blocks.
+     * @param prevExpirationBlock The previous expiration block of the policy.
+     * @param newPrice The new cover quote price.
+     * @param prevPrice The previous cover quote price of the policy.
+     */
+    function _updatePolicy(
+        uint256 policyID,
+        uint256 newCoverLimit,
+        uint256 prevCoverLimit,
+        uint40 extension,
+        uint40 prevExpirationBlock,
+        uint24 newPrice,
+        uint24 prevPrice
+        ) internal
+    {
+        // add new block extension
+        uint40 newExpirationBlock = prevExpirationBlock + extension;
+        // check if duration is valid
+        uint40 duration = newExpirationBlock - uint40(block.number);
+        require(duration >= _minPeriod && duration <= _maxPeriod, "invalid period");
+
+        // calculate premium needed for new cover limit as if policy is bought now
+        uint256 newPremium = newCoverLimit * duration * newPrice / Q12;
+        // calculate premium already paid based on current policy
+        uint256 paidPremium = prevCoverLimit * (prevExpirationBlock - uint40(block.number)) * prevPrice / Q12;
+
+        if (newPremium >= paidPremium) {
+            uint256 premium = newPremium - paidPremium;
+            require(IERC20(getAsset()).balanceOf(msg.sender) >= premium, "insufficient payment");
+            _deposit(premium);
+        } else {
+            _withdraw(paidPremium - newPremium);
+        }
+        // update policy info
+        IPolicyManager(_registry.get("policyManager")).updatePolicyInfo(policyID, newCoverLimit, newExpirationBlock, newPrice);
+        emit PolicyUpdated(policyID);
+    }
+
+    /**
+     * @notice Returns the underlying principal asset for `Solace Cover Product`.
+     * @return asset The underlying asset.
+    */
+    function getAsset() internal view returns (IERC20 asset) {
+        return IERC20(_registry.get("dai"));
+    }
+
+    /**
+     * @notice Sends the amount to the premium pool
      * @param amount amount to send to premium pool
      */
     function _deposit(uint256 amount) internal {
-        // Wrap ETH into wETH
-        IWETH9(payable(_registry.get("weth"))).deposit{value: amount}();
-        // Send wETH to premium pool
-        IWETH9(payable(_registry.get("weth"))).transfer(_registry.get("premiumPool"), amount);
+        SafeERC20.safeTransferFrom(getAsset(), msg.sender, _registry.get("premiumPool"), amount);
         emit DepositMade(amount);
     }
 
     /**
-     * @notice Withdraw wETH from premium pool, and send it to the user
+     * @notice Withdraw dai from premium pool, and send it to the user
      * @param amount amount to send to premium pool
      */
     function _withdraw(uint256 amount) internal {
-        // Pull wETH from premium pool
-        IWETH9(payable(_registry.get("weth"))).transferFrom(_registry.get("premiumPool"), address(this), amount);
-        // Unwrap wETH
-        IWETH9(payable(_registry.get("weth"))).withdraw(uint(amount));
-        // Send ETH to msg.sender
-        Address.sendValue(payable(msg.sender), amount);
+        SafeERC20.safeTransferFrom(getAsset(), _registry.get("premiumPool"), msg.sender, amount);
         emit WithdrawMade(amount);
     }
-
 
     /**
      * @notice Adds two numbers.
@@ -524,12 +542,4 @@ contract SolaceMarketProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgr
             : a - uint256(-b);
     }
 
-    /***************************************
-    MISC
-    ***************************************/
-
-    /**
-     * @notice Fallback function to receive ETH
-     */
-    receive() external payable override {}
 }

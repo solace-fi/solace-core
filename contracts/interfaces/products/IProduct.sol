@@ -41,43 +41,43 @@ interface IProduct {
 
     /**
      * @notice Purchases and mints a policy on the behalf of the policyholder.
-     * User will need to pay **ETH**.
+     * User will need to pay **USD**.
      * @param policyholder Holder of the position(s) to cover.
-     * @param coverLimit The value to cover in **ETH**.
+     * @param coverLimit The value to cover in **USD**.
      * @param blocks The length (in blocks) for policy.
      * @param positionDescription A byte encoded description of the position(s) to cover.
      * @param riskStrategy The risk strategy of the product to cover.
      * @return policyID The ID of newly created policy.
      */
-    function buyPolicy(address policyholder, uint256 coverLimit, uint40 blocks, bytes memory positionDescription, address riskStrategy) external payable returns (uint256 policyID);
+    function buyPolicy(address policyholder, uint256 coverLimit, uint40 blocks, bytes memory positionDescription, address riskStrategy) external returns (uint256 policyID);
 
     /**
      * @notice Increase or decrease the cover limit of the policy.
-     * User may need to pay **ETH** for increased cover limit or receive a refund for decreased cover limit.
+     * User may need to pay **USD** for increased cover limit or receive a refund for decreased cover limit.
      * Can only be called by the policyholder.
      * @param policyID The ID of the policy.
-     * @param newCoverLimit The new value to cover in **ETH**.
+     * @param newCoverLimit The new value to cover in **USD**.
      */
-    function updateCoverLimit(uint256 policyID, uint256 newCoverLimit) external payable;
+    function updateCoverLimit(uint256 policyID, uint256 newCoverLimit) external;
 
     /**
      * @notice Extend a policy.
-     * User will need to pay **ETH**.
+     * User will need to pay **USD**.
      * Can only be called by the policyholder.
      * @param policyID The ID of the policy.
      * @param extension The length of extension in blocks.
      */
-    function extendPolicy(uint256 policyID, uint40 extension) external payable;
+    function extendPolicy(uint256 policyID, uint40 extension) external;
 
     /**
      * @notice Extend a policy and update its cover limit.
-     * User may need to pay **ETH** for increased cover limit or receive a refund for decreased cover limit.
+     * User may need to pay **USD** for increased cover limit or receive a refund for decreased cover limit.
      * Can only be called by the policyholder.
      * @param policyID The ID of the policy.
-     * @param newCoverLimit The new value to cover in **ETH**.
+     * @param newCoverLimit The new value to cover in **USD**.
      * @param extension The length of extension in blocks.
      */
-    function updatePolicy(uint256 policyID, uint256 newCoverLimit, uint40 extension) external payable;
+    function updatePolicy(uint256 policyID, uint256 newCoverLimit, uint40 extension) external;
 
     /**
      * @notice Cancel and burn a policy.
@@ -93,10 +93,10 @@ interface IProduct {
 
     /**
      * @notice Calculate a premium quote for a policy.
-     * @param coverLimit The value to cover in **ETH**.
+     * @param coverLimit The value to cover in **USD**.
      * @param blocks The duration of the policy in blocks.
      * @param riskStrategy The risk strategy address.
-     * @return premium The quote for their policy in **ETH**.
+     * @return premium The quote for their policy in **USD**.
      */
     function getQuote(uint256 coverLimit, uint40 blocks, address riskStrategy) external view returns (uint256 premium);
 
@@ -180,13 +180,4 @@ interface IProduct {
      * @param maxPeriod_ The maximum number of blocks
      */
     function setMaxPeriod(uint40 maxPeriod_) external;
-
-    /***************************************
-    MISC
-    ***************************************/
-
-    /**
-     * @notice Fallback function to receive ETH
-     */
-    receive() external payable;
 }

@@ -203,9 +203,8 @@ interface IPolicyManager is IERC721Enhanced {
      * @param coverLimit The policy coverage amount (in wei).
      * @param expirationBlock The policy expiration block number.
      * @param price The coverage price.
-     * @param riskStrategy The risk strategy of the covered positions(s).
      */
-     function updatePolicyInfo(uint256 policyID, uint256 coverLimit, uint40 expirationBlock, uint24 price, address riskStrategy) external;
+     function updatePolicyInfo(uint256 policyID, uint256 coverLimit, uint40 expirationBlock, uint24 price) external;
 
     /**
      * @notice Burns expired or cancelled policies.

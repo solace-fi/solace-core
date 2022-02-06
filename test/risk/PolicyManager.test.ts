@@ -11,30 +11,27 @@ import { import_artifacts, ArtifactImports } from "../utilities/artifact_importe
 import { burnBlocks, burnBlocksUntil } from "../utilities/time";
 import { encodeAddresses } from "../utilities/positionDescription";
 
-import { PolicyManager, MockProductV2, Registry, RiskManager, PolicyDescriptorV2, Vault, Weth9, MockRiskStrategy, CoverageDataProvider, ProductFactory } from "../../typechain";
+import { PolicyManager, MockProductV2, Registry, RiskManager, PolicyDescriptorV2, MockRiskStrategy, CoverageDataProvider, ProductFactory, RiskStrategy, MockErc20 } from "../../typechain";
 
 describe("PolicyManager", function() {
   let artifacts: ArtifactImports;
-  const [deployer, governor, user, user2, premiumPool, walletProduct1, walletProduct2, walletProduct3, positionContract, solace, solaceUsdcPool, priceOracle] = provider.getWallets();
+  const [deployer, governor, user, user2, premiumPool, walletProduct1, walletProduct2, walletProduct3, positionContract, solace, riskStrategy] = provider.getWallets();
 
   // contracts
   let policyManager: PolicyManager;
-  let mockProduct: MockProductV2;
-  let vault: Vault;
   let registry: Registry;
   let coverageDataProvider: CoverageDataProvider;
   let riskManager: RiskManager;
-  let riskStrategy: MockRiskStrategy;
-  let baseRiskStrategy: MockRiskStrategy;
-  let riskStrategyFactory: Contract;
   let policyDescriptor: PolicyDescriptorV2;
-  let weth: Weth9;
 
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
   const name = "Solace Policy";
   const symbol = "SPT";
   const expirationBlock = 20000000;
-  const coverLimit = BN.from("100000000000000"); 
+  const coverLimit = BN.from("100000000000000");
+  const AMOUNT = BN.from("100000000000000000").mul(1000); // 1000 USD(DAI)
+  const ONE_MILLION_USD = BN.from("1000000000000000000000000"); // 1M USD(DAI)
+
   const price = 11044; // price in wei for block/wei
   const chainId = 31337;
   const STRATEGY_STATUS_ACTIVE = 1;
@@ -48,53 +45,26 @@ describe("PolicyManager", function() {
 
     // deploy registry contract
     registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
-    await registry.connect(governor).set(["premiumPool"],[premiumPool.address])
+    await registry.connect(governor).set(["premiumPool"], [premiumPool.address])
 
     // deploy policy manager
     policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address, registry.address])) as PolicyManager;
     await registry.connect(governor).set(["policyManager"],[policyManager.address])
 
-    // deploy weth
-    weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
-    await registry.connect(governor).set(["weth"],[weth.address])
-
-    // deploy vault contract
-    vault = (await deployContract(deployer,artifacts.Vault,[governor.address,registry.address])) as Vault;
-
     // deploy risk manager contract
     riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
+    await registry.connect(governor).set(["riskManager"],[riskManager.address])
 
     // deploy nft descriptor
     policyDescriptor = (await deployContract(deployer, artifacts.PolicyDescriptorV2, [governor.address])) as PolicyDescriptorV2;
 
+    await registry.connect(governor).set(["solace"],[solace.address]);
+
     // deploy coverage provider contract    
-    await registry.connect(governor).set(["solace"],[solace.address])
-
     coverageDataProvider = (await deployContract(deployer, artifacts.CoverageDataProvider, [governor.address])) as CoverageDataProvider;
-
-    await registry.connect(governor).set(["vault"],[vault.address])
-    await registry.connect(governor).set(["riskManager"],[riskManager.address])
-
-    await governor.sendTransaction({ to: vault.address, value: BN.from("9000000000000000000000") });
-
+    await coverageDataProvider.connect(governor).set("mainnet", ONE_MILLION_USD);
     await registry.connect(governor).set(["coverageDataProvider"],[coverageDataProvider.address])
 
-    // deploy risk strategy factory
-    let riskStrategyContractFactory = await ethers.getContractFactory("RiskStrategyFactory", deployer);
-    riskStrategyFactory = (await riskStrategyContractFactory.deploy(registry.address, governor.address));
-    await riskStrategyFactory.deployed();
-  
-    // create risk strategy for products
-    baseRiskStrategy = (await deployContract(deployer, artifacts.MockRiskStrategy)) as MockRiskStrategy;
-    let tx = await riskStrategyFactory.createRiskStrategy(baseRiskStrategy.address, [walletProduct1.address, walletProduct2.address, walletProduct3.address],[1,2,3],[10000,10000,10000],[1,1,1]);
-    
-    let events = (await tx.wait())?.events;
-    if (events && events.length > 0) {
-      let event = events[0];
-      riskStrategy = await ethers.getContractAt(artifacts.MockRiskStrategy.abi, event?.args?.["deployment"]) as MockRiskStrategy;
-    } else {
-      throw "no risk strategy deployment!";
-    }
     // add and enable risk strategy
     await riskManager.connect(governor).addRiskStrategy(riskStrategy.address);
     await riskManager.connect(governor).setStrategyStatus(riskStrategy.address, STRATEGY_STATUS_ACTIVE);
@@ -255,11 +225,11 @@ describe("PolicyManager", function() {
     });
     it("cannot update nonexistent policy", async function() {
       await expect(policyManager.setPolicyInfo(2, coverLimit, expirationBlock, price, positionContract.address, riskStrategy.address)).to.be.revertedWith("query for nonexistent token");
-      await expect(policyManager.updatePolicyInfo(2, coverLimit, expirationBlock, price, riskStrategy.address)).to.be.revertedWith("query for nonexistent token");
+      await expect(policyManager.updatePolicyInfo(2, coverLimit, expirationBlock, price)).to.be.revertedWith("query for nonexistent token");
     });
     it("product cannot update other products policy", async function() {
       await expect(policyManager.setPolicyInfo(1, coverLimit, expirationBlock, price, positionContract.address, riskStrategy.address)).to.be.revertedWith("wrong product");
-      await expect(policyManager.updatePolicyInfo(1, coverLimit, expirationBlock, price, riskStrategy.address)).to.be.revertedWith("wrong product");
+      await expect(policyManager.updatePolicyInfo(1, coverLimit, expirationBlock, price)).to.be.revertedWith("wrong product");
     });
     it("can set policy info", async function() {
       let policyDescription = "0xabcd1234";
@@ -281,7 +251,7 @@ describe("PolicyManager", function() {
       expect(await riskManager.minCapitalRequirementPerStrategy(riskStrategy.address)).to.equal(1);
     });
     it("can update policy info with same parameters", async function () {
-      let tx = await policyManager.connect(walletProduct2).updatePolicyInfo(1, 1, 2, 3, riskStrategy.address);
+      let tx = await policyManager.connect(walletProduct2).updatePolicyInfo(1, 1, 2, 3);
       expect(tx).to.emit(policyManager, "PolicyUpdated").withArgs(1);
       expect(await policyManager.getPolicyholder(1)).to.equal(user.address);
       expect(await policyManager.getPolicyProduct(1)).to.equal(walletProduct2.address);
@@ -408,52 +378,68 @@ describe("PolicyManager", function() {
   });
 
   describe("updateActivePolicies", async function() {
+    const ONE_DAI = BN.from("1000000000000000000");
+    let dai: MockErc20;
+    let productFactory: ProductFactory;
+    let riskStrategyFactory: Contract;
+    let riskManager: RiskManager;
+    let mockProduct: MockProductV2;
+    let mockRiskStrategy: RiskStrategy;
+
     before(async function() {
-      let productFactory: ProductFactory;
-
-      // Send extra ETH to governor to avoid insufficient funds error in `npx hardhat coverage --testfiles test/PolicyManager.test.ts`
-      const balancePriceOracle = await priceOracle.getBalance()
-      await priceOracle.sendTransaction({to: governor.address, value: balancePriceOracle.mul(999).div(1000)})
-
       // deploy product factory
       productFactory = (await deployContract(deployer, artifacts.ProductFactory)) as ProductFactory;
 
       // deploy base product
-      let coverageProduct = (await deployContract(deployer, artifacts.MockProductV2)) as MockProductV2;
+      let marketProduct = (await deployContract(deployer, artifacts.MockProductV2)) as MockProductV2;
+
+      // deploy risk strategy factory
+      let riskStrategyContractFactory = await ethers.getContractFactory("RiskStrategyFactory", deployer);
+      riskStrategyFactory = (await riskStrategyContractFactory.deploy(registry.address, governor.address));
+      await riskStrategyFactory.deployed();
+
+      // deploy base risk strategy
+      let riskStrategy = (await deployContract(deployer, artifacts.MockRiskStrategy)) as MockRiskStrategy;
      
       // redeploy risk manager
       riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
       await registry.connect(governor).set(["riskManager"], [riskManager.address])
-//
+     
       // redeploy policy manager
       policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address, registry.address])) as PolicyManager;
       await registry.connect(governor).set(["policyManager"], [policyManager.address])
+      await policyManager.connect(governor).setPolicyDescriptor(policyDescriptor.address);
+
+      // deploy mock DAI
+      dai = (await deployContract(deployer, artifacts.MockERC20, ["Dai Stablecoin", "DAI", ONE_DAI.mul(10000000)])) as MockErc20;
+      await registry.connect(governor).set(["dai"], [dai.address]);
 
       // add products
-      let tx1 = await productFactory.createProduct(coverageProduct.address, governor.address, registry.address, 0, 100000000000, SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, "1");
+      let tx1 = await productFactory.createProduct(marketProduct.address, governor.address, registry.address, 0, 100000000000, SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, "1");
       let events1 = (await tx1.wait())?.events;
-      if(events1 && events1.length > 0) {
+      if (events1 && events1.length > 0) {
         let event1 = events1[0];
         mockProduct = await ethers.getContractAt(artifacts.MockProductV2.abi, event1?.args?.["deployment"]) as MockProductV2;
       } else throw "no deployment";
 
+      // add product to policy manager
       await mockProduct.connect(governor).setPrice(1);
       await policyManager.connect(governor).addProduct(mockProduct.address);
 
       // deploy new risk strategy for the product
-      let tx = await riskStrategyFactory.createRiskStrategy(baseRiskStrategy.address, [mockProduct.address],[1],[10000],[1]);
+      let tx = await riskStrategyFactory.createRiskStrategy(riskStrategy.address, [mockProduct.address],[1],[10000],[1]);
       let events = (await tx.wait())?.events;
       if (events && events.length > 0) {
         let event = events[0];
-        riskStrategy = await ethers.getContractAt(artifacts.MockRiskStrategy.abi, event?.args?.["deployment"]) as MockRiskStrategy;
+        mockRiskStrategy = await ethers.getContractAt(artifacts.MockRiskStrategy.abi, event?.args?.["deployment"]) as MockRiskStrategy;
       } else {
         throw "no risk strategy deployment!";
       }
 
       // add and enable risk strategy
-      await riskManager.connect(governor).addRiskStrategy(riskStrategy.address);
-      await riskManager.connect(governor).setStrategyStatus(riskStrategy.address, STRATEGY_STATUS_ACTIVE);
-      await riskManager.connect(governor).setWeightAllocation(riskStrategy.address, STRATEGY_WEIGHT_ALLOCATION);
+      await riskManager.connect(governor).addRiskStrategy(mockRiskStrategy.address);
+      await riskManager.connect(governor).setStrategyStatus(mockRiskStrategy.address, STRATEGY_STATUS_ACTIVE);
+      await riskManager.connect(governor).setWeightAllocation(mockRiskStrategy.address, STRATEGY_WEIGHT_ALLOCATION);
       await riskManager.connect(governor).addCoverLimitUpdater(policyManager.address);
 
     });
@@ -461,47 +447,47 @@ describe("PolicyManager", function() {
     it("can update active policies", async function() {
       // create policies
       // policy 1 expires
-      await mockProduct.connect(user)._buyPolicy(user.address, 0b00001, 110, positionContract.address, riskStrategy.address);
+      await mockProduct.connect(user)._buyPolicy(user.address,  0b00001, 110, positionContract.address, mockRiskStrategy.address);
       expect(await riskManager.activeCoverLimit()).to.equal(0b00001);
-      expect(await riskManager.activeCoverLimitPerStrategy(riskStrategy.address)).to.equal(0b00001);
+      expect(await riskManager.activeCoverLimitPerStrategy(mockRiskStrategy.address)).to.equal(0b00001);
       expect(await riskManager.minCapitalRequirement()).to.equal(0b00001);
-      expect(await riskManager.minCapitalRequirementPerStrategy(riskStrategy.address)).to.equal(0b00001);
+      expect(await riskManager.minCapitalRequirementPerStrategy(mockRiskStrategy.address)).to.equal(0b00001);
 
       // policy 2 expires
-      await mockProduct.connect(user)._buyPolicy(user.address, 0b00010, 120, positionContract.address, riskStrategy.address);
+      await mockProduct.connect(user)._buyPolicy(user.address,  0b00010, 120, positionContract.address, mockRiskStrategy.address);
       expect(await riskManager.activeCoverLimit()).to.equal(0b00011);
       expect(await riskManager.minCapitalRequirement()).to.equal(0b00011);
-      expect(await riskManager.activeCoverLimitPerStrategy(riskStrategy.address)).to.equal(0b00011);
-      expect(await riskManager.minCapitalRequirementPerStrategy(riskStrategy.address)).to.equal(0b00011);
+      expect(await riskManager.activeCoverLimitPerStrategy(mockRiskStrategy.address)).to.equal(0b00011);
+      expect(await riskManager.minCapitalRequirementPerStrategy(mockRiskStrategy.address)).to.equal(0b00011);
 
       // policy 3 expires but is not updated
-      await mockProduct.connect(user)._buyPolicy(user.address, 0b00100, 130, positionContract.address, riskStrategy.address);
+      await mockProduct.connect(user)._buyPolicy(user.address,  0b00100, 130, positionContract.address, mockRiskStrategy.address);
       expect(await riskManager.activeCoverLimit()).to.equal(0b00111);
       expect(await riskManager.minCapitalRequirement()).to.equal(0b00111);
-      expect(await riskManager.activeCoverLimitPerStrategy(riskStrategy.address)).to.equal(0b00111);
-      expect(await riskManager.minCapitalRequirementPerStrategy(riskStrategy.address)).to.equal(0b00111);
+      expect(await riskManager.activeCoverLimitPerStrategy(mockRiskStrategy.address)).to.equal(0b00111);
+      expect(await riskManager.minCapitalRequirementPerStrategy(mockRiskStrategy.address)).to.equal(0b00111);
 
       // policy 4 does not expire
-      await mockProduct.connect(user)._buyPolicy(user.address, 0b01000, 200, positionContract.address, riskStrategy.address);
+      await mockProduct.connect(user)._buyPolicy(user.address,  0b01000, 200, positionContract.address, mockRiskStrategy.address);
       expect(await riskManager.activeCoverLimit()).to.equal(0b01111);
       expect(await riskManager.minCapitalRequirement()).to.equal(0b01111);
-      expect(await riskManager.activeCoverLimitPerStrategy(riskStrategy.address)).to.equal(0b01111);
-      expect(await riskManager.minCapitalRequirementPerStrategy(riskStrategy.address)).to.equal(0b01111);
+      expect(await riskManager.activeCoverLimitPerStrategy(mockRiskStrategy.address)).to.equal(0b01111);
+      expect(await riskManager.minCapitalRequirementPerStrategy(mockRiskStrategy.address)).to.equal(0b01111);
 
       // policy 5 is canceled
-      await mockProduct.connect(user)._buyPolicy(user.address, 0b10000, 300, positionContract.address, riskStrategy.address);
+      await mockProduct.connect(user)._buyPolicy(user.address,  0b10000, 300, positionContract.address, mockRiskStrategy.address);
       expect(await riskManager.activeCoverLimit()).to.equal(0b11111);
       expect(await riskManager.minCapitalRequirement()).to.equal(0b11111);
-      expect(await riskManager.activeCoverLimitPerStrategy(riskStrategy.address)).to.equal(0b11111);
-      expect(await riskManager.minCapitalRequirementPerStrategy(riskStrategy.address)).to.equal(0b11111);
+      expect(await riskManager.activeCoverLimitPerStrategy(mockRiskStrategy.address)).to.equal(0b11111);
+      expect(await riskManager.minCapitalRequirementPerStrategy(mockRiskStrategy.address)).to.equal(0b11111);
 
       // pass time
       await burnBlocks(150);
       await mockProduct.connect(user).cancelPolicy(5);
       expect(await riskManager.activeCoverLimit()).to.equal(0b01111);
       expect(await riskManager.minCapitalRequirement()).to.equal(0b01111);
-      expect(await riskManager.activeCoverLimitPerStrategy(riskStrategy.address)).to.equal(0b01111);
-      expect(await riskManager.minCapitalRequirementPerStrategy(riskStrategy.address)).to.equal(0b01111);
+      expect(await riskManager.activeCoverLimitPerStrategy(mockRiskStrategy.address)).to.equal(0b01111);
+      expect(await riskManager.minCapitalRequirementPerStrategy(mockRiskStrategy.address)).to.equal(0b01111);
 
       // update policies
       await policyManager.updateActivePolicies([1, 2, 4, 5, 999]);
@@ -518,51 +504,64 @@ describe("PolicyManager", function() {
 
   describe("tokenURI", function() {
     let policyId:BN;
-    before(async function(){
-        let productFactory: ProductFactory;
+    let productFactory: ProductFactory;
+    let riskStrategyFactory: Contract;
+    let riskManager: RiskManager;
+    let mockProduct: MockProductV2;
+    let mockRiskStrategy: RiskStrategy;
 
+    before(async function(){
         // deploy product factory
         productFactory = (await deployContract(deployer, artifacts.ProductFactory)) as ProductFactory;
 
         // deploy base product
-        let coverageProduct = (await deployContract(deployer, artifacts.MockProductV2)) as MockProductV2;
-      
+        let marketProduct = (await deployContract(deployer, artifacts.MockProductV2)) as MockProductV2;
+
+        // deploy risk strategy factory
+        let riskStrategyContractFactory = await ethers.getContractFactory("RiskStrategyFactory", deployer);
+        riskStrategyFactory = (await riskStrategyContractFactory.deploy(registry.address, governor.address));
+        await riskStrategyFactory.deployed();
+
+        // deploy base risk strategy
+        let riskStrategy = (await deployContract(deployer, artifacts.MockRiskStrategy)) as MockRiskStrategy;
+        
         // redeploy risk manager
         riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
         await registry.connect(governor).set(["riskManager"], [riskManager.address])
-      
+        
         // redeploy policy manager
         policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address, registry.address])) as PolicyManager;
         await registry.connect(governor).set(["policyManager"], [policyManager.address])
+        await policyManager.connect(governor).setPolicyDescriptor(policyDescriptor.address);
 
         // add products
-        let tx1 = await productFactory.createProduct(coverageProduct.address, governor.address, registry.address, 0, 100000000000, SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, "1");
+        let tx1 = await productFactory.createProduct(marketProduct.address, governor.address, registry.address, 0, 100000000000, SUBMIT_CLAIM_TYPEHASH, DOMAIN_NAME, "1");
         let events1 = (await tx1.wait())?.events;
         if(events1 && events1.length > 0) {
           let event1 = events1[0];
           mockProduct = await ethers.getContractAt(artifacts.MockProductV2.abi, event1?.args?.["deployment"]) as MockProductV2;
         } else throw "no deployment";
 
+        // add product to policy manager
         await mockProduct.connect(governor).setPrice(1);
         await policyManager.connect(governor).addProduct(mockProduct.address);
 
         // deploy new risk strategy for the product
-        let tx = await riskStrategyFactory.createRiskStrategy(baseRiskStrategy.address, [mockProduct.address],[1],[10000],[1]);
+        let tx = await riskStrategyFactory.createRiskStrategy(riskStrategy.address, [mockProduct.address],[1],[10000],[1]);
         let events = (await tx.wait())?.events;
         if (events && events.length > 0) {
           let event = events[0];
-          riskStrategy = await ethers.getContractAt(artifacts.MockRiskStrategy.abi, event?.args?.["deployment"]) as MockRiskStrategy;
+          mockRiskStrategy = await ethers.getContractAt(artifacts.MockRiskStrategy.abi, event?.args?.["deployment"]) as MockRiskStrategy;
         } else {
           throw "no risk strategy deployment!";
         }
 
         // add and enable risk strategy
-        await riskManager.connect(governor).addRiskStrategy(riskStrategy.address);
-        await riskManager.connect(governor).setStrategyStatus(riskStrategy.address, STRATEGY_STATUS_ACTIVE);
-        await riskManager.connect(governor).setWeightAllocation(riskStrategy.address, STRATEGY_WEIGHT_ALLOCATION);
+        await riskManager.connect(governor).addRiskStrategy(mockRiskStrategy.address);
+        await riskManager.connect(governor).setStrategyStatus(mockRiskStrategy.address, STRATEGY_STATUS_ACTIVE);
+        await riskManager.connect(governor).setWeightAllocation(mockRiskStrategy.address, STRATEGY_WEIGHT_ALLOCATION);
         await riskManager.connect(governor).addCoverLimitUpdater(policyManager.address);
-        await policyManager.connect(governor).setPolicyDescriptor(policyDescriptor.address);
-        await mockProduct.connect(user)._buyPolicy(user.address, 5000, 110, positionContract.address,riskStrategy.address);
+        await mockProduct.connect(user)._buyPolicy(user.address,  5000, 110, positionContract.address, mockRiskStrategy.address);
         policyId = await policyManager.totalPolicyCount();
     });
 

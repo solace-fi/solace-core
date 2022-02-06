@@ -20,7 +20,7 @@ describe("CoverageDataProvider", function() {
 
   // vars
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-  const ONE_MILLION_USD = BN.from("1000000");
+  const ONE_MILLION_USD = BN.from("1000000000000000000000000"); // 1M USD(DAI)
   const UWP_POOL_NAMES = {
     "MAINNET_1": "mainnet_1",
     "AUORA_1": "auora_1",

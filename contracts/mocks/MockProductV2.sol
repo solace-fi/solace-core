@@ -29,15 +29,15 @@ contract MockProductV2 is SolaceMarketProduct {
 
     /**
      * @notice Purchases and mints a policy on the behalf of the policyholder.
-     * User will need to pay **ETH**.
+     * User will need to pay **USD**.
      * @param policyholder Holder of the position to cover.
-     * @param coverLimit The value to cover in **ETH**. Will only cover up to the appraised value.
+     * @param coverLimit The value to cover in **USD**. Will only cover up to the appraised value.
      * @param blocks The length (in blocks) for policy.
      * @param positionDescription The byte encoded description of the covered position(s).
      * @param riskStrategy The risk strategy of the covered product.
      * @return policyID The ID of newly created policy.
      */
-    function _buyPolicy(address policyholder, uint256 coverLimit, uint40 blocks, bytes calldata positionDescription, address riskStrategy) external payable nonReentrant returns (uint256 policyID) {
+    function _buyPolicy(address policyholder, uint256 coverLimit,  uint40 blocks, bytes calldata positionDescription, address riskStrategy) external payable nonReentrant returns (uint256 policyID) {
         // bypasses some important checks in BaseProduct
         // create the policy
         uint40 expirationBlock = uint40(block.number + blocks);
