@@ -118,7 +118,7 @@ async function deployCoverageDataProvider() {
     await tx.wait();
 
     console.log("Setting Underwriting Pool Amounts");
-    tx = await coverageDataProvider.connect(deployer).set("mainnet", BN.from("10000000000000000000")); // 10M USD
+    tx = await coverageDataProvider.connect(deployer).set("mainnet", BN.from("1000000000000000000").mul(10000000)); // 10M USD
     await tx.wait();
 
     // tx = await coverageDataProvider.connect(deployer).set("aurora", AMOUNT2);
