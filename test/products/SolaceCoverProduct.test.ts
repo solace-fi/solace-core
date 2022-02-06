@@ -667,7 +667,6 @@ describe("SolaceCoverProduct", function() {
             await coverageDataProvider.connect(governor).set("underwritingPool", ONE_MILLION_DAI.mul(1000000));
             await expect(solaceCoverProduct.connect(policyholder1).updateCoverLimit(maxPermissibleNewCoverLimit.add(ONE_ETH), [])).to.revertedWith("insufficient deposit for minimum required account balance");
             await coverageDataProvider.connect(governor).set("underwritingPool", ONE_MILLION_DAI);
-
         })
 
         it("policy owner can update policy", async () => {
