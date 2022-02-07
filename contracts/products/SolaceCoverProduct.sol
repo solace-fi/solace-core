@@ -16,7 +16,19 @@ import "../interfaces/products/ISolaceCoverProduct.sol";
 /**
  * @title SolaceCoverProduct
  * @author solace.fi
- * @notice The smart contract implementation of **SolaceCoverProduct**.
+ * @notice A Solace insurance product that allows users to purchase a single policy that insures all of their DeFi positions against smart contract risk.
+ * 
+ * The policy will remain active until i.) the user cancels their policy or ii.) the user's account runs out of funds. The policy will be billed like a subscription, every epoch a fee will be charged from the user's account.
+ *
+ * Policies can be purchased via [`activatePolicy()`](#activatePolicy). Policies are represented as ERC721s, which once minted, cannot then be transferred or burned. Users can change the cover limit of their policy through [`updateCoverLimit()`](#updateCoverLimit).
+ * 
+ * Users can deposit funds into their account via [`deposit()`](#deposit). Currently the contract only accepts deposits in **DAI**. Note that both [`activatePolicy()`](#activatePolicy) and [`deposit()`](#deposit) enables a user to perform these actions (activate a policy, make a deposit) on behalf of another user.
+ *
+ * Users can cancel their policy via [`deactivatePolicy()`](#deactivatePolicy). This will start a cooldown timer: Before the cooldown timer starts or passes, the user cannot withdraw their entire account balance.
+ *
+ * Users can withdraw funds from their account via [`withdraw()`](#withdraw). If the cooldown has not started or has not passed, a minimum required account balance (to cover one epoch's fee) will be left in the user's account. Only after the cooldown has passed, will a user be able to withdraw their entire account balance.
+ *
+ * Users can enter a referral code with [`activatePolicy()`](#activatePolicy) or [`updateCoverLimit()`](#updateCoverLimit). A valid referral code will earn reward points to both the referrer and the referee. When the user's account is charged, reward points will be deducted before deposited funds.
  */
 contract SolaceCoverProduct is
     ISolaceCoverProduct,
@@ -39,7 +51,7 @@ contract SolaceCoverProduct is
     bool internal _paused;
 
     /**
-     * @notice Referral typehash
+     * @notice Referral typehash.
      */
     // solhint-disable-next-line var-name-mixedcase
     bytes32 private constant _REFERRAL_TYPEHASH = keccak256("SolaceReferral(uint256 version)");
@@ -52,57 +64,67 @@ contract SolaceCoverProduct is
     uint256 internal _totalPolicyCount;
 
     /**
-     * @notice The maximum rate charged per second per wei of coverLimit.
-     * @dev For testing assume _maxRate reflects 10% of coverLimit annually = 1/315360000
+     * @notice The maximum rate charged per second per 1e-18 (wei) of coverLimit.
+     * @dev Default to charge 10% of cover limit annually = 1/315360000.
      */
     uint256 internal _maxRateNum;
     uint256 internal _maxRateDenom;
 
-    /// @notice Maximum epoch duration over which premiums are charged.
+    /// @notice Maximum epoch duration over which premiums are charged (Default is one week).
     uint256 internal _chargeCycle;
 
     /**
-     * @notice The cooldown period
-     * Withdrawing total soteria account balance is a two-step process
-     * i.) Call deactivatePolicy(), which sets cover limit to 0 and begins a cooldown time
-     * ii.) After the cooldown period has been completed, the policy holder can then withdraw funds
-     * @dev We could use uint40 to store time, I thought it easier to just use uint256s in this contract. We're also not packing structs in this contract.
+     * @notice The cooldown period (Default is one week)
+     * Cooldown timer is started by the user calling deactivatePolicy().
+     * Before the cooldown has started or has passed, withdrawing funds will leave a minimim required account balance in the user's account. Only after the cooldown has passed, is a user able to withdraw their entire account balance.
      */
     uint256 internal _cooldownPeriod;
 
     /**
-     * @notice The reward points earned (to both the referee and referrer) for succcessful referral
+     * @notice The reward points earned (to both the referee and referrer) for a valid referral code. (Default is 50 DAI).
      */
     uint256 internal _referralReward;
 
     /**
-     * @notice Switch controlling whether referral campaign is active or not
+     * @notice If true, referral rewards are active. If false, referral rewards are switched off (Default is true).
      */
     bool internal _isReferralOn;
 
     /**
-     * @notice Policy holder address => Timestamp that a depositor's cooldown started
-     * @dev this is set to 0 to reset (default value is 0 in Solidity anyway)
+     * @notice policyholder => cooldown start timestamp
+     * @dev will be 0 if cooldown has not started, or has been reset
      */
     mapping(address => uint256) internal _cooldownStart;
 
-    /// @notice The policyholder => policyID.
+    /// @notice policyholder => policyID.
     mapping(address => uint256) internal _policyOf;
 
-    /// @notice The cover limit for each policy(policyID => coverLimit).
+    /// @notice policyID => coverLimit
     mapping(uint256 => uint256) internal _coverLimitOf;
 
-    /// @notice This mapping is created for the purpose of avoiding the unintended side effect where `user deactivates policy -> cover limit set to 0 -> minRequiredAccountBalance also set to 0 unintentionally because minRequiredAccountBalance = coverLimit * chargeCycle * maxRate -> user can withdraw all funds immediately after deactivating account
-    /// @dev This mapping is intended to mirror the _coverLimitOf mapping, except time between cooldown start and after cooldown completed
+    /**
+     * @notice This is a mapping that no-one likes but seems necessary to circumvent a couple of edge cases. This mapping is intended to mirror the _coverLimitOf mapping, except for the period between i.) cooldown starting when deactivatePolicy() called and ii.) cooldown has passed and user calls withdraw()
+     * @dev Edge case 1: User deactivates policy -> User can withdraw all funds immediately after, circumventing the intended cooldown mechanic. This occurs because when deactivatePolicy() called, _coverLimitOf[user] is set to 0, which also sets their minRequiredAccountBalance (coverLimit * chargeCycle * maxRate) to 0.
+     * @dev Edge case 2: A user should not be able to deactivate their policy just prior to the fee charge tranasction, and then avoid the insurance fee for the current epoch.
+     * @dev will be 0 if cooldown has not started, or has been reset
+     */
     mapping(uint256 => uint256) internal _preDeactivateCoverLimitOf;
 
-    /// @notice The policy holder => reward points. Having a reward points mechanism enables `free` cover gifts and discounts for referrals.
+    /** 
+     * @notice policyholder => reward points. 
+     * Users earn reward points for using a valid referral code (as a referee), and having other users successfully use their referral code (as a referrer)
+     * Reward points can be manually set by the Cover Promotion Admin
+     * Reward points act as a credit, when an account is charged, they are deducted from before deposited funds
+     */
     mapping(address => uint256) internal _rewardPointsOf;
 
-    /// @notice PolicyID => Has referral code been used for this policyID?
+    /** 
+     * @notice policyID => true if referral code has been used, false if not
+     * A referral code can only be used once for each policy. There is no way to reset to false.
+     */
     mapping(uint256 => bool) internal _isReferralCodeUsed;
 
-    /// @notice Keeps total balances (in USD, to 18 decimal places) per policyholder.
+    /// @notice policyholder => account balance (in USD, to 18 decimals places)
     mapping(address => uint256) private _accountBalanceOf;
 
     /***************************************
@@ -116,7 +138,7 @@ contract SolaceCoverProduct is
 
     /**
      * @notice Constructs `Soteria` product.
-     * @param governance_ The governor.
+     * @param governance_ The address of the governor.
      * @param registry_ The [`Registry`](./Registry) contract address.
      * @param domain_ The user readable name of the EIP712 signing domain.
      * @param version_ The current major version of the signing domain.
@@ -136,13 +158,13 @@ contract SolaceCoverProduct is
         require(_registry.get("riskManager") != address(0x0), "zero address riskmanager");
         require(_registry.get("dai") != address(0x0), "zero address dai");
 
-        // Set default values - charge cycle of one week, max premium rate of 10% of cover limit per annum, 50 DAI referral reward, referral program active
+        // Set default values
         _maxRateNum = 1;
-        _maxRateDenom = 315360000;
-        _chargeCycle = 604800;
-        _cooldownPeriod = 604800;
+        _maxRateDenom = 315360000; // Max premium rate of 10% of cover limit per annum
+        _chargeCycle = 604800; // One-week charge cycle
+        _cooldownPeriod = 604800; // One-week cooldown period
         _referralReward = 50e18; // 50 DAI
-        _isReferralOn = true;
+        _isReferralOn = true; // Referral rewards activate
     }
 
     /***************************************
@@ -150,12 +172,12 @@ contract SolaceCoverProduct is
     ***************************************/
 
     /**
-     * @notice Activates policy on the behalf of the policyholder.
-     * @param policyholder_ Holder of the position to cover.
-     * @param coverLimit_ The value to cover in **USD**.
-     * @param amount_ The amount in **USD** to deposit in order to activate the policy.
-     * @param referralCode_ Referral code
-     * @return policyID The ID of newly created policy.
+     * @notice Activates policy for `policyholder_`
+     * @param policyholder_ The address of the intended policyholder.
+     * @param coverLimit_ The maximum value to cover in **USD**.
+     * @param amount_ The deposit amount in **USD** to fund the policyholder's account.
+     * @param referralCode_ The referral code.
+     * @return policyID The ID of the newly minted policy.
      */
     function activatePolicy(
         address policyholder_,
@@ -195,10 +217,11 @@ contract SolaceCoverProduct is
     }
     
     /**
-     * @notice Updates the cover amount of your policy
-     * @notice If you update the cover limit for your policy, you will exit the cooldown process if you already started it. This means that if you want to withdraw all your funds, you have to redo the 'deactivatePolicy() => withdraw()' process
-     * @param newCoverLimit_ The new value to cover in **USD**.
-     * @param referralCode_ Referral code
+     * @notice Updates the cover limit of a user's policy.
+     *
+     * This will reset the cooldown.
+     * @param newCoverLimit_ The new maximum value to cover in **USD**.
+     * @param referralCode_ The referral code.
      */
     function updateCoverLimit(
         uint256 newCoverLimit_, 
@@ -227,9 +250,9 @@ contract SolaceCoverProduct is
     }
 
     /**
-     * @notice Deposits funds for policy holders.
-     * @param policyholder The holder of the policy.
-     * @param amount The amount to deposit.
+     * @notice Deposits funds into `policyholder`'s account.
+     * @param policyholder The policyholder.
+     * @param amount The amount to deposit in **USD**.
      */
     function deposit(
         address policyholder,
@@ -239,11 +262,11 @@ contract SolaceCoverProduct is
     }
 
     /**
-     * @notice Withdraw funds from Soteria account to user.
-     * @notice If cooldown has passed, the user can withdraw any amount
-     * @notice If cooldown has not passed, the user can only withdraw down to minRequiredAccountBalance
-     * User Soteria account must have > minAccountBalance.
-     * Otherwise account will be deactivated.
+     * @notice Withdraw funds from user's account.
+     *
+     * @notice If cooldown has passed, the user will withdraw their entire account balance. 
+     * @notice If cooldown has not started, or has not passed, the user will not be able to withdraw their entire account. 
+     * @notice If cooldown has not passed, [`withdraw()`](#withdraw) will leave a minimum required account balance (one epoch's fee) in the user's account.
      */
     function withdraw() external override nonReentrant whileUnpaused {
         if ( _hasCooldownPassed(msg.sender) ) {
@@ -256,11 +279,11 @@ contract SolaceCoverProduct is
     }
 
     /**
-     * @notice Deactivate a policy holder's own policy.
-     * Policy holder's cover will be set to 0, and cooldown timer will start
-     * Policy holder must wait out the cooldown, and then he/she will be able to withdraw their entire account balance
+     * @notice Deactivate a user's policy.
+     * 
+     * This will set a user's cover limit to 0, and begin the cooldown timer. Read comments for [`withdraw()`](#withdraw) for cooldown mechanic details.
      */
-    function deactivatePolicy() public override nonReentrant {
+    function deactivatePolicy() external override nonReentrant {
         require(policyStatus(_policyOf[msg.sender]), "invalid policy");
         _deactivatePolicy(msg.sender);
     }
@@ -270,46 +293,63 @@ contract SolaceCoverProduct is
     ***************************************/
 
     /**
-     * @notice Determine available capacity for new cover.
-     * @return availableCoverCapacity_ The amount of available capacity for new cover.
+     * @notice Returns the policyholder's account account balance in **USD**.
+     * @param policyholder The policyholder address.
+     * @return balance The policyholder's account balance in **USD**.
+     */
+    function accountBalanceOf(address policyholder) public view override returns (uint256 balance) {
+        return _accountBalanceOf[policyholder];
+    }
+
+    /**
+     * @notice The maximum amount of cover that can be sold in **USD** to 18 decimals places.
+     * @return cover The max amount of cover.
+     */
+    function maxCover() public view override returns (uint256 cover) {
+        return IRiskManager(_registry.get("riskManager")).maxCoverPerStrategy(address(this));
+    }
+
+    /**
+     * @notice Returns the active cover limit in **USD** to 18 decimal places. In other words, the total cover that has been sold at the current time.
+     * @return amount The active cover limit.
+     */
+    function activeCoverLimit() public view override returns (uint256 amount) {
+        return IRiskManager(_registry.get("riskManager")).activeCoverLimitPerStrategy(address(this));
+    }
+
+    /**
+     * @notice Determine the available remaining capacity for new cover.
+     * @return availableCoverCapacity_ The amount of available remaining capacity for new cover.
      */
     function availableCoverCapacity() public view override returns (uint256 availableCoverCapacity_) {
         availableCoverCapacity_ = maxCover() - activeCoverLimit();
     }
 
     /**
-     * @notice Return reward points for a policyholder.
-     * @param policyholder_ The address of the policyholder.
-     * @return rewardPoints_ The reward points for a policyholder.
+     * @notice Get the reward points that a policyholder has in **USD** to 18 decimal places.
+     * @param policyholder_ The policyholder address.
+     * @return rewardPoints_ The reward points for the policyholder.
      */
     function rewardPointsOf(address policyholder_) public view override returns (uint256 rewardPoints_) {
         return _rewardPointsOf[policyholder_];
     }
 
     /**
-     * @notice Returns whether if the policy is active or not.
-     * @param policyID_ The id of the policy.
-     * @return status True if policy is active. False otherwise.
-     */
-    function policyStatus(uint256 policyID_) public view override returns (bool status) {
-        return coverLimitOf(policyID_) > 0 ? true : false;
-    }
-
-    /**
-     * @notice Returns the policyholder's policy id.
+     * @notice Gets the policyholder's policy ID.
      * @param policyholder_ The address of the policyholder.
-     * @return policyID The policy id.
+     * @return policyID The policy ID.
      */
     function policyOf(address policyholder_) public view override returns (uint256 policyID) {
         return _policyOf[policyholder_];
     }
 
     /**
-     * @notice The maximum amount of cover that `Soteria Product` can be sold.
-     * @return cover The max amount of cover in `wei`
+     * @notice Returns true if the policy is active, false if inactive
+     * @param policyID_ The policy ID.
+     * @return status True if policy is active. False otherwise.
      */
-    function maxCover() public view override returns (uint256 cover) {
-        return IRiskManager(_registry.get("riskManager")).maxCoverPerStrategy(address(this));
+    function policyStatus(uint256 policyID_) public view override returns (bool status) {
+        return coverLimitOf(policyID_) > 0 ? true : false;
     }
 
     /**
@@ -329,7 +369,7 @@ contract SolaceCoverProduct is
     }
 
     /**
-     * @notice Returns whether or not product is currently in paused state.
+     * @notice Returns true if the product is paused, false if not.
      * @return status True if product is paused.
      */
     function paused() external view override returns (bool status) {
@@ -337,15 +377,7 @@ contract SolaceCoverProduct is
     }
 
     /**
-     * @notice Returns active cover limit in `wei`.
-     * @return amount The active cover limit.
-     */
-    function activeCoverLimit() public view override returns (uint256 amount) {
-        return IRiskManager(_registry.get("riskManager")).activeCoverLimitPerStrategy(address(this));
-    }
-
-    /**
-     * @notice Returns the policy count.
+     * @notice Gets the policy count (amount of policies that have been purchased, includes inactive policies).
      * @return count The policy count.
      */
     function policyCount() public view override returns (uint256 count) {
@@ -353,7 +385,7 @@ contract SolaceCoverProduct is
     }
 
     /**
-     * @notice Returns the max rate numerator.
+     * @notice Gets the max rate numerator.
      * @return maxRateNum_ the max rate numerator.
      */
     function maxRateNum() public view override returns (uint256 maxRateNum_) {
@@ -361,37 +393,36 @@ contract SolaceCoverProduct is
     }
 
     /**
-     * @notice Returns the max rate denominator.
+     * @notice Gets the max rate denominator.
      * @return maxRateDenom_ the max rate denominator.
      */
-    function maxRateDenom()
-        public
-        view
-        override
-        returns (uint256 maxRateDenom_)
-    {
+    function maxRateDenom() public view override returns (uint256 maxRateDenom_) {
         return _maxRateDenom;
     }
 
     /**
-     * @notice Returns the charge cycle duration.
-     * @return chargeCycle_ the charge cycle duration.
+     * @notice Gets the charge cycle duration.
+     * @return chargeCycle_ the charge cycle duration in seconds.
      */
     function chargeCycle() public view override returns (uint256 chargeCycle_) {
         return _chargeCycle;
     }
 
     /**
-     * @notice Returns cover amount of given policy id.
-     * @param policy_ The policy id.
-     * @return amount The cover amount for given policy.
+     * @notice Gets cover limit for a given policy ID.
+     * @param policyID_ The policy ID.
+     * @return amount The cover limit for given policy ID.
      */
-    function coverLimitOf(uint256 policy_) public view override returns (uint256 amount) {
-        return _coverLimitOf[policy_];
+    function coverLimitOf(uint256 policyID_) public view override returns (uint256 amount) {
+        return _coverLimitOf[policyID_];
     }
 
     /**
-     * @notice The minimum amount of time a user must wait to withdraw funds.
+     * @notice Gets the cooldown period.
+     *
+     * Cooldown timer is started by the user calling deactivatePolicy().
+     * Before the cooldown has started or has passed, withdrawing funds will leave a minimim required account balance in the user's account. 
+     * Only after the cooldown has passed, is a user able to withdraw their entire account balance.
      * @return cooldownPeriod_ The cooldown period in seconds.
      */
     function cooldownPeriod() external view override returns (uint256 cooldownPeriod_) {
@@ -399,8 +430,8 @@ contract SolaceCoverProduct is
     }
 
     /**
-     * @notice The timestamp that a depositor's cooldown started.
-     * @param policyholder_ The policy holder
+     * @notice The Unix timestamp that a policyholder's cooldown started. If cooldown has not started or has been reset, will return 0.
+     * @param policyholder_ The policyholder address
      * @return cooldownStart_ The cooldown period start expressed as Unix timestamp
      */
     function cooldownStart(address policyholder_) external view override returns (uint256 cooldownStart_) {
@@ -416,30 +447,22 @@ contract SolaceCoverProduct is
     }
 
     /**
-     * @notice Gets whether the referral campaign is active or not
-     * @return isReferralOn_ True if referral campaign active, false if not
+     * @notice Returns true if referral rewards are active, false if not.
+     * @return isReferralOn_ True if referral rewards are active, false if not.
      */
     function isReferralOn() external view override returns (bool isReferralOn_) {
         return _isReferralOn;
     }
 
     /**
-     * @notice Gets whether a policyholder has used a valid referral code or not.
-     * After using a valid referral code, a policyholder is no longer eligible to receive any further rewards from additional referral codes
-     * @return isReferralCodeUsed_ True if the policyholder has used a valid referral code, false if not
+     * @notice True if a policyholder has previously used a valid referral code, false if not
+     * 
+     * A policyholder can only use a referral code once. Afterwards a policyholder is ineligible to receive further rewards from additional referral codes.
+     * @return isReferralCodeUsed_ True if the policyholder has previoulsy used a valid referral code, false if not
      */
     function isReferralCodeUsed(address policyholder) external view override returns (bool isReferralCodeUsed_) {
         return _isReferralCodeUsed[_policyOf[policyholder]];
     } 
-
-    /**
-     * @notice Returns the user balance in `USD`.
-     * @param policyholder The address to get balance.
-     * @return balance The user balance in `USD`.
-     */
-    function accountBalanceOf(address policyholder) public view override returns (uint256 balance) {
-        return _accountBalanceOf[policyholder];
-    }
 
     /***************************************
     GOVERNANCE FUNCTIONS
@@ -460,7 +483,7 @@ contract SolaceCoverProduct is
     }
 
     /**
-     * @notice Pauses or unpauses buying and extending policies.
+     * @notice Pauses or unpauses policies.
      * Deactivating policies are unaffected by pause.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param paused_ True to pause, false to unpause.
@@ -471,7 +494,7 @@ contract SolaceCoverProduct is
     }
 
     /**
-     * @notice Sets the cooldown period that a user must wait after deactivating their policy, to withdraw funds from their Soteria account.
+     * @notice Sets the cooldown period. Read comments for [`cooldownPeriod()`](#cooldownPeriod) for more information on the cooldown mechanic.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param cooldownPeriod_ Cooldown period in seconds.
      */
@@ -523,7 +546,7 @@ contract SolaceCoverProduct is
     /**
      * @notice set _isReferralOn
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param isReferralOn_ Desired state of referral campaign.
+     * @param isReferralOn_ True if referral rewards active, false if not.
     */
     function setIsReferralOn(bool isReferralOn_) external override onlyGovernance {
         _isReferralOn = isReferralOn_;
@@ -535,9 +558,10 @@ contract SolaceCoverProduct is
     ***************************************/
 
     /**
-     * @notice Enables cover promotion admin to gift (and remove) 'free' cover to specific addresses.
-     * Can only be called by the current cover promotion admin.
-     * @param policyholder_ The policy holder to set reward points for.
+     * @notice Enables cover promotion admin to set reward points for a selected address.
+     * 
+     * Can only be called by the **Cover Promotion Admin** role.
+     * @param policyholder_ The address of the policyholder to set reward points for.
      * @param rewardPoints_ Desired amount of reward points.
      */
     function setRewardPoints(address policyholder_, uint256 rewardPoints_) external override {
@@ -552,9 +576,11 @@ contract SolaceCoverProduct is
 
     /**
      * @notice Charge premiums for each policy holder.
-     * @param holders The policy holders.
-     * @param premiums The premium amounts in `wei` per policy holder.
-     * @dev cheaper to load variables directly from calldata, rather than copying to memory
+     *
+     * Can only be called by the **Premium Collector** role.
+     * @dev Cheaper to load variables directly from calldata, rather than adding an additional operation of copying to memory.
+     * @param holders Array of addresses of the policyholders to charge.
+     * @param premiums Array of premium amounts (in **USD** to 18 decimal places) to charge each policyholder.
      */
     function chargePremiums(
         address[] calldata holders, 
@@ -567,13 +593,9 @@ contract SolaceCoverProduct is
         uint256 amountToPayPremiumPool = 0;
 
         for (uint256 i = 0; i < count; i++) {
-            // Skip computation if the account is deactivated, but we need to circumvent the following edge case:
-            // Premium collector should be able to charge policy holders that have deactivated their policy within the last epoch
-            // I.e. a policy holder should not be able to the following: Activate a policy, then deactivate their policy just prior to premiums being charged, and get free cover
-
-            // This does however bring up an additional edge case: the premium collector can charge a deactivated account more than once. 
-            // We are trusting that the premium collector does not do this.
-            // So in effect this will only skip computation if the policyholder has withdrawn their entire account balance
+            // Skip computation if the user has withdrawn entire account balance
+            // We use _preDeactivateCoverLimitOf mapping here to circumvent the following edge case: A user should not be able to deactivate their policy just prior to the chargePremiums() tranasction, and then avoid the premium for the current epoch.
+            // There is another edge case introduced here however: the premium collector can charge a deactivated account more than once. We are trusting that the premium collector does not do this.
             
             uint256 preDeactivateCoverLimit = _preDeactivateCoverLimitOf[_policyOf[holders[i]]];
             if ( preDeactivateCoverLimit == 0) continue;
@@ -583,10 +605,10 @@ contract SolaceCoverProduct is
                 premium = _minRequiredAccountBalance(preDeactivateCoverLimit);
             }
 
-            // If policy holder can pay for premium charged in full
+            // If policyholder's account can pay for premium charged in full
             if (_accountBalanceOf[holders[i]] + _rewardPointsOf[holders[i]] >= premium) {
                 
-                // If reward points can cover premium charged in full
+                // If reward points can pay for premium charged in full
                 if (_rewardPointsOf[holders[i]] >= premium) {
                     _rewardPointsOf[holders[i]] -= premium;
                 } else {
@@ -610,7 +632,7 @@ contract SolaceCoverProduct is
             }
         }
   
-        // single transfer to the premium pool
+        // single DAI transfer to the premium pool
         SafeERC20.safeTransferFrom(getAsset(), address(this), _registry.get("premiumPool"), amountToPayPremiumPool);
     }
 
@@ -619,27 +641,28 @@ contract SolaceCoverProduct is
     ***************************************/
 
     /**
-     * @notice Given a request for new coverage, determines if there is sufficient coverage capacity.
-     * @param existingTotalCover_ The existing total cover, will be 0 when a policy is first purchased.
-     * @param newTotalCover_  The total cover amount requested in a new cover request.
-     * @return acceptable True there is sufficient capacity for requested new coverage amount, false otherwise.
+     * @notice Returns true if there is sufficient capacity to accept a request for updating the cover limit of a policy, false if not (there is insufficient available cover capacity).
+     * @param existingTotalCover_ The current cover limit, 0 if policy has not previously been activated.
+     * @param newTotalCover_  The new cover limit requested.
+     * @return acceptable True there is sufficient capacity for the requested new cover limit, false otherwise.
      */
     function _canPurchaseNewCover(
         uint256 existingTotalCover_,
         uint256 newTotalCover_
     ) internal view returns (bool acceptable) {
-        uint256 changeInTotalCover = newTotalCover_ - existingTotalCover_;
+        uint256 changeInTotalCover = newTotalCover_ - existingTotalCover_; // This will revert if newTotalCover_ < existingTotalCover_
         if (changeInTotalCover < availableCoverCapacity()) return true;
         else return false;
     }
 
     /**
-     * @notice Adds funds to policy holder's balance.
-     * @param from from
-     * @param policyholder The policy holder address.
-     * @param amount The amount of fund to deposit.
+     * @notice Deposits funds into the policyholder's account balance.
+     *
      * @dev Explicit decision that _deposit() will not affect, nor be affected by the cooldown mechanic.
      * Rationale: _deposit() doesn't affect cover limit, and cooldown mechanic is to protect protocol from manipulated cover limit
+     * @param from The address which is funding the deposit.
+     * @param policyholder The policyholder address.
+     * @param amount The deposit amount in **USD** to 18 decimal places.
      */
     function _deposit(
         address from,
@@ -652,9 +675,9 @@ contract SolaceCoverProduct is
     }
 
     /**
-     * @notice Withdraw funds from Soteria to policy holder.
-     * @param policyholder The policy holder address.
-     * @param amount The amount of fund to withdraw.
+     * @notice Withdraw funds from policyholder's account to the policyholder.
+     * @param policyholder The policyholder address.
+     * @param amount The amount to withdraw in **USD** to 18 decimal places.
      */
     function _withdraw(
         address policyholder, 
@@ -667,7 +690,7 @@ contract SolaceCoverProduct is
 
     /**
      * @notice Deactivate the policy.
-     * @param policyholder The address of the policy owner.
+     * @param policyholder The policyholder address.
      */
     function _deactivatePolicy(address policyholder) internal {
         _startCooldown(policyholder);
@@ -678,9 +701,9 @@ contract SolaceCoverProduct is
     }
 
     /**
-     * @notice Updates active cover limit of `Soteria`.
-     * @param currentCoverLimit The current cover limit of the policy.
-     * @param newCoverLimit The new cover limit of the policy.
+     * @notice Updates the Risk Manager on the current total cover limit purchased by policyholders.
+     * @param currentCoverLimit The current policyholder cover limit (0 if activating policy).
+     * @param newCoverLimit The new policyholder cover limit.
      */
     function _updateActiveCoverLimit(
         uint256 currentCoverLimit,
@@ -695,16 +718,16 @@ contract SolaceCoverProduct is
     }
 
     /**
-     * @notice Calculate minimum required account balance for a given cover limit
-     * @param coverLimit cover limit.
+     * @notice Calculate minimum required account balance for a given cover limit. Equals the maximum chargeable fee for one epoch.
+     * @param coverLimit Cover limit.
      */
     function _minRequiredAccountBalance(uint256 coverLimit) internal view returns (uint256 minRequiredAccountBalance) {
         minRequiredAccountBalance = (_maxRateNum * _chargeCycle * coverLimit) / _maxRateDenom;
     }
 
     /**
-     * @notice Use _beforeTokenTransfer hook from ERC721 standard to ensure Soteria policies are non-transferable, and only one can be minted per user
-     * @dev This hook is called on mint, transfer and burn
+     * @notice Override _beforeTokenTransfer hook from ERC721 standard to ensure policies are non-transferable, and only one can be minted per user.
+     * @dev This hook is called on mint, transfer and burn.
      * @param from sending address.
      * @param to receiving address.
      * @param tokenId tokenId.
@@ -719,7 +742,8 @@ contract SolaceCoverProduct is
     }
 
     /**
-     * @notice Starts the **cooldown** period for the user.
+     * @notice Starts the cooldown period for the policyholder.
+     * @param policyholder Policyholder address.
      */
     function _startCooldown(address policyholder) internal {
         _cooldownStart[policyholder] = block.timestamp;
@@ -727,10 +751,8 @@ contract SolaceCoverProduct is
     }
 
     /**
-     * @notice Abandons the **cooldown** period for the user.
-     * @dev Original name for this function from the deprecated Vault.sol was stopCooldown()
-     * @dev Renamed this to _exitCooldown because "reset" gives the impression that you are starting the cooldown again, and "stop" gives the impression you are stopping the cooldown for it to pick up again later from where you stopped it
-     * @dev I thought "exit" gives the imagery that you are exitting the process, and you will need to restart it manually later (which is more accurate, if user calls updateCoverLimit(), they then need to redo 'deactivatePolicy() => withdraw()' to get their entire funds back)
+     * @notice Exits the cooldown period for a policyholder.
+     * @param policyholder Policyholder address.
      */
     function _exitCooldown(address policyholder) internal {
         _cooldownStart[policyholder] = 0;
@@ -738,8 +760,9 @@ contract SolaceCoverProduct is
     }
 
     /**
-     * @notice Determine if cooldown has passed for a policy holder
-     * @return True if cooldown has passed, false if not
+     * @notice Return true if cooldown has passed for a policyholder, false if cooldown has not started or has not passed.
+     * @param policyholder Policyholder address.
+     * @return True if cooldown has passed, false if cooldown has not started or has not passed.
      */
     function _hasCooldownPassed(address policyholder) internal view returns (bool) {
         if (_cooldownStart[policyholder] == 0) {
@@ -750,9 +773,9 @@ contract SolaceCoverProduct is
     }
 
     /**
-     * @notice Internal function to process referral code
-     * @param policyholder_ Policy holder
-     * @param referralCode_ Referral code
+     * @notice Internal function to process a referral code
+     * @param policyholder_ Policyholder address.
+     * @param referralCode_ Referral code.
      */
     function _processReferralCode(
         address policyholder_,
@@ -761,7 +784,6 @@ contract SolaceCoverProduct is
         // Skip processing referral code, if referral campaign switched off or empty referral code argument
         if ( !_isReferralOn || _isEmptyReferralCode(referralCode_) ) return;
         
-        // require(referrer != address(0), "cannot have zero address referrer"); // Redundant because we cannot call _processReferralCode with referralCode_ = 0
         address referrer = ECDSA.recover(_getEIP712Hash(), referralCode_);
         require(referrer != policyholder_, "cannot refer to self");
         require(policyStatus(_policyOf[referrer]), "referrer must be active policy holder");
@@ -776,23 +798,16 @@ contract SolaceCoverProduct is
     }
 
     /**
-     * @notice Returns the underlying principal asset for `Solace Cover Product`.
-     * @return asset The underlying asset.
-    */
-    function getAsset() internal view returns (IERC20 asset) {
-        return IERC20(_registry.get("dai"));
-    }
-
-    /**
      * @notice Internal helper function to determine if referralCode_ is an empty bytes value
-     * @param referralCode_ Referral code
+     * @param referralCode_ Referral code.
+     * @return True if empty referral code, false if not.
      */
     function _isEmptyReferralCode(bytes calldata referralCode_) internal pure returns (bool) {
         return (keccak256(abi.encodePacked(referralCode_)) == keccak256(abi.encodePacked("")));
     }
 
     /**
-     * @notice Internal helper function to get EIP712-compliant hash for referral code verification
+     * @notice Internal helper function to get EIP712-compliant hash for referral code verification.
      */
     function _getEIP712Hash() internal view returns (bytes32) {
         bytes32 digest = 
@@ -806,5 +821,13 @@ contract SolaceCoverProduct is
                 )
             );
         return digest;
+    }
+
+    /**
+     * @notice Returns the underlying principal asset for `Solace Cover Product`.
+     * @return asset The underlying asset.
+    */
+    function getAsset() internal view returns (IERC20 asset) {
+        return IERC20(_registry.get("dai"));
     }
 }

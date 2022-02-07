@@ -88,12 +88,12 @@ interface ISolaceCoverProduct {
     ***************************************/
 
     /**
-     * @notice Activates policy on the behalf of the policyholder.
-     * @param policyholder_ Holder of the position to cover.
-     * @param coverLimit_ The value to cover in **USD**.
-     * @param amount_ The amount to deposit in order to activate the policy.
-     * @param referralCode_ Referral code
-     * @return policyID The ID of newly created policy.
+     * @notice Activates policy for `policyholder_`
+     * @param policyholder_ The address of the intended policyholder.
+     * @param coverLimit_ The maximum value to cover in **USD**.
+     * @param amount_ The deposit amount in **USD** to fund the policyholder's account.
+     * @param referralCode_ The referral code.
+     * @return policyID The ID of the newly minted policy.
      */
     function activatePolicy(
         address policyholder_,
@@ -103,25 +103,11 @@ interface ISolaceCoverProduct {
     ) external returns (uint256 policyID);
 
     /**
-     * @notice Deposits funds for policy holders.
-     * @param policyholder The holder of the policy.
-     * @param amount The amount to deposit.
-     */
-    function deposit(
-        address policyholder, 
-        uint256 amount
-    ) external;
-
-    /**
-     * @notice Withdraw funds from Soteria account to user.
-     */
-    function withdraw() external;
-
-    /**
-     * @notice Updates the cover amount of your policy
-     * @notice If you update the cover limit for your policy, you will exit the cooldown process if you already started it. This means that if you want to withdraw all your funds, you have to redo the 'deactivatePolicy() => withdraw()' process
-     * @param newCoverLimit_ The new value to cover in **USD**.
-     * @param referralCode_ Referral code
+     * @notice Updates the cover limit of a user's policy.
+     *
+     * This will reset the cooldown.
+     * @param newCoverLimit_ The new maximum value to cover in **USD**.
+     * @param referralCode_ The referral code.
      */
     function updateCoverLimit(
         uint256 newCoverLimit_, 
@@ -129,8 +115,29 @@ interface ISolaceCoverProduct {
     ) external;
 
     /**
-     * @notice Deactivate a user's own policy.
-     * User will receive their entire Soteria account balance.
+     * @notice Deposits funds into `policyholder`'s account.
+     * @param policyholder The policyholder.
+     * @param amount The amount to deposit in **USD**.
+     */
+    function deposit(
+        address policyholder,
+        uint256 amount
+    ) external;
+
+
+    /**
+     * @notice Withdraw funds from user's account.
+     *
+     * @notice If cooldown has passed, the user will withdraw their entire account balance. 
+     * @notice If cooldown has not started, or has not passed, the user will not be able to withdraw their entire account. 
+     * @notice If cooldown has not passed, [`withdraw()`](#withdraw) will leave a minimum required account balance (one epoch's fee) in the user's account.
+     */
+    function withdraw() external;
+
+    /**
+     * @notice Deactivate a user's policy.
+     * 
+     * This will set a user's cover limit to 0, and begin the cooldown timer. Read comments for [`withdraw()`](#withdraw) for cooldown mechanic details.
      */
     function deactivatePolicy() external;
 
@@ -139,44 +146,50 @@ interface ISolaceCoverProduct {
     ***************************************/
 
     /**
-     * @notice Returns the user balance in `USD`.
-     * @param policyholder The address to get balance.
-     * @return balance The user balance in `USD`.
+     * @notice Returns the policyholder's account account balance in **USD**.
+     * @param policyholder The policyholder address.
+     * @return balance The policyholder's account balance in **USD**.
      */
     function accountBalanceOf(address policyholder) external view returns (uint256 balance);
 
     /**
-     * @notice Determine available capacity for new cover.
-     * @return availableCoverCapacity_ The amount of available capacity for new cover.
+     * @notice The maximum amount of cover that can be sold in **USD** to 18 decimals places.
+     * @return cover The max amount of cover.
+     */
+    function maxCover() external view returns (uint256 cover);
+
+    /**
+     * @notice Returns the active cover limit in **USD** to 18 decimal places. In other words, the total cover that has been sold at the current time.
+     * @return amount The active cover limit.
+     */
+    function activeCoverLimit() external view returns (uint256 amount);
+
+    /**
+     * @notice Determine the available remaining capacity for new cover.
+     * @return availableCoverCapacity_ The amount of available remaining capacity for new cover.
      */
     function availableCoverCapacity() external view returns (uint256 availableCoverCapacity_);
 
     /**
-     * @notice Return reward points for a policyholder.
-     * @param policyholder_ The address of the policyholder.
-     * @return rewardPoints_ The reward points for a policyholder.
+     * @notice Get the reward points that a policyholder has in **USD** to 18 decimal places.
+     * @param policyholder_ The policyholder address.
+     * @return rewardPoints_ The reward points for the policyholder.
      */
     function rewardPointsOf(address policyholder_) external view returns (uint256 rewardPoints_);
 
     /**
-     * @notice Returns the policyholder's policy id.
+     * @notice Gets the policyholder's policy ID.
      * @param policyholder_ The address of the policyholder.
-     * @return policyID The policy id.
+     * @return policyID The policy ID.
      */
     function policyOf(address policyholder_) external view returns (uint256 policyID);
 
     /**
-     * @notice Returns whether if the policy is active or not.
-     * @param policyID_ The id of the policy.
+     * @notice Returns true if the policy is active, false if inactive
+     * @param policyID_ The policy ID.
      * @return status True if policy is active. False otherwise.
      */
     function policyStatus(uint256 policyID_) external view returns (bool status);
-
-    /**
-     * @notice The maximum amount of cover that `Soteria Product` can be sold.
-     * @return cover The max amount of cover in `wei`
-     */
-    function maxCover() external view returns (uint256 cover);
 
     /**
      * @notice Returns  [`Registry`](./Registry) contract address.
@@ -191,19 +204,13 @@ interface ISolaceCoverProduct {
     function riskManager() external view returns (address riskManager_);
 
     /**
-     * @notice Returns whether or not product is currently in paused state.
+     * @notice Returns true if the product is paused, false if not.
      * @return status True if product is paused.
      */
     function paused() external view returns (bool status);
 
     /**
-     * @notice Returns active cover limit in `wei`.
-     * @return amount The active cover limit.
-     */
-    function activeCoverLimit() external view returns (uint256 amount);
-
-    /**
-     * @notice Returns the policy count.
+     * @notice Gets the policy count (amount of policies that have been purchased, includes inactive policies).
      * @return count The policy count.
      */
     function policyCount() external view returns (uint256 count);
@@ -221,27 +228,31 @@ interface ISolaceCoverProduct {
     function maxRateDenom() external view returns (uint256 maxRateDenom_);
 
     /**
-     * @notice Returns the charge cycle duration.
-     * @return chargeCycle_ the charge cycle duration.
+     * @notice Gets the charge cycle duration.
+     * @return chargeCycle_ the charge cycle duration in seconds.
      */
     function chargeCycle() external view returns (uint256 chargeCycle_);
 
     /**
-     * @notice Returns cover amount of given policy id.
-     * @param policy_ The policy id.
-     * @return amount The cover amount for given policy.
+     * @notice Gets cover limit for a given policy ID.
+     * @param policyID_ The policy ID.
+     * @return amount The cover limit for given policy ID.
      */
-    function coverLimitOf(uint256 policy_) external view returns (uint256 amount);
+    function coverLimitOf(uint256 policyID_) external view returns (uint256 amount);
 
     /**
-     * @notice The minimum amount of time a user must wait to withdraw funds.
+     * @notice Gets the cooldown period.
+     *
+     * Cooldown timer is started by the user calling deactivatePolicy().
+     * Before the cooldown has started or has passed, withdrawing funds will leave a minimim required account balance in the user's account. 
+     * Only after the cooldown has passed, is a user able to withdraw their entire account balance.
      * @return cooldownPeriod_ The cooldown period in seconds.
      */
     function cooldownPeriod() external view returns (uint256 cooldownPeriod_);
 
     /**
-     * @notice The timestamp that a depositor's cooldown started.
-     * @param policyholder_ The policy holder
+     * @notice The Unix timestamp that a policyholder's cooldown started. If cooldown has not started or has been reset, will return 0.
+     * @param policyholder_ The policyholder address
      * @return cooldownStart_ The cooldown period start expressed as Unix timestamp
      */
     function cooldownStart(address policyholder_) external view returns (uint256 cooldownStart_);
@@ -253,15 +264,16 @@ interface ISolaceCoverProduct {
     function referralReward() external view returns (uint256 referralReward_);
 
     /**
-     * @notice Gets whether the referral campaign is active or not
-     * @return isReferralOn_ True if referral campaign active, false if not
+     * @notice Returns true if referral rewards are active, false if not.
+     * @return isReferralOn_ True if referral rewards are active, false if not.
      */
     function isReferralOn() external view returns (bool isReferralOn_);
 
     /**
-     * @notice Gets whether a policyholder has used a valid referral code or not.
-     * After using a valid referral code, a policyholder is no longer eligible to receive any further rewards from additional referral codes
-     * @return isReferralCodeUsed_ True if the policyholder has used a valid referral code, false if not
+     * @notice True if a policyholder has previously used a valid referral code, false if not
+     * 
+     * A policyholder can only use a referral code once. Afterwards a policyholder is ineligible to receive further rewards from additional referral codes.
+     * @return isReferralCodeUsed_ True if the policyholder has previoulsy used a valid referral code, false if not
      */
     function isReferralCodeUsed(address policyholder) external view returns (bool isReferralCodeUsed_);
 
@@ -277,7 +289,7 @@ interface ISolaceCoverProduct {
     function setRegistry(address registry_) external;
 
     /**
-     * @notice Pauses or unpauses buying and extending policies.
+     * @notice Pauses or unpauses policies.
      * Deactivating policies are unaffected by pause.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param paused_ True to pause, false to unpause.
@@ -285,7 +297,7 @@ interface ISolaceCoverProduct {
     function setPaused(bool paused_) external;
 
     /**
-     * @notice Sets the cooldown period that a user must wait after deactivating their policy, to withdraw funds from their Soteria account.
+     * @notice Sets the cooldown period. Read comments for [`cooldownPeriod()`](#cooldownPeriod) for more information on the cooldown mechanic.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param cooldownPeriod_ Cooldown period in seconds.
      */
@@ -331,9 +343,10 @@ interface ISolaceCoverProduct {
     ***************************************/
 
     /**
-     * @notice Enables cover promotion admin to gift (and remove) 'free' cover to specific addresses.
-     * Can only be called by the current cover promotion admin.
-     * @param policyholder_ The policy holder to set reward points for.
+     * @notice Enables cover promotion admin to set reward points for a selected address.
+     * 
+     * Can only be called by the **Cover Promotion Admin** role.
+     * @param policyholder_ The address of the policyholder to set reward points for.
      * @param rewardPoints_ Desired amount of reward points.
      */
     function setRewardPoints(
@@ -347,11 +360,14 @@ interface ISolaceCoverProduct {
 
     /**
      * @notice Charge premiums for each policy holder.
-     * @param holders_ The policy holders.
-     * @param premiums_ The premium amounts in `wei` per policy holder.
+     *
+     * Can only be called by the **Premium Collector** role.
+     * @dev Cheaper to load variables directly from calldata, rather than adding an additional operation of copying to memory.
+     * @param holders Array of addresses of the policyholders to charge.
+     * @param premiums Array of premium amounts (in **USD** to 18 decimal places) to charge each policyholder.
      */
     function chargePremiums(
-        address[] calldata holders_,
-        uint256[] calldata premiums_
+        address[] calldata holders,
+        uint256[] calldata premiums
     ) external;
 }
