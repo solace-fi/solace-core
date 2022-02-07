@@ -16,19 +16,20 @@ import "../interfaces/products/ISolaceCoverProduct.sol";
 /**
  * @title SolaceCoverProduct
  * @author solace.fi
- * @notice A Solace insurance product that allows users to purchase a single policy that insures all of their DeFi positions against smart contract risk.
+ * @notice A Solace insurance product that allows users to insure all of their DeFi positions against smart contract risk through a single policy. 
+ *
+ * Policies can be **purchased** via [`activatePolicy()`](#activatepolicy). Policies are represented as ERC721s, which once minted, cannot then be transferred or burned. Users can change the cover limit of their policy through [`updateCoverLimit()`](#updatecoverlimit).
  * 
  * The policy will remain active until i.) the user cancels their policy or ii.) the user's account runs out of funds. The policy will be billed like a subscription, every epoch a fee will be charged from the user's account.
  *
- * Policies can be purchased via [`activatePolicy()`](#activatepolicy). Policies are represented as ERC721s, which once minted, cannot then be transferred or burned. Users can change the cover limit of their policy through [`updateCoverLimit()`](#updatecoverlimit).
- * 
- * Users can deposit funds into their account via [`deposit()`](#deposit). Currently the contract only accepts deposits in **DAI**. Note that both [`activatePolicy()`](#activatepolicy) and [`deposit()`](#deposit) enables a user to perform these actions (activate a policy, make a deposit) on behalf of another user.
+ * Users can **deposit funds** into their account via [`deposit()`](#deposit). Currently the contract only accepts deposits in **DAI**. Note that both [`activatePolicy()`](#activatepolicy) and [`deposit()`](#deposit) enables a user to perform these actions (activate a policy, make a deposit) on behalf of another user.
  *
- * Users can cancel their policy via [`deactivatePolicy()`](#deactivatepolicy). This will start a cooldown timer: Before the cooldown timer starts or passes, the user cannot withdraw their entire account balance.
+ * Users can **cancel** their policy via [`deactivatePolicy()`](#deactivatepolicy). This will start a cooldown timer. Users can **withdraw funds** from their account via [`withdraw()`](#withdraw).
  *
- * Users can withdraw funds from their account via [`withdraw()`](#withdraw). If the cooldown has not started or has not passed, a minimum required account balance (to cover one epoch's fee) will be left in the user's account. Only after the cooldown has passed, will a user be able to withdraw their entire account balance.
+ * Before the cooldown timer starts or passes, the user cannot withdraw their entire account balance. A minimum required account balance (to cover one epoch's fee) will be left in the user's account. After the cooldown has passed, a user will be able to withdraw their entire account balance.
  *
- * Users can enter a referral code with [`activatePolicy()`](#activatePolicy) or [`updateCoverLimit()`](#updatecoverlimit). A valid referral code will earn reward points to both the referrer and the referee. When the user's account is charged, reward points will be deducted before deposited funds.
+ * Users can enter a **referral code** with [`activatePolicy()`](#activatePolicy) or [`updateCoverLimit()`](#updatecoverlimit). A valid referral code will earn reward points to both the referrer and the referee. When the user's account is charged, reward points will be deducted before deposited funds. 
+ * Each account can only enter a valid referral code once, however there are no restrictions on how many times a referral code can be used for new accounts.
  */
 contract SolaceCoverProduct is
     ISolaceCoverProduct,
@@ -137,7 +138,7 @@ contract SolaceCoverProduct is
     }
 
     /**
-     * @notice Constructs `Soteria` product.
+     * @notice Constructs `Solace Cover Product`.
      * @param governance_ The address of the governor.
      * @param registry_ The [`Registry`](./Registry) contract address.
      * @param domain_ The user readable name of the EIP712 signing domain.
@@ -191,7 +192,7 @@ contract SolaceCoverProduct is
         policyID = policyOf(policyholder_);
         require(!policyStatus(policyID), "policy already activated");
         require(_canPurchaseNewCover(0, coverLimit_), "insufficient capacity for new cover");
-        require(IERC20(getAsset()).balanceOf(msg.sender) >= amount_ && amount_ + accountBalanceOf(policyholder_) > _minRequiredAccountBalance(coverLimit_), "insufficient deposit for minimum required account balance");
+        require(IERC20(_getAsset()).balanceOf(msg.sender) >= amount_ && amount_ + accountBalanceOf(policyholder_) > _minRequiredAccountBalance(coverLimit_), "insufficient deposit for minimum required account balance");
 
         // Exit cooldown
         _exitCooldown(policyholder_);
@@ -218,8 +219,7 @@ contract SolaceCoverProduct is
     
     /**
      * @notice Updates the cover limit of a user's policy.
-     *
-     * This will reset the cooldown.
+     * @notice This will reset the cooldown.
      * @param newCoverLimit_ The new maximum value to cover in **USD**.
      * @param referralCode_ The referral code.
      */
@@ -250,7 +250,7 @@ contract SolaceCoverProduct is
     }
 
     /**
-     * @notice Deposits funds into `policyholder`'s account.
+     * @notice Deposits funds into the `policyholder` account.
      * @param policyholder The policyholder.
      * @param amount The amount to deposit in **USD**.
      */
@@ -265,8 +265,8 @@ contract SolaceCoverProduct is
      * @notice Withdraw funds from user's account.
      *
      * @notice If cooldown has passed, the user will withdraw their entire account balance. 
-     * @notice If cooldown has not started, or has not passed, the user will not be able to withdraw their entire account. 
-     * @notice If cooldown has not passed, [`withdraw()`](#withdraw) will leave a minimum required account balance (one epoch's fee) in the user's account.
+     *
+     * @notice If cooldown has not started, or has not passed, the user will not be able to withdraw their entire account. A minimum required account balance (one epoch's fee) will be left in the user's account.
      */
     function withdraw() external override nonReentrant whileUnpaused {
         if ( _hasCooldownPassed(msg.sender) ) {
@@ -281,7 +281,7 @@ contract SolaceCoverProduct is
     /**
      * @notice Deactivate a user's policy.
      * 
-     * This will set a user's cover limit to 0, and begin the cooldown timer. Read comments for [`withdraw()`](#withdraw) for cooldown mechanic details.
+     * This will set a user's cover limit to 0, and begin the cooldown timer. Read comments for [`cooldownPeriod()`](#cooldownperiod) for more information on the cooldown mechanic.
      */
     function deactivatePolicy() external override nonReentrant {
         require(policyStatus(_policyOf[msg.sender]), "invalid policy");
@@ -439,7 +439,7 @@ contract SolaceCoverProduct is
     }
 
     /**
-     * @notice Gets the referral reward
+     * @notice Gets the current reward amount in USD for a valid referral code.
      * @return referralReward_ The referral reward
      */
     function referralReward() external view override returns (uint256 referralReward_) {
@@ -457,7 +457,7 @@ contract SolaceCoverProduct is
     /**
      * @notice True if a policyholder has previously used a valid referral code, false if not
      * 
-     * A policyholder can only use a referral code once. Afterwards a policyholder is ineligible to receive further rewards from additional referral codes.
+     * A policyholder can only use a referral code once. A policyholder is then ineligible to receive further rewards from additional referral codes.
      * @return isReferralCodeUsed_ True if the policyholder has previoulsy used a valid referral code, false if not
      */
     function isReferralCodeUsed(address policyholder) external view override returns (bool isReferralCodeUsed_) {
@@ -558,9 +558,7 @@ contract SolaceCoverProduct is
     ***************************************/
 
     /**
-     * @notice Enables cover promotion admin to set reward points for a selected address.
-     * 
-     * Can only be called by the **Cover Promotion Admin** role.
+     * @notice Set reward points for a selected address. Can only be called by the **Cover Promotion Admin** role.
      * @param policyholder_ The address of the policyholder to set reward points for.
      * @param rewardPoints_ Desired amount of reward points.
      */
@@ -575,9 +573,8 @@ contract SolaceCoverProduct is
     ***************************************/
 
     /**
-     * @notice Charge premiums for each policy holder.
+     * @notice Charge premiums for each policy holder. Can only be called by the **Premium Collector** role.
      *
-     * Can only be called by the **Premium Collector** role.
      * @dev Cheaper to load variables directly from calldata, rather than adding an additional operation of copying to memory.
      * @param holders Array of addresses of the policyholders to charge.
      * @param premiums Array of premium amounts (in **USD** to 18 decimal places) to charge each policyholder.
@@ -633,7 +630,7 @@ contract SolaceCoverProduct is
         }
   
         // single DAI transfer to the premium pool
-        SafeERC20.safeTransferFrom(getAsset(), address(this), _registry.get("premiumPool"), amountToPayPremiumPool);
+        SafeERC20.safeTransferFrom(_getAsset(), address(this), _registry.get("premiumPool"), amountToPayPremiumPool);
     }
 
     /***************************************
@@ -641,7 +638,7 @@ contract SolaceCoverProduct is
     ***************************************/
 
     /**
-     * @notice Returns true if there is sufficient capacity to accept a request for updating the cover limit of a policy, false if not (there is insufficient available cover capacity).
+     * @notice Returns true if there is sufficient capacity to update a policy's cover limit, false if not.
      * @param existingTotalCover_ The current cover limit, 0 if policy has not previously been activated.
      * @param newTotalCover_  The new cover limit requested.
      * @return acceptable True there is sufficient capacity for the requested new cover limit, false otherwise.
@@ -657,9 +654,6 @@ contract SolaceCoverProduct is
 
     /**
      * @notice Deposits funds into the policyholder's account balance.
-     *
-     * @dev Explicit decision that _deposit() will not affect, nor be affected by the cooldown mechanic.
-     * Rationale: _deposit() doesn't affect cover limit, and cooldown mechanic is to protect protocol from manipulated cover limit
      * @param from The address which is funding the deposit.
      * @param policyholder The policyholder address.
      * @param amount The deposit amount in **USD** to 18 decimal places.
@@ -669,7 +663,7 @@ contract SolaceCoverProduct is
         address policyholder,
         uint256 amount
     ) internal whileUnpaused {
-        SafeERC20.safeTransferFrom(getAsset(), from, address(this), amount);
+        SafeERC20.safeTransferFrom(_getAsset(), from, address(this), amount);
         _accountBalanceOf[policyholder] += amount;
         emit DepositMade(from, policyholder, amount);
     }
@@ -683,7 +677,7 @@ contract SolaceCoverProduct is
         address policyholder, 
         uint256 amount
     ) internal whileUnpaused {
-        SafeERC20.safeTransferFrom(getAsset(), address(this), policyholder, amount);
+        SafeERC20.safeTransferFrom(_getAsset(), address(this), policyholder, amount);
         _accountBalanceOf[policyholder] -= amount;
         emit WithdrawMade(policyholder, amount);
     }
@@ -827,7 +821,7 @@ contract SolaceCoverProduct is
      * @notice Returns the underlying principal asset for `Solace Cover Product`.
      * @return asset The underlying asset.
     */
-    function getAsset() internal view returns (IERC20 asset) {
+    function _getAsset() internal view returns (IERC20 asset) {
         return IERC20(_registry.get("dai"));
     }
 }
