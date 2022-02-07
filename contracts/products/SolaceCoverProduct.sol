@@ -20,15 +20,15 @@ import "../interfaces/products/ISolaceCoverProduct.sol";
  * 
  * The policy will remain active until i.) the user cancels their policy or ii.) the user's account runs out of funds. The policy will be billed like a subscription, every epoch a fee will be charged from the user's account.
  *
- * Policies can be purchased via [`activatePolicy()`](#activatePolicy). Policies are represented as ERC721s, which once minted, cannot then be transferred or burned. Users can change the cover limit of their policy through [`updateCoverLimit()`](#updateCoverLimit).
+ * Policies can be purchased via [`activatePolicy()`](#activatepolicy). Policies are represented as ERC721s, which once minted, cannot then be transferred or burned. Users can change the cover limit of their policy through [`updateCoverLimit()`](#updatecoverlimit).
  * 
- * Users can deposit funds into their account via [`deposit()`](#deposit). Currently the contract only accepts deposits in **DAI**. Note that both [`activatePolicy()`](#activatePolicy) and [`deposit()`](#deposit) enables a user to perform these actions (activate a policy, make a deposit) on behalf of another user.
+ * Users can deposit funds into their account via [`deposit()`](#deposit). Currently the contract only accepts deposits in **DAI**. Note that both [`activatePolicy()`](#activatepolicy) and [`deposit()`](#deposit) enables a user to perform these actions (activate a policy, make a deposit) on behalf of another user.
  *
- * Users can cancel their policy via [`deactivatePolicy()`](#deactivatePolicy). This will start a cooldown timer: Before the cooldown timer starts or passes, the user cannot withdraw their entire account balance.
+ * Users can cancel their policy via [`deactivatePolicy()`](#deactivatepolicy). This will start a cooldown timer: Before the cooldown timer starts or passes, the user cannot withdraw their entire account balance.
  *
  * Users can withdraw funds from their account via [`withdraw()`](#withdraw). If the cooldown has not started or has not passed, a minimum required account balance (to cover one epoch's fee) will be left in the user's account. Only after the cooldown has passed, will a user be able to withdraw their entire account balance.
  *
- * Users can enter a referral code with [`activatePolicy()`](#activatePolicy) or [`updateCoverLimit()`](#updateCoverLimit). A valid referral code will earn reward points to both the referrer and the referee. When the user's account is charged, reward points will be deducted before deposited funds.
+ * Users can enter a referral code with [`activatePolicy()`](#activatePolicy) or [`updateCoverLimit()`](#updatecoverlimit). A valid referral code will earn reward points to both the referrer and the referee. When the user's account is charged, reward points will be deducted before deposited funds.
  */
 contract SolaceCoverProduct is
     ISolaceCoverProduct,
@@ -494,7 +494,7 @@ contract SolaceCoverProduct is
     }
 
     /**
-     * @notice Sets the cooldown period. Read comments for [`cooldownPeriod()`](#cooldownPeriod) for more information on the cooldown mechanic.
+     * @notice Sets the cooldown period. Read comments for [`cooldownPeriod()`](#cooldownperiod) for more information on the cooldown mechanic.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param cooldownPeriod_ Cooldown period in seconds.
      */
