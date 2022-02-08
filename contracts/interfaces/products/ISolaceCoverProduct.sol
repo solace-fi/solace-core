@@ -77,11 +77,8 @@ interface ISolaceCoverProduct {
         uint256 rewardPointsEarned
     );
 
-    /// @notice Emitted when stablecoin is added to accepted stablecoin list
-    event StablecoinAdded(address stablecoin);
-
-    /// @notice Emitted when stablecoin is removed from accepted stablecoin list
-    event StablecoinRemoved(address stablecoin);
+    /// @notice Emitted when baseURI is set
+    event BaseURISet(string baseURI);
 
     /***************************************
     POLICY FUNCTIONS
@@ -277,6 +274,12 @@ interface ISolaceCoverProduct {
      */
     function isReferralCodeUsed(address policyholder) external view returns (bool isReferralCodeUsed_);
 
+    /**
+     * @notice Calculate minimum required account balance for a given cover limit. Equals the maximum chargeable fee for one epoch.
+     * @param coverLimit Cover limit.
+     */
+    function minRequiredAccountBalance(uint256 coverLimit) external view returns (uint256 minRequiredAccountBalance_);
+
     /***************************************
     GOVERNANCE FUNCTIONS
     ***************************************/
@@ -337,6 +340,12 @@ interface ISolaceCoverProduct {
      * @param isReferralOn_ Desired state of referral campaign.
     */
     function setIsReferralOn(bool isReferralOn_) external;
+
+    /**
+     * @notice Sets the base URI for computing `tokenURI`.
+     * @param baseURI_ The new base URI.
+     */
+    function setBaseURI(string memory baseURI_) external;
 
     /***************************************
     COVER PROMOTION ADMIN FUNCTIONS

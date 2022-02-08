@@ -388,6 +388,20 @@ describe("SolaceCoverProduct", function() {
         })
     })
 
+    describe ("setBaseURI", () => {
+        it("should default as empty string", async () => {
+            expect(await solaceCoverProduct.baseURI()).eq("")
+        })
+        it("cannot be set by non governance", async () => {
+            await expect(solaceCoverProduct.connect(policyholder1).setBaseURI("https://solace")).to.revertedWith("!governance");
+        })
+        it("can be set", async () => {
+            let tx = await solaceCoverProduct.connect(governor).setBaseURI("https://solace")
+            expect(tx).emit(solaceCoverProduct, "BaseURISet").withArgs("https://solace")
+            expect(await solaceCoverProduct.baseURI()).eq("https://solace")
+        })
+    })
+
     describe("activatePolicy", () => {
         let rmActiveCoverLimit:BN;
         let rmSoteriaactiveCoverLimit: BN;
@@ -578,6 +592,15 @@ describe("SolaceCoverProduct", function() {
             expect(await solaceCoverProduct.rewardPointsOf(policyholder3.address)).eq(0)
         })
     });
+
+    describe ("tokenURI", () => {
+        it("cannot get for invalid policy ID", async () => {
+            await expect(solaceCoverProduct.tokenURI(INVALID_POLICY_ID)).to.revertedWith("invalid policy");
+        })
+        it("can get for valid policy ID", async () => {
+            expect(await solaceCoverProduct.tokenURI(POLICY_ID_1)).eq("https://solace1")
+        })
+    })
 
     describe("deposit", () => {
         it("can deposit", async () => {
@@ -848,6 +871,10 @@ describe("SolaceCoverProduct", function() {
             cooldownPeriod = await solaceCoverProduct.cooldownPeriod()
         })
         
+        it("minRequiredAccountBalance view function working", async () => {
+            expect(await solaceCoverProduct.minRequiredAccountBalance(INITIAL_COVER_LIMIT)).eq(minRequiredAccountBalance)
+        })
+
         it("cannot withdraw while paused", async () => {
             await solaceCoverProduct.connect(governor).setPaused(true);
             await expect(solaceCoverProduct.connect(policyholder3).withdraw()).to.revertedWith("contract paused");

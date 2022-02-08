@@ -51,11 +51,11 @@ contract SolaceCoverProduct is
     /// @notice Cannot buy new policies while paused. (Default is False)
     bool internal _paused;
 
-    /**
-     * @notice Referral typehash.
-     */
-    // solhint-disable-next-line var-name-mixedcase
+    /// @notice Referral typehash.
+    /// solhint-disable-next-line var-name-mixedcase
     bytes32 private constant _REFERRAL_TYPEHASH = keccak256("SolaceReferral(uint256 version)");
+
+    string public baseURI;
 
     /***************************************
     BOOK-KEEPING VARIABLES
@@ -166,6 +166,7 @@ contract SolaceCoverProduct is
         _cooldownPeriod = 604800; // One-week cooldown period
         _referralReward = 50e18; // 50 DAI
         _isReferralOn = true; // Referral rewards activate
+        baseURI = "";
     }
 
     /***************************************
@@ -464,6 +465,24 @@ contract SolaceCoverProduct is
         return _isReferralCodeUsed[_policyOf[policyholder]];
     } 
 
+    /**
+     * @notice Returns the Uniform Resource Identifier (URI) for `policyID`.
+     * @param policyID The policy ID.
+     */
+    function tokenURI(uint256 policyID) public view virtual override returns (string memory tokenURI_) {
+        require(_exists(policyID), "invalid policy");
+        string memory baseURI_ = baseURI;
+        return string(abi.encodePacked( baseURI_, Strings.toString(policyID) ));
+    }
+
+    /**
+     * @notice Calculate minimum required account balance for a given cover limit. Equals the maximum chargeable fee for one epoch.
+     * @param coverLimit Cover limit.
+     */
+    function minRequiredAccountBalance(uint256 coverLimit) external view override returns (uint256 minRequiredAccountBalance_) {
+        return _minRequiredAccountBalance(coverLimit);
+    }
+
     /***************************************
     GOVERNANCE FUNCTIONS
     ***************************************/
@@ -551,6 +570,15 @@ contract SolaceCoverProduct is
     function setIsReferralOn(bool isReferralOn_) external override onlyGovernance {
         _isReferralOn = isReferralOn_;
         emit IsReferralOnSet(isReferralOn_);
+    }
+
+    /**
+     * @notice Sets the base URI for computing `tokenURI`.
+     * @param baseURI_ The new base URI.
+     */
+    function setBaseURI(string memory baseURI_) external override onlyGovernance {
+        baseURI = baseURI_;
+        emit BaseURISet(baseURI_);
     }
 
     /***************************************
