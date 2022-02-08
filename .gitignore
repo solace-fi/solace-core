@@ -19,3 +19,8 @@ typechain/
 *-ignore
 *.hbs
 *-backup*
+
+analysis.json
+bin/
+contracts_processed.zip
+scripts/contract_locations.txt
