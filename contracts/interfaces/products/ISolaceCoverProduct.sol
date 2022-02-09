@@ -275,6 +275,12 @@ interface ISolaceCoverProduct {
     function isReferralCodeUsed(address policyholder) external view returns (bool isReferralCodeUsed_);
 
     /**
+     * @notice Returns true if valid referral code, false otherwise.
+     * @param referralCode The referral code.
+     */
+    function isReferralCodeValid(bytes calldata referralCode) external view returns (bool);
+
+    /**
      * @notice Calculate minimum required account balance for a given cover limit. Equals the maximum chargeable fee for one epoch.
      * @param coverLimit Cover limit.
      */

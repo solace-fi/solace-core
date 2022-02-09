@@ -466,13 +466,13 @@ contract SolaceCoverProduct is
     } 
 
     /**
-     * @notice Returns the Uniform Resource Identifier (URI) for `policyID`.
-     * @param policyID The policy ID.
+     * @notice Returns true if valid referral code, false otherwise.
+     * @param referralCode The referral code.
      */
-    function tokenURI(uint256 policyID) public view virtual override returns (string memory tokenURI_) {
-        require(_exists(policyID), "invalid policy");
-        string memory baseURI_ = baseURI;
-        return string(abi.encodePacked( baseURI_, Strings.toString(policyID) ));
+    function isReferralCodeValid(bytes calldata referralCode) external view override returns (bool) {
+        (address referrer,) = ECDSA.tryRecover(_getEIP712Hash(), referralCode);
+        if(referrer == address(0)) return false;
+        return true;
     }
 
     /**
@@ -481,6 +481,16 @@ contract SolaceCoverProduct is
      */
     function minRequiredAccountBalance(uint256 coverLimit) external view override returns (uint256 minRequiredAccountBalance_) {
         return _minRequiredAccountBalance(coverLimit);
+    }
+
+    /**
+     * @notice Returns the Uniform Resource Identifier (URI) for `policyID`.
+     * @param policyID The policy ID.
+     */
+    function tokenURI(uint256 policyID) public view virtual override returns (string memory tokenURI_) {
+        require(_exists(policyID), "invalid policy");
+        string memory baseURI_ = baseURI;
+        return string(abi.encodePacked( baseURI_, Strings.toString(policyID) ));
     }
 
     /***************************************
