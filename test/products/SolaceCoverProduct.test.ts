@@ -64,6 +64,9 @@ describe("SolaceCoverProduct", function() {
     const maxRateDenom = BN.from("315360000"); // We are testing with maxRateNum and maxRateDenom that gives us an annual max rate of 10% coverLimit
     const REFERRAL_REWARD = ONE_ETH.mul(50) // 50 DAI
 
+    // Random 130 character hex string
+    const FAKE_REFERRAL_CODE = "0xe4e7cba021ff6b83b14d54016198f31b04cba044d71d9a8b9bdf964aa2259cc3b207237f814aa56e516638b448edc43a6c3f4637dca5de54cb199e37b039a832e7"
+
     const DAI_ADDRESS = "0x6B175474E89094C44Da98b954EedeAC495271d0F"
     const USDC_ADDRESS = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
     const WETH_ADDRESS = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
@@ -405,8 +408,7 @@ describe("SolaceCoverProduct", function() {
     describe ("isReferralCodeValid", () => {
         it("should return false for invalid referral code", async () => {
             expect(await solaceCoverProduct.isReferralCodeValid("0x01")).eq(false)
-            let fakeReferralCode = "0xe4e7cba021ff6b83b14d54016198f31b04cba044d71d9a8b9bdf964aa2259cc3b207237f814aa56e516638b448edc43a6c3f4637dca5de54cb199e37b039a832e7"
-            expect(await solaceCoverProduct.isReferralCodeValid(fakeReferralCode)).eq(false)
+            expect(await solaceCoverProduct.isReferralCodeValid(FAKE_REFERRAL_CODE)).eq(false)
         })
         it("should return true for valid referral code", async () => {
             let referralCode = await getSolaceReferralCode(policyholder1, solaceCoverProduct)
@@ -553,6 +555,9 @@ describe("SolaceCoverProduct", function() {
             await solaceCoverProduct.connect(policyholder1).activatePolicy(policyholder1.address, initialCoverLimit, 0, []);
             expect (await solaceCoverProduct.cooldownStart(policyholder1.address)).eq(0)
         })
+        it("cannot use an invalid referral code", async () => {
+            await expect(solaceCoverProduct.connect(governor).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, INITIAL_DEPOSIT, FAKE_REFERRAL_CODE)).to.reverted
+        })
         it("cannot use own referral code", async () => {
             // Create new wallet just for this unit test scope, to avoid creating side effects that impact other unit tests. It's a headfuck to work that out.
             const ownReferralCode = await getSolaceReferralCode(policyholder3, solaceCoverProduct)
@@ -615,6 +620,9 @@ describe("SolaceCoverProduct", function() {
     })
 
     describe("deposit", () => {
+        it("cannot deposit for zero address policyholder", async () => {
+            await expect(solaceCoverProduct.connect(policyholder1).deposit(ZERO_ADDRESS, INITIAL_DEPOSIT)).to.be.revertedWith("zero address policyholder");
+        })
         it("can deposit", async () => {
             let accountBalance = await solaceCoverProduct.accountBalanceOf(policyholder1.address);
             let soteriaContractDAIbalance = await dai.balanceOf(solaceCoverProduct.address)
@@ -738,6 +746,10 @@ describe("SolaceCoverProduct", function() {
             expect (await solaceCoverProduct.cooldownStart(policyholder1.address)).gt(0)
             await solaceCoverProduct.connect(policyholder1).updateCoverLimit(initialCoverLimit, []);
             expect (await solaceCoverProduct.cooldownStart(policyholder1.address)).eq(0)
+        })
+        it("cannot use invalid referral code", async () => {
+            let coverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_1);
+            await expect(solaceCoverProduct.connect(policyholder1).updateCoverLimit(coverLimit, FAKE_REFERRAL_CODE)).to.be.reverted;
         })
         it("cannot use own referral code", async () => {
             let ownReferralCode = await getSolaceReferralCode(policyholder1, solaceCoverProduct)

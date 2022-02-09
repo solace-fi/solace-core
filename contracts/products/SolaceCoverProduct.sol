@@ -259,6 +259,7 @@ contract SolaceCoverProduct is
         address policyholder,
         uint256 amount
     ) external override nonReentrant whileUnpaused {
+        require(policyholder != address(0x0), "zero address policyholder");
         _deposit(msg.sender, policyholder, amount);
     }
 
