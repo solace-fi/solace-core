@@ -166,7 +166,7 @@ contract SolaceCoverProduct is
         _cooldownPeriod = 604800; // One-week cooldown period
         _referralReward = 50e18; // 50 DAI
         _isReferralOn = true; // Referral rewards activate
-        baseURI = "";
+        baseURI = string(abi.encodePacked("https://stats.solace.fi/policy/?chainID=", Strings.toString(block.chainid), "&policyID="));
     }
 
     /***************************************

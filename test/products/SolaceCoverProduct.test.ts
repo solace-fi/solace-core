@@ -393,8 +393,8 @@ describe("SolaceCoverProduct", function() {
     })
 
     describe ("setBaseURI", () => {
-        it("should default as empty string", async () => {
-            expect(await solaceCoverProduct.baseURI()).eq("")
+        it("should default as expected string", async () => {
+            expect(await solaceCoverProduct.baseURI()).eq("https://stats.solace.fi/policy/?chainID=31337&policyID=")
         })
         it("cannot be set by non governance", async () => {
             await expect(solaceCoverProduct.connect(policyholder1).setBaseURI("https://solace")).to.revertedWith("!governance");
@@ -1227,43 +1227,43 @@ describe("SolaceCoverProduct", function() {
             expect(await solaceCoverProduct.availableCoverCapacity()).eq(initialAvailableCoverCapacity.add(initialPolicy3CoverLimit))
         })
 
-        // it("will charge for 100 users in one call", async() => {
-        //     // Create 100 test wallets
-        //     // 100 wallets -> 1.6M gas
-        //     // 1000 wallets -> 16M gas
-        //     let numberWallets = 100 // Change this number to whatever number of wallets you want to test for
-        //     let users:(Wallet)[] = [];
-        //     for (let i = 0; i < numberWallets; i++) {
-        //         users.push(provider.createEmptyWallet())
-        //     }
+        it("will charge for 100 users in one call", async() => {
+            // Create 100 test wallets
+            // 100 wallets -> 1.6M gas
+            // 1000 wallets -> 16M gas
+            let numberWallets = 100 // Change this number to whatever number of wallets you want to test for
+            let users:(Wallet)[] = [];
+            for (let i = 0; i < numberWallets; i++) {
+                users.push(provider.createEmptyWallet())
+            }
 
-        //     let coverLimit = BN.from(100);
-        //     let depositAmount = BN.from(10);
-        //     let WEEKLY_MAX_PREMIUM = coverLimit.div(10).mul(604800).div(31536000) // Override global WEEKLY_MAX_PREMIUM variable
+            let coverLimit = BN.from(100);
+            let depositAmount = BN.from(10);
+            let WEEKLY_MAX_PREMIUM = coverLimit.div(10).mul(604800).div(31536000) // Override global WEEKLY_MAX_PREMIUM variable
 
-        //     // Activate policies for each user, 100 DAI cover limit with 10 DAI deposit
-        //     for (let user of users) {
-        //         await solaceCoverProduct.connect(governor).activatePolicy(user.address, coverLimit, depositAmount, [])
-        //     }
-        //     // Gift 0 reward points to one-third of users, half-weekly premium to one-third, and full weekly premium to remaining third
-        //     for (let user of users) {
-        //         if ( Math.floor(Math.random() * 3) == 0 ) {
-        //             await solaceCoverProduct.connect(coverPromotionAdmin).setRewardPoints(user.address, WEEKLY_MAX_PREMIUM.div(2))
-        //         } else if ( Math.floor(Math.random() * 3) == 1 ) {
-        //             await solaceCoverProduct.connect(coverPromotionAdmin).setRewardPoints(user.address, WEEKLY_MAX_PREMIUM)
-        //         }
-        //     }
-        //     // Create arrays for chargePremium parameter
-        //     let PREMIUM_ARRAY:BN[] = []
-        //     let ADDRESS_ARRAY:string[] = []
-        //     for (let user of users) {
-        //         ADDRESS_ARRAY.push(user.address)
-        //         PREMIUM_ARRAY.push(WEEKLY_MAX_PREMIUM)
-        //     }
+            // Activate policies for each user, 100 DAI cover limit with 10 DAI deposit
+            for (let user of users) {
+                await solaceCoverProduct.connect(governor).activatePolicy(user.address, coverLimit, depositAmount, [])
+            }
+            // Gift 0 reward points to one-third of users, half-weekly premium to one-third, and full weekly premium to remaining third
+            for (let user of users) {
+                if ( Math.floor(Math.random() * 3) == 0 ) {
+                    await solaceCoverProduct.connect(coverPromotionAdmin).setRewardPoints(user.address, WEEKLY_MAX_PREMIUM.div(2))
+                } else if ( Math.floor(Math.random() * 3) == 1 ) {
+                    await solaceCoverProduct.connect(coverPromotionAdmin).setRewardPoints(user.address, WEEKLY_MAX_PREMIUM)
+                }
+            }
+            // Create arrays for chargePremium parameter
+            let PREMIUM_ARRAY:BN[] = []
+            let ADDRESS_ARRAY:string[] = []
+            for (let user of users) {
+                ADDRESS_ARRAY.push(user.address)
+                PREMIUM_ARRAY.push(WEEKLY_MAX_PREMIUM)
+            }
 
-        //     // Charge premiums
-        //     await solaceCoverProduct.connect(premiumCollector).chargePremiums(ADDRESS_ARRAY, PREMIUM_ARRAY);
-        // })
+            // Charge premiums
+            await solaceCoverProduct.connect(premiumCollector).chargePremiums(ADDRESS_ARRAY, PREMIUM_ARRAY);
+        })
 
     });
 
