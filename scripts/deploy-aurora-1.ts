@@ -21,7 +21,7 @@ const XSLOCKER_ADDRESS              = "0x501Ace47c5b0C2099C4464f681c3fa2ECD3146C
 const STAKING_REWARDS_ADDRESS       = "0x501ace3D42f9c8723B108D4fBE29989060a91411";
 const XSOLACE_ADDRESS               = "0x501ACe802447B1Ed4Aae36EA830BFBde19afbbF9";
 const BSOLACE_ADDRESS               = "0x1BDA7007C9e3Bc33267E883864137aF8eb53CC2D";
-const BRIDGE_WRAPPER_ADDRESS        = "0x501ACE45014539C5574055794d8a82A3d31fcb54,";
+const BRIDGE_WRAPPER_ADDRESS        = "0x501ACE45014539C5574055794d8a82A3d31fcb54";
 
 let artifacts: ArtifactImports;
 let deployerContract: Deployer;
@@ -109,53 +109,20 @@ async function deployStakingRewards() {
     await tx.wait(10);
     stakingRewards = (await ethers.getContractAt(artifacts.StakingRewards.abi, "0x501ace3D42f9c8723B108D4fBE29989060a91411")) as StakingRewards;
     console.log(`Deployed StakingRewards to ${stakingRewards.address}`);
-  }
-  /*
-  console.log("staking rewards - registering in xslocker");
-  let tx1 = await xslocker.connect(deployer).addXsLockListener(stakingRewards.address);
-  await tx1.wait(10);
-  console.log("staking rewards - set rewards");
-  let tx2 = await solace.connect(deployer).mint(stakingRewards.address, solacePerYear);
-  await tx2.wait(10);
-  console.log("staking rewards - set times");
-  let tx3 = await stakingRewards.connect(deployer).setTimes(startTime, endTime);
-  await tx3.wait(10);
-  console.log("staking rewards - minting SOLACE");
-  let tx4 = await solace.connect(deployer).mint(stakingRewards.address, solacePerYear);
-  await tx4.wait(10);
-  */
 
-  /*
-  let tenMil = BN.from("10000000000000000000000000");
-  let bal1 = await solace.balanceOf(stakingRewards.address);
-  console.log(bal1.toString());
-  console.log(bal1.div(ONE_ETHER).toString())
-  console.log(bal1.div(ONE_ETHER).div(1000000).toString())
-
-  let bal2 = await solace.balanceOf(signerAddress);
-  console.log(bal2.toString());
-  console.log(bal2.div(ONE_ETHER).toString())
-  console.log(bal2.div(ONE_ETHER).div(1000000).toString())
-
-  if(bal1.gt(tenMil)) {
-    console.log('rescuing tokens');
-    let tx1 = await stakingRewards.connect(deployer).rescueTokens(solace.address, tenMil, signerAddress);
+    console.log("staking rewards - registering in xslocker");
+    let tx1 = await xslocker.connect(deployer).addXsLockListener(stakingRewards.address);
     await tx1.wait(10);
-    console.log('burning tokens');
-    let tx2 = await solace.connect(deployer).burn(tenMil);
+    console.log("staking rewards - set rewards");
+    let tx2 = await solace.connect(deployer).mint(stakingRewards.address, solacePerYear);
     await tx2.wait(10);
+    console.log("staking rewards - set times");
+    let tx3 = await stakingRewards.connect(deployer).setTimes(startTime, endTime);
+    await tx3.wait(10);
+    console.log("staking rewards - minting SOLACE");
+    let tx4 = await solace.connect(deployer).mint(stakingRewards.address, solacePerYear);
+    await tx4.wait(10);
   }
-
-  bal1 = await solace.balanceOf(stakingRewards.address);
-  console.log(bal1.toString());
-  console.log(bal1.div(ONE_ETHER).toString())
-  console.log(bal1.div(ONE_ETHER).div(1000000).toString())
-
-  bal2 = await solace.balanceOf(signerAddress);
-  console.log(bal2.toString());
-  console.log(bal2.div(ONE_ETHER).toString())
-  console.log(bal2.div(ONE_ETHER).div(1000000).toString())
-  */
 }
 
 async function deployXSOLACE() {
@@ -186,14 +153,6 @@ async function deployBridgeWrapper() {
     await tx1.wait(10);
     console.log("Added BridgeWrapper as SOLACE minter");
   }
-  console.log('Unwrapping bSOLACE');
-  let tx1 = await wrapper.connect(deployer).bsolaceToSolace(0, signerAddress);
-  await tx1.wait(10);
-  console.log('Unwrapped bSOLACE');
-  console.log('Wrapping bSOLACE');
-  let tx2 = await wrapper.connect(deployer).solaceToBSolace(0, signerAddress);
-  await tx2.wait(10);
-  console.log('Wrapped bSOLACE');
 }
 
 async function logAddresses() {

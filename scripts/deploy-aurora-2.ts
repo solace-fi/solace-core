@@ -25,8 +25,8 @@ const ONE_ETHER = BN.from("1000000000000000000");
 
 const SOLACE_ADDRESS                = "0x501acE9c35E60f03A2af4d484f49F9B1EFde9f40";
 const XSLOCKER_ADDRESS              = "0x501Ace47c5b0C2099C4464f681c3fa2ECD3146C1";
-const DAO_ADDRESS                   = "0x501aceB2Ff39b3aC0189ba1ACe497C3dAB486F7B";
-const UNDERWRITING_POOL_ADDRESS     = "0x501ace27A074471F099ffFeC008Bd1b151c7F7dE";
+const DAO_ADDRESS                   = "0x21afD3bCDa49c125a72ef123Af86d3133b6565Be";
+const UNDERWRITING_POOL_ADDRESS     = "0x4A6B0f90597e7429Ce8400fC0E2745Add343df78";
 const BOND_DEPO_ADDRESS             = "0x501ACe2f00EC599D4FDeA408680e192f88D94D0D";
 
 const DAI_ADDRESS                   = "0xe3520349F477A5F6EB06107066048508498A291b";
@@ -47,6 +47,12 @@ const USDT_BOND_TELLER_ADDRESS      = "0x501ACe5CeEc693Df03198755ee80d4CE0b5c55f
 const FRAX_ADDRESS                  = "0xDA2585430fEf327aD8ee44Af8F1f989a2A91A3d2";
 const FRAX_BOND_TELLER_ADDRESS      = "0x501aCef4F8397413C33B13cB39670aD2f17BfE62";
 
+const NEAR_ADDRESS                  = "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d";
+const NEAR_BOND_TELLER_ADDRESS      = "0x501aCe71a83CBE03B1467a6ffEaeB58645d844b4";
+
+const AURORA_ADDRESS                = "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79";
+const AURORA_BOND_TELLER_ADDRESS    = "0x501Ace35f0B7Fad91C199824B8Fe555ee9037AA3";
+
 let artifacts: ArtifactImports;
 let deployerContract: Deployer;
 
@@ -60,6 +66,8 @@ let usdcTeller: BondTellerErc20;
 let wbtcTeller: BondTellerErc20;
 let usdtTeller: BondTellerErc20;
 let fraxTeller: BondTellerErc20;
+let nearTeller: BondTellerErc20;
+let auroraTeller: BondTellerErc20;
 
 let signerAddress: string;
 
@@ -74,18 +82,18 @@ async function main() {
   await expectDeployed(DEPLOYER_CONTRACT_ADDRESS);
   await expectDeployed(SOLACE_ADDRESS);
   await expectDeployed(XSLOCKER_ADDRESS);
-  //await expectDeployed(_ADDRESS);
 
   // new underwriting
   await deployBondDepo();
 
   await deployDaiTeller();
   await deployEthTeller();
-
   await deployUsdcTeller();
   await deployWbtcTeller();
   await deployUsdtTeller();
   await deployFraxTeller();
+  await deployNearTeller();
+  await deployAuroraTeller();
 
   await logAddresses();
 }
@@ -296,7 +304,9 @@ async function deployUsdtTeller() {
     await tx4.wait(10);
     console.log('USDT Teller - done');
   }
-}async function deployFraxTeller() {
+}
+
+async function deployFraxTeller() {
   const NAME = "Solace FRAX Bond";
   const VESTING_TERM = 604800; // 7 days
   const HALF_LIFE = 2592000; // 30 days
@@ -332,11 +342,89 @@ async function deployUsdtTeller() {
   }
 }
 
+async function deployNearTeller() {
+  const NAME = "Solace NEAR Bond";
+  const VESTING_TERM = 604800; // 7 days
+  const HALF_LIFE = 2592000; // 30 days
+  //const ONE_CENT_IN_NEAR = BN.from("909090909090909090909"); // @ 1 NEAR = $11
+  //const ONE_TENTH_CENT_IN_NEAR = BN.from("90909090909090909090");
+  const ONE_CENT_IN_NEAR = BN.from("800000000000000000000"); // @ 1 NEAR = $12.50
+  const ONE_TENTH_CENT_IN_NEAR = BN.from("80000000000000000000");
+
+  const START_PRICE = ONE_CENT_IN_NEAR.mul(8); // 8 cents
+  const MAX_PAYOUT = BN.from("10000000000000000000000000") // 10 million SOLACE max single bond
+  const CAPACITY = BN.from("100000000000000000000000000"); // 100 million SOLACE max over lifetime
+  // every 50,000 SOLACE bonded raises the price one tenth of a cent
+  const PRICE_ADJ_NUM = ONE_TENTH_CENT_IN_NEAR; // tenth of a cent in NEAR
+  const PRICE_ADJ_DENOM = BN.from("50000000000000000000000"); // 50,000 SOLACE
+  if(PRICE_ADJ_NUM.gt(MAX_UINT128) || PRICE_ADJ_DENOM.gt(MAX_UINT128)) throw `Uint128 too large: ${PRICE_ADJ_NUM.toString()} | ${PRICE_ADJ_DENOM.toString()} > ${MAX_UINT128.toString()}`;
+
+  console.log('NEAR Bond Teller')
+  if(await isDeployed(NEAR_BOND_TELLER_ADDRESS)) {
+    nearTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, NEAR_BOND_TELLER_ADDRESS)) as BondTellerErc20;
+  } else {
+    console.log("NEAR Teller - deploy");
+    var salt = "0x0000000000000000000000000000000000000000000000000000000004843332";
+    nearTeller = await cloneTeller(daiTeller, NAME, NEAR_ADDRESS, false, salt);
+    console.log(`NEAR Teller - deployed to ${nearTeller.address}`);
+    await expectDeployed(nearTeller.address);
+    console.log('NEAR Teller - set terms');
+    let tx2 = await nearTeller.connect(deployer).setTerms({startPrice: START_PRICE, minimumPrice: START_PRICE, maxPayout: MAX_PAYOUT, priceAdjNum: PRICE_ADJ_NUM, priceAdjDenom: PRICE_ADJ_DENOM, capacity: CAPACITY, capacityIsPayout: true, startTime: BOND_START_TIME, endTime: MAX_UINT40, globalVestingTerm: VESTING_TERM, halfLife: HALF_LIFE}, {gasLimit: 300000});
+    await tx2.wait(10);
+    console.log('NEAR teller - add to bond depo');
+    let tx3 = await bondDepo.connect(deployer).addTeller(nearTeller.address);
+    await tx3.wait(10);
+    console.log('NEAR Teller - set fees');
+    let tx4 = await nearTeller.connect(deployer).setFees(500);
+    await tx4.wait(10);
+    console.log('NEAR Teller - done');
+  }
+}
+
+async function deployAuroraTeller() {
+  const NAME = "Solace AURORA Bond";
+  const VESTING_TERM = 604800; // 7 days
+  const HALF_LIFE = 2592000; // 30 days
+  //const ONE_CENT_IN_AURORA = BN.from("800000000000000"); // @ 1 AURORA = $12.50
+  //const ONE_TENTH_CENT_IN_AURORA = BN.from("80000000000000");
+  const ONE_CENT_IN_AURORA = BN.from("724637681159420"); // @ 1 AURORA = $13.80
+  const ONE_TENTH_CENT_IN_AURORA = BN.from("72463768115942");
+
+  const START_PRICE = ONE_CENT_IN_AURORA.mul(8); // 8 cents
+  const MAX_PAYOUT = BN.from("10000000000000000000000000") // 10 million SOLACE max single bond
+  const CAPACITY = BN.from("100000000000000000000000000"); // 100 million SOLACE max over lifetime
+  // every 50,000 SOLACE bonded raises the price one tenth of a cent
+  const PRICE_ADJ_NUM = ONE_TENTH_CENT_IN_AURORA; // tenth of a cent in AURORA
+  const PRICE_ADJ_DENOM = BN.from("50000000000000000000000"); // 50,000 SOLACE
+  if(PRICE_ADJ_NUM.gt(MAX_UINT128) || PRICE_ADJ_DENOM.gt(MAX_UINT128)) throw `Uint128 too large: ${PRICE_ADJ_NUM.toString()} | ${PRICE_ADJ_DENOM.toString()} > ${MAX_UINT128.toString()}`;
+
+  if(await isDeployed(AURORA_BOND_TELLER_ADDRESS)) {
+    auroraTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, AURORA_BOND_TELLER_ADDRESS)) as BondTellerErc20;
+  } else {
+    console.log("AURORA Teller - deploy");
+    var salt = "0x0000000000000000000000000000000000000000000000000000000005201ba9";
+    auroraTeller = await cloneTeller(daiTeller, NAME, AURORA_ADDRESS, false, salt);
+    console.log(`AURORA Teller - deployed to ${auroraTeller.address}`);
+    await expectDeployed(auroraTeller.address);
+    console.log('AURORA Teller - set terms');
+    let tx2 = await auroraTeller.connect(deployer).setTerms({startPrice: START_PRICE, minimumPrice: START_PRICE, maxPayout: MAX_PAYOUT, priceAdjNum: PRICE_ADJ_NUM, priceAdjDenom: PRICE_ADJ_DENOM, capacity: CAPACITY, capacityIsPayout: true, startTime: BOND_START_TIME, endTime: MAX_UINT40, globalVestingTerm: VESTING_TERM, halfLife: HALF_LIFE}, {gasLimit: 300000});
+    await tx2.wait(10);
+    console.log('AURORA teller - add to bond depo');
+    let tx3 = await bondDepo.connect(deployer).addTeller(auroraTeller.address);
+    await tx3.wait(10);
+    console.log('AURORA Teller - set fees');
+    let tx4 = await auroraTeller.connect(deployer).setFees(500);
+    await tx4.wait(10);
+    console.log('AURORA Teller - done');
+  }
+}
+
 async function cloneTeller(sourceTeller: BondTellerErc20, name: string, principal: string, isPermittable: boolean, salt: BytesLike) {
   await expectDeployed(sourceTeller.address);
   let addr = await sourceTeller.calculateMinimalProxyDeploymentAddress(salt);
+  console.log(`cloning ${sourceTeller.address} to ${addr}`);
   let tx = await sourceTeller.clone(name, signerAddress, principal, isPermittable, salt, {gasLimit: 500000});
-  let receipt = await tx.wait(1);
+  let receipt = await tx.wait(10);
   let newTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, addr)) as BondTellerErc20;
   await expectDeployed(newTeller.address);
   return newTeller;
@@ -355,12 +443,16 @@ async function logAddresses() {
   logContractAddress("WBTC Bond Teller", wbtcTeller.address);
   logContractAddress("USDT Bond Teller", usdtTeller.address);
   logContractAddress("FRAX Bond Teller", fraxTeller.address);
+  logContractAddress("NEAR Bond Teller", nearTeller.address);
+  logContractAddress("AURORA Bond Teller", auroraTeller.address);
   logContractAddress("DAI", DAI_ADDRESS);
   logContractAddress("WETH", WETH_ADDRESS);
   logContractAddress("USDC", USDC_ADDRESS);
   logContractAddress("WBTC", WBTC_ADDRESS);
   logContractAddress("USDT", USDT_ADDRESS);
   logContractAddress("FRAX", FRAX_ADDRESS);
+  logContractAddress("NEAR", NEAR_ADDRESS);
+  logContractAddress("AURORA", AURORA_ADDRESS);
 }
 
 main()
