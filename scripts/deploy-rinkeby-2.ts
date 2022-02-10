@@ -408,6 +408,7 @@ async function deployFraxTeller() {
 
 async function cloneTeller(sourceTeller: BondTellerErc20, name: string, principal: string, isPermittable: boolean, salt: BytesLike) {
   let addr = await sourceTeller.calculateMinimalProxyDeploymentAddress(salt);
+  console.log(`cloning ${sourceTeller.address} to ${addr}`);
   await sourceTeller.clone(name, signerAddress, principal, isPermittable, salt, {gasLimit: 500000});
   let newTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, addr)) as BondTellerErc20;
   return newTeller;

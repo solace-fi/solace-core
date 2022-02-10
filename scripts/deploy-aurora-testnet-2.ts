@@ -14,7 +14,7 @@ import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_
 import { Deployer, Solace, XsLocker, BondDepository, BondTellerErc20, BondTellerEth, MockErc20, Weth9 } from "../typechain";
 import { BytesLike, constants } from "ethers";
 import { deployContract } from "ethereum-waffle";
-import { expectDeployed } from "../test/utilities/expectDeployed";
+import { expectDeployed, isDeployed } from "../test/utilities/expectDeployed";
 
 const DEPLOYER_CONTRACT_ADDRESS    = "0x501acE4b4F9085348F60b61Fe3C95937a34565E7";
 
@@ -47,6 +47,12 @@ const USDT_BOND_TELLER_ADDRESS      = "0x501aCEa6ff6dcE05D108D616cE886AF74f00EAA
 const FRAX_ADDRESS                  = "0x5405059004A74d191a07badC3e32501ac8A39788";
 const FRAX_BOND_TELLER_ADDRESS      = "0x501acE87fF4E7A1498320ABB674a4960A87792E4";
 
+const NEAR_ADDRESS                  = "0x80dAF9794A2b6f0A6B1E58c6Ae99803c028c00f8";
+const NEAR_BOND_TELLER_ADDRESS      = "0x501AcE9D730dcf60d6bbD1FDDca9c1b69CAF0A61";
+
+const AURORA_ADDRESS                = "0x034c971902b0B2EF37abd249c1A5DEc5Dc5bE14B";
+const AURORA_BOND_TELLER_ADDRESS    = "0x501ACef4fDF8C0597aA40b5Cb82035FFe5Ad3552";
+
 let artifacts: ArtifactImports;
 let deployerContract: Deployer;
 
@@ -60,6 +66,8 @@ let usdc: MockErc20;
 let wbtc: MockErc20;
 let usdt: MockErc20;
 let frax: MockErc20;
+let near: MockErc20;
+let aurora: MockErc20;
 
 let daiTeller: BondTellerErc20;
 let ethTeller: BondTellerEth;
@@ -67,6 +75,8 @@ let usdcTeller: BondTellerErc20;
 let wbtcTeller: BondTellerErc20;
 let usdtTeller: BondTellerErc20;
 let fraxTeller: BondTellerErc20;
+let nearTeller: BondTellerErc20;
+let auroraTeller: BondTellerErc20;
 
 let signerAddress: string;
 
@@ -92,12 +102,14 @@ async function main() {
   await deployWbtcTeller();
   await deployUsdtTeller();
   await deployFraxTeller();
+  await deployNearTeller();
+  await deployAuroraTeller();
 
   await logAddresses();
 }
 
 async function deployBondDepo() {
-  if(!!BOND_DEPO_ADDRESS) {
+  if(await isDeployed(BOND_DEPO_ADDRESS)) {
     bondDepo = (await ethers.getContractAt(artifacts.BondDepository.abi, BOND_DEPO_ADDRESS)) as BondDepository;
   } else {
     console.log("Deploying BondDepository");
@@ -130,7 +142,7 @@ async function deployDaiTeller() {
   const PRICE_ADJ_DENOM = BN.from("50000000000000000000000"); // 50,000 SOLACE
   if(PRICE_ADJ_NUM.gt(MAX_UINT128) || PRICE_ADJ_DENOM.gt(MAX_UINT128)) throw `Uint128 too large: ${PRICE_ADJ_NUM.toString()} | ${PRICE_ADJ_DENOM.toString()} > ${MAX_UINT128.toString()}`;
 
-  if(!!DAI_BOND_TELLER_ADDRESS) {
+  if(await isDeployed(DAI_BOND_TELLER_ADDRESS)) {
     daiTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, DAI_BOND_TELLER_ADDRESS)) as BondTellerErc20;
   } else {
     console.log("DAI Teller - deploy");
@@ -170,7 +182,7 @@ async function deployEthTeller() {
   if(PRICE_ADJ_NUM.gt(MAX_UINT128) || PRICE_ADJ_DENOM.gt(MAX_UINT128)) throw `Uint128 too large: ${PRICE_ADJ_NUM.toString()} | ${PRICE_ADJ_DENOM.toString()} > ${MAX_UINT128.toString()}`;
 
 
-  if(!!ETH_BOND_TELLER_ADDRESS) {
+  if(await isDeployed(ETH_BOND_TELLER_ADDRESS)) {
     ethTeller = (await ethers.getContractAt(artifacts.BondTellerETH.abi, ETH_BOND_TELLER_ADDRESS)) as BondTellerEth;
   } else {
     console.log("ETH Teller - deploy");
@@ -210,7 +222,7 @@ async function deployUsdcTeller() {
   const PRICE_ADJ_DENOM = BN.from("50000000000000000000000"); // 50,000 SOLACE
   if(PRICE_ADJ_NUM.gt(MAX_UINT128) || PRICE_ADJ_DENOM.gt(MAX_UINT128)) throw `Uint128 too large: ${PRICE_ADJ_NUM.toString()} | ${PRICE_ADJ_DENOM.toString()} > ${MAX_UINT128.toString()}`;
 
-  if(!!USDC_BOND_TELLER_ADDRESS) {
+  if(await isDeployed(USDC_BOND_TELLER_ADDRESS)) {
     usdcTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, USDC_BOND_TELLER_ADDRESS)) as BondTellerErc20;
   } else {
     console.log("USDC Teller - deploy");
@@ -248,7 +260,7 @@ async function deployWbtcTeller() {
   const PRICE_ADJ_DENOM = BN.from("5000000000000000000000000"); //  5000,000 SOLACE
   if(PRICE_ADJ_NUM.gt(MAX_UINT128) || PRICE_ADJ_DENOM.gt(MAX_UINT128)) throw `Uint128 too large: ${PRICE_ADJ_NUM.toString()} | ${PRICE_ADJ_DENOM.toString()} > ${MAX_UINT128.toString()}`;
 
-  if(!!WBTC_BOND_TELLER_ADDRESS) {
+  if(await isDeployed(WBTC_BOND_TELLER_ADDRESS)) {
     wbtcTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, WBTC_BOND_TELLER_ADDRESS)) as BondTellerErc20;
   } else {
     console.log("WBTC Teller - deploy");
@@ -285,7 +297,7 @@ async function deployUsdtTeller() {
   const PRICE_ADJ_DENOM = BN.from("50000000000000000000000"); // 50,000 SOLACE
   if(PRICE_ADJ_NUM.gt(MAX_UINT128) || PRICE_ADJ_DENOM.gt(MAX_UINT128)) throw `Uint128 too large: ${PRICE_ADJ_NUM.toString()} | ${PRICE_ADJ_DENOM.toString()} > ${MAX_UINT128.toString()}`;
 
-  if(!!USDT_BOND_TELLER_ADDRESS) {
+  if(await isDeployed(USDT_BOND_TELLER_ADDRESS)) {
     usdtTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, USDT_BOND_TELLER_ADDRESS)) as BondTellerErc20;
   } else {
     console.log("USDT Teller - deploy");
@@ -323,7 +335,7 @@ async function deployFraxTeller() {
   if(PRICE_ADJ_NUM.gt(MAX_UINT128) || PRICE_ADJ_DENOM.gt(MAX_UINT128)) throw `Uint128 too large: ${PRICE_ADJ_NUM.toString()} | ${PRICE_ADJ_DENOM.toString()} > ${MAX_UINT128.toString()}`;
 
 
-  if(!!FRAX_BOND_TELLER_ADDRESS) {
+  if(await isDeployed(FRAX_BOND_TELLER_ADDRESS)) {
     fraxTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, FRAX_BOND_TELLER_ADDRESS)) as BondTellerErc20;
   } else {
     console.log("FRAX Teller - deploy");
@@ -344,8 +356,89 @@ async function deployFraxTeller() {
   }
 }
 
+async function deployNearTeller() {
+  const NAME = "Solace NEAR Bond";
+  //const VESTING_TERM = 604800; // 7 days
+  const VESTING_TERM = 600; // 10 minutes
+  const HALF_LIFE = 2592000; // 30 days
+  //const ONE_CENT_IN_NEAR = BN.from("909090909090909090909"); // @ 1 NEAR = $11
+  //const ONE_TENTH_CENT_IN_NEAR = BN.from("90909090909090909090");
+  const ONE_CENT_IN_NEAR = BN.from("800000000000000000000"); // @ 1 NEAR = $12.50
+  const ONE_TENTH_CENT_IN_NEAR = BN.from("80000000000000000000");
+
+  const START_PRICE = ONE_CENT_IN_NEAR.mul(8); // 8 cents
+  const MAX_PAYOUT = BN.from("10000000000000000000000000") // 10 million SOLACE max single bond
+  const CAPACITY = BN.from("100000000000000000000000000"); // 100 million SOLACE max over lifetime
+  // every 50,000 SOLACE bonded raises the price one tenth of a cent
+  const PRICE_ADJ_NUM = ONE_TENTH_CENT_IN_NEAR; // tenth of a cent in NEAR
+  const PRICE_ADJ_DENOM = BN.from("50000000000000000000000"); // 50,000 SOLACE
+  if(PRICE_ADJ_NUM.gt(MAX_UINT128) || PRICE_ADJ_DENOM.gt(MAX_UINT128)) throw `Uint128 too large: ${PRICE_ADJ_NUM.toString()} | ${PRICE_ADJ_DENOM.toString()} > ${MAX_UINT128.toString()}`;
+
+
+  if(await isDeployed(NEAR_BOND_TELLER_ADDRESS)) {
+    nearTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, NEAR_BOND_TELLER_ADDRESS)) as BondTellerErc20;
+  } else {
+    console.log("NEAR Teller - deploy");
+    var salt = "0x0000000000000000000000000000000000000000000000000000000004373f7d";
+    nearTeller = await cloneTeller(daiTeller, NAME, NEAR_ADDRESS, false, salt);
+    console.log(`NEAR Teller - deployed to ${nearTeller.address}`);
+    await expectDeployed(nearTeller.address);
+    console.log('NEAR Teller - set terms');
+    let tx2 = await nearTeller.connect(deployer).setTerms({startPrice: START_PRICE, minimumPrice: START_PRICE, maxPayout: MAX_PAYOUT, priceAdjNum: PRICE_ADJ_NUM, priceAdjDenom: PRICE_ADJ_DENOM, capacity: CAPACITY, capacityIsPayout: true, startTime: BOND_START_TIME, endTime: MAX_UINT40, globalVestingTerm: VESTING_TERM, halfLife: HALF_LIFE}, {gasLimit: 300000});
+    await tx2.wait(10);
+    console.log('NEAR teller - add to bond depo');
+    let tx3 = await bondDepo.connect(deployer).addTeller(nearTeller.address);
+    await tx3.wait(10);
+    console.log('NEAR Teller - set fees');
+    let tx4 = await nearTeller.connect(deployer).setFees(500);
+    await tx4.wait(10);
+    console.log('NEAR Teller - done');
+  }
+}
+
+async function deployAuroraTeller() {
+  const NAME = "Solace AURORA Bond";
+  //const VESTING_TERM = 604800; // 7 days
+  const VESTING_TERM = 600; // 10 minutes
+  const HALF_LIFE = 2592000; // 30 days
+  //const ONE_CENT_IN_AURORA = BN.from("800000000000000"); // @ 1 AURORA = $12.50
+  //const ONE_TENTH_CENT_IN_AURORA = BN.from("80000000000000");
+  const ONE_CENT_IN_AURORA = BN.from("724637681159420"); // @ 1 AURORA = $13.80
+  const ONE_TENTH_CENT_IN_AURORA = BN.from("72463768115942");
+
+  const START_PRICE = ONE_CENT_IN_AURORA.mul(8); // 8 cents
+  const MAX_PAYOUT = BN.from("10000000000000000000000000") // 10 million SOLACE max single bond
+  const CAPACITY = BN.from("100000000000000000000000000"); // 100 million SOLACE max over lifetime
+  // every 50,000 SOLACE bonded raises the price one tenth of a cent
+  const PRICE_ADJ_NUM = ONE_TENTH_CENT_IN_AURORA; // tenth of a cent in AURORA
+  const PRICE_ADJ_DENOM = BN.from("50000000000000000000000"); // 50,000 SOLACE
+  if(PRICE_ADJ_NUM.gt(MAX_UINT128) || PRICE_ADJ_DENOM.gt(MAX_UINT128)) throw `Uint128 too large: ${PRICE_ADJ_NUM.toString()} | ${PRICE_ADJ_DENOM.toString()} > ${MAX_UINT128.toString()}`;
+
+
+  if(await isDeployed(AURORA_BOND_TELLER_ADDRESS)) {
+    auroraTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, AURORA_BOND_TELLER_ADDRESS)) as BondTellerErc20;
+  } else {
+    console.log("AURORA Teller - deploy");
+    var salt = "0x0000000000000000000000000000000000000000000000000000000004d104f9";
+    auroraTeller = await cloneTeller(daiTeller, NAME, AURORA_ADDRESS, false, salt);
+    console.log(`AURORA Teller - deployed to ${auroraTeller.address}`);
+    await expectDeployed(auroraTeller.address);
+    console.log('AURORA Teller - set terms');
+    let tx2 = await auroraTeller.connect(deployer).setTerms({startPrice: START_PRICE, minimumPrice: START_PRICE, maxPayout: MAX_PAYOUT, priceAdjNum: PRICE_ADJ_NUM, priceAdjDenom: PRICE_ADJ_DENOM, capacity: CAPACITY, capacityIsPayout: true, startTime: BOND_START_TIME, endTime: MAX_UINT40, globalVestingTerm: VESTING_TERM, halfLife: HALF_LIFE}, {gasLimit: 300000});
+    await tx2.wait(10);
+    console.log('AURORA teller - add to bond depo');
+    let tx3 = await bondDepo.connect(deployer).addTeller(auroraTeller.address);
+    await tx3.wait(10);
+    console.log('AURORA Teller - set fees');
+    let tx4 = await auroraTeller.connect(deployer).setFees(500);
+    await tx4.wait(10);
+    console.log('AURORA Teller - done');
+  }
+}
+
 async function cloneTeller(sourceTeller: BondTellerErc20, name: string, principal: string, isPermittable: boolean, salt: BytesLike) {
   let addr = await sourceTeller.calculateMinimalProxyDeploymentAddress(salt);
+  console.log(`cloning ${sourceTeller.address} to ${addr}`);
   await sourceTeller.clone(name, signerAddress, principal, isPermittable, salt, {gasLimit: 500000});
   let newTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, addr)) as BondTellerErc20;
   return newTeller;
@@ -361,6 +454,8 @@ async function deployTestnetTokens() {
     {name: "Wrapped Bitcoin", symbol: "WBTC", supply: BN.from("1000000000"), decimals: 8, permit: false},
     {name: "USD Token", symbol: "USDT", supply: BN.from("1000000000"), decimals: 6, permit: false},
     {name: "Frax", symbol: "FRAX", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
+    {name: "NEAR", symbol: "NEAR", supply: ONE_ETHER.mul(1000000).mul(1000000), decimals: 24, permit: false},
+    {name: "Aurora", symbol: "AURORA", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
   ];
   for(var i = 0; i < tokens.length; ++i) {
     let token = tokens[i];
@@ -392,10 +487,11 @@ async function mintTestnetTokens() {
     {name: "Wrapped Bitcoin", symbol: "WBTC", supply: BN.from("1000000000"), decimals: 8, permit: false, address: WBTC_ADDRESS},
     {name: "USD Token", symbol: "USDT", supply: BN.from("1000000000"), decimals: 6, permit: false, address: USDT_ADDRESS},
     {name: "Frax", symbol: "FRAX", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false, address: FRAX_ADDRESS},
+    {name: "NEAR", symbol: "NEAR", supply: ONE_ETHER.mul(1000000).mul(1000000), decimals: 24, permit: false},
+    {name: "Aurora", symbol: "AURORA", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
   ];
-  //let recipients = [signerAddress];
   /*
-  let recipients = ["0x1271e2acD0d209FA490692F5578239583Cde4073"];
+  let recipients = [signerAddress];
   for(var j = 0; j < recipients.length; ++j) {
     let recipient = recipients[j];
     for(var i = 0; i < tokens.length; ++i) {
@@ -421,6 +517,7 @@ async function mintTestnetTokens() {
     console.log(await solace.balanceOf(recipient));
   }
   */
+
   //let dai = (await ethers.getContractAt(artifacts.MockERC20.abi, DAI_ADDRESS)) as MockErc20;
   //let bal1 = await dai.balanceOf(signerAddress);
   /*
@@ -464,12 +561,16 @@ async function logAddresses() {
   logContractAddress("WBTC Bond Teller", wbtcTeller.address);
   logContractAddress("USDT Bond Teller", usdtTeller.address);
   logContractAddress("FRAX Bond Teller", fraxTeller.address);
+  logContractAddress("NEAR Bond Teller", nearTeller.address);
+  logContractAddress("AURORA Bond Teller", auroraTeller.address);
   logContractAddress("DAI", DAI_ADDRESS);
   logContractAddress("WETH", WETH_ADDRESS);
   logContractAddress("USDC", USDC_ADDRESS);
   logContractAddress("WBTC", WBTC_ADDRESS);
   logContractAddress("USDT", USDT_ADDRESS);
   logContractAddress("FRAX", FRAX_ADDRESS);
+  logContractAddress("NEAR", NEAR_ADDRESS);
+  logContractAddress("AURORA", AURORA_ADDRESS);
 }
 
 main()

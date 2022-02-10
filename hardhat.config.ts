@@ -19,6 +19,8 @@ const kovan_fork = { url: process.env.KOVAN_URL || '', blockNumber: 28627875 };
 const goerli_fork = { url: process.env.GOERLI_URL || '', blockNumber: 6267645 };
 const aurora_fork = { url: process.env.AURORA_URL || '' };
 const aurora_testnet_fork = { url: process.env.AURORA_TESTNET_URL || '' };
+const polygon_fork = { url: process.env.POLYGON_URL || '', blockNumber: 24525000 };
+const mumbai_fork = { url: process.env.MUMBAI_URL || '', blockNumber: 24529352 };
 const no_fork = undefined;
 const forking = (
     process.env.FORK_NETWORK === "mainnet"        ? mainnet_fork
@@ -27,6 +29,8 @@ const forking = (
   : process.env.FORK_NETWORK === "goerli"         ? goerli_fork
   : process.env.FORK_NETWORK === "aurora"         ? aurora_fork
   : process.env.FORK_NETWORK === "aurora_testnet" ? aurora_testnet_fork
+  : process.env.FORK_NETWORK === "polygon"        ? polygon_fork
+  : process.env.FORK_NETWORK === "mumbai"         ? mumbai_fork
   : no_fork
 );
 
@@ -70,6 +74,16 @@ const config: HardhatUserConfig = {
       url: process.env.AURORA_TESTNET_URL || '',
       chainId: 1313161555,
       accounts: JSON.parse(process.env.AURORA_TESTNET_ACCOUNTS || '[]')
+    },
+    polygon: {
+      url: process.env.POLYGON_URL || '',
+      chainId: 137,
+      accounts: JSON.parse(process.env.POLYGON_ACCOUNTS || '[]')
+    },
+    mumbai: {
+      url: process.env.MUMBAI_URL || '',
+      chainId: 80001,
+      accounts: JSON.parse(process.env.MUMBAI_ACCOUNTS || '[]')
     },
   },
   solidity: {
