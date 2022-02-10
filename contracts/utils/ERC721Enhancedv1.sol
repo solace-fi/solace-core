@@ -5,19 +5,17 @@ pragma solidity 0.8.6;
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
-import "@openzeppelin/contracts/utils/Strings.sol";
 import "./../interfaces/utils/IERC1271.sol";
-import "./../interfaces/utils/IERC721Enhanced.sol";
+import "./../interfaces/utils/IERC721Enhancedv1.sol";
 
 /**
  * @title ERC721Enhancedv1
  * @author solace.fi
  * @notice An extension of `ERC721`.
  *
- * The base is OpenZeppelin's `ERC721Enumerable` which also includes the `Metadata` extension. This extension includes simpler transfers, gasless approvals, and changeable URIs.
+ * The base is OpenZeppelin's `ERC721Enumerable` which also includes the `Metadata` extension. This extension includes simpler transfers, gasless approvals, and better enumeration.
  */
-abstract contract ERC721Enhanced is ERC721Enumerable, IERC721Enhanced, EIP712 {
-    using Strings for uint256;
+abstract contract ERC721Enhancedv1 is ERC721Enumerable, IERC721Enhancedv1, EIP712 {
 
     /// @dev The nonces used in the permit signature verification.
     /// tokenID => nonce
@@ -27,8 +25,6 @@ abstract contract ERC721Enhanced is ERC721Enumerable, IERC721Enhanced, EIP712 {
     // solhint-disable-next-line var-name-mixedcase
     bytes32 private immutable _PERMIT_TYPEHASH = 0x137406564cdcf9b40b1700502a9241e87476728da7ae3d0edfcf0541e5b49b3e;
 
-    string public baseURI;
-
     /**
      * @notice Constructs the `ERC721Enhancedv1` contract.
      * @param name_ The name of the token.
@@ -37,9 +33,8 @@ abstract contract ERC721Enhanced is ERC721Enumerable, IERC721Enhanced, EIP712 {
     constructor(
         string memory name_,
         string memory symbol_
-    ) ERC721(name_, symbol_) EIP712(name_, "1") {
-        baseURI = "";
-    }
+    // solhint-disable-next-line no-empty-blocks
+    ) ERC721(name_, symbol_) EIP712(name_, "1") { }
 
     /***************************************
     SIMPLER TRANSFERS
@@ -188,37 +183,6 @@ abstract contract ERC721Enhanced is ERC721Enumerable, IERC721Enhanced, EIP712 {
     }
 
     /***************************************
-    CHANGEABLE URIS
-    ***************************************/
-
-    /**
-     * @notice Returns the Uniform Resource Identifier (URI) for `tokenID` token.
-     */
-    function tokenURI(uint256 tokenID) public view virtual override tokenMustExist(tokenID) returns (string memory) {
-        string memory baseURI_ = baseURI;
-        return string(abi.encodePacked(baseURI_, tokenID.toString()));
-    }
-
-    /**
-     * @notice Base URI for computing `tokenURI`. If set, the resulting URI for each
-     * token will be the concatenation of the `baseURI` and the `tokenID`. Empty
-     * by default, can be overriden in child contracts.
-     */
-    function _baseURI() internal view virtual override returns (string memory baseURI_) {
-        return baseURI;
-    }
-
-    /**
-     * @notice Sets the base URI for computing `tokenURI`.
-     * @dev Remember to add access control to inheriting contracts.
-     * @param baseURI_ The new base URI.
-     */
-    function _setBaseURI(string memory baseURI_) internal {
-        baseURI = baseURI_;
-        emit BaseURISet(baseURI_);
-    }
-
-    /***************************************
     MODIFIERS
     ***************************************/
 
@@ -227,70 +191,4 @@ abstract contract ERC721Enhanced is ERC721Enumerable, IERC721Enhanced, EIP712 {
         require(_exists(tokenID), "query for nonexistent token");
         _;
     }
-
-    // Call will revert if not made by owner.
-    // Call will revert if the token does not exist.
-    modifier onlyOwner(uint256 tokenID) {
-        require(ownerOf(tokenID) == msg.sender, "only owner");
-        _;
-    }
-
-    // Call will revert if not made by owner or approved.
-    // Call will revert if the token does not exist.
-    modifier onlyOwnerOrApproved(uint256 tokenID) {
-        require(_isApprovedOrOwner(msg.sender, tokenID), "only owner or approved");
-        _;
-    }
-
-    /***************************************
-    MORE HOOKS
-    ***************************************/
-
-    /**
-     * @notice Mints `tokenID` and transfers it to `to`.
-     * @param to The receiver of the token.
-     * @param tokenID The ID of the token to mint.
-     */
-    function _mint(address to, uint256 tokenID) internal virtual override {
-        super._mint(to, tokenID);
-        _afterTokenTransfer(address(0), to, tokenID);
-    }
-
-    /**
-     * @notice Destroys `tokenID`.
-     * @param tokenID The ID of the token to burn.
-     */
-    function _burn(uint256 tokenID) internal virtual override {
-        address owner = ERC721.ownerOf(tokenID);
-        super._burn(tokenID);
-        _afterTokenTransfer(owner, address(0), tokenID);
-    }
-
-    /**
-     * @notice Transfers `tokenID` from `from` to `to`.
-     * @param from The account to transfer the token from.
-     * @param to The account to transfer the token to.
-     * @param tokenID The ID of the token to transfer.
-     */
-    function _transfer(
-        address from,
-        address to,
-        uint256 tokenID
-    ) internal virtual override {
-        super._transfer(from, to, tokenID);
-        _afterTokenTransfer(from, to, tokenID);
-    }
-
-    /**
-     * @notice Hook that is called after any token transfer. This includes minting and burning.
-     * @param from The user that sends the token, or zero if minting.
-     * @param to The zero that receives the token, or zero if burning.
-     * @param tokenID The ID of the token being transferred.
-     */
-    function _afterTokenTransfer(
-        address from,
-        address to,
-        uint256 tokenID
-    // solhint-disable-next-line no-empty-blocks
-    ) internal virtual {}
 }

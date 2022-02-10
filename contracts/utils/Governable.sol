@@ -63,7 +63,7 @@ contract Governable is IGovernable {
     ***************************************/
 
     /// @notice Address of the current governor.
-    function governance() external view override returns (address) {
+    function governance() public view override returns (address) {
         return _governance;
     }
 

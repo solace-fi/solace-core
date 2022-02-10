@@ -445,17 +445,15 @@ async function cloneTeller(sourceTeller: BondTellerErc20, name: string, principa
 }
 
 async function deployTestnetTokens() {
-  /*
   console.log(`Deploying WETH`);
   let weth = await deployContract(deployer, artifacts.WETH);
   console.log(`Deployed to ${weth.address}`);
-  */
   let tokens: any[] = [
-    //{name: "Dai Stablecoin", symbol: "DAI", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
-    //{name: "USD Coin", symbol: "USDC", supply: BN.from("1000000000"), decimals: 6, permit: true},
-    //{name: "Wrapped Bitcoin", symbol: "WBTC", supply: BN.from("1000000000"), decimals: 8, permit: false},
-    //{name: "USD Token", symbol: "USDT", supply: BN.from("1000000000"), decimals: 6, permit: false},
-    //{name: "Frax", symbol: "FRAX", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
+    {name: "Dai Stablecoin", symbol: "DAI", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
+    {name: "USD Coin", symbol: "USDC", supply: BN.from("1000000000"), decimals: 6, permit: true},
+    {name: "Wrapped Bitcoin", symbol: "WBTC", supply: BN.from("1000000000"), decimals: 8, permit: false},
+    {name: "USD Token", symbol: "USDT", supply: BN.from("1000000000"), decimals: 6, permit: false},
+    {name: "Frax", symbol: "FRAX", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
     {name: "NEAR", symbol: "NEAR", supply: ONE_ETHER.mul(1000000).mul(1000000), decimals: 24, permit: false},
     {name: "Aurora", symbol: "AURORA", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
   ];
@@ -484,17 +482,16 @@ async function mintTestnetTokens() {
   console.log(await weth.balanceOf(signerAddress));
   */
   let tokens: any[] = [
-    //{name: "Dai Stablecoin", symbol: "DAI", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false, address: DAI_ADDRESS},
-    //{name: "USD Coin", symbol: "USDC", supply: BN.from("1000000000"), decimals: 6, permit: true, address: USDC_ADDRESS},
-    //{name: "Wrapped Bitcoin", symbol: "WBTC", supply: BN.from("1000000000"), decimals: 8, permit: false, address: WBTC_ADDRESS},
-    //{name: "USD Token", symbol: "USDT", supply: BN.from("1000000000"), decimals: 6, permit: false, address: USDT_ADDRESS},
-    //{name: "Frax", symbol: "FRAX", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false, address: FRAX_ADDRESS},
-    {name: "NEAR", symbol: "NEAR", supply: ONE_ETHER.mul(1000000).mul(1000000), decimals: 24, permit: false, address: NEAR_ADDRESS},
-    {name: "Aurora", symbol: "AURORA", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false, address: AURORA_ADDRESS},
+    {name: "Dai Stablecoin", symbol: "DAI", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false, address: DAI_ADDRESS},
+    {name: "USD Coin", symbol: "USDC", supply: BN.from("1000000000"), decimals: 6, permit: true, address: USDC_ADDRESS},
+    {name: "Wrapped Bitcoin", symbol: "WBTC", supply: BN.from("1000000000"), decimals: 8, permit: false, address: WBTC_ADDRESS},
+    {name: "USD Token", symbol: "USDT", supply: BN.from("1000000000"), decimals: 6, permit: false, address: USDT_ADDRESS},
+    {name: "Frax", symbol: "FRAX", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false, address: FRAX_ADDRESS},
+    {name: "NEAR", symbol: "NEAR", supply: ONE_ETHER.mul(1000000).mul(1000000), decimals: 24, permit: false},
+    {name: "Aurora", symbol: "AURORA", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
   ];
-  //let recipients = [signerAddress];
-  //let recipients = ["0x1271e2acD0d209FA490692F5578239583Cde4073"];
-  let recipients = ["0x34Bb9e91dC8AC1E13fb42A0e23f7236999e063D4", "0x1271e2acD0d209FA490692F5578239583Cde4073", "0xfb5cAAe76af8D3CE730f3D62c6442744853d43Ef"];
+  /*
+  let recipients = [signerAddress];
   for(var j = 0; j < recipients.length; ++j) {
     let recipient = recipients[j];
     for(var i = 0; i < tokens.length; ++i) {
@@ -513,14 +510,13 @@ async function mintTestnetTokens() {
       console.log(`Checking balance of ${token.symbol}`);
       console.log(await tokenContract.balanceOf(recipient));
     }
-    /*
     console.log('Minting SOLACE');
     let tx3 = await solace.connect(deployer).mint(recipient, ONE_ETHER.mul(1000));
     await tx3.wait(10)
     console.log('Checking balance of SOLACE');
     console.log(await solace.balanceOf(recipient));
-    */
   }
+  */
 
   //let dai = (await ethers.getContractAt(artifacts.MockERC20.abi, DAI_ADDRESS)) as MockErc20;
   //let bal1 = await dai.balanceOf(signerAddress);

@@ -95,6 +95,7 @@ contract Registry is IRegistry, Governable {
         uint256 len = keys.length;
         require(len == values.length, "length mismatch");
         for(uint256 i = 0; i < len; i++) {
+            require(values[i] != address(0), "cannot set zero address");
             string memory key = keys[i];
             address value = values[i];
             RegistryEntry memory entry = _addresses[key];

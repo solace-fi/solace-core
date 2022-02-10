@@ -2,17 +2,16 @@
 // code borrowed from OpenZeppelin and @uniswap/v3-periphery
 pragma solidity 0.8.6;
 
-import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/IERC721EnumerableUpgradeable.sol";
-
+import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Enumerable.sol";
 
 /**
- * @title ERC721Enhanced
+ * @title ERC721Enhancedv1
  * @author solace.fi
  * @notice An extension of `ERC721`.
  *
  * The base is OpenZeppelin's `ERC721Enumerable` which also includes the `Metadata` extension. This extension includes simpler transfers, gasless approvals, and better enumeration.
  */
-interface IERC721EnhancedInitializable is IERC721EnumerableUpgradeable {
+interface IERC721Enhancedv1 is IERC721Enumerable {
 
     /***************************************
     SIMPLER TRANSFERS
@@ -81,15 +80,24 @@ interface IERC721EnhancedInitializable is IERC721EnumerableUpgradeable {
     function DOMAIN_SEPARATOR() external view returns (bytes32 seperator);
 
     /***************************************
-    CHANGEABLE URIS
+    BETTER ENUMERATION
     ***************************************/
 
-    /// @notice Emitted when the base URI is set.
-    event BaseURISet(string baseURI);
+    /**
+     * @notice Lists all tokens.
+     * Order not specified.
+     * @dev This function is more useful off chain than on chain.
+     * @return tokenIDs The list of token IDs.
+     */
+    function listTokens() external view returns (uint256[] memory tokenIDs);
 
-    /***************************************
-    MISC
-    ***************************************/
+    /**
+     * @notice Lists the tokens owned by `owner`.
+     * Order not specified.
+     * @dev This function is more useful off chain than on chain.
+     * @return tokenIDs The list of token IDs.
+     */
+    function listTokensOfOwner(address owner) external view returns (uint256[] memory tokenIDs);
 
     /**
      * @notice Determines if a token exists or not.
