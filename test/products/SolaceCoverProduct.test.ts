@@ -140,6 +140,7 @@ describe("SolaceCoverProduct", function() {
 
             // Grant infinite ERC20 allowance from active test wallets to Soteria
             await dai.connect(policyholder1).approve(solaceCoverProduct.address, constants.MaxUint256)
+            await dai.connect(policyholder2).approve(solaceCoverProduct.address, constants.MaxUint256)
             await dai.connect(governor).approve(solaceCoverProduct.address, constants.MaxUint256)
         })
     });
@@ -904,6 +905,25 @@ describe("SolaceCoverProduct", function() {
             await expect(solaceCoverProduct.connect(policyholder3).withdraw()).to.revertedWith("contract paused");
             await solaceCoverProduct.connect(governor).setPaused(false);
         });
+        it("when cooldown not started, will withdraw such that remaining balance = minRequiredAccountBalance", async () => {
+            const initialPolicyholder2DAIBalance = await dai.balanceOf(policyholder2.address)
+            const initialAccountBalanceOfPolicyHolder2 = await solaceCoverProduct.accountBalanceOf(policyholder2.address)
+            expect(await solaceCoverProduct.cooldownStart(policyholder2.address)).eq(0)
+
+            withdrawAmount = initialAccountBalanceOfPolicyHolder2.sub(minRequiredAccountBalance)
+            let tx = await solaceCoverProduct.connect(policyholder2).withdraw();          
+            await expect(tx).emit(solaceCoverProduct, "WithdrawMade").withArgs(policyholder2.address, withdrawAmount);
+
+            expect(initialAccountBalanceOfPolicyHolder2).gt(await solaceCoverProduct.accountBalanceOf(policyholder2.address))
+            expect(await solaceCoverProduct.accountBalanceOf(policyholder2.address)).eq(minRequiredAccountBalance)
+            expect(await dai.balanceOf(policyholder2.address)).eq(initialPolicyholder2DAIBalance.add(withdrawAmount))
+            expect(await dai.balanceOf(solaceCoverProduct.address)).eq(initialSoteriaDAIBalance.sub(withdrawAmount))
+
+            // reset state changes
+            await solaceCoverProduct.connect(policyholder2).deposit(policyholder2.address, withdrawAmount);  
+            expect(await dai.balanceOf(policyholder2.address)).eq(initialPolicyholder2DAIBalance)
+            expect(await solaceCoverProduct.accountBalanceOf(policyholder2.address)).eq(initialAccountBalanceOfPolicyHolder2)
+        })
         it("before cooldown complete, will withdraw such that remaining balance = minRequiredAccountBalance", async () => {
             // Ensure we are before cooldown completion
             const currentTimestamp = (await provider.getBlock('latest')).timestamp
@@ -1161,7 +1181,7 @@ describe("SolaceCoverProduct", function() {
             let initialContractDAIBalance = await dai.balanceOf(solaceCoverProduct.address)
             let initialPremiumPoolDAIBalance = await dai.balanceOf(premiumPool.address)
 
-            tx = await solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder1.address, policyholder2.address, policyholder3.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM])
+            tx = await solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder1.address, policyholder2.address, policyholder3.address, premiumPool.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM])
             expect(tx).to.emit(solaceCoverProduct, "PremiumCharged").withArgs(policyholder1.address, WEEKLY_MAX_PREMIUM);
             expect(tx).to.emit(solaceCoverProduct, "PremiumCharged").withArgs(policyholder2.address, WEEKLY_MAX_PREMIUM);
             expect(tx).to.emit(solaceCoverProduct, "PremiumPartiallyCharged").withArgs(policyholder3.address, WEEKLY_MAX_PREMIUM, initialHolder3AccountBalance.add(initialRewardPoints3));
@@ -1207,43 +1227,43 @@ describe("SolaceCoverProduct", function() {
             expect(await solaceCoverProduct.availableCoverCapacity()).eq(initialAvailableCoverCapacity.add(initialPolicy3CoverLimit))
         })
 
-        it("will charge for 100 users in one call", async() => {
-            // Create 100 test wallets
-            // 100 wallets -> 1.6M gas
-            // 1000 wallets -> 16M gas
-            let numberWallets = 100 // Change this number to whatever number of wallets you want to test for
-            let users:(Wallet)[] = [];
-            for (let i = 0; i < numberWallets; i++) {
-                users.push(provider.createEmptyWallet())
-            }
+        // it("will charge for 100 users in one call", async() => {
+        //     // Create 100 test wallets
+        //     // 100 wallets -> 1.6M gas
+        //     // 1000 wallets -> 16M gas
+        //     let numberWallets = 100 // Change this number to whatever number of wallets you want to test for
+        //     let users:(Wallet)[] = [];
+        //     for (let i = 0; i < numberWallets; i++) {
+        //         users.push(provider.createEmptyWallet())
+        //     }
 
-            let coverLimit = BN.from(100);
-            let depositAmount = BN.from(10);
-            let WEEKLY_MAX_PREMIUM = coverLimit.div(10).mul(604800).div(31536000) // Override global WEEKLY_MAX_PREMIUM variable
+        //     let coverLimit = BN.from(100);
+        //     let depositAmount = BN.from(10);
+        //     let WEEKLY_MAX_PREMIUM = coverLimit.div(10).mul(604800).div(31536000) // Override global WEEKLY_MAX_PREMIUM variable
 
-            // Activate policies for each user, 100 DAI cover limit with 10 DAI deposit
-            for (let user of users) {
-                await solaceCoverProduct.connect(governor).activatePolicy(user.address, coverLimit, depositAmount, [])
-            }
-            // Gift 0 reward points to one-third of users, half-weekly premium to one-third, and full weekly premium to remaining third
-            for (let user of users) {
-                if ( Math.floor(Math.random() * 3) == 0 ) {
-                    await solaceCoverProduct.connect(coverPromotionAdmin).setRewardPoints(user.address, WEEKLY_MAX_PREMIUM.div(2))
-                } else if ( Math.floor(Math.random() * 3) == 1 ) {
-                    await solaceCoverProduct.connect(coverPromotionAdmin).setRewardPoints(user.address, WEEKLY_MAX_PREMIUM)
-                }
-            }
-            // Create arrays for chargePremium parameter
-            let PREMIUM_ARRAY:BN[] = []
-            let ADDRESS_ARRAY:string[] = []
-            for (let user of users) {
-                ADDRESS_ARRAY.push(user.address)
-                PREMIUM_ARRAY.push(WEEKLY_MAX_PREMIUM)
-            }
+        //     // Activate policies for each user, 100 DAI cover limit with 10 DAI deposit
+        //     for (let user of users) {
+        //         await solaceCoverProduct.connect(governor).activatePolicy(user.address, coverLimit, depositAmount, [])
+        //     }
+        //     // Gift 0 reward points to one-third of users, half-weekly premium to one-third, and full weekly premium to remaining third
+        //     for (let user of users) {
+        //         if ( Math.floor(Math.random() * 3) == 0 ) {
+        //             await solaceCoverProduct.connect(coverPromotionAdmin).setRewardPoints(user.address, WEEKLY_MAX_PREMIUM.div(2))
+        //         } else if ( Math.floor(Math.random() * 3) == 1 ) {
+        //             await solaceCoverProduct.connect(coverPromotionAdmin).setRewardPoints(user.address, WEEKLY_MAX_PREMIUM)
+        //         }
+        //     }
+        //     // Create arrays for chargePremium parameter
+        //     let PREMIUM_ARRAY:BN[] = []
+        //     let ADDRESS_ARRAY:string[] = []
+        //     for (let user of users) {
+        //         ADDRESS_ARRAY.push(user.address)
+        //         PREMIUM_ARRAY.push(WEEKLY_MAX_PREMIUM)
+        //     }
 
-            // Charge premiums
-            await solaceCoverProduct.connect(premiumCollector).chargePremiums(ADDRESS_ARRAY, PREMIUM_ARRAY);
-        })
+        //     // Charge premiums
+        //     await solaceCoverProduct.connect(premiumCollector).chargePremiums(ADDRESS_ARRAY, PREMIUM_ARRAY);
+        // })
 
     });
 
