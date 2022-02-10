@@ -165,7 +165,7 @@ contract SolaceCoverProduct is
         _chargeCycle = 604800; // One-week charge cycle
         _cooldownPeriod = 604800; // One-week cooldown period
         _referralReward = 50e18; // 50 DAI
-        _isReferralOn = true; // Referral rewards activate
+        _isReferralOn = true; // Referral rewards active
         baseURI = string(abi.encodePacked("https://stats.solace.fi/policy/?chainID=", Strings.toString(block.chainid), "&policyID="));
     }
 
