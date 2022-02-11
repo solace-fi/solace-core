@@ -13,6 +13,8 @@ import { logContractAddress } from "./utils";
 import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_importer";
 import { Deployer, Solace, Faucet, XsLocker, XSolace, StakingRewards, BridgeWrapper } from "../typechain";
 import { expectDeployed, isDeployed } from "../test/utilities/expectDeployed";
+import { constants, Contract } from "ethers";
+import { deployContract } from "ethereum-waffle";
 
 const SINGLETON_FACTORY_ADDRESS     = "0x941F6f17Eade71E88D926FD9ca020dB535bDe573";
 const DEPLOYER_CONTRACT_ADDRESS     = "0x501acE4b4F9085348F60b61Fe3C95937a34565E7";
@@ -136,21 +138,20 @@ async function deployStakingRewards() {
     stakingRewards = (await ethers.getContractAt(artifacts.StakingRewards.abi, res.address)) as StakingRewards;
     await expectDeployed(stakingRewards.address);
     console.log(`Deployed StakingRewards to ${stakingRewards.address}`);
+
+    console.log("staking rewards - registering in xslocker");
+    let tx1 = await xslocker.connect(deployer).addXsLockListener(stakingRewards.address);
+    await tx1.wait();
+    console.log("staking rewards - set rewards");
+    let tx2 = await stakingRewards.connect(deployer).setRewards(solacePerSecond);
+    await tx2.wait();
+    console.log("staking rewards - set times");
+    let tx3 = await stakingRewards.connect(deployer).setTimes(startTime, endTime);
+    await tx3.wait();
+    console.log("staking rewards - minting solace");
+    let tx4 = await solace.connect(deployer).mint(stakingRewards.address, solacePerYear);
+    await tx4.wait();
   }
-  /*
-  console.log("staking rewards - registering in xslocker");
-  let tx1 = await xslocker.connect(deployer).addXsLockListener(stakingRewards.address);
-  await tx1.wait();
-  console.log("staking rewards - set rewards");
-  let tx2 = await stakingRewards.connect(deployer).setRewards(solacePerSecond);
-  await tx2.wait();
-  console.log("staking rewards - set times");
-  let tx3 = await stakingRewards.connect(deployer).setTimes(startTime, endTime);
-  await tx3.wait();
-  console.log("staking rewards - minting solace");
-  let tx4 = await solace.connect(deployer).mint(stakingRewards.address, solacePerYear);
-  await tx4.wait();
-  */
 }
 
 async function deployXSOLACE() {

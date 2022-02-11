@@ -1,5 +1,6 @@
 import hardhat from "hardhat";
 const { ethers } = hardhat;
+import { BigNumber as BN } from "ethers";
 
 const DAI_BOND_TELLER_ADDRESS       = "0x501ACe677634Fd09A876E88126076933b686967a";
 
@@ -16,12 +17,17 @@ let found: any[] = [
   // SCP
   {"salt":"0x000000000000000000000000000000000000000000000000000000000244cea9","address":"0x501ACe00FD8e5dB7C3be5e6D254ba4995e1B45b7"},
   // FRAX
-  {"salt":"0x0000000000000000000000000000000000000000000000000000000002e3569f","address":"0x501aCef4F8397413C33B13cB39670aD2f17BfE62"}
+  {"salt":"0x0000000000000000000000000000000000000000000000000000000002e3569f","address":"0x501aCef4F8397413C33B13cB39670aD2f17BfE62"},
+  // WETH (used on chains where eth is not native token)
+  {"salt":"0x0000000000000000000000000000000000000000000000000000000003ba0308","address":"0x501Ace367f1865DEa154236D5A8016B80a49e8a9"},
+  // NEAR
+  {"salt":"0x0000000000000000000000000000000000000000000000000000000004843332","address":"0x501aCe71a83CBE03B1467a6ffEaeB58645d844b4"},
+  // AURORA
+  {"salt":"0x0000000000000000000000000000000000000000000000000000000005201ba9","address":"0x501Ace35f0B7Fad91C199824B8Fe555ee9037AA3"}
 ]
 
-let numToFind = 5;
-let lastSalt = 48453279;
-let nextSalt = 0;
+let numToFind = 8;
+let nextSalt = 62522121;
 let maxSalt = 72057594037927936;
 
 async function main () {
@@ -34,6 +40,10 @@ async function main () {
   let initCode = `0x3d602d80600a3d3981f3363d3d373d3d3d363d73${DAI_BOND_TELLER_ADDRESS.substring(2)}5af43d82803e903d91602b57fd5bf3`;
   // hash the initCode
   var initCodeHash = keccak256(initCode);
+  // no redundant salts
+  for(var i = 0; i < found.length; ++i) {
+    nextSalt = Math.max(nextSalt, BN.from(found[i].salt).toNumber()+1);
+  }
   // loop over possible salts
   for (var i = nextSalt; i < maxSalt; i++) {
     var saltToBytes = '0x'+i.toString(16).padStart(64, '0');

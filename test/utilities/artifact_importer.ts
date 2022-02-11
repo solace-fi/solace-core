@@ -32,6 +32,7 @@ export async function import_artifacts() {
   artifacts.MockProductV2 = await tryImport(`${artifact_dir}/mocks/MockProductV2.sol/MockProductV2.json`);
   // investing v2
   artifacts.WETH10 = await tryImport(`${artifact_dir}/WETH10.sol/WETH10.json`);
+  artifacts.WMATIC = await tryImport(`${artifact_dir}/WMATIC.sol/WMATIC.json`);
   artifacts.SOLACE = await tryImport(`${artifact_dir}/SOLACE.sol/SOLACE.json`);
   // staking
   artifacts.xSOLACEV1 = await tryImport(`${artifact_dir}/staking/xSOLACEV1.sol/xSOLACEV1.json`);
@@ -45,6 +46,7 @@ export async function import_artifacts() {
   // bonds
   artifacts.BondDepository = await tryImport(`${artifact_dir}/bonds/BondDepository.sol/BondDepository.json`);
   artifacts.BondTellerETH = await tryImport(`${artifact_dir}/bonds/BondTellerEth.sol/BondTellerEth.json`);
+  artifacts.BondTellerMATIC = await tryImport(`${artifact_dir}/bonds/BondTellerMatic.sol/BondTellerMatic.json`);
   artifacts.BondTellerERC20 = await tryImport(`${artifact_dir}/bonds/BondTellerErc20.sol/BondTellerErc20.json`);
   artifacts.Faucet = await tryImport(`${artifact_dir}/Faucet.sol/Faucet.json`);
   // utils

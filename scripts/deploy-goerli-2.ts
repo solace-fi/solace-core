@@ -265,15 +265,15 @@ async function deployWbtcTeller() {
   const VESTING_TERM = 600; // 10 minutes
   const HALF_LIFE = 2592000; // 30 days
 
-  const ONE_HUNDRETH_CENT_IN_WBTC = BN.from("2500"); // @ BTC ~= 40K
-  const ONE_THOUSANDTH_CENT_IN_WBTC = BN.from("250");
+  const ONE_DOLLAR_IN_WBTC = BN.from("2697"); // @ BTC = $37077
+  const TEN_CENTS_IN_WBTC = BN.from("269");
 
-  const START_PRICE = ONE_HUNDRETH_CENT_IN_WBTC.mul(800); // 8 cents
+  const START_PRICE = ONE_DOLLAR_IN_WBTC.mul(8).div(100); // 8 cents
   const MAX_PAYOUT = BN.from("10000000000000000000000000") // 10 million SOLACE max single bond
   const CAPACITY = BN.from("100000000000000000000000000"); // 100 million SOLACE max over lifetime
   // every 50,000 SOLACE bonded raises the price one tenth of a cent
-  const PRICE_ADJ_NUM = ONE_THOUSANDTH_CENT_IN_WBTC;
-  const PRICE_ADJ_DENOM = BN.from("5000000000000000000000000"); // 5,000,000 SOLACE
+  const PRICE_ADJ_NUM = ONE_DOLLAR_IN_WBTC.div(10); // ten cents in DAI
+  const PRICE_ADJ_DENOM = BN.from("5000000000000000000000000"); //  5000,000 SOLACE
   if(PRICE_ADJ_NUM.gt(MAX_UINT128) || PRICE_ADJ_DENOM.gt(MAX_UINT128)) throw `Uint128 too large: ${PRICE_ADJ_NUM.toString()} | ${PRICE_ADJ_DENOM.toString()} > ${MAX_UINT128.toString()}`;
 
   if(await isDeployed(WBTC_BOND_TELLER_ADDRESS)) {
@@ -294,6 +294,9 @@ async function deployWbtcTeller() {
     await tx4.wait();
     console.log('WBTC Teller - done');
   }
+  console.log('WBTC Teller - set terms');
+  let tx2 = await wbtcTeller.connect(deployer).setTerms({startPrice: START_PRICE, minimumPrice: START_PRICE, maxPayout: MAX_PAYOUT, priceAdjNum: PRICE_ADJ_NUM, priceAdjDenom: PRICE_ADJ_DENOM, capacity: CAPACITY, capacityIsPayout: true, startTime: BOND_START_TIME, endTime: MAX_UINT40, globalVestingTerm: VESTING_TERM, halfLife: HALF_LIFE}, {gasLimit: 300000});
+  await tx2.wait();
 }
 
 async function deployUsdtTeller() {
@@ -371,6 +374,7 @@ async function deployFraxTeller() {
 
 async function cloneTeller(sourceTeller: BondTellerErc20, name: string, principal: string, isPermittable: boolean, salt: BytesLike) {
   let addr = await sourceTeller.calculateMinimalProxyDeploymentAddress(salt);
+  console.log(`cloning ${sourceTeller.address} to ${addr}`);
   await sourceTeller.clone(name, signerAddress, principal, isPermittable, salt, {gasLimit: 500000});
   let newTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, addr)) as BondTellerErc20;
   return newTeller;
