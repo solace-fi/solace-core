@@ -193,7 +193,8 @@ contract SolaceCoverProduct is
         policyID = policyOf(policyholder_);
         require(!policyStatus(policyID), "policy already activated");
         require(_canPurchaseNewCover(0, coverLimit_), "insufficient capacity for new cover");
-        require(IERC20(_getAsset()).balanceOf(msg.sender) >= amount_ && amount_ + accountBalanceOf(policyholder_) > _minRequiredAccountBalance(coverLimit_), "insufficient deposit for minimum required account balance");
+        require(IERC20(_getAsset()).balanceOf(msg.sender) >= amount_, "insufficient caller balance for deposit");
+        require(amount_ + accountBalanceOf(policyholder_) > _minRequiredAccountBalance(coverLimit_), "insufficient deposit for minimum required account balance");
 
         // Exit cooldown
         _exitCooldown(policyholder_);
@@ -271,6 +272,7 @@ contract SolaceCoverProduct is
      * @notice If cooldown has not started, or has not passed, the user will not be able to withdraw their entire account. A minimum required account balance (one epoch's fee) will be left in the user's account.
      */
     function withdraw() external override nonReentrant whileUnpaused {
+        require(_accountBalanceOf[msg.sender] > 0, "no account balance to withdraw");
         if ( _hasCooldownPassed(msg.sender) ) {
           _withdraw(msg.sender, _accountBalanceOf[msg.sender]);
           _preDeactivateCoverLimitOf[_policyOf[msg.sender]] = 0;
@@ -669,7 +671,7 @@ contract SolaceCoverProduct is
         }
   
         // single DAI transfer to the premium pool
-        SafeERC20.safeTransferFrom(_getAsset(), address(this), _registry.get("premiumPool"), amountToPayPremiumPool);
+        SafeERC20.safeTransfer(_getAsset(), _registry.get("premiumPool"), amountToPayPremiumPool);
     }
 
     /***************************************
@@ -686,6 +688,7 @@ contract SolaceCoverProduct is
         uint256 existingTotalCover_,
         uint256 newTotalCover_
     ) internal view returns (bool acceptable) {
+        if (newTotalCover_ <= existingTotalCover_) return true; // Return if user is lowering cover limit
         uint256 changeInTotalCover = newTotalCover_ - existingTotalCover_; // This will revert if newTotalCover_ < existingTotalCover_
         if (changeInTotalCover < availableCoverCapacity()) return true;
         else return false;
@@ -716,7 +719,7 @@ contract SolaceCoverProduct is
         address policyholder, 
         uint256 amount
     ) internal whileUnpaused {
-        SafeERC20.safeTransferFrom(_getAsset(), address(this), policyholder, amount);
+        SafeERC20.safeTransfer(_getAsset(), policyholder, amount);
         _accountBalanceOf[policyholder] -= amount;
         emit WithdrawMade(policyholder, amount);
     }

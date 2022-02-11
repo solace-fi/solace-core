@@ -478,6 +478,11 @@ describe("SolaceCoverProduct", function() {
             await expect(solaceCoverProduct.connect(policyholder1).activatePolicy(policyholder1.address, maxCover.add(1), INITIAL_DEPOSIT, [])).to.revertedWith("insufficient capacity for new cover");
         });
 
+        it("cannot buy policy when insufficient user balance for deposit", async () => {
+            const userBalance = await dai.balanceOf(policyholder1.address)
+            await expect(solaceCoverProduct.connect(policyholder1).activatePolicy(policyholder1.address, ONE_ETH, userBalance.mul(2), [])).to.revertedWith("insufficient caller balance for deposit");
+        })
+
         it("cannot buy policy when insufficient deposit provided", async () => {
             await expect(solaceCoverProduct.connect(policyholder1).activatePolicy(policyholder1.address, ONE_ETH, 0, [])).to.revertedWith("insufficient deposit for minimum required account balance");
         });
@@ -724,6 +729,16 @@ describe("SolaceCoverProduct", function() {
             expect(await solaceCoverProduct.connect(policyholder1).coverLimitOf(POLICY_ID_1)).to.equal(NEW_COVER_LIMIT);
         });
 
+        it("policy owner can reduce cover limit", async () => {
+            let tx = await solaceCoverProduct.connect(policyholder1).updateCoverLimit(NEW_COVER_LIMIT.div(2), []);
+            await expect(tx).emit(solaceCoverProduct, "PolicyUpdated").withArgs(POLICY_ID_1);
+            expect(await solaceCoverProduct.connect(policyholder1).coverLimitOf(POLICY_ID_1)).to.equal(NEW_COVER_LIMIT.div(2));
+
+            // revert state changes
+            await solaceCoverProduct.connect(policyholder1).updateCoverLimit(NEW_COVER_LIMIT, []);
+            expect(await solaceCoverProduct.connect(policyholder1).coverLimitOf(POLICY_ID_1)).to.equal(NEW_COVER_LIMIT);
+        })
+
         it("should update risk manager active cover limit", async () => {
             let amount1 = initialRMActiveCoverLimit.add(NEW_COVER_LIMIT).sub(initialPolicyCoverLimit);
             let amount2 = initialRMActiveCoverLimitForSoteria.add(NEW_COVER_LIMIT).sub(initialPolicyCoverLimit);
@@ -905,6 +920,12 @@ describe("SolaceCoverProduct", function() {
             await expect(solaceCoverProduct.connect(policyholder3).withdraw()).to.revertedWith("contract paused");
             await solaceCoverProduct.connect(governor).setPaused(false);
         });
+
+        it("cannot withdraw with no account balance", async () => {
+            expect(await solaceCoverProduct.accountBalanceOf(governor.address)).eq(0)
+            await expect(solaceCoverProduct.connect(governor).withdraw()).to.revertedWith("no account balance to withdraw");
+        })
+
         it("when cooldown not started, will withdraw such that remaining balance = minRequiredAccountBalance", async () => {
             const initialPolicyholder2DAIBalance = await dai.balanceOf(policyholder2.address)
             const initialAccountBalanceOfPolicyHolder2 = await solaceCoverProduct.accountBalanceOf(policyholder2.address)
