@@ -12,10 +12,11 @@ import { logContractAddress } from "./utils";
 
 import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_importer";
 import { Deployer, CoverageDataProvider, Registry, RiskManager, SolaceCoverProduct } from "../typechain";
+import { isDeployed } from "../test/utilities/expectDeployed";
 
 const DEPLOYER_CONTRACT_ADDRESS    = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
 
-const DAI_ADDRESS                  = "0x5592ec0cfb4dbc12d3ab100b257153436a1f0fea"; // testnet
+const DAI_ADDRESS                  = "0x8ad3aA5d5ff084307d28C8f514D7a193B2Bfe725"; // testnet DAI with approve, mint functions exposed on Etherscan
 
 // wallet addresses
 let   COVERAGE_DATA_PROVIDER_UPDATER_ADDRESS  = "0xc5683ea4888DadfdE421a1E593DfbD36290D63AB"; // the bot address to update underwriting pool values
@@ -24,10 +25,10 @@ let   COVER_PROMOTION_ADMIN_ADDRESS           = "0x4770becA2628685F7C45102c7a649
 const PREMIUM_COLLECTOR_ADDRESS               = "0xF321be3577B1AcB436869493862bA18bDde6fc39"; // the bot address that will be set in registry
 
 // contract addresses
-const REGISTRY_V2_ADDRESS               = "";
-const RISK_MANAGER_V2_ADDRESS           = "";
-const COVERAGE_DATA_PROVIDER_ADDRESS    = "";
-const SOLACE_COVER_PRODUCT_ADDRESS      = "";
+const REGISTRY_V2_ADDRESS               = "0x501ACe0f576fc4ef9C0380AA46A578eA96b85776";
+const RISK_MANAGER_V2_ADDRESS           = "0x501AcEf9020632a71CB25CFa9F554252eB51732b";
+const COVERAGE_DATA_PROVIDER_ADDRESS    = "0x501ACE6C5fFf4d42EaC02357B6DD9b756E337355";
+const SOLACE_COVER_PRODUCT_ADDRESS      = "0x501aceFe2DfB6496c421512Ed0e5bE42eE0dFA2a";
 
 const DOMAIN_NAME = "Solace.fi-SolaceCoverProduct";
 const VERSION = "1";
@@ -46,12 +47,12 @@ async function main() {
   signerAddress = await deployer.getAddress();
   console.log(`Using ${signerAddress} as deployer and governor`);
 
-  if (!!COVERAGE_DATA_PROVIDER_ADDRESS) {
+  if (await isDeployed(COVERAGE_DATA_PROVIDER_ADDRESS)) {
     console.log(`Using ${signerAddress} as COVERAGE_DATA_PROVIDER_UPDATER_ADDRESS`);
     COVERAGE_DATA_PROVIDER_UPDATER_ADDRESS = signerAddress;
   }
 
-  if (!!COVER_PROMOTION_ADMIN_ADDRESS) {
+  if (await isDeployed(COVER_PROMOTION_ADMIN_ADDRESS)) {
     console.log(`Using ${signerAddress} as COVER_PROMOTION_ADMIN_ADDRESS`);
     COVER_PROMOTION_ADMIN_ADDRESS = signerAddress;
   }
@@ -77,7 +78,7 @@ async function main() {
 }
 
 async function deployRegistry() {
-  if(!!REGISTRY_V2_ADDRESS) {
+  if(await isDeployed(REGISTRY_V2_ADDRESS)) {
     registryV2 = (await ethers.getContractAt(artifacts.Registry.abi, REGISTRY_V2_ADDRESS)) as Registry;
   } else {
     console.log("Deploying Registry(V2)");
@@ -98,7 +99,7 @@ async function deployRegistry() {
 }
 
 async function deployCoverageDataProvider() {
-  if (!!COVERAGE_DATA_PROVIDER_ADDRESS) {
+  if (await isDeployed(COVERAGE_DATA_PROVIDER_ADDRESS)) {
     coverageDataProvider = (await ethers.getContractAt(artifacts.CoverageDataProvider.abi, COVERAGE_DATA_PROVIDER_ADDRESS)) as CoverageDataProvider;
   } else {
     console.log("Deploying Coverage Data Provider");
@@ -127,7 +128,7 @@ async function deployCoverageDataProvider() {
 }
 
 async function deployRiskManager() {
-  if (!!RISK_MANAGER_V2_ADDRESS) {
+  if (await isDeployed(RISK_MANAGER_V2_ADDRESS)) {
     riskManagerV2 = (await ethers.getContractAt(artifacts.RiskManager.abi, RISK_MANAGER_V2_ADDRESS)) as RiskManager;
   } else {
     console.log("Deploying Risk Manager(V2)");
@@ -144,7 +145,7 @@ async function deployRiskManager() {
 }
 
 async function deploySolaceCoverProduct() {
-  if (!!SOLACE_COVER_PRODUCT_ADDRESS) {
+  if (await isDeployed(SOLACE_COVER_PRODUCT_ADDRESS)) {
     solaceCoverProduct = (await ethers.getContractAt(artifacts.SolaceCoverProduct.abi, SOLACE_COVER_PRODUCT_ADDRESS)) as SolaceCoverProduct;
   } else {
     console.log("Deploying Solace Cover Product");

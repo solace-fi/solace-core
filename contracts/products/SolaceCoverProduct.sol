@@ -51,11 +51,11 @@ contract SolaceCoverProduct is
     /// @notice Cannot buy new policies while paused. (Default is False)
     bool internal _paused;
 
-    /**
-     * @notice Referral typehash.
-     */
-    // solhint-disable-next-line var-name-mixedcase
+    /// @notice Referral typehash.
+    /// solhint-disable-next-line var-name-mixedcase
     bytes32 private constant _REFERRAL_TYPEHASH = keccak256("SolaceReferral(uint256 version)");
+
+    string public baseURI;
 
     /***************************************
     BOOK-KEEPING VARIABLES
@@ -165,7 +165,8 @@ contract SolaceCoverProduct is
         _chargeCycle = 604800; // One-week charge cycle
         _cooldownPeriod = 604800; // One-week cooldown period
         _referralReward = 50e18; // 50 DAI
-        _isReferralOn = true; // Referral rewards activate
+        _isReferralOn = true; // Referral rewards active
+        baseURI = string(abi.encodePacked("https://stats.solace.fi/policy/?chainID=", Strings.toString(block.chainid), "&policyID="));
     }
 
     /***************************************
@@ -192,7 +193,8 @@ contract SolaceCoverProduct is
         policyID = policyOf(policyholder_);
         require(!policyStatus(policyID), "policy already activated");
         require(_canPurchaseNewCover(0, coverLimit_), "insufficient capacity for new cover");
-        require(IERC20(_getAsset()).balanceOf(msg.sender) >= amount_ && amount_ + accountBalanceOf(policyholder_) > _minRequiredAccountBalance(coverLimit_), "insufficient deposit for minimum required account balance");
+        require(IERC20(_getAsset()).balanceOf(msg.sender) >= amount_, "insufficient caller balance for deposit");
+        require(amount_ + accountBalanceOf(policyholder_) > _minRequiredAccountBalance(coverLimit_), "insufficient deposit for minimum required account balance");
 
         // Exit cooldown
         _exitCooldown(policyholder_);
@@ -258,6 +260,7 @@ contract SolaceCoverProduct is
         address policyholder,
         uint256 amount
     ) external override nonReentrant whileUnpaused {
+        require(policyholder != address(0x0), "zero address policyholder");
         _deposit(msg.sender, policyholder, amount);
     }
 
@@ -269,6 +272,7 @@ contract SolaceCoverProduct is
      * @notice If cooldown has not started, or has not passed, the user will not be able to withdraw their entire account. A minimum required account balance (one epoch's fee) will be left in the user's account.
      */
     function withdraw() external override nonReentrant whileUnpaused {
+        require(_accountBalanceOf[msg.sender] > 0, "no account balance to withdraw");
         if ( _hasCooldownPassed(msg.sender) ) {
           _withdraw(msg.sender, _accountBalanceOf[msg.sender]);
           _preDeactivateCoverLimitOf[_policyOf[msg.sender]] = 0;
@@ -458,11 +462,48 @@ contract SolaceCoverProduct is
      * @notice True if a policyholder has previously used a valid referral code, false if not
      * 
      * A policyholder can only use a referral code once. A policyholder is then ineligible to receive further rewards from additional referral codes.
-     * @return isReferralCodeUsed_ True if the policyholder has previoulsy used a valid referral code, false if not
+     * @return isReferralCodeUsed_ True if the policyholder has previously used a valid referral code, false if not
      */
     function isReferralCodeUsed(address policyholder) external view override returns (bool isReferralCodeUsed_) {
         return _isReferralCodeUsed[_policyOf[policyholder]];
     } 
+
+    /**
+     * @notice Returns true if valid referral code, false otherwise.
+     * @param referralCode The referral code.
+     */
+    function isReferralCodeValid(bytes calldata referralCode) external view override returns (bool) {
+        (address referrer,) = ECDSA.tryRecover(_getEIP712Hash(), referralCode);
+        if(referrer == address(0)) return false;
+        return true;
+    }
+
+    /**
+     * @notice Get referrer from referral code, returns 0 address if invalid referral code.
+     * @param referralCode The referral code.
+     * @return referrer The referrer address, returns 0 address if invalid referral code.
+     */
+    function getReferrerFromReferralCode(bytes calldata referralCode) external view override returns (address referrer) {
+        (referrer,) = ECDSA.tryRecover(_getEIP712Hash(), referralCode);
+    }
+
+    /**
+     * @notice Calculate minimum required account balance for a given cover limit. Equals the maximum chargeable fee for one epoch.
+     * @param coverLimit Cover limit.
+     */
+    function minRequiredAccountBalance(uint256 coverLimit) external view override returns (uint256 minRequiredAccountBalance_) {
+        return _minRequiredAccountBalance(coverLimit);
+    }
+
+    /**
+     * @notice Returns the Uniform Resource Identifier (URI) for `policyID`.
+     * @param policyID The policy ID.
+     */
+    function tokenURI(uint256 policyID) public view virtual override returns (string memory tokenURI_) {
+        require(_exists(policyID), "invalid policy");
+        string memory baseURI_ = baseURI;
+        return string(abi.encodePacked( baseURI_, Strings.toString(policyID) ));
+    }
 
     /***************************************
     GOVERNANCE FUNCTIONS
@@ -553,6 +594,15 @@ contract SolaceCoverProduct is
         emit IsReferralOnSet(isReferralOn_);
     }
 
+    /**
+     * @notice Sets the base URI for computing `tokenURI`.
+     * @param baseURI_ The new base URI.
+     */
+    function setBaseURI(string memory baseURI_) external override onlyGovernance {
+        baseURI = baseURI_;
+        emit BaseURISet(baseURI_);
+    }
+
     /***************************************
     COVER PROMOTION ADMIN FUNCTIONS
     ***************************************/
@@ -630,7 +680,7 @@ contract SolaceCoverProduct is
         }
   
         // single DAI transfer to the premium pool
-        SafeERC20.safeTransferFrom(_getAsset(), address(this), _registry.get("premiumPool"), amountToPayPremiumPool);
+        SafeERC20.safeTransfer(_getAsset(), _registry.get("premiumPool"), amountToPayPremiumPool);
     }
 
     /***************************************
@@ -647,6 +697,7 @@ contract SolaceCoverProduct is
         uint256 existingTotalCover_,
         uint256 newTotalCover_
     ) internal view returns (bool acceptable) {
+        if (newTotalCover_ <= existingTotalCover_) return true; // Return if user is lowering cover limit
         uint256 changeInTotalCover = newTotalCover_ - existingTotalCover_; // This will revert if newTotalCover_ < existingTotalCover_
         if (changeInTotalCover < availableCoverCapacity()) return true;
         else return false;
@@ -677,7 +728,7 @@ contract SolaceCoverProduct is
         address policyholder, 
         uint256 amount
     ) internal whileUnpaused {
-        SafeERC20.safeTransferFrom(_getAsset(), address(this), policyholder, amount);
+        SafeERC20.safeTransfer(_getAsset(), policyholder, amount);
         _accountBalanceOf[policyholder] -= amount;
         emit WithdrawMade(policyholder, amount);
     }

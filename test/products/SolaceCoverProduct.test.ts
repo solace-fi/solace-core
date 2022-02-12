@@ -64,6 +64,9 @@ describe("SolaceCoverProduct", function() {
     const maxRateDenom = BN.from("315360000"); // We are testing with maxRateNum and maxRateDenom that gives us an annual max rate of 10% coverLimit
     const REFERRAL_REWARD = ONE_ETH.mul(50) // 50 DAI
 
+    // Random 130 character hex string
+    const FAKE_REFERRAL_CODE = "0xe4e7cba021ff6b83b14d54016198f31b04cba044d71d9a8b9bdf964aa2259cc3b207237f814aa56e516638b448edc43a6c3f4637dca5de54cb199e37b039a832e7"
+
     const DAI_ADDRESS = "0x6B175474E89094C44Da98b954EedeAC495271d0F"
     const USDC_ADDRESS = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
     const WETH_ADDRESS = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
@@ -137,6 +140,7 @@ describe("SolaceCoverProduct", function() {
 
             // Grant infinite ERC20 allowance from active test wallets to Soteria
             await dai.connect(policyholder1).approve(solaceCoverProduct.address, constants.MaxUint256)
+            await dai.connect(policyholder2).approve(solaceCoverProduct.address, constants.MaxUint256)
             await dai.connect(governor).approve(solaceCoverProduct.address, constants.MaxUint256)
         })
     });
@@ -388,6 +392,41 @@ describe("SolaceCoverProduct", function() {
         })
     })
 
+    describe ("setBaseURI", () => {
+        it("should default as expected string", async () => {
+            expect(await solaceCoverProduct.baseURI()).eq("https://stats.solace.fi/policy/?chainID=31337&policyID=")
+        })
+        it("cannot be set by non governance", async () => {
+            await expect(solaceCoverProduct.connect(policyholder1).setBaseURI("https://solace")).to.revertedWith("!governance");
+        })
+        it("can be set", async () => {
+            let tx = await solaceCoverProduct.connect(governor).setBaseURI("https://solace")
+            expect(tx).emit(solaceCoverProduct, "BaseURISet").withArgs("https://solace")
+            expect(await solaceCoverProduct.baseURI()).eq("https://solace")
+        })
+    })
+
+    describe ("isReferralCodeValid", () => {
+        it("should return false for invalid referral code", async () => {
+            expect(await solaceCoverProduct.isReferralCodeValid("0x01")).eq(false)
+            expect(await solaceCoverProduct.isReferralCodeValid(FAKE_REFERRAL_CODE)).eq(false)
+        })
+        it("should return true for valid referral code", async () => {
+            let referralCode = await getSolaceReferralCode(policyholder1, solaceCoverProduct)
+            expect(await solaceCoverProduct.isReferralCodeValid(referralCode)).eq(true)
+        })
+    })
+
+    describe ("getReferrerFromReferralCode", () => {
+        it("should return 0 for invalid referral code", async () => {
+            expect(await solaceCoverProduct.getReferrerFromReferralCode(FAKE_REFERRAL_CODE)).eq(ZERO_ADDRESS)
+        })
+        it("should return referrer address for valid referral code", async () => {
+            let referralCode = await getSolaceReferralCode(policyholder1, solaceCoverProduct)
+            expect(await solaceCoverProduct.getReferrerFromReferralCode(referralCode)).eq(policyholder1.address)
+        })
+    })
+
     describe("activatePolicy", () => {
         let rmActiveCoverLimit:BN;
         let rmSoteriaactiveCoverLimit: BN;
@@ -448,6 +487,11 @@ describe("SolaceCoverProduct", function() {
             let maxCover = await solaceCoverProduct.maxCover();
             await expect(solaceCoverProduct.connect(policyholder1).activatePolicy(policyholder1.address, maxCover.add(1), INITIAL_DEPOSIT, [])).to.revertedWith("insufficient capacity for new cover");
         });
+
+        it("cannot buy policy when insufficient user balance for deposit", async () => {
+            const userBalance = await dai.balanceOf(policyholder1.address)
+            await expect(solaceCoverProduct.connect(policyholder1).activatePolicy(policyholder1.address, ONE_ETH, userBalance.mul(2), [])).to.revertedWith("insufficient caller balance for deposit");
+        })
 
         it("cannot buy policy when insufficient deposit provided", async () => {
             await expect(solaceCoverProduct.connect(policyholder1).activatePolicy(policyholder1.address, ONE_ETH, 0, [])).to.revertedWith("insufficient deposit for minimum required account balance");
@@ -527,6 +571,9 @@ describe("SolaceCoverProduct", function() {
             await solaceCoverProduct.connect(policyholder1).activatePolicy(policyholder1.address, initialCoverLimit, 0, []);
             expect (await solaceCoverProduct.cooldownStart(policyholder1.address)).eq(0)
         })
+        it("cannot use an invalid referral code", async () => {
+            await expect(solaceCoverProduct.connect(governor).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, INITIAL_DEPOSIT, FAKE_REFERRAL_CODE)).to.reverted
+        })
         it("cannot use own referral code", async () => {
             // Create new wallet just for this unit test scope, to avoid creating side effects that impact other unit tests. It's a headfuck to work that out.
             const ownReferralCode = await getSolaceReferralCode(policyholder3, solaceCoverProduct)
@@ -579,7 +626,19 @@ describe("SolaceCoverProduct", function() {
         })
     });
 
+    describe ("tokenURI", () => {
+        it("cannot get for invalid policy ID", async () => {
+            await expect(solaceCoverProduct.tokenURI(INVALID_POLICY_ID)).to.revertedWith("invalid policy");
+        })
+        it("can get for valid policy ID", async () => {
+            expect(await solaceCoverProduct.tokenURI(POLICY_ID_1)).eq("https://solace1")
+        })
+    })
+
     describe("deposit", () => {
+        it("cannot deposit for zero address policyholder", async () => {
+            await expect(solaceCoverProduct.connect(policyholder1).deposit(ZERO_ADDRESS, INITIAL_DEPOSIT)).to.be.revertedWith("zero address policyholder");
+        })
         it("can deposit", async () => {
             let accountBalance = await solaceCoverProduct.accountBalanceOf(policyholder1.address);
             let soteriaContractDAIbalance = await dai.balanceOf(solaceCoverProduct.address)
@@ -680,6 +739,16 @@ describe("SolaceCoverProduct", function() {
             expect(await solaceCoverProduct.connect(policyholder1).coverLimitOf(POLICY_ID_1)).to.equal(NEW_COVER_LIMIT);
         });
 
+        it("policy owner can reduce cover limit", async () => {
+            let tx = await solaceCoverProduct.connect(policyholder1).updateCoverLimit(NEW_COVER_LIMIT.div(2), []);
+            await expect(tx).emit(solaceCoverProduct, "PolicyUpdated").withArgs(POLICY_ID_1);
+            expect(await solaceCoverProduct.connect(policyholder1).coverLimitOf(POLICY_ID_1)).to.equal(NEW_COVER_LIMIT.div(2));
+
+            // revert state changes
+            await solaceCoverProduct.connect(policyholder1).updateCoverLimit(NEW_COVER_LIMIT, []);
+            expect(await solaceCoverProduct.connect(policyholder1).coverLimitOf(POLICY_ID_1)).to.equal(NEW_COVER_LIMIT);
+        })
+
         it("should update risk manager active cover limit", async () => {
             let amount1 = initialRMActiveCoverLimit.add(NEW_COVER_LIMIT).sub(initialPolicyCoverLimit);
             let amount2 = initialRMActiveCoverLimitForSoteria.add(NEW_COVER_LIMIT).sub(initialPolicyCoverLimit);
@@ -703,6 +772,10 @@ describe("SolaceCoverProduct", function() {
             expect (await solaceCoverProduct.cooldownStart(policyholder1.address)).gt(0)
             await solaceCoverProduct.connect(policyholder1).updateCoverLimit(initialCoverLimit, []);
             expect (await solaceCoverProduct.cooldownStart(policyholder1.address)).eq(0)
+        })
+        it("cannot use invalid referral code", async () => {
+            let coverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_1);
+            await expect(solaceCoverProduct.connect(policyholder1).updateCoverLimit(coverLimit, FAKE_REFERRAL_CODE)).to.be.reverted;
         })
         it("cannot use own referral code", async () => {
             let ownReferralCode = await getSolaceReferralCode(policyholder1, solaceCoverProduct)
@@ -848,11 +921,40 @@ describe("SolaceCoverProduct", function() {
             cooldownPeriod = await solaceCoverProduct.cooldownPeriod()
         })
         
+        it("minRequiredAccountBalance view function working", async () => {
+            expect(await solaceCoverProduct.minRequiredAccountBalance(INITIAL_COVER_LIMIT)).eq(minRequiredAccountBalance)
+        })
+
         it("cannot withdraw while paused", async () => {
             await solaceCoverProduct.connect(governor).setPaused(true);
             await expect(solaceCoverProduct.connect(policyholder3).withdraw()).to.revertedWith("contract paused");
             await solaceCoverProduct.connect(governor).setPaused(false);
         });
+
+        it("cannot withdraw with no account balance", async () => {
+            expect(await solaceCoverProduct.accountBalanceOf(governor.address)).eq(0)
+            await expect(solaceCoverProduct.connect(governor).withdraw()).to.revertedWith("no account balance to withdraw");
+        })
+
+        it("when cooldown not started, will withdraw such that remaining balance = minRequiredAccountBalance", async () => {
+            const initialPolicyholder2DAIBalance = await dai.balanceOf(policyholder2.address)
+            const initialAccountBalanceOfPolicyHolder2 = await solaceCoverProduct.accountBalanceOf(policyholder2.address)
+            expect(await solaceCoverProduct.cooldownStart(policyholder2.address)).eq(0)
+
+            withdrawAmount = initialAccountBalanceOfPolicyHolder2.sub(minRequiredAccountBalance)
+            let tx = await solaceCoverProduct.connect(policyholder2).withdraw();          
+            await expect(tx).emit(solaceCoverProduct, "WithdrawMade").withArgs(policyholder2.address, withdrawAmount);
+
+            expect(initialAccountBalanceOfPolicyHolder2).gt(await solaceCoverProduct.accountBalanceOf(policyholder2.address))
+            expect(await solaceCoverProduct.accountBalanceOf(policyholder2.address)).eq(minRequiredAccountBalance)
+            expect(await dai.balanceOf(policyholder2.address)).eq(initialPolicyholder2DAIBalance.add(withdrawAmount))
+            expect(await dai.balanceOf(solaceCoverProduct.address)).eq(initialSoteriaDAIBalance.sub(withdrawAmount))
+
+            // reset state changes
+            await solaceCoverProduct.connect(policyholder2).deposit(policyholder2.address, withdrawAmount);  
+            expect(await dai.balanceOf(policyholder2.address)).eq(initialPolicyholder2DAIBalance)
+            expect(await solaceCoverProduct.accountBalanceOf(policyholder2.address)).eq(initialAccountBalanceOfPolicyHolder2)
+        })
         it("before cooldown complete, will withdraw such that remaining balance = minRequiredAccountBalance", async () => {
             // Ensure we are before cooldown completion
             const currentTimestamp = (await provider.getBlock('latest')).timestamp
@@ -1110,7 +1212,7 @@ describe("SolaceCoverProduct", function() {
             let initialContractDAIBalance = await dai.balanceOf(solaceCoverProduct.address)
             let initialPremiumPoolDAIBalance = await dai.balanceOf(premiumPool.address)
 
-            tx = await solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder1.address, policyholder2.address, policyholder3.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM])
+            tx = await solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder1.address, policyholder2.address, policyholder3.address, premiumPool.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM])
             expect(tx).to.emit(solaceCoverProduct, "PremiumCharged").withArgs(policyholder1.address, WEEKLY_MAX_PREMIUM);
             expect(tx).to.emit(solaceCoverProduct, "PremiumCharged").withArgs(policyholder2.address, WEEKLY_MAX_PREMIUM);
             expect(tx).to.emit(solaceCoverProduct, "PremiumPartiallyCharged").withArgs(policyholder3.address, WEEKLY_MAX_PREMIUM, initialHolder3AccountBalance.add(initialRewardPoints3));

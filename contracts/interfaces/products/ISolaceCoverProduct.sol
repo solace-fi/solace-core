@@ -77,11 +77,8 @@ interface ISolaceCoverProduct {
         uint256 rewardPointsEarned
     );
 
-    /// @notice Emitted when stablecoin is added to accepted stablecoin list
-    event StablecoinAdded(address stablecoin);
-
-    /// @notice Emitted when stablecoin is removed from accepted stablecoin list
-    event StablecoinRemoved(address stablecoin);
+    /// @notice Emitted when baseURI is set
+    event BaseURISet(string baseURI);
 
     /***************************************
     POLICY FUNCTIONS
@@ -273,9 +270,27 @@ interface ISolaceCoverProduct {
      * @notice True if a policyholder has previously used a valid referral code, false if not
      * 
      * A policyholder can only use a referral code once. Afterwards a policyholder is ineligible to receive further rewards from additional referral codes.
-     * @return isReferralCodeUsed_ True if the policyholder has previoulsy used a valid referral code, false if not
+     * @return isReferralCodeUsed_ True if the policyholder has previously used a valid referral code, false if not
      */
     function isReferralCodeUsed(address policyholder) external view returns (bool isReferralCodeUsed_);
+
+    /**
+     * @notice Returns true if valid referral code, false otherwise.
+     * @param referralCode The referral code.
+     */
+    function isReferralCodeValid(bytes calldata referralCode) external view returns (bool);
+
+    /**
+     * @notice Get referrer from referral code, returns 0 address if invalid referral code.
+     * @param referralCode The referral code.
+     * @return referrer The referrer address, returns 0 address if invalid referral code.
+     */
+    function getReferrerFromReferralCode(bytes calldata referralCode) external view returns (address referrer);
+    /**
+     * @notice Calculate minimum required account balance for a given cover limit. Equals the maximum chargeable fee for one epoch.
+     * @param coverLimit Cover limit.
+     */
+    function minRequiredAccountBalance(uint256 coverLimit) external view returns (uint256 minRequiredAccountBalance_);
 
     /***************************************
     GOVERNANCE FUNCTIONS
@@ -337,6 +352,12 @@ interface ISolaceCoverProduct {
      * @param isReferralOn_ Desired state of referral campaign.
     */
     function setIsReferralOn(bool isReferralOn_) external;
+
+    /**
+     * @notice Sets the base URI for computing `tokenURI`.
+     * @param baseURI_ The new base URI.
+     */
+    function setBaseURI(string memory baseURI_) external;
 
     /***************************************
     COVER PROMOTION ADMIN FUNCTIONS
