@@ -270,7 +270,7 @@ interface ISolaceCoverProduct {
      * @notice True if a policyholder has previously used a valid referral code, false if not
      * 
      * A policyholder can only use a referral code once. Afterwards a policyholder is ineligible to receive further rewards from additional referral codes.
-     * @return isReferralCodeUsed_ True if the policyholder has previoulsy used a valid referral code, false if not
+     * @return isReferralCodeUsed_ True if the policyholder has previously used a valid referral code, false if not
      */
     function isReferralCodeUsed(address policyholder) external view returns (bool isReferralCodeUsed_);
 
@@ -281,9 +281,9 @@ interface ISolaceCoverProduct {
     function isReferralCodeValid(bytes calldata referralCode) external view returns (bool);
 
     /**
-     * @notice Get referrer from referral code, returns 0 address if non-valid referral code.
+     * @notice Get referrer from referral code, returns 0 address if invalid referral code.
      * @param referralCode The referral code.
-     * @return referrer The referrer address, returns 0 address if non-valid referral code.
+     * @return referrer The referrer address, returns 0 address if invalid referral code.
      */
     function getReferrerFromReferralCode(bytes calldata referralCode) external view returns (address referrer);
     /**

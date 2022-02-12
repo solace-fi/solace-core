@@ -462,7 +462,7 @@ contract SolaceCoverProduct is
      * @notice True if a policyholder has previously used a valid referral code, false if not
      * 
      * A policyholder can only use a referral code once. A policyholder is then ineligible to receive further rewards from additional referral codes.
-     * @return isReferralCodeUsed_ True if the policyholder has previoulsy used a valid referral code, false if not
+     * @return isReferralCodeUsed_ True if the policyholder has previously used a valid referral code, false if not
      */
     function isReferralCodeUsed(address policyholder) external view override returns (bool isReferralCodeUsed_) {
         return _isReferralCodeUsed[_policyOf[policyholder]];
@@ -479,9 +479,9 @@ contract SolaceCoverProduct is
     }
 
     /**
-     * @notice Get referrer from referral code, returns 0 address if non-valid referral code.
+     * @notice Get referrer from referral code, returns 0 address if invalid referral code.
      * @param referralCode The referral code.
-     * @return referrer The referrer address, returns 0 address if non-valid referral code.
+     * @return referrer The referrer address, returns 0 address if invalid referral code.
      */
     function getReferrerFromReferralCode(bytes calldata referralCode) external view override returns (address referrer) {
         (referrer,) = ECDSA.tryRecover(_getEIP712Hash(), referralCode);
