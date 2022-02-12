@@ -281,9 +281,9 @@ interface ISolaceCoverProduct {
     function isReferralCodeValid(bytes calldata referralCode) external view returns (bool);
 
     /**
-     * @notice Get referrer from referral code, returns 0 address if non-valid referral code
+     * @notice Get referrer from referral code, returns 0 address if non-valid referral code.
      * @param referralCode The referral code.
-     * @return referrer The referrer address, returns 0 address if non-valid referral code
+     * @return referrer The referrer address, returns 0 address if non-valid referral code.
      */
     function getReferrerFromReferralCode(bytes calldata referralCode) external view returns (address referrer);
     /**
