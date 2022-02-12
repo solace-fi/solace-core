@@ -417,6 +417,16 @@ describe("SolaceCoverProduct", function() {
         })
     })
 
+    describe ("getReferrerFromReferralCode", () => {
+        it("should return 0 for invalid referral code", async () => {
+            expect(await solaceCoverProduct.getReferrerFromReferralCode(FAKE_REFERRAL_CODE)).eq(ZERO_ADDRESS)
+        })
+        it("should return referrer address for valid referral code", async () => {
+            let referralCode = await getSolaceReferralCode(policyholder1, solaceCoverProduct)
+            expect(await solaceCoverProduct.getReferrerFromReferralCode(referralCode)).eq(policyholder1.address)
+        })
+    })
+
     describe("activatePolicy", () => {
         let rmActiveCoverLimit:BN;
         let rmSoteriaactiveCoverLimit: BN;
