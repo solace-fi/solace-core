@@ -16,7 +16,7 @@ import { isDeployed } from "../test/utilities/expectDeployed";
 
 const DEPLOYER_CONTRACT_ADDRESS    = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
 
-const DAI_ADDRESS                  = "0x8ad3aA5d5ff084307d28C8f514D7a193B2Bfe725"; // testnet DAI with approve, mint functions exposed on Etherscan
+const DAI_ADDRESS                  = "0x6B175474E89094C44Da98b954EedeAC495271d0F";
 
 // wallet addresses
 let   COVERAGE_DATA_PROVIDER_UPDATER_ADDRESS  = "0xc5683ea4888DadfdE421a1E593DfbD36290D63AB"; // the bot address to update underwriting pool values

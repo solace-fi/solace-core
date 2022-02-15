@@ -394,7 +394,7 @@ describe("SolaceCoverProduct", function() {
 
     describe ("setBaseURI", () => {
         it("should default as expected string", async () => {
-            expect(await solaceCoverProduct.baseURI()).eq("https://stats.solace.fi/policy/?chainID=31337&policyID=")
+            expect(await solaceCoverProduct.baseURI()).eq("https://stats.solace.fi/policy/soteria/?chainID=31337&policyID=")
         })
         it("cannot be set by non governance", async () => {
             await expect(solaceCoverProduct.connect(policyholder1).setBaseURI("https://solace")).to.revertedWith("!governance");
