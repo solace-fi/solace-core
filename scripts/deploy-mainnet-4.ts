@@ -79,11 +79,11 @@ async function deployRegistry() {
 
   // set default addresses
   if (await registryV2.governance() == signerAddress) {
-    console.log("Setting 'DAI', 'premiumPool', 'coverPromotionAdmin', 'premiumCollector' addresses");
+    console.log("Setting 'DAI', 'premiumPool', 'coverPromotionAdmin', 'premiumCollector', 'riskManager', 'coverageDataProvider', 'solaceCoverProduct' addresses");
     let tx = await registryV2.connect(deployer).set(
-          ["dai", "premiumPool", "coverPromotionAdmin", "premiumCollector"],
-          [DAI_ADDRESS, PREMIUM_POOL_ADDRESS, COVER_PROMOTION_ADMIN_ADDRESS, PREMIUM_COLLECTOR_ADDRESS]
-        )
+          ["dai", "premiumPool", "coverPromotionAdmin", "premiumCollector", "riskManager", "coverageDataProvider", "solaceCoverProduct"],
+          [DAI_ADDRESS, PREMIUM_POOL_ADDRESS, COVER_PROMOTION_ADMIN_ADDRESS, PREMIUM_COLLECTOR_ADDRESS, RISK_MANAGER_V2_ADDRESS, COVERAGE_DATA_PROVIDER_ADDRESS, SOLACE_COVER_PRODUCT_ADDRESS]
+        );
     await tx.wait()
   }
 }
