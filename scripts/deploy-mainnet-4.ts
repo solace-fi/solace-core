@@ -20,7 +20,7 @@ const DAI_ADDRESS                  = "0x6B175474E89094C44Da98b954EedeAC495271d0F
 
 // wallet addresses
 let   COVERAGE_DATA_PROVIDER_UPDATER_ADDRESS  = "0xc5683ea4888DadfdE421a1E593DfbD36290D63AB"; // the bot address to update underwriting pool values
-const PREMIUM_POOL_ADDRESS                    = "0x86392998F4c8950b312137E8d635b0cB003E92EA"; // will be set in registry
+const PREMIUM_POOL_ADDRESS                    = "0x88fdDCe9aD3C5A12c06B597F0948F8EafFC3862d"; // will be set in registry
 let   COVER_PROMOTION_ADMIN_ADDRESS           = "0x4770becA2628685F7C45102c7a649F921df71C70"; // will be set in registry
 const PREMIUM_COLLECTOR_ADDRESS               = "0xF321be3577B1AcB436869493862bA18bDde6fc39"; // the bot address that will be set in registry
 
