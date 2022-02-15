@@ -791,6 +791,7 @@ contract SolaceCoverProduct is
      * @param policyholder Policyholder address.
      */
     function _startCooldown(address policyholder) internal {
+        // solhint-disable-next-line not-rely-on-time
         _cooldownStart[policyholder] = block.timestamp;
         emit CooldownStarted(policyholder, _cooldownStart[policyholder]);
     }
@@ -813,6 +814,7 @@ contract SolaceCoverProduct is
         if (_cooldownStart[policyholder] == 0) {
             return false;
         } else {
+            // solhint-disable-next-line not-rely-on-time
             return block.timestamp >= _cooldownStart[policyholder] + _cooldownPeriod;
         }
     }

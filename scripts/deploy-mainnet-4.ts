@@ -28,7 +28,7 @@ const PREMIUM_COLLECTOR_ADDRESS               = "0xF321be3577B1AcB436869493862bA
 const REGISTRY_V2_ADDRESS               = "0x501ACe0f576fc4ef9C0380AA46A578eA96b85776";
 const RISK_MANAGER_V2_ADDRESS           = "0x501AcEf9020632a71CB25CFa9F554252eB51732b";
 const COVERAGE_DATA_PROVIDER_ADDRESS    = "0x501ACE6C5fFf4d42EaC02357B6DD9b756E337355";
-const SOLACE_COVER_PRODUCT_ADDRESS      = "0x501ace2146981263604F7F5C4d0600583ebA8eF6";
+const SOLACE_COVER_PRODUCT_ADDRESS      = "0x501ACEbe29eabc346779BcB5Fd62Eaf6Bfb5320E";
 
 const DOMAIN_NAME = "Solace.fi-SolaceCoverProduct";
 const VERSION = "1";
@@ -46,16 +46,6 @@ async function main() {
   artifacts = await import_artifacts();
   signerAddress = await deployer.getAddress();
   console.log(`Using ${signerAddress} as deployer and governor`);
-
-  if (await isDeployed(COVERAGE_DATA_PROVIDER_ADDRESS)) {
-    console.log(`Using ${signerAddress} as COVERAGE_DATA_PROVIDER_UPDATER_ADDRESS`);
-    COVERAGE_DATA_PROVIDER_UPDATER_ADDRESS = signerAddress;
-  }
-
-  if (await isDeployed(COVER_PROMOTION_ADMIN_ADDRESS)) {
-    console.log(`Using ${signerAddress} as COVER_PROMOTION_ADMIN_ADDRESS`);
-    COVER_PROMOTION_ADMIN_ADDRESS = signerAddress;
-  }
 
   if ((await provider.getNetwork()).chainId == 31337) { // testnet
     console.log('funding')
@@ -119,7 +109,7 @@ async function deployCoverageDataProvider() {
     await tx.wait();
 
     console.log("Setting Underwriting Pool Amounts");
-    tx = await coverageDataProvider.connect(deployer).set("mainnet", BN.from("1000000000000000000").mul(10000000)); // 10M USD
+    tx = await coverageDataProvider.connect(deployer).set("mainnet", BN.from("1000000000000000000").mul(8450000)); // 8.45M USD
     await tx.wait();
 
     // tx = await coverageDataProvider.connect(deployer).set("aurora", AMOUNT2);
