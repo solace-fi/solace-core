@@ -869,7 +869,7 @@ contract SolaceCoverProduct is
         // Skip processing referral code, if referral campaign switched off or empty referral code argument
         if ( !_isReferralOn || _isEmptyReferralCode(referralCode_) ) return;
 
-        require(_premiumPaidOf[policyholder_] >= 100e18, "cannot apply referral code if premium paid < 100 DAI");
+        require(_premiumPaidOf[policyholder_] >= _referralThreshold, "cannot apply referral code if premium paid < referralThreshold");
 
         address referrer = ECDSA.recover(_getEIP712Hash(), referralCode_);
         require(referrer != policyholder_, "cannot refer to self");

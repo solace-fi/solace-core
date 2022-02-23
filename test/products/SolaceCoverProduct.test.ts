@@ -617,7 +617,7 @@ describe("SolaceCoverProduct", function() {
         it("cannot use a referral code, if premiumPaid < 100", async () => {
             const referralCode = await getSolaceReferralCode(policyholder1, solaceCoverProduct)
             expect(await solaceCoverProduct.premiumsPaidOf(policyholder1.address)).eq(0)
-            await expect(solaceCoverProduct.connect(policyholder1).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, INITIAL_DEPOSIT, referralCode)).to.revertedWith("cannot apply referral code if premium paid < 100 DAI")
+            await expect(solaceCoverProduct.connect(policyholder1).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, INITIAL_DEPOSIT, referralCode)).to.revertedWith("cannot apply referral code if premium paid < referralThreshold")
         })
         it("cannot use own referral code", async () => {
             // Temporary state change just for this state, set premiumPaidOf(policyholder3) = 100
@@ -817,7 +817,7 @@ describe("SolaceCoverProduct", function() {
         it("cannot use a referral code, if premiumPaid < 100", async () => {
             let referralCode = await getSolaceReferralCode(policyholder1, solaceCoverProduct)
             let coverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_2);
-            await expect(solaceCoverProduct.connect(policyholder2).updateCoverLimit(coverLimit, referralCode)).to.revertedWith("cannot apply referral code if premium paid < 100 DAI")
+            await expect(solaceCoverProduct.connect(policyholder2).updateCoverLimit(coverLimit, referralCode)).to.revertedWith("cannot apply referral code if premium paid < referralThreshold")
         })
         it("cannot use invalid referral code", async () => {
             // Temporary state change just for this state, set premiumPaidOf(policyholder1) = 100
