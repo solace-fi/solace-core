@@ -87,6 +87,11 @@ contract SolaceCoverProduct is
     uint256 internal _referralReward;
 
     /**
+     * @notice The threshold premium amount that an account needs to have paid, for the account to be able to apply a referral code. (Default is 100 DAI).
+     */
+    uint256 internal _referralThreshold;
+
+    /**
      * @notice If true, referral rewards are active. If false, referral rewards are switched off (Default is true).
      */
     bool internal _isReferralOn;
@@ -102,6 +107,9 @@ contract SolaceCoverProduct is
 
     /// @notice policyID => coverLimit
     mapping(uint256 => uint256) internal _coverLimitOf;
+
+    /// @notice policyholder => premiumPaid
+    mapping(address => uint256) internal _premiumPaidOf;
 
     /**
      * @notice This is a mapping that no-one likes but seems necessary to circumvent a couple of edge cases. This mapping is intended to mirror the _coverLimitOf mapping, except for the period between i.) cooldown starting when deactivatePolicy() called and ii.) cooldown has passed and user calls withdraw()
@@ -165,6 +173,7 @@ contract SolaceCoverProduct is
         _chargeCycle = 604800; // One-week charge cycle
         _cooldownPeriod = 604800; // One-week cooldown period
         _referralReward = 50e18; // 50 DAI
+        _referralThreshold = 100e18; // 100 DAI
         _isReferralOn = true; // Referral rewards active
         baseURI = string(abi.encodePacked("https://stats.solace.fi/policy/soteria/?chainID=", Strings.toString(block.chainid), "&policyID="));
     }
@@ -339,6 +348,15 @@ contract SolaceCoverProduct is
     }
 
     /**
+     * @notice Get the total premium that a policyholder has in **USD** to 18 decimal places (does not include premium paid through reward points)
+     * @param policyholder_ The policyholder address.
+     * @return premiumsPaid_ The total premium paid for the policyholder.
+     */
+    function premiumsPaidOf(address policyholder_) public view override returns (uint256 premiumsPaid_) {
+        return _premiumPaidOf[policyholder_];
+    }
+
+    /**
      * @notice Gets the policyholder's policy ID.
      * @param policyholder_ The address of the policyholder.
      * @return policyID The policy ID.
@@ -448,6 +466,14 @@ contract SolaceCoverProduct is
      */
     function referralReward() external view override returns (uint256 referralReward_) {
         return _referralReward;
+    }
+
+    /**
+     * @notice Gets the threshold premium amount in USD that an account needs to have paid, for the account to be able to apply a referral code
+     * @return referralThreshold_ The referral threshold
+     */
+    function referralThreshold() external view override returns (uint256 referralThreshold_) {
+        return _referralThreshold;
     }
 
     /**
@@ -585,6 +611,16 @@ contract SolaceCoverProduct is
     }
 
     /**
+     * @notice set _referralThreshhold
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param referralThreshhold_ Desired referralThreshhold.
+    */
+    function setReferralThreshold(uint256 referralThreshhold_) external override onlyGovernance {
+        _referralThreshold = referralThreshhold_;
+        emit ReferralThresholdSet(referralThreshhold_);
+    }
+
+    /**
      * @notice set _isReferralOn
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param isReferralOn_ True if referral rewards active, false if not.
@@ -661,6 +697,7 @@ contract SolaceCoverProduct is
                 } else {
                     uint256 amountDeductedFromSoteriaAccount = premium - _rewardPointsOf[holders[i]];
                     amountToPayPremiumPool += amountDeductedFromSoteriaAccount;
+                    _premiumPaidOf[holders[i]] += amountDeductedFromSoteriaAccount;
                     _accountBalanceOf[holders[i]] -= amountDeductedFromSoteriaAccount;
                     _rewardPointsOf[holders[i]] = 0;
                 }
@@ -668,6 +705,7 @@ contract SolaceCoverProduct is
             } else {
                 uint256 partialPremium = _accountBalanceOf[holders[i]] + _rewardPointsOf[holders[i]];
                 amountToPayPremiumPool += _accountBalanceOf[holders[i]];
+                _premiumPaidOf[holders[i]] += _accountBalanceOf[holders[i]]; 
                 _accountBalanceOf[holders[i]] = 0;
                 _rewardPointsOf[holders[i]] = 0;
                 _deactivatePolicy(holders[i]);
@@ -830,6 +868,8 @@ contract SolaceCoverProduct is
     ) internal {
         // Skip processing referral code, if referral campaign switched off or empty referral code argument
         if ( !_isReferralOn || _isEmptyReferralCode(referralCode_) ) return;
+
+        require(_premiumPaidOf[policyholder_] >= _referralThreshold, "cannot apply referral code if premium paid < referralThreshold");
 
         address referrer = ECDSA.recover(_getEIP712Hash(), referralCode_);
         require(referrer != policyholder_, "cannot refer to self");
