@@ -16,11 +16,11 @@ import { isDeployed } from "../test/utilities/expectDeployed";
 
 const DEPLOYER_CONTRACT_ADDRESS    = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
 
-const DAI_ADDRESS                  = "0x8ad3aA5d5ff084307d28C8f514D7a193B2Bfe725"; // testnet DAI with approve, mint functions exposed on Etherscan
+const DAI_ADDRESS                  = "0x6B175474E89094C44Da98b954EedeAC495271d0F";
 
 // wallet addresses
 let   COVERAGE_DATA_PROVIDER_UPDATER_ADDRESS  = "0xc5683ea4888DadfdE421a1E593DfbD36290D63AB"; // the bot address to update underwriting pool values
-const PREMIUM_POOL_ADDRESS                    = "0x86392998F4c8950b312137E8d635b0cB003E92EA"; // will be set in registry
+const PREMIUM_POOL_ADDRESS                    = "0x88fdDCe9aD3C5A12c06B597F0948F8EafFC3862d"; // will be set in registry
 let   COVER_PROMOTION_ADMIN_ADDRESS           = "0x4770becA2628685F7C45102c7a649F921df71C70"; // will be set in registry
 const PREMIUM_COLLECTOR_ADDRESS               = "0xF321be3577B1AcB436869493862bA18bDde6fc39"; // the bot address that will be set in registry
 
@@ -109,7 +109,7 @@ async function deployCoverageDataProvider() {
     await tx.wait();
 
     console.log("Setting Underwriting Pool Amounts");
-    tx = await coverageDataProvider.connect(deployer).set("mainnet", BN.from("1000000000000000000").mul(10000000)); // 10M USD
+    tx = await coverageDataProvider.connect(deployer).set("mainnet", BN.from("1000000000000000000").mul(8450000)); // 8.45M USD
     await tx.wait();
 
     // tx = await coverageDataProvider.connect(deployer).set("aurora", AMOUNT2);

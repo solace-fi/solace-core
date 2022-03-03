@@ -63,6 +63,7 @@ describe("SolaceCoverProduct", function() {
     const maxRateNum = BN.from("1");
     const maxRateDenom = BN.from("315360000"); // We are testing with maxRateNum and maxRateDenom that gives us an annual max rate of 10% coverLimit
     const REFERRAL_REWARD = ONE_ETH.mul(50) // 50 DAI
+    const REFERRAL_THRESHOLD = ONE_ETH.mul(100) // 100 DAI
 
     // Random 130 character hex string
     const FAKE_REFERRAL_CODE = "0xe4e7cba021ff6b83b14d54016198f31b04cba044d71d9a8b9bdf964aa2259cc3b207237f814aa56e516638b448edc43a6c3f4637dca5de54cb199e37b039a832e7"
@@ -142,6 +143,10 @@ describe("SolaceCoverProduct", function() {
             await dai.connect(policyholder1).approve(solaceCoverProduct.address, constants.MaxUint256)
             await dai.connect(policyholder2).approve(solaceCoverProduct.address, constants.MaxUint256)
             await dai.connect(governor).approve(solaceCoverProduct.address, constants.MaxUint256)
+        })
+        it("manipulatePremiumPaidOf helper function working", async() => {
+            await manipulatePremiumPaidOf(deployer, BN.from(11))
+            expect(await solaceCoverProduct.premiumsPaidOf(deployer.address)).eq(BN.from(11))
         })
     });
 
@@ -372,6 +377,19 @@ describe("SolaceCoverProduct", function() {
         })
     })
 
+    describe("setReferralThreshold", () => {
+        it("cannot be set by non governance", async () => {
+            await expect(solaceCoverProduct.connect(policyholder1).setReferralThreshold(REFERRAL_THRESHOLD)).to.revertedWith("!governance");
+        });
+        it("can be set", async () => {
+            let tx = await solaceCoverProduct.connect(governor).setReferralThreshold(REFERRAL_THRESHOLD)
+            expect(tx).emit(solaceCoverProduct, "ReferralThresholdSet").withArgs(REFERRAL_THRESHOLD);
+        })
+        it("getter functions working", async () => {
+            expect(await solaceCoverProduct.referralThreshold()).eq(REFERRAL_THRESHOLD)
+        })
+    })
+
     describe("setIsReferralOn", () => {
         it("should default as true", async () => {
             expect(await solaceCoverProduct.isReferralOn()).eq(true)
@@ -394,7 +412,7 @@ describe("SolaceCoverProduct", function() {
 
     describe ("setBaseURI", () => {
         it("should default as expected string", async () => {
-            expect(await solaceCoverProduct.baseURI()).eq("https://stats.solace.fi/policy/?chainID=31337&policyID=")
+            expect(await solaceCoverProduct.baseURI()).eq("https://stats.solace.fi/policy/soteria/?chainID=31337&policyID=")
         })
         it("cannot be set by non governance", async () => {
             await expect(solaceCoverProduct.connect(policyholder1).setBaseURI("https://solace")).to.revertedWith("!governance");
@@ -571,14 +589,6 @@ describe("SolaceCoverProduct", function() {
             await solaceCoverProduct.connect(policyholder1).activatePolicy(policyholder1.address, initialCoverLimit, 0, []);
             expect (await solaceCoverProduct.cooldownStart(policyholder1.address)).eq(0)
         })
-        it("cannot use an invalid referral code", async () => {
-            await expect(solaceCoverProduct.connect(governor).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, INITIAL_DEPOSIT, FAKE_REFERRAL_CODE)).to.reverted
-        })
-        it("cannot use own referral code", async () => {
-            // Create new wallet just for this unit test scope, to avoid creating side effects that impact other unit tests. It's a headfuck to work that out.
-            const ownReferralCode = await getSolaceReferralCode(policyholder3, solaceCoverProduct)
-            await expect(solaceCoverProduct.connect(governor).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, INITIAL_DEPOSIT, ownReferralCode)).to.revertedWith("cannot refer to self");
-        })
         it("will not give reward points if isReferralOn == false", async () => {
             // Set isReferralOn to false
             await solaceCoverProduct.connect(governor).setIsReferralOn(false);
@@ -600,12 +610,42 @@ describe("SolaceCoverProduct", function() {
             // Set isReferralOn back to true (default)
             await solaceCoverProduct.connect(governor).setIsReferralOn(true);
             expect(await solaceCoverProduct.isReferralOn()).eq(true)
+
+            // Deactivate policyholder3 account (so we can repeat activatePolicy in subsequent tests)
+            await solaceCoverProduct.connect(policyholder3).deactivatePolicy();
+        })
+        it("cannot use a referral code, if premiumPaid < 100", async () => {
+            const referralCode = await getSolaceReferralCode(policyholder1, solaceCoverProduct)
+            expect(await solaceCoverProduct.premiumsPaidOf(policyholder1.address)).eq(0)
+            await expect(solaceCoverProduct.connect(policyholder1).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, INITIAL_DEPOSIT, referralCode)).to.revertedWith("cannot apply referral code if premium paid < referralThreshold")
+        })
+        it("cannot use own referral code", async () => {
+            // Temporary state change just for this state, set premiumPaidOf(policyholder3) = 100
+            await manipulatePremiumPaidOf(policyholder3, REFERRAL_THRESHOLD)
+            
+            // Create new wallet just for this unit test scope, to avoid creating side effects that impact other unit tests. It's a headfuck to work that out.
+            const ownReferralCode = await getSolaceReferralCode(policyholder3, solaceCoverProduct)
+            await expect(solaceCoverProduct.connect(governor).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, INITIAL_DEPOSIT, ownReferralCode)).to.revertedWith("cannot refer to self");
+
+            await manipulatePremiumPaidOf(policyholder3, BN.from(0))
+            expect(await solaceCoverProduct.premiumsPaidOf(policyholder3.address)).eq(0)
+        })
+        it("cannot use an invalid referral code", async () => {
+            // Temporary state change just for this state, set premiumPaidOf(policyholder3) = 100
+            await manipulatePremiumPaidOf(policyholder3, REFERRAL_THRESHOLD)
+
+            await expect(solaceCoverProduct.connect(governor).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, INITIAL_DEPOSIT, FAKE_REFERRAL_CODE)).to.revertedWith("ECDSA: invalid signature 's' value")
+
+            await manipulatePremiumPaidOf(policyholder3, BN.from(0))
+            expect(await solaceCoverProduct.premiumsPaidOf(policyholder3.address)).eq(0)
         })
 
         it("can use referral code only once", async () => {
-            let referralCode = await getSolaceReferralCode(policyholder1, solaceCoverProduct)
+            // Temporary state change just for this state, set premiumPaidOf(policyholder3) = 100
+            await manipulatePremiumPaidOf(policyholder3, REFERRAL_THRESHOLD)
 
-            await solaceCoverProduct.connect(policyholder3).deactivatePolicy();
+            let referralCode = await getSolaceReferralCode(policyholder1, solaceCoverProduct)
+            
             let tx = await solaceCoverProduct.connect(governor).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, INITIAL_DEPOSIT, referralCode);
             await expect(tx).emit(solaceCoverProduct, "PolicyCreated").withArgs(POLICY_ID_3);
             await expect(tx).emit(solaceCoverProduct, "ReferralRewardsEarned").withArgs(policyholder1.address, REFERRAL_REWARD);
@@ -623,6 +663,8 @@ describe("SolaceCoverProduct", function() {
             await solaceCoverProduct.connect(coverPromotionAdmin).setRewardPoints(policyholder3.address, 0);
             expect(await solaceCoverProduct.rewardPointsOf(policyholder1.address)).eq(0)
             expect(await solaceCoverProduct.rewardPointsOf(policyholder3.address)).eq(0)
+            await manipulatePremiumPaidOf(policyholder3, BN.from(0))
+            expect(await solaceCoverProduct.premiumsPaidOf(policyholder3.address)).eq(0)
         })
     });
 
@@ -744,7 +786,6 @@ describe("SolaceCoverProduct", function() {
             await expect(tx).emit(solaceCoverProduct, "PolicyUpdated").withArgs(POLICY_ID_1);
             expect(await solaceCoverProduct.connect(policyholder1).coverLimitOf(POLICY_ID_1)).to.equal(NEW_COVER_LIMIT.div(2));
 
-            // revert state changes
             await solaceCoverProduct.connect(policyholder1).updateCoverLimit(NEW_COVER_LIMIT, []);
             expect(await solaceCoverProduct.connect(policyholder1).coverLimitOf(POLICY_ID_1)).to.equal(NEW_COVER_LIMIT);
         })
@@ -773,20 +814,43 @@ describe("SolaceCoverProduct", function() {
             await solaceCoverProduct.connect(policyholder1).updateCoverLimit(initialCoverLimit, []);
             expect (await solaceCoverProduct.cooldownStart(policyholder1.address)).eq(0)
         })
+        it("cannot use a referral code, if premiumPaid < 100", async () => {
+            let referralCode = await getSolaceReferralCode(policyholder1, solaceCoverProduct)
+            let coverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_2);
+            await expect(solaceCoverProduct.connect(policyholder2).updateCoverLimit(coverLimit, referralCode)).to.revertedWith("cannot apply referral code if premium paid < referralThreshold")
+        })
         it("cannot use invalid referral code", async () => {
+            // Temporary state change just for this state, set premiumPaidOf(policyholder1) = 100
+            await manipulatePremiumPaidOf(policyholder1, REFERRAL_THRESHOLD)
+            
             let coverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_1);
             await expect(solaceCoverProduct.connect(policyholder1).updateCoverLimit(coverLimit, FAKE_REFERRAL_CODE)).to.be.reverted;
+
+            await manipulatePremiumPaidOf(policyholder1, BN.from(0))
+            expect(await solaceCoverProduct.premiumsPaidOf(policyholder1.address)).eq(0)
         })
         it("cannot use own referral code", async () => {
+            // Temporary state change just for this state, set premiumPaidOf(policyholder1) = 100
+            await manipulatePremiumPaidOf(policyholder1, REFERRAL_THRESHOLD)
+
             let ownReferralCode = await getSolaceReferralCode(policyholder1, solaceCoverProduct)
             let coverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_1);
             await expect(solaceCoverProduct.connect(policyholder1).updateCoverLimit(coverLimit, ownReferralCode)).to.revertedWith("cannot refer to self");
+
+            await manipulatePremiumPaidOf(policyholder1, BN.from(0))
+            expect(await solaceCoverProduct.premiumsPaidOf(policyholder1.address)).eq(0)
         })
         it("cannot use referral code of an inactive policy holder", async () => {
+            // Temporary state change just for this state, set premiumPaidOf(policyholder2) = 100
+            await manipulatePremiumPaidOf(policyholder2, REFERRAL_THRESHOLD)
+
             expect(await solaceCoverProduct.policyStatus(POLICY_ID_3)).eq(false)
             let referralCode = await getSolaceReferralCode(policyholder3, solaceCoverProduct)
             let coverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_2);
             await expect(solaceCoverProduct.connect(policyholder2).updateCoverLimit(coverLimit, referralCode)).to.revertedWith("referrer must be active policy holder");
+
+            await manipulatePremiumPaidOf(policyholder2, BN.from(0))
+            expect(await solaceCoverProduct.premiumsPaidOf(policyholder2.address)).eq(0)
         })
         it("will not give reward points if isReferralOn == false", async () => {
             // Set isReferralOn to false
@@ -809,6 +873,9 @@ describe("SolaceCoverProduct", function() {
             expect(await solaceCoverProduct.isReferralOn()).eq(true)
         })
         it("can use referral code only once", async () => {
+            // Temporary state change just for this state, set premiumPaidOf(policyholder2) = 100
+            await manipulatePremiumPaidOf(policyholder2, REFERRAL_THRESHOLD)
+
             let referralCode = await getSolaceReferralCode(policyholder1, solaceCoverProduct)
             let coverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_2);
             expect(await solaceCoverProduct.isReferralCodeUsed(policyholder2.address)).eq(false)
@@ -831,6 +898,8 @@ describe("SolaceCoverProduct", function() {
             await solaceCoverProduct.connect(coverPromotionAdmin).setRewardPoints(policyholder2.address, 0);
             expect(await solaceCoverProduct.rewardPointsOf(policyholder1.address)).eq(0)
             expect(await solaceCoverProduct.rewardPointsOf(policyholder2.address)).eq(0)
+            await manipulatePremiumPaidOf(policyholder2, BN.from(0))
+            expect(await solaceCoverProduct.premiumsPaidOf(policyholder2.address)).eq(0)
         })
     });
 
@@ -950,7 +1019,6 @@ describe("SolaceCoverProduct", function() {
             expect(await dai.balanceOf(policyholder2.address)).eq(initialPolicyholder2DAIBalance.add(withdrawAmount))
             expect(await dai.balanceOf(solaceCoverProduct.address)).eq(initialSoteriaDAIBalance.sub(withdrawAmount))
 
-            // reset state changes
             await solaceCoverProduct.connect(policyholder2).deposit(policyholder2.address, withdrawAmount);  
             expect(await dai.balanceOf(policyholder2.address)).eq(initialPolicyholder2DAIBalance)
             expect(await solaceCoverProduct.accountBalanceOf(policyholder2.address)).eq(initialAccountBalanceOfPolicyHolder2)
@@ -1026,6 +1094,9 @@ describe("SolaceCoverProduct", function() {
             await expect(tx).emit(solaceCoverProduct, "PremiumCharged").withArgs(policyholder1.address, WEEKLY_MAX_PREMIUM);
             await expect(tx).emit(solaceCoverProduct, "PremiumCharged").withArgs(policyholder2.address, WEEKLY_MAX_PREMIUM);
          
+            expect(await solaceCoverProduct.premiumsPaidOf(policyholder1.address)).eq(WEEKLY_MAX_PREMIUM)            
+            expect(await solaceCoverProduct.premiumsPaidOf(policyholder2.address)).eq(WEEKLY_MAX_PREMIUM)
+
             // premiums should be transferred to premium pool
             expect(await dai.balanceOf(solaceCoverProduct.address)).eq(initialContractDAIBalance.sub(WEEKLY_MAX_PREMIUM.mul(2)))
             expect(await dai.balanceOf(premiumPool.address)).eq(initialPremiumPoolDAIBalance.add(WEEKLY_MAX_PREMIUM.mul(2)))
@@ -1048,11 +1119,13 @@ describe("SolaceCoverProduct", function() {
             let initialContractDAIBalance = await dai.balanceOf(solaceCoverProduct.address)
             let initialPremiumPoolDAIBalance = await dai.balanceOf(premiumPool.address)
             let minRequiredAccountBalance = maxRateNum.mul(ONE_WEEK).mul(initialCoverLimit1).div(maxRateDenom);
+            let initialPremiumPaid1 = await solaceCoverProduct.premiumsPaidOf(policyholder1.address);
 
             // charge premiums
             let tx = solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder1.address], [minRequiredAccountBalance.mul(2)]);
             await expect(tx).emit(solaceCoverProduct, "PremiumCharged").withArgs(policyholder1.address, minRequiredAccountBalance);
 
+            expect(await solaceCoverProduct.premiumsPaidOf(policyholder1.address)).eq(initialPremiumPaid1.add(minRequiredAccountBalance))            
             expect(await solaceCoverProduct.accountBalanceOf(policyholder1.address)).to.equal(policyholder1AccountBalance.sub(minRequiredAccountBalance));
             expect(await dai.balanceOf(solaceCoverProduct.address)).eq(initialContractDAIBalance.sub(minRequiredAccountBalance))
             expect(await dai.balanceOf(premiumPool.address)).eq(initialPremiumPoolDAIBalance.add(minRequiredAccountBalance))
@@ -1075,6 +1148,7 @@ describe("SolaceCoverProduct", function() {
             let initialRMSoteriaCoverAmount = await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address);
             let initialContractDAIBalance = await dai.balanceOf(solaceCoverProduct.address)
             let initialPremiumPoolDAIBalance = await dai.balanceOf(premiumPool.address)
+            let initialPremiumPaid4 = await solaceCoverProduct.premiumsPaidOf(policyholder4.address);
 
             // we cannot reach the PremiumPartiallyCharged branch within a single chargePremiums() call
             await solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder4.address], [WEEKLY_MAX_PREMIUM]);
@@ -1101,6 +1175,7 @@ describe("SolaceCoverProduct", function() {
 
             // policyholder account balance should be depleted
             expect(await solaceCoverProduct.accountBalanceOf(policyholder4.address)).to.equal(0);
+            expect(await solaceCoverProduct.premiumsPaidOf(policyholder4.address)).eq(initialPremiumPaid4.add(depositAmount))    
 
             // dai should be transferred to premium pool
             expect(await dai.balanceOf(solaceCoverProduct.address)).eq(initialContractDAIBalance.sub(depositAmount))
@@ -1120,6 +1195,7 @@ describe("SolaceCoverProduct", function() {
             let initialHolderFunds = await solaceCoverProduct.accountBalanceOf(policyholder5.address);
             let initialContractDAIBalance = await dai.balanceOf(solaceCoverProduct.address)
             let initialPremiumPoolDAIBalance = await dai.balanceOf(premiumPool.address)
+            let initialPremiumPaid5 = await solaceCoverProduct.premiumsPaidOf(policyholder5.address);
 
             // Charge premiums
             let tx = await solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder5.address], [WEEKLY_MAX_PREMIUM]);
@@ -1129,40 +1205,41 @@ describe("SolaceCoverProduct", function() {
             expect(await solaceCoverProduct.accountBalanceOf(policyholder5.address)).to.equal(initialHolderFunds.sub(WEEKLY_MAX_PREMIUM));
             expect(await dai.balanceOf(solaceCoverProduct.address)).eq(initialContractDAIBalance.sub(WEEKLY_MAX_PREMIUM))
             expect(await dai.balanceOf(premiumPool.address)).eq(initialPremiumPoolDAIBalance.add(WEEKLY_MAX_PREMIUM))
+            expect(await solaceCoverProduct.premiumsPaidOf(policyholder5.address)).eq(initialPremiumPaid5.add(WEEKLY_MAX_PREMIUM))
         })
 
-    //     // it("REDUNDANT FOR NOW - will skip charging premium for inactive accounts", async () => {
-    //         // CASE 4 (REUNDANT FOR NOW) - Policy holder 5 withdraws, then premium is charged twice
-    //         // Redundant because we allow the edge case of premium collector charging a deactivated account more than once
+        // it("REDUNDANT FOR NOW - will skip charging premium for inactive accounts", async () => {
+            // CASE 4 (REUNDANT FOR NOW) - Policy holder 5 withdraws, then premium is charged twice
+            // Redundant because we allow the edge case of premium collector charging a deactivated account more than once
 
-    //         // let initialSoteriaBalance = await dai.balanceOf(solaceCoverProduct.address);
-    //         // let initialPremiumPoolBalance = await dai.balanceOf(premiumPool.address);
-    //         // let initialHolderFunds = await solaceCoverProduct.accountBalanceOf(policyholder5.address);
+            // let initialSoteriaBalance = await dai.balanceOf(solaceCoverProduct.address);
+            // let initialPremiumPoolBalance = await dai.balanceOf(premiumPool.address);
+            // let initialHolderFunds = await solaceCoverProduct.accountBalanceOf(policyholder5.address);
 
-    //         // // Policy holder 5 withdraw
-    //         // await solaceCoverProduct.connect(policyholder5).withdraw();
+            // // Policy holder 5 withdraw
+            // await solaceCoverProduct.connect(policyholder5).withdraw();
             
-    //         // let minRequiredAccountBalance = maxRateNum.mul(ONE_WEEK).mul(INITIAL_COVER_LIMIT).div(maxRateDenom)
-    //         // console.log(Number(minRequiredAccountBalance))
-    //         // console.log(Number(await solaceCoverProduct.accountBalanceOf(policyholder5.address)))
-    //         // console.log(Number(WEEKLY_MAX_PREMIUM))
+            // let minRequiredAccountBalance = maxRateNum.mul(ONE_WEEK).mul(INITIAL_COVER_LIMIT).div(maxRateDenom)
+            // console.log(Number(minRequiredAccountBalance))
+            // console.log(Number(await solaceCoverProduct.accountBalanceOf(policyholder5.address)))
+            // console.log(Number(WEEKLY_MAX_PREMIUM))
 
-    //         // // charge premiums
-    //         // let tx = await solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder5.address], [WEEKLY_MAX_PREMIUM]);
-    //         // await expect(tx).emit(solaceCoverProduct, "PremiumCharged").withArgs(policyholder5.address, WEEKLY_MAX_PREMIUM);
-    //         // console.log(Number(await solaceCoverProduct.accountBalanceOf(policyholder5.address)))
+            // // charge premiums
+            // let tx = await solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder5.address], [WEEKLY_MAX_PREMIUM]);
+            // await expect(tx).emit(solaceCoverProduct, "PremiumCharged").withArgs(policyholder5.address, WEEKLY_MAX_PREMIUM);
+            // console.log(Number(await solaceCoverProduct.accountBalanceOf(policyholder5.address)))
 
-    //         // let tx = solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder2.address, policyholder4.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM]);
-    //         // await expect(tx).emit(solaceCoverProduct, "PremiumCharged").withArgs(policyholder2.address, WEEKLY_MAX_PREMIUM);
+            // let tx = solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder2.address, policyholder4.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM]);
+            // await expect(tx).emit(solaceCoverProduct, "PremiumCharged").withArgs(policyholder2.address, WEEKLY_MAX_PREMIUM);
          
-    //         // expect(await solaceCoverProduct.connect(policyholder2).accountBalanceOf(policyholder2.address)).to.equal(initialHolderFunds.sub(WEEKLY_MAX_PREMIUM));
+            // expect(await solaceCoverProduct.connect(policyholder2).accountBalanceOf(policyholder2.address)).to.equal(initialHolderFunds.sub(WEEKLY_MAX_PREMIUM));
          
-    //         // // soteria balance should be decreased by single weekly premium
-    //         // expect(await dai.balanceOf(solaceCoverProduct.address)).to.equal(initialSoteriaBalance.sub(WEEKLY_MAX_PREMIUM));
+            // // soteria balance should be decreased by single weekly premium
+            // expect(await dai.balanceOf(solaceCoverProduct.address)).to.equal(initialSoteriaBalance.sub(WEEKLY_MAX_PREMIUM));
           
-    //         // // single weekly premium should be sent to premium pool
-    //         // expect(await dai.balanceOf(premiumPool.address)).to.equal(initialPremiumPoolBalance.add(WEEKLY_MAX_PREMIUM));
-    //     // });
+            // // single weekly premium should be sent to premium pool
+            // expect(await dai.balanceOf(premiumPool.address)).to.equal(initialPremiumPoolBalance.add(WEEKLY_MAX_PREMIUM));
+        // });
 
         it("will correctly charge premiums with reward points", async () => {
             // CASE 5 - Charge weekly premium for three active policies
@@ -1170,17 +1247,14 @@ describe("SolaceCoverProduct", function() {
             // Policy 2: reward points can partially pay for premium, rest will come from account balance
             // Policy 3: reward points + account balance unable to fully pay for premium
 
-            // Set up reward points for policy 1 and 2
-            // Use referral code to set up reward points for policy 1
-            // Use setRewardPoints() method to set up reward points for policy 2
+            // Set up reward points for policy 1 and 2 - with setRewardPoints()
             let EXCESS_REWARD_POINTS = WEEKLY_MAX_PREMIUM.mul(2)
             let INSUFFICIENT_REWARD_POINTS = WEEKLY_MAX_PREMIUM.div(10)
 
-            let referralCode = await getSolaceReferralCode(policyholder2, solaceCoverProduct)
-            let coverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_1);
-            let tx = await solaceCoverProduct.connect(policyholder1).updateCoverLimit(coverLimit, referralCode);
+            let tx = await solaceCoverProduct.connect(coverPromotionAdmin).setRewardPoints(policyholder1.address, EXCESS_REWARD_POINTS)
+            expect(tx).to.emit(solaceCoverProduct, "RewardPointsSet").withArgs(policyholder1.address, EXCESS_REWARD_POINTS);
             let initialRewardPoints1 = await solaceCoverProduct.rewardPointsOf(policyholder1.address)
-            expect(initialRewardPoints1).gt(EXCESS_REWARD_POINTS)
+            expect(initialRewardPoints1).eq(EXCESS_REWARD_POINTS)
 
             tx = await solaceCoverProduct.connect(coverPromotionAdmin).setRewardPoints(policyholder2.address, INSUFFICIENT_REWARD_POINTS)
             expect(tx).to.emit(solaceCoverProduct, "RewardPointsSet").withArgs(policyholder2.address, INSUFFICIENT_REWARD_POINTS);
@@ -1211,6 +1285,9 @@ describe("SolaceCoverProduct", function() {
             let initialRMSoteriaCoverAmount = await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address);
             let initialContractDAIBalance = await dai.balanceOf(solaceCoverProduct.address)
             let initialPremiumPoolDAIBalance = await dai.balanceOf(premiumPool.address)
+            let initialPremiumPaid1 = await solaceCoverProduct.premiumsPaidOf(policyholder1.address);
+            let initialPremiumPaid2 = await solaceCoverProduct.premiumsPaidOf(policyholder2.address);
+            let initialPremiumPaid3 = await solaceCoverProduct.premiumsPaidOf(policyholder3.address);
 
             tx = await solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder1.address, policyholder2.address, policyholder3.address, premiumPool.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM])
             expect(tx).to.emit(solaceCoverProduct, "PremiumCharged").withArgs(policyholder1.address, WEEKLY_MAX_PREMIUM);
@@ -1220,6 +1297,11 @@ describe("SolaceCoverProduct", function() {
             await expect(tx).emit(riskManager, "ActiveCoverLimitUpdated").withArgs(solaceCoverProduct.address, initialActiveCoverLimit, initialActiveCoverLimit.sub(initialPolicy3CoverLimit));
             
             // Confirm state is what we expect after charging premium
+
+            // Check premiumsPaid
+            expect(await solaceCoverProduct.premiumsPaidOf(policyholder1.address)).eq(initialPremiumPaid1)
+            expect(await solaceCoverProduct.premiumsPaidOf(policyholder2.address)).eq(initialPremiumPaid2.add(WEEKLY_MAX_PREMIUM).sub(INSUFFICIENT_REWARD_POINTS))
+            expect(await solaceCoverProduct.premiumsPaidOf(policyholder3.address)).eq(initialPremiumPaid3.add(initialHolder3AccountBalance))
 
             // Check reward points
             expect(await solaceCoverProduct.rewardPointsOf(policyholder1.address)).eq(initialRewardPoints1.sub(WEEKLY_MAX_PREMIUM))            
@@ -1328,6 +1410,14 @@ describe("SolaceCoverProduct", function() {
     //         expect(await usdc.balanceOf(usdcPolicyholder.address)).eq(withdrawAmount.div(10**12))
     //     })
     // })
+
+    // Credit to https://medium.com/coinmonks/solidity-tutorial-all-about-mappings-29a12269ee14
+
+    async function manipulatePremiumPaidOf(policyholder: Wallet, desiredBalance: BN) {
+        const storageSlot = utils.keccak256(utils.defaultAbiCoder.encode(["address", "uint256"], [policyholder.address, 22]))
+        await provider.send("hardhat_setStorageAt", [solaceCoverProduct.address, storageSlot, toBytes32(desiredBalance).toString()])
+        await provider.send("evm_mine", [])
+    }
 
     // Credit to https://kndrck.co/posts/local_erc20_bal_mani_w_hh/
 
