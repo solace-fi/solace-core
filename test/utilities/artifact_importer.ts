@@ -88,6 +88,7 @@ export async function import_artifacts() {
 
   // soteria coverage product
   artifacts.SolaceCoverProduct = await tryImport(`${artifact_dir}/products/SolaceCoverProduct.sol/SolaceCoverProduct.json`);
+  artifacts.SolaceCoverProductFrax = await tryImport(`${artifact_dir}/products/SolaceCoverProductFrax.sol/SolaceCoverProductFrax.json`);
   return artifacts;
 }
 

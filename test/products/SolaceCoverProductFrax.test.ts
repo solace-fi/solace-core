@@ -5,7 +5,7 @@ import chai from "chai";
 import { config as dotenv_config } from "dotenv";
 import { import_artifacts, ArtifactImports } from "../utilities/artifact_importer";
 import { getSolaceReferralCode } from "../utilities/getSolaceReferralCode"
-import { Registry, RiskManager, SolaceCoverProduct, CoverageDataProvider, Solace, MockPriceOracle, MockSlp, MockErc20Permit } from "../../typechain";
+import { Registry, RiskManager, SolaceCoverProductFrax, CoverageDataProvider, Solace, MockPriceOracle, MockSlp, MockErc20Permit } from "../../typechain";
 import { Console } from "console";
 import { expectClose } from "./../utilities/math";
 
@@ -19,13 +19,13 @@ chai.use(solidity)
 const DOMAIN_NAME = "Solace.fi-SolaceCoverProduct";
 const VERSION = "1";
 
-describe("SolaceCoverProduct", function() {
+describe("SolaceCoverProductFrax", function() {
     let artifacts: ArtifactImports;
     let registry: Registry;
     let riskManager: RiskManager;
     let solace: Solace;
-    let solaceCoverProduct: SolaceCoverProduct;
-    let dai: MockErc20Permit;
+    let solaceCoverProduct: SolaceCoverProductFrax;
+    let frax: MockErc20Permit;
     let usdc: MockErc20Permit;
     let priceOracle: MockPriceOracle;
     let solaceUsdcPool: MockSlp;
@@ -34,10 +34,10 @@ describe("SolaceCoverProduct", function() {
     const [deployer, governor, newGovernor, policyholder1, policyholder2, policyholder3, policyholder4, policyholder5, underwritingPool, premiumPool, premiumCollector, coverPromotionAdmin, usdcPolicyholder] = provider.getWallets();
     const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
     const ONE_ETH = BN.from("1000000000000000000"); // 1 eth
-    const INITIAL_DEPOSIT = ONE_ETH.mul(1000); // 1000 DAI
-    const INITIAL_COVER_LIMIT = ONE_ETH.mul(10000); // 10000 DAI
-    const ONE_MILLION_DAI = ONE_ETH.mul(1000000)
-    const NEW_COVER_LIMIT = INITIAL_COVER_LIMIT.mul(2); // 20000 DAI
+    const INITIAL_DEPOSIT = ONE_ETH.mul(1000); // 1000 FRAX
+    const INITIAL_COVER_LIMIT = ONE_ETH.mul(10000); // 10000 FRAX
+    const ONE_MILLION_FRAX = ONE_ETH.mul(1000000)
+    const NEW_COVER_LIMIT = INITIAL_COVER_LIMIT.mul(2); // 20000 FRAX
     const ONE_TENTH_ETH = BN.from("100000000000000000"); // 0.1 eth
     const TWO_ETH = BN.from("2000000000000000000"); // 1 eth
     const ONE_THOUSAND_USDC = BN.from("1000000000")
@@ -45,9 +45,9 @@ describe("SolaceCoverProduct", function() {
     const ZERO_AMOUNT = BN.from("0");
     const ANNUAL_MAX_PREMIUM = INITIAL_COVER_LIMIT.div(10); // 0.1 eth, for testing we assume max annual rate of 10% of cover limit
     const WEEKLY_MAX_PREMIUM = ANNUAL_MAX_PREMIUM.mul(604800).div(31536000);
-    // mainnet
+    // polygon
     const TOKEN0 = "0x501ace9c35e60f03a2af4d484f49f9b1efde9f40"; // SOLACE.sol
-    const TOKEN1 = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"; // USDC.sol
+    const TOKEN1 = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"; // USDC.sol
     const RESERVE0 = BN.from("13250148273341498385651903");
     const RESERVE1 = BN.from("1277929641956");
     const STRATEGY_STATUS = {
@@ -63,16 +63,16 @@ describe("SolaceCoverProduct", function() {
     const ONE_WEEK = BN.from("604800");
     const maxRateNum = BN.from("1");
     const maxRateDenom = BN.from("315360000"); // We are testing with maxRateNum and maxRateDenom that gives us an annual max rate of 10% coverLimit
-    const REFERRAL_REWARD = ONE_ETH.mul(50) // 50 DAI
-    const REFERRAL_THRESHOLD = ONE_ETH.mul(100) // 100 DAI
+    const REFERRAL_REWARD = ONE_ETH.mul(50) // 50 FRAX
+    const REFERRAL_THRESHOLD = ONE_ETH.mul(100) // 100 FRAX
 
     // Random 130 character hex string
     const FAKE_REFERRAL_CODE = "0xe4e7cba021ff6b83b14d54016198f31b04cba044d71d9a8b9bdf964aa2259cc3b207237f814aa56e516638b448edc43a6c3f4637dca5de54cb199e37b039a832e7"
 
-    // mainnet
-    const DAI_ADDRESS = "0x6B175474E89094C44Da98b954EedeAC495271d0F"
-    const USDC_ADDRESS = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
-    const WETH_ADDRESS = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+    // polygon
+    const FRAX_ADDRESS = "0x45c32fA6DF82ead1e2EF74d17b76547EDdFaFF89"
+    const USDC_ADDRESS = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
+    const WETH_ADDRESS = "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619"
 
     before( async () => {
         artifacts = await import_artifacts();
@@ -88,37 +88,37 @@ describe("SolaceCoverProduct", function() {
 
         priceOracle = (await deployContract(deployer, artifacts.MockPriceOracle)) as MockPriceOracle;
         solaceUsdcPool = (await deployContract(deployer, artifacts.MockSLP, ["SushiSwap LP Token", "SLP", ONE_ETH.mul(1000000), TOKEN0, TOKEN1, RESERVE0, RESERVE1])) as MockSlp;
-        
+
         coverageDataProvider = (await deployContract(deployer, artifacts.CoverageDataProvider, [governor.address])) as CoverageDataProvider;
         await registry.connect(governor).set(["coverageDataProvider"], [coverageDataProvider.address])
     });
 
     describe("deployment", () => {
         let mockRegistry: Registry;
-        
+
         before(async () => {
             mockRegistry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
         });
 
         it("reverts for zero address registry", async () => {
-            await expect(deployContract(deployer, artifacts.SolaceCoverProduct, [governor.address, ZERO_ADDRESS, DOMAIN_NAME, VERSION])).to.be.revertedWith("zero address registry");
+            await expect(deployContract(deployer, artifacts.SolaceCoverProductFrax, [governor.address, ZERO_ADDRESS, DOMAIN_NAME, VERSION])).to.be.revertedWith("zero address registry");
         });
 
         it("reverts for zero address riskmanager", async () => {
-            await expect(deployContract(deployer, artifacts.SolaceCoverProduct, [governor.address, mockRegistry.address, DOMAIN_NAME, VERSION])).to.be.revertedWith("key not in mapping");
+            await expect(deployContract(deployer, artifacts.SolaceCoverProductFrax, [governor.address, mockRegistry.address, DOMAIN_NAME, VERSION])).to.be.revertedWith("key not in mapping");
         });
 
         it("reverts for zero address governance", async () => {
-            await expect(deployContract(deployer, artifacts.SolaceCoverProduct, [ZERO_ADDRESS, registry.address , DOMAIN_NAME, VERSION])).to.be.revertedWith("zero address governance");
+            await expect(deployContract(deployer, artifacts.SolaceCoverProductFrax, [ZERO_ADDRESS, registry.address , DOMAIN_NAME, VERSION])).to.be.revertedWith("zero address governance");
         });
 
-        it("reverts for zero address dai", async () => {
-            await expect(deployContract(deployer, artifacts.SolaceCoverProduct, [governor.address, registry.address , DOMAIN_NAME, VERSION])).to.be.revertedWith("key not in mapping");
-            await registry.connect(governor).set(["dai"], [DAI_ADDRESS])
+        it("reverts for zero address frax", async () => {
+            await expect(deployContract(deployer, artifacts.SolaceCoverProductFrax, [governor.address, registry.address , DOMAIN_NAME, VERSION])).to.be.revertedWith("key not in mapping");
+            await registry.connect(governor).set(["frax"], [FRAX_ADDRESS])
         });
 
         it("can deploy", async () => {
-            solaceCoverProduct = await deployContract(deployer, artifacts.SolaceCoverProduct, [governor.address, registry.address , DOMAIN_NAME, VERSION]) as SolaceCoverProduct;
+            solaceCoverProduct = await deployContract(deployer, artifacts.SolaceCoverProductFrax, [governor.address, registry.address , DOMAIN_NAME, VERSION]) as SolaceCoverProductFrax;
             expect(solaceCoverProduct.address).to.not.undefined;
         });
 
@@ -131,20 +131,20 @@ describe("SolaceCoverProduct", function() {
             expect(await solaceCoverProduct.isReferralOn()).eq(true);
         })
 
-        it("completes DAI setup", async() => {
-            const Dai = await ethers.getContractFactory("MockERC20Permit");
-            dai = await Dai.attach(DAI_ADDRESS) as MockErc20Permit
-            
-            // Give 10,000 DAI to all active test wallets
-            await manipulateDAIbalance(policyholder1, ONE_ETH.mul(10000))
-            await manipulateDAIbalance(governor, ONE_ETH.mul(10000))
-            expect(await dai.balanceOf(policyholder1.address)).eq(ONE_ETH.mul(10000))
-            expect(await dai.balanceOf(governor.address)).eq(ONE_ETH.mul(10000))
+        it("completes FRAX setup", async() => {
+            const Frax = await ethers.getContractFactory("MockERC20Permit");
+            frax = await Frax.attach(FRAX_ADDRESS) as MockErc20Permit
+
+            // Give 10,000 FRAX to all active test wallets
+            await manipulateFRAXbalance(policyholder1, ONE_ETH.mul(10000))
+            await manipulateFRAXbalance(governor, ONE_ETH.mul(10000))
+            expect(await frax.balanceOf(policyholder1.address)).eq(ONE_ETH.mul(10000))
+            expect(await frax.balanceOf(governor.address)).eq(ONE_ETH.mul(10000))
 
             // Grant infinite ERC20 allowance from active test wallets to Soteria
-            await dai.connect(policyholder1).approve(solaceCoverProduct.address, constants.MaxUint256)
-            await dai.connect(policyholder2).approve(solaceCoverProduct.address, constants.MaxUint256)
-            await dai.connect(governor).approve(solaceCoverProduct.address, constants.MaxUint256)
+            await frax.connect(policyholder1).approve(solaceCoverProduct.address, constants.MaxUint256)
+            await frax.connect(policyholder2).approve(solaceCoverProduct.address, constants.MaxUint256)
+            await frax.connect(governor).approve(solaceCoverProduct.address, constants.MaxUint256)
         })
         it("manipulatePremiumPaidOf helper function working", async() => {
             await manipulatePremiumPaidOf(deployer, BN.from(11))
@@ -187,23 +187,23 @@ describe("SolaceCoverProduct", function() {
         it("starts unpaused", async () => {
           expect(await solaceCoverProduct.paused()).to.equal(false);
         });
-    
+
         it("cannot be paused by non governance", async () => {
           await expect(solaceCoverProduct.connect(policyholder1).setPaused(true)).to.be.revertedWith("!governance");
           expect(await solaceCoverProduct.paused()).to.equal(false);
         });
-    
+
         it("can be paused", async () => {
           let tx = await solaceCoverProduct.connect(governor).setPaused(true);
           expect(tx).to.emit(solaceCoverProduct, "PauseSet").withArgs(true);
           expect(await solaceCoverProduct.paused()).to.equal(true);
         });
-    
+
         it("cannot be unpaused by non governance", async () => {
           await expect(solaceCoverProduct.connect(policyholder1).setPaused(false)).to.be.revertedWith("!governance");
           expect(await solaceCoverProduct.paused()).to.equal(true);
         });
-    
+
         it("can be unpaused", async () => {
           let tx = await solaceCoverProduct.connect(governor).setPaused(false);
           expect(tx).to.emit(solaceCoverProduct, "PauseSet").withArgs(false);
@@ -245,13 +245,13 @@ describe("SolaceCoverProduct", function() {
             await expect(solaceCoverProduct.connect(governor).setRegistry(registry2.address)).to.revertedWith("key not in mapping");
         });
 
-        it("reverts for zero address dai", async () => {
+        it("reverts for zero address frax", async () => {
             await registry2.connect(governor).set(["riskManager"], [riskManager2.address]);
             await expect(solaceCoverProduct.connect(governor).setRegistry(registry2.address)).to.revertedWith("key not in mapping");
         });
 
         it("governance can set registry", async () => {
-            await registry2.connect(governor).set(["dai"], [DAI_ADDRESS]);
+            await registry2.connect(governor).set(["frax"], [FRAX_ADDRESS]);
             let tx = await solaceCoverProduct.connect(governor).setRegistry(registry2.address);
             expect(tx).emit(solaceCoverProduct, "RegistrySet").withArgs(registry2.address);
             expect(await solaceCoverProduct.connect(policyholder1).riskManager()).to.equal(riskManager2.address);
@@ -455,7 +455,7 @@ describe("SolaceCoverProduct", function() {
 
         before(async () => {
             await riskManager.connect(governor).addCoverLimitUpdater(solaceCoverProduct.address);
-            
+
             // risk manager active cover amount and active cover amount for soteria.
             rmActiveCoverLimit = await riskManager.activeCoverLimit();
             rmSoteriaactiveCoverLimit = await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address);
@@ -490,11 +490,11 @@ describe("SolaceCoverProduct", function() {
             expect(maxCover1).to.equal(0)
             expect(await coverageDataProvider.numOfPools()).to.equal(0);
 
-            await coverageDataProvider.connect(governor).set("underwritingPool", ONE_MILLION_DAI);
+            await coverageDataProvider.connect(governor).set("underwritingPool", ONE_MILLION_FRAX);
             expect(await coverageDataProvider.connect(governor).numOfPools()).to.equal(1);
             let maxCover2 = await riskManager.maxCover();
-            expect(maxCover2).to.equal(maxCover1.add(ONE_MILLION_DAI));
-            
+            expect(maxCover2).to.equal(maxCover1.add(ONE_MILLION_FRAX));
+
             // add Soteria to the risk manager and assign coverage allocation
             await riskManager.connect(governor).addRiskStrategy(solaceCoverProduct.address);
             await riskManager.connect(governor).setStrategyStatus(solaceCoverProduct.address, STRATEGY_STATUS.ACTIVE);
@@ -509,7 +509,7 @@ describe("SolaceCoverProduct", function() {
         });
 
         it("cannot buy policy when insufficient user balance for deposit", async () => {
-            const userBalance = await dai.balanceOf(policyholder1.address)
+            const userBalance = await frax.balanceOf(policyholder1.address)
             await expect(solaceCoverProduct.connect(policyholder1).activatePolicy(policyholder1.address, ONE_ETH, userBalance.mul(2), [])).to.revertedWith("insufficient caller balance for deposit");
         })
 
@@ -517,7 +517,7 @@ describe("SolaceCoverProduct", function() {
             await expect(solaceCoverProduct.connect(policyholder1).activatePolicy(policyholder1.address, ONE_ETH, 0, [])).to.revertedWith("insufficient deposit for minimum required account balance");
         });
 
-        it("can activate policy - 10000 DAI cover with 1000 DAI deposit", async () => {
+        it("can activate policy - 10000 FRAX cover with 1000 FRAX deposit", async () => {
             let tx = await solaceCoverProduct.connect(policyholder1).activatePolicy(policyholder1.address, INITIAL_COVER_LIMIT, INITIAL_DEPOSIT, []);
 
             await expect(tx).emit(solaceCoverProduct, "PolicyCreated").withArgs(POLICY_ID_1);
@@ -533,7 +533,7 @@ describe("SolaceCoverProduct", function() {
             expect (await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address)).eq(INITIAL_COVER_LIMIT)
             expect (await solaceCoverProduct.policyCount()).eq(1)
             expect (await solaceCoverProduct.coverLimitOf(POLICY_ID_1)).eq(INITIAL_COVER_LIMIT)
-            expect(await dai.balanceOf(solaceCoverProduct.address)).to.equal(INITIAL_DEPOSIT);
+            expect(await frax.balanceOf(solaceCoverProduct.address)).to.equal(INITIAL_DEPOSIT);
             expect (await solaceCoverProduct.cooldownStart(policyholder1.address)).eq(0)
         });
 
@@ -541,14 +541,14 @@ describe("SolaceCoverProduct", function() {
             await expect(solaceCoverProduct.connect(policyholder1).activatePolicy(policyholder1.address, INITIAL_COVER_LIMIT, INITIAL_DEPOSIT, [])).to.be.revertedWith("policy already activated")
             await expect(solaceCoverProduct.connect(policyholder2).activatePolicy(policyholder1.address, INITIAL_COVER_LIMIT, INITIAL_DEPOSIT, [])).to.be.revertedWith("policy already activated")
         })
-        
+
         it("cannot transfer policy", async () => {
             await expect(solaceCoverProduct.connect(policyholder1).transferFrom(policyholder1.address, policyholder2.address, 1)).to.be.revertedWith("only minting permitted");
             await expect(solaceCoverProduct.connect(policyholder1).transferFrom(policyholder1.address, ZERO_ADDRESS, 1)).to.be.revertedWith("ERC721: transfer to the zero address");
             // TO-DO, test ERC721.safeTransferFrom() => TypeError: solaceCoverProduct.connect(...).safeTransferFrom is not a function
         })
 
-        it("can activate policy for another address - 10000 DAI cover with 1000 DAI deposit", async () => {
+        it("can activate policy for another address - 10000 FRAX cover with 1000 FRAX deposit", async () => {
             let tx = await solaceCoverProduct.connect(policyholder1).activatePolicy(policyholder2.address, INITIAL_COVER_LIMIT, INITIAL_DEPOSIT, []);
 
             await expect(tx).emit(solaceCoverProduct, "PolicyCreated").withArgs(POLICY_ID_2);
@@ -565,7 +565,7 @@ describe("SolaceCoverProduct", function() {
             expect (await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address)).eq(INITIAL_COVER_LIMIT.mul(2))
             expect (await solaceCoverProduct.policyCount()).eq(2)
             expect (await solaceCoverProduct.coverLimitOf(POLICY_ID_2)).eq(INITIAL_COVER_LIMIT)
-            expect(await dai.balanceOf(solaceCoverProduct.address)).to.equal(INITIAL_DEPOSIT.mul(2));
+            expect(await frax.balanceOf(solaceCoverProduct.address)).to.equal(INITIAL_DEPOSIT.mul(2));
             expect (await solaceCoverProduct.cooldownStart(policyholder2.address)).eq(0)
         });
         it("policy holder should have policy nft after buying coverage", async () => {
@@ -597,7 +597,7 @@ describe("SolaceCoverProduct", function() {
             expect(await solaceCoverProduct.isReferralOn()).eq(false)
 
             // Get valid referral code (we know it is valid, because it works in the next unit test)
-            
+
             let referralCode = await getSolaceReferralCode(policyholder1, solaceCoverProduct)
             let coverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_2);
 
@@ -624,7 +624,7 @@ describe("SolaceCoverProduct", function() {
         it("cannot use own referral code", async () => {
             // Temporary state change just for this state, set premiumPaidOf(policyholder3) = 100
             await manipulatePremiumPaidOf(policyholder3, REFERRAL_THRESHOLD)
-            
+
             // Create new wallet just for this unit test scope, to avoid creating side effects that impact other unit tests. It's a headfuck to work that out.
             const ownReferralCode = await getSolaceReferralCode(policyholder3, solaceCoverProduct)
             await expect(solaceCoverProduct.connect(governor).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, INITIAL_DEPOSIT, ownReferralCode)).to.revertedWith("cannot refer to self");
@@ -647,7 +647,7 @@ describe("SolaceCoverProduct", function() {
             await manipulatePremiumPaidOf(policyholder3, REFERRAL_THRESHOLD)
 
             let referralCode = await getSolaceReferralCode(policyholder1, solaceCoverProduct)
-            
+
             let tx = await solaceCoverProduct.connect(governor).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, INITIAL_DEPOSIT, referralCode);
             await expect(tx).emit(solaceCoverProduct, "PolicyCreated").withArgs(POLICY_ID_3);
             await expect(tx).emit(solaceCoverProduct, "ReferralRewardsEarned").withArgs(policyholder1.address, REFERRAL_REWARD);
@@ -685,22 +685,22 @@ describe("SolaceCoverProduct", function() {
         })
         it("can deposit", async () => {
             let accountBalance = await solaceCoverProduct.accountBalanceOf(policyholder1.address);
-            let soteriaContractDAIbalance = await dai.balanceOf(solaceCoverProduct.address)
+            let soteriaContractFRAXbalance = await frax.balanceOf(solaceCoverProduct.address)
             let tx = await solaceCoverProduct.connect(policyholder1).deposit(policyholder1.address, INITIAL_DEPOSIT);
             await expect(tx).emit(solaceCoverProduct, "DepositMade").withArgs(policyholder1.address, policyholder1.address, INITIAL_DEPOSIT);
             expect(await solaceCoverProduct.accountBalanceOf(policyholder1.address)).to.equal(accountBalance.add(INITIAL_DEPOSIT));
-            expect(await dai.balanceOf(solaceCoverProduct.address)).to.equal(soteriaContractDAIbalance.add(INITIAL_DEPOSIT));
+            expect(await frax.balanceOf(solaceCoverProduct.address)).to.equal(soteriaContractFRAXbalance.add(INITIAL_DEPOSIT));
         });
 
         it("can deposit on behalf of policy holder", async () => {
             let accountBalance = await solaceCoverProduct.accountBalanceOf(policyholder2.address);
-            let soteriaContractDAIbalance = await dai.balanceOf(solaceCoverProduct.address)
+            let soteriaContractFRAXbalance = await frax.balanceOf(solaceCoverProduct.address)
             let tx = await solaceCoverProduct.connect(policyholder1).deposit(policyholder2.address, INITIAL_DEPOSIT);
             await expect(tx).emit(solaceCoverProduct, "DepositMade").withArgs(policyholder1.address, policyholder2.address, INITIAL_DEPOSIT);
             expect(await solaceCoverProduct.accountBalanceOf(policyholder2.address)).to.equal(accountBalance.add(INITIAL_DEPOSIT));
-            expect(await dai.balanceOf(solaceCoverProduct.address)).to.equal(soteriaContractDAIbalance.add(INITIAL_DEPOSIT));
+            expect(await frax.balanceOf(solaceCoverProduct.address)).to.equal(soteriaContractFRAXbalance.add(INITIAL_DEPOSIT));
         });
-        
+
         it("cannot deposit while paused", async () => {
             await solaceCoverProduct.connect(governor).setPaused(true);
             await expect(solaceCoverProduct.connect(policyholder1).deposit(policyholder1.address, INITIAL_DEPOSIT)).to.revertedWith("contract paused");
@@ -726,7 +726,7 @@ describe("SolaceCoverProduct", function() {
             // risk manager current values
             initialMCR = await riskManager.minCapitalRequirement();
             initialMCRForSoteria = await riskManager.minCapitalRequirementPerStrategy(solaceCoverProduct.address);
-            
+
             // risk manager current values
             initialRMActiveCoverLimit = await riskManager.activeCoverLimit();
             initialRMActiveCoverLimitForSoteria = await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address);
@@ -765,16 +765,16 @@ describe("SolaceCoverProduct", function() {
             let chargeCycle = await solaceCoverProduct.chargeCycle();
             let accountBalance = await solaceCoverProduct.accountBalanceOf(policyholder1.address)
             let maxPermissibleNewCoverLimit = accountBalance.mul(maxRateDenom).div(maxRateNum).div(chargeCycle)
-            
+
             // Temporarily increase underwriting pool balance to avoid running into "insufficient capacity for new cover" revert
-            await coverageDataProvider.connect(governor).set("underwritingPool", ONE_MILLION_DAI.mul(1000000));
+            await coverageDataProvider.connect(governor).set("underwritingPool", ONE_MILLION_FRAX.mul(1000000));
             await expect(solaceCoverProduct.connect(policyholder1).updateCoverLimit(maxPermissibleNewCoverLimit.add(ONE_ETH), [])).to.revertedWith("insufficient deposit for minimum required account balance");
-            await coverageDataProvider.connect(governor).set("underwritingPool", ONE_MILLION_DAI);
+            await coverageDataProvider.connect(governor).set("underwritingPool", ONE_MILLION_FRAX);
         })
 
         it("policy owner can update policy", async () => {
             let activeCoverLimit = initialSoteriaActiveCoverLimit.add(NEW_COVER_LIMIT).sub(initialPolicyCoverLimit);
-            
+
             let tx = await solaceCoverProduct.connect(policyholder1).updateCoverLimit(NEW_COVER_LIMIT, []);
 
             await expect(tx).emit(solaceCoverProduct, "PolicyUpdated").withArgs(POLICY_ID_1);
@@ -800,7 +800,7 @@ describe("SolaceCoverProduct", function() {
             expect(await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address)).to.equal(amount2);
         });
 
-        it("should update risk manager mcr", async () => {         
+        it("should update risk manager mcr", async () => {
             let amount1 = initialMCR.add(NEW_COVER_LIMIT).sub(initialPolicyCoverLimit);
             let amount2 = initialMCRForSoteria.add(NEW_COVER_LIMIT).sub(initialPolicyCoverLimit);
             expect(await riskManager.minCapitalRequirement()).to.equal(amount1);
@@ -824,7 +824,7 @@ describe("SolaceCoverProduct", function() {
         it("cannot use invalid referral code", async () => {
             // Temporary state change just for this state, set premiumPaidOf(policyholder1) = 100
             await manipulatePremiumPaidOf(policyholder1, REFERRAL_THRESHOLD)
-            
+
             let coverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_1);
             await expect(solaceCoverProduct.connect(policyholder1).updateCoverLimit(coverLimit, FAKE_REFERRAL_CODE)).to.be.reverted;
 
@@ -927,7 +927,7 @@ describe("SolaceCoverProduct", function() {
             let tx = await solaceCoverProduct.connect(policyholder3).deactivatePolicy();
             await expect(tx).emit(solaceCoverProduct, "PolicyDeactivated").withArgs(POLICY_ID_3);
             await expect(tx).emit(riskManager, "ActiveCoverLimitUpdated").withArgs(solaceCoverProduct.address, initialRMActiveCoverLimit, initialRMActiveCoverLimit.sub(initialPolicyCoverLimit));
-            
+
             // user balance should not change
             let receipt = await tx.wait();
             let gasCost = receipt.gasUsed.mul(receipt.effectiveGasPrice);
@@ -955,10 +955,10 @@ describe("SolaceCoverProduct", function() {
 
     describe("withdraw", () => {
         let initialAccountBalance: BN;
-        let initialAccountDAIBalance: BN;
+        let initialAccountFRAXBalance: BN;
         let initialPolicyCover:BN;
-        let initialPolicyholderDAIBalance: BN;
-        let initialSoteriaDAIBalance: BN;
+        let initialPolicyholderFRAXBalance: BN;
+        let initialSoteriaFRAXBalance: BN;
         let initialActiveCoverLimit: BN;
         let initialAvailableCoverCapacity: BN;
         let initialRMActiveCoverLimit: BN;
@@ -976,8 +976,8 @@ describe("SolaceCoverProduct", function() {
             initialAccountBalance = await solaceCoverProduct.accountBalanceOf(policyholder3.address);
             initialPolicyCover = await solaceCoverProduct.coverLimitOf(POLICY_ID_3);
 
-            initialPolicyholderDAIBalance = await dai.balanceOf(policyholder3.address)
-            initialSoteriaDAIBalance = await dai.balanceOf(solaceCoverProduct.address)
+            initialPolicyholderFRAXBalance = await frax.balanceOf(policyholder3.address)
+            initialSoteriaFRAXBalance = await frax.balanceOf(solaceCoverProduct.address)
 
             initialActiveCoverLimit = await solaceCoverProduct.connect(policyholder3).activeCoverLimit();
             initialAvailableCoverCapacity = await solaceCoverProduct.availableCoverCapacity();
@@ -991,7 +991,7 @@ describe("SolaceCoverProduct", function() {
             cooldownStart =  await solaceCoverProduct.cooldownStart(policyholder3.address)
             cooldownPeriod = await solaceCoverProduct.cooldownPeriod()
         })
-        
+
         it("minRequiredAccountBalance view function working", async () => {
             expect(await solaceCoverProduct.minRequiredAccountBalance(INITIAL_COVER_LIMIT)).eq(minRequiredAccountBalance)
         })
@@ -1008,7 +1008,7 @@ describe("SolaceCoverProduct", function() {
         })
 
         it("when cooldown not started, will withdraw such that remaining balance = minRequiredAccountBalance", async () => {
-            const initialPolicyholder2DAIBalance = await dai.balanceOf(policyholder2.address)
+            const initialPolicyholder2FRAXBalance = await frax.balanceOf(policyholder2.address)
             const initialAccountBalanceOfPolicyHolder2 = await solaceCoverProduct.accountBalanceOf(policyholder2.address)
             expect(await solaceCoverProduct.cooldownStart(policyholder2.address)).eq(0)
 
@@ -1018,11 +1018,11 @@ describe("SolaceCoverProduct", function() {
 
             expect(initialAccountBalanceOfPolicyHolder2).gt(await solaceCoverProduct.accountBalanceOf(policyholder2.address))
             expect(await solaceCoverProduct.accountBalanceOf(policyholder2.address)).eq(minRequiredAccountBalance)
-            expect(await dai.balanceOf(policyholder2.address)).eq(initialPolicyholder2DAIBalance.add(withdrawAmount))
-            expect(await dai.balanceOf(solaceCoverProduct.address)).eq(initialSoteriaDAIBalance.sub(withdrawAmount))
+            expect(await frax.balanceOf(policyholder2.address)).eq(initialPolicyholder2FRAXBalance.add(withdrawAmount))
+            expect(await frax.balanceOf(solaceCoverProduct.address)).eq(initialSoteriaFRAXBalance.sub(withdrawAmount))
 
             await solaceCoverProduct.connect(policyholder2).deposit(policyholder2.address, withdrawAmount);
-            expect(await dai.balanceOf(policyholder2.address)).eq(initialPolicyholder2DAIBalance)
+            expect(await frax.balanceOf(policyholder2.address)).eq(initialPolicyholder2FRAXBalance)
             expect(await solaceCoverProduct.accountBalanceOf(policyholder2.address)).eq(initialAccountBalanceOfPolicyHolder2)
         })
         it("before cooldown complete, will withdraw such that remaining balance = minRequiredAccountBalance", async () => {
@@ -1030,7 +1030,7 @@ describe("SolaceCoverProduct", function() {
             const currentTimestamp = (await provider.getBlock('latest')).timestamp
             expect(cooldownStart).gt(0)
             expect(currentTimestamp).lt(cooldownStart.add(cooldownPeriod))
-            
+
             withdrawAmount = initialAccountBalance.sub(minRequiredAccountBalance)
 
             let tx = await solaceCoverProduct.connect(policyholder3).withdraw();
@@ -1038,24 +1038,24 @@ describe("SolaceCoverProduct", function() {
 
             expect(initialAccountBalance).gt(await solaceCoverProduct.accountBalanceOf(policyholder3.address))
             expect(await solaceCoverProduct.accountBalanceOf(policyholder3.address)).eq(minRequiredAccountBalance)
-            expect(await dai.balanceOf(policyholder3.address)).eq(initialPolicyholderDAIBalance.add(withdrawAmount))
-            expect(await dai.balanceOf(solaceCoverProduct.address)).eq(initialSoteriaDAIBalance.sub(withdrawAmount))
+            expect(await frax.balanceOf(policyholder3.address)).eq(initialPolicyholderFRAXBalance.add(withdrawAmount))
+            expect(await frax.balanceOf(solaceCoverProduct.address)).eq(initialSoteriaFRAXBalance.sub(withdrawAmount))
         })
         it("after cooldown complete, can withdraw entire account balance", async () => {
             const initialTimestamp = (await provider.getBlock('latest')).timestamp
             const postCooldownTimestamp = initialTimestamp + cooldownPeriod.toNumber()
             expect(BN.from(postCooldownTimestamp)).gt(cooldownStart.add(cooldownPeriod))
             await provider.send("evm_mine", [postCooldownTimestamp])
-            
-            let policyholderDAIBalance = await dai.balanceOf(policyholder3.address)
-            let soteriaDAIBalance = await dai.balanceOf(solaceCoverProduct.address)
+
+            let policyholderFRAXBalance = await frax.balanceOf(policyholder3.address)
+            let soteriaFRAXBalance = await frax.balanceOf(solaceCoverProduct.address)
             let accountBalance = await solaceCoverProduct.accountBalanceOf(policyholder3.address)
             let tx = await solaceCoverProduct.connect(policyholder3).withdraw();
             await expect(tx).emit(solaceCoverProduct, "WithdrawMade").withArgs(policyholder3.address, accountBalance);
 
             expect(await solaceCoverProduct.accountBalanceOf(policyholder3.address)).eq(0);
-            expect(await dai.balanceOf(policyholder3.address)).eq(policyholderDAIBalance.add(accountBalance))
-            expect(await dai.balanceOf(solaceCoverProduct.address)).eq(soteriaDAIBalance.sub(accountBalance))
+            expect(await frax.balanceOf(policyholder3.address)).eq(policyholderFRAXBalance.add(accountBalance))
+            expect(await frax.balanceOf(solaceCoverProduct.address)).eq(soteriaFRAXBalance.sub(accountBalance))
         })
 
         after(async () => {
@@ -1081,11 +1081,11 @@ describe("SolaceCoverProduct", function() {
 
         it("can charge premiums", async () => {
             // CASE 1 - Charge weekly premium for two policyholders, no reward points involved
-            
+
             let policyholder1AccountBalance = await solaceCoverProduct.connect(policyholder1).accountBalanceOf(policyholder1.address);
             let policyholder2AccountBalance = await solaceCoverProduct.connect(policyholder1).accountBalanceOf(policyholder2.address);
-            let initialContractDAIBalance = await dai.balanceOf(solaceCoverProduct.address)
-            let initialPremiumPoolDAIBalance = await dai.balanceOf(premiumPool.address)
+            let initialContractFRAXBalance = await frax.balanceOf(solaceCoverProduct.address)
+            let initialPremiumPoolFRAXBalance = await frax.balanceOf(premiumPool.address)
             let initialCoverLimit1 = await solaceCoverProduct.coverLimitOf(POLICY_ID_1);
             let initialCoverLimit2 = await solaceCoverProduct.coverLimitOf(POLICY_ID_2);
             let initialActiveCoverLimit = await solaceCoverProduct.activeCoverLimit();
@@ -1100,8 +1100,8 @@ describe("SolaceCoverProduct", function() {
             expect(await solaceCoverProduct.premiumsPaidOf(policyholder2.address)).eq(WEEKLY_MAX_PREMIUM)
 
             // premiums should be transferred to premium pool
-            expect(await dai.balanceOf(solaceCoverProduct.address)).eq(initialContractDAIBalance.sub(WEEKLY_MAX_PREMIUM.mul(2)))
-            expect(await dai.balanceOf(premiumPool.address)).eq(initialPremiumPoolDAIBalance.add(WEEKLY_MAX_PREMIUM.mul(2)))
+            expect(await frax.balanceOf(solaceCoverProduct.address)).eq(initialContractFRAXBalance.sub(WEEKLY_MAX_PREMIUM.mul(2)))
+            expect(await frax.balanceOf(premiumPool.address)).eq(initialPremiumPoolFRAXBalance.add(WEEKLY_MAX_PREMIUM.mul(2)))
 
             // Soteria account balance should be decreased
             expect(await solaceCoverProduct.accountBalanceOf(policyholder1.address)).to.equal(policyholder1AccountBalance.sub(WEEKLY_MAX_PREMIUM));
@@ -1118,8 +1118,8 @@ describe("SolaceCoverProduct", function() {
             // CASE 2 - Charge more than minRequiredAccountBalance to a policyholder
             let policyholder1AccountBalance = await solaceCoverProduct.connect(policyholder1).accountBalanceOf(policyholder1.address);
             let initialCoverLimit1 = await solaceCoverProduct.coverLimitOf(POLICY_ID_1);
-            let initialContractDAIBalance = await dai.balanceOf(solaceCoverProduct.address)
-            let initialPremiumPoolDAIBalance = await dai.balanceOf(premiumPool.address)
+            let initialContractFRAXBalance = await frax.balanceOf(solaceCoverProduct.address)
+            let initialPremiumPoolFRAXBalance = await frax.balanceOf(premiumPool.address)
             let minRequiredAccountBalance = maxRateNum.mul(ONE_WEEK).mul(initialCoverLimit1).div(maxRateDenom);
             let initialPremiumPaid1 = await solaceCoverProduct.premiumsPaidOf(policyholder1.address);
 
@@ -1129,8 +1129,8 @@ describe("SolaceCoverProduct", function() {
 
             expect(await solaceCoverProduct.premiumsPaidOf(policyholder1.address)).eq(initialPremiumPaid1.add(minRequiredAccountBalance))
             expect(await solaceCoverProduct.accountBalanceOf(policyholder1.address)).to.equal(policyholder1AccountBalance.sub(minRequiredAccountBalance));
-            expect(await dai.balanceOf(solaceCoverProduct.address)).eq(initialContractDAIBalance.sub(minRequiredAccountBalance))
-            expect(await dai.balanceOf(premiumPool.address)).eq(initialPremiumPoolDAIBalance.add(minRequiredAccountBalance))
+            expect(await frax.balanceOf(solaceCoverProduct.address)).eq(initialContractFRAXBalance.sub(minRequiredAccountBalance))
+            expect(await frax.balanceOf(premiumPool.address)).eq(initialPremiumPoolFRAXBalance.add(minRequiredAccountBalance))
         })
 
         it("can partially charge premiums if the fund is insufficient", async () => {
@@ -1148,8 +1148,8 @@ describe("SolaceCoverProduct", function() {
             let initialAvailableCoverCapacity = await solaceCoverProduct.connect(policyholder4).availableCoverCapacity();
             let initialRMCoverAmount = await riskManager.activeCoverLimit();
             let initialRMSoteriaCoverAmount = await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address);
-            let initialContractDAIBalance = await dai.balanceOf(solaceCoverProduct.address)
-            let initialPremiumPoolDAIBalance = await dai.balanceOf(premiumPool.address)
+            let initialContractFRAXBalance = await frax.balanceOf(solaceCoverProduct.address)
+            let initialPremiumPoolFRAXBalance = await frax.balanceOf(premiumPool.address)
             let initialPremiumPaid4 = await solaceCoverProduct.premiumsPaidOf(policyholder4.address);
 
             // we cannot reach the PremiumPartiallyCharged branch within a single chargePremiums() call
@@ -1157,7 +1157,7 @@ describe("SolaceCoverProduct", function() {
             expect(await solaceCoverProduct.accountBalanceOf(policyholder4.address)).eq(WEEKLY_MAX_PREMIUM.div(10))
             tx = await solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder4.address], [WEEKLY_MAX_PREMIUM]);
             await expect(tx).emit(solaceCoverProduct, "PremiumPartiallyCharged").withArgs(policyholder4.address, WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM.div(10));
-           
+
             // policy should be deactivated
             await expect(tx).emit(solaceCoverProduct, "PolicyDeactivated").withArgs(POLICY_ID_4);
             await expect(tx).emit(riskManager, "ActiveCoverLimitUpdated").withArgs(solaceCoverProduct.address, initialActiveCoverLimit, initialActiveCoverLimit.sub(initialPolicyCoverLimit));
@@ -1179,14 +1179,14 @@ describe("SolaceCoverProduct", function() {
             expect(await solaceCoverProduct.accountBalanceOf(policyholder4.address)).to.equal(0);
             expect(await solaceCoverProduct.premiumsPaidOf(policyholder4.address)).eq(initialPremiumPaid4.add(depositAmount))
 
-            // dai should be transferred to premium pool
-            expect(await dai.balanceOf(solaceCoverProduct.address)).eq(initialContractDAIBalance.sub(depositAmount))
-            expect(await dai.balanceOf(premiumPool.address)).eq(initialPremiumPoolDAIBalance.add(depositAmount))
+            // frax should be transferred to premium pool
+            expect(await frax.balanceOf(solaceCoverProduct.address)).eq(initialContractFRAXBalance.sub(depositAmount))
+            expect(await frax.balanceOf(premiumPool.address)).eq(initialPremiumPoolFRAXBalance.add(depositAmount))
         });
 
         it("will be able to charge premiums for accounts that have been deactivated in the last epoch", async () => {
             // CASE 4 - Create a new account, deactivate it, then charge premium on this newly deactivated account
-            
+
             // Create a new account, then deactivate it
             await solaceCoverProduct.connect(governor).activatePolicy(policyholder5.address, INITIAL_COVER_LIMIT, INITIAL_DEPOSIT, [])
             expect(await solaceCoverProduct.policyStatus(POLICY_ID_5)).to.equal(true);
@@ -1195,18 +1195,18 @@ describe("SolaceCoverProduct", function() {
 
             // Get initial balances
             let initialHolderFunds = await solaceCoverProduct.accountBalanceOf(policyholder5.address);
-            let initialContractDAIBalance = await dai.balanceOf(solaceCoverProduct.address)
-            let initialPremiumPoolDAIBalance = await dai.balanceOf(premiumPool.address)
+            let initialContractFRAXBalance = await frax.balanceOf(solaceCoverProduct.address)
+            let initialPremiumPoolFRAXBalance = await frax.balanceOf(premiumPool.address)
             let initialPremiumPaid5 = await solaceCoverProduct.premiumsPaidOf(policyholder5.address);
 
             // Charge premiums
             let tx = await solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder5.address], [WEEKLY_MAX_PREMIUM]);
             await expect(tx).emit(solaceCoverProduct, "PremiumCharged").withArgs(policyholder5.address, WEEKLY_MAX_PREMIUM);
-         
+
             // Check balances
             expect(await solaceCoverProduct.accountBalanceOf(policyholder5.address)).to.equal(initialHolderFunds.sub(WEEKLY_MAX_PREMIUM));
-            expect(await dai.balanceOf(solaceCoverProduct.address)).eq(initialContractDAIBalance.sub(WEEKLY_MAX_PREMIUM))
-            expect(await dai.balanceOf(premiumPool.address)).eq(initialPremiumPoolDAIBalance.add(WEEKLY_MAX_PREMIUM))
+            expect(await frax.balanceOf(solaceCoverProduct.address)).eq(initialContractFRAXBalance.sub(WEEKLY_MAX_PREMIUM))
+            expect(await frax.balanceOf(premiumPool.address)).eq(initialPremiumPoolFRAXBalance.add(WEEKLY_MAX_PREMIUM))
             expect(await solaceCoverProduct.premiumsPaidOf(policyholder5.address)).eq(initialPremiumPaid5.add(WEEKLY_MAX_PREMIUM))
         })
 
@@ -1214,13 +1214,13 @@ describe("SolaceCoverProduct", function() {
             // CASE 4 (REUNDANT FOR NOW) - Policy holder 5 withdraws, then premium is charged twice
             // Redundant because we allow the edge case of premium collector charging a deactivated account more than once
 
-            // let initialSoteriaBalance = await dai.balanceOf(solaceCoverProduct.address);
-            // let initialPremiumPoolBalance = await dai.balanceOf(premiumPool.address);
+            // let initialSoteriaBalance = await frax.balanceOf(solaceCoverProduct.address);
+            // let initialPremiumPoolBalance = await frax.balanceOf(premiumPool.address);
             // let initialHolderFunds = await solaceCoverProduct.accountBalanceOf(policyholder5.address);
 
             // // Policy holder 5 withdraw
             // await solaceCoverProduct.connect(policyholder5).withdraw();
-            
+
             // let minRequiredAccountBalance = maxRateNum.mul(ONE_WEEK).mul(INITIAL_COVER_LIMIT).div(maxRateDenom)
             // console.log(Number(minRequiredAccountBalance))
             // console.log(Number(await solaceCoverProduct.accountBalanceOf(policyholder5.address)))
@@ -1233,14 +1233,14 @@ describe("SolaceCoverProduct", function() {
 
             // let tx = solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder2.address, policyholder4.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM]);
             // await expect(tx).emit(solaceCoverProduct, "PremiumCharged").withArgs(policyholder2.address, WEEKLY_MAX_PREMIUM);
-         
+
             // expect(await solaceCoverProduct.connect(policyholder2).accountBalanceOf(policyholder2.address)).to.equal(initialHolderFunds.sub(WEEKLY_MAX_PREMIUM));
-         
+
             // // soteria balance should be decreased by single weekly premium
-            // expect(await dai.balanceOf(solaceCoverProduct.address)).to.equal(initialSoteriaBalance.sub(WEEKLY_MAX_PREMIUM));
-          
+            // expect(await frax.balanceOf(solaceCoverProduct.address)).to.equal(initialSoteriaBalance.sub(WEEKLY_MAX_PREMIUM));
+
             // // single weekly premium should be sent to premium pool
-            // expect(await dai.balanceOf(premiumPool.address)).to.equal(initialPremiumPoolBalance.add(WEEKLY_MAX_PREMIUM));
+            // expect(await frax.balanceOf(premiumPool.address)).to.equal(initialPremiumPoolBalance.add(WEEKLY_MAX_PREMIUM));
         // });
 
         it("will correctly charge premiums with reward points", async () => {
@@ -1285,8 +1285,8 @@ describe("SolaceCoverProduct", function() {
             let initialAvailableCoverCapacity = await solaceCoverProduct.availableCoverCapacity();
             let initialRMCoverAmount = await riskManager.activeCoverLimit();
             let initialRMSoteriaCoverAmount = await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address);
-            let initialContractDAIBalance = await dai.balanceOf(solaceCoverProduct.address)
-            let initialPremiumPoolDAIBalance = await dai.balanceOf(premiumPool.address)
+            let initialContractFRAXBalance = await frax.balanceOf(solaceCoverProduct.address)
+            let initialPremiumPoolFRAXBalance = await frax.balanceOf(premiumPool.address)
             let initialPremiumPaid1 = await solaceCoverProduct.premiumsPaidOf(policyholder1.address);
             let initialPremiumPaid2 = await solaceCoverProduct.premiumsPaidOf(policyholder2.address);
             let initialPremiumPaid3 = await solaceCoverProduct.premiumsPaidOf(policyholder3.address);
@@ -1297,7 +1297,7 @@ describe("SolaceCoverProduct", function() {
             expect(tx).to.emit(solaceCoverProduct, "PremiumPartiallyCharged").withArgs(policyholder3.address, WEEKLY_MAX_PREMIUM, initialHolder3AccountBalance.add(initialRewardPoints3));
             expect(tx).to.emit(solaceCoverProduct, "PolicyDeactivated").withArgs(POLICY_ID_3);
             await expect(tx).emit(riskManager, "ActiveCoverLimitUpdated").withArgs(solaceCoverProduct.address, initialActiveCoverLimit, initialActiveCoverLimit.sub(initialPolicy3CoverLimit));
-            
+
             // Confirm state is what we expect after charging premium
 
             // Check premiumsPaid
@@ -1330,14 +1330,14 @@ describe("SolaceCoverProduct", function() {
             let accountBalanceDeductedForHolder2 = WEEKLY_MAX_PREMIUM.sub(initialRewardPoints2);
             let accountBalanceDeductedForHolder3 = initialHolder3AccountBalance;
             let expectedSoteriaBalanceChange = accountBalanceDeductedForHolder1.add(accountBalanceDeductedForHolder2).add(accountBalanceDeductedForHolder3)
-            expect(await dai.balanceOf(solaceCoverProduct.address)).eq(initialContractDAIBalance.sub(expectedSoteriaBalanceChange))
-            expect(await dai.balanceOf(premiumPool.address)).eq(initialPremiumPoolDAIBalance.add(expectedSoteriaBalanceChange))
+            expect(await frax.balanceOf(solaceCoverProduct.address)).eq(initialContractFRAXBalance.sub(expectedSoteriaBalanceChange))
+            expect(await frax.balanceOf(premiumPool.address)).eq(initialPremiumPoolFRAXBalance.add(expectedSoteriaBalanceChange))
 
             // Soteria active cover limit check - policy 3 deactivated
             expect(await solaceCoverProduct.activeCoverLimit()).eq(initialActiveCoverLimit.sub(initialPolicy3CoverLimit))
             expect(await riskManager.activeCoverLimit()).eq(initialRMCoverAmount.sub(initialPolicy3CoverLimit))
             expect(await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address)).eq(initialRMSoteriaCoverAmount.sub(initialPolicy3CoverLimit))
-            
+
             // Cover capacity check - should be increased by policy 3 initial cover limit
             expect(await solaceCoverProduct.availableCoverCapacity()).eq(initialAvailableCoverCapacity.add(initialPolicy3CoverLimit))
         })
@@ -1356,7 +1356,7 @@ describe("SolaceCoverProduct", function() {
             let depositAmount = BN.from(10);
             let WEEKLY_MAX_PREMIUM = coverLimit.div(10).mul(604800).div(31536000) // Override global WEEKLY_MAX_PREMIUM variable
 
-            // Activate policies for each user, 100 DAI cover limit with 10 DAI deposit
+            // Activate policies for each user, 100 FRAX cover limit with 10 FRAX deposit
             for (let user of users) {
                 await solaceCoverProduct.connect(governor).activatePolicy(user.address, coverLimit, depositAmount, [])
             }
@@ -1404,7 +1404,7 @@ describe("SolaceCoverProduct", function() {
     //         const minRequiredAccountBalance = maxRateNum.mul(ONE_WEEK).mul(initialCoverLimit).div(maxRateDenom)
     //         const withdrawAmount = initialAccountBalance.sub(minRequiredAccountBalance)
     //         expect(await usdc.balanceOf(usdcPolicyholder.address)).eq(0)
-            
+
     //         // Design as standalone unit test that has minimal side effects on pre-existing unit tests
     //         await solaceCoverProduct.connect(usdcPolicyholder).withdraw(1)
     //         expect(await solaceCoverProduct.accountBalanceOf(usdcPolicyholder.address)).eq(minRequiredAccountBalance)
@@ -1436,16 +1436,16 @@ describe("SolaceCoverProduct", function() {
         await provider.send("evm_mine", []) // Mine the next block
     }
 
-    async function manipulateDAIbalance(wallet: Wallet, desiredBalance: BN) {
-        const DAI_BALANCEOF_SLOT = 2;
+    async function manipulateFRAXbalance(wallet: Wallet, desiredBalance: BN) {
+        const FRAX_BALANCEOF_SLOT = 0;
         // Get storage slot index
         const index = utils.solidityKeccak256(
             ["uint256", "uint256"],
-            [wallet.address, DAI_BALANCEOF_SLOT] // key, slot
+            [wallet.address, FRAX_BALANCEOF_SLOT] // key, slot
           );
 
         // Manipulate local balance (needs to be bytes32 string)
-        await provider.send("hardhat_setStorageAt", [DAI_ADDRESS, index.toString(), toBytes32(desiredBalance).toString()])
+        await provider.send("hardhat_setStorageAt", [FRAX_ADDRESS, index.toString(), toBytes32(desiredBalance).toString()])
         await provider.send("evm_mine", []) // Mine the next block
     }
 
