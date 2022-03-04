@@ -26,10 +26,13 @@ export async function import_artifacts() {
   // farms (deprecated)
   artifacts.FarmRewards = await tryImport(`${artifact_dir}/staking/FarmRewards.sol/FarmRewards.json`);
 
-  // product v2
+  // products
   artifacts.ProductFactory = await tryImport(`${artifact_dir}/products/ProductFactory.sol/ProductFactory.json`);
   artifacts.SolaceMarketProduct = await tryImport(`${artifact_dir}/products/SolaceMarketProduct.sol/SolaceMarketProduct.json`);
   artifacts.MockProductV2 = await tryImport(`${artifact_dir}/mocks/MockProductV2.sol/MockProductV2.json`);
+  artifacts.SolaceCoverProduct = await tryImport(`${artifact_dir}/products/SolaceCoverProduct.sol/SolaceCoverProduct.json`);
+  artifacts.SolaceCoverProductV2 = await tryImport(`${artifact_dir}/products/SolaceCoverProductV2.sol/SolaceCoverProductV2.json`);
+
   // investing v2
   artifacts.WETH10 = await tryImport(`${artifact_dir}/WETH10.sol/WETH10.json`);
   artifacts.WMATIC = await tryImport(`${artifact_dir}/WMATIC.sol/WMATIC.json`);
@@ -87,7 +90,6 @@ export async function import_artifacts() {
   artifacts.MockPriceOracle = await tryImport(`${artifact_dir}/mocks/MockPriceOracle.sol/MockPriceOracle.json`);
 
   // soteria coverage product
-  artifacts.SolaceCoverProduct = await tryImport(`${artifact_dir}/products/SolaceCoverProduct.sol/SolaceCoverProduct.json`);
   return artifacts;
 }
 
