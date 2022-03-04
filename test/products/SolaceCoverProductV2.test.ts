@@ -52,6 +52,8 @@ describe("SolaceCoverProductV2", function() {
     const maxRateNum = BN.from("1");
     const maxRateDenom = BN.from("315360000"); // We are testing with maxRateNum and maxRateDenom that gives us an annual max rate of 10% coverLimit
     const REFERRAL_REWARD = ONE_ETH.mul(50) // 50 FRAX
+    const REFERRAL_THRESHOLD = ONE_ETH.mul(100) // 100 FRAX
+
     const CHAINS = {
         MAINNET: 1,
         POLYGON: 137
@@ -138,6 +140,10 @@ describe("SolaceCoverProductV2", function() {
             await frax.connect(policyholder1).approve(solaceCoverProduct.address, constants.MaxUint256)
             await frax.connect(policyholder2).approve(solaceCoverProduct.address, constants.MaxUint256)
             await frax.connect(governor).approve(solaceCoverProduct.address, constants.MaxUint256)
+        })
+        it("manipulatePremiumPaidOf helper function working", async() => {
+            await manipulatePremiumPaidOf(deployer, BN.from(11))
+            expect(await solaceCoverProduct.premiumsPaidOf(deployer.address)).eq(BN.from(11))
         })
     });
 
@@ -365,6 +371,19 @@ describe("SolaceCoverProductV2", function() {
         })
         it("getter functions working", async () => {
             expect(await solaceCoverProduct.referralReward()).eq(REFERRAL_REWARD)
+        })
+    })
+
+    describe("setReferralThreshold", () => {
+        it("cannot be set by non governance", async () => {
+            await expect(solaceCoverProduct.connect(policyholder1).setReferralThreshold(REFERRAL_THRESHOLD)).to.revertedWith("!governance");
+        });
+        it("can be set", async () => {
+            let tx = await solaceCoverProduct.connect(governor).setReferralThreshold(REFERRAL_THRESHOLD)
+            expect(tx).emit(solaceCoverProduct, "ReferralThresholdSet").withArgs(REFERRAL_THRESHOLD);
+        })
+        it("getter functions working", async () => {
+            expect(await solaceCoverProduct.referralThreshold()).eq(REFERRAL_THRESHOLD)
         })
     })
 
@@ -1166,6 +1185,11 @@ describe("SolaceCoverProductV2", function() {
             // Policy 2: reward points can partially pay for premium, rest will come from account balance
             // Policy 3: reward points + account balance unable to fully pay for premium
 
+            // Need to manipuate premium paid to be >= 100, so reward points count in chargePremiums() computation
+            await manipulatePremiumPaidOf(policyholder1, REFERRAL_THRESHOLD)
+            await manipulatePremiumPaidOf(policyholder2, REFERRAL_THRESHOLD)
+            await manipulatePremiumPaidOf(policyholder3, REFERRAL_THRESHOLD)
+
             // Set up reward points for policy 1 and 2
             // Use referral code to set up reward points for policy 1
             // Use setRewardPoints() method to set up reward points for policy 2
@@ -1324,6 +1348,14 @@ describe("SolaceCoverProductV2", function() {
     //         expect(await usdc.balanceOf(usdcPolicyholder.address)).eq(withdrawAmount.div(10**12))
     //     })
     // })
+
+    // Credit to https://medium.com/coinmonks/solidity-tutorial-all-about-mappings-29a12269ee14
+
+    async function manipulatePremiumPaidOf(policyholder: Wallet, desiredBalance: BN) {
+        const storageSlot = utils.keccak256(utils.defaultAbiCoder.encode(["address", "uint256"], [policyholder.address, 23]))
+        await provider.send("hardhat_setStorageAt", [solaceCoverProduct.address, storageSlot, toBytes32(desiredBalance).toString()])
+        await provider.send("evm_mine", [])
+    }
 
     // Credit to https://kndrck.co/posts/local_erc20_bal_mani_w_hh/
 

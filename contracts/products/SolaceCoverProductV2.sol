@@ -92,6 +92,11 @@ contract SolaceCoverProductV2 is
     uint256 internal _referralReward;
 
     /**
+     * @notice The threshold premium amount that an account needs to have paid, for the account to be able to apply a referral code. (Default is 100 FRAX).
+     */
+    uint256 internal _referralThreshold;
+
+    /**
      * @notice If true, referral rewards are active. If false, referral rewards are switched off (Default is true).
      */
     bool internal _isReferralOn;
@@ -107,6 +112,9 @@ contract SolaceCoverProductV2 is
 
     /// @notice policyID => coverLimit
     mapping(uint256 => uint256) internal _coverLimitOf;
+
+    /// @notice policyholder => premiumPaid
+    mapping(address => uint256) internal _premiumPaidOf;
 
     /**
      * @notice This is a mapping that no-one likes but seems necessary to circumvent a couple of edge cases. This mapping is intended to mirror the _coverLimitOf mapping, except for the period between i.) cooldown starting when deactivatePolicy() called and ii.) cooldown has passed and user calls withdraw()
@@ -178,6 +186,7 @@ contract SolaceCoverProductV2 is
         _chargeCycle = 604800; // One-week charge cycle
         _cooldownPeriod = 604800; // One-week cooldown period
         _referralReward = 50e18; // 50 FRAX
+        _referralThreshold = 100e18; // 100 FRAX
         _isReferralOn = true; // Referral rewards active
         asset = asset_;
         baseURI = string(abi.encodePacked("https://stats.solace.fi/policy/?chainID=", Strings.toString(block.chainid), "&policyID="));
@@ -369,6 +378,15 @@ contract SolaceCoverProductV2 is
     }
 
     /**
+     * @notice Get the total premium that a policyholder has in **USD** to 18 decimal places (does not include premium paid through reward points)
+     * @param policyholder_ The policyholder address.
+     * @return premiumsPaid_ The total premium paid for the policyholder.
+     */
+    function premiumsPaidOf(address policyholder_) public view override returns (uint256 premiumsPaid_) {
+        return _premiumPaidOf[policyholder_];
+    }
+
+    /**
      * @notice Gets the policyholder's policy ID.
      * @param policyholder_ The address of the policyholder.
      * @return policyID The policy ID.
@@ -478,6 +496,14 @@ contract SolaceCoverProductV2 is
      */
     function referralReward() external view override returns (uint256 referralReward_) {
         return _referralReward;
+    }
+
+    /**
+     * @notice Gets the threshold premium amount in USD that an account needs to have paid, for the account to be able to apply a referral code
+     * @return referralThreshold_ The referral threshold
+     */
+    function referralThreshold() external view override returns (uint256 referralThreshold_) {
+        return _referralThreshold;
     }
 
     /**
@@ -649,6 +675,16 @@ contract SolaceCoverProductV2 is
     }
 
     /**
+     * @notice set _referralThreshhold
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param referralThreshhold_ Desired referralThreshhold.
+    */
+    function setReferralThreshold(uint256 referralThreshhold_) external override onlyGovernance {
+        _referralThreshold = referralThreshhold_;
+        emit ReferralThresholdSet(referralThreshhold_);
+    }
+
+    /**
      * @notice set _isReferralOn
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param isReferralOn_ True if referral rewards active, false if not.
@@ -736,7 +772,7 @@ contract SolaceCoverProductV2 is
             // Skip computation if the user has withdrawn entire account balance
             // We use _preDeactivateCoverLimitOf mapping here to circumvent the following edge case: A user should not be able to deactivate their policy just prior to the chargePremiums() tranasction, and then avoid the premium for the current epoch.
             // There is another edge case introduced here however: the premium collector can charge a deactivated account more than once. We are trusting that the premium collector does not do this.
-            
+
             uint256 preDeactivateCoverLimit = _preDeactivateCoverLimitOf[_policyOf[holders[i]]];
             if ( preDeactivateCoverLimit == 0) continue;
 
@@ -745,33 +781,58 @@ contract SolaceCoverProductV2 is
                 premium = _minRequiredAccountBalance(preDeactivateCoverLimit);
             }
 
-            // If policyholder's account can pay for premium charged in full
-            if (_accountBalanceOf[holders[i]] + _rewardPointsOf[holders[i]] >= premium) {
-                
-                // If reward points can pay for premium charged in full
-                if (_rewardPointsOf[holders[i]] >= premium) {
-                    _rewardPointsOf[holders[i]] -= premium;
+            // If premiums paid >= referralThreshold, then reward points count
+            if (_premiumPaidOf[holders[i]] >= _referralThreshold) {
+                // If policyholder's account can pay for premium charged in full
+                if (_accountBalanceOf[holders[i]] + _rewardPointsOf[holders[i]] >= premium) {
+
+                    // If reward points can pay for premium charged in full
+                    if (_rewardPointsOf[holders[i]] >= premium) {
+                        _rewardPointsOf[holders[i]] -= premium;
+                    } else {
+                        uint256 amountDeductedFromSoteriaAccount = premium - _rewardPointsOf[holders[i]];
+                        amountToPayPremiumPool += amountDeductedFromSoteriaAccount;
+                        _premiumPaidOf[holders[i]] += amountDeductedFromSoteriaAccount;
+                        _accountBalanceOf[holders[i]] -= amountDeductedFromSoteriaAccount;
+                        _rewardPointsOf[holders[i]] = 0;
+                    }
+                    emit PremiumCharged(holders[i], premium);
                 } else {
-                    uint256 amountDeductedFromSoteriaAccount = premium - _rewardPointsOf[holders[i]];
-                    amountToPayPremiumPool += amountDeductedFromSoteriaAccount;
-                    _accountBalanceOf[holders[i]] -= amountDeductedFromSoteriaAccount;
+                    uint256 partialPremium = _accountBalanceOf[holders[i]] + _rewardPointsOf[holders[i]];
+                    amountToPayPremiumPool += _accountBalanceOf[holders[i]];
+                    _premiumPaidOf[holders[i]] += _accountBalanceOf[holders[i]]; 
+                    _accountBalanceOf[holders[i]] = 0;
                     _rewardPointsOf[holders[i]] = 0;
+                    _deactivatePolicy(holders[i]);
+                    emit PremiumPartiallyCharged(
+                        holders[i],
+                        premium,
+                        partialPremium
+                    );
                 }
-                emit PremiumCharged(holders[i], premium);
+            // Else if premiums paid < referralThreshold, reward don't count
             } else {
-                uint256 partialPremium = _accountBalanceOf[holders[i]] + _rewardPointsOf[holders[i]];
-                amountToPayPremiumPool += _accountBalanceOf[holders[i]];
-                _accountBalanceOf[holders[i]] = 0;
-                _rewardPointsOf[holders[i]] = 0;
-                _deactivatePolicy(holders[i]);
-                emit PremiumPartiallyCharged(
-                    holders[i],
-                    premium,
-                    partialPremium
-                );
+                // If policyholder's account can pay for premium charged in full
+                if (_accountBalanceOf[holders[i]] >= premium) {
+                        amountToPayPremiumPool += premium;
+                        _premiumPaidOf[holders[i]] += premium;
+                        _accountBalanceOf[holders[i]] -= premium;
+                        emit PremiumCharged(holders[i], premium);   
+                } else {
+                    uint256 partialPremium = _accountBalanceOf[holders[i]];
+                    amountToPayPremiumPool += partialPremium;
+                    _premiumPaidOf[holders[i]] += partialPremium; 
+                    _accountBalanceOf[holders[i]] = 0;
+                    _deactivatePolicy(holders[i]);
+                    emit PremiumPartiallyCharged(
+                        holders[i],
+                        premium,
+                        partialPremium
+                    );
+                }
             }
         }
-  
+
         // single FRAX transfer to the premium pool
         SafeERC20.safeTransfer(_getAsset(), _registry.get("premiumPool"), amountToPayPremiumPool);
     }
