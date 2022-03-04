@@ -1,3 +1,5 @@
+// NOTE - this test requires ETH mainnet fork to pass
+
 import { waffle, ethers } from "hardhat";
 import { MockProvider } from "ethereum-waffle";
 import { BigNumber as BN, utils, Contract, Wallet, constants } from "ethers";
@@ -6,8 +8,6 @@ import { config as dotenv_config } from "dotenv";
 import { import_artifacts, ArtifactImports } from "../utilities/artifact_importer";
 import { getSolaceReferralCode } from "../utilities/getSolaceReferralCode"
 import { Registry, RiskManager, SolaceCoverProduct, CoverageDataProvider, Solace, MockPriceOracle, MockSlp, MockErc20Permit } from "../../typechain";
-import { Console } from "console";
-import { expectClose } from "./../utilities/math";
 
 const { expect } = chai;
 const { deployContract, solidity} = waffle;
@@ -72,7 +72,6 @@ describe("SolaceCoverProduct", function() {
     // mainnet
     const DAI_ADDRESS = "0x6B175474E89094C44Da98b954EedeAC495271d0F"
     const USDC_ADDRESS = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
-    const WETH_ADDRESS = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
 
     before( async () => {
         artifacts = await import_artifacts();

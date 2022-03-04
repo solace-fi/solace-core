@@ -34,11 +34,11 @@ const forking = (
   : no_fork
 );
 
-const accounts = {
-  accountsBalance: "2000000000000000000000000" // Default to start with 2,000,000 ether in each Hardhat provided wallet. Needed increase from default of 10000 ether because unit tests in SoteriaCoverageProduct failing with maxCover being denominated in ETH and rest of contract in DAI
-}
+// Need this hardhat config to overcome "trying to deploy a contract whose code is too large" error in SolaceCoverProductV2 test
+// 5.7M gas deployment cost for SolaceCoverProductV2.sol according to tests, ETH block limit 15-30M, should be fine
+const allowUnlimitedContractSize = true;
 
-const hardhat_network = process.env.FORK_NETWORK ? {forking, accounts} : {};
+const hardhat_network = process.env.FORK_NETWORK ? {forking, allowUnlimitedContractSize} : {};
 
 const config: HardhatUserConfig = {
   defaultNetwork: "hardhat",
