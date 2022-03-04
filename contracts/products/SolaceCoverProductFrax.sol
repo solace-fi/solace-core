@@ -688,32 +688,55 @@ contract SolaceCoverProductFrax is
                 premium = _minRequiredAccountBalance(preDeactivateCoverLimit);
             }
 
-            // If policyholder's account can pay for premium charged in full
-            if (_accountBalanceOf[holders[i]] + _rewardPointsOf[holders[i]] >= premium) {
+            // If premiums paid >= referralThreshold, then reward points count
+            if (_premiumPaidOf[holders[i]] >= _referralThreshold) {
+                // If policyholder's account can pay for premium charged in full
+                if (_accountBalanceOf[holders[i]] + _rewardPointsOf[holders[i]] >= premium) {
 
-                // If reward points can pay for premium charged in full
-                if (_rewardPointsOf[holders[i]] >= premium) {
-                    _rewardPointsOf[holders[i]] -= premium;
+                    // If reward points can pay for premium charged in full
+                    if (_rewardPointsOf[holders[i]] >= premium) {
+                        _rewardPointsOf[holders[i]] -= premium;
+                    } else {
+                        uint256 amountDeductedFromSoteriaAccount = premium - _rewardPointsOf[holders[i]];
+                        amountToPayPremiumPool += amountDeductedFromSoteriaAccount;
+                        _premiumPaidOf[holders[i]] += amountDeductedFromSoteriaAccount;
+                        _accountBalanceOf[holders[i]] -= amountDeductedFromSoteriaAccount;
+                        _rewardPointsOf[holders[i]] = 0;
+                    }
+                    emit PremiumCharged(holders[i], premium);
                 } else {
-                    uint256 amountDeductedFromSoteriaAccount = premium - _rewardPointsOf[holders[i]];
-                    amountToPayPremiumPool += amountDeductedFromSoteriaAccount;
-                    _premiumPaidOf[holders[i]] += amountDeductedFromSoteriaAccount;
-                    _accountBalanceOf[holders[i]] -= amountDeductedFromSoteriaAccount;
+                    uint256 partialPremium = _accountBalanceOf[holders[i]] + _rewardPointsOf[holders[i]];
+                    amountToPayPremiumPool += _accountBalanceOf[holders[i]];
+                    _premiumPaidOf[holders[i]] += _accountBalanceOf[holders[i]]; 
+                    _accountBalanceOf[holders[i]] = 0;
                     _rewardPointsOf[holders[i]] = 0;
+                    _deactivatePolicy(holders[i]);
+                    emit PremiumPartiallyCharged(
+                        holders[i],
+                        premium,
+                        partialPremium
+                    );
                 }
-                emit PremiumCharged(holders[i], premium);
+            // Else if premiums paid < referralThreshold, reward don't count
             } else {
-                uint256 partialPremium = _accountBalanceOf[holders[i]] + _rewardPointsOf[holders[i]];
-                amountToPayPremiumPool += _accountBalanceOf[holders[i]];
-                _premiumPaidOf[holders[i]] += _accountBalanceOf[holders[i]];
-                _accountBalanceOf[holders[i]] = 0;
-                _rewardPointsOf[holders[i]] = 0;
-                _deactivatePolicy(holders[i]);
-                emit PremiumPartiallyCharged(
-                    holders[i],
-                    premium,
-                    partialPremium
-                );
+                // If policyholder's account can pay for premium charged in full
+                if (_accountBalanceOf[holders[i]] >= premium) {
+                        amountToPayPremiumPool += premium;
+                        _premiumPaidOf[holders[i]] += premium;
+                        _accountBalanceOf[holders[i]] -= premium;
+                        emit PremiumCharged(holders[i], premium);   
+                } else {
+                    uint256 partialPremium = _accountBalanceOf[holders[i]];
+                    amountToPayPremiumPool += partialPremium;
+                    _premiumPaidOf[holders[i]] += partialPremium; 
+                    _accountBalanceOf[holders[i]] = 0;
+                    _deactivatePolicy(holders[i]);
+                    emit PremiumPartiallyCharged(
+                        holders[i],
+                        premium,
+                        partialPremium
+                    );
+                }
             }
         }
 
@@ -868,8 +891,6 @@ contract SolaceCoverProductFrax is
     ) internal {
         // Skip processing referral code, if referral campaign switched off or empty referral code argument
         if ( !_isReferralOn || _isEmptyReferralCode(referralCode_) ) return;
-
-        require(_premiumPaidOf[policyholder_] >= _referralThreshold, "cannot apply referral code if premium paid < referralThreshold");
 
         address referrer = ECDSA.recover(_getEIP712Hash(), referralCode_);
         require(referrer != policyholder_, "cannot refer to self");

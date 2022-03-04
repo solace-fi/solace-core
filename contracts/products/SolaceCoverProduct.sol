@@ -738,7 +738,6 @@ contract SolaceCoverProduct is
                         partialPremium
                     );
                 }
-
             }
         }
 
