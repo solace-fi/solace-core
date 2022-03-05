@@ -34,11 +34,7 @@ const forking = (
   : no_fork
 );
 
-// Need this hardhat config to overcome "trying to deploy a contract whose code is too large" error in SolaceCoverProductV2 test
-// 5.7M gas deployment cost for SolaceCoverProductV2.sol according to tests, ETH block limit 15-30M, should be fine
-const allowUnlimitedContractSize = true;
-
-const hardhat_network = process.env.FORK_NETWORK ? {forking, allowUnlimitedContractSize} : {};
+const hardhat_network = process.env.FORK_NETWORK ? {forking} : {};
 
 const config: HardhatUserConfig = {
   defaultNetwork: "hardhat",
@@ -98,6 +94,17 @@ const config: HardhatUserConfig = {
         },
       },
     ],
+    overrides: {
+      "contracts/products/SolaceCoverProductV2.sol": {
+        version: "0.8.6",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 300,
+          },
+        }
+      }
+    }
   },
   paths: {
     sources: USE_PROCESSED_FILES ? "./contracts_processed" : "./contracts",
