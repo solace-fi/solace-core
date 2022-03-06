@@ -11,7 +11,7 @@ import { create2Contract } from "./create2Contract";
 import { logContractAddress } from "./utils";
 
 import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_importer";
-import { Deployer, CoverageDataProvider, Registry, RiskManager, SolaceCoverProductFrax } from "../typechain";
+import { Deployer, CoverageDataProvider, Registry, RiskManager, SolaceCoverProductV2 } from "../typechain";
 import { isDeployed } from "../test/utilities/expectDeployed";
 
 const DEPLOYER_CONTRACT_ADDRESS     = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
@@ -28,7 +28,7 @@ const PREMIUM_COLLECTOR_ADDRESS               = "0xF321be3577B1AcB436869493862bA
 const REGISTRY_V2_ADDRESS               = "0x501ACe0f576fc4ef9C0380AA46A578eA96b85776";
 const RISK_MANAGER_V2_ADDRESS           = "0x501AcEf9020632a71CB25CFa9F554252eB51732b";
 const COVERAGE_DATA_PROVIDER_ADDRESS    = "0x501ACE6C5fFf4d42EaC02357B6DD9b756E337355";
-const SOLACE_COVER_PRODUCT_ADDRESS      = "0x501aCE5DD0069AE10c3c1E72d1d21EF9b3789cD2";
+const SOLACE_COVER_PRODUCT_ADDRESS      = "0x501ACEEe52605aF0EfC0319F0bE43b029A3a697c";
 
 const DOMAIN_NAME = "Solace.fi-SolaceCoverProduct";
 const VERSION = "1";
@@ -39,7 +39,7 @@ let deployerContract: Deployer;
 let coverageDataProvider: CoverageDataProvider;
 let registryV2: Registry;
 let riskManagerV2: RiskManager;
-let solaceCoverProduct: SolaceCoverProductFrax;
+let solaceCoverProduct: SolaceCoverProductV2;
 
 let signerAddress: string;
 async function main() {
@@ -62,7 +62,7 @@ async function main() {
 
   await deployCoverageDataProvider();
   await deployRiskManager();
-  await deploySolaceCoverProductFrax();
+  await deploySolaceCoverProductV2();
 
   // log addresses
   await logAddresses();
@@ -121,14 +121,6 @@ async function deployCoverageDataProvider() {
     // tx = await coverageDataProvider.connect(deployer).set("aurora", AMOUNT2);
     // await tx.wait();
   }
-
-  console.log("Setting Underwriting Pool Updater");
-  let tx1 = await coverageDataProvider.connect(deployer).setUwpUpdater(COVERAGE_DATA_PROVIDER_UPDATER_ADDRESS);
-  await tx1.wait();
-
-  console.log("Setting Underwriting Pool Amounts");
-  let tx2 = await coverageDataProvider.connect(deployer).set("mainnet", BN.from("1000000000000000000").mul(8450000)); // 8.45M USD
-  await tx2.wait();
 }
 
 async function deployRiskManager() {
@@ -149,18 +141,18 @@ async function deployRiskManager() {
   }
 }
 
-async function deploySolaceCoverProductFrax() {
+async function deploySolaceCoverProductV2() {
   if (await isDeployed(SOLACE_COVER_PRODUCT_ADDRESS)) {
-    solaceCoverProduct = (await ethers.getContractAt(artifacts.SolaceCoverProductFrax.abi, SOLACE_COVER_PRODUCT_ADDRESS)) as SolaceCoverProductFrax;
+    solaceCoverProduct = (await ethers.getContractAt(artifacts.SolaceCoverProductV2.abi, SOLACE_COVER_PRODUCT_ADDRESS)) as SolaceCoverProductV2;
   } else {
     console.log("Deploying Solace Cover Product");
-    const res = await create2Contract(deployer, artifacts.SolaceCoverProductFrax, [signerAddress, registryV2.address, DOMAIN_NAME, VERSION], {}, "", deployerContract.address);
-    solaceCoverProduct = (await ethers.getContractAt(artifacts.SolaceCoverProductFrax.abi, res.address)) as SolaceCoverProductFrax;
+    const res = await create2Contract(deployer, artifacts.SolaceCoverProductV2, [signerAddress, registryV2.address, "frax", DOMAIN_NAME, VERSION], {}, "", deployerContract.address);
+    solaceCoverProduct = (await ethers.getContractAt(artifacts.SolaceCoverProductV2.abi, res.address)) as SolaceCoverProductV2;
     console.log(`Deployed Solace Cover Product to ${solaceCoverProduct.address}`);
   }
   console.log('ere 3');
-  let { success } = await registryV2.tryGet("solaceCoverProduct");
-  if (!success && await registryV2.governance() == signerAddress) {
+  let { success, value } = await registryV2.tryGet("solaceCoverProduct");
+  if ((!success || value != solaceCoverProduct.address) && await registryV2.governance() == signerAddress) {
     console.log("Registering Solace Cover Product");
     let tx = await registryV2.connect(deployer).set(["solaceCoverProduct"], [solaceCoverProduct.address]);
     await tx.wait();
