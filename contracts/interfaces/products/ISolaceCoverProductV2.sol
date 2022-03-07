@@ -71,6 +71,9 @@ interface ISolaceCoverProductV2 {
     /// @notice Emitted when referralReward is set.
     event ReferralRewardSet(uint256 referralReward);
 
+    /// @notice Emitted when referralThreshold is set.
+    event ReferralThresholdSet(uint256 referralThreshold);
+
     /// @notice Emitted when referral rewards are earned;
     event ReferralRewardsEarned(
         address rewardEarner,
@@ -192,6 +195,13 @@ interface ISolaceCoverProductV2 {
     function rewardPointsOf(address policyholder_) external view returns (uint256 rewardPoints_);
 
     /**
+     * @notice Get the total premium that a policyholder has in **USD** to 18 decimal places (does not include premium paid through reward points)
+     * @param policyholder_ The policyholder address.
+     * @return premiumsPaid_ The total premium paid for the policyholder.
+     */
+    function premiumsPaidOf(address policyholder_) external view returns (uint256 premiumsPaid_);
+
+    /**
      * @notice Gets the policyholder's policy ID.
      * @param policyholder_ The address of the policyholder.
      * @return policyID The policy ID.
@@ -276,6 +286,12 @@ interface ISolaceCoverProductV2 {
      * @return referralReward_ The referral reward
      */
     function referralReward() external view returns (uint256 referralReward_);
+
+    /**
+     * @notice Gets the threshold premium amount in USD that an account needs to have paid, for the account to be able to apply a referral code
+     * @return referralThreshold_ The referral threshold
+     */
+    function referralThreshold() external view returns (uint256 referralThreshold_);
 
     /**
      * @notice Returns true if referral rewards are active, false if not.
@@ -389,6 +405,13 @@ interface ISolaceCoverProductV2 {
      * @param referralReward_ Desired referralReward.
     */
     function setReferralReward(uint256 referralReward_) external;
+
+    /**
+     * @notice set _referralThreshhold
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param referralThreshhold_ Desired referralThreshhold.
+    */
+    function setReferralThreshold(uint256 referralThreshhold_) external;
 
     /**
      * @notice set _isReferralOn

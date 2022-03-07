@@ -275,6 +275,7 @@ interface ISolaceCoverProduct {
      * @return referralThreshold_ The referral threshold
      */
     function referralThreshold() external view returns (uint256 referralThreshold_);
+    
     /**
      * @notice Returns true if referral rewards are active, false if not.
      * @return isReferralOn_ True if referral rewards are active, false if not.

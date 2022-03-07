@@ -1,10 +1,12 @@
+// NOTE - this test requires MATIC mainnet fork to pass
+
 import { waffle, ethers } from "hardhat";
 import { MockProvider } from "ethereum-waffle";
 import { BigNumber as BN, utils, Contract, Wallet, constants } from "ethers";
 import chai from "chai";
 import { config as dotenv_config } from "dotenv";
 import { import_artifacts, ArtifactImports } from "../utilities/artifact_importer";
-import { getSolaceReferralCode } from "../utilities/getSolaceReferralCode"
+import { getSolaceReferralCodeV2 } from "../utilities/getSolaceReferralCode"
 import { Registry, RiskManager, SolaceCoverProductV2, CoverageDataProvider, Solace, MockErc20Permit } from "../../typechain";
 
 const { expect } = chai;
@@ -14,8 +16,8 @@ const provider: MockProvider = waffle.provider;
 dotenv_config();
 chai.use(solidity)
 
-const DOMAIN_NAME = "Solace.fi-SolaceCoverProduct";
-const VERSION = "1";
+const DOMAIN_NAME = "Solace.fi-SolaceCoverProductV2";
+const VERSION = "2";
 
 describe("SolaceCoverProductV2", function() {
     let artifacts: ArtifactImports;
@@ -50,6 +52,8 @@ describe("SolaceCoverProductV2", function() {
     const maxRateNum = BN.from("1");
     const maxRateDenom = BN.from("315360000"); // We are testing with maxRateNum and maxRateDenom that gives us an annual max rate of 10% coverLimit
     const REFERRAL_REWARD = ONE_ETH.mul(50) // 50 FRAX
+    const REFERRAL_THRESHOLD = ONE_ETH.mul(100) // 100 FRAX
+
     const CHAINS = {
         MAINNET: 1,
         POLYGON: 137
@@ -60,7 +64,8 @@ describe("SolaceCoverProductV2", function() {
     // Random 130 character hex string
     const FAKE_REFERRAL_CODE = "0xe4e7cba021ff6b83b14d54016198f31b04cba044d71d9a8b9bdf964aa2259cc3b207237f814aa56e516638b448edc43a6c3f4637dca5de54cb199e37b039a832e7"
 
-    const FRAX_ADDRESS = "0x853d955aCEf822Db058eb8505911ED77F175b99e"
+    // const FRAX_ADDRESS = "0xE338d08783CE3bdE2Cc03b137b196168641A8C05" // Mumbai testnet address
+    const FRAX_ADDRESS = "0x45c32fA6DF82ead1e2EF74d17b76547EDdFaFF89" // Polygon mainnet address
     const USDC_ADDRESS = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
 
     before( async () => {
@@ -135,6 +140,10 @@ describe("SolaceCoverProductV2", function() {
             await frax.connect(policyholder1).approve(solaceCoverProduct.address, constants.MaxUint256)
             await frax.connect(policyholder2).approve(solaceCoverProduct.address, constants.MaxUint256)
             await frax.connect(governor).approve(solaceCoverProduct.address, constants.MaxUint256)
+        })
+        it("manipulatePremiumPaidOf helper function working", async() => {
+            await manipulatePremiumPaidOf(deployer, BN.from(11))
+            expect(await solaceCoverProduct.premiumsPaidOf(deployer.address)).eq(BN.from(11))
         })
     });
 
@@ -237,7 +246,7 @@ describe("SolaceCoverProductV2", function() {
         });
 
         it("governance can set registry", async () => {
-            await registry2.connect(governor).set(["riskManager","frax"], [riskManager2.address,FRAX_ADDRESS]);
+            await registry2.connect(governor).set(["frax"], [FRAX_ADDRESS]);
             let tx = await solaceCoverProduct.connect(governor).setRegistry(registry2.address);
             expect(tx).emit(solaceCoverProduct, "RegistrySet").withArgs(registry2.address);
             expect(await solaceCoverProduct.connect(policyholder1).riskManager()).to.equal(riskManager2.address);
@@ -365,6 +374,19 @@ describe("SolaceCoverProductV2", function() {
         })
     })
 
+    describe("setReferralThreshold", () => {
+        it("cannot be set by non governance", async () => {
+            await expect(solaceCoverProduct.connect(policyholder1).setReferralThreshold(REFERRAL_THRESHOLD)).to.revertedWith("!governance");
+        });
+        it("can be set", async () => {
+            let tx = await solaceCoverProduct.connect(governor).setReferralThreshold(REFERRAL_THRESHOLD)
+            expect(tx).emit(solaceCoverProduct, "ReferralThresholdSet").withArgs(REFERRAL_THRESHOLD);
+        })
+        it("getter functions working", async () => {
+            expect(await solaceCoverProduct.referralThreshold()).eq(REFERRAL_THRESHOLD)
+        })
+    })
+
     describe("setIsReferralOn", () => {
         it("should default as true", async () => {
             expect(await solaceCoverProduct.isReferralOn()).eq(true)
@@ -405,7 +427,7 @@ describe("SolaceCoverProductV2", function() {
             expect(await solaceCoverProduct.isReferralCodeValid(FAKE_REFERRAL_CODE)).eq(false)
         })
         it("should return true for valid referral code", async () => {
-            let referralCode = await getSolaceReferralCode(policyholder1, solaceCoverProduct)
+            let referralCode = await getSolaceReferralCodeV2(policyholder1, solaceCoverProduct)
             expect(await solaceCoverProduct.isReferralCodeValid(referralCode)).eq(true)
         })
     })
@@ -415,7 +437,7 @@ describe("SolaceCoverProductV2", function() {
             expect(await solaceCoverProduct.getReferrerFromReferralCode(FAKE_REFERRAL_CODE)).eq(ZERO_ADDRESS)
         })
         it("should return referrer address for valid referral code", async () => {
-            let referralCode = await getSolaceReferralCode(policyholder1, solaceCoverProduct)
+            let referralCode = await getSolaceReferralCodeV2(policyholder1, solaceCoverProduct)
             expect(await solaceCoverProduct.getReferrerFromReferralCode(referralCode)).eq(policyholder1.address)
         })
     })
@@ -569,7 +591,7 @@ describe("SolaceCoverProductV2", function() {
         })
         it("cannot use own referral code", async () => {
             // Create new wallet just for this unit test scope, to avoid creating side effects that impact other unit tests. It's a headfuck to work that out.
-            const ownReferralCode = await getSolaceReferralCode(policyholder3, solaceCoverProduct)
+            const ownReferralCode = await getSolaceReferralCodeV2(policyholder3, solaceCoverProduct)
             await expect(solaceCoverProduct.connect(governor).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, INITIAL_DEPOSIT, ownReferralCode,CHAIN_IDS)).to.revertedWith("cannot refer to self");
         })
         it("will not give reward points if isReferralOn == false", async () => {
@@ -578,8 +600,8 @@ describe("SolaceCoverProductV2", function() {
             expect(await solaceCoverProduct.isReferralOn()).eq(false)
 
             // Get valid referral code (we know it is valid, because it works in the next unit test)
-
-            let referralCode = await getSolaceReferralCode(policyholder1, solaceCoverProduct)
+            
+            let referralCode = await getSolaceReferralCodeV2(policyholder1, solaceCoverProduct)
             let coverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_2);
 
             // Attempt to use referral code
@@ -596,7 +618,7 @@ describe("SolaceCoverProductV2", function() {
         })
 
         it("can use referral code only once", async () => {
-            let referralCode = await getSolaceReferralCode(policyholder1, solaceCoverProduct)
+            let referralCode = await getSolaceReferralCodeV2(policyholder1, solaceCoverProduct)
 
             await solaceCoverProduct.connect(policyholder3).deactivatePolicy();
             let tx = await solaceCoverProduct.connect(governor).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, INITIAL_DEPOSIT, referralCode, CHAIN_IDS);
@@ -608,7 +630,7 @@ describe("SolaceCoverProductV2", function() {
 
             // Attempt to use another referral code, via activePolicy()
             await solaceCoverProduct.connect(policyholder3).deactivatePolicy();
-            referralCode = await getSolaceReferralCode(policyholder2, solaceCoverProduct)
+            referralCode = await getSolaceReferralCodeV2(policyholder2, solaceCoverProduct)
             await expect(solaceCoverProduct.connect(governor).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, 0, referralCode, CHAIN_IDS)).to.revertedWith("cannot use referral code again");
 
             // Reset state to avoid side effects impacting consequent unit tests
@@ -771,13 +793,13 @@ describe("SolaceCoverProductV2", function() {
             await expect(solaceCoverProduct.connect(policyholder1).updateCoverLimit(coverLimit, FAKE_REFERRAL_CODE)).to.be.reverted;
         })
         it("cannot use own referral code", async () => {
-            let ownReferralCode = await getSolaceReferralCode(policyholder1, solaceCoverProduct)
+            let ownReferralCode = await getSolaceReferralCodeV2(policyholder1, solaceCoverProduct)
             let coverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_1);
             await expect(solaceCoverProduct.connect(policyholder1).updateCoverLimit(coverLimit, ownReferralCode)).to.revertedWith("cannot refer to self");
         })
         it("cannot use referral code of an inactive policy holder", async () => {
             expect(await solaceCoverProduct.policyStatus(POLICY_ID_3)).eq(false)
-            let referralCode = await getSolaceReferralCode(policyholder3, solaceCoverProduct)
+            let referralCode = await getSolaceReferralCodeV2(policyholder3, solaceCoverProduct)
             let coverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_2);
             await expect(solaceCoverProduct.connect(policyholder2).updateCoverLimit(coverLimit, referralCode)).to.revertedWith("referrer must be active policy holder");
         })
@@ -787,7 +809,7 @@ describe("SolaceCoverProductV2", function() {
             expect(await solaceCoverProduct.isReferralOn()).eq(false)
 
             // Get valid referral code (we know it is valid, because it works in the next unit test)
-            let referralCode = await getSolaceReferralCode(policyholder1, solaceCoverProduct)
+            let referralCode = await getSolaceReferralCodeV2(policyholder1, solaceCoverProduct)
             let coverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_2);
 
             // Attempt to use referral code
@@ -802,7 +824,7 @@ describe("SolaceCoverProductV2", function() {
             expect(await solaceCoverProduct.isReferralOn()).eq(true)
         })
         it("can use referral code only once", async () => {
-            let referralCode = await getSolaceReferralCode(policyholder1, solaceCoverProduct)
+            let referralCode = await getSolaceReferralCodeV2(policyholder1, solaceCoverProduct)
             let coverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_2);
             expect(await solaceCoverProduct.isReferralCodeUsed(policyholder2.address)).eq(false)
 
@@ -816,7 +838,7 @@ describe("SolaceCoverProductV2", function() {
             // Attempt to use another referral code
             tx = await solaceCoverProduct.connect(policyholder3).activatePolicy(policyholder3.address, INITIAL_COVER_LIMIT, 0, [], CHAIN_IDS);
             await expect(tx).emit(solaceCoverProduct, "PolicyCreated").withArgs(POLICY_ID_3);
-            referralCode = await getSolaceReferralCode(policyholder3, solaceCoverProduct)
+            referralCode = await getSolaceReferralCodeV2(policyholder3, solaceCoverProduct)
             await expect(solaceCoverProduct.connect(policyholder2).updateCoverLimit(coverLimit, referralCode)).to.revertedWith("cannot use referral code again");
 
             // Reset state to avoid side effects impacting consequent unit tests
@@ -1018,7 +1040,7 @@ describe("SolaceCoverProductV2", function() {
             let tx = solaceCoverProduct.connect(premiumCollector).chargePremiums([policyholder1.address, policyholder2.address], [WEEKLY_MAX_PREMIUM, WEEKLY_MAX_PREMIUM]);
             await expect(tx).emit(solaceCoverProduct, "PremiumCharged").withArgs(policyholder1.address, WEEKLY_MAX_PREMIUM);
             await expect(tx).emit(solaceCoverProduct, "PremiumCharged").withArgs(policyholder2.address, WEEKLY_MAX_PREMIUM);
-
+         
             // premiums should be transferred to premium pool
             expect(await frax.balanceOf(solaceCoverProduct.address)).eq(initialContractFRAXBalance.sub(WEEKLY_MAX_PREMIUM.mul(2)))
             expect(await frax.balanceOf(premiumPool.address)).eq(initialPremiumPoolFRAXBalance.add(WEEKLY_MAX_PREMIUM.mul(2)))
@@ -1134,7 +1156,6 @@ describe("SolaceCoverProductV2", function() {
 
     //         // // Policy holder 5 withdraw
     //         // await solaceCoverProduct.connect(policyholder5).withdraw();
-
     //         // let minRequiredAccountBalance = maxRateNum.mul(ONE_WEEK).mul(INITIAL_COVER_LIMIT).div(maxRateDenom)
     //         // console.log(Number(minRequiredAccountBalance))
     //         // console.log(Number(await solaceCoverProduct.accountBalanceOf(policyholder5.address)))
@@ -1163,13 +1184,18 @@ describe("SolaceCoverProductV2", function() {
             // Policy 2: reward points can partially pay for premium, rest will come from account balance
             // Policy 3: reward points + account balance unable to fully pay for premium
 
+            // Need to manipuate premium paid to be >= 100, so reward points count in chargePremiums() computation
+            await manipulatePremiumPaidOf(policyholder1, REFERRAL_THRESHOLD)
+            await manipulatePremiumPaidOf(policyholder2, REFERRAL_THRESHOLD)
+            await manipulatePremiumPaidOf(policyholder3, REFERRAL_THRESHOLD)
+
             // Set up reward points for policy 1 and 2
             // Use referral code to set up reward points for policy 1
             // Use setRewardPoints() method to set up reward points for policy 2
             let EXCESS_REWARD_POINTS = WEEKLY_MAX_PREMIUM.mul(2)
             let INSUFFICIENT_REWARD_POINTS = WEEKLY_MAX_PREMIUM.div(10)
 
-            let referralCode = await getSolaceReferralCode(policyholder2, solaceCoverProduct)
+            let referralCode = await getSolaceReferralCodeV2(policyholder2, solaceCoverProduct)
             let coverLimit = await solaceCoverProduct.coverLimitOf(POLICY_ID_1);
             let tx = await solaceCoverProduct.connect(policyholder1).updateCoverLimit(coverLimit, referralCode);
             let initialRewardPoints1 = await solaceCoverProduct.rewardPointsOf(policyholder1.address)
@@ -1321,6 +1347,14 @@ describe("SolaceCoverProductV2", function() {
     //         expect(await usdc.balanceOf(usdcPolicyholder.address)).eq(withdrawAmount.div(10**12))
     //     })
     // })
+
+    // Credit to https://medium.com/coinmonks/solidity-tutorial-all-about-mappings-29a12269ee14
+
+    async function manipulatePremiumPaidOf(policyholder: Wallet, desiredBalance: BN) {
+        const storageSlot = utils.keccak256(utils.defaultAbiCoder.encode(["address", "uint256"], [policyholder.address, 23]))
+        await provider.send("hardhat_setStorageAt", [solaceCoverProduct.address, storageSlot, toBytes32(desiredBalance).toString()])
+        await provider.send("evm_mine", [])
+    }
 
     // Credit to https://kndrck.co/posts/local_erc20_bal_mani_w_hh/
 
