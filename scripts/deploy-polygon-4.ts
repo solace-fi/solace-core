@@ -16,7 +16,7 @@ import { isDeployed } from "../test/utilities/expectDeployed";
 
 const DEPLOYER_CONTRACT_ADDRESS     = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
 
-const FRAX_ADDRESS                  = "0xE338d08783CE3bdE2Cc03b137b196168641A8C05";
+const FRAX_ADDRESS                  = "0x45c32fA6DF82ead1e2EF74d17b76547EDdFaFF89";
 
 // wallet addresses
 let   COVERAGE_DATA_PROVIDER_UPDATER_ADDRESS  = "0xc5683ea4888DadfdE421a1E593DfbD36290D63AB"; // the bot address to update underwriting pool values
@@ -76,7 +76,6 @@ async function deployRegistry() {
   }
 
   // set default addresses
-  /*
   if (await registryV2.governance() == signerAddress) {
     console.log("Setting 'FRAX', 'premiumPool', 'coverPromotionAdmin', 'premiumCollector', 'riskManager', 'coverageDataProvider', 'solaceCoverProduct' addresses");
     let tx = await registryV2.connect(deployer).set(
@@ -85,7 +84,6 @@ async function deployRegistry() {
         );
     await tx.wait()
   }
-  */
 }
 
 async function deployCoverageDataProvider() {
@@ -115,6 +113,14 @@ async function deployCoverageDataProvider() {
     // tx = await coverageDataProvider.connect(deployer).set("aurora", AMOUNT2);
     // await tx.wait();
   }
+
+  console.log("Setting Underwriting Pool Updater");
+  let tx = await coverageDataProvider.connect(deployer).setUwpUpdater(COVERAGE_DATA_PROVIDER_UPDATER_ADDRESS);
+  await tx.wait();
+
+  console.log("Setting Underwriting Pool Amounts");
+  tx = await coverageDataProvider.connect(deployer).set("mainnet", BN.from("1000000000000000000").mul(8450000)); // 8.45M USD
+  await tx.wait();
 }
 
 async function deployRiskManager() {
@@ -191,11 +197,11 @@ async function deploySolaceCoverProductV2() {
   console.log('Risk Manager(V2) - Adding Soteria as a cover limit updated');
   tx = await riskManagerV2.connect(deployer).addCoverLimitUpdater(solaceCoverProduct.address)
   await tx.wait();
-  /*
+
   console.log('Adding supported chains to cover product');
-  let tx2 = await solaceCoverProduct.connect(deployer).addSupportedChains([1,137]);
+  let tx2 = await solaceCoverProduct.connect(deployer).addSupportedChains([137]);
   await tx2.wait();
-  */
+
 }
 
 async function logAddresses() {
