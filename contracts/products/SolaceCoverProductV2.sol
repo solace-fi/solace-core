@@ -125,14 +125,14 @@ contract SolaceCoverProductV2 is
     mapping(uint256 => uint256) internal _preDeactivateCoverLimitOf;
 
     /** 
-     * @notice policyholder => reward points. 
+     * @notice policyholder => reward points.
      * Users earn reward points for using a valid referral code (as a referee), and having other users successfully use their referral code (as a referrer)
      * Reward points can be manually set by the Cover Promotion Admin
      * Reward points act as a credit, when an account is charged, they are deducted from before deposited funds
      */
     mapping(address => uint256) internal _rewardPointsOf;
 
-    /** 
+    /**
      * @notice policyID => true if referral code has been used, false if not
      * A referral code can only be used once for each policy. There is no way to reset to false.
      */
@@ -245,7 +245,7 @@ contract SolaceCoverProductV2 is
         emit PolicyCreated(policyID);
         return policyID;
     }
-    
+
     /**
      * @notice Updates the cover limit of a user's policy.
      * @notice This will reset the cooldown.
@@ -253,7 +253,7 @@ contract SolaceCoverProductV2 is
      * @param referralCode_ The referral code.
      */
     function updateCoverLimit(
-        uint256 newCoverLimit_, 
+        uint256 newCoverLimit_,
         bytes calldata referralCode_
     ) external override nonReentrant whileUnpaused {
         require(newCoverLimit_ > 0, "zero cover value");
@@ -280,8 +280,8 @@ contract SolaceCoverProductV2 is
 
     /**
      * @notice Updates policy chain info.
-     * @param policyChains The requested policy chains to update.    
-    */
+     * @param policyChains The requested policy chains to update.
+     */
     function updatePolicyChainInfo(uint256[] memory policyChains) external override nonReentrant whileUnpaused {
         uint256 policyID = policyOf(msg.sender);
         require(_exists(policyID), "invalid policy");
@@ -306,7 +306,7 @@ contract SolaceCoverProductV2 is
     /**
      * @notice Withdraw funds from user's account.
      *
-     * @notice If cooldown has passed, the user will withdraw their entire account balance. 
+     * @notice If cooldown has passed, the user will withdraw their entire account balance.
      *
      * @notice If cooldown has not started, or has not passed, the user will not be able to withdraw their entire account. A minimum required account balance (one epoch's fee) will be left in the user's account.
      */
@@ -323,7 +323,7 @@ contract SolaceCoverProductV2 is
 
     /**
      * @notice Deactivate a user's policy.
-     * 
+     *
      * This will set a user's cover limit to 0, and begin the cooldown timer. Read comments for [`cooldownPeriod()`](#cooldownperiod) for more information on the cooldown mechanic.
      */
     function deactivatePolicy() external override nonReentrant {
@@ -473,7 +473,7 @@ contract SolaceCoverProductV2 is
      * @notice Gets the cooldown period.
      *
      * Cooldown timer is started by the user calling deactivatePolicy().
-     * Before the cooldown has started or has passed, withdrawing funds will leave a minimim required account balance in the user's account. 
+     * Before the cooldown has started or has passed, withdrawing funds will leave a minimim required account balance in the user's account.
      * Only after the cooldown has passed, is a user able to withdraw their entire account balance.
      * @return cooldownPeriod_ The cooldown period in seconds.
      */
@@ -516,13 +516,13 @@ contract SolaceCoverProductV2 is
 
     /**
      * @notice True if a policyholder has previously used a valid referral code, false if not
-     * 
+     *
      * A policyholder can only use a referral code once. A policyholder is then ineligible to receive further rewards from additional referral codes.
      * @return isReferralCodeUsed_ True if the policyholder has previously used a valid referral code, false if not
      */
     function isReferralCodeUsed(address policyholder) external view override returns (bool isReferralCodeUsed_) {
         return _isReferralCodeUsed[_policyOf[policyholder]];
-    } 
+    }
 
     /**
      * @notice Returns true if valid referral code, false otherwise.
@@ -607,9 +607,9 @@ contract SolaceCoverProductV2 is
     function setRegistry(address registry_) external override onlyGovernance {
         require(registry_ != address(0x0), "zero address registry");
         _registry = IRegistry(registry_);
-        
+
         require(_registry.get("riskManager") != address(0x0), "zero address riskmanager");
-        require(_registry.get("frax") != address(0x0), "zero address frax");
+        require(_registry.get(asset) != address(0x0), "zero address asset");
         emit RegistrySet(registry_);
     }
 
@@ -678,7 +678,7 @@ contract SolaceCoverProductV2 is
      * @notice set _referralThreshhold
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param referralThreshhold_ Desired referralThreshhold.
-    */
+     */
     function setReferralThreshold(uint256 referralThreshhold_) external override onlyGovernance {
         _referralThreshold = referralThreshhold_;
         emit ReferralThresholdSet(referralThreshhold_);
@@ -759,7 +759,7 @@ contract SolaceCoverProductV2 is
      * @param premiums Array of premium amounts (in **USD** to 18 decimal places) to charge each policyholder.
      */
     function chargePremiums(
-        address[] calldata holders, 
+        address[] calldata holders,
         uint256[] calldata premiums
     ) external override whileUnpaused {
         uint256 count = holders.length;
@@ -879,7 +879,7 @@ contract SolaceCoverProductV2 is
      * @param amount The amount to withdraw in **USD** to 18 decimal places.
      */
     function _withdraw(
-        address policyholder, 
+        address policyholder,
         uint256 amount
     ) internal whileUnpaused {
         SafeERC20.safeTransfer(_getAsset(), policyholder, amount);
@@ -983,7 +983,7 @@ contract SolaceCoverProductV2 is
     ) internal {
         // Skip processing referral code, if referral campaign switched off or empty referral code argument
         if ( !_isReferralOn || _isEmptyReferralCode(referralCode_) ) return;
-        
+
         address referrer = ECDSA.recover(_getEIP712Hash(), referralCode_);
         require(referrer != policyholder_, "cannot refer to self");
         require(policyStatus(_policyOf[referrer]), "referrer must be active policy holder");
@@ -1010,7 +1010,7 @@ contract SolaceCoverProductV2 is
      * @notice Internal helper function to get EIP712-compliant hash for referral code verification.
      */
     function _getEIP712Hash() internal view returns (bytes32) {
-        bytes32 digest = 
+        bytes32 digest =
             ECDSA.toTypedDataHash(
                 _domainSeparatorV4(),
                 keccak256(

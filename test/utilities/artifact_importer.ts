@@ -89,11 +89,6 @@ export async function import_artifacts() {
   artifacts.CoverageDataProvider = await tryImport(`${artifact_dir}/risk/CoverageDataProvider.sol/CoverageDataProvider.json`);
   artifacts.MockPriceOracle = await tryImport(`${artifact_dir}/mocks/MockPriceOracle.sol/MockPriceOracle.json`);
 
-  // soteria coverage product
-  artifacts.SolaceCoverProduct = await tryImport(`${artifact_dir}/products/SolaceCoverProduct.sol/SolaceCoverProduct.json`);
-  artifacts.SolaceCoverProductFrax = await tryImport(`${artifact_dir}/products/SolaceCoverProductFrax.sol/SolaceCoverProductFrax.json`);
-  artifacts.SolaceCoverProductV2 = await tryImport(`${artifact_dir}/products/SolaceCoverProductV2.sol/SolaceCoverProductV2.json`);
-
   return artifacts;
 }
 
