@@ -17,10 +17,10 @@ import "../interfaces/products/ISolaceCoverProductV2.sol";
 /**
  * @title SolaceCoverProductV2
  * @author solace.fi
- * @notice A Solace insurance product that allows users to insure all of their DeFi positions against smart contract risk through a single policy. 
+ * @notice A Solace insurance product that allows users to insure all of their DeFi positions against smart contract risk through a single policy.
  *
  * Policies can be **purchased** via [`activatePolicy()`](#activatepolicy). Policies are represented as ERC721s, which once minted, cannot then be transferred or burned. Users can change the cover limit of their policy through [`updateCoverLimit()`](#updatecoverlimit).
- * 
+ *
  * The policy will remain active until i.) the user cancels their policy or ii.) the user's account runs out of funds. The policy will be billed like a subscription, every epoch a fee will be charged from the user's account.
  *
  * Users can **deposit funds** into their account via [`deposit()`](#deposit). Currently the contract only accepts deposits in **FRAX**. Note that both [`activatePolicy()`](#activatepolicy) and [`deposit()`](#deposit) enables a user to perform these actions (activate a policy, make a deposit) on behalf of another user.
@@ -29,7 +29,7 @@ import "../interfaces/products/ISolaceCoverProductV2.sol";
  *
  * Before the cooldown timer starts or passes, the user cannot withdraw their entire account balance. A minimum required account balance (to cover one epoch's fee) will be left in the user's account. After the cooldown has passed, a user will be able to withdraw their entire account balance.
  *
- * Users can enter a **referral code** with [`activatePolicy()`](#activatePolicy) or [`updateCoverLimit()`](#updatecoverlimit). A valid referral code will earn reward points to both the referrer and the referee. When the user's account is charged, reward points will be deducted before deposited funds. 
+ * Users can enter a **referral code** with [`activatePolicy()`](#activatePolicy) or [`updateCoverLimit()`](#updatecoverlimit). A valid referral code will earn reward points to both the referrer and the referee. When the user's account is charged, reward points will be deducted before deposited funds.
  * Each account can only enter a valid referral code once, however there are no restrictions on how many times a referral code can be used for new accounts.
  */
 contract SolaceCoverProductV2 is
@@ -124,7 +124,7 @@ contract SolaceCoverProductV2 is
      */
     mapping(uint256 => uint256) internal _preDeactivateCoverLimitOf;
 
-    /** 
+    /**
      * @notice policyholder => reward points.
      * Users earn reward points for using a valid referral code (as a referee), and having other users successfully use their referral code (as a referrer)
      * Reward points can be manually set by the Cover Promotion Admin
@@ -437,19 +437,12 @@ contract SolaceCoverProductV2 is
     }
 
     /**
-     * @notice Gets the max rate numerator.
+     * @notice Gets the max rate.
      * @return maxRateNum_ the max rate numerator.
-     */
-    function maxRateNum() public view override returns (uint256 maxRateNum_) {
-        return _maxRateNum;
-    }
-
-    /**
-     * @notice Gets the max rate denominator.
      * @return maxRateDenom_ the max rate denominator.
      */
-    function maxRateDenom() public view override returns (uint256 maxRateDenom_) {
-        return _maxRateDenom;
+    function maxRate() public view override returns (uint256 maxRateNum_, uint256 maxRateDenom_) {
+        return (_maxRateNum, _maxRateDenom);
     }
 
     /**
@@ -635,23 +628,15 @@ contract SolaceCoverProductV2 is
     }
 
     /**
-     * @notice set _maxRateNum.
+     * @notice set _maxRate.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param maxRateNum_ Desired maxRateNum.
-     */
-    function setMaxRateNum(uint256 maxRateNum_) external override onlyGovernance {
-        _maxRateNum = maxRateNum_;
-        emit MaxRateNumSet(maxRateNum_);
-    }
-
-    /**
-     * @notice set _maxRateDenom.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param maxRateDenom_ Desired maxRateDenom.
      */
-    function setMaxRateDenom(uint256 maxRateDenom_) external override onlyGovernance {
+    function setMaxRate(uint256 maxRateNum_, uint256 maxRateDenom_) external override onlyGovernance {
+        _maxRateNum = maxRateNum_;
         _maxRateDenom = maxRateDenom_;
-        emit MaxRateDenomSet(maxRateDenom_);
+        emit MaxRateSet(maxRateNum_, maxRateDenom_);
     }
 
     /**
@@ -800,7 +785,7 @@ contract SolaceCoverProductV2 is
                 } else {
                     uint256 partialPremium = _accountBalanceOf[holders[i]] + _rewardPointsOf[holders[i]];
                     amountToPayPremiumPool += _accountBalanceOf[holders[i]];
-                    _premiumPaidOf[holders[i]] += _accountBalanceOf[holders[i]]; 
+                    _premiumPaidOf[holders[i]] += _accountBalanceOf[holders[i]];
                     _accountBalanceOf[holders[i]] = 0;
                     _rewardPointsOf[holders[i]] = 0;
                     _deactivatePolicy(holders[i]);
@@ -817,11 +802,11 @@ contract SolaceCoverProductV2 is
                         amountToPayPremiumPool += premium;
                         _premiumPaidOf[holders[i]] += premium;
                         _accountBalanceOf[holders[i]] -= premium;
-                        emit PremiumCharged(holders[i], premium);   
+                        emit PremiumCharged(holders[i], premium);
                 } else {
                     uint256 partialPremium = _accountBalanceOf[holders[i]];
                     amountToPayPremiumPool += partialPremium;
-                    _premiumPaidOf[holders[i]] += partialPremium; 
+                    _premiumPaidOf[holders[i]] += partialPremium;
                     _accountBalanceOf[holders[i]] = 0;
                     _deactivatePolicy(holders[i]);
                     emit PremiumPartiallyCharged(
