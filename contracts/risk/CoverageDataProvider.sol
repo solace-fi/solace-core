@@ -6,8 +6,6 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "../interfaces/risk/ICoverageDataProvider.sol";
 import "../interfaces/utils/IRegistry.sol";
 import "../interfaces/ISOLACE.sol";
-import "../interfaces/utils/Aave/IAavePriceOracle.sol";
-import "../interfaces/utils/Sushiswap/ISushiswapLPToken.sol";
 import "../utils/Governable.sol";
 
 /**
