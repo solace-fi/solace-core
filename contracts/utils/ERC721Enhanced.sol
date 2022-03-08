@@ -10,7 +10,7 @@ import "./../interfaces/utils/IERC1271.sol";
 import "./../interfaces/utils/IERC721Enhanced.sol";
 
 /**
- * @title ERC721Enhancedv1
+ * @title ERC721Enhanced
  * @author solace.fi
  * @notice An extension of `ERC721`.
  *
@@ -30,7 +30,7 @@ abstract contract ERC721Enhanced is ERC721Enumerable, IERC721Enhanced, EIP712 {
     string public baseURI;
 
     /**
-     * @notice Constructs the `ERC721Enhancedv1` contract.
+     * @notice Constructs the `ERC721Enhanced` contract.
      * @param name_ The name of the token.
      * @param symbol_ The symbol of the token.
      */
@@ -144,50 +144,6 @@ abstract contract ERC721Enhanced is ERC721Enumerable, IERC721Enhanced, EIP712 {
     }
 
     /***************************************
-    BETTER ENUMERATION
-    ***************************************/
-
-    /**
-     * @notice Lists all tokens.
-     * Order not specified.
-     * @dev This function is more useful off chain than on chain.
-     * @return tokenIDs The list of token IDs.
-     */
-    function listTokens() public view override returns (uint256[] memory tokenIDs) {
-        uint256 tokenCount = totalSupply();
-        tokenIDs = new uint256[](tokenCount);
-        for(uint256 index = 0; index < tokenCount; index++) {
-            tokenIDs[index] = tokenByIndex(index);
-        }
-        return tokenIDs;
-    }
-
-    /**
-     * @notice Lists the tokens owned by `owner`.
-     * Order not specified.
-     * @dev This function is more useful off chain than on chain.
-     * @return tokenIDs The list of token IDs.
-     */
-    function listTokensOfOwner(address owner) public view override returns (uint256[] memory tokenIDs) {
-        require(owner != address(0x0), "zero address owner");
-        uint256 tokenCount = balanceOf(owner);
-        tokenIDs = new uint256[](tokenCount);
-        for(uint256 index = 0; index < tokenCount; index++) {
-            tokenIDs[index] = tokenOfOwnerByIndex(owner, index);
-        }
-        return tokenIDs;
-    }
-
-    /**
-     * @notice Determines if a token exists or not.
-     * @param tokenID The ID of the token to query.
-     * @return status True if the token exists, false if it doesn't.
-     */
-    function exists(uint256 tokenID) external view override returns (bool status) {
-        return _exists(tokenID);
-    }
-
-    /***************************************
     CHANGEABLE URIS
     ***************************************/
 
@@ -293,4 +249,17 @@ abstract contract ERC721Enhanced is ERC721Enumerable, IERC721Enhanced, EIP712 {
         uint256 tokenID
     // solhint-disable-next-line no-empty-blocks
     ) internal virtual {}
+
+    /***************************************
+    MISC
+    ***************************************/
+
+    /**
+     * @notice Determines if a token exists or not.
+     * @param tokenID The ID of the token to query.
+     * @return status True if the token exists, false if it doesn't.
+     */
+    function exists(uint256 tokenID) external view override returns (bool status) {
+        return _exists(tokenID);
+    }
 }

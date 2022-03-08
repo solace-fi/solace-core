@@ -87,24 +87,8 @@ interface IERC721Enhanced is IERC721Enumerable {
     event BaseURISet(string baseURI);
 
     /***************************************
-    BETTER ENUMERATION
+    MISC
     ***************************************/
-
-    /**
-     * @notice Lists all tokens.
-     * Order not specified.
-     * @dev This function is more useful off chain than on chain.
-     * @return tokenIDs The list of token IDs.
-     */
-    function listTokens() external view returns (uint256[] memory tokenIDs);
-
-    /**
-     * @notice Lists the tokens owned by `owner`.
-     * Order not specified.
-     * @dev This function is more useful off chain than on chain.
-     * @return tokenIDs The list of token IDs.
-     */
-    function listTokensOfOwner(address owner) external view returns (uint256[] memory tokenIDs);
 
     /**
      * @notice Determines if a token exists or not.

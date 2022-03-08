@@ -325,12 +325,6 @@ describe("ERC721Enhanced", function() {
     });
   });
 
-  describe("listTokensOfOwner", function () {
-    it("reverts zero address lookup", async function () {
-      await expect(token.listTokensOfOwner(ZERO_ADDRESS)).to.be.revertedWith("zero address owner");
-    });
-  });
-
   describe("_afterTokenTransfer", function () {
     let tokenID: BN;
     it("hears mint", async function () {
