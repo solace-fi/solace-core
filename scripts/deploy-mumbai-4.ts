@@ -11,27 +11,24 @@ import { create2Contract } from "./create2Contract";
 import { logContractAddress } from "./utils";
 
 import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_importer";
-import { Deployer, CoverageDataProvider, Registry, RiskManager, SolaceCoverProduct } from "../typechain";
+import { Deployer, CoverageDataProvider, Registry, RiskManager, SolaceCoverProductV2 } from "../typechain";
 import { isDeployed } from "../test/utilities/expectDeployed";
 
-const DEPLOYER_CONTRACT_ADDRESS    = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
+const DEPLOYER_CONTRACT_ADDRESS     = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
 
-const DAI_ADDRESS                  = "0x6B175474E89094C44Da98b954EedeAC495271d0F";
+const FRAX_ADDRESS                  = "0xE338d08783CE3bdE2Cc03b137b196168641A8C05";
 
 // wallet addresses
 let   COVERAGE_DATA_PROVIDER_UPDATER_ADDRESS  = "0xc5683ea4888DadfdE421a1E593DfbD36290D63AB"; // the bot address to update underwriting pool values
-const PREMIUM_POOL_ADDRESS                    = "0x88fdDCe9aD3C5A12c06B597F0948F8EafFC3862d"; // will be set in registry
-let   COVER_PROMOTION_ADMIN_ADDRESS           = "0x4770becA2628685F7C45102c7a649F921df71C70"; // will be set in registry
+const PREMIUM_POOL_ADDRESS                    = "0x501AcE0e8D16B92236763E2dEd7aE3bc2DFfA276"; // will be set in registry
+let   COVER_PROMOTION_ADMIN_ADDRESS           = "0x501AcE0e8D16B92236763E2dEd7aE3bc2DFfA276"; // will be set in registry
 const PREMIUM_COLLECTOR_ADDRESS               = "0xF321be3577B1AcB436869493862bA18bDde6fc39"; // the bot address that will be set in registry
 
 // contract addresses
 const REGISTRY_V2_ADDRESS               = "0x501ACe0f576fc4ef9C0380AA46A578eA96b85776";
 const RISK_MANAGER_V2_ADDRESS           = "0x501AcEf9020632a71CB25CFa9F554252eB51732b";
 const COVERAGE_DATA_PROVIDER_ADDRESS    = "0x501ACE6C5fFf4d42EaC02357B6DD9b756E337355";
-const SOLACE_COVER_PRODUCT_ADDRESS      = "0x501ACEbe29eabc346779BcB5Fd62Eaf6Bfb5320E";
-
-const DOMAIN_NAME = "Solace.fi-SolaceCoverProduct";
-const VERSION = "1";
+const SOLACE_COVER_PRODUCT_ADDRESS      = "0x501AcEC83d440c00644cA5C48d059e1840852a64";
 
 let artifacts: ArtifactImports;
 let deployerContract: Deployer;
@@ -39,7 +36,7 @@ let deployerContract: Deployer;
 let coverageDataProvider: CoverageDataProvider;
 let registryV2: Registry;
 let riskManagerV2: RiskManager;
-let solaceCoverProduct: SolaceCoverProduct;
+let solaceCoverProduct: SolaceCoverProductV2;
 
 let signerAddress: string;
 async function main() {
@@ -59,9 +56,10 @@ async function main() {
 
   // deploy contracts
   await deployRegistry()
+
   await deployCoverageDataProvider();
   await deployRiskManager();
-  await deploySolaceCoverProduct();
+  await deploySolaceCoverProductV2();
 
   // log addresses
   await logAddresses();
@@ -78,14 +76,16 @@ async function deployRegistry() {
   }
 
   // set default addresses
+  /*
   if (await registryV2.governance() == signerAddress) {
-    console.log("Setting 'DAI', 'premiumPool', 'coverPromotionAdmin', 'premiumCollector', 'riskManager', 'coverageDataProvider', 'solaceCoverProduct' addresses");
+    console.log("Setting 'FRAX', 'premiumPool', 'coverPromotionAdmin', 'premiumCollector', 'riskManager', 'coverageDataProvider', 'solaceCoverProduct' addresses");
     let tx = await registryV2.connect(deployer).set(
-          ["dai", "premiumPool", "coverPromotionAdmin", "premiumCollector", "riskManager", "coverageDataProvider", "solaceCoverProduct"],
-          [DAI_ADDRESS, PREMIUM_POOL_ADDRESS, COVER_PROMOTION_ADMIN_ADDRESS, PREMIUM_COLLECTOR_ADDRESS, RISK_MANAGER_V2_ADDRESS, COVERAGE_DATA_PROVIDER_ADDRESS, SOLACE_COVER_PRODUCT_ADDRESS]
+          ["frax", "premiumPool", "coverPromotionAdmin", "premiumCollector", "riskManager", "coverageDataProvider", "solaceCoverProduct"],
+          [FRAX_ADDRESS, PREMIUM_POOL_ADDRESS, COVER_PROMOTION_ADMIN_ADDRESS, PREMIUM_COLLECTOR_ADDRESS, RISK_MANAGER_V2_ADDRESS, COVERAGE_DATA_PROVIDER_ADDRESS, SOLACE_COVER_PRODUCT_ADDRESS]
         );
     await tx.wait()
   }
+  */
 }
 
 async function deployCoverageDataProvider() {
@@ -126,6 +126,7 @@ async function deployRiskManager() {
     riskManagerV2 = (await ethers.getContractAt(artifacts.RiskManager.abi, res.address)) as RiskManager;
     console.log(`Deployed Risk Manager(V2) to ${riskManagerV2.address}`);
   }
+
   const { success } = await registryV2.tryGet("riskManager");
   if (!success && await registryV2.governance() == signerAddress) {
     console.log("Registering Risk Manager");
@@ -134,18 +135,21 @@ async function deployRiskManager() {
   }
 }
 
-async function deploySolaceCoverProduct() {
+async function deploySolaceCoverProductV2() {
+  const DOMAIN_NAME = "Solace.fi-SolaceCoverProductV2";
+  const VERSION = "2";
+
   if (await isDeployed(SOLACE_COVER_PRODUCT_ADDRESS)) {
-    solaceCoverProduct = (await ethers.getContractAt(artifacts.SolaceCoverProduct.abi, SOLACE_COVER_PRODUCT_ADDRESS)) as SolaceCoverProduct;
+    solaceCoverProduct = (await ethers.getContractAt(artifacts.SolaceCoverProductV2.abi, SOLACE_COVER_PRODUCT_ADDRESS)) as SolaceCoverProductV2;
   } else {
     console.log("Deploying Solace Cover Product");
-    const res = await create2Contract(deployer, artifacts.SolaceCoverProduct, [signerAddress, registryV2.address, DOMAIN_NAME, VERSION], {}, "", deployerContract.address);
-    solaceCoverProduct = (await ethers.getContractAt(artifacts.SolaceCoverProduct.abi, res.address)) as SolaceCoverProduct;
+    const res = await create2Contract(deployer, artifacts.SolaceCoverProductV2, [signerAddress, registryV2.address, "frax", DOMAIN_NAME, VERSION], {}, "", deployerContract.address);
+    solaceCoverProduct = (await ethers.getContractAt(artifacts.SolaceCoverProductV2.abi, res.address)) as SolaceCoverProductV2;
     console.log(`Deployed Solace Cover Product to ${solaceCoverProduct.address}`);
   }
 
-  let { success } = await registryV2.tryGet("solaceCoverProduct");
-  if (!success && await registryV2.governance() == signerAddress) {
+  let { success, value } = await registryV2.tryGet("solaceCoverProduct");
+  if ((!success || value != solaceCoverProduct.address) && await registryV2.governance() == signerAddress) {
     console.log("Registering Solace Cover Product");
     let tx = await registryV2.connect(deployer).set(["solaceCoverProduct"], [solaceCoverProduct.address]);
     await tx.wait();
@@ -187,6 +191,11 @@ async function deploySolaceCoverProduct() {
   console.log('Risk Manager(V2) - Adding Soteria as a cover limit updated');
   tx = await riskManagerV2.connect(deployer).addCoverLimitUpdater(solaceCoverProduct.address)
   await tx.wait();
+  /*
+  console.log('Adding supported chains to cover product');
+  let tx2 = await solaceCoverProduct.connect(deployer).addSupportedChains([1,137]);
+  await tx2.wait();
+  */
 }
 
 async function logAddresses() {
@@ -197,6 +206,7 @@ async function logAddresses() {
   logContractAddress("RiskManagerV2", riskManagerV2.address);
   logContractAddress("CoverageDataProvider", coverageDataProvider.address);
   logContractAddress("SolaceCoverProduct", solaceCoverProduct.address);
+  logContractAddress("Frax", FRAX_ADDRESS);
 }
 
 main()

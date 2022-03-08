@@ -2,6 +2,7 @@
 pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -11,10 +12,10 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "../utils/Governable.sol";
 import "../interfaces/utils/IRegistry.sol";
 import "../interfaces/risk/IRiskManager.sol";
-import "../interfaces/products/ISolaceCoverProduct.sol";
+import "../interfaces/products/ISolaceCoverProductV2.sol";
 
 /**
- * @title SolaceCoverProduct
+ * @title SolaceCoverProductV2
  * @author solace.fi
  * @notice A Solace insurance product that allows users to insure all of their DeFi positions against smart contract risk through a single policy.
  *
@@ -22,7 +23,7 @@ import "../interfaces/products/ISolaceCoverProduct.sol";
  *
  * The policy will remain active until i.) the user cancels their policy or ii.) the user's account runs out of funds. The policy will be billed like a subscription, every epoch a fee will be charged from the user's account.
  *
- * Users can **deposit funds** into their account via [`deposit()`](#deposit). Currently the contract only accepts deposits in **DAI**. Note that both [`activatePolicy()`](#activatepolicy) and [`deposit()`](#deposit) enables a user to perform these actions (activate a policy, make a deposit) on behalf of another user.
+ * Users can **deposit funds** into their account via [`deposit()`](#deposit). Currently the contract only accepts deposits in **FRAX**. Note that both [`activatePolicy()`](#activatepolicy) and [`deposit()`](#deposit) enables a user to perform these actions (activate a policy, make a deposit) on behalf of another user.
  *
  * Users can **cancel** their policy via [`deactivatePolicy()`](#deactivatepolicy). This will start a cooldown timer. Users can **withdraw funds** from their account via [`withdraw()`](#withdraw).
  *
@@ -31,8 +32,8 @@ import "../interfaces/products/ISolaceCoverProduct.sol";
  * Users can enter a **referral code** with [`activatePolicy()`](#activatePolicy) or [`updateCoverLimit()`](#updatecoverlimit). A valid referral code will earn reward points to both the referrer and the referee. When the user's account is charged, reward points will be deducted before deposited funds.
  * Each account can only enter a valid referral code once, however there are no restrictions on how many times a referral code can be used for new accounts.
  */
-contract SolaceCoverProduct is
-    ISolaceCoverProduct,
+contract SolaceCoverProductV2 is
+    ISolaceCoverProductV2,
     ERC721,
     EIP712,
     ReentrancyGuard,
@@ -40,6 +41,7 @@ contract SolaceCoverProduct is
 {
     using SafeERC20 for IERC20;
     using Address for address;
+    using EnumerableSet for EnumerableSet.UintSet;
 
     /***************************************
     STATE VARIABLES
@@ -56,6 +58,9 @@ contract SolaceCoverProduct is
     bytes32 private constant _REFERRAL_TYPEHASH = keccak256("SolaceReferral(uint256 version)");
 
     string public baseURI;
+
+    /// @notice Asset name to pay coverage.
+    string public asset;
 
     /***************************************
     BOOK-KEEPING VARIABLES
@@ -82,12 +87,12 @@ contract SolaceCoverProduct is
     uint256 internal _cooldownPeriod;
 
     /**
-     * @notice The reward points earned (to both the referee and referrer) for a valid referral code. (Default is 50 DAI).
+     * @notice The reward points earned (to both the referee and referrer) for a valid referral code. (Default is 50 FRAX).
      */
     uint256 internal _referralReward;
 
     /**
-     * @notice The threshold premium amount that an account needs to have paid, for the account to be able to apply a referral code. (Default is 100 DAI).
+     * @notice The threshold premium amount that an account needs to have paid, for the account to be able to apply a referral code. (Default is 100 FRAX).
      */
     uint256 internal _referralThreshold;
 
@@ -136,6 +141,12 @@ contract SolaceCoverProduct is
     /// @notice policyholder => account balance (in USD, to 18 decimals places)
     mapping(address => uint256) private _accountBalanceOf;
 
+    /// @notice The policy chain info.
+    mapping(uint256 => uint256[]) private _policyChainInfo;
+
+    /// @notice Supported chains to cover positions.
+    EnumerableSet.UintSet internal chains;
+
     /***************************************
     MODIFIERS
     ***************************************/
@@ -149,12 +160,14 @@ contract SolaceCoverProduct is
      * @notice Constructs `Solace Cover Product`.
      * @param governance_ The address of the governor.
      * @param registry_ The [`Registry`](./Registry) contract address.
+     * @param asset_ The asset name to pay coverage.
      * @param domain_ The user readable name of the EIP712 signing domain.
      * @param version_ The current major version of the signing domain.
      */
     constructor(
         address governance_,
         address registry_,
+        string memory asset_,
         string memory domain_,
         string memory version_
     )
@@ -165,17 +178,18 @@ contract SolaceCoverProduct is
         require(registry_ != address(0x0), "zero address registry");
         _registry = IRegistry(registry_);
         require(_registry.get("riskManager") != address(0x0), "zero address riskmanager");
-        require(_registry.get("dai") != address(0x0), "zero address dai");
+        require(_registry.get(asset_) != address(0x0), "zero address asset");
 
         // Set default values
         _maxRateNum = 1;
         _maxRateDenom = 315360000; // Max premium rate of 10% of cover limit per annum
         _chargeCycle = 604800; // One-week charge cycle
         _cooldownPeriod = 604800; // One-week cooldown period
-        _referralReward = 50e18; // 50 DAI
-        _referralThreshold = 100e18; // 100 DAI
+        _referralReward = 50e18; // 50 FRAX
+        _referralThreshold = 100e18; // 100 FRAX
         _isReferralOn = true; // Referral rewards active
-        baseURI = string(abi.encodePacked("https://stats.solace.fi/policy/soteria/?chainID=", Strings.toString(block.chainid), "&policyID="));
+        asset = asset_;
+        baseURI = string(abi.encodePacked("https://stats.solace.fi/policy/?chainID=", Strings.toString(block.chainid), "&policyID="));
     }
 
     /***************************************
@@ -188,16 +202,19 @@ contract SolaceCoverProduct is
      * @param coverLimit_ The maximum value to cover in **USD**.
      * @param amount_ The deposit amount in **USD** to fund the policyholder's account.
      * @param referralCode_ The referral code.
+     * @param chains_ The chain ids.
      * @return policyID The ID of the newly minted policy.
      */
     function activatePolicy(
         address policyholder_,
         uint256 coverLimit_,
         uint256 amount_,
-        bytes calldata referralCode_
+        bytes calldata referralCode_,
+        uint256[] calldata chains_
     ) external override nonReentrant whileUnpaused returns (uint256 policyID) {
         require(policyholder_ != address(0x0), "zero address policyholder");
         require(coverLimit_ > 0, "zero cover value");
+        require(_validateChains(chains_), "invalid chain");
 
         policyID = policyOf(policyholder_);
         require(!policyStatus(policyID), "policy already activated");
@@ -224,6 +241,7 @@ contract SolaceCoverProduct is
         _updateActiveCoverLimit(0, coverLimit_);
         _coverLimitOf[policyID] = coverLimit_;
         _preDeactivateCoverLimitOf[policyID] = coverLimit_;
+        _setPolicyChainInfo(policyID, chains_);
         emit PolicyCreated(policyID);
         return policyID;
     }
@@ -257,6 +275,18 @@ contract SolaceCoverProduct is
         _coverLimitOf[policyID] = newCoverLimit_;
         _preDeactivateCoverLimitOf[policyID] = newCoverLimit_;
         _updateActiveCoverLimit(currentCoverLimit, newCoverLimit_);
+        emit PolicyUpdated(policyID);
+    }
+
+    /**
+     * @notice Updates policy chain info.
+     * @param policyChains The requested policy chains to update.
+     */
+    function updatePolicyChainInfo(uint256[] memory policyChains) external override nonReentrant whileUnpaused {
+        uint256 policyID = policyOf(msg.sender);
+        require(_exists(policyID), "invalid policy");
+        require(policyStatus(policyID), "inactive policy");
+        _setPolicyChainInfo(policyID, policyChains);
         emit PolicyUpdated(policyID);
     }
 
@@ -407,19 +437,12 @@ contract SolaceCoverProduct is
     }
 
     /**
-     * @notice Gets the max rate numerator.
+     * @notice Gets the max rate.
      * @return maxRateNum_ the max rate numerator.
-     */
-    function maxRateNum() public view override returns (uint256 maxRateNum_) {
-        return _maxRateNum;
-    }
-
-    /**
-     * @notice Gets the max rate denominator.
      * @return maxRateDenom_ the max rate denominator.
      */
-    function maxRateDenom() public view override returns (uint256 maxRateDenom_) {
-        return _maxRateDenom;
+    function maxRate() public view override returns (uint256 maxRateNum_, uint256 maxRateDenom_) {
+        return (_maxRateNum, _maxRateDenom);
     }
 
     /**
@@ -531,6 +554,40 @@ contract SolaceCoverProduct is
         return string(abi.encodePacked( baseURI_, Strings.toString(policyID) ));
     }
 
+    /**
+     * @notice Returns true if given chain id supported.
+     * @return status True if chain is supported otherwise false.
+    */
+    function isSupportedChain(uint256 chainId) public view override returns (bool status) {
+       return chains.contains(chainId);
+    }
+
+    /**
+     * @notice Returns the number of chains.
+     * @return count The number of chains.
+     */
+     function numSupportedChains() public override view returns (uint256 count) {
+        return chains.length();
+    }
+
+    /**
+     * @notice Returns the chain at the given index.
+     * @param chainIndex The index to query.
+     * @return chainId The address of the chain.
+     */
+    function getChain(uint256 chainIndex) external override view returns (uint256 chainId) {
+        return chains.at(chainIndex);
+    }
+
+    /**
+     * @notice Returns the policy chain info.
+     * @param policyID The policy id to get chain info.
+     * @return policyChains The list of policy chain values.
+    */
+    function getPolicyChainInfo(uint256 policyID) external override view returns (uint256[] memory policyChains) {
+        return _policyChainInfo[policyID];
+    }
+
     /***************************************
     GOVERNANCE FUNCTIONS
     ***************************************/
@@ -545,7 +602,7 @@ contract SolaceCoverProduct is
         _registry = IRegistry(registry_);
 
         require(_registry.get("riskManager") != address(0x0), "zero address riskmanager");
-        require(_registry.get("dai") != address(0x0), "zero address dai");
+        require(_registry.get(asset) != address(0x0), "zero address asset");
         emit RegistrySet(registry_);
     }
 
@@ -571,23 +628,15 @@ contract SolaceCoverProduct is
     }
 
     /**
-     * @notice set _maxRateNum.
+     * @notice set _maxRate.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param maxRateNum_ Desired maxRateNum.
-     */
-    function setMaxRateNum(uint256 maxRateNum_) external override onlyGovernance {
-        _maxRateNum = maxRateNum_;
-        emit MaxRateNumSet(maxRateNum_);
-    }
-
-    /**
-     * @notice set _maxRateDenom.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param maxRateDenom_ Desired maxRateDenom.
      */
-    function setMaxRateDenom(uint256 maxRateDenom_) external override onlyGovernance {
+    function setMaxRate(uint256 maxRateNum_, uint256 maxRateDenom_) external override onlyGovernance {
+        _maxRateNum = maxRateNum_;
         _maxRateDenom = maxRateDenom_;
-        emit MaxRateDenomSet(maxRateDenom_);
+        emit MaxRateSet(maxRateNum_, maxRateDenom_);
     }
 
     /**
@@ -614,7 +663,7 @@ contract SolaceCoverProduct is
      * @notice set _referralThreshhold
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param referralThreshhold_ Desired referralThreshhold.
-    */
+     */
     function setReferralThreshold(uint256 referralThreshhold_) external override onlyGovernance {
         _referralThreshold = referralThreshhold_;
         emit ReferralThresholdSet(referralThreshhold_);
@@ -637,6 +686,35 @@ contract SolaceCoverProduct is
     function setBaseURI(string memory baseURI_) external override onlyGovernance {
         baseURI = baseURI_;
         emit BaseURISet(baseURI_);
+    }
+
+    /**
+     * @notice Adds supported chains to cover positions.
+     * @param supportedChains The supported array of chains.
+    */
+    function addSupportedChains(uint256[] memory supportedChains) external override onlyGovernance {
+        for (uint256 i = 0; i < supportedChains.length; i++) {
+            chains.add(supportedChains[i]);
+            emit SupportedChainSet(supportedChains[i]);
+        }
+    }
+
+    /**
+     * @notice Removes chain from the supported chain list.
+     * @param chainId The chain id to remove.
+    */
+    function removeSupportedChain(uint256 chainId) external override onlyGovernance {
+        chains.remove(chainId);
+        emit SupportedChainRemoved(chainId);
+    }
+
+    /**
+     * @notice Sets the asset name.
+     * @param assetName The asset name to set.
+    */
+    function setAsset(string memory assetName) external override onlyGovernance {
+        asset = assetName;
+        emit AssetSet(assetName);
     }
 
     /***************************************
@@ -675,7 +753,6 @@ contract SolaceCoverProduct is
         require(count <= policyCount(), "policy count exceeded");
         uint256 amountToPayPremiumPool = 0;
 
-
         for (uint256 i = 0; i < count; i++) {
             // Skip computation if the user has withdrawn entire account balance
             // We use _preDeactivateCoverLimitOf mapping here to circumvent the following edge case: A user should not be able to deactivate their policy just prior to the chargePremiums() tranasction, and then avoid the premium for the current epoch.
@@ -708,7 +785,7 @@ contract SolaceCoverProduct is
                 } else {
                     uint256 partialPremium = _accountBalanceOf[holders[i]] + _rewardPointsOf[holders[i]];
                     amountToPayPremiumPool += _accountBalanceOf[holders[i]];
-                    _premiumPaidOf[holders[i]] += _accountBalanceOf[holders[i]]; 
+                    _premiumPaidOf[holders[i]] += _accountBalanceOf[holders[i]];
                     _accountBalanceOf[holders[i]] = 0;
                     _rewardPointsOf[holders[i]] = 0;
                     _deactivatePolicy(holders[i]);
@@ -725,11 +802,11 @@ contract SolaceCoverProduct is
                         amountToPayPremiumPool += premium;
                         _premiumPaidOf[holders[i]] += premium;
                         _accountBalanceOf[holders[i]] -= premium;
-                        emit PremiumCharged(holders[i], premium);   
+                        emit PremiumCharged(holders[i], premium);
                 } else {
                     uint256 partialPremium = _accountBalanceOf[holders[i]];
                     amountToPayPremiumPool += partialPremium;
-                    _premiumPaidOf[holders[i]] += partialPremium; 
+                    _premiumPaidOf[holders[i]] += partialPremium;
                     _accountBalanceOf[holders[i]] = 0;
                     _deactivatePolicy(holders[i]);
                     emit PremiumPartiallyCharged(
@@ -741,7 +818,7 @@ contract SolaceCoverProduct is
             }
         }
 
-        // single DAI transfer to the premium pool
+        // single FRAX transfer to the premium pool
         SafeERC20.safeTransfer(_getAsset(), _registry.get("premiumPool"), amountToPayPremiumPool);
     }
 
@@ -804,6 +881,7 @@ contract SolaceCoverProduct is
         uint256 policyID = _policyOf[policyholder];
         _updateActiveCoverLimit(_coverLimitOf[policyID], 0);
         _coverLimitOf[policyID] = 0;
+        delete _policyChainInfo[policyID];
         emit PolicyDeactivated(policyID);
     }
 
@@ -853,7 +931,6 @@ contract SolaceCoverProduct is
      * @param policyholder Policyholder address.
      */
     function _startCooldown(address policyholder) internal {
-        // solhint-disable-next-line not-rely-on-time
         _cooldownStart[policyholder] = block.timestamp;
         emit CooldownStarted(policyholder, _cooldownStart[policyholder]);
     }
@@ -876,7 +953,6 @@ contract SolaceCoverProduct is
         if (_cooldownStart[policyholder] == 0) {
             return false;
         } else {
-            // solhint-disable-next-line not-rely-on-time
             return block.timestamp >= _cooldownStart[policyholder] + _cooldownPeriod;
         }
     }
@@ -925,7 +1001,7 @@ contract SolaceCoverProduct is
                 keccak256(
                     abi.encode(
                         _REFERRAL_TYPEHASH,
-                        1
+                        2
                     )
                 )
             );
@@ -936,7 +1012,31 @@ contract SolaceCoverProduct is
      * @notice Returns the underlying principal asset for `Solace Cover Product`.
      * @return asset The underlying asset.
     */
-    function _getAsset() internal view returns (IERC20 asset) {
-        return IERC20(_registry.get("dai"));
+    function _getAsset() internal view returns (IERC20) {
+        return IERC20(_registry.get(asset));
     }
+
+    /**
+     * @notice Checks if the given chain info is valid or not.
+     * @param requestedChains The chain id array to check.
+     * @return status True if the given chain array is valid.
+    */
+    function _validateChains(uint256[] memory requestedChains) internal view returns (bool) {
+        require(requestedChains.length > 0, "zero length");
+        require(requestedChains.length <= numSupportedChains(), "invalid length");
+        for (uint256 i = 0; i < requestedChains.length; i++) {
+            if (!chains.contains(requestedChains[i])) return false;
+        }
+        return true;
+    }
+
+    /**
+     * @notice Sets chain info for the policy.
+     * @param policyID The policy id to add chain info.
+     * @param policyChains The array of chain id to add.
+    */
+    function _setPolicyChainInfo(uint256 policyID, uint256[] memory policyChains) internal {
+        _policyChainInfo[policyID] = policyChains;
+    }
+
 }

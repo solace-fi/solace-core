@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
-interface ISolaceCoverProduct {
+interface ISolaceCoverProductV2 {
     /***************************************
     EVENTS
     ***************************************/
@@ -53,11 +53,8 @@ interface ISolaceCoverProduct {
     /// @notice Emitted when policy manager cover amount for soteria is updated.
     event PolicyManagerUpdated(uint256 activeCoverLimit);
 
-    /// @notice Emitted when maxRateNum is set.
-    event MaxRateNumSet(uint256 maxRateNum);
-
-    /// @notice Emitted when maxRateDenom is set.
-    event MaxRateDenomSet(uint256 maxRateDenom);
+    /// @notice Emitted when maxRate is set.
+    event MaxRateSet(uint256 maxRateNum, uint256 maxRateDenom);
 
     /// @notice Emitted when chargeCycle is set.
     event ChargeCycleSet(uint256 chargeCycle);
@@ -83,6 +80,15 @@ interface ISolaceCoverProduct {
     /// @notice Emitted when baseURI is set
     event BaseURISet(string baseURI);
 
+    /// @notice Emitted when supported chain is set.
+    event SupportedChainSet(uint256 chainId);
+
+    /// @notice Emitted when supported chain is removed.
+    event SupportedChainRemoved(uint256 chainId);
+
+    /// @notice Emiited when asset is set.
+    event AssetSet(string asset);
+
     /***************************************
     POLICY FUNCTIONS
     ***************************************/
@@ -93,13 +99,15 @@ interface ISolaceCoverProduct {
      * @param coverLimit_ The maximum value to cover in **USD**.
      * @param amount_ The deposit amount in **USD** to fund the policyholder's account.
      * @param referralCode_ The referral code.
+     * @param chains_ The chain ids.
      * @return policyID The ID of the newly minted policy.
      */
     function activatePolicy(
         address policyholder_,
         uint256 coverLimit_,
         uint256 amount_,
-        bytes calldata referralCode_
+        bytes calldata referralCode_,
+        uint256[] calldata chains_
     ) external returns (uint256 policyID);
 
     /**
@@ -110,9 +118,15 @@ interface ISolaceCoverProduct {
      * @param referralCode_ The referral code.
      */
     function updateCoverLimit(
-        uint256 newCoverLimit_, 
+        uint256 newCoverLimit_,
         bytes calldata referralCode_
     ) external;
+
+    /**
+     * @notice Updates policy chain info.
+     * @param policyChains The requested policy chains to update.
+    */
+    function updatePolicyChainInfo(uint256[] memory policyChains) external;
 
     /**
      * @notice Deposits funds into `policyholder`'s account.
@@ -128,15 +142,15 @@ interface ISolaceCoverProduct {
     /**
      * @notice Withdraw funds from user's account.
      *
-     * @notice If cooldown has passed, the user will withdraw their entire account balance. 
-     * @notice If cooldown has not started, or has not passed, the user will not be able to withdraw their entire account. 
+     * @notice If cooldown has passed, the user will withdraw their entire account balance.
+     * @notice If cooldown has not started, or has not passed, the user will not be able to withdraw their entire account.
      * @notice If cooldown has not passed, [`withdraw()`](#withdraw) will leave a minimum required account balance (one epoch's fee) in the user's account.
      */
     function withdraw() external;
 
     /**
      * @notice Deactivate a user's policy.
-     * 
+     *
      * This will set a user's cover limit to 0, and begin the cooldown timer. Read comments for [`withdraw()`](#withdraw) for cooldown mechanic details.
      */
     function deactivatePolicy() external;
@@ -223,16 +237,11 @@ interface ISolaceCoverProduct {
     function policyCount() external view returns (uint256 count);
 
     /**
-     * @notice Returns the max rate numerator.
+     * @notice Returns the max rate.
      * @return maxRateNum_ the max rate numerator.
-     */
-    function maxRateNum() external view returns (uint256 maxRateNum_);
-
-    /**
-     * @notice Returns the max rate denominator.
      * @return maxRateDenom_ the max rate denominator.
      */
-    function maxRateDenom() external view returns (uint256 maxRateDenom_);
+    function maxRate() external view returns (uint256 maxRateNum_, uint256 maxRateDenom_);
 
     /**
      * @notice Gets the charge cycle duration.
@@ -251,7 +260,7 @@ interface ISolaceCoverProduct {
      * @notice Gets the cooldown period.
      *
      * Cooldown timer is started by the user calling deactivatePolicy().
-     * Before the cooldown has started or has passed, withdrawing funds will leave a minimim required account balance in the user's account. 
+     * Before the cooldown has started or has passed, withdrawing funds will leave a minimim required account balance in the user's account.
      * Only after the cooldown has passed, is a user able to withdraw their entire account balance.
      * @return cooldownPeriod_ The cooldown period in seconds.
      */
@@ -275,7 +284,7 @@ interface ISolaceCoverProduct {
      * @return referralThreshold_ The referral threshold
      */
     function referralThreshold() external view returns (uint256 referralThreshold_);
-    
+
     /**
      * @notice Returns true if referral rewards are active, false if not.
      * @return isReferralOn_ True if referral rewards are active, false if not.
@@ -284,7 +293,7 @@ interface ISolaceCoverProduct {
 
     /**
      * @notice True if a policyholder has previously used a valid referral code, false if not
-     * 
+     *
      * A policyholder can only use a referral code once. Afterwards a policyholder is ineligible to receive further rewards from additional referral codes.
      * @return isReferralCodeUsed_ True if the policyholder has previously used a valid referral code, false if not
      */
@@ -302,11 +311,38 @@ interface ISolaceCoverProduct {
      * @return referrer The referrer address, returns 0 address if invalid referral code.
      */
     function getReferrerFromReferralCode(bytes calldata referralCode) external view returns (address referrer);
+
     /**
      * @notice Calculate minimum required account balance for a given cover limit. Equals the maximum chargeable fee for one epoch.
      * @param coverLimit Cover limit.
      */
     function minRequiredAccountBalance(uint256 coverLimit) external view returns (uint256 minRequiredAccountBalance_);
+
+    /**
+     * @notice Returns true if given chain id supported.
+     * @return status True if chain is supported otherwise false.
+    */
+    function isSupportedChain(uint256 chainId) external view returns (bool status);
+
+    /**
+     * @notice Returns the number of chains.
+     * @return count The number of chains.
+     */
+    function numSupportedChains() external view returns (uint256 count);
+
+    /**
+     * @notice Returns the chain at the given index.
+     * @param chainIndex The index to query.
+     * @return chainId The address of the chain.
+     */
+    function getChain(uint256 chainIndex) external view returns (uint256 chainId);
+
+    /**
+     * @notice Returns the policy chain info.
+     * @param policyID The policy id to get chain info.
+     * @return policyChains The list of policy chain values.
+    */
+    function getPolicyChainInfo(uint256 policyID) external view returns (uint256[] memory policyChains);
 
     /***************************************
     GOVERNANCE FUNCTIONS
@@ -335,18 +371,12 @@ interface ISolaceCoverProduct {
     function setCooldownPeriod(uint256 cooldownPeriod_) external;
 
     /**
-     * @notice set _maxRateNum.
+     * @notice set _maxRate.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param maxRateNum_ Desired maxRateNum.
-     */
-    function setMaxRateNum(uint256 maxRateNum_) external;
-
-    /**
-     * @notice set _maxRateDenom.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param maxRateDenom_ Desired maxRateDenom.
      */
-    function setMaxRateDenom(uint256 maxRateDenom_) external;
+    function setMaxRate(uint256 maxRateNum_, uint256 maxRateDenom_) external;
 
     /**
      * @notice set _chargeCycle.
@@ -382,19 +412,37 @@ interface ISolaceCoverProduct {
      */
     function setBaseURI(string memory baseURI_) external;
 
+    /**
+     * @notice Adds supported chains to cover positions.
+     * @param chains The supported array of chains.
+    */
+    function addSupportedChains(uint256[] memory chains) external;
+
+    /**
+     * @notice Removes chain from the supported chain list.
+     * @param chainId The chain id to remove.
+    */
+    function removeSupportedChain(uint256 chainId) external;
+
+    /**
+     * @notice Sets the asset name.
+     * @param assetName The asset name to set.
+    */
+    function setAsset(string memory assetName) external;
+
     /***************************************
     COVER PROMOTION ADMIN FUNCTIONS
     ***************************************/
 
     /**
      * @notice Enables cover promotion admin to set reward points for a selected address.
-     * 
+     *
      * Can only be called by the **Cover Promotion Admin** role.
      * @param policyholder_ The address of the policyholder to set reward points for.
      * @param rewardPoints_ Desired amount of reward points.
      */
     function setRewardPoints(
-        address policyholder_, 
+        address policyholder_,
         uint256 rewardPoints_
     ) external;
 

@@ -22,7 +22,7 @@ import "../interfaces/products/ISolaceCoverProduct.sol";
  *
  * The policy will remain active until i.) the user cancels their policy or ii.) the user's account runs out of funds. The policy will be billed like a subscription, every epoch a fee will be charged from the user's account.
  *
- * Users can **deposit funds** into their account via [`deposit()`](#deposit). Currently the contract only accepts deposits in **DAI**. Note that both [`activatePolicy()`](#activatepolicy) and [`deposit()`](#deposit) enables a user to perform these actions (activate a policy, make a deposit) on behalf of another user.
+ * Users can **deposit funds** into their account via [`deposit()`](#deposit). Currently the contract only accepts deposits in **FRAX**. Note that both [`activatePolicy()`](#activatepolicy) and [`deposit()`](#deposit) enables a user to perform these actions (activate a policy, make a deposit) on behalf of another user.
  *
  * Users can **cancel** their policy via [`deactivatePolicy()`](#deactivatepolicy). This will start a cooldown timer. Users can **withdraw funds** from their account via [`withdraw()`](#withdraw).
  *
@@ -31,7 +31,7 @@ import "../interfaces/products/ISolaceCoverProduct.sol";
  * Users can enter a **referral code** with [`activatePolicy()`](#activatePolicy) or [`updateCoverLimit()`](#updatecoverlimit). A valid referral code will earn reward points to both the referrer and the referee. When the user's account is charged, reward points will be deducted before deposited funds.
  * Each account can only enter a valid referral code once, however there are no restrictions on how many times a referral code can be used for new accounts.
  */
-contract SolaceCoverProduct is
+contract SolaceCoverProductFrax is
     ISolaceCoverProduct,
     ERC721,
     EIP712,
@@ -82,12 +82,12 @@ contract SolaceCoverProduct is
     uint256 internal _cooldownPeriod;
 
     /**
-     * @notice The reward points earned (to both the referee and referrer) for a valid referral code. (Default is 50 DAI).
+     * @notice The reward points earned (to both the referee and referrer) for a valid referral code. (Default is 50 FRAX).
      */
     uint256 internal _referralReward;
 
     /**
-     * @notice The threshold premium amount that an account needs to have paid, for the account to be able to apply a referral code. (Default is 100 DAI).
+     * @notice The threshold premium amount that an account needs to have paid, for the account to be able to apply a referral code. (Default is 100 FRAX).
      */
     uint256 internal _referralThreshold;
 
@@ -165,15 +165,15 @@ contract SolaceCoverProduct is
         require(registry_ != address(0x0), "zero address registry");
         _registry = IRegistry(registry_);
         require(_registry.get("riskManager") != address(0x0), "zero address riskmanager");
-        require(_registry.get("dai") != address(0x0), "zero address dai");
+        require(_registry.get("frax") != address(0x0), "zero address frax");
 
         // Set default values
         _maxRateNum = 1;
         _maxRateDenom = 315360000; // Max premium rate of 10% of cover limit per annum
         _chargeCycle = 604800; // One-week charge cycle
         _cooldownPeriod = 604800; // One-week cooldown period
-        _referralReward = 50e18; // 50 DAI
-        _referralThreshold = 100e18; // 100 DAI
+        _referralReward = 50e18; // 50 FRAX
+        _referralThreshold = 100e18; // 100 FRAX
         _isReferralOn = true; // Referral rewards active
         baseURI = string(abi.encodePacked("https://stats.solace.fi/policy/soteria/?chainID=", Strings.toString(block.chainid), "&policyID="));
     }
@@ -545,7 +545,7 @@ contract SolaceCoverProduct is
         _registry = IRegistry(registry_);
 
         require(_registry.get("riskManager") != address(0x0), "zero address riskmanager");
-        require(_registry.get("dai") != address(0x0), "zero address dai");
+        require(_registry.get("frax") != address(0x0), "zero address frax");
         emit RegistrySet(registry_);
     }
 
@@ -675,7 +675,6 @@ contract SolaceCoverProduct is
         require(count <= policyCount(), "policy count exceeded");
         uint256 amountToPayPremiumPool = 0;
 
-
         for (uint256 i = 0; i < count; i++) {
             // Skip computation if the user has withdrawn entire account balance
             // We use _preDeactivateCoverLimitOf mapping here to circumvent the following edge case: A user should not be able to deactivate their policy just prior to the chargePremiums() tranasction, and then avoid the premium for the current epoch.
@@ -741,7 +740,7 @@ contract SolaceCoverProduct is
             }
         }
 
-        // single DAI transfer to the premium pool
+        // single FRAX transfer to the premium pool
         SafeERC20.safeTransfer(_getAsset(), _registry.get("premiumPool"), amountToPayPremiumPool);
     }
 
@@ -937,6 +936,6 @@ contract SolaceCoverProduct is
      * @return asset The underlying asset.
     */
     function _getAsset() internal view returns (IERC20 asset) {
-        return IERC20(_registry.get("dai"));
+        return IERC20(_registry.get("frax"));
     }
 }

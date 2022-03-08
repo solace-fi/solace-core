@@ -34,11 +34,7 @@ const forking = (
   : no_fork
 );
 
-const accounts = {
-  accountsBalance: "2000000000000000000000000" // Default to start with 2,000,000 ether in each Hardhat provided wallet. Needed increase from default of 10000 ether because unit tests in SoteriaCoverageProduct failing with maxCover being denominated in ETH and rest of contract in DAI
-}
-
-const hardhat_network = process.env.FORK_NETWORK ? {forking, accounts} : {};
+const hardhat_network = process.env.FORK_NETWORK ? {forking} : {};
 
 const config: HardhatUserConfig = {
   defaultNetwork: "hardhat",
@@ -98,6 +94,17 @@ const config: HardhatUserConfig = {
         },
       },
     ],
+    overrides: {
+      "contracts/products/SolaceCoverProductV2.sol": {
+        version: "0.8.6",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 300,
+          },
+        }
+      }
+    }
   },
   paths: {
     sources: USE_PROCESSED_FILES ? "./contracts_processed" : "./contracts",
