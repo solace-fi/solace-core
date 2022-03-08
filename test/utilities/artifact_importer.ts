@@ -17,7 +17,6 @@ export async function import_artifacts() {
 
   let artifact_dir = process.env.USE_PROCESSED_FILES === "true" ? "../../artifacts/contracts_processed" : "../../artifacts/contracts";
   artifacts.WETH = await tryImport(`${artifact_dir}/WETH9.sol/WETH9.json`);
-  artifacts.Vault = await tryImport(`${artifact_dir}/utils/Vault.sol/Vault.json`);
   artifacts.Treasury = await tryImport (`${artifact_dir}/utils/Treasury.sol/Treasury.json`);
   artifacts.PolicyManager = await tryImport(`${artifact_dir}/risk/PolicyManager.sol/PolicyManager.json`);
   artifacts.PolicyDescriptorV2 = await tryImport(`${artifact_dir}/utils/PolicyDescriptorV2.sol/PolicyDescriptorV2.json`);
