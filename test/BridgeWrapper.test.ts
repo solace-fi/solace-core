@@ -88,7 +88,7 @@ describe("BridgeWrapper", function () {
       await bsolace.connect(user1).approve(wrapper.address, 0);
     });
     it("cannot unwrap with insufficient bsolace approval", async function () {
-      await bsolace.connect(user1).mint();
+      await bsolace.connect(user1).mintToken(user1.address, ONE_ETHER.mul(1000));
       await expect(wrapper.connect(user1).bsolaceToSolace(1, user2.address)).to.be.revertedWith("ERC20: transfer amount exceeds allowance");
     });
     it("can unwrap", async function () {
@@ -176,7 +176,7 @@ describe("BridgeWrapper", function () {
     });
     it("cannot wrap with invalid permit", async function () {
       let { v, r, s } = await getERC20PermitSignature(user1, wrapper.address, solace, 1, deadline);
-      await expect(wrapper.connect(user1).solaceToBSolaceSigned(1, user2.address, deadline, v+1, r, s)).to.be.revertedWith("ERC20Permit: invalid signature");
+      await expect(wrapper.connect(user1).solaceToBSolaceSigned(1, user2.address, deadline, v+1, r, s)).to.be.reverted;
     });
     it("cannot wrap with insufficient bridge liquidity", async function () {
       let { v, r, s } = await getERC20PermitSignature(user2, wrapper.address, solace, ONE_ETHER.mul(4), deadline);
