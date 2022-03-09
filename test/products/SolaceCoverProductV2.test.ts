@@ -19,12 +19,15 @@ chai.use(solidity)
 const DOMAIN_NAME = "Solace.fi-SolaceCoverProductV2";
 const VERSION = "2";
 
+let forkNetwork = process.env.FORK_NETWORK || "";
+let supportedNetworks = ["mainnet","polygon"];
+
 describe("SolaceCoverProductV2", function() {
-  if(process.env.FORK_NETWORK !== "polygon") {
-    it("can only be tested when forking polygon", async function() {
-      console.log("SolaceCoverProductV2 can only be tested when forking polygon");
-      console.log("set `FORK_NETWORK=polygon` in .env");
-      expect(true, "SolaceCoverProductV2 can only be tested when forking polygon").to.be.false;
+  if(!supportedNetworks.includes(forkNetwork)) {
+    it(`can only be tested when forking one of ${supportedNetworks.join(',')}`, async function() {
+      console.log(`SolaceCoverProductV2 can only be tested when forking one of ${supportedNetworks.join(',')}`);
+      console.log("set `FORK_NETWORK=mainnet` in .env");
+      expect(true, `SolaceCoverProductV2 can only be tested when forking one of ${supportedNetworks.join(',')}`).to.be.false;
     });
   } else {
     let artifacts: ArtifactImports;
@@ -71,8 +74,10 @@ describe("SolaceCoverProductV2", function() {
     // Random 130 character hex string
     const FAKE_REFERRAL_CODE = "0xe4e7cba021ff6b83b14d54016198f31b04cba044d71d9a8b9bdf964aa2259cc3b207237f814aa56e516638b448edc43a6c3f4637dca5de54cb199e37b039a832e7"
 
-    // const FRAX_ADDRESS = "0xE338d08783CE3bdE2Cc03b137b196168641A8C05" // Mumbai testnet address
-    const FRAX_ADDRESS = "0x45c32fA6DF82ead1e2EF74d17b76547EDdFaFF89" // Polygon mainnet address
+    const FRAX_ADDRESSES: {[network: string] : string} = {
+      "mainnet": "0x853d955aCEf822Db058eb8505911ED77F175b99e",
+      "polygon": "0x45c32fA6DF82ead1e2EF74d17b76547EDdFaFF89"
+    };
     const USDC_ADDRESS = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
 
     before( async () => {
@@ -112,7 +117,7 @@ describe("SolaceCoverProductV2", function() {
 
       it("reverts for zero address frax", async () => {
         await expect(deployContract(deployer, artifacts.SolaceCoverProductV2, [governor.address, registry.address, ASSET_NAME, DOMAIN_NAME, VERSION])).to.be.revertedWith("key not in mapping");
-        await registry.connect(governor).set(["frax"], [FRAX_ADDRESS])
+        await registry.connect(governor).set(["frax"], [FRAX_ADDRESSES[forkNetwork]])
       });
 
       it("can deploy", async () => {
@@ -132,7 +137,7 @@ describe("SolaceCoverProductV2", function() {
 
       it("completes FRAX setup", async() => {
         const Frax = await ethers.getContractFactory("MockERC20Permit");
-        frax = await Frax.attach(FRAX_ADDRESS) as MockErc20Permit
+        frax = await Frax.attach(FRAX_ADDRESSES[forkNetwork]) as MockErc20Permit
 
         // Give 10,000 FRAX to all active test wallets
         await manipulateFRAXbalance(policyholder1, ONE_ETH.mul(10000))
@@ -307,7 +312,7 @@ describe("SolaceCoverProductV2", function() {
       });
 
       it("governance can set registry", async () => {
-        await registry2.connect(governor).set(["frax"], [FRAX_ADDRESS]);
+        await registry2.connect(governor).set(["frax"], [FRAX_ADDRESSES[forkNetwork]]);
         let tx = await solaceCoverProduct.connect(governor).setRegistry(registry2.address);
         await expect(tx).emit(solaceCoverProduct, "RegistrySet").withArgs(registry2.address);
         expect(await solaceCoverProduct.connect(policyholder1).riskManager()).to.equal(riskManager2.address);
@@ -1472,7 +1477,10 @@ describe("SolaceCoverProductV2", function() {
     }
 
     async function manipulateFRAXbalance(wallet: Wallet, desiredBalance: BN) {
-      const FRAX_BALANCEOF_SLOT = 0;
+      const FRAX_BALANCEOF_SLOT = {
+        "mainnet": 0,
+        "polygon": 0
+      }[forkNetwork];
       // Get storage slot index
       const index = utils.solidityKeccak256(
         ["uint256", "uint256"],
@@ -1480,7 +1488,7 @@ describe("SolaceCoverProductV2", function() {
         );
 
       // Manipulate local balance (needs to be bytes32 string)
-      await provider.send("hardhat_setStorageAt", [FRAX_ADDRESS, index.toString(), toBytes32(desiredBalance).toString()])
+      await provider.send("hardhat_setStorageAt", [FRAX_ADDRESSES[forkNetwork], index.toString(), toBytes32(desiredBalance).toString()])
       await provider.send("evm_mine", []) // Mine the next block
     }
 

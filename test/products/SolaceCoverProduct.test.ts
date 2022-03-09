@@ -19,12 +19,15 @@ chai.use(solidity)
 const DOMAIN_NAME = "Solace.fi-SolaceCoverProduct";
 const VERSION = "1";
 
+let forkNetwork = process.env.FORK_NETWORK || "";
+let supportedNetworks = ["mainnet","polygon"];
+
 describe("SolaceCoverProduct", function() {
-  if(process.env.FORK_NETWORK !== "mainnet") {
-    it("can only be tested when forking mainnet", async function() {
-      console.log("SolaceCoverProduct can only be tested when forking mainnet");
+  if(!supportedNetworks.includes(forkNetwork)) {
+    it(`can only be tested when forking one of ${supportedNetworks.join(',')}`, async function() {
+      console.log(`SolaceCoverProduct can only be tested when forking one of ${supportedNetworks.join(',')}`);
       console.log("set `FORK_NETWORK=mainnet` in .env");
-      expect(true, "SolaceCoverProduct can only be tested when forking mainnet").to.be.false;
+      expect(true, `SolaceCoverProduct can only be tested when forking one of ${supportedNetworks.join(',')}`).to.be.false;
     });
   } else {
     let artifacts: ArtifactImports;
@@ -76,8 +79,10 @@ describe("SolaceCoverProduct", function() {
     // Random 130 character hex string
     const FAKE_REFERRAL_CODE = "0xe4e7cba021ff6b83b14d54016198f31b04cba044d71d9a8b9bdf964aa2259cc3b207237f814aa56e516638b448edc43a6c3f4637dca5de54cb199e37b039a832e7"
 
-    // mainnet
-    const DAI_ADDRESS = "0x6B175474E89094C44Da98b954EedeAC495271d0F"
+    const DAI_ADDRESSES: {[network: string] : string} = {
+      "mainnet": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+      "polygon": "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063"
+    };
     const USDC_ADDRESS = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
 
     before( async () => {
@@ -120,7 +125,7 @@ describe("SolaceCoverProduct", function() {
 
       it("reverts for zero address dai", async () => {
         await expect(deployContract(deployer, artifacts.SolaceCoverProduct, [governor.address, registry.address , DOMAIN_NAME, VERSION])).to.be.revertedWith("key not in mapping");
-        await registry.connect(governor).set(["dai"], [DAI_ADDRESS])
+        await registry.connect(governor).set(["dai"], [DAI_ADDRESSES[forkNetwork]])
       });
 
       it("can deploy", async () => {
@@ -139,7 +144,7 @@ describe("SolaceCoverProduct", function() {
 
       it("completes DAI setup", async() => {
         const Dai = await ethers.getContractFactory("MockERC20Permit");
-        dai = await Dai.attach(DAI_ADDRESS) as MockErc20Permit
+        dai = await Dai.attach(DAI_ADDRESSES[forkNetwork]) as MockErc20Permit
 
         // Give 10,000 DAI to all active test wallets
         await manipulateDAIbalance(policyholder1, ONE_ETH.mul(10000))
@@ -257,7 +262,7 @@ describe("SolaceCoverProduct", function() {
       });
 
       it("governance can set registry", async () => {
-        await registry2.connect(governor).set(["dai"], [DAI_ADDRESS]);
+        await registry2.connect(governor).set(["dai"], [DAI_ADDRESSES[forkNetwork]]);
         let tx = await solaceCoverProduct.connect(governor).setRegistry(registry2.address);
         expect(tx).emit(solaceCoverProduct, "RegistrySet").withArgs(registry2.address);
         expect(await solaceCoverProduct.connect(policyholder1).riskManager()).to.equal(riskManager2.address);
@@ -1398,7 +1403,10 @@ describe("SolaceCoverProduct", function() {
     }
 
     async function manipulateDAIbalance(wallet: Wallet, desiredBalance: BN) {
-      const DAI_BALANCEOF_SLOT = 2;
+      const DAI_BALANCEOF_SLOT = {
+        "mainnet": 2,
+        "polygon": 0
+      }[forkNetwork];
       // Get storage slot index
       const index = utils.solidityKeccak256(
         ["uint256", "uint256"],
@@ -1406,7 +1414,7 @@ describe("SolaceCoverProduct", function() {
         );
 
       // Manipulate local balance (needs to be bytes32 string)
-      await provider.send("hardhat_setStorageAt", [DAI_ADDRESS, index.toString(), toBytes32(desiredBalance).toString()])
+      await provider.send("hardhat_setStorageAt", [DAI_ADDRESSES[forkNetwork], index.toString(), toBytes32(desiredBalance).toString()])
       await provider.send("evm_mine", []) // Mine the next block
     }
 
