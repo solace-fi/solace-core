@@ -94,10 +94,6 @@ describe("SolaceCoverProductV2", function() {
     describe("deployment", () => {
       let mockRegistry: Registry;
 
-      after(async () => {
-        await solaceCoverProduct.connect(governor).addSupportedChains(CHAIN_IDS);
-      });
-
       before(async () => {
         mockRegistry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
       });
@@ -183,6 +179,63 @@ describe("SolaceCoverProductV2", function() {
         expect(await solaceCoverProduct.governance()).to.equal(newGovernor.address);
         await solaceCoverProduct.connect(newGovernor).setPendingGovernance(governor.address);
         await solaceCoverProduct.connect(governor).acceptGovernance();
+      });
+    });
+
+    describe("supported chains", function () {
+      it("starts with no supported chains", async function () {
+        expect(await solaceCoverProduct.isSupportedChain(CHAINS.MAINNET)).to.be.false;
+        expect(await solaceCoverProduct.isSupportedChain(CHAINS.POLYGON)).to.be.false;
+        expect(await solaceCoverProduct.numSupportedChains()).eq(0);
+        await expect(solaceCoverProduct.getChain(0)).to.be.reverted;
+      });
+      it("non governance cannot add chains", async function () {
+        await expect(solaceCoverProduct.connect(policyholder1).addSupportedChains([])).to.be.revertedWith("!governance");
+      });
+      it("governance can add chains", async function () {
+        let tx = await solaceCoverProduct.connect(governor).addSupportedChains([1,2,137]);
+        await expect(tx).to.emit(solaceCoverProduct, "SupportedChainSet").withArgs(1);
+        await expect(tx).to.emit(solaceCoverProduct, "SupportedChainSet").withArgs(2);
+        await expect(tx).to.emit(solaceCoverProduct, "SupportedChainSet").withArgs(137);
+        expect(await solaceCoverProduct.isSupportedChain(CHAINS.MAINNET)).to.be.true;
+        expect(await solaceCoverProduct.isSupportedChain(CHAINS.POLYGON)).to.be.true;
+        expect(await solaceCoverProduct.isSupportedChain(2)).to.be.true;
+        expect(await solaceCoverProduct.numSupportedChains()).eq(3);
+        expect(await solaceCoverProduct.getChain(0)).eq(1);
+        expect(await solaceCoverProduct.getChain(1)).eq(2);
+        expect(await solaceCoverProduct.getChain(2)).eq(137);
+        await expect(solaceCoverProduct.getChain(3)).to.be.reverted;
+      });
+      it("non governance cannot remove chains", async function () {
+        await expect(solaceCoverProduct.connect(policyholder1).removeSupportedChain(0)).to.be.revertedWith("!governance")
+      });
+      it("governance can remove chains", async function () {
+        let tx = await solaceCoverProduct.connect(governor).removeSupportedChain(2);
+        await expect(tx).to.emit(solaceCoverProduct, "SupportedChainRemoved").withArgs(2);
+        expect(await solaceCoverProduct.isSupportedChain(CHAINS.MAINNET)).to.be.true;
+        expect(await solaceCoverProduct.isSupportedChain(CHAINS.POLYGON)).to.be.true;
+        expect(await solaceCoverProduct.isSupportedChain(2)).to.be.false;
+        expect(await solaceCoverProduct.numSupportedChains()).eq(2);
+        expect(await solaceCoverProduct.getChain(0)).eq(1);
+        expect(await solaceCoverProduct.getChain(1)).eq(137);
+        await expect(solaceCoverProduct.getChain(2)).to.be.reverted;
+      });
+    });
+
+    describe("asset", function () {
+      it("starts as frax", async function () {
+        expect(await solaceCoverProduct.asset()).eq("frax");
+      });
+      it("cannot be set by non governor", async function () {
+        await expect(solaceCoverProduct.connect(policyholder1).setAsset("dai")).to.be.revertedWith("!governance");
+      });
+      it("can be set by governor", async function () {
+        let tx1 = await solaceCoverProduct.connect(governor).setAsset("dai");
+        await expect(tx1).to.emit(solaceCoverProduct, "AssetSet").withArgs("dai");
+        expect(await solaceCoverProduct.asset()).eq("dai");
+        let tx2 = await solaceCoverProduct.connect(governor).setAsset("frax");
+        await expect(tx2).to.emit(solaceCoverProduct, "AssetSet").withArgs("frax");
+        expect(await solaceCoverProduct.asset()).eq("frax");
       });
     });
 
@@ -518,12 +571,18 @@ describe("SolaceCoverProductV2", function() {
         await expect(solaceCoverProduct.connect(policyholder1).activatePolicy(policyholder1.address, ONE_ETH, 0, [], CHAIN_IDS)).to.revertedWith("insufficient deposit for minimum required account balance");
       });
 
+      it("cannot buy policy on unsupported chains", async () => {
+        await expect(solaceCoverProduct.connect(policyholder1).activatePolicy(policyholder1.address, ONE_ETH, 0, [], [])).to.revertedWith("zero length");
+        await expect(solaceCoverProduct.connect(policyholder1).activatePolicy(policyholder1.address, ONE_ETH, 0, [], [1,1,1])).to.revertedWith("invalid length");
+        await expect(solaceCoverProduct.connect(policyholder1).activatePolicy(policyholder1.address, ONE_ETH, 0, [], [2])).to.revertedWith("invalid chain");
+      });
+
       it("can activate policy - 10000 FRAX cover with 1000 FRAX deposit", async () => {
         let tx = await solaceCoverProduct.connect(policyholder1).activatePolicy(policyholder1.address, INITIAL_COVER_LIMIT, INITIAL_DEPOSIT, [], CHAIN_IDS);
 
-        await await expect(tx).emit(solaceCoverProduct, "PolicyCreated").withArgs(POLICY_ID_1);
-        await await expect(tx).emit(solaceCoverProduct, "Transfer").withArgs(ZERO_ADDRESS, policyholder1.address, POLICY_ID_1);
-        await await expect(tx).emit(riskManager, "ActiveCoverLimitUpdated").withArgs(solaceCoverProduct.address, rmActiveCoverLimit, INITIAL_COVER_LIMIT);
+        await expect(tx).emit(solaceCoverProduct, "PolicyCreated").withArgs(POLICY_ID_1);
+        await expect(tx).emit(solaceCoverProduct, "Transfer").withArgs(ZERO_ADDRESS, policyholder1.address, POLICY_ID_1);
+        await expect(tx).emit(riskManager, "ActiveCoverLimitUpdated").withArgs(solaceCoverProduct.address, rmActiveCoverLimit, INITIAL_COVER_LIMIT);
 
         expect (await solaceCoverProduct.rewardPointsOf(policyholder1.address)).eq(0)
         expect (await solaceCoverProduct.accountBalanceOf(policyholder1.address)).eq(INITIAL_DEPOSIT)
@@ -1321,6 +1380,41 @@ describe("SolaceCoverProductV2", function() {
         await solaceCoverProduct.connect(premiumCollector).chargePremiums(ADDRESS_ARRAY, PREMIUM_ARRAY);
       })
 
+    });
+
+    describe("policy chain info", function () {
+      let policyID: BN;
+      it("is empty for non existant policy", async function () {
+        expect(await solaceCoverProduct.getPolicyChainInfo(0)).deep.eq([]);
+        expect(await solaceCoverProduct.getPolicyChainInfo(999)).deep.eq([]);
+      });
+      it("is set on policy activation", async function () {
+        await solaceCoverProduct.connect(governor).activatePolicy(governor.address, INITIAL_COVER_LIMIT, INITIAL_DEPOSIT, [], [1]);
+        policyID = await solaceCoverProduct.policyCount();
+        expect(await solaceCoverProduct.getPolicyChainInfo(policyID)).deep.eq([BN.from(1)]);
+      });
+      it("cannot update non existant policy", async function () {
+        await expect(solaceCoverProduct.connect(deployer).updatePolicyChainInfo([])).to.be.revertedWith("invalid policy");
+      });
+      it("cannot update inactive policy", async function () {
+        await solaceCoverProduct.connect(governor).deactivatePolicy();
+        await expect(solaceCoverProduct.connect(governor).updatePolicyChainInfo([])).to.be.revertedWith("inactive policy");
+        await solaceCoverProduct.connect(governor).activatePolicy(governor.address, INITIAL_COVER_LIMIT, INITIAL_DEPOSIT, [], [1]);
+      });
+      it("cannot update while paused", async function () {
+        await solaceCoverProduct.connect(governor).setPaused(true);
+        await expect(solaceCoverProduct.connect(governor).updatePolicyChainInfo([])).to.be.revertedWith("contract paused")
+        await solaceCoverProduct.connect(governor).setPaused(false);
+      });
+      it("can be updated", async function () {
+        let tx = await solaceCoverProduct.connect(governor).updatePolicyChainInfo([1,137]);
+        await expect(tx).to.emit(solaceCoverProduct, "PolicyUpdated").withArgs(policyID);
+        expect(await solaceCoverProduct.getPolicyChainInfo(policyID)).deep.eq([BN.from(1),BN.from(137)]);
+      });
+      it("is empty for deactivated policy", async function () {
+        await solaceCoverProduct.connect(governor).deactivatePolicy();
+        expect(await solaceCoverProduct.getPolicyChainInfo(policyID)).deep.eq([]);
+      });
     });
 
     // describe("USDC accounting with 6 decimal places", () => {
