@@ -95,6 +95,15 @@ describe("CoverageDataProvider", function() {
     });
 
     it("should set", async function() {
+      let tx = await coverageDataProvider.connect(governor).set(UWP_POOL_NAMES.MAINNET_1, 1);
+      await expect(tx).to.emit(coverageDataProvider, "UnderwritingPoolSet").withArgs(UWP_POOL_NAMES.MAINNET_1, 1);
+      expect(await coverageDataProvider.connect(user).numOfPools()).to.be.equal(1);
+      expect(await coverageDataProvider.connect(user).balanceOf(UWP_POOL_NAMES.MAINNET_1)).to.be.equal(1);
+      expect(await coverageDataProvider.connect(user).poolOf(1)).to.be.equal(UWP_POOL_NAMES.MAINNET_1);
+      expect(await coverageDataProvider.connect(user).maxCover()).to.be.equal(1);
+    });
+
+    it("should set same", async function() {
       let tx = await coverageDataProvider.connect(governor).set(UWP_POOL_NAMES.MAINNET_1, ONE_MILLION_USD);
       await expect(tx).to.emit(coverageDataProvider, "UnderwritingPoolSet").withArgs(UWP_POOL_NAMES.MAINNET_1, ONE_MILLION_USD);
       expect(await coverageDataProvider.connect(user).numOfPools()).to.be.equal(1);
@@ -154,6 +163,11 @@ describe("CoverageDataProvider", function() {
       expect(await coverageDataProvider.connect(user).poolOf(1)).to.be.equal("");
       expect(await coverageDataProvider.connect(user).poolOf(2)).to.be.equal("");
 
+    });
+
+    it("can remove pool from list of no pools", async function () {
+      let coverageDataProvider2 = await deployContract(deployer, artifacts.CoverageDataProvider, [governor.address]) as CoverageDataProvider;
+      await coverageDataProvider2.connect(governor).remove("");
     });
   });
 
@@ -215,5 +229,27 @@ describe("CoverageDataProvider", function() {
       expect(await coverageDataProvider.connect(user).maxCover()).to.be.equal(ONE_MILLION_USD.mul(3).div(2));
     });
   });
+
+  describe("uwp updater", async function () {
+    it("starts unset", async function () {
+      expect(await coverageDataProvider.getUwpUpdater()).eq(ZERO_ADDRESS);
+    });
+    it("cannot be set by non governance", async function () {
+      await expect(coverageDataProvider.connect(user).setUwpUpdater(user.address)).to.be.revertedWith("!governance");
+    });
+    it("cannot be set to zero address", async function () {
+      await expect(coverageDataProvider.connect(governor).setUwpUpdater(ZERO_ADDRESS)).to.be.revertedWith("zero address uwp updater");
+    });
+    it("can be set by governance", async function () {
+      let tx = await coverageDataProvider.connect(governor).setUwpUpdater(deployer.address);
+      await expect(tx).to.emit(coverageDataProvider, "UwpUpdaterSet").withArgs(deployer.address);
+      expect(await coverageDataProvider.getUwpUpdater()).eq(deployer.address);
+    });
+    it("uwp updater can update uwp", async function () {
+      let tx = await coverageDataProvider.connect(governor).set(UWP_POOL_NAMES.MAINNET_1, 1);
+      await expect(tx).to.emit(coverageDataProvider, "UnderwritingPoolSet").withArgs(UWP_POOL_NAMES.MAINNET_1, 1);
+      expect(await coverageDataProvider.connect(user).balanceOf(UWP_POOL_NAMES.MAINNET_1)).to.be.equal(1);
+    });
+  })
 
 });

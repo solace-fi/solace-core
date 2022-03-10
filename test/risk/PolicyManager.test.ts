@@ -581,4 +581,24 @@ describe("PolicyManager", function() {
       await expect(policyManager.tokenURI(1000)).to.be.revertedWith("query for nonexistent token");
     });
   });
+
+  describe("registry", function () {
+    it("cannot deploy with zero address registry", async function () {
+      await expect(deployContract(deployer, artifacts.PolicyManager, [governor.address, ZERO_ADDRESS])).to.be.revertedWith("zero address registry");
+    });
+    it("starts set", async function () {
+      expect(await policyManager.registry()).eq(registry.address)
+    });
+    it("cannot be set by non governance", async function () {
+      await expect(policyManager.connect(deployer).setRegistry(deployer.address)).to.be.revertedWith("!governance");
+    });
+    it("cannot be set to zero address", async function () {
+      await expect(policyManager.connect(governor).setRegistry(ZERO_ADDRESS)).to.be.revertedWith("zero address registry");
+    });
+    it("can be set by governance", async function () {
+      let tx = await policyManager.connect(governor).setRegistry(governor.address);
+      await expect(tx).to.emit(policyManager, "RegistrySet").withArgs(governor.address);
+      expect(await policyManager.registry()).eq(governor.address);
+    });
+  });
 });
