@@ -27,7 +27,7 @@ describe("PolicyManager", function() {
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
   const name = "Solace Policy";
   const symbol = "SPT";
-  const expirationBlock = 20000000;
+  let expirationBlock: number;
   const coverLimit = BN.from("100000000000000");
   const AMOUNT = BN.from("100000000000000000").mul(1000); // 1000 USD(DAI)
   const ONE_MILLION_USD = BN.from("1000000000000000000000000"); // 1M USD(DAI)
@@ -60,7 +60,7 @@ describe("PolicyManager", function() {
 
     await registry.connect(governor).set(["solace"],[solace.address]);
 
-    // deploy coverage provider contract    
+    // deploy coverage provider contract
     coverageDataProvider = (await deployContract(deployer, artifacts.CoverageDataProvider, [governor.address])) as CoverageDataProvider;
     await coverageDataProvider.connect(governor).set("mainnet", ONE_MILLION_USD);
     await registry.connect(governor).set(["coverageDataProvider"],[coverageDataProvider.address])
@@ -70,6 +70,9 @@ describe("PolicyManager", function() {
     await riskManager.connect(governor).setStrategyStatus(riskStrategy.address, STRATEGY_STATUS_ACTIVE);
     await riskManager.connect(governor).setWeightAllocation(riskStrategy.address, STRATEGY_WEIGHT_ALLOCATION);
     await riskManager.connect(governor).addCoverLimitUpdater(policyManager.address);
+
+    let block = await provider.getBlock('latest');
+    expirationBlock = block.number + 1000000;
   });
 
   it("has a correct name", async function() {
@@ -267,10 +270,7 @@ describe("PolicyManager", function() {
       expect(await riskManager.minCapitalRequirementPerStrategy(riskStrategy.address)).to.equal(1);
     })
     it("can list my policies", async function() {
-      expect(await policyManager.listTokensOfOwner(deployer.address)).to.deep.equal([]);
-      expect(await policyManager.listTokensOfOwner(user.address)).to.deep.equal([BN.from(1)]);
       await policyManager.connect(walletProduct2).createPolicy(user.address, coverLimit, expirationBlock, price, positionContract.address, riskStrategy.address);
-      expect(await policyManager.listTokensOfOwner(user.address)).to.deep.equal([BN.from(1), BN.from(2)]);
       expect(await riskManager.activeCoverLimit()).to.equal(coverLimit.add(1));
       expect(await riskManager.minCapitalRequirement()).to.equal(coverLimit.add(1));
       expect(await riskManager.activeCoverLimitPerStrategy(riskStrategy.address)).to.equal(coverLimit.add(1));
@@ -310,21 +310,15 @@ describe("PolicyManager", function() {
       expect(await policyManager.ownerOf(policyID)).to.equal(user.address);
       expect(await policyManager.getPolicyholder(policyID)).to.equal(user.address);
       expect((await policyManager.getPolicyInfo(policyID)).policyholder).to.equal(user.address);
-      expect(await policyManager.listTokensOfOwner(user.address)).to.deep.equal([policyID]);
-      expect(await policyManager.listTokensOfOwner(user2.address)).to.deep.equal([]);
       await policyManager.connect(user).transferFrom(user.address, user2.address, policyID);
       expect(await policyManager.ownerOf(policyID)).to.equal(user2.address);
       expect(await policyManager.getPolicyholder(policyID)).to.equal(user2.address);
       expect((await policyManager.getPolicyInfo(policyID)).policyholder).to.equal(user2.address);
-      expect(await policyManager.listTokensOfOwner(user.address)).to.deep.equal([]);
-      expect(await policyManager.listTokensOfOwner(user2.address)).to.deep.equal([policyID]);
       await policyManager.connect(user2).approve(user.address, policyID);
       await policyManager.connect(user).transferFrom(user2.address, user.address, policyID);
       expect(await policyManager.ownerOf(policyID)).to.equal(user.address);
       expect(await policyManager.getPolicyholder(policyID)).to.equal(user.address);
       expect((await policyManager.getPolicyInfo(policyID)).policyholder).to.equal(user.address);
-      expect(await policyManager.listTokensOfOwner(user.address)).to.deep.equal([policyID]);
-      expect(await policyManager.listTokensOfOwner(user2.address)).to.deep.equal([]);
     });
   });
 
@@ -400,11 +394,11 @@ describe("PolicyManager", function() {
 
       // deploy base risk strategy
       let riskStrategy = (await deployContract(deployer, artifacts.MockRiskStrategy)) as MockRiskStrategy;
-     
+
       // redeploy risk manager
       riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
       await registry.connect(governor).set(["riskManager"], [riskManager.address])
-     
+
       // redeploy policy manager
       policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address, registry.address])) as PolicyManager;
       await registry.connect(governor).set(["policyManager"], [policyManager.address])
@@ -524,11 +518,11 @@ describe("PolicyManager", function() {
 
         // deploy base risk strategy
         let riskStrategy = (await deployContract(deployer, artifacts.MockRiskStrategy)) as MockRiskStrategy;
-        
+
         // redeploy risk manager
         riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
         await registry.connect(governor).set(["riskManager"], [riskManager.address])
-        
+
         // redeploy policy manager
         policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address, registry.address])) as PolicyManager;
         await registry.connect(governor).set(["policyManager"], [policyManager.address])
@@ -585,6 +579,26 @@ describe("PolicyManager", function() {
     });
     it("cannot get tokenURI for nonexistant policy id", async function() {
       await expect(policyManager.tokenURI(1000)).to.be.revertedWith("query for nonexistent token");
+    });
+  });
+
+  describe("registry", function () {
+    it("cannot deploy with zero address registry", async function () {
+      await expect(deployContract(deployer, artifacts.PolicyManager, [governor.address, ZERO_ADDRESS])).to.be.revertedWith("zero address registry");
+    });
+    it("starts set", async function () {
+      expect(await policyManager.registry()).eq(registry.address)
+    });
+    it("cannot be set by non governance", async function () {
+      await expect(policyManager.connect(deployer).setRegistry(deployer.address)).to.be.revertedWith("!governance");
+    });
+    it("cannot be set to zero address", async function () {
+      await expect(policyManager.connect(governor).setRegistry(ZERO_ADDRESS)).to.be.revertedWith("zero address registry");
+    });
+    it("can be set by governance", async function () {
+      let tx = await policyManager.connect(governor).setRegistry(governor.address);
+      await expect(tx).to.emit(policyManager, "RegistrySet").withArgs(governor.address);
+      expect(await policyManager.registry()).eq(governor.address);
     });
   });
 });

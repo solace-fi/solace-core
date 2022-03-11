@@ -9,7 +9,7 @@ import "../utils/GovernableInitializable.sol";
 import "../interfaces/risk/IPolicyManager.sol";
 import "../interfaces/risk/IRiskManager.sol";
 import "../interfaces/risk/IRiskStrategy.sol";
-import "../interfaces/utils/IClaimsEscrow.sol";
+//import "../interfaces/utils/IClaimsEscrow.sol";
 import "../interfaces/utils/IRegistry.sol";
 import "../interfaces/products/IProduct.sol";
 
@@ -296,7 +296,7 @@ contract SolaceMarketProduct is IProduct, EIP712Upgradeable, ReentrancyGuardUpgr
         // burn policy
         IPolicyManager(_registry.get("policyManager")).burn(policyID);
         // submit claim to ClaimsEscrow
-        IClaimsEscrow(payable(_registry.get("claimsEscrow"))).receiveClaim(policyID, policyholder, amountOut);
+        //IClaimsEscrow(payable(_registry.get("claimsEscrow"))).receiveClaim(policyID, policyholder, amountOut);
         emit ClaimSubmitted(policyID);
     }
 
