@@ -138,8 +138,13 @@ contract SolaceNative is
     function stream(uint256 policyID) external override tokenMustExist(policyID) {
         Policy memory policy = _policies[policyID];
         // math
+        // no solace if policy inactive or not yet started
         if(policy.status != ACTIVE || block.timestamp < policy.startTime) return;
-        uint256 vested = policy.solaceAmountTotal * (block.timestamp - policy.startTime) / policy.duration;
+        // solace vested over time
+        uint256 vested = (block.timestamp > (policy.startTime + policy.duration))
+            ? policy.solaceAmountTotal // fully vested
+            : policy.solaceAmountTotal * (block.timestamp - policy.startTime) / policy.duration;
+        // solace already streamed
         if(vested <= policy.solaceAmountStreamed) return;
         uint256 stream = vested - policy.solaceAmountStreamed;
         // ensure lock exists, create new one if not
