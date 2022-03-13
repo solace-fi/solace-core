@@ -13,39 +13,37 @@ interface ISolaceCoverTellerStables is IGovernable {
     /***************************************
     GLOBAL DATA
     ***************************************/
-    /*
+
     /// @notice Solace Cover Minutes contract.
-    address public scm;
+    function scm() external view returns (address);
 
     /// @notice The premum pool.
-    address public premiumPool;
-    */
+    function premiumPool() external view returns (address);
+
     /***************************************
     USER DEPOSIT DATA
     ***************************************/
 
     /// @notice Emitted when a token is deposited.
     event TokenDeposited(address indexed token, address indexed depositor, address indexed receiver, uint256 amount);
-    /*
+
     /// @dev user => token => amount deposited
-    mapping(address => mapping(address => uint256)) public deposits;
-    */
+    function deposits(address user, address token) external view returns (uint256 amount);
+
     /***************************************
     ACCEPTED TOKEN DATA
     ***************************************/
 
-    /*
-    bytes32 public constant ZERO = 0x0000000000000000000000000000000000000000000000000000000000000000;
-    bytes32 public constant IS_ACCEPTED_FLAG = 0x0000000000000000000000000000000000000000000000000000000000000001;
-    bytes32 public constant IS_PERMITTABLE_FLAG = 0x0000000000000000000000000000000000000000000000000000000000000002;
-    */
+    function ZERO() external view returns (bytes32);
+    function IS_ACCEPTED_MASK() external view returns (bytes32);
+    function IS_PERMITTABLE_MASK() external view returns (bytes32);
+
     event TokenFlagsSet(address indexed token, bytes32 flags);
-    /*
-    mapping(address => bytes32) public tokenFlags;
-    mapping(address => uint256) public tokenIndex;
-    mapping(uint256 => address) public tokenList;
-    uint256 public tokensLength;
-    */
+
+    function tokenFlags(address token) external view returns (bytes32 flags);
+    function tokenIndex(address token) external view returns (uint256 index);
+    function tokenList(uint256 index) external view returns (address token);
+    function tokensLength() external view returns (uint256 length);
 
     /***************************************
     MONEY FUNCTIONS

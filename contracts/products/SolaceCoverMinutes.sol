@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
-//import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 import "./../utils/Governable.sol";
-//import "./interfaces/ISOLACE.sol";
 import "./../interfaces/products/ISolaceCoverMinutes.sol";
 
 /**
@@ -31,10 +29,10 @@ contract SolaceCoverMinutes is Context, ISolaceCoverMinutes, Governable {
     BALANCE MANAGER DATA
     ***************************************/
 
-    mapping(address => bool) public isBalanceManager;
-    mapping(address => uint256) public balanceManagerIndex;
-    mapping(uint256 => address) public balanceManagers;
-    uint256 public balanceManagersLength;
+    mapping(address => bool) public override isBalanceManager;
+    mapping(address => uint256) public override balanceManagerIndex;
+    mapping(uint256 => address) public override balanceManagers;
+    uint256 public override balanceManagersLength;
 
     /***************************************
     CONSTRUCTOR

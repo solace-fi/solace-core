@@ -23,30 +23,30 @@ contract SolaceCoverTellerStables is ISolaceCoverTellerStables, Governable, Reen
     ***************************************/
 
     /// @notice Solace Cover Minutes contract.
-    address public scm;
+    address public override scm;
 
     /// @notice The premum pool.
-    address public premiumPool;
+    address public override premiumPool;
 
     /***************************************
     USER DEPOSIT DATA
     ***************************************/
 
     /// @dev user => token => amount deposited
-    mapping(address => mapping(address => uint256)) public deposits;
+    mapping(address => mapping(address => uint256)) public override deposits;
 
     /***************************************
     ACCEPTED TOKEN DATA
     ***************************************/
 
-    bytes32 public constant ZERO = 0x0000000000000000000000000000000000000000000000000000000000000000;
-    bytes32 public constant IS_ACCEPTED_FLAG = 0x0000000000000000000000000000000000000000000000000000000000000001;
-    bytes32 public constant IS_PERMITTABLE_FLAG = 0x0000000000000000000000000000000000000000000000000000000000000002;
+    bytes32 public constant override ZERO = 0x0000000000000000000000000000000000000000000000000000000000000000;
+    bytes32 public constant override IS_ACCEPTED_MASK = 0x0000000000000000000000000000000000000000000000000000000000000001;
+    bytes32 public constant override IS_PERMITTABLE_MASK = 0x0000000000000000000000000000000000000000000000000000000000000002;
 
-    mapping(address => bytes32) public tokenFlags;
-    mapping(address => uint256) public tokenIndex;
-    mapping(uint256 => address) public tokenList;
-    uint256 public tokensLength;
+    mapping(address => bytes32) public override tokenFlags;
+    mapping(address => uint256) public override tokenIndex;
+    mapping(uint256 => address) public override tokenList;
+    uint256 public override tokensLength;
 
     /***************************************
     CONSTRUCTOR
@@ -83,7 +83,7 @@ contract SolaceCoverTellerStables is ISolaceCoverTellerStables, Governable, Reen
     ) external override nonReentrant {
         // checks
         bytes32 flags = tokenFlags[token];
-        require((flags & IS_ACCEPTED_FLAG) != ZERO, "token not accepted");
+        require((flags & IS_ACCEPTED_MASK) != ZERO, "token not accepted");
         // effects
         deposits[recipient][token] += amount;
         // convert decimals
@@ -117,8 +117,8 @@ contract SolaceCoverTellerStables is ISolaceCoverTellerStables, Governable, Reen
     ) external override nonReentrant {
         // checks
         bytes32 flags = tokenFlags[token];
-        require((flags & IS_ACCEPTED_FLAG) != ZERO, "token not accepted");
-        require((flags & IS_PERMITTABLE_FLAG) != ZERO, "token not permittable");
+        require((flags & IS_ACCEPTED_MASK) != ZERO, "token not accepted");
+        require((flags & IS_PERMITTABLE_MASK) != ZERO, "token not permittable");
         // effects
         deposits[depositor][token] += amount;
         // convert decimals

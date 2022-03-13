@@ -13,12 +13,11 @@ import "./../utils/IGovernable.sol";
 interface ISolaceCoverMinutes is IERC20, IERC20Metadata, IGovernable {
 
     event BalanceManagerStatusSet(address indexed balanceManager, bool status);
-    /*
-    mapping(address => bool) public isBalanceManager;
-    mapping(address => uint256) public balanceManagerIndex;
-    mapping(uint256 => address) public balanceManagers;
-    uint256 public balanceManagersLength;
-    */
+
+    function isBalanceManager(address bm) external view returns (bool status);
+    function balanceManagerIndex(address bm) external view returns (uint256 index);
+    function balanceManagers(uint256 index) external view returns (address bm);
+    function balanceManagersLength() external view returns (uint256 length);
 
     /** @dev Creates `amount` tokens and assigns them to `account`, increasing
      * the total supply.
