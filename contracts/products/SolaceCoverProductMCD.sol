@@ -139,6 +139,9 @@ contract SolaceCoverProductMCD is
     /// @notice policyholder => account balance (in USD, to 18 decimals places)
     mapping(address => uint256) private _accountBalanceOf;
 
+    /// @notice policyID => list of ipfs hashes containing messages about the policy.
+    mapping(uint256 => bytes32[]) private _messages;
+
     /***************************************
     MODIFIERS
     ***************************************/
@@ -305,6 +308,17 @@ contract SolaceCoverProductMCD is
     function deactivatePolicy() external override nonReentrant {
         require(policyStatus(_policyOf[msg.sender]), "invalid policy");
         _deactivatePolicy(msg.sender);
+    }
+
+    /**
+     * @notice Posts a message about a policy.
+     * @dev Note that anyone can post messages about any policy.
+     * Messages should be signed before uploading to ipfs.
+     * @param policyID The ID of the policy to post message.
+     * @param ipfsHash The hash of the message posted.
+     */
+    function postMessage(uint256 policyID, bytes32 ipfsHash) external override {
+        _messages[policyID].push(ipfsHash);
     }
 
     /***************************************
@@ -528,6 +542,25 @@ contract SolaceCoverProductMCD is
         require(_exists(policyID), "invalid policy");
         string memory baseURI_ = baseURI;
         return string(abi.encodePacked( baseURI_, Strings.toString(policyID) ));
+    }
+
+    /**
+     * @notice Returns the hash of a message posted about a policy.
+     * @param policyID The ID of the policy to query.
+     * @param index The message index.
+     * @return ipfsHash The hash of the message stored in ipfs.
+     */
+    function messages(uint256 policyID, uint256 index) external view override returns (bytes32 ipfsHash) {
+        return _messages[policyID][index];
+    }
+
+    /**
+     * @notice Returns the number of messages that have been posted about a policy.
+     * @param policyID The ID of the policy to query.
+     * @return length The number of messages.
+     */
+    function messagesLength(uint256 policyID) external view override returns (uint256 length) {
+        return _messages[policyID].length;
     }
 
     /***************************************

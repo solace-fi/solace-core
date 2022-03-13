@@ -141,6 +141,15 @@ interface ISolaceCoverProductMCD {
      */
     function deactivatePolicy() external;
 
+    /**
+     * @notice Posts a message about a policy.
+     * @dev Note that anyone can post messages about any policy.
+     * Messages should be signed before uploading to ipfs.
+     * @param policyID The ID of the policy to post message.
+     * @param ipfsHash The hash of the message posted.
+     */
+    function postMessage(uint256 policyID, bytes32 ipfsHash) external;
+
     /***************************************
     VIEW FUNCTIONS
     ***************************************/
@@ -303,6 +312,21 @@ interface ISolaceCoverProductMCD {
      * @param coverLimit Cover limit.
      */
     function minRequiredAccountBalance(uint256 coverLimit) external view returns (uint256 minRequiredAccountBalance_);
+
+    /**
+     * @notice Returns the hash of a message posted about a policy.
+     * @param policyID The ID of the policy to query.
+     * @param index The message index.
+     * @return ipfsHash The hash of the message stored in ipfs.
+     */
+    function messages(uint256 policyID, uint256 index) external view returns (bytes32 ipfsHash);
+
+    /**
+     * @notice Returns the number of messages that have been posted about a policy.
+     * @param policyID The ID of the policy to query.
+     * @return length The number of messages.
+     */
+    function messagesLength(uint256 policyID) external view returns (uint256 length);
 
     /***************************************
     GOVERNANCE FUNCTIONS
