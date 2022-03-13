@@ -2,7 +2,6 @@
 pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
-import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -41,7 +40,6 @@ contract SolaceCoverProductMCD is
 {
     using SafeERC20 for IERC20;
     using Address for address;
-    using EnumerableSet for EnumerableSet.UintSet;
 
     /***************************************
     STATE VARIABLES
@@ -141,12 +139,6 @@ contract SolaceCoverProductMCD is
     /// @notice policyholder => account balance (in USD, to 18 decimals places)
     mapping(address => uint256) private _accountBalanceOf;
 
-    /// @notice The policy chain info.
-    mapping(uint256 => uint256[]) private _policyChainInfo;
-
-    /// @notice Supported chains to cover positions.
-    EnumerableSet.UintSet internal chains;
-
     /***************************************
     MODIFIERS
     ***************************************/
@@ -202,19 +194,16 @@ contract SolaceCoverProductMCD is
      * @param coverLimit_ The maximum value to cover in **USD**.
      * @param amount_ The deposit amount in **USD** to fund the policyholder's account.
      * @param referralCode_ The referral code.
-     * @param chains_ The chain ids.
      * @return policyID The ID of the newly minted policy.
      */
     function activatePolicy(
         address policyholder_,
         uint256 coverLimit_,
         uint256 amount_,
-        bytes calldata referralCode_,
-        uint256[] calldata chains_
+        bytes calldata referralCode_
     ) external override nonReentrant whileUnpaused returns (uint256 policyID) {
         require(policyholder_ != address(0x0), "zero address policyholder");
         require(coverLimit_ > 0, "zero cover value");
-        require(_validateChains(chains_), "invalid chain");
 
         policyID = policyOf(policyholder_);
         require(!policyStatus(policyID), "policy already activated");
@@ -241,7 +230,6 @@ contract SolaceCoverProductMCD is
         _updateActiveCoverLimit(0, coverLimit_);
         _coverLimitOf[policyID] = coverLimit_;
         _preDeactivateCoverLimitOf[policyID] = coverLimit_;
-        _setPolicyChainInfo(policyID, chains_);
         emit PolicyCreated(policyID);
         return policyID;
     }
@@ -275,18 +263,6 @@ contract SolaceCoverProductMCD is
         _coverLimitOf[policyID] = newCoverLimit_;
         _preDeactivateCoverLimitOf[policyID] = newCoverLimit_;
         _updateActiveCoverLimit(currentCoverLimit, newCoverLimit_);
-        emit PolicyUpdated(policyID);
-    }
-
-    /**
-     * @notice Updates policy chain info.
-     * @param policyChains The requested policy chains to update.
-     */
-    function updatePolicyChainInfo(uint256[] memory policyChains) external override nonReentrant whileUnpaused {
-        uint256 policyID = policyOf(msg.sender);
-        require(_exists(policyID), "invalid policy");
-        require(policyStatus(policyID), "inactive policy");
-        _setPolicyChainInfo(policyID, policyChains);
         emit PolicyUpdated(policyID);
     }
 
@@ -554,40 +530,6 @@ contract SolaceCoverProductMCD is
         return string(abi.encodePacked( baseURI_, Strings.toString(policyID) ));
     }
 
-    /**
-     * @notice Returns true if given chain id supported.
-     * @return status True if chain is supported otherwise false.
-    */
-    function isSupportedChain(uint256 chainId) public view override returns (bool status) {
-       return chains.contains(chainId);
-    }
-
-    /**
-     * @notice Returns the number of chains.
-     * @return count The number of chains.
-     */
-     function numSupportedChains() public override view returns (uint256 count) {
-        return chains.length();
-    }
-
-    /**
-     * @notice Returns the chain at the given index.
-     * @param chainIndex The index to query.
-     * @return chainId The address of the chain.
-     */
-    function getChain(uint256 chainIndex) external override view returns (uint256 chainId) {
-        return chains.at(chainIndex);
-    }
-
-    /**
-     * @notice Returns the policy chain info.
-     * @param policyID The policy id to get chain info.
-     * @return policyChains The list of policy chain values.
-    */
-    function getPolicyChainInfo(uint256 policyID) external override view returns (uint256[] memory policyChains) {
-        return _policyChainInfo[policyID];
-    }
-
     /***************************************
     GOVERNANCE FUNCTIONS
     ***************************************/
@@ -686,26 +628,6 @@ contract SolaceCoverProductMCD is
     function setBaseURI(string memory baseURI_) external override onlyGovernance {
         baseURI = baseURI_;
         emit BaseURISet(baseURI_);
-    }
-
-    /**
-     * @notice Adds supported chains to cover positions.
-     * @param supportedChains The supported array of chains.
-    */
-    function addSupportedChains(uint256[] memory supportedChains) external override onlyGovernance {
-        for (uint256 i = 0; i < supportedChains.length; i++) {
-            chains.add(supportedChains[i]);
-            emit SupportedChainSet(supportedChains[i]);
-        }
-    }
-
-    /**
-     * @notice Removes chain from the supported chain list.
-     * @param chainId The chain id to remove.
-    */
-    function removeSupportedChain(uint256 chainId) external override onlyGovernance {
-        chains.remove(chainId);
-        emit SupportedChainRemoved(chainId);
     }
 
     /**
@@ -881,7 +803,6 @@ contract SolaceCoverProductMCD is
         uint256 policyID = _policyOf[policyholder];
         _updateActiveCoverLimit(_coverLimitOf[policyID], 0);
         _coverLimitOf[policyID] = 0;
-        delete _policyChainInfo[policyID];
         emit PolicyDeactivated(policyID);
     }
 
@@ -1015,28 +936,4 @@ contract SolaceCoverProductMCD is
     function _getAsset() internal view returns (IERC20) {
         return IERC20(_registry.get(asset));
     }
-
-    /**
-     * @notice Checks if the given chain info is valid or not.
-     * @param requestedChains The chain id array to check.
-     * @return status True if the given chain array is valid.
-    */
-    function _validateChains(uint256[] memory requestedChains) internal view returns (bool) {
-        require(requestedChains.length > 0, "zero length");
-        require(requestedChains.length <= numSupportedChains(), "invalid length");
-        for (uint256 i = 0; i < requestedChains.length; i++) {
-            if (!chains.contains(requestedChains[i])) return false;
-        }
-        return true;
-    }
-
-    /**
-     * @notice Sets chain info for the policy.
-     * @param policyID The policy id to add chain info.
-     * @param policyChains The array of chain id to add.
-    */
-    function _setPolicyChainInfo(uint256 policyID, uint256[] memory policyChains) internal {
-        _policyChainInfo[policyID] = policyChains;
-    }
-
 }

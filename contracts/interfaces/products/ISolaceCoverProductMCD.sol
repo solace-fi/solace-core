@@ -80,12 +80,6 @@ interface ISolaceCoverProductMCD {
     /// @notice Emitted when baseURI is set
     event BaseURISet(string baseURI);
 
-    /// @notice Emitted when supported chain is set.
-    event SupportedChainSet(uint256 chainId);
-
-    /// @notice Emitted when supported chain is removed.
-    event SupportedChainRemoved(uint256 chainId);
-
     /// @notice Emiited when asset is set.
     event AssetSet(string asset);
 
@@ -99,15 +93,13 @@ interface ISolaceCoverProductMCD {
      * @param coverLimit_ The maximum value to cover in **USD**.
      * @param amount_ The deposit amount in **USD** to fund the policyholder's account.
      * @param referralCode_ The referral code.
-     * @param chains_ The chain ids.
      * @return policyID The ID of the newly minted policy.
      */
     function activatePolicy(
         address policyholder_,
         uint256 coverLimit_,
         uint256 amount_,
-        bytes calldata referralCode_,
-        uint256[] calldata chains_
+        bytes calldata referralCode_
     ) external returns (uint256 policyID);
 
     /**
@@ -121,12 +113,6 @@ interface ISolaceCoverProductMCD {
         uint256 newCoverLimit_,
         bytes calldata referralCode_
     ) external;
-
-    /**
-     * @notice Updates policy chain info.
-     * @param policyChains The requested policy chains to update.
-    */
-    function updatePolicyChainInfo(uint256[] memory policyChains) external;
 
     /**
      * @notice Deposits funds into `policyholder`'s account.
@@ -318,32 +304,6 @@ interface ISolaceCoverProductMCD {
      */
     function minRequiredAccountBalance(uint256 coverLimit) external view returns (uint256 minRequiredAccountBalance_);
 
-    /**
-     * @notice Returns true if given chain id supported.
-     * @return status True if chain is supported otherwise false.
-    */
-    function isSupportedChain(uint256 chainId) external view returns (bool status);
-
-    /**
-     * @notice Returns the number of chains.
-     * @return count The number of chains.
-     */
-    function numSupportedChains() external view returns (uint256 count);
-
-    /**
-     * @notice Returns the chain at the given index.
-     * @param chainIndex The index to query.
-     * @return chainId The address of the chain.
-     */
-    function getChain(uint256 chainIndex) external view returns (uint256 chainId);
-
-    /**
-     * @notice Returns the policy chain info.
-     * @param policyID The policy id to get chain info.
-     * @return policyChains The list of policy chain values.
-    */
-    function getPolicyChainInfo(uint256 policyID) external view returns (uint256[] memory policyChains);
-
     /***************************************
     GOVERNANCE FUNCTIONS
     ***************************************/
@@ -411,18 +371,6 @@ interface ISolaceCoverProductMCD {
      * @param baseURI_ The new base URI.
      */
     function setBaseURI(string memory baseURI_) external;
-
-    /**
-     * @notice Adds supported chains to cover positions.
-     * @param chains The supported array of chains.
-    */
-    function addSupportedChains(uint256[] memory chains) external;
-
-    /**
-     * @notice Removes chain from the supported chain list.
-     * @param chainId The chain id to remove.
-    */
-    function removeSupportedChain(uint256 chainId) external;
 
     /**
      * @notice Sets the asset name.
