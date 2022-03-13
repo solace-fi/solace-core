@@ -30,16 +30,6 @@ interface ISolaceCoverProductMCD {
     /// @notice Emitted when the cooldown period is set.
     event CooldownPeriodSet(uint256 cooldownPeriod);
 
-    /// @notice Emitted when a deposit is made.
-    event DepositMade(
-        address from,
-        address policyholder,
-        uint256 amount
-    );
-
-    /// @notice Emitted when a withdraw is made.
-    event WithdrawMade(address policyholder, uint256 amount);
-
     /// @notice Emitted when premium is charged.
     event PremiumCharged(address policyholder, uint256 amount);
 
@@ -80,25 +70,18 @@ interface ISolaceCoverProductMCD {
     /// @notice Emitted when baseURI is set
     event BaseURISet(string baseURI);
 
-    /// @notice Emiited when asset is set.
-    event AssetSet(string asset);
-
     /***************************************
     POLICY FUNCTIONS
     ***************************************/
 
     /**
-     * @notice Activates policy for `policyholder_`
-     * @param policyholder_ The address of the intended policyholder.
+     * @notice Activates policy for `msg.sender`.
      * @param coverLimit_ The maximum value to cover in **USD**.
-     * @param amount_ The deposit amount in **USD** to fund the policyholder's account.
      * @param referralCode_ The referral code.
      * @return policyID The ID of the newly minted policy.
      */
     function activatePolicy(
-        address policyholder_,
         uint256 coverLimit_,
-        uint256 amount_,
         bytes calldata referralCode_
     ) external returns (uint256 policyID);
 
@@ -113,26 +96,6 @@ interface ISolaceCoverProductMCD {
         uint256 newCoverLimit_,
         bytes calldata referralCode_
     ) external;
-
-    /**
-     * @notice Deposits funds into `policyholder`'s account.
-     * @param policyholder The policyholder.
-     * @param amount The amount to deposit in **USD**.
-     */
-    function deposit(
-        address policyholder,
-        uint256 amount
-    ) external;
-
-
-    /**
-     * @notice Withdraw funds from user's account.
-     *
-     * @notice If cooldown has passed, the user will withdraw their entire account balance.
-     * @notice If cooldown has not started, or has not passed, the user will not be able to withdraw their entire account.
-     * @notice If cooldown has not passed, [`withdraw()`](#withdraw) will leave a minimum required account balance (one epoch's fee) in the user's account.
-     */
-    function withdraw() external;
 
     /**
      * @notice Deactivate a user's policy.
@@ -153,13 +116,6 @@ interface ISolaceCoverProductMCD {
     /***************************************
     VIEW FUNCTIONS
     ***************************************/
-
-    /**
-     * @notice Returns the policyholder's account account balance in **USD**.
-     * @param policyholder The policyholder address.
-     * @return balance The policyholder's account balance in **USD**.
-     */
-    function accountBalanceOf(address policyholder) external view returns (uint256 balance);
 
     /**
      * @notice The maximum amount of cover that can be sold in **USD** to 18 decimals places.
@@ -395,12 +351,6 @@ interface ISolaceCoverProductMCD {
      * @param baseURI_ The new base URI.
      */
     function setBaseURI(string memory baseURI_) external;
-
-    /**
-     * @notice Sets the asset name.
-     * @param assetName The asset name to set.
-    */
-    function setAsset(string memory assetName) external;
 
     /***************************************
     COVER PROMOTION ADMIN FUNCTIONS
