@@ -3,6 +3,7 @@ pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import "./ISolaceCoverMinutesRetainer.sol";
 import "./../utils/IGovernable.sol";
 
 /**
@@ -10,14 +11,21 @@ import "./../utils/IGovernable.sol";
  * @author solace.fi
  * @notice
  */
-interface ISolaceCoverMinutes is IERC20, IERC20Metadata, IGovernable {
+interface ISolaceCoverMinutes is IERC20, IERC20Metadata, ISolaceCoverMinutesRetainer, IGovernable {
 
     event BalanceManagerStatusSet(address indexed balanceManager, bool status);
 
     function isBalanceManager(address bm) external view returns (bool status);
     function balanceManagerIndex(address bm) external view returns (uint256 index);
-    function balanceManagers(uint256 index) external view returns (address bm);
-    function balanceManagersLength() external view returns (uint256 length);
+    function balanceManagerList(uint256 index) external view returns (address bm);
+    function balanceManagerLength() external view returns (uint256 length);
+
+    event ScmRetainerStatusSet(address indexed scmRetainer, bool status);
+
+    function isScmRetainer(address scmRetainer) external view returns (bool status);
+    function scmRetainerIndex(address scmRetainer) external view returns (uint256 index);
+    function scmRetainerList(uint256 index) external view returns (address scmRetainer);
+    function scmRetainerLength() external view returns (uint256 length);
 
     /** @dev Creates `amount` tokens and assigns them to `account`, increasing
      * the total supply.
@@ -28,7 +36,7 @@ interface ISolaceCoverMinutes is IERC20, IERC20Metadata, IGovernable {
      *
      * - `account` cannot be the zero address.
      */
-    function mint(address account, uint256 amount) external;
+    function mint(address account, uint256 amount, bool isRefundable) external;
 
     /**
      * @dev Destroys `amount` tokens from `account`, reducing the
@@ -48,7 +56,15 @@ interface ISolaceCoverMinutes is IERC20, IERC20Metadata, IGovernable {
      * @param account The account to change balance.
      * @param amount The new balance of the account.
      */
-    function setBalance(address account, uint256 amount) external;
+    //function setBalance(address account, uint256 amount) external;
+
+    /**
+     * @notice Withdraws funds from an account.
+     * The user must have sufficient refundable balance.
+     * @param account The account to withdraw from.
+     * @param amount The amount to withdraw.
+     */
+    function withdraw(address account, uint256 amount) external;
 
     /***************************************
     GOVERNANCE FUNCTIONS
@@ -61,4 +77,12 @@ interface ISolaceCoverMinutes is IERC20, IERC20Metadata, IGovernable {
      * @param statuses Statuses to set.
      */
     function setBalanceManagerStatuses(address[] calldata bms, bool[] calldata statuses) external;
+
+    /**
+     * @notice Adds or removes a set of scm retainers.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param retainers List of scm retainers to set.
+     * @param statuses Statuses to set.
+     */
+    function setScmRetainerStatuses(address[] calldata retainers, bool[] calldata statuses) external;
 }

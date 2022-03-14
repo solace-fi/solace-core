@@ -483,6 +483,19 @@ contract SolaceCoverProductMCD is
     }
 
     /**
+     * @notice Calculates the minimum amount of Solace Cover Minutes required by this contract for the account to hold.
+     * @param account Account to query.
+     * @return amount The amount of SCM the account must hold.
+     */
+    function minScmRequired(address account) external view override returns (uint256 amount) {
+        if ( _hasCooldownPassed(account) ) {
+          return 0;
+        } else {
+          return _minRequiredAccountBalance(_preDeactivateCoverLimitOf[_policyOf[account]]);
+        }
+    }
+
+    /**
      * @notice Returns the Uniform Resource Identifier (URI) for `policyID`.
      * @param policyID The policy ID.
      */

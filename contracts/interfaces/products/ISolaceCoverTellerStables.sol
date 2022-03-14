@@ -26,6 +26,8 @@ interface ISolaceCoverTellerStables is IGovernable {
 
     /// @notice Emitted when a token is deposited.
     event TokenDeposited(address indexed token, address indexed depositor, address indexed receiver, uint256 amount);
+    /// @notice Emitted when a token is withdrawn.
+    event TokenWithdrawn(address indexed token, address indexed depositor, address indexed receiver, uint256 amount);
 
     /// @dev user => token => amount deposited
     function deposits(address user, address token) external view returns (uint256 amount);
@@ -37,6 +39,7 @@ interface ISolaceCoverTellerStables is IGovernable {
     function ZERO() external view returns (bytes32);
     function IS_ACCEPTED_MASK() external view returns (bytes32);
     function IS_PERMITTABLE_MASK() external view returns (bytes32);
+    function IS_REFUNDABLE_MASK() external view returns (bytes32);
 
     event TokenFlagsSet(address indexed token, bytes32 flags);
 
@@ -77,7 +80,21 @@ interface ISolaceCoverTellerStables is IGovernable {
         bytes32 s
     ) external;
 
-    // TODO: withdraw?
+    /**
+     * @notice Withdraws some of the user's deposit and sends it to `recipient`.
+     * User must have deposited that token in at least that amount in the past.
+     * User must have sufficient Solace Cover Minutes to withdraw.
+     * Token must be refundable.
+     * Premium pool must have the tokens to return.
+     * @param token The token to withdraw.
+     * @param amount The amount of to withdraw.
+     * @param recipient The receiver of funds.
+     */
+    function withdraw(
+        address token,
+        uint256 amount,
+        address recipient
+    ) external;
 
     /***************************************
     GOVERNANCE FUNCTIONS

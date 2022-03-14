@@ -42,6 +42,7 @@ contract SolaceCoverTellerStables is ISolaceCoverTellerStables, Governable, Reen
     bytes32 public constant override ZERO = 0x0000000000000000000000000000000000000000000000000000000000000000;
     bytes32 public constant override IS_ACCEPTED_MASK = 0x0000000000000000000000000000000000000000000000000000000000000001;
     bytes32 public constant override IS_PERMITTABLE_MASK = 0x0000000000000000000000000000000000000000000000000000000000000002;
+    bytes32 public constant override IS_REFUNDABLE_MASK = 0x0000000000000000000000000000000000000000000000000000000000000004;
 
     mapping(address => bytes32) public override tokenFlags;
     mapping(address => uint256) public override tokenIndex;
@@ -86,14 +87,12 @@ contract SolaceCoverTellerStables is ISolaceCoverTellerStables, Governable, Reen
         require((flags & IS_ACCEPTED_MASK) != ZERO, "token not accepted");
         // effects
         deposits[recipient][token] += amount;
-        // convert decimals
-        uint8 dec_t = IERC20Metadata(token).decimals();
-        uint8 dec_s = IERC20Metadata(scm).decimals();
-        if(dec_t < dec_s) amount *= 10 ** (dec_s - dec_t);
-        else if(dec_t > dec_s) amount /= 10 ** (dec_t - dec_s);
         // interactions
-        ISolaceCoverMinutes(scm).mint(recipient, amount);
+        bool isRefundable = (flags & IS_REFUNDABLE_MASK) != ZERO;
+        uint256 scmAmount = _convertDecimals(amount, token, scm);
+        ISolaceCoverMinutes(scm).mint(recipient, scmAmount, isRefundable);
         SafeERC20.safeTransferFrom(IERC20(token), msg.sender, premiumPool, amount);
+        emit TokenDeposited(token, msg.sender, recipient, amount);
     }
 
     /**
@@ -121,18 +120,66 @@ contract SolaceCoverTellerStables is ISolaceCoverTellerStables, Governable, Reen
         require((flags & IS_PERMITTABLE_MASK) != ZERO, "token not permittable");
         // effects
         deposits[depositor][token] += amount;
-        // convert decimals
-        uint8 dec_t = IERC20Metadata(token).decimals();
-        uint8 dec_s = IERC20Metadata(scm).decimals();
-        if(dec_t < dec_s) amount *= 10 ** (dec_s - dec_t);
-        else if(dec_t > dec_s) amount /= 10 ** (dec_t - dec_s);
         // interactions
-        ISolaceCoverMinutes(scm).mint(depositor, amount);
+        bool isRefundable = (flags & IS_REFUNDABLE_MASK) != ZERO;
+        uint256 scmAmount = _convertDecimals(amount, token, scm);
+        ISolaceCoverMinutes(scm).mint(depositor, scmAmount, isRefundable);
         IERC20Permit(token).permit(depositor, address(this), amount, deadline, v, r, s);
         SafeERC20.safeTransferFrom(IERC20(token), msg.sender, premiumPool, amount);
+        emit TokenDeposited(token, depositor, depositor, amount);
     }
 
-    // TODO: withdraw?
+    /**
+     * @notice Withdraws some of the user's deposit and sends it to `recipient`.
+     * User must have deposited that token in at least that amount in the past.
+     * User must have sufficient Solace Cover Minutes to withdraw.
+     * Token must be refundable.
+     * Premium pool must have the tokens to return.
+     * @param token The token to withdraw.
+     * @param amount The amount of to withdraw.
+     * @param recipient The receiver of funds.
+     */
+    function withdraw(
+        address token,
+        uint256 amount,
+        address recipient
+    ) external override nonReentrant {
+        // checks
+        bytes32 flags = tokenFlags[token];
+        require((flags & IS_REFUNDABLE_MASK) != ZERO, "token not refundable");
+        uint256 deposited = deposits[msg.sender][token];
+        require(deposited >= amount, "insufficient deposit");
+        // effects
+        uint256 scmAmount = _convertDecimals(amount, token, scm);
+        ISolaceCoverMinutes(scm).withdraw(msg.sender, scmAmount);
+        SafeERC20.safeTransferFrom(IERC20(token), premiumPool, recipient, amount);
+        emit TokenWithdrawn(token, msg.sender, recipient, amount);
+    }
+
+    /***************************************
+    HELPER FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Converts an amount of tokens to another amount of decimals.
+     * Great for converting between tokens with equal value eg USDC to DAI.
+     * Does not handle different token values eg ETH to DAI.
+     * @param amountIn The amount of tokens in.
+     * @param tokenIn The input token.
+     * @param tokenOut The output token.
+     * @param amountOut The amount of tokens out.
+     */
+    function _convertDecimals(uint256 amountIn, address tokenIn, address tokenOut) internal view returns (uint256 amountOut) {
+        // fetch decimals
+        uint8 decIn = IERC20Metadata(tokenIn).decimals();
+        uint8 decOut = IERC20Metadata(tokenOut).decimals();
+        // convert
+        return (decIn < decOut)
+            ? amountIn * (10 ** (decOut - decIn)) // upscale
+            : (decIn > decOut)
+            ? amountIn / (10 ** (decIn - decOut)) // downscale
+            : amountIn; // equal
+    }
 
     /***************************************
     GOVERNANCE FUNCTIONS
