@@ -1,5 +1,6 @@
 # solace.fi
-https://solace.fi
+https://solace.fi  
+![coverage](coverage.svg)
 
 ![architecture](architecture_diagram.svg)
 
@@ -51,6 +52,9 @@ Redeploying:
 3. Run `npx hardhat run scripts/deploy-local-1.ts --network localhost`.
 4. Run `npx hardhat run scripts/deploy-local-2.ts --network localhost`.
 5. Your local network will be available at `localhost:8545`. See the outputs of the above commands for a list of contract addresses.
+
+## Code Coverage
+See https://share.solace.fi/test_coverage/index.html
 
 ## License
 GNU General Public License v3.0
