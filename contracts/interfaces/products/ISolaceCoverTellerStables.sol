@@ -6,7 +6,7 @@ import "./../utils/IGovernable.sol";
 /**
  * @title Solace Cover Teller - Stables
  * @author solace.fi
- * @notice A teller for Solace Cover Minutes that accepts stablecoins for payment.
+ * @notice A teller for Solace Cover Dollars that accepts stablecoins for payment.
  */
 interface ISolaceCoverTellerStables is IGovernable {
 
@@ -14,8 +14,8 @@ interface ISolaceCoverTellerStables is IGovernable {
     GLOBAL DATA
     ***************************************/
 
-    /// @notice Solace Cover Minutes contract.
-    function scm() external view returns (address);
+    /// @notice Solace Cover Dollars contract.
+    function scd() external view returns (address);
 
     /// @notice The premum pool.
     function premiumPool() external view returns (address);
@@ -55,7 +55,7 @@ interface ISolaceCoverTellerStables is IGovernable {
     /**
      * @notice Deposits tokens from msg.sender and credits them to recipient.
      * @param token The token to deposit.
-     * @param recipient The recipient of Solace Cover Minutes.
+     * @param recipient The recipient of Solace Cover Dollars.
      * @param amount Amount of token to deposit.
      */
     function deposit(address token, address recipient, uint256 amount) external;
@@ -63,7 +63,7 @@ interface ISolaceCoverTellerStables is IGovernable {
     /**
      * @notice Deposits tokens from depositor using permit.
      * @param token The token to deposit.
-     * @param depositor The depositor and recipient of Solace Cover Minutes.
+     * @param depositor The depositor and recipient of Solace Cover Dollars.
      * @param amount Amount of token to deposit.
      * @param deadline Time the transaction must go through before.
      * @param v secp256k1 signature
@@ -83,7 +83,7 @@ interface ISolaceCoverTellerStables is IGovernable {
     /**
      * @notice Withdraws some of the user's deposit and sends it to `recipient`.
      * User must have deposited that token in at least that amount in the past.
-     * User must have sufficient Solace Cover Minutes to withdraw.
+     * User must have sufficient Solace Cover Dollars to withdraw.
      * Token must be refundable.
      * Premium pool must have the tokens to return.
      * @param token The token to withdraw.

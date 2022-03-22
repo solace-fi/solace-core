@@ -7,14 +7,14 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./../utils/Governable.sol";
-import "./../interfaces/products/ISolaceCoverMinutes.sol";
+import "./../interfaces/products/ISolaceCoverDollars.sol";
 import "./../interfaces/utils/IRegistry.sol";
 import "./../interfaces/products/ISolaceCoverTellerStables.sol";
 
 /**
  * @title Solace Cover Teller - Stables
  * @author solace.fi
- * @notice A teller for Solace Cover Minutes that accepts stablecoins for payment.
+ * @notice A teller for Solace Cover Dollars that accepts stablecoins for payment.
  */
 contract SolaceCoverTellerStables is ISolaceCoverTellerStables, Governable, ReentrancyGuard {
 
@@ -22,8 +22,8 @@ contract SolaceCoverTellerStables is ISolaceCoverTellerStables, Governable, Reen
     GLOBAL DATA
     ***************************************/
 
-    /// @notice Solace Cover Minutes contract.
-    address public override scm;
+    /// @notice Solace Cover Dollars contract.
+    address public override scd;
 
     /// @notice The premum pool.
     address public override premiumPool;
@@ -59,9 +59,9 @@ contract SolaceCoverTellerStables is ISolaceCoverTellerStables, Governable, Reen
      */
     constructor(address governance_, address registry_) Governable(governance_) {
         IRegistry reg = IRegistry(registry_);
-        (bool success1, address scm_) = reg.tryGet("scm");
-        require(success1, "zero address scm");
-        scm = scm_;
+        (bool success1, address scd_) = reg.tryGet("scd");
+        require(success1, "zero address scd");
+        scd = scd_;
         (bool success2, address premiumPool_) = reg.tryGet("premiumPool");
         require(success2, "zero address premium pool");
         premiumPool = premiumPool_;
@@ -74,7 +74,7 @@ contract SolaceCoverTellerStables is ISolaceCoverTellerStables, Governable, Reen
     /**
      * @notice Deposits tokens from msg.sender and credits them to recipient.
      * @param token The token to deposit.
-     * @param recipient The recipient of Solace Cover Minutes.
+     * @param recipient The recipient of Solace Cover Dollars.
      * @param amount Amount of token to deposit.
      */
     function deposit(
@@ -89,8 +89,8 @@ contract SolaceCoverTellerStables is ISolaceCoverTellerStables, Governable, Reen
         deposits[recipient][token] += amount;
         // interactions
         bool isRefundable = (flags & IS_REFUNDABLE_MASK) != ZERO;
-        uint256 scmAmount = _convertDecimals(amount, token, scm);
-        ISolaceCoverMinutes(scm).mint(recipient, scmAmount, isRefundable);
+        uint256 scdAmount = _convertDecimals(amount, token, scd);
+        ISolaceCoverDollars(scd).mint(recipient, scdAmount, isRefundable);
         SafeERC20.safeTransferFrom(IERC20(token), msg.sender, premiumPool, amount);
         emit TokenDeposited(token, msg.sender, recipient, amount);
     }
@@ -98,7 +98,7 @@ contract SolaceCoverTellerStables is ISolaceCoverTellerStables, Governable, Reen
     /**
      * @notice Deposits tokens from depositor using permit.
      * @param token The token to deposit.
-     * @param depositor The depositor and recipient of Solace Cover Minutes.
+     * @param depositor The depositor and recipient of Solace Cover Dollars.
      * @param amount Amount of token to deposit.
      * @param deadline Time the transaction must go through before.
      * @param v secp256k1 signature
@@ -122,8 +122,8 @@ contract SolaceCoverTellerStables is ISolaceCoverTellerStables, Governable, Reen
         deposits[depositor][token] += amount;
         // interactions
         bool isRefundable = (flags & IS_REFUNDABLE_MASK) != ZERO;
-        uint256 scmAmount = _convertDecimals(amount, token, scm);
-        ISolaceCoverMinutes(scm).mint(depositor, scmAmount, isRefundable);
+        uint256 scdAmount = _convertDecimals(amount, token, scd);
+        ISolaceCoverDollars(scd).mint(depositor, scdAmount, isRefundable);
         IERC20Permit(token).permit(depositor, address(this), amount, deadline, v, r, s);
         SafeERC20.safeTransferFrom(IERC20(token), msg.sender, premiumPool, amount);
         emit TokenDeposited(token, depositor, depositor, amount);
@@ -132,7 +132,7 @@ contract SolaceCoverTellerStables is ISolaceCoverTellerStables, Governable, Reen
     /**
      * @notice Withdraws some of the user's deposit and sends it to `recipient`.
      * User must have deposited that token in at least that amount in the past.
-     * User must have sufficient Solace Cover Minutes to withdraw.
+     * User must have sufficient Solace Cover Dollars to withdraw.
      * Token must be refundable.
      * Premium pool must have the tokens to return.
      * @param token The token to withdraw.
@@ -150,8 +150,8 @@ contract SolaceCoverTellerStables is ISolaceCoverTellerStables, Governable, Reen
         uint256 deposited = deposits[msg.sender][token];
         require(deposited >= amount, "insufficient deposit");
         // effects
-        uint256 scmAmount = _convertDecimals(amount, token, scm);
-        ISolaceCoverMinutes(scm).withdraw(msg.sender, scmAmount);
+        uint256 scdAmount = _convertDecimals(amount, token, scd);
+        ISolaceCoverDollars(scd).withdraw(msg.sender, scdAmount);
         SafeERC20.safeTransferFrom(IERC20(token), premiumPool, recipient, amount);
         emit TokenWithdrawn(token, msg.sender, recipient, amount);
     }

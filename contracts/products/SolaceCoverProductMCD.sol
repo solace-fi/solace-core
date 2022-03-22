@@ -11,7 +11,7 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "../utils/Governable.sol";
 import "../interfaces/utils/IRegistry.sol";
 import "../interfaces/risk/IRiskManager.sol";
-import "../interfaces/products/ISolaceCoverMinutes.sol";
+import "../interfaces/products/ISolaceCoverDollars.sol";
 import "../interfaces/products/ISolaceCoverProductMCD.sol";
 
 /**
@@ -29,7 +29,7 @@ import "../interfaces/products/ISolaceCoverProductMCD.sol";
  *
  * Before the cooldown timer starts or passes, the user cannot withdraw their entire account balance. A minimum required account balance (to cover one epoch's fee) will be left in the user's account. After the cooldown has passed, a user will be able to withdraw their entire account balance.
  *
- * Users can enter a **referral code** with [`activatePolicy()`](#activatePolicy) or [`updateCoverLimit()`](#updatecoverlimit). A valid referral code will earn reward points to both the referrer and the referee. When the user's account is charged, reward points will be deducted before solace cover minutes.
+ * Users can enter a **referral code** with [`activatePolicy()`](#activatePolicy) or [`updateCoverLimit()`](#updatecoverlimit). A valid referral code will earn reward points to both the referrer and the referee. When the user's account is charged, reward points will be deducted before solace cover dollars.
  * Each account can only enter a valid referral code once, however there are no restrictions on how many times a referral code can be used for new accounts.
  */
 contract SolaceCoverProductMCD is
@@ -58,8 +58,8 @@ contract SolaceCoverProductMCD is
 
     string public baseURI;
 
-    /// @notice Solace Cover Minutes contract.
-    address public scm;
+    /// @notice Solace Cover Dollars contract.
+    address public scd;
 
     /***************************************
     BOOK-KEEPING VARIABLES
@@ -127,7 +127,7 @@ contract SolaceCoverProductMCD is
      * @notice policyholder => reward points.
      * Users earn reward points for using a valid referral code (as a referee), and having other users successfully use their referral code (as a referrer)
      * Reward points can be manually set by the Cover Promotion Admin
-     * Reward points act as a credit, when an account is charged, they are deducted from before cover minutes
+     * Reward points act as a credit, when an account is charged, they are deducted from before cover dollars
      */
     mapping(address => uint256) internal _rewardPointsOf;
 
@@ -169,9 +169,9 @@ contract SolaceCoverProductMCD is
         require(registry_ != address(0x0), "zero address registry");
         _registry = IRegistry(registry_);
         require(_registry.get("riskManager") != address(0x0), "zero address riskmanager");
-        (, address scm_) = _registry.tryGet("scm");
-        require(scm_ != address(0x0), "zero address scm");
-        scm = scm_;
+        (, address scd_) = _registry.tryGet("scd");
+        require(scd_ != address(0x0), "zero address scd");
+        scd = scd_;
 
         // Set default values
         _maxRateNum = 1;
@@ -203,7 +203,7 @@ contract SolaceCoverProductMCD is
         policyID = policyOf(msg.sender);
         require(!policyStatus(policyID), "policy already activated");
         require(_canPurchaseNewCover(0, coverLimit_), "insufficient capacity for new cover");
-        require(IERC20(scm).balanceOf(msg.sender) > _minRequiredAccountBalance(coverLimit_), "insufficient deposit for minimum required account balance");
+        require(IERC20(scd).balanceOf(msg.sender) > _minRequiredAccountBalance(coverLimit_), "insufficient deposit for minimum required account balance");
 
         // Exit cooldown
         _exitCooldown(msg.sender);
@@ -244,7 +244,7 @@ contract SolaceCoverProductMCD is
             "insufficient capacity for new cover"
         );
         require(
-            IERC20(scm).balanceOf(msg.sender) > _minRequiredAccountBalance(newCoverLimit_),
+            IERC20(scd).balanceOf(msg.sender) > _minRequiredAccountBalance(newCoverLimit_),
             "insufficient deposit for minimum required account balance"
         );
 
@@ -483,11 +483,11 @@ contract SolaceCoverProductMCD is
     }
 
     /**
-     * @notice Calculates the minimum amount of Solace Cover Minutes required by this contract for the account to hold.
+     * @notice Calculates the minimum amount of Solace Cover Dollars required by this contract for the account to hold.
      * @param account Account to query.
-     * @return amount The amount of SCM the account must hold.
+     * @return amount The amount of SCD the account must hold.
      */
-    function minScmRequired(address account) external view override returns (uint256 amount) {
+    function minScdRequired(address account) external view override returns (uint256 amount) {
         if ( _hasCooldownPassed(account) ) {
           return 0;
         } else {
@@ -657,7 +657,7 @@ contract SolaceCoverProductMCD is
         require(msg.sender == _registry.get("premiumCollector"), "not premium collector");
         require(count == premiums.length, "length mismatch");
         require(count <= policyCount(), "policy count exceeded");
-        ISolaceCoverMinutes scm_ = ISolaceCoverMinutes(scm);
+        ISolaceCoverDollars scd_ = ISolaceCoverDollars(scd);
         address premiumPool = _registry.get("premiumPool");
 
         for (uint256 i = 0; i < count; i++) {
@@ -673,12 +673,12 @@ contract SolaceCoverProductMCD is
                 premium = _minRequiredAccountBalance(preDeactivateCoverLimit);
             }
 
-            uint256 scmbal = scm_.balanceOf(holders[i]);
+            uint256 scdbal = scd_.balanceOf(holders[i]);
 
             // If premiums paid >= referralThreshold, then reward points count
             if (_premiumPaidOf[holders[i]] >= _referralThreshold) {
                 // If policyholder's account can pay for premium charged in full
-                if (scmbal + _rewardPointsOf[holders[i]] >= premium) {
+                if (scdbal + _rewardPointsOf[holders[i]] >= premium) {
 
                     // If reward points can pay for premium charged in full
                     if (_rewardPointsOf[holders[i]] >= premium) {
@@ -686,14 +686,14 @@ contract SolaceCoverProductMCD is
                     } else {
                         uint256 amountDeductedFromSoteriaAccount = premium - _rewardPointsOf[holders[i]];
                         _premiumPaidOf[holders[i]] += amountDeductedFromSoteriaAccount;
-                        scm_.transferFrom(holders[i], premiumPool, amountDeductedFromSoteriaAccount);
+                        scd_.transferFrom(holders[i], premiumPool, amountDeductedFromSoteriaAccount);
                         _rewardPointsOf[holders[i]] = 0;
                     }
                     emit PremiumCharged(holders[i], premium);
                 } else {
-                    uint256 partialPremium = scmbal + _rewardPointsOf[holders[i]];
-                    _premiumPaidOf[holders[i]] += scmbal;
-                    scm_.transferFrom(holders[i], premiumPool, scmbal);
+                    uint256 partialPremium = scdbal + _rewardPointsOf[holders[i]];
+                    _premiumPaidOf[holders[i]] += scdbal;
+                    scd_.transferFrom(holders[i], premiumPool, scdbal);
                     _rewardPointsOf[holders[i]] = 0;
                     _deactivatePolicy(holders[i]);
                     emit PremiumPartiallyCharged(
@@ -705,14 +705,14 @@ contract SolaceCoverProductMCD is
             // Else if premiums paid < referralThreshold, reward don't count
             } else {
                 // If policyholder's account can pay for premium charged in full
-                if (scmbal >= premium) {
+                if (scdbal >= premium) {
                         _premiumPaidOf[holders[i]] += premium;
-                        scm_.transferFrom(holders[i], premiumPool, premium);
+                        scd_.transferFrom(holders[i], premiumPool, premium);
                         emit PremiumCharged(holders[i], premium);
                 } else {
-                    uint256 partialPremium = scmbal;
+                    uint256 partialPremium = scdbal;
                     _premiumPaidOf[holders[i]] += partialPremium;
-                    scm_.transferFrom(holders[i], premiumPool, partialPremium);
+                    scd_.transferFrom(holders[i], premiumPool, partialPremium);
                     _deactivatePolicy(holders[i]);
                     emit PremiumPartiallyCharged(
                         holders[i],

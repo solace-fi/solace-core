@@ -2,9 +2,9 @@
 pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import "./ISolaceCoverMinutesRetainer.sol";
+import "./ISCDRetainer.sol";
 
-interface ISolaceCoverProductMCD is IERC721, ISolaceCoverMinutesRetainer {
+interface ISolaceCoverProductMCD is IERC721, ISCDRetainer {
 
     /***************************************
     EVENTS
