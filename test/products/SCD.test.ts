@@ -7,11 +7,11 @@ const provider = waffle.provider;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./../utilities/artifact_importer";
-import { SolaceCoverDollars, MockScdRetainer } from "./../../typechain";
+import { SCD, MockScdRetainer } from "./../../typechain";
 import { expectDeployed } from "./../utilities/expectDeployed";
 
-describe("SolaceCoverDollars", function () {
-  let scd: SolaceCoverDollars;
+describe("SCD", function () {
+  let scd: SCD;
   const [deployer, governor, user1, user2, scdMover1, scdMover2] = provider.getWallets();
   const name = "scd";
   const symbol = "SCD";
@@ -29,10 +29,10 @@ describe("SolaceCoverDollars", function () {
 
   describe("deployment", function () {
     it("cannot deploy with zero address governance", async function () {
-      await expect(deployContract(deployer, artifacts.SolaceCoverDollars, [ZERO_ADDRESS])).to.be.revertedWith("zero address governance");
+      await expect(deployContract(deployer, artifacts.SCD, [ZERO_ADDRESS])).to.be.revertedWith("zero address governance");
     });
     it("deploys successfully", async function () {
-      scd = (await deployContract(deployer, artifacts.SolaceCoverDollars, [governor.address])) as SolaceCoverDollars;
+      scd = (await deployContract(deployer, artifacts.SCD, [governor.address])) as SCD;
       await expectDeployed(scd.address);
     });
     it("has a correct name", async function () {

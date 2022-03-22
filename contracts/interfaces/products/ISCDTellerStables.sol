@@ -8,7 +8,7 @@ import "./../utils/IGovernable.sol";
  * @author solace.fi
  * @notice A teller for Solace Cover Dollars that accepts stablecoins for payment.
  */
-interface ISolaceCoverTellerStables is IGovernable {
+interface ISCDTellerStables is IGovernable {
 
     /***************************************
     GLOBAL DATA

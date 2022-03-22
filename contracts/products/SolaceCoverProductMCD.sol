@@ -11,7 +11,7 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "../utils/Governable.sol";
 import "../interfaces/utils/IRegistry.sol";
 import "../interfaces/risk/IRiskManager.sol";
-import "../interfaces/products/ISolaceCoverDollars.sol";
+import "../interfaces/products/ISCD.sol";
 import "../interfaces/products/ISolaceCoverProductMCD.sol";
 
 /**
@@ -657,7 +657,7 @@ contract SolaceCoverProductMCD is
         require(msg.sender == _registry.get("premiumCollector"), "not premium collector");
         require(count == premiums.length, "length mismatch");
         require(count <= policyCount(), "policy count exceeded");
-        ISolaceCoverDollars scd_ = ISolaceCoverDollars(scd);
+        ISCD scd_ = ISCD(scd);
         address premiumPool = _registry.get("premiumPool");
 
         for (uint256 i = 0; i < count; i++) {

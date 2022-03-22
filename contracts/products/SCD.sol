@@ -5,16 +5,16 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "./../utils/Governable.sol";
-import "./../interfaces/products/ISolaceCoverDollars.sol";
+import "./../interfaces/products/ISCD.sol";
 
 /**
- * @title Solace Cover Dollars
+ * @title Solace Cover Dollars (SCD)
  * @author solace.fi
- * @notice Solace Cover Dollars (SCD) is a stablecoin pegged to USD. It is used to pay for coverage.
+ * @notice SCD is a stablecoin pegged to USD. It is used to pay for coverage.
  *
  * SCD conforms to the ERC20 standard but cannot be minted or transferred by most users. Balances can only be managed by "SCD movers" such as SCD Tellers and coverage contracts. In some cases the user may be able to exchange SCD for the payment token, if not the balance will be marked non refundable. Some coverage contracts may have a minimum balance required to prevent abuse - these are called "SCD retainers" and may block `withdraw()`.
  */
-contract SolaceCoverDollars is ISolaceCoverDollars, Governable {
+contract SCD is ISCD, Governable {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     /***************************************
