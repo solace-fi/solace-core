@@ -10,9 +10,11 @@ import "./../interfaces/products/ISCD.sol";
 /**
  * @title Solace Cover Dollars (SCD)
  * @author solace.fi
- * @notice SCD is a stablecoin pegged to USD. It is used to pay for coverage.
+ * @notice **SCD** is a stablecoin pegged to **USD**. It is used to pay for coverage.
  *
- * SCD conforms to the ERC20 standard but cannot be minted or transferred by most users. Balances can only be managed by "SCD movers" such as SCD Tellers and coverage contracts. In some cases the user may be able to exchange SCD for the payment token, if not the balance will be marked non refundable. Some coverage contracts may have a minimum balance required to prevent abuse - these are called "SCD retainers" and may block `withdraw()`.
+ * **SCD** conforms to the ERC20 standard but cannot be minted or transferred by most users. Balances can only be modified by "SCD movers" such as SCD Tellers and coverage contracts. In some cases the user may be able to exchange **SCD** for the payment token, if not the balance will be marked non refundable. Some coverage contracts may have a minimum balance required to prevent abuse - these are called "SCD retainers" and may block [`withdraw()`](#withdraw).
+ *
+ * [**Governance**](/docs/protocol/governance) can add and remove SCD movers and retainers. SCD movers can modify token balances via [`mint()`](#mint), [`burn()`](#burn), [`transfer()`](#transfer), [`transferFrom()`](#transferfrom), and [`withdraw()`](#withdraw).
  */
 contract SCD is ISCD, Governable {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -83,7 +85,7 @@ contract SCD is ISCD, Governable {
         return 0;
     }
 
-    /// @notice Overwritten. Cannot be called.
+    /// @notice Overwritten. Reverts when called.
     function approve(address, uint256) public virtual override returns (bool) {
         revert("SCD: token not approvable");
     }
@@ -197,9 +199,9 @@ contract SCD is ISCD, Governable {
         // checks
         require(isScdMover(msg.sender), "!scd mover");
         require(account != address(0), "SCD: withdraw from the zero address");
-        uint256 bal = _balances[account];
-        uint256 bnr = _balancesNonRefundable[account];
-        uint256 br = _subOrZero(bal, bnr);
+        uint256 bal = _balances[account]; // total
+        uint256 bnr = _balancesNonRefundable[account]; // nonrefundable
+        uint256 br = _subOrZero(bal, bnr); // refundable
         require(br >= amount, "SCD: withdraw amount exceeds balance");
         uint256 minScd = minScdRequired(account);
         uint256 newBal = bal - amount;
@@ -207,7 +209,6 @@ contract SCD is ISCD, Governable {
         // effects
         _totalSupply -= amount;
         _balances[account] = newBal;
-        _balancesNonRefundable[account] = _subOrZero(bnr, amount);
         emit Transfer(account, address(0), amount);
     }
 

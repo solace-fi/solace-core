@@ -7,11 +7,11 @@ const provider = waffle.provider;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./../utilities/artifact_importer";
-import { SCD, MockScdRetainer } from "./../../typechain";
+import { Scd, MockScdRetainer } from "./../../typechain";
 import { expectDeployed } from "./../utilities/expectDeployed";
 
 describe("SCD", function () {
-  let scd: SCD;
+  let scd: Scd;
   const [deployer, governor, user1, user2, scdMover1, scdMover2] = provider.getWallets();
   const name = "scd";
   const symbol = "SCD";
@@ -32,7 +32,7 @@ describe("SCD", function () {
       await expect(deployContract(deployer, artifacts.SCD, [ZERO_ADDRESS])).to.be.revertedWith("zero address governance");
     });
     it("deploys successfully", async function () {
-      scd = (await deployContract(deployer, artifacts.SCD, [governor.address])) as SCD;
+      scd = (await deployContract(deployer, artifacts.SCD, [governor.address])) as Scd;
       await expectDeployed(scd.address);
     });
     it("has a correct name", async function () {
@@ -316,56 +316,42 @@ describe("SCD", function () {
       await scd.connect(scdMover1).mint(user2.address, 300, true);
       let b1 = await getBalances();
 
-      console.log(b1.balanceOfs[2].toString())
-      console.log(b1.balanceOfNonRefundables[2].toString())
-
-      console.log(b1.balanceOfs[3].toString())
-      console.log(b1.balanceOfNonRefundables[3].toString())
-
-      // fully nonrefundable
       let tx1 = await scd.connect(scdMover1).withdraw(user2.address, 100);
       await expect(tx1).to.emit(scd, "Transfer").withArgs(user2.address, ZERO_ADDRESS, 100);
       let b2 = await getBalances();
       let bd21 = getBalancesDiff(b2, b1);
       expect(bd21.totalSupply).eq(-100);
       expect(bd21.balanceOfs[3]).eq(-100);
-      expect(bd21.balanceOfNonRefundables[3]).eq(-100);
+      expect(bd21.balanceOfNonRefundables[3]).eq(0);
 
-      // partly nonrefundable
       let tx2 = await scd.connect(scdMover1).withdraw(user2.address, 300);
       await expect(tx2).to.emit(scd, "Transfer").withArgs(user2.address, ZERO_ADDRESS, 300);
       let b3 = await getBalances();
       let bd32 = getBalancesDiff(b3, b2);
       expect(bd32.totalSupply).eq(-300);
       expect(bd32.balanceOfs[3]).eq(-300);
-      expect(bd32.balanceOfNonRefundables[3]).eq(-200);
-
-      // fully refundable
-      let tx3 = await scd.connect(scdMover1).withdraw(user2.address, 200);
-      await expect(tx3).to.emit(scd, "Transfer").withArgs(user2.address, ZERO_ADDRESS, 200);
-      let b4 = await getBalances();
-      let bd43 = getBalancesDiff(b4, b3);
-      expect(bd43.totalSupply).eq(-200);
-      expect(bd43.balanceOfs[3]).eq(-200);
-      expect(bd43.balanceOfNonRefundables[3]).eq(0);
+      expect(bd32.balanceOfNonRefundables[3]).eq(0);
     });
-    it("cannot withdraw more than balance", async function () {
+    it("cannot withdraw more than refundable balance", async function () {
       let bal = await scd.balanceOf(user1.address);
-      await expect(scd.connect(scdMover1).withdraw(user1.address, bal.add(1))).to.be.revertedWith("SCD: withdraw amount exceeds balance");
+      let bnr = await scd.balanceOfNonRefundable(user1.address);
+      let br = bal.sub(bnr);
+      await expect(scd.connect(scdMover1).withdraw(user1.address, br.add(1))).to.be.revertedWith("SCD: withdraw amount exceeds balance");
     });
     it("cannot withdraw to below min", async function () {
+      let bal1 = await scd.balanceOf(user2.address);
+      await scd.connect(scdMover1).transferFrom(user2.address, deployer.address, bal1);
+      await scd.connect(scdMover1).mint(user2.address, 60, true);
       await scdRetainer1.setMinScdRequired(user2.address, 50);
-      await scd.connect(scdMover1).withdraw(user2.address, 40);
-      await expect(scd.connect(scdMover1).withdraw(user2.address, 40)).to.be.revertedWith("SCD: withdraw to below min");
+      await expect(scd.connect(scdMover1).withdraw(user2.address, 20)).to.be.revertedWith("SCD: withdraw to below min");
+
+      let bal2 = await scd.balanceOf(user2.address);
+      await scd.connect(scdMover1).transferFrom(user2.address, deployer.address, bal2);
+      await scd.connect(scdMover1).mint(user2.address, 60, false);
+      await scdRetainer1.setMinScdRequired(user2.address, 50);
+      await expect(scd.connect(scdMover1).withdraw(user2.address, 20)).to.be.revertedWith("SCD: withdraw amount exceeds balance");
     });
   });
-  /*
-  console.log(b2.balanceOfs[2].toString())
-  console.log(b2.balanceOfNonRefundables[2].toString())
-
-  console.log(b2.balanceOfs[3].toString())
-  console.log(b2.balanceOfNonRefundables[3].toString())
-  */
 
   interface Balances {
     totalSupply: BN;

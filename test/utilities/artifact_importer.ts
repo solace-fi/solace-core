@@ -32,6 +32,7 @@ export async function import_artifacts() {
   artifacts.SolaceCoverProduct = await tryImport(`${artifact_dir}/products/SolaceCoverProduct.sol/SolaceCoverProduct.json`);
   artifacts.SolaceCoverProductV2 = await tryImport(`${artifact_dir}/products/SolaceCoverProductV2.sol/SolaceCoverProductV2.json`);
   artifacts.SCD = await tryImport(`${artifact_dir}/products/SCD.sol/SCD.json`);
+  artifacts.SCDTellerStables = await tryImport(`${artifact_dir}/products/SCDTellerStables.sol/SCDTellerStables.json`);
 
   // investing v2
   artifacts.WETH10 = await tryImport(`${artifact_dir}/WETH10.sol/WETH10.json`);

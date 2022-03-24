@@ -9,9 +9,11 @@ import "./../utils/IGovernable.sol";
 /**
  * @title Solace Cover Dollars (SCD)
  * @author solace.fi
- * @notice SCD is a stablecoin pegged to USD. It is used to pay for coverage.
+ * @notice **SCD** is a stablecoin pegged to **USD**. It is used to pay for coverage.
  *
- * SCD conforms to the ERC20 standard but cannot be minted or transferred by most users. Balances can only be managed by "SCD movers" such as SCD Tellers and coverage contracts. In some cases the user may be able to exchange SCD for the payment token, if not the balance will be marked non refundable. Some coverage contracts may have a minimum balance required to prevent abuse - these are called "SCD retainers" and may block `withdraw()`.
+ * **SCD** conforms to the ERC20 standard but cannot be minted or transferred by most users. Balances can only be modified by "SCD movers" such as SCD Tellers and coverage contracts. In some cases the user may be able to exchange **SCD** for the payment token, if not the balance will be marked non refundable. Some coverage contracts may have a minimum balance required to prevent abuse - these are called "SCD retainers" and may block [`withdraw()`](#withdraw).
+ *
+ * [**Governance**](/docs/protocol/governance) can add and remove SCD movers and retainers. SCD movers can modify token balances via [`mint()`](#mint), [`burn()`](#burn), [`transfer()`](#transfer), [`transferFrom()`](#transferfrom), and [`withdraw()`](#withdraw).
  */
 interface ISCD is IERC20, IERC20Metadata, ISCDRetainer, IGovernable {
 
