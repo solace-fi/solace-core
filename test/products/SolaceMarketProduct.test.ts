@@ -10,7 +10,7 @@ import { config as dotenv_config } from "dotenv";
 dotenv_config();
 
 import { import_artifacts, ArtifactImports } from "../utilities/artifact_importer";
-import { PolicyManager, ProductFactory, MockProductV2, Registry, RiskManager, RiskStrategy, MockRiskStrategy, CoverageDataProvider, MockErc20 } from "../../typechain";
+import { PolicyManager, ProductFactory, MockProductV2, Registry, RiskManager, RiskStrategy, MockRiskStrategy, CoverageDataProvider, MockErc20, BlockGetter } from "../../typechain";
 import { toBytes32 } from "../utilities/setStorage";
 import { after } from "mocha";
 
@@ -31,6 +31,7 @@ describe("SolaceMarketProduct", function () {
   let mockRiskStrategy: RiskStrategy;
   let coverageDataProvider: CoverageDataProvider;
   let dai: MockErc20;
+  let blockGetter: BlockGetter;
   const [deployer, governor, newGovernor, positionContract, policyholder1, policyholder2, policyholder3, mockPolicyManager, solace, premiumPool] = provider.getWallets();
 
   const ONE_DAI =  BN.from("1000000000000000000");
@@ -55,13 +56,17 @@ describe("SolaceMarketProduct", function () {
   const blocks = BN.from(threeDays);
   const expectedPremium = BN.from("213701400000000");
 
+  let snapshot: BN;
+
   before(async function () {
     artifacts = await import_artifacts();
+    snapshot = await provider.send("evm_snapshot", []);
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
+    blockGetter = (await deployContract(deployer, artifacts.BlockGetter)) as BlockGetter;
 
     // deploy registry
     registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
-    
+
     // deploy policy manager
     policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address, registry.address])) as PolicyManager;
     await registry.connect(governor).set(["policyManager"],[policyManager.address]);
@@ -101,6 +106,10 @@ describe("SolaceMarketProduct", function () {
 
     // deploy base risk strategy
     mockRiskStrategy = (await deployContract(deployer, artifacts.MockRiskStrategy)) as RiskStrategy;
+  });
+
+  after(async function () {
+    await provider.send("evm_revert", [snapshot]);
   });
 
   describe("deployment", function () {
@@ -201,7 +210,7 @@ describe("SolaceMarketProduct", function () {
   });
 
   describe("productParameters", function () {
-    before(async function () { 
+    before(async function () {
       let tx = await riskStrategyFactory.createRiskStrategy(mockRiskStrategy.address, [product.address],[1],[11044],[1]);
       let events = (await tx.wait())?.events;
       if (events && events.length > 0) {
@@ -542,7 +551,7 @@ describe("SolaceMarketProduct", function () {
     it("reverts insufficient payment", async function () {
       // calculate new premium
       let expBlock = BN.from(await policyManager.getPolicyExpirationBlock(policyID));
-      let blockNumber = BN.from(await provider.getBlockNumber()).add(1);
+      let blockNumber = (await blockGetter.getBlockNumber()).add(1);
       let prevCoverLimit = await policyManager.getPolicyCoverLimit(policyID);
       expect(newCoverLimit).to.be.gt(prevCoverLimit);
       let prevPrice = await policyManager.getPolicyPrice(policyID);
@@ -570,7 +579,7 @@ describe("SolaceMarketProduct", function () {
       let activeCover1 = await product.activeCoverLimitPerStrategy(riskStrategy.address);
       // calculate new premium
       let expBlock = BN.from(await policyManager.getPolicyExpirationBlock(policyID));
-      let blockNumber = BN.from(await provider.getBlockNumber()).add(1);
+      let blockNumber = (await blockGetter.getBlockNumber()).add(1);
       let prevCoverLimit = await policyManager.getPolicyCoverLimit(policyID);
       expect(newCoverLimit).to.be.gt(prevCoverLimit);
       let prevPrice = await policyManager.getPolicyPrice(policyID);
@@ -606,7 +615,7 @@ describe("SolaceMarketProduct", function () {
       newCoverLimit = BN.from("1200000000000000000"); // 1.2 eth
       // calculate new premium
       let expBlock = BN.from(await policyManager.getPolicyExpirationBlock(policyID));
-      let blockNumber = BN.from(await provider.getBlockNumber()).add(1);
+      let blockNumber = (await blockGetter.getBlockNumber()).add(1);
       let prevCoverLimit = await policyManager.getPolicyCoverLimit(policyID);
       let prevPrice = await policyManager.getPolicyPrice(policyID);
       let remainingBlocks = expBlock.sub(blockNumber);
@@ -645,7 +654,7 @@ describe("SolaceMarketProduct", function () {
       newCoverLimit = BN.from("900000000000000000"); // 0.9 eth
       // calculate new premium
       let expBlock = BN.from(await policyManager.getPolicyExpirationBlock(policyID));
-      let blockNumber = BN.from(await provider.getBlockNumber()).add(2);
+      let blockNumber = (await blockGetter.getBlockNumber()).add(2);
       let prevCoverLimit = await policyManager.getPolicyCoverLimit(policyID);
       expect(newCoverLimit).to.be.lt(prevCoverLimit);
       let prevPrice = await policyManager.getPolicyPrice(policyID);
@@ -684,7 +693,7 @@ describe("SolaceMarketProduct", function () {
       newCoverLimit = BN.from("800000000000000000"); // 0.8 dai
       // calculate new premium
       let expBlock = BN.from(await policyManager.getPolicyExpirationBlock(policyID));
-      let blockNumber = BN.from(await provider.getBlockNumber()).add(1);
+      let blockNumber = (await blockGetter.getBlockNumber()).add(1);
       let prevCoverLimit = await policyManager.getPolicyCoverLimit(policyID);
       expect(newCoverLimit).to.be.lt(prevCoverLimit);
       let prevPrice = await policyManager.getPolicyPrice(policyID);
@@ -811,7 +820,7 @@ describe("SolaceMarketProduct", function () {
     it("can increase cover amount and extend", async function () {
       let activeCover1 = await product.activeCoverLimitPerStrategy(riskStrategy.address);
       let prevExpirationBlock = BN.from(await policyManager.getPolicyExpirationBlock(policyID));
-      let blockNumber = BN.from(await provider.getBlockNumber()).add(1);
+      let blockNumber = (await blockGetter.getBlockNumber()).add(1);
       let prevCoverLimit = await policyManager.getPolicyCoverLimit(policyID);
       let prevPrice = await policyManager.getPolicyPrice(policyID);
       // calculate new premium
@@ -846,7 +855,7 @@ describe("SolaceMarketProduct", function () {
     it("returns overpayment from update policy", async function () {
       let premiumPool1 = await dai.balanceOf(premiumPool.address);
       newCoverLimit = BN.from("1000000000000000000"); // 1  eth
-      let blockNumber = BN.from(await provider.getBlockNumber()).add(1);
+      let blockNumber = (await blockGetter.getBlockNumber()).add(1);
       let prevExpirationBlock = BN.from(await policyManager.getPolicyExpirationBlock(policyID));
       let prevCoverLimit = await policyManager.getPolicyCoverLimit(policyID);
       let prevPrice = await policyManager.getPolicyPrice(policyID);
@@ -880,7 +889,7 @@ describe("SolaceMarketProduct", function () {
       let policyCover = (await policyManager.policyInfo(policyID)).coverLimit;
       let coverLimit = policyCover.div(10);
       let prevExpirationBlock = BN.from(await policyManager.getPolicyExpirationBlock(policyID));
-      let blockNumber = BN.from(await provider.getBlockNumber()).add(1);
+      let blockNumber = (await blockGetter.getBlockNumber()).add(1);
       let prevCoverLimit = await policyManager.getPolicyCoverLimit(policyID);
       let prevPrice = await policyManager.getPolicyPrice(policyID);
       // calculate new premium
@@ -915,7 +924,7 @@ describe("SolaceMarketProduct", function () {
       let policyCover = (await policyManager.policyInfo(policyID)).coverLimit;
       let coverLimit = policyCover.div(10);
       let prevExpirationBlock = BN.from(await policyManager.getPolicyExpirationBlock(policyID));
-      let blockNumber = BN.from(await provider.getBlockNumber()).add(1);
+      let blockNumber = (await blockGetter.getBlockNumber()).add(1);
       let prevCoverLimit = await policyManager.getPolicyCoverLimit(policyID);
       let prevPrice = await policyManager.getPolicyPrice(policyID);
       // calculate new premium
@@ -948,7 +957,7 @@ describe("SolaceMarketProduct", function () {
       let activeCover1 = await product.activeCoverLimitPerStrategy(riskStrategy.address);
       let policyCover = (await policyManager.policyInfo(policyID)).coverLimit;
       let prevExpirationBlock = BN.from(await policyManager.getPolicyExpirationBlock(policyID));
-      let blockNumber = BN.from(await provider.getBlockNumber()).add(1);
+      let blockNumber = (await blockGetter.getBlockNumber()).add(1);
       let prevCoverLimit = await policyManager.getPolicyCoverLimit(policyID);
       let prevPrice = await policyManager.getPolicyPrice(policyID);
       // calculate new premium
@@ -1011,7 +1020,7 @@ describe("SolaceMarketProduct", function () {
     it("can cancel and refunds proper amount", async function () {
       let activeCover1 = await product.activeCoverLimitPerStrategy(riskStrategy.address);
       let info = await policyManager.policyInfo(policyID);
-      let block = await provider.getBlockNumber();
+      let block = (await blockGetter.getBlockNumber()).toNumber();
       let balance1 = await dai.balanceOf(policyholder1.address);
       let expectedRefund = BN.from(info.expirationBlock)
         .sub(block + 1)

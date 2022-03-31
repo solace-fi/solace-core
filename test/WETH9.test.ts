@@ -2,6 +2,7 @@ import chai from "chai";
 import { waffle } from "hardhat";
 const { expect } = chai;
 const { deployContract, solidity } = waffle;
+import { BigNumber as BN } from "ethers";
 const provider = waffle.provider;
 chai.use(solidity);
 
@@ -15,12 +16,18 @@ describe("WETH9", function () {
   const name = "Wrapped Ether";
   const symbol = "WETH";
   let artifacts: ArtifactImports;
+  let snapshot: BN;
 
   before(async function () {
     artifacts = await import_artifacts();
+    snapshot = await provider.send("evm_snapshot", []);
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
     weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
     await expectDeployed(weth.address);
+  });
+
+  after(async function () {
+    await provider.send("evm_revert", [snapshot]);
   });
 
   describe("deployment", function () {

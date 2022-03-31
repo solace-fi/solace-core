@@ -74,6 +74,7 @@ export async function import_artifacts() {
   artifacts.Deployer = await tryImport(`${artifact_dir}/utils/Deployer.sol/Deployer.json`);
   artifacts.MockSLP = await tryImport(`${artifact_dir}/mocks/MockSLP.sol/MockSLP.json`);
   artifacts.MockERC677 = await tryImport(`${artifact_dir}/mocks/MockERC677.sol/MockERC677.json`);
+  artifacts.BlockGetter = await tryImport(`${artifact_dir}/mocks/BlockGetter.sol/BlockGetter.json`);
   // risk strategy imports
   artifacts.RiskStrategyFactory = await tryImport(`${artifact_dir}/RiskStrategyFactory.sol/RiskStrategyFactory.json`);
   artifacts.RiskStrategy = await tryImport(`${artifact_dir}/RiskStrategy.sol/RiskStrategy.json`);

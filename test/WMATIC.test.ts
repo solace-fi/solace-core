@@ -2,6 +2,7 @@ import chai from "chai";
 import { waffle } from "hardhat";
 const { expect } = chai;
 const { deployContract, solidity } = waffle;
+import { BigNumber as BN } from "ethers";
 const provider = waffle.provider;
 chai.use(solidity);
 
@@ -15,12 +16,18 @@ describe("WMATIC9", function () {
   const name = "Wrapped Matic";
   const symbol = "WMATIC";
   let artifacts: ArtifactImports;
+  let snapshot: BN;
 
   before(async function () {
     artifacts = await import_artifacts();
+    snapshot = await provider.send("evm_snapshot", []);
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
     wmatic = (await deployContract(deployer, artifacts.WMATIC)) as Wmatic;
     await expectDeployed(wmatic.address);
+  });
+
+  after(async function () {
+    await provider.send("evm_revert", [snapshot]);
   });
 
   describe("deployment", function () {

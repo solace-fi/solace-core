@@ -15,6 +15,7 @@ import { expectDeployed } from "../utilities/expectDeployed";
 
 describe("ERC721EnhancedInitializable", function() {
   let artifacts: ArtifactImports;
+  let snapshot: BN;
   const [deployer, user1, user2, user3] = provider.getWallets();
 
   // contracts
@@ -32,8 +33,13 @@ describe("ERC721EnhancedInitializable", function() {
 
   before(async function() {
     artifacts = await import_artifacts();
+    snapshot = await provider.send("evm_snapshot", []);
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
     signerContract = (await deployContract(deployer, artifacts.MockERC1271)) as MockErc1271;
+  });
+
+  after(async function () {
+    await provider.send("evm_revert", [snapshot]);
   });
 
   describe("deployment", async function () {

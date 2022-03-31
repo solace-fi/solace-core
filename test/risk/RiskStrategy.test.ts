@@ -40,8 +40,11 @@ describe("RiskStrategy", function () {
   const ONE_DAI = BN.from("1000000000000000000");
   const UWP_AMOUNT = ONE_DAI.mul(1000000); // 1M USD(DAI)
 
+  let snapshot: BN;
+  
   before(async function () {
     artifacts = await import_artifacts();
+    snapshot = await provider.send("evm_snapshot", []);
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
 
     // deploy registry
@@ -62,7 +65,7 @@ describe("RiskStrategy", function () {
     // deploy risk manager
     riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
     await registry.connect(governor).set(["riskManager"], [riskManager.address]);
-    
+
     // deploy product factory
     productFactory = (await deployContract(deployer, artifacts.ProductFactory)) as ProductFactory;
 
@@ -92,7 +95,7 @@ describe("RiskStrategy", function () {
       let event3 = events3[0];
       product6 = await ethers.getContractAt(artifacts.MockProductV2.abi, event3?.args?.["deployment"]) as MockProductV2;
     } else throw "no deployment";
- 
+
     // create base risk strategy
     baseRiskStrategy = (await deployContract(deployer, artifacts.MockRiskStrategy)) as MockRiskStrategy;
 
@@ -102,6 +105,10 @@ describe("RiskStrategy", function () {
     await policyManager.connect(governor).addProduct(product4.address);
     await policyManager.connect(governor).addProduct(product5.address);
     await policyManager.connect(governor).addProduct(product6.address);
+  });
+
+  after(async function () {
+    await provider.send("evm_revert", [snapshot]);
   });
 
   describe("deployment", function () {
@@ -162,7 +169,7 @@ describe("RiskStrategy", function () {
       let predictedAddress1 = await riskStrategyFactory.calculateMinimalProxyDeploymentAddress(baseRiskStrategy.address, toBytes32(0));
       let tx = await riskStrategyFactory.create2RiskStrategy(baseRiskStrategy.address, toBytes32(0), [product1.address],[1],[10000],[1]);
       let events = (await tx.wait())?.events;
-  
+
       if (events && events.length > 0) {
         let event = events[0];
         create2RiskStrategy1 = await ethers.getContractAt(artifacts.MockRiskStrategy.abi, event?.args?.["deployment"]) as MockRiskStrategy;
@@ -174,7 +181,7 @@ describe("RiskStrategy", function () {
       let predictedAddress2 = await riskStrategyFactory.calculateMinimalProxyDeploymentAddress(baseRiskStrategy.address, toBytes32(1));
       let tx2 = await riskStrategyFactory.create2RiskStrategy(baseRiskStrategy.address, toBytes32(1), [product1.address],[1],[10000],[1]);
       let events2 = (await tx2.wait())?.events;
-  
+
       if (events2 && events2.length > 0) {
         let event2 = events2[0];
         create2RiskStrategy2 = await ethers.getContractAt(artifacts.MockRiskStrategy.abi, event2?.args?.["deployment"]) as MockRiskStrategy;
@@ -242,7 +249,7 @@ describe("RiskStrategy", function () {
       expect(await riskStrategy.weightSum()).to.equal(6);
       expect(await riskStrategy.weightAllocation()).to.equal(NO_WEIGHT);
       expect(await riskStrategy.productIsActive(ZERO_ADDRESS)).to.be.false;
-  
+
       let products = [product4.address, product5.address, product6.address];
       for (let i = 1; i < 3; i++) {
         expect(await riskStrategy.productIsActive(products[i-1])).to.be.true;
@@ -536,7 +543,7 @@ describe("RiskStrategy", function () {
       riskManager2 = await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address]) as RiskManager;
       expect(await riskStrategy.connect(governor).riskManager()).eq(riskManager.address)
     })
-    
+
     it("should revert on zero address risk manager", async function () {
       await expect(riskStrategy.connect(governor).setRiskManager(ZERO_ADDRESS)).to.be.revertedWith("zero address risk manager");
     })

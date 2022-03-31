@@ -30,9 +30,16 @@ describe("CoverageDataProvider", function() {
     "MATIC_2": "matic_2"
   }
 
+  let snapshot: BN;
+
   before(async function() {
     artifacts = await import_artifacts();
+    snapshot = await provider.send("evm_snapshot", []);
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
+  });
+
+  after(async function () {
+    await provider.send("evm_revert", [snapshot]);
   });
 
   describe("deployment", function() {

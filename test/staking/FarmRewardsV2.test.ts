@@ -43,9 +43,11 @@ const deadline = constants.MaxUint256;
 describe("FarmRewardsV2", function () {
   const [deployer, governor, farmer1, farmer2, farmer3, trader, receiver] = provider.getWallets();
   let artifacts: ArtifactImports;
+  let snapshot: BN;
 
   before(async function () {
     artifacts = await import_artifacts();
+    snapshot = await provider.send("evm_snapshot", []);
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
 
     // deploy tokens
@@ -80,6 +82,10 @@ describe("FarmRewardsV2", function () {
     await usdt.connect(deployer).transfer(farmer2.address, ONE_MILLION_ETHER);
     await uni.connect(deployer).transfer(farmer2.address, ONE_MILLION_ETHER);
     await usdc.connect(deployer).transfer(farmer3.address, ONE_MILLION_ETHER);
+  });
+
+  after(async function () {
+    await provider.send("evm_revert", [snapshot]);
   });
 
   describe("deployment", function () {

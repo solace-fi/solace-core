@@ -26,14 +26,20 @@ const deadline = constants.MaxUint256;
 describe("BridgeWrapper", function () {
   const [deployer, governor, user1, user2, user3] = provider.getWallets();
   let artifacts: ArtifactImports;
+  let snapshot: BN;
 
   before(async function () {
     artifacts = await import_artifacts();
+    snapshot = await provider.send("evm_snapshot", []);
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
 
     solace = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
     await solace.connect(governor).addMinter(governor.address);
     bsolace = (await deployContract(deployer, artifacts.MockERC20, ["Bridged SOLACE", "bSOLACE", 0])) as MockErc20;
+  });
+
+  after(async function () {
+    await provider.send("evm_revert", [snapshot]);
   });
 
   describe("deployment", function () {

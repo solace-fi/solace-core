@@ -37,9 +37,11 @@ const solacePerSecond = BN.from("317097919837645865");
 describe("StakingRewards", function () {
   const [deployer, governor, user1, user2, user3] = provider.getWallets();
   let artifacts: ArtifactImports;
+  let snapshot: BN;
 
   before(async function () {
     artifacts = await import_artifacts();
+    snapshot = await provider.send("evm_snapshot", []);
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
 
     solace = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
@@ -52,6 +54,10 @@ describe("StakingRewards", function () {
     await solace.connect(user1).approve(xslocker.address, constants.MaxUint256);
     await solace.connect(user2).approve(xslocker.address, constants.MaxUint256);
     await solace.connect(user3).approve(xslocker.address, constants.MaxUint256);
+  });
+
+  after(async function () {
+    await provider.send("evm_revert", [snapshot]);
   });
 
   describe("deployment", function () {
@@ -375,9 +381,9 @@ describe("StakingRewards", function () {
       stakingRewards = (await deployContract(deployer, artifacts.StakingRewards, [governor.address, solace.address, xslocker.address, solacePerSecond])) as StakingRewards;
       await stakingRewards.connect(governor).setTimes(startTime, endTime);
       await xslocker.connect(governor).addXsLockListener(stakingRewards.address);
-      await xslocker.connect(user1).createLock(user1.address, ONE_ETHER, 0); // xsLockID 1 value 1
-      await xslocker.connect(user1).createLock(user1.address, ONE_ETHER.mul(2), block.timestamp+ONE_YEAR*4); // xsLockID 2 value 5
-      await xslocker.connect(user2).createLock(user2.address, ONE_ETHER.mul(3), 0); // xsLockID 3 value 3
+      await xslocker.connect(user1).createLock(user1.address, ONE_ETHER, 0, {gasLimit: 600000}); // xsLockID 1 value 1
+      await xslocker.connect(user1).createLock(user1.address, ONE_ETHER.mul(2), block.timestamp+ONE_YEAR*4, {gasLimit: 600000}); // xsLockID 2 value 5
+      await xslocker.connect(user2).createLock(user2.address, ONE_ETHER.mul(3), 0, {gasLimit: 600000}); // xsLockID 3 value 3
       await solace.connect(governor).mint(stakingRewards.address, ONE_ETHER.mul(1000000000));
     });
     it("before start", async function () {
@@ -457,9 +463,9 @@ describe("StakingRewards", function () {
       stakingRewards = (await deployContract(deployer, artifacts.StakingRewards, [governor.address, solace.address, xslocker.address, solacePerSecond])) as StakingRewards;
       await stakingRewards.connect(governor).setTimes(startTime, endTime);
       await xslocker.connect(governor).addXsLockListener(stakingRewards.address);
-      await xslocker.connect(user1).createLock(user1.address, ONE_ETHER, 0); // xsLockID 1 value 1
-      await xslocker.connect(user1).createLock(user1.address, ONE_ETHER.mul(2), block.timestamp+ONE_YEAR*4); // xsLockID 2 value 5
-      await xslocker.connect(user2).createLock(user2.address, ONE_ETHER.mul(3), 0); // xsLockID 3 value 3
+      await xslocker.connect(user1).createLock(user1.address, ONE_ETHER, 0, {gasLimit: 600000}); // xsLockID 1 value 1
+      await xslocker.connect(user1).createLock(user1.address, ONE_ETHER.mul(2), block.timestamp+ONE_YEAR*4, {gasLimit: 600000}); // xsLockID 2 value 5
+      await xslocker.connect(user2).createLock(user2.address, ONE_ETHER.mul(3), 0, {gasLimit: 600000}); // xsLockID 3 value 3
     });
     it("before start", async function () {
       await checkConsistency();
@@ -543,7 +549,7 @@ describe("StakingRewards", function () {
       stakingRewards = (await deployContract(deployer, artifacts.StakingRewards, [governor.address, solace.address, xslocker.address, solacePerSecond])) as StakingRewards;
       await stakingRewards.connect(governor).setTimes(startTime, endTime);
       await xslocker.connect(governor).addXsLockListener(stakingRewards.address);
-      await xslocker.connect(user1).createLock(user1.address, ONE_ETHER.mul(10), block.timestamp+ONE_YEAR*4); // xsLockID 1
+      await xslocker.connect(user1).createLock(user1.address, ONE_ETHER.mul(10), block.timestamp+ONE_YEAR*4, {gasLimit: 600000}); // xsLockID 1
     });
     it("decreases over time but only after harvest", async function () {
       // y = (3x/8 + 1)*amount
@@ -586,9 +592,9 @@ describe("StakingRewards", function () {
       stakingRewards = (await deployContract(deployer, artifacts.StakingRewards, [governor.address, solace.address, xslocker.address, solacePerSecond])) as StakingRewards;
       await stakingRewards.connect(governor).setTimes(startTime, endTime);
       await xslocker.connect(governor).addXsLockListener(stakingRewards.address);
-      await xslocker.connect(user1).createLock(user1.address, ONE_ETHER, 0); // xsLockID 1 value 1
-      await xslocker.connect(user1).createLock(user1.address, ONE_ETHER.mul(2), block.timestamp+ONE_YEAR*4); // xsLockID 2 value 5
-      await xslocker.connect(user2).createLock(user2.address, ONE_ETHER.mul(3), 0); // xsLockID 3 value 3
+      await xslocker.connect(user1).createLock(user1.address, ONE_ETHER, 0, {gasLimit: 600000}); // xsLockID 1 value 1
+      await xslocker.connect(user1).createLock(user1.address, ONE_ETHER.mul(2), block.timestamp+ONE_YEAR*4, {gasLimit: 600000}); // xsLockID 2 value 5
+      await xslocker.connect(user2).createLock(user2.address, ONE_ETHER.mul(3), 0, {gasLimit: 600000}); // xsLockID 3 value 3
       await solace.connect(governor).mint(stakingRewards.address, ONE_ETHER.mul(1000000000));
     });
     it("before start", async function () {

@@ -34,9 +34,11 @@ const deadline = constants.MaxUint256;
 describe("xsLocker", function () {
   const [deployer, governor, user1, user2, user3] = provider.getWallets();
   let artifacts: ArtifactImports;
+  let snapshot: BN;
 
   before(async function () {
     artifacts = await import_artifacts();
+    snapshot = await provider.send("evm_snapshot", []);
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
 
     solace = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
@@ -45,6 +47,10 @@ describe("xsLocker", function () {
     listener1 = (await deployContract(deployer, artifacts.MockListener)) as MockListener;
     listener2 = (await deployContract(deployer, artifacts.MockListener)) as MockListener;
     listener3 = (await deployContract(deployer, artifacts.MockListener)) as MockListener;
+  });
+
+  after(async function () {
+    await provider.send("evm_revert", [snapshot]);
   });
 
   describe("deployment", function () {
