@@ -129,7 +129,18 @@ const config: HardhatUserConfig = {
     coinmarketcap: process.env.CMC_API_KEY || "",
   },
   etherscan: {
-    apiKey: process.env.ETHERSCAN_API_KEY || ""
+    apiKey: {
+      // ethereum
+      mainnet: process.env.ETHERSCAN_API_KEY || "",
+      ropsten: process.env.ETHERSCAN_API_KEY || "",
+      rinkeby: process.env.ETHERSCAN_API_KEY || "",
+      goerli:  process.env.ETHERSCAN_API_KEY || "",
+      kovan:   process.env.ETHERSCAN_API_KEY || "",
+      // polygon
+      polygon: process.env.POLYGONSCAN_API_KEY || "",
+      polygonMumbai: process.env.POLYGONSCAN_API_KEY || "",
+
+    }
   }
 };
 
