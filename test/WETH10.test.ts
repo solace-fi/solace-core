@@ -7,7 +7,7 @@ const provider = waffle.provider;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "./utilities/artifact_importer";
-import { Weth10, MockErc677, MockFaultyReceiver } from "./../typechain";
+import { Weth10, MockErc677Receiver, MockFaultyReceiver } from "./../typechain";
 import { expectDeployed } from "./utilities/expectDeployed";
 import { getDomainSeparator } from "./utilities/signature";
 import { getERC20PermitSignature } from "./utilities/getERC20PermitSignature";
@@ -24,7 +24,7 @@ const WITHDRAW_FROM_SIGHASH = "9555a942";
 
 describe("WETH10", function () {
   let weth: Weth10;
-  let mockErc677: MockErc677;
+  let mockReceiver: MockErc677Receiver;
   let mockFaultyReceiver: MockFaultyReceiver;
   const [deployer, user1, user2] = provider.getWallets();
   const name = "Wrapped Ether v10";
@@ -38,7 +38,7 @@ describe("WETH10", function () {
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
     weth = (await deployContract(deployer, artifacts.WETH10)) as Weth10;
     await expectDeployed(weth.address);
-    mockErc677 = (await deployContract(deployer, artifacts.MockERC677)) as MockErc677;
+    mockReceiver = (await deployContract(deployer, artifacts.MockERC677Receiver)) as MockErc677Receiver;
     mockFaultyReceiver = (await deployContract(deployer, artifacts.MockFaultyReceiver)) as MockFaultyReceiver;
   });
 
@@ -106,10 +106,10 @@ describe("WETH10", function () {
       // call to user fails
       await expect(weth.connect(user2).depositToAndCall(user1.address, "0xabcd", {value: 64})).to.be.revertedWith("Transaction reverted: function call to a non-contract account");
       // call to contract succeeds
-      let tx2 = await weth.connect(user2).depositToAndCall(mockErc677.address, "0xabcd", {value: 64});
-      await expect(tx2).to.emit(weth, "Transfer").withArgs(ZERO_ADDRESS, mockErc677.address, 64);
-      await expect(tx2).to.emit(mockErc677, "TokenTransferred").withArgs(user2.address, 64, "0xabcd");
-      expect(await weth.balanceOf(mockErc677.address)).eq(64);
+      let tx2 = await weth.connect(user2).depositToAndCall(mockReceiver.address, "0xabcd", {value: 64});
+      await expect(tx2).to.emit(weth, "Transfer").withArgs(ZERO_ADDRESS, mockReceiver.address, 64);
+      await expect(tx2).to.emit(mockReceiver, "TokenTransferred").withArgs(user2.address, 64, "0xabcd");
+      expect(await weth.balanceOf(mockReceiver.address)).eq(64);
       expect(await weth.totalSupply()).eq(127);
     });
   });
