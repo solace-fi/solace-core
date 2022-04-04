@@ -15,6 +15,7 @@ import { expectDeployed } from "../utilities/expectDeployed";
 
 describe("Cloneable", function() {
   let artifacts: ArtifactImports;
+  let snapshot: BN;
   const [deployer, governor, governor2, user] = provider.getWallets();
 
   // contracts
@@ -28,7 +29,12 @@ describe("Cloneable", function() {
 
   before(async function() {
     artifacts = await import_artifacts();
+    snapshot = await provider.send("evm_snapshot", []);
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
+  });
+
+  after(async function () {
+    await provider.send("evm_revert", [snapshot]);
   });
 
   describe("deployment", async function () {

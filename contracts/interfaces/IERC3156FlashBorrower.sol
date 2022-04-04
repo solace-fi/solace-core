@@ -2,6 +2,11 @@
 pragma solidity 0.8.6;
 
 
+/**
+ * @title IERC3156FlashBorrower
+ * @author solace.fi
+ * @notice An interface that borrows flash loans per the [`EIP-3156` standard](https://eips.ethereum.org/EIPS/eip-3156).
+ */
 interface IERC3156FlashBorrower {
 
     /**

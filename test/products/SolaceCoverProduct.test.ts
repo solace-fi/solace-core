@@ -85,8 +85,11 @@ describe("SolaceCoverProduct", function() {
     };
     const USDC_ADDRESS = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
 
+    let snapshot: BN;
+
     before( async () => {
       artifacts = await import_artifacts();
+      snapshot = await provider.send("evm_snapshot", []);
       await deployer.sendTransaction({to: deployer.address});
 
       registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
@@ -102,6 +105,10 @@ describe("SolaceCoverProduct", function() {
 
       coverageDataProvider = (await deployContract(deployer, artifacts.CoverageDataProvider, [governor.address])) as CoverageDataProvider;
       await registry.connect(governor).set(["coverageDataProvider"], [coverageDataProvider.address])
+    });
+
+    after(async function () {
+      await provider.send("evm_revert", [snapshot]);
     });
 
     describe("deployment", () => {

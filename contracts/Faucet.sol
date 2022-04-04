@@ -8,6 +8,8 @@ import "./interfaces/IFaucet.sol";
  * @title Faucet
  * @author solace.fi
  * @notice Drips [**SOLACE**](./SOLACE).
+ *
+ * Useful for testing but should NOT be used in production.
  */
 contract Faucet is IFaucet {
 

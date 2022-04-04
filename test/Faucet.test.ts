@@ -18,11 +18,17 @@ describe("Faucet", function () {
   let faucet: Faucet;
   const [deployer, governor, receiver1, receiver2] = provider.getWallets();
   let artifacts: ArtifactImports;
+  let snapshot: BN;
 
   before(async function () {
     artifacts = await import_artifacts();
+    snapshot = await provider.send("evm_snapshot", []);
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
     solace = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
+  });
+
+  after(async function () {
+    await provider.send("evm_revert", [snapshot]);
   });
 
   describe("deployment", function () {

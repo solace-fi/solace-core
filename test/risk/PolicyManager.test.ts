@@ -11,7 +11,7 @@ import { import_artifacts, ArtifactImports } from "../utilities/artifact_importe
 import { burnBlocks, burnBlocksUntil } from "../utilities/time";
 import { encodeAddresses } from "../utilities/positionDescription";
 
-import { PolicyManager, MockProductV2, Registry, RiskManager, PolicyDescriptorV2, MockRiskStrategy, CoverageDataProvider, ProductFactory, RiskStrategy, MockErc20 } from "../../typechain";
+import { PolicyManager, MockProductV2, Registry, RiskManager, PolicyDescriptorV2, MockRiskStrategy, CoverageDataProvider, ProductFactory, RiskStrategy, MockErc20, BlockGetter } from "../../typechain";
 
 describe("PolicyManager", function() {
   let artifacts: ArtifactImports;
@@ -23,6 +23,7 @@ describe("PolicyManager", function() {
   let coverageDataProvider: CoverageDataProvider;
   let riskManager: RiskManager;
   let policyDescriptor: PolicyDescriptorV2;
+  let blockGetter: BlockGetter;
 
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
   const name = "Solace Policy";
@@ -39,9 +40,13 @@ describe("PolicyManager", function() {
   const SUBMIT_CLAIM_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("MockProductSubmitClaim(uint256 policyID,address claimant,uint256 amountOut,uint256 deadline)"));
   const DOMAIN_NAME = "Solace.fi-MockProduct";
 
+  let snapshot: BN;
+
   before(async function() {
     artifacts = await import_artifacts();
+    snapshot = await provider.send("evm_snapshot", []);
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
+    blockGetter = (await deployContract(deployer, artifacts.BlockGetter)) as BlockGetter;
 
     // deploy registry contract
     registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
@@ -71,8 +76,12 @@ describe("PolicyManager", function() {
     await riskManager.connect(governor).setWeightAllocation(riskStrategy.address, STRATEGY_WEIGHT_ALLOCATION);
     await riskManager.connect(governor).addCoverLimitUpdater(policyManager.address);
 
-    let block = await provider.getBlock('latest');
-    expirationBlock = block.number + 1000000;
+    let blockNum = (await blockGetter.getBlockNumber()).toNumber();
+    expirationBlock = blockNum + 1000000;
+  });
+
+  after(async function () {
+    await provider.send("evm_revert", [snapshot]);
   });
 
   it("has a correct name", async function() {
@@ -338,7 +347,7 @@ describe("PolicyManager", function() {
       expect(await policyManager.policyHasExpired(policyID)).to.be.false;
     });
     it("pre-expiration", async function() {
-      blockNum = BN.from(await provider.getBlockNumber());
+      blockNum = await blockGetter.getBlockNumber();
       expBlock = blockNum.add(10);
       await policyManager.connect(walletProduct2).createPolicy(user.address, coverLimit, expBlock, price, positionContract.address, riskStrategy.address);
       expect(await policyManager.exists(policyID)).to.be.true;
@@ -351,6 +360,7 @@ describe("PolicyManager", function() {
     });
     it("post-expiration", async function() {
       await burnBlocks(12);
+      blockNum = await blockGetter.getBlockNumber();
       expect(await policyManager.exists(policyID)).to.be.true;
       expect(await policyManager.policyIsActive(policyID)).to.be.false;
       expect(await policyManager.policyHasExpired(policyID)).to.be.true;

@@ -17,6 +17,7 @@ import { expectDeployed } from "../utilities/expectDeployed";
 
 describe("Governance", function() {
   let artifacts: ArtifactImports;
+  let snapshot: BN;
   // users
   let deployer: Wallet;
   let governor: Wallet;
@@ -32,6 +33,7 @@ describe("Governance", function() {
   const MAX_ADDRESS = "0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF";
 
   before(async function() {
+    snapshot = await provider.send("evm_snapshot", []);
     [deployer, governor, user] = provider.getWallets();
     await hre.network.provider.request({method: "hardhat_impersonateAccount", params: [ZERO_ADDRESS]});
     await deployer.sendTransaction({to: ZERO_ADDRESS, value: BN.from("1000000000000000000")});
@@ -45,6 +47,10 @@ describe("Governance", function() {
     // deploy solace
     solace = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
     await expectDeployed(solace.address);
+  });
+
+  after(async function () {
+    await provider.send("evm_revert", [snapshot]);
   });
 
   describe("deployment", function () {

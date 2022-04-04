@@ -5,14 +5,9 @@ pragma solidity 0.8.6;
 
 import "./interfaces/IWETH10.sol";
 import "./interfaces/IERC3156FlashBorrower.sol";
+import "./interfaces/ITransferReceiver.sol";
+import "./interfaces/IApprovalReceiver.sol";
 
-interface ITransferReceiver {
-    function onTokenTransfer(address, uint, bytes calldata) external returns (bool);
-}
-
-interface IApprovalReceiver {
-    function onTokenApproval(address, uint, bytes calldata) external returns (bool);
-}
 
 /// @dev Wrapped Ether v10 (WETH10) is an Ether (ETH) ERC-20 wrapper. You can `deposit` ETH and obtain a WETH10 balance which can then be operated as an ERC-20 token. You can
 /// `withdraw` ETH from WETH10, which will then burn WETH10 token in your wallet. The amount of WETH10 token in any wallet is always identical to the

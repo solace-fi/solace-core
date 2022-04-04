@@ -32,9 +32,11 @@ const deadline = constants.MaxUint256;
 describe("xSolaceMigrator", function () {
   const [deployer, governor, user1, user2, user3] = provider.getWallets();
   let artifacts: ArtifactImports;
+  let snapshot: BN;
 
   before(async function () {
     artifacts = await import_artifacts();
+    snapshot = await provider.send("evm_snapshot", []);
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
 
     solace = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
@@ -48,6 +50,10 @@ describe("xSolaceMigrator", function () {
     await solace.connect(user1).approve(xsolace.address, constants.MaxUint256);
     await solace.connect(user2).approve(xsolace.address, constants.MaxUint256);
     await solace.connect(user3).approve(xsolace.address, constants.MaxUint256);
+  });
+
+  after(async function () {
+    await provider.send("evm_revert", [snapshot]);
   });
 
   describe("deployment", function () {

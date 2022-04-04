@@ -2,7 +2,7 @@ import { waffle } from "hardhat";
 const { deployContract, solidity } = waffle;
 import { MockProvider } from "ethereum-waffle";
 const provider: MockProvider = waffle.provider;
-import { Contract, ContractFactory, Wallet } from "ethers";
+import { Contract, ContractFactory, Wallet, BigNumber as BN } from "ethers";
 import chai from "chai";
 const { expect } = chai;
 chai.use(solidity);
@@ -13,6 +13,7 @@ import { expectDeployed } from "../utilities/expectDeployed";
 
 describe("Registry", function() {
   let artifacts: ArtifactImports;
+  let snapshot: BN;
   const [deployer, governor, user, mockContract1, mockContract2, mockContract3] = provider.getWallets();
 
   // contracts
@@ -23,10 +24,15 @@ describe("Registry", function() {
 
   before(async function () {
     artifacts = await import_artifacts();
+    snapshot = await provider.send("evm_snapshot", []);
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
     registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
     await expectDeployed(registry.address);
     weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
+  });
+
+  after(async function () {
+    await provider.send("evm_revert", [snapshot]);
   });
 
   describe("governance", function () {
