@@ -26,6 +26,8 @@ describe("BondDepository", function() {
   let bondDepo: BondDepository;
   let dai: MockErc20;
 
+  let snapshot: BN;
+
   // vars
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
   const TEN_ETHER = BN.from("10000000000000000000");
@@ -33,6 +35,7 @@ describe("BondDepository", function() {
 
   before(async function() {
     artifacts = await import_artifacts();
+    snapshot = await provider.send("evm_snapshot", []);
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
 
     weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
@@ -41,6 +44,10 @@ describe("BondDepository", function() {
     dai = (await deployContract(deployer, artifacts.MockERC20, ["DAI", "DAI", ONE_MILLION_ETHER])) as MockErc20;
     await weth.connect(depositor).deposit({ value: TEN_ETHER });
     await solace.connect(governor).addMinter(minter.address);
+  });
+
+  after(async function () {
+    await provider.send("evm_revert", [snapshot]);
   });
 
   describe("deployment", function () {

@@ -23,12 +23,18 @@ describe("SOLACE", function () {
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
   const amount = BN.from("1000000000000000000");
   let artifacts: ArtifactImports;
+  let snapshot: BN;
 
   before(async function () {
     artifacts = await import_artifacts();
+    snapshot = await provider.send("evm_snapshot", []);
     await owner.sendTransaction({to:owner.address}); // for some reason this helps solidity-coverage
     solace = (await deployContract(owner, artifacts.SOLACE, [governor.address])) as Solace;
     await expectDeployed(solace.address);
+  });
+
+  after(async function () {
+    await provider.send("evm_revert", [snapshot]);
   });
 
   describe("deployment", function () {

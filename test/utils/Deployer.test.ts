@@ -21,12 +21,18 @@ describe("Deployer", function () {
 
   let initcode: string;
   let solaceAddress: string;
+  let snapshot: BN;
 
   before(async function () {
     artifacts = await import_artifacts();
+    snapshot = await provider.send("evm_snapshot", []);
     await owner.sendTransaction({to:owner.address}); // for some reason this helps solidity-coverage
     deployerContract = (await deployContract(owner, artifacts.Deployer)) as Deployer;
     await expectDeployed(deployerContract.address);
+  });
+
+  after(async function () {
+    await provider.send("evm_revert", [snapshot]);
   });
 
   describe("CREATE", async function () {

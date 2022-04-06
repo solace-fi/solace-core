@@ -72,9 +72,11 @@ const DEFAULT_BOND_TERMS:BOND_GLOBAL_TERMS = {
 describe("BondTellerERC20", function() {
   let artifacts: ArtifactImports;
   const [deployer, governor, depositor1, depositor2, minter, dao, underwritingPool, dao2, underwritingPool2, randomGreedyPerson] = provider.getWallets();
+  let snapshot: BN;
 
   before(async function() {
     artifacts = await import_artifacts();
+    snapshot = await provider.send("evm_snapshot", []);
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
 
     solace = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
@@ -83,6 +85,10 @@ describe("BondTellerERC20", function() {
     usdc = (await deployContract(deployer, artifacts.MockERC20Permit, ["USD Coin", "USDC", ONE_ETHER.mul(1000000), 18])) as MockErc20Permit;
     bondDepo = (await deployContract(deployer, artifacts.BondDepository, [governor.address, solace.address])) as BondDepository;
     await solace.connect(governor).addMinter(bondDepo.address);
+  });
+
+  after(async function () {
+    await provider.send("evm_revert", [snapshot]);
   });
 
   describe("before initialization", function () {

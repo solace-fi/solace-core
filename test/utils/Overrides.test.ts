@@ -19,12 +19,18 @@ let weth: Weth9;
 describe("Overrides", function () {
   const [deployer, governor] = provider.getWallets();
   let artifacts: ArtifactImports;
+  let snapshot: BN;
 
   before(async function () {
     artifacts = await import_artifacts();
+    snapshot = await provider.send("evm_snapshot", []);
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
 
     weth = (await deployContract(deployer, artifacts.WETH)) as Weth9;
+  });
+
+  after(async function () {
+    await provider.send("evm_revert", [snapshot]);
   });
 
   it("does stuff", async function () {

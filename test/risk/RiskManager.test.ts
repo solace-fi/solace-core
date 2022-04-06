@@ -38,18 +38,21 @@ describe("RiskManager", function () {
   const TEN_THOUSAND_DAI = ONE_DAI.mul(10000); // 10000 DAI
   const ONE_MILLION_DAI = ONE_DAI.mul(1000000); // 1M USD(DAI)
 
+  let snapshot: BN;
+  
   before(async function () {
     artifacts = await import_artifacts();
+    snapshot = await provider.send("evm_snapshot", []);
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
 
     // deploy registry
     registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
     await registry.connect(governor).set(["premiumPool"],[premiumPool.address])
-    
+
     // deploy policy manager
     policyManager = (await deployContract(deployer, artifacts.PolicyManager, [governor.address, registry.address])) as PolicyManager;
     await registry.connect(governor).set(["policyManager"], [policyManager.address])
-    
+
     // solace
     await registry.connect(governor).set(["solace"], [solace.address]);
 
@@ -61,7 +64,7 @@ describe("RiskManager", function () {
     coverageDataProvider = (await deployContract(deployer, artifacts.CoverageDataProvider, [governor.address])) as CoverageDataProvider;
     await coverageDataProvider.connect(governor).set("underwritingPool", ONE_MILLION_DAI);
     await registry.connect(governor).set(["coverageDataProvider"], [coverageDataProvider.address]);
-  
+
     // deploy risk manager
     riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
     await registry.connect(governor).set(["riskManager"], [riskManager.address])
@@ -120,6 +123,10 @@ describe("RiskManager", function () {
     await policyManager.connect(governor).addProduct(product5.address);
     await policyManager.connect(governor).addProduct(product6.address);
 
+  });
+
+  after(async function () {
+    await provider.send("evm_revert", [snapshot]);
   });
 
   describe("deployment", function () {
@@ -344,7 +351,7 @@ describe("RiskManager", function () {
 
       await policyManager.connect(product3).updatePolicyInfo(3, 4, 0, 0);
       expect(await riskManager.minCapitalRequirement()).to.equal(5);
-     
+
       await policyManager.connect(product2).burn(2);
       expect(await riskManager.minCapitalRequirement()).to.equal(4);
     });

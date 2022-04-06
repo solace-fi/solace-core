@@ -29,11 +29,17 @@ describe("ERC721Enhanced", function() {
   const symbol = "MMT";
   const PERMIT_TYPEHASH = utils.keccak256(utils.toUtf8Bytes("Permit(address spender,uint256 tokenID,uint256 nonce,uint256 deadline)"));
   let DOMAIN_SEPARATOR: string;
+  let snapshot: BN;
 
   before(async function() {
     artifacts = await import_artifacts();
+    snapshot = await provider.send("evm_snapshot", []);
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
     signerContract = (await deployContract(deployer, artifacts.MockERC1271)) as MockErc1271;
+  });
+
+  after(async function () {
+    await provider.send("evm_revert", [snapshot]);
   });
 
   describe("deployment", async function () {
