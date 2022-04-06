@@ -9,6 +9,7 @@ chai.use(solidity);
 import { import_artifacts, ArtifactImports } from "./../utilities/artifact_importer";
 import { Scd, MockScdRetainer } from "./../../typechain";
 import { expectDeployed } from "./../utilities/expectDeployed";
+import { toAbiEncoded } from "./../utilities/setStorage";
 
 describe("SCD", function () {
   let scd: Scd;
@@ -16,6 +17,11 @@ describe("SCD", function () {
   const name = "scd";
   const symbol = "SCD";
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+
+  const MINT_SIGHASH          = "0xd1a1beb4";
+  const TRANSFER_FROM_SIGHASH = "0x23b872dd";
+  const BURN_SIGHASH          = "0x9dc29fac";
+  const WITHDRAW_SIGHASH      = "0xf3fef3a3";
 
   let scdRetainer1: MockScdRetainer;
   let scdRetainer2: MockScdRetainer;
@@ -202,6 +208,22 @@ describe("SCD", function () {
       expect(bd54.balanceOfs[2]).eq(800);
       expect(bd54.balanceOfNonRefundables[2]).eq(0);
     });
+    it("can mint many via multicall", async function () {
+      let b1 = await getBalances();
+      let tx = await scd.connect(scdMover1).multicall([
+        `${MINT_SIGHASH}${toAbiEncoded(user1.address)}${toAbiEncoded(100)}${toAbiEncoded(1)}`,
+        `${MINT_SIGHASH}${toAbiEncoded(user2.address)}${toAbiEncoded(200)}${toAbiEncoded(0)}`,
+      ]);
+      await expect(tx).to.emit(scd, "Transfer").withArgs(ZERO_ADDRESS, user1.address, 100);
+      await expect(tx).to.emit(scd, "Transfer").withArgs(ZERO_ADDRESS, user2.address, 200);
+      let b2 = await getBalances();
+      let bd21 = getBalancesDiff(b2, b1);
+      expect(bd21.totalSupply).eq(300);
+      expect(bd21.balanceOfs[2]).eq(100);
+      expect(bd21.balanceOfNonRefundables[2]).eq(0);
+      expect(bd21.balanceOfs[3]).eq(200);
+      expect(bd21.balanceOfNonRefundables[3]).eq(200);
+    });
   });
 
   describe("transfer", function () {
@@ -259,9 +281,33 @@ describe("SCD", function () {
       let bal2 = await scd.balanceOf(user1.address);
       await expect(scd.connect(scdMover1).transferFrom(user1.address, user2.address, bal2.add(1))).to.be.revertedWith("SCD: transfer amount exceeds balance");
     });
+    it("can transfer many via multicall", async function () {
+      let b1 = await getBalances();
+      let tx = await scd.connect(scdMover1).multicall([
+        `${TRANSFER_FROM_SIGHASH}${toAbiEncoded(user1.address)}${toAbiEncoded(scdMover1.address)}${toAbiEncoded(100)}`,
+        `${TRANSFER_FROM_SIGHASH}${toAbiEncoded(user2.address)}${toAbiEncoded(scdMover2.address)}${toAbiEncoded(200)}`,
+      ]);
+      await expect(tx).to.emit(scd, "Transfer").withArgs(user1.address, scdMover1.address, 100);
+      await expect(tx).to.emit(scd, "Transfer").withArgs(user2.address, scdMover2.address, 200);
+      let b2 = await getBalances();
+      let bd21 = getBalancesDiff(b2, b1);
+      expect(bd21.totalSupply).eq(0);
+      expect(bd21.balanceOfs[0]).eq(100);
+      expect(bd21.balanceOfs[1]).eq(200);
+      expect(bd21.balanceOfs[2]).eq(-100);
+      expect(bd21.balanceOfs[3]).eq(-200);
+    });
   });
 
   describe("burn", function () {
+    before("redeploy", async function () {
+      scd = (await deployContract(deployer, artifacts.SCD, [governor.address])) as Scd;
+      await scd.connect(governor).setScdMoverStatuses([scdMover1.address, scdMover2.address, user1.address], [true, true, false]);
+      await scd.connect(governor).setScdRetainerStatuses([scdRetainer1.address, scdRetainer2.address, user1.address], [true, true, false]);
+      await scd.connect(scdMover1).mint(user1.address, 100, false);
+      await scd.connect(scdMover1).mint(user2.address, 500, false);
+      await scd.connect(scdMover1).mint(user2.address, 200, true);
+    });
     it("non mover cannot burn", async function () {
       await expect(scd.connect(user1).burn(user1.address, 1)).to.be.revertedWith("!scd mover");
     });
@@ -302,9 +348,30 @@ describe("SCD", function () {
       let bal = await scd.balanceOf(user1.address);
       await expect(scd.connect(scdMover1).burn(user1.address, bal.add(1))).to.be.revertedWith("SCD: burn amount exceeds balance");
     });
+    it("can burn many via multicall", async function () {
+      await scd.connect(scdMover1).mint(user2.address, 200, true);
+      let b1 = await getBalances();
+      let tx = await scd.connect(scdMover1).multicall([
+        `${BURN_SIGHASH}${toAbiEncoded(user1.address)}${toAbiEncoded(100)}`,
+        `${BURN_SIGHASH}${toAbiEncoded(user2.address)}${toAbiEncoded(200)}`,
+      ]);
+      await expect(tx).to.emit(scd, "Transfer").withArgs(user1.address, ZERO_ADDRESS, 100);
+      await expect(tx).to.emit(scd, "Transfer").withArgs(user2.address, ZERO_ADDRESS, 200);
+      let b2 = await getBalances();
+      let bd21 = getBalancesDiff(b2, b1);
+      expect(bd21.totalSupply).eq(-300);
+      expect(bd21.balanceOfs[2]).eq(-100);
+      expect(bd21.balanceOfs[3]).eq(-200);
+    });
   });
 
   describe("withdraw", function () {
+    before("redeploy", async function () {
+      scd = (await deployContract(deployer, artifacts.SCD, [governor.address])) as Scd;
+      await scd.connect(governor).setScdMoverStatuses([scdMover1.address, scdMover2.address, user1.address], [true, true, false]);
+      await scd.connect(governor).setScdRetainerStatuses([scdRetainer1.address, scdRetainer2.address, user1.address], [true, true, false]);
+      await scd.connect(scdMover1).mint(user2.address, 500, true);
+    });
     it("non mover cannot withdraw", async function () {
       await expect(scd.connect(user1).withdraw(user1.address, 1)).to.be.revertedWith("!scd mover");
     });
@@ -312,8 +379,6 @@ describe("SCD", function () {
       await expect(scd.connect(scdMover1).withdraw(ZERO_ADDRESS, 1)).to.be.revertedWith("SCD: withdraw from the zero address");
     });
     it("mover can withdraw", async function () {
-      await scd.connect(scdMover1).mint(user2.address, 300, false);
-      await scd.connect(scdMover1).mint(user2.address, 300, true);
       let b1 = await getBalances();
 
       let tx1 = await scd.connect(scdMover1).withdraw(user2.address, 100);
@@ -350,6 +415,56 @@ describe("SCD", function () {
       await scd.connect(scdMover1).mint(user2.address, 60, false);
       await scdRetainer1.setMinScdRequired(user2.address, 50);
       await expect(scd.connect(scdMover1).withdraw(user2.address, 20)).to.be.revertedWith("SCD: withdraw amount exceeds balance");
+    });
+    it("can withdraw many via multicall", async function () {
+      await scd.connect(scdMover1).mint(user1.address, 500, true);
+      await scd.connect(scdMover1).mint(user2.address, 500, true);
+      let b1 = await getBalances();
+      let tx = await scd.connect(scdMover1).multicall([
+        `${WITHDRAW_SIGHASH}${toAbiEncoded(user1.address)}${toAbiEncoded(100)}`,
+        `${WITHDRAW_SIGHASH}${toAbiEncoded(user2.address)}${toAbiEncoded(200)}`,
+      ]);
+      await expect(tx).to.emit(scd, "Transfer").withArgs(user1.address, ZERO_ADDRESS, 100);
+      await expect(tx).to.emit(scd, "Transfer").withArgs(user2.address, ZERO_ADDRESS, 200);
+      let b2 = await getBalances();
+      let bd21 = getBalancesDiff(b2, b1);
+      expect(bd21.totalSupply).eq(-300);
+      expect(bd21.balanceOfs[2]).eq(-100);
+      expect(bd21.balanceOfs[3]).eq(-200);
+    });
+  });
+
+  describe("multicall", function () {
+    before("redeploy", async function () {
+      scd = (await deployContract(deployer, artifacts.SCD, [governor.address])) as Scd;
+      await scd.connect(governor).setScdMoverStatuses([scdMover1.address, scdMover2.address, user1.address], [true, true, false]);
+    });
+    it("can bundle multiple calls", async function () {
+      let b1 = await getBalances();
+      let tx = await scd.connect(scdMover1).multicall([
+        `${MINT_SIGHASH}${toAbiEncoded(user1.address)}${toAbiEncoded(500)}${toAbiEncoded(1)}`,
+        `${MINT_SIGHASH}${toAbiEncoded(user1.address)}${toAbiEncoded(600)}${toAbiEncoded(0)}`,
+        `${TRANSFER_FROM_SIGHASH}${toAbiEncoded(user1.address)}${toAbiEncoded(user2.address)}${toAbiEncoded(800)}`,
+        `${WITHDRAW_SIGHASH}${toAbiEncoded(user1.address)}${toAbiEncoded(100)}`,
+        `${BURN_SIGHASH}${toAbiEncoded(user2.address)}${toAbiEncoded(200)}`,
+      ]);
+      await expect(tx).to.emit(scd, "Transfer").withArgs(ZERO_ADDRESS, user1.address, 500);
+      await expect(tx).to.emit(scd, "Transfer").withArgs(ZERO_ADDRESS, user1.address, 600);
+      await expect(tx).to.emit(scd, "Transfer").withArgs(user1.address, user2.address, 800);
+      await expect(tx).to.emit(scd, "Transfer").withArgs(user1.address, ZERO_ADDRESS, 100);
+      await expect(tx).to.emit(scd, "Transfer").withArgs(user2.address, ZERO_ADDRESS, 200);
+      let b2 = await getBalances();
+      expect(b2.totalSupply).eq(800);
+      expect(b2.balanceOfs[2]).eq(200);
+      expect(b2.balanceOfNonRefundables[2]).eq(0);
+      expect(b2.balanceOfs[3]).eq(600);
+      expect(b2.balanceOfNonRefundables[3]).eq(400);
+    });
+    it("bundle fails if one fails", async function () {
+      await expect(scd.connect(scdMover1).multicall([
+        `${MINT_SIGHASH}${toAbiEncoded(user1.address)}${toAbiEncoded(500)}${toAbiEncoded(1)}`,
+        `${WITHDRAW_SIGHASH}${toAbiEncoded(user1.address)}${toAbiEncoded(10000)}`
+      ])).to.be.reverted;
     });
   });
 

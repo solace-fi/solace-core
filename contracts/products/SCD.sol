@@ -4,6 +4,7 @@ pragma solidity 0.8.6;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import "@openzeppelin/contracts/utils/Multicall.sol";
 import "./../utils/Governable.sol";
 import "./../interfaces/products/ISCD.sol";
 
@@ -16,7 +17,7 @@ import "./../interfaces/products/ISCD.sol";
  *
  * [**Governance**](/docs/protocol/governance) can add and remove SCD movers and retainers. SCD movers can modify token balances via [`mint()`](#mint), [`burn()`](#burn), [`transfer()`](#transfer), [`transferFrom()`](#transferfrom), and [`withdraw()`](#withdraw).
  */
-contract SCD is ISCD, Governable {
+contract SCD is ISCD, Multicall, Governable {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     /***************************************
