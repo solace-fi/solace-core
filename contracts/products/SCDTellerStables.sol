@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol";
+import "@openzeppelin/contracts/utils/Multicall.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./../utils/Governable.sol";
 import "./../interfaces/products/ISCD.sol";
@@ -23,7 +24,7 @@ import "./../interfaces/products/ISCDTellerStables.sol";
  *
  * [**Governance**](/docs/protocol/governance) can add new tokens and set their flags. Flags determine how a user can use a token to interact with the teller, the most important are `IS_ACCEPTED`, `IS_PERMITTABLE`, and `IS_REFUNDABLE`. Governance can also set the address of the premium pool. The address of [**SCD**](./SCD) is set during construction and cannot be modified.
  */
-contract SCDTellerStables is ISCDTellerStables, Governable, ReentrancyGuard {
+contract SCDTellerStables is ISCDTellerStables, Multicall, Governable, ReentrancyGuard {
 
     /***************************************
     STORAGE

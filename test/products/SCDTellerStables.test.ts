@@ -9,7 +9,7 @@ chai.use(solidity);
 import { import_artifacts, ArtifactImports } from "./../utilities/artifact_importer";
 import { Registry, Scd, MockScdRetainer, ScdTellerStables, MockErc20Decimals, MockErc20Permit, Weth10 } from "./../../typechain";
 import { expectDeployed } from "./../utilities/expectDeployed";
-import { toBytes32 } from "./../utilities/setStorage";
+import { toBytes32, toAbiEncoded } from "./../utilities/setStorage";
 import { getERC20PermitSignature } from "./../utilities/getERC20PermitSignature";
 
 describe("SCDTellerStables", function () {
@@ -49,6 +49,9 @@ describe("SCDTellerStables", function () {
   let FEI_FLAGS_3 = bitwiseOr([IS_ACCEPTED_MASK, IS_PERMITTABLE_MASK, IS_REFUNDABLE_MASK, IS_KNOWN_MASK]);
 
   let USDC_FLAGS_4 = bitwiseOr([IS_ACCEPTED_MASK, IS_PERMITTABLE_MASK, IS_KNOWN_MASK]);
+
+  const DEPOSIT_SIGHASH  = "0x8340f549";
+  const WITHDRAW_SIGHASH = "0x69328dec";
 
   let artifacts: ArtifactImports;
 
@@ -290,6 +293,38 @@ describe("SCDTellerStables", function () {
 
       await teller.connect(governor).setTokenFlags([usdc.address], [toBytes32(USDC_FLAGS_3)])
     });
+    it("can deposit many via multicall", async function () {
+      await dai.connect(user2).mint();
+      await dai.connect(user2).approve(teller.address, constants.MaxUint256);
+      let scdBal11 = await scd.balanceOf(user1.address);
+      let daiBal11 = await dai.balanceOf(user1.address);
+      let usdcBal11 = await usdc.balanceOf(user1.address);
+      let scdBal12 = await scd.balanceOf(user2.address);
+      let daiBal12 = await dai.balanceOf(user2.address);
+      let usdcBal12 = await usdc.balanceOf(user2.address);
+      let depositAmount1 = ONE_ETHER.mul(10);
+      let depositAmount2 = ONE_USDC.mul(20);
+      let depositValue1 = ONE_ETHER.mul(10);
+      let depositValue2 = ONE_ETHER.mul(20);
+      let tx = await teller.connect(user2).multicall([
+        `${DEPOSIT_SIGHASH}${toAbiEncoded(dai.address)}${toAbiEncoded(user1.address)}${toAbiEncoded(depositAmount1)}`,
+        `${DEPOSIT_SIGHASH}${toAbiEncoded(usdc.address)}${toAbiEncoded(user2.address)}${toAbiEncoded(depositAmount2)}`,
+      ]);
+      await expect(tx).to.emit(teller, "TokenDeposited").withArgs(dai.address, user2.address, user1.address, depositAmount1);
+      await expect(tx).to.emit(teller, "TokenDeposited").withArgs(usdc.address, user2.address, user2.address, depositAmount2);
+      let scdBal21 = await scd.balanceOf(user1.address);
+      let daiBal21 = await dai.balanceOf(user1.address);
+      let usdcBal21 = await usdc.balanceOf(user1.address);
+      let scdBal22 = await scd.balanceOf(user2.address);
+      let daiBal22 = await dai.balanceOf(user2.address);
+      let usdcBal22 = await usdc.balanceOf(user2.address);
+      expect(scdBal21.sub(scdBal11)).eq(depositValue1);
+      expect(daiBal21.sub(daiBal11)).eq(0);
+      expect(usdcBal21.sub(usdcBal11)).eq(0);
+      expect(scdBal22.sub(scdBal12)).eq(depositValue2);
+      expect(daiBal22.sub(daiBal12)).eq(depositAmount1.mul(-1));
+      expect(usdcBal22.sub(usdcBal12)).eq(depositAmount2.mul(-1));
+    });
   });
 
   describe("depositSigned", function () {
@@ -442,6 +477,7 @@ describe("SCDTellerStables", function () {
     });
     it("can withdraw", async function () {
       await dai.connect(premiumPool).approve(teller.address, constants.MaxUint256);
+      await usdc.connect(premiumPool).approve(teller.address, constants.MaxUint256);
       let withdrawAmount1 = 9;
       let withdrawAmount2 = 7;
 
@@ -466,22 +502,12 @@ describe("SCDTellerStables", function () {
       await teller.connect(user2).deposit(dai.address, user2.address, 100);
       await teller.connect(governor).setTokenFlags([dai.address],[toBytes32(DAI_FLAGS_3)]);
 
-      console.log('')
-      console.log(await scd.balanceOf(user2.address));
-      console.log(await scd.balanceOfNonRefundable(user2.address));
-      console.log(await scd.minScdRequired(user2.address));
-
       let daiBal32 = await dai.balanceOf(user2.address);
       let scdBal32 = await scd.balanceOf(user2.address);
       let scdBnr32 = await scd.balanceOfNonRefundable(user2.address);
       let scdBr32 = scdBal32.sub(scdBnr32);
       let tx2 = await teller.connect(user2).withdraw(dai.address, withdrawAmount2, user2.address);
       await expect(tx2).to.emit(teller, "TokenWithdrawn").withArgs(dai.address, user2.address, user2.address, withdrawAmount2);
-
-      console.log('')
-      console.log(await scd.balanceOf(user2.address));
-      console.log(await scd.balanceOfNonRefundable(user2.address));
-      console.log(await scd.minScdRequired(user2.address));
 
       let daiBal42 = await dai.balanceOf(user2.address);
       let scdBal42 = await scd.balanceOf(user2.address);
@@ -497,6 +523,38 @@ describe("SCDTellerStables", function () {
       let bnr = await scd.balanceOfNonRefundable(user2.address);
       let br = bal.sub(bnr);
       await expect(teller.connect(user2).withdraw(dai.address, br.add(1), user2.address)).to.be.revertedWith("SCD: withdraw amount exceeds balance");
+    });
+    it("can withdraw many via multicall", async function () {
+      await teller.connect(user2).deposit(dai.address, user2.address, ONE_ETHER.mul(100));
+      await teller.connect(user2).deposit(usdc.address, user2.address, ONE_USDC.mul(100));
+      let scdBal11 = await scd.balanceOf(user1.address);
+      let daiBal11 = await dai.balanceOf(user1.address);
+      let usdcBal11 = await usdc.balanceOf(user1.address);
+      let scdBal12 = await scd.balanceOf(user2.address);
+      let daiBal12 = await dai.balanceOf(user2.address);
+      let usdcBal12 = await usdc.balanceOf(user2.address);
+      let withdrawAmount1 = ONE_ETHER.mul(10);
+      let withdrawAmount2 = ONE_USDC.mul(20);
+      let withdrawValue1 = ONE_ETHER.mul(10);
+      let withdrawValue2 = ONE_ETHER.mul(20);
+      let tx = await teller.connect(user2).multicall([
+        `${WITHDRAW_SIGHASH}${toAbiEncoded(dai.address)}${toAbiEncoded(withdrawAmount1)}${toAbiEncoded(user1.address)}`,
+        `${WITHDRAW_SIGHASH}${toAbiEncoded(usdc.address)}${toAbiEncoded(withdrawAmount2)}${toAbiEncoded(user2.address)}`,
+      ]);
+      await expect(tx).to.emit(teller, "TokenWithdrawn").withArgs(dai.address, user2.address, user1.address, withdrawAmount1);
+      await expect(tx).to.emit(teller, "TokenWithdrawn").withArgs(usdc.address, user2.address, user2.address, withdrawAmount2);
+      let scdBal21 = await scd.balanceOf(user1.address);
+      let daiBal21 = await dai.balanceOf(user1.address);
+      let usdcBal21 = await usdc.balanceOf(user1.address);
+      let scdBal22 = await scd.balanceOf(user2.address);
+      let daiBal22 = await dai.balanceOf(user2.address);
+      let usdcBal22 = await usdc.balanceOf(user2.address);
+      expect(scdBal21.sub(scdBal11)).eq(0);
+      expect(daiBal21.sub(daiBal11)).eq(withdrawAmount1);
+      expect(usdcBal21.sub(usdcBal11)).eq(0);
+      expect(scdBal22.sub(scdBal12)).eq((withdrawValue1.add(withdrawValue2)).mul(-1));
+      expect(daiBal22.sub(daiBal12)).eq(0);
+      expect(usdcBal22.sub(usdcBal12)).eq(withdrawAmount2);
     });
   });
 
