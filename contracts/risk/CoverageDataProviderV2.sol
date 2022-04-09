@@ -36,6 +36,9 @@ contract CoverageDataProviderV2 is ICoverageDataProviderV2, Governable, Reentran
     /// @notice The underwriting pool count
     uint256 public numOfPools;
 
+    /// @notice The max. coverage amount.
+    uint256 public maxCover;
+
     /***************************************
      MODIFIERS FUNCTIONS
     ***************************************/
@@ -77,18 +80,6 @@ contract CoverageDataProviderV2 is ICoverageDataProviderV2, Governable, Reentran
     /***************************************
      VIEW FUNCTIONS
     ***************************************/
-
-    /**
-     * @notice Returns the maximum amount of cover in `USD` that Solace as a whole can sell.
-     * @return cover The max amount of cover in `USD`.
-    */
-    function maxCover() external view override returns (uint256 cover) {
-      // get pool balance
-      uint256 pools = numOfPools;
-      for (uint256 i = pools; i > 0; i--) {
-        cover += balanceOf(_indexToUwp[i]);
-      }
-    }
    
     /**
      * @notice Returns the balance of the underwriting pool in `USD`.
@@ -157,11 +148,13 @@ contract CoverageDataProviderV2 is ICoverageDataProviderV2, Governable, Reentran
       }
 
       // set new underwriting pools
+      uint256 cover = 0;
       numOfPools = 0;
       uint256 amount;
       for (uint256 i = 0; i < uwpNames.length; i++) {
         uwpName = uwpNames[i];
         amount = amounts[i];
+        cover += amount;
         require(bytes(uwpName).length > 0, "empty underwriting pool name");
         
         _uwpBalanceOf[uwpName] = amount;
@@ -173,6 +166,7 @@ contract CoverageDataProviderV2 is ICoverageDataProviderV2, Governable, Reentran
         }
         emit UnderwritingPoolSet(uwpName, amount);
       }
+      maxCover = cover;
     }
 
     /**
@@ -181,6 +175,7 @@ contract CoverageDataProviderV2 is ICoverageDataProviderV2, Governable, Reentran
     */
     function _remove(string[] memory uwpNames) internal {
       string memory uwpName;
+      uint256 cover = maxCover;
 
       for (uint256 i = 0; i < uwpNames.length; i++) {
         uwpName = uwpNames[i];
@@ -196,12 +191,14 @@ contract CoverageDataProviderV2 is ICoverageDataProviderV2, Governable, Reentran
           _indexToUwp[index] = lastPool;
         }
 
+        cover -= _uwpBalanceOf[uwpName];
         delete _uwpToIndex[uwpName];
         delete _indexToUwp[poolCount];
         delete _uwpBalanceOf[uwpName];
         numOfPools -= 1;
         emit UnderwritingPoolRemoved(uwpName);
       }
+      maxCover = cover;
     }
 
     /***************************************

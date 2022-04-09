@@ -46,12 +46,6 @@ interface ICoverageDataProviderV2 {
     ***************************************/
 
     /**
-     * @notice The maximum amount of cover in `USD` that Solace as a whole can sell.
-     * @return cover The max amount of cover in `USD`.
-    */
-    function maxCover() external view returns (uint256 cover);
-
-    /**
      * @notice Returns the balance of the underwriting pool in `USD`.
      * @param uwpName The underwriting pool name to get balance.
      * @return amount The balance of the underwriting pool in `USD`.
