@@ -31,6 +31,8 @@ export async function import_artifacts() {
   artifacts.MockProductV2 = await tryImport(`${artifact_dir}/mocks/MockProductV2.sol/MockProductV2.json`);
   artifacts.SolaceCoverProduct = await tryImport(`${artifact_dir}/products/SolaceCoverProduct.sol/SolaceCoverProduct.json`);
   artifacts.SolaceCoverProductV2 = await tryImport(`${artifact_dir}/products/SolaceCoverProductV2.sol/SolaceCoverProductV2.json`);
+  artifacts.SCD = await tryImport(`${artifact_dir}/products/SCD.sol/SCD.json`);
+  artifacts.SCDTellerStables = await tryImport(`${artifact_dir}/products/SCDTellerStables.sol/SCDTellerStables.json`);
 
   // investing v2
   artifacts.WETH10 = await tryImport(`${artifact_dir}/WETH10.sol/WETH10.json`);
@@ -73,9 +75,9 @@ export async function import_artifacts() {
   artifacts.Blacklist = await tryImport(`${artifact_dir}/interface/IBlacklist.sol/IBlacklist.json`);
   artifacts.Deployer = await tryImport(`${artifact_dir}/utils/Deployer.sol/Deployer.json`);
   artifacts.MockSLP = await tryImport(`${artifact_dir}/mocks/MockSLP.sol/MockSLP.json`);
+  artifacts.MockSCDRetainer = await tryImport(`${artifact_dir}/mocks/MockSCDRetainer.sol/MockSCDRetainer.json`);
   artifacts.MockERC677Receiver = await tryImport(`${artifact_dir}/mocks/MockERC677Receiver.sol/MockERC677Receiver.json`);
   artifacts.BlockGetter = await tryImport(`${artifact_dir}/mocks/BlockGetter.sol/BlockGetter.json`);
-  // risk strategy imports
   artifacts.RiskStrategyFactory = await tryImport(`${artifact_dir}/RiskStrategyFactory.sol/RiskStrategyFactory.json`);
   artifacts.RiskStrategy = await tryImport(`${artifact_dir}/RiskStrategy.sol/RiskStrategy.json`);
   artifacts.MockRiskStrategy = await tryImport(`${artifact_dir}/mocks/MockRiskStrategy.sol/MockRiskStrategy.json`);
