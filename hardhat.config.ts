@@ -13,8 +13,8 @@ import { config as dotenv_config } from "dotenv";
 dotenv_config();
 const USE_PROCESSED_FILES = process.env.USE_PROCESSED_FILES === "true";
 
-const mainnet_fork = { url: process.env.MAINNET_URL || '', blockNumber: 14111407 };
 const rinkeby_fork = { url: process.env.RINKEBY_URL || '', blockNumber: 10069000 };
+const ethereum_fork = { url: process.env.ETHEREUM_URL || '', blockNumber: 14671400 };
 const kovan_fork = { url: process.env.KOVAN_URL || '', blockNumber: 28627875 };
 const goerli_fork = { url: process.env.GOERLI_URL || '', blockNumber: 6267645 };
 const aurora_fork = { url: process.env.AURORA_URL || '' };
@@ -23,7 +23,7 @@ const polygon_fork = { url: process.env.POLYGON_URL || '', blockNumber: 24525000
 const mumbai_fork = { url: process.env.MUMBAI_URL || '', blockNumber: 24529352 };
 const no_fork = undefined;
 const forking = (
-    process.env.FORK_NETWORK === "mainnet"        ? mainnet_fork
+    process.env.FORK_NETWORK === "ethereum"       ? ethereum_fork
   : process.env.FORK_NETWORK === "rinkeby"        ? rinkeby_fork
   : process.env.FORK_NETWORK === "kovan"          ? kovan_fork
   : process.env.FORK_NETWORK === "goerli"         ? goerli_fork
@@ -41,10 +41,10 @@ const config: HardhatUserConfig = {
   networks: {
     hardhat: hardhat_network,
     localhost: { url: "http://127.0.0.1:8545" },
-    mainnet: {
-      url: process.env.MAINNET_URL || '',
+    ethereum: {
+      url: process.env.ETHEREUM_URL || '',
       chainId: 1,
-      accounts: JSON.parse(process.env.MAINNET_ACCOUNTS || '[]')
+      accounts: JSON.parse(process.env.ETHEREUM_ACCOUNTS || '[]')
     },
     rinkeby: {
       url: process.env.RINKEBY_URL || '',
@@ -136,10 +136,12 @@ const config: HardhatUserConfig = {
       rinkeby: process.env.ETHERSCAN_API_KEY || "",
       goerli:  process.env.ETHERSCAN_API_KEY || "",
       kovan:   process.env.ETHERSCAN_API_KEY || "",
+      // aurora
+      aurora: process.env.AURORASCAN_API_KEY || "",
+      auroraTestnet: process.env.AURORASCAN_API_KEY || "",
       // polygon
       polygon: process.env.POLYGONSCAN_API_KEY || "",
       polygonMumbai: process.env.POLYGONSCAN_API_KEY || "",
-
     }
   }
 };

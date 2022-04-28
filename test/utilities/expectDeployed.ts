@@ -6,7 +6,7 @@ const provider = waffle.provider;
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 export async function expectDeployed(address: string) {
-  expect(await isDeployed(address)).to.be.true;
+  expect(await isDeployed(address), `no contract deployed at ${address}`).to.be.true;
 }
 
 export async function isDeployed(address: string) {
