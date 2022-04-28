@@ -224,6 +224,8 @@ async function logAddresses() {
   logContractAddress("CoverageDataProvider", coverageDataProvider.address);
   logContractAddress("SolaceCoverProduct", solaceCoverProduct.address);
   logContractAddress("Dai", DAI_ADDRESS);
+  logContractAddress("MessageBus", MESSAGE_BUS_ADDRESS);
+  logContractAddress("CoverageDataProviderWrapper", COVERAGE_DATA_PROVIDER_WRAPPER_ADDRESS);
 }
 
 main()
