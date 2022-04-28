@@ -7,6 +7,7 @@ import UniswapV3PoolArtifact from "@uniswap/v3-core/artifacts/contracts/UniswapV
 
 export function expandStr(str: String, len: number) {
   let s = str;
+  if(s === undefined || s === null) s = ""
   while(s.length < len) s = `${s} `
   return s;
 }
