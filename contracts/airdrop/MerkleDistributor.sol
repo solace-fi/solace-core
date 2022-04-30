@@ -1,7 +1,6 @@
 // Off-chain checks
 // Did we send the right amount of SOLACE to this address
 // Will claiming work? Unit tests.
-// How do create Merkle root?
 // Will off-chain Merkle root calculator work?
 
 // Use Custom error type?
