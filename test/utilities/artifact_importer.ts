@@ -91,6 +91,9 @@ export async function import_artifacts() {
   artifacts.CoverageDataProviderV2 = await tryImport(`${artifact_dir}/risk/CoverageDataProviderV2.sol/CoverageDataProviderV2.json`);
   artifacts.MockPriceOracle = await tryImport(`${artifact_dir}/mocks/MockPriceOracle.sol/MockPriceOracle.json`);
 
+  // merkle distributor
+  artifacts.MerkleDistributor = await tryImport(`${artifact_dir}/airdrop/MerkleDistributor.sol/MerkleDistributor.json`);
+
   return artifacts;
 }
 
