@@ -18,7 +18,7 @@ import { getNetworkSettings } from "../getNetworkSettings";
 const DEPLOYER_CONTRACT_ADDRESS     = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
 
 // contract addresses
-const MERKLE_DISTRIBUTOR_ADDRESS               = "";
+let MERKLE_DISTRIBUTOR_ADDRESS               = "";
 
 let artifacts: ArtifactImports;
 let deployerContract: Deployer;
@@ -35,8 +35,8 @@ async function main() {
   let chainID = (await provider.getNetwork()).chainId;
   networkSettings = getNetworkSettings(chainID);
 
-  await expectDeployed(DEPLOYER_CONTRACT_ADDRESS);
-  deployerContract = (await ethers.getContractAt(artifacts.Deployer.abi, DEPLOYER_CONTRACT_ADDRESS)) as Deployer;
+  // await expectDeployed(DEPLOYER_CONTRACT_ADDRESS);
+  // deployerContract = (await ethers.getContractAt(artifacts.Deployer.abi, DEPLOYER_CONTRACT_ADDRESS)) as Deployer;
 
   // deploy contracts
   await deployMerkleDistributor();
@@ -51,16 +51,25 @@ async function deployMerkleDistributor() {
   } else {
     console.log("Deploying MerkleDistributor");
 
+    const merkleRoot = "0xbbb16024c17f0501bc6923e84c690f5561b7e901a0bf957cfcc1397ea5ceb06c"
+
+    // Basic deploy as per https://hardhat.org/guides/deploying.html
+    const MerkleDistributor = await ethers.getContractFactory("MerkleDistributor");
+    const merkleDistributor = await MerkleDistributor.deploy(signerAddress, merkleRoot, signerAddress);
+    await merkleDistributor.deployed();
+
     // Deployment process 1
-    const res = await create2Contract(deployer, artifacts.MerkleDistributor, [signerAddress], {}, "", deployerContract.address);
-    merkleDistributor = (await ethers.getContractAt(artifacts.MerkleDistributor.abi, res.address)) as unknown as MerkleDistributor;
+    // const res = await create2Contract(deployer, artifacts.MerkleDistributor, [signerAddress], {}, "", deployerContract.address);
+    // const res = await create2Contract(deployer, artifacts.MerkleDistributor, [signerAddress, merkleRoot, signerAddress], {}, "", deployer.address);
+    // merkleDistributor = (await ethers.getContractAt(artifacts.MerkleDistributor.abi, res.address)) as unknown as MerkleDistributor;
 
     // let bytecode = fs.readFileSync("scripts/contract_deploy_bytecodes/utils/Registry.txt").toString().trim();
     // let tx = await deployer.sendTransaction({...networkSettings.overrides, to: DEPLOYER_CONTRACT_ADDRESS, gasLimit: 6000000, data: bytecode});
     // await tx.wait(networkSettings.confirmations);
     // merkleDistributor = (await ethers.getContractAt(artifacts.MerkleDistributor.abi, MERKLE_DISTRIBUTOR_ADDRESS)) as unknown as MerkleDistributor;
 
-    console.log(`Deployed Registry to ${merkleDistributor.address}`);
+    console.log("Deployed MerkleDistributor to:", merkleDistributor.address);
+    MERKLE_DISTRIBUTOR_ADDRESS = merkleDistributor.address
   }
 }
 
