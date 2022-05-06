@@ -73,7 +73,7 @@ contract SCPTellerSOLACE is ISCPTellerSOLACE, Governable, ReentrancyGuard {
     ) external override nonReentrant {
         require(ISOLACEPriceVerifier(priceVerifier).verifyPrice(price, signature), "invalid price");
         depositsOf[recipient] += amount;
-        uint256 scpAmount = amount * price;
+        uint256 scpAmount = (amount * price) / 10**18;
        
         SafeERC20.safeTransferFrom(IERC20(solace), msg.sender, premiumPool, amount);
         ISCP(scp).mint(recipient, scpAmount, true);
@@ -103,7 +103,7 @@ contract SCPTellerSOLACE is ISCPTellerSOLACE, Governable, ReentrancyGuard {
     ) external override nonReentrant {
         require(ISOLACEPriceVerifier(priceVerifier).verifyPrice(price, signature), "invalid price");
         depositsOf[depositor] += amount;
-        uint256 scpAmount = amount * price;
+        uint256 scpAmount = (amount * price) / 10**18;
 
         IERC20Permit(solace).permit(depositor, address(this), amount, deadline, v, r, s);
         SafeERC20.safeTransferFrom(IERC20(solace), msg.sender, premiumPool, amount);
@@ -141,7 +141,7 @@ contract SCPTellerSOLACE is ISCPTellerSOLACE, Governable, ReentrancyGuard {
         uint256 rbalance = scpBalance - requiredScp;
 
         // check withdraw amount
-        uint256 scpAmount = amount * price;
+        uint256 scpAmount = (amount * price) / 10**18;
         require(scpAmount >= rbalance, "withdraw amount exceeds balance");
 
         depositsOf[msg.sender] -= amount;
