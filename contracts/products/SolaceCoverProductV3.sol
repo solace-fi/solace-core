@@ -417,7 +417,4 @@ contract SolaceCoverProductV3 is
         scp = ISCP(scpAddr);
         emit RegistrySet(_registry);
     }
-
-
-
 }

@@ -6,18 +6,18 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/utils/Multicall.sol";
 import "./../utils/Governable.sol";
-import "./../interfaces/products/ISCD.sol";
+import "./../interfaces/payment/ISCP.sol";
 
 /**
- * @title Solace Cover Dollars (SCD)
+ * @title Solace Cover Points (SCP)
  * @author solace.fi
- * @notice **SCD** is a stablecoin pegged to **USD**. It is used to pay for coverage.
+ * @notice **SCP** is a stablecoin pegged to **USD**. It is used to pay for coverage.
  *
- * **SCD** conforms to the ERC20 standard but cannot be minted or transferred by most users. Balances can only be modified by "SCD movers" such as SCD Tellers and coverage contracts. In some cases the user may be able to exchange **SCD** for the payment token, if not the balance will be marked non refundable. Some coverage contracts may have a minimum balance required to prevent abuse - these are called "SCD retainers" and may block [`withdraw()`](#withdraw).
+ * **SCP** conforms to the ERC20 standard but cannot be minted or transferred by most users. Balances can only be modified by "SCP movers" such as SCP Tellers and coverage contracts. In some cases the user may be able to exchange **SCP** for the payment token, if not the balance will be marked non refundable. Some coverage contracts may have a minimum balance required to prevent abuse - these are called "SCP retainers" and may block [`withdraw()`](#withdraw).
  *
- * [**Governance**](/docs/protocol/governance) can add and remove SCD movers and retainers. SCD movers can modify token balances via [`mint()`](#mint), [`burn()`](#burn), [`transfer()`](#transfer), [`transferFrom()`](#transferfrom), and [`withdraw()`](#withdraw).
+ * [**Governance**](/docs/protocol/governance) can add and remove SCP movers and retainers. SCP movers can modify token balances via [`mint()`](#mint), [`burn()`](#burn), [`transfer()`](#transfer), [`transferFrom()`](#transferfrom), and [`withdraw()`](#withdraw).
  */
-contract SCD is ISCD, Multicall, Governable {
+contract SCP is ISCP, Multicall, Governable {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     /***************************************
@@ -36,20 +36,20 @@ contract SCD is ISCD, Multicall, Governable {
     MOVER AND RETAINER DATA
     ***************************************/
 
-    EnumerableSet.AddressSet private _scdMovers;
-    EnumerableSet.AddressSet private _scdRetainers;
+    EnumerableSet.AddressSet private _scpMovers;
+    EnumerableSet.AddressSet private _scpRetainers;
 
     /***************************************
     CONSTRUCTOR
     ***************************************/
 
     /**
-     * @notice Constructs the Solace Cover Dollars contract.
+     * @notice Constructs the Solace Cover Points contract.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
      */
     constructor(address governance_) Governable(governance_) {
-        _name = "scd";
-        _symbol = "SCD";
+        _name = "scp";
+        _symbol = "SCP";
     }
 
     /***************************************
@@ -88,12 +88,12 @@ contract SCD is ISCD, Multicall, Governable {
 
     /// @notice Overwritten. Reverts when called.
     function approve(address, uint256) public virtual override returns (bool) {
-        revert("SCD: token not approvable");
+        revert("SCP: token not approvable");
     }
 
     /**
      * @notice Moves `amount` tokens from the caller's account to `recipient`.
-     * Can only be called by a scd mover.
+     * Can only be called by a scp mover.
      * Requirements:
      * - `recipient` cannot be the zero address.
      * - the caller must have a balance of at least `amount`.
@@ -105,7 +105,7 @@ contract SCD is ISCD, Multicall, Governable {
 
     /**
      * @notice Moves `amount` tokens from `sender` to `recipient`.
-     * Can only be called by a scd mover.
+     * Can only be called by a scp mover.
      * Requirements:
      * - `sender` and `recipient` cannot be the zero address.
      * - `sender` must have a balance of at least `amount`.
@@ -131,12 +131,12 @@ contract SCD is ISCD, Multicall, Governable {
         address recipient,
         uint256 amount
     ) internal virtual {
-        require(isScdMover(msg.sender), "!scd mover");
-        require(sender != address(0), "SCD: transfer from the zero address");
-        require(recipient != address(0), "SCD: transfer to the zero address");
+        require(isScpMover(msg.sender), "!scp mover");
+        require(sender != address(0), "SCP: transfer from the zero address");
+        require(recipient != address(0), "SCP: transfer to the zero address");
 
         uint256 senderBalance = _balances[sender];
-        require(senderBalance >= amount, "SCD: transfer amount exceeds balance");
+        require(senderBalance >= amount, "SCP: transfer amount exceeds balance");
         unchecked {
             _balances[sender] = senderBalance - amount;
         }
@@ -157,8 +157,8 @@ contract SCD is ISCD, Multicall, Governable {
      * - `account` cannot be the zero address.
      */
     function mint(address account, uint256 amount, bool isRefundable) external override {
-        require(isScdMover(msg.sender), "!scd mover");
-        require(account != address(0), "SCD: mint to the zero address");
+        require(isScpMover(msg.sender), "!scp mover");
+        require(account != address(0), "SCP: mint to the zero address");
         _totalSupply += amount;
         _balances[account] += amount;
         if(!isRefundable) _balancesNonRefundable[account] += amount;
@@ -173,10 +173,10 @@ contract SCD is ISCD, Multicall, Governable {
      */
     function burn(address account, uint256 amount) external override {
         // checks
-        require(isScdMover(msg.sender), "!scd mover");
-        require(account != address(0), "SCD: burn from the zero address");
+        require(isScpMover(msg.sender), "!scp mover");
+        require(account != address(0), "SCP: burn from the zero address");
         uint256 accountBalance = _balances[account];
-        require(accountBalance >= amount, "SCD: burn amount exceeds balance");
+        require(accountBalance >= amount, "SCP: burn amount exceeds balance");
         // effects
         unchecked {
             _balances[account] = accountBalance - amount;
@@ -191,22 +191,22 @@ contract SCD is ISCD, Multicall, Governable {
 
     /**
      * @notice Withdraws funds from an account.
-     * @dev Same as burn() except uses refundable amount and checks min scd required.
+     * @dev Same as burn() except uses refundable amount and checks min scp required.
      * The user must have sufficient refundable balance.
      * @param account The account to withdraw from.
      * @param amount The amount to withdraw.
      */
     function withdraw(address account, uint256 amount) external override {
         // checks
-        require(isScdMover(msg.sender), "!scd mover");
-        require(account != address(0), "SCD: withdraw from the zero address");
+        require(isScpMover(msg.sender), "!scp mover");
+        require(account != address(0), "SCP: withdraw from the zero address");
         uint256 bal = _balances[account]; // total
         uint256 bnr = _balancesNonRefundable[account]; // nonrefundable
         uint256 br = _subOrZero(bal, bnr); // refundable
-        require(br >= amount, "SCD: withdraw amount exceeds balance");
-        uint256 minScd = minScdRequired(account);
+        require(br >= amount, "SCP: withdraw amount exceeds balance");
+        uint256 minScp = minScpRequired(account);
         uint256 newBal = bal - amount;
-        require(newBal >= minScd, "SCD: withdraw to below min");
+        require(newBal >= minScp, "SCP: withdraw to below min");
         // effects
         _totalSupply -= amount;
         _balances[account] = newBal;
@@ -218,33 +218,33 @@ contract SCD is ISCD, Multicall, Governable {
     ***************************************/
 
     /// @notice Returns true if `account` has permissions to move balances.
-    function isScdMover(address account) public view override returns (bool status) {
-        return _scdMovers.contains(account);
+    function isScpMover(address account) public view override returns (bool status) {
+        return _scpMovers.contains(account);
     }
 
-    /// @notice Returns the number of scd movers.
-    function scdMoverLength() external view override returns (uint256 length) {
-        return _scdMovers.length();
+    /// @notice Returns the number of scp movers.
+    function scpMoverLength() external view override returns (uint256 length) {
+        return _scpMovers.length();
     }
 
-    /// @notice Returns the scd mover at `index`.
-    function scdMoverList(uint256 index) external view override returns (address scdMover) {
-        return _scdMovers.at(index);
+    /// @notice Returns the scp mover at `index`.
+    function scpMoverList(uint256 index) external view override returns (address scpMover) {
+        return _scpMovers.at(index);
     }
 
-    /// @notice Returns true if `account` may need to retain scd on behalf of a user.
-    function isScdRetainer(address account) public view override returns (bool status) {
-        return _scdRetainers.contains(account);
+    /// @notice Returns true if `account` may need to retain scp on behalf of a user.
+    function isScpRetainer(address account) public view override returns (bool status) {
+        return _scpRetainers.contains(account);
     }
 
-    /// @notice Returns the number of scd retainers.
-    function scdRetainerLength() external view override returns (uint256 length) {
-        return _scdRetainers.length();
+    /// @notice Returns the number of scp retainers.
+    function scpRetainerLength() external view override returns (uint256 length) {
+        return _scpRetainers.length();
     }
 
-    /// @notice Returns the scd retainer at `index`.
-    function scdRetainerList(uint256 index) external view override returns (address scdRetainer) {
-        return _scdRetainers.at(index);
+    /// @notice Returns the scp retainer at `index`.
+    function scpRetainerList(uint256 index) external view override returns (address scpRetainer) {
+        return _scpRetainers.at(index);
     }
 
     /// @notice The amount of tokens owned by account that cannot be withdrawn.
@@ -253,15 +253,15 @@ contract SCD is ISCD, Multicall, Governable {
     }
 
     /**
-     * @notice Calculates the minimum amount of Solace Cover Dollars required by this contract for the account to hold.
+     * @notice Calculates the minimum amount of Solace Cover Points required by this contract for the account to hold.
      * @param account Account to query.
-     * @return amount The amount of SCD the account must hold.
+     * @return amount The amount of SCP the account must hold.
      */
-    function minScdRequired(address account) public view override returns (uint256 amount) {
+    function minScpRequired(address account) public view override returns (uint256 amount) {
         amount = 0;
-        uint256 len = _scdRetainers.length();
+        uint256 len = _scpRetainers.length();
         for(uint256 i = 0; i < len; i++) {
-            amount += ISCDRetainer(_scdRetainers.at(i)).minScdRequired(account);
+            amount += ISCPRetainer(_scpRetainers.at(i)).minScpRequired(account);
         }
         return amount;
     }
@@ -271,34 +271,34 @@ contract SCD is ISCD, Multicall, Governable {
     ***************************************/
 
     /**
-     * @notice Adds or removes a set of scd movers.
+     * @notice Adds or removes a set of scp movers.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param scdMovers List of scd movers to set.
+     * @param scpMovers List of scp movers to set.
      * @param statuses Statuses to set.
      */
-    function setScdMoverStatuses(address[] calldata scdMovers, bool[] calldata statuses) external override onlyGovernance {
-        uint256 len = scdMovers.length;
+    function setScpMoverStatuses(address[] calldata scpMovers, bool[] calldata statuses) external override onlyGovernance {
+        uint256 len = scpMovers.length;
         require(statuses.length == len, "length mismatch");
         for(uint256 i = 0; i < len; i++) {
-            if(statuses[i]) _scdMovers.add(scdMovers[i]);
-            else _scdMovers.remove(scdMovers[i]);
-            emit ScdMoverStatusSet(scdMovers[i], statuses[i]);
+            if(statuses[i]) _scpMovers.add(scpMovers[i]);
+            else _scpMovers.remove(scpMovers[i]);
+            emit ScpMoverStatusSet(scpMovers[i], statuses[i]);
         }
     }
 
     /**
-     * @notice Adds or removes a set of scd retainers.
+     * @notice Adds or removes a set of scp retainers.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param scdRetainers List of scd retainers to set.
+     * @param scpRetainers List of scp retainers to set.
      * @param statuses Statuses to set.
      */
-    function setScdRetainerStatuses(address[] calldata scdRetainers, bool[] calldata statuses) external override onlyGovernance {
-        uint256 len = scdRetainers.length;
+    function setScpRetainerStatuses(address[] calldata scpRetainers, bool[] calldata statuses) external override onlyGovernance {
+        uint256 len = scpRetainers.length;
         require(statuses.length == len, "length mismatch");
         for(uint256 i = 0; i < len; i++) {
-            if(statuses[i]) _scdRetainers.add(scdRetainers[i]);
-            else _scdRetainers.remove(scdRetainers[i]);
-            emit ScdRetainerStatusSet(scdRetainers[i], statuses[i]);
+            if(statuses[i]) _scpRetainers.add(scpRetainers[i]);
+            else _scpRetainers.remove(scpRetainers[i]);
+            emit ScpRetainerStatusSet(scpRetainers[i], statuses[i]);
         }
     }
 

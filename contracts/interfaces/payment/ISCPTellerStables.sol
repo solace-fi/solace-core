@@ -6,15 +6,15 @@ import "./../utils/IGovernable.sol";
 /**
  * @title Solace Cover Teller - Stables
  * @author solace.fi
- * @notice A teller for [**Solace Cover Dollars**](./ISCD) that accepts stablecoins for payment.
+ * @notice A teller for [**Solace Cover Points**](./ISCP) that accepts stablecoins for payment.
  *
- * Users can call [`deposit()`](#deposit) or [`depositSigned()`](#depositsigned) to deposit any accepted stablecoin and receive [**SCD**](./ISCD). Cover products may deduct from a user's [**SCD**](./ISCD) balance to pay for coverage. Users can call [`withdraw()`](#withdraw) to redeem their [**SCD**](./ISCD) for stablecoins that they deposited as long as they're refundable and not required by a cover product. Deposited tokens are sent to and withdrawn from the premium pool.
+ * Users can call [`deposit()`](#deposit) or [`depositSigned()`](#depositsigned) to deposit any accepted stablecoin and receive [**SCP**](./ISCP). Cover products may deduct from a user's [**SCP**](./ISCP) balance to pay for coverage. Users can call [`withdraw()`](#withdraw) to redeem their [**SCP**](./ISCP) for stablecoins that they deposited as long as they're refundable and not required by a cover product. Deposited tokens are sent to and withdrawn from the premium pool.
  *
  * This teller assumes that accepted tokens are sufficiently pegged to **USD**, for example **USDC**, **DAI**, and Aave's interest bearing **aDAI** but not Yearn's interest bearing **yDAI**. Users cannot withdraw tokens they did not deposit, in other words this cannot be used to freely exchange **DAI** for **USDC** unless they previously deposited **USDC**. Token balances are automatically converted to the appropriate amount of decimals.
  *
- * [**Governance**](/docs/protocol/governance) can add new tokens and set their flags. Flags determine how a user can use a token to interact with the teller, the most important are `IS_ACCEPTED`, `IS_PERMITTABLE`, and `IS_REFUNDABLE`. Governance can also set the address of the premium pool. The address of [**SCD**](./ISCD) is set during construction and cannot be modified.
+ * [**Governance**](/docs/protocol/governance) can add new tokens and set their flags. Flags determine how a user can use a token to interact with the teller, the most important are `IS_ACCEPTED`, `IS_PERMITTABLE`, and `IS_REFUNDABLE`. Governance can also set the address of the premium pool. The address of [**SCP**](./ISCP) is set during construction and cannot be modified.
  */
-interface ISCDTellerStables is IGovernable {
+interface ISCPTellerStables is IGovernable {
 
     /***************************************
     EVENTS
@@ -33,8 +33,8 @@ interface ISCDTellerStables is IGovernable {
     VIEW FUNCTIONS
     ***************************************/
 
-    /// @notice [**Solace Cover Dollars**](./ISCD) contract.
-    function scd() external view returns (address);
+    /// @notice [**Solace Cover Points**](./ISCP) contract.
+    function scp() external view returns (address);
 
     /// @notice The premum pool.
     function premiumPool() external view returns (address);
@@ -61,7 +61,7 @@ interface ISCDTellerStables is IGovernable {
     /**
      * @notice Deposits tokens from msg.sender and credits them to recipient.
      * @param token The token to deposit.
-     * @param recipient The recipient of Solace Cover Dollars.
+     * @param recipient The recipient of Solace Cover Points.
      * @param amount Amount of token to deposit.
      */
     function deposit(address token, address recipient, uint256 amount) external;
@@ -69,7 +69,7 @@ interface ISCDTellerStables is IGovernable {
     /**
      * @notice Deposits tokens from depositor using permit.
      * @param token The token to deposit.
-     * @param depositor The depositor and recipient of Solace Cover Dollars.
+     * @param depositor The depositor and recipient of Solace Cover Points.
      * @param amount Amount of token to deposit.
      * @param deadline Time the transaction must go through before.
      * @param v secp256k1 signature
@@ -89,7 +89,7 @@ interface ISCDTellerStables is IGovernable {
     /**
      * @notice Withdraws some of the user's deposit and sends it to `recipient`.
      * User must have deposited that token in at least that amount in the past.
-     * User must have sufficient Solace Cover Dollars to withdraw.
+     * User must have sufficient Solace Cover Points to withdraw.
      * Token must be refundable.
      * Premium pool must have the tokens to return.
      * @param token The token to withdraw.
