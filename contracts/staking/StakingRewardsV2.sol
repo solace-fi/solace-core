@@ -239,7 +239,7 @@ contract StakingRewardsV2 is IStakingRewardsV2, ReentrancyGuard, Governable {
      * @param price The `SOLACE` price in wei(usd).
      * @param signature The `SOLACE` price signature.
     */
-    function harvestLocks(uint256[] memory xsLockIDs, uint256 price, bytes calldata signature) external override nonReentrant {
+    function harvestLocksForScp(uint256[] memory xsLockIDs, uint256 price, bytes calldata signature) external override nonReentrant {
         update();
         uint256 len = xsLockIDs.length;
         for(uint256 i = 0; i < len; i++) {

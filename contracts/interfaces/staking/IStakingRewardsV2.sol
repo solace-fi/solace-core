@@ -153,7 +153,7 @@ interface IStakingRewardsV2 is IxsListener {
      * @param price The `SOLACE` price in wei(usd).
      * @param signature The `SOLACE` price signature.
      */
-    function harvestLocks(uint256[] memory xsLockIDs, uint256 price, bytes calldata signature) external;
+    function harvestLocksForScp(uint256[] memory xsLockIDs, uint256 price, bytes calldata signature) external;
 
     /***************************************
     GOVERNANCE FUNCTIONS
