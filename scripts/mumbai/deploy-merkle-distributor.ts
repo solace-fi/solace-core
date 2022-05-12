@@ -16,6 +16,7 @@ import { expectDeployed, isDeployed } from "../../test/utilities/expectDeployed"
 import { getNetworkSettings } from "../getNetworkSettings";
 
 const DEPLOYER_CONTRACT_ADDRESS     = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
+const XS_LOCKER_ADDRESS             = "0x501Ace47c5b0C2099C4464f681c3fa2ECD3146C1";
 
 // contract addresses
 let MERKLE_DISTRIBUTOR_ADDRESS               = "";
@@ -55,7 +56,7 @@ async function deployMerkleDistributor() {
 
     // Basic deploy as per https://hardhat.org/guides/deploying.html
     const MerkleDistributor = await ethers.getContractFactory("MerkleDistributor");
-    const merkleDistributor = await MerkleDistributor.deploy(signerAddress, merkleRoot, signerAddress);
+    const merkleDistributor = await MerkleDistributor.deploy(signerAddress, merkleRoot, signerAddress, XS_LOCKER_ADDRESS);
     await merkleDistributor.deployed();
 
     // Deployment process 1
