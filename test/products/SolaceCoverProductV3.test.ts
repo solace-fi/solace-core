@@ -15,17 +15,7 @@ const provider: MockProvider = waffle.provider;
 dotenv_config();
 chai.use(solidity)
 
-let forkNetwork = process.env.FORK_NETWORK || "";
-let supportedNetworks = ["mainnet","polygon"];
-
 describe("SolaceCoverProductV3", function() {
-  if(!supportedNetworks.includes(forkNetwork)) {
-    it(`can only be tested when forking one of ${supportedNetworks.join(',')}`, async function() {
-      console.log(`SolaceCoverProductV3 can only be tested when forking one of ${supportedNetworks.join(',')}`);
-      console.log("set `FORK_NETWORK=mainnet` in .env");
-      expect(true, `SolaceCoverProductV3 can only be tested when forking one of ${supportedNetworks.join(',')}`).to.be.false;
-    });
-  } else {
     let artifacts: ArtifactImports;
     let registry: Registry;
     let riskManager: RiskManager;
@@ -35,7 +25,7 @@ describe("SolaceCoverProductV3", function() {
     let coverageDataProvider: CoverageDataProvider;
     let scp: Scp;
 
-    const [deployer, governor, newGovernor, policyholder1, policyholder2, policyholder3, policyholder4, policyholder5, premiumPool, premiumCollector] = provider.getWallets();
+    const [deployer, governor, newGovernor, user, policyholder1, policyholder2, policyholder3, policyholder4, policyholder5, premiumPool, premiumCollector] = provider.getWallets();
 
     const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
     const ONE_ETH = BN.from("1000000000000000000"); // 1 eth
@@ -94,7 +84,7 @@ describe("SolaceCoverProductV3", function() {
       await provider.send("evm_revert", [snapshot]);
     });
 
-    describe.only("deployment", () => {
+    describe("deployment", () => {
       let mockRegistry: Registry;
 
       before(async () => {
@@ -130,7 +120,7 @@ describe("SolaceCoverProductV3", function() {
       })
     });
 
-    describe.only("governance", () => {
+    describe("governance", () => {
       it("starts with the correct governor", async () => {
         expect(await solaceCoverProduct.governance()).to.equal(governor.address);
       });
@@ -161,7 +151,7 @@ describe("SolaceCoverProductV3", function() {
       });
     });
 
-    describe.only("pause", () => {
+    describe("pause", () => {
       it("starts unpaused", async () => {
         expect(await solaceCoverProduct.paused()).to.equal(false);
       });
@@ -189,7 +179,7 @@ describe("SolaceCoverProductV3", function() {
       });
     });
 
-    describe.only("registry", () => {
+    describe("registry", () => {
       let registry2: Registry;
       let riskManager2: RiskManager;
 
@@ -242,7 +232,7 @@ describe("SolaceCoverProductV3", function() {
       });
     });
 
-    describe.only("setMaxRate", () => {
+    describe("setMaxRate", () => {
       it("cannot be set by non governance", async () => {
         await expect(solaceCoverProduct.connect(policyholder1).setMaxRate(1,1)).to.revertedWith("!governance");
       });
@@ -256,7 +246,7 @@ describe("SolaceCoverProductV3", function() {
       })
     })
 
-    describe.only("setChargeCycle", () => {
+    describe("setChargeCycle", () => {
       it("cannot be set by non governance", async () => {
         await expect(solaceCoverProduct.connect(policyholder1).setChargeCycle(1)).to.revertedWith("!governance");
       });
@@ -269,7 +259,7 @@ describe("SolaceCoverProductV3", function() {
       })
     })
 
-    describe.only("setBaseURI", () => {
+    describe("setBaseURI", () => {
       it("should default as expected string", async () => {
         expect(await solaceCoverProduct.baseURI()).eq("https://stats.solace.fi/policy/?chainID=31337&policyID=")
       });
@@ -288,8 +278,7 @@ describe("SolaceCoverProductV3", function() {
       });
     })
 
-
-    describe.only("purchase(create)", () => {
+    describe("purchase(create)", () => {
       let rmActiveCoverLimit:BN;
       let rmSoteriaactiveCoverLimit: BN;
       let mcr: BN;
@@ -432,7 +421,7 @@ describe("SolaceCoverProductV3", function() {
       });
     });
 
-    describe.only("tokenURI", () => {
+    describe("tokenURI", () => {
       it("cannot get for invalid policy ID", async () => {
         await expect(solaceCoverProduct.tokenURI(INVALID_POLICY_ID)).to.revertedWith("invalid policy");
       });
@@ -443,7 +432,7 @@ describe("SolaceCoverProductV3", function() {
       })
     });
 
-    describe.only("purchase(update)", () => {
+    describe("purchase(update)", () => {
       let maxCover: BN;
       let maxCoverPerStrategy: BN;
       let initialMCRForSoteria: BN;
@@ -539,7 +528,7 @@ describe("SolaceCoverProductV3", function() {
       });
     });
 
-    describe.only("cancel", () => {
+    describe("cancel", () => {
       it("cannot cancel an invalid policy", async () => {
         await expect(solaceCoverProduct.connect(policyholder4).cancel()).to.revertedWith("invalid policy");
       });
@@ -591,6 +580,78 @@ describe("SolaceCoverProductV3", function() {
       });
     });
 
-  }
+    describe("setChargedTime", async () => {
+      it("cannot set while paused", async () => {
+        await solaceCoverProduct.connect(governor).setPaused(true);
+        expect(await solaceCoverProduct.connect(governor).paused()).to.true;
+        await expect(solaceCoverProduct.connect(governor).setChargedTime(Date.now())).revertedWith("contract paused");
+        await solaceCoverProduct.connect(governor).setPaused(false);
+      });
 
+      it("cannot set if not collector", async () => {
+        await expect(solaceCoverProduct.connect(user).setChargedTime(Date.now())).revertedWith("not premium collector");
+      });
+
+      it("cannot set with 0 time", async () => {
+        await expect(solaceCoverProduct.connect(governor).setChargedTime(0)).revertedWith("invalid charged timestamp");
+      });
+
+      it("cannot set with exceed time", async () => {
+        await expect(solaceCoverProduct.connect(governor).setChargedTime(Date.now() + 100000)).revertedWith("invalid charged timestamp");
+      });
+
+      it("can set with governor", async () => {
+        const chargedTime = (await provider.getBlock("latest")).timestamp;
+        let tx = await solaceCoverProduct.connect(governor).setChargedTime(chargedTime);
+        await expect(tx).emit(solaceCoverProduct, "LatestChargedTimeSet").withArgs(chargedTime);
+      });
+
+      it("can set with premium collector", async () => {
+        const chargedTime = (await provider.getBlock("latest")).timestamp;
+        let tx = await solaceCoverProduct.connect(premiumCollector).setChargedTime(chargedTime);
+        await expect(tx).emit(solaceCoverProduct, "LatestChargedTimeSet").withArgs(chargedTime);
+        expect(await solaceCoverProduct.connect(user).latestChargedTime()).equal(chargedTime);
+      });
+    });
+
+    describe("setDebts", async () => {
+      before(async () => {
+        expect(await solaceCoverProduct.connect(user).debtOf(policyholder3.address)).equal(0);
+        expect(await solaceCoverProduct.connect(user).policyCount()).equal(3);
+      });
+
+      it("cannot set while paused", async () => {
+        await solaceCoverProduct.connect(governor).setPaused(true);
+        expect(await solaceCoverProduct.connect(governor).paused()).to.true;
+        await expect(solaceCoverProduct.connect(governor).setDebts([policyholder3.address], [BN.from(1)])).revertedWith("contract paused");
+        await solaceCoverProduct.connect(governor).setPaused(false);
+      });
+
+      it("cannot set if not collector", async () => {
+        await expect(solaceCoverProduct.connect(user).setDebts([policyholder3.address], [BN.from(1)])).revertedWith("not premium collector");
+      });
+
+      it("cannot set when length mismatch", async () => {
+        await expect(solaceCoverProduct.connect(governor).setDebts([policyholder3.address], [])).revertedWith("length mismatch");
+      });
+
+      it("cannot set if policy count exceeded", async () => {
+        await expect(solaceCoverProduct.connect(governor).setDebts([policyholder1.address, policyholder2.address, policyholder3.address, policyholder4.address],[BN.from(0), BN.from(0), BN.from(0), BN.from(0)])).revertedWith("policy count exceeded");
+      });
+
+      it("can set with governor", async () => {
+        let debt = await solaceCoverProduct.connect(user).debtOf(policyholder3.address);
+        let tx = await solaceCoverProduct.connect(governor).setDebts([policyholder3.address], [BN.from(1)]);
+        await expect(tx).emit(solaceCoverProduct, "DebtSet").withArgs(policyholder3.address, BN.from(1));
+        expect(await solaceCoverProduct.connect(user).debtOf(policyholder3.address)).equal(debt.add(BN.from(1)));
+      });
+
+      it("can set with collector", async () => {
+        let debt = await solaceCoverProduct.connect(user).debtOf(policyholder3.address);
+        let tx = await solaceCoverProduct.connect(premiumCollector).setDebts([policyholder3.address], [BN.from(1)]);
+        await expect(tx).emit(solaceCoverProduct, "DebtSet").withArgs(policyholder3.address, BN.from(1));
+        expect(await solaceCoverProduct.connect(user).debtOf(policyholder3.address)).equal(debt.add(BN.from(1)));
+      });
+
+    });
 });

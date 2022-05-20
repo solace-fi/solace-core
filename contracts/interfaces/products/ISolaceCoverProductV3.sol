@@ -26,7 +26,7 @@ interface ISolaceCoverProductV3 is IERC721, ISCPRetainer {
     event PauseSet(bool pause);
 
     /// @notice Emitted when latest charged time is set.
-    event LatestChargeTimeSet(uint256 timestamp);
+    event LatestChargedTimeSet(uint256 timestamp);
 
     /// @notice Emitted when maxRate is set.
     event MaxRateSet(uint256 maxRateNum, uint256 maxRateDenom);

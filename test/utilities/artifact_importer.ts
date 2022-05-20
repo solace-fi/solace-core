@@ -31,8 +31,11 @@ export async function import_artifacts() {
   artifacts.MockProductV2 = await tryImport(`${artifact_dir}/mocks/MockProductV2.sol/MockProductV2.json`);
   artifacts.SolaceCoverProduct = await tryImport(`${artifact_dir}/products/SolaceCoverProduct.sol/SolaceCoverProduct.json`);
   artifacts.SolaceCoverProductV2 = await tryImport(`${artifact_dir}/products/SolaceCoverProductV2.sol/SolaceCoverProductV2.json`);
-  artifacts.SCD = await tryImport(`${artifact_dir}/products/SCD.sol/SCD.json`);
-  artifacts.SCDTellerStables = await tryImport(`${artifact_dir}/products/SCDTellerStables.sol/SCDTellerStables.json`);
+  artifacts.SolaceCoverProductV3 = await tryImport(`${artifact_dir}/products/SolaceCoverProductV3.sol/SolaceCoverProductV3.json`);
+  
+  //payments
+  artifacts.SCP = await tryImport(`${artifact_dir}/payment/SCP.sol/SCP.json`);
+  artifacts.CoverPaymentManager = await tryImport(`${artifact_dir}/payment/CoverPaymentManager.sol/CoverPaymentManager.json`);
 
   // investing v2
   artifacts.WETH10 = await tryImport(`${artifact_dir}/WETH10.sol/WETH10.json`);
@@ -44,6 +47,8 @@ export async function import_artifacts() {
   artifacts.xSOLACE = await tryImport(`${artifact_dir}/staking/xSOLACE.sol/xSOLACE.json`);
   artifacts.MockListener = await tryImport(`${artifact_dir}/mocks/MockListener.sol/MockListener.json`);
   artifacts.StakingRewards = await tryImport(`${artifact_dir}/staking/StakingRewards.sol/StakingRewards.json`);
+  artifacts.StakingRewardsV2 = await tryImport(`${artifact_dir}/staking/StakingRewardsV2.sol/StakingRewardsV2.json`);
+
   artifacts.xSolaceMigrator = await tryImport(`${artifact_dir}/staking/xSolaceMigrator.sol/xSolaceMigrator.json`);
   artifacts.FarmRewards = await tryImport(`${artifact_dir}/staking/FarmRewards.sol/FarmRewards.json`);
   artifacts.FarmRewardsV2 = await tryImport(`${artifact_dir}/staking/FarmRewardsV2.sol/FarmRewardsV2.json`);
@@ -57,6 +62,7 @@ export async function import_artifacts() {
   artifacts.Registry = await tryImport(`${artifact_dir}/utils/Registry.sol/Registry.json`);
   artifacts.SingletonFactory = await tryImport(`${artifact_dir}/interfaces/utils/ISingletonFactory.sol/ISingletonFactory.json`);
   artifacts.Deployer = await tryImport(`${artifact_dir}/utils/Deployer.sol/Deployer.json`);
+  artifacts.PriceVerifier = await tryImport(`${artifact_dir}/utils/PriceVerifier.sol/PriceVerifier.json`);
   // cross chain
   artifacts.BridgeWrapper = await tryImport(`${artifact_dir}/BridgeWrapper.sol/BridgeWrapper.json`);
   // generic imports
@@ -75,7 +81,7 @@ export async function import_artifacts() {
   artifacts.Blacklist = await tryImport(`${artifact_dir}/interface/IBlacklist.sol/IBlacklist.json`);
   artifacts.Deployer = await tryImport(`${artifact_dir}/utils/Deployer.sol/Deployer.json`);
   artifacts.MockSLP = await tryImport(`${artifact_dir}/mocks/MockSLP.sol/MockSLP.json`);
-  artifacts.MockSCDRetainer = await tryImport(`${artifact_dir}/mocks/MockSCDRetainer.sol/MockSCDRetainer.json`);
+  artifacts.MockSCPRetainer = await tryImport(`${artifact_dir}/mocks/MockSCPRetainer.sol/MockSCPRetainer.json`);
   artifacts.MockERC677Receiver = await tryImport(`${artifact_dir}/mocks/MockERC677Receiver.sol/MockERC677Receiver.json`);
   artifacts.BlockGetter = await tryImport(`${artifact_dir}/mocks/BlockGetter.sol/BlockGetter.json`);
   artifacts.RiskStrategyFactory = await tryImport(`${artifact_dir}/RiskStrategyFactory.sol/RiskStrategyFactory.json`);

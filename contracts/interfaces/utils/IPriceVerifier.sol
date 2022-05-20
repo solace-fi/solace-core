@@ -3,11 +3,11 @@ pragma solidity 0.8.6;
 
 
 /**
- * @title ISOLACEPriceVerifier
+ * @title IPriceVerifier
  * @author solace.fi
- * @notice Verifies `SOLACE` token price.
+ * @notice Verifies token price.
 */
-interface ISOLACEPriceVerifier {
+interface IPriceVerifier {
 
     /***************************************
     EVENTS
@@ -25,10 +25,12 @@ interface ISOLACEPriceVerifier {
 
     /**
      * @notice Verifies `SOLACE` price data.
+     * @param token The token to verify price.
      * @param price The `SOLACE` price in wei(usd).
+     * @param deadline The deadline for the price.
      * @param signature The `SOLACE` price signature.
     */
-    function verifyPrice(uint256 price, bytes calldata signature) external view returns (bool);
+    function verifyPrice(address token, uint256 price, uint256 deadline, bytes calldata signature) external view returns (bool);
 
     /**
      * @notice Checks whether given signer is an authorized signer or not.

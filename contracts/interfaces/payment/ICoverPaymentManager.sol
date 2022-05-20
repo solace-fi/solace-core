@@ -4,7 +4,7 @@ pragma solidity 0.8.6;
 import "./../utils/IGovernable.sol";
 
 /**
- * @title Solace Cover Teller - Stables
+ * @title Solace Cover Payment Manager - Stables
  * @author solace.fi
  * @notice A teller for [**Solace Cover Points**](./ISCP) that accepts stablecoins for payment.
  *
@@ -14,7 +14,19 @@ import "./../utils/IGovernable.sol";
  *
  * [**Governance**](/docs/protocol/governance) can add new tokens and set their flags. Flags determine how a user can use a token to interact with the teller, the most important are `IS_ACCEPTED`, `IS_PERMITTABLE`, and `IS_REFUNDABLE`. Governance can also set the address of the premium pool. The address of [**SCP**](./ISCP) is set during construction and cannot be modified.
  */
-interface ISCPTellerStables is IGovernable {
+interface ICoverPaymentManager is IGovernable {
+   
+    /***************************************
+    STRUCTS
+    ***************************************/
+
+    struct TokenInfo {
+        address token;
+        bool accepted;
+        bool permittable;
+        bool refundable;
+        bool stable;
+    }
 
     /***************************************
     EVENTS
@@ -22,40 +34,22 @@ interface ISCPTellerStables is IGovernable {
 
     /// @notice Emitted when a token is deposited.
     event TokenDeposited(address indexed token, address indexed depositor, address indexed receiver, uint256 amount);
+    
     /// @notice Emitted when a token is withdrawn.
-    event TokenWithdrawn(address indexed token, address indexed depositor, address indexed receiver, uint256 amount);
-    /// @notice Emitted when token flags are set.
-    event TokenFlagsSet(address indexed token, bytes32 flags);
-    /// @notice Emitted when the premium pool is set.
-    event PremiumPoolSet(address pool);
+    event TokenWithdrawn(address indexed depositor, address indexed receiver, uint256 amount);
+   
+    /// @notice Emitted when registry is set.
+    event RegistrySet(address registry);
+
+    /// @notice Emitted when a token is set.
+    event TokenInfoSet(address token, bool accepted, bool permittable, bool refundable, bool stable);
+
+    /// @notice Emitted when paused is set.
+    event PauseSet(bool paused);
+
 
     /***************************************
-    VIEW FUNCTIONS
-    ***************************************/
-
-    /// @notice [**Solace Cover Points**](./ISCP) contract.
-    function scp() external view returns (address);
-
-    /// @notice The premum pool.
-    function premiumPool() external view returns (address);
-
-    /// @notice The amount of a token that an account is credited for depositing.
-    function deposits(address account, address token) external view returns (uint256 amount);
-
-    /// @notice Returns a token's flags.
-    function tokenFlags(address token) external view returns (bytes32 flags);
-
-    /// @notice Returns a token's flags.
-    function getTokenFlags(address token) external view returns (bool isKnown, bool isAccepted, bool isPermittable, bool isRefundable);
-
-    /// @notice Returns the number of tokens that have been added.
-    function tokensLength() external view returns (uint256 length);
-
-    /// @notice Returns the token at `index`.
-    function tokenList(uint256 index) external view returns (address token);
-
-    /***************************************
-    MONEY FUNCTIONS
+    DEPOSIT FUNCTIONS
     ***************************************/
 
     /**
@@ -63,8 +57,12 @@ interface ISCPTellerStables is IGovernable {
      * @param token The token to deposit.
      * @param recipient The recipient of Solace Cover Points.
      * @param amount Amount of token to deposit.
-     */
-    function deposit(address token, address recipient, uint256 amount) external;
+    */
+    function depositStable(
+        address token,
+        address recipient,
+        uint256 amount
+    ) external;
 
     /**
      * @notice Deposits tokens from depositor using permit.
@@ -75,8 +73,8 @@ interface ISCPTellerStables is IGovernable {
      * @param v secp256k1 signature
      * @param r secp256k1 signature
      * @param s secp256k1 signature
-     */
-    function depositSigned(
+    */
+    function depositSignedStable(
         address token,
         address depositor,
         uint256 amount,
@@ -87,37 +85,91 @@ interface ISCPTellerStables is IGovernable {
     ) external;
 
     /**
+     * @notice Deposits tokens from msg.sender and credits them to recipient.
+     * @param token The token to deposit.
+     * @param recipient The recipient of Solace Cover Points.
+     * @param amount Amount of token to deposit.
+     * @param price The `SOLACE` price in wei(usd).
+     * @param priceDeadline The `SOLACE` price in wei(usd).
+     * @param signature The `SOLACE` price signature.
+    */
+    function depositNonStable(
+        address token,
+        address recipient,
+        uint256 amount,
+        uint256 price,
+        uint256 priceDeadline,
+        bytes calldata signature
+    ) external;
+
+    /***************************************
+    WITHDRAW FUNCTIONS
+    ***************************************/
+
+    /**
      * @notice Withdraws some of the user's deposit and sends it to `recipient`.
-     * User must have deposited that token in at least that amount in the past.
+     * User must have deposited `SOLACE` in at least that amount in the past.
      * User must have sufficient Solace Cover Points to withdraw.
      * Token must be refundable.
      * Premium pool must have the tokens to return.
-     * @param token The token to withdraw.
      * @param amount The amount of to withdraw.
      * @param recipient The receiver of funds.
-     */
+     * @param price The `SOLACE` price in wei(usd).
+     * @param priceDeadline The `SOLACE` price in wei(usd).
+     * @param signature The `SOLACE` price signature.
+    */
     function withdraw(
-        address token,
         uint256 amount,
-        address recipient
+        address recipient,
+        uint256 price,
+        uint256 priceDeadline,
+        bytes calldata signature
     ) external;
+
+    /***************************************
+    VIEW FUNCTIONS
+    ***************************************/
+    /**
+     * @notice Returns to token information for given token index.
+     * @param index The token index.
+    */
+    function getTokenInfo(
+        uint256 index
+    ) external view returns (address token, bool accepted, bool permittable, bool refundable, bool stable);
+
+    /**
+     * @notice Calculates the refundable `SOLACE` amount.
+     * @param depositor The ownder of funds.
+     * @param price The `SOLACE` price in wei(usd).
+     * @param priceDeadline The `SOLACE` price in wei(usd).
+     * @param signature The `SOLACE` price signature.
+     * @return solaceAmount
+     *
+    */
+    function getRefundableSOLACEAmount(address depositor, uint256 price, uint256 priceDeadline, bytes calldata signature) external view returns (uint256 solaceAmount);
 
     /***************************************
     GOVERNANCE FUNCTIONS
     ***************************************/
 
-    /**
-     * @notice Sets the premium pool.
+   /**
+     * @notice Sets the [`Registry`](./Registry) contract address.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param pool Address of the new pool.
-     */
-    function setPremiumPool(address pool) external;
+     * @param _registry The address of `Registry` contract.
+    */
+    function setRegistry(address _registry) external;
 
     /**
      * @notice Adds or removes a set of accepted tokens.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param tokens Tokens to set.
-     * @param flags Flags to set.
-     */
-    function setTokenFlags(address[] calldata tokens, bytes32[] calldata flags) external;
+    */
+    function setTokenInfo(TokenInfo[] calldata tokens) external;
+
+    /**
+     * @notice Pauses or unpauses contract..
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param _paused True to pause, false to unpause.
+    */
+    function setPaused(bool _paused) external;
 }

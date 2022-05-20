@@ -143,17 +143,19 @@ interface IStakingRewardsV2 is IxsListener {
      * @notice Updates and sends a lock's rewards.
      * @param xsLockID The ID of the lock to process rewards for.
      * @param price The `SOLACE` price in wei(usd).
+     * @param priceDeadline The `SOLACE` price in wei(usd).
      * @param signature The `SOLACE` price signature.
     */
-    function harvestLockForScp(uint256 xsLockID, uint256 price, bytes calldata signature) external;
+    function harvestLockForScp(uint256 xsLockID, uint256 price, uint256 priceDeadline, bytes calldata signature) external;
 
     /**
      * @notice Updates and sends multiple lock's rewards.
      * @param xsLockIDs The IDs of the locks to process rewards for.
      * @param price The `SOLACE` price in wei(usd).
+     * @param priceDeadline The `SOLACE` price in wei(usd).
      * @param signature The `SOLACE` price signature.
      */
-    function harvestLocksForScp(uint256[] memory xsLockIDs, uint256 price, bytes calldata signature) external;
+    function harvestLocksForScp(uint256[] memory xsLockIDs, uint256 price, uint256 priceDeadline, bytes calldata signature) external;
 
     /***************************************
     GOVERNANCE FUNCTIONS

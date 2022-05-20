@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "./../utils/Governable.sol";
 import "./../interfaces/utils/IRegistry.sol";
-import "./../interfaces/payment/ISCPTellerSOLACE.sol";
+import "./../interfaces/payment/ICoverPaymentManager.sol";
 import "./../interfaces/staking/IxsLocker.sol";
 import "./../interfaces/staking/IStakingRewardsV2.sol";
 
@@ -46,8 +46,8 @@ contract StakingRewardsV2 is IStakingRewardsV2, ReentrancyGuard, Governable {
 
     /// @notice The registry address.
     address public registry;
-    /// @notice The solace scp teller address.
-    address public solaceScpTeller;
+    /// @notice The cover payment manager address.
+    address public coverPaymentManager;
     /// @notice [**SOLACE**](./../SOLACE) token.
     address public override solace;
     /// @notice The [**xsLocker**](../xsLocker) contract.
@@ -226,24 +226,26 @@ contract StakingRewardsV2 is IStakingRewardsV2, ReentrancyGuard, Governable {
      * @notice Updates and sends a lock's rewards.
      * @param xsLockID The ID of the lock to process rewards for.
      * @param price The `SOLACE` price in wei(usd).
+     * @param priceDeadline The `SOLACE` price in wei(usd).
      * @param signature The `SOLACE` price signature.
     */
-    function harvestLockForScp(uint256 xsLockID, uint256 price, bytes calldata signature) external override nonReentrant {
+    function harvestLockForScp(uint256 xsLockID, uint256 price, uint256 priceDeadline, bytes calldata signature) external override nonReentrant {
         update();
-        _harvestForScp(xsLockID, price, signature);
+        _harvestForScp(xsLockID, price, priceDeadline, signature);
     }
 
     /**
      * @notice Updates and sends multiple lock's rewards.
      * @param xsLockIDs The IDs of the locks to process rewards for.
      * @param price The `SOLACE` price in wei(usd).
+     * @param priceDeadline The `SOLACE` price in wei(usd).
      * @param signature The `SOLACE` price signature.
     */
-    function harvestLocksForScp(uint256[] memory xsLockIDs, uint256 price, bytes calldata signature) external override nonReentrant {
+    function harvestLocksForScp(uint256[] memory xsLockIDs, uint256 price, uint256 priceDeadline, bytes calldata signature) external override nonReentrant {
         update();
         uint256 len = xsLockIDs.length;
         for(uint256 i = 0; i < len; i++) {
-            _harvestForScp(xsLockIDs[i], price, signature);
+            _harvestForScp(xsLockIDs[i], price, priceDeadline, signature);
         }
     }
 
@@ -264,14 +266,14 @@ contract StakingRewardsV2 is IStakingRewardsV2, ReentrancyGuard, Governable {
      * @notice Updates and buys `SCP` with a lock's rewards.
      * @param xsLockID The ID of the lock to process rewards for.
      * @param price The `SOLACE` price in wei(usd).
+     * @param priceDeadline The `SOLACE` price in wei(usd).
      * @param signature The `SOLACE` price signature.
     */
-    function _harvestForScp(uint256 xsLockID, uint256 price, bytes calldata signature) internal {
+    function _harvestForScp(uint256 xsLockID, uint256 price, uint256 priceDeadline, bytes calldata signature) internal {
         (uint256 transferAmount, address receiver) = _updateLock(xsLockID);
         if (receiver != address(0x0) && transferAmount != 0) return;
-        
         // buy scp
-        ISCPTellerSOLACE(solaceScpTeller).deposit(receiver, transferAmount, price, signature);
+        ICoverPaymentManager(coverPaymentManager).depositNonStable(solace, receiver, transferAmount, price, priceDeadline, signature);
     }
 
     /**
@@ -406,9 +408,9 @@ contract StakingRewardsV2 is IStakingRewardsV2, ReentrancyGuard, Governable {
         IRegistry reg = IRegistry(_registry);
   
         // set scp
-        (, address solaceScpTellerAddr) = reg.tryGet("solaceScpTellerAddr");
-        require(solaceScpTellerAddr != address(0x0), "zero address solace scp teller");
-        solaceScpTeller = solaceScpTellerAddr;
+        (, address coverPaymentManagerAddr) = reg.tryGet("coverPaymentManager");
+        require(coverPaymentManagerAddr != address(0x0), "zero address payment manager");
+        coverPaymentManager = coverPaymentManagerAddr;
   
         // set solace
         (, address solaceAddr) = reg.tryGet("solace");

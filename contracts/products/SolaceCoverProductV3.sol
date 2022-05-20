@@ -39,13 +39,13 @@ contract SolaceCoverProductV3 is
     ***************************************/
 
     /// @notice Registry contract.
-    IRegistry public registry;
+    address public registry;
 
     /// @notice RiskManager contract.
-    IRiskManager public riskManager;
+    address public riskManager;
 
     /// @notice SCP(Solace Cover Points) contract.
-    ISCP public scp;
+    address public scp;
 
     /// @notice Cannot buy new policies while paused. (Default is False)
     bool public paused;
@@ -90,8 +90,8 @@ contract SolaceCoverProductV3 is
 
     modifier onlyCollector() {
         require(
-            msg.sender == registry.get("premiumCollector") ||
-            msg.sender == governance(), "!premium collector"
+            msg.sender == IRegistry(registry).get("premiumCollector") ||
+            msg.sender == governance(), "not premium collector"
         );
         _;
     }
@@ -153,7 +153,7 @@ contract SolaceCoverProductV3 is
      * @return cover The max amount of cover.
      */
     function maxCover() public view override returns (uint256 cover) {
-        return riskManager.maxCoverPerStrategy(address(this));
+        return IRiskManager(riskManager).maxCoverPerStrategy(address(this));
     }
 
     /**
@@ -161,7 +161,7 @@ contract SolaceCoverProductV3 is
      * @return amount The active cover limit.
      */
     function activeCoverLimit() public view override returns (uint256 amount) {
-        return riskManager.activeCoverLimitPerStrategy(address(this));
+        return IRiskManager(riskManager).activeCoverLimitPerStrategy(address(this));
     }
 
     /**
@@ -284,9 +284,10 @@ contract SolaceCoverProductV3 is
      * @param _timestamp The timestamp value when the premiums are charged.
     */
     function setChargedTime(uint256 _timestamp) external override whileUnpaused onlyCollector {
+        // solhint-disable-next-line not-rely-on-time
         require(_timestamp > 0 && _timestamp <= block.timestamp, "invalid charged timestamp");
         latestChargedTime = _timestamp;
-        emit LatestChargeTimeSet(_timestamp);
+        emit LatestChargedTimeSet(_timestamp);
     }
 
     /**
@@ -304,9 +305,11 @@ contract SolaceCoverProductV3 is
 
         for (uint256 i = 0; i < count; i++) {
             policyholder = _policyholders[i];
-            debt = _debts[i];
-            debtOf[policyholder] += debt;
-            emit DebtSet(policyholder, debt);
+            if (policyOf[policyholder] > 0) {
+                debt = _debts[i];
+                debtOf[policyholder] += debt;
+                emit DebtSet(policyholder, debt);
+            }
         }
     }
 
@@ -343,7 +346,7 @@ contract SolaceCoverProductV3 is
 
         policyID = policyOf[_user];
         require(_checkCapacity(0, _coverLimit), "insufficient capacity");
-        require(scp.balanceOf(_user) > minRequiredAccountBalance(_coverLimit), "insufficient scp balance");
+        require(ISCP(scp).balanceOf(_user) > minRequiredAccountBalance(_coverLimit), "insufficient scp balance");
 
         // mint policy if doesn't currently exist
         if (policyID == 0) {
@@ -382,7 +385,7 @@ contract SolaceCoverProductV3 is
      * @param _newCoverLimit The new policyholder cover limit.
      */
     function _updateActiveCoverLimit(uint256 _currentCoverLimit, uint256 _newCoverLimit) internal {
-        riskManager.updateActiveCoverLimitForStrategy(address(this), _currentCoverLimit, _newCoverLimit);
+        IRiskManager(riskManager).updateActiveCoverLimitForStrategy(address(this), _currentCoverLimit, _newCoverLimit);
     }
 
     /**
@@ -404,17 +407,17 @@ contract SolaceCoverProductV3 is
     function _setRegistry(address _registry) internal {
         // set registry
         require(_registry != address(0x0), "zero address registry");
-        registry = IRegistry(_registry);
+        registry = _registry;
 
         // set risk manager
-        (, address riskManagerAddr) = registry.tryGet("riskManager");
+        (, address riskManagerAddr) = IRegistry(_registry).tryGet("riskManager");
         require(riskManagerAddr != address(0x0), "zero address riskmanager");
-        riskManager = IRiskManager(riskManagerAddr);
+        riskManager = riskManagerAddr;
 
         // set scp
-        (, address scpAddr) = registry.tryGet("scp");
+        (, address scpAddr) = IRegistry(_registry).tryGet("scp");
         require(scpAddr != address(0x0), "zero address scp");
-        scp = ISCP(scpAddr);
+        scp = scpAddr;
         emit RegistrySet(_registry);
     }
 }
