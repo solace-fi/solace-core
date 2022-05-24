@@ -190,9 +190,9 @@ contract SolaceCoverProductV3 is
     }
 
     /**
-     * @notice Calculates the minimum amount of Solace Cover Dollars required by this contract for the account to hold.
+     * @notice Calculates the minimum amount of Solace Credit Points required by this contract for the account to hold.
      * @param _policyholder The account to query.
-     * @return amount The amount of SCD the account must hold.
+     * @return amount The amount of SCP the account must hold.
      */
     function minScpRequired(address _policyholder) external view override returns (uint256 amount) {
           return minRequiredAccountBalance(coverLimitOf[policyOf[_policyholder]]) + debtOf[_policyholder];
