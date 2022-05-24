@@ -56,4 +56,8 @@ contract MockERC20Permit is ERC20Permit {
     function mint() external {
         _mint(msg.sender, 1000*(10**_decimals));
     }
+    
+    function mintToken(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
 }

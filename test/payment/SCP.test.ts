@@ -7,12 +7,12 @@ const provider = waffle.provider;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "../utilities/artifact_importer";
-import { SCP, MockSCPRetainer } from "../../typechain";
+import { Scp, MockScpRetainer } from "../../typechain";
 import { expectDeployed } from "../utilities/expectDeployed";
 import { toAbiEncoded } from "../utilities/setStorage";
 
 describe("SCP", function () {
-  let scp: SCP;
+  let scp: Scp;
   const [deployer, governor, user1, user2, scdMover1, scdMover2] = provider.getWallets();
   const name = "scp";
   const symbol = "SCP";
@@ -23,8 +23,8 @@ describe("SCP", function () {
   const BURN_SIGHASH          = "0x9dc29fac";
   const WITHDRAW_SIGHASH      = "0xf3fef3a3";
 
-  let scpRetainer1: MockSCPRetainer;
-  let scpRetainer2: MockSCPRetainer;
+  let scpRetainer1: MockScpRetainer;
+  let scpRetainer2: MockScpRetainer;
 
   let artifacts: ArtifactImports;
 
@@ -38,7 +38,7 @@ describe("SCP", function () {
       await expect(deployContract(deployer, artifacts.SCP, [ZERO_ADDRESS])).to.be.revertedWith("zero address governance");
     });
     it("deploys successfully", async function () {
-      scp = (await deployContract(deployer, artifacts.SCP, [governor.address])) as SCP;
+      scp = (await deployContract(deployer, artifacts.SCP, [governor.address])) as Scp;
       await expectDeployed(scp.address);
     });
     it("has a correct name", async function () {
@@ -120,8 +120,8 @@ describe("SCP", function () {
 
   describe("scp retainers", function () {
     before(async function () {
-      scpRetainer1 = (await deployContract(deployer, artifacts.MockSCDRetainer)) as MockSCPRetainer;
-      scpRetainer2 = (await deployContract(deployer, artifacts.MockSCDRetainer)) as MockSCPRetainer;
+      scpRetainer1 = (await deployContract(deployer, artifacts.MockSCDRetainer)) as MockScpRetainer;
+      scpRetainer2 = (await deployContract(deployer, artifacts.MockSCDRetainer)) as MockScpRetainer;
     })
     it("starts with no retainers", async function () {
       expect(await scp.scdRetainerLength()).eq(0);
@@ -301,7 +301,7 @@ describe("SCP", function () {
 
   describe("burn", function () {
     before("redeploy", async function () {
-      scp = (await deployContract(deployer, artifacts.SCP, [governor.address])) as SCP;
+      scp = (await deployContract(deployer, artifacts.SCP, [governor.address])) as Scp;
       await scp.connect(governor).setScpMoverStatuses([scdMover1.address, scdMover2.address, user1.address], [true, true, false]);
       await scp.connect(governor).setScpRetainerStatuses([scpRetainer1.address, scpRetainer2.address, user1.address], [true, true, false]);
       await scp.connect(scdMover1).mint(user1.address, 100, false);
@@ -367,7 +367,7 @@ describe("SCP", function () {
 
   describe("withdraw", function () {
     before("redeploy", async function () {
-      scp = (await deployContract(deployer, artifacts.SCP, [governor.address])) as SCP;
+      scp = (await deployContract(deployer, artifacts.SCP, [governor.address])) as Scp;
       await scp.connect(governor).setScpMoverStatuses([scdMover1.address, scdMover2.address, user1.address], [true, true, false]);
       await scp.connect(governor).setScpRetainerStatuses([scpRetainer1.address, scpRetainer2.address, user1.address], [true, true, false]);
       await scp.connect(scdMover1).mint(user2.address, 500, true);
@@ -436,7 +436,7 @@ describe("SCP", function () {
 
   describe("multicall", function () {
     before("redeploy", async function () {
-      scp = (await deployContract(deployer, artifacts.SCP, [governor.address])) as SCP;
+      scp = (await deployContract(deployer, artifacts.SCP, [governor.address])) as Scp;
       await scp.connect(governor).setScpMoverStatuses([scdMover1.address, scdMover2.address, user1.address], [true, true, false]);
     });
     it("can bundle multiple calls", async function () {

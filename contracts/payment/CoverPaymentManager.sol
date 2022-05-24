@@ -15,15 +15,10 @@ import "./../interfaces/utils/IPriceVerifier.sol";
 
 
 /**
- * @title Solace Cover Points Teller - Stables
+ * @title Cover Payment Manager
  * @author solace.fi
- * @notice A teller for [**Solace Cover Points**](./SCP) that accepts stablecoins for payment.
+ * @notice A cover payment manager for [**Solace Cover Points**](./SCP) that accepts stablecoins  and `SOLACE` for payment.
  *
- * Users can call [`deposit()`](#deposit) or [`depositSigned()`](#depositsigned) to deposit any accepted stablecoin and receive [**SCP**](./SCP). Cover products may deduct from a user's [**SCP**](./SCP) balance to pay for coverage. Users can call [`withdraw()`](#withdraw) to redeem their [**SCP**](./SCP) for stablecoins that they deposited as long as they're refundable and not required by a cover product. Deposited tokens are sent to and withdrawn from the premium pool.
- *
- * This teller assumes that accepted tokens are sufficiently pegged to **USD**, for example **USDC**, **DAI**, and Aave's interest bearing **aDAI** but not Yearn's interest bearing **yDAI**. Users cannot withdraw tokens they did not deposit, in other words this cannot be used to freely exchange **DAI** for **USDC** unless they previously deposited **USDC**. Token balances are automatically converted to the appropriate amount of decimals.
- *
- * [**Governance**](/docs/protocol/governance) can add new tokens and set their flags. Flags determine how a user can use a token to interact with the teller, the most important are `IS_ACCEPTED`, `IS_PERMITTABLE`, and `IS_REFUNDABLE`. Governance can also set the address of the premium pool. The address of [**SCP**](./SCP) is set during construction and cannot be modified.
  */
 contract CoverPaymentManager is ICoverPaymentManager, Multicall, PriceVerifier, ReentrancyGuard {
 
@@ -158,13 +153,13 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, PriceVerifier, 
         TokenInfo memory ti = tokenInfo[token];
         require(ti.accepted,  "token not accepted");
         require(!ti.stable,   "token not non-stable");
-        require(verifyPrice(token, price,priceDeadline, signature), "invalid token price");
+        require(verifyPrice(token, price, priceDeadline, signature), "invalid token price");
 
         // interactions
         uint256 scpAmount = (_convertDecimals(amount, token, scp) * price) / 10**18;
         SafeERC20.safeTransferFrom(IERC20(token), msg.sender, premiumPool, amount);
         ISCP(scp).mint(recipient, scpAmount, true);
-        emit TokenDeposited(token, msg.sender, recipient, scpAmount);
+        emit TokenDeposited(token, msg.sender, recipient, amount);
     }
 
 
@@ -188,7 +183,8 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, PriceVerifier, 
         uint256 priceDeadline,
         bytes calldata signature
     ) external override nonReentrant {
-        require(amount > 0, "zero amount");
+        require(amount > 0, "zero amount withdraw");
+        require(verifyPrice(solace, price, priceDeadline, signature), "invalid solace price");
         uint256 refundableSolaceAmount = getRefundableSOLACEAmount(msg.sender, price, priceDeadline, signature);
         require(amount <= refundableSolaceAmount, "withdraw amount exceeds balance");
 
