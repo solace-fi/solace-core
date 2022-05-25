@@ -8,7 +8,7 @@ const { expect } = chai;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "../utilities/artifact_importer";
-import { Solace, XsLocker, StakingRewardsV2, Registry, Scp, CoverPaymentManager } from "../../typechain";
+import { Solace, XsLocker, StakingRewardsV2, Registry, Scp, CoverPaymentManager, BlockGetter } from "../../typechain";
 import { bnAddSub, bnMulDiv, expectClose } from "../utilities/math";
 import { expectDeployed } from "../utilities/expectDeployed";
 import { assembleSignature, getPriceDataDigest, sign } from "../utilities/signature";
@@ -20,6 +20,7 @@ let xsLocker: XsLocker;
 let stakingRewards: StakingRewardsV2;
 let scp: Scp;
 let coverPaymentManager: CoverPaymentManager;
+let blockGetter: BlockGetter;
 
 // vars
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
@@ -47,7 +48,8 @@ describe("StakingRewardsV2", function () {
     artifacts = await import_artifacts();
     snapshot = await provider.send("evm_snapshot", []);
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
-    
+    blockGetter = (await deployContract(deployer, artifacts.BlockGetter)) as BlockGetter;
+
     // deploy registry
     registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
     await registry.connect(governor).set(["premiumPool"], [premiumPool.address]);
@@ -60,7 +62,7 @@ describe("StakingRewardsV2", function () {
     solace = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
     await registry.connect(governor).set(["solace"], [solace.address])
     await solace.connect(governor).addMinter(governor.address);
-   
+
     // deploy xslocker
     xsLocker = (await deployContract(deployer, artifacts.xsLocker, [governor.address, solace.address])) as unknown as XsLocker;
     await registry.connect(governor).set(["xsLocker"], [xsLocker.address])
@@ -87,9 +89,13 @@ describe("StakingRewardsV2", function () {
     before(async function () {
       mockRegistry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
     });
-    
+
     it("reverts if zero governance", async function () {
       await expect(deployContract(deployer, artifacts.StakingRewardsV2, [ZERO_ADDRESS, registry.address, solacePerSecond])).to.be.revertedWith("zero address governance");
+    });
+
+    it("reverts if zero address registry", async function () {
+      await expect(deployContract(deployer, artifacts.StakingRewardsV2, [governor.address, ZERO_ADDRESS, solacePerSecond])).to.be.revertedWith("zero address registry");
     });
 
     it("reverts if zero address payment manager", async function () {
@@ -139,9 +145,9 @@ describe("StakingRewardsV2", function () {
     let startTime: number;
     let endTime: number;
     before(async function () {
-      let block = await provider.getBlock('latest');
-      startTime = block.timestamp;
-      endTime = block.timestamp + 200;
+      let timestamp = (await blockGetter.getBlockTimestamp()).toNumber();
+      startTime = timestamp;
+      endTime = timestamp + 200;
       stakingRewards = (await deployContract(deployer, artifacts.StakingRewardsV2, [governor.address, registry.address, solacePerSecond])) as StakingRewardsV2;
       await stakingRewards.connect(governor).setTimes(startTime, endTime);
       await solace.connect(governor).mint(stakingRewards.address, ONE_ETHER.mul(1000000));
@@ -220,8 +226,8 @@ describe("StakingRewardsV2", function () {
       expect(info4.unpaidRewards).eq(0);
       expect(info4.owner).eq(user1.address);
       // extend to future
-      let block = await provider.getBlock('latest');
-      let end = block.timestamp+ONE_YEAR*4;
+      let timestamp = (await blockGetter.getBlockTimestamp()).toNumber();
+      let end = timestamp+ONE_YEAR*4;
       await xsLocker.connect(user1).extendLock(xsLockID, end);
       let info5 = await stakingRewards.stakedLockInfo(xsLockID);
       expectClose(info5.value, ONE_ETHER.mul(10), PRECISION);
@@ -257,7 +263,7 @@ describe("StakingRewardsV2", function () {
     before(async function () {
       xsLocker = (await deployContract(deployer, artifacts.xsLocker, [governor.address, solace.address])) as unknown as XsLocker;
       await registry.connect(governor).set(["xsLocker"], [xsLocker.address])
-  
+
       await solace.connect(user1).approve(xsLocker.address, constants.MaxUint256);
       await solace.connect(user2).approve(xsLocker.address, constants.MaxUint256);
       await solace.connect(user3).approve(xsLocker.address, constants.MaxUint256);
@@ -266,8 +272,8 @@ describe("StakingRewardsV2", function () {
       await xsLocker.connect(governor).addXsLockListener(stakingRewards.address);
       await solace.connect(user1).approve(xsLocker.address, ONE_ETHER);
       await xsLocker.connect(user1).createLock(user1.address, ONE_ETHER, 0);
-      let block = await provider.getBlock('latest');
-      await provider.send("evm_setNextBlockTimestamp", [block.timestamp + 20]);
+      let timestamp = (await blockGetter.getBlockTimestamp()).toNumber();
+      await provider.send("evm_setNextBlockTimestamp", [timestamp + 20]);
       await provider.send("evm_mine", []);
     });
 
@@ -284,15 +290,15 @@ describe("StakingRewardsV2", function () {
     });
 
     it("times set", async function () {
-      let block = await provider.getBlock('latest');
-      startTime = block.timestamp + 5;
-      endTime = block.timestamp + 20;
+      let timestamp = (await blockGetter.getBlockTimestamp()).toNumber();
+      startTime = timestamp + 5;
+      endTime = timestamp + 20;
       await stakingRewards.connect(governor).setTimes(startTime, endTime);
       expect(await stakingRewards.pendingRewardsOfLock(1)).eq(0);
       expect(await stakingRewards.getRewardAmountDistributed(0, startTime)).eq(0);
       expect(await stakingRewards.getRewardAmountDistributed(startTime, endTime)).eq(solacePerSecond.mul(15));
       let balances1 = await getBalances();
-      await provider.send("evm_setNextBlockTimestamp", [block.timestamp + 10]);
+      await provider.send("evm_setNextBlockTimestamp", [timestamp + 10]);
       await provider.send("evm_mine", []);
       await checkConsistency();
       expectClose(await stakingRewards.pendingRewardsOfLock(1), solacePerSecond.mul(5), PRECISION);
@@ -344,9 +350,9 @@ describe("StakingRewardsV2", function () {
       xsLocker = (await deployContract(deployer, artifacts.xsLocker, [governor.address, solace.address])) as unknown as XsLocker;
       await registry.connect(governor).set(["xsLocker"], [xsLocker.address]);
 
-      let block = await provider.getBlock('latest');
-      startTime = block.timestamp + 100;
-      endTime = block.timestamp + 200;
+      let timestamp = (await blockGetter.getBlockTimestamp()).toNumber();
+      startTime = timestamp + 100;
+      endTime = timestamp + 200;
       stakingRewards = (await deployContract(deployer, artifacts.StakingRewardsV2, [governor.address, registry.address, solacePerSecond])) as StakingRewardsV2;
       await stakingRewards.connect(governor).setTimes(startTime, endTime);
       await xsLocker.connect(governor).addXsLockListener(stakingRewards.address);
@@ -387,9 +393,9 @@ describe("StakingRewardsV2", function () {
       await solace.connect(user1).approve(xsLocker.address, constants.MaxUint256);
       await solace.connect(user2).approve(xsLocker.address, constants.MaxUint256);
       await solace.connect(user3).approve(xsLocker.address, constants.MaxUint256);
-      let block = await provider.getBlock('latest');
-      startTime = block.timestamp + 100;
-      endTime = block.timestamp + 200;
+      let timestamp = (await blockGetter.getBlockTimestamp()).toNumber();
+      startTime = timestamp + 100;
+      endTime = timestamp + 200;
       stakingRewards = (await deployContract(deployer, artifacts.StakingRewardsV2, [governor.address, registry.address, solacePerSecond])) as StakingRewardsV2;
       await solace.connect(governor).mint(stakingRewards.address, ONE_ETHER.mul(1000000000));
       await stakingRewards.connect(governor).setTimes(startTime, endTime);
@@ -428,9 +434,9 @@ describe("StakingRewardsV2", function () {
     let endTime: number;
 
     before(async function () {
-      let block = await provider.getBlock('latest');
-      startTime = block.timestamp + 10;
-      endTime = block.timestamp + ONE_YEAR*10;
+      let timestamp = (await blockGetter.getBlockTimestamp()).toNumber();
+      startTime = timestamp + 30;
+      endTime = timestamp + ONE_YEAR*10;
       xsLocker = (await deployContract(deployer, artifacts.xsLocker, [governor.address, solace.address])) as unknown as XsLocker;
       await registry.connect(governor).set(["xsLocker"], [xsLocker.address]);
 
@@ -441,7 +447,7 @@ describe("StakingRewardsV2", function () {
       await stakingRewards.connect(governor).setTimes(startTime, endTime);
       await xsLocker.connect(governor).addXsLockListener(stakingRewards.address);
       await xsLocker.connect(user1).createLock(user1.address, ONE_ETHER, 0, {gasLimit: 600000}); // xsLockID 1 value 1
-      await xsLocker.connect(user1).createLock(user1.address, ONE_ETHER.mul(2), block.timestamp+ONE_YEAR*4, {gasLimit: 600000}); // xsLockID 2 value 5
+      await xsLocker.connect(user1).createLock(user1.address, ONE_ETHER.mul(2), timestamp+ONE_YEAR*4, {gasLimit: 600000}); // xsLockID 2 value 5
       await xsLocker.connect(user2).createLock(user2.address, ONE_ETHER.mul(3), 0, {gasLimit: 600000}); // xsLockID 3 value 3
       await solace.connect(governor).mint(stakingRewards.address, ONE_ETHER.mul(1000000000));
     });
@@ -499,8 +505,8 @@ describe("StakingRewardsV2", function () {
       expect(await stakingRewards.pendingRewardsOfLock(2)).eq(0);
       expect(await stakingRewards.pendingRewardsOfLock(3)).eq(0);
       await checkConsistency();
-      let block = await provider.getBlock('latest');
-      await provider.send("evm_setNextBlockTimestamp", [startTime + block.timestamp+ONE_YEAR]);
+      let timestamp = (await blockGetter.getBlockTimestamp()).toNumber();
+      await provider.send("evm_setNextBlockTimestamp", [startTime + timestamp+ONE_YEAR]);
       await provider.send("evm_mine", []);
       expect(await stakingRewards.pendingRewardsOfLock(1)).eq(0);
       expect(await stakingRewards.pendingRewardsOfLock(2)).eq(0);
@@ -516,9 +522,9 @@ describe("StakingRewardsV2", function () {
     let startTime: number;
     let endTime: number;
     before(async function () {
-      let block = await provider.getBlock('latest');
-      startTime = block.timestamp + 10;
-      endTime = block.timestamp + ONE_YEAR*10;
+      let timestamp = (await blockGetter.getBlockTimestamp()).toNumber();
+      startTime = timestamp + 30;
+      endTime = timestamp + ONE_YEAR*10;
       xsLocker = (await deployContract(deployer, artifacts.xsLocker, [governor.address, solace.address])) as unknown as XsLocker;
       await registry.connect(governor).set(["xsLocker"], [xsLocker.address]);
 
@@ -529,7 +535,7 @@ describe("StakingRewardsV2", function () {
       await stakingRewards.connect(governor).setTimes(startTime, endTime);
       await xsLocker.connect(governor).addXsLockListener(stakingRewards.address);
       await xsLocker.connect(user1).createLock(user1.address, ONE_ETHER, 0, {gasLimit: 600000}); // xsLockID 1 value 1
-      await xsLocker.connect(user1).createLock(user1.address, ONE_ETHER.mul(2), block.timestamp+ONE_YEAR*4, {gasLimit: 600000}); // xsLockID 2 value 5
+      await xsLocker.connect(user1).createLock(user1.address, ONE_ETHER.mul(2), timestamp+ONE_YEAR*4, {gasLimit: 600000}); // xsLockID 2 value 5
       await xsLocker.connect(user2).createLock(user2.address, ONE_ETHER.mul(3), 0, {gasLimit: 600000}); // xsLockID 3 value 3
     });
 
@@ -583,8 +589,8 @@ describe("StakingRewardsV2", function () {
       let prl1 = await stakingRewards.pendingRewardsOfLock(1);
       let prl2 = await stakingRewards.pendingRewardsOfLock(2);
       let prl3 = await stakingRewards.pendingRewardsOfLock(3);
-      let block = await provider.getBlock('latest');
-      await provider.send("evm_setNextBlockTimestamp", [startTime + block.timestamp+ONE_YEAR]);
+      let timestamp = (await blockGetter.getBlockTimestamp()).toNumber();
+      await provider.send("evm_setNextBlockTimestamp", [startTime + timestamp+ONE_YEAR]);
       await provider.send("evm_mine", []);
       expect(await stakingRewards.pendingRewardsOfLock(1)).eq(prl1);
       expect(await stakingRewards.pendingRewardsOfLock(2)).eq(prl2);
@@ -608,9 +614,9 @@ describe("StakingRewardsV2", function () {
     let startTime: number;
     let endTime: number;
     before(async function () {
-      let block = await provider.getBlock('latest');
-      startTime = block.timestamp + 10;
-      endTime = block.timestamp + ONE_YEAR*10;
+      let timestamp = (await blockGetter.getBlockTimestamp()).toNumber();
+      startTime = timestamp + 10;
+      endTime = timestamp + ONE_YEAR*10;
       xsLocker = (await deployContract(deployer, artifacts.xsLocker, [governor.address, solace.address])) as unknown as XsLocker;
       await registry.connect(governor).set(["xsLocker"], [xsLocker.address]);
 
@@ -620,17 +626,17 @@ describe("StakingRewardsV2", function () {
       stakingRewards = (await deployContract(deployer, artifacts.StakingRewardsV2, [governor.address, registry.address, solacePerSecond])) as StakingRewardsV2;
       await stakingRewards.connect(governor).setTimes(startTime, endTime);
       await xsLocker.connect(governor).addXsLockListener(stakingRewards.address);
-      await xsLocker.connect(user1).createLock(user1.address, ONE_ETHER.mul(10), block.timestamp+ONE_YEAR*4, {gasLimit: 600000}); // xsLockID 1
+      await xsLocker.connect(user1).createLock(user1.address, ONE_ETHER.mul(10), timestamp+ONE_YEAR*4, {gasLimit: 600000}); // xsLockID 1
     });
 
     it("decreases over time but after harvest", async function () {
       // y = (3x/8 + 1)*amount
-      let block = await provider.getBlock('latest');
+      let timestamp = (await blockGetter.getBlockTimestamp()).toNumber();
       // 4 years left
       let value1 = (await stakingRewards.stakedLockInfo(1)).value;
       expectClose(value1, ONE_ETHER.mul(25), PRECISION);
       // 3 years left, no harvest
-      await provider.send("evm_setNextBlockTimestamp", [block.timestamp+ONE_YEAR*1]);
+      await provider.send("evm_setNextBlockTimestamp", [timestamp+ONE_YEAR*1]);
       await provider.send("evm_mine", []);
       let value2 = (await stakingRewards.stakedLockInfo(1)).value;
       expect(value2).eq(value1);
@@ -639,7 +645,7 @@ describe("StakingRewardsV2", function () {
       let value3 = (await stakingRewards.stakedLockInfo(1)).value;
       expectClose(value3, bnMulDiv([ONE_ETHER, 10, 17], [8]), PRECISION);
       // no time left, no harvest
-      await provider.send("evm_setNextBlockTimestamp", [block.timestamp+ONE_YEAR*4]);
+      await provider.send("evm_setNextBlockTimestamp", [timestamp+ONE_YEAR*4]);
       await provider.send("evm_mine", []);
       let value4 = (await stakingRewards.stakedLockInfo(1)).value;
       expect(value4).eq(value3);
@@ -655,9 +661,9 @@ describe("StakingRewardsV2", function () {
     let endTime: number;
 
     before(async function () {
-      let block = await provider.getBlock('latest');
-      startTime = block.timestamp + 10;
-      endTime = block.timestamp + ONE_YEAR*10;
+      let timestamp = (await blockGetter.getBlockTimestamp()).toNumber();
+      startTime = timestamp + 30;
+      endTime = timestamp + ONE_YEAR*10;
       xsLocker = (await deployContract(deployer, artifacts.xsLocker, [governor.address, solace.address])) as unknown as XsLocker;
       await registry.connect(governor).set(["xsLocker"], [xsLocker.address]);
 
@@ -668,7 +674,7 @@ describe("StakingRewardsV2", function () {
       await stakingRewards.connect(governor).setTimes(startTime, endTime);
       await xsLocker.connect(governor).addXsLockListener(stakingRewards.address);
       await xsLocker.connect(user1).createLock(user1.address, ONE_ETHER, 0, {gasLimit: 600000}); // xsLockID 1 value 1
-      await xsLocker.connect(user1).createLock(user1.address, ONE_ETHER.mul(2), block.timestamp+ONE_YEAR*4, {gasLimit: 600000}); // xsLockID 2 value 5
+      await xsLocker.connect(user1).createLock(user1.address, ONE_ETHER.mul(2), timestamp+ONE_YEAR*4, {gasLimit: 600000}); // xsLockID 2 value 5
       await xsLocker.connect(user2).createLock(user2.address, ONE_ETHER.mul(3), 0, {gasLimit: 600000}); // xsLockID 3 value 3
       await solace.connect(governor).mint(stakingRewards.address, ONE_ETHER.mul(1000000000));
     });
@@ -786,10 +792,9 @@ describe("StakingRewardsV2", function () {
   });
 
   describe("harvestForScp", async function() {
-    // TODO: Complete this test
     let startTime: number;
     let endTime: number;
-    const SOLACE_PRICE = ONE_ETHER; // 1$
+    const SOLACE_PRICE = ONE_ETHER.mul(3).div(100); // $0.03
     const DOMAIN_NAME = "Solace.fi-PriceVerifier";
     const TYPEHASH = utils.keccak256(utils.toUtf8Bytes("PriceData(address token,uint256 price,uint256 deadline)"));
     const CHAIN_ID = 31337;
@@ -797,7 +802,7 @@ describe("StakingRewardsV2", function () {
     let priceSignature: string;
 
     before(async function() {
-      // add price signder
+      // add price signer
       await coverPaymentManager.connect(governor).addPriceSigner(governor.address);
       expect(await coverPaymentManager.connect(governor).isPriceSigner(governor.address)).to.true;
 
@@ -806,35 +811,121 @@ describe("StakingRewardsV2", function () {
       priceSignature = assembleSignature(sign(digest, Buffer.from(governor.privateKey.slice(2), "hex")));
 
       // locks
-      let block = await provider.getBlock('latest');
-      startTime = block.timestamp + 10;
-      endTime = block.timestamp + ONE_YEAR*10;
+      let timestamp = (await blockGetter.getBlockTimestamp()).toNumber();
+      startTime = timestamp + 30;
+      endTime = timestamp + ONE_YEAR*10;
       xsLocker = (await deployContract(deployer, artifacts.xsLocker, [governor.address, solace.address])) as unknown as XsLocker;
       await registry.connect(governor).set(["xsLocker"], [xsLocker.address]);
 
       await solace.connect(user1).approve(xsLocker.address, constants.MaxUint256);
+      await solace.connect(user2).approve(xsLocker.address, constants.MaxUint256);
       stakingRewards = (await deployContract(deployer, artifacts.StakingRewardsV2, [governor.address, registry.address, solacePerSecond])) as StakingRewardsV2;
       await stakingRewards.connect(governor).setTimes(startTime, endTime);
       await xsLocker.connect(governor).addXsLockListener(stakingRewards.address);
       await xsLocker.connect(user1).createLock(user1.address, ONE_ETHER, 0, {gasLimit: 600000}); // xsLockID 1 value 1
+      await xsLocker.connect(user2).createLock(user2.address, ONE_ETHER.mul(2), 0, {gasLimit: 600000}); // xsLockID 2 value 2
+      await xsLocker.connect(user1).createLock(user1.address, ONE_ETHER.mul(3), 0, {gasLimit: 600000}); // xsLockID 3 value 3
       await solace.connect(governor).mint(stakingRewards.address, ONE_ETHER.mul(1000000000));
 
+      await provider.send("evm_setNextBlockTimestamp", [startTime + 10000]);
+      await provider.send("evm_mine", []);
     });
 
-    it("harvest for scp", async function() {
-      // 20 blocks
-      // await provider.send("evm_setNextBlockTimestamp", [startTime + 20]);
-      // await provider.send("evm_mine", []);
+    it("cannot harvest for scp if solace not accepted", async function () {
+      let tokenInfo1 = await coverPaymentManager.tokenInfo(solace.address);
+      expect(tokenInfo1.accepted).to.be.false;
+      await expect(stakingRewards.connect(user1).harvestLockForScp(1, SOLACE_PRICE, DEADLINE, priceSignature)).to.be.revertedWith("token not accepted");
 
-      // // 1. get pending rewards
-      // let pendingRewards = await stakingRewards.pendingRewardsOfLock(1);
-
-      // // 2. harvest for scp(1 SCP == 1 SOLACE).
-      // await stakingRewards.connect(user1).harvestLockForScp(1, SOLACE_PRICE, DEADLINE, priceSignature);
-
-      // // 3. checks
-      // expect(await scp.connect(user1).balanceOf(user1.address)).eq(pendingRewards);
+      await coverPaymentManager.connect(governor).setTokenInfo([{'token': solace.address, 'accepted': true, 'permittable': true, 'refundable': true, 'stable': false}]);
+      let tokenInfo2 = await coverPaymentManager.tokenInfo(solace.address);
+      expect(tokenInfo2.accepted).to.be.true;
     });
+
+    it("cannot harvest for scp if payment manager is not scp mover", async function () {
+      expect(await scp.isScpMover(coverPaymentManager.address)).to.be.false;
+      await expect(stakingRewards.connect(user1).harvestLockForScp(1, SOLACE_PRICE, DEADLINE, priceSignature)).to.be.revertedWith("!scp mover");
+
+      await scp.connect(governor).setScpMoverStatuses([coverPaymentManager.address], [true]);
+      expect(await scp.isScpMover(coverPaymentManager.address)).to.be.true;
+    });
+
+    it("cannot harvest non existant lock", async function () {
+      await expect(stakingRewards.connect(user1).harvestLockForScp(999, SOLACE_PRICE, DEADLINE, priceSignature)).to.be.reverted;
+    });
+
+    it("cannot harvest someone elses lock", async function () {
+      await expect(stakingRewards.connect(user1).harvestLockForScp(2, SOLACE_PRICE, DEADLINE, priceSignature)).to.be.revertedWith("not owner");
+      await expect(stakingRewards.connect(user1).harvestLocksForScp([1,2], SOLACE_PRICE, DEADLINE, priceSignature)).to.be.revertedWith("not owner");
+    });
+
+    it("cannot harvest with invalid price signature", async function () {
+      await expect(stakingRewards.connect(user1).harvestLockForScp(1, SOLACE_PRICE, DEADLINE, [])).to.be.reverted;
+      await expect(stakingRewards.connect(user1).harvestLockForScp(1, SOLACE_PRICE, DEADLINE, "0x00")).to.be.reverted;
+      await expect(stakingRewards.connect(user1).harvestLockForScp(1, SOLACE_PRICE, DEADLINE, "0x0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789")).to.be.reverted;
+    });
+
+    it("can harvest for scp", async function() {
+      // 1. get pending rewards
+      let pendingRewards = await stakingRewards.pendingRewardsOfLock(1);
+      expect(pendingRewards).gt(0);
+      let expectedRewards = pendingRewards.mul(3).div(100)
+
+      // 2. harvest for scp (1 SOLACE == 0.03 SCP).
+      await stakingRewards.connect(user1).harvestLockForScp(1, SOLACE_PRICE, DEADLINE, priceSignature);
+
+      // 3. checks
+      expectClose(await scp.balanceOf(user1.address), expectedRewards, BN.from(10).pow(17));
+      expect(await stakingRewards.pendingRewardsOfLock(1)).eq(0);
+    });
+
+    it("can harvest multiple", async function () {
+      await provider.send("evm_setNextBlockTimestamp", [startTime + 11000]);
+      await provider.send("evm_mine", []);
+      let scpBal1 = await scp.balanceOf(user1.address);
+
+      // 1. get pending rewards
+      let pendingRewards1 = await stakingRewards.pendingRewardsOfLock(1);
+      expect(pendingRewards1).gt(0);
+      let pendingRewards3 = await stakingRewards.pendingRewardsOfLock(3);
+      expect(pendingRewards3).gt(0);
+      let pendingRewards = pendingRewards1.add(pendingRewards3);
+      let expectedRewards = pendingRewards.mul(3).div(100);
+
+      // 2. harvest for scp (1 SOLACE == 0.03 SCP).
+      await stakingRewards.connect(user1).harvestLocksForScp([1,3], SOLACE_PRICE, DEADLINE, priceSignature);
+
+      // 3. checks
+      let scpBal2 = await scp.balanceOf(user1.address);
+      let scpDiff = scpBal2.sub(scpBal1);
+      expectClose(scpDiff, expectedRewards, BN.from(10).pow(17));
+      expect(await stakingRewards.pendingRewardsOfLock(1)).eq(0);
+      expect(await stakingRewards.pendingRewardsOfLock(3)).eq(0);
+    });
+
+    it("can harvest for no rewards", async function () {
+      let timestamp = (await blockGetter.getBlockTimestamp()).toNumber();
+      startTime = timestamp - 1;
+      endTime = timestamp + 1;
+      await stakingRewards.connect(governor).setTimes(startTime, endTime);
+      await provider.send("evm_setNextBlockTimestamp", [endTime + 10]);
+      await provider.send("evm_mine", []);
+      await stakingRewards.connect(user1).harvestLockForScp(1, SOLACE_PRICE, DEADLINE, priceSignature);
+      let scpBal1 = await scp.balanceOf(user1.address);
+
+      // 1. get pending rewards
+      let pendingRewards = await stakingRewards.pendingRewardsOfLock(1);
+      expect(pendingRewards).eq(0);
+      let expectedRewards = pendingRewards.mul(3).div(100);
+
+      // 2. harvest for scp (1 SOLACE == 0.03 SCP).
+      await stakingRewards.connect(user1).harvestLockForScp(1, SOLACE_PRICE, DEADLINE, priceSignature);
+
+      // 3. checks
+      let scpBal2 = await scp.balanceOf(user1.address);
+      let scpDiff = scpBal2.sub(scpBal1);
+      expect(scpDiff).eq(expectedRewards);
+      expect(await stakingRewards.pendingRewardsOfLock(1)).eq(0);
+    })
   });
 
   describe("set rewards", function () {
@@ -860,6 +951,61 @@ describe("StakingRewardsV2", function () {
       await expect(tx).to.emit(stakingRewards, "FarmTimesSet").withArgs(123, 456);
       expect(await stakingRewards.startTime()).eq(123);
       expect(await stakingRewards.endTime()).eq(456);
+    });
+  });
+
+  describe("set registry", function () {
+    let registry2: Registry;
+    let coverPaymentManager2: CoverPaymentManager;
+    let solace2: Solace;
+    let xsLocker2: XsLocker;
+
+    before(async function () {
+      registry2 = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
+      await registry2.connect(governor).set(["scp", "premiumPool"], [scp.address, premiumPool.address]);
+      // deploy solace
+      solace2 = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
+      await solace2.connect(governor).addMinter(governor.address);
+      // deploy xslocker
+      xsLocker2 = (await deployContract(deployer, artifacts.xsLocker, [governor.address, solace2.address])) as unknown as XsLocker;
+      // deploy coverPaymentManager
+      coverPaymentManager2 = (await deployContract(deployer, artifacts.CoverPaymentManager, [governor.address, registry.address])) as CoverPaymentManager;
+    });
+
+    it("reverts if not governor", async function () {
+      await expect(stakingRewards.connect(user1).setRegistry(registry2.address)).to.be.revertedWith("!governance");
+    })
+
+    it("reverts if zero address registry", async function () {
+      await expect(stakingRewards.connect(governor).setRegistry(ZERO_ADDRESS)).to.be.revertedWith("zero address registry");
+    });
+
+    it("reverts if zero address payment manager", async function () {
+      await expect(stakingRewards.connect(governor).setRegistry(registry2.address)).to.be.revertedWith("zero address payment manager");
+      await registry2.connect(governor).set(["coverPaymentManager"], [coverPaymentManager2.address]);
+    });
+
+    it("reverts if zero solace", async function () {
+      await expect(stakingRewards.connect(governor).setRegistry(registry2.address)).to.be.revertedWith("zero address solace");
+      await registry2.connect(governor).set(["solace"], [solace2.address]);
+    });
+
+    it("reverts if zero xslocker", async function () {
+      await expect(stakingRewards.connect(governor).setRegistry(registry2.address)).to.be.revertedWith("zero address xslocker");
+      await registry2.connect(governor).set(["xsLocker"], [xsLocker2.address]);
+    });
+
+    it("sets registry", async function () {
+      let tx = await stakingRewards.connect(governor).setRegistry(registry2.address);
+      await expect(tx).to.emit(stakingRewards, "RegistrySet").withArgs(registry2.address);
+    });
+
+    it("registers properly", async function () {
+      expect(await stakingRewards.registry()).eq(registry2.address);
+      expect(await stakingRewards.coverPaymentManager()).eq(coverPaymentManager2.address);
+      expect(await stakingRewards.solace()).eq(solace2.address);
+      expect(await stakingRewards.xsLocker()).eq(xsLocker2.address);
+      await stakingRewards.connect(governor).setRegistry(registry.address);
     });
   });
 
@@ -948,12 +1094,12 @@ describe("StakingRewardsV2", function () {
     if(!exists) {
       return -1;
     }
-    let block = await provider.getBlock('latest');
+    let timestamp = (await blockGetter.getBlockTimestamp()).toNumber();
     let lock = await xsLocker.locks(xsLockID);
     let base = lock.amount.mul(UNLOCKED_MULTIPLIER_BPS).div(MAX_BPS);
-    let bonus = (lock.end.lte(block.timestamp))
+    let bonus = (lock.end.lte(timestamp))
       ? 0 // unlocked
-      : lock.amount.mul(lock.end.toNumber() - block.timestamp).mul(MAX_LOCK_MULTIPLIER_BPS - UNLOCKED_MULTIPLIER_BPS).div(MAX_LOCK_DURATION * MAX_BPS); // locked
+      : lock.amount.mul(lock.end.toNumber() - timestamp).mul(MAX_LOCK_MULTIPLIER_BPS - UNLOCKED_MULTIPLIER_BPS).div(MAX_LOCK_DURATION * MAX_BPS); // locked
     let expectedAmount = base.add(bonus);
     return expectedAmount;
   }

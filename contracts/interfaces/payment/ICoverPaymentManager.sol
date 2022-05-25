@@ -133,7 +133,7 @@ interface ICoverPaymentManager is IGovernable {
 
     /**
      * @notice Calculates the refundable `SOLACE` amount.
-     * @param depositor The ownder of funds.
+     * @param depositor The owner of funds.
      * @param price The `SOLACE` price in wei(usd).
      * @param priceDeadline The `SOLACE` price in wei(usd).
      * @param signature The `SOLACE` price signature.

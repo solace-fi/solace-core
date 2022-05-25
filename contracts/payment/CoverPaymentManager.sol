@@ -11,7 +11,6 @@ import "./../utils/PriceVerifier.sol";
 import "./../interfaces/payment/ISCP.sol";
 import "./../interfaces/utils/IRegistry.sol";
 import "./../interfaces/payment/ICoverPaymentManager.sol";
-import "./../interfaces/utils/IPriceVerifier.sol";
 
 
 /**
@@ -156,7 +155,7 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, PriceVerifier, 
         require(verifyPrice(token, price, priceDeadline, signature), "invalid token price");
 
         // interactions
-        uint256 scpAmount = (_convertDecimals(amount, token, scp) * price) / 10**18;
+        uint256 scpAmount = (amount * price) / 10**18;
         SafeERC20.safeTransferFrom(IERC20(token), msg.sender, premiumPool, amount);
         ISCP(scp).mint(recipient, scpAmount, true);
         emit TokenDeposited(token, msg.sender, recipient, amount);
@@ -211,7 +210,7 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, PriceVerifier, 
 
     /**
      * @notice Calculates the refundable `SOLACE` amount.
-     * @param depositor The ownder of funds.
+     * @param depositor The owner of funds.
      * @param price The `SOLACE` price in wei(usd).
      * @param priceDeadline The deadline for the price.
      * @param signature The `SOLACE` price signature.
@@ -252,7 +251,7 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, PriceVerifier, 
             // new token
             if (tokenInfo[token].token == address(0x0)) {
                 _indexToToken[tokensLength++] = token;
-            } 
+            }
             tokenInfo[token] = tokens[i];
             emit TokenInfoSet(tokens[i].token, tokens[i].accepted, tokens[i].permittable, tokens[i].refundable, tokens[i].stable);
         }

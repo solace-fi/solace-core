@@ -79,7 +79,6 @@ contract StakingRewardsV2 is IStakingRewardsV2, ReentrancyGuard, Governable {
         // set registry
         _setRegistry(registry_);
         rewardPerSecond = rewardPerSecond_;
-        IERC20(solace).approve(xsLocker, type(uint256).max);
     }
 
     /***************************************
@@ -270,10 +269,12 @@ contract StakingRewardsV2 is IStakingRewardsV2, ReentrancyGuard, Governable {
      * @param signature The `SOLACE` price signature.
     */
     function _harvestForScp(uint256 xsLockID, uint256 price, uint256 priceDeadline, bytes calldata signature) internal {
-        (uint256 transferAmount, address receiver) = _updateLock(xsLockID);
-        if (receiver != address(0x0) && transferAmount != 0) return;
+        (uint256 transferAmount, address owner) = _updateLock(xsLockID);
+        require(msg.sender == owner, "not owner");
         // buy scp
-        ICoverPaymentManager(coverPaymentManager).depositNonStable(solace, receiver, transferAmount, price, priceDeadline, signature);
+        if (owner != address(0x0) && transferAmount != 0) {
+            ICoverPaymentManager(coverPaymentManager).depositNonStable(solace, owner, transferAmount, price, priceDeadline, signature);
+        }
     }
 
     /**
@@ -406,21 +407,25 @@ contract StakingRewardsV2 is IStakingRewardsV2, ReentrancyGuard, Governable {
         require(_registry != address(0x0), "zero address registry");
         registry = _registry;
         IRegistry reg = IRegistry(_registry);
-  
+
         // set scp
         (, address coverPaymentManagerAddr) = reg.tryGet("coverPaymentManager");
         require(coverPaymentManagerAddr != address(0x0), "zero address payment manager");
         coverPaymentManager = coverPaymentManagerAddr;
-  
+
         // set solace
         (, address solaceAddr) = reg.tryGet("solace");
         require(solaceAddr != address(0x0), "zero address solace");
         solace = solaceAddr;
-  
+
         // set xslocker
         (, address xslockerAddr) = reg.tryGet("xsLocker");
         require(xslockerAddr != address(0x0), "zero address xslocker");
         xsLocker = xslockerAddr;
+
+        // approve solace
+        IERC20(solaceAddr).approve(xslockerAddr, type(uint256).max);
+        IERC20(solaceAddr).approve(coverPaymentManagerAddr, type(uint256).max);
 
         emit RegistrySet(_registry);
     }
