@@ -1,5 +1,5 @@
 import chai from "chai";
-import { waffle } from "hardhat";
+import { ethers, waffle } from "hardhat";
 const { expect } = chai;
 const { deployContract, solidity } = waffle;
 import { BigNumber as BN, Wallet } from "ethers";
@@ -22,6 +22,7 @@ describe("SCP", function () {
   const TRANSFER_FROM_SIGHASH = "0x23b872dd";
   const BURN_SIGHASH          = "0x9dc29fac";
   const WITHDRAW_SIGHASH      = "0xf3fef3a3";
+  const BURN_MULTIPLE_SIGHASH = "0xd216294f";
 
   let scpRetainer1: MockScpRetainer;
   let scpRetainer2: MockScpRetainer;
@@ -355,6 +356,78 @@ describe("SCP", function () {
         `${BURN_SIGHASH}${toAbiEncoded(user1.address)}${toAbiEncoded(100)}`,
         `${BURN_SIGHASH}${toAbiEncoded(user2.address)}${toAbiEncoded(200)}`,
       ]);
+      await expect(tx).to.emit(scp, "Transfer").withArgs(user1.address, ZERO_ADDRESS, 100);
+      await expect(tx).to.emit(scp, "Transfer").withArgs(user2.address, ZERO_ADDRESS, 200);
+      let b2 = await getBalances();
+      let bd21 = getBalancesDiff(b2, b1);
+      expect(bd21.totalSupply).eq(-300);
+      expect(bd21.balanceOfs[2]).eq(-100);
+      expect(bd21.balanceOfs[3]).eq(-200);
+    });
+  });
+
+  describe("burnMultipe", function () {
+    before("redeploy", async function () {
+      scp = (await deployContract(deployer, artifacts.SCP, [governor.address])) as Scp;
+      await scp.connect(governor).setScpMoverStatuses([scpMover1.address, scpMover2.address, user1.address], [true, true, false]);
+      await scp.connect(governor).setScpRetainerStatuses([scpRetainer1.address, scpRetainer2.address, user1.address], [true, true, false]);
+      await scp.connect(scpMover1).mint(user1.address, 100, false);
+      await scp.connect(scpMover1).mint(user2.address, 500, false);
+      await scp.connect(scpMover1).mint(user2.address, 200, true);
+    });
+    it("non mover cannot burn", async function () {
+      await expect(scp.connect(user1).burnMultiple([user1.address], [1])).to.be.revertedWith("!scp mover");
+    });
+    it("cannot burn from zero address", async function () {
+      await expect(scp.connect(scpMover1).burnMultiple([ZERO_ADDRESS], [1])).to.be.revertedWith("SCP: burn from the zero address");
+    });
+    it("cannot burn length mismatch", async function () {
+      await expect(scp.connect(scpMover1).burnMultiple([user1.address], [])).to.be.revertedWith("length mismatch");
+    });
+    it("mover can burn", async function () {
+      let b1 = await getBalances();
+
+      // fully nonrefundable
+      let tx1 = await scp.connect(scpMover1).burnMultiple([user2.address], [100]);
+      await expect(tx1).to.emit(scp, "Transfer").withArgs(user2.address, ZERO_ADDRESS, 100);
+      let b2 = await getBalances();
+      let bd21 = getBalancesDiff(b2, b1);
+      expect(bd21.totalSupply).eq(-100);
+      expect(bd21.balanceOfs[3]).eq(-100);
+      expect(bd21.balanceOfNonRefundables[3]).eq(-100);
+
+      // partly nonrefundable
+      let tx2 = await scp.connect(scpMover1).burnMultiple([user2.address], [500]);
+      await expect(tx2).to.emit(scp, "Transfer").withArgs(user2.address, ZERO_ADDRESS, 500);
+      let b3 = await getBalances();
+      let bd32 = getBalancesDiff(b3, b2);
+      expect(bd32.totalSupply).eq(-500);
+      expect(bd32.balanceOfs[3]).eq(-500);
+      expect(bd32.balanceOfNonRefundables[3]).eq(-400);
+
+      // fully refundable
+      let tx3 = await scp.connect(scpMover1).burnMultiple([user2.address], [100]);
+      await expect(tx3).to.emit(scp, "Transfer").withArgs(user2.address, ZERO_ADDRESS, 100);
+      let b4 = await getBalances();
+      let bd43 = getBalancesDiff(b4, b3);
+      expect(bd43.totalSupply).eq(-100);
+      expect(bd43.balanceOfs[3]).eq(-100);
+      expect(bd43.balanceOfNonRefundables[3]).eq(0);
+    });
+    it("cannot burn more than balance", async function () {
+      let bal = await scp.balanceOf(user1.address);
+      await expect(scp.connect(scpMover1).burnMultiple([user1.address], [bal.add(1)])).to.be.revertedWith("SCP: burn amount exceeds balance");
+    });
+    it("can burn many via multicall", async function () {
+      await scp.connect(scpMover1).mint(user2.address, 200, true);
+      let b1 = await getBalances();
+
+      let finterface = new ethers.utils.Interface(["function burnMultiple(address[] accounts, uint256[] amounts)"]);
+      let call1 = finterface.encodeFunctionData("burnMultiple", [[user1.address], [100]])
+      let call2 = finterface.encodeFunctionData("burnMultiple", [[user2.address], [200]])
+      
+      let tx = await scp.connect(scpMover1).multicall([call1, call2]);
+        
       await expect(tx).to.emit(scp, "Transfer").withArgs(user1.address, ZERO_ADDRESS, 100);
       await expect(tx).to.emit(scp, "Transfer").withArgs(user2.address, ZERO_ADDRESS, 200);
       let b2 = await getBalances();

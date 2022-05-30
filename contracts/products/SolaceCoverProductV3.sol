@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "../utils/Governable.sol";
 import "../interfaces/utils/IRegistry.sol";
 import "../interfaces/risk/IRiskManager.sol";
-import "../interfaces/payment/ISCP.sol";
+import "../interfaces/payment/ICoverPaymentManager.sol";
 import "../interfaces/products/ISolaceCoverProductV3.sol";
 
 /**
@@ -44,8 +44,8 @@ contract SolaceCoverProductV3 is
     /// @notice RiskManager contract.
     address public riskManager;
 
-    /// @notice SCP(Solace Cover Points) contract.
-    address public scp;
+    /// @notice CoverPaymentManager contract.
+    address public paymentManager;
 
     /// @notice Cannot buy new policies while paused. (Default is False)
     bool public paused;
@@ -56,7 +56,7 @@ contract SolaceCoverProductV3 is
     /// @notice The total policy count.
     uint256 public policyCount;
 
-    /// @notice The maximum rate charged per second per 1e-18 (wei) of coverLimit.
+    /// @notice The maximum rate charged per second per 1e-18 (wei) of cover limit.
     /// @dev Default to charge 10% of cover limit annually = 1/315360000.
     uint256 public maxRateNum;
 
@@ -106,9 +106,9 @@ contract SolaceCoverProductV3 is
         _setRegistry(_registry);
 
         // set defaults
-        maxRateNum = 1;
+        maxRateNum = 1; 
         maxRateDenom = 315360000;
-        chargeCycle = 604800;
+        chargeCycle = _getChargePeriodValue(ChargePeriod.WEEKLY);
         baseURI = string(abi.encodePacked("https://stats.solace.fi/policy/?chainID=", Strings.toString(block.chainid), "&policyID="));
     }
 
@@ -117,28 +117,54 @@ contract SolaceCoverProductV3 is
     ***************************************/
 
     /**
-     * @notice Activates policy for `msg.sender`.
-     * @param _user The account to purchase policy. 
+     * @notice Purchases policy for the user.
+     * @param _user The policy owner.
      * @param _coverLimit The maximum value to cover in **USD**.
      * @return policyID The ID of the newly minted policy.
-     */
-    function purchaseFor(address _user, uint256 _coverLimit) external override nonReentrant whileUnpaused returns (uint256 policyID) {
-        return _purchase(_user, _coverLimit);
+    */
+    function purchase(address _user, uint256 _coverLimit) external override nonReentrant whileUnpaused returns (uint256 policyID) {
+       return _purchase(_user, _coverLimit);
     }
 
     /**
-     * @notice Activates policy for `msg.sender`.
+     * @notice Purchases policy for the user.
+     * @param _user The policy owner.
      * @param _coverLimit The maximum value to cover in **USD**.
+     * @param _token The token to deposit.
+     * @param _amount Amount of token to deposit.
      * @return policyID The ID of the newly minted policy.
-     */
-    function purchase(uint256 _coverLimit) external override nonReentrant whileUnpaused returns (uint256 policyID) {
-       return _purchase(msg.sender, _coverLimit);
+    */
+    function purchaseWithStable(address _user, uint256 _coverLimit, address _token, uint256 _amount) external override nonReentrant whileUnpaused returns (uint256 policyID) {
+        return _purchaseWithStable(msg.sender, _user, _coverLimit, _token, _amount);
+    }
+
+    /**
+     * @notice Purchases policy for the user.
+     * @param _user The policy owner.
+     * @param _coverLimit The maximum value to cover in **USD**.
+     * @param _token The token to deposit.
+     * @param _amount Amount of token to deposit.
+     * @param _price The `SOLACE` price in wei(usd).
+     * @param _priceDeadline The `SOLACE` price in wei(usd).
+     * @param _signature The `SOLACE` price signature.
+     * @return policyID The ID of the newly minted policy.
+    */
+    function purchaseWithNonStable(
+        address _user,
+        uint256 _coverLimit,
+        address _token, 
+        uint256 _amount,
+        uint256 _price, 
+        uint256 _priceDeadline,
+        bytes calldata _signature
+    ) external override nonReentrant whileUnpaused returns (uint256 policyID) {
+        return _purchaseWithNonStable(msg.sender, _user, _coverLimit, _token, _amount, _price, _priceDeadline, _signature);
     }
 
     /**
      * @notice Cancels the policy.
      * The function cancels the policy of the policyholder.
-     */
+    */
     function cancel() external override {
         require(policyStatus(policyOf[msg.sender]), "invalid policy");
         _cancel(msg.sender);
@@ -151,7 +177,7 @@ contract SolaceCoverProductV3 is
     /**
      * @notice The maximum amount of cover that can be sold in **USD** to 18 decimals places.
      * @return cover The max amount of cover.
-     */
+    */
     function maxCover() public view override returns (uint256 cover) {
         return IRiskManager(riskManager).maxCoverPerStrategy(address(this));
     }
@@ -159,7 +185,7 @@ contract SolaceCoverProductV3 is
     /**
      * @notice Returns the active cover limit in **USD** to 18 decimal places. In other words, the total cover that has been sold at the current time.
      * @return amount The active cover limit.
-     */
+    */
     function activeCoverLimit() public view override returns (uint256 amount) {
         return IRiskManager(riskManager).activeCoverLimitPerStrategy(address(this));
     }
@@ -167,7 +193,7 @@ contract SolaceCoverProductV3 is
     /**
      * @notice Determine the available remaining capacity for new cover.
      * @return capacity The amount of available remaining capacity for new cover.
-     */
+    */
     function availableCoverCapacity() public view override returns (uint256 capacity) {
         capacity = maxCover() - activeCoverLimit();
     }
@@ -176,7 +202,7 @@ contract SolaceCoverProductV3 is
      * @notice Returns true if the policy is active, false if inactive
      * @param _policyID The policy ID.
      * @return status True if policy is active. False otherwise.
-     */
+    */
     function policyStatus(uint256 _policyID) public view override returns (bool status) {
         return coverLimitOf[_policyID] > 0 ? true : false;
     }
@@ -184,7 +210,7 @@ contract SolaceCoverProductV3 is
     /**
      * @notice Calculate minimum required account balance for a given cover limit. Equals the maximum chargeable fee for one epoch.
      * @param _coverLimit The maximum value to cover in **USD**.
-     */
+    */
     function minRequiredAccountBalance(uint256 _coverLimit) public view override returns (uint256 mrab) {
         mrab = (maxRateNum * chargeCycle * _coverLimit) / maxRateDenom;
     }
@@ -193,31 +219,21 @@ contract SolaceCoverProductV3 is
      * @notice Calculates the minimum amount of Solace Credit Points required by this contract for the account to hold.
      * @param _policyholder The account to query.
      * @return amount The amount of SCP the account must hold.
-     */
+    */
     function minScpRequired(address _policyholder) external view override returns (uint256 amount) {
-          return minRequiredAccountBalance(coverLimitOf[policyOf[_policyholder]]) + debtOf[_policyholder];
+        if (policyStatus(policyOf[_policyholder])) {
+            return minRequiredAccountBalance(coverLimitOf[policyOf[_policyholder]]) + debtOf[_policyholder];
+        }
+        return debtOf[_policyholder];
     }
 
     /**
      * @notice Returns the Uniform Resource Identifier (URI) for `policyID`.
      * @param policyID The policy ID.
-     */
+    */
     function tokenURI(uint256 policyID) public view virtual override returns (string memory uri) {
         require(_exists(policyID), "invalid policy");
         return string(abi.encodePacked(baseURI, Strings.toString(policyID)));
-    }
-
-    /**
-     * @notice Calculates the policy cancellation fee.
-     * @param policyID The policy id.
-     * @return fee The cancellation fee.
-    */
-    function calculateCancelFee(uint256 policyID) public view override returns (uint256 fee) {
-        // calculate cancellation fee
-        if (latestChargedTime > 0) {
-            return (minRequiredAccountBalance(coverLimitOf[policyID]) * ((block.timestamp - latestChargedTime) / 86400)) / chargeCycle;
-        }
-        return 0;
     }
 
     /***************************************
@@ -228,7 +244,7 @@ contract SolaceCoverProductV3 is
      * @notice Sets the [`Registry`](./Registry) contract address.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param _registry The address of `Registry` contract.
-     */
+    */
     function setRegistry(address _registry) external override onlyGovernance {
         _setRegistry(_registry);
     }
@@ -238,7 +254,7 @@ contract SolaceCoverProductV3 is
      * Deactivating policies are unaffected by pause.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param _paused True to pause, false to unpause.
-     */
+    */
     function setPaused(bool _paused) external override onlyGovernance {
         paused = _paused;
         emit PauseSet(_paused);
@@ -247,9 +263,9 @@ contract SolaceCoverProductV3 is
     /**
      * @notice set _maxRate.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param _maxRateNum Desired maxRateNum.
-     * @param _maxRateDenom Desired maxRateDenom.
-     */
+     * @param _maxRateNum The maximum rate charged per second per 1e-18 (wei) of cover limit. The default is to charge 10% of cover limit annually = 1/315360000.
+     * @param _maxRateDenom The maximum rate denomination value. The default value is max premium rate of 10% of cover limit per annum.
+    */
     function setMaxRate(uint256 _maxRateNum, uint256 _maxRateDenom) external override onlyGovernance {
         maxRateNum = _maxRateNum;
         maxRateDenom = _maxRateDenom;
@@ -259,17 +275,17 @@ contract SolaceCoverProductV3 is
     /**
      * @notice Sets maximum epoch duration over which premiums are charged.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param _chargeCycle The charge period to set.
-     */
-    function setChargeCycle(uint256 _chargeCycle) external override onlyGovernance {
-        chargeCycle = _chargeCycle;
-        emit ChargeCycleSet(_chargeCycle);
+     * @param _chargeCycle The premium charge period(Weekly, Monthly, Annually, Daily, Hourly) in seconds to set. The default is weekly(604800).
+    */
+    function setChargeCycle(ChargePeriod _chargeCycle) external override onlyGovernance {
+        chargeCycle = _getChargePeriodValue(_chargeCycle);
+        emit ChargeCycleSet(chargeCycle);
     }
 
     /**
      * @notice Sets the base URI for computing `tokenURI`.
      * @param _baseURI The new base URI.
-     */
+    */
     function setBaseURI(string memory _baseURI) external override onlyGovernance {
         baseURI = _baseURI;
         emit BaseURISet(_baseURI);
@@ -294,7 +310,7 @@ contract SolaceCoverProductV3 is
      * @notice Add debts for each policy holder. Can only be called by the **Premium Collector** role.
      * @param _policyholders The array of addresses of the policyholders to add debt.
      * @param _debts The array of debt amounts (in **USD** to 18 decimal places) for each policyholder.
-     */
+    */
     function setDebts(address[] calldata _policyholders, uint256[] calldata _debts) external override whileUnpaused onlyCollector {
         uint256 count = _policyholders.length;
         require(count == _debts.length, "length mismatch");
@@ -305,7 +321,7 @@ contract SolaceCoverProductV3 is
 
         for (uint256 i = 0; i < count; i++) {
             policyholder = _policyholders[i];
-            if (policyOf[policyholder] > 0) {
+            if (policyStatus(policyOf[policyholder])) {
                 debt = _debts[i];
                 debtOf[policyholder] += debt;
                 emit DebtSet(policyholder, debt);
@@ -322,7 +338,7 @@ contract SolaceCoverProductV3 is
      * @param _currentCoverLimit The current cover limit, 0 if policy has not previously been activated.
      * @param _newCoverLimit  The new cover limit requested.
      * @return acceptable True there is sufficient capacity for the requested new cover limit, false otherwise.
-     */
+    */
     function _checkCapacity(uint256 _currentCoverLimit, uint256 _newCoverLimit) internal view returns (bool acceptable) {
         // return true if user is lowering cover limit
         if (_newCoverLimit <= _currentCoverLimit) return true;
@@ -336,17 +352,18 @@ contract SolaceCoverProductV3 is
     }
 
     /**
-     * @notice Activates policy for `msg.sender`.
+     * @notice Purchases policy for user.
      * @param _user The account to purchase policy. 
      * @param _coverLimit The maximum value to cover in **USD**.
      * @return policyID The ID of the newly minted policy.
-     */
-     function _purchase(address _user, uint256 _coverLimit) internal returns (uint256 policyID) {
+    */
+    function _purchase(address _user, uint256 _coverLimit) internal returns (uint256 policyID) {
         require(_coverLimit > 0, "zero cover value");
 
         policyID = policyOf[_user];
-        require(_checkCapacity(0, _coverLimit), "insufficient capacity");
-        require(ISCP(scp).balanceOf(_user) > minRequiredAccountBalance(_coverLimit), "insufficient scp balance");
+        uint256 currentCoverlimit = coverLimitOf[policyID];
+        require(_checkCapacity(currentCoverlimit, _coverLimit), "insufficient capacity");
+        require(ICoverPaymentManager(paymentManager).getSCPBalance(_user) > minRequiredAccountBalance(_coverLimit), "insufficient scp balance");
 
         // mint policy if doesn't currently exist
         if (policyID == 0) {
@@ -355,26 +372,66 @@ contract SolaceCoverProductV3 is
             _mint(_user, policyID);
             emit PolicyCreated(policyID);
         } else {
-            if (_coverLimit == coverLimitOf[policyID]) return policyID;
+            if (_coverLimit == currentCoverlimit) return policyID;
             emit PolicyUpdated(policyID);
         }
 
         // update cover amount
-        _updateActiveCoverLimit(coverLimitOf[policyID], _coverLimit);
+        _updateActiveCoverLimit(currentCoverlimit, _coverLimit);
         coverLimitOf[policyID] = _coverLimit;
         return policyID;
     }
 
     /**
+     * @notice Purchases policy for user.
+     * @param _purchaser The account that purchases the policy.
+     * @param _user The account to purchase policy for. 
+     * @param _coverLimit The maximum value to cover in **USD**.
+     * @param _token The token to deposit.
+     * @param _amount Amount of token to deposit.
+     * @return policyID The ID of the newly minted policy.
+    */
+    function _purchaseWithStable(address _purchaser, address _user, uint256 _coverLimit, address _token, uint256 _amount) internal returns (uint256 policyID) {
+        ICoverPaymentManager(paymentManager).depositStableFrom(_token, _purchaser, _user, _amount);
+        return _purchase(_user, _coverLimit);
+    }
+
+    /**
+     * @notice Purchases policy for user.
+     * @param _purchaser The account that purchases the policy.
+     * @param _user The account to purchase policy. 
+     * @param _coverLimit The maximum value to cover in **USD**.
+     * @param _token The token to deposit.
+     * @param _amount Amount of token to deposit.
+     * @param _price The `SOLACE` price in wei(usd).
+     * @param _priceDeadline The `SOLACE` price in wei(usd).
+     * @param _signature The `SOLACE` price signature.
+     * @return policyID The ID of the newly minted policy.
+    */
+    function _purchaseWithNonStable(
+        address _purchaser,
+        address _user,
+        uint256 _coverLimit,
+        address _token,
+        uint256 _amount,
+        uint256 _price, 
+        uint256 _priceDeadline,
+        bytes calldata _signature
+    ) internal returns (uint256 policyID) {
+        ICoverPaymentManager(paymentManager).depositNonStableFrom(_token, _purchaser, _user, _amount, _price, _priceDeadline, _signature);
+        return _purchase(_user, _coverLimit);
+    } 
+
+    /**
      * @notice Cancels the policy.
      * @param _policyholder The policyholder address.
-     */
+    */
     function _cancel(address _policyholder) internal {
         uint256 policyID = policyOf[_policyholder];
         uint256 coverLimit = coverLimitOf[policyID];
         _updateActiveCoverLimit(coverLimit, 0);
 
-        debtOf[_policyholder] += calculateCancelFee(policyID);
+        debtOf[_policyholder] += minRequiredAccountBalance(coverLimit);
         coverLimitOf[policyID] = 0;
         emit PolicyCanceled(policyID);
     }
@@ -383,7 +440,7 @@ contract SolaceCoverProductV3 is
      * @notice Updates the Risk Manager on the current total cover limit purchased by policyholders.
      * @param _currentCoverLimit The current policyholder cover limit (0 if activating policy).
      * @param _newCoverLimit The new policyholder cover limit.
-     */
+    */
     function _updateActiveCoverLimit(uint256 _currentCoverLimit, uint256 _newCoverLimit) internal {
         IRiskManager(riskManager).updateActiveCoverLimitForStrategy(address(this), _currentCoverLimit, _newCoverLimit);
     }
@@ -394,7 +451,7 @@ contract SolaceCoverProductV3 is
      * @param from sending address.
      * @param to receiving address.
      * @param tokenId tokenId.
-     */
+    */
     function _beforeTokenTransfer(address from, address to, uint256 tokenId) internal virtual override {
         super._beforeTokenTransfer(from, to, tokenId);
         require(from == address(0), "only minting permitted");
@@ -414,10 +471,25 @@ contract SolaceCoverProductV3 is
         require(riskManagerAddr != address(0x0), "zero address riskmanager");
         riskManager = riskManagerAddr;
 
-        // set scp
-        (, address scpAddr) = IRegistry(_registry).tryGet("scp");
-        require(scpAddr != address(0x0), "zero address scp");
-        scp = scpAddr;
+        // set cover payment manager
+        (, address paymentManagerAddr) = IRegistry(_registry).tryGet("coverPaymentManager");
+        require(paymentManagerAddr != address(0x0), "zero address payment manager");
+        paymentManager = paymentManagerAddr;
         emit RegistrySet(_registry);
+    }
+
+    function _getChargePeriodValue(ChargePeriod period) private pure returns (uint256 value) {
+        if (period == ChargePeriod.WEEKLY) {
+            return 604800;
+        } else if (period == ChargePeriod.MONTHLY) {
+            return 2629746;
+        } else if (period == ChargePeriod.ANNUALLY) {
+            return 31556952;
+        } else if (period == ChargePeriod.DAILY) {
+            return 86400;
+        } else {
+            // hourly
+            return 3600;
+        }
     }
 }

@@ -78,6 +78,31 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, PriceVerifier, 
     /**
      * @notice Deposits tokens from msg.sender and credits them to recipient.
      * @param token The token to deposit.
+     * @param from The depositor of the token.
+     * @param recipient The recipient of Solace Cover Points.
+     * @param amount Amount of token to deposit.
+    */
+    function depositStableFrom(
+        address token,
+        address from,
+        address recipient,
+        uint256 amount
+    ) external override nonReentrant whileUnpaused {
+        // checks
+        TokenInfo memory ti = tokenInfo[token];
+        require(ti.accepted, "token not accepted");
+        require(ti.stable,   "token not stable");
+
+        // interactions
+        uint256 scpAmount = _convertDecimals(amount, token, scp);
+        SafeERC20.safeTransferFrom(IERC20(token), from, premiumPool, amount);
+        ISCP(scp).mint(recipient, scpAmount, ti.refundable);
+        emit TokenDeposited(token, from, recipient, amount);
+    }
+
+    /**
+     * @notice Deposits tokens from msg.sender and credits them to recipient.
+     * @param token The token to deposit.
      * @param recipient The recipient of Solace Cover Points.
      * @param amount Amount of token to deposit.
     */
@@ -129,6 +154,38 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, PriceVerifier, 
         SafeERC20.safeTransferFrom(IERC20(token), msg.sender, premiumPool, amount);
         ISCP(scp).mint(depositor, scpAmount, ti.refundable);
         emit TokenDeposited(token, depositor, depositor, amount);
+    }
+
+    /**
+     * @notice Deposits tokens from msg.sender and credits them to recipient.
+     * @param token The token to deposit.
+     * @param from The depositor of the token.
+     * @param recipient The recipient of Solace Cover Points.
+     * @param amount Amount of token to deposit.
+     * @param price The `SOLACE` price in wei(usd).
+     * @param priceDeadline The `SOLACE` price in wei(usd).
+     * @param signature The `SOLACE` price signature.
+    */
+    function depositNonStableFrom(
+        address token,
+        address from,
+        address recipient,
+        uint256 amount,
+        uint256 price,
+        uint256 priceDeadline,
+        bytes calldata signature
+    ) external override nonReentrant whileUnpaused {
+        // checks
+        TokenInfo memory ti = tokenInfo[token];
+        require(ti.accepted,  "token not accepted");
+        require(!ti.stable,   "token not non-stable");
+        require(verifyPrice(token, price, priceDeadline, signature), "invalid token price");
+
+        // interactions
+        uint256 scpAmount = (amount * price) / 10**18;
+        SafeERC20.safeTransferFrom(IERC20(token), from, premiumPool, amount);
+        ISCP(scp).mint(recipient, scpAmount, true);
+        emit TokenDeposited(token, from, recipient, amount);
     }
 
     /**
@@ -196,6 +253,15 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, PriceVerifier, 
     /***************************************
     VIEW FUNCTIONS
     ***************************************/
+
+    /**
+     * @notice Returns account's `SCP` balance.
+     * @param account The account to fetch.
+     * @return amount The amount of `SCP`.
+    */
+    function getSCPBalance(address account) external view override returns (uint256 amount) {
+        return ISCP(scp).balanceOf(account);
+    }
 
     /**
      * @notice Returns to token information for given token index.

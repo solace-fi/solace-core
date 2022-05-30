@@ -49,6 +49,20 @@ interface ICoverPaymentManager is IGovernable {
     /**
      * @notice Deposits tokens from msg.sender and credits them to recipient.
      * @param token The token to deposit.
+     * @param from The depositor of the token.
+     * @param recipient The recipient of Solace Cover Points.
+     * @param amount Amount of token to deposit.
+    */
+    function depositStableFrom(
+        address token,
+        address from,
+        address recipient,
+        uint256 amount
+    ) external;
+
+    /**
+     * @notice Deposits tokens from msg.sender and credits them to recipient.
+     * @param token The token to deposit.
      * @param recipient The recipient of Solace Cover Points.
      * @param amount Amount of token to deposit.
     */
@@ -76,6 +90,26 @@ interface ICoverPaymentManager is IGovernable {
         uint8 v,
         bytes32 r,
         bytes32 s
+    ) external;
+
+    /**
+     * @notice Deposits tokens from msg.sender and credits them to recipient.
+     * @param token The token to deposit.
+     * @param from The depositor of the token.
+     * @param recipient The recipient of Solace Cover Points.
+     * @param amount Amount of token to deposit.
+     * @param price The `SOLACE` price in wei(usd).
+     * @param priceDeadline The `SOLACE` price in wei(usd).
+     * @param signature The `SOLACE` price signature.
+    */
+    function depositNonStableFrom(
+        address token,
+        address from,
+        address recipient,
+        uint256 amount,
+        uint256 price,
+        uint256 priceDeadline,
+        bytes calldata signature
     ) external;
 
     /**
@@ -123,6 +157,14 @@ interface ICoverPaymentManager is IGovernable {
     /***************************************
     VIEW FUNCTIONS
     ***************************************/
+    
+    /**
+     * @notice Returns account's `SCP` balance.
+     * @param account The account to fetch.
+     * @return amount The amount of `SCP`.
+    */
+    function getSCPBalance(address account) external view returns (uint256 amount);
+
     /**
      * @notice Returns to token information for given token index.
      * @param index The token index.

@@ -29,12 +29,13 @@ describe("CoverPaymentManager", function () {
   let weth: Weth10;
   let solace: MockErc20Permit;
 
-  const [deployer, governor, user1, user2, user3, user4, premiumPool, premiumPool2, premiumPool3, premiumPool4] = provider.getWallets();
+  const [deployer, governor, user1, user2, user3, user4, user5, premiumPool, premiumPool2, premiumPool3, premiumPool4, premiumPool5, premiumPool6] = provider.getWallets();
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
   const ONE_ETHER = BN.from("1000000000000000000");
   const ONE_USDC = BN.from("1000000");
   const DEADLINE = constants.MaxUint256;
   const DEPOSIT_SIGHASH  = "0x4ba58eee";
+  const DEPOSIT_STABLE_SIGHASH = "0xed8013a0";
   const TYPEHASH = utils.keccak256(utils.toUtf8Bytes("PriceData(address token,uint256 price,uint256 deadline)"));
   const DOMAIN_NAME = "Solace.fi-PriceVerifier";
   const CHAIN_ID = 31337;
@@ -486,6 +487,169 @@ describe("CoverPaymentManager", function () {
     });
   });
 
+
+  describe("depositStableFrom", function() {
+    let tokens: any[];
+
+    before("redeploy scp and coverPaymentManager", async function () {
+      tokens = [
+            {'token': dai.address, 'accepted': true, 'permittable': false, 'refundable': true, 'stable': true},  // dai
+            {'token': usdc.address, 'accepted': true, 'permittable': true, 'refundable': true, 'stable': true},  // usdc
+            {'token': frax.address, 'accepted': true, 'permittable': false, 'refundable': true, 'stable': true}, // frax
+            {'token': fei.address, 'accepted': true, 'permittable': true, 'refundable': true, 'stable': true},   // fei
+            {'token': solace.address, 'accepted': true, 'permittable': true, 'refundable': true, 'stable': false},   // solace
+      ];
+
+      // deploy scp
+      scp = (await deployContract(deployer, artifacts.SCP, [governor.address])) as Scp;
+      await registry.connect(governor).set(["scp"], [scp.address]);
+
+      // deploy cover payment manager
+      await registry.connect(governor).set(["premiumPool"], [premiumPool5.address]);
+      coverPaymentManager = (await deployContract(deployer, artifacts.CoverPaymentManager, [governor.address, registry.address])) as CoverPaymentManager;
+      expect( await coverPaymentManager.connect(governor).premiumPool()).eq(premiumPool5.address);
+
+      // set tokens
+      await coverPaymentManager.connect(governor).setTokenInfo(tokens);
+      await dai.mintToken(user1.address, ONE_ETHER.mul(1000));
+
+    });
+
+    it("starts with no deposits", async function () {
+      expect(await scp.balanceOf(user1.address)).eq(0);
+      expect(await scp.balanceOfNonRefundable(user1.address)).eq(0);
+    });
+
+    it("cannot deposit unaccepted token", async function () {
+      await expect(coverPaymentManager.connect(deployer).depositStableFrom(weth.address, user1.address, user1.address, 0)).to.be.revertedWith("token not accepted");
+    });
+
+    it("cannot deposit non-stable token", async function () {
+        await expect(coverPaymentManager.connect(deployer).depositStableFrom(solace.address, user1.address, user1.address, 0)).to.be.revertedWith("token not stable");
+    });
+
+    it("cannot deposit with insufficient allowance", async function () {
+      await expect(coverPaymentManager.connect(deployer).depositStableFrom(dai.address, user1.address, user1.address, 1)).to.be.revertedWith("ERC20: transfer amount exceeds allowance");
+    });
+
+    it("cannot deposit with insufficient balance", async function () {
+      await dai.connect(user1).approve(coverPaymentManager.address, constants.MaxUint256);
+      const balance = await dai.balanceOf(user1.address);
+      await expect(coverPaymentManager.connect(deployer).depositStableFrom(dai.address, user1.address, user1.address, balance.add(1))).to.be.revertedWith("ERC20: transfer amount exceeds balance");
+    });
+
+    it("cannot deposit if coverPaymentManager is not an scp mover", async function () {
+      await scp.connect(governor).setScpMoverStatuses([coverPaymentManager.address],[false]);
+      await expect(coverPaymentManager.connect(deployer).depositStableFrom(dai.address, user1.address, user1.address, 1)).to.be.revertedWith("!scp mover");
+      await scp.connect(governor).setScpMoverStatuses([coverPaymentManager.address],[true]);
+    });
+
+    it("can deposit", async function () {
+      await usdc.connect(user2).mint();
+      await usdc.connect(user2).approve(coverPaymentManager.address, constants.MaxUint256);
+
+      let depositAmount1 = ONE_ETHER.mul(10);
+      let depositAmount2 = ONE_USDC.mul(20);
+      let depositAmount3 = ONE_USDC.mul(30);
+      let depositAmount4 = ONE_USDC.mul(40);
+
+      let depositValue12 = ONE_ETHER.mul(30);
+      let depositValue123 = ONE_ETHER.mul(60);
+      let depositValue1234 = ONE_ETHER.mul(100);
+      let depositValue3 = ONE_ETHER.mul(30);
+      let depositValue34 = ONE_ETHER.mul(70);
+
+      // tx1: user1 deposits dai for user2
+      let daiBal1 = await dai.balanceOf(user1.address);
+      let tx1 = await coverPaymentManager.connect(deployer).depositStableFrom(dai.address, user1.address, user2.address, depositAmount1);
+      let daiBal2 = await dai.balanceOf(user1.address);
+      expect(daiBal1.sub(daiBal2)).eq(depositAmount1);
+      await expect(tx1).to.emit(coverPaymentManager, "TokenDeposited").withArgs(dai.address, user1.address, user2.address, depositAmount1);
+      expect(await scp.balanceOf(user1.address)).eq(0);
+      expect(await scp.balanceOf(user2.address)).eq(depositAmount1);
+      expect(await scp.balanceOfNonRefundable(user1.address)).eq(0);
+      expect(await scp.balanceOfNonRefundable(user2.address)).eq(0);
+      expect(await dai.balanceOf(premiumPool5.address)).eq(depositAmount1);
+
+      // tx2: user2 deposits usdc for user2
+      let usdcBal1 = await usdc.balanceOf(user2.address);
+      let tx2 = await coverPaymentManager.connect(deployer).depositStableFrom(usdc.address, user2.address, user2.address, depositAmount2);
+      let usdcBal2 = await usdc.balanceOf(user2.address);
+      expect(usdcBal1.sub(usdcBal2)).eq(depositAmount2);
+      await expect(tx2).to.emit(coverPaymentManager, "TokenDeposited").withArgs(usdc.address, user2.address, user2.address, depositAmount2);
+      expect(await scp.balanceOf(user1.address)).eq(0);
+      expect(await scp.balanceOf(user2.address)).eq(depositValue12);
+      expect(await scp.balanceOfNonRefundable(user2.address)).eq(0);
+      expect(await usdc.balanceOf(premiumPool5.address)).eq(depositAmount2);
+
+      // tx3: user2 deposits usdc for users
+      await coverPaymentManager
+        .connect(governor)
+        .setTokenInfo([{'token': usdc.address, 'accepted': true, 'permittable': true, 'refundable': false, 'stable': true}]);
+
+      let tx3 = await coverPaymentManager.connect(deployer).depositStableFrom(usdc.address, user2.address, user2.address, depositAmount3);
+      let usdcBal3 = await usdc.balanceOf(user2.address);
+      expect(usdcBal2.sub(usdcBal3)).eq(depositAmount3);
+      await expect(tx3).to.emit(coverPaymentManager, "TokenDeposited").withArgs(usdc.address, user2.address, user2.address, depositAmount3);
+      expect(await scp.balanceOf(user2.address)).eq(depositValue123);
+      expect(await scp.balanceOfNonRefundable(user2.address)).eq(depositValue3);
+      expect(await usdc.balanceOf(premiumPool5.address)).eq(depositAmount2.add(depositAmount3));
+
+      // tx4: user2 deposits usdc for user2
+      let tx4 = await coverPaymentManager.connect(deployer).depositStableFrom(usdc.address, user2.address, user2.address, depositAmount4);
+      let usdcBal4 = await usdc.balanceOf(user2.address);
+      expect(usdcBal3.sub(usdcBal4)).eq(depositAmount4);
+      await expect(tx4).to.emit(coverPaymentManager, "TokenDeposited").withArgs(usdc.address, user2.address, user2.address, depositAmount4);
+      expect(await scp.balanceOf(user2.address)).eq(depositValue1234);
+      expect(await scp.balanceOfNonRefundable(user2.address)).eq(depositValue34);
+      expect(await usdc.balanceOf(premiumPool5.address)).eq(depositAmount2.add(depositAmount3).add(depositAmount4));
+
+      await coverPaymentManager
+      .connect(governor)
+      .setTokenInfo([{'token': usdc.address, 'accepted': true, 'permittable': true, 'refundable': true, 'stable': true}]);
+    });
+
+    it("can deposit many via multicall", async function () {
+      await dai.connect(user2).mint();
+      await dai.connect(user2).approve(coverPaymentManager.address, constants.MaxUint256);
+
+      // user1 balances
+      let scpBal11 = await scp.balanceOf(user1.address);
+      let daiBal11 = await dai.balanceOf(user1.address);
+      let usdcBal11 = await usdc.balanceOf(user1.address);
+
+      // user2 balances
+      let scpBal12 = await scp.balanceOf(user2.address);
+      let daiBal12 = await dai.balanceOf(user2.address);
+      let usdcBal12 = await usdc.balanceOf(user2.address);
+
+      let depositAmount1 = ONE_ETHER.mul(10);
+      let depositAmount2 = ONE_USDC.mul(20);
+      let depositValue1 = ONE_ETHER.mul(10);
+      let depositValue2 = ONE_ETHER.mul(20);
+
+      let tx = await coverPaymentManager.connect(deployer).multicall([
+        `${DEPOSIT_STABLE_SIGHASH}${toAbiEncoded(dai.address)}${toAbiEncoded(user2.address)}${toAbiEncoded(user1.address)}${toAbiEncoded(depositAmount1)}`,
+        `${DEPOSIT_STABLE_SIGHASH}${toAbiEncoded(usdc.address)}${toAbiEncoded(user2.address)}${toAbiEncoded(user2.address)}${toAbiEncoded(depositAmount2)}`,
+      ]);
+
+      await expect(tx).to.emit(coverPaymentManager, "TokenDeposited").withArgs(dai.address, user2.address, user1.address, depositAmount1);
+      await expect(tx).to.emit(coverPaymentManager, "TokenDeposited").withArgs(usdc.address, user2.address, user2.address, depositAmount2);
+      let scpBal21 = await scp.balanceOf(user1.address);
+      let daiBal21 = await dai.balanceOf(user1.address);
+      let usdcBal21 = await usdc.balanceOf(user1.address);
+      let scpBal22 = await scp.balanceOf(user2.address);
+      let daiBal22 = await dai.balanceOf(user2.address);
+      let usdcBal22 = await usdc.balanceOf(user2.address);
+      expect(scpBal21.sub(scpBal11)).eq(depositValue1);
+      expect(daiBal21.sub(daiBal11)).eq(0);
+      expect(usdcBal21.sub(usdcBal11)).eq(0);
+      expect(scpBal22.sub(scpBal12)).eq(depositValue2);
+      expect(daiBal22.sub(daiBal12)).eq(depositAmount1.mul(-1));
+      expect(usdcBal22.sub(usdcBal12)).eq(depositAmount2.mul(-1));
+    });
+  });
+
   describe("depositSignedStable", function () {
     let tokens: any[];
 
@@ -726,6 +890,121 @@ describe("CoverPaymentManager", function () {
         expect(await scp.balanceOf(user3.address)).eq(scpAmount1.add(scpAmount2).add(scpAmount3));
         expect(await solace.balanceOf(user3.address)).eq(solaceBalance3.sub(depositAmount3));
         expect(await solace.balanceOf(premiumPool3.address)).eq(depositAmount1.add(depositAmount2).add(depositAmount3));
+    });
+  });
+
+  describe("depositNonStableFrom", function () {
+    let priceSignature1: string;
+    let priceSignature2: string;
+    let priceSignature3: string;
+    let invalidPriceSignature: string;
+    let SOLACE_PRICE_1 = ONE_ETHER; // 1$
+    let SOLACE_PRICE_2 = ONE_ETHER.mul(2); // 2$
+    let SOLACE_PRICE_3 = ONE_ETHER.div(100); // 0.01$
+    let tokens: any[];
+
+    before("redeploy scp and coverPaymentManager", async function () {
+      tokens = [
+            {'token': dai.address, 'accepted': true, 'permittable': false, 'refundable': true, 'stable': true},  // dai
+            {'token': solace.address, 'accepted': true, 'permittable': true, 'refundable': true, 'stable': false},   // solace
+      ];
+
+      // deploy scp
+      scp = (await deployContract(deployer, artifacts.SCP, [governor.address])) as Scp;
+      await registry.connect(governor).set(["scp"], [scp.address]);
+
+      // deploy cover payment manager
+      await registry.connect(governor).set(["premiumPool"], [premiumPool6.address]);
+      coverPaymentManager = (await deployContract(deployer, artifacts.CoverPaymentManager, [governor.address, registry.address])) as CoverPaymentManager;
+      expect( await coverPaymentManager.connect(governor).premiumPool()).eq(premiumPool6.address);
+
+      // set tokens
+      await coverPaymentManager.connect(governor).setTokenInfo(tokens);
+
+      // create price signatures
+      await coverPaymentManager.connect(governor).addPriceSigner(governor.address);
+      expect(await coverPaymentManager.connect(governor).isPriceSigner(governor.address)).eq(true);
+
+      const digest1 = getPriceDataDigest(DOMAIN_NAME, coverPaymentManager.address, CHAIN_ID, solace.address, SOLACE_PRICE_1, DEADLINE, TYPEHASH);
+      priceSignature1 = assembleSignature(sign(digest1, Buffer.from(governor.privateKey.slice(2), "hex")));
+
+      const digest2 = getPriceDataDigest(DOMAIN_NAME, coverPaymentManager.address, CHAIN_ID, solace.address, SOLACE_PRICE_2, DEADLINE, TYPEHASH);
+      priceSignature2 = assembleSignature(sign(digest2, Buffer.from(governor.privateKey.slice(2), "hex")));
+
+      const digest3 = getPriceDataDigest(DOMAIN_NAME, coverPaymentManager.address, CHAIN_ID, solace.address, SOLACE_PRICE_3, DEADLINE, TYPEHASH);
+      priceSignature3 = assembleSignature(sign(digest3, Buffer.from(governor.privateKey.slice(2), "hex")));
+
+      const digest4 = getPriceDataDigest(DOMAIN_NAME, coverPaymentManager.address, CHAIN_ID, weth.address, SOLACE_PRICE_3, DEADLINE, TYPEHASH);
+      invalidPriceSignature = assembleSignature(sign(digest4, Buffer.from(governor.privateKey.slice(2), "hex")));
+    });
+
+    it("starts with no deposits", async function () {
+        expect(await scp.balanceOf(user5.address)).eq(0);
+        expect(await scp.balanceOfNonRefundable(user5.address)).eq(0);
+    });
+
+    it("cannot deposit unaccepted token", async function () {
+      await expect(coverPaymentManager.connect(deployer).depositNonStableFrom(weth.address, user5.address, user5.address, 0, SOLACE_PRICE_1, DEADLINE, priceSignature1)).to.be.revertedWith("token not accepted");
+    });
+
+    it("cannot deposit stable token", async function () {
+        await expect(coverPaymentManager.connect(deployer).depositNonStableFrom(dai.address, user5.address, user5.address, 0, SOLACE_PRICE_1, DEADLINE, priceSignature1)).to.be.revertedWith("token not non-stable");
+    });
+
+    it("cannot deposit invalid price", async function () {
+        await expect(coverPaymentManager.connect(deployer).depositNonStableFrom(solace.address, user5.address, user5.address, 0, SOLACE_PRICE_1, DEADLINE, invalidPriceSignature)).to.be.revertedWith("invalid token price");
+    });
+
+    it("cannot deposit with insufficient allowance", async function () {
+      await solace.mintToken(user5.address, ONE_ETHER.mul(1000));
+      await expect(coverPaymentManager.connect(deployer).depositNonStableFrom(solace.address, user5.address, user5.address, 1, SOLACE_PRICE_1, DEADLINE, priceSignature1)).to.be.revertedWith("ERC20: transfer amount exceeds allowance");
+    });
+
+    it("cannot deposit with insufficient balance", async function () {
+      const balance = await solace.balanceOf(user5.address);
+      await expect(coverPaymentManager.connect(deployer).depositNonStableFrom(solace.address,user5.address, user5.address, balance.add(1000), SOLACE_PRICE_1, DEADLINE, priceSignature1)).to.be.revertedWith("ERC20: transfer amount exceeds balance");
+    });
+
+    it("cannot deposit if coverPaymentManager is not an scp mover", async function () {
+      await solace.connect(user5).approve(coverPaymentManager.address, constants.MaxUint256);
+      await scp.connect(governor).setScpMoverStatuses([coverPaymentManager.address],[false]);
+      await expect(coverPaymentManager.connect(deployer).depositNonStableFrom(solace.address, user5.address, user5.address, 1, SOLACE_PRICE_1, DEADLINE, priceSignature1)).to.be.revertedWith("!scp mover");
+      await scp.connect(governor).setScpMoverStatuses([coverPaymentManager.address],[true]);
+    });
+
+    it("can deposit", async function() {
+        // check user5 solace balance(1000 SOLACE)
+        expect(await solace.connect(user5).balanceOf(user5.address)).eq(ONE_ETHER.mul(1000));
+
+        // tx1: The SOLACE price is $1. 10 SOLACE => 10 SCP
+        const solaceBalance1 = ONE_ETHER.mul(1000);
+        const depositAmount1 = ONE_ETHER.mul(10); // 10 SOLACE
+        const scpAmount1 = ONE_ETHER.mul(10); // 10 SCP
+        let tx1 = await coverPaymentManager.connect(deployer).depositNonStableFrom(solace.address, user5.address, user5.address, depositAmount1, SOLACE_PRICE_1, DEADLINE, priceSignature1);
+        await expect(tx1).to.emit(coverPaymentManager, "TokenDeposited").withArgs(solace.address, user5.address, user5.address, depositAmount1);
+        expect(await scp.balanceOf(user5.address)).eq(scpAmount1);
+        expect(await solace.balanceOf(user5.address)).eq(solaceBalance1.sub(depositAmount1));
+        expect(await solace.balanceOf(premiumPool6.address)).eq(depositAmount1);
+
+        // tx2: The SOLACE price is $2. 10 SOLACE => 20 SCP
+        const solaceBalance2 = await solace.connect(user5).balanceOf(user5.address);
+        const depositAmount2 = ONE_ETHER.mul(10); // 10 SOLACE
+        const scpAmount2 = ONE_ETHER.mul(20); // 20 SCP
+        let tx2 = await coverPaymentManager.connect(deployer).depositNonStableFrom(solace.address, user5.address, user5.address, depositAmount2, SOLACE_PRICE_2, DEADLINE, priceSignature2);
+        await expect(tx2).to.emit(coverPaymentManager, "TokenDeposited").withArgs(solace.address, user5.address, user5.address, depositAmount2);
+        expect(await scp.balanceOf(user5.address)).eq(scpAmount1.add(scpAmount2));
+        expect(await solace.balanceOf(user5.address)).eq(solaceBalance2.sub(depositAmount2));
+        expect(await solace.balanceOf(premiumPool6.address)).eq(depositAmount1.add(depositAmount2));
+
+        // tx3: The SOLACE price is $0.01. 100 SOLACE => 1 SCP
+        const solaceBalance3 = await solace.connect(user5).balanceOf(user5.address);
+        const depositAmount3 = ONE_ETHER.mul(100); // 10 SOLACE
+        const scpAmount3 = ONE_ETHER; // 1 SCP
+        let tx3 = await coverPaymentManager.connect(deployer).depositNonStableFrom(solace.address, user5.address, user5.address, depositAmount3, SOLACE_PRICE_3, DEADLINE, priceSignature3);
+        await expect(tx3).to.emit(coverPaymentManager, "TokenDeposited").withArgs(solace.address, user5.address, user5.address, depositAmount3);
+        expect(await scp.balanceOf(user5.address)).eq(scpAmount1.add(scpAmount2).add(scpAmount3));
+        expect(await solace.balanceOf(user5.address)).eq(solaceBalance3.sub(depositAmount3));
+        expect(await solace.balanceOf(premiumPool6.address)).eq(depositAmount1.add(depositAmount2).add(depositAmount3));
     });
   });
 

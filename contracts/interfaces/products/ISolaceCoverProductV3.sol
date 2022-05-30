@@ -5,6 +5,18 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "../payment/ISCPRetainer.sol";
 
 interface ISolaceCoverProductV3 is IERC721, ISCPRetainer {
+    
+    /***************************************
+    ENUMS
+    ***************************************/
+    
+    enum ChargePeriod {
+        HOURLY,
+        DAILY,
+        WEEKLY,
+        MONTHLY,
+        ANNUALLY
+    }
 
     /***************************************
     EVENTS
@@ -45,20 +57,44 @@ interface ISolaceCoverProductV3 is IERC721, ISCPRetainer {
     ***************************************/
 
     /**
-     * @notice Activates policy for `msg.sender`.
-     * @param _user The account to purchase policy. 
+     * @notice Purchases policy for the user.
+     * @param _user The policy owner.
      * @param _coverLimit The maximum value to cover in **USD**.
      * @return policyID The ID of the newly minted policy.
-     */
-    function purchaseFor(address _user, uint256 _coverLimit) external returns (uint256 policyID);
-
+    */
+    function purchase(address _user, uint256 _coverLimit) external returns (uint256 policyID);
+    
     /**
-     * @notice Activates policy for `msg.sender`.
+     * @notice Purchases policy for the user.
+     * @param _user The policy owner.
      * @param _coverLimit The maximum value to cover in **USD**.
+     * @param _token The token to deposit.
+     * @param _amount Amount of token to deposit.
      * @return policyID The ID of the newly minted policy.
      */
-    function purchase(uint256 _coverLimit) external returns (uint256 policyID);
-  
+     function purchaseWithStable(address _user, uint256 _coverLimit, address _token, uint256 _amount) external returns (uint256 policyID);
+    
+    /**
+     * @notice Purchases policy for the user.
+     * @param _user The policy owner.
+     * @param _coverLimit The maximum value to cover in **USD**.
+     * @param _token The token to deposit.
+     * @param _amount Amount of token to deposit.
+     * @param _price The `SOLACE` price in wei(usd).
+     * @param _priceDeadline The `SOLACE` price in wei(usd).
+     * @param _signature The `SOLACE` price signature.
+     * @return policyID The ID of the newly minted policy.
+    */
+    function purchaseWithNonStable(
+        address _user,
+        uint256 _coverLimit,
+        address _token, 
+        uint256 _amount,
+        uint256 _price, 
+        uint256 _priceDeadline,
+        bytes calldata _signature
+    ) external returns (uint256 policyID);
+
     /**
      * @notice Cancels the policy.
      * The function cancels the policy of the policyholder.
@@ -100,13 +136,6 @@ interface ISolaceCoverProductV3 is IERC721, ISCPRetainer {
      */
     function minRequiredAccountBalance(uint256 coverLimit) external view returns (uint256 minRequiredAccountBalance_);
 
-    /**
-     * @notice Calculates the policy cancellation fee.
-     * @param policyID The policy id.
-     * @return fee The cancellation fee.
-    */
-    function calculateCancelFee(uint256 policyID) external view returns (uint256 fee);
-
     /***************************************
     GOVERNANCE FUNCTIONS
     ***************************************/
@@ -139,7 +168,7 @@ interface ISolaceCoverProductV3 is IERC721, ISCPRetainer {
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param chargeCycle_ Desired chargeCycle.
      */
-    function setChargeCycle(uint256 chargeCycle_) external;
+    function setChargeCycle(ChargePeriod chargeCycle_) external;
 
     /**
      * @notice Sets the base URI for computing `tokenURI`.

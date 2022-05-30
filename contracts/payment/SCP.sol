@@ -166,6 +166,22 @@ contract SCP is ISCP, Multicall, Governable {
     }
 
     /**
+     * @notice Destroys `amounts` tokens from `accounts`, reducing the total supply.
+     * Requirements:
+     * - `account` cannot be the zero address.
+     * - `account` must have at least `amount` tokens.
+    */
+    function burnMultiple(address[] calldata accounts, uint256[] calldata amounts) external override {
+        require(isScpMover(msg.sender), "!scp mover");
+        uint256 length = accounts.length;
+        require(length == amounts.length, "length mismatch");
+
+        for (uint256 i = 0; i < length; i++) {
+            _burn(accounts[i], amounts[i]);
+        }
+    }
+
+    /**
      * @notice Destroys `amount` tokens from `account`, reducing the total supply.
      * Requirements:
      * - `account` cannot be the zero address.
@@ -174,19 +190,7 @@ contract SCP is ISCP, Multicall, Governable {
     function burn(address account, uint256 amount) external override {
         // checks
         require(isScpMover(msg.sender), "!scp mover");
-        require(account != address(0), "SCP: burn from the zero address");
-        uint256 accountBalance = _balances[account];
-        require(accountBalance >= amount, "SCP: burn amount exceeds balance");
-        // effects
-        unchecked {
-            _balances[account] = accountBalance - amount;
-        }
-        _totalSupply -= amount;
-        // burn nonrefundable amount first
-        uint256 bnr1 = _balancesNonRefundable[account];
-        uint256 bnr2 = _subOrZero(bnr1, amount);
-        if(bnr2 != bnr1) _balancesNonRefundable[account] = bnr2;
-        emit Transfer(account, address(0), amount);
+        _burn(account, amount);
     }
 
     /**
@@ -305,6 +309,28 @@ contract SCP is ISCP, Multicall, Governable {
     /***************************************
     HELPER FUNCTIONS
     ***************************************/
+
+    /**
+     * @notice Destroys `amount` tokens from `account`, reducing the total supply.
+     * Requirements:
+     * - `account` cannot be the zero address.
+     * - `account` must have at least `amount` tokens.
+     */
+    function _burn(address account, uint256 amount) private {
+        require(account != address(0), "SCP: burn from the zero address");
+        uint256 accountBalance = _balances[account];
+        require(accountBalance >= amount, "SCP: burn amount exceeds balance");
+        // effects
+        unchecked {
+            _balances[account] = accountBalance - amount;
+        }
+        _totalSupply -= amount;
+        // burn nonrefundable amount first
+        uint256 bnr1 = _balancesNonRefundable[account];
+        uint256 bnr2 = _subOrZero(bnr1, amount);
+        if(bnr2 != bnr1) _balancesNonRefundable[account] = bnr2;
+        emit Transfer(account, address(0), amount);
+    }
 
     /**
      * @notice Safely performs `c = a - b`.
