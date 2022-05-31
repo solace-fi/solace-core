@@ -43,7 +43,7 @@ export function getNetworkSettings(chainID: number) {
     [1313161555]: {},
     [137]: {maxFeePerGas: 31 * ONE_GWEI, maxPriorityFeePerGas: 31 * ONE_GWEI},
     [80001]: {maxFeePerGas: 31 * ONE_GWEI, maxPriorityFeePerGas: 31 * ONE_GWEI},
-    [250]: {},
+    [250]: {gasPrice: 90 * ONE_GWEI},
     [4002]: {},
     [31337]: {},
   };

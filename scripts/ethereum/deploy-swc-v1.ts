@@ -181,7 +181,7 @@ async function deploySolaceCoverProduct() {
     tx = await riskManager.connect(deployer).setWeightAllocation(solaceCoverProduct.address, 1000, networkSettings.overrides)
     await tx.wait(networkSettings.confirmations);
 
-    console.log('Risk Manager - Adding Soteria as a cover limit updated');
+    console.log('Risk Manager - Adding Soteria as a cover limit updater');
     tx = await riskManager.connect(deployer).addCoverLimitUpdater(solaceCoverProduct.address, networkSettings.overrides)
     await tx.wait(networkSettings.confirmations);
   }

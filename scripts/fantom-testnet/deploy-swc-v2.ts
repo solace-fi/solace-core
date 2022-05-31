@@ -35,8 +35,8 @@ const COVERAGE_DATA_PROVIDER_ADDRESS = "0x501ace25625CadaF178558346A4603ceDb5a0A
 const RISK_MANAGER_ADDRESS           = "0x501aceF459292B26CC165ebA2F5960b49c4EA990";
 const SOLACE_COVER_PRODUCT_ADDRESS   = "0x501ACe36fF9078aEA9b9Cc43a4e329f01361764e";
 
-const MESSAGE_BUS_ADDRESS                    = "0xaFDb9C40C7144022811F034EE07Ce2E110093fe6";
-const COVERAGE_DATA_PROVIDER_WRAPPER_ADDRESS = "0x501Acef201B7Ad6FFe86A37d83df757454924aD5"; // not deployed on fantom testnet
+const MESSAGE_BUS_ADDRESS                    = "0xb92d6933A024bcca9A21669a480C236Cbc973110";
+const COVERAGE_DATA_PROVIDER_WRAPPER_ADDRESS = "0x501aceFd6Af9C83170F975595d9f1B9D9Eb044cF";
 
 let artifacts: ArtifactImports;
 let deployerContract: Deployer;
@@ -194,7 +194,7 @@ async function deploySolaceCoverProductV2() {
     tx = await riskManager.connect(deployer).setWeightAllocation(solaceCoverProduct.address, 1000, networkSettings.overrides)
     await tx.wait(networkSettings.confirmations);
 
-    console.log('Risk Manager - Adding Soteria as a cover limit updated');
+    console.log('Risk Manager - Adding Soteria as a cover limit updater');
     tx = await riskManager.connect(deployer).addCoverLimitUpdater(solaceCoverProduct.address, networkSettings.overrides)
     await tx.wait(networkSettings.confirmations);
   }
