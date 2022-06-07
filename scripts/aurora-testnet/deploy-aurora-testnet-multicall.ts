@@ -49,7 +49,7 @@ async function deployMulticall1() {
   } else {
     console.log("deploying multicall 1");
     let salt = "0x0000000000000000000000000000000000000000000000000000000000000000";
-    let bytecode = fs.readFileSync("scripts/contract_deploy_bytecodes/utils/Multicall1.txt").toString().trim();
+    let bytecode = fs.readFileSync("scripts/contract_deploy_bytecodes/aurora_testnet/utils/Multicall1.txt").toString().trim();
     let tx = await deployerContract.connect(deployer).deploy(bytecode, salt, {gasLimit: 6000000, type: 0});
     await tx.wait(networkSettings.confirmations);
     let addr = predictAddress(bytecode, DEPLOYER_CONTRACT_ADDRESS, salt);
@@ -68,7 +68,7 @@ async function deployMulticall2() {
   } else {
     console.log("deploying multicall 2");
     let salt = "0x0000000000000000000000000000000000000000000000000000000000000001";
-    let bytecode = fs.readFileSync("scripts/contract_deploy_bytecodes/utils/Multicall2.txt").toString().trim();
+    let bytecode = fs.readFileSync("scripts/contract_deploy_bytecodes/aurora_testnet/utils/Multicall2.txt").toString().trim();
     let tx = await deployerContract.connect(deployer).deploy(bytecode, salt, {gasLimit: 6000000, type: 0});
     await tx.wait(networkSettings.confirmations);
     let addr = predictAddress(bytecode, DEPLOYER_CONTRACT_ADDRESS, salt);

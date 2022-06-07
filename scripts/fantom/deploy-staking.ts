@@ -15,12 +15,14 @@ import { import_artifacts, ArtifactImports } from "./../../test/utilities/artifa
 import { Deployer, Solace, XsLocker, XSolace, StakingRewards } from "../../typechain";
 import { expectDeployed, isDeployed } from "../../test/utilities/expectDeployed";
 import { getNetworkSettings } from "../getNetworkSettings";
+import { abiEncodeArgs } from "../../test/utilities/setStorage";
+import { create2ContractStashed } from "../create2ContractStashed";
 
-const DEPLOYER_CONTRACT_ADDRESS     = "0x501acE4b4F9085348F60b61Fe3C95937a34565E7";
-const SOLACE_ADDRESS                = "0x501ACE0C6DeA16206bb2D120484a257B9F393891";
-const XSLOCKER_ADDRESS              = "0x501ACebF0918c99546b65cEdCD430e0D4A8E9167";
-const STAKING_REWARDS_ADDRESS       = "0x501ACe4D89f596296C66f14D087a4BbB53Ed2049";
-const XSOLACE_ADDRESS               = "0x501ACEF0358fb055027A89AE46387a53C75498e0";
+const DEPLOYER_CONTRACT_ADDRESS     = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
+const SOLACE_ADDRESS                = "0x501acE9c35E60f03A2af4d484f49F9B1EFde9f40";
+const XSLOCKER_ADDRESS              = "0x501Ace47c5b0C2099C4464f681c3fa2ECD3146C1";
+const STAKING_REWARDS_ADDRESS       = "0x501ace3D42f9c8723B108D4fBE29989060a91411";
+const XSOLACE_ADDRESS               = "0x501ACe802447B1Ed4Aae36EA830BFBde19afbbF9";
 
 let artifacts: ArtifactImports;
 let deployerContract: Deployer;
@@ -55,9 +57,15 @@ async function deploySOLACE() {
     solace = (await ethers.getContractAt(artifacts.SOLACE.abi, SOLACE_ADDRESS)) as Solace;
   } else {
     console.log("Deploying SOLACE");
-    let bytecode = fs.readFileSync("scripts/contract_deploy_bytecodes/aurora_testnet/SOLACE.txt").toString().trim();
-    let tx = await deployer.sendTransaction({...networkSettings.overrides, to: DEPLOYER_CONTRACT_ADDRESS, gasLimit: 5000000, data: bytecode});
-    await tx.wait(networkSettings.confirmations);
+    await create2ContractStashed(
+      "SOLACE",
+      "scripts/contract_deploy_bytecodes/SOLACE.txt",
+      "stash/contracts_processed/SOLACE.sol",
+      deployer,
+      DEPLOYER_CONTRACT_ADDRESS,
+      SOLACE_ADDRESS,
+      abiEncodeArgs([signerAddress])
+    );
     solace = (await ethers.getContractAt(artifacts.SOLACE.abi, SOLACE_ADDRESS)) as Solace;
     console.log(`Deployed SOLACE to ${solace.address}`);
 
@@ -81,9 +89,15 @@ async function deployXSLocker() {
     xslocker = (await ethers.getContractAt(artifacts.xsLocker.abi, XSLOCKER_ADDRESS)) as unknown as XsLocker;
   } else {
     console.log("Deploying xsLocker");
-    let bytecode = fs.readFileSync("scripts/contract_deploy_bytecodes/aurora_testnet/staking/xsLocker.txt").toString().trim();
-    let tx = await deployer.sendTransaction({...networkSettings.overrides, to: DEPLOYER_CONTRACT_ADDRESS, gasLimit: 5000000, data: bytecode});
-    await tx.wait(networkSettings.confirmations);
+    await create2ContractStashed(
+      "xsLocker",
+      "scripts/contract_deploy_bytecodes/staking/xsLocker.txt",
+      "stash/contracts_processed/staking/xsLocker.sol",
+      deployer,
+      DEPLOYER_CONTRACT_ADDRESS,
+      XSLOCKER_ADDRESS,
+      abiEncodeArgs([signerAddress, SOLACE_ADDRESS])
+    );
     xslocker = (await ethers.getContractAt(artifacts.xsLocker.abi, XSLOCKER_ADDRESS)) as unknown as XsLocker;
     console.log(`Deployed xsLocker to ${xslocker.address}`);
   }
@@ -99,15 +113,23 @@ async function deployStakingRewards() {
     stakingRewards = (await ethers.getContractAt(artifacts.StakingRewards.abi, STAKING_REWARDS_ADDRESS)) as StakingRewards;
   } else {
     console.log("Deploying StakingRewards");
-    let bytecode = fs.readFileSync("scripts/contract_deploy_bytecodes/aurora_testnet/staking/StakingRewards.txt").toString().trim();
-    let tx = await deployer.sendTransaction({...networkSettings.overrides, to: DEPLOYER_CONTRACT_ADDRESS, gasLimit: 5000000, data: bytecode});
-    await tx.wait(networkSettings.confirmations);
+    await create2ContractStashed(
+      "StakingRewards",
+      "scripts/contract_deploy_bytecodes/staking/StakingRewards.txt",
+      "stash/contracts_processed/staking/StakingRewards.sol",
+      deployer,
+      DEPLOYER_CONTRACT_ADDRESS,
+      STAKING_REWARDS_ADDRESS,
+      abiEncodeArgs([signerAddress, SOLACE_ADDRESS, XSLOCKER_ADDRESS, "317097919837645865"])
+    );
     stakingRewards = (await ethers.getContractAt(artifacts.StakingRewards.abi, STAKING_REWARDS_ADDRESS)) as StakingRewards;
     console.log(`Deployed StakingRewards to ${stakingRewards.address}`);
-
+    /*
     console.log("staking rewards - registering in xslocker");
     let tx1 = await xslocker.connect(deployer).addXsLockListener(stakingRewards.address);
     await tx1.wait(networkSettings.confirmations);
+    */
+    /*
     console.log("staking rewards - set rewards");
     let tx2 = await solace.connect(deployer).mint(stakingRewards.address, solacePerYear);
     await tx2.wait(networkSettings.confirmations);
@@ -117,6 +139,12 @@ async function deployStakingRewards() {
     console.log("staking rewards - minting SOLACE");
     let tx4 = await solace.connect(deployer).mint(stakingRewards.address, solacePerYear);
     await tx4.wait(networkSettings.confirmations);
+    */
+    /*
+    console.log("staking rewards - disabling rewards");
+    let tx5 = await stakingRewards.connect(deployer).setRewards(0, networkSettings.overrides);
+    await tx5.wait(networkSettings.confirmations);
+    */
   }
 }
 
@@ -125,9 +153,15 @@ async function deployXSOLACE() {
     xsolace = (await ethers.getContractAt(artifacts.xSOLACE.abi, XSOLACE_ADDRESS)) as XSolace;
   } else {
     console.log("Deploying xSOLACE");
-    let bytecode = fs.readFileSync("scripts/contract_deploy_bytecodes/aurora_testnet/staking/xSOLACE.txt").toString().trim();
-    let tx = await deployer.sendTransaction({...networkSettings.overrides, to: DEPLOYER_CONTRACT_ADDRESS, gasLimit: 5000000, data: bytecode});
-    await tx.wait(networkSettings.confirmations);
+    await create2ContractStashed(
+      "xSOLACE",
+      "scripts/contract_deploy_bytecodes/staking/xSOLACE.txt",
+      "stash/contracts_processed/staking/xSOLACE.sol",
+      deployer,
+      DEPLOYER_CONTRACT_ADDRESS,
+      XSOLACE_ADDRESS,
+      abiEncodeArgs([XSLOCKER_ADDRESS])
+    );
     xsolace = (await ethers.getContractAt(artifacts.xSOLACE.abi, XSOLACE_ADDRESS)) as XSolace;
     console.log(`Deployed xSOLACE to ${xsolace.address}`);
   }

@@ -15,9 +15,11 @@ import { import_artifacts, ArtifactImports } from "./../../test/utilities/artifa
 import { Deployer } from "../../typechain";
 import { expectDeployed, isDeployed } from "../../test/utilities/expectDeployed";
 import { getNetworkSettings } from "../getNetworkSettings";
+import { create2ContractStashed } from "../create2ContractStashed";
 
-const SINGLETON_FACTORY_ADDRESS     = "0x941F6f17Eade71E88D926FD9ca020dB535bDe573";
-const DEPLOYER_CONTRACT_ADDRESS     = "0x501acE4b4F9085348F60b61Fe3C95937a34565E7";
+const FACTORY_DEPLOYER_ADDRESS      = "0xBb6e024b9cFFACB947A71991E386681B1Cd1477D";
+const SINGLETON_FACTORY_ADDRESS     = "0xce0042B868300000d44A59004Da54A005ffdcf9f";
+const DEPLOYER_CONTRACT_ADDRESS     = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
 
 let artifacts: ArtifactImports;
 let deployerContract: Deployer;
@@ -33,10 +35,35 @@ async function main() {
   let chainID = (await provider.getNetwork()).chainId;
   networkSettings = getNetworkSettings(chainID);
 
-  await expectDeployed(SINGLETON_FACTORY_ADDRESS);
+  if(chainID == 31337) { // testnet
+    console.log('funding')
+    var [funder] = await hardhat.ethers.getSigners();
+    let tx = await funder.sendTransaction({to: signerAddress, value: BN.from("100000000000000000000")});
+    await tx.wait(networkSettings.confirmations);
+  }
+
+  await deploySingletonFactoryNicksMethod();
   await deployDeployerContract();
 
   await logAddresses();
+}
+
+async function deploySingletonFactoryNicksMethod() {
+  if(await isDeployed(SINGLETON_FACTORY_ADDRESS)) return;
+  console.log("Deploying SingletonFactory");
+  let bal = await provider.getBalance(FACTORY_DEPLOYER_ADDRESS);
+  let amountNeeded = BN.from("24700000000000000");
+  if(bal.lt(amountNeeded)) {
+    console.log('funding')
+    let tx1 = await deployer.sendTransaction({to: FACTORY_DEPLOYER_ADDRESS, value: amountNeeded.sub(bal), ...networkSettings.overrides});
+    await tx1.wait(networkSettings.confirmations);
+  }
+  console.log('deploying')
+  let bytecode = fs.readFileSync("scripts/contract_deploy_bytecodes/utils/SingletonFactoryNicksMethod.txt").toString().trim();
+  let tx2 = await provider.sendTransaction(bytecode);
+  await tx2.wait(networkSettings.confirmations);
+  await expectDeployed(SINGLETON_FACTORY_ADDRESS);
+  console.log(`Deployed SingletonFactory to ${SINGLETON_FACTORY_ADDRESS}`);
 }
 
 async function deployDeployerContract() {
@@ -44,10 +71,15 @@ async function deployDeployerContract() {
     deployerContract = (await ethers.getContractAt(artifacts.Deployer.abi, DEPLOYER_CONTRACT_ADDRESS)) as Deployer;
   } else {
     console.log("Deploying Deployer");
-    let bytecode = fs.readFileSync("scripts/contract_deploy_bytecodes/aurora_testnet/utils/Deployer.txt").toString().trim();
-    let tx = await deployer.sendTransaction({...networkSettings.overrides, to:SINGLETON_FACTORY_ADDRESS, gasLimit: 5000000, data: bytecode});
-    await tx.wait(networkSettings.confirmations);
-    await expectDeployed(DEPLOYER_CONTRACT_ADDRESS);
+    await create2ContractStashed(
+      "Deployer",
+      "scripts/contract_deploy_bytecodes/utils/Deployer.txt",
+      "stash/contracts_processed/utils/Deployer.sol",
+      deployer,
+      SINGLETON_FACTORY_ADDRESS,
+      DEPLOYER_CONTRACT_ADDRESS,
+      ""
+    );
     deployerContract = (await ethers.getContractAt(artifacts.Deployer.abi, DEPLOYER_CONTRACT_ADDRESS)) as Deployer;
     console.log(`Deployed Deployer to ${deployerContract.address}`);
   }

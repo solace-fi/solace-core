@@ -65,7 +65,7 @@ async function main() {
   await registerAddresses();
   await deployCoverageDataProvider();
   await deployRiskManager();
-  await deploySolaceCoverProduct();
+  await deploySolaceCoverProductV2();
 
   // log addresses
   await logAddresses();
@@ -90,15 +90,12 @@ async function registerAddresses() {
   // set default addresses
   if (await registry.governance() == signerAddress) {
     /*
-    // set default addresses
-    if (await registry.governance() == signerAddress) {
-      console.log("Setting 'FRAX', 'premiumPool', 'coverPromotionAdmin', 'premiumCollector', 'riskManager', 'coverageDataProvider', 'solaceCoverProduct' addresses");
-      let tx = await registry.connect(deployer).set(
-        ["frax", "premiumPool", "coverPromotionAdmin", "premiumCollector", "riskManager", "coverageDataProvider", "solaceCoverProduct"],
-        [FRAX_ADDRESS, PREMIUM_POOL_ADDRESS, COVER_PROMOTION_ADMIN_ADDRESS, PREMIUM_COLLECTOR_ADDRESS, RISK_MANAGER_ADDRESS, COVERAGE_DATA_PROVIDER_ADDRESS, SOLACE_COVER_PRODUCT_ADDRESS], {...networkSettings.overrides, gasLimit: 1000000}
-      );
-      await tx.wait(networkSettings.confirmations)
-    }
+    console.log("Setting 'FRAX', 'premiumPool', 'coverPromotionAdmin', 'premiumCollector', 'riskManager', 'coverageDataProvider', 'solaceCoverProduct' addresses");
+    let tx = await registry.connect(deployer).set(
+      ["frax", "premiumPool", "coverPromotionAdmin", "premiumCollector", "riskManager", "coverageDataProvider", "solaceCoverProduct"],
+      [FRAX_ADDRESS, PREMIUM_POOL_ADDRESS, COVER_PROMOTION_ADMIN_ADDRESS, PREMIUM_COLLECTOR_ADDRESS, RISK_MANAGER_ADDRESS, COVERAGE_DATA_PROVIDER_ADDRESS, SOLACE_COVER_PRODUCT_ADDRESS], {...networkSettings.overrides, gasLimit: 1000000}
+    );
+    await tx.wait(networkSettings.confirmations)
     */
     /*
     console.log("Setting 'messagebus', 'coverageDataProviderWrapper' addresses");
@@ -154,17 +151,21 @@ async function deployRiskManager() {
   }
 }
 
-async function deploySolaceCoverProduct() {
+async function deploySolaceCoverProductV2() {
+  const DOMAIN_NAME = "Solace.fi-SolaceCoverProductV2";
+  const VERSION = "2";
+
   if (await isDeployed(SOLACE_COVER_PRODUCT_ADDRESS)) {
     solaceCoverProduct = (await ethers.getContractAt(artifacts.SolaceCoverProductV2.abi, SOLACE_COVER_PRODUCT_ADDRESS)) as SolaceCoverProductV2;
   } else {
     console.log("Deploying Solace Cover Product");
-    //const res = await create2Contract(deployer, artifacts.SolaceCoverProduct, [signerAddress, registry.address, DOMAIN_NAME, VERSION], {}, "", deployerContract.address);
-    //solaceCoverProduct = (await ethers.getContractAt(artifacts.SolaceCoverProduct.abi, res.address)) as unknown as SolaceCoverProduct;
-    let bytecode = fs.readFileSync("scripts/contract_deploy_bytecodes/products/SolaceCoverProductV2.txt").toString().trim();
-    let tx1 = await deployer.sendTransaction({...networkSettings.overrides, to: DEPLOYER_CONTRACT_ADDRESS, gasLimit: 6000000, data: bytecode});
-    await tx1.wait(networkSettings.confirmations);
-    solaceCoverProduct = (await ethers.getContractAt(artifacts.SolaceCoverProductV2.abi, SOLACE_COVER_PRODUCT_ADDRESS)) as SolaceCoverProductV2;
+    const res = await create2Contract(deployer, artifacts.SolaceCoverProductV2, [signerAddress, registry.address, "frax", DOMAIN_NAME, VERSION], {}, "", deployerContract.address);
+    solaceCoverProduct = (await ethers.getContractAt(artifacts.SolaceCoverProductV2.abi, res.address)) as SolaceCoverProductV2;
+
+    //let bytecode = fs.readFileSync("scripts/contract_deploy_bytecodes/products/SolaceCoverProductV2.txt").toString().trim();
+    //let tx1 = await deployer.sendTransaction({...networkSettings.overrides, to: DEPLOYER_CONTRACT_ADDRESS, gasLimit: 6000000, data: bytecode});
+    //await tx1.wait(networkSettings.confirmations);
+    //solaceCoverProduct = (await ethers.getContractAt(artifacts.SolaceCoverProductV2.abi, SOLACE_COVER_PRODUCT_ADDRESS)) as SolaceCoverProductV2;
     console.log(`Deployed Solace Cover Product to ${solaceCoverProduct.address}`);
 
     console.log('Risk Manager - Adding Soteria as Risk Strategy');
@@ -179,7 +180,7 @@ async function deploySolaceCoverProduct() {
     tx = await riskManager.connect(deployer).setWeightAllocation(solaceCoverProduct.address, 1000, networkSettings.overrides)
     await tx.wait(networkSettings.confirmations);
 
-    console.log('Risk Manager - Adding Soteria as a cover limit updated');
+    console.log('Risk Manager - Adding Soteria as a cover limit updater');
     tx = await riskManager.connect(deployer).addCoverLimitUpdater(solaceCoverProduct.address, networkSettings.overrides)
     await tx.wait(networkSettings.confirmations);
   }

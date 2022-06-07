@@ -10,7 +10,7 @@ const { waffle, ethers } = hardhat;
 const { provider } = waffle;
 
 import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_importer";
-import { isDeployed } from "../test/utilities/expectDeployed";
+import { expectDeployed, isDeployed } from "../test/utilities/expectDeployed";
 import { getNetworkSettings } from "./getNetworkSettings";
 let artifacts: ArtifactImports;
 
@@ -32,6 +32,7 @@ export async function create2Contract(wallet: Signer, factoryOrContractJson: Con
   else {
     console.log(`deploying to ${address}`);
     var [deployCode, gasUsed] = await _deployer(wallet, initCode, salt, deployerAddress);
+    await expectDeployed(address);
   }
   await _verifier(address, args, contractPath);
   if(deploy) {

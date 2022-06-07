@@ -19,17 +19,17 @@ import { deployContract } from "ethereum-waffle";
 import { expectDeployed, isDeployed } from "../../test/utilities/expectDeployed";
 import { getNetworkSettings } from "../getNetworkSettings";
 
-const DEPLOYER_CONTRACT_ADDRESS     = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
-const SOLACE_ADDRESS                = "0x501acE9c35E60f03A2af4d484f49F9B1EFde9f40";
-const FAUCET_ADDRESS                = "0x501ACe0742B45fbE2ac422301b55C261b4DEc11F";
+const DEPLOYER_CONTRACT_ADDRESS     = "0x501acE4b4F9085348F60b61Fe3C95937a34565E7";
+const SOLACE_ADDRESS                = "0x501ACE0C6DeA16206bb2D120484a257B9F393891";
+const FAUCET_ADDRESS                = "0x501aCE125D0BE22FDA4e035d06EE1D5150869b53";
 
-const DAI_ADDRESS                   = "0x31a1D59460a9619ec6965a5684C6d3Ae470D0fE5";
-const WETH_ADDRESS                  = "0xd0A1E359811322d97991E03f863a0C30C2cF029C";
-const USDC_ADDRESS                  = "0x512d93ADc3DF4E24cb4b26c44A91682Ec073F559";
-const WBTC_ADDRESS                  = "0x1063bf969F8D3D7296a2A94274D3df9202da2A3A";
-const USDT_ADDRESS                  = "0xAEA2B0F4763c8Ffc33A4c454CD08F803B02B6B53";
-const SCP_ADDRESS                   = "0x501AcEe83a6f269B77c167c6701843D454E2EFA0";
-const FRAX_ADDRESS                  = "0x58B23b32a9774153E1E344762751aDfdca2764DD";
+const DAI_ADDRESS                   = "0xC709a8965eF42fD80b28F226E253283539ddBb12";
+const WETH_ADDRESS                  = "0x82b2c5950955cfEf23AD73675F7dC8C66cE23150";
+const USDC_ADDRESS                  = "0x1EE27c7c11E12dBa0F4b3aeEF9599D51Df06bB14";
+const WBTC_ADDRESS                  = "0xe3a5001b027168dc9b4b64311fc7a9eb87363d78";
+const USDT_ADDRESS                  = "0xC382931bF0D86B0Fd04ecAC093676A61446F3E2d";
+const FRAX_ADDRESS                  = "0x87Eba7597721C156240Ae7d8aE26e269118AFdca";
+const WFTM_ADDRESS                  = "0x4701b4535CDcC6541292fCef468836486D871250";
 
 const ONE_ETHER = BN.from("1000000000000000000");
 
@@ -82,15 +82,16 @@ async function deployFaucet() {
 }
 
 async function deployTestnetTokens() {
-  console.log(`Deploying WETH`);
-  let weth = await deployContract(deployer, artifacts.WETH, [], {...networkSettings.overrides, gasLimit:6000000});
-  console.log(`Deployed to ${weth.address}`);
+  console.log(`Deploying WFTM`);
+  let wftm = await deployContract(deployer, artifacts.WFTM, [], {...networkSettings.overrides, gasLimit:6000000});
+  console.log(`Deployed to ${wftm.address}`);
   let tokens: any[] = [
     {name: "Dai Stablecoin", symbol: "DAI", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
     {name: "USD Coin", symbol: "USDC", supply: BN.from("1000000000"), decimals: 6, permit: true},
     {name: "Wrapped Bitcoin", symbol: "WBTC", supply: BN.from("1000000000"), decimals: 8, permit: false},
     {name: "USD Token", symbol: "USDT", supply: BN.from("1000000000"), decimals: 6, permit: false},
     {name: "Frax", symbol: "FRAX", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
+    {name: "Wrapped Ether", symbol: "WETH", supply: ONE_ETHER.mul(1000000).mul(1000000), decimals: 18, permit: false},
   ];
   for(var i = 0; i < tokens.length; ++i) {
     let token = tokens[i];
@@ -102,18 +103,18 @@ async function deployTestnetTokens() {
 }
 
 async function mintTestnetTokens() {
-  let weth = await ethers.getContractAt(artifacts.WETH.abi, WETH_ADDRESS);
-  console.log('start eth balance');
+  let wftm = await ethers.getContractAt(artifacts.WFTM.abi, WFTM_ADDRESS);
+  console.log('start ftm balance');
   console.log(await provider.getBalance(signerAddress));
-  console.log('start weth balance');
-  console.log(await weth.balanceOf(signerAddress));
-  console.log('wrapping eth')
-  let tx1 = await weth.connect(deployer).deposit({...networkSettings.overrides, value: ONE_ETHER.div(1000)});
+  console.log('start wftm balance');
+  console.log(await wftm.balanceOf(signerAddress));
+  console.log('wrapping ftm')
+  let tx1 = await wftm.connect(deployer).deposit({...networkSettings.overrides, value: ONE_ETHER.div(1000)});
   await tx1.wait(networkSettings.confirmations);
-  console.log('end eth balance');
+  console.log('end ftm balance');
   console.log(await provider.getBalance(signerAddress));
-  console.log('end weth balance');
-  console.log(await weth.balanceOf(signerAddress));
+  console.log('end wftm balance');
+  console.log(await wftm.balanceOf(signerAddress));
 
   let tokens: any[] = [
     {name: "Dai Stablecoin", symbol: "DAI", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false, address: DAI_ADDRESS},
@@ -121,6 +122,7 @@ async function mintTestnetTokens() {
     {name: "Wrapped Bitcoin", symbol: "WBTC", supply: BN.from("1000000000"), decimals: 8, permit: false, address: WBTC_ADDRESS},
     {name: "USD Token", symbol: "USDT", supply: BN.from("1000000000"), decimals: 6, permit: false, address: USDT_ADDRESS},
     {name: "Frax", symbol: "FRAX", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false, address: FRAX_ADDRESS},
+    {name: "Wrapped Ether", symbol: "WETH", supply: ONE_ETHER.mul(1000000).mul(1000000), decimals: 18, permit: false, address: WETH_ADDRESS},
   ];
   let recipients = [signerAddress];
   for(var j = 0; j < recipients.length; ++j) {
@@ -160,8 +162,8 @@ async function logAddresses() {
   logContractAddress("USDC", USDC_ADDRESS);
   logContractAddress("WBTC", WBTC_ADDRESS);
   logContractAddress("USDT", USDT_ADDRESS);
-  logContractAddress("SCP", SCP_ADDRESS);
   logContractAddress("FRAX", FRAX_ADDRESS);
+  logContractAddress("WFTM", WFTM_ADDRESS);
 }
 
 main()

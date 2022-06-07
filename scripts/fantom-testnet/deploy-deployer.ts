@@ -33,10 +33,20 @@ async function main() {
   let chainID = (await provider.getNetwork()).chainId;
   networkSettings = getNetworkSettings(chainID);
 
-  await expectDeployed(SINGLETON_FACTORY_ADDRESS);
+  await deploySingletonFactory();
   await deployDeployerContract();
 
   await logAddresses();
+}
+
+async function deploySingletonFactory() {
+  if(await isDeployed(SINGLETON_FACTORY_ADDRESS)) return;
+  console.log("Deploying SingletonFactory");
+  let bytecode = fs.readFileSync("scripts/contract_deploy_bytecodes/aurora_testnet/utils/SingletonFactory.txt").toString().trim();
+  let tx2 = await deployer.sendTransaction({...networkSettings.overrides, gasLimit: 5000000, data: bytecode});
+  await tx2.wait(networkSettings.confirmations);
+  await expectDeployed(SINGLETON_FACTORY_ADDRESS);
+  console.log(`Deployed SingletonFactory to ${SINGLETON_FACTORY_ADDRESS}`);
 }
 
 async function deployDeployerContract() {
