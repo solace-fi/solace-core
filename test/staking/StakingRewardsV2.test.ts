@@ -534,6 +534,11 @@ describe("StakingRewardsV2", function () {
       stakingRewards = (await deployContract(deployer, artifacts.StakingRewardsV2, [governor.address, registry.address, solacePerSecond])) as StakingRewardsV2;
       await stakingRewards.connect(governor).setTimes(startTime, endTime);
       await xsLocker.connect(governor).addXsLockListener(stakingRewards.address);
+
+      await solace.connect(governor).mint(deployer.address, ONE_ETHER.mul(1000000000));
+      await solace.connect(deployer).approve(stakingRewards.address, constants.MaxUint256);
+      await stakingRewards.connect(deployer).postRewards(0);
+
       await xsLocker.connect(user1).createLock(user1.address, ONE_ETHER, 0, {gasLimit: 600000}); // xsLockID 1 value 1
       await xsLocker.connect(user1).createLock(user1.address, ONE_ETHER.mul(2), timestamp+ONE_YEAR*4, {gasLimit: 600000}); // xsLockID 2 value 5
       await xsLocker.connect(user2).createLock(user2.address, ONE_ETHER.mul(3), 0, {gasLimit: 600000}); // xsLockID 3 value 3
@@ -572,17 +577,29 @@ describe("StakingRewardsV2", function () {
       expectClose(await stakingRewards.pendingRewardsOfLock(3), bnMulDiv([solacePerSecond, 3, 50], [9]), PRECISION);
       let balances4 = await getBalances();
       expect(balances3).deep.eq(balances4);
-      // next 11 years
-      for(var i = 1; i <= 11; ++i) {
-        await provider.send("evm_setNextBlockTimestamp", [startTime + ONE_YEAR*i]);
-        await stakingRewards.connect(user3).harvestLock(1);
-        await stakingRewards.connect(user3).harvestLock(2);
-        await stakingRewards.connect(user3).harvestLock(3);
-        await checkConsistency();
-      }
+    });
+
+    it("post rewards during", async function () {
+      let depositAmount = ONE_ETHER.mul(20);
+      await provider.send("evm_setNextBlockTimestamp", [startTime + 60]);
+      await stakingRewards.connect(deployer).postRewards(depositAmount);
+      await checkConsistency();
+      expectClose(await stakingRewards.pendingRewardsOfLock(1), bnAddSub([
+        bnMulDiv([solacePerSecond, 1, 60], [9]),
+        bnMulDiv([depositAmount, 1], [9])
+      ]), PRECISION);
+      expectClose(await stakingRewards.pendingRewardsOfLock(2), bnAddSub([
+        bnMulDiv([solacePerSecond, 5, 60], [9]),
+        bnMulDiv([depositAmount, 5], [9])
+      ]), PRECISION);
+      expectClose(await stakingRewards.pendingRewardsOfLock(3), bnAddSub([
+        bnMulDiv([solacePerSecond, 3, 60], [9]),
+        bnMulDiv([depositAmount, 3], [9])
+      ]), PRECISION);
     });
 
     it("after end", async function () {
+      await provider.send("evm_setNextBlockTimestamp", [startTime + ONE_YEAR*11]);
       await stakingRewards.connect(user3).harvestLocks([1,2]);
       await stakingRewards.connect(user3).harvestLock(3);
       await checkConsistency();
@@ -603,6 +620,18 @@ describe("StakingRewardsV2", function () {
       expect(await stakingRewards.pendingRewardsOfLock(1)).eq(0);
       expect(await stakingRewards.pendingRewardsOfLock(2)).eq(0);
       expect(await stakingRewards.pendingRewardsOfLock(3)).eq(0);
+    });
+
+    it("post rewards after end", async function () {
+      expect(await stakingRewards.pendingRewardsOfLock(1)).eq(0);
+      expect(await stakingRewards.pendingRewardsOfLock(2)).eq(0);
+      expect(await stakingRewards.pendingRewardsOfLock(3)).eq(0);
+      let depositAmount = ONE_ETHER.mul(50);
+      await stakingRewards.connect(deployer).postRewards(depositAmount);
+      await checkConsistency();
+      expectClose(await stakingRewards.pendingRewardsOfLock(1), bnMulDiv([depositAmount, 1], [6]), PRECISION);
+      expectClose(await stakingRewards.pendingRewardsOfLock(2), bnMulDiv([depositAmount, 2], [6]), PRECISION);
+      expectClose(await stakingRewards.pendingRewardsOfLock(3), bnMulDiv([depositAmount, 3], [6]), PRECISION);
     });
 
     after(async function () {

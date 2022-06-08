@@ -168,6 +168,21 @@ contract StakingRewardsV2 is IStakingRewardsV2, ReentrancyGuard, Governable {
     }
 
     /**
+     * @notice Adds a one time boost to rewards.
+     * Paid in [**SOLACE**](./../SOLACE) by `msg.sender`.
+     * @param amount Amount of rewards to distribute.
+     */
+    function postRewards(uint256 amount) external override {
+        // pull solace
+        SafeERC20.safeTransferFrom(IERC20(solace), msg.sender, address(this), amount);
+        // accounting
+        update();
+        if (valueStaked > 0) {
+            accRewardPerShare += amount * Q12 / valueStaked;
+        }
+    }
+
+    /**
      * @notice Updates and sends a lock's rewards.
      * @param xsLockID The ID of the lock to process rewards for.
      */

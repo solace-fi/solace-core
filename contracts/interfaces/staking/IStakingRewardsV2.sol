@@ -113,6 +113,13 @@ interface IStakingRewardsV2 is IxsListener {
     function update() external;
 
     /**
+     * @notice Adds a one time boost to rewards.
+     * Paid in [**SOLACE**](./../../SOLACE) by `msg.sender`.
+     * @param amount Amount of rewards to distribute.
+     */
+    function postRewards(uint256 amount) external;
+
+    /**
      * @notice Updates and sends a lock's rewards.
      * @param xsLockID The ID of the lock to process rewards for.
      */
