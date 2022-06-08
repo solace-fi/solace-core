@@ -11,6 +11,11 @@ export function toAbiEncoded(bn: BigNumberish) {
   return toBytes32(bn).substring(2);
 };
 
+// same as above but a list
+export function abiEncodeArgs(list: BigNumberish[]) {
+  return list.map(toAbiEncoded).join('');
+}
+
 // manipulates storage in the hardhat test network
 export async function setStorageAt(address: string, index: string, value: string) {
   index = ethers.utils.hexStripZeros(index);

@@ -10,7 +10,8 @@ const { waffle, ethers } = hardhat;
 const { provider } = waffle;
 
 import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_importer";
-import { isDeployed } from "../test/utilities/expectDeployed";
+import { expectDeployed, isDeployed } from "../test/utilities/expectDeployed";
+import { getNetworkSettings } from "./getNetworkSettings";
 let artifacts: ArtifactImports;
 
 let initialized = false;
@@ -31,6 +32,7 @@ export async function create2Contract(wallet: Signer, factoryOrContractJson: Con
   else {
     console.log(`deploying to ${address}`);
     var [deployCode, gasUsed] = await _deployer(wallet, initCode, salt, deployerAddress);
+    await expectDeployed(address);
   }
   await _verifier(address, args, contractPath);
   if(deploy) {
@@ -89,10 +91,6 @@ function _hasher(initCode: string, deployerAddress: string): [string, string] {
   //console.log(`hashing\n${string1}\n${string2}`);
   // In each loop, i is the value of the salt we are checking
   for (var i = 0; i < 72057594037927936; i++) {
-  //for (var i =    6440000; i < 72057594037927936; i++) {
-  //for (var i =  8821000; i < 72057594037927936; i++) {
-  //for (var i = 27000000; i < 72057594037927936; i++) {
-  //for (var i = 100000000; i < 72057594037927936; i++) {
     //if(i % 1000000 == 0) console.log(i.toLocaleString('en-US'));
     // 1. Convert i to hex, and it pad to 32 bytes:
     var saltToBytes = i.toString(16).padStart(64, '0');
@@ -120,12 +118,13 @@ function _hasher(initCode: string, deployerAddress: string): [string, string] {
 
 // deploy the contract
 async function _deployer(wallet: Signer, initCode: string, salt: string, deployerAddress: string) {
-  const ONE_GWEI = 1000000000;
-  const gas = 80 * ONE_GWEI;
+  let chainID = (await provider.getNetwork()).chainId;
+  let networkSettings: any = getNetworkSettings(chainID);
+  networkSettings.overrides.gasLimit = 6000000;
   try {
     let deployerContract = await ethers.getContractAt(artifacts.SingletonFactory.abi, deployerAddress);
-    let tx = await deployerContract.connect(wallet).deploy(initCode, salt, {gasLimit: 6000000, maxFeePerGas: gas});
-    let receipt = await tx.wait();
+    let tx = await deployerContract.connect(wallet).deploy(initCode, salt, networkSettings.overrides);
+    let receipt = await tx.wait(networkSettings.confirmations);
     return [tx.data, receipt.gasUsed.toString()]
     //return ["", "0"];
   } catch(e) {

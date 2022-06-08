@@ -1,8 +1,11 @@
+// finds the salts required to clone a BondTellerErc20 to another 0x501ace... address
+// requires the first bond teller to be deployed
+
 import hardhat from "hardhat";
 const { ethers } = hardhat;
 import { BigNumber as BN } from "ethers";
 
-const DAI_BOND_TELLER_ADDRESS       = "0x501ACe677634Fd09A876E88126076933b686967a";
+const DAI_BOND_TELLER_ADDRESS = "0x501ACe677634Fd09A876E88126076933b686967a";
 
 var keccak256 = ethers.utils.keccak256;
 var getCreate2Address = ethers.utils.getCreate2Address;
@@ -23,11 +26,13 @@ let found: any[] = [
   // NEAR
   {"salt":"0x0000000000000000000000000000000000000000000000000000000004843332","address":"0x501aCe71a83CBE03B1467a6ffEaeB58645d844b4"},
   // AURORA
-  {"salt":"0x0000000000000000000000000000000000000000000000000000000005201ba9","address":"0x501Ace35f0B7Fad91C199824B8Fe555ee9037AA3"}
+  {"salt":"0x0000000000000000000000000000000000000000000000000000000005201ba9","address":"0x501Ace35f0B7Fad91C199824B8Fe555ee9037AA3"},
+  // SLP USDC
+  {"salt":"0x0000000000000000000000000000000000000000000000000000000005e96d75","address":"0x501acE55C9a613a15cDDbA158F67Ffca775842eB"}
 ]
 
-let numToFind = 8;
-let nextSalt = 62522121;
+let numToFind = 9;
+let nextSalt = 99183990;
 let maxSalt = 72057594037927936;
 
 async function main () {
