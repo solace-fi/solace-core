@@ -5,9 +5,11 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Multicall.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "./../utils/PriceVerifier.sol";
+import "./../utils/SolaceSigner.sol";
 import "./../interfaces/payment/ISCP.sol";
 import "./../interfaces/utils/IRegistry.sol";
 import "./../interfaces/payment/ICoverPaymentManager.sol";
@@ -19,7 +21,9 @@ import "./../interfaces/payment/ICoverPaymentManager.sol";
  * @notice A cover payment manager for [**Solace Cover Points**](./SCP) that accepts stablecoins  and `SOLACE` for payment.
  *
  */
-contract CoverPaymentManager is ICoverPaymentManager, Multicall, PriceVerifier, ReentrancyGuard {
+contract CoverPaymentManager is ICoverPaymentManager, Multicall, SolaceSigner, ReentrancyGuard {
+    using Address for address;
+    using EnumerableSet for EnumerableSet.AddressSet;
 
     /***************************************
     STATE VARIABLES
@@ -46,7 +50,10 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, PriceVerifier, 
     /// @notice The mapping of token index to address.
     mapping(uint256 => address) private _indexToToken;
 
-    /// @notice The number of tokens that have been added
+    /// @notice Set of products.
+    EnumerableSet.AddressSet private _products;
+
+    /// @notice The number of tokens that have been added.
     uint256 public tokensLength;
 
    /***************************************
@@ -67,7 +74,7 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, PriceVerifier, 
      * @param _governance The address of the [governor](/docs/protocol/governance).
      * @param _registry The address of the registry contract.
      */
-    constructor(address _governance, address _registry) PriceVerifier(_governance) {
+    constructor(address _governance, address _registry) SolaceSigner(_governance) {
         _setRegistry(_registry);
     }
 
@@ -88,6 +95,7 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, PriceVerifier, 
         address recipient,
         uint256 amount
     ) external override nonReentrant whileUnpaused {
+        require(productIsActive(msg.sender), "invalid product caller");
         // checks
         TokenInfo memory ti = tokenInfo[token];
         require(ti.accepted, "token not accepted");
@@ -175,6 +183,7 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, PriceVerifier, 
         uint256 priceDeadline,
         bytes calldata signature
     ) external override nonReentrant whileUnpaused {
+        require(productIsActive(msg.sender), "invalid product caller");
         // checks
         TokenInfo memory ti = tokenInfo[token];
         require(ti.accepted,  "token not accepted");
@@ -227,6 +236,36 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, PriceVerifier, 
      * @notice Withdraws some of the user's deposit and sends it to `recipient`.
      * User must have sufficient Solace Cover Points to withdraw.
      * Premium pool must have the tokens to return.
+     * @param from The SCP balance holder address.
+     * @param amount The amount of `SOLACE` to withdraw.
+     * @param recipient The receiver of funds.
+     * @param priceDeadline The `SOLACE` price in wei(usd).
+     * @param signature The `SOLACE` price signature.
+     */
+     function withdrawFrom(
+        address from,
+        uint256 amount,
+        address recipient,
+        uint256 price,
+        uint256 priceDeadline,
+        bytes calldata signature
+    ) external override nonReentrant {
+        require(productIsActive(msg.sender), "invalid product caller");
+        require(amount > 0, "zero amount withdraw");
+        require(verifyPrice(solace, price, priceDeadline, signature), "invalid solace price");
+        uint256 refundableSolaceAmount = getRefundableSOLACEAmount(from, price, priceDeadline, signature);
+        require(amount <= refundableSolaceAmount, "withdraw amount exceeds balance");
+
+        uint256 scpAmount = (amount * price) / 10**18;
+        ISCP(scp).withdraw(from, scpAmount);
+        SafeERC20.safeTransferFrom(IERC20(solace), premiumPool, recipient, amount);
+        emit TokenWithdrawn(from, recipient, amount);
+    }
+
+    /**
+     * @notice Withdraws some of the user's deposit and sends it to `recipient`.
+     * User must have sufficient Solace Cover Points to withdraw.
+     * Premium pool must have the tokens to return.
      * @param amount The amount of `SOLACE` to withdraw.
      * @param recipient The receiver of funds.
      * @param priceDeadline The `SOLACE` price in wei(usd).
@@ -248,6 +287,21 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, PriceVerifier, 
         ISCP(scp).withdraw(msg.sender, scpAmount);
         SafeERC20.safeTransferFrom(IERC20(solace), premiumPool, recipient, amount);
         emit TokenWithdrawn(msg.sender, recipient, amount);
+    }
+
+    /**
+     * @notice Charge premiums for each policyholder.
+     * @param accounts Array of addresses of the policyholders to charge.
+     * @param premiums Array of premium amounts (in **USD** to 18 decimal places) to charge each policyholder.
+    */
+    function chargePremiums(address[] calldata accounts, uint256[] calldata premiums) external override whileUnpaused {
+        require(
+            msg.sender == IRegistry(registry).get("premiumCollector") ||
+            msg.sender == governance() ||
+            productIsActive(msg.sender), "!authorized"
+        );
+        require(accounts.length == premiums.length, "length mismatch");
+        ISCP(scp).burnMultiple(accounts, premiums);
     }
 
     /***************************************
@@ -292,6 +346,36 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, PriceVerifier, 
     }
 
     /***************************************
+    PRODUCT VIEW FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Checks is an address is an active product.
+     * @param product The product to check.
+     * @return status Returns true if the product is active.
+     */
+     function productIsActive(address product) public view override returns (bool status) {
+        return _products.contains(product);
+    }
+
+    /**
+     * @notice Returns the number of products.
+     * @return count The number of products.
+     */
+    function numProducts() external override view returns (uint256 count) {
+        return _products.length();
+    }
+
+    /**
+     * @notice Returns the product at the given index.
+     * @param productNum The index to query.
+     * @return product The address of the product.
+     */
+    function getProduct(uint256 productNum) external override view returns (address product) {
+        return _products.at(productNum);
+    }
+
+    /***************************************
     GOVERNANCE FUNCTIONS
     ***************************************/
 
@@ -331,6 +415,27 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, PriceVerifier, 
     function setPaused(bool _paused) external override onlyGovernance {
         paused = _paused;
         emit PauseSet(_paused);
+    }
+
+    /**
+     * @notice Adds a new product.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param product the new product
+     */
+     function addProduct(address product) external override onlyGovernance {
+        require(product != address(0x0), "zero address product");
+        _products.add(product);
+        emit ProductAdded(product);
+    }
+
+    /**
+     * @notice Removes a product.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param product the product to remove
+     */
+    function removeProduct(address product) external override onlyGovernance {
+        _products.remove(product);
+        emit ProductRemoved(product);
     }
 
     /***************************************

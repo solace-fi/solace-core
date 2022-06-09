@@ -62,7 +62,7 @@ export async function import_artifacts() {
   artifacts.Registry = await tryImport(`${artifact_dir}/utils/Registry.sol/Registry.json`);
   artifacts.SingletonFactory = await tryImport(`${artifact_dir}/interfaces/utils/ISingletonFactory.sol/ISingletonFactory.json`);
   artifacts.Deployer = await tryImport(`${artifact_dir}/utils/Deployer.sol/Deployer.json`);
-  artifacts.PriceVerifier = await tryImport(`${artifact_dir}/utils/PriceVerifier.sol/PriceVerifier.json`);
+  artifacts.SolaceSigner = await tryImport(`${artifact_dir}/utils/SolaceSigner.sol/SolaceSigner.json`);
   // cross chain
   artifacts.BridgeWrapper = await tryImport(`${artifact_dir}/BridgeWrapper.sol/BridgeWrapper.json`);
   // generic imports

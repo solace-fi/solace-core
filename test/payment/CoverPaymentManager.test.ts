@@ -29,7 +29,7 @@ describe("CoverPaymentManager", function () {
   let weth: Weth10;
   let solace: MockErc20Permit;
 
-  const [deployer, governor, user1, user2, user3, user4, user5, premiumPool, premiumPool2, premiumPool3, premiumPool4, premiumPool5, premiumPool6] = provider.getWallets();
+  const [deployer, governor, user1, user2, user3, user4, user5, user6, user7, user8, premiumPool, premiumPool2, premiumPool3, premiumPool4, premiumPool5, premiumPool6,premiumPool7, premiumPool8, product1, product2] = provider.getWallets();
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
   const ONE_ETHER = BN.from("1000000000000000000");
   const ONE_USDC = BN.from("1000000");
@@ -37,7 +37,7 @@ describe("CoverPaymentManager", function () {
   const DEPOSIT_SIGHASH  = "0x4ba58eee";
   const DEPOSIT_STABLE_SIGHASH = "0xed8013a0";
   const TYPEHASH = utils.keccak256(utils.toUtf8Bytes("PriceData(address token,uint256 price,uint256 deadline)"));
-  const DOMAIN_NAME = "Solace.fi-PriceVerifier";
+  const DOMAIN_NAME = "Solace.fi-SolaceSigner";
   const CHAIN_ID = 31337;
 
   let artifacts: ArtifactImports;
@@ -117,6 +117,10 @@ describe("CoverPaymentManager", function () {
     it("has a correct premium pool", async function () {
       expect(await coverPaymentManager.premiumPool()).eq(premiumPool.address);
     });
+
+    it("starts with no product info", async function() {
+      expect(await coverPaymentManager.numProducts()).eq(0)
+    });
   });
 
   describe("governance", function() {
@@ -180,7 +184,7 @@ describe("CoverPaymentManager", function () {
     });
   });
 
-  describe("registry", () => {
+  describe("setRegistry", () => {
     let registry2: Registry;
 
     before(async () => {
@@ -272,12 +276,18 @@ describe("CoverPaymentManager", function () {
         expect(tokenInfo.stable).eq(false);
     });
 
+    it("cannot set with empty token array info", async function () {
+      await coverPaymentManager.connect(governor).setTokenInfo([]);
+      expect(await coverPaymentManager.connect(governor).tokensLength()).eq(0);
+
+    });
+
     it("non governance cannot set token info", async function() {
-        await expect(coverPaymentManager.connect(user1).setTokenInfo(tokens)).revertedWith("!governance");
+      await expect(coverPaymentManager.connect(user1).setTokenInfo(tokens)).revertedWith("!governance");
     });
 
     it("cannot set with zero address token info", async function() {
-        await expect(coverPaymentManager.connect(governor).setTokenInfo(tokensWithZeroAddress)).revertedWith("zero address token");
+      await expect(coverPaymentManager.connect(governor).setTokenInfo(tokensWithZeroAddress)).revertedWith("zero address token");
     });
 
     it("can set token info", async function() {
@@ -348,6 +358,75 @@ describe("CoverPaymentManager", function () {
                  tokens[i].stable);
         }
         expect(await coverPaymentManager.connect(governor).tokensLength()).eq(tokens.length);
+    });
+  });
+
+  describe("addProduct", function() {
+    it("starts with no product", async function() {
+      expect(await coverPaymentManager.numProducts()).eq(0)
+      expect(await coverPaymentManager.productIsActive(product1.address)).eq(false);
+      await expect(coverPaymentManager.getProduct(0)).reverted;
+    });
+
+    it("cannot add if non-governor", async function() {
+      await expect(coverPaymentManager.connect(user1).addProduct(product1.address)).revertedWith("!governance");
+    });
+
+    it("cannot add zero address product", async function() {
+      await expect(coverPaymentManager.connect(governor).addProduct(ZERO_ADDRESS)).revertedWith("zero address product");
+    });
+
+    it("can add product", async function() {
+      let tx = await coverPaymentManager.connect(governor).addProduct(product1.address);
+      await expect(tx).emit(coverPaymentManager, "ProductAdded").withArgs(product1.address);
+      expect(await coverPaymentManager.numProducts()).eq(1)
+      expect(await coverPaymentManager.productIsActive(product1.address)).eq(true);
+      expect(await coverPaymentManager.getProduct(0)).eq(product1.address);
+    });
+
+    it("can add more", async function() {
+      let tx = await coverPaymentManager.connect(governor).addProduct(product2.address);
+      await expect(tx).emit(coverPaymentManager, "ProductAdded").withArgs(product2.address);
+      expect(await coverPaymentManager.numProducts()).eq(2)
+      expect(await coverPaymentManager.productIsActive(product2.address)).eq(true);
+      expect(await coverPaymentManager.getProduct(1)).eq(product2.address);
+    });
+  });
+
+  describe("removeProduct", function() {
+    before(async function() {
+      expect(await coverPaymentManager.numProducts()).eq(2);
+      expect(await coverPaymentManager.productIsActive(product1.address)).eq(true);
+      expect(await coverPaymentManager.productIsActive(product2.address)).eq(true);
+    });
+
+    it("cannot remove if non-governor", async function() {
+      await expect(coverPaymentManager.connect(user1).removeProduct(product1.address)).revertedWith("!governance");
+    });
+
+    it("cannot remove if product is invalid", async function() {
+      await coverPaymentManager.connect(governor).removeProduct(user1.address);
+      expect(await coverPaymentManager.numProducts()).eq(2);
+      expect(await coverPaymentManager.productIsActive(product1.address)).eq(true);
+      expect(await coverPaymentManager.productIsActive(product2.address)).eq(true);
+    });
+
+    it("can remove", async function() {
+      let tx = await coverPaymentManager.connect(governor).removeProduct(product1.address);
+      await expect(tx).emit(coverPaymentManager, "ProductRemoved").withArgs(product1.address);
+      expect(await coverPaymentManager.numProducts()).eq(1);
+      expect(await coverPaymentManager.productIsActive(product1.address)).eq(false);
+      expect(await coverPaymentManager.productIsActive(product2.address)).eq(true);
+      expect(await coverPaymentManager.getProduct(0)).eq(product2.address);
+    });
+
+    it("can remove more", async function() {
+      let tx = await coverPaymentManager.connect(governor).removeProduct(product2.address);
+      await expect(tx).emit(coverPaymentManager, "ProductRemoved").withArgs(product2.address);
+      expect(await coverPaymentManager.numProducts()).eq(0);
+      expect(await coverPaymentManager.productIsActive(product1.address)).eq(false);
+      expect(await coverPaymentManager.productIsActive(product2.address)).eq(false);
+      await expect(coverPaymentManager.getProduct(0)).reverted;
     });
   });
 
@@ -513,6 +592,10 @@ describe("CoverPaymentManager", function () {
       await coverPaymentManager.connect(governor).setTokenInfo(tokens);
       await dai.mintToken(user1.address, ONE_ETHER.mul(1000));
 
+      // products
+      await coverPaymentManager.connect(governor).addProduct(product1.address);
+      expect(await coverPaymentManager.numProducts()).eq(1);
+      expect(await coverPaymentManager.productIsActive(product1.address)).eq(true);
     });
 
     it("starts with no deposits", async function () {
@@ -520,27 +603,31 @@ describe("CoverPaymentManager", function () {
       expect(await scp.balanceOfNonRefundable(user1.address)).eq(0);
     });
 
+    it("cannot deposit with invalid product caller", async function () {
+      await expect(coverPaymentManager.connect(deployer).depositStableFrom(dai.address, user1.address, user1.address, 1)).to.be.revertedWith("nvalid product caller");
+    });
+
     it("cannot deposit unaccepted token", async function () {
-      await expect(coverPaymentManager.connect(deployer).depositStableFrom(weth.address, user1.address, user1.address, 0)).to.be.revertedWith("token not accepted");
+      await expect(coverPaymentManager.connect(product1).depositStableFrom(weth.address, user1.address, user1.address, 0)).to.be.revertedWith("token not accepted");
     });
 
     it("cannot deposit non-stable token", async function () {
-        await expect(coverPaymentManager.connect(deployer).depositStableFrom(solace.address, user1.address, user1.address, 0)).to.be.revertedWith("token not stable");
+        await expect(coverPaymentManager.connect(product1).depositStableFrom(solace.address, user1.address, user1.address, 0)).to.be.revertedWith("token not stable");
     });
 
     it("cannot deposit with insufficient allowance", async function () {
-      await expect(coverPaymentManager.connect(deployer).depositStableFrom(dai.address, user1.address, user1.address, 1)).to.be.revertedWith("ERC20: transfer amount exceeds allowance");
+      await expect(coverPaymentManager.connect(product1).depositStableFrom(dai.address, user1.address, user1.address, 1)).to.be.revertedWith("ERC20: transfer amount exceeds allowance");
     });
 
     it("cannot deposit with insufficient balance", async function () {
       await dai.connect(user1).approve(coverPaymentManager.address, constants.MaxUint256);
       const balance = await dai.balanceOf(user1.address);
-      await expect(coverPaymentManager.connect(deployer).depositStableFrom(dai.address, user1.address, user1.address, balance.add(1))).to.be.revertedWith("ERC20: transfer amount exceeds balance");
+      await expect(coverPaymentManager.connect(product1).depositStableFrom(dai.address, user1.address, user1.address, balance.add(1))).to.be.revertedWith("ERC20: transfer amount exceeds balance");
     });
 
     it("cannot deposit if coverPaymentManager is not an scp mover", async function () {
       await scp.connect(governor).setScpMoverStatuses([coverPaymentManager.address],[false]);
-      await expect(coverPaymentManager.connect(deployer).depositStableFrom(dai.address, user1.address, user1.address, 1)).to.be.revertedWith("!scp mover");
+      await expect(coverPaymentManager.connect(product1).depositStableFrom(dai.address, user1.address, user1.address, 1)).to.be.revertedWith("!scp mover");
       await scp.connect(governor).setScpMoverStatuses([coverPaymentManager.address],[true]);
     });
 
@@ -561,7 +648,7 @@ describe("CoverPaymentManager", function () {
 
       // tx1: user1 deposits dai for user2
       let daiBal1 = await dai.balanceOf(user1.address);
-      let tx1 = await coverPaymentManager.connect(deployer).depositStableFrom(dai.address, user1.address, user2.address, depositAmount1);
+      let tx1 = await coverPaymentManager.connect(product1).depositStableFrom(dai.address, user1.address, user2.address, depositAmount1);
       let daiBal2 = await dai.balanceOf(user1.address);
       expect(daiBal1.sub(daiBal2)).eq(depositAmount1);
       await expect(tx1).to.emit(coverPaymentManager, "TokenDeposited").withArgs(dai.address, user1.address, user2.address, depositAmount1);
@@ -573,7 +660,7 @@ describe("CoverPaymentManager", function () {
 
       // tx2: user2 deposits usdc for user2
       let usdcBal1 = await usdc.balanceOf(user2.address);
-      let tx2 = await coverPaymentManager.connect(deployer).depositStableFrom(usdc.address, user2.address, user2.address, depositAmount2);
+      let tx2 = await coverPaymentManager.connect(product1).depositStableFrom(usdc.address, user2.address, user2.address, depositAmount2);
       let usdcBal2 = await usdc.balanceOf(user2.address);
       expect(usdcBal1.sub(usdcBal2)).eq(depositAmount2);
       await expect(tx2).to.emit(coverPaymentManager, "TokenDeposited").withArgs(usdc.address, user2.address, user2.address, depositAmount2);
@@ -587,7 +674,7 @@ describe("CoverPaymentManager", function () {
         .connect(governor)
         .setTokenInfo([{'token': usdc.address, 'accepted': true, 'permittable': true, 'refundable': false, 'stable': true}]);
 
-      let tx3 = await coverPaymentManager.connect(deployer).depositStableFrom(usdc.address, user2.address, user2.address, depositAmount3);
+      let tx3 = await coverPaymentManager.connect(product1).depositStableFrom(usdc.address, user2.address, user2.address, depositAmount3);
       let usdcBal3 = await usdc.balanceOf(user2.address);
       expect(usdcBal2.sub(usdcBal3)).eq(depositAmount3);
       await expect(tx3).to.emit(coverPaymentManager, "TokenDeposited").withArgs(usdc.address, user2.address, user2.address, depositAmount3);
@@ -596,7 +683,7 @@ describe("CoverPaymentManager", function () {
       expect(await usdc.balanceOf(premiumPool5.address)).eq(depositAmount2.add(depositAmount3));
 
       // tx4: user2 deposits usdc for user2
-      let tx4 = await coverPaymentManager.connect(deployer).depositStableFrom(usdc.address, user2.address, user2.address, depositAmount4);
+      let tx4 = await coverPaymentManager.connect(product1).depositStableFrom(usdc.address, user2.address, user2.address, depositAmount4);
       let usdcBal4 = await usdc.balanceOf(user2.address);
       expect(usdcBal3.sub(usdcBal4)).eq(depositAmount4);
       await expect(tx4).to.emit(coverPaymentManager, "TokenDeposited").withArgs(usdc.address, user2.address, user2.address, depositAmount4);
@@ -628,7 +715,7 @@ describe("CoverPaymentManager", function () {
       let depositValue1 = ONE_ETHER.mul(10);
       let depositValue2 = ONE_ETHER.mul(20);
 
-      let tx = await coverPaymentManager.connect(deployer).multicall([
+      let tx = await coverPaymentManager.connect(product1).multicall([
         `${DEPOSIT_STABLE_SIGHASH}${toAbiEncoded(dai.address)}${toAbiEncoded(user2.address)}${toAbiEncoded(user1.address)}${toAbiEncoded(depositAmount1)}`,
         `${DEPOSIT_STABLE_SIGHASH}${toAbiEncoded(usdc.address)}${toAbiEncoded(user2.address)}${toAbiEncoded(user2.address)}${toAbiEncoded(depositAmount2)}`,
       ]);
@@ -808,8 +895,8 @@ describe("CoverPaymentManager", function () {
       await coverPaymentManager.connect(governor).setTokenInfo(tokens);
 
       // create price signatures
-      await coverPaymentManager.connect(governor).addPriceSigner(governor.address);
-      expect(await coverPaymentManager.connect(governor).isPriceSigner(governor.address)).eq(true);
+      await coverPaymentManager.connect(governor).addSigner(governor.address);
+      expect(await coverPaymentManager.connect(governor).isSigner(governor.address)).eq(true);
 
       const digest1 = getPriceDataDigest(DOMAIN_NAME, coverPaymentManager.address, CHAIN_ID, solace.address, SOLACE_PRICE_1, DEADLINE, TYPEHASH);
       priceSignature1 = assembleSignature(sign(digest1, Buffer.from(governor.privateKey.slice(2), "hex")));
@@ -922,8 +1009,8 @@ describe("CoverPaymentManager", function () {
       await coverPaymentManager.connect(governor).setTokenInfo(tokens);
 
       // create price signatures
-      await coverPaymentManager.connect(governor).addPriceSigner(governor.address);
-      expect(await coverPaymentManager.connect(governor).isPriceSigner(governor.address)).eq(true);
+      await coverPaymentManager.connect(governor).addSigner(governor.address);
+      expect(await coverPaymentManager.connect(governor).isSigner(governor.address)).eq(true);
 
       const digest1 = getPriceDataDigest(DOMAIN_NAME, coverPaymentManager.address, CHAIN_ID, solace.address, SOLACE_PRICE_1, DEADLINE, TYPEHASH);
       priceSignature1 = assembleSignature(sign(digest1, Buffer.from(governor.privateKey.slice(2), "hex")));
@@ -936,39 +1023,47 @@ describe("CoverPaymentManager", function () {
 
       const digest4 = getPriceDataDigest(DOMAIN_NAME, coverPaymentManager.address, CHAIN_ID, weth.address, SOLACE_PRICE_3, DEADLINE, TYPEHASH);
       invalidPriceSignature = assembleSignature(sign(digest4, Buffer.from(governor.privateKey.slice(2), "hex")));
+
+      // product
+      await coverPaymentManager.connect(governor).addProduct(product1.address);
+      expect(await coverPaymentManager.productIsActive(product1.address)).eq(true);
     });
 
     it("starts with no deposits", async function () {
         expect(await scp.balanceOf(user5.address)).eq(0);
         expect(await scp.balanceOfNonRefundable(user5.address)).eq(0);
     });
+    
+    it("cannot deposit with invalid product caller", async function () {
+      await expect(coverPaymentManager.connect(deployer).depositStableFrom(dai.address, user1.address, user1.address, 1)).to.be.revertedWith("nvalid product caller");
+    });
 
     it("cannot deposit unaccepted token", async function () {
-      await expect(coverPaymentManager.connect(deployer).depositNonStableFrom(weth.address, user5.address, user5.address, 0, SOLACE_PRICE_1, DEADLINE, priceSignature1)).to.be.revertedWith("token not accepted");
+      await expect(coverPaymentManager.connect(product1).depositNonStableFrom(weth.address, user5.address, user5.address, 0, SOLACE_PRICE_1, DEADLINE, priceSignature1)).to.be.revertedWith("token not accepted");
     });
 
     it("cannot deposit stable token", async function () {
-        await expect(coverPaymentManager.connect(deployer).depositNonStableFrom(dai.address, user5.address, user5.address, 0, SOLACE_PRICE_1, DEADLINE, priceSignature1)).to.be.revertedWith("token not non-stable");
+        await expect(coverPaymentManager.connect(product1).depositNonStableFrom(dai.address, user5.address, user5.address, 0, SOLACE_PRICE_1, DEADLINE, priceSignature1)).to.be.revertedWith("token not non-stable");
     });
 
     it("cannot deposit invalid price", async function () {
-        await expect(coverPaymentManager.connect(deployer).depositNonStableFrom(solace.address, user5.address, user5.address, 0, SOLACE_PRICE_1, DEADLINE, invalidPriceSignature)).to.be.revertedWith("invalid token price");
+        await expect(coverPaymentManager.connect(product1).depositNonStableFrom(solace.address, user5.address, user5.address, 0, SOLACE_PRICE_1, DEADLINE, invalidPriceSignature)).to.be.revertedWith("invalid token price");
     });
 
     it("cannot deposit with insufficient allowance", async function () {
       await solace.mintToken(user5.address, ONE_ETHER.mul(1000));
-      await expect(coverPaymentManager.connect(deployer).depositNonStableFrom(solace.address, user5.address, user5.address, 1, SOLACE_PRICE_1, DEADLINE, priceSignature1)).to.be.revertedWith("ERC20: transfer amount exceeds allowance");
+      await expect(coverPaymentManager.connect(product1).depositNonStableFrom(solace.address, user5.address, user5.address, 1, SOLACE_PRICE_1, DEADLINE, priceSignature1)).to.be.revertedWith("ERC20: transfer amount exceeds allowance");
     });
 
     it("cannot deposit with insufficient balance", async function () {
       const balance = await solace.balanceOf(user5.address);
-      await expect(coverPaymentManager.connect(deployer).depositNonStableFrom(solace.address,user5.address, user5.address, balance.add(1000), SOLACE_PRICE_1, DEADLINE, priceSignature1)).to.be.revertedWith("ERC20: transfer amount exceeds balance");
+      await expect(coverPaymentManager.connect(product1).depositNonStableFrom(solace.address,user5.address, user5.address, balance.add(1000), SOLACE_PRICE_1, DEADLINE, priceSignature1)).to.be.revertedWith("ERC20: transfer amount exceeds balance");
     });
 
     it("cannot deposit if coverPaymentManager is not an scp mover", async function () {
       await solace.connect(user5).approve(coverPaymentManager.address, constants.MaxUint256);
       await scp.connect(governor).setScpMoverStatuses([coverPaymentManager.address],[false]);
-      await expect(coverPaymentManager.connect(deployer).depositNonStableFrom(solace.address, user5.address, user5.address, 1, SOLACE_PRICE_1, DEADLINE, priceSignature1)).to.be.revertedWith("!scp mover");
+      await expect(coverPaymentManager.connect(product1).depositNonStableFrom(solace.address, user5.address, user5.address, 1, SOLACE_PRICE_1, DEADLINE, priceSignature1)).to.be.revertedWith("!scp mover");
       await scp.connect(governor).setScpMoverStatuses([coverPaymentManager.address],[true]);
     });
 
@@ -980,7 +1075,7 @@ describe("CoverPaymentManager", function () {
         const solaceBalance1 = ONE_ETHER.mul(1000);
         const depositAmount1 = ONE_ETHER.mul(10); // 10 SOLACE
         const scpAmount1 = ONE_ETHER.mul(10); // 10 SCP
-        let tx1 = await coverPaymentManager.connect(deployer).depositNonStableFrom(solace.address, user5.address, user5.address, depositAmount1, SOLACE_PRICE_1, DEADLINE, priceSignature1);
+        let tx1 = await coverPaymentManager.connect(product1).depositNonStableFrom(solace.address, user5.address, user5.address, depositAmount1, SOLACE_PRICE_1, DEADLINE, priceSignature1);
         await expect(tx1).to.emit(coverPaymentManager, "TokenDeposited").withArgs(solace.address, user5.address, user5.address, depositAmount1);
         expect(await scp.balanceOf(user5.address)).eq(scpAmount1);
         expect(await solace.balanceOf(user5.address)).eq(solaceBalance1.sub(depositAmount1));
@@ -990,7 +1085,7 @@ describe("CoverPaymentManager", function () {
         const solaceBalance2 = await solace.connect(user5).balanceOf(user5.address);
         const depositAmount2 = ONE_ETHER.mul(10); // 10 SOLACE
         const scpAmount2 = ONE_ETHER.mul(20); // 20 SCP
-        let tx2 = await coverPaymentManager.connect(deployer).depositNonStableFrom(solace.address, user5.address, user5.address, depositAmount2, SOLACE_PRICE_2, DEADLINE, priceSignature2);
+        let tx2 = await coverPaymentManager.connect(product1).depositNonStableFrom(solace.address, user5.address, user5.address, depositAmount2, SOLACE_PRICE_2, DEADLINE, priceSignature2);
         await expect(tx2).to.emit(coverPaymentManager, "TokenDeposited").withArgs(solace.address, user5.address, user5.address, depositAmount2);
         expect(await scp.balanceOf(user5.address)).eq(scpAmount1.add(scpAmount2));
         expect(await solace.balanceOf(user5.address)).eq(solaceBalance2.sub(depositAmount2));
@@ -1000,7 +1095,7 @@ describe("CoverPaymentManager", function () {
         const solaceBalance3 = await solace.connect(user5).balanceOf(user5.address);
         const depositAmount3 = ONE_ETHER.mul(100); // 10 SOLACE
         const scpAmount3 = ONE_ETHER; // 1 SCP
-        let tx3 = await coverPaymentManager.connect(deployer).depositNonStableFrom(solace.address, user5.address, user5.address, depositAmount3, SOLACE_PRICE_3, DEADLINE, priceSignature3);
+        let tx3 = await coverPaymentManager.connect(product1).depositNonStableFrom(solace.address, user5.address, user5.address, depositAmount3, SOLACE_PRICE_3, DEADLINE, priceSignature3);
         await expect(tx3).to.emit(coverPaymentManager, "TokenDeposited").withArgs(solace.address, user5.address, user5.address, depositAmount3);
         expect(await scp.balanceOf(user5.address)).eq(scpAmount1.add(scpAmount2).add(scpAmount3));
         expect(await solace.balanceOf(user5.address)).eq(solaceBalance3.sub(depositAmount3));
@@ -1036,8 +1131,8 @@ describe("CoverPaymentManager", function () {
       await coverPaymentManager.connect(governor).setTokenInfo(tokens);
 
       // create price signatures
-      await coverPaymentManager.connect(governor).addPriceSigner(governor.address);
-      expect(await coverPaymentManager.connect(governor).isPriceSigner(governor.address)).eq(true);
+      await coverPaymentManager.connect(governor).addSigner(governor.address);
+      expect(await coverPaymentManager.connect(governor).isSigner(governor.address)).eq(true);
 
       const digest1 = getPriceDataDigest(DOMAIN_NAME, coverPaymentManager.address, CHAIN_ID, solace.address, SOLACE_PRICE_1, DEADLINE, TYPEHASH);
       priceSignature1 = assembleSignature(sign(digest1, Buffer.from(governor.privateKey.slice(2), "hex")));
@@ -1141,4 +1236,253 @@ describe("CoverPaymentManager", function () {
         expect(await solace.balanceOf(premiumPool4.address)).eq(premiumPoolBalance.sub(withdrawAmount1).sub(withdrawAmount2).sub(withdrawAmount3));
     });
   });
+
+  describe("withdrawFrom", function () {
+    let priceSignature1: string;
+    let priceSignature2: string;
+    let priceSignature3: string;
+    let invalidPriceSignature: string;
+    let SOLACE_PRICE_1 = ONE_ETHER; // 1$
+    let SOLACE_PRICE_2 = ONE_ETHER.mul(2); // 2$
+    let SOLACE_PRICE_3 = ONE_ETHER.div(100); // 0.01$
+    let tokens: any[];
+
+    before("redeploy scp and coverPaymentManager", async function () {
+      tokens = [
+            {'token': solace.address, 'accepted': true, 'permittable': true, 'refundable': true, 'stable': false},   // solace
+      ];
+
+      // deploy scp
+      scp = (await deployContract(deployer, artifacts.SCP, [governor.address])) as Scp;
+      await registry.connect(governor).set(["scp"], [scp.address]);
+
+      // deploy cover payment manager
+      await registry.connect(governor).set(["premiumPool"], [premiumPool7.address]);
+      coverPaymentManager = (await deployContract(deployer, artifacts.CoverPaymentManager, [governor.address, registry.address])) as CoverPaymentManager;
+      expect( await coverPaymentManager.connect(governor).premiumPool()).eq(premiumPool7.address);
+
+      // set tokens
+      await coverPaymentManager.connect(governor).setTokenInfo(tokens);
+
+      // create price signatures
+      await coverPaymentManager.connect(governor).addSigner(governor.address);
+      expect(await coverPaymentManager.connect(governor).isSigner(governor.address)).eq(true);
+
+      const digest1 = getPriceDataDigest(DOMAIN_NAME, coverPaymentManager.address, CHAIN_ID, solace.address, SOLACE_PRICE_1, DEADLINE, TYPEHASH);
+      priceSignature1 = assembleSignature(sign(digest1, Buffer.from(governor.privateKey.slice(2), "hex")));
+
+      const digest2 = getPriceDataDigest(DOMAIN_NAME, coverPaymentManager.address, CHAIN_ID, solace.address, SOLACE_PRICE_2, DEADLINE, TYPEHASH);
+      priceSignature2 = assembleSignature(sign(digest2, Buffer.from(governor.privateKey.slice(2), "hex")));
+
+      const digest3 = getPriceDataDigest(DOMAIN_NAME, coverPaymentManager.address, CHAIN_ID, solace.address, SOLACE_PRICE_3, DEADLINE, TYPEHASH);
+      priceSignature3 = assembleSignature(sign(digest3, Buffer.from(governor.privateKey.slice(2), "hex")));
+
+      const digest4 = getPriceDataDigest(DOMAIN_NAME, coverPaymentManager.address, CHAIN_ID, weth.address, SOLACE_PRICE_3, DEADLINE, TYPEHASH);
+      invalidPriceSignature = assembleSignature(sign(digest4, Buffer.from(governor.privateKey.slice(2), "hex")));
+
+      // deposit SOLACE
+      await solace.connect(governor).mintToken(user3.address, ONE_ETHER.mul(1000));
+      await solace.connect(user3).approve(coverPaymentManager.address, constants.MaxUint256);
+      await solace.connect(user6).approve(coverPaymentManager.address, constants.MaxUint256);
+
+      await scp.connect(governor).setScpMoverStatuses([coverPaymentManager.address],[true]);
+      await coverPaymentManager.connect(user3).depositNonStable(solace.address, user6.address, ONE_ETHER.mul(100), SOLACE_PRICE_1, DEADLINE, priceSignature1);
+      expect(await scp.balanceOf(user6.address)).eq(ONE_ETHER.mul(100)); // 100 SCP
+      expect(await solace.balanceOf(user6.address)).eq(0); // 0 SOLACE
+
+      // product
+      await coverPaymentManager.connect(governor).addProduct(product1.address);
+      expect(await coverPaymentManager.productIsActive(product1.address)).eq(true);
+    });
+
+    it("cannot withdraw with invalid product caller", async function () {
+      await expect(coverPaymentManager.connect(user6).withdrawFrom(user6.address, 0, user6.address, SOLACE_PRICE_1, DEADLINE, priceSignature1)).to.be.revertedWith("invalid product caller");
+    });
+
+    it("cannot withdraw zero amount", async function () {
+      await expect(coverPaymentManager.connect(product1).withdrawFrom(user6.address, 0, user6.address, SOLACE_PRICE_1, DEADLINE, priceSignature1)).to.be.revertedWith("zero amount withdraw");
+    });
+
+    it("cannot withdraw with invalid price", async function () {
+        await expect(coverPaymentManager.connect(product1).withdrawFrom(user6.address, 1, user6.address, SOLACE_PRICE_1, DEADLINE, invalidPriceSignature)).to.be.revertedWith("invalid solace price");
+    });
+
+    it("cannot withdraw if amount exceeds balance", async function () {
+        let refundableBalance = await coverPaymentManager.connect(product1).getRefundableSOLACEAmount(user6.address, SOLACE_PRICE_1, DEADLINE, priceSignature1);
+        await expect(coverPaymentManager.connect(product1).withdrawFrom(user6.address, refundableBalance.add(1), user6.address, SOLACE_PRICE_1, DEADLINE, priceSignature1)).to.be.revertedWith("withdraw amount exceeds balance");
+    });
+
+    it("cannot withraw with insufficient premium pool solace balance", async function () {
+        // user refundable SOLACE balance(10000 SOLACE). The SOLACE price is 0.01$.
+        let refundableBalance = await coverPaymentManager.connect(product1).getRefundableSOLACEAmount(user6.address, SOLACE_PRICE_3, DEADLINE, priceSignature3);
+        expect(refundableBalance).eq(ONE_ETHER.mul(10000));
+
+        // premium pool SOLACE balance(100 SOLACE)
+        let premiumPooBalance = await solace.balanceOf(premiumPool7.address);
+        expect(premiumPooBalance).eq(ONE_ETHER.mul(100));
+
+        await expect(coverPaymentManager.connect(product1).withdrawFrom(user6.address,refundableBalance, user6.address, SOLACE_PRICE_3, DEADLINE, priceSignature3)).to.be.revertedWith("ERC20: transfer amount exceeds balance");
+    });
+
+    it("cannot withdraw if coverPaymentManager is not an scp mover", async function () {
+      await scp.connect(governor).setScpMoverStatuses([coverPaymentManager.address],[false]);
+      await expect(coverPaymentManager.connect(product1).withdrawFrom(user6.address, 1, user6.address, SOLACE_PRICE_1, DEADLINE, priceSignature1)).to.be.revertedWith("!scp mover");
+      await scp.connect(governor).setScpMoverStatuses([coverPaymentManager.address],[true]);
+    });
+
+    it("can withdraw", async function() {
+        await solace.connect(premiumPool7).approve(coverPaymentManager.address, constants.MaxInt256);
+
+        // check user4 solace balance(0 SOLACE - 100 SCP)
+        expect(await scp.balanceOf(user6.address)).eq(ONE_ETHER.mul(100));
+        expect(await solace.connect(user4).balanceOf(user6.address)).eq(0);
+        expect(await solace.balanceOf(premiumPool7.address)).eq(ONE_ETHER.mul(100));
+
+        const premiumPoolBalance = await solace.balanceOf(premiumPool7.address);
+
+        // tx1: The SOLACE price is 1$. 10 SOLACE => 10 SCP
+        const solaceBalance1 = await solace.connect(user4).balanceOf(user6.address); // 0 SOLACE
+        const scpBalance1 = await scp.connect(user4).balanceOf(user6.address); // 100 SCP
+
+        const scpAmount1 = ONE_ETHER.mul(10); // 10 SCP
+        const withdrawAmount1 = ONE_ETHER.mul(10); // 10 SOLACE
+        let tx1 = await coverPaymentManager.connect(product1).withdrawFrom(user6.address, withdrawAmount1, user6.address, SOLACE_PRICE_1, DEADLINE, priceSignature1);
+        await expect(tx1).to.emit(coverPaymentManager, "TokenWithdrawn").withArgs(user6.address, user6.address, withdrawAmount1);
+        expect(await scp.balanceOf(user6.address)).eq(scpBalance1.sub(scpAmount1));
+        expect(await solace.balanceOf(user6.address)).eq(solaceBalance1.add(withdrawAmount1));
+        expect(await solace.balanceOf(premiumPool7.address)).eq(premiumPoolBalance.sub(withdrawAmount1));
+
+        // tx2: The SOLACE price is $2. 10 SOLACE => 20 SCP
+        const solaceBalance2 = await solace.connect(user4).balanceOf(user6.address);
+        const scpBalance2 = await scp.connect(user4).balanceOf(user6.address);
+
+        const withdrawAmount2 = ONE_ETHER.mul(10); // 10 SOLACE
+        const scpAmount2 = ONE_ETHER.mul(20); // 20 SCP
+        let tx2 = await coverPaymentManager.connect(product1).withdrawFrom(user6.address, withdrawAmount2, user6.address, SOLACE_PRICE_2, DEADLINE, priceSignature2);
+        await expect(tx2).to.emit(coverPaymentManager, "TokenWithdrawn").withArgs(user6.address, user6.address, withdrawAmount2);
+        expect(await scp.balanceOf(user6.address)).eq(scpBalance2.sub(scpAmount2));
+        expect(await solace.balanceOf(user6.address)).eq(solaceBalance2.add(withdrawAmount2));
+        expect(await solace.balanceOf(premiumPool7.address)).eq(premiumPoolBalance.sub(withdrawAmount1).sub(withdrawAmount2));
+
+        // tx3: The SOLACE price is $0.01. 10 SOLACE => 0.1 SCP
+        const solaceBalance3 = await solace.connect(user4).balanceOf(user6.address);
+        const scpBalance3 = await scp.connect(user4).balanceOf(user6.address);
+
+        const withdrawAmount3 = ONE_ETHER.mul(10); // 10 SOLACE
+        const scpAmount3 = ONE_ETHER.div(10); // 0.1 SCP
+        let tx3 = await coverPaymentManager.connect(product1).withdrawFrom(user6.address, withdrawAmount3, user6.address, SOLACE_PRICE_3, DEADLINE, priceSignature3);
+        await expect(tx3).to.emit(coverPaymentManager, "TokenWithdrawn").withArgs(user6.address, user6.address, withdrawAmount3);
+        expect(await scp.balanceOf(user6.address)).eq(scpBalance3.sub(scpAmount3));
+        expect(await solace.balanceOf(user6.address)).eq(solaceBalance3.add(withdrawAmount3));
+        expect(await solace.balanceOf(premiumPool7.address)).eq(premiumPoolBalance.sub(withdrawAmount1).sub(withdrawAmount2).sub(withdrawAmount3));
+    });
+  });
+
+  describe("chargePremiums", function() {
+      let tokens: any[];
+      let premiums: any[];
+      let accounts: any[];
+
+      before("redeploy scp and coverPaymentManager", async function () {
+        tokens = [
+              {'token': dai.address, 'accepted': true, 'permittable': false, 'refundable': true, 'stable': true},  // dai
+              {'token': usdc.address, 'accepted': true, 'permittable': true, 'refundable': true, 'stable': true},  // usdc
+        ];
+  
+        // deploy scp
+        scp = (await deployContract(deployer, artifacts.SCP, [governor.address])) as Scp;
+        await registry.connect(governor).set(["scp"], [scp.address]);
+  
+        // deploy cover payment manager
+        await registry.connect(governor).set(["premiumPool"], [premiumPool8.address]);
+        coverPaymentManager = (await deployContract(deployer, artifacts.CoverPaymentManager, [governor.address, registry.address])) as CoverPaymentManager;
+        expect( await coverPaymentManager.connect(governor).premiumPool()).eq(premiumPool8.address);
+        await scp.connect(governor).setScpMoverStatuses([coverPaymentManager.address], [true]);
+
+        // set tokens
+        await coverPaymentManager.connect(governor).setTokenInfo(tokens);
+
+        // set premium collector
+        await registry.connect(governor).set(["premiumCollector"], [user1.address]);
+
+        // mint tokens
+        await dai.connect(user7).mint(); // $1000
+        await usdc.connect(user8).mint(); // $1000
+
+        // approve
+        await dai.connect(user7).approve(coverPaymentManager.address, constants.MaxUint256);
+        await usdc.connect(user8).approve(coverPaymentManager.address, constants.MaxUint256);
+  
+        // products
+        await coverPaymentManager.connect(governor).addProduct(product1.address);
+        expect(await coverPaymentManager.numProducts()).eq(1);
+        expect(await coverPaymentManager.productIsActive(product1.address)).eq(true);
+
+        // deposit stables
+        await coverPaymentManager.connect(user7).depositStable(dai.address, user7.address, ONE_ETHER.mul(1000));
+        await coverPaymentManager.connect(user8).depositStable(usdc.address, user8.address, ONE_USDC.mul(1000));
+
+        // check scp balances
+        expect(await coverPaymentManager.connect(user7).getSCPBalance(user7.address)).eq(ONE_ETHER.mul(1000));
+        expect(await coverPaymentManager.connect(user8).getSCPBalance(user8.address)).eq(ONE_ETHER.mul(1000));
+        expect(await dai.balanceOf(premiumPool8.address)).eq(ONE_ETHER.mul(1000));
+        expect(await usdc.balanceOf(premiumPool8.address)).eq(ONE_USDC.mul(1000));
+
+        // check callers
+        expect(await registry.get("premiumCollector")).eq(user1.address);
+        expect(await coverPaymentManager.governance()).eq(governor.address);
+        expect(await coverPaymentManager.productIsActive(product1.address)).eq(true);
+
+        // charge data
+        accounts = [user7.address, user8.address];
+        premiums = [ONE_ETHER.mul(100), ONE_ETHER.mul(100)];
+    });
+
+    it("cannot charge premiums while paused", async function() {
+      await coverPaymentManager.connect(governor).setPaused(true);
+      await expect(coverPaymentManager.connect(governor).chargePremiums(accounts, premiums)).revertedWith("ontract paused");
+      await coverPaymentManager.connect(governor).setPaused(false);
+    });
+
+    it("cannot charge with empty data", async function() {
+       const user7Balance1 = await coverPaymentManager.connect(user7).getSCPBalance(user7.address);
+       const user8Balance1 = await coverPaymentManager.connect(user8).getSCPBalance(user8.address);
+       await coverPaymentManager.connect(governor).chargePremiums([], []);
+       expect(await coverPaymentManager.connect(user7).getSCPBalance(user7.address)).eq(user7Balance1);
+       expect(await coverPaymentManager.connect(user8).getSCPBalance(user8.address)).eq(user8Balance1);
+    });
+
+    it("cannot charge non-authorized user", async function() {
+      await expect(coverPaymentManager.connect(user2).chargePremiums(accounts, premiums)).revertedWith("!authorized");
+    });
+
+    it("cannot charge with length mismatch", async function () {
+      await expect(coverPaymentManager.connect(governor).chargePremiums(accounts, [ONE_ETHER.mul(100)])).revertedWith("length mismatch");
+    });
+
+    it("can charge if caller is premium collector", async function () {
+      const user7Balance1 = await coverPaymentManager.connect(user7).getSCPBalance(user7.address);
+      const user8Balance1 = await coverPaymentManager.connect(user8).getSCPBalance(user8.address);
+      await coverPaymentManager.connect(user1).chargePremiums(accounts, premiums);
+      expect(await coverPaymentManager.connect(user7).getSCPBalance(user7.address)).eq(user7Balance1.sub(ONE_ETHER.mul(100)));
+      expect(await coverPaymentManager.connect(user8).getSCPBalance(user8.address)).eq(user8Balance1.sub(ONE_ETHER.mul(100)));
+    });
+
+    it("can charge if caller is governor", async function () {
+      const user7Balance1 = await coverPaymentManager.connect(user7).getSCPBalance(user7.address);
+      const user8Balance1 = await coverPaymentManager.connect(user8).getSCPBalance(user8.address);
+      await coverPaymentManager.connect(governor).chargePremiums(accounts, premiums);
+      expect(await coverPaymentManager.connect(user7).getSCPBalance(user7.address)).eq(user7Balance1.sub(ONE_ETHER.mul(100)));
+      expect(await coverPaymentManager.connect(user8).getSCPBalance(user8.address)).eq(user8Balance1.sub(ONE_ETHER.mul(100)));
+    });
+
+    it("can charge if caller is product", async function () {
+      const user7Balance1 = await coverPaymentManager.connect(user7).getSCPBalance(user7.address);
+      const user8Balance1 = await coverPaymentManager.connect(user8).getSCPBalance(user8.address);
+      await coverPaymentManager.connect(product1).chargePremiums(accounts, premiums);
+      expect(await coverPaymentManager.connect(user7).getSCPBalance(user7.address)).eq(user7Balance1.sub(ONE_ETHER.mul(100)));
+      expect(await coverPaymentManager.connect(user8).getSCPBalance(user8.address)).eq(user8Balance1.sub(ONE_ETHER.mul(100)));
+    });
+  });
+
 })

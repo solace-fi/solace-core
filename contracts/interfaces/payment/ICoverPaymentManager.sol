@@ -41,6 +41,11 @@ interface ICoverPaymentManager is IGovernable {
     /// @notice Emitted when paused is set.
     event PauseSet(bool paused);
 
+    /// @notice Emitted when product is added.
+    event ProductAdded(address product);
+
+    /// @notice Emitted when product is removed.
+    event ProductRemoved(address product);
 
     /***************************************
     DEPOSIT FUNCTIONS
@@ -136,6 +141,25 @@ interface ICoverPaymentManager is IGovernable {
 
     /**
      * @notice Withdraws some of the user's deposit and sends it to `recipient`.
+     * User must have sufficient Solace Cover Points to withdraw.
+     * Premium pool must have the tokens to return.
+     * @param from The SCP balance holder address.
+     * @param amount The amount of `SOLACE` to withdraw.
+     * @param recipient The receiver of funds.
+     * @param priceDeadline The `SOLACE` price in wei(usd).
+     * @param signature The `SOLACE` price signature.
+     */
+     function withdrawFrom(
+        address from,
+        uint256 amount,
+        address recipient,
+        uint256 price,
+        uint256 priceDeadline,
+        bytes calldata signature
+    ) external;
+
+    /**
+     * @notice Withdraws some of the user's deposit and sends it to `recipient`.
      * User must have deposited `SOLACE` in at least that amount in the past.
      * User must have sufficient Solace Cover Points to withdraw.
      * Token must be refundable.
@@ -153,6 +177,13 @@ interface ICoverPaymentManager is IGovernable {
         uint256 priceDeadline,
         bytes calldata signature
     ) external;
+
+    /**
+     * @notice Charge premiums for each policyholder.
+     * @param accounts Array of addresses of the policyholders to charge.
+     * @param premiums Array of premium amounts (in **USD** to 18 decimal places) to charge each policyholder.
+    */
+    function chargePremiums(address[] calldata accounts, uint256[] calldata premiums) external;
 
     /***************************************
     VIEW FUNCTIONS
@@ -185,6 +216,30 @@ interface ICoverPaymentManager is IGovernable {
     function getRefundableSOLACEAmount(address depositor, uint256 price, uint256 priceDeadline, bytes calldata signature) external view returns (uint256 solaceAmount);
 
     /***************************************
+    PRODUCT VIEW FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Checks is an address is an active product.
+     * @param product The product to check.
+     * @return status Returns true if the product is active.
+    */
+    function productIsActive(address product) external returns (bool status);
+
+    /**
+     * @notice Returns the number of products.
+     * @return count The number of products.
+    */
+    function numProducts() external returns (uint256 count);
+
+    /**
+     * @notice Returns the product at the given index.
+     * @param productNum The index to query.
+     * @return product The address of the product.
+    */
+    function getProduct(uint256 productNum) external returns (address product);
+
+    /***************************************
     GOVERNANCE FUNCTIONS
     ***************************************/
 
@@ -208,4 +263,18 @@ interface ICoverPaymentManager is IGovernable {
      * @param _paused True to pause, false to unpause.
     */
     function setPaused(bool _paused) external;
+
+    /**
+     * @notice Adds a new product.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param product the new product
+     */
+     function addProduct(address product) external;
+
+    /**
+     * @notice Removes a product.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param product the product to remove
+     */
+     function removeProduct(address product) external;
 }

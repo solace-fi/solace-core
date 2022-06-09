@@ -97,9 +97,18 @@ interface ISolaceCoverProductV3 is IERC721, ISCPRetainer {
 
     /**
      * @notice Cancels the policy.
-     * The function cancels the policy of the policyholder.
-     */
-    function cancel() external;
+     * @param _premium The premium amount to verify.
+     * @param _policyholder The policyholder address.
+     * @param _deadline The deadline for the signature.
+     * @param _signature The premium data signature.
+    */
+    function cancel(uint256 _premium, address _policyholder, uint256 _deadline, bytes calldata _signature) external;
+
+    /**
+     * @notice Terminates the policies if users don't have enough balance to pay coverage.
+     * @param _policyholders The owners of the policies to terminate.
+    */
+    function cancelPolicies(address[] calldata _policyholders) external;
 
     /***************************************
     VIEW FUNCTIONS
@@ -185,11 +194,4 @@ interface ISolaceCoverProductV3 is IERC721, ISCPRetainer {
      * @param _timestamp The timestamp value when the premiums are charged.
     */
     function setChargedTime(uint256 _timestamp) external;
-
-     /**
-     * @notice Add debts for each policy holder. Can only be called by the **Premium Collector** role.
-     * @param _policyholders The array of addresses of the policyholders to add debt.
-     * @param _debts The array of debt amounts (in **USD** to 18 decimal places) for each policyholder.
-     */
-    function setDebts(address[] calldata _policyholders, uint256[] calldata _debts) external;
 }
