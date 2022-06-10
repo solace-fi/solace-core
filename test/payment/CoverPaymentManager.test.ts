@@ -763,8 +763,8 @@ describe("CoverPaymentManager", function () {
     });
 
     it("starts with no deposits", async function () {
-      expect(await scp.balanceOf(user1.address)).eq(0);
-      expect(await scp.balanceOfNonRefundable(user1.address)).eq(0);
+      let { v, r, s } = await getERC20PermitSignature(user1, coverPaymentManager.address, usdc, ONE_USDC);
+      await expect(coverPaymentManager.connect(user1).depositSignedStable(usdc.address, user1.address, ONE_USDC, DEADLINE, v, r, s)).to.be.revertedWith("ERC20: transfer amount exceeds balance");
     });
 
     it("cannot depositSigned unaccepted token", async function () {
@@ -863,6 +863,145 @@ describe("CoverPaymentManager", function () {
       expect(await scp.balanceOf(user2.address)).eq(depositValue1234);
       expect(await scp.balanceOfNonRefundable(user2.address)).eq(depositValue34);
       expect(await usdc.balanceOf(premiumPool2.address)).eq(depositAmount2.add(depositAmount3).add(depositAmount4))
+    });
+  });
+
+  describe("depositSignedStableFrom", function () {
+    let tokens: any[];
+
+    before("redeploy scp and coverPaymentManager", async function () {
+      tokens = [
+            {'token': dai.address, 'accepted': true, 'permittable': false, 'refundable': true, 'stable': true},  // dai
+            {'token': usdc.address, 'accepted': true, 'permittable': true, 'refundable': true, 'stable': true},  // usdc
+            {'token': frax.address, 'accepted': true, 'permittable': false, 'refundable': true, 'stable': true}, // frax
+            {'token': fei.address, 'accepted': true, 'permittable': true, 'refundable': true, 'stable': true},   // fei
+            {'token': solace.address, 'accepted': true, 'permittable': true, 'refundable': true, 'stable': false},   // solace
+      ];
+
+      // deploy scp
+      scp = (await deployContract(deployer, artifacts.SCP, [governor.address])) as Scp;
+      await registry.connect(governor).set(["scp"], [scp.address]);
+
+      // deploy cover payment manager
+      await registry.connect(governor).set(["premiumPool"], [premiumPool2.address]);
+      coverPaymentManager = (await deployContract(deployer, artifacts.CoverPaymentManager, [governor.address, registry.address])) as CoverPaymentManager;
+      expect( await coverPaymentManager.connect(governor).premiumPool()).eq(premiumPool2.address);
+
+      // set tokens
+      await coverPaymentManager.connect(governor).setTokenInfo(tokens);
+    });
+
+    it("starts with no deposits", async function () {
+      expect(await scp.balanceOf(user1.address)).eq(0);
+      expect(await scp.balanceOfNonRefundable(user1.address)).eq(0);
+    });
+
+    it("cannot depositSigned if caller is invalid", async function () {
+      let { v, r, s } = await getERC20PermitSignature(user2, coverPaymentManager.address, usdc, ONE_USDC);
+      await expect(coverPaymentManager.connect(user2).depositSignedStableFrom(usdc.address, user2.address, user2.address, ONE_USDC, DEADLINE, v, r, s)).to.be.revertedWith("invalid product caller");
+      await coverPaymentManager.connect(governor).addProduct(product1.address);
+    });
+
+    it("cannot depositSigned unaccepted token", async function () {
+      let { v, r, s } = await getERC20PermitSignature(user1, coverPaymentManager.address, weth, ONE_ETHER);
+      await expect(coverPaymentManager.connect(product1).depositSignedStableFrom(weth.address, user1.address, user1.address, ONE_ETHER, DEADLINE, v, r, s)).to.be.revertedWith("token not accepted");
+    });
+
+    it("cannot depositSigned non-stable token", async function () {
+        let { v, r, s } = await getERC20PermitSignature(user1, coverPaymentManager.address, solace, ONE_ETHER);
+        await expect(coverPaymentManager.connect(product1).depositSignedStableFrom(solace.address, user1.address, user1.address, ONE_ETHER, DEADLINE, v, r, s)).to.be.revertedWith("token not stable");
+    });
+
+    it("cannot depositSigned unpermittable token", async function () {
+      let { v, r, s } = await getERC20PermitSignature(user1, coverPaymentManager.address, weth, ONE_ETHER);
+      await expect(coverPaymentManager.connect(product1).depositSignedStableFrom(dai.address, user1.address, user1.address, ONE_ETHER, DEADLINE, v, r, s)).to.be.revertedWith("token not permittable");
+    });
+
+    it("cannot depositSigned with insufficient balance", async function () {
+      let { v, r, s } = await getERC20PermitSignature(user1, coverPaymentManager.address, usdc, ONE_USDC);
+      await expect(coverPaymentManager.connect(product1).depositSignedStableFrom(usdc.address, user1.address, user1.address, ONE_USDC, DEADLINE, v, r, s)).to.be.revertedWith("ERC20: transfer amount exceeds balance");
+    });
+
+    it("cannot depositSigned with invalid permit", async function () {
+      await dai.mintToken(user1.address, ONE_ETHER.mul(1000));
+      let { v, r, s } = await getERC20PermitSignature(user1, coverPaymentManager.address, usdc, ONE_USDC);
+      await expect(coverPaymentManager.connect(product1).depositSignedStableFrom(usdc.address, user1.address, user1.address, ONE_USDC, DEADLINE, v+1, r, s)).to.be.reverted;
+    });
+
+    it("cannot deposit if coverPaymentManager is not an scp mover", async function () {
+      await scp.connect(governor).setScpMoverStatuses([coverPaymentManager.address],[false]);
+      let { v, r, s } = await getERC20PermitSignature(user2, coverPaymentManager.address, usdc, ONE_USDC);
+      await expect(coverPaymentManager.connect(product1).depositSignedStableFrom(usdc.address, user2.address, user2.address, ONE_USDC, DEADLINE, v, r, s)).to.be.revertedWith("!scp mover");
+      await scp.connect(governor).setScpMoverStatuses([coverPaymentManager.address],[true]);
+    });
+
+    it("can deposit", async function () {
+      await usdc.connect(user2).mint();
+      await fei.connect(user2).mint();
+
+      let depositAmount1 = ONE_ETHER.mul(10);
+      let depositAmount2 = ONE_USDC.mul(20);
+      let depositAmount3 = ONE_USDC.mul(30);
+      let depositAmount4 = ONE_USDC.mul(40);
+
+      let depositValue12 = ONE_ETHER.mul(30);
+      let depositValue123 = ONE_ETHER.mul(60);
+      let depositValue1234 = ONE_ETHER.mul(100);
+      let depositValue3 = ONE_ETHER.mul(30);
+      let depositValue34 = ONE_ETHER.mul(70);
+
+      // tx1: user2 deposits depositAmount1 for user2
+      let feiBal1 = await fei.balanceOf(user2.address);
+      let feiPremBal1 = await fei.balanceOf(premiumPool2.address);
+      var { v, r, s } = await getERC20PermitSignature(user2, coverPaymentManager.address, fei, depositAmount1);
+      let tx1 = await coverPaymentManager.connect(product1).depositSignedStableFrom(fei.address, user2.address, user2.address, depositAmount1, DEADLINE, v, r, s);
+      let feiBal2 = await fei.balanceOf(user2.address);
+      expect(feiBal1.sub(feiBal2)).eq(depositAmount1);
+      await expect(tx1).to.emit(coverPaymentManager, "TokenDeposited").withArgs(fei.address, user2.address, user2.address, depositAmount1);
+      expect(await scp.balanceOf(user1.address)).eq(0);
+      expect(await scp.balanceOf(user2.address)).eq(depositAmount1);
+      expect(await scp.balanceOfNonRefundable(user1.address)).eq(0);
+      expect(await scp.balanceOfNonRefundable(user2.address)).eq(0);
+      expect(await fei.balanceOf(premiumPool2.address)).eq(feiPremBal1.add(depositAmount1));
+
+      // tx2: user2 deposits depositAmount2 for user2
+      let usdcBal1 = await usdc.balanceOf(user2.address);
+      let usdcPremBal2 = await usdc.balanceOf(premiumPool2.address);
+
+      var { v, r, s } = await getERC20PermitSignature(user2, coverPaymentManager.address, usdc, depositAmount2);
+      let tx2 = await coverPaymentManager.connect(product1).depositSignedStableFrom(usdc.address, user2.address, user2.address, depositAmount2, DEADLINE, v, r, s);
+      let usdcBal2 = await usdc.balanceOf(user2.address);
+      expect(usdcBal1.sub(usdcBal2)).eq(depositAmount2);
+      await expect(tx2).to.emit(coverPaymentManager, "TokenDeposited").withArgs(usdc.address, user2.address, user2.address, depositAmount2);
+      expect(await scp.balanceOf(user1.address)).eq(0);
+      expect(await scp.balanceOf(user2.address)).eq(depositValue12);
+      expect(await scp.balanceOfNonRefundable(user2.address)).eq(0);
+      expect(await usdc.balanceOf(premiumPool2.address)).eq(usdcPremBal2.add(depositAmount2));
+
+      // tx3: user2 deposits depositAmount3 for user2
+      await coverPaymentManager
+      .connect(governor)
+      .setTokenInfo([{'token': usdc.address, 'accepted': true, 'permittable': true, 'refundable': false, 'stable': true}]);
+      let usdcPremBal3 = await usdc.balanceOf(premiumPool2.address); 
+      var { v, r, s } = await getERC20PermitSignature(user2, coverPaymentManager.address, usdc, depositAmount3);
+      let tx3 = await coverPaymentManager.connect(product1).depositSignedStableFrom(usdc.address, user2.address, user2.address, depositAmount3, DEADLINE, v, r, s);
+      let usdcBal3 = await usdc.balanceOf(user2.address);
+      expect(usdcBal2.sub(usdcBal3)).eq(depositAmount3);
+      await expect(tx3).to.emit(coverPaymentManager, "TokenDeposited").withArgs(usdc.address, user2.address, user2.address, depositAmount3);
+      expect(await scp.balanceOf(user2.address)).eq(depositValue123);
+      expect(await scp.balanceOfNonRefundable(user2.address)).eq(depositValue3);
+      expect(await usdc.balanceOf(premiumPool2.address)).eq(usdcPremBal3.add(depositAmount3));
+
+      // tx4: user2 deposits depositAmount4 for user2
+      let usdcPremBal4 = await usdc.balanceOf(premiumPool2.address); 
+      var { v, r, s } = await getERC20PermitSignature(user2, coverPaymentManager.address, usdc, depositAmount4);
+      let tx4 = await coverPaymentManager.connect(product1).depositSignedStableFrom(usdc.address, user2.address, user2.address, depositAmount4, DEADLINE, v, r, s);
+      let usdcBal4 = await usdc.balanceOf(user2.address);
+      expect(usdcBal3.sub(usdcBal4)).eq(depositAmount4);
+      await expect(tx4).to.emit(coverPaymentManager, "TokenDeposited").withArgs(usdc.address, user2.address, user2.address, depositAmount4);
+      expect(await scp.balanceOf(user2.address)).eq(depositValue1234);
+      expect(await scp.balanceOfNonRefundable(user2.address)).eq(depositValue34);
+      expect(await usdc.balanceOf(premiumPool2.address)).eq(usdcPremBal4.add(depositAmount4))
     });
   });
 

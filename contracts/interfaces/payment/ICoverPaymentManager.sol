@@ -80,6 +80,28 @@ interface ICoverPaymentManager is IGovernable {
     /**
      * @notice Deposits tokens from depositor using permit.
      * @param token The token to deposit.
+     * @param from The depositor of the token.
+     * @param depositor The depositor and recipient of Solace Cover Points.
+     * @param amount Amount of token to deposit.
+     * @param deadline Time the transaction must go through before.
+     * @param v secp256k1 signature
+     * @param r secp256k1 signature
+     * @param s secp256k1 signature
+    */
+    function depositSignedStableFrom(
+        address token,
+        address from,
+        address depositor,
+        uint256 amount,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external;
+    
+    /**
+     * @notice Deposits tokens from depositor using permit.
+     * @param token The token to deposit.
      * @param depositor The depositor and recipient of Solace Cover Points.
      * @param amount Amount of token to deposit.
      * @param deadline Time the transaction must go through before.

@@ -96,18 +96,9 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, SolaceSigner, R
         uint256 amount
     ) external override nonReentrant whileUnpaused {
         require(productIsActive(msg.sender), "invalid product caller");
-        // checks
-        TokenInfo memory ti = tokenInfo[token];
-        require(ti.accepted, "token not accepted");
-        require(ti.stable,   "token not stable");
-
-        // interactions
-        uint256 scpAmount = _convertDecimals(amount, token, scp);
-        SafeERC20.safeTransferFrom(IERC20(token), from, premiumPool, amount);
-        ISCP(scp).mint(recipient, scpAmount, ti.refundable);
-        emit TokenDeposited(token, from, recipient, amount);
+        _depositStable(token, from, recipient, amount);
     }
-
+   
     /**
      * @notice Deposits tokens from msg.sender and credits them to recipient.
      * @param token The token to deposit.
@@ -119,18 +110,34 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, SolaceSigner, R
         address recipient,
         uint256 amount
     ) external override nonReentrant whileUnpaused {
-        // checks
-        TokenInfo memory ti = tokenInfo[token];
-        require(ti.accepted, "token not accepted");
-        require(ti.stable,   "token not stable");
-
-        // interactions
-        uint256 scpAmount = _convertDecimals(amount, token, scp);
-        SafeERC20.safeTransferFrom(IERC20(token), msg.sender, premiumPool, amount);
-        ISCP(scp).mint(recipient, scpAmount, ti.refundable);
-        emit TokenDeposited(token, msg.sender, recipient, amount);
+        _depositStable(token, msg.sender, recipient, amount);
     }
 
+    /**
+     * @notice Deposits tokens from depositor using permit.
+     * @param token The token to deposit.
+     * @param from The depositor of the token.
+     * @param depositor The depositor and recipient of Solace Cover Points.
+     * @param amount Amount of token to deposit.
+     * @param deadline Time the transaction must go through before.
+     * @param v secp256k1 signature
+     * @param r secp256k1 signature
+     * @param s secp256k1 signature
+    */
+    function depositSignedStableFrom(
+        address token,
+        address from,
+        address depositor,
+        uint256 amount,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external override nonReentrant whileUnpaused {
+        require(productIsActive(msg.sender), "invalid product caller");
+        _depositSignedStable(token, from, depositor, amount, deadline, v, r, s);
+    }
+    
     /**
      * @notice Deposits tokens from depositor using permit.
      * @param token The token to deposit.
@@ -150,18 +157,7 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, SolaceSigner, R
         bytes32 r,
         bytes32 s
     ) external override nonReentrant whileUnpaused {
-        // checks
-        TokenInfo memory ti = tokenInfo[token];
-        require(ti.accepted, "token not accepted");
-        require(ti.stable,   "token not stable");
-        require(ti.permittable, "token not permittable");
-
-        // interactions
-        uint256 scpAmount = _convertDecimals(amount, token, scp);
-        IERC20Permit(token).permit(depositor, address(this), amount, deadline, v, r, s);
-        SafeERC20.safeTransferFrom(IERC20(token), msg.sender, premiumPool, amount);
-        ISCP(scp).mint(depositor, scpAmount, ti.refundable);
-        emit TokenDeposited(token, depositor, depositor, amount);
+        _depositSignedStable(token, msg.sender, depositor, amount, deadline, v, r, s);
     }
 
     /**
@@ -184,17 +180,7 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, SolaceSigner, R
         bytes calldata signature
     ) external override nonReentrant whileUnpaused {
         require(productIsActive(msg.sender), "invalid product caller");
-        // checks
-        TokenInfo memory ti = tokenInfo[token];
-        require(ti.accepted,  "token not accepted");
-        require(!ti.stable,   "token not non-stable");
-        require(verifyPrice(token, price, priceDeadline, signature), "invalid token price");
-
-        // interactions
-        uint256 scpAmount = (amount * price) / 10**18;
-        SafeERC20.safeTransferFrom(IERC20(token), from, premiumPool, amount);
-        ISCP(scp).mint(recipient, scpAmount, true);
-        emit TokenDeposited(token, from, recipient, amount);
+        _depositNonStable(token, from, recipient, amount, price, priceDeadline, signature);
     }
 
     /**
@@ -214,19 +200,8 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, SolaceSigner, R
         uint256 priceDeadline,
         bytes calldata signature
     ) external override nonReentrant whileUnpaused {
-        // checks
-        TokenInfo memory ti = tokenInfo[token];
-        require(ti.accepted,  "token not accepted");
-        require(!ti.stable,   "token not non-stable");
-        require(verifyPrice(token, price, priceDeadline, signature), "invalid token price");
-
-        // interactions
-        uint256 scpAmount = (amount * price) / 10**18;
-        SafeERC20.safeTransferFrom(IERC20(token), msg.sender, premiumPool, amount);
-        ISCP(scp).mint(recipient, scpAmount, true);
-        emit TokenDeposited(token, msg.sender, recipient, amount);
+        _depositNonStable(token, msg.sender, recipient, amount, price, priceDeadline, signature);
     }
-
 
     /***************************************
     WITHDRAW FUNCTIONS
@@ -251,15 +226,7 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, SolaceSigner, R
         bytes calldata signature
     ) external override nonReentrant {
         require(productIsActive(msg.sender), "invalid product caller");
-        require(amount > 0, "zero amount withdraw");
-        require(verifyPrice(solace, price, priceDeadline, signature), "invalid solace price");
-        uint256 refundableSolaceAmount = getRefundableSOLACEAmount(from, price, priceDeadline, signature);
-        require(amount <= refundableSolaceAmount, "withdraw amount exceeds balance");
-
-        uint256 scpAmount = (amount * price) / 10**18;
-        ISCP(scp).withdraw(from, scpAmount);
-        SafeERC20.safeTransferFrom(IERC20(solace), premiumPool, recipient, amount);
-        emit TokenWithdrawn(from, recipient, amount);
+        _withdraw(from, amount, recipient, price, priceDeadline, signature);
     }
 
     /**
@@ -278,15 +245,7 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, SolaceSigner, R
         uint256 priceDeadline,
         bytes calldata signature
     ) external override nonReentrant {
-        require(amount > 0, "zero amount withdraw");
-        require(verifyPrice(solace, price, priceDeadline, signature), "invalid solace price");
-        uint256 refundableSolaceAmount = getRefundableSOLACEAmount(msg.sender, price, priceDeadline, signature);
-        require(amount <= refundableSolaceAmount, "withdraw amount exceeds balance");
-
-        uint256 scpAmount = (amount * price) / 10**18;
-        ISCP(scp).withdraw(msg.sender, scpAmount);
-        SafeERC20.safeTransferFrom(IERC20(solace), premiumPool, recipient, amount);
-        emit TokenWithdrawn(msg.sender, recipient, amount);
+        _withdraw(msg.sender, amount, recipient, price, priceDeadline, signature);
     }
 
     /**
@@ -336,7 +295,12 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, SolaceSigner, R
      * @param signature The `SOLACE` price signature.
      * @return solaceAmount
     */
-    function getRefundableSOLACEAmount(address depositor, uint256 price, uint256 priceDeadline, bytes calldata signature) public view override returns (uint256 solaceAmount) {
+    function getRefundableSOLACEAmount(
+        address depositor,
+        uint256 price, 
+        uint256 priceDeadline, 
+        bytes calldata signature
+    ) public view override returns (uint256 solaceAmount) {
         // check price
         require(verifyPrice(solace, price, priceDeadline, signature), "invalid token price");
         uint256 scpBalance = ISCP(scp).balanceOf(depositor);
@@ -441,6 +405,127 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, SolaceSigner, R
     /***************************************
     INTERNAL FUNCTIONS
     ***************************************/
+
+    /**
+     * @notice Deposits tokens from msg.sender and credits them to recipient.
+     * @param token The token to deposit.
+     * @param from The depositor of the token.
+     * @param recipient The recipient of Solace Cover Points.
+     * @param amount Amount of token to deposit.
+    */
+    function _depositStable(
+        address token,
+        address from,
+        address recipient,
+        uint256 amount
+    ) internal {
+      // checks
+      TokenInfo memory ti = tokenInfo[token];
+      require(ti.accepted, "token not accepted");
+      require(ti.stable,   "token not stable");
+
+      // interactions
+      uint256 scpAmount = _convertDecimals(amount, token, scp);
+      SafeERC20.safeTransferFrom(IERC20(token), from, premiumPool, amount);
+      ISCP(scp).mint(recipient, scpAmount, ti.refundable);
+      emit TokenDeposited(token, from, recipient, amount);
+    }
+
+    /**
+     * @notice Deposits tokens from msg.sender and credits them to recipient.
+     * @param token The token to deposit.
+     * @param from The depositor of the token.
+     * @param recipient The recipient of Solace Cover Points.
+     * @param amount Amount of token to deposit.
+     * @param price The `SOLACE` price in wei(usd).
+     * @param priceDeadline The `SOLACE` price in wei(usd).
+     * @param signature The `SOLACE` price signature.
+    */
+    function _depositNonStable(
+        address token,
+        address from,
+        address recipient,
+        uint256 amount,
+        uint256 price,
+        uint256 priceDeadline,
+        bytes calldata signature
+    ) private {
+        // checks
+        TokenInfo memory ti = tokenInfo[token];
+        require(ti.accepted,  "token not accepted");
+        require(!ti.stable,   "token not non-stable");
+        require(verifyPrice(token, price, priceDeadline, signature), "invalid token price");
+
+        // interactions
+        uint256 scpAmount = (amount * price) / 10**18;
+        SafeERC20.safeTransferFrom(IERC20(token), from, premiumPool, amount);
+        ISCP(scp).mint(recipient, scpAmount, true);
+        emit TokenDeposited(token, from, recipient, amount);
+    }
+
+    /**
+     * @notice Deposits tokens from depositor using permit.
+     * @param token The token to deposit.
+     * @param from The depositor of the token.
+     * @param depositor The depositor and recipient of Solace Cover Points.
+     * @param amount Amount of token to deposit.
+     * @param deadline Time the transaction must go through before.
+     * @param v secp256k1 signature
+     * @param r secp256k1 signature
+     * @param s secp256k1 signature
+    */
+    function _depositSignedStable(
+        address token,
+        address from,
+        address depositor,
+        uint256 amount,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) private {
+        // checks
+        TokenInfo memory ti = tokenInfo[token];
+        require(ti.accepted, "token not accepted");
+        require(ti.stable,   "token not stable");
+        require(ti.permittable, "token not permittable");
+
+        // interactions
+        uint256 scpAmount = _convertDecimals(amount, token, scp);
+        IERC20Permit(token).permit(depositor, address(this), amount, deadline, v, r, s);
+        SafeERC20.safeTransferFrom(IERC20(token), from, premiumPool, amount);
+        ISCP(scp).mint(depositor, scpAmount, ti.refundable);
+        emit TokenDeposited(token, depositor, depositor, amount);
+    }
+
+    /**
+     * @notice Withdraws some of the user's deposit and sends it to `recipient`.
+     * User must have sufficient Solace Cover Points to withdraw.
+     * Premium pool must have the tokens to return.
+     * @param from The SCP balance holder address.
+     * @param amount The amount of `SOLACE` to withdraw.
+     * @param recipient The receiver of funds.
+     * @param priceDeadline The `SOLACE` price in wei(usd).
+     * @param signature The `SOLACE` price signature.
+     */
+     function _withdraw(
+        address from,
+        uint256 amount,
+        address recipient,
+        uint256 price,
+        uint256 priceDeadline,
+        bytes calldata signature
+    ) private {
+        require(amount > 0, "zero amount withdraw");
+        require(verifyPrice(solace, price, priceDeadline, signature), "invalid solace price");
+        uint256 refundableSolaceAmount = getRefundableSOLACEAmount(from, price, priceDeadline, signature);
+        require(amount <= refundableSolaceAmount, "withdraw amount exceeds balance");
+
+        uint256 scpAmount = (amount * price) / 10**18;
+        ISCP(scp).withdraw(from, scpAmount);
+        SafeERC20.safeTransferFrom(IERC20(solace), premiumPool, recipient, amount);
+        emit TokenWithdrawn(from, recipient, amount);
+    } 
 
     /**
      * @notice Sets registry and related contract addresses.

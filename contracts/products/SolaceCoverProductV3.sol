@@ -41,7 +41,7 @@ contract SolaceCoverProductV3 is
     string public baseURI;
 
     /// @notice The total policy count.
-    uint256 public policyCount;
+    uint256 public totalSupply;
 
     /// @notice The maximum rate charged per second per 1e-18 (wei) of cover limit.
     /// @dev Default to charge 10% of cover limit annually = 1/315360000.
@@ -377,7 +377,7 @@ contract SolaceCoverProductV3 is
 
         // mint policy if doesn't exist
         if (policyID == 0) {
-            policyID = ++policyCount;
+            policyID = ++totalSupply;
             policyOf[_user] = policyID;
             _mint(_user, policyID);
             emit PolicyCreated(policyID);

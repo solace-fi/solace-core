@@ -449,7 +449,7 @@ describe("SolaceCoverProductV3", function() {
         expect(await solaceCoverProduct.ownerOf(POLICY_ID_1)).eq(policyholder1.address)
         expect(await solaceCoverProduct.activeCoverLimit()).eq(COVER_LIMIT)
         expect(await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address)).eq(COVER_LIMIT)
-        expect(await solaceCoverProduct.policyCount()).eq(1)
+        expect(await solaceCoverProduct.totalSupply()).eq(1)
         expect(await solaceCoverProduct.coverLimitOf(POLICY_ID_1)).eq(COVER_LIMIT)
         expect(await scp.balanceOf(policyholder1.address)).eq(INITIAL_DEPOSIT)
       });
@@ -461,7 +461,7 @@ describe("SolaceCoverProductV3", function() {
         expect(await solaceCoverProduct.ownerOf(POLICY_ID_1)).eq(policyholder1.address)
         expect(await solaceCoverProduct.activeCoverLimit()).eq(COVER_LIMIT)
         expect(await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address)).eq(COVER_LIMIT)
-        expect(await solaceCoverProduct.policyCount()).eq(1)
+        expect(await solaceCoverProduct.totalSupply()).eq(1)
         expect(await solaceCoverProduct.coverLimitOf(POLICY_ID_1)).eq(COVER_LIMIT)
         expect(await scp.balanceOf(policyholder1.address)).eq(INITIAL_DEPOSIT)
       });
@@ -494,7 +494,7 @@ describe("SolaceCoverProductV3", function() {
         expect(await solaceCoverProduct.ownerOf(POLICY_ID_2)).eq(policyholder2.address)
         expect(await solaceCoverProduct.activeCoverLimit()).eq(COVER_LIMIT.mul(2))
         expect(await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address)).eq(COVER_LIMIT.mul(2))
-        expect(await solaceCoverProduct.policyCount()).eq(2)
+        expect(await solaceCoverProduct.totalSupply()).eq(2)
         expect(await solaceCoverProduct.coverLimitOf(POLICY_ID_2)).eq(COVER_LIMIT)
       });
 
@@ -632,7 +632,7 @@ describe("SolaceCoverProductV3", function() {
       
       before(async () => {
         // checks
-        expect(await solaceCoverProduct.policyCount()).eq(2);
+        expect(await solaceCoverProduct.totalSupply()).eq(2);
         expect(await solaceCoverProduct.policyOf(policyholder3.address)).eq(0);
 
         // risk manager active cover amount and active cover amount for soteria.
@@ -693,7 +693,7 @@ describe("SolaceCoverProductV3", function() {
         expect(await solaceCoverProduct.ownerOf(POLICY_ID_3)).eq(policyholder3.address)
         expect(await solaceCoverProduct.activeCoverLimit()).eq(rmSoteriaactiveCoverLimit.add(COVER_LIMIT));
         expect(await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address)).eq(rmSoteriaactiveCoverLimit.add(COVER_LIMIT))
-        expect(await solaceCoverProduct.policyCount()).eq(3)
+        expect(await solaceCoverProduct.totalSupply()).eq(3)
         expect(await solaceCoverProduct.coverLimitOf(POLICY_ID_3)).eq(COVER_LIMIT)
         expect(await scp.balanceOf(policyholder3.address)).eq(POLICYHOLDER3_DEPOSIT_AMOUNT)
         expect(await dai.balanceOf(policyholder3.address)).eq(0);
@@ -708,7 +708,7 @@ describe("SolaceCoverProductV3", function() {
         expect(await solaceCoverProduct.ownerOf(POLICY_ID_3)).eq(policyholder3.address)
         expect(await solaceCoverProduct.activeCoverLimit()).eq(rmSoteriaactiveCoverLimit.add(COVER_LIMIT));
         expect(await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address)).eq(rmSoteriaactiveCoverLimit.add(COVER_LIMIT))
-        expect(await solaceCoverProduct.policyCount()).eq(3)
+        expect(await solaceCoverProduct.totalSupply()).eq(3)
         expect(await solaceCoverProduct.coverLimitOf(POLICY_ID_3)).eq(COVER_LIMIT)
         expect(await scp.balanceOf(policyholder3.address)).eq(POLICYHOLDER3_DEPOSIT_AMOUNT.mul(2));
         expect(await dai.balanceOf(policyholder3.address)).eq(0);
@@ -747,7 +747,7 @@ describe("SolaceCoverProductV3", function() {
 
       before(async () => {
         // checks
-        expect(await solaceCoverProduct.policyCount()).eq(3);
+        expect(await solaceCoverProduct.totalSupply()).eq(3);
         expect(await solaceCoverProduct.policyOf(policyholder4.address)).eq(0);
 
         // risk manager active cover amount and active cover amount for soteria.
@@ -835,7 +835,7 @@ describe("SolaceCoverProductV3", function() {
         expect(await solaceCoverProduct.ownerOf(POLICY_ID_4)).eq(policyholder4.address)
         expect(await solaceCoverProduct.activeCoverLimit()).eq(rmSoteriaactiveCoverLimit.add(COVER_LIMIT));
         expect(await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address)).eq(rmSoteriaactiveCoverLimit.add(COVER_LIMIT))
-        expect(await solaceCoverProduct.policyCount()).eq(4)
+        expect(await solaceCoverProduct.totalSupply()).eq(4)
         expect(await solaceCoverProduct.coverLimitOf(POLICY_ID_4)).eq(COVER_LIMIT)
         expect(await scp.balanceOf(policyholder4.address)).eq(POLICYHOLDER4_DEPOSIT_AMOUNT)
         expect(await solace.balanceOf(policyholder4.address)).eq(0);
@@ -851,7 +851,7 @@ describe("SolaceCoverProductV3", function() {
         expect(await solaceCoverProduct.ownerOf(POLICY_ID_4)).eq(policyholder4.address)
         expect(await solaceCoverProduct.activeCoverLimit()).eq(rmSoteriaactiveCoverLimit.add(COVER_LIMIT));
         expect(await riskManager.activeCoverLimitPerStrategy(solaceCoverProduct.address)).eq(rmSoteriaactiveCoverLimit.add(COVER_LIMIT))
-        expect(await solaceCoverProduct.policyCount()).eq(4)
+        expect(await solaceCoverProduct.totalSupply()).eq(4)
         expect(await solaceCoverProduct.coverLimitOf(POLICY_ID_4)).eq(COVER_LIMIT)
         expect(await scp.balanceOf(policyholder4.address)).eq(POLICYHOLDER4_DEPOSIT_AMOUNT.mul(2));
         expect(await solace.balanceOf(policyholder4.address)).eq(0);
