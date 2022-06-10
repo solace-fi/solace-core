@@ -137,7 +137,7 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, SolaceSigner, R
         require(productIsActive(msg.sender), "invalid product caller");
         _depositSignedStable(token, from, depositor, amount, deadline, v, r, s);
     }
-    
+
     /**
      * @notice Deposits tokens from depositor using permit.
      * @param token The token to deposit.
