@@ -57,12 +57,11 @@ interface ISolaceCoverProductV3 is IERC721, ISCPRetainer {
     ***************************************/
 
     /**
-     * @notice Purchases policy for the user.
-     * @param _user The policy owner.
-     * @param _coverLimit The maximum value to cover in **USD**.
-     * @return policyID The ID of the newly minted policy.
+     * @notice Purchases policies for the users.
+     * @param _users The policy owners.
+     * @param _coverLimits The maximum value to cover in **USD**.
     */
-    function purchase(address _user, uint256 _coverLimit) external returns (uint256 policyID);
+    function purchase(address[] calldata _users, uint256[] calldata _coverLimits) external;
     
     /**
      * @notice Purchases policy for the user.

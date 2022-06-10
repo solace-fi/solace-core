@@ -101,13 +101,17 @@ contract SolaceCoverProductV3 is
     ***************************************/
 
     /**
-     * @notice Purchases policy for the user.
-     * @param _user The policy owner.
-     * @param _coverLimit The maximum value to cover in **USD**.
-     * @return policyID The ID of the newly minted policy.
+     * @notice Purchases policies for the users.
+     * @param _users The policy owners.
+     * @param _coverLimits The maximum value to cover in **USD**.
     */
-    function purchase(address _user, uint256 _coverLimit) external override nonReentrant whileUnpaused returns (uint256 policyID) {
-       return _purchase(_user, _coverLimit);
+    function purchase(address[] calldata _users, uint256[] calldata _coverLimits) external override nonReentrant whileUnpaused {
+        uint256 count = _users.length;
+        require(count == _coverLimits.length, "length mismatch");
+
+        for (uint256 i = 0; i < count; i++) {
+            _purchase(_users[i], _coverLimits[i]);
+        }
     }
 
     /**
