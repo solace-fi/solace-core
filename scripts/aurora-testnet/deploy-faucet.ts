@@ -6,15 +6,14 @@ const { provider } = waffle;
 const BN = ethers.BigNumber;
 import { config as dotenv_config } from "dotenv";
 dotenv_config();
-const deployer = new ethers.Wallet(JSON.parse(process.env.RINKEBY_ACCOUNTS || '[]')[0], provider);
+const deployer = new ethers.Wallet(JSON.parse(process.env.PRIVATE_KEYS || '[]')[0], provider);
 
 import { create2Contract } from "./../create2Contract";
 
 import { logContractAddress } from "./../utils";
 
 import { import_artifacts, ArtifactImports } from "./../../test/utilities/artifact_importer";
-import { Deployer, Solace, Faucet } from "../../typechain";
-import { BytesLike, constants } from "ethers";
+import { Solace, Faucet } from "../../typechain";
 import { deployContract } from "ethereum-waffle";
 import { expectDeployed, isDeployed } from "../../test/utilities/expectDeployed";
 import { getNetworkSettings } from "../getNetworkSettings";
@@ -35,7 +34,6 @@ const AURORA_ADDRESS                = "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f7
 const ONE_ETHER = BN.from("1000000000000000000");
 
 let artifacts: ArtifactImports;
-let deployerContract: Deployer;
 
 let solace: Solace;
 let faucet: Faucet;
@@ -54,7 +52,6 @@ async function main() {
   if(!networkSettings.isTestnet) throw("Do not deploy the faucet on production networks");
   await expectDeployed(DEPLOYER_CONTRACT_ADDRESS);
   await expectDeployed(SOLACE_ADDRESS);
-  deployerContract = (await ethers.getContractAt(artifacts.Deployer.abi, DEPLOYER_CONTRACT_ADDRESS)) as Deployer;
   solace = (await ethers.getContractAt(artifacts.SOLACE.abi, SOLACE_ADDRESS)) as Solace;
 
   //await deployTestnetTokens();
@@ -69,7 +66,7 @@ async function deployFaucet() {
     faucet = (await ethers.getContractAt(artifacts.Faucet.abi, FAUCET_ADDRESS)) as Faucet;
   } else {
     console.log("Deploying Faucet");
-    var res = await create2Contract(deployer, artifacts.Faucet, [solace.address], {}, "", deployerContract.address);
+    var res = await create2Contract(deployer, artifacts.Faucet, [solace.address], {}, "", DEPLOYER_CONTRACT_ADDRESS);
     faucet = (await ethers.getContractAt(artifacts.Faucet.abi, res.address)) as Faucet;
     console.log(`Deployed Faucet to ${faucet.address}`);
   }

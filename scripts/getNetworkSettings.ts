@@ -9,7 +9,7 @@
 // 80001: polygon mumbai
 // 250: fantom
 // 4002: fantom testnet
-// 31137: hardhat testnet
+// 31337: hardhat testnet
 
 import { config as dotenv_config } from "dotenv";
 dotenv_config();
@@ -64,7 +64,7 @@ export function getNetworkSettings(chainID: number) {
   let etherscanSettings = ETHERSCAN_SETTINGS.hasOwnProperty(chainID) ? ETHERSCAN_SETTINGS[chainID] : undefined;
 
   // testnets
-  const TESTNETS: any = [4, 5, 42, 1313161555, 80001, 4002, 31137];
+  const TESTNETS: any = [4, 5, 42, 1313161555, 80001, 4002, 31337];
   let isTestnet = TESTNETS.includes(chainID);
 
   let networkSettings = {confirmations, overrides, isTestnet, etherscanSettings};
