@@ -22,33 +22,28 @@ const DEPLOYER_CONTRACT_ADDRESS    = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF
 
 const SOLACE_ADDRESS                = "0x501acE9c35E60f03A2af4d484f49F9B1EFde9f40";
 const XSLOCKER_ADDRESS              = "0x501Ace47c5b0C2099C4464f681c3fa2ECD3146C1";
-const UNDERWRITING_POOL_ADDRESS     = "0x9Fec1Bb252e20bFB7C492beeEe70314DDfe89c55";
-const DAO_ADDRESS                   = "0x9Fec1Bb252e20bFB7C492beeEe70314DDfe89c55";
+const DAO_ADDRESS                   = "0x501aceB2Ff39b3aC0189ba1ACe497C3dAB486F7B";
+const UNDERWRITING_POOL_ADDRESS     = "0x501ace27A074471F099ffFeC008Bd1b151c7F7dE";
 const BOND_DEPO_ADDRESS             = "0x501ACe2f00EC599D4FDeA408680e192f88D94D0D";
 
-const DAI_ADDRESS                   = "0xE28bEf39f41c63B66cFD97BFfDB6Defc915B3C88";
+// TODO: enter the results of deploy-faucet here
+const DAI_ADDRESS                   = "";
 const DAI_BOND_TELLER_ADDRESS       = "0x501ACe677634Fd09A876E88126076933b686967a";
 
-const WETH_ADDRESS                  = "0xc778417E063141139Fce010982780140Aa0cD5Ab";
+const WETH_ADDRESS                  = "";
 const ETH_BOND_TELLER_ADDRESS       = "0x501ACe95141F3eB59970dD64af0405f6056FB5d8";
 
-const USDC_ADDRESS                  = "0x6D6DC3A8f02a1fEc0B9575e8dDE4135929Bd6e21";
+const USDC_ADDRESS                  = "";
 const USDC_BOND_TELLER_ADDRESS      = "0x501ACE7E977e06A3Cb55f9c28D5654C9d74d5cA9";
 
-const WBTC_ADDRESS                  = "0x20fB9CDDbcA5a5EB468c76010AEc6eD4eAcc037F";
+const WBTC_ADDRESS                  = "";
 const WBTC_BOND_TELLER_ADDRESS      = "0x501aCEF0d0c73BD103337e6E9Fd49d58c426dC27";
 
-const USDT_ADDRESS                  = "0x638b7BaA3D0C7d235fb904B01523883F980f24Ce";
+const USDT_ADDRESS                  = "";
 const USDT_BOND_TELLER_ADDRESS      = "0x501ACe5CeEc693Df03198755ee80d4CE0b5c55fE";
 
-const SCP_ADDRESS                   = "0x501AcEe83a6f269B77c167c6701843D454E2EFA0";
-const SCP_BOND_TELLER_ADDRESS       = "0x501ACe00FD8e5dB7C3be5e6D254ba4995e1B45b7";
-
-const FRAX_ADDRESS                  = "0x86E5B6485e28E52a0dEEd28Cc10772FeB9c4C400";
+const FRAX_ADDRESS                  = "";
 const FRAX_BOND_TELLER_ADDRESS      = "0x501aCef4F8397413C33B13cB39670aD2f17BfE62";
-
-const SLP_USDC_ADDRESS              = "0x7BEc68fB902f90Ba84634E764C91fDfFCA04D084";
-const SLP_USDC_BOND_TELLER_ADDRESS  = "0x501acE55C9a613a15cDDbA158F67Ffca775842eB";
 
 let artifacts: ArtifactImports;
 
@@ -60,10 +55,7 @@ let ethTeller: BondTellerEth;
 let usdcTeller: BondTellerErc20;
 let wbtcTeller: BondTellerErc20;
 let usdtTeller: BondTellerErc20;
-let scpTeller: BondTellerErc20;
 let fraxTeller: BondTellerErc20;
-
-let slpUsdcTeller: BondTellerErc20;
 
 let signerAddress: string;
 let networkSettings: any;
@@ -81,17 +73,15 @@ async function main() {
   await expectDeployed(DEPLOYER_CONTRACT_ADDRESS);
   await expectDeployed(SOLACE_ADDRESS);
   await expectDeployed(XSLOCKER_ADDRESS);
-  await expectDeployed(DAO_ADDRESS);
-  await expectDeployed(UNDERWRITING_POOL_ADDRESS);
+  //await expectDeployed(DAO_ADDRESS);
+  //await expectDeployed(UNDERWRITING_POOL_ADDRESS);
 
   await expectDeployed(DAI_ADDRESS);
   await expectDeployed(WETH_ADDRESS);
   await expectDeployed(USDC_ADDRESS);
   await expectDeployed(WBTC_ADDRESS);
   await expectDeployed(USDT_ADDRESS);
-  await expectDeployed(SCP_ADDRESS);
   await expectDeployed(FRAX_ADDRESS);
-  await expectDeployed(SLP_USDC_ADDRESS);
 
   // new underwriting
   await deployBondDepo();
@@ -101,9 +91,7 @@ async function main() {
   await deployUsdcTeller();
   await deployWbtcTeller();
   await deployUsdtTeller();
-  await deployScpTeller();
   await deployFraxTeller();
-  await deploySlpUsdcTeller();
 
   await logAddresses();
 }
@@ -279,48 +267,14 @@ async function deployFraxTeller() {
   }
 }
 
-async function deployScpTeller() {
-  const NAME = "Solace SCP Bond";
-
-  if(await isDeployed(SCP_BOND_TELLER_ADDRESS)) {
-    scpTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, SCP_BOND_TELLER_ADDRESS)) as BondTellerErc20;
-  } else {
-    console.log("SCP Teller - deploy");
-    var salt = "0x000000000000000000000000000000000000000000000000000000000244cea9";
-    scpTeller = await cloneTeller(daiTeller, NAME, SCP_ADDRESS, true, salt);
-    console.log(`SCP Teller - deployed to ${scpTeller.address}`);
-    console.log('SCP teller - add to bond depo');
-    let tx3 = await bondDepo.connect(deployer).addTeller(scpTeller.address);
-    await tx3.wait(networkSettings.confirmations);
-    console.log('SCP Teller - done');
-  }
-}
-
-async function deploySlpUsdcTeller() {
-  const NAME = "Solace SLP Bond";
-
-  if(await isDeployed(SLP_USDC_BOND_TELLER_ADDRESS)) {
-    slpUsdcTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, SLP_USDC_BOND_TELLER_ADDRESS)) as BondTellerErc20;
-  } else {
-    console.log("SLP Teller - deploy");
-    var salt = "0x0000000000000000000000000000000000000000000000000000000005e96d75";
-    slpUsdcTeller = await cloneTeller(daiTeller, NAME, SLP_USDC_ADDRESS, false, salt);
-    console.log(`SLP Teller - deployed to ${slpUsdcTeller.address}`);
-    console.log('SLP teller - add to bond depo');
-    let tx3 = await bondDepo.connect(deployer).addTeller(slpUsdcTeller.address, networkSettings.overrides);
-    await tx3.wait(networkSettings.confirmations);
-    console.log('SLP Teller - done');
-  }
-}
-
 async function cloneTeller(sourceTeller: BondTellerErc20, name: string, principal: string, isPermittable: boolean, salt: BytesLike) {
   await expectDeployed(sourceTeller.address);
   let addr = await sourceTeller.calculateMinimalProxyDeploymentAddress(salt);
   console.log(`cloning ${sourceTeller.address} to ${addr}`);
   let tx = await sourceTeller.clone(name, signerAddress, principal, isPermittable, salt, {...networkSettings.overrides, gasLimit: 500000});
   await tx.wait(networkSettings.confirmations);
-  await expectDeployed(addr);
   let newTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, addr)) as BondTellerErc20;
+  await expectDeployed(newTeller.address);
   return newTeller;
 }
 
@@ -335,14 +289,12 @@ async function logAddresses() {
   logContractAddress("WBTC Bond Teller", wbtcTeller.address);
   logContractAddress("USDT Bond Teller", usdtTeller.address);
   logContractAddress("FRAX Bond Teller", fraxTeller.address);
-  logContractAddress("SLP Bond Teller", slpUsdcTeller.address);
   logContractAddress("DAI", DAI_ADDRESS);
   logContractAddress("WETH", WETH_ADDRESS);
   logContractAddress("USDC", USDC_ADDRESS);
   logContractAddress("WBTC", WBTC_ADDRESS);
   logContractAddress("USDT", USDT_ADDRESS);
   logContractAddress("FRAX", FRAX_ADDRESS);
-  logContractAddress("SLP", SLP_USDC_ADDRESS);
 }
 
 main()
