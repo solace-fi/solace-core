@@ -67,8 +67,21 @@ async function registerAddresses() {
 
   // add key->value pairs to this list as needed
   const registryEntries:any = {
-
-
+    // multisigs
+    "premiumPool"                 : "0x37cd57c6C7243455aC66631cE37Bb7F977C71442",
+    // EOAs
+    "coverPromotionAdmin"         : "0x4770becA2628685F7C45102c7a649F921df71C70",
+    "premiumCollector"            : "0xF321be3577B1AcB436869493862bA18bDde6fc39",
+    // external contracts
+    "frax"                        : "0x45c32fA6DF82ead1e2EF74d17b76547EDdFaFF89",
+    "messagebus"                  : "0xaFDb9C40C7144022811F034EE07Ce2E110093fe6",
+    // solace contracts
+    "solace"                      : "0x501acE9c35E60f03A2af4d484f49F9B1EFde9f40",
+    "xsLocker"                    : "0x501Ace47c5b0C2099C4464f681c3fa2ECD3146C1",
+    "riskManager"                 : "0x501AcEf9020632a71CB25CFa9F554252eB51732b",
+    "coverageDataProvider"        : "0x501ACe6D80111c9B54FA36EEC5f1B213d7F24770",
+    "solaceCoverProduct"          : "0x501AcEC83d440c00644cA5C48d059e1840852a64",
+    "coverageDataProviderWrapper" : "0x501Acef201B7Ad6FFe86A37d83df757454924aD5",
   }
 
   // set default addresses

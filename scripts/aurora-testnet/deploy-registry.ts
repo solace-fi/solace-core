@@ -67,8 +67,12 @@ async function registerAddresses() {
 
   // add key->value pairs to this list as needed
   const registryEntries:any = {
-
-
+    // multisigs
+    // EOAs
+    // external contracts
+    // solace contracts
+    "solace"                      : "0x501ACE0C6DeA16206bb2D120484a257B9F393891",
+    "xsLocker"                    : "0x501ACebF0918c99546b65cEdCD430e0D4A8E9167",
   }
 
   // set default addresses
