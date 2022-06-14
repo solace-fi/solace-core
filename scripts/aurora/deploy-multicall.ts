@@ -9,7 +9,7 @@ import { Contract } from "ethers";
 import { bufferToHex, keccak256 } from "ethereumjs-util";
 import { config as dotenv_config } from "dotenv";
 dotenv_config();
-const deployer = new ethers.Wallet(JSON.parse(process.env.AURORA_TESTNET_ACCOUNTS || '[]')[0], provider);
+const deployer = new ethers.Wallet(JSON.parse(process.env.PRIVATE_KEYS || '[]')[0], provider);
 
 import { logContractAddress } from "./../utils";
 
