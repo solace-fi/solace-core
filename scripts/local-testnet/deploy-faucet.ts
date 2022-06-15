@@ -22,13 +22,15 @@ const DEPLOYER_CONTRACT_ADDRESS     = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694E
 const SOLACE_ADDRESS                = "0x501acE9c35E60f03A2af4d484f49F9B1EFde9f40";
 const FAUCET_ADDRESS                = "0x501ACe0742B45fbE2ac422301b55C261b4DEc11F";
 
-const DAI_ADDRESS                   = "0x31a1D59460a9619ec6965a5684C6d3Ae470D0fE5";
-const WETH_ADDRESS                  = "0xd0A1E359811322d97991E03f863a0C30C2cF029C";
-const USDC_ADDRESS                  = "0x512d93ADc3DF4E24cb4b26c44A91682Ec073F559";
-const WBTC_ADDRESS                  = "0x1063bf969F8D3D7296a2A94274D3df9202da2A3A";
-const USDT_ADDRESS                  = "0xAEA2B0F4763c8Ffc33A4c454CD08F803B02B6B53";
-const SCP_ADDRESS                   = "0x501AcEe83a6f269B77c167c6701843D454E2EFA0";
-const FRAX_ADDRESS                  = "0x58B23b32a9774153E1E344762751aDfdca2764DD";
+// TODO: run this script then enter the deployment results here
+const DAI_ADDRESS                   = "";
+const WETH_ADDRESS                  = "";
+const USDC_ADDRESS                  = "";
+const WBTC_ADDRESS                  = "";
+const USDT_ADDRESS                  = "";
+const SCP_ADDRESS                   = "";
+const FRAX_ADDRESS                  = "";
+const SLP_USDC_ADDRESS              = "";
 
 const ONE_ETHER = BN.from("1000000000000000000");
 
@@ -159,6 +161,7 @@ async function logAddresses() {
   logContractAddress("USDT", USDT_ADDRESS);
   logContractAddress("SCP", SCP_ADDRESS);
   logContractAddress("FRAX", FRAX_ADDRESS);
+  logContractAddress("SLP", SLP_USDC_ADDRESS);
 }
 
 main()

@@ -4,19 +4,19 @@ import hardhat from "hardhat";
 const { waffle, ethers } = hardhat;
 const { provider } = waffle;
 const BN = ethers.BigNumber;
-import fs from "fs";
 import { config as dotenv_config } from "dotenv";
 dotenv_config();
-const deployer = new ethers.Wallet(JSON.parse(process.env.GOERLI_ACCOUNTS || '[]')[0], provider);
+const deployer = new ethers.Wallet(JSON.parse(process.env.PRIVATE_KEYS || '[]')[0], provider);
+
+import { create2ContractStashed } from "./../create2ContractStashed";
 
 import { logContractAddress } from "./../utils";
 
 import { import_artifacts, ArtifactImports } from "./../../test/utilities/artifact_importer";
-import { Deployer, Solace, XsLocker, XSolace, StakingRewards } from "../../typechain";
+import { Solace, XsLocker, XSolace, StakingRewards } from "../../typechain";
 import { expectDeployed, isDeployed } from "../../test/utilities/expectDeployed";
 import { getNetworkSettings } from "../getNetworkSettings";
 import { abiEncodeArgs } from "../../test/utilities/setStorage";
-import { create2ContractStashed } from "../create2ContractStashed";
 
 const DEPLOYER_CONTRACT_ADDRESS     = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
 const SOLACE_ADDRESS                = "0x501acE9c35E60f03A2af4d484f49F9B1EFde9f40";
@@ -25,7 +25,6 @@ const STAKING_REWARDS_ADDRESS       = "0x501ace3D42f9c8723B108D4fBE29989060a9141
 const XSOLACE_ADDRESS               = "0x501ACe802447B1Ed4Aae36EA830BFBde19afbbF9";
 
 let artifacts: ArtifactImports;
-let deployerContract: Deployer;
 let solace: Solace;
 let xslocker: XsLocker;
 let xsolace: XSolace;
@@ -43,7 +42,6 @@ async function main() {
   networkSettings = getNetworkSettings(chainID);
 
   await expectDeployed(DEPLOYER_CONTRACT_ADDRESS);
-  deployerContract = (await ethers.getContractAt(artifacts.Deployer.abi, DEPLOYER_CONTRACT_ADDRESS)) as Deployer;
   await deploySOLACE();
   await deployXSLocker();
   await deployStakingRewards();
@@ -74,14 +72,6 @@ async function deploySOLACE() {
     await tx2.wait(networkSettings.confirmations);
     console.log("Added deployer as SOLACE minter");
   }
-  /*
-  if(await solace.governance() === signerAddress && await solace.pendingGovernance() !== multisigAddress) {
-    console.log(`solace.setPendingGovernance(${multisigAddress})`)
-    let tx = await solace.connect(deployer).setPendingGovernance(multisigAddress);
-    await tx.wait(networkSettings.confirmations);
-    console.log('set');
-  }
-  */
 }
 
 async function deployXSLocker() {
@@ -120,31 +110,23 @@ async function deployStakingRewards() {
       deployer,
       DEPLOYER_CONTRACT_ADDRESS,
       STAKING_REWARDS_ADDRESS,
-      abiEncodeArgs([signerAddress, SOLACE_ADDRESS, XSLOCKER_ADDRESS, "317097919837645865"])
+      abiEncodeArgs([signerAddress, SOLACE_ADDRESS, XSLOCKER_ADDRESS, solacePerSecond])
     );
     stakingRewards = (await ethers.getContractAt(artifacts.StakingRewards.abi, STAKING_REWARDS_ADDRESS)) as StakingRewards;
     console.log(`Deployed StakingRewards to ${stakingRewards.address}`);
-    /*
+
     console.log("staking rewards - registering in xslocker");
-    let tx1 = await xslocker.connect(deployer).addXsLockListener(stakingRewards.address);
+    let tx1 = await xslocker.connect(deployer).addXsLockListener(stakingRewards.address, networkSettings.overrides);
     await tx1.wait(networkSettings.confirmations);
-    */
-    /*
     console.log("staking rewards - set rewards");
-    let tx2 = await solace.connect(deployer).mint(stakingRewards.address, solacePerYear);
+    let tx2 = await stakingRewards.connect(deployer).setRewards(solacePerSecond, networkSettings.overrides);
     await tx2.wait(networkSettings.confirmations);
     console.log("staking rewards - set times");
-    let tx3 = await stakingRewards.connect(deployer).setTimes(startTime, endTime);
+    let tx3 = await stakingRewards.connect(deployer).setTimes(startTime, endTime, networkSettings.overrides);
     await tx3.wait(networkSettings.confirmations);
     console.log("staking rewards - minting SOLACE");
-    let tx4 = await solace.connect(deployer).mint(stakingRewards.address, solacePerYear);
+    let tx4 = await solace.connect(deployer).mint(stakingRewards.address, solacePerYear, networkSettings.overrides);
     await tx4.wait(networkSettings.confirmations);
-    */
-    /*
-    console.log("staking rewards - disabling rewards");
-    let tx5 = await stakingRewards.connect(deployer).setRewards(0, networkSettings.overrides);
-    await tx5.wait(networkSettings.confirmations);
-    */
   }
 }
 

@@ -4,29 +4,21 @@ import hardhat from "hardhat";
 const { waffle, ethers } = hardhat;
 const { provider } = waffle;
 const BN = ethers.BigNumber;
-import fs from "fs";
 import { config as dotenv_config } from "dotenv";
 dotenv_config();
-const deployer = new ethers.Wallet(JSON.parse(process.env.RINKEBY_ACCOUNTS || '[]')[0], provider);
-
-import { create2Contract } from "./../create2Contract";
-
-import { logContractAddress } from "./../utils";
+const deployer = new ethers.Wallet(JSON.parse(process.env.PRIVATE_KEYS || '[]')[0], provider);
 
 import { import_artifacts, ArtifactImports } from "./../../test/utilities/artifact_importer";
-import { Deployer, Solace, BondDepository, BondTellerErc20, BondTellerEth, XsLocker, BondTellerFtm } from "../../typechain";
-import { BytesLike, constants } from "ethers";
+import { Solace, BondDepository, BondTellerErc20, BondTellerEth, BondTellerMatic, BondTellerFtm } from "../../typechain";
+import { BytesLike } from "ethers";
 import { expectDeployed, isDeployed } from "../../test/utilities/expectDeployed";
 import { getNetworkSettings } from "../getNetworkSettings";
+import { create2Contract } from "./../create2Contract";
 import { create2ContractStashed } from "../create2ContractStashed";
 import { abiEncodeArgs } from "../../test/utilities/setStorage";
+import { logContractAddress } from "./../utils";
 
 const DEPLOYER_CONTRACT_ADDRESS    = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
-
-const BOND_START_TIME = BN.from("1638205200"); // 5 PM UTC November 29 2021
-const MAX_UINT40 = BN.from("1099511627775");
-const MAX_UINT128 = BN.from(1).shl(128).sub(1);
-const ONE_ETHER = BN.from("1000000000000000000");
 
 const SOLACE_ADDRESS                = "0x501acE9c35E60f03A2af4d484f49F9B1EFde9f40";
 const XSLOCKER_ADDRESS              = "0x501Ace47c5b0C2099C4464f681c3fa2ECD3146C1";
@@ -56,10 +48,8 @@ const WFTM_ADDRESS                  = "0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C8
 const FTM_BOND_TELLER_ADDRESS       = "0x501ACE43A70b62744037c0ec78dD043BE35EF653";
 
 let artifacts: ArtifactImports;
-let deployerContract: Deployer;
 
 let solace: Solace;
-let xslocker: XsLocker;
 let bondDepo: BondDepository;
 
 let ftmTeller: BondTellerFtm;
@@ -81,9 +71,7 @@ async function main() {
   let chainID = (await provider.getNetwork()).chainId;
   networkSettings = getNetworkSettings(chainID);
 
-  deployerContract = (await ethers.getContractAt(artifacts.Deployer.abi, DEPLOYER_CONTRACT_ADDRESS)) as Deployer;
   solace = (await ethers.getContractAt(artifacts.SOLACE.abi, SOLACE_ADDRESS)) as Solace;
-  xslocker = (await ethers.getContractAt(artifacts.xsLocker.abi, XSLOCKER_ADDRESS)) as XsLocker;
 
   await expectDeployed(DEPLOYER_CONTRACT_ADDRESS);
   await expectDeployed(SOLACE_ADDRESS);
@@ -130,12 +118,14 @@ async function deployBondDepo() {
     bondDepo = (await ethers.getContractAt(artifacts.BondDepository.abi, BOND_DEPO_ADDRESS)) as BondDepository;
     console.log(`Deployed BondDepository to ${bondDepo.address}`);
     await expectDeployed(bondDepo.address);
+
+    if(!(await solace.isMinter(bondDepo.address)) && (await solace.governance()) == signerAddress) {
+      console.log('Adding BondDepo as SOLACE minter');
+      let tx2 = await solace.connect(deployer).addMinter(bondDepo.address);
+      await tx2.wait(networkSettings.confirmations);
+      console.log('Added BondDepo as SOLACE minter');
+    }
   }
-  /*
-  console.log("Adding BondDepo as SOLACE minter");
-  let tx2 = await solace.connect(deployer).addMinter(bondDepo.address, networkSettings.overrides);
-  await tx2.wait(networkSettings.confirmations);
-  */
 }
 
 async function deployFtmTeller() {
@@ -145,12 +135,12 @@ async function deployFtmTeller() {
     ftmTeller = (await ethers.getContractAt(artifacts.BondTellerFTM.abi, FTM_BOND_TELLER_ADDRESS)) as BondTellerFtm;
   } else {
     console.log("FTM Teller - deploy");
-    var res = await create2Contract(deployer,artifacts.BondTellerFTM, [], {}, "", deployerContract.address);
+    var res = await create2Contract(deployer,artifacts.BondTellerFTM, [], {}, "", DEPLOYER_CONTRACT_ADDRESS);
     ftmTeller = (await ethers.getContractAt(artifacts.BondTellerFTM.abi, res.address)) as BondTellerFtm;
     console.log(`FTM Teller - deployed to ${ftmTeller.address}`);
     await expectDeployed(ftmTeller.address);
     console.log('FTM teller - init');
-    let tx1 = await ftmTeller.connect(deployer).initialize(NAME, signerAddress, solace.address, xslocker.address, UNDERWRITING_POOL_ADDRESS, DAO_ADDRESS, WFTM_ADDRESS, false, bondDepo.address);
+    let tx1 = await ftmTeller.connect(deployer).initialize(NAME, signerAddress, SOLACE_ADDRESS, XSLOCKER_ADDRESS, UNDERWRITING_POOL_ADDRESS, DAO_ADDRESS, WFTM_ADDRESS, false, bondDepo.address);
     await tx1.wait(networkSettings.confirmations);
     console.log('FTM teller - add to bond depo');
     let tx3 = await bondDepo.connect(deployer).addTeller(ftmTeller.address);
@@ -169,10 +159,6 @@ async function deployDaiTeller() {
     daiTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, DAI_BOND_TELLER_ADDRESS)) as BondTellerErc20;
   } else {
     console.log("DAI Teller - deploy");
-    //var res = await create2Contract(deployer, artifacts.BondTellerERC20, [], {}, "", deployerContract.address);
-    //let bytecode = fs.readFileSync("scripts/contract_deploy_bytecodes/bonds/BondTellerErc20.txt").toString().trim();
-    //let tx = await deployer.sendTransaction({...networkSettings.overrides, to: DEPLOYER_CONTRACT_ADDRESS, gasLimit: 6000000, data: bytecode});
-    //await tx.wait(networkSettings.confirmations);
     await create2ContractStashed(
       "BondTellerErc20",
       "scripts/contract_deploy_bytecodes/bonds/BondTellerErc20.txt",
@@ -186,7 +172,7 @@ async function deployDaiTeller() {
     console.log(`DAI Teller - deployed to ${daiTeller.address}`);
     await expectDeployed(daiTeller.address);
     console.log('DAI teller - init');
-    let tx1 = await daiTeller.connect(deployer).initialize(NAME, signerAddress, solace.address, xslocker.address, UNDERWRITING_POOL_ADDRESS, DAO_ADDRESS, DAI_ADDRESS, false, bondDepo.address, networkSettings.overrides);
+    let tx1 = await daiTeller.connect(deployer).initialize(NAME, signerAddress, SOLACE_ADDRESS, XSLOCKER_ADDRESS, UNDERWRITING_POOL_ADDRESS, DAO_ADDRESS, DAI_ADDRESS, false, bondDepo.address, networkSettings.overrides);
     await tx1.wait(networkSettings.confirmations);
     console.log('DAI teller - add to bond depo');
     let tx3 = await bondDepo.connect(deployer).addTeller(daiTeller.address, networkSettings.overrides);
@@ -196,16 +182,6 @@ async function deployDaiTeller() {
     await tx4.wait(networkSettings.confirmations);
     console.log('DAI teller - done');
   }
-  console.log("DAI Teller - deploy");
-  await create2ContractStashed(
-    "BondTellerErc20",
-    "scripts/contract_deploy_bytecodes/bonds/BondTellerErc20.txt",
-    "stash/contracts_processed/bonds/BondTellerErc20.sol",
-    deployer,
-    DEPLOYER_CONTRACT_ADDRESS,
-    DAI_BOND_TELLER_ADDRESS,
-    ""
-  );
 }
 
 async function deployEthTeller() {
@@ -315,8 +291,8 @@ async function cloneTeller(sourceTeller: BondTellerErc20, name: string, principa
   console.log(`cloning ${sourceTeller.address} to ${addr}`);
   let tx = await sourceTeller.connect(deployer).clone(name, signerAddress, principal, isPermittable, salt, {...networkSettings.overrides, gasLimit: 500000});
   await tx.wait(networkSettings.confirmations);
+  await expectDeployed(addr);
   let newTeller = (await ethers.getContractAt(artifacts.BondTellerERC20.abi, addr)) as BondTellerErc20;
-  await expectDeployed(newTeller.address);
   return newTeller;
 }
 
@@ -324,8 +300,6 @@ async function logAddresses() {
   console.log("");
   console.log("| Contract Name                | Address                                      |");
   console.log("|------------------------------|----------------------------------------------|");
-  logContractAddress("SOLACE", solace.address);
-  logContractAddress("xsLocker", xslocker.address);
   logContractAddress("BondDepository", bondDepo.address);
   logContractAddress("FTM Bond Teller", ftmTeller.address);
   logContractAddress("WETH Bond Teller", wethTeller.address);
