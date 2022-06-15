@@ -94,6 +94,10 @@ describe("CoverageDataProviderV2", function() {
       await expect(coverageDataProviderV2.connect(governor).set([""], [ONE_MILLION_USD])).to.be.revertedWith("empty underwriting pool name");
     });
 
+    it("should revert for length mismatch", async function () {
+      await expect(coverageDataProviderV2.connect(governor).set(["aaa"], [1, 2])).to.be.revertedWith("length mismatch");
+    });
+
     it("should set", async function() {
       let tx = await coverageDataProviderV2.connect(governor).set([UWP_POOL_NAMES.MAINNET_1], [1]);
       await expect(tx).to.emit(coverageDataProviderV2, "UnderwritingPoolSet").withArgs(UWP_POOL_NAMES.MAINNET_1, 1);

@@ -982,7 +982,7 @@ describe("CoverPaymentManager", function () {
       await coverPaymentManager
       .connect(governor)
       .setTokenInfo([{'token': usdc.address, 'accepted': true, 'permittable': true, 'refundable': false, 'stable': true}]);
-      let usdcPremBal3 = await usdc.balanceOf(premiumPool2.address); 
+      let usdcPremBal3 = await usdc.balanceOf(premiumPool2.address);
       var { v, r, s } = await getERC20PermitSignature(user2, coverPaymentManager.address, usdc, depositAmount3);
       let tx3 = await coverPaymentManager.connect(product1).depositSignedStableFrom(usdc.address, user2.address, user2.address, depositAmount3, DEADLINE, v, r, s);
       let usdcBal3 = await usdc.balanceOf(user2.address);
@@ -993,7 +993,7 @@ describe("CoverPaymentManager", function () {
       expect(await usdc.balanceOf(premiumPool2.address)).eq(usdcPremBal3.add(depositAmount3));
 
       // tx4: user2 deposits depositAmount4 for user2
-      let usdcPremBal4 = await usdc.balanceOf(premiumPool2.address); 
+      let usdcPremBal4 = await usdc.balanceOf(premiumPool2.address);
       var { v, r, s } = await getERC20PermitSignature(user2, coverPaymentManager.address, usdc, depositAmount4);
       let tx4 = await coverPaymentManager.connect(product1).depositSignedStableFrom(usdc.address, user2.address, user2.address, depositAmount4, DEADLINE, v, r, s);
       let usdcBal4 = await usdc.balanceOf(user2.address);
@@ -1172,7 +1172,7 @@ describe("CoverPaymentManager", function () {
         expect(await scp.balanceOf(user5.address)).eq(0);
         expect(await scp.balanceOfNonRefundable(user5.address)).eq(0);
     });
-    
+
     it("cannot deposit with invalid product caller", async function () {
       await expect(coverPaymentManager.connect(deployer).depositStableFrom(dai.address, user1.address, user1.address, 1)).to.be.revertedWith("nvalid product caller");
     });
@@ -1247,6 +1247,7 @@ describe("CoverPaymentManager", function () {
     let priceSignature2: string;
     let priceSignature3: string;
     let invalidPriceSignature: string;
+    let invalidPriceSignature2: string;
     let SOLACE_PRICE_1 = ONE_ETHER; // 1$
     let SOLACE_PRICE_2 = ONE_ETHER.mul(2); // 2$
     let SOLACE_PRICE_3 = ONE_ETHER.div(100); // 0.01$
@@ -1285,6 +1286,8 @@ describe("CoverPaymentManager", function () {
       const digest4 = getPriceDataDigest(DOMAIN_NAME, coverPaymentManager.address, CHAIN_ID, weth.address, SOLACE_PRICE_3, DEADLINE, TYPEHASH);
       invalidPriceSignature = assembleSignature(sign(digest4, Buffer.from(governor.privateKey.slice(2), "hex")));
 
+      invalidPriceSignature2 = assembleSignature(sign(digest3, Buffer.from(user4.privateKey.slice(2), "hex")));
+
       // deposit SOLACE
       await solace.connect(governor).mintToken(user3.address, ONE_ETHER.mul(1000));
       await solace.connect(user3).approve(coverPaymentManager.address, constants.MaxUint256);
@@ -1303,6 +1306,10 @@ describe("CoverPaymentManager", function () {
 
     it("cannot withdraw with invalid price", async function () {
         await expect(coverPaymentManager.connect(user4).withdraw(1, user4.address, SOLACE_PRICE_1, DEADLINE, invalidPriceSignature)).to.be.revertedWith("invalid solace price");
+    });
+
+    it("cannot withdraw if invalid price signature", async function () {
+        await expect(coverPaymentManager.connect(user4).getRefundableSOLACEAmount(user4.address, SOLACE_PRICE_1, DEADLINE, invalidPriceSignature2)).to.be.revertedWith("invalid token price");
     });
 
     it("cannot withdraw if amount exceeds balance", async function () {
@@ -1527,11 +1534,11 @@ describe("CoverPaymentManager", function () {
               {'token': dai.address, 'accepted': true, 'permittable': false, 'refundable': true, 'stable': true},  // dai
               {'token': usdc.address, 'accepted': true, 'permittable': true, 'refundable': true, 'stable': true},  // usdc
         ];
-  
+
         // deploy scp
         scp = (await deployContract(deployer, artifacts.SCP, [governor.address])) as Scp;
         await registry.connect(governor).set(["scp"], [scp.address]);
-  
+
         // deploy cover payment manager
         await registry.connect(governor).set(["premiumPool"], [premiumPool8.address]);
         coverPaymentManager = (await deployContract(deployer, artifacts.CoverPaymentManager, [governor.address, registry.address])) as CoverPaymentManager;
@@ -1551,7 +1558,7 @@ describe("CoverPaymentManager", function () {
         // approve
         await dai.connect(user7).approve(coverPaymentManager.address, constants.MaxUint256);
         await usdc.connect(user8).approve(coverPaymentManager.address, constants.MaxUint256);
-  
+
         // products
         await coverPaymentManager.connect(governor).addProduct(product1.address);
         expect(await coverPaymentManager.numProducts()).eq(1);

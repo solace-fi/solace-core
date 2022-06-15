@@ -16,7 +16,7 @@ const DOMAIN_NAME = "Solace.fi-MockProduct";
 
 describe("RiskManager", function () {
   let artifacts: ArtifactImports;
-  const [deployer, governor, user, product1, product2, product3, solace, premiumPool] = provider.getWallets();
+  const [deployer, governor, user, product1, product2, product3, solace, premiumPool, riskStrategy2] = provider.getWallets();
 
   // solace contracts
   let registry: Registry;
@@ -307,6 +307,67 @@ describe("RiskManager", function () {
       await expect(riskManager.connect(governor).setWeightAllocation(riskStrategy.address, 1)).to.be.revertedWith("invalid weight allocation");
       await policyManager.connect(product1).burn(1);
     });
+
+    it("can set another weight", async function () {
+      await riskManager.connect(governor).addRiskStrategy(riskStrategy2.address);
+      await riskManager.connect(governor).setStrategyStatus(riskStrategy2.address, STRATEGY_STATUS_ACTIVE);
+      let tx1 = await riskManager.connect(governor).setWeightAllocation(riskStrategy2.address, 2000);
+      expect(tx1).to.emit(riskManager, "RiskStrategyWeightAllocationSet").withArgs(riskStrategy2.address, 2000);
+      expect(await riskManager.connect(user).weightSum()).eq(3000);
+      expect(await riskManager.connect(user).weightPerStrategy(riskStrategy2.address)).eq(2000);
+
+      await riskManager.connect(governor).addCoverLimitUpdater(governor.address);
+      await riskManager.connect(governor).updateActiveCoverLimitForStrategy(riskStrategy.address, 0, ONE_DAI);
+      await riskManager.connect(governor).updateActiveCoverLimitForStrategy(riskStrategy2.address, 0, ONE_DAI);
+
+      let tx2 = await riskManager.connect(governor).setWeightAllocation(riskStrategy2.address, 4000);
+      expect(tx2).to.emit(riskManager, "RiskStrategyWeightAllocationSet").withArgs(riskStrategy2.address, 4000);
+      expect(await riskManager.connect(user).weightSum()).eq(5000)
+      expect(await riskManager.connect(user).weightPerStrategy(riskStrategy2.address)).eq(4000)
+    });
+
+    it("cannot set another weight if allocation drops under the strategy mcr", async function() {
+      await expect(riskManager.connect(governor).setWeightAllocation(riskStrategy2.address, 999999999)).to.be.revertedWith("invalid weight allocation");
+    });
+  });
+
+  describe("updateActiveCoverLimitForStrategy", function () {
+    before(async function () {
+      riskManager = (await deployContract(deployer, artifacts.RiskManager, [governor.address, registry.address])) as RiskManager;
+      await registry.connect(governor).set(["riskManager"], [riskManager.address]);
+      await riskManager.connect(governor).addRiskStrategy(riskStrategy.address);
+      await riskManager.connect(governor).setStrategyStatus(riskStrategy.address, STRATEGY_STATUS_ACTIVE);
+      await riskManager.connect(governor).setWeightAllocation(riskStrategy.address, 1000);
+    });
+    it("reverts unauthorized caller", async function () {
+      await expect(riskManager.connect(user).updateActiveCoverLimitForStrategy(riskStrategy.address, 0, 1)).to.be.revertedWith("unauthorized caller");
+    });
+    it("reverts inactive strategy", async function () {
+      await riskManager.connect(governor).addCoverLimitUpdater(user.address);
+      await expect(riskManager.connect(user).updateActiveCoverLimitForStrategy(user.address, 0, 1)).to.be.revertedWith("inactive strategy");
+    });
+    it("can update", async function () {
+      let cl1 = await riskManager.activeCoverLimit();
+      let cls1 = await riskManager.activeCoverLimitPerStrategy(riskStrategy.address);
+      let tx1 = await riskManager.connect(user).updateActiveCoverLimitForStrategy(riskStrategy.address, 0, 20);
+      await expect(tx1).to.emit(riskManager, "ActiveCoverLimitUpdated").withArgs(riskStrategy.address, cls1, cls1.add(20));
+      let cl2 = await riskManager.activeCoverLimit();
+      let cls2 = await riskManager.activeCoverLimitPerStrategy(riskStrategy.address);
+      expect(cl2.sub(cl1).eq(20));
+      expect(cls2.sub(cls1).eq(20));
+      let tx2 = await riskManager.connect(user).updateActiveCoverLimitForStrategy(riskStrategy.address, 20, 50);
+      await expect(tx2).to.emit(riskManager, "ActiveCoverLimitUpdated").withArgs(riskStrategy.address, cls2, cls2.add(30));
+      let cl3 = await riskManager.activeCoverLimit();
+      let cls3 = await riskManager.activeCoverLimitPerStrategy(riskStrategy.address);
+      expect(cl3.sub(cl2).eq(30));
+      expect(cls3.sub(cls2).eq(30));
+      let tx3 = await riskManager.connect(user).updateActiveCoverLimitForStrategy(riskStrategy.address, 50, 0);
+      await expect(tx3).to.emit(riskManager, "ActiveCoverLimitUpdated").withArgs(riskStrategy.address, cls3, cls3.sub(50));
+      let cl4 = await riskManager.activeCoverLimit();
+      let cls4 = await riskManager.activeCoverLimitPerStrategy(riskStrategy.address);
+      expect(cl4.sub(cl3).eq(-50));
+      expect(cls4.sub(cls3).eq(-50));
+    });
   });
 
   describe("max cover amount", function () {
@@ -336,6 +397,10 @@ describe("RiskManager", function () {
   });
 
   describe("minCapitalRequirement", function () {
+    before(async function () {
+      await riskManager.connect(governor).addCoverLimitUpdater(policyManager.address);
+    });
+
     it("should start at zero", async function () {
       expect(await riskManager.minCapitalRequirement()).to.equal(0);
     });
