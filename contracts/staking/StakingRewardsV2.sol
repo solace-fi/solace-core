@@ -73,12 +73,10 @@ contract StakingRewardsV2 is IStakingRewardsV2, ReentrancyGuard, Governable {
      * @notice Constructs the StakingRewardsV2 contract.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
      * @param registry_ The [`Registry`](./Registry) contract address.
-     * @param rewardPerSecond_ The amount of [**SOLACE**](./../SOLACE) to distribute per second.
      */
-    constructor(address governance_, address registry_, uint256 rewardPerSecond_) Governable(governance_) {
+    constructor(address governance_, address registry_) Governable(governance_) {
         // set registry
         _setRegistry(registry_);
-        rewardPerSecond = rewardPerSecond_;
     }
 
     /***************************************
