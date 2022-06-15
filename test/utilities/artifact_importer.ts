@@ -17,6 +17,10 @@ export async function import_artifacts() {
 
   let artifact_dir = process.env.USE_PROCESSED_FILES === "true" ? "../../artifacts/contracts_processed" : "../../artifacts/contracts";
   artifacts.WETH = await tryImport(`${artifact_dir}/WETH9.sol/WETH9.json`);
+  artifacts.WETH10 = await tryImport(`${artifact_dir}/WETH10.sol/WETH10.json`);
+  artifacts.WMATIC = await tryImport(`${artifact_dir}/WMATIC.sol/WMATIC.json`);
+  artifacts.WFTM = await tryImport(`${artifact_dir}/WFTM.sol/WFTM.json`);
+
   artifacts.Treasury = await tryImport (`${artifact_dir}/utils/Treasury.sol/Treasury.json`);
   artifacts.PolicyManager = await tryImport(`${artifact_dir}/risk/PolicyManager.sol/PolicyManager.json`);
   artifacts.PolicyDescriptorV2 = await tryImport(`${artifact_dir}/utils/PolicyDescriptorV2.sol/PolicyDescriptorV2.json`);
@@ -37,11 +41,8 @@ export async function import_artifacts() {
   artifacts.SCP = await tryImport(`${artifact_dir}/payment/SCP.sol/SCP.json`);
   artifacts.CoverPaymentManager = await tryImport(`${artifact_dir}/payment/CoverPaymentManager.sol/CoverPaymentManager.json`);
 
-  // investing v2
-  artifacts.WETH10 = await tryImport(`${artifact_dir}/WETH10.sol/WETH10.json`);
-  artifacts.WMATIC = await tryImport(`${artifact_dir}/WMATIC.sol/WMATIC.json`);
-  artifacts.SOLACE = await tryImport(`${artifact_dir}/SOLACE.sol/SOLACE.json`);
   // staking
+  artifacts.SOLACE = await tryImport(`${artifact_dir}/SOLACE.sol/SOLACE.json`);
   artifacts.xSOLACEV1 = await tryImport(`${artifact_dir}/staking/xSOLACEV1.sol/xSOLACEV1.json`);
   artifacts.xsLocker = await tryImport(`${artifact_dir}/staking/xsLocker.sol/xsLocker.json`);
   artifacts.xSOLACE = await tryImport(`${artifact_dir}/staking/xSOLACE.sol/xSOLACE.json`);
@@ -56,6 +57,7 @@ export async function import_artifacts() {
   artifacts.BondDepository = await tryImport(`${artifact_dir}/bonds/BondDepository.sol/BondDepository.json`);
   artifacts.BondTellerETH = await tryImport(`${artifact_dir}/bonds/BondTellerEth.sol/BondTellerEth.json`);
   artifacts.BondTellerMATIC = await tryImport(`${artifact_dir}/bonds/BondTellerMatic.sol/BondTellerMatic.json`);
+  artifacts.BondTellerFTM = await tryImport(`${artifact_dir}/bonds/BondTellerFtm.sol/BondTellerFtm.json`);
   artifacts.BondTellerERC20 = await tryImport(`${artifact_dir}/bonds/BondTellerErc20.sol/BondTellerErc20.json`);
   artifacts.Faucet = await tryImport(`${artifact_dir}/Faucet.sol/Faucet.json`);
   // utils
