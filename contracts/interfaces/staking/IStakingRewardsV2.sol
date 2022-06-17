@@ -95,6 +95,9 @@ interface IStakingRewardsV2 is IxsListener {
      */
     function pendingRewardsOfLock(uint256 xsLockID) external view returns (uint256 reward);
 
+    /// @notice True if info about a lock was migrated from a previous version of StakingRewardsV1.
+    function wasLockMigrated(uint256 xsLockID) external view returns (bool migrated);
+
     /**
      * @notice Calculates the reward amount distributed between two timestamps.
      * @param from The start of the period to measure rewards for.
@@ -192,4 +195,12 @@ interface IStakingRewardsV2 is IxsListener {
      * @param _registry The address of `Registry` contract.
     */
     function setRegistry(address _registry) external;
+
+    /**
+     * @notice Migrates information about locks from a previous version of staking rewards.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param stakingRewardsV1 The previous version of staking rewards.
+     * @param lockIDs The IDs of the locks to migrate.
+     */
+    function migrate(address stakingRewardsV1, uint256[] memory lockIDs) external;
 }

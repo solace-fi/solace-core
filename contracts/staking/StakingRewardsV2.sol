@@ -69,6 +69,9 @@ contract StakingRewardsV2 is IStakingRewardsV2, ReentrancyGuard, Governable {
     /// @dev lock id => lock info
     mapping(uint256 => StakedLockInfo) private _lockInfo;
 
+    /// @notice True if info about a lock was migrated from a previous version of StakingRewardsV1.
+    mapping(uint256 => bool) public override wasLockMigrated;
+
     /**
      * @notice Constructs the StakingRewardsV2 contract.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
@@ -426,5 +429,53 @@ contract StakingRewardsV2 is IStakingRewardsV2, ReentrancyGuard, Governable {
         IERC20(solaceAddr).approve(coverPaymentManagerAddr, type(uint256).max);
 
         emit RegistrySet(_registry);
+    }
+
+    /**
+     * @notice Migrates information about locks from a previous version of staking rewards.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param stakingRewardsV1 The previous version of staking rewards.
+     * @param xsLockIDs The IDs of the locks to migrate.
+     */
+    function migrate(address stakingRewardsV1, uint256[] memory xsLockIDs) external override onlyGovernance {
+        update();
+        // loop over locks
+        for(uint256 i = 0; i < xsLockIDs.length; i++) {// migrate
+            _migrateLock(stakingRewardsV1, xsLockIDs[i]);
+        }
+    }
+
+    /**
+     * @notice Migrates information about a lock from a previous version of staking rewards.
+     * @param stakingRewardsV1 The previous version of staking rewards.
+     * @param xsLockID The IDs of the locks to migrate.
+    */
+    function _migrateLock(address stakingRewardsV1, uint256 xsLockID) internal {
+        // can only migrate each lock once
+        if(wasLockMigrated[xsLockID]) return;
+        // math
+        uint256 accRewardPerShare_ = accRewardPerShare;
+        // get lock information
+        StakedLockInfo memory lockInfo = _lockInfo[xsLockID];
+        (bool exists, address owner, Lock memory lock) = _fetchLockInfo(xsLockID);
+        // accumulate unpaid rewards
+        lockInfo.unpaidRewards += (
+            // from this StakingRewardsV2
+            (lockInfo.value * accRewardPerShare_ / Q12 - lockInfo.rewardDebt) +
+            // from previous StakingRewardsV1
+            (IStakingRewardsV2(stakingRewardsV1).pendingRewardsOfLock(xsLockID)) );
+        // update lock value
+        uint256 oldValue = lockInfo.value;
+        uint256 newValue = _calculateLockValue(lock.amount, lock.end);
+        lockInfo.value = newValue;
+        lockInfo.rewardDebt = newValue * accRewardPerShare_ / Q12;
+        if(oldValue != newValue) valueStaked = valueStaked - oldValue + newValue;
+        // update lock owner. maintain pre-burn owner in case of unpaid rewards
+        if(owner != lockInfo.owner && exists) {
+            lockInfo.owner = owner;
+        }
+        _lockInfo[xsLockID] = lockInfo;
+        wasLockMigrated[xsLockID] = true;
+        emit LockUpdated(xsLockID);
     }
 }

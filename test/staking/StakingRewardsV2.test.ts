@@ -8,7 +8,7 @@ const { expect } = chai;
 chai.use(solidity);
 
 import { import_artifacts, ArtifactImports } from "../utilities/artifact_importer";
-import { Solace, XsLocker, StakingRewardsV2, Registry, Scp, CoverPaymentManager, BlockGetter } from "../../typechain";
+import { Solace, XsLocker, StakingRewards, StakingRewardsV2, Registry, Scp, CoverPaymentManager, BlockGetter } from "../../typechain";
 import { bnAddSub, bnMulDiv, expectClose } from "../utilities/math";
 import { expectDeployed } from "../utilities/expectDeployed";
 import { assembleSignature, getPriceDataDigest, sign } from "../utilities/signature";
@@ -1015,6 +1015,119 @@ describe("StakingRewardsV2", function () {
       expect(await stakingRewards.solace()).eq(solace2.address);
       expect(await stakingRewards.xsLocker()).eq(xsLocker2.address);
       await stakingRewards.connect(governor).setRegistry(registry.address);
+    });
+  });
+
+  describe("migrate", function () {
+    let stakingRewardsV1: StakingRewards;
+    let startTime: number;
+    let endTime: number;
+    before(async function () {
+      // redeploy xslocker
+      xsLocker = (await deployContract(deployer, artifacts.xsLocker, [governor.address, solace.address])) as unknown as XsLocker;
+      await registry.connect(governor).set(["xsLocker"], [xsLocker.address]);
+      await solace.connect(user1).approve(xsLocker.address, constants.MaxUint256);
+      await solace.connect(user2).approve(xsLocker.address, constants.MaxUint256);
+      await solace.connect(user3).approve(xsLocker.address, constants.MaxUint256);
+
+      // setup staking rewards v1
+      let timestamp = (await blockGetter.getBlockTimestamp()).toNumber();
+      startTime = timestamp + 30;
+      endTime = timestamp + 50;
+      stakingRewardsV1 = (await deployContract(deployer, artifacts.StakingRewards, [governor.address, solace.address, xsLocker.address, solacePerSecond])) as StakingRewards;
+      await stakingRewardsV1.connect(governor).setTimes(startTime, endTime);
+      await solace.connect(governor).addMinter(governor.address);
+      await solace.connect(governor).mint(stakingRewardsV1.address, solacePerSecond.mul(1000));
+
+      // farm v1
+      await xsLocker.connect(governor).addXsLockListener(stakingRewardsV1.address);
+      await xsLocker.connect(user1).createLock(user1.address, ONE_ETHER, 0, {gasLimit: 600000}); // xsLockID 1 value 1
+      await xsLocker.connect(user1).createLock(user1.address, ONE_ETHER.mul(2), timestamp+ONE_YEAR*4, {gasLimit: 600000}); // xsLockID 2 value 5
+      await xsLocker.connect(user2).createLock(user2.address, ONE_ETHER.mul(3), 0, {gasLimit: 600000}); // xsLockID 3 value 3
+      await xsLocker.connect(user2).createLock(user2.address, ONE_ETHER.mul(4), 0, {gasLimit: 600000}); // xsLockID 4 value 4
+      await xsLocker.connect(user2).createLock(user2.address, ONE_ETHER.mul(5), 0, {gasLimit: 600000}); // xsLockID 5 value 5
+
+      // end staking rewards v1
+      await provider.send("evm_setNextBlockTimestamp", [endTime + 10]);
+      await provider.send("evm_mine", []);
+
+      // setup staking rewards v2
+      timestamp = (await blockGetter.getBlockTimestamp()).toNumber();
+      startTime = timestamp + 30;
+      endTime = timestamp + 100;
+      stakingRewards = (await deployContract(deployer, artifacts.StakingRewardsV2, [governor.address, registry.address])) as StakingRewardsV2;
+      await stakingRewards.connect(governor).setRewards(solacePerSecond);
+      await stakingRewards.connect(governor).setTimes(startTime, endTime);
+    });
+    it("can rescue funds from v1", async function () {
+      let bal1 = await solace.balanceOf(stakingRewardsV1.address);
+      expect(await solace.balanceOf(stakingRewards.address)).eq(0);
+      await stakingRewardsV1.connect(governor).rescueTokens(solace.address, bal1, stakingRewards.address);
+      expect(await solace.balanceOf(stakingRewardsV1.address)).eq(0);
+      let bal2 = await solace.balanceOf(stakingRewards.address);
+      expect(bal2).eq(bal1);
+    });
+    it("migrate cannot be called by non governance", async function () {
+      await expect(stakingRewards.connect(user1).migrate(stakingRewardsV1.address, [])).to.be.revertedWith("!governance");
+    });
+    it("can migrate none", async function () {
+      let tx = await stakingRewards.connect(governor).migrate(stakingRewardsV1.address, []);
+      await expect(tx).to.emit(stakingRewards, "Updated");
+    });
+    it("can migrate", async function () {
+      let p11 = await stakingRewardsV1.pendingRewardsOfLock(1);
+      let p12 = await stakingRewardsV1.pendingRewardsOfLock(2);
+      let p13 = await stakingRewardsV1.pendingRewardsOfLock(3);
+      expect(await stakingRewards.wasLockMigrated(1)).eq(false);
+      expect(await stakingRewards.wasLockMigrated(2)).eq(false);
+      expect(await stakingRewards.wasLockMigrated(3)).eq(false);
+      let tx = await stakingRewards.connect(governor).migrate(stakingRewardsV1.address, [1,2]);
+      await expect(tx).to.emit(stakingRewards, "LockUpdated").withArgs(1);
+      await expect(tx).to.emit(stakingRewards, "LockUpdated").withArgs(2);
+      let p21 = await stakingRewards.pendingRewardsOfLock(1);
+      let p22 = await stakingRewards.pendingRewardsOfLock(2);
+      let p23 = await stakingRewards.pendingRewardsOfLock(3);
+      expect(p11).eq(p21);
+      expect(p12).eq(p22);
+      expect(p13).not.eq(p23);
+      expect(await stakingRewards.wasLockMigrated(1)).eq(true);
+      expect(await stakingRewards.wasLockMigrated(2)).eq(true);
+      expect(await stakingRewards.wasLockMigrated(3)).eq(false);
+    });
+    it("will not migrate again", async function () {
+      let tx = await stakingRewards.connect(governor).migrate(stakingRewardsV1.address, [1,2]);
+      await expect(tx).to.not.emit(stakingRewards, "LockUpdated").withArgs(1);
+      await expect(tx).to.not.emit(stakingRewards, "LockUpdated").withArgs(2);
+    });
+    it("can migrate mid stream", async function () {
+      await stakingRewards.harvestLock(3);
+      await stakingRewards.harvestLock(4);
+      await stakingRewards.harvestLock(5);
+      await provider.send("evm_setNextBlockTimestamp", [startTime + 10]);
+      await provider.send("evm_mine", []);
+      await xsLocker.connect(user2).withdraw(4, user2.address);
+      await xsLocker.connect(user2).withdrawInPart(5, user2.address, ONE_ETHER);
+      await provider.send("evm_setNextBlockTimestamp", [startTime + 20]);
+      await provider.send("evm_mine", []);
+      let p13 = await stakingRewardsV1.pendingRewardsOfLock(3);
+      let p14 = await stakingRewardsV1.pendingRewardsOfLock(4);
+      let p15 = await stakingRewardsV1.pendingRewardsOfLock(5);
+      let p23 = await stakingRewards.pendingRewardsOfLock(3);
+      let p24 = await stakingRewards.pendingRewardsOfLock(4);
+      let p25 = await stakingRewards.pendingRewardsOfLock(5);
+      let tx = await stakingRewards.connect(governor).migrate(stakingRewardsV1.address, [3, 4, 5]);
+      await expect(tx).to.emit(stakingRewards, "LockUpdated").withArgs(3);
+      await expect(tx).to.emit(stakingRewards, "LockUpdated").withArgs(4);
+      await expect(tx).to.emit(stakingRewards, "LockUpdated").withArgs(5);
+      let p33 = await stakingRewards.pendingRewardsOfLock(3);
+      let p34 = await stakingRewards.pendingRewardsOfLock(4);
+      let p35 = await stakingRewards.pendingRewardsOfLock(5);
+      expectClose(p13.add(p23), p33, solacePerSecond);
+      expectClose(p14.add(p24), p34, solacePerSecond);
+      expectClose(p15.add(p25), p35, solacePerSecond);
+      expect(await stakingRewards.wasLockMigrated(3)).eq(true);
+      expect(await stakingRewards.wasLockMigrated(4)).eq(true);
+      expect(await stakingRewards.wasLockMigrated(5)).eq(true);
     });
   });
 
