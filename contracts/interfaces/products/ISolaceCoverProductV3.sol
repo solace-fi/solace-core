@@ -5,11 +5,11 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "../payment/ISCPRetainer.sol";
 
 interface ISolaceCoverProductV3 is IERC721, ISCPRetainer {
-    
+
     /***************************************
     ENUMS
     ***************************************/
-    
+
     enum ChargePeriod {
         HOURLY,
         DAILY,
@@ -57,12 +57,12 @@ interface ISolaceCoverProductV3 is IERC721, ISCPRetainer {
     ***************************************/
 
     /**
-     * @notice Purchases policies for the users.
-     * @param _users The policy owners.
-     * @param _coverLimits The maximum value to cover in **USD**.
-    */
-    function purchase(address[] calldata _users, uint256[] calldata _coverLimits) external;
-    
+     * @notice Purchases policies for the user.
+     * @param _user The policy owner.
+     * @param _coverLimit The maximum value to cover in **USD**.
+     */
+    function purchase(address _user, uint256 _coverLimit) external;
+
     /**
      * @notice Purchases policy for the user.
      * @param _user The policy owner.
@@ -72,7 +72,7 @@ interface ISolaceCoverProductV3 is IERC721, ISCPRetainer {
      * @return policyID The ID of the newly minted policy.
      */
      function purchaseWithStable(address _user, uint256 _coverLimit, address _token, uint256 _amount) external returns (uint256 policyID);
-    
+
     /**
      * @notice Purchases policy for the user.
      * @param _user The policy owner.
@@ -83,13 +83,13 @@ interface ISolaceCoverProductV3 is IERC721, ISCPRetainer {
      * @param _priceDeadline The `SOLACE` price in wei(usd).
      * @param _signature The `SOLACE` price signature.
      * @return policyID The ID of the newly minted policy.
-    */
+     */
     function purchaseWithNonStable(
         address _user,
         uint256 _coverLimit,
-        address _token, 
+        address _token,
         uint256 _amount,
-        uint256 _price, 
+        uint256 _price,
         uint256 _priceDeadline,
         bytes calldata _signature
     ) external returns (uint256 policyID);
@@ -97,16 +97,15 @@ interface ISolaceCoverProductV3 is IERC721, ISCPRetainer {
     /**
      * @notice Cancels the policy.
      * @param _premium The premium amount to verify.
-     * @param _policyholder The policyholder address.
      * @param _deadline The deadline for the signature.
      * @param _signature The premium data signature.
-    */
-    function cancel(uint256 _premium, address _policyholder, uint256 _deadline, bytes calldata _signature) external;
+     */
+    function cancel(uint256 _premium, uint256 _deadline, bytes calldata _signature) external;
 
     /**
      * @notice Terminates the policies if users don't have enough balance to pay coverage.
      * @param _policyholders The owners of the policies to terminate.
-    */
+     */
     function cancelPolicies(address[] calldata _policyholders) external;
 
     /***************************************
@@ -137,7 +136,7 @@ interface ISolaceCoverProductV3 is IERC721, ISCPRetainer {
      * @return status True if policy is active. False otherwise.
      */
     function policyStatus(uint256 policyID_) external view returns (bool status);
-  
+
     /**
      * @notice Calculate minimum required account balance for a given cover limit. Equals the maximum chargeable fee for one epoch.
      * @param coverLimit Cover limit.
@@ -191,6 +190,6 @@ interface ISolaceCoverProductV3 is IERC721, ISCPRetainer {
     /**
      * @notice Sets the latest premium charged time.
      * @param _timestamp The timestamp value when the premiums are charged.
-    */
+     */
     function setChargedTime(uint256 _timestamp) external;
 }

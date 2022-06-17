@@ -19,13 +19,13 @@ describe("SolaceCoverProductV3", function() {
     let registry: Registry;
     let riskManager: RiskManager;
     let solaceCoverProduct: SolaceCoverProductV3;
-    let solace: MockErc20Permit;
+    let solace: Solace;
     let dai: MockErc20Decimals;
     let coverageDataProvider: CoverageDataProvider;
     let scp: Scp;
     let coverPaymentManager: CoverPaymentManager;
 
-    const [deployer, governor, newGovernor, user, policyholder1, policyholder2, policyholder3, policyholder4, policyholder5, policyholder6, policyholder7, policyholder8, policyholder9, signer, premiumPool, premiumCollector] = provider.getWallets();
+    const [deployer, governor, newGovernor, user, policyholder1, policyholder2, policyholder3, policyholder4, policyholder5, policyholder6, policyholder7, policyholder8, policyholder9, policyholder10, signer, premiumPool, premiumCollector] = provider.getWallets();
 
     const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
     const ONE_ETH = BN.from("1000000000000000000"); // 1 eth
@@ -52,6 +52,7 @@ describe("SolaceCoverProductV3", function() {
     const POLICY_ID_7 = BN.from("7");
     const POLICY_ID_8 = BN.from("8");
     const POLICY_ID_9 = BN.from("9");
+    const POLICY_ID_10 = BN.from("10");
 
     /**
         HOURLY=0,
@@ -86,7 +87,8 @@ describe("SolaceCoverProductV3", function() {
       registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
 
       // deploy solace
-      solace = (await deployContract(deployer, artifacts.MockERC20Permit, ["solace", "SOLACE", 0, 18])) as MockErc20Permit;
+      solace = (await deployContract(deployer, artifacts.SOLACE, [governor.address])) as Solace;
+      await solace.connect(governor).addMinter(governor.address);
       await registry.connect(governor).set(["solace"], [solace.address])
 
       // deploy riskmanager
@@ -386,28 +388,15 @@ describe("SolaceCoverProductV3", function() {
         mcrps = await riskManager.minCapitalRequirementPerStrategy(solaceCoverProduct.address);
       });
 
-      it("cannot purchase when empty data is given", async () => {
-        await solaceCoverProduct.connect(policyholder1).purchase([], []);
-        expect(await solaceCoverProduct.totalSupply()).eq(0);
-      });
-
-      it("cannot purchase when length is mismatch", async () => {
-        await expect(solaceCoverProduct.connect(policyholder1).purchase([policyholder1.address], [])).to.revertedWith("length mismatch");
-      });
-
-      it("cannot purchase policy when zero cover amount value is provided", async () => {
-        await expect(solaceCoverProduct.connect(policyholder1).purchase([policyholder1.address], [ZERO_AMOUNT])).to.revertedWith("zero cover value");
-      });
-
       it("cannot purchase policy when contract is paused", async () => {
         await solaceCoverProduct.connect(governor).setPaused(true);
-        await expect(solaceCoverProduct.connect(policyholder1).purchase([policyholder1.address], [COVER_LIMIT])).to.revertedWith("contract paused");
+        await expect(solaceCoverProduct.connect(policyholder1).purchase(policyholder1.address, COVER_LIMIT)).to.revertedWith("contract paused");
         await solaceCoverProduct.connect(governor).setPaused(false);
       });
 
-      it("cannot purchase a policy if there is no enough capacity", async () => {
+      it("cannot purchase a policy if there is not enough capacity", async () => {
         expect (await solaceCoverProduct.maxCover()).eq(0)
-        await expect(solaceCoverProduct.connect(policyholder1).purchase([policyholder1.address], [COVER_LIMIT])).to.revertedWith("insufficient capacity");
+        await expect(solaceCoverProduct.connect(policyholder1).purchase(policyholder1.address, COVER_LIMIT)).to.revertedWith("insufficient capacity");
       });
 
       it("can get updated max cover value", async () => {
@@ -431,12 +420,12 @@ describe("SolaceCoverProductV3", function() {
 
       it("cannot purchase policy when max cover exceeded", async () => {
         let maxCover = await solaceCoverProduct.maxCover();
-        await expect(solaceCoverProduct.connect(policyholder1).purchase([policyholder1.address], [maxCover.add(1)])).to.revertedWith("insufficient capacity");
+        await expect(solaceCoverProduct.connect(policyholder1).purchase(policyholder1.address, maxCover.add(1))).to.revertedWith("insufficient capacity");
       });
 
       it("cannot purchase policy when insufficient user balance", async () => {
         expect(await scp.connect(policyholder1).balanceOf(policyholder1.address)).eq(0);
-        await expect(solaceCoverProduct.connect(policyholder1).purchase([policyholder1.address], [COVER_LIMIT])).to.revertedWith("insufficient scp balance");
+        await expect(solaceCoverProduct.connect(policyholder1).purchase(policyholder1.address, COVER_LIMIT)).to.revertedWith("insufficient scp balance");
       })
 
       it("can purchase policy", async () => {
@@ -447,7 +436,7 @@ describe("SolaceCoverProductV3", function() {
         expect(await scp.connect(policyholder1).balanceOf(policyholder1.address)).eq(INITIAL_DEPOSIT);
 
         // make purchase
-        let tx = await solaceCoverProduct.connect(policyholder1).purchase([policyholder1.address], [COVER_LIMIT]);
+        let tx = await solaceCoverProduct.connect(policyholder1).purchase(policyholder1.address, COVER_LIMIT);
 
         await expect(tx).emit(solaceCoverProduct, "PolicyCreated").withArgs(POLICY_ID_1);
         await expect(tx).emit(solaceCoverProduct, "Transfer").withArgs(ZERO_ADDRESS, policyholder1.address, POLICY_ID_1);
@@ -464,7 +453,7 @@ describe("SolaceCoverProductV3", function() {
       });
 
       it("cannot re-purchase with same cover limit", async () => {
-        await solaceCoverProduct.connect(policyholder1).purchase([policyholder1.address], [COVER_LIMIT]);
+        await solaceCoverProduct.connect(policyholder1).purchase(policyholder1.address, COVER_LIMIT);
         expect(await solaceCoverProduct.policyStatus(POLICY_ID_1)).eq(true)
         expect(await solaceCoverProduct.policyOf(policyholder1.address)).eq(POLICY_ID_1)
         expect(await solaceCoverProduct.ownerOf(POLICY_ID_1)).eq(policyholder1.address)
@@ -490,7 +479,7 @@ describe("SolaceCoverProductV3", function() {
         expect(await scp.connect(policyholder2).balanceOf(policyholder2.address)).eq(INITIAL_DEPOSIT);
 
         // make purchase
-        let tx = await solaceCoverProduct.connect(policyholder2).purchase([policyholder2.address], [COVER_LIMIT]);
+        let tx = await solaceCoverProduct.connect(policyholder2).purchase(policyholder2.address, COVER_LIMIT);
 
         await expect(tx).emit(solaceCoverProduct, "PolicyCreated").withArgs(POLICY_ID_2);
         await expect(tx).emit(solaceCoverProduct, "Transfer").withArgs(ZERO_ADDRESS, policyholder2.address, POLICY_ID_2);
@@ -564,22 +553,18 @@ describe("SolaceCoverProductV3", function() {
         expect(await solaceCoverProduct.connect(policyholder1).ownerOf(POLICY_ID_1)).to.equal(policyholder1.address);
       });
 
-      it("cannot update for zero cover amount", async () => {
-        await expect(solaceCoverProduct.connect(policyholder1).purchase([policyholder1.address], [ZERO_AMOUNT])).to.revertedWith("zero cover value");
-      });
-
       it("cannot update while paused", async () => {
         await solaceCoverProduct.connect(governor).setPaused(true);
-        await expect(solaceCoverProduct.connect(policyholder1).purchase([policyholder1.address], [NEW_COVER_LIMIT])).to.revertedWith("contract paused");
+        await expect(solaceCoverProduct.connect(policyholder1).purchase(policyholder1.address, NEW_COVER_LIMIT)).to.revertedWith("contract paused");
         await solaceCoverProduct.connect(governor).setPaused(false);
       });
 
       it("cannot update if max cover is exceeded", async () => {
-        await expect(solaceCoverProduct.connect(policyholder1).purchase([policyholder1.address], [maxCover.add(1)])).to.revertedWith("insufficient capacity");
+        await expect(solaceCoverProduct.connect(policyholder1).purchase(policyholder1.address, maxCover.add(1))).to.revertedWith("insufficient capacity");
       });
 
       it("cannot update if max cover for the strategy is exceeded", async () => {
-        await expect(solaceCoverProduct.connect(policyholder1).purchase([policyholder1.address], [maxCoverPerStrategy.add(1)])).to.revertedWith("insufficient capacity");
+        await expect(solaceCoverProduct.connect(policyholder1).purchase(policyholder1.address, maxCoverPerStrategy.add(1))).to.revertedWith("insufficient capacity");
       });
 
       it("cannot update if below minimum required account balance for new cover limit", async () => {
@@ -591,14 +576,14 @@ describe("SolaceCoverProductV3", function() {
 
         // Temporarily increase underwriting pool balance to avoid running into "insufficient capacity" revert
         await coverageDataProvider.connect(governor).set("underwritingPool", ONE_MILLION_SCP.mul(1000000));
-        await expect(solaceCoverProduct.connect(policyholder1).purchase([policyholder1.address], [maxPermissibleNewCoverLimit.add(ONE_ETH)])).to.revertedWith("insufficient scp balance");
+        await expect(solaceCoverProduct.connect(policyholder1).purchase(policyholder1.address, maxPermissibleNewCoverLimit.add(ONE_ETH))).to.revertedWith("insufficient scp balance");
         await coverageDataProvider.connect(governor).set("underwritingPool", ONE_MILLION_SCP);
       });
 
       it("policy owner can update policy", async () => {
         let activeCoverLimit = initialSoteriaActiveCoverLimit.add(NEW_COVER_LIMIT).sub(initialPolicyCoverLimit);
 
-        let tx = await solaceCoverProduct.connect(policyholder1).purchase([policyholder1.address], [NEW_COVER_LIMIT]);
+        let tx = await solaceCoverProduct.connect(policyholder1).purchase(policyholder1.address, NEW_COVER_LIMIT);
 
         await expect(tx).emit(solaceCoverProduct, "PolicyUpdated").withArgs(POLICY_ID_1);
         await expect(tx).emit(riskManager, "ActiveCoverLimitUpdated").withArgs(solaceCoverProduct.address, initialRMActiveCoverLimit, initialRMActiveCoverLimit.add(NEW_COVER_LIMIT).sub(initialPolicyCoverLimit));
@@ -607,12 +592,12 @@ describe("SolaceCoverProductV3", function() {
       });
 
       it("policy owner can reduce cover limit", async () => {
-        let tx = await solaceCoverProduct.connect(policyholder1).purchase([policyholder1.address], [NEW_COVER_LIMIT.div(2)]);
+        let tx = await solaceCoverProduct.connect(policyholder1).purchase(policyholder1.address, NEW_COVER_LIMIT.div(2));
         await expect(tx).emit(solaceCoverProduct, "PolicyUpdated").withArgs(POLICY_ID_1);
         expect(await solaceCoverProduct.connect(policyholder1).coverLimitOf(POLICY_ID_1)).to.equal(NEW_COVER_LIMIT.div(2));
 
         // revert state changes
-        await solaceCoverProduct.connect(policyholder1).purchase([policyholder1.address], [NEW_COVER_LIMIT]);
+        await solaceCoverProduct.connect(policyholder1).purchase(policyholder1.address, NEW_COVER_LIMIT);
         expect(await solaceCoverProduct.connect(policyholder1).coverLimitOf(POLICY_ID_1)).to.equal(NEW_COVER_LIMIT);
       });
 
@@ -672,10 +657,6 @@ describe("SolaceCoverProductV3", function() {
 
       it("cannot purchase policy with insufficient balance", async () => {
         await expect(solaceCoverProduct.connect(policyholder3).purchaseWithStable(policyholder3.address, COVER_LIMIT, dai.address, POLICYHOLDER3_DEPOSIT_AMOUNT.add(10000))).to.revertedWith("ERC20: transfer amount exceeds balance");
-      });
-
-      it("cannot purchase policy when zero cover limit value is provided", async () => {
-        await expect(solaceCoverProduct.connect(policyholder3).purchaseWithStable(policyholder3.address, ZERO_AMOUNT, dai.address, POLICYHOLDER3_DEPOSIT_AMOUNT)).to.revertedWith("zero cover value");
       });
 
       it("cannot purchase policy when contract is paused", async () => {
@@ -787,7 +768,7 @@ describe("SolaceCoverProductV3", function() {
       });
 
       it("cannot purchase policy with insufficient allowance", async () => {
-        await solace.mintToken(policyholder4.address, POLICYHOLDER4_DEPOSIT_AMOUNT);
+        await solace.connect(governor).mint(policyholder4.address, POLICYHOLDER4_DEPOSIT_AMOUNT);
         expect(await solace.balanceOf(policyholder4.address)).eq(POLICYHOLDER4_DEPOSIT_AMOUNT);
 
         await expect(solaceCoverProduct.connect(policyholder4)
@@ -809,10 +790,6 @@ describe("SolaceCoverProductV3", function() {
         await expect(solaceCoverProduct.connect(policyholder4)
           .purchaseWithNonStable(policyholder4.address, COVER_LIMIT, solace.address, POLICYHOLDER4_DEPOSIT_AMOUNT, SOLACE_PRICE_1, DEADLINE, invalidPriceSignature))
           .to.revertedWith("invalid token price");
-      });
-
-      it("cannot purchase policy when zero cover limit value is provided", async () => {
-        await expect(solaceCoverProduct.connect(policyholder4).purchaseWithNonStable(policyholder4.address, ZERO_AMOUNT, solace.address, POLICYHOLDER4_DEPOSIT_AMOUNT, SOLACE_PRICE_1, DEADLINE, priceSignature1)).to.revertedWith("zero cover value");
       });
 
       it("cannot purchase policy when contract is paused", async () => {
@@ -852,7 +829,7 @@ describe("SolaceCoverProductV3", function() {
       });
 
       it("cannot re-purchase with same cover limit", async () => {
-        await solace.mintToken(policyholder4.address, POLICYHOLDER4_DEPOSIT_AMOUNT);
+        await solace.connect(governor).mint(policyholder4.address, POLICYHOLDER4_DEPOSIT_AMOUNT);
         await solaceCoverProduct.connect(policyholder4)
           .purchaseWithNonStable(policyholder4.address, COVER_LIMIT, solace.address, POLICYHOLDER4_DEPOSIT_AMOUNT, SOLACE_PRICE_1, DEADLINE, priceSignature1);
         expect(await solaceCoverProduct.policyStatus(POLICY_ID_4)).eq(true)
@@ -980,7 +957,7 @@ describe("SolaceCoverProductV3", function() {
 
       it("cannot cancel an invalid policy", async () => {
         await expect(solaceCoverProduct.connect(policyholder5)
-          .cancel(PREMIUM_AMOUNT1, policyholder5.address, DEADLINE, signature1))
+          .cancel(PREMIUM_AMOUNT1, DEADLINE, signature1))
           .to.revertedWith("invalid policy");
 
         // purchase policyholder5
@@ -996,33 +973,27 @@ describe("SolaceCoverProductV3", function() {
         await expect(tx).emit(solaceCoverProduct, "PolicyCreated").withArgs(POLICY_ID_7);
       });
 
-      it("cannot cancel policy if not owner", async () => {
-        await expect(solaceCoverProduct.connect(policyholder5)
-          .cancel(PREMIUM_AMOUNT1, policyholder4.address, DEADLINE, signature1))
-          .to.revertedWith("not policy owner");
-      });
-
       it("cannot cancel with invalid premium data(deadline)", async () => {
         await expect(solaceCoverProduct.connect(policyholder5)
-          .cancel(PREMIUM_AMOUNT1, policyholder5.address, 0, invalidSignature1))
+          .cancel(PREMIUM_AMOUNT1, 0, invalidSignature1))
           .to.revertedWith("expired deadline");
       });
 
       it("cannot cancel with invalid premium data(signer)", async () => {
         await expect(solaceCoverProduct.connect(policyholder5)
-          .cancel(PREMIUM_AMOUNT1, policyholder5.address, DEADLINE, invalidSignature1))
+          .cancel(PREMIUM_AMOUNT1, DEADLINE, invalidSignature1))
           .to.revertedWith("invalid premium data");
       });
 
       it("cannot cancel with invalid premium data(domain)", async () => {
         await expect(solaceCoverProduct.connect(policyholder5)
-          .cancel(PREMIUM_AMOUNT1, policyholder5.address, DEADLINE, invalidSignature2))
+          .cancel(PREMIUM_AMOUNT1, DEADLINE, invalidSignature2))
           .to.revertedWith("invalid premium data");
       });
 
       it("cannot cancel with invalid premium data(typehash)", async () => {
         await expect(solaceCoverProduct.connect(policyholder5)
-          .cancel(PREMIUM_AMOUNT1, policyholder5.address, DEADLINE, invalidSignature3))
+          .cancel(PREMIUM_AMOUNT1, DEADLINE, invalidSignature3))
           .to.revertedWith("invalid premium data");
       });
 
@@ -1039,7 +1010,7 @@ describe("SolaceCoverProductV3", function() {
         expect(await solaceCoverProduct.connect(policyholder5).minScpRequired(policyholder5.address)).eq(mrab);
 
         // cancel policy
-        let tx = await solaceCoverProduct.connect(policyholder5).cancel(PREMIUM_AMOUNT1, policyholder5.address, DEADLINE, signature1);
+        let tx = await solaceCoverProduct.connect(policyholder5).cancel(PREMIUM_AMOUNT1, DEADLINE, signature1);
         await expect(tx).emit(solaceCoverProduct, "PolicyCanceled").withArgs(POLICY_ID_5);
         await expect(tx).emit(riskManager, "ActiveCoverLimitUpdated")
           .withArgs(solaceCoverProduct.address, initialRMActiveCoverLimit, initialRMActiveCoverLimit.sub(initialPolicyCoverLimit));
@@ -1066,7 +1037,7 @@ describe("SolaceCoverProductV3", function() {
 
       it("cannot cancel again", async () => {
         await expect(solaceCoverProduct.connect(policyholder5)
-          .cancel(PREMIUM_AMOUNT1, policyholder5.address, DEADLINE, signature1))
+          .cancel(PREMIUM_AMOUNT1, DEADLINE, signature1))
           .to.revertedWith("invalid policy");
       });
 
@@ -1083,7 +1054,7 @@ describe("SolaceCoverProductV3", function() {
         expect(await solaceCoverProduct.connect(policyholder6).minScpRequired(policyholder6.address)).eq(mrab);
 
         // cancel policy
-        let tx = await solaceCoverProduct.connect(policyholder6).cancel(ZERO_PREMIUM, policyholder6.address, DEADLINE, signature2);
+        let tx = await solaceCoverProduct.connect(policyholder6).cancel(ZERO_PREMIUM, DEADLINE, signature2);
         await expect(tx).emit(solaceCoverProduct, "PolicyCanceled").withArgs(POLICY_ID_6);
         await expect(tx).emit(riskManager, "ActiveCoverLimitUpdated")
           .withArgs(solaceCoverProduct.address, initialRMActiveCoverLimit, initialRMActiveCoverLimit.sub(initialPolicyCoverLimit));
@@ -1121,7 +1092,7 @@ describe("SolaceCoverProductV3", function() {
         expect(await solaceCoverProduct.connect(policyholder7).minScpRequired(policyholder7.address)).eq(mrab);
 
         // cancel policy
-        let tx = await solaceCoverProduct.connect(policyholder7).cancel(PREMIUM_AMOUNT2, policyholder7.address, DEADLINE, signature3);
+        let tx = await solaceCoverProduct.connect(policyholder7).cancel(PREMIUM_AMOUNT2, DEADLINE, signature3);
         await expect(tx).emit(solaceCoverProduct, "PolicyCanceled").withArgs(POLICY_ID_7);
         await expect(tx).emit(riskManager, "ActiveCoverLimitUpdated")
           .withArgs(solaceCoverProduct.address, initialRMActiveCoverLimit, initialRMActiveCoverLimit.sub(initialPolicyCoverLimit));
@@ -1214,5 +1185,30 @@ describe("SolaceCoverProductV3", function() {
         expect(await solaceCoverProduct.policyStatus(POLICY_ID_9)).eq(false);
       });
     });
+
+    describe("purchase for other", function () {
+      before("mint scp", async function () {
+        await scp.connect(governor).mint(policyholder10.address, 1000, false);
+      });
+      it("can purchase for other", async function () {
+        let cl1 = await solaceCoverProduct.coverLimitOf(POLICY_ID_10);
+        expect(cl1).eq(0);
+        let cl2 = cl1.add(1000);
+        let tx = await solaceCoverProduct.connect(policyholder1).purchase(policyholder10.address, cl2);
+        await expect(tx).to.emit(solaceCoverProduct, "PolicyCreated");
+        await expect(tx).to.emit(solaceCoverProduct, "PolicyUpdated");
+        let cl3 = await solaceCoverProduct.coverLimitOf(POLICY_ID_10);
+        expect(cl3).eq(cl2);
+      });
+      it("purchase(update) for other does not change cover limit", async function () {
+        let cl1 = await solaceCoverProduct.coverLimitOf(POLICY_ID_10);
+        let cl2 = cl1.add(2000);
+        let tx = await solaceCoverProduct.connect(policyholder1).purchase(policyholder10.address, cl2);
+        await expect(tx).to.not.emit(solaceCoverProduct, "PolicyCreated");
+        await expect(tx).to.not.emit(solaceCoverProduct, "PolicyUpdated");
+        let cl3 = await solaceCoverProduct.coverLimitOf(POLICY_ID_10);
+        expect(cl3).eq(cl1);
+      });
+    })
 
 });

@@ -84,8 +84,8 @@ contract SolaceCoverProductV3 is
      * @notice Constructs `Solace Cover Product`.
      * @param _governance The address of the governor.
      * @param _registry The [`Registry`](./Registry) contract address.
-    */
-    constructor(address _governance, address _registry) ERC721("Solace Wallet Coverage", "SWC") SolaceSigner(_governance) {
+     */
+    constructor(address _governance, address _registry) ERC721("Solace Portfolio Insurance", "SPI") SolaceSigner(_governance) {
         // set registry
         _setRegistry(_registry);
 
@@ -101,17 +101,12 @@ contract SolaceCoverProductV3 is
     ***************************************/
 
     /**
-     * @notice Purchases policies for the users.
-     * @param _users The policy owners.
-     * @param _coverLimits The maximum value to cover in **USD**.
-    */
-    function purchase(address[] calldata _users, uint256[] calldata _coverLimits) external override nonReentrant whileUnpaused {
-        uint256 count = _users.length;
-        require(count == _coverLimits.length, "length mismatch");
-
-        for (uint256 i = 0; i < count; i++) {
-            _purchase(_users[i], _coverLimits[i]);
-        }
+     * @notice Purchases policies for the user.
+     * @param _user The policy owner.
+     * @param _coverLimit The maximum value to cover in **USD**.
+     */
+    function purchase(address _user, uint256 _coverLimit) external override nonReentrant whileUnpaused {
+        _purchase(_user, _coverLimit);
     }
 
     /**
@@ -157,26 +152,24 @@ contract SolaceCoverProductV3 is
     /**
      * @notice Cancels the policy.
      * @param _premium The premium amount to verify.
-     * @param _policyholder The policyholder address.
      * @param _deadline The deadline for the signature.
      * @param _signature The premium data signature.
-    */
-    function cancel(uint256 _premium, address _policyholder, uint256 _deadline, bytes calldata _signature) external override {
+     */
+    function cancel(uint256 _premium, uint256 _deadline, bytes calldata _signature) external override {
         require(policyStatus(policyOf[msg.sender]), "invalid policy");
-        require(msg.sender == _policyholder, "not policy owner");
-        require(verifyPremium(_premium, _policyholder, _deadline, _signature), "invalid premium data");
+        require(verifyPremium(_premium, msg.sender, _deadline, _signature), "invalid premium data");
 
-        uint256 scpBalance = ICoverPaymentManager(paymentManager).getSCPBalance(_policyholder);
+        uint256 scpBalance = ICoverPaymentManager(paymentManager).getSCPBalance(msg.sender);
         uint256 chargeAmount = scpBalance < _premium ? scpBalance : _premium;
         if (chargeAmount > 0) {
             address[] memory accounts = new address[](1);
             uint256[] memory premiums = new uint256[](1);
-            accounts[0] = _policyholder;
+            accounts[0] = msg.sender;
             premiums[0] = chargeAmount;
             ICoverPaymentManager(paymentManager).chargePremiums(accounts, premiums);
         }
-       
-        uint256 policyID = policyOf[_policyholder];
+
+        uint256 policyID = policyOf[msg.sender];
         uint256 coverLimit = coverLimitOf[policyID];
         _updateActiveCoverLimit(coverLimit, 0);
         coverLimitOf[policyID] = 0;
@@ -372,27 +365,30 @@ contract SolaceCoverProductV3 is
      * @return policyID The ID of the newly minted policy.
     */
     function _purchase(address _user, uint256 _coverLimit) internal returns (uint256 policyID) {
-        require(_coverLimit > 0, "zero cover value");
-
         policyID = policyOf[_user];
-        uint256 currentCoverlimit = coverLimitOf[policyID];
-        require(_checkCapacity(currentCoverlimit, _coverLimit), "insufficient capacity");
-        require(ICoverPaymentManager(paymentManager).getSCPBalance(_user) > minRequiredAccountBalance(_coverLimit), "insufficient scp balance");
 
         // mint policy if doesn't exist
-        if (policyID == 0) {
+        bool mint = policyID == 0;
+        if (mint) {
             policyID = ++totalSupply;
             policyOf[_user] = policyID;
             _mint(_user, policyID);
             emit PolicyCreated(policyID);
-        } else {
-            if (_coverLimit == currentCoverlimit) return policyID;
+        }
+
+        // only update cover limit if initial mint or called by policyholder
+        if(mint || msg.sender == _user) {
+            uint256 currentCoverLimit = coverLimitOf[policyID];
+            if(_coverLimit != currentCoverLimit) {
+                require(_checkCapacity(currentCoverLimit, _coverLimit), "insufficient capacity");
+                // update cover amount
+                _updateActiveCoverLimit(currentCoverLimit, _coverLimit);
+                coverLimitOf[policyID] = _coverLimit;
+            }
+            require(ICoverPaymentManager(paymentManager).getSCPBalance(_user) >= minRequiredAccountBalance(_coverLimit), "insufficient scp balance");
             emit PolicyUpdated(policyID);
         }
 
-        // update cover amount
-        _updateActiveCoverLimit(currentCoverlimit, _coverLimit);
-        coverLimitOf[policyID] = _coverLimit;
         return policyID;
     }
 
