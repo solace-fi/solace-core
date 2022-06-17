@@ -36,13 +36,13 @@ interface ISCP is IERC20, IERC20Metadata, ISCPRetainer, IGovernable {
      * - `account` cannot be the zero address.
      */
     function mint(address account, uint256 amount, bool isRefundable) external;
-    
+
     /**
      * @notice Destroys `amounts` tokens from `accounts`, reducing the total supply.
      * Requirements:
      * - `account` cannot be the zero address.
      * - `account` must have at least `amount` tokens.
-    */
+     */
     function burnMultiple(address[] calldata accounts, uint256[] calldata amounts) external;
 
     /**

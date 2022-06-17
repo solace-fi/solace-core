@@ -52,7 +52,7 @@ contract SolaceCoverProductV3 is
     uint256 public maxRateDenom;
 
     /// @notice Maximum epoch duration over which premiums are charged (Default is one week).
-    uint256 public chargeCycle; 
+    uint256 public chargeCycle;
 
     /// @notice The latest premium charged timestamp.
     uint256 public latestChargedTime;
@@ -90,7 +90,7 @@ contract SolaceCoverProductV3 is
         _setRegistry(_registry);
 
         // set defaults
-        maxRateNum = 1; 
+        maxRateNum = 1;
         maxRateDenom = 315360000;
         chargeCycle = _getChargePeriodValue(ChargePeriod.WEEKLY);
         baseURI = string(abi.encodePacked("https://stats.solace.fi/policy/?chainID=", Strings.toString(block.chainid), "&policyID="));
@@ -116,11 +116,11 @@ contract SolaceCoverProductV3 is
      * @param _token The token to deposit.
      * @param _amount Amount of token to deposit.
      * @return policyID The ID of the newly minted policy.
-    */
+     */
     function purchaseWithStable(
         address _user,
-        uint256 _coverLimit, 
-        address _token, 
+        uint256 _coverLimit,
+        address _token,
         uint256 _amount
     ) external override nonReentrant whileUnpaused returns (uint256 policyID) {
         return _purchaseWithStable(msg.sender, _user, _coverLimit, _token, _amount);
@@ -136,13 +136,13 @@ contract SolaceCoverProductV3 is
      * @param _priceDeadline The `SOLACE` price in wei(usd).
      * @param _signature The `SOLACE` price signature.
      * @return policyID The ID of the newly minted policy.
-    */
+     */
     function purchaseWithNonStable(
         address _user,
         uint256 _coverLimit,
-        address _token, 
+        address _token,
         uint256 _amount,
-        uint256 _price, 
+        uint256 _price,
         uint256 _priceDeadline,
         bytes calldata _signature
     ) external override nonReentrant whileUnpaused returns (uint256 policyID) {
@@ -179,7 +179,7 @@ contract SolaceCoverProductV3 is
     /**
      * @notice Terminates the policies if users don't have enough balance to pay coverage.
      * @param _policyholders The owners of the policies to terminate.
-    */
+     */
     function cancelPolicies(address[] calldata _policyholders) external override onlyCollector {
         uint256 count = _policyholders.length;
         address policyholder;
@@ -206,7 +206,7 @@ contract SolaceCoverProductV3 is
     /**
      * @notice The maximum amount of cover that can be sold in **USD** to 18 decimals places.
      * @return cover The max amount of cover.
-    */
+     */
     function maxCover() public view override returns (uint256 cover) {
         return IRiskManager(riskManager).maxCoverPerStrategy(address(this));
     }
@@ -214,7 +214,7 @@ contract SolaceCoverProductV3 is
     /**
      * @notice Returns the active cover limit in **USD** to 18 decimal places. In other words, the total cover that has been sold at the current time.
      * @return amount The active cover limit.
-    */
+     */
     function activeCoverLimit() public view override returns (uint256 amount) {
         return IRiskManager(riskManager).activeCoverLimitPerStrategy(address(this));
     }
@@ -222,7 +222,7 @@ contract SolaceCoverProductV3 is
     /**
      * @notice Determine the available remaining capacity for new cover.
      * @return capacity The amount of available remaining capacity for new cover.
-    */
+     */
     function availableCoverCapacity() public view override returns (uint256 capacity) {
         capacity = maxCover() - activeCoverLimit();
     }
@@ -231,7 +231,7 @@ contract SolaceCoverProductV3 is
      * @notice Returns true if the policy is active, false if inactive
      * @param _policyID The policy ID.
      * @return status True if policy is active. False otherwise.
-    */
+     */
     function policyStatus(uint256 _policyID) public view override returns (bool status) {
         return coverLimitOf[_policyID] > 0 ? true : false;
     }
@@ -239,7 +239,7 @@ contract SolaceCoverProductV3 is
     /**
      * @notice Calculate minimum required account balance for a given cover limit. Equals the maximum chargeable fee for one epoch.
      * @param _coverLimit The maximum value to cover in **USD**.
-    */
+     */
     function minRequiredAccountBalance(uint256 _coverLimit) public view override returns (uint256 mrab) {
         mrab = (maxRateNum * chargeCycle * _coverLimit) / maxRateDenom;
     }
@@ -248,7 +248,7 @@ contract SolaceCoverProductV3 is
      * @notice Calculates the minimum amount of Solace Credit Points required by this contract for the account to hold.
      * @param _policyholder The account to query.
      * @return amount The amount of SCP the account must hold.
-    */
+     */
     function minScpRequired(address _policyholder) external view override returns (uint256 amount) {
         if (policyStatus(policyOf[_policyholder])) {
             return minRequiredAccountBalance(coverLimitOf[policyOf[_policyholder]]);
@@ -259,7 +259,7 @@ contract SolaceCoverProductV3 is
     /**
      * @notice Returns the Uniform Resource Identifier (URI) for `policyID`.
      * @param policyID The policy ID.
-    */
+     */
     function tokenURI(uint256 policyID) public view virtual override returns (string memory uri) {
         require(_exists(policyID), "invalid policy");
         return string(abi.encodePacked(baseURI, Strings.toString(policyID)));
@@ -273,7 +273,7 @@ contract SolaceCoverProductV3 is
      * @notice Sets the [`Registry`](./Registry) contract address.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param _registry The address of `Registry` contract.
-    */
+     */
     function setRegistry(address _registry) external override onlyGovernance {
         _setRegistry(_registry);
     }
@@ -283,7 +283,7 @@ contract SolaceCoverProductV3 is
      * Deactivating policies are unaffected by pause.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param _paused True to pause, false to unpause.
-    */
+     */
     function setPaused(bool _paused) external override onlyGovernance {
         paused = _paused;
         emit PauseSet(_paused);
@@ -295,7 +295,7 @@ contract SolaceCoverProductV3 is
      * @param _maxRateNum The maximum rate charged per second per 1e-18 (wei) of cover limit.
      * The default is to charge 10% of cover limit annually = 1/315360000.
      * @param _maxRateDenom The maximum rate denomination value. The default value is max premium rate of 10% of cover limit per annum.
-    */
+     */
     function setMaxRate(uint256 _maxRateNum, uint256 _maxRateDenom) external override onlyGovernance {
         maxRateNum = _maxRateNum;
         maxRateDenom = _maxRateDenom;
@@ -306,7 +306,7 @@ contract SolaceCoverProductV3 is
      * @notice Sets maximum epoch duration over which premiums are charged.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param _chargeCycle The premium charge period(Weekly, Monthly, Annually, Daily, Hourly) in seconds to set. The default is weekly(604800).
-    */
+     */
     function setChargeCycle(ChargePeriod _chargeCycle) external override onlyGovernance {
         chargeCycle = _getChargePeriodValue(_chargeCycle);
         emit ChargeCycleSet(chargeCycle);
@@ -315,7 +315,7 @@ contract SolaceCoverProductV3 is
     /**
      * @notice Sets the base URI for computing `tokenURI`.
      * @param _baseURI The new base URI.
-    */
+     */
     function setBaseURI(string memory _baseURI) external override onlyGovernance {
         baseURI = _baseURI;
         emit BaseURISet(_baseURI);
@@ -328,7 +328,7 @@ contract SolaceCoverProductV3 is
     /**
      * @notice Sets the latest premium charged time.
      * @param _timestamp The timestamp value when the premiums are charged.
-    */
+     */
     function setChargedTime(uint256 _timestamp) external override whileUnpaused onlyCollector {
         // solhint-disable-next-line not-rely-on-time
         require(_timestamp > 0 && _timestamp <= block.timestamp, "invalid charged timestamp");
@@ -345,7 +345,7 @@ contract SolaceCoverProductV3 is
      * @param _currentCoverLimit The current cover limit, 0 if policy has not previously been activated.
      * @param _newCoverLimit  The new cover limit requested.
      * @return acceptable True there is sufficient capacity for the requested new cover limit, false otherwise.
-    */
+     */
     function _checkCapacity(uint256 _currentCoverLimit, uint256 _newCoverLimit) internal view returns (bool acceptable) {
         // return true if user is lowering cover limit
         if (_newCoverLimit <= _currentCoverLimit) return true;
@@ -353,17 +353,17 @@ contract SolaceCoverProductV3 is
         // check capacity
         uint256 diff = _newCoverLimit - _currentCoverLimit;
         if (diff < availableCoverCapacity()) return true;
-        
+
         // no available capacity
         return false;
     }
 
     /**
      * @notice Purchases policy for user.
-     * @param _user The account to purchase policy. 
+     * @param _user The account to purchase policy.
      * @param _coverLimit The maximum value to cover in **USD**.
      * @return policyID The ID of the newly minted policy.
-    */
+     */
     function _purchase(address _user, uint256 _coverLimit) internal returns (uint256 policyID) {
         policyID = policyOf[_user];
 
@@ -395,12 +395,12 @@ contract SolaceCoverProductV3 is
     /**
      * @notice Purchases policy for user.
      * @param _purchaser The account that purchases the policy.
-     * @param _user The account to purchase policy for. 
+     * @param _user The account to purchase policy for.
      * @param _coverLimit The maximum value to cover in **USD**.
      * @param _token The token to deposit.
      * @param _amount Amount of token to deposit.
      * @return policyID The ID of the newly minted policy.
-    */
+     */
     function _purchaseWithStable(address _purchaser, address _user, uint256 _coverLimit, address _token, uint256 _amount) internal returns (uint256 policyID) {
         ICoverPaymentManager(paymentManager).depositStableFrom(_token, _purchaser, _user, _amount);
         return _purchase(_user, _coverLimit);
@@ -409,7 +409,7 @@ contract SolaceCoverProductV3 is
     /**
      * @notice Purchases policy for user.
      * @param _purchaser The account that purchases the policy.
-     * @param _user The account to purchase policy. 
+     * @param _user The account to purchase policy.
      * @param _coverLimit The maximum value to cover in **USD**.
      * @param _token The token to deposit.
      * @param _amount Amount of token to deposit.
@@ -417,14 +417,14 @@ contract SolaceCoverProductV3 is
      * @param _priceDeadline The `SOLACE` price in wei(usd).
      * @param _signature The `SOLACE` price signature.
      * @return policyID The ID of the newly minted policy.
-    */
+     */
     function _purchaseWithNonStable(
         address _purchaser,
         address _user,
         uint256 _coverLimit,
         address _token,
         uint256 _amount,
-        uint256 _price, 
+        uint256 _price,
         uint256 _priceDeadline,
         bytes calldata _signature
     ) internal returns (uint256 policyID) {
@@ -436,7 +436,7 @@ contract SolaceCoverProductV3 is
      * @notice Updates the Risk Manager on the current total cover limit purchased by policyholders.
      * @param _currentCoverLimit The current policyholder cover limit (0 if activating policy).
      * @param _newCoverLimit The new policyholder cover limit.
-    */
+     */
     function _updateActiveCoverLimit(uint256 _currentCoverLimit, uint256 _newCoverLimit) internal {
         IRiskManager(riskManager).updateActiveCoverLimitForStrategy(address(this), _currentCoverLimit, _newCoverLimit);
     }
@@ -447,7 +447,7 @@ contract SolaceCoverProductV3 is
      * @param from sending address.
      * @param to receiving address.
      * @param tokenId tokenId.
-    */
+     */
     function _beforeTokenTransfer(address from, address to, uint256 tokenId) internal virtual override {
         super._beforeTokenTransfer(from, to, tokenId);
         require(from == address(0), "only minting permitted");
@@ -456,7 +456,7 @@ contract SolaceCoverProductV3 is
     /**
      * @notice Sets registry and related contract addresses.
      * @param _registry The registry address to set.
-    */
+     */
     function _setRegistry(address _registry) internal {
         // set registry
         require(_registry != address(0x0), "zero address registry");

@@ -228,7 +228,7 @@ contract StakingRewardsV2 is IStakingRewardsV2, ReentrancyGuard, Governable {
      * @param price The `SOLACE` price in wei(usd).
      * @param priceDeadline The `SOLACE` price in wei(usd).
      * @param signature The `SOLACE` price signature.
-    */
+     */
     function harvestLockForScp(uint256 xsLockID, uint256 price, uint256 priceDeadline, bytes calldata signature) external override nonReentrant {
         update();
         _harvestForScp(xsLockID, price, priceDeadline, signature);
@@ -240,7 +240,7 @@ contract StakingRewardsV2 is IStakingRewardsV2, ReentrancyGuard, Governable {
      * @param price The `SOLACE` price in wei(usd).
      * @param priceDeadline The `SOLACE` price in wei(usd).
      * @param signature The `SOLACE` price signature.
-    */
+     */
     function harvestLocksForScp(uint256[] memory xsLockIDs, uint256 price, uint256 priceDeadline, bytes calldata signature) external override nonReentrant {
         update();
         uint256 len = xsLockIDs.length;
@@ -256,7 +256,7 @@ contract StakingRewardsV2 is IStakingRewardsV2, ReentrancyGuard, Governable {
     /**
      * @notice Updates and sends a lock's rewards.
      * @param xsLockID The ID of the lock to process rewards for.
-    */
+     */
     function _harvest(uint256 xsLockID) internal {
         (uint256 transferAmount, address receiver) = _updateLock(xsLockID);
         if(receiver != address(0x0) && transferAmount != 0) SafeERC20.safeTransfer(IERC20(solace), receiver, transferAmount);
@@ -268,7 +268,7 @@ contract StakingRewardsV2 is IStakingRewardsV2, ReentrancyGuard, Governable {
      * @param price The `SOLACE` price in wei(usd).
      * @param priceDeadline The `SOLACE` price in wei(usd).
      * @param signature The `SOLACE` price signature.
-    */
+     */
     function _harvestForScp(uint256 xsLockID, uint256 price, uint256 priceDeadline, bytes calldata signature) internal {
         (uint256 transferAmount, address owner) = _updateLock(xsLockID);
         require(msg.sender == owner, "not owner");
@@ -283,7 +283,7 @@ contract StakingRewardsV2 is IStakingRewardsV2, ReentrancyGuard, Governable {
      * @param xsLockID The ID of the lock to process rewards for.
      * @return transferAmount The amount of [**SOLACE**](./../SOLACE) to transfer to the receiver.
      * @return receiver The user to receive the [**SOLACE**](./../SOLACE).
-    */
+     */
     function _updateLock(uint256 xsLockID) internal returns (uint256 transferAmount, address receiver) {
         // math
         uint256 accRewardPerShare_ = accRewardPerShare;
@@ -395,7 +395,7 @@ contract StakingRewardsV2 is IStakingRewardsV2, ReentrancyGuard, Governable {
      * @notice Sets the [`Registry`](./Registry) contract address.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param _registry The address of `Registry` contract.
-    */
+     */
     function setRegistry(address _registry) external override onlyGovernance {
         _setRegistry(_registry);
     }
@@ -403,7 +403,7 @@ contract StakingRewardsV2 is IStakingRewardsV2, ReentrancyGuard, Governable {
     /**
      * @notice Sets registry and related contract addresses.
      * @param _registry The registry address to set.
-    */
+     */
     function _setRegistry(address _registry) internal {
         require(_registry != address(0x0), "zero address registry");
         registry = _registry;
@@ -449,7 +449,7 @@ contract StakingRewardsV2 is IStakingRewardsV2, ReentrancyGuard, Governable {
      * @notice Migrates information about a lock from a previous version of staking rewards.
      * @param stakingRewardsV1 The previous version of staking rewards.
      * @param xsLockID The IDs of the locks to migrate.
-    */
+     */
     function _migrateLock(address stakingRewardsV1, uint256 xsLockID) internal {
         // can only migrate each lock once
         if(wasLockMigrated[xsLockID]) return;

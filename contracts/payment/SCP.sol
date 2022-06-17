@@ -170,7 +170,7 @@ contract SCP is ISCP, Multicall, Governable {
      * Requirements:
      * - `account` cannot be the zero address.
      * - `account` must have at least `amount` tokens.
-    */
+     */
     function burnMultiple(address[] calldata accounts, uint256[] calldata amounts) external override {
         require(isScpMover(msg.sender), "!scp mover");
         uint256 length = accounts.length;

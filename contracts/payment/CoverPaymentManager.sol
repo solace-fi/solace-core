@@ -88,7 +88,7 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, SolaceSigner, R
      * @param from The depositor of the token.
      * @param recipient The recipient of Solace Cover Points.
      * @param amount Amount of token to deposit.
-    */
+     */
     function depositStableFrom(
         address token,
         address from,
@@ -98,13 +98,13 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, SolaceSigner, R
         require(productIsActive(msg.sender), "invalid product caller");
         _depositStable(token, from, recipient, amount);
     }
-   
+
     /**
      * @notice Deposits tokens from msg.sender and credits them to recipient.
      * @param token The token to deposit.
      * @param recipient The recipient of Solace Cover Points.
      * @param amount Amount of token to deposit.
-    */
+     */
     function depositStable(
         address token,
         address recipient,
@@ -123,7 +123,7 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, SolaceSigner, R
      * @param v secp256k1 signature
      * @param r secp256k1 signature
      * @param s secp256k1 signature
-    */
+     */
     function depositSignedStableFrom(
         address token,
         address from,
@@ -147,7 +147,7 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, SolaceSigner, R
      * @param v secp256k1 signature
      * @param r secp256k1 signature
      * @param s secp256k1 signature
-    */
+     */
     function depositSignedStable(
         address token,
         address depositor,
@@ -169,7 +169,7 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, SolaceSigner, R
      * @param price The `SOLACE` price in wei(usd).
      * @param priceDeadline The `SOLACE` price in wei(usd).
      * @param signature The `SOLACE` price signature.
-    */
+     */
     function depositNonStableFrom(
         address token,
         address from,
@@ -191,7 +191,7 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, SolaceSigner, R
      * @param price The `SOLACE` price in wei(usd).
      * @param priceDeadline The `SOLACE` price in wei(usd).
      * @param signature The `SOLACE` price signature.
-    */
+     */
     function depositNonStable(
         address token,
         address recipient,
@@ -252,7 +252,7 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, SolaceSigner, R
      * @notice Charge premiums for each policyholder.
      * @param accounts Array of addresses of the policyholders to charge.
      * @param premiums Array of premium amounts (in **USD** to 18 decimal places) to charge each policyholder.
-    */
+     */
     function chargePremiums(address[] calldata accounts, uint256[] calldata premiums) external override whileUnpaused {
         require(
             msg.sender == IRegistry(registry).get("premiumCollector") ||
@@ -271,7 +271,7 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, SolaceSigner, R
      * @notice Returns account's `SCP` balance.
      * @param account The account to fetch.
      * @return amount The amount of `SCP`.
-    */
+     */
     function getSCPBalance(address account) external view override returns (uint256 amount) {
         return ISCP(scp).balanceOf(account);
     }
@@ -279,7 +279,7 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, SolaceSigner, R
     /**
      * @notice Returns to token information for given token index.
      * @param index The token index.
-    */
+     */
     function getTokenInfo(
         uint256 index
     ) external view override returns (address token, bool accepted, bool permittable, bool refundable, bool stable) {
@@ -294,11 +294,11 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, SolaceSigner, R
      * @param priceDeadline The deadline for the price.
      * @param signature The `SOLACE` price signature.
      * @return solaceAmount
-    */
+     */
     function getRefundableSOLACEAmount(
         address depositor,
-        uint256 price, 
-        uint256 priceDeadline, 
+        uint256 price,
+        uint256 priceDeadline,
         bytes calldata signature
     ) public view override returns (uint256 solaceAmount) {
         // check price
@@ -347,7 +347,7 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, SolaceSigner, R
      * @notice Sets the [`Registry`](./Registry) contract address.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param _registry The address of `Registry` contract.
-    */
+     */
     function setRegistry(address _registry) external override onlyGovernance {
         _setRegistry(_registry);
     }
@@ -356,7 +356,7 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, SolaceSigner, R
      * @notice Adds or removes a set of accepted tokens.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param tokens Tokens to set.
-    */
+     */
     function setTokenInfo(TokenInfo[] calldata tokens) external override onlyGovernance {
         for (uint256 i = 0; i < tokens.length; i++) {
             address token = tokens[i].token;
@@ -375,7 +375,7 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, SolaceSigner, R
      * @notice Pauses or unpauses contract..
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param _paused True to pause, false to unpause.
-    */
+     */
     function setPaused(bool _paused) external override onlyGovernance {
         paused = _paused;
         emit PauseSet(_paused);
@@ -412,7 +412,7 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, SolaceSigner, R
      * @param from The depositor of the token.
      * @param recipient The recipient of Solace Cover Points.
      * @param amount Amount of token to deposit.
-    */
+     */
     function _depositStable(
         address token,
         address from,
@@ -440,7 +440,7 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, SolaceSigner, R
      * @param price The `SOLACE` price in wei(usd).
      * @param priceDeadline The `SOLACE` price in wei(usd).
      * @param signature The `SOLACE` price signature.
-    */
+     */
     function _depositNonStable(
         address token,
         address from,
@@ -473,7 +473,7 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, SolaceSigner, R
      * @param v secp256k1 signature
      * @param r secp256k1 signature
      * @param s secp256k1 signature
-    */
+     */
     function _depositSignedStable(
         address token,
         address from,
@@ -525,12 +525,12 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, SolaceSigner, R
         ISCP(scp).withdraw(from, scpAmount);
         SafeERC20.safeTransferFrom(IERC20(solace), premiumPool, recipient, amount);
         emit TokenWithdrawn(from, recipient, amount);
-    } 
+    }
 
     /**
      * @notice Sets registry and related contract addresses.
      * @param _registry The registry address to set.
-    */
+     */
     function _setRegistry(address _registry) internal {
         require(_registry != address(0x0), "zero address registry");
         IRegistry reg = IRegistry(_registry);
@@ -560,7 +560,7 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, SolaceSigner, R
      * @param tokenIn The input token.
      * @param tokenOut The output token.
      * @param amountOut The amount of tokens out.
-    */
+     */
     function _convertDecimals(uint256 amountIn, address tokenIn, address tokenOut) internal view returns (uint256 amountOut) {
         // fetch decimals
         uint8 decIn = IERC20Metadata(tokenIn).decimals();

@@ -29,7 +29,7 @@ interface ISolaceSigner {
      * @param price The `SOLACE` price in wei(usd).
      * @param deadline The deadline for the price.
      * @param signature The `SOLACE` price signature.
-    */
+     */
     function verifyPrice(address token, uint256 price, uint256 deadline, bytes calldata signature) external view returns (bool);
 
     /**
@@ -38,7 +38,7 @@ interface ISolaceSigner {
      * @param policyholder The policyholder address.
      * @param deadline The deadline for the signature.
      * @param signature The premium data signature.
-    */
+     */
     function verifyPremium(uint256 premium, address policyholder, uint256 deadline, bytes calldata signature) external view returns (bool);
 
     /***************************************
@@ -48,21 +48,21 @@ interface ISolaceSigner {
     /**
      * @notice Returns the number of signers.
      * @return count The number of signers.
-    */
+     */
     function numSigners() external returns (uint256 count);
 
     /**
      * @notice Returns the signer at the given index.
      * @param index The index to query.
      * @return signer The address of the signer.
-    */
+     */
     function getSigner(uint256 index) external returns (address signer);
 
     /**
      * @notice Checks whether given signer is an authorized signer or not.
      * @param signer The signer address to check.
      * @return bool True if signer is a authorized signer.
-    */
+     */
     function isSigner(address signer) external view returns (bool);
 
     /***************************************
@@ -73,13 +73,13 @@ interface ISolaceSigner {
      * @notice Adds a new signer.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param signer The signer to add.
-    */
+     */
     function addSigner(address signer) external;
 
     /**
      * @notice Removes a signer.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param signer The signer to remove.
-    */
+     */
     function removeSigner(address signer) external;
 }

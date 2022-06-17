@@ -33,7 +33,7 @@ contract SolaceSigner is ISolaceSigner, EIP712, Governable {
     /**
      * @notice Constructs the Solace Signer contract.
      * @param _governance The address of the [governor](/docs/protocol/governance).
-    */
+     */
     // solhint-disable-next-line no-empty-blocks
     constructor(address _governance) EIP712("Solace.fi-SolaceSigner", "1") Governable(_governance) {}
 
@@ -47,7 +47,7 @@ contract SolaceSigner is ISolaceSigner, EIP712, Governable {
      * @param price The `SOLACE` price in wei(usd).
      * @param deadline The deadline for the price.
      * @param signature The `SOLACE` price signature.
-    */
+     */
     function verifyPrice(address token, uint256 price, uint256 deadline, bytes calldata signature) public view override returns (bool) {
         require(token != address(0x0), "zero address token");
         require(price > 0, "zero price");
@@ -73,7 +73,7 @@ contract SolaceSigner is ISolaceSigner, EIP712, Governable {
      * @param policyholder The policyholder address.
      * @param deadline The deadline for the signature.
      * @param signature The premium data signature.
-    */
+     */
     function verifyPremium(uint256 premium, address policyholder, uint256 deadline, bytes calldata signature) public view override returns (bool) {
         // solhint-disable-next-line not-rely-on-time
         require(block.timestamp <= deadline, "expired deadline");
@@ -99,7 +99,7 @@ contract SolaceSigner is ISolaceSigner, EIP712, Governable {
     /**
      * @notice Returns the number of signers.
      * @return count The number of signers.
-    */
+     */
     function numSigners() external override view returns (uint256 count) {
         return _signers.length();
     }
@@ -108,7 +108,7 @@ contract SolaceSigner is ISolaceSigner, EIP712, Governable {
      * @notice Returns the signer at the given index.
      * @param index The index to query.
      * @return signer The address of the signer.
-    */
+     */
     function getSigner(uint256 index) external override view returns (address signer) {
         return _signers.at(index);
     }
@@ -117,7 +117,7 @@ contract SolaceSigner is ISolaceSigner, EIP712, Governable {
      * @notice Checks whether given signer is an authorized signer or not.
      * @param signer The signer address to check.
      * @return bool True if signer is a authorized signer.
-    */
+     */
     function isSigner(address signer) public view override returns (bool) {
         return _signers.contains(signer);
     }
