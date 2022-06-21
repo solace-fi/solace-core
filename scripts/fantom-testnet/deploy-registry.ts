@@ -81,8 +81,10 @@ async function registerAddresses() {
     "xsLocker"                    : "0x501ACebF0918c99546b65cEdCD430e0D4A8E9167",
     "riskManager"                 : "0x501aceF459292B26CC165ebA2F5960b49c4EA990",
     "coverageDataProvider"        : "0x501ace25625CadaF178558346A4603ceDb5a0A43",
-    "solaceCoverProduct"          : "0x501ACe36fF9078aEA9b9Cc43a4e329f01361764e",
     "coverageDataProviderWrapper" : "0x501aceFd6Af9C83170F975595d9f1B9D9Eb044cF",
+    "scp"                         : "0x501acE73cF81312D02d40A02a9a6e656038aa9A3",
+    "coverPaymentManager"         : "0x501acEDC954141420C4FD1ac64552A9Cd5D9e684",
+    "solaceCoverProduct"          : "0x501aCeAe7Cc16A145C88EE581d03D37068254e90",
   }
 
   // set default addresses

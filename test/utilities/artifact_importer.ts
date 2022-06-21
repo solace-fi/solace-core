@@ -7,6 +7,7 @@
 import { config as dotenv_config } from "dotenv";
 dotenv_config();
 import { ContractJSON } from "ethereum-waffle/dist/esm/ContractJSON";
+import fs from "fs";
 
 export interface ArtifactImports { [contract_name: string]: ContractJSON };
 
@@ -36,7 +37,7 @@ export async function import_artifacts() {
   artifacts.SolaceCoverProduct = await tryImport(`${artifact_dir}/products/SolaceCoverProduct.sol/SolaceCoverProduct.json`);
   artifacts.SolaceCoverProductV2 = await tryImport(`${artifact_dir}/products/SolaceCoverProductV2.sol/SolaceCoverProductV2.json`);
   artifacts.SolaceCoverProductV3 = await tryImport(`${artifact_dir}/products/SolaceCoverProductV3.sol/SolaceCoverProductV3.json`);
-  
+
   //payments
   artifacts.SCP = await tryImport(`${artifact_dir}/payment/SCP.sol/SCP.json`);
   artifacts.CoverPaymentManager = await tryImport(`${artifact_dir}/payment/CoverPaymentManager.sol/CoverPaymentManager.json`);
@@ -65,6 +66,7 @@ export async function import_artifacts() {
   artifacts.SingletonFactory = await tryImport(`${artifact_dir}/interfaces/utils/ISingletonFactory.sol/ISingletonFactory.json`);
   artifacts.Deployer = await tryImport(`${artifact_dir}/utils/Deployer.sol/Deployer.json`);
   artifacts.SolaceSigner = await tryImport(`${artifact_dir}/utils/SolaceSigner.sol/SolaceSigner.json`);
+  artifacts.Multicall = {abi: JSON.parse(fs.readFileSync('./scripts/abi/Multicall.json').toString())} as any;
   // cross chain
   artifacts.BridgeWrapper = await tryImport(`${artifact_dir}/BridgeWrapper.sol/BridgeWrapper.json`);
   // generic imports

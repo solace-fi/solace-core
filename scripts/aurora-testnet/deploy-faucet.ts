@@ -30,6 +30,7 @@ const USDT_ADDRESS                  = "0x4988a896b1227218e4A686fdE5EabdcAbd91571
 const FRAX_ADDRESS                  = "0xDA2585430fEf327aD8ee44Af8F1f989a2A91A3d2";
 const NEAR_ADDRESS                  = "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d";
 const AURORA_ADDRESS                = "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79";
+const MAI_ADDRESS                   = "0xd1c08D4710154ED4CA111D752F92e9B184DB4d8c";
 
 const ONE_ETHER = BN.from("1000000000000000000");
 
@@ -90,7 +91,8 @@ async function deployTestnetTokens() {
     {name: "USD Token", symbol: "USDT", supply: BN.from("1000000000"), decimals: 6, permit: false},
     {name: "Frax", symbol: "FRAX", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
     {name: "NEAR", symbol: "NEAR", supply: ONE_ETHER.mul(1000000).mul(1000000), decimals: 24, permit: false},
-    {name: "Aurora", symbol: "AURORA", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false}
+    {name: "Aurora", symbol: "AURORA", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
+    {name: "miMATIC", symbol: "miMATIC", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
   ];
   for(var i = 0; i < tokens.length; ++i) {
     let token = tokens[i];
@@ -123,6 +125,7 @@ async function mintTestnetTokens() {
     {name: "Frax", symbol: "FRAX", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false, address: FRAX_ADDRESS},
     {name: "NEAR", symbol: "NEAR", supply: ONE_ETHER.mul(1000000).mul(1000000), decimals: 24, permit: false, address: NEAR_ADDRESS},
     {name: "Aurora", symbol: "AURORA", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false, address: AURORA_ADDRESS},
+    {name: "miMATIC", symbol: "miMATIC", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false, address: MAI_ADDRESS},
   ];
   let recipients = [signerAddress];
   for(var j = 0; j < recipients.length; ++j) {
