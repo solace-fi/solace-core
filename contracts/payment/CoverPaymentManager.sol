@@ -4,6 +4,7 @@ pragma solidity 0.8.6;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
@@ -304,8 +305,10 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, SolaceSigner, R
         // check price
         require(verifyPrice(solace, price, priceDeadline, signature), "invalid token price");
         uint256 scpBalance = ISCP(scp).balanceOf(depositor);
-        uint256 requiredScp = ISCP(scp).minScpRequired(depositor);
-        uint256 refundableScpBalance = scpBalance > requiredScp ? scpBalance - requiredScp : 0;
+        uint256 minRequiredScp = ISCP(scp).minScpRequired(depositor);
+        uint256 nrScpBalance = ISCP(scp).balanceOfNonRefundable(depositor);
+        uint256 nonRefundableScp =  Math.max(minRequiredScp, nrScpBalance);
+        uint256 refundableScpBalance = scpBalance > nonRefundableScp ? scpBalance - nonRefundableScp : 0;
         solaceAmount = refundableScpBalance > 0 ? (refundableScpBalance * 10**18) / price : 0;
     }
 
