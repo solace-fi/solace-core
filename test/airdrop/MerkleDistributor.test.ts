@@ -25,7 +25,7 @@ describe("MerkleDistributor", function() {
   // vars
   const ZERO = BN.from("0")
   const TEN_ETHER = BN.from("10000000000000000000");
-  const merkleRoot = "0xbbb16024c17f0501bc6923e84c690f5561b7e901a0bf957cfcc1397ea5ceb06c"
+  const merkleRoot = "0xa3355b0ea435593f559c0e6e51a16e374bd801ce86911543fa6b09161ad0235c"
   const TOTAL_AIRDROP_AMOUNT = parseUnits("10000000", 18) // 10M SOLACE
 
   // vars to setup later
@@ -102,22 +102,22 @@ describe("MerkleDistributor", function() {
 
   describe("claim", function() {
     before(async () => {
-      user = "0x8b80755C441d355405CA7571443Bb9247B77Ec16"
+      user = "0x010efb04880aacf3121f6822b18034e15F3F10Be"
 
       merkleProof = [
-        '0xaffe48dd3bc622b18c95fef7f420a850319d9215dbb369344a4282c4b76e8c4e',
-        '0x62534b60a2ca693e75395432d4f4240eb87a40cffb9a15d3d17ace67978d2fb5',
-        '0xd55074396fb7f0c47f11eb43bf75faf03a66f7859c33f67c05dd5e013959f0aa',
-        '0xfe5e23e2e2c89533072b8f44c032a25e7578300aa9e775a91ccb582d889e6010',
-        '0x59bb99e4edf3d86bf99a6abab25ad5b71e4347e4fd703e1e116344589eb896a8',
-        '0x92cf753759730eafe4526610c3f2e6f107e1d3d4d9ac325b07509af980af7526',
-        '0xa8d661b9875964041863269ac6f80c742698e882f415f8b429bb62fb2179c993',
-        '0x7bfc4fc6208faa54d71220f431895a244817c75514c7211253d4bdf2d1fbe6e7',
-        '0xfb03cae7eb1ce135771749d804248165592a5fc56f023e3e91c2ca5d394cc9c4',
-        '0x05f94696863f0716663de4708932f7148f65e7b5eb5d540fd5d658948cc07c2d'
+        "0xc238951c433954f175a5d00c10d84a972bd182f9ac7c180f32f42fd4b4d43bf3",
+        "0xc46854fb6780ce31d965b96ecd0dab17f8ac637b66ddd6a1d69d4ceaa35975c4",
+        "0xd36525631174b0a4885377704d9420b6f190a297bfdaaafb29568672bed570f2",
+        "0xe82ef4aecf940e7be8171ba16a6dfb22724ac150ba887f0fbcaf05a14bc6d058",
+        "0x130aea82795b60e859c20aaa8b6ec8d557a530df15ade20e4df5cabeb12c46ac",
+        "0x001d7124307016a08c37688604c6413a16625a3b4c0ca6183b8b3b8ee439dfa2",
+        "0x3b06eeef9272f30bc125684585da5680e9d792458e5f940e776818f5471aef2a",
+        "0x8a23b7cc2b7aa220912a4e2e760135ca85aeaf8398e405d7aaba49dc5d600ff4",
+        "0xd2435ed88aa123e48d4727f8ae3e5150843b34ca26fb7c6a162bce17c2c16457",
+        "0xb7b00b2962586d3f625b8f31adeb8260d594cf2b59429d54e905c69366f25552"
       ]
 
-      amount = BN.from("167260274146021285559982")
+      amount = BN.from("1181910000000000000000")
     });
 
     it("throws on invalid claim", async function() {
