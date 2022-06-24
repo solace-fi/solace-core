@@ -51,7 +51,7 @@ async function deployMerkleDistributor() {
   } else {
     console.log("Deploying MerkleDistributor");
 
-    const merkleRoot = "0xbbb16024c17f0501bc6923e84c690f5561b7e901a0bf957cfcc1397ea5ceb06c"
+    const merkleRoot = "0xa3355b0ea435593f559c0e6e51a16e374bd801ce86911543fa6b09161ad0235c"
 
     // Basic deploy as per https://hardhat.org/guides/deploying.html
     const MerkleDistributor = await ethers.getContractFactory("MerkleDistributor");
