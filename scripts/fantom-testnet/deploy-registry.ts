@@ -83,7 +83,7 @@ async function registerAddresses() {
     "coverageDataProvider"        : "0x501ace25625CadaF178558346A4603ceDb5a0A43",
     "coverageDataProviderWrapper" : "0x501aceFd6Af9C83170F975595d9f1B9D9Eb044cF",
     "scp"                         : "0x501acE73cF81312D02d40A02a9a6e656038aa9A3",
-    "coverPaymentManager"         : "0x501acEDC954141420C4FD1ac64552A9Cd5D9e684",
+    "coverPaymentManager"         : "0x501Ace82f6C1e584656a3B3ba528bc8b86EB2160",
     "solaceCoverProduct"          : "0x501aCeAe7Cc16A145C88EE581d03D37068254e90",
   }
 

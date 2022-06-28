@@ -304,9 +304,10 @@ contract CoverPaymentManager is ICoverPaymentManager, Multicall, SolaceSigner, R
     ) public view override returns (uint256 solaceAmount) {
         // check price
         require(verifyPrice(solace, price, priceDeadline, signature), "invalid token price");
-        uint256 scpBalance = ISCP(scp).balanceOf(depositor);
-        uint256 minRequiredScp = ISCP(scp).minScpRequired(depositor);
-        uint256 nrScpBalance = ISCP(scp).balanceOfNonRefundable(depositor);
+        ISCP scp_ = ISCP(scp);
+        uint256 scpBalance = scp_.balanceOf(depositor);
+        uint256 minRequiredScp = scp_.minScpRequired(depositor);
+        uint256 nrScpBalance = scp_.balanceOfNonRefundable(depositor);
         uint256 nonRefundableScp =  Math.max(minRequiredScp, nrScpBalance);
         uint256 refundableScpBalance = scpBalance > nonRefundableScp ? scpBalance - nonRefundableScp : 0;
         solaceAmount = refundableScpBalance > 0 ? (refundableScpBalance * 10**18) / price : 0;

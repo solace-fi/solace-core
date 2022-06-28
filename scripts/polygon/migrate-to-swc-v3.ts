@@ -17,7 +17,7 @@ import { abiEncodeArgs } from "../../test/utilities/setStorage";
 // contract addresses
 const SOLACE_ADDRESS                  = "0x501acE9c35E60f03A2af4d484f49F9B1EFde9f40";
 const SCP_ADDRESS                     = "0x501ACE72166956F57b44dbBcc531A8E741449997";
-const COVER_PAYMENT_MANAGER_ADDRESS   = "0x501aCe8EA57c0f83De8aEB179f32951181e36Fc1";
+const COVER_PAYMENT_MANAGER_ADDRESS   = "0x501acE7a18b0F59E51eb198cD73480F8467DE100";
 const SOLACE_COVER_PRODUCT_ADDRESS_V2 = "0x501AcEC83d440c00644cA5C48d059e1840852a64";
 const SOLACE_COVER_PRODUCT_ADDRESS_V3 = "0x501ACeB72d62C9875825b71d9f78a27780B5624d";
 const MULTICALL_ADDRESS               = "0x11ce4B23bD875D7F5C6a31084f55fDe1e9A87507";
@@ -43,23 +43,23 @@ async function main() {
   networkSettings = getNetworkSettings(chainID);
 
   await expectDeployed(SOLACE_ADDRESS);
-  //await expectDeployed(SCP_ADDRESS);
-  //await expectDeployed(COVER_PAYMENT_MANAGER_ADDRESS);
+  await expectDeployed(SCP_ADDRESS);
+  await expectDeployed(COVER_PAYMENT_MANAGER_ADDRESS);
   await expectDeployed(SOLACE_COVER_PRODUCT_ADDRESS_V2);
-  //await expectDeployed(SOLACE_COVER_PRODUCT_ADDRESS_V3);
+  await expectDeployed(SOLACE_COVER_PRODUCT_ADDRESS_V3);
   await expectDeployed(MULTICALL_ADDRESS);
 
-  //scp = (await ethers.getContractAt(artifacts.SCP.abi, SCP_ADDRESS)) as Scp;
-  //coverPaymentManager = (await ethers.getContractAt(artifacts.CoverPaymentManager.abi, COVER_PAYMENT_MANAGER_ADDRESS)) as CoverPaymentManager;
+  scp = (await ethers.getContractAt(artifacts.SCP.abi, SCP_ADDRESS)) as Scp;
+  coverPaymentManager = (await ethers.getContractAt(artifacts.CoverPaymentManager.abi, COVER_PAYMENT_MANAGER_ADDRESS)) as CoverPaymentManager;
   solaceCoverProductV2 = (await ethers.getContractAt(artifacts.SolaceCoverProductV2.abi, SOLACE_COVER_PRODUCT_ADDRESS_V2)) as SolaceCoverProductV2;
-  //solaceCoverProductV3 = (await ethers.getContractAt(artifacts.SolaceCoverProductV3.abi, SOLACE_COVER_PRODUCT_ADDRESS_V3)) as SolaceCoverProductV3;
-  //multicall = await ethers.getContractAt(artifacts.Multicall.abi, MULTICALL_ADDRESS);
+  solaceCoverProductV3 = (await ethers.getContractAt(artifacts.SolaceCoverProductV3.abi, SOLACE_COVER_PRODUCT_ADDRESS_V3)) as SolaceCoverProductV3;
+  multicall = await ethers.getContractAt(artifacts.Multicall.abi, MULTICALL_ADDRESS);
 
   // deploy contracts
-  await fetchPolicies();
+  //await fetchPolicies();
   //await mintScp();
   //await mintPolicies();
-  //await pauseV2();
+  await pauseV2();
 }
 
 async function fetchPolicies() {
