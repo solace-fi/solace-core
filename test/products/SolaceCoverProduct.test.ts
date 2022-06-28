@@ -20,13 +20,13 @@ const DOMAIN_NAME = "Solace.fi-SolaceCoverProduct";
 const VERSION = "1";
 
 let forkNetwork = process.env.FORK_NETWORK || "";
-let supportedNetworks = ["mainnet","polygon"];
+let supportedNetworks = ["ethereum","polygon"];
 
 describe("SolaceCoverProduct", function() {
   if(!supportedNetworks.includes(forkNetwork)) {
     it(`can only be tested when forking one of ${supportedNetworks.join(',')}`, async function() {
       console.log(`SolaceCoverProduct can only be tested when forking one of ${supportedNetworks.join(',')}`);
-      console.log("set `FORK_NETWORK=mainnet` in .env");
+      console.log("set `FORK_NETWORK=ethereum` in .env");
       expect(true, `SolaceCoverProduct can only be tested when forking one of ${supportedNetworks.join(',')}`).to.be.false;
     });
   } else {
@@ -55,7 +55,7 @@ describe("SolaceCoverProduct", function() {
     const ZERO_AMOUNT = BN.from("0");
     const ANNUAL_MAX_PREMIUM = INITIAL_COVER_LIMIT.div(10); // 0.1 eth, for testing we assume max annual rate of 10% of cover limit
     const WEEKLY_MAX_PREMIUM = ANNUAL_MAX_PREMIUM.mul(604800).div(31536000);
-    // mainnet
+    // ethereum
     const TOKEN0 = "0x501ace9c35e60f03a2af4d484f49f9b1efde9f40"; // SOLACE.sol
     const TOKEN1 = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"; // USDC.sol
     const RESERVE0 = BN.from("13250148273341498385651903");
@@ -80,7 +80,7 @@ describe("SolaceCoverProduct", function() {
     const FAKE_REFERRAL_CODE = "0xe4e7cba021ff6b83b14d54016198f31b04cba044d71d9a8b9bdf964aa2259cc3b207237f814aa56e516638b448edc43a6c3f4637dca5de54cb199e37b039a832e7"
 
     const DAI_ADDRESSES: {[network: string] : string} = {
-      "mainnet": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+      "ethereum": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
       "polygon": "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063"
     };
     const USDC_ADDRESS = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
@@ -1411,7 +1411,7 @@ describe("SolaceCoverProduct", function() {
 
     async function manipulateDAIbalance(wallet: Wallet, desiredBalance: BN) {
       const DAI_BALANCEOF_SLOT = {
-        "mainnet": 2,
+        "ethereum": 2,
         "polygon": 0
       }[forkNetwork];
       // Get storage slot index
