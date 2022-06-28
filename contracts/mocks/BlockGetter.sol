@@ -17,4 +17,12 @@ contract BlockGetter {
     function getBlockNumber() external view returns (uint256 num) {
         return block.number;
     }
+
+    /**
+     * @notice Returns the timestamp of the latest block in the chain.
+     * @return timestamp The block timestamp.
+     */
+    function getBlockTimestamp() external view returns (uint256 timestamp) {
+        return block.timestamp;
+    }
 }

@@ -29,6 +29,7 @@ const WBTC_ADDRESS                  = "0xe3a5001b027168dc9b4b64311fc7a9eb87363d7
 const USDT_ADDRESS                  = "0xC382931bF0D86B0Fd04ecAC093676A61446F3E2d";
 const FRAX_ADDRESS                  = "0x87Eba7597721C156240Ae7d8aE26e269118AFdca";
 const WFTM_ADDRESS                  = "0x4701b4535CDcC6541292fCef468836486D871250";
+const MAI_ADDRESS                   = "0x5F1D856C7b3A8C71168775C4423A67A52F5493d1";
 
 const ONE_ETHER = BN.from("1000000000000000000");
 
@@ -89,6 +90,7 @@ async function deployTestnetTokens() {
     {name: "USD Token", symbol: "USDT", supply: BN.from("1000000000"), decimals: 6, permit: false},
     {name: "Frax", symbol: "FRAX", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
     {name: "Wrapped Ether", symbol: "WETH", supply: ONE_ETHER.mul(1000000).mul(1000000), decimals: 18, permit: false},
+    {name: "miMATIC", symbol: "miMATIC", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
   ];
   for(var i = 0; i < tokens.length; ++i) {
     let token = tokens[i];
@@ -120,6 +122,7 @@ async function mintTestnetTokens() {
     {name: "USD Token", symbol: "USDT", supply: BN.from("1000000000"), decimals: 6, permit: false, address: USDT_ADDRESS},
     {name: "Frax", symbol: "FRAX", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false, address: FRAX_ADDRESS},
     {name: "Wrapped Ether", symbol: "WETH", supply: ONE_ETHER.mul(1000000).mul(1000000), decimals: 18, permit: false, address: WETH_ADDRESS},
+    {name: "miMATIC", symbol: "miMATIC", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false, address: MAI_ADDRESS},
   ];
   let recipients = [signerAddress];
   for(var j = 0; j < recipients.length; ++j) {
