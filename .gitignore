@@ -10,6 +10,7 @@ docgen/
 .openzeppelin/
 .vscode/
 gas_reports.txt
+stash
 
 #Hardhat files
 cache
