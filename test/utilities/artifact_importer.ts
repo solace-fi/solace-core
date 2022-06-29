@@ -103,6 +103,9 @@ export async function import_artifacts() {
   artifacts.CoverageDataProviderV2 = await tryImport(`${artifact_dir}/risk/CoverageDataProviderV2.sol/CoverageDataProviderV2.json`);
   artifacts.MockPriceOracle = await tryImport(`${artifact_dir}/mocks/MockPriceOracle.sol/MockPriceOracle.json`);
 
+  // vesting
+  artifacts.TokenVesting = await tryImport(`${artifact_dir}/vesting/TokenVesting.sol/TokenVesting.json`);
+
   return artifacts;
 }
 
