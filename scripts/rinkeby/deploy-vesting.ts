@@ -9,9 +9,6 @@
 
 // Require absolute path `stash/scripts/knownHashes.json` to be present, with initial contents {}
 
-// Verify command
-// npx hardhat verify --network mumbai 0x501ACeEEa805D0D43AE54577ED4E7dCbDA169675 "0x501acE9c35E60f03A2af4d484f49F9B1EFde9f40" "0xa3355b0ea435593f559c0e6e51a16e374bd801ce86911543fa6b09161ad0235c" "0xC32e0d89e25222ABb4d2d68755baBF5aA6648F15"
-
 import hardhat from "hardhat";
 const { waffle, ethers } = hardhat;
 const { provider } = waffle;
@@ -31,7 +28,7 @@ import { create2Contract } from "../create2Contract";
 
 const DEPLOYER_CONTRACT_ADDRESS  = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
 const SOLACE_ADDRESS             = "0x501acE9c35E60f03A2af4d484f49F9B1EFde9f40";
-const GOVERNOR_ADDRESS           = ""
+const GOVERNOR_ADDRESS           = "0xc47911f768c6fE3a9fe076B95e93a33Ed45B7B34"; // Core multisig
 const TOKEN_VESTING_ADDRESS      = "";
 
 const VESTING_START = 1638209176;
@@ -94,7 +91,8 @@ let networkSettings: any;
 async function main() {
   artifacts = await import_artifacts();
   signerAddress = await deployer.getAddress();
-  console.log(`Using ${signerAddress} as deployer and governor`);
+  console.log(`Using ${signerAddress} as deployer`);
+  console.log(`Using ${GOVERNOR_ADDRESS} as governor`);
 
   let chainID = (await provider.getNetwork()).chainId;
   networkSettings = getNetworkSettings(chainID);
@@ -116,7 +114,7 @@ async function deployTokenVesting() {
     tokenVesting = (await ethers.getContractAt(artifacts.TokenVesting.abi, TOKEN_VESTING_ADDRESS)) as TokenVesting;
   } else {
     console.log("Deploying TokenVesting");
-    const res = await create2Contract(deployer, artifacts.TokenVesting, [signerAddress, SOLACE_ADDRESS, VESTING_START], {}, "", DEPLOYER_CONTRACT_ADDRESS);
+    const res = await create2Contract(deployer, artifacts.TokenVesting, [GOVERNOR_ADDRESS, SOLACE_ADDRESS, VESTING_START], {}, "", DEPLOYER_CONTRACT_ADDRESS);
     tokenVesting = (await ethers.getContractAt(artifacts.TokenVesting.abi, res.address)) as unknown as TokenVesting;
     console.log(`Deployed TokenVesting to ${tokenVesting.address}`);
   }
