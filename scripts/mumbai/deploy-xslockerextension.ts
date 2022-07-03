@@ -1,15 +1,13 @@
-// deploys MerkleDistributor
+// deploys XsLockerExtension
 
 // Requires following fields in .env
 // MUMBAI_URL
 // MUMBAI_ACCOUNTS
+// POLYGONSCAN_API_KEY
+
 // PRIVATE_KEYS
 // RINKEBY_ACCOUNTS
 // RINKEBY_ALCHEMY_KEY
-// POLYGONSCAN_API_KEY
-
-// Verify command
-// npx hardhat verify --network mumbai 0x501ACeEEa805D0D43AE54577ED4E7dCbDA169675 "0x501acE9c35E60f03A2af4d484f49F9B1EFde9f40" "0xa3355b0ea435593f559c0e6e51a16e374bd801ce86911543fa6b09161ad0235c" "0xC32e0d89e25222ABb4d2d68755baBF5aA6648F15"
 
 import hardhat from "hardhat";
 const { waffle, ethers } = hardhat;
@@ -32,8 +30,6 @@ const SOLACE_ADDRESS             = "0x501acE9c35E60f03A2af4d484f49F9B1EFde9f40";
 const XSLOCKER_ADDRESS           = "0x501Ace47c5b0C2099C4464f681c3fa2ECD3146C1";
 const XSLOCKEREXTENSION_ADDRESS  = "0x501Ace88C8FDB3209B7D95849b8908124e167374"
 const MAX_UINT256 = BN.from("115792089237316195423570985008687907853269984665640564039457584007913129639935")
-
-const ONE = BN.from("1")
 
 let artifacts: ArtifactImports;
 let xsLockerExtension: XsLockerExtension;
