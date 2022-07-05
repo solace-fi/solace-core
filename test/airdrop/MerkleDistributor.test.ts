@@ -25,7 +25,7 @@ describe("MerkleDistributor", function() {
   // vars
   const ZERO = BN.from("0")
   const TEN_ETHER = BN.from("10000000000000000000");
-  const merkleRoot = "0xa3355b0ea435593f559c0e6e51a16e374bd801ce86911543fa6b09161ad0235c"
+  const merkleRoot = "0xa0e21b0d305e9aed051db3078ce4169f8a06bfef37164220a51ade06ce18ce3f"
   const TOTAL_AIRDROP_AMOUNT = parseUnits("10000000", 18) // 10M SOLACE
 
   // vars to setup later
@@ -100,31 +100,7 @@ describe("MerkleDistributor", function() {
     });
   });
 
-  describe("claim", function() {
-    before(async () => {
-      // user = "0x010efb04880aacf3121f6822b18034e15F3F10Be"
-      user = "0x725087B23bAB9796Fc8ec57911C413bfdd8B65c1"
-
-      merkleProof = 
-      ["0x49c53860ba715801200baa5be1730ed47f38dd5445eff6d9979552e104921efe","0x454a584d8e07f73dcebf55ecc45200a63ee438496e040e02727a924a58c23638","0x76ebe3d4ad75076c56ff37981ccf8f553ab43a07a7571fab343f780252b5ed03","0x94dac03d37aa2f75979c5226f00d59a48ac423784a62ffe0c9c556184cfc6363","0x44780d2553d5f6185a140b2878fb2ffc0988c92ddd2a7b4b880ea4d6f774872e","0x001d7124307016a08c37688604c6413a16625a3b4c0ca6183b8b3b8ee439dfa2","0x3b06eeef9272f30bc125684585da5680e9d792458e5f940e776818f5471aef2a","0x8a23b7cc2b7aa220912a4e2e760135ca85aeaf8398e405d7aaba49dc5d600ff4","0xd2435ed88aa123e48d4727f8ae3e5150843b34ca26fb7c6a162bce17c2c16457","0xb7b00b2962586d3f625b8f31adeb8260d594cf2b59429d54e905c69366f25552"]
-
-      // merkleProof = [
-      //   "0xc238951c433954f175a5d00c10d84a972bd182f9ac7c180f32f42fd4b4d43bf3",
-      //   "0xc46854fb6780ce31d965b96ecd0dab17f8ac637b66ddd6a1d69d4ceaa35975c4",
-      //   "0xd36525631174b0a4885377704d9420b6f190a297bfdaaafb29568672bed570f2",
-      //   "0xe82ef4aecf940e7be8171ba16a6dfb22724ac150ba887f0fbcaf05a14bc6d058",
-      //   "0x130aea82795b60e859c20aaa8b6ec8d557a530df15ade20e4df5cabeb12c46ac",
-      //   "0x001d7124307016a08c37688604c6413a16625a3b4c0ca6183b8b3b8ee439dfa2",
-      //   "0x3b06eeef9272f30bc125684585da5680e9d792458e5f940e776818f5471aef2a",
-      //   "0x8a23b7cc2b7aa220912a4e2e760135ca85aeaf8398e405d7aaba49dc5d600ff4",
-      //   "0xd2435ed88aa123e48d4727f8ae3e5150843b34ca26fb7c6a162bce17c2c16457",
-      //   "0xb7b00b2962586d3f625b8f31adeb8260d594cf2b59429d54e905c69366f25552"
-      // ]
-
-      amount = BN.from("1213570000000000000000")
-      // amount = BN.from("1181910000000000000000")
-    });
-
+  describe("claim 1", function() {
     it("throws on invalid claim", async function() {
       invalidMerkleProof = [
         '0xaffe48dd3bc622b18c95fef7f420a850319d9215dbb369344a4282c4b76e8c4d',
@@ -142,7 +118,46 @@ describe("MerkleDistributor", function() {
       await expect(merkleDistributor.connect(greedy_anon).claim(greedy_anon.address, TOTAL_AIRDROP_AMOUNT, invalidMerkleProof)).to.be.revertedWith("NotInMerkle");
     });
 
-    it("successfully claims", async function() {      
+    it("successfully claims 1", async function() {      
+      user = "0x8b29b22b67964074648A5639BB7e8E31D2493a29"
+
+      merkleProof = 
+      ["0x8e7862cf40f0f01ac31812f9ee82a237ea539b773c40bec67303998846bbc590","0x3e847cf59026f7f00ce5b5c98470f04aaaeec22781f6685792b1bad208eb1d11","0x100eb0e4fe6d27f442c3fc70c58aa12360342bd8704c17dbd376e29e582fc1f0","0x13b05fc361a92a4a795d8caaa016c01461cbae9bf74789fd0e24158d245af400","0xd69a6f82543b2ca71e9233b7f89b8ba1845f5de238311dd371cdd57a0e228b50","0x007849af804a1201739aafa3909c269937c49c7c6766e292175c531c6a5bc490","0x8de9048d658948c6776c09c9b00b3ce29f020ba29c52499967eec6e2e137c2b0","0x0b594c41b110c89e7d511d936a8bec00113c2b120b34aa8250cf21c4d126a297","0x4e71c1998bc2d97e4f93b9da4b4910dbaed2c4a6eae66f8a2a9e378b4877e91b","0x6f0c012ca2ff066eba0743ed917e6894c04a39488881076a65d7b3ac47bac27e"]
+
+      amount = BN.from("543630000000000000000")
+
+      // Test that anyone can call airdrop claim on behalf of airdrop recipient
+      // However the airdrop recipient will receive the airdrop, and NOT the claim() caller
+      tx = await merkleDistributor.connect(greedy_anon).claim(user, amount, merkleProof);
+      expect(await solace.balanceOf(user)).eq(amount)
+      expect(await solace.balanceOf(greedy_anon.address)).eq(ZERO)
+      await expect(tx).to.emit(merkleDistributor, "Claimed").withArgs(user, amount);
+    });
+
+    it("successfully claims 2", async function() {      
+      user = "0x6924797FcC5B505cc1C3E2A6FB8ca21f9f0f8816"
+
+      merkleProof = 
+      ["0x73c685ea611c5306824dbfaef821e3d6ed323fc9753f2afa2a131ea75eb8e6f6","0x266718bfd215263d51bb036114728bbd0024119ec0d56ef9ada0e8af44b430f1","0x6ccbdb7dc37a5842e5823bb73913ce7acb0e9eba31a0dce57c4a59ede875ffaa","0x0cbd495394ab5781b0b39f3b0c33c87ffcac2151e8a5187918817a65ab86e938","0xd69a6f82543b2ca71e9233b7f89b8ba1845f5de238311dd371cdd57a0e228b50","0x007849af804a1201739aafa3909c269937c49c7c6766e292175c531c6a5bc490","0x8de9048d658948c6776c09c9b00b3ce29f020ba29c52499967eec6e2e137c2b0","0x0b594c41b110c89e7d511d936a8bec00113c2b120b34aa8250cf21c4d126a297","0x4e71c1998bc2d97e4f93b9da4b4910dbaed2c4a6eae66f8a2a9e378b4877e91b","0x6f0c012ca2ff066eba0743ed917e6894c04a39488881076a65d7b3ac47bac27e"]
+
+      amount = BN.from("555770000000000000000")
+
+      // Test that anyone can call airdrop claim on behalf of airdrop recipient
+      // However the airdrop recipient will receive the airdrop, and NOT the claim() caller
+      tx = await merkleDistributor.connect(greedy_anon).claim(user, amount, merkleProof);
+      expect(await solace.balanceOf(user)).eq(amount)
+      expect(await solace.balanceOf(greedy_anon.address)).eq(ZERO)
+      await expect(tx).to.emit(merkleDistributor, "Claimed").withArgs(user, amount);
+    });
+
+    it("successfully claims 3", async function() {      
+      user = "0x1770008fA8920411D9502103528A04A911B3dE22"
+
+      merkleProof = 
+      ["0x6c05d8ac5932b1f31558ffa8da37d2c73a14b08dcf2c0591811b9a8fbf6e9e57","0xe88c2387d44d6e2817b62ac9ba6a2c50b600d92c862974561ae6fff5790296ec","0x4af01ea661e3d60393475e78e7e5260bde6eef4d7a0fc0eb91708e16237de401","0xc3359f899aa0c8b03f0b9e94506d0a36328b3e2093184bce2020cffb4a7eadda","0xe617b5b875d691cadae14d7c0d3faf554ea68a4154b41ce9d87bae95a65341ea","0xfcd86764a621574ee0d5d671aa783a667943631f54f7ec5c63607610bace0de0","0x1cfd80c0b9253e38dae6b60cdad79434670c8806d6ba5830772bc6b96aa9c744","0x28dab22c07a577d9908929cfe6d649d5928a5b19fd68d444fdcdac67576ba89a","0x4e71c1998bc2d97e4f93b9da4b4910dbaed2c4a6eae66f8a2a9e378b4877e91b","0x6f0c012ca2ff066eba0743ed917e6894c04a39488881076a65d7b3ac47bac27e"]
+
+      amount = BN.from("1655590000000000000000")
+
       // Test that anyone can call airdrop claim on behalf of airdrop recipient
       // However the airdrop recipient will receive the airdrop, and NOT the claim() caller
       tx = await merkleDistributor.connect(greedy_anon).claim(user, amount, merkleProof);
