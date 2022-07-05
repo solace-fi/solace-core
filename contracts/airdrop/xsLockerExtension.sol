@@ -6,7 +6,6 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./../interfaces/staking/IxsLocker.sol";
 import "./../interfaces/airdrop/IxsLockerExtension.sol";
-import "./../utils/Governable.sol";
 
 /**
  * @title xsLockerExtension
@@ -14,7 +13,7 @@ import "./../utils/Governable.sol";
  * @notice A utility contract to distribute [**SOLACE**](./../SOLACE) to multiple [**xslocks**](./../staking/xsLocker).
  */
 // solhint-disable-next-line contract-name-camelcase
-contract xsLockerExtension is IxsLockerExtension, ReentrancyGuard, Governable {
+contract xsLockerExtension is IxsLockerExtension, ReentrancyGuard {
 
     /// @notice [**SOLACE**](./../SOLACE) token.
     address public immutable solace;
@@ -23,13 +22,10 @@ contract xsLockerExtension is IxsLockerExtension, ReentrancyGuard, Governable {
     address public immutable xslocker;
 
     /**
-     * @param governance_ The address of the [governor](/docs/protocol/governance).
      * @param solace_ Address of [**SOLACE**](./../SOLACE).
      * @param xslocker_ Address of [**xsLocker**](./../staking/xsLocker).
      */
-    constructor(address governance_, address solace_, address xslocker_)
-        Governable(governance_)
-    {
+    constructor(address solace_, address xslocker_) {
         require(solace_ != address(0x0), "zero address solace");
         require(xslocker_ != address(0x0), "zero address xslocker");
         solace = solace_;

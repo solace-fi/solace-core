@@ -45,17 +45,14 @@ describe("xsLockerExtension", function () {
   });
 
   describe("deployment", function () {
-    it("reverts if zero governance", async function () {
-      await expect(deployContract(deployer, artifacts.xsLockerExtension, [ZERO_ADDRESS, solace.address, xslocker.address])).to.be.revertedWith("zero address governance");
-    });
     it("reverts if zero solace", async function () {
-      await expect(deployContract(deployer, artifacts.xsLockerExtension, [governor.address, ZERO_ADDRESS, xslocker.address])).to.be.revertedWith("zero address solace");
+      await expect(deployContract(deployer, artifacts.xsLockerExtension, [ZERO_ADDRESS, xslocker.address])).to.be.revertedWith("zero address solace");
     });
     it("reverts if zero xslocker", async function () {
-      await expect(deployContract(deployer, artifacts.xsLockerExtension, [governor.address, solace.address, ZERO_ADDRESS])).to.be.revertedWith("zero address xslocker");
+      await expect(deployContract(deployer, artifacts.xsLockerExtension, [solace.address, ZERO_ADDRESS])).to.be.revertedWith("zero address xslocker");
     });
     it("deploys", async function () {
-      xslockerextension = (await deployContract(deployer, artifacts.xsLockerExtension, [governor.address, solace.address, xslocker.address])) as XsLockerExtension;
+      xslockerextension = (await deployContract(deployer, artifacts.xsLockerExtension, [solace.address, xslocker.address])) as XsLockerExtension;
       await expectDeployed(xslockerextension.address);
     });
     it("initializes properly", async function () {
