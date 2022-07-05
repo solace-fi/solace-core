@@ -85,12 +85,18 @@ describe("xsLockerExtension", function () {
     it("cannot provide mismatched array lengths", async function () {
       await expect(xslockerextension.connect(user1).increaseAmountMultiple([1], [1, 1])).to.be.revertedWith("array length mismatch");
     });
-    it("cannot deposit to non existent lock", async function () {
-      await solace.connect(user1).approve(xslockerextension.address, ONE_ETHER.mul(100));
-      await expect(xslockerextension.connect(user1).increaseAmountMultiple([999], [1])).to.be.revertedWith("query for nonexistent token");
-    });
-    it("can deposit", async function () {
+    it("will single refund for non-existent lock", async function () {
       const balance = await solace.balanceOf(user1.address)
+      await solace.connect(user1).approve(xslockerextension.address, ONE_ETHER.mul(100));
+      let tx = await xslockerextension.connect(user1).increaseAmountMultiple([999], [1])
+      await expect(tx).to.emit(xslockerextension, "SolaceNotDistributed").withArgs(999, 1);
+      await expect(tx).to.emit(xslockerextension, "SolaceRefunded").withArgs(1);
+      // Balance should not change
+      expect(balance).eq(await solace.balanceOf(user1.address))
+    });
+    it("will process multiple deposits", async function () {
+      const INITIAL_USER1_BALANCE = await solace.balanceOf(user1.address)
+      const INITIAL_XSLOCKER_BALANCE = await solace.balanceOf(xslocker.address)
       const AMOUNT1 = ONE_ETHER;
       const AMOUNT2 = ONE_ETHER.mul(2);
       const AMOUNT3 = ONE_ETHER.mul(3);
@@ -99,6 +105,11 @@ describe("xsLockerExtension", function () {
       let lock1 = await xslocker.locks(1)
       let lock2 = await xslocker.locks(2)
       let lock3 = await xslocker.locks(3)
+
+      await expect(tx).to.emit(xslockerextension, "SolaceDistributed").withArgs(1, AMOUNT1);
+      await expect(tx).to.emit(xslockerextension, "SolaceDistributed").withArgs(2, AMOUNT2);
+      await expect(tx).to.emit(xslockerextension, "SolaceDistributed").withArgs(3, AMOUNT3);
+
       await expect(tx).to.emit(xslocker, "LockUpdated").withArgs(1, lock1.amount, lock1.end);
       await expect(tx).to.emit(xslocker, "LockUpdated").withArgs(2, lock2.amount, lock2.end);
       await expect(tx).to.emit(xslocker, "LockUpdated").withArgs(3, lock3.amount, lock3.end);
@@ -107,8 +118,38 @@ describe("xsLockerExtension", function () {
       await expect(tx).to.emit(solace, "Transfer").withArgs(xslockerextension.address, xslocker.address, AMOUNT2);
       await expect(tx).to.emit(solace, "Transfer").withArgs(xslockerextension.address, xslocker.address, AMOUNT3);
 
-      expect (await solace.balanceOf(user1.address)).eq(balance.sub(AMOUNT1).sub(AMOUNT2).sub(AMOUNT3))
+      expect (await solace.balanceOf(user1.address)).eq(INITIAL_USER1_BALANCE.sub(AMOUNT1).sub(AMOUNT2).sub(AMOUNT3))
+      expect (await solace.balanceOf(xslocker.address)).eq((AMOUNT1).add(AMOUNT2).add(AMOUNT3).add(INITIAL_XSLOCKER_BALANCE))
     });
+    it("will properly process multiple deposits and multiple refunds", async function () {
+      const INITIAL_USER1_BALANCE = await solace.balanceOf(user1.address)
+      const INITIAL_XSLOCKER_BALANCE = await solace.balanceOf(xslocker.address)
+      const AMOUNT1 = ONE_ETHER;
+      const AMOUNT2 = ONE_ETHER.mul(2);
+      const AMOUNT3 = ONE_ETHER.mul(3);
+      const AMOUNT4 = ONE_ETHER.mul(4);
+
+      let tx = await xslockerextension.connect(user1).increaseAmountMultiple([1, 900, 3, 300], [AMOUNT1, AMOUNT2, AMOUNT3, AMOUNT4]);
+      let lock1 = await xslocker.locks(1)
+      let lock3 = await xslocker.locks(3)
+
+      await expect(tx).to.emit(xslockerextension, "SolaceDistributed").withArgs(1, AMOUNT1);
+      await expect(tx).to.emit(xslockerextension, "SolaceDistributed").withArgs(3, AMOUNT3);
+
+      await expect(tx).to.emit(xslockerextension, "SolaceNotDistributed").withArgs(900, AMOUNT2);
+      await expect(tx).to.emit(xslockerextension, "SolaceNotDistributed").withArgs(300, AMOUNT4);
+
+      await expect(tx).to.emit(xslocker, "LockUpdated").withArgs(1, lock1.amount, lock1.end);
+      await expect(tx).to.emit(xslocker, "LockUpdated").withArgs(3, lock3.amount, lock3.end);
+
+      await expect(tx).to.emit(solace, "Transfer").withArgs(xslockerextension.address, xslocker.address, AMOUNT1);
+      await expect(tx).to.emit(solace, "Transfer").withArgs(xslockerextension.address, xslocker.address, AMOUNT3);
+
+      await expect(tx).to.emit(xslockerextension, "SolaceRefunded").withArgs(AMOUNT2.add(AMOUNT4));
+
+      expect (await solace.balanceOf(user1.address)).eq(INITIAL_USER1_BALANCE.sub(AMOUNT1).sub(AMOUNT3))
+      expect (await solace.balanceOf(xslocker.address)).eq((AMOUNT1).add(AMOUNT3).add(INITIAL_XSLOCKER_BALANCE))
+    })
   });
 
 });

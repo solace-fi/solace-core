@@ -42,10 +42,12 @@ contract xsLockerExtension is IxsLockerExtension, ReentrancyGuard {
     function increaseAmountMultiple(uint256[] calldata xsLockIDs, uint256[] calldata amounts) external override nonReentrant {
         require (xsLockIDs.length == amounts.length, "array length mismatch");
 
-        // xsLocker.increaseAmount called transferFrom with `from` = msg.sender
-        // In this context msg.sender = xsLockerExtension.sol contract
+        // xsLocker.increaseAmount calls transferFrom with `from` = msg.sender
+        // Within context of increaseAmountMultiple() call to xsLocker.increaseAmount
+        // msg.sender = xsLockerExtension.sol contract
         // So need to first transfer SOLACE from caller to this contract.
         uint256 totalAmount = 0;
+        uint256 refundAmount = 0;
 
         for (uint256 i = 0; i < amounts.length; i++) {
             totalAmount += amounts[i];
@@ -54,7 +56,17 @@ contract xsLockerExtension is IxsLockerExtension, ReentrancyGuard {
         SafeERC20.safeTransferFrom(IERC20(solace), msg.sender, address(this), totalAmount);
 
         for (uint256 i = 0; i < xsLockIDs.length; i++) {
-            IxsLocker(xslocker).increaseAmount(xsLockIDs[i], amounts[i]);
+            // Guard against revert for non-existing lockIDs
+            if ( IxsLocker(xslocker).exists(xsLockIDs[i]) ) {
+                IxsLocker(xslocker).increaseAmount(xsLockIDs[i], amounts[i]);
+                emit SolaceDistributed(xsLockIDs[i], amounts[i]);
+            } else {
+                refundAmount += amounts[i];
+                emit SolaceNotDistributed(xsLockIDs[i], amounts[i]);
+            }
         }
+
+        SafeERC20.safeTransfer(IERC20(solace), msg.sender, refundAmount);
+        emit SolaceRefunded(refundAmount);
     }
 }

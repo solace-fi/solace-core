@@ -8,6 +8,15 @@ pragma solidity 0.8.6;
  */
 interface IxsLockerExtension {
 
+    /// @notice Emitted when xsLockID does exist, and hence [**SOLACE**](./../../SOLACE) is distributed to an [**xslocks**](./../../staking/xsLocker)
+    event SolaceDistributed(uint256 indexed xsLockID, uint256 indexed amount);
+
+    /// @notice Emitted when xsLockID does not exist, and hence [**SOLACE**](./../../SOLACE) is not distributed
+    event SolaceNotDistributed(uint256 indexed xsLockID, uint256 indexed amount);
+
+    /// @notice Emitted when [**SOLACE**](./../../SOLACE) is refunded to msg.sender
+    event SolaceRefunded(uint256 indexed refundAmount);  
+
     /**
      * @notice Deposit [**SOLACE**](./../../SOLACE) to increase the value of multiple existing locks.
      * @dev [**SOLACE**](./../../SOLACE) is transferred from msg.sender, assumes its already approved.
