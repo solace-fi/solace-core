@@ -61,6 +61,7 @@ describe("xsLockerExtension", function () {
     it("initializes properly", async function () {
       expect(await xslockerextension.solace()).eq(solace.address);
       expect(await xslockerextension.xslocker()).eq(xslocker.address);
+      expect(await solace.allowance(xslockerextension.address, xslocker.address)).eq(constants.MaxUint256);
     });
   });
 
