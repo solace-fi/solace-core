@@ -100,12 +100,12 @@ async function distributeLocks() {
     ]
     
     const amounts = [
-      parseUnits("29278.71"),
-      parseUnits("247835.57"),
-      parseUnits("9665.32"),
-      parseUnits("196247.35"),
-      parseUnits("159589.09"),
-      parseUnits("1540.70")
+      parseUnits("14639.36"),
+      parseUnits("123917.78"),
+      parseUnits("4832.66"),
+      parseUnits("98123.68"),
+      parseUnits("79794.55"),
+      parseUnits("770.35")
     ]
     
     let tx = await xsLockerExtension.connect(deployer).increaseAmountMultiple(xsLocks, amounts, networkSettings.overrides);
