@@ -28,7 +28,8 @@ import { create2Contract } from "../create2Contract";
 
 const DEPLOYER_CONTRACT_ADDRESS  = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
 const SOLACE_ADDRESS             = "0x501acE9c35E60f03A2af4d484f49F9B1EFde9f40";
-const TOKEN_VESTING_ADDRESS      = "0x501AcE25DE6c10D2d8aF113346465B0365bf4c0D";
+const GOVERNOR_ADDRESS           = "0xAc582Fa78EA8e3be61F4A7B7AD52Dfaa910212a6"; // contract governance multisig
+const TOKEN_VESTING_ADDRESS      = "0x501AcE9BDba2c218B827B410eDd6D56fd1b2564F";
 
 const VESTING_START = 1638209176;
 // Unix timestamp for initial SOLACE add liquidity transaction - https://etherscan.io/tx/0x71f1de15ee75f414c454aec3612433d0123e44ec5987515fc3566795cd840bc3
@@ -90,7 +91,8 @@ let networkSettings: any;
 async function main() {
   artifacts = await import_artifacts();
   signerAddress = await deployer.getAddress();
-  console.log(`Using ${signerAddress} as deployer and governor`);
+  console.log(`Using ${signerAddress} as deployer`);
+  console.log(`Using ${GOVERNOR_ADDRESS} as governor`);
 
   let chainID = (await provider.getNetwork()).chainId;
   networkSettings = getNetworkSettings(chainID);
@@ -112,7 +114,7 @@ async function deployTokenVesting() {
     tokenVesting = (await ethers.getContractAt(artifacts.TokenVesting.abi, TOKEN_VESTING_ADDRESS)) as TokenVesting;
   } else {
     console.log("Deploying TokenVesting");
-    const res = await create2Contract(deployer, artifacts.TokenVesting, [signerAddress, SOLACE_ADDRESS, VESTING_START], {}, "", DEPLOYER_CONTRACT_ADDRESS);
+    const res = await create2Contract(deployer, artifacts.TokenVesting, [GOVERNOR_ADDRESS, SOLACE_ADDRESS, VESTING_START], {}, "", DEPLOYER_CONTRACT_ADDRESS);
     tokenVesting = (await ethers.getContractAt(artifacts.TokenVesting.abi, res.address)) as unknown as TokenVesting;
     console.log(`Deployed TokenVesting to ${tokenVesting.address}`);
   }
