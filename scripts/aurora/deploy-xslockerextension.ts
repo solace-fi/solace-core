@@ -29,11 +29,12 @@ import { XsLockerExtension, Solace } from "../../typechain";
 import { expectDeployed, isDeployed } from "../../test/utilities/expectDeployed";
 import { getNetworkSettings } from "../getNetworkSettings";
 import { create2Contract } from "../create2Contract";
+import { formatUnits } from "ethers/lib/utils";
 
 const DEPLOYER_CONTRACT_ADDRESS  = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
 const SOLACE_ADDRESS             = "0x501acE9c35E60f03A2af4d484f49F9B1EFde9f40";
 const XSLOCKER_ADDRESS           = "0x501Ace47c5b0C2099C4464f681c3fa2ECD3146C1";
-const XSLOCKEREXTENSION_ADDRESS  = ""
+const XSLOCKEREXTENSION_ADDRESS  = "0x501acEe72CA9E72F1b71C846f6A520680EFA3919";
 const MAX_UINT256 = BN.from("115792089237316195423570985008687907853269984665640564039457584007913129639935")
 
 let artifacts: ArtifactImports;
@@ -104,7 +105,7 @@ async function distributeLocks() {
       238,
       245
     ]
-    
+
     const amounts = [
       parseUnits("35767.31"),
       parseUnits("23080.20"),
@@ -120,7 +121,12 @@ async function distributeLocks() {
       parseUnits("834.73"),
       parseUnits("236146.97")
     ]
-    
+    let sum = BN.from(0);
+    for(var i = 0; i < amounts.length; ++i) {
+      sum = sum.add(amounts[i]);
+    }
+    console.log(`Total amount of SOLACE to distribute: ${formatUnits(sum)} ${sum.toString()}`)
+
     let tx = await xsLockerExtension.connect(deployer).increaseAmountMultiple(xsLocks, amounts, networkSettings.overrides);
     await tx.wait(networkSettings.confirmations);
 }
