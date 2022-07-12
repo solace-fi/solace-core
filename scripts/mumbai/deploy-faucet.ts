@@ -6,20 +6,19 @@ const { provider } = waffle;
 const BN = ethers.BigNumber;
 import { config as dotenv_config } from "dotenv";
 dotenv_config();
-const deployer = new ethers.Wallet(JSON.parse(process.env.RINKEBY_ACCOUNTS || '[]')[0], provider);
+const deployer = new ethers.Wallet(JSON.parse(process.env.PRIVATE_KEYS || '[]')[0], provider);
 
 import { create2Contract } from "./../create2Contract";
 
 import { logContractAddress } from "./../utils";
 
 import { import_artifacts, ArtifactImports } from "./../../test/utilities/artifact_importer";
-import { Deployer, Solace, Faucet } from "../../typechain";
-import { BytesLike, constants } from "ethers";
+import { Solace, Faucet } from "../../typechain";
 import { deployContract } from "ethereum-waffle";
 import { expectDeployed, isDeployed } from "../../test/utilities/expectDeployed";
 import { getNetworkSettings } from "../getNetworkSettings";
 
-const DEPLOYER_CONTRACT_ADDRESS    = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
+const DEPLOYER_CONTRACT_ADDRESS     = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
 const SOLACE_ADDRESS                = "0x501acE9c35E60f03A2af4d484f49F9B1EFde9f40";
 const FAUCET_ADDRESS                = "0x501ACe0742B45fbE2ac422301b55C261b4DEc11F";
 
@@ -30,11 +29,11 @@ const WBTC_ADDRESS                  = "0x1063bf969F8D3D7296a2A94274D3df9202da2A3
 const USDT_ADDRESS                  = "0xAEA2B0F4763c8Ffc33A4c454CD08F803B02B6B53";
 const SCP_ADDRESS                   = "0x501AcEe83a6f269B77c167c6701843D454E2EFA0";
 const FRAX_ADDRESS                  = "0x58B23b32a9774153E1E344762751aDfdca2764DD";
+const MAI_ADDRESS                   = "0x5e8200F06Ed6B7bBC10f905b40D38eE453366a0B";
 
 const ONE_ETHER = BN.from("1000000000000000000");
 
 let artifacts: ArtifactImports;
-let deployerContract: Deployer;
 
 let solace: Solace;
 let faucet: Faucet;
@@ -53,7 +52,6 @@ async function main() {
   if(!networkSettings.isTestnet) throw("Do not deploy the faucet on production networks");
   await expectDeployed(DEPLOYER_CONTRACT_ADDRESS);
   await expectDeployed(SOLACE_ADDRESS);
-  deployerContract = (await ethers.getContractAt(artifacts.Deployer.abi, DEPLOYER_CONTRACT_ADDRESS)) as Deployer;
   solace = (await ethers.getContractAt(artifacts.SOLACE.abi, SOLACE_ADDRESS)) as Solace;
 
   //await deployTestnetTokens();
@@ -68,7 +66,7 @@ async function deployFaucet() {
     faucet = (await ethers.getContractAt(artifacts.Faucet.abi, FAUCET_ADDRESS)) as Faucet;
   } else {
     console.log("Deploying Faucet");
-    var res = await create2Contract(deployer, artifacts.Faucet, [solace.address], {}, "", deployerContract.address);
+    var res = await create2Contract(deployer, artifacts.Faucet, [solace.address], {}, "", DEPLOYER_CONTRACT_ADDRESS);
     faucet = (await ethers.getContractAt(artifacts.Faucet.abi, res.address)) as Faucet;
     console.log(`Deployed Faucet to ${faucet.address}`);
   }
@@ -91,6 +89,7 @@ async function deployTestnetTokens() {
     {name: "Wrapped Bitcoin", symbol: "WBTC", supply: BN.from("1000000000"), decimals: 8, permit: false},
     {name: "USD Token", symbol: "USDT", supply: BN.from("1000000000"), decimals: 6, permit: false},
     {name: "Frax", symbol: "FRAX", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
+    {name: "miMATIC", symbol: "miMATIC", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
   ];
   for(var i = 0; i < tokens.length; ++i) {
     let token = tokens[i];
@@ -121,6 +120,7 @@ async function mintTestnetTokens() {
     {name: "Wrapped Bitcoin", symbol: "WBTC", supply: BN.from("1000000000"), decimals: 8, permit: false, address: WBTC_ADDRESS},
     {name: "USD Token", symbol: "USDT", supply: BN.from("1000000000"), decimals: 6, permit: false, address: USDT_ADDRESS},
     {name: "Frax", symbol: "FRAX", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false, address: FRAX_ADDRESS},
+    {name: "miMATIC", symbol: "miMATIC", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false, address: MAI_ADDRESS},
   ];
   let recipients = [signerAddress];
   for(var j = 0; j < recipients.length; ++j) {

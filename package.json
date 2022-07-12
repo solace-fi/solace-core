@@ -42,6 +42,7 @@
     "@openzeppelin/hardhat-upgrades": "^1.13.0",
     "@uniswap/v3-core": "^1.0.0",
     "@uniswap/v3-periphery": "^1.1.1",
+    "axios": "^0.27.2",
     "dotenv": "^10.0.0"
   }
 }

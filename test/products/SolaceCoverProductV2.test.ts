@@ -20,13 +20,13 @@ const DOMAIN_NAME = "Solace.fi-SolaceCoverProductV2";
 const VERSION = "2";
 
 let forkNetwork = process.env.FORK_NETWORK || "";
-let supportedNetworks = ["mainnet","polygon"];
+let supportedNetworks = ["ethereum","polygon"];
 
 describe("SolaceCoverProductV2", function() {
   if(!supportedNetworks.includes(forkNetwork)) {
     it(`can only be tested when forking one of ${supportedNetworks.join(',')}`, async function() {
       console.log(`SolaceCoverProductV2 can only be tested when forking one of ${supportedNetworks.join(',')}`);
-      console.log("set `FORK_NETWORK=mainnet` in .env");
+      console.log("set `FORK_NETWORK=ethereum` in .env");
       expect(true, `SolaceCoverProductV2 can only be tested when forking one of ${supportedNetworks.join(',')}`).to.be.false;
     });
   } else {
@@ -65,17 +65,17 @@ describe("SolaceCoverProductV2", function() {
     const REFERRAL_THRESHOLD = ONE_ETH.mul(100) // 100 FRAX
 
     const CHAINS = {
-      MAINNET: 1,
+      ETHEREUM: 1,
       POLYGON: 137
     };
-    const CHAIN_IDS = [CHAINS.MAINNET, CHAINS.POLYGON]
+    const CHAIN_IDS = [CHAINS.ETHEREUM, CHAINS.POLYGON]
     const ASSET_NAME = "frax"
 
     // Random 130 character hex string
     const FAKE_REFERRAL_CODE = "0xe4e7cba021ff6b83b14d54016198f31b04cba044d71d9a8b9bdf964aa2259cc3b207237f814aa56e516638b448edc43a6c3f4637dca5de54cb199e37b039a832e7"
 
     const FRAX_ADDRESSES: {[network: string] : string} = {
-      "mainnet": "0x853d955aCEf822Db058eb8505911ED77F175b99e",
+      "ethereum": "0x853d955aCEf822Db058eb8505911ED77F175b99e",
       "polygon": "0x45c32fA6DF82ead1e2EF74d17b76547EDdFaFF89"
     };
     const USDC_ADDRESS = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
@@ -196,7 +196,7 @@ describe("SolaceCoverProductV2", function() {
 
     describe("supported chains", function () {
       it("starts with no supported chains", async function () {
-        expect(await solaceCoverProduct.isSupportedChain(CHAINS.MAINNET)).to.be.false;
+        expect(await solaceCoverProduct.isSupportedChain(CHAINS.ETHEREUM)).to.be.false;
         expect(await solaceCoverProduct.isSupportedChain(CHAINS.POLYGON)).to.be.false;
         expect(await solaceCoverProduct.numSupportedChains()).eq(0);
         await expect(solaceCoverProduct.getChain(0)).to.be.reverted;
@@ -209,7 +209,7 @@ describe("SolaceCoverProductV2", function() {
         await expect(tx).to.emit(solaceCoverProduct, "SupportedChainSet").withArgs(1);
         await expect(tx).to.emit(solaceCoverProduct, "SupportedChainSet").withArgs(2);
         await expect(tx).to.emit(solaceCoverProduct, "SupportedChainSet").withArgs(137);
-        expect(await solaceCoverProduct.isSupportedChain(CHAINS.MAINNET)).to.be.true;
+        expect(await solaceCoverProduct.isSupportedChain(CHAINS.ETHEREUM)).to.be.true;
         expect(await solaceCoverProduct.isSupportedChain(CHAINS.POLYGON)).to.be.true;
         expect(await solaceCoverProduct.isSupportedChain(2)).to.be.true;
         expect(await solaceCoverProduct.numSupportedChains()).eq(3);
@@ -224,7 +224,7 @@ describe("SolaceCoverProductV2", function() {
       it("governance can remove chains", async function () {
         let tx = await solaceCoverProduct.connect(governor).removeSupportedChain(2);
         await expect(tx).to.emit(solaceCoverProduct, "SupportedChainRemoved").withArgs(2);
-        expect(await solaceCoverProduct.isSupportedChain(CHAINS.MAINNET)).to.be.true;
+        expect(await solaceCoverProduct.isSupportedChain(CHAINS.ETHEREUM)).to.be.true;
         expect(await solaceCoverProduct.isSupportedChain(CHAINS.POLYGON)).to.be.true;
         expect(await solaceCoverProduct.isSupportedChain(2)).to.be.false;
         expect(await solaceCoverProduct.numSupportedChains()).eq(2);
@@ -532,7 +532,7 @@ describe("SolaceCoverProductV2", function() {
       });
 
       it("cannot activate policy when zero address policy holder is provided", async () => {
-        await expect(solaceCoverProduct.connect(policyholder1).activatePolicy(ZERO_ADDRESS, INITIAL_COVER_LIMIT, INITIAL_DEPOSIT, [], [CHAINS.MAINNET])).to.revertedWith("zero address policyholder");
+        await expect(solaceCoverProduct.connect(policyholder1).activatePolicy(ZERO_ADDRESS, INITIAL_COVER_LIMIT, INITIAL_DEPOSIT, [], [CHAINS.ETHEREUM])).to.revertedWith("zero address policyholder");
       });
 
       it("cannot buy policy when zero cover amount value is provided", async () => {
@@ -1485,7 +1485,7 @@ describe("SolaceCoverProductV2", function() {
 
     async function manipulateFRAXbalance(wallet: Wallet, desiredBalance: BN) {
       const FRAX_BALANCEOF_SLOT = {
-        "mainnet": 0,
+        "ethereum": 0,
         "polygon": 0
       }[forkNetwork];
       // Get storage slot index

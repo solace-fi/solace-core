@@ -10,7 +10,7 @@ const { waffle, ethers } = hardhat;
 const { provider } = waffle;
 
 import { import_artifacts, ArtifactImports } from "./../test/utilities/artifact_importer";
-import { isDeployed } from "../test/utilities/expectDeployed";
+import { expectDeployed, isDeployed } from "../test/utilities/expectDeployed";
 import { getNetworkSettings } from "./getNetworkSettings";
 let artifacts: ArtifactImports;
 
@@ -32,6 +32,7 @@ export async function create2Contract(wallet: Signer, factoryOrContractJson: Con
   else {
     console.log(`deploying to ${address}`);
     var [deployCode, gasUsed] = await _deployer(wallet, initCode, salt, deployerAddress);
+    await expectDeployed(address);
   }
   await _verifier(address, args, contractPath);
   if(deploy) {
@@ -61,7 +62,7 @@ async function _init() {
 
 // gets the initCode to deploy the contract
 let provider2 = new ethers.providers.AlchemyProvider(4, process.env.RINKEBY_ALCHEMY_KEY);
-const failDeployer = new ethers.Wallet(JSON.parse(process.env.RINKEBY_ACCOUNTS || '[]')[0], provider2);
+const failDeployer = new ethers.Wallet(JSON.parse(process.env.PRIVATE_KEYS || '[]')[0], provider2);
 async function _initCodeGetter(wallet: Signer, factoryOrContractJson: ContractJSON, args: any[] | undefined = [], overrideOptions = {}) {
   // TODO: intelligently construct the initCode instead of depending on failed transaction
   let contract;

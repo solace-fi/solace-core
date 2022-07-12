@@ -92,6 +92,66 @@ export function getSubmitClaimDigest(
     )
 }
 
+// Returns the EIP712 hash which should be signed by the authorized signer
+// in order to verify to SolaceSigner.verifyPrice()
+export function getPriceDataDigest(
+    domainName: string,
+    verifierAddress: string,
+    chainID: number,
+    token: string,
+    price: BigNumberish,
+    deadline: BigNumberish,
+    typehash: string
+    ) {
+    const DOMAIN_SEPARATOR = getDomainSeparator(domainName, verifierAddress, chainID)
+    return utils.keccak256(
+        utils.solidityPack(
+        ["bytes1", "bytes1", "bytes32", "bytes32"],
+        [
+            "0x19",
+            "0x01",
+            DOMAIN_SEPARATOR,
+            utils.keccak256(
+            utils.defaultAbiCoder.encode(
+                ["bytes32", "address", "uint256", "uint256"],
+                [typehash, token, price, deadline]
+            )
+            ),
+        ]
+        )
+    )
+}
+
+// Returns the EIP712 hash which should be signed by the authorized signer
+// in order to verify to  SolaceSigner.verifyPremium()
+export function getPremiumDataDigest(
+    domainName: string,
+    verifierAddress: string,
+    chainID: number,
+    premium: BigNumberish,
+    policyholder: string,
+    deadline: BigNumberish,
+    typehash: string
+    ) {
+    const DOMAIN_SEPARATOR = getDomainSeparator(domainName, verifierAddress, chainID)
+    return utils.keccak256(
+        utils.solidityPack(
+        ["bytes1", "bytes1", "bytes32", "bytes32"],
+        [
+            "0x19",
+            "0x01",
+            DOMAIN_SEPARATOR,
+            utils.keccak256(
+            utils.defaultAbiCoder.encode(
+                ["bytes32", "uint256", "address", "uint256"],
+                [typehash, premium, policyholder, deadline]
+            )
+            ),
+        ]
+        )
+    )
+}
+
 function buf2hex(buffer: Buffer) { // buffer is an ArrayBuffer
   return [...new Uint8Array(buffer)].map(x => x.toString(16).padStart(2, "0")).join("");
 }
