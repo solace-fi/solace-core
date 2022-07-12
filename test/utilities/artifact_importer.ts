@@ -105,6 +105,9 @@ export async function import_artifacts() {
 
   // vesting
   artifacts.TokenVesting = await tryImport(`${artifact_dir}/vesting/TokenVesting.sol/TokenVesting.json`);
+  
+  // merkle distributor
+  artifacts.MerkleDistributor = await tryImport(`${artifact_dir}/airdrop/MerkleDistributor.sol/MerkleDistributor.json`);
 
   return artifacts;
 }
