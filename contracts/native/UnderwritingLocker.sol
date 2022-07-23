@@ -13,13 +13,14 @@ import "./../utils/Governable.sol";
 import "./../interfaces/native/IUnderwriterLockerListener.sol";
 import "./../interfaces/native/IUnderwriterLocker.sol";
 
-
-// Should I add new events? LockIncreased
+// TODO
+// Need formula for _getEmergencyWithdrawPenaltyPercentage
+// $UWE needs to inherit ERC20Permit, or we remove ...Signed methods from this contract
 
 /**
  * @title UnderwritingLocker
- * @author solace.fi
- * @notice Having an underwriting lock is a requirement to vote on Solace Native insurance gauges.
+ * @author pull token.fi
+ * @notice Having an underwriting lock is a requirement to vote on pull token Native insurance gauges.
  * To create an underwriting lock, $UWE must be locked for a minimum of 6 months.
  * 
  * Locks are ERC721s and can be viewed with [`locks()`](#locks). 
@@ -52,7 +53,10 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
     /// @notice Token locked in the underwriting lock.
     address public override token;
 
-    /// @notice The minimum time (six months) into the future that a lock can expire.
+    /// @notice Revenue router address (Emergency withdraw penalties will be transferred here).
+    address public override revenueRouter;
+
+    /// @notice The minimum lock duration (six months) that a new lock must be created with.
     uint256 public constant override MIN_LOCK_DURATION = (365 days) / 2;
 
     /// @notice The maximum time (four years) into the future that a lock can expire.
@@ -70,18 +74,36 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
     /**
      * @notice Construct the UnderwritingLocker contract.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
-     * @param token _ Token to be locked
+     * @param token_ The address of the token to be locked
+     * @param revenueRouter_ Revenue router address, where emergency withdraw penalty will be transferred
      */
-    constructor(address governance_, address token_)
+    constructor(address governance_, address token_, address revenueRouter_)
         ERC721Enhanced("Underwriting Lock", "UnderwritingLock")
         Governable(governance_)
     {
         require(token_ != address(0x0), "zero address token");
+        require(revenueRouter_ != address(0x0), "zero address revenue router");
         token = token_;
+        revenueRouter = revenueRouter_;
     }
 
     /***************************************
-    VIEW FUNCTIONS
+    INTERNAL VIEW FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Computes current penalty (as a % of emergency withdrawn amount) for emergency withdrawing from a specified lock.
+     * @dev penaltyPercentage == 1e18 means 100% penalty percentage. Similarly 1e17 => 10% penalty percentage.
+     * @param lockID The ID of the lock to compute emergency withdraw penalty.
+     * @return penaltyAmount Token amount that will be paid to RevenueRouter.sol as a penalty for emergency withdrawing.
+     */
+    function _getEmergencyWithdrawPenaltyPercentage(uint256 lockID) internal view returns (uint256 penaltyPercentage) {
+        uint256 end = _locks[lockID].end;
+        // Insert formula for computing penalty
+    }
+
+    /***************************************
+    EXTERNAL VIEW FUNCTIONS
     ***************************************/
 
     /**
@@ -117,11 +139,11 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
     }
 
     /**
-     * @notice Returns the token amount that the user has staked.
+     * @notice Returns the total token amount that the user has staked in underwriting locks.
      * @param account The account to query.
-     * @return balance The user's balance.
+     * @return balance The user's total staked token amount.
      */
-    function stakedBalance(address account) external view override returns (uint256 balance) {
+    function totalStakedBalance(address account) external view override returns (uint256 balance) {
         uint256 numOfLocks = balanceOf(account);
         balance = 0;
         for (uint256 i = 0; i < numOfLocks; i++) {
@@ -144,8 +166,18 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
         return listeners_;
     }
 
+    /**
+     * @notice Computes current penalty (as a % of emergency withdrawn amount) for emergency withdrawing from a specified lock.
+     * @dev penaltyPercentage == 1e18 means 100% penalty percentage. Similarly 1e17 => 10% penalty percentage.
+     * @param lockID The ID of the lock to compute emergency withdraw penalty.
+     * @return penaltyAmount Token amount that will be paid to RevenueRouter.sol as a penalty for emergency withdrawing.
+     */
+    function getEmergencyWithdrawPenaltyPercentage(uint256 lockID) external view override tokenMustExist(lockID) returns (uint256 penaltyAmount) {
+        return _getEmergencyWithdrawPenaltyPercentage(lockID);
+    }
+
     /***************************************
-    MUTATOR FUNCTIONS
+    EXTERNAL MUTATOR FUNCTIONS
     ***************************************/
 
     /**
@@ -157,7 +189,7 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
      * @return lockID The ID of the newly created lock.
      */
     function createLock(address recipient, uint256 amount, uint256 end) external override nonReentrant returns (uint256 lockID) {
-        // pull solace
+        // pull token
         SafeERC20.safeTransferFrom(IERC20(token), msg.sender, address(this), amount);
         // accounting
         return _createLock(recipient, amount, end);
@@ -178,7 +210,7 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
     function createLockSigned(uint256 amount, uint256 end, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external override nonReentrant returns (uint256 lockID) {
         // permit
         IERC20Permit(token).permit(msg.sender, address(this), amount, deadline, v, r, s);
-        // pull solace
+        // pull token
         SafeERC20.safeTransferFrom(IERC20(token), msg.sender, address(this), amount);
         // accounting
         return _createLock(msg.sender, amount, end);
@@ -187,41 +219,43 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
     /**
      * @notice Deposit token to increase the value of an existing lock.
      * @dev Token is transferred from msg.sender, assumes its already approved.
+     * @dev Anyone (not just the lock owner) can call increaseAmount() and deposit to an existing lock.
      * @param lockID The ID of the lock to update.
      * @param amount The amount of token to deposit.
      */
     function increaseAmount(uint256 lockID, uint256 amount) external override nonReentrant tokenMustExist(lockID) {
-        // pull solace
+        // pull token
         SafeERC20.safeTransferFrom(IERC20(token), msg.sender, address(this), amount);
         // accounting
-        uint256 newAmount = _locks[lockID].amount + amount;
-        _updateLock(lockID, newAmount, _locks[lockID].end);
+        _increaseAmount(lockID, amount);
     }
-
 
     /**
      * @notice Deposit token to increase the value of multiple existing locks.
      * @dev Token is transferred from msg.sender, assumes its already approved.
-     * @param xsLockIDs Array of lock IDs to update.
+     * @dev If a lockID does not exist, the corresponding amount will be refunded to msg.sender.
+     * @dev Anyone (not just the lock owner) can call increaseAmountMultiple() and deposit to existing locks.
+     * @param lockIDs Array of lock IDs to update.
      * @param amounts Array of token amounts to deposit.
      */
-    function increaseAmountMultiple(uint256[] calldata xsLockIDs, uint256[] calldata amounts) external override nonReentrant {
-        require (xsLockIDs.length == amounts.length, "array length mismatch");
+    function increaseAmountMultiple(uint256[] calldata lockIDs, uint256[] calldata amounts) external override nonReentrant {
+        require (lockIDs.length == amounts.length, "array length mismatch");
         uint256 refundAmount = 0;
-        for (uint256 i = 0; i < xsLockIDs.length; i++) {
+        for (uint256 i = 0; i < lockIDs.length; i++) {
             // Guard against revert for non-existing lockIDs
-            if ( _exists(xsLockIDs[i]) ) {
-                increaseAmount(xsLockIDs[i], amounts[i]);
+            if ( _exists(lockIDs[i]) ) {
+                increaseAmount(lockIDs[i], amounts[i]);
             } else {
                 refundAmount += amounts[i];
             }
         }
-        SafeERC20.safeTransfer(IERC20(solace), msg.sender, refundAmount);
+        SafeERC20.safeTransfer(IERC20(token), msg.sender, refundAmount);
     }
 
     /**
      * @notice Deposit token to increase the value of an existing lock.
      * @dev Token is transferred from msg.sender using ERC20Permit.
+     * @dev Anyone (not just the lock owner) can call increaseAmount() and deposit to an existing lock.
      * @param lockID The ID of the lock to update.
      * @param amount The amount of token to deposit.
      * @param deadline Time the transaction must go through before.
@@ -232,11 +266,10 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
     function increaseAmountSigned(uint256 lockID, uint256 amount, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external override nonReentrant tokenMustExist(lockID) {
         // permit
         IERC20Permit(token).permit(msg.sender, address(this), amount, deadline, v, r, s);
-        // pull solace
+        // pull token
         SafeERC20.safeTransferFrom(IERC20(token), msg.sender, address(this), amount);
         // accounting
-        uint256 newAmount = _locks[lockID].amount + amount;
-        _updateLock(lockID, newAmount, _locks[lockID].end);
+        _increaseAmount(lockID, amount);
     }
 
     /**
@@ -250,6 +283,25 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
         require(end <= block.timestamp + MAX_LOCK_DURATION, "Max lock is 4 years");
         require(_locks[lockID].end <= end, "not extended");
         _updateLock(lockID, _locks[lockID].amount, end);
+        emit LockExtended(lockID, end);
+    }
+
+    /**
+     * @notice Extend multiple locks' duration.
+     * @dev Can only be called by the lock owner or approved.
+     * @dev If non-existing lockIDs are entered, these will be skipped.
+     * @param lockIDs Array of lock IDs to update.
+     * @param ends Array of new unlock times.
+     */
+    function extendLockMultiple(uint256[] calldata lockIDs, uint256[] calldata ends) external override nonReentrant onlyOwnerOrApproved(lockID) {
+        require (lockIDs.length == ends.length, "array length mismatch");
+
+        for (uint256 i = 0; i < lockIDs.length; i++) {
+            // Guard against revert for non-existing lockIDs
+            if ( _exists(lockIDs[i]) ) {
+                extendLock(lockIDs[i], amounts[i]);
+            }
+        }
     }
 
     /**
@@ -262,7 +314,7 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
     function withdraw(uint256 lockID, address recipient) external override nonReentrant onlyOwnerOrApproved(lockID) {
         uint256 amount = _locks[lockID].amount;
         _withdraw(lockID, amount);
-        // transfer solace
+        // transfer token
         SafeERC20.safeTransfer(IERC20(token), recipient, amount);
     }
 
@@ -277,7 +329,7 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
     function withdrawInPart(uint256 lockID, address recipient, uint256 amount) external override nonReentrant onlyOwnerOrApproved(lockID) {
         require(amount <= _locks[lockID].amount, "excess withdraw");
         _withdraw(lockID, amount);
-        // transfer solace
+        // transfer token
         SafeERC20.safeTransfer(IERC20(token), recipient, amount);
     }
 
@@ -290,20 +342,125 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
      */
     function withdrawMultiple(uint256[] calldata lockIDs, address recipient) external override nonReentrant {
         uint256 len = lockIDs.length;
-        uint256 amount = 0;
+        uint256 totalWithdrawAmount = 0;
         for(uint256 i = 0; i < len; i++) {
             uint256 lockID = lockIDs[i];
             require(_isApprovedOrOwner(msg.sender, lockID), "only owner or approved");
-            uint256 amount_ = _locks[lockID].amount;
-            amount += amount_;
-            _withdraw(lockID, amount_);
+            uint256 singleLockAmount = _locks[lockID].amount;
+            totalWithdrawAmount += singleLockAmount;
+            _withdraw(lockID, singleLockAmount);
         }
-        // transfer solace
-        SafeERC20.safeTransfer(IERC20(token), recipient, amount);
+        // batched token transfer
+        SafeERC20.safeTransfer(IERC20(token), recipient, totalWithdrawAmount);
+    }
+
+    /**
+     * @notice Withdraw from multiple locks in part.
+     * @dev Can only be called by the lock owner or approved.
+     * @dev Can only be called if unlocked.
+     * @param lockIDs The ID of the locks to withdraw from.
+     * @param recipient The user to receive the lock's token.
+     * @param amounts Array of token amounts to withdraw
+     */
+    function withdrawInPartMultiple(uint256[] calldata lockIDs, address recipient, uint256[] calldata amounts) external override nonReentrant {
+        require (lockIDs.length == amounts.length, "array length mismatch");
+        uint256 len = lockIDs.length;
+        uint256 totalWithdrawAmount = 0;
+        for(uint256 i = 0; i < len; i++) {
+            uint256 lockID = lockIDs[i];
+            require(_isApprovedOrOwner(msg.sender, lockID), "only owner or approved");
+            uint256 singleLockAmount = amounts[i];
+            require(singleLockAmount <= _locks[lockID].amount, "excess withdraw");
+            totalWithdrawAmount += singleLockAmount;
+            _withdraw(lockID, singleLockAmount);
+        }
+        // batched token transfer
+        SafeERC20.safeTransfer(IERC20(token), recipient, totalWithdrawAmount);
+    }
+
+    /**
+     * @notice Emergency withdraw from a lock in full.
+     * @dev Can only be called by the lock owner or approved.
+     * @dev If called before `end` timestamp, will incur a penalty
+     * @param lockID The ID of the lock to emergency withdraw from.
+     * @param recipient The user to receive the lock's token.
+     */
+    function emergencyWithdraw(uint256 lockID, address recipient) external override nonReentrant onlyOwnerOrApproved(lockID) {
+        uint256 amount = _locks[lockID].amount;
+        // Accounting
+        uint256 penalty = _emergencyWithdraw(lockID, amount);
+        // Token transfers
+        SafeERC20.safeTransfer(IERC20(token), revenueRouter, penalty);
+        SafeERC20.safeTransfer(IERC20(token), recipient, amount - penalty);
+    }
+
+    /**
+     * @notice Emergency withdraw from a lock in part.
+     * @dev Can only be called by the lock owner or approved.
+     * @dev If called before `end` timestamp, will incur a penalty
+     * @param lockID The ID of the lock to emergency withdraw from.
+     * @param recipient The user to receive the lock's token.
+     * @param amount The amount of token to withdraw.
+     */
+    function emergencyWithdrawInPart(uint256 lockID, address recipient, uint256 amount) external override nonReentrant onlyOwnerOrApproved(lockID) {
+        require(amount <= _locks[lockID].amount, "excess withdraw");
+        uint256 penalty = _emergencyWithdraw(lockID, amount);
+        SafeERC20.safeTransfer(IERC20(token), revenueRouter, penalty);
+        SafeERC20.safeTransfer(IERC20(token), recipient, amount - penalty);
+    }
+
+    /**
+     * @notice Emergency withdraw from multiple locks in full.
+     * @dev Can only be called by the lock owner or approved.
+     * @dev If called before `end` timestamp, will incur a penalty
+     * @param lockIDs The ID of the locks to withdraw from.
+     * @param recipient The user to receive the lock's token.
+     */
+    function emergencyWithdrawMultiple(uint256[] calldata lockIDs, address recipient) external override nonReentrant {
+        uint256 len = lockIDs.length;
+        uint256 totalWithdrawAmount = 0;
+        uint256 totalPenaltyAmount = 0;
+        for(uint256 i = 0; i < len; i++) {
+            uint256 lockID = lockIDs[i];
+            require(_isApprovedOrOwner(msg.sender, lockID), "only owner or approved");
+            uint256 singleLockAmount = _locks[lockID].amount;
+            uint256 penalty = _emergencyWithdraw(lockID, singleLockAmount);
+            totalPenaltyAmount += penalty;
+            totalWithdrawAmount += (singleLockAmount - penalty);
+        }
+        // batched token transfer
+        SafeERC20.safeTransfer(IERC20(token), revenueRouter, totalPenaltyAmount);
+        SafeERC20.safeTransfer(IERC20(token), recipient, totalWithdrawAmount);
+    }
+
+    /**
+     * @notice Emergency withdraw from multiple locks in part.
+     * @dev Can only be called by the lock owner or approved.
+     * @dev If called before `end` timestamp, will incur a penalty
+     * @param lockIDs The ID of the locks to withdraw from.
+     * @param recipient The user to receive the lock's token.
+     * @param amounts Array of token amounts to emergency withdraw
+     */
+    function emergencyWithdrawInPartMultiple(uint256[] calldata lockIDs, address recipient) external override nonReentrant {
+        uint256 len = lockIDs.length;
+        uint256 totalWithdrawAmount = 0;
+        uint256 totalPenaltyAmount = 0;
+        for(uint256 i = 0; i < len; i++) {
+            uint256 lockID = lockIDs[i];
+            require(_isApprovedOrOwner(msg.sender, lockID), "only owner or approved");
+            uint256 singleLockAmount = amounts[i];
+            require(singleLockAmount <= _locks[lockID].amount, "excess withdraw");
+            uint256 penalty = _emergencyWithdraw(lockID, singleLockAmount);
+            totalPenaltyAmount += penalty;
+            totalWithdrawAmount += (singleLockAmount - penalty);
+        }
+        // batched token transfer
+        SafeERC20.safeTransfer(IERC20(token), revenueRouter, totalPenaltyAmount);
+        SafeERC20.safeTransfer(IERC20(token), recipient, totalWithdrawAmount);
     }
 
     /***************************************
-    INTERNAL FUNCTIONS
+    INTERNAL MUTATOR FUNCTIONS
     ***************************************/
 
     /**
@@ -311,10 +468,10 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
      * @param recipient The user that the lock will be minted to.
      * @param amount The amount of token in the lock.
      * @param end The end of the lock.
-     * @param lockID The ID of the new lock.
+     * @return lockID The ID of the new lock.
      */
     function _createLock(address recipient, uint256 amount, uint256 end) internal returns (uint256 lockID) {
-                // solhint-disable-next-line not-rely-on-time
+        // solhint-disable-next-line not-rely-on-time
         require(end >= block.timestamp + MIN_LOCK_DURATION, "Min lock is 6 months");
         // solhint-disable-next-line not-rely-on-time
         require(end <= block.timestamp + MAX_LOCK_DURATION, "Max lock is 4 years");
@@ -325,6 +482,20 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
         _safeMint(recipient, lockID);
         emit LockCreated(lockID);
     }
+
+    /**
+     * @notice Deposit token to increase the value of an existing lock.
+     * @dev Token is transferred from msg.sender, assumes its already approved.
+     * @dev Anyone (not just the lock owner) can call increaseAmount() and deposit to an existing lock.
+     * @param lockID The ID of the lock to update.
+     * @param amount The amount of token to deposit.
+     */
+    function _increaseAmount(uint256 lockID, uint256 amount) internal {
+        uint256 newAmount = _locks[lockID].amount + amount;
+        _updateLock(lockID, newAmount, _locks[lockID].end);
+        emit LockIncreased(lockID, newAmount, amount);
+    }
+
 
     /**
      * @notice Updates an existing lock.
@@ -363,8 +534,34 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
             address owner = ownerOf(lockID);
             _notify(lockID, owner, owner, oldLock, newLock);
         }
-        emit Withdrawl(lockID, amount);
+        emit Withdrawal(lockID, amount);
     }
+
+    /**
+     * @notice Emergency withdraws from a lock.
+     * @param lockID The ID of the lock to emergency withdraw from.
+     * @param amount The amount of token to emergency withdraw.
+     * @return penalty Token amount that will be paid to RevenueRouter as a penalty for emergency withdraw
+     */
+    function _emergencyWithdraw(uint256 lockID, uint256 amount) internal returns (uint256 penalty) {
+        // Make _getEmergencyWithdrawPenaltyPercentage query before lockID is potentially deleted
+        uint256 penalty = _getEmergencyWithdrawPenaltyPercentage(lockID);
+        penalty = amount * penaltyPercentage / 1e18;
+        // accounting
+        if(amount == _locks[lockID].amount) {
+            _burn(lockID);
+            delete _locks[lockID];
+        }
+        else {
+            Lock memory oldLock = _locks[lockID];
+            Lock memory newLock = Lock(oldLock.amount-amount, oldLock.end);
+            _locks[lockID].amount -= amount;
+            address owner = ownerOf(lockID);
+            _notify(lockID, owner, owner, oldLock, newLock);
+        }
+        emit EmergencyWithdrawal(lockID, amount, penalty);
+    }
+
 
     /**
      * @notice Hook that is called after any token transfer. This includes minting and burning.
