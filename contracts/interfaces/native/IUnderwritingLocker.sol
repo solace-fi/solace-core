@@ -22,14 +22,14 @@ struct Lock {
  * Locks have a maximum duration of four years.
  *
  * Locked $UWE can be withdrawn without penalty via [`withdraw()`](#withdraw) only after the `end` timestamp
- * Locked $UWE withdrawn before the `end` timestamp via [`emergencyWithdraw()`](#emergencyWithdraw) will incur 
+ * Locked $UWE withdrawn before the `end` timestamp via [`emergencyWithdraw()`](#emergencywithdraw) will incur 
  * a withdrawal penalty, which increases with remaining lock time.
  *
  * Users can create locks via [`createLock()`](#createlock) or [`createLockSigned()`](#createlocksigned)
  * Users can deposit more $UWE into a lock via [`increaseAmount()`](#increaseamount), [`increaseAmountSigned()`] (#increaseamountsigned) or [`increaseAmountMultiple()`](#increaseamountmultiple)
  * Users can extend a lock via [`extendLock()`](#extendlock) or [`extendLockMultiply()`](#extendlockmultiple)
- * Users can withdraw from a lock via [`withdraw()`](#withdraw), [`withdrawInPart()`](#withdrawinpart), or [`withdrawMultiple()`](#withdrawmultiple).
- * Users can emergency withdraw from a lock via [`emergencyWithdraw()`](#emergencywithdraw), [`emergencyWithdrawInPart()`](#emergencywithdrawinpart), or [`emergencyWithdrawMultiple()`](#emergencywithdrawmultiple).
+ * Users can withdraw from a lock via [`withdraw()`](#withdraw), [`withdrawInPart()`](#withdrawinpart), or [`withdrawmultiple()`](#withdrawmultiple).
+ * Users can emergency withdraw from a lock via [`emergencyWithdraw()`](#emergencywithdraw), [`emergencywithdrawinpart()`](#emergencywithdrawinpart), or [`emergencyWithdrawMultiple()`](#emergencywithdrawmultiple).
  *
  * Users and contracts may deposit into a lock that they do not own.
  *
@@ -66,6 +66,9 @@ interface IUnderwritingLocker is IERC721Enhanced {
     /// @notice Emitted when a listener is removed.
     event LockListenerRemoved(address indexed listener);
 
+    /// @notice Emitted when the registry is set.
+    event RegistrySet(address indexed registry);
+
     /***************************************
     GLOBAL VARIABLES
     ***************************************/
@@ -75,6 +78,9 @@ interface IUnderwritingLocker is IERC721Enhanced {
 
     /// @notice Revenue router address (Emergency withdraw penalties will be transferred here).
     function revenueRouter() external view returns (address);
+
+    /// @notice Registry address
+    function registry() external view returns (address);
 
     /// @notice The minimum lock duration that a new lock must be created with.
     function MIN_LOCK_DURATION() external view returns (uint256);
@@ -308,4 +314,19 @@ interface IUnderwritingLocker is IERC721Enhanced {
      * @param baseURI_ The new base URI.
      */
     function setBaseURI(string memory baseURI_) external;
+
+    /**
+     * @notice Sets the [`Registry`](./Registry) contract address.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param _registry The address of `Registry` contract.
+     */
+    function setRegistry(address _registry) external;
+
+    /**
+     * @notice Approves [`UnderwritingLockVoting`](./UnderwritingLockVoting) to transfer token from this contract
+     * @dev Hacky fix to the issue that [`UnderwritingLockVoting`](./UnderwritingLockVoting) needs token transfer approval, but will be deployed after this contract.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param _votingContract The address of `Registry` contract.
+     */
+    function setVotingContractApproval(address _votingContract) external;
 }

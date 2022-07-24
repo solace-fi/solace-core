@@ -6,21 +6,22 @@ import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 import "./../utils/ERC721Enhanced.sol";
 import "./../utils/Governable.sol";
+import "./../interfaces/utils/IRegistry.sol";
 import "./../interfaces/native/IUnderwriterLockerListener.sol";
 import "./../interfaces/native/IUnderwriterLocker.sol";
 
 // TODO
 // Need formula for _getEmergencyWithdrawPenaltyPercentage
 // $UWE needs to inherit ERC20Permit, or we remove ...Signed methods from this contract
+// Custom Error types
 
 /**
  * @title UnderwritingLocker
- * @author pull token.fi
- * @notice Having an underwriting lock is a requirement to vote on pull token Native insurance gauges.
+ * @author solace.fi
+ * @notice Having an underwriting lock is a requirement to vote on Solace Native insurance gauges.
  * To create an underwriting lock, $UWE must be locked for a minimum of 6 months.
  * 
  * Locks are ERC721s and can be viewed with [`locks()`](#locks). 
@@ -28,18 +29,18 @@ import "./../interfaces/native/IUnderwriterLocker.sol";
  * Locks have a maximum duration of four years.
  *
  * Locked $UWE can be withdrawn without penalty via [`withdraw()`](#withdraw) only after the `end` timestamp
- * Locked $UWE withdrawn before the `end` timestamp via [`emergencyWithdraw()`](#emergencyWithdraw) will incur 
+ * Locked $UWE withdrawn before the `end` timestamp via [`emergencyWithdraw()`](#emergencywithdraw) will incur 
  * a withdrawal penalty, which increases with remaining lock time.
  *
  * Users can create locks via [`createLock()`](#createlock) or [`createLockSigned()`](#createlocksigned)
  * Users can deposit more $UWE into a lock via [`increaseAmount()`](#increaseamount), [`increaseAmountSigned()`] (#increaseamountsigned) or [`increaseAmountMultiple()`](#increaseamountmultiple)
  * Users can extend a lock via [`extendLock()`](#extendlock) or [`extendLockMultiply()`](#extendlockmultiple)
- * Users can withdraw from a lock via [`withdraw()`](#withdraw), [`withdrawInPart()`](#withdrawinpart), or [`withdrawMultiple()`](#withdrawmultiple).
- * Users can emergency withdraw from a lock via [`emergencyWithdraw()`](#emergencywithdraw), [`emergencyWithdrawInPart()`](#emergencywithdrawinpart), or [`emergencyWithdrawMultiple()`](#emergencywithdrawmultiple).
+ * Users can withdraw from a lock via [`withdraw()`](#withdraw), [`withdrawInPart()`](#withdrawinpart), or [`withdrawmultiple()`](#withdrawmultiple).
+ * Users can emergency withdraw from a lock via [`emergencyWithdraw()`](#emergencywithdraw), [`emergencywithdrawinpart()`](#emergencywithdrawinpart), or [`emergencyWithdrawMultiple()`](#emergencywithdrawmultiple).
  *
  * Users and contracts may deposit into a lock that they do not own.
  *
- * Any time a lock is minted, burned or otherwise modified it will notify the listener contracts (eg UnderwriterLockVoting.sol).
+ * Any time a lock is minted, burned or otherwise modified it will notify the listener contracts.
  *
  */
 // solhint-disable-next-line contract-name-camelcase
@@ -55,6 +56,9 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
 
     /// @notice Revenue router address (Emergency withdraw penalties will be transferred here).
     address public override revenueRouter;
+
+    /// @notice Registry address
+    address public override registry;
 
     /// @notice The minimum lock duration (six months) that a new lock must be created with.
     uint256 public constant override MIN_LOCK_DURATION = (365 days) / 2;
@@ -73,18 +77,15 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
 
     /**
      * @notice Construct the UnderwritingLocker contract.
+     * @dev Requires 'uwe' and 'revenueRouter' addresses to be set in the Registry.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
-     * @param token_ The address of the token to be locked
-     * @param revenueRouter_ Revenue router address, where emergency withdraw penalty will be transferred
+     * @param registry_ The [`Registry`](./Registry) contract address.
      */
-    constructor(address governance_, address token_, address revenueRouter_)
+    constructor(address governance_, address registry_)
         ERC721Enhanced("Underwriting Lock", "UnderwritingLock")
         Governable(governance_)
     {
-        require(token_ != address(0x0), "zero address token");
-        require(revenueRouter_ != address(0x0), "zero address revenue router");
-        token = token_;
-        revenueRouter = revenueRouter_;
+        _setRegistry(registry_);
     }
 
     /***************************************
@@ -604,6 +605,26 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
         }
     }
 
+    /**
+     * @notice Sets registry and related contract addresses.
+     * @dev Requires 'uwe' and 'revenueRouter' addresses to be set in the Registry.
+     * @param _registry The registry address to set.
+     */
+    function _setRegistry(address _registry) internal {
+        require(_registry != address(0x0), "zero address registry");
+        registry = _registry;
+        IRegistry reg = IRegistry(_registry);
+        // set revenueRouter
+        (, address revenueRouterAddr) = reg.tryGet("revenueRouter");
+        require(revenueRouterAddr != address(0x0), "zero address revenueRouter");
+        revenueRouter = revenueRouterAddr;
+        // set token ($UWE)
+        (, address uweAddr) = reg.tryGet("uwe");
+        require(uweAddr != address(0x0), "zero address uwe");
+        token = uweAddr;
+        emit RegistrySet(_registry);
+    }
+
     /***************************************
     GOVERNANCE FUNCTIONS
     ***************************************/
@@ -635,5 +656,25 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
      */
     function setBaseURI(string memory baseURI_) external override onlyGovernance {
         _setBaseURI(baseURI_);
+    }
+
+    /**
+     * @notice Sets the [`Registry`](./Registry) contract address.
+     * @dev Requires 'uwe' and 'revenueRouter' addresses to be set in the Registry.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param _registry The address of `Registry` contract.
+     */
+    function setRegistry(address _registry) external override onlyGovernance {
+        _setRegistry(_registry);
+    }
+
+    /**
+     * @notice Approves [`UnderwritingLockVoting`](./UnderwritingLockVoting) to transfer token from this contract
+     * @dev Hacky fix to the issue that [`UnderwritingLockVoting`](./UnderwritingLockVoting) needs token transfer approval, but will be deployed after this contract.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param _votingContract The address of `Registry` contract.
+     */
+    function setVotingContractApproval(address _votingContract) external override onlyGovernance {
+        SafeERC20.safeApprove(IERC20(token), _votingContract, type(uint256).max);
     }
 }
