@@ -83,7 +83,7 @@ contract UnderwritingLockVoting is IUnderwritingLockVoting, ReentrancyGuard, Gov
     /// @notice Batch size of votes that will be processed in a single call of [`processVotes()`](#processvotes).
     uint256 public override voteBatchSize;
 
-    /// @notice Epoch timestamp (rounded down to weeks) => gaugeID => total vote power
+    /// @notice Epoch start timestamp (rounded to weeks) => gaugeID => total vote power
     mapping(uint256 => mapping(uint256 => uint256)) private override _votePowerOfGaugeForEpoch;
 
     /// @notice Last timestamp (rounded down to weeks) that all stored votes were processed
@@ -340,11 +340,12 @@ contract UnderwritingLockVoting is IUnderwritingLockVoting, ReentrancyGuard, Gov
         let n_votes = _votes.length();
         let vote_index = 0; // Vote index starts from 0, and must be strictly less than n_votes
 
+        // Iterate through each vote
         // This is still technically an unbounded loop because n_votes is unbounded, need to test what the limit is here.
         while locks_processed <= voteBatchSize && vote_index < n_votes {
             (uint256 lockID, uint256 gaugeID) = _votes.at(vote_index)
 
-            // If lockID hasn't been processed for last epoch, then process it
+            // If lockID hasn't been processed for last epoch, then process the individual lcok
             if _lastTimeVoteProcessed[lockID] != epochStartTimestamp {
                 (,,uint256 amount, uint256 end) = _getLockInfo(lockID);
                 sum_voting_fee += _calculateVoteFee(amount, end);
