@@ -285,10 +285,10 @@ interface IUnderwritingLocker is IERC721Enhanced {
      * @dev Can only be called by the lock owner or approved.
      * @dev If called before `end` timestamp, will incur a penalty
      * @param lockIDs The ID of the locks to withdraw from.
-     * @param recipient The user to receive the lock's token.
      * @param amounts Array of token amounts to emergency withdraw
+     * @param recipient The user to receive the lock's token.
      */
-    function emergencyWithdrawInPartMultiple(uint256[] calldata lockIDs, address recipient) external;
+    function emergencyWithdrawInPartMultiple(uint256[] calldata lockIDs, uint256[] amounts, address recipient) external;
 
     /***************************************
     GOVERNANCE FUNCTIONS

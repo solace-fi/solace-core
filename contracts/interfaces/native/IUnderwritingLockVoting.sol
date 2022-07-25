@@ -78,7 +78,7 @@ contract IUnderwritingLockVoting is IGaugeVoter {
 
     /// @notice Get lockManager for a given lockId
     /// @param lockId The ID of the lock to query for
-    /// @returns lockManager
+    /// @return lockManager
     function lockManagers(uint256 lockId) external view returns (address lockManager);
 
     /***************************************

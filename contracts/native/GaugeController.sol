@@ -58,7 +58,8 @@ contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
     {
         // Fill slot 0 of gaugeNames array, so that gaugeNames[x] maps to name of gaugeID x instead of `x + 1` (we do not permit a gaugeId of 0)
         // Should we instead use a mapping?
-        gaugeNames.push(""); 
+        Gauge newGauge = Gauge(0, "");
+        _gauges.push(newGauge); 
     }
 
     /***************************************
@@ -85,10 +86,10 @@ contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
      * @notice Get vote power sum for all gauges
      * @return votePowerSum
      */
-    function _getVotePowerSum(gaugeID) internal view returns (uint256 votePowerSum) {
+    function _getVotePowerSum(uint256 gaugeID) internal view returns (uint256 votePowerSum) {
         for(uint256 i = 1; i < n_gauges + 1; i++) {
             if (_gauges[i].active) {
-                votePowerSum += _votePowerOfGaugeForEpoch[lastTimeGaugeWeightUpdated][i]
+                votePowerSum += _votePowerOfGaugeForEpoch[lastTimeGaugeWeightUpdated][i];
             }
         }
     }
@@ -99,9 +100,9 @@ contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
      * @param gaugeID The ID of the gauge to query.
      * @return weight
      */
-    function _getGaugeWeight(gaugeID) internal view returns (uint256 weight) {
+    function _getGaugeWeight(uint256 gaugeID) internal view returns (uint256 weight) {
         uint256 votePowerSum = _getVotePowerSum();
-        return 1e18 * _votePowerOfGaugeForEpoch[lastTimeGaugeWeightUpdated][gaugeID] / votePowerSum
+        return 1e18 * _votePowerOfGaugeForEpoch[lastTimeGaugeWeightUpdated][gaugeID] / votePowerSum;
     }
 
     /**
@@ -110,7 +111,7 @@ contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
      * @return weights[].
      * @dev weights[0] will always be 0, so that weights[1] maps to the weight of gaugeID 1.
      */
-    function _getAllGaugeWeights() public view override returns (uint256 weights[]) {
+    function _getAllGaugeWeights() public view override returns (uint256[] weights) {
         weights.push(0);
         uint256 votePowerSum = _getVotePowerSum();
 
@@ -149,7 +150,7 @@ contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
      * @param gaugeID The ID of the gauge to query.
      * @return weight
      */
-    function getGaugeWeight(gaugeID) external view override returns (uint256 weight) {
+    function getGaugeWeight(uint256 gaugeID) external view override returns (uint256 weight) {
         _getGaugeWeight(gaugeID);
     }
 
@@ -159,7 +160,7 @@ contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
      * @return weights[].
      * @dev weights[0] will always be 0, so that weights[1] maps to the weight of gaugeID 1.
      */
-    function getAllGaugeWeight() external view override returns (uint256 weights[]) {
+    function getAllGaugeWeight() external view override returns (uint256[] weights) {
         _getAllGaugeWeights();
     }
 
@@ -168,7 +169,7 @@ contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
      * @return numActiveGauges
      */
     function getNumActiveGauges() external view override returns (uint256 numActiveGauges) {
-        return (n_gauges - _n_gauges_paused)
+        return (n_gauges - _n_gauges_paused);
     }
 
     /**
@@ -176,7 +177,7 @@ contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
      * @return numPausedGauges
      */
     function getNumPausedGauges() external view override returns (uint256 numPausedGauges) {
-        return _n_gauges_paused
+        return _n_gauges_paused;
     }
 
     /**
@@ -184,7 +185,7 @@ contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
      * @param gaugeID The ID of the gauge to query.
      * @return gaugeName
      */
-    function getGaugeName(gaugeID) external view override returns (string gaugeName) {
+    function getGaugeName(uint256 gaugeID) external view override returns (string gaugeName) {
         return _gauges[gaugeID].name;
     }
 
@@ -193,7 +194,7 @@ contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
      * @param gaugeID The ID of the gauge to query.
      * @return gaugeActive True if active, false otherwise.
      */
-    function isGaugeActive(gaugeID) external view override returns (bool gaugeActive) {
+    function isGaugeActive(uint256 gaugeID) external view override returns (bool gaugeActive) {
         return _gauges[gaugeID].active;
     }
 
@@ -218,7 +219,7 @@ contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
      */
     function removeVotingContract(address votingContract) external override onlyGovernance {
         _votingContracts.remove(votingContract);
-        emit VotingContractRemove(votingContract);
+        emit VotingContractRemoved(votingContract);
     }
 
     /**
@@ -228,8 +229,9 @@ contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
      */
     function addGauge(string gaugeName) external override onlyGovernance {
         uint256 gaugeID = ++n_gauges;
-        gaugeNames.push(gaugeName);
-        assert(gaugeNames.length == n_gauges); // Uphold invariant, should not be violated.
+        Gauge newGauge = Gauge(gaugeID,gaugeName);
+        _gauges.push(newGauge); 
+        assert(_gauges.length == n_gauges); // Uphold invariant, should not be violated.
         emit GaugeAdded(gaugeID, gaugeName);
     }
 
@@ -242,7 +244,7 @@ contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
      * @param gaugeID ID of gauge to pause
      */
     function pauseGauge(uint256 gaugeID) external override onlyGovernance {
-        require(_gauges[gaugeID].active == true, 'already paused')
+        require(_gauges[gaugeID].active == true, 'already paused');
         _n_gauges_paused += 1;
         _gauges[gaugeID].active = false;
         emit GaugePaused(gaugeID, _gauges[gaugeID].name);
@@ -254,7 +256,7 @@ contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
      * @param gaugeID ID of gauge to pause
      */
     function unpauseGauge(uint256 gaugeID) external override onlyGovernance {
-        require(_gauges[gaugeID].active == false, 'already unpaused')
+        require(_gauges[gaugeID].active == false, 'already unpaused');
         _n_gauges_paused -= 1;
         _gauges[gaugeID].active = true;
         emit GaugeUnpaused(gaugeID, _gauges[gaugeID].name);
@@ -278,7 +280,7 @@ contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
             // Iterate through gaugeID, gaugeID start from 1
             for (uint256 j = 1; j < n_gauges + 1; j++) {
                 if (_gauges[j].active) {
-                    _votePowerOfGaugeForEpoch[epochStartTime, j] += IGaugeVoter(_votingContracts.at(i)).getVotePowerOfGaugeForEpoch(epochStartTime, j);
+                    _votePowerOfGaugeForEpoch[epochStartTime][j] += IGaugeVoter(_votingContracts.at(i)).getVotePowerOfGaugeForEpoch(epochStartTime, j);
                 }
             }
         }

@@ -82,14 +82,14 @@ contract IGaugeController {
      * @param gaugeID The ID of the gauge to query.
      * @return weight
      */
-    function getGaugeWeight(gaugeID) external view returns (uint256 weight);
+    function getGaugeWeight(uint256 gaugeID) external view returns (uint256 weight);
     /**
      * @notice Get all gauge weights.
      * @dev Gauge weights must sum to 1e18, so a weight of 1e17 == 10% weight.
      * @return weights[].
      * @dev weights[0] will always be 0, so that weights[1] maps to the weight of gaugeID 1.
      */
-    function getAllGaugeWeight() external view returns (uint256 weights[]);
+    function getAllGaugeWeight() external view returns (uint256[] weights);
 
     /**
      * @notice Get number of active gauges
@@ -107,14 +107,14 @@ contract IGaugeController {
      * @param gaugeID The ID of the gauge to query.
      * @return gaugeName
      */
-    function getGaugeName(gaugeID) external view returns (string gaugeName);
+    function getGaugeName(uint256 gaugeID) external view returns (string gaugeName);
 
     /**
      * @notice Query whether gauge is active.
      * @param gaugeID The ID of the gauge to query.
      * @return gaugeActive True if active, false otherwise.
      */
-    function isGaugeActive(gaugeID) external view returns (bool gaugeActive);
+    function isGaugeActive(uint256 gaugeID) external view returns (bool gaugeActive);
 
     /***************************************
     GOVERNANCE FUNCTIONS

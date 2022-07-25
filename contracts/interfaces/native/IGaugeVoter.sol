@@ -12,13 +12,13 @@ interface IGaugeVoter {
      * @notice Obtain vote power sum for a gauge for a given epoch
      * @param epochStartTimestamp The ID of the lock that was altered.
      * @param gaugeID The old owner of the lock.
-     * @returns votePower
+     * @return votePower
      */
     function getVotePowerOfGaugeForEpoch(uint256 epochStartTimestamp, uint256 gaugeID) external view returns (uint256 votePower);
 
     /**
      * @notice Obtain end timetamp for the epoch most recently processed in full.
-     * @returns timestamp
+     * @return timestamp
      */
     function lastTimeAllVotesProcessed() external view returns (uint256 timestamp);
 }

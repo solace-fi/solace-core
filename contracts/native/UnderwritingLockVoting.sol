@@ -9,8 +9,8 @@ import "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "./../utils/Governable.sol";
 import "./../interfaces/utils/IRegistry.sol";
-import "./../interfaces/staking/IUnderwritingLocker.sol";
-import "./../interfaces/staking/IUnderwritingLockVoting.sol";
+import "./../interfaces/native/IUnderwritingLocker.sol";
+import "./../interfaces/native/IUnderwritingLockVoting.sol";
 
 // TO-DO
 // Custom Error types
@@ -135,14 +135,17 @@ contract UnderwritingLockVoting is IUnderwritingLockVoting, ReentrancyGuard, Gov
      * @return votePower The vote power for the lock (for the current epoch)
      */
     function _calculateVotePower(uint256 amount, uint256 end) internal view returns (uint256 votePower) {
+        return 1; // dummy return for contract compile
     }
 
     /**
      * @notice Computes voting fee (in token amount)
      * @dev Requires 'uwe', 'revenueRouter' and 'underwritingLocker' addresses to be set in the Registry.
-     * @param _registry The registry address to set.
+     * @param amount The amount of token in the underwriting lock.
+     * @param end The unlock timestamp of the lock.
      */
     function _calculateVoteFee(uint256 amount, uint256 end) internal view returns (uint256 fee) {
+        return 1; // dummy return for contract compile
     }
 
     /**
@@ -169,7 +172,7 @@ contract UnderwritingLockVoting is IUnderwritingLockVoting, ReentrancyGuard, Gov
      * @notice Obtain vote power sum for a gauge for a given epoch
      * @param epochStartTimestamp The ID of the lock that was altered.
      * @param gaugeID The old owner of the lock.
-     * @returns votePower
+     * @return votePower
      */
     function getVotePowerOfGaugeForEpoch(uint256 epochStartTimestamp, uint256 gaugeID) external view override returns (uint256 votePower) {
         return _votePowerOfGaugeForEpoch[epochStartTimestamp][gaugeID];
@@ -192,7 +195,7 @@ contract UnderwritingLockVoting is IUnderwritingLockVoting, ReentrancyGuard, Gov
      * @return gaugeID The ID of the gauge the lock has voted for, returns 0 if either lockID or vote doesn't exist
      */
     function getVote(uint256 lockID) external view override returns (uint256 gaugeID) {
-        (bool success, gaugeID) = _votes.tryGet(lockID);
+        (bool success, uint256 gaugeID) = _votes.tryGet(lockID);
     }
 
     /**
@@ -332,21 +335,21 @@ contract UnderwritingLockVoting is IUnderwritingLockVoting, ReentrancyGuard, Gov
      * @return epochProcessed True if all stored votes are processed for the last epoch, false otherwise
      */
     function processVotes() external override onlyGovernance nonReentrant returns (bool epochProcessed) {
-        require(lastTimeAllVotesProcessed != (block.timestamp * WEEK) / WEEK, "last epoch already processed")
+        require(lastTimeAllVotesProcessed != (block.timestamp * WEEK) / WEEK, "last epoch already processed");
 
-        uint256 epochStartTimestamp = getEpochStartTimestamp();
-        uint256 locks_processed = 0;
-        uint256 sum_voting_fee = 0;
-        let n_votes = _votes.length();
-        let vote_index = 0; // Vote index starts from 0, and must be strictly less than n_votes
+        uint256 epochStartTimestamp = _getEpochStartTimestamp();
+        uint256 locks_processed;
+        uint256 sum_voting_fee;
+        uint256 n_votes = _votes.length();
+        uint256 vote_index; // Vote index starts from 0, and must be strictly less than n_votes
 
         // Iterate through each vote
         // This is still technically an unbounded loop because n_votes is unbounded, need to test what the limit is here.
-        while locks_processed <= voteBatchSize && vote_index < n_votes {
-            (uint256 lockID, uint256 gaugeID) = _votes.at(vote_index)
+        while (locks_processed <= voteBatchSize && vote_index < n_votes) {
+            (uint256 lockID, uint256 gaugeID) = _votes.at(vote_index);
 
             // If lockID hasn't been processed for last epoch, then process the individual lcok
-            if _lastTimeVoteProcessed[lockID] != epochStartTimestamp {
+            if (_lastTimeVoteProcessed[lockID] != epochStartTimestamp) {
                 (,,uint256 amount, uint256 end) = _getLockInfo(lockID);
                 sum_voting_fee += _calculateVoteFee(amount, end);
                 _votePowerOfGaugeForEpoch[epochStartTimestamp][gaugeID] += _calculateVotePower(amount, end);
@@ -360,11 +363,11 @@ contract UnderwritingLockVoting is IUnderwritingLockVoting, ReentrancyGuard, Gov
             IERC20(IUnderwritingLocker(underwritingLocker).token()), 
             underwritingLocker, 
             revenueRouter,
-            sum_voting_fee,
+            sum_voting_fee
         );
 
         // If no locks processed in this invocation or we don't reach full batch size, make assumption that all locks have been processed
-        if locks_processed != voteBatchSize && n_votes > 0 {
+        if (locks_processed != voteBatchSize && n_votes > 0) {
             lastTimeAllVotesProcessed = epochStartTimestamp;
             emit AllVotesProcessed(epochStartTimestamp);
             return true;

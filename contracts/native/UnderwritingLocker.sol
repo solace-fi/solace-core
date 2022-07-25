@@ -10,8 +10,7 @@ import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 import "./../utils/ERC721Enhanced.sol";
 import "./../utils/Governable.sol";
 import "./../interfaces/utils/IRegistry.sol";
-import "./../interfaces/native/IUnderwriterLockerListener.sol";
-import "./../interfaces/native/IUnderwriterLocker.sol";
+import "./../interfaces/native/IUnderwritingLocker.sol";
 
 // TODO
 // Need formula for _getEmergencyWithdrawPenaltyPercentage
@@ -99,8 +98,9 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
      * @return penaltyAmount Token amount that will be paid to RevenueRouter.sol as a penalty for emergency withdrawing.
      */
     function _getEmergencyWithdrawPenaltyPercentage(uint256 lockID) internal view returns (uint256 penaltyPercentage) {
-        uint256 end = _locks[lockID].end;
+        // uint256 end = _locks[lockID].end;
         // Insert formula for computing penalty
+        return 1; // dummy return for contract compile
     }
 
     /***************************************
@@ -439,10 +439,10 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
      * @dev Can only be called by the lock owner or approved.
      * @dev If called before `end` timestamp, will incur a penalty
      * @param lockIDs The ID of the locks to withdraw from.
-     * @param recipient The user to receive the lock's token.
      * @param amounts Array of token amounts to emergency withdraw
+     * @param recipient The user to receive the lock's token.
      */
-    function emergencyWithdrawInPartMultiple(uint256[] calldata lockIDs, address recipient) external override nonReentrant {
+    function emergencyWithdrawInPartMultiple(uint256[] calldata lockIDs, uint256[] amounts, address recipient) external override nonReentrant {
         uint256 len = lockIDs.length;
         uint256 totalWithdrawAmount = 0;
         uint256 totalPenaltyAmount = 0;
