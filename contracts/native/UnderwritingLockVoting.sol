@@ -69,7 +69,7 @@ contract UnderwritingLockVoting is IUnderwritingLockVoting, ReentrancyGuard, Gov
     /// @dev Input validation for lockId will be performed in this contract
     /// @dev Input validation for insurance gauge vote will be performed in GaugeController.sol, when vote data is relayed at end of each epoch
     /// @dev If vote is invalid value, it will be skipped and ignored (rather than revert) 
-    EnumerableMap.UintToAddressMap private _votes;
+    EnumerableMap.UintToUintMap private _votes;
 
     // lockId => timestamp of last time (rounded down to weeks) that vote was processed via [`processVotes()`](#processvotes).
     mapping(uint256 => uint256) private _lastTimeVoteProcessed;
@@ -84,7 +84,7 @@ contract UnderwritingLockVoting is IUnderwritingLockVoting, ReentrancyGuard, Gov
     uint256 public override voteBatchSize;
 
     /// @notice Epoch start timestamp (rounded to weeks) => gaugeID => total vote power
-    mapping(uint256 => mapping(uint256 => uint256)) private override _votePowerOfGaugeForEpoch;
+    mapping(uint256 => mapping(uint256 => uint256)) internal _votePowerOfGaugeForEpoch;
 
     /// @notice Last timestamp (rounded down to weeks) that all stored votes were processed
     uint256 public override lastTimeAllVotesProcessed;
@@ -119,7 +119,9 @@ contract UnderwritingLockVoting is IUnderwritingLockVoting, ReentrancyGuard, Gov
         exists = locker.exists(lockID);
         if(exists) {
             owner = locker.ownerOf(lockID);
-            (amount, end) = locker.locks(lockID);
+            Lock memory lock = locker.locks(lockID);
+            amount = lock.amount;
+            end = lock.end;
         } else {
             owner = address(0x0);
             amount = 0;
@@ -137,6 +139,18 @@ contract UnderwritingLockVoting is IUnderwritingLockVoting, ReentrancyGuard, Gov
     function _calculateVotePower(uint256 amount, uint256 end) internal view returns (uint256 votePower) {
         return 1; // dummy return for contract compile
     }
+
+    /**
+     * @notice Get vote power (for the current epoch) for a lock
+     * @param lockID The ID of the lock to query.
+     * @return votePower
+     */
+    function _votePower(uint256 lockID) internal view returns (uint256 votePower) {
+        // Expect revert if lockID doesn't exist
+        Lock memory lock = IUnderwritingLocker(underwritingLocker).locks(lockID);
+        return _calculateVotePower(lock.amount, lock.end);
+    }
+
 
     /**
      * @notice Computes voting fee (in token amount)
@@ -184,9 +198,7 @@ contract UnderwritingLockVoting is IUnderwritingLockVoting, ReentrancyGuard, Gov
      * @return votePower
      */
     function votePower(uint256 lockID) external view override returns (uint256 votePower) {
-        // Expect revert if lockID doesn't exist
-        (uint256 amount, uint256 end) = IUnderwritingLocker(underwritingLocker).lock(lockID);
-        return _calculateVotePower(amount, end);
+        return _votePower(lockID);
     }
 
     /**
@@ -195,7 +207,7 @@ contract UnderwritingLockVoting is IUnderwritingLockVoting, ReentrancyGuard, Gov
      * @return gaugeID The ID of the gauge the lock has voted for, returns 0 if either lockID or vote doesn't exist
      */
     function getVote(uint256 lockID) external view override returns (uint256 gaugeID) {
-        (bool success, uint256 gaugeID) = _votes.tryGet(lockID);
+        (,gaugeID) = _votes.tryGet(lockID);
     }
 
     /**
@@ -210,7 +222,7 @@ contract UnderwritingLockVoting is IUnderwritingLockVoting, ReentrancyGuard, Gov
      * @notice Get timestamp for end of the current epoch
      * @return timestamp
      */
-    function getEpochEndTimestamp() public view override returns (uint256 timestamp) {
+    function getEpochEndTimestamp() external view override returns (uint256 timestamp) {
         _getEpochEndTimestamp();
     }
 
@@ -228,7 +240,7 @@ contract UnderwritingLockVoting is IUnderwritingLockVoting, ReentrancyGuard, Gov
      */
     function vote(uint256 lockID, uint256 gaugeID) external override {
         // This require to deal with edge case where if a user puts a new vote in the time window between an epoch end and processVotes() returning true for that epoch, we do not know (with the current setup) whether that lockID has a previous vote or not (that then needs to be included in processVotes());
-        require ( _getEpochStartTime() == lastTimeAllVotesProcessed, "votes not processed for last epoch");
+        require ( _getEpochStartTimestamp() == lastTimeAllVotesProcessed, "votes not processed for last epoch");
         _vote(lockID, gaugeID);
     }
 
@@ -242,7 +254,7 @@ contract UnderwritingLockVoting is IUnderwritingLockVoting, ReentrancyGuard, Gov
      */
     function voteMultiple(uint256[] calldata lockIDs, uint256[] calldata gaugeIDs) external override {
         require (lockIDs.length == gaugeIDs.length, "array length mismatch");
-        require ( _getEpochStartTime() == lastTimeAllVotesProcessed, "votes not processed for last epoch");
+        require ( _getEpochStartTimestamp() == lastTimeAllVotesProcessed, "votes not processed for last epoch");
         for (uint256 i = 0; i < lockIDs.length; i++) {
             _vote(lockIDs[i], gaugeIDs[i]);
         }
@@ -256,7 +268,7 @@ contract UnderwritingLockVoting is IUnderwritingLockVoting, ReentrancyGuard, Gov
      * @param manager_ Address of intended lock manager
      */
     function setLockManager(uint256 lockID, address manager_) external override {
-        require( IUnderwritingLock(underwritingLocker).ownerOf(lockID) == msg.sender, "not owner" );
+        require( IUnderwritingLocker(underwritingLocker).ownerOf(lockID) == msg.sender, "not owner" );
         lockManagers[lockID] = manager_;
         emit LockManagerSet(lockID, manager_);
     }
@@ -298,9 +310,9 @@ contract UnderwritingLockVoting is IUnderwritingLockVoting, ReentrancyGuard, Gov
      * @param gaugeID Address of intended lock manager
      */
     function _vote(uint256 lockID, uint256 gaugeID) internal  {
-        require( IUnderwritingLock(underwritingLocker).ownerOf(lockID) == msg.sender || lockManagers[lockID] == msg.sender, "not owner or manager" );
+        require( IUnderwritingLocker(underwritingLocker).ownerOf(lockID) == msg.sender || lockManagers[lockID] == msg.sender, "not owner or manager" );
         _votes.set(lockID, gaugeID);
-        emit Vote(lockID, gaugeID, msg.sender, _getEpochEndTimestamp(), votePower(lockID));
+        emit Vote(lockID, gaugeID, msg.sender, _getEpochEndTimestamp(), _votePower(lockID));
     }
 
     /***************************************

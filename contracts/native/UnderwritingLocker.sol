@@ -10,6 +10,7 @@ import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 import "./../utils/ERC721Enhanced.sol";
 import "./../utils/Governable.sol";
 import "./../interfaces/utils/IRegistry.sol";
+import "./../interfaces/native/IUnderwritingLockListener.sol";
 import "./../interfaces/native/IUnderwritingLocker.sol";
 
 // TODO
@@ -95,7 +96,7 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
      * @notice Computes current penalty (as a % of emergency withdrawn amount) for emergency withdrawing from a specified lock.
      * @dev penaltyPercentage == 1e18 means 100% penalty percentage. Similarly 1e17 => 10% penalty percentage.
      * @param lockID The ID of the lock to compute emergency withdraw penalty.
-     * @return penaltyAmount Token amount that will be paid to RevenueRouter.sol as a penalty for emergency withdrawing.
+     * @return penaltyPercentage Token amount that will be paid to RevenueRouter.sol as a penalty for emergency withdrawing.
      */
     function _getEmergencyWithdrawPenaltyPercentage(uint256 lockID) internal view returns (uint256 penaltyPercentage) {
         // uint256 end = _locks[lockID].end;
@@ -245,7 +246,7 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
         for (uint256 i = 0; i < lockIDs.length; i++) {
             // Guard against revert for non-existing lockIDs
             if ( _exists(lockIDs[i]) ) {
-                increaseAmount(lockIDs[i], amounts[i]);
+                _increaseAmount(lockIDs[i], amounts[i]);
             } else {
                 refundAmount += amounts[i];
             }
@@ -280,11 +281,7 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
      * @param end The new time for the lock to unlock.
      */
     function extendLock(uint256 lockID, uint256 end) external override nonReentrant onlyOwnerOrApproved(lockID) {
-        // solhint-disable-next-line not-rely-on-time
-        require(end <= block.timestamp + MAX_LOCK_DURATION, "Max lock is 4 years");
-        require(_locks[lockID].end <= end, "not extended");
-        _updateLock(lockID, _locks[lockID].amount, end);
-        emit LockExtended(lockID, end);
+        _extendLock(lockID, end);
     }
 
     /**
@@ -294,13 +291,13 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
      * @param lockIDs Array of lock IDs to update.
      * @param ends Array of new unlock times.
      */
-    function extendLockMultiple(uint256[] calldata lockIDs, uint256[] calldata ends) external override nonReentrant onlyOwnerOrApproved(lockID) {
+    function extendLockMultiple(uint256[] calldata lockIDs, uint256[] calldata ends) external override nonReentrant {
         require (lockIDs.length == ends.length, "array length mismatch");
 
         for (uint256 i = 0; i < lockIDs.length; i++) {
             // Guard against revert for non-existing lockIDs
             if ( _exists(lockIDs[i]) ) {
-                extendLock(lockIDs[i], amounts[i]);
+                _extendLock(lockIDs[i], ends[i]);
             }
         }
     }
@@ -442,7 +439,7 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
      * @param amounts Array of token amounts to emergency withdraw
      * @param recipient The user to receive the lock's token.
      */
-    function emergencyWithdrawInPartMultiple(uint256[] calldata lockIDs, uint256[] amounts, address recipient) external override nonReentrant {
+    function emergencyWithdrawInPartMultiple(uint256[] calldata lockIDs, uint256[] calldata amounts, address recipient) external override nonReentrant {
         uint256 len = lockIDs.length;
         uint256 totalWithdrawAmount = 0;
         uint256 totalPenaltyAmount = 0;
@@ -539,6 +536,21 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
     }
 
     /**
+     * @notice Extend a lock's duration.
+     * @dev Can only be called by the lock owner or approved.
+     * @param lockID The ID of the lock to update.
+     * @param end The new time for the lock to unlock.
+     */
+    function _extendLock(uint256 lockID, uint256 end) internal nonReentrant onlyOwnerOrApproved(lockID) {
+        // solhint-disable-next-line not-rely-on-time
+        require(end <= block.timestamp + MAX_LOCK_DURATION, "Max lock is 4 years");
+        require(_locks[lockID].end <= end, "not extended");
+        _updateLock(lockID, _locks[lockID].amount, end);
+        emit LockExtended(lockID, end);
+    }
+
+
+    /**
      * @notice Emergency withdraws from a lock.
      * @param lockID The ID of the lock to emergency withdraw from.
      * @param amount The amount of token to emergency withdraw.
@@ -546,7 +558,7 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
      */
     function _emergencyWithdraw(uint256 lockID, uint256 amount) internal returns (uint256 penalty) {
         // Make _getEmergencyWithdrawPenaltyPercentage query before lockID is potentially deleted
-        uint256 penalty = _getEmergencyWithdrawPenaltyPercentage(lockID);
+        uint256 penaltyPercentage = _getEmergencyWithdrawPenaltyPercentage(lockID);
         penalty = amount * penaltyPercentage / 1e18;
         // accounting
         if(amount == _locks[lockID].amount) {
@@ -562,7 +574,6 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
         }
         emit EmergencyWithdrawal(lockID, amount, penalty);
     }
-
 
     /**
      * @notice Hook that is called after any token transfer. This includes minting and burning.
@@ -601,7 +612,7 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
         // register action with listener
         uint256 len = _lockListeners.length();
         for(uint256 i = 0; i < len; i++) {
-            IxsListener(_lockListeners.at(i)).registerLockEvent(lockID, oldOwner, newOwner, oldLock, newLock);
+            IUnderwritingLockListener(_lockListeners.at(i)).registerLockEvent(lockID, oldOwner, newOwner, oldLock, newLock);
         }
     }
 

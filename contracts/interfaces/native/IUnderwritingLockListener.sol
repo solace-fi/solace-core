@@ -4,11 +4,11 @@ pragma solidity 0.8.6;
 import "./IUnderwritingLocker.sol";
 
 /**
- * @title IxsListener
+ * @title IUnderwritingLockListener
  * @author solace.fi
  * @notice A standard interface for notifying a contract about an action in another contract.
  */
-interface IxsListener {
+interface IUnderwritingLockListener {
     /**
      * @notice Called when an action is performed on a lock.
      * @dev Called on transfer, mint, burn, and update.

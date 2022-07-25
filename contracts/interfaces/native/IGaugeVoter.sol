@@ -15,9 +15,9 @@ interface IGaugeVoter {
      * @return votePower
      */
     function getVotePowerOfGaugeForEpoch(uint256 epochStartTimestamp, uint256 gaugeID) external view returns (uint256 votePower);
-
+    
     /**
-     * @notice Obtain end timetamp for the epoch most recently processed in full.
+     * @notice Obtain timestamp (rounded down to weeks) for the epoch most recently processed in full.
      * @return timestamp
      */
     function lastTimeAllVotesProcessed() external view returns (uint256 timestamp);

@@ -288,7 +288,7 @@ interface IUnderwritingLocker is IERC721Enhanced {
      * @param amounts Array of token amounts to emergency withdraw
      * @param recipient The user to receive the lock's token.
      */
-    function emergencyWithdrawInPartMultiple(uint256[] calldata lockIDs, uint256[] amounts, address recipient) external;
+    function emergencyWithdrawInPartMultiple(uint256[] calldata lockIDs, uint256[] calldata amounts, address recipient) external;
 
     /***************************************
     GOVERNANCE FUNCTIONS

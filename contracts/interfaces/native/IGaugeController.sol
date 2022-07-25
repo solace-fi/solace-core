@@ -15,7 +15,7 @@ pragma solidity 0.8.6;
  *
  * Governance can [`addGauge()`](#addgauge) or [`pauseGauge()`](#pausegauge).
  */
-contract IGaugeController {
+interface IGaugeController {
 
     /***************************************
     STRUCTS
@@ -53,10 +53,10 @@ contract IGaugeController {
     ***************************************/
 
     /// @notice The total number of gauges that have been created
-    function n_gauges() external view returns (address);
+    function n_gauges() external view returns (uint256);
 
     /// @notice Timestamp of last epoch start (rounded to weeks) that gauge weights were successfully updated.
-    function lastTimeGaugeWeightUpdated() external view returns (address);
+    function lastTimeGaugeWeightUpdated() external view returns (uint256);
 
     function WEEK() external view returns (uint256);
 
@@ -83,13 +83,14 @@ contract IGaugeController {
      * @return weight
      */
     function getGaugeWeight(uint256 gaugeID) external view returns (uint256 weight);
+
     /**
      * @notice Get all gauge weights.
      * @dev Gauge weights must sum to 1e18, so a weight of 1e17 == 10% weight.
-     * @return weights[].
+     * @return weights
      * @dev weights[0] will always be 0, so that weights[1] maps to the weight of gaugeID 1.
      */
-    function getAllGaugeWeight() external view returns (uint256[] weights);
+    function getAllGaugeWeight() external view returns (uint256[] memory weights);
 
     /**
      * @notice Get number of active gauges
@@ -107,7 +108,7 @@ contract IGaugeController {
      * @param gaugeID The ID of the gauge to query.
      * @return gaugeName
      */
-    function getGaugeName(uint256 gaugeID) external view returns (string gaugeName);
+    function getGaugeName(uint256 gaugeID) external view returns (string calldata gaugeName);
 
     /**
      * @notice Query whether gauge is active.
@@ -139,7 +140,7 @@ contract IGaugeController {
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param gaugeName Gauge name
      */
-    function addGauge(string gaugeName) external;
+    function addGauge(string calldata gaugeName) external;
 
     /**
      * @notice Pauses an insurance gauge

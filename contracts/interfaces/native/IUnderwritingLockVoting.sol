@@ -27,7 +27,7 @@ import "./IGaugeVoter.sol";
  * ii.) It is possible that in the future there will be more than one source of voting data to GaugeController.sol, i.e. owners of xsLocks may also have voting rights. 
  * One drawback is that it requires two regular function calls, rather than one.
  */
-contract IUnderwritingLockVoting is IGaugeVoter {
+interface IUnderwritingLockVoting is IGaugeVoter {
 
     /***************************************
     EVENTS
@@ -37,7 +37,7 @@ contract IUnderwritingLockVoting is IGaugeVoter {
     event LockManagerSet(uint256 indexed lockID, address indexed manager);
 
     /// @notice Emitted when the Registry is set.
-    event Registry(address indexed registry);
+    event RegistrySet(address indexed registry);
 
     /// @notice Emitted when the Vote is registered.
     /// epochTimestamp is the timestamp for the epoch (rounded down to weeks) that the vote counts for
@@ -73,9 +73,6 @@ contract IUnderwritingLockVoting is IGaugeVoter {
     /// @notice Batch size of votes that will be processed in a single call of [`processVotes()`](#processvotes).
     function voteBatchSize() external view returns (uint256);
 
-    /// @notice Last timestamp (rounded down to weeks) that all stored votes were processed
-    function lastTimeAllVotesProcessed() external view returns (uint256);
-
     /// @notice Get lockManager for a given lockId
     /// @param lockId The ID of the lock to query for
     /// @return lockManager
@@ -108,7 +105,7 @@ contract IUnderwritingLockVoting is IGaugeVoter {
      * @notice Get timestamp for end of the current epoch
      * @return timestamp
      */
-    function getEpochEndTimestamp() public view returns (uint256 timestamp);
+    function getEpochEndTimestamp() external view returns (uint256 timestamp);
 
     /***************************************
     EXTERNAL MUTATOR FUNCTIONS
