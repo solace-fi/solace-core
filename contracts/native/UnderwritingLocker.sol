@@ -65,6 +65,7 @@ contract UnderwritingLocker is
     address public override registry;
 
     /// @notice The total number of locks that have been created.
+    /// @dev Difference with totalSupply is that totalNumLocks does not decrement when locks are burned.
     uint256 public override totalNumLocks;
 
     /// @notice The minimum lock duration (six months) that a new lock must be created with.
@@ -196,7 +197,7 @@ contract UnderwritingLocker is
      * @param lockID_ The ID of the lock to compute emergency withdraw penalty.
      * @return penaltyAmount Token amount that will be paid to RevenueRouter.sol as a penalty for emergency withdrawing.
      */
-    function getEmergencyWithdrawPenalty(uint256 lockID_) external view override returns (uint256 penaltyAmount) {
+    function getEmergencyWithdrawPenalty(uint256 lockID_) external view override tokenMustExist(lockID_) returns (uint256 penaltyAmount) {
         return _getEmergencyWithdrawPenalty(lockID_);
     }
 
@@ -512,9 +513,9 @@ contract UnderwritingLocker is
      * @param amount_ The amount of token to deposit.
      */
     function _increaseAmount(uint256 lockID_, uint256 amount_) internal {
-        uint256 newAmount = _locks[lockID_].amount + amount_;
-        _updateLock(lockID_, newAmount, _locks[lockID_].end);
-        emit LockIncreased(lockID_, newAmount, amount_);
+        uint256 newTotalAmount = _locks[lockID_].amount + amount_;
+        _updateLock(lockID_, newTotalAmount, _locks[lockID_].end);
+        emit LockIncreased(lockID_, newTotalAmount, amount_);
     }
 
 
@@ -532,7 +533,7 @@ contract UnderwritingLocker is
         _locks[lockID_] = newLock;
         address owner = ownerOf(lockID_);
         _notify(lockID_, owner, owner, prevLock, newLock);
-        emit LockUpdated(lockID_, amount_, newLock.end);
+        emit LockUpdated(lockID_, amount_, end_);
     }
 
     /**

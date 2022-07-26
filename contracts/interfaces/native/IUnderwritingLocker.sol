@@ -130,6 +130,7 @@ interface IUnderwritingLocker is IERC721Enhanced {
     function MAX_LOCK_DURATION() external view returns (uint256);
 
     /// @notice The total number of locks that have been created.
+    /// @dev Difference with totalSupply is that totalNumLocks does not decrement when locks are burned.
     function totalNumLocks() external view returns (uint256);
 
     /***************************************
