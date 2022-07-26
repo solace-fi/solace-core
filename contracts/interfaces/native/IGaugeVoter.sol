@@ -10,15 +10,15 @@ pragma solidity 0.8.6;
 interface IGaugeVoter {
     /**
      * @notice Obtain vote power sum for a gauge for a given epoch
-     * @param epochStartTimestamp The ID of the lock that was altered.
-     * @param gaugeID The old owner of the lock.
+     * @param epochStartTimestamp_ Start timestamp for epoch.
+     * @param gaugeID_ Gauge ID to query.
      * @return votePower
      */
-    function getVotePowerOfGaugeForEpoch(uint256 epochStartTimestamp, uint256 gaugeID) external view returns (uint256 votePower);
-    
+    function getVotePowerOfGaugeForEpoch(uint256 epochStartTimestamp_, uint256 gaugeID_) external view returns (uint256 votePower);
+
     /**
-     * @notice Obtain timestamp (rounded down to weeks) for the epoch most recently processed in full.
-     * @return timestamp
+     * @notice Obtain end timestamp (rounded down to weeks) for the epoch most recently processed in full.
+     * @return timestamp_
      */
-    function lastTimeAllVotesProcessed() external view returns (uint256 timestamp);
+    function lastTimeAllVotesProcessed() external view returns (uint256 timestamp_);
 }

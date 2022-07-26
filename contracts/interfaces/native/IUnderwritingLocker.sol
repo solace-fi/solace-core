@@ -49,13 +49,9 @@ interface IUnderwritingLocker is IERC721Enhanced {
      */
     error ArrayArgumentsLengthMismatch();
 
-    /**
-     * @notice Thrown when a withdraw or emergency withdraw is attempted for an `amount` that exceeds the lock balance.
-     * @param lockID The ID of the lock
-     * @param lockAmount Balance of the lock
-     * @param attemptedWithdrawAmount Attempted withdraw amount
-     */
-    error ExcessWithdraw(uint256 lockID, uint256 lockAmount, uint256 attemptedWithdrawAmount);
+    /// @notice Thrown when zero address is given as an argument.
+    /// @param contractName Name of contract for which zero address was incorrectly provided.
+    error ZeroAddressInput(string contractName);
 
     /// @notice Thrown when extend, withdraw, or emergency withdraw is attempted by a party that is not the owner nor approved for a lock.
     error NotOwnerNorApproved();
@@ -66,10 +62,6 @@ interface IUnderwritingLocker is IERC721Enhanced {
     /// @notice Thrown when createLock or extendLock is attempted with lock duration > 4 years.
     error LockTimeTooLong();
 
-    /// @notice Thrown when zero address is given as an argument.
-    /// @param contractName Name of contract for which zero address was incorrectly provided.
-    error ZeroAddressInput(string contractName);
-
     /// @notice Thrown when extendLock is attempted to shorten the lock duration.
     error LockTimeNotExtended();
 
@@ -78,6 +70,14 @@ interface IUnderwritingLocker is IERC721Enhanced {
 
     /// @notice Thrown when withdraw is attempted while locked.
     error CannotWithdrawWhileLocked();
+
+    /**
+     * @notice Thrown when a withdraw or emergency withdraw is attempted for an `amount` that exceeds the lock balance.
+     * @param lockID The ID of the lock
+     * @param lockAmount Balance of the lock
+     * @param attemptedWithdrawAmount Attempted withdraw amount
+     */
+    error ExcessWithdraw(uint256 lockID, uint256 lockAmount, uint256 attemptedWithdrawAmount);
 
     /***************************************
     EVENTS
@@ -138,32 +138,32 @@ interface IUnderwritingLocker is IERC721Enhanced {
 
     /**
      * @notice Get `amount` and `end` values for a lockID.
-     * @param lockID The ID of the lock to query.
+     * @param lockID_ The ID of the lock to query.
      * @return lock_ Lock {uint256 amount, uint256 end}
      */
-    function locks(uint256 lockID) external view returns (Lock memory lock_);
+    function locks(uint256 lockID_) external view returns (Lock memory lock_);
 
 
     /**
      * @notice Determines if the lock is currently locked.
-     * @param lockID The ID of the lock to query.
+     * @param lockID_ The ID of the lock to query.
      * @return locked True if the lock is locked, false if unlocked.
      */
-    function isLocked(uint256 lockID) external view returns (bool locked);
+    function isLocked(uint256 lockID_) external view returns (bool locked);
 
     /**
      * @notice Determines the time left until the lock unlocks.
-     * @param lockID The ID of the lock to query.
+     * @param lockID_ The ID of the lock to query.
      * @return time The time left in seconds, 0 if unlocked.
      */
-    function timeLeft(uint256 lockID) external view returns (uint256 time);
+    function timeLeft(uint256 lockID_) external view returns (uint256 time);
 
     /**
      * @notice Returns the total token amount that the user has staked in underwriting locks.
-     * @param account The account to query.
+     * @param account_ The account to query.
      * @return balance The user's total staked token amount.
      */
-    function totalStakedBalance(address account) external view returns (uint256 balance);
+    function totalStakedBalance(address account_) external view returns (uint256 balance);
 
     /**
      * @notice The list of contracts that are listening to lock updates.
@@ -172,12 +172,11 @@ interface IUnderwritingLocker is IERC721Enhanced {
     function getLockListeners() external view returns (address[] memory listeners_);
 
     /**
-     * @notice Computes current penalty (as a % of emergency withdrawn amount) for emergency withdrawing from a specified lock.
-     * @dev penaltyPercentage == 1e18 means 100% penalty percentage. Similarly 1e17 => 10% penalty percentage.
-     * @param lockID The ID of the lock to compute emergency withdraw penalty.
+     * @notice Computes current penalty for emergency withdrawing from a specified lock.
+     * @param lockID_ The ID of the lock to compute emergency withdraw penalty.
      * @return penaltyAmount Token amount that will be paid to RevenueRouter.sol as a penalty for emergency withdrawing.
      */
-    function getEmergencyWithdrawPenaltyPercentage(uint256 lockID) external view returns (uint256 penaltyAmount);
+    function getEmergencyWithdrawPenalty(uint256 lockID_) external view returns (uint256 penaltyAmount);
 
     /***************************************
     EXTERNAL MUTATOR FUNCTIONS
@@ -186,150 +185,150 @@ interface IUnderwritingLocker is IERC721Enhanced {
     /**
      * @notice Deposit token to create a new lock.
      * @dev Token is transferred from msg.sender, assumes its already approved.
-     * @param recipient The account that will receive the lock.
-     * @param amount The amount of token to deposit.
-     * @param end The timestamp the lock will unlock.
+     * @param recipient_ The account that will receive the lock.
+     * @param amount_ The amount of token to deposit.
+     * @param end_ The timestamp the lock will unlock.
      * @return lockID The ID of the newly created lock.
      */
-    function createLock(address recipient, uint256 amount, uint256 end) external returns (uint256 lockID);
+    function createLock(address recipient_, uint256 amount_, uint256 end_) external returns (uint256 lockID);
 
     /**
      * @notice Deposit token to create a new lock.
      * @dev Token is transferred from msg.sender using ERC20Permit.
      * @dev recipient = msg.sender
-     * @param amount The amount of token to deposit.
-     * @param end The timestamp the lock will unlock.
-     * @param deadline Time the transaction must go through before.
+     * @param amount_ The amount of token to deposit.
+     * @param end_ The timestamp the lock will unlock.
+     * @param deadline_ Time the transaction must go through before.
      * @param v secp256k1 signature
      * @param r secp256k1 signature
      * @param s secp256k1 signature
      * @return lockID The ID of the newly created lock.
      */
-    function createLockSigned(uint256 amount, uint256 end, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external returns (uint256 lockID);
+    function createLockSigned(uint256 amount_, uint256 end_, uint256 deadline_, uint8 v, bytes32 r, bytes32 s) external returns (uint256 lockID);
 
     /**
      * @notice Deposit token to increase the value of an existing lock.
      * @dev Token is transferred from msg.sender, assumes its already approved.
      * @dev Anyone (not just the lock owner) can call increaseAmount() and deposit to an existing lock.
-     * @param lockID The ID of the lock to update.
-     * @param amount The amount of token to deposit.
+     * @param lockID_ The ID of the lock to update.
+     * @param amount_ The amount of token to deposit.
      */
-    function increaseAmount(uint256 lockID, uint256 amount) external;
+    function increaseAmount(uint256 lockID_, uint256 amount_) external;
 
     /**
      * @notice Deposit token to increase the value of multiple existing locks.
      * @dev Token is transferred from msg.sender, assumes its already approved.
      * @dev If a lockID does not exist, the corresponding amount will be refunded to msg.sender.
      * @dev Anyone (not just the lock owner) can call increaseAmountMultiple() and deposit to existing locks.
-     * @param lockIDs Array of lock IDs to update.
-     * @param amounts Array of token amounts to deposit.
+     * @param lockIDs_ Array of lock IDs to update.
+     * @param amounts_ Array of token amounts to deposit.
      */
-    function increaseAmountMultiple(uint256[] calldata lockIDs, uint256[] calldata amounts) external;
+    function increaseAmountMultiple(uint256[] calldata lockIDs_, uint256[] calldata amounts_) external;
 
     /**
      * @notice Deposit token to increase the value of an existing lock.
      * @dev Token is transferred from msg.sender using ERC20Permit.
      * @dev Anyone (not just the lock owner) can call increaseAmount() and deposit to an existing lock.
-     * @param lockID The ID of the lock to update.
-     * @param amount The amount of token to deposit.
-     * @param deadline Time the transaction must go through before.
+     * @param lockID_ The ID of the lock to update.
+     * @param amount_ The amount of token to deposit.
+     * @param deadline_ Time the transaction must go through before.
      * @param v secp256k1 signature
      * @param r secp256k1 signature
      * @param s secp256k1 signature
      */
-    function increaseAmountSigned(uint256 lockID, uint256 amount, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external;
+    function increaseAmountSigned(uint256 lockID_, uint256 amount_, uint256 deadline_, uint8 v, bytes32 r, bytes32 s) external;
 
     /**
      * @notice Extend a lock's duration.
      * @dev Can only be called by the lock owner or approved.
-     * @param lockID The ID of the lock to update.
-     * @param end The new time for the lock to unlock.
+     * @param lockID_ The ID of the lock to update.
+     * @param end_ The new time for the lock to unlock.
      */
-    function extendLock(uint256 lockID, uint256 end) external;
+    function extendLock(uint256 lockID_, uint256 end_) external;
 
     /**
      * @notice Extend multiple locks' duration.
      * @dev Can only be called by the lock owner or approved.
      * @dev If non-existing lockIDs are entered, these will be skipped.
-     * @param lockIDs Array of lock IDs to update.
-     * @param ends Array of new unlock times.
+     * @param lockIDs_ Array of lock IDs to update.
+     * @param ends_ Array of new unlock times.
      */
-    function extendLockMultiple(uint256[] calldata lockIDs, uint256[] calldata ends) external;
+    function extendLockMultiple(uint256[] calldata lockIDs_, uint256[] calldata ends_) external;
 
     /**
      * @notice Withdraw from a lock in full.
      * @dev Can only be called by the lock owner or approved.
      * @dev Can only be called if unlocked.
-     * @param lockID The ID of the lock to withdraw from.
-     * @param recipient The user to receive the lock's token.
+     * @param lockID_ The ID of the lock to withdraw from.
+     * @param recipient_ The user to receive the lock's token.
      */
-    function withdraw(uint256 lockID, address recipient) external;
+    function withdraw(uint256 lockID_, address recipient_) external;
 
     /**
      * @notice Withdraw from a lock in part.
      * @dev Can only be called by the lock owner or approved.
      * @dev Can only be called if unlocked.
-     * @param lockID The ID of the lock to withdraw from.
-     * @param recipient The user to receive the lock's token.
-     * @param amount The amount of token to withdraw.
+     * @param lockID_ The ID of the lock to withdraw from.
+     * @param amount_ The amount of token to withdraw.
+     * @param recipient_ The user to receive the lock's token.
      */
-    function withdrawInPart(uint256 lockID, address recipient, uint256 amount) external;
+    function withdrawInPart(uint256 lockID_, uint256 amount_, address recipient_) external;
     /**
      * @notice Withdraw from multiple locks in full.
      * @dev Can only be called by the lock owner or approved.
      * @dev Can only be called if unlocked.
-     * @param lockIDs The ID of the locks to withdraw from.
-     * @param recipient The user to receive the lock's token.
+     * @param lockIDs_ The ID of the locks to withdraw from.
+     * @param recipient_ The user to receive the lock's token.
      */
-    function withdrawMultiple(uint256[] calldata lockIDs, address recipient) external;
+    function withdrawMultiple(uint256[] calldata lockIDs_, address recipient_) external;
 
     /**
      * @notice Withdraw from multiple locks in part.
      * @dev Can only be called by the lock owner or approved.
      * @dev Can only be called if unlocked.
-     * @param lockIDs The ID of the locks to withdraw from.
-     * @param recipient The user to receive the lock's token.
-     * @param amounts Array of token amounts to withdraw
+     * @param lockIDs_ The ID of the locks to withdraw from.
+     * @param amounts_ Array of token amounts to withdraw
+     * @param recipient_ The user to receive the lock's token.
      */
-    function withdrawInPartMultiple(uint256[] calldata lockIDs, address recipient, uint256[] calldata amounts) external;
+    function withdrawInPartMultiple(uint256[] calldata lockIDs_,  uint256[] calldata amounts_, address recipient_) external;
 
     /**
      * @notice Emergency withdraw from a lock in full.
      * @dev Can only be called by the lock owner or approved.
      * @dev If called before `end` timestamp, will incur a penalty
-     * @param lockID The ID of the lock to emergency withdraw from.
-     * @param recipient The user to receive the lock's token.
+     * @param lockID_ The ID of the lock to emergency withdraw from.
+     * @param recipient_ The user to receive the lock's token.
      */
-    function emergencyWithdraw(uint256 lockID, address recipient) external;
+    function emergencyWithdraw(uint256 lockID_, address recipient_) external;
 
     /**
      * @notice Emergency withdraw from a lock in part.
      * @dev Can only be called by the lock owner or approved.
      * @dev If called before `end` timestamp, will incur a penalty
-     * @param lockID The ID of the lock to emergency withdraw from.
-     * @param recipient The user to receive the lock's token.
-     * @param amount The amount of token to withdraw.
+     * @param lockID_ The ID of the lock to emergency withdraw from.
+     * @param amount_ The amount of token to withdraw.
+     * @param recipient_ The user to receive the lock's token.
      */
-    function emergencyWithdrawInPart(uint256 lockID, address recipient, uint256 amount) external;
+    function emergencyWithdrawInPart(uint256 lockID_, uint256 amount_, address recipient_) external;
 
     /**
      * @notice Emergency withdraw from multiple locks in full.
      * @dev Can only be called by the lock owner or approved.
      * @dev If called before `end` timestamp, will incur a penalty
-     * @param lockIDs The ID of the locks to withdraw from.
-     * @param recipient The user to receive the lock's token.
+     * @param lockIDs_ The ID of the locks to withdraw from.
+     * @param recipient_ The user to receive the lock's token.
      */
-    function emergencyWithdrawMultiple(uint256[] calldata lockIDs, address recipient) external;
+    function emergencyWithdrawMultiple(uint256[] calldata lockIDs_, address recipient_) external;
 
     /**
      * @notice Emergency withdraw from multiple locks in part.
      * @dev Can only be called by the lock owner or approved.
      * @dev If called before `end` timestamp, will incur a penalty
-     * @param lockIDs The ID of the locks to withdraw from.
-     * @param amounts Array of token amounts to emergency withdraw
-     * @param recipient The user to receive the lock's token.
+     * @param lockIDs_ The ID of the locks to withdraw from.
+     * @param amounts_ Array of token amounts to emergency withdraw
+     * @param recipient_ The user to receive the lock's token.
      */
-    function emergencyWithdrawInPartMultiple(uint256[] calldata lockIDs, uint256[] calldata amounts, address recipient) external;
+    function emergencyWithdrawInPartMultiple(uint256[] calldata lockIDs_, uint256[] calldata amounts_, address recipient_) external;
 
     /***************************************
     GOVERNANCE FUNCTIONS
@@ -338,16 +337,16 @@ interface IUnderwritingLocker is IERC721Enhanced {
     /**
      * @notice Adds a listener.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param listener The listener to add.
+     * @param listener_ The listener to add.
      */
-    function addLockListener(address listener) external;
+    function addLockListener(address listener_) external;
 
     /**
      * @notice Removes a listener.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param listener The listener to remove.
+     * @param listener_ The listener to remove.
      */
-    function removeLockListener(address listener) external;
+    function removeLockListener(address listener_) external;
 
     /**
      * @notice Sets the base URI for computing `tokenURI`.
@@ -359,15 +358,15 @@ interface IUnderwritingLocker is IERC721Enhanced {
     /**
      * @notice Sets the [`Registry`](./Registry) contract address.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param _registry The address of `Registry` contract.
+     * @param registry_ The address of `Registry` contract.
      */
-    function setRegistry(address _registry) external;
+    function setRegistry(address registry_) external;
 
     /**
      * @notice Approves [`UnderwritingLockVoting`](./UnderwritingLockVoting) to transfer token from this contract
      * @dev Hacky fix to the issue that [`UnderwritingLockVoting`](./UnderwritingLockVoting) needs token transfer approval, but will be deployed after this contract.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param _votingContract The address of `Registry` contract.
+     * @param votingContract_ The address of `LockUnderwritingVoting` contract.
      */
-    function setVotingContractApproval(address _votingContract) external;
+    function setVotingContractApproval(address votingContract_) external;
 }

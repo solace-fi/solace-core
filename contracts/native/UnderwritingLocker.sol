@@ -16,7 +16,6 @@ import "./../interfaces/native/IUnderwritingLocker.sol";
 // TODO
 // Need formula for _getEmergencyWithdrawPenaltyPercentage
 // $UWE needs to inherit ERC20Permit, or we remove ...Signed methods from this contract
-// Custom Error types
 
 /**
  * @title UnderwritingLocker
@@ -44,11 +43,16 @@ import "./../interfaces/native/IUnderwritingLocker.sol";
  *
  */
 // solhint-disable-next-line contract-name-camelcase
-contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGuard, Governable {
+contract UnderwritingLocker is 
+        IUnderwritingLocker, 
+        ERC721Enhanced, 
+        ReentrancyGuard, 
+        Governable 
+    {    
     using EnumerableSet for EnumerableSet.AddressSet;
 
     /***************************************
-    GLOBAL VARIABLES
+    GLOBAL PUBLIC VARIABLES
     ***************************************/
 
     /// @notice Token locked in the underwriting lock.
@@ -60,20 +64,28 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
     /// @notice Registry address
     address public override registry;
 
+    /// @notice The total number of locks that have been created.
+    uint256 public override totalNumLocks;
+
     /// @notice The minimum lock duration (six months) that a new lock must be created with.
     uint256 public constant override MIN_LOCK_DURATION = (365 days) / 2;
 
     /// @notice The maximum time (four years) into the future that a lock can expire.
     uint256 public constant override MAX_LOCK_DURATION = 4 * (365 days);
 
-    /// @notice The total number of locks that have been created.
-    uint256 public override totalNumLocks;
+    /***************************************
+    GLOBAL INTERNAL VARIABLES
+    ***************************************/
 
     // lockId => Lock {uint256 amount, uint256 end}
-    mapping(uint256 => Lock) private _locks;
+    mapping(uint256 => Lock) internal _locks;
 
     // Contracts that listen for lock changes
-    EnumerableSet.AddressSet private _lockListeners;
+    EnumerableSet.AddressSet internal _lockListeners;
+
+    /***************************************
+    CONSTRUCTOR
+    ***************************************/
 
     /**
      * @notice Construct the UnderwritingLocker contract.
@@ -95,13 +107,24 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
     /**
      * @notice Computes current penalty (as a % of emergency withdrawn amount) for emergency withdrawing from a specified lock.
      * @dev penaltyPercentage == 1e18 means 100% penalty percentage. Similarly 1e17 => 10% penalty percentage.
-     * @param lockID The ID of the lock to compute emergency withdraw penalty.
-     * @return penaltyPercentage Token amount that will be paid to RevenueRouter.sol as a penalty for emergency withdrawing.
+     * @param end_ Timestamp when lock unlocks
+     * @return penaltyPercentage Penalty percentage that will be paid to RevenueRouter.sol for emergency withdrawing.
      */
-    function _getEmergencyWithdrawPenaltyPercentage(uint256 lockID) internal view returns (uint256 penaltyPercentage) {
+    function _getEmergencyWithdrawPenaltyPercentage(uint256 end_) internal view returns (uint256 penaltyPercentage) {
         // uint256 end = _locks[lockID].end;
         // Insert formula for computing penalty
         return 1; // dummy return for contract compile
+    }
+
+    /**
+     * @notice Computes current penalty for emergency withdrawing from a specified lock.
+     * @param lockID_ The ID of the lock to compute emergency withdraw penalty.
+     * @return penaltyAmount Token amount that will be paid to RevenueRouter.sol as a penalty for emergency withdrawing.
+     */
+    function _getEmergencyWithdrawPenalty(uint256 lockID_) internal view returns (uint256 penaltyAmount) {
+        Lock memory lock = _locks[lockID_];
+        uint256 penaltyPercentage = _getEmergencyWithdrawPenaltyPercentage(lock.end);
+        return (penaltyPercentage * lock.amount) / 1e18;
     }
 
     /***************************************
@@ -110,46 +133,46 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
 
     /**
      * @notice Get `amount` and `end` values for a lockID.
-     * @param lockID The ID of the lock to query.
-     * @return lock_ Lock {uint256 amount, uint256 end}
+     * @param lockID_ The ID of the lock to query.
+     * @return lock Lock {uint256 amount, uint256 end}
      */
-    function locks(uint256 lockID) external view override tokenMustExist(lockID) returns (Lock memory lock_) {
-        return _locks[lockID];
+    function locks(uint256 lockID_) external view override tokenMustExist(lockID_) returns (Lock memory lock) {
+        return _locks[lockID_];
     }
 
     /**
      * @notice Determines if the lock is currently locked.
-     * @param lockID The ID of the lock to query.
+     * @param lockID_ The ID of the lock to query.
      * @return locked True if the lock is locked, false if unlocked.
      */
-    function isLocked(uint256 lockID) external view override tokenMustExist(lockID) returns (bool locked) {
+    function isLocked(uint256 lockID_) external view override tokenMustExist(lockID_) returns (bool locked) {
         // solhint-disable-next-line not-rely-on-time
-        return _locks[lockID].end > block.timestamp;
+        return _locks[lockID_].end > block.timestamp;
     }
 
     /**
      * @notice Determines the time left until the lock unlocks.
-     * @param lockID The ID of the lock to query.
+     * @param lockID_ The ID of the lock to query.
      * @return time The time left in seconds, 0 if unlocked.
      */
-    function timeLeft(uint256 lockID) external view override tokenMustExist(lockID) returns (uint256 time) {
+    function timeLeft(uint256 lockID_) external view override tokenMustExist(lockID_) returns (uint256 time) {
         // solhint-disable-next-line not-rely-on-time
-        return (_locks[lockID].end > block.timestamp)
+        return (_locks[lockID_].end > block.timestamp)
             // solhint-disable-next-line not-rely-on-time
-            ? _locks[lockID].end - block.timestamp // locked
+            ? _locks[lockID_].end - block.timestamp // locked
             : 0; // unlocked
     }
 
     /**
      * @notice Returns the total token amount that the user has staked in underwriting locks.
-     * @param account The account to query.
+     * @param account_ The account to query.
      * @return balance The user's total staked token amount.
      */
-    function totalStakedBalance(address account) external view override returns (uint256 balance) {
-        uint256 numOfLocks = balanceOf(account);
+    function totalStakedBalance(address account_) external view override returns (uint256 balance) {
+        uint256 numOfLocks = balanceOf(account_);
         balance = 0;
         for (uint256 i = 0; i < numOfLocks; i++) {
-            uint256 lockID = tokenOfOwnerByIndex(account, i);
+            uint256 lockID = tokenOfOwnerByIndex(account_, i);
             balance += _locks[lockID].amount;
         }
         return balance;
@@ -169,13 +192,12 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
     }
 
     /**
-     * @notice Computes current penalty (as a % of emergency withdrawn amount) for emergency withdrawing from a specified lock.
-     * @dev penaltyPercentage == 1e18 means 100% penalty percentage. Similarly 1e17 => 10% penalty percentage.
-     * @param lockID The ID of the lock to compute emergency withdraw penalty.
+     * @notice Computes current penalty for emergency withdrawing from a specified lock.
+     * @param lockID_ The ID of the lock to compute emergency withdraw penalty.
      * @return penaltyAmount Token amount that will be paid to RevenueRouter.sol as a penalty for emergency withdrawing.
      */
-    function getEmergencyWithdrawPenaltyPercentage(uint256 lockID) external view override tokenMustExist(lockID) returns (uint256 penaltyAmount) {
-        return _getEmergencyWithdrawPenaltyPercentage(lockID);
+    function getEmergencyWithdrawPenalty(uint256 lockID_) external view override returns (uint256 penaltyAmount) {
+        return _getEmergencyWithdrawPenalty(lockID_);
     }
 
     /***************************************
@@ -185,51 +207,51 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
     /**
      * @notice Deposit token to create a new lock.
      * @dev Token is transferred from msg.sender, assumes its already approved.
-     * @param recipient The account that will receive the lock.
-     * @param amount The amount of token to deposit.
-     * @param end The timestamp the lock will unlock.
+     * @param recipient_ The account that will receive the lock.
+     * @param amount_ The amount of token to deposit.
+     * @param end_ The timestamp the lock will unlock.
      * @return lockID The ID of the newly created lock.
      */
-    function createLock(address recipient, uint256 amount, uint256 end) external override nonReentrant returns (uint256 lockID) {
+    function createLock(address recipient_, uint256 amount_, uint256 end_) external override nonReentrant returns (uint256 lockID) {
         // pull token
-        SafeERC20.safeTransferFrom(IERC20(token), msg.sender, address(this), amount);
+        SafeERC20.safeTransferFrom(IERC20(token), msg.sender, address(this), amount_);
         // accounting
-        return _createLock(recipient, amount, end);
+        return _createLock(recipient_, amount_, end_);
     }
 
     /**
      * @notice Deposit token to create a new lock.
      * @dev Token is transferred from msg.sender using ERC20Permit.
      * @dev recipient = msg.sender
-     * @param amount The amount of token to deposit.
-     * @param end The timestamp the lock will unlock.
-     * @param deadline Time the transaction must go through before.
+     * @param amount_ The amount of token to deposit.
+     * @param end_ The timestamp the lock will unlock.
+     * @param deadline_ Time the transaction must go through before.
      * @param v secp256k1 signature
      * @param r secp256k1 signature
      * @param s secp256k1 signature
      * @return lockID The ID of the newly created lock.
      */
-    function createLockSigned(uint256 amount, uint256 end, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external override nonReentrant returns (uint256 lockID) {
+    function createLockSigned(uint256 amount_, uint256 end_, uint256 deadline_, uint8 v, bytes32 r, bytes32 s) external override nonReentrant returns (uint256 lockID) {
         // permit
-        IERC20Permit(token).permit(msg.sender, address(this), amount, deadline, v, r, s);
+        IERC20Permit(token).permit(msg.sender, address(this), amount_, deadline_, v, r, s);
         // pull token
-        SafeERC20.safeTransferFrom(IERC20(token), msg.sender, address(this), amount);
+        SafeERC20.safeTransferFrom(IERC20(token), msg.sender, address(this), amount_);
         // accounting
-        return _createLock(msg.sender, amount, end);
+        return _createLock(msg.sender, amount_, end_);
     }
 
     /**
      * @notice Deposit token to increase the value of an existing lock.
      * @dev Token is transferred from msg.sender, assumes its already approved.
      * @dev Anyone (not just the lock owner) can call increaseAmount() and deposit to an existing lock.
-     * @param lockID The ID of the lock to update.
-     * @param amount The amount of token to deposit.
+     * @param lockID_ The ID of the lock to update.
+     * @param amount_ The amount of token to deposit.
      */
-    function increaseAmount(uint256 lockID, uint256 amount) external override nonReentrant tokenMustExist(lockID) {
+    function increaseAmount(uint256 lockID_, uint256 amount_) external override nonReentrant tokenMustExist(lockID_) {
         // pull token
-        SafeERC20.safeTransferFrom(IERC20(token), msg.sender, address(this), amount);
+        SafeERC20.safeTransferFrom(IERC20(token), msg.sender, address(this), amount_);
         // accounting
-        _increaseAmount(lockID, amount);
+        _increaseAmount(lockID_, amount_);
     }
 
     /**
@@ -237,18 +259,18 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
      * @dev Token is transferred from msg.sender, assumes its already approved.
      * @dev If a lockID does not exist, the corresponding amount will be refunded to msg.sender.
      * @dev Anyone (not just the lock owner) can call increaseAmountMultiple() and deposit to existing locks.
-     * @param lockIDs Array of lock IDs to update.
-     * @param amounts Array of token amounts to deposit.
+     * @param lockIDs_ Array of lock IDs to update.
+     * @param amounts_ Array of token amounts to deposit.
      */
-    function increaseAmountMultiple(uint256[] calldata lockIDs, uint256[] calldata amounts) external override nonReentrant {
-        if (lockIDs.length != amounts.length) revert ArrayArgumentsLengthMismatch();
+    function increaseAmountMultiple(uint256[] calldata lockIDs_, uint256[] calldata amounts_) external override nonReentrant {
+        if (lockIDs_.length != amounts_.length) revert ArrayArgumentsLengthMismatch();
         uint256 refundAmount = 0;
-        for (uint256 i = 0; i < lockIDs.length; i++) {
+        for (uint256 i = 0; i < lockIDs_.length; i++) {
             // Guard against revert for non-existing lockIDs
-            if ( _exists(lockIDs[i]) ) {
-                _increaseAmount(lockIDs[i], amounts[i]);
+            if ( _exists(lockIDs_[i]) ) {
+                _increaseAmount(lockIDs_[i], amounts_[i]);
             } else {
-                refundAmount += amounts[i];
+                refundAmount += amounts_[i];
             }
         }
         SafeERC20.safeTransfer(IERC20(token), msg.sender, refundAmount);
@@ -258,46 +280,46 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
      * @notice Deposit token to increase the value of an existing lock.
      * @dev Token is transferred from msg.sender using ERC20Permit.
      * @dev Anyone (not just the lock owner) can call increaseAmount() and deposit to an existing lock.
-     * @param lockID The ID of the lock to update.
-     * @param amount The amount of token to deposit.
-     * @param deadline Time the transaction must go through before.
+     * @param lockID_ The ID of the lock to update.
+     * @param amount_ The amount of token to deposit.
+     * @param deadline_ Time the transaction must go through before.
      * @param v secp256k1 signature
      * @param r secp256k1 signature
      * @param s secp256k1 signature
      */
-    function increaseAmountSigned(uint256 lockID, uint256 amount, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external override nonReentrant tokenMustExist(lockID) {
+    function increaseAmountSigned(uint256 lockID_, uint256 amount_, uint256 deadline_, uint8 v, bytes32 r, bytes32 s) external override nonReentrant tokenMustExist(lockID_) {
         // permit
-        IERC20Permit(token).permit(msg.sender, address(this), amount, deadline, v, r, s);
+        IERC20Permit(token).permit(msg.sender, address(this), amount_, deadline_, v, r, s);
         // pull token
-        SafeERC20.safeTransferFrom(IERC20(token), msg.sender, address(this), amount);
+        SafeERC20.safeTransferFrom(IERC20(token), msg.sender, address(this), amount_);
         // accounting
-        _increaseAmount(lockID, amount);
+        _increaseAmount(lockID_, amount_);
     }
 
     /**
      * @notice Extend a lock's duration.
      * @dev Can only be called by the lock owner or approved.
-     * @param lockID The ID of the lock to update.
-     * @param end The new time for the lock to unlock.
+     * @param lockID_ The ID of the lock to update.
+     * @param end_ The new time for the lock to unlock.
      */
-    function extendLock(uint256 lockID, uint256 end) external override nonReentrant onlyOwnerOrApproved(lockID) {
-        _extendLock(lockID, end);
+    function extendLock(uint256 lockID_, uint256 end_) external override nonReentrant onlyOwnerOrApproved(lockID_) {
+        _extendLock(lockID_, end_);
     }
 
     /**
      * @notice Extend multiple locks' duration.
      * @dev Can only be called by the lock owner or approved.
      * @dev If non-existing lockIDs are entered, these will be skipped.
-     * @param lockIDs Array of lock IDs to update.
-     * @param ends Array of new unlock times.
+     * @param lockIDs_ Array of lock IDs to update.
+     * @param ends_ Array of new unlock times.
      */
-    function extendLockMultiple(uint256[] calldata lockIDs, uint256[] calldata ends) external override nonReentrant {
-        if (lockIDs.length != ends.length) revert ArrayArgumentsLengthMismatch();
+    function extendLockMultiple(uint256[] calldata lockIDs_, uint256[] calldata ends_) external override nonReentrant {
+        if (lockIDs_.length != ends_.length) revert ArrayArgumentsLengthMismatch();
 
-        for (uint256 i = 0; i < lockIDs.length; i++) {
+        for (uint256 i = 0; i < lockIDs_.length; i++) {
             // Guard against revert for non-existing lockIDs
-            if ( _exists(lockIDs[i]) ) {
-                _extendLock(lockIDs[i], ends[i]);
+            if ( _exists(lockIDs_[i]) ) {
+                _extendLock(lockIDs_[i], ends_[i]);
             }
         }
     }
@@ -306,120 +328,120 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
      * @notice Withdraw from a lock in full.
      * @dev Can only be called by the lock owner or approved.
      * @dev Can only be called if unlocked.
-     * @param lockID The ID of the lock to withdraw from.
-     * @param recipient The user to receive the lock's token.
+     * @param lockID_ The ID of the lock to withdraw from.
+     * @param recipient_ The user to receive the lock's token.
      */
-    function withdraw(uint256 lockID, address recipient) external override nonReentrant onlyOwnerOrApproved(lockID) {
-        uint256 amount = _locks[lockID].amount;
-        _withdraw(lockID, amount);
+    function withdraw(uint256 lockID_, address recipient_) external override nonReentrant onlyOwnerOrApproved(lockID_) {
+        uint256 amount = _locks[lockID_].amount;
+        _withdraw(lockID_, amount);
         // transfer token
-        SafeERC20.safeTransfer(IERC20(token), recipient, amount);
+        SafeERC20.safeTransfer(IERC20(token), recipient_, amount);
     }
 
     /**
      * @notice Withdraw from a lock in part.
      * @dev Can only be called by the lock owner or approved.
      * @dev Can only be called if unlocked.
-     * @param lockID The ID of the lock to withdraw from.
-     * @param recipient The user to receive the lock's token.
-     * @param amount The amount of token to withdraw.
+     * @param lockID_ The ID of the lock to withdraw from.
+     * @param amount_ The amount of token to withdraw.
+     * @param recipient_ The user to receive the lock's token.
      */
-    function withdrawInPart(uint256 lockID, address recipient, uint256 amount) external override nonReentrant onlyOwnerOrApproved(lockID) {
-        if (amount > _locks[lockID].amount) revert ExcessWithdraw(lockID, _locks[lockID].amount, amount);
-        _withdraw(lockID, amount);
+    function withdrawInPart(uint256 lockID_, uint256 amount_, address recipient_) external override nonReentrant onlyOwnerOrApproved(lockID_) {
+        if (amount_ > _locks[lockID_].amount) revert ExcessWithdraw(lockID_, _locks[lockID_].amount, amount_);
+        _withdraw(lockID_, amount_);
         // transfer token
-        SafeERC20.safeTransfer(IERC20(token), recipient, amount);
+        SafeERC20.safeTransfer(IERC20(token), recipient_, amount_);
     }
 
     /**
      * @notice Withdraw from multiple locks in full.
      * @dev Can only be called by the lock owner or approved.
      * @dev Can only be called if unlocked.
-     * @param lockIDs The ID of the locks to withdraw from.
-     * @param recipient The user to receive the lock's token.
+     * @param lockIDs_ The ID of the locks to withdraw from.
+     * @param recipient_ The user to receive the lock's token.
      */
-    function withdrawMultiple(uint256[] calldata lockIDs, address recipient) external override nonReentrant {
-        uint256 len = lockIDs.length;
+    function withdrawMultiple(uint256[] calldata lockIDs_, address recipient_) external override nonReentrant {
+        uint256 len = lockIDs_.length;
         uint256 totalWithdrawAmount = 0;
         for(uint256 i = 0; i < len; i++) {
-            uint256 lockID = lockIDs[i];
+            uint256 lockID = lockIDs_[i];
             if (!_isApprovedOrOwner(msg.sender, lockID)) revert NotOwnerNorApproved();
             uint256 singleLockAmount = _locks[lockID].amount;
             totalWithdrawAmount += singleLockAmount;
             _withdraw(lockID, singleLockAmount);
         }
         // batched token transfer
-        SafeERC20.safeTransfer(IERC20(token), recipient, totalWithdrawAmount);
+        SafeERC20.safeTransfer(IERC20(token), recipient_, totalWithdrawAmount);
     }
 
     /**
      * @notice Withdraw from multiple locks in part.
      * @dev Can only be called by the lock owner or approved.
      * @dev Can only be called if unlocked.
-     * @param lockIDs The ID of the locks to withdraw from.
-     * @param recipient The user to receive the lock's token.
-     * @param amounts Array of token amounts to withdraw
+     * @param lockIDs_ The ID of the locks to withdraw from.
+     * @param amounts_ Array of token amounts to withdraw
+     * @param recipient_ The user to receive the lock's token.
      */
-    function withdrawInPartMultiple(uint256[] calldata lockIDs, address recipient, uint256[] calldata amounts) external override nonReentrant {
-        if (lockIDs.length != amounts.length) revert ArrayArgumentsLengthMismatch();
-        uint256 len = lockIDs.length;
+    function withdrawInPartMultiple(uint256[] calldata lockIDs_, uint256[] calldata amounts_ ,address recipient_) external override nonReentrant {
+        if (lockIDs_.length != amounts_.length) revert ArrayArgumentsLengthMismatch();
+        uint256 len = lockIDs_.length;
         uint256 totalWithdrawAmount = 0;
         for(uint256 i = 0; i < len; i++) {
-            uint256 lockID = lockIDs[i];
+            uint256 lockID = lockIDs_[i];
             if (!_isApprovedOrOwner(msg.sender, lockID)) revert NotOwnerNorApproved();
-            uint256 singleLockAmount = amounts[i];
+            uint256 singleLockAmount = amounts_[i];
             if (singleLockAmount > _locks[lockID].amount) revert ExcessWithdraw(lockID, _locks[lockID].amount, singleLockAmount);
             totalWithdrawAmount += singleLockAmount;
             _withdraw(lockID, singleLockAmount);
         }
         // batched token transfer
-        SafeERC20.safeTransfer(IERC20(token), recipient, totalWithdrawAmount);
+        SafeERC20.safeTransfer(IERC20(token), recipient_, totalWithdrawAmount);
     }
 
     /**
      * @notice Emergency withdraw from a lock in full.
      * @dev Can only be called by the lock owner or approved.
      * @dev If called before `end` timestamp, will incur a penalty
-     * @param lockID The ID of the lock to emergency withdraw from.
-     * @param recipient The user to receive the lock's token.
+     * @param lockID_ The ID of the lock to emergency withdraw from.
+     * @param recipient_ The user to receive the lock's token.
      */
-    function emergencyWithdraw(uint256 lockID, address recipient) external override nonReentrant onlyOwnerOrApproved(lockID) {
-        uint256 amount = _locks[lockID].amount;
+    function emergencyWithdraw(uint256 lockID_, address recipient_) external override nonReentrant onlyOwnerOrApproved(lockID_) {
+        uint256 amount = _locks[lockID_].amount;
         // Accounting
-        uint256 penalty = _emergencyWithdraw(lockID, amount);
+        uint256 penalty = _emergencyWithdraw(lockID_, amount);
         // Token transfers
         SafeERC20.safeTransfer(IERC20(token), revenueRouter, penalty);
-        SafeERC20.safeTransfer(IERC20(token), recipient, amount - penalty);
+        SafeERC20.safeTransfer(IERC20(token), recipient_, amount - penalty);
     }
 
     /**
      * @notice Emergency withdraw from a lock in part.
      * @dev Can only be called by the lock owner or approved.
      * @dev If called before `end` timestamp, will incur a penalty
-     * @param lockID The ID of the lock to emergency withdraw from.
-     * @param recipient The user to receive the lock's token.
-     * @param amount The amount of token to withdraw.
+     * @param lockID_ The ID of the lock to emergency withdraw from.
+     * @param amount_ The amount of token to withdraw.
+     * @param recipient_ The user to receive the lock's token.
      */
-    function emergencyWithdrawInPart(uint256 lockID, address recipient, uint256 amount) external override nonReentrant onlyOwnerOrApproved(lockID) {
-        if (amount > _locks[lockID].amount) revert ExcessWithdraw(lockID, _locks[lockID].amount, amount);
-        uint256 penalty = _emergencyWithdraw(lockID, amount);
+    function emergencyWithdrawInPart(uint256 lockID_, uint256 amount_, address recipient_) external override nonReentrant onlyOwnerOrApproved(lockID_) {
+        if (amount_ > _locks[lockID_].amount) revert ExcessWithdraw(lockID_, _locks[lockID_].amount, amount_);
+        uint256 penalty = _emergencyWithdraw(lockID_, amount_);
         SafeERC20.safeTransfer(IERC20(token), revenueRouter, penalty);
-        SafeERC20.safeTransfer(IERC20(token), recipient, amount - penalty);
+        SafeERC20.safeTransfer(IERC20(token), recipient_, amount_ - penalty);
     }
 
     /**
      * @notice Emergency withdraw from multiple locks in full.
      * @dev Can only be called by the lock owner or approved.
      * @dev If called before `end` timestamp, will incur a penalty
-     * @param lockIDs The ID of the locks to withdraw from.
-     * @param recipient The user to receive the lock's token.
+     * @param lockIDs_ The ID of the locks to withdraw from.
+     * @param recipient_ The user to receive the lock's token.
      */
-    function emergencyWithdrawMultiple(uint256[] calldata lockIDs, address recipient) external override nonReentrant {
-        uint256 len = lockIDs.length;
+    function emergencyWithdrawMultiple(uint256[] calldata lockIDs_, address recipient_) external override nonReentrant {
+        uint256 len = lockIDs_.length;
         uint256 totalWithdrawAmount = 0;
         uint256 totalPenaltyAmount = 0;
         for(uint256 i = 0; i < len; i++) {
-            uint256 lockID = lockIDs[i];
+            uint256 lockID = lockIDs_[i];
             if (!_isApprovedOrOwner(msg.sender, lockID)) revert NotOwnerNorApproved();
             uint256 singleLockAmount = _locks[lockID].amount;
             uint256 penalty = _emergencyWithdraw(lockID, singleLockAmount);
@@ -428,25 +450,26 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
         }
         // batched token transfer
         SafeERC20.safeTransfer(IERC20(token), revenueRouter, totalPenaltyAmount);
-        SafeERC20.safeTransfer(IERC20(token), recipient, totalWithdrawAmount);
+        SafeERC20.safeTransfer(IERC20(token), recipient_, totalWithdrawAmount);
     }
 
     /**
      * @notice Emergency withdraw from multiple locks in part.
      * @dev Can only be called by the lock owner or approved.
      * @dev If called before `end` timestamp, will incur a penalty
-     * @param lockIDs The ID of the locks to withdraw from.
-     * @param amounts Array of token amounts to emergency withdraw
-     * @param recipient The user to receive the lock's token.
+     * @param lockIDs_ The ID of the locks to withdraw from.
+     * @param amounts_ Array of token amounts to emergency withdraw
+     * @param recipient_ The user to receive the lock's token.
      */
-    function emergencyWithdrawInPartMultiple(uint256[] calldata lockIDs, uint256[] calldata amounts, address recipient) external override nonReentrant {
-        uint256 len = lockIDs.length;
+    function emergencyWithdrawInPartMultiple(uint256[] calldata lockIDs_, uint256[] calldata amounts_, address recipient_) external override nonReentrant {
+        if (lockIDs_.length != amounts_.length) revert ArrayArgumentsLengthMismatch();
+        uint256 len = lockIDs_.length;
         uint256 totalWithdrawAmount = 0;
         uint256 totalPenaltyAmount = 0;
         for(uint256 i = 0; i < len; i++) {
-            uint256 lockID = lockIDs[i];
+            uint256 lockID = lockIDs_[i];
             if (!_isApprovedOrOwner(msg.sender, lockID)) revert NotOwnerNorApproved();
-            uint256 singleLockAmount = amounts[i];
+            uint256 singleLockAmount = amounts_[i];
             if (singleLockAmount > _locks[lockID].amount) revert ExcessWithdraw(lockID, _locks[lockID].amount, singleLockAmount);
             uint256 penalty = _emergencyWithdraw(lockID, singleLockAmount);
             totalPenaltyAmount += penalty;
@@ -454,7 +477,7 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
         }
         // batched token transfer
         SafeERC20.safeTransfer(IERC20(token), revenueRouter, totalPenaltyAmount);
-        SafeERC20.safeTransfer(IERC20(token), recipient, totalWithdrawAmount);
+        SafeERC20.safeTransfer(IERC20(token), recipient_, totalWithdrawAmount);
     }
 
     /***************************************
@@ -463,21 +486,21 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
 
     /**
      * @notice Creates a new lock.
-     * @param recipient The user that the lock will be minted to.
-     * @param amount The amount of token in the lock.
-     * @param end The end of the lock.
+     * @param recipient_ The user that the lock will be minted to.
+     * @param amount_ The amount of token in the lock.
+     * @param end_ The end of the lock.
      * @return lockID The ID of the new lock.
      */
-    function _createLock(address recipient, uint256 amount, uint256 end) internal returns (uint256 lockID) {
+    function _createLock(address recipient_, uint256 amount_, uint256 end_) internal returns (uint256 lockID) {
         // solhint-disable-next-line not-rely-on-time
-        if(end < block.timestamp + MIN_LOCK_DURATION) revert LockTimeTooShort();
+        if(end_ < block.timestamp + MIN_LOCK_DURATION) revert LockTimeTooShort();
         // solhint-disable-next-line not-rely-on-time
-        if(end > block.timestamp + MAX_LOCK_DURATION) revert LockTimeTooLong();
+        if(end_ > block.timestamp + MAX_LOCK_DURATION) revert LockTimeTooLong();
         lockID = ++totalNumLocks;
-        Lock memory newLock = Lock(amount, end);
+        Lock memory newLock = Lock(amount_, end_);
         // accounting
         _locks[lockID] = newLock;
-        _safeMint(recipient, lockID);
+        _safeMint(recipient_, lockID);
         emit LockCreated(lockID);
     }
 
@@ -485,116 +508,115 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
      * @notice Deposit token to increase the value of an existing lock.
      * @dev Token is transferred from msg.sender, assumes its already approved.
      * @dev Anyone (not just the lock owner) can call increaseAmount() and deposit to an existing lock.
-     * @param lockID The ID of the lock to update.
-     * @param amount The amount of token to deposit.
+     * @param lockID_ The ID of the lock to update.
+     * @param amount_ The amount of token to deposit.
      */
-    function _increaseAmount(uint256 lockID, uint256 amount) internal {
-        uint256 newAmount = _locks[lockID].amount + amount;
-        _updateLock(lockID, newAmount, _locks[lockID].end);
-        emit LockIncreased(lockID, newAmount, amount);
+    function _increaseAmount(uint256 lockID_, uint256 amount_) internal {
+        uint256 newAmount = _locks[lockID_].amount + amount_;
+        _updateLock(lockID_, newAmount, _locks[lockID_].end);
+        emit LockIncreased(lockID_, newAmount, amount_);
     }
 
 
     /**
      * @notice Updates an existing lock.
-     * @param lockID The ID of the lock to update.
-     * @param amount The amount of token now in the lock.
-     * @param end The end of the lock.
+     * @param lockID_ The ID of the lock to update.
+     * @param amount_ The amount of token now in the lock.
+     * @param end_ The end of the lock.
      */
-    function _updateLock(uint256 lockID, uint256 amount, uint256 end) internal {
+    function _updateLock(uint256 lockID_, uint256 amount_, uint256 end_) internal {
         // checks
-        Lock memory prevLock = _locks[lockID];
-        Lock memory newLock = Lock(amount, end); // end was sanitized before passed in
+        Lock memory prevLock = _locks[lockID_];
+        Lock memory newLock = Lock(amount_, end_); // end was sanitized before passed in
         // accounting
-        _locks[lockID] = newLock;
-        address owner = ownerOf(lockID);
-        _notify(lockID, owner, owner, prevLock, newLock);
-        emit LockUpdated(lockID, amount, newLock.end);
+        _locks[lockID_] = newLock;
+        address owner = ownerOf(lockID_);
+        _notify(lockID_, owner, owner, prevLock, newLock);
+        emit LockUpdated(lockID_, amount_, newLock.end);
     }
 
     /**
      * @notice Withdraws from a lock.
-     * @param lockID The ID of the lock to withdraw from.
-     * @param amount The amount of token to withdraw.
+     * @param lockID_ The ID of the lock to withdraw from.
+     * @param amount_ The amount of token to withdraw.
      */
-    function _withdraw(uint256 lockID, uint256 amount) internal {
+    function _withdraw(uint256 lockID_, uint256 amount_) internal {
         // solhint-disable-next-line not-rely-on-time
-        if(_locks[lockID].end > block.timestamp) revert CannotWithdrawWhileLocked(); // cannot withdraw while locked
+        if(_locks[lockID_].end > block.timestamp) revert CannotWithdrawWhileLocked(); // cannot withdraw while locked
         // accounting
-        if(amount == _locks[lockID].amount) {
-            _burn(lockID);
-            delete _locks[lockID];
+        if(amount_ == _locks[lockID_].amount) {
+            _burn(lockID_);
+            delete _locks[lockID_];
         }
         else {
-            Lock memory oldLock = _locks[lockID];
-            Lock memory newLock = Lock(oldLock.amount-amount, oldLock.end);
-            _locks[lockID].amount -= amount;
-            address owner = ownerOf(lockID);
-            _notify(lockID, owner, owner, oldLock, newLock);
+            Lock memory oldLock = _locks[lockID_];
+            Lock memory newLock = Lock(oldLock.amount - amount_, oldLock.end);
+            _locks[lockID_].amount -= amount_;
+            address owner = ownerOf(lockID_);
+            _notify(lockID_, owner, owner, oldLock, newLock);
         }
-        emit Withdrawal(lockID, amount);
+        emit Withdrawal(lockID_, amount_);
     }
 
     /**
      * @notice Extend a lock's duration.
      * @dev Can only be called by the lock owner or approved.
-     * @param lockID The ID of the lock to update.
-     * @param end The new time for the lock to unlock.
+     * @param lockID_ The ID of the lock to update.
+     * @param end_ The new time for the lock to unlock.
      */
-    function _extendLock(uint256 lockID, uint256 end) internal nonReentrant onlyOwnerOrApproved(lockID) {
+    function _extendLock(uint256 lockID_, uint256 end_) internal nonReentrant onlyOwnerOrApproved(lockID_) {
         // solhint-disable-next-line not-rely-on-time
-        if(end > block.timestamp + MAX_LOCK_DURATION) revert LockTimeTooLong();
-        if(_locks[lockID].end > end) revert LockTimeNotExtended();
-        _updateLock(lockID, _locks[lockID].amount, end);
-        emit LockExtended(lockID, end);
+        if(end_ > block.timestamp + MAX_LOCK_DURATION) revert LockTimeTooLong();
+        if(_locks[lockID_].end > end_) revert LockTimeNotExtended();
+        _updateLock(lockID_, _locks[lockID_].amount, end_);
+        emit LockExtended(lockID_, end_);
     }
-
 
     /**
      * @notice Emergency withdraws from a lock.
-     * @param lockID The ID of the lock to emergency withdraw from.
-     * @param amount The amount of token to emergency withdraw.
+     * @param lockID_ The ID of the lock to emergency withdraw from.
+     * @param amount_ The amount of token to emergency withdraw.
      * @return penalty Token amount that will be paid to RevenueRouter as a penalty for emergency withdraw
      */
-    function _emergencyWithdraw(uint256 lockID, uint256 amount) internal returns (uint256 penalty) {
+    function _emergencyWithdraw(uint256 lockID_, uint256 amount_) internal returns (uint256 penalty) {
         // Make _getEmergencyWithdrawPenaltyPercentage query before lockID is potentially deleted
-        uint256 penaltyPercentage = _getEmergencyWithdrawPenaltyPercentage(lockID);
-        penalty = amount * penaltyPercentage / 1e18;
+        uint256 penaltyPercentage = _getEmergencyWithdrawPenaltyPercentage(lockID_);
+        penalty = amount_ * penaltyPercentage / 1e18;
         // accounting
-        if(amount == _locks[lockID].amount) {
-            _burn(lockID);
-            delete _locks[lockID];
+        if(amount_ == _locks[lockID_].amount) {
+            _burn(lockID_);
+            delete _locks[lockID_];
         }
         else {
-            Lock memory oldLock = _locks[lockID];
-            Lock memory newLock = Lock(oldLock.amount-amount, oldLock.end);
-            _locks[lockID].amount -= amount;
-            address owner = ownerOf(lockID);
-            _notify(lockID, owner, owner, oldLock, newLock);
+            Lock memory oldLock = _locks[lockID_];
+            Lock memory newLock = Lock(oldLock.amount - amount_, oldLock.end);
+            _locks[lockID_].amount -= amount_;
+            address owner = ownerOf(lockID_);
+            _notify(lockID_, owner, owner, oldLock, newLock);
         }
-        emit EmergencyWithdrawal(lockID, amount, penalty);
+        emit EmergencyWithdrawal(lockID_, amount_, penalty);
     }
 
     /**
      * @notice Hook that is called after any token transfer. This includes minting and burning.
-     * @param from The user that sends the token, or zero if minting.
-     * @param to The zero that receives the token, or zero if burning.
-     * @param lockID The ID of the token being transferred.
+     * @param from_ The user that sends the token, or zero if minting.
+     * @param to_ The zero that receives the token, or zero if burning.
+     * @param lockID_ The ID of the token being transferred.
      */
     function _afterTokenTransfer(
-        address from,
-        address to,
-        uint256 lockID
+        address from_,
+        address to_,
+        uint256 lockID_
     ) internal override {
-        super._afterTokenTransfer(from, to, lockID);
-        Lock memory lock = _locks[lockID];
+        super._afterTokenTransfer(from_, to_, lockID_);
+        Lock memory lock = _locks[lockID_];
         // notify listeners
-        if(from == address(0x0)) _notify(lockID, from, to, Lock(0, 0), lock); // mint
-        else if(to == address(0x0)) _notify(lockID, from, to, lock, Lock(0, 0)); // burn
+        if(from_ == address(0x0)) _notify(lockID_, from_, to_, Lock(0, 0), lock); // mint
+        else if(to_ == address(0x0)) _notify(lockID_, from_, to_, lock, Lock(0, 0)); // burn
         else { // transfer
             // solhint-disable-next-line not-rely-on-time
             if(lock.end > block.timestamp) revert CannotTransferWhileLocked();
-            _notify(lockID, from, to, lock, lock);
+            _notify(lockID_, from_, to_, lock, lock);
         }
     }
 
@@ -602,30 +624,30 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
      * @notice Notify the listeners of any updates.
      * @dev Called on transfer, mint, burn, and update.
      * Either the owner will change or the lock will change, not both.
-     * @param lockID The ID of the lock that was altered.
-     * @param oldOwner The old owner of the lock.
-     * @param newOwner The new owner of the lock.
-     * @param oldLock The old lock data.
-     * @param newLock The new lock data.
+     * @param lockID_ The ID of the lock that was altered.
+     * @param oldOwner_ The old owner of the lock.
+     * @param newOwner_ The new owner of the lock.
+     * @param oldLock_ The old lock data.
+     * @param newLock_ The new lock data.
      */
-    function _notify(uint256 lockID, address oldOwner, address newOwner, Lock memory oldLock, Lock memory newLock) internal {
+    function _notify(uint256 lockID_, address oldOwner_, address newOwner_, Lock memory oldLock_, Lock memory newLock_) internal {
         // register action with listener
         uint256 len = _lockListeners.length();
         for(uint256 i = 0; i < len; i++) {
-            IUnderwritingLockListener(_lockListeners.at(i)).registerLockEvent(lockID, oldOwner, newOwner, oldLock, newLock);
+            IUnderwritingLockListener(_lockListeners.at(i)).registerLockEvent(lockID_, oldOwner_, newOwner_, oldLock_, newLock_);
         }
     }
 
     /**
      * @notice Sets registry and related contract addresses.
      * @dev Requires 'uwe' and 'revenueRouter' addresses to be set in the Registry.
-     * @param _registry The registry address to set.
+     * @param registry_ The registry address to set.
      */
-    function _setRegistry(address _registry) internal {
+    function _setRegistry(address registry_) internal {
         // set registry        
-        if(_registry == address(0x0)) revert ZeroAddressInput("registry");
-        registry = _registry;
-        IRegistry reg = IRegistry(_registry);
+        if(registry_ == address(0x0)) revert ZeroAddressInput("registry");
+        registry = registry_;
+        IRegistry reg = IRegistry(registry_);
         // set revenueRouter
         (, address revenueRouterAddr) = reg.tryGet("revenueRouter");
         if(revenueRouterAddr == address(0x0)) revert ZeroAddressInput("revenueRouter");
@@ -634,7 +656,7 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
         (, address uweAddr) = reg.tryGet("uwe");
         if(uweAddr == address(0x0)) revert ZeroAddressInput("uwe");
         token = uweAddr;
-        emit RegistrySet(_registry);
+        emit RegistrySet(registry_);
     }
 
     /***************************************
@@ -644,21 +666,21 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
     /**
      * @notice Adds a listener.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param listener The listener to add.
+     * @param listener_ The listener to add.
      */
-    function addLockListener(address listener) external override onlyGovernance {
-        _lockListeners.add(listener);
-        emit LockListenerAdded(listener);
+    function addLockListener(address listener_) external override onlyGovernance {
+        _lockListeners.add(listener_);
+        emit LockListenerAdded(listener_);
     }
 
     /**
      * @notice Removes a listener.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param listener The listener to remove.
+     * @param listener_ The listener to remove.
      */
-    function removeLockListener(address listener) external override onlyGovernance {
-        _lockListeners.remove(listener);
-        emit LockListenerRemoved(listener);
+    function removeLockListener(address listener_) external override onlyGovernance {
+        _lockListeners.remove(listener_);
+        emit LockListenerRemoved(listener_);
     }
 
     /**
@@ -674,19 +696,19 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
      * @notice Sets the [`Registry`](./Registry) contract address.
      * @dev Requires 'uwe' and 'revenueRouter' addresses to be set in the Registry.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param _registry The address of `Registry` contract.
+     * @param registry_ The address of `Registry` contract.
      */
-    function setRegistry(address _registry) external override onlyGovernance {
-        _setRegistry(_registry);
+    function setRegistry(address registry_) external override onlyGovernance {
+        _setRegistry(registry_);
     }
 
     /**
      * @notice Approves [`UnderwritingLockVoting`](./UnderwritingLockVoting) to transfer token from this contract
      * @dev Hacky fix to the issue that [`UnderwritingLockVoting`](./UnderwritingLockVoting) needs token transfer approval, but will be deployed after this contract.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param _votingContract The address of `Registry` contract.
+     * @param votingContract_ The address of `LockUnderwritingVoting` contract.
      */
-    function setVotingContractApproval(address _votingContract) external override onlyGovernance {
-        SafeERC20.safeApprove(IERC20(token), _votingContract, type(uint256).max);
+    function setVotingContractApproval(address votingContract_) external override onlyGovernance {
+        SafeERC20.safeApprove(IERC20(token), votingContract_, type(uint256).max);
     }
 }

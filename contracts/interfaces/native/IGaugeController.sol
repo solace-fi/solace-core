@@ -82,7 +82,7 @@ interface IGaugeController {
     ***************************************/
 
     /// @notice The total number of gauges that have been created
-    function n_gauges() external view returns (uint256);
+    function totalGauges() external view returns (uint256);
 
     /// @notice Timestamp of last epoch start (rounded to weeks) that gauge weights were successfully updated.
     function lastTimeGaugeWeightUpdated() external view returns (uint256);
@@ -108,10 +108,10 @@ interface IGaugeController {
     /**
      * @notice Get current gauge weight of single gauge ID
      * @dev Gauge weights must sum to 1e18, so a weight of 1e17 == 10% weight
-     * @param gaugeID The ID of the gauge to query.
+     * @param gaugeID_ The ID of the gauge to query.
      * @return weight
      */
-    function getGaugeWeight(uint256 gaugeID) external view returns (uint256 weight);
+    function getGaugeWeight(uint256 gaugeID_) external view returns (uint256 weight);
 
     /**
      * @notice Get all gauge weights.
@@ -132,19 +132,20 @@ interface IGaugeController {
      * @return numPausedGauges
      */
     function getNumPausedGauges() external view returns (uint256 numPausedGauges);
+    
     /**
      * @notice Get gauge name
-     * @param gaugeID The ID of the gauge to query.
+     * @param gaugeID_ The ID of the gauge to query.
      * @return gaugeName
      */
-    function getGaugeName(uint256 gaugeID) external view returns (string calldata gaugeName);
+    function getGaugeName(uint256 gaugeID_) external view returns (string calldata gaugeName);
 
     /**
      * @notice Query whether gauge is active.
-     * @param gaugeID The ID of the gauge to query.
+     * @param gaugeID_ The ID of the gauge to query.
      * @return gaugeActive True if active, false otherwise.
      */
-    function isGaugeActive(uint256 gaugeID) external view returns (bool gaugeActive);
+    function isGaugeActive(uint256 gaugeID_) external view returns (bool gaugeActive);
 
     /***************************************
     GOVERNANCE FUNCTIONS
@@ -153,23 +154,23 @@ interface IGaugeController {
     /**
      * @notice Adds a voting contract
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param votingContract The votingContract to add.
+     * @param votingContract_ The votingContract to add.
      */
-    function addVotingContract(address votingContract) external;
+    function addVotingContract(address votingContract_) external;
 
     /**
      * @notice Removes a voting contract
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param votingContract The votingContract to add.
+     * @param votingContract_ The votingContract to add.
      */
-    function removeVotingContract(address votingContract) external;
+    function removeVotingContract(address votingContract_) external;
 
     /**
      * @notice Adds an insurance gauge
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param gaugeName Gauge name
+     * @param gaugeName_ Gauge name
      */
-    function addGauge(string calldata gaugeName) external;
+    function addGauge(string calldata gaugeName_) external;
 
     /**
      * @notice Pauses an insurance gauge
@@ -177,16 +178,16 @@ interface IGaugeController {
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * If a gaugeID is paused, it means that vote data for that gauge will no longer be collected on future [`updateGaugeWeights()`](#updategaugeweights) calls.
      * It does not mean that users can no longer vote for their gauge, it just means that their vote for that gauge will no longer count for gauge weights (however they will still be charged for that vote. It is the responsibility of the voter to ensure they are voting for a valid gauge).
-     * @param gaugeID ID of gauge to pause
+     * @param gaugeID_ ID of gauge to pause
      */
-    function pauseGauge(uint256 gaugeID) external;
+    function pauseGauge(uint256 gaugeID_) external;
 
     /**
      * @notice Unpauses an insurance gauge
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param gaugeID ID of gauge to pause
+     * @param gaugeID_ ID of gauge to pause
      */
-    function unpauseGauge(uint256 gaugeID) external;
+    function unpauseGauge(uint256 gaugeID_) external;
 
     /**
      * @notice Updates gauge weights by getting current vote data from Voting contracts.

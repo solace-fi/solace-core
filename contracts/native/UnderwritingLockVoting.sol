@@ -13,7 +13,6 @@ import "./../interfaces/native/IUnderwritingLocker.sol";
 import "./../interfaces/native/IUnderwritingLockVoting.sol";
 
 // TO-DO
-// Custom Error types
 // Formula for _calculateVotePower()
 // Formula for _calculateVoteFee()
 
@@ -44,11 +43,16 @@ import "./../interfaces/native/IUnderwritingLockVoting.sol";
  * ii.) It is possible that in the future there will be more than one source of voting data to GaugeController.sol, i.e. owners of xsLocks may also have voting rights. 
  * One drawback is that it requires two regular function calls, rather than one.
  */
-contract UnderwritingLockVoting is IUnderwritingLockVoting, ReentrancyGuard, Governable {
-    /***************************************
-    GLOBAL VARIABLES
-    ***************************************/
+contract UnderwritingLockVoting is 
+        IUnderwritingLockVoting, 
+        ReentrancyGuard, 
+        Governable 
+    {
     using EnumerableMap for EnumerableMap.UintToUintMap;
+
+    /***************************************
+    GLOBAL PUBLIC VARIABLES
+    ***************************************/
 
     /// @notice Token locked in [`UnderwritingLocker`](./UnderwritingLocker).
     address public override token;
@@ -62,17 +66,13 @@ contract UnderwritingLockVoting is IUnderwritingLockVoting, ReentrancyGuard, Gov
     /// @notice Registry address
     address public override registry;
 
+    /// @notice Batch size of votes that will be processed in a single call of [`processVotes()`](#processvotes).
+    uint256 public override voteBatchSize;
+
+    /// @notice End timestamp (rounded down to weeks) for epoch for which all stored votes were processed in full
+    uint256 public override lastTimeAllVotesProcessed;
+
     uint256 constant public override WEEK = 604800;
-
-    /// @notice lockId => insurance gauge vote
-    /// @dev Use an enumerable map so that governance can iterate through each vote after each epoch, and relay vote data to the GaugeController
-    /// @dev Input validation for lockId will be performed in this contract
-    /// @dev Input validation for insurance gauge vote will be performed in GaugeController.sol, when vote data is relayed at end of each epoch
-    /// @dev If vote is invalid value, it will be skipped and ignored (rather than revert) 
-    EnumerableMap.UintToUintMap private _votes;
-
-    // lockId => timestamp of last time (rounded down to weeks) that vote was processed via [`processVotes()`](#processvotes).
-    mapping(uint256 => uint256) private _lastTimeVoteProcessed;
 
     /// @notice lockId => lockManager address
     /// @dev We have several mappings using lockId as the key, we may intuitively consider merging the values types into a struct and use a single mapping. 
@@ -80,14 +80,28 @@ contract UnderwritingLockVoting is IUnderwritingLockVoting, ReentrancyGuard, Gov
     /// @dev By minimising the entry size of the mapping we iterate through, we minimise the risk of exceeding the gas limit. We also increase the ceiling on voteBatchSize value that we can use.
     mapping(uint256 => address) public override lockManagers;
 
-    /// @notice Batch size of votes that will be processed in a single call of [`processVotes()`](#processvotes).
-    uint256 public override voteBatchSize;
+    /***************************************
+    GLOBAL INTERNAL VARIABLES
+    ***************************************/
+
+    // Ideally we would like an EnumerableMap of (lockId => {gaugeID, lastTimeVoteProcessed, lockManager}) to merge lockManagers, _votes and _lastTimeVoteProcessed mappings. We would need to create a custom data structure to do this.
+
+    /// @notice lockId => insurance gauge vote
+    /// @dev Use an enumerable map so that governance can iterate through each vote after each epoch, and relay vote data to the GaugeController
+    /// @dev Input validation for lockId will be performed in this contract
+    /// @dev Input validation for insurance gauge vote will be performed in GaugeController.sol, when vote data is relayed at end of each epoch
+    /// @dev If vote is invalid value, it will be skipped and ignored (rather than revert) 
+    EnumerableMap.UintToUintMap internal _votes;
+
+    // lockId => timestamp of last time (rounded down to weeks) that vote was processed via [`processVotes()`](#processvotes).
+    mapping(uint256 => uint256) internal _lastTimeVoteProcessed;
 
     /// @notice Epoch start timestamp (rounded to weeks) => gaugeID => total vote power
     mapping(uint256 => mapping(uint256 => uint256)) internal _votePowerOfGaugeForEpoch;
 
-    /// @notice Last timestamp (rounded down to weeks) that all stored votes were processed
-    uint256 public override lastTimeAllVotesProcessed;
+    /***************************************
+    CONSTRUCTOR
+    ***************************************/
 
     /**
      * @notice Constructs the UnderwritingLockVoting contract.
@@ -96,7 +110,6 @@ contract UnderwritingLockVoting is IUnderwritingLockVoting, ReentrancyGuard, Gov
      * @param registry_ The [`Registry`](./Registry) contract address.
      */
     constructor(address governance_, address registry_) Governable(governance_) {
-        // set registry
         _setRegistry(registry_);
         // Default value of 500 (experiment to find suitable default value)
         voteBatchSize = 500;
@@ -108,18 +121,18 @@ contract UnderwritingLockVoting is IUnderwritingLockVoting, ReentrancyGuard, Gov
 
     /**
      * @notice Get current information about a lock.
-     * @param lockID The ID of the lock to query.
+     * @param lockID_ The ID of the lock to query.
      * @return exists True if the lock exists.
      * @return owner The owner of the lock or the zero address if it doesn't exist.
      * @return amount Token amount staked in lock.
      * @return end Timestamp of lock end.
      */
-    function _getLockInfo(uint256 lockID) internal view returns (bool exists, address owner, uint256 amount, uint256 end) {
+    function _getLockInfo(uint256 lockID_) internal view returns (bool exists, address owner, uint256 amount, uint256 end) {
         IUnderwritingLocker locker = IUnderwritingLocker(underwritingLocker);
-        exists = locker.exists(lockID);
+        exists = locker.exists(lockID_);
         if(exists) {
-            owner = locker.ownerOf(lockID);
-            Lock memory lock = locker.locks(lockID);
+            owner = locker.ownerOf(lockID_);
+            Lock memory lock = locker.locks(lockID_);
             amount = lock.amount;
             end = lock.end;
         } else {
@@ -132,33 +145,32 @@ contract UnderwritingLockVoting is IUnderwritingLockVoting, ReentrancyGuard, Gov
 
     /**
      * @notice Calculates the vote power (for the current epoch) of a lock with specified `amount` and `end` values
-     * @param amount The amount of token in the underwriting lock.
-     * @param end The unlock timestamp of the lock.
+     * @param amount_ The amount of token in the underwriting lock.
+     * @param end_ The unlock timestamp of the lock.
      * @return votePower The vote power for the lock (for the current epoch)
      */
-    function _calculateVotePower(uint256 amount, uint256 end) internal view returns (uint256 votePower) {
+    function _calculateVotePower(uint256 amount_, uint256 end_) internal view returns (uint256 votePower) {
         return 1; // dummy return for contract compile
     }
 
     /**
      * @notice Get vote power (for the current epoch) for a lock
-     * @param lockID The ID of the lock to query.
+     * @param lockID_ The ID of the lock to query.
      * @return votePower
      */
-    function _votePower(uint256 lockID) internal view returns (uint256 votePower) {
+    function _votePower(uint256 lockID_) internal view returns (uint256 votePower) {
         // Expect revert if lockID doesn't exist
-        Lock memory lock = IUnderwritingLocker(underwritingLocker).locks(lockID);
+        Lock memory lock = IUnderwritingLocker(underwritingLocker).locks(lockID_);
         return _calculateVotePower(lock.amount, lock.end);
     }
 
 
     /**
      * @notice Computes voting fee (in token amount)
-     * @dev Requires 'uwe', 'revenueRouter' and 'underwritingLocker' addresses to be set in the Registry.
-     * @param amount The amount of token in the underwriting lock.
-     * @param end The unlock timestamp of the lock.
+     * @param amount_ The amount of token in the underwriting lock.
+     * @param end_ The unlock timestamp of the lock.
      */
-    function _calculateVoteFee(uint256 amount, uint256 end) internal view returns (uint256 fee) {
+    function _calculateVoteFee(uint256 amount_, uint256 end_) internal view returns (uint256 fee) {
         return 1; // dummy return for contract compile
     }
 
@@ -184,30 +196,30 @@ contract UnderwritingLockVoting is IUnderwritingLockVoting, ReentrancyGuard, Gov
 
     /**
      * @notice Obtain vote power sum for a gauge for a given epoch
-     * @param epochStartTimestamp The ID of the lock that was altered.
-     * @param gaugeID The old owner of the lock.
+     * @param epochStartTimestamp_ Start timestamp for epoch.
+     * @param gaugeID_ Gauge ID to query.
      * @return votePower
      */
-    function getVotePowerOfGaugeForEpoch(uint256 epochStartTimestamp, uint256 gaugeID) external view override returns (uint256 votePower) {
-        return _votePowerOfGaugeForEpoch[epochStartTimestamp][gaugeID];
+    function getVotePowerOfGaugeForEpoch(uint256 epochStartTimestamp_, uint256 gaugeID_) external view override returns (uint256 votePower) {
+        return _votePowerOfGaugeForEpoch[epochStartTimestamp_][gaugeID_];
     }
 
     /**
      * @notice Get vote power (for the current epoch) for a lock
-     * @param lockID The ID of the lock to query.
+     * @param lockID_ The ID of the lock to query.
      * @return votePower
      */
-    function votePower(uint256 lockID) external view override returns (uint256 votePower) {
-        return _votePower(lockID);
+    function votePower(uint256 lockID_) external view override returns (uint256 votePower) {
+        return _votePower(lockID_);
     }
 
     /**
      * @notice Get currently registered vote for a lockID.
-     * @param lockID The ID of the lock to query.
+     * @param lockID_ The ID of the lock to query.
      * @return gaugeID The ID of the gauge the lock has voted for, returns 0 if either lockID or vote doesn't exist
      */
-    function getVote(uint256 lockID) external view override returns (uint256 gaugeID) {
-        (,gaugeID) = _votes.tryGet(lockID);
+    function getVote(uint256 lockID_) external view override returns (uint256 gaugeID) {
+        (,gaugeID) = _votes.tryGet(lockID_);
     }
 
     /**
@@ -224,53 +236,6 @@ contract UnderwritingLockVoting is IUnderwritingLockVoting, ReentrancyGuard, Gov
      */
     function getEpochEndTimestamp() external view override returns (uint256 timestamp) {
         return _getEpochEndTimestamp();
-    }
-
-    /***************************************
-    EXTERNAL MUTATOR FUNCTIONS
-    ***************************************/
-
-    /**
-     * @notice Register a vote for a gauge
-     * @notice Each underwriting lock is entitled to a single vote
-     * @notice A new vote cannot be registered before all stored votes have been registered for the previous epoch (via governor invoking [`processVotes()`](#processvotes)).
-     * Can only be called by the lock owner or manager
-     * @param lockID The ID of the lock to vote for.
-     * @param gaugeID The ID of the gauge to vote for.
-     */
-    function vote(uint256 lockID, uint256 gaugeID) external override {
-        // This require to deal with edge case where if a user puts a new vote in the time window between an epoch end and processVotes() returning true for that epoch, we do not know (with the current setup) whether that lockID has a previous vote or not (that then needs to be included in processVotes());
-        require ( _getEpochStartTimestamp() == lastTimeAllVotesProcessed, "votes not processed for last epoch");
-        _vote(lockID, gaugeID);
-    }
-
-    /**
-     * @notice Register multiple votes for a gauge
-     * @notice Each underwriting lock is entitled to a single vote
-     * @notice A new vote cannot be registered before all stored votes have been registered for the previous epoch (via governor invoking [`processVotes()`](#processvotes)).
-     * Can only be called by the lock owner or manager
-     * @param lockIDs Array of lockIDs to vote for.
-     * @param gaugeIDs Array of gaugeIDs to vote for.
-     */
-    function voteMultiple(uint256[] calldata lockIDs, uint256[] calldata gaugeIDs) external override {
-        require (lockIDs.length == gaugeIDs.length, "array length mismatch");
-        require ( _getEpochStartTimestamp() == lastTimeAllVotesProcessed, "votes not processed for last epoch");
-        for (uint256 i = 0; i < lockIDs.length; i++) {
-            _vote(lockIDs[i], gaugeIDs[i]);
-        }
-    }
-
-    /**
-     * @notice Set the manager for a given lock
-     * Can only be called by the lock owner
-     * To remove a manager, the manager can be set to the ZERO_ADDRESS - 0x0000000000000000000000000000000000000000
-     * @param lockID The ID of the lock to set the manager of.
-     * @param manager_ Address of intended lock manager
-     */
-    function setLockManager(uint256 lockID, address manager_) external override {
-        if( IUnderwritingLocker(underwritingLocker).ownerOf(lockID) != msg.sender) revert NotOwner();
-        lockManagers[lockID] = manager_;
-        emit LockManagerSet(lockID, manager_);
     }
 
     /***************************************
@@ -307,14 +272,60 @@ contract UnderwritingLockVoting is IUnderwritingLockVoting, ReentrancyGuard, Gov
      * @notice Each underwriting lock is entitled to a single vote
      * @notice A new vote cannot be registered before all stored votes have been registered for the previous epoch (via governor invoking [`processVotes()`](#processvotes)).
      * Can only be called by the lock owner or manager
-     * @param lockID The ID of the lock to vote for.
-     * @param gaugeID Address of intended lock manager
+     * @param lockID_ The ID of the lock to vote for.
+     * @param gaugeID_ Address of intended lock manager
      */
-    function _vote(uint256 lockID, uint256 gaugeID) internal  {
-        if( IUnderwritingLocker(underwritingLocker).ownerOf(lockID) != msg.sender && lockManagers[lockID] != msg.sender) revert NotOwnerNorManager();
-        // require( IUnderwritingLocker(underwritingLocker).ownerOf(lockID) == msg.sender || lockManagers[lockID] == msg.sender, "not owner or manager" );
-        _votes.set(lockID, gaugeID);
-        emit Vote(lockID, gaugeID, msg.sender, _getEpochEndTimestamp(), _votePower(lockID));
+    function _vote(uint256 lockID_, uint256 gaugeID_) internal  {
+        if( IUnderwritingLocker(underwritingLocker).ownerOf(lockID_) != msg.sender && lockManagers[lockID_] != msg.sender) revert NotOwnerNorManager();
+        _votes.set(lockID_, gaugeID_);
+        emit Vote(lockID_, gaugeID_, msg.sender, _getEpochEndTimestamp(), _votePower(lockID_));
+    }
+
+    /***************************************
+    EXTERNAL MUTATOR FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Register a vote for a gauge
+     * @notice Each underwriting lock is entitled to a single vote
+     * @notice A new vote cannot be registered before all stored votes have been registered for the previous epoch (via governor invoking [`processVotes()`](#processvotes)).
+     * Can only be called by the lock owner or manager
+     * @param lockID_ The ID of the lock to vote for.
+     * @param gaugeID_ The ID of the gauge to vote for.
+     */
+    function vote(uint256 lockID_, uint256 gaugeID_) external override {
+        // This require to deal with edge case where if a user puts a new vote in the time window between an epoch end and processVotes() returning true for that epoch, we do not know (with the current setup) whether that lockID has a previous vote or not (that then needs to be included in processVotes());
+        if ( _getEpochStartTimestamp() != lastTimeAllVotesProcessed) revert LastEpochVotesNotProcessed();
+        _vote(lockID_, gaugeID_);
+    }
+
+    /**
+     * @notice Register multiple votes for a gauge
+     * @notice Each underwriting lock is entitled to a single vote
+     * @notice A new vote cannot be registered before all stored votes have been registered for the previous epoch (via governor invoking [`processVotes()`](#processvotes)).
+     * Can only be called by the lock owner or manager
+     * @param lockIDs_ Array of lockIDs to vote for.
+     * @param gaugeIDs_ Array of gaugeIDs to vote for.
+     */
+    function voteMultiple(uint256[] calldata lockIDs_, uint256[] calldata gaugeIDs_) external override {
+        if (lockIDs_.length != gaugeIDs_.length) revert ArrayArgumentsLengthMismatch();
+        if ( _getEpochStartTimestamp() != lastTimeAllVotesProcessed) revert LastEpochVotesNotProcessed();
+        for (uint256 i = 0; i < lockIDs_.length; i++) {
+            _vote(lockIDs_[i], gaugeIDs_[i]);
+        }
+    }
+
+    /**
+     * @notice Set the manager for a given lock
+     * Can only be called by the lock owner
+     * To remove a manager, the manager can be set to the ZERO_ADDRESS - 0x0000000000000000000000000000000000000000
+     * @param lockID_ The ID of the lock to set the manager of.
+     * @param manager_ Address of intended lock manager
+     */
+    function setLockManager(uint256 lockID_, address manager_) external override {
+        if( IUnderwritingLocker(underwritingLocker).ownerOf(lockID_) != msg.sender) revert NotOwner();
+        lockManagers[lockID_] = manager_;
+        emit LockManagerSet(lockID_, manager_);
     }
 
     /***************************************
@@ -325,20 +336,20 @@ contract UnderwritingLockVoting is IUnderwritingLockVoting, ReentrancyGuard, Gov
      * @notice Sets the [`Registry`](./Registry) contract address.
      * @dev Requires 'uwe', 'revenueRouter' and 'underwritingLocker' addresses to be set in the Registry.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param _registry The address of `Registry` contract.
+     * @param registry_ The address of `Registry` contract.
      */
-    function setRegistry(address _registry) external override onlyGovernance {
-        _setRegistry(_registry);
+    function setRegistry(address registry_) external override onlyGovernance {
+        _setRegistry(registry_);
     }
 
     /**
      * @notice Sets voteBatchSize
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param _voteBatchSize Batch size of votes that will be processed in a single call of [`processVotes()`](#processvotes)
+     * @param voteBatchSize_ Batch size of votes that will be processed in a single call of [`processVotes()`](#processvotes)
      */
-    function setVoteBatchSize(uint256 _voteBatchSize) external override onlyGovernance {
-        voteBatchSize = _voteBatchSize;
-        emit VoteBatchSizeSet(_voteBatchSize);
+    function setVoteBatchSize(uint256 voteBatchSize_) external override onlyGovernance {
+        voteBatchSize = voteBatchSize_;
+        emit VoteBatchSizeSet(voteBatchSize_);
     }
 
     /**

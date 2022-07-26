@@ -50,6 +50,12 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     /// @notice Thrown when vote() attempted by a non-owner or non-manager.
     error NotOwnerNorManager();
 
+    /// @notice Thrown when array arguments are mismatched in length (and need to have the same length);
+    error ArrayArgumentsLengthMismatch();
+
+    /// @notice Thrown when vote is attempted before last epoch's votes have been successfully processed.
+    error LastEpochVotesNotProcessed();
+
     /***************************************
     EVENTS
     ***************************************/
@@ -89,32 +95,32 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     /// @notice Registry address
     function registry() external view returns (address);
 
-    function WEEK() external view returns (uint256);
-
     /// @notice Batch size of votes that will be processed in a single call of [`processVotes()`](#processvotes).
     function voteBatchSize() external view returns (uint256);
 
+    function WEEK() external view returns (uint256);
+
     /// @notice Get lockManager for a given lockId
-    /// @param lockId The ID of the lock to query for
+    /// @param lockID_ The ID of the lock to query for
     /// @return lockManager
-    function lockManagers(uint256 lockId) external view returns (address lockManager);
+    function lockManagers(uint256 lockID_) external view returns (address lockManager);
 
     /***************************************
     EXTERNAL VIEW FUNCTIONS
     ***************************************/
     /**
      * @notice Get vote power (for the current epoch) for a lock
-     * @param lockID The ID of the lock to query.
+     * @param lockID_ The ID of the lock to query.
      * @return votePower
      */
-    function votePower(uint256 lockID) external view returns (uint256 votePower);
+    function votePower(uint256 lockID_) external view returns (uint256 votePower);
 
     /**
      * @notice Get currently registered vote for a lockID.
-     * @param lockID The ID of the lock to query.
+     * @param lockID_ The ID of the lock to query.
      * @return gaugeID The ID of the gauge the lock has voted for, returns 0 if either lockID or vote doesn't exist
      */
-    function getVote(uint256 lockID) external view returns (uint256 gaugeID);
+    function getVote(uint256 lockID_) external view returns (uint256 gaugeID);
 
     /**
      * @notice Get timestamp for the start of the current epoch
@@ -137,29 +143,29 @@ interface IUnderwritingLockVoting is IGaugeVoter {
      * @notice Each underwriting lock is entitled to a single vote
      * @notice A new vote cannot be registered before all stored votes have been registered for the previous epoch (via governor invoking [`processVotes()`](#processvotes)).
      * Can only be called by the lock owner or manager
-     * @param lockID The ID of the lock to vote for.
-     * @param gaugeID Address of intended lock manager
+     * @param lockID_ The ID of the lock to vote for.
+     * @param gaugeID_ Address of intended lock manager
      */
-    function vote(uint256 lockID, uint256 gaugeID) external;
+    function vote(uint256 lockID_, uint256 gaugeID_) external;
 
     /**
      * @notice Register multiple votes for a gauge
      * @notice Each underwriting lock is entitled to a single vote
      * @notice A new vote cannot be registered before all stored votes have been registered for the previous epoch (via governor invoking [`processVotes()`](#processvotes)).
      * Can only be called by the lock owner or manager
-     * @param lockIDs Array of lockIDs to vote for.
-     * @param gaugeIDs Array of gaugeIDs to vote for.
+     * @param lockIDs_ Array of lockIDs to vote for.
+     * @param gaugeIDs_ Array of gaugeIDs to vote for.
      */
-    function voteMultiple(uint256[] calldata lockIDs, uint256[] calldata gaugeIDs) external;
+    function voteMultiple(uint256[] calldata lockIDs_, uint256[] calldata gaugeIDs_) external;
 
     /**
      * @notice Set the manager for a given lock
      * Can only be called by the lock owner
      * To remove a manager, the manager can be set to the ZERO_ADDRESS - 0x0000000000000000000000000000000000000000
-     * @param lockID The ID of the lock to set the manager of.
+     * @param lockID_ The ID of the lock to set the manager of.
      * @param manager_ Address of intended lock manager
      */
-    function setLockManager(uint256 lockID, address manager_) external;
+    function setLockManager(uint256 lockID_, address manager_) external;
 
     /***************************************
     GOVERNANCE FUNCTIONS
@@ -169,16 +175,16 @@ interface IUnderwritingLockVoting is IGaugeVoter {
      * @notice Sets the [`Registry`](./Registry) contract address.
      * @dev Requires 'uwe', 'revenueRouter' and 'underwritingLocker' addresses to be set in the Registry.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param _registry The address of `Registry` contract.
+     * @param registry_ The address of `Registry` contract.
      */
-    function setRegistry(address _registry) external;
+    function setRegistry(address registry_) external;
 
     /**
      * @notice Sets voteBatchSize
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param _voteBatchSize Batch size of votes that will be processed in a single call of [`processVotes()`](#processvotes)
+     * @param voteBatchSize_ Batch size of votes that will be processed in a single call of [`processVotes()`](#processvotes)
      */
-    function setVoteBatchSize(uint256 _voteBatchSize) external;
+    function setVoteBatchSize(uint256 voteBatchSize_) external;
     /**
      * @notice Processes votes for the last epoch passed, batches $UWE voting fees and sends to RevenueRouter.sol, updates aggregate voting data (for each gauge) 
      * @dev Designed to be called multiple times until this function returns true (all stored votes are processed)

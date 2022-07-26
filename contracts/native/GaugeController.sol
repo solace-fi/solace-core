@@ -24,41 +24,54 @@ import "./../interfaces/native/IGaugeController.sol";
  * Governance can [`addGauge()`](#addgauge) or [`pauseGauge()`](#pausegauge).
  */
 // solhint-disable-next-line contract-name-camelcase
-contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
+contract GaugeController is 
+        IGaugeController, 
+        ReentrancyGuard, 
+        Governable 
+    {
     using EnumerableSet for EnumerableSet.AddressSet;
 
-    /// @notice The total number of gauges that have been created
-    uint256 public override n_gauges;
-    
-    /// @notice The total number of paused gauges
-    uint256 internal _n_gauges_paused;
+    /***************************************
+    GLOBAL PUBLIC VARIABLES
+    ***************************************/
 
+    /// @notice The total number of gauges that have been created
+    uint256 public override totalGauges;
+    
     /// @notice Timestamp of last epoch start (rounded to weeks) that gauge weights were successfully updated.
     uint256 public override lastTimeGaugeWeightUpdated;
 
     uint256 constant public override WEEK = 604800;
 
+    /***************************************
+    GLOBAL INTERNAL VARIABLES
+    ***************************************/
+
+    /// @notice The total number of paused gauges
+    uint256 internal pausedGaugesCount;
+
     /// @notice Epoch start timestamp (rounded to weeks) => gaugeID => total vote power
     /// @dev The same data structure exists in UnderwritingLockVoting.sol. If there is only the single IGaugeVoting contract (UnderwritingLockVoting.sol), then this data structure will be a deep copy. If there is more than one IGaugeVoting contract, this data structure will be the merged deep copies of `_votePowerOfGaugeForEpoch` in the IGaugeVoting contracts.   
     mapping(uint256 => mapping(uint256 => uint256)) internal _votePowerOfGaugeForEpoch;
 
-    // Voting contracts conforming IGaugeVoting.sol interface. Source of aggregated voting data.
+    // Set of voting contracts conforming to IGaugeVoting.sol interface. Sources of aggregated voting data.
     EnumerableSet.AddressSet internal _votingContracts;
 
-    /// @notice Array of gauges
+    /// @notice Array of Gauge {string name, bool active}
     Gauge[] internal _gauges;
+
+    /***************************************
+    CONSTRUCTOR
+    ***************************************/
 
     /**
      * @notice Construct the UnderwritingLocker contract.
-     * @dev Requires 'uwe' and 'revenueRouter' addresses to be set in the Registry.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
      */
     constructor(address governance_)
         Governable(governance_)
     {
-        // Fill slot 0 of gaugeNames array, so that gaugeNames[x] maps to name of gaugeID x instead of `x + 1` (we do not permit a gaugeId of 0)
-        // Should we instead use a mapping?
-        Gauge memory newGauge = Gauge("", false);
+        Gauge memory newGauge = Gauge("", false); // Pre-fill slot 0 of _gauges, ensure gaugeID 1 maps to _gauges[1]
         _gauges.push(newGauge); 
     }
 
@@ -87,7 +100,7 @@ contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
      * @return votePowerSum
      */
     function _getVotePowerSum() internal view returns (uint256 votePowerSum) {
-        for(uint256 i = 1; i < n_gauges + 1; i++) {
+        for(uint256 i = 1; i < totalGauges + 1; i++) {
             if (_gauges[i].active) {
                 votePowerSum += _votePowerOfGaugeForEpoch[lastTimeGaugeWeightUpdated][i];
             }
@@ -97,12 +110,12 @@ contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
     /**
      * @notice Get current gauge weight of single gauge ID
      * @dev Gauge weights must sum to 1e18, so a weight of 1e17 == 10% weight
-     * @param gaugeID The ID of the gauge to query.
+     * @param gaugeID_ The ID of the gauge to query.
      * @return weight
      */
-    function _getGaugeWeight(uint256 gaugeID) internal view returns (uint256 weight) {
+    function _getGaugeWeight(uint256 gaugeID_) internal view returns (uint256 weight) {
         uint256 votePowerSum = _getVotePowerSum();
-        return 1e18 * _votePowerOfGaugeForEpoch[lastTimeGaugeWeightUpdated][gaugeID] / votePowerSum;
+        return 1e18 * _votePowerOfGaugeForEpoch[lastTimeGaugeWeightUpdated][gaugeID_] / votePowerSum;
     }
 
     /**
@@ -112,11 +125,11 @@ contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
      * @dev weights[0] will always be 0, so that weights[1] maps to the weight of gaugeID 1.
      */
     function _getAllGaugeWeights() internal view returns (uint256[] memory weights) {
-        weights = new uint[](n_gauges + 1);
+        weights = new uint[](totalGauges + 1);
         weights[0] = 0;
         uint256 votePowerSum = _getVotePowerSum();
 
-        for(uint256 i = 1; i < n_gauges + 1; i++) {
+        for(uint256 i = 1; i < totalGauges + 1; i++) {
             if (_gauges[i].active) {
                 weights[i] = (1e18 * _votePowerOfGaugeForEpoch[lastTimeGaugeWeightUpdated][i] / votePowerSum);
             } else {
@@ -150,11 +163,11 @@ contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
     /**
      * @notice Get current gauge weight of single gauge ID
      * @dev Gauge weights must sum to 1e18, so a weight of 1e17 == 10% weight
-     * @param gaugeID The ID of the gauge to query.
+     * @param gaugeID_ The ID of the gauge to query.
      * @return weight
      */
-    function getGaugeWeight(uint256 gaugeID) external view override returns (uint256 weight) {
-        return _getGaugeWeight(gaugeID);
+    function getGaugeWeight(uint256 gaugeID_) external view override returns (uint256 weight) {
+        return _getGaugeWeight(gaugeID_);
     }
 
     /**
@@ -172,7 +185,7 @@ contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
      * @return numActiveGauges
      */
     function getNumActiveGauges() external view override returns (uint256 numActiveGauges) {
-        return (n_gauges - _n_gauges_paused);
+        return (totalGauges - pausedGaugesCount);
     }
 
     /**
@@ -180,25 +193,25 @@ contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
      * @return numPausedGauges
      */
     function getNumPausedGauges() external view override returns (uint256 numPausedGauges) {
-        return _n_gauges_paused;
+        return pausedGaugesCount;
     }
 
     /**
      * @notice Get gauge name
-     * @param gaugeID The ID of the gauge to query.
+     * @param gaugeID_ The ID of the gauge to query.
      * @return gaugeName
      */
-    function getGaugeName(uint256 gaugeID) external view override returns (string memory gaugeName) {
-        return _gauges[gaugeID].name;
+    function getGaugeName(uint256 gaugeID_) external view override returns (string memory gaugeName) {
+        return _gauges[gaugeID_].name;
     }
 
     /**
      * @notice Query whether gauge is active.
-     * @param gaugeID The ID of the gauge to query.
+     * @param gaugeID_ The ID of the gauge to query.
      * @return gaugeActive True if active, false otherwise.
      */
-    function isGaugeActive(uint256 gaugeID) external view override returns (bool gaugeActive) {
-        return _gauges[gaugeID].active;
+    function isGaugeActive(uint256 gaugeID_) external view override returns (bool gaugeActive) {
+        return _gauges[gaugeID_].active;
     }
 
     /***************************************
@@ -208,34 +221,34 @@ contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
     /**
      * @notice Adds a voting contract
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param votingContract The votingContract to add.
+     * @param votingContract_ The votingContract to add.
      */
-    function addVotingContract(address votingContract) external override onlyGovernance {
-        _votingContracts.add(votingContract);
-        emit VotingContractAdded(votingContract);
+    function addVotingContract(address votingContract_) external override onlyGovernance {
+        _votingContracts.add(votingContract_);
+        emit VotingContractAdded(votingContract_);
     }
 
     /**
      * @notice Removes a voting contract
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param votingContract The votingContract to add.
+     * @param votingContract_ The votingContract to add.
      */
-    function removeVotingContract(address votingContract) external override onlyGovernance {
-        _votingContracts.remove(votingContract);
-        emit VotingContractRemoved(votingContract);
+    function removeVotingContract(address votingContract_) external override onlyGovernance {
+        _votingContracts.remove(votingContract_);
+        emit VotingContractRemoved(votingContract_);
     }
 
     /**
      * @notice Adds an insurance gauge
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param gaugeName Gauge name
+     * @param gaugeName_ Gauge name
      */
-    function addGauge(string calldata gaugeName) external override onlyGovernance {
-        uint256 gaugeID = ++n_gauges;
-        Gauge memory newGauge = Gauge(gaugeName, true);
+    function addGauge(string calldata gaugeName_) external override onlyGovernance {
+        uint256 gaugeID = ++totalGauges;
+        Gauge memory newGauge = Gauge(gaugeName_, true);
         _gauges.push(newGauge); 
-        assert(_gauges.length == n_gauges); // Uphold invariant, should not be violated.
-        emit GaugeAdded(gaugeID, gaugeName);
+        assert(_gauges.length == totalGauges); // Uphold invariant, should not be violated.
+        emit GaugeAdded(gaugeID, gaugeName_);
     }
 
     /**
@@ -244,25 +257,25 @@ contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * If a gaugeID is paused, it means that vote data for that gauge will no longer be collected on future [`updateGaugeWeights()`](#updategaugeweights) calls.
      * It does not mean that users can no longer vote for their gauge, it just means that their vote for that gauge will no longer count for gauge weights (however they will still be charged for that vote. It is the responsibility of the voter to ensure they are voting for a valid gauge).
-     * @param gaugeID ID of gauge to pause
+     * @param gaugeID_ ID of gauge to pause
      */
-    function pauseGauge(uint256 gaugeID) external override onlyGovernance {
-        if(_gauges[gaugeID].active == false) revert GaugeAlreadyPaused({gaugeID: gaugeID});
-        _n_gauges_paused += 1;
-        _gauges[gaugeID].active = false;
-        emit GaugePaused(gaugeID, _gauges[gaugeID].name);
+    function pauseGauge(uint256 gaugeID_) external override onlyGovernance {
+        if(_gauges[gaugeID_].active == false) revert GaugeAlreadyPaused({gaugeID: gaugeID_});
+        pausedGaugesCount += 1;
+        _gauges[gaugeID_].active = false;
+        emit GaugePaused(gaugeID_, _gauges[gaugeID_].name);
     }
 
     /**
      * @notice Unpauses an insurance gauge
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param gaugeID ID of gauge to pause
+     * @param gaugeID_ ID of gauge to pause
      */
-    function unpauseGauge(uint256 gaugeID) external override onlyGovernance {
-        if(_gauges[gaugeID].active == true) revert GaugeAlreadyUnpaused({gaugeID: gaugeID});
-        _n_gauges_paused -= 1;
-        _gauges[gaugeID].active = true;
-        emit GaugeUnpaused(gaugeID, _gauges[gaugeID].name);
+    function unpauseGauge(uint256 gaugeID_) external override onlyGovernance {
+        if(_gauges[gaugeID_].active == true) revert GaugeAlreadyUnpaused({gaugeID: gaugeID_});
+        pausedGaugesCount -= 1;
+        _gauges[gaugeID_].active = true;
+        emit GaugeUnpaused(gaugeID_, _gauges[gaugeID_].name);
     }
 
     /**
@@ -281,7 +294,7 @@ contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
             if( IGaugeVoter(_votingContracts.at(i)).lastTimeAllVotesProcessed() != epochStartTime) revert VotingContractNotUpdated(epochStartTime, _votingContracts.at(i));
 
             // Iterate through gaugeID, gaugeID start from 1
-            for (uint256 j = 1; j < n_gauges + 1; j++) {
+            for (uint256 j = 1; j < totalGauges + 1; j++) {
                 if (_gauges[j].active) {
                     _votePowerOfGaugeForEpoch[epochStartTime][j] += IGaugeVoter(_votingContracts.at(i)).getVotePowerOfGaugeForEpoch(epochStartTime, j);
                 }

@@ -13,11 +13,11 @@ interface IUnderwritingLockListener {
      * @notice Called when an action is performed on a lock.
      * @dev Called on transfer, mint, burn, and update.
      * Either the owner will change or the lock will change, not both.
-     * @param xsLockID The ID of the lock that was altered.
-     * @param oldOwner The old owner of the lock.
-     * @param newOwner The new owner of the lock.
-     * @param oldLock The old lock data.
-     * @param newLock The new lock data.
+     * @param lockID_ The ID of the lock that was altered.
+     * @param oldOwner_ The old owner of the lock.
+     * @param newOwner_ The new owner of the lock.
+     * @param oldLock_ The old lock data.
+     * @param newLock_ The new lock data.
      */
-    function registerLockEvent(uint256 xsLockID, address oldOwner, address newOwner, Lock memory oldLock, Lock memory newLock) external;
+    function registerLockEvent(uint256 lockID_, address oldOwner_, address newOwner_, Lock memory oldLock_, Lock memory newLock_) external;
 }
