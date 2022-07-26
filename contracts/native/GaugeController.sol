@@ -112,7 +112,7 @@ contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
      * @dev weights[0] will always be 0, so that weights[1] maps to the weight of gaugeID 1.
      */
     function _getAllGaugeWeights() internal view returns (uint256[] memory weights) {
-        uint[] memory weights = new uint[](n_gauges + 1);
+        weights = new uint[](n_gauges + 1);
         weights[0] = 0;
         uint256 votePowerSum = _getVotePowerSum();
 
@@ -123,6 +123,8 @@ contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
                 weights[i] = 0;
             }
         }
+
+        return weights;
     }
 
     /***************************************
@@ -142,7 +144,7 @@ contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
      * @return timestamp
      */
     function getEpochEndTimestamp() external view override returns (uint256 timestamp) {
-        _getEpochEndTimestamp();
+        return _getEpochEndTimestamp();
     }
 
     /**
@@ -152,7 +154,7 @@ contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
      * @return weight
      */
     function getGaugeWeight(uint256 gaugeID) external view override returns (uint256 weight) {
-        _getGaugeWeight(gaugeID);
+        return _getGaugeWeight(gaugeID);
     }
 
     /**
@@ -162,7 +164,7 @@ contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
      * @dev weights[0] will always be 0, so that weights[1] maps to the weight of gaugeID 1.
      */
     function getAllGaugeWeight() external view override returns (uint256[] memory weights) {
-        _getAllGaugeWeights();
+        return _getAllGaugeWeights();
     }
 
     /**
@@ -245,7 +247,7 @@ contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
      * @param gaugeID ID of gauge to pause
      */
     function pauseGauge(uint256 gaugeID) external override onlyGovernance {
-        require(_gauges[gaugeID].active == true, "already paused");
+        if(_gauges[gaugeID].active == false) revert GaugeAlreadyPaused({gaugeID: gaugeID});
         _n_gauges_paused += 1;
         _gauges[gaugeID].active = false;
         emit GaugePaused(gaugeID, _gauges[gaugeID].name);
@@ -257,7 +259,7 @@ contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
      * @param gaugeID ID of gauge to pause
      */
     function unpauseGauge(uint256 gaugeID) external override onlyGovernance {
-        require(_gauges[gaugeID].active == false, "already unpaused");
+        if(_gauges[gaugeID].active == true) revert GaugeAlreadyUnpaused({gaugeID: gaugeID});
         _n_gauges_paused -= 1;
         _gauges[gaugeID].active = true;
         emit GaugeUnpaused(gaugeID, _gauges[gaugeID].name);
@@ -271,12 +273,12 @@ contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
      */
     function updateGaugeWeights() external override nonReentrant onlyGovernance {
         uint256 epochStartTime = _getEpochStartTimestamp();
-        require(lastTimeGaugeWeightUpdated <= epochStartTime, "gauge weights already updated for this epoch");
-
+        if (lastTimeGaugeWeightUpdated >= epochStartTime) revert GaugeWeightsAlreadyUpdated({epochTimestamp: epochStartTime});
         uint256 n_voting_contracts = _votingContracts.length();
         // Iterate through voting contracts
         for(uint256 i = 0; i < n_voting_contracts; i++) {
             require( IGaugeVoter(_votingContracts.at(i)).lastTimeAllVotesProcessed() == epochStartTime, "Voting contract not updated for this epoch");
+            if( IGaugeVoter(_votingContracts.at(i)).lastTimeAllVotesProcessed() != epochStartTime) revert VotingContractNotUpdated(epochStartTime, _votingContracts.at(i));
 
             // Iterate through gaugeID, gaugeID start from 1
             for (uint256 j = 1; j < n_gauges + 1; j++) {
@@ -286,6 +288,7 @@ contract GaugeController is IGaugeController, ReentrancyGuard, Governable {
             }
         }
         
+        lastTimeGaugeWeightUpdated = epochStartTime;
         emit GaugeWeightsUpdated(epochStartTime);
     }
 }

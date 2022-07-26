@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+pragma solidity 0.8.6;
+
 import "./IGaugeVoter.sol";
 
 /**
@@ -28,6 +31,24 @@ import "./IGaugeVoter.sol";
  * One drawback is that it requires two regular function calls, rather than one.
  */
 interface IUnderwritingLockVoting is IGaugeVoter {
+
+    /***************************************
+    CUSTOM ERRORS
+    ***************************************/
+
+    /// @notice Thrown when zero address is given as an argument.
+    /// @param contractName Name of contract for which zero address was incorrectly provided.
+    error ZeroAddressInput(string contractName);
+
+    /// @notice Thrown when processVote() attempted when all stored votes have already been processed for the last epoch.
+    /// @param epochTime Timestamp of endtime for epoch already processed.
+    error LastEpochAlreadyProcessed(uint256 epochTime);
+
+    /// @notice Thrown when setLockManager() attempted for a non-owner.
+    error NotOwner();
+
+    /// @notice Thrown when vote() attempted by a non-owner or non-manager.
+    error NotOwnerNorManager();
 
     /***************************************
     EVENTS

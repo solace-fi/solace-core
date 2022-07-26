@@ -241,7 +241,7 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
      * @param amounts Array of token amounts to deposit.
      */
     function increaseAmountMultiple(uint256[] calldata lockIDs, uint256[] calldata amounts) external override nonReentrant {
-        require (lockIDs.length == amounts.length, "array length mismatch");
+        if (lockIDs.length != amounts.length) revert ArrayArgumentsLengthMismatch();
         uint256 refundAmount = 0;
         for (uint256 i = 0; i < lockIDs.length; i++) {
             // Guard against revert for non-existing lockIDs
@@ -292,7 +292,7 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
      * @param ends Array of new unlock times.
      */
     function extendLockMultiple(uint256[] calldata lockIDs, uint256[] calldata ends) external override nonReentrant {
-        require (lockIDs.length == ends.length, "array length mismatch");
+        if (lockIDs.length != ends.length) revert ArrayArgumentsLengthMismatch();
 
         for (uint256 i = 0; i < lockIDs.length; i++) {
             // Guard against revert for non-existing lockIDs
@@ -325,7 +325,7 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
      * @param amount The amount of token to withdraw.
      */
     function withdrawInPart(uint256 lockID, address recipient, uint256 amount) external override nonReentrant onlyOwnerOrApproved(lockID) {
-        require(amount <= _locks[lockID].amount, "excess withdraw");
+        if (amount > _locks[lockID].amount) revert ExcessWithdraw(lockID, _locks[lockID].amount, amount);
         _withdraw(lockID, amount);
         // transfer token
         SafeERC20.safeTransfer(IERC20(token), recipient, amount);
@@ -343,7 +343,7 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
         uint256 totalWithdrawAmount = 0;
         for(uint256 i = 0; i < len; i++) {
             uint256 lockID = lockIDs[i];
-            require(_isApprovedOrOwner(msg.sender, lockID), "only owner or approved");
+            if (!_isApprovedOrOwner(msg.sender, lockID)) revert NotOwnerNorApproved();
             uint256 singleLockAmount = _locks[lockID].amount;
             totalWithdrawAmount += singleLockAmount;
             _withdraw(lockID, singleLockAmount);
@@ -361,14 +361,14 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
      * @param amounts Array of token amounts to withdraw
      */
     function withdrawInPartMultiple(uint256[] calldata lockIDs, address recipient, uint256[] calldata amounts) external override nonReentrant {
-        require (lockIDs.length == amounts.length, "array length mismatch");
+        if (lockIDs.length != amounts.length) revert ArrayArgumentsLengthMismatch();
         uint256 len = lockIDs.length;
         uint256 totalWithdrawAmount = 0;
         for(uint256 i = 0; i < len; i++) {
             uint256 lockID = lockIDs[i];
-            require(_isApprovedOrOwner(msg.sender, lockID), "only owner or approved");
+            if (!_isApprovedOrOwner(msg.sender, lockID)) revert NotOwnerNorApproved();
             uint256 singleLockAmount = amounts[i];
-            require(singleLockAmount <= _locks[lockID].amount, "excess withdraw");
+            if (singleLockAmount > _locks[lockID].amount) revert ExcessWithdraw(lockID, _locks[lockID].amount, singleLockAmount);
             totalWithdrawAmount += singleLockAmount;
             _withdraw(lockID, singleLockAmount);
         }
@@ -401,7 +401,7 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
      * @param amount The amount of token to withdraw.
      */
     function emergencyWithdrawInPart(uint256 lockID, address recipient, uint256 amount) external override nonReentrant onlyOwnerOrApproved(lockID) {
-        require(amount <= _locks[lockID].amount, "excess withdraw");
+        if (amount > _locks[lockID].amount) revert ExcessWithdraw(lockID, _locks[lockID].amount, amount);
         uint256 penalty = _emergencyWithdraw(lockID, amount);
         SafeERC20.safeTransfer(IERC20(token), revenueRouter, penalty);
         SafeERC20.safeTransfer(IERC20(token), recipient, amount - penalty);
@@ -420,7 +420,7 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
         uint256 totalPenaltyAmount = 0;
         for(uint256 i = 0; i < len; i++) {
             uint256 lockID = lockIDs[i];
-            require(_isApprovedOrOwner(msg.sender, lockID), "only owner or approved");
+            if (!_isApprovedOrOwner(msg.sender, lockID)) revert NotOwnerNorApproved();
             uint256 singleLockAmount = _locks[lockID].amount;
             uint256 penalty = _emergencyWithdraw(lockID, singleLockAmount);
             totalPenaltyAmount += penalty;
@@ -445,9 +445,9 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
         uint256 totalPenaltyAmount = 0;
         for(uint256 i = 0; i < len; i++) {
             uint256 lockID = lockIDs[i];
-            require(_isApprovedOrOwner(msg.sender, lockID), "only owner or approved");
+            if (!_isApprovedOrOwner(msg.sender, lockID)) revert NotOwnerNorApproved();
             uint256 singleLockAmount = amounts[i];
-            require(singleLockAmount <= _locks[lockID].amount, "excess withdraw");
+            if (singleLockAmount > _locks[lockID].amount) revert ExcessWithdraw(lockID, _locks[lockID].amount, singleLockAmount);
             uint256 penalty = _emergencyWithdraw(lockID, singleLockAmount);
             totalPenaltyAmount += penalty;
             totalWithdrawAmount += (singleLockAmount - penalty);
@@ -470,9 +470,9 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
      */
     function _createLock(address recipient, uint256 amount, uint256 end) internal returns (uint256 lockID) {
         // solhint-disable-next-line not-rely-on-time
-        require(end >= block.timestamp + MIN_LOCK_DURATION, "Min lock is 6 months");
+        if(end < block.timestamp + MIN_LOCK_DURATION) revert LockTimeTooShort();
         // solhint-disable-next-line not-rely-on-time
-        require(end <= block.timestamp + MAX_LOCK_DURATION, "Max lock is 4 years");
+        if(end > block.timestamp + MAX_LOCK_DURATION) revert LockTimeTooLong();
         lockID = ++totalNumLocks;
         Lock memory newLock = Lock(amount, end);
         // accounting
@@ -519,7 +519,7 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
      */
     function _withdraw(uint256 lockID, uint256 amount) internal {
         // solhint-disable-next-line not-rely-on-time
-        require(_locks[lockID].end <= block.timestamp, "locked"); // cannot withdraw while locked
+        if(_locks[lockID].end > block.timestamp) revert CannotWithdrawWhileLocked(); // cannot withdraw while locked
         // accounting
         if(amount == _locks[lockID].amount) {
             _burn(lockID);
@@ -543,8 +543,8 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
      */
     function _extendLock(uint256 lockID, uint256 end) internal nonReentrant onlyOwnerOrApproved(lockID) {
         // solhint-disable-next-line not-rely-on-time
-        require(end <= block.timestamp + MAX_LOCK_DURATION, "Max lock is 4 years");
-        require(_locks[lockID].end <= end, "not extended");
+        if(end > block.timestamp + MAX_LOCK_DURATION) revert LockTimeTooLong();
+        if(_locks[lockID].end > end) revert LockTimeNotExtended();
         _updateLock(lockID, _locks[lockID].amount, end);
         emit LockExtended(lockID, end);
     }
@@ -593,7 +593,7 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
         else if(to == address(0x0)) _notify(lockID, from, to, lock, Lock(0, 0)); // burn
         else { // transfer
             // solhint-disable-next-line not-rely-on-time
-            require(lock.end <= block.timestamp, "locked"); // cannot transfer while locked
+            if(lock.end > block.timestamp) revert CannotTransferWhileLocked();
             _notify(lockID, from, to, lock, lock);
         }
     }
@@ -622,16 +622,17 @@ contract UnderwritingLocker is IUnderwritingLocker, ERC721Enhanced, ReentrancyGu
      * @param _registry The registry address to set.
      */
     function _setRegistry(address _registry) internal {
-        require(_registry != address(0x0), "zero address registry");
+        // set registry        
+        if(_registry == address(0x0)) revert ZeroAddressInput("registry");
         registry = _registry;
         IRegistry reg = IRegistry(_registry);
         // set revenueRouter
         (, address revenueRouterAddr) = reg.tryGet("revenueRouter");
-        require(revenueRouterAddr != address(0x0), "zero address revenueRouter");
+        if(revenueRouterAddr == address(0x0)) revert ZeroAddressInput("revenueRouter");
         revenueRouter = revenueRouterAddr;
         // set token ($UWE)
         (, address uweAddr) = reg.tryGet("uwe");
-        require(uweAddr != address(0x0), "zero address uwe");
+        if(uweAddr == address(0x0)) revert ZeroAddressInput("uwe");
         token = uweAddr;
         emit RegistrySet(_registry);
     }

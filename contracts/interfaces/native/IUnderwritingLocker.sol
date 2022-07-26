@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 import "./../utils/IERC721Enhanced.sol";
 
+/// @dev Defining Lock struct outside of the interface body causes this struct to be visible to contracts that import, but do not inherit, this file. If we otherwise define this struct in the interface body, it is only visible to contracts that both import and inherit this file.
 struct Lock {
     uint256 amount;
     uint256 end;
@@ -37,6 +38,46 @@ struct Lock {
  *
  */
 interface IUnderwritingLocker is IERC721Enhanced {
+
+    /***************************************
+    CUSTOM ERRORS
+    ***************************************/
+
+    /**
+     * @notice Thrown when array arguments are mismatched in length (and need to have the same length);
+     * @dev Should we use array of custom structs as the parameter type, instead of multiple array parameters for functions requiring this input validation?
+     */
+    error ArrayArgumentsLengthMismatch();
+
+    /**
+     * @notice Thrown when a withdraw or emergency withdraw is attempted for an `amount` that exceeds the lock balance.
+     * @param lockID The ID of the lock
+     * @param lockAmount Balance of the lock
+     * @param attemptedWithdrawAmount Attempted withdraw amount
+     */
+    error ExcessWithdraw(uint256 lockID, uint256 lockAmount, uint256 attemptedWithdrawAmount);
+
+    /// @notice Thrown when extend, withdraw, or emergency withdraw is attempted by a party that is not the owner nor approved for a lock.
+    error NotOwnerNorApproved();
+
+    /// @notice Thrown when createLock is attempted with lock duration < 6 months.
+    error LockTimeTooShort();
+
+    /// @notice Thrown when createLock or extendLock is attempted with lock duration > 4 years.
+    error LockTimeTooLong();
+
+    /// @notice Thrown when zero address is given as an argument.
+    /// @param contractName Name of contract for which zero address was incorrectly provided.
+    error ZeroAddressInput(string contractName);
+
+    /// @notice Thrown when extendLock is attempted to shorten the lock duration.
+    error LockTimeNotExtended();
+
+    /// @notice Thrown when transfer is attempted while locked.
+    error CannotTransferWhileLocked();
+
+    /// @notice Thrown when withdraw is attempted while locked.
+    error CannotWithdrawWhileLocked();
 
     /***************************************
     EVENTS

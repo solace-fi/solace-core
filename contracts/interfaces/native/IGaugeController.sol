@@ -27,6 +27,35 @@ interface IGaugeController {
     }
 
     /***************************************
+    CUSTOM ERRORS
+    ***************************************/
+
+    /**
+     * @notice Thrown if pauseGauge() is attempted on a gauge that is already paused.
+     * @param gaugeID The gauge ID.
+     */
+    error GaugeAlreadyPaused(uint256 gaugeID);
+
+    /**
+     * @notice Thrown if unpauseGauge() is attempted on a gauge that is already paused.
+     * @param gaugeID The gauge ID.
+     */
+    error GaugeAlreadyUnpaused(uint256 gaugeID);
+
+    /**
+     * @notice Thrown if updateGaugeWeights() is called more than once in an epoch.
+     * @param epochTimestamp Epoch start timestamp (rounded down to weeks).
+     */
+    error GaugeWeightsAlreadyUpdated(uint256 epochTimestamp);
+
+    /**
+     * @notice Thrown if updateGaugeWeights() is called more than once in an epoch.
+     * @param epochTimestamp Epoch start timestamp (rounded down to weeks).
+     * @param votingContract Address of voting contract.
+     */
+    error VotingContractNotUpdated(uint256 epochTimestamp, address votingContract);
+
+    /***************************************
     EVENTS
     ***************************************/
 

@@ -223,7 +223,7 @@ contract UnderwritingLockVoting is IUnderwritingLockVoting, ReentrancyGuard, Gov
      * @return timestamp
      */
     function getEpochEndTimestamp() external view override returns (uint256 timestamp) {
-        _getEpochEndTimestamp();
+        return _getEpochEndTimestamp();
     }
 
     /***************************************
@@ -268,7 +268,7 @@ contract UnderwritingLockVoting is IUnderwritingLockVoting, ReentrancyGuard, Gov
      * @param manager_ Address of intended lock manager
      */
     function setLockManager(uint256 lockID, address manager_) external override {
-        require( IUnderwritingLocker(underwritingLocker).ownerOf(lockID) == msg.sender, "not owner" );
+        if( IUnderwritingLocker(underwritingLocker).ownerOf(lockID) != msg.sender) revert NotOwner();
         lockManagers[lockID] = manager_;
         emit LockManagerSet(lockID, manager_);
     }
@@ -283,20 +283,21 @@ contract UnderwritingLockVoting is IUnderwritingLockVoting, ReentrancyGuard, Gov
      * @param _registry The registry address to set.
      */
     function _setRegistry(address _registry) internal {
-        require(_registry != address(0x0), "zero address registry");
+
+        if(_registry == address(0x0)) revert ZeroAddressInput("registry");
         registry = _registry;
         IRegistry reg = IRegistry(_registry);
         // set revenueRouter
         (, address revenueRouterAddr) = reg.tryGet("revenueRouter");
-        require(revenueRouterAddr != address(0x0), "zero address revenueRouter");
+        if(revenueRouterAddr == address(0x0)) revert ZeroAddressInput("revenueRouter");
         revenueRouter = revenueRouterAddr;
         // set token ($UWE)
         (, address uweAddr) = reg.tryGet("uwe");
-        require(uweAddr != address(0x0), "zero address uwe");
+        if(uweAddr == address(0x0)) revert ZeroAddressInput("uwe");
         token = uweAddr;
         // set underwritingLocker
         (, address underwritingLockerAddr) = reg.tryGet("underwritingLocker");
-        require(underwritingLockerAddr != address(0x0), "zero address underwritingLocker");
+        if(underwritingLockerAddr == address(0x0)) revert ZeroAddressInput("underwritingLocker");
         underwritingLocker = underwritingLockerAddr;
         emit RegistrySet(_registry);
     }
@@ -310,7 +311,8 @@ contract UnderwritingLockVoting is IUnderwritingLockVoting, ReentrancyGuard, Gov
      * @param gaugeID Address of intended lock manager
      */
     function _vote(uint256 lockID, uint256 gaugeID) internal  {
-        require( IUnderwritingLocker(underwritingLocker).ownerOf(lockID) == msg.sender || lockManagers[lockID] == msg.sender, "not owner or manager" );
+        if( IUnderwritingLocker(underwritingLocker).ownerOf(lockID) != msg.sender && lockManagers[lockID] != msg.sender) revert NotOwnerNorManager();
+        // require( IUnderwritingLocker(underwritingLocker).ownerOf(lockID) == msg.sender || lockManagers[lockID] == msg.sender, "not owner or manager" );
         _votes.set(lockID, gaugeID);
         emit Vote(lockID, gaugeID, msg.sender, _getEpochEndTimestamp(), _votePower(lockID));
     }
@@ -347,13 +349,12 @@ contract UnderwritingLockVoting is IUnderwritingLockVoting, ReentrancyGuard, Gov
      * @return epochProcessed True if all stored votes are processed for the last epoch, false otherwise
      */
     function processVotes() external override onlyGovernance nonReentrant returns (bool epochProcessed) {
-        require(lastTimeAllVotesProcessed != (block.timestamp * WEEK) / WEEK, "last epoch already processed");
-
         uint256 epochStartTimestamp = _getEpochStartTimestamp();
+        if(lastTimeAllVotesProcessed == epochStartTimestamp) revert LastEpochAlreadyProcessed({epochTime: epochStartTimestamp});    
+        uint256 n_votes = _votes.length();
+        uint256 vote_index;
         uint256 locks_processed;
         uint256 sum_voting_fee;
-        uint256 n_votes = _votes.length();
-        uint256 vote_index; // Vote index starts from 0, and must be strictly less than n_votes
 
         // Iterate through each vote
         // This is still technically an unbounded loop because n_votes is unbounded, need to test what the limit is here.
