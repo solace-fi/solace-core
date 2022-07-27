@@ -15,6 +15,7 @@ import "./../interfaces/native/IUnderwritingLocker.sol";
 
 // TODO
 // $UWE needs to inherit ERC20Permit, or we remove ...Signed methods from this contract
+// getEarlyWithdrawInPartPenalty
 
 /**
  * @title IUnderwritingLocker
@@ -132,6 +133,19 @@ contract UnderwritingLocker is
         return (penaltyPercentage * lock.amount) / 1e18;
     }
 
+    /**
+     * @notice Computes current penalty for early partial withdrawal from a specified lock.
+     * @param lockID_ The ID of the lock to compute early withdraw penalty.
+     * @param amount_ The amount to withdraw.
+     * @return penaltyAmount Token amount that will be paid to RevenueRouter.sol as a penalty for early partial withdrawal.
+     */
+    function _getEarlyWithdrawInPartPenalty(uint256 lockID_, uint256 amount_) internal view returns (uint256 penaltyAmount) {
+        Lock memory lock = _locks[lockID_];
+        if (amount_ > lock.amount) revert ExcessWithdraw(lockID_, lock.amount, amount_);
+        uint256 penaltyPercentage = _getEarlyWithdrawPenaltyPercentage(_locks[lockID_].end);
+        return (penaltyPercentage * amount_) / 1e18;
+    }
+
     /***************************************
     EXTERNAL VIEW FUNCTIONS
     ***************************************/
@@ -197,12 +211,22 @@ contract UnderwritingLocker is
     }
 
     /**
-     * @notice Computes current penalty for early withdrawing from a specified lock.
+     * @notice Computes current penalty for early complete withdrawal from a specified lock.
      * @param lockID_ The ID of the lock to compute early withdraw penalty.
-     * @return penaltyAmount Token amount that will be paid to RevenueRouter.sol as a penalty for early withdrawing.
+     * @return penaltyAmount Token amount that will be paid to RevenueRouter.sol as a penalty for early complete withdrawal.
      */
     function getEarlyWithdrawPenalty(uint256 lockID_) external view override tokenMustExist(lockID_) returns (uint256 penaltyAmount) {
         return _getEarlyWithdrawPenalty(lockID_);
+    }
+
+    /**
+     * @notice Computes current penalty for early partial withdrawal from a specified lock.
+     * @param lockID_ The ID of the lock to compute early withdraw penalty.
+     * @param amount_ The amount to withdraw.
+     * @return penaltyAmount Token amount that will be paid to RevenueRouter.sol as a penalty for early partial withdrawal.
+     */
+    function getEarlyWithdrawInPartPenalty(uint256 lockID_, uint256 amount_) external view override tokenMustExist(lockID_) returns (uint256 penaltyAmount) {
+        return _getEarlyWithdrawInPartPenalty(lockID_, amount_);
     }
 
     /***************************************
@@ -481,13 +505,17 @@ contract UnderwritingLocker is
      * @param amount_ The amount of token to withdraw.
      * @param penalty Penalty amount (will be 0 if block.timestamp >= end).
      */
-    function _withdraw(uint256 lockID_, uint256 amount_) internal onlyOwnerOrApproved(lockID_) returns (uint256 penalty) {
+    function _withdraw(uint256 lockID_, uint256 amount_) 
+        internal 
+        onlyOwnerOrApproved(lockID_) 
+        returns (uint256 penalty) 
+    {
         // solhint-disable-next-line not-rely-on-time
-        bool isEarlyWithdraw = _locks[lockID_].end < block.timestamp;
+        bool isEarlyWithdraw = block.timestamp < _locks[lockID_].end;
 
         if(isEarlyWithdraw) {
             // Make _getEarlyWithdrawPenaltyPercentage query before lockID is potentially deleted
-            uint256 penaltyPercentage = _getEarlyWithdrawPenaltyPercentage(lockID_);
+            uint256 penaltyPercentage = _getEarlyWithdrawPenaltyPercentage(_locks[lockID_].end);
             penalty = amount_ * penaltyPercentage / 1e18;
         }
 

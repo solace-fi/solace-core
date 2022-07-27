@@ -176,11 +176,19 @@ interface IUnderwritingLocker is IERC721Enhanced {
     function getLockListeners() external view returns (address[] memory listeners_);
 
     /**
-     * @notice Computes current penalty for early withdrawing from a specified lock.
+     * @notice Computes current penalty for early complete withdrawal from a specified lock.
      * @param lockID_ The ID of the lock to compute early withdraw penalty.
-     * @return penaltyAmount Token amount that will be paid to RevenueRouter.sol as a penalty for early withdrawing.
+     * @return penaltyAmount Token amount that will be paid to RevenueRouter.sol as a penalty for early complete withdrawal.
      */
-    function getEarlyWithdrawPenalty(uint256 lockID_) external view returns (uint256 penaltyAmount);
+    function getEarlyWithdrawPenalty(uint256 lockID_) external returns (uint256 penaltyAmount);
+
+    /**
+     * @notice Computes current penalty for early partial withdrawal from a specified lock.
+     * @param lockID_ The ID of the lock to compute early withdraw penalty.
+     * @param amount_ The amount to withdraw.
+     * @return penaltyAmount Token amount that will be paid to RevenueRouter.sol as a penalty for early partial withdrawal.
+     */
+    function getEarlyWithdrawInPartPenalty(uint256 lockID_, uint256 amount_) external returns (uint256 penaltyAmount);
 
     /***************************************
     EXTERNAL MUTATOR FUNCTIONS

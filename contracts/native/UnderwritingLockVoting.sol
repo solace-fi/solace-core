@@ -16,6 +16,9 @@ import "./../interfaces/native/IUnderwritingLockVoting.sol";
 // Formula for _calculateVotePower()
 // Formula for _calculateVoteFee()
 
+// vote gaugeID = 0 -> retract vote (no $UWE charge)
+// setLockManagerMultiple[]
+
 /**
  * @title UnderwritingLockVoting
  * @author solace.fi
@@ -195,7 +198,7 @@ contract UnderwritingLockVoting is
     ***************************************/
 
     /**
-     * @notice Obtain vote power sum for a gauge for a given epoch
+     * @notice Obtain vote power sum for a gauge for a given epoch.
      * @param epochStartTimestamp_ Start timestamp for epoch.
      * @param gaugeID_ Gauge ID to query.
      * @return votePower
