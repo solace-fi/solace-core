@@ -114,6 +114,7 @@ export async function import_artifacts() {
   artifacts.UnderwritingLocker = await tryImport(`${artifact_dir}/native/UnderwritingLocker.sol/UnderwritingLocker.json`);
   artifacts.UnderwritingLockVoting = await tryImport(`${artifact_dir}/native/UnderwritingLockVoting.sol/UnderwritingLockVoting.json`);
   artifacts.GaugeController = await tryImport(`${artifact_dir}/native/GaugeController.sol/GaugeController.json`);
+  artifacts.MockUnderwritingLockListener = await tryImport(`${artifact_dir}/mocks/MockUnderwritingLockListener.sol/MockUnderwritingLockListener.json`);
 
   return artifacts;
 }

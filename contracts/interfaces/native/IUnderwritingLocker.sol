@@ -26,7 +26,7 @@ struct Lock {
  *
  * Users can create locks via [`createLock()`](#createlock) or [`createLockSigned()`](#createlocksigned).
  * Users can deposit more $UWE into a lock via [`increaseAmount()`](#increaseamount), [`increaseAmountSigned()`] (#increaseamountsigned) or [`increaseAmountMultiple()`](#increaseamountmultiple).
- * Users can extend a lock via [`extendLock()`](#extendlock) or [`extendLockMultiply()`](#extendlockmultiple).
+ * Users can extend a lock via [`extendLock()`](#extendlock) or [`extendLockMultiple()`](#extendlockmultiple).
  * Users can withdraw from a lock via [`withdraw()`](#withdraw), [`withdrawInPart()`](#withdrawinpart), [`withdrawMultiple()`](#withdrawmultiple) or [`withdrawInPartMultiple()`](#withdrawinpartmultiple).
  *
  * Users and contracts may create a lock for another address.
@@ -50,8 +50,11 @@ interface IUnderwritingLocker is IERC721Enhanced {
     /// @param contractName Name of contract for which zero address was incorrectly provided.
     error ZeroAddressInput(string contractName);
 
-    /// @notice Thrown when extend, withdraw, or emergency withdraw is attempted by a party that is not the owner nor approved for a lock.
+    /// @notice Thrown when extend or withdraw is attempted by a party that is not the owner nor approved for a lock.
     error NotOwnerNorApproved();
+
+    /// @notice Thrown when create lock is attempted with 0 deposit.
+    error CannotCreateEmptyLock();
 
     /// @notice Thrown when createLock is attempted with lock duration < 6 months.
     error LockTimeTooShort();
@@ -66,7 +69,7 @@ interface IUnderwritingLocker is IERC721Enhanced {
     error CannotTransferWhileLocked();
 
     /**
-     * @notice Thrown when a withdraw or emergency withdraw is attempted for an `amount` that exceeds the lock balance.
+     * @notice Thrown when a withdraw is attempted for an `amount` that exceeds the lock balance.
      * @param lockID The ID of the lock
      * @param lockAmount Balance of the lock
      * @param attemptedWithdrawAmount Attempted withdraw amount
@@ -104,6 +107,9 @@ interface IUnderwritingLocker is IERC721Enhanced {
     /// @notice Emitted when the registry is set.
     event RegistrySet(address indexed registry);
 
+    /// @notice Emitted when voting contract has been set
+    event VotingContractSet(address indexed votingContract);
+
     /***************************************
     GLOBAL VARIABLES
     ***************************************/
@@ -111,11 +117,14 @@ interface IUnderwritingLocker is IERC721Enhanced {
     /// @notice Token locked in the underwriting lock.
     function token() external view returns (address);
 
-    /// @notice Revenue router address (Emergency withdraw penalties will be transferred here).
+    /// @notice Revenue router address (Early withdraw penalties will be transferred here).
     function revenueRouter() external view returns (address);
 
     /// @notice Registry address
     function registry() external view returns (address);
+
+    /// @notice UnderwriterLockVoting.sol address
+    function votingContract() external view returns (address);
 
     /// @notice The minimum lock duration that a new lock must be created with.
     function MIN_LOCK_DURATION() external view returns (uint256);
@@ -167,11 +176,11 @@ interface IUnderwritingLocker is IERC721Enhanced {
     function getLockListeners() external view returns (address[] memory listeners_);
 
     /**
-     * @notice Computes current penalty for emergency withdrawing from a specified lock.
-     * @param lockID_ The ID of the lock to compute emergency withdraw penalty.
-     * @return penaltyAmount Token amount that will be paid to RevenueRouter.sol as a penalty for emergency withdrawing.
+     * @notice Computes current penalty for early withdrawing from a specified lock.
+     * @param lockID_ The ID of the lock to compute early withdraw penalty.
+     * @return penaltyAmount Token amount that will be paid to RevenueRouter.sol as a penalty for early withdrawing.
      */
-    function getEmergencyWithdrawPenalty(uint256 lockID_) external view returns (uint256 penaltyAmount);
+    function getEarlyWithdrawPenalty(uint256 lockID_) external view returns (uint256 penaltyAmount);
 
     /***************************************
     EXTERNAL MUTATOR FUNCTIONS
@@ -321,10 +330,9 @@ interface IUnderwritingLocker is IERC721Enhanced {
     function setRegistry(address registry_) external;
 
     /**
-     * @notice Approves [`UnderwritingLockVoting`](./UnderwritingLockVoting) to transfer token from this contract
+     * @notice Sets votingContract and enable safeTransferFrom call by `underwritingLockVoting` address stored in Registry.
      * @dev Hacky fix to the issue that [`UnderwritingLockVoting`](./UnderwritingLockVoting) needs token transfer approval, but will be deployed after this contract.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param votingContract_ The address of `LockUnderwritingVoting` contract.
      */
-    function setVotingContractApproval(address votingContract_) external;
+    function setVotingContract() external;
 }
