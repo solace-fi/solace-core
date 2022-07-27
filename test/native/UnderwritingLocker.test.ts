@@ -287,8 +287,6 @@ describe("UnderwritingLocker", function () {
     STATE SUMMARY
   *******************/
   /**
-   * user1 has 99e18 tokens
-   * 
    * There are one lock:
    * i.) lockID 1 => One-year lock held by user1, with 1e18 token locked
    */
@@ -359,8 +357,6 @@ describe("UnderwritingLocker", function () {
     STATE SUMMARY
   *******************/
   /**
-   * user1 has 98e18 tokens
-   * 
    * There are two locks:
    * i.) lockID 1 => One-year lock held by user1, with 1e18 token locked
    * ii.) lockID 2 => One-year lock held by user1, with 1e18 token locked
@@ -419,8 +415,6 @@ describe("UnderwritingLocker", function () {
     STATE SUMMARY
   *******************/
   /**
-   * user1 has 97e18 tokens
-   * 
    * There are two locks:
    * i.) lockID 1 => One-year lock held by user1, with 2e18 token locked
    * ii.) lockID 2 => One-year lock held by user1, with 1e18 token locked
@@ -485,8 +479,6 @@ describe("UnderwritingLocker", function () {
     STATE SUMMARY
   *******************/
   /**
-   * user1 has 96e18 tokens
-   * 
    * There are two locks:
    * i.) lockID 1 => One-year lock held by user1, with 2e18 token locked
    * ii.) lockID 2 => One-year lock held by user1, with 2e18 token locked
@@ -563,8 +555,6 @@ describe("UnderwritingLocker", function () {
     STATE SUMMARY
   *******************/
   /**
-   * user1 has 94e18 tokens
-   * 
    * There are two locks:
    * i.) lockID 1 => One-year lock held by user1, with 3e18 token locked
    * ii.) lockID 2 => One-year lock held by user1, with 3e18 token locked
@@ -648,8 +638,6 @@ describe("UnderwritingLocker", function () {
     STATE SUMMARY
   *******************/
   /**
-   * user1 has 94e18 tokens
-   * 
    * There are two locks:
    * i.) lockID 1 => 1yr + 2wk lock held by user1, with 3e18 token locked
    * ii.) lockID 2 => 1yr lock held by user1, with 3e18 token locked
@@ -802,8 +790,6 @@ describe("UnderwritingLocker", function () {
     STATE SUMMARY
   *******************/
   /**
-   * user1 has 94e18 tokens
-   * 
    * There are two locks:
    * i.) lockID 1 => 1yr + 4wk lock held by user1, with 3e18 token locked
    * ii.) lockID 2 => 1yr + 2wk lock held by user1, with 3e18 token locked
@@ -829,8 +815,6 @@ describe("UnderwritingLocker", function () {
     STATE SUMMARY
   *******************/
   /**
-   * user1 has 94e18 tokens
-   * 
    * There are two locks:
    * i.) lockID 1 => 2wk lock held by user1, with 3e18 token locked
    * ii.) lockID 2 => Unlocked lock held by user1, with 3e18 token staked
@@ -865,8 +849,9 @@ describe("UnderwritingLocker", function () {
       await expect(underwritingLocker.connect(user2).transferFrom(user1.address, user2.address, LOCKED_LOCK_ID)).to.be.revertedWith("CannotTransferWhileLocked");
       await expect(underwritingLocker.connect(user2)['safeTransferFrom(address,address,uint256)'](user1.address, user2.address, LOCKED_LOCK_ID)).to.be.revertedWith("CannotTransferWhileLocked");
     });
-    it("can transfer when unlocked", async function () {
+    it("can transfer when unlocked, and listener notified", async function () {
       const UNLOCKED_LOCK_ID = 2;
+      const {amount: LOCK_AMOUNT, end: LOCK_END} = await underwritingLocker.locks(UNLOCKED_LOCK_ID);
       await underwritingLocker.connect(user1).transfer(user2.address, UNLOCKED_LOCK_ID);
       expect(await underwritingLocker.ownerOf(UNLOCKED_LOCK_ID)).eq(user2.address);
       await underwritingLocker.connect(user2).safeTransfer(user1.address, UNLOCKED_LOCK_ID);
@@ -875,8 +860,19 @@ describe("UnderwritingLocker", function () {
       await underwritingLocker.connect(user2).transferFrom(user1.address, user2.address, UNLOCKED_LOCK_ID); // user2 already approved
       expect(await underwritingLocker.ownerOf(UNLOCKED_LOCK_ID)).eq(user2.address);
       await underwritingLocker.connect(user2).approve(user1.address, UNLOCKED_LOCK_ID);
+      const {number: CURRENT_BLOCK} = await provider.getBlock('latest')
       await underwritingLocker.connect(user1)['safeTransferFrom(address,address,uint256)'](user2.address, user1.address, UNLOCKED_LOCK_ID);
       expect(await underwritingLocker.ownerOf(UNLOCKED_LOCK_ID)).eq(user1.address);
+      const listenerUpdate = await listener.lastUpdate();
+      expect(listenerUpdate.blocknum).eq(CURRENT_BLOCK + 1);
+      expect(listenerUpdate.caller).eq(underwritingLocker.address);
+      expect(listenerUpdate.lockID).eq(UNLOCKED_LOCK_ID);
+      expect(listenerUpdate.oldOwner).eq(user2.address);
+      expect(listenerUpdate.newOwner).eq(user1.address);
+      expect(listenerUpdate.oldLock.amount).eq(LOCK_AMOUNT);
+      expect(listenerUpdate.oldLock.end).eq(LOCK_END);
+      expect(listenerUpdate.newLock.amount).eq(LOCK_AMOUNT);
+      expect(listenerUpdate.newLock.end).eq(LOCK_END);
     });
   });
 
@@ -1097,263 +1093,177 @@ describe("UnderwritingLocker", function () {
     });
   });
 
-  // describe("withdraw in part", function () {
-  //   before("create more locks", async function () {
-  //     await token.connect(governor).mint(user1.address, ONE_ETHER.mul(100));
-  //     await token.connect(user1).approve(underwritingLocker.address, ONE_ETHER.mul(100));
-  //     await underwritingLocker.connect(user1).setApprovalForAll(user3.address, false);
-  //     await provider.send("evm_mine", []);
-  //     let timestamp = (await provider.getBlock('latest')).timestamp;
-  //     await underwritingLocker.connect(user1).createLock(user1.address, ONE_ETHER, 0); // 9
-  //     await underwritingLocker.connect(user1).createLock(user1.address, ONE_ETHER.mul(2), timestamp+ONE_WEEK*2); // 10
-  //     await underwritingLocker.connect(user1).createLock(user1.address, ONE_ETHER.mul(3), 0); // 11
-  //     await underwritingLocker.connect(user1).createLock(user1.address, ONE_ETHER.mul(4), 0); // 12
-  //   });
-  //   it("cannot withdraw non existant token", async function () {
-  //     await expect(underwritingLocker.connect(user1).withdrawInPart(999, user1.address, 1)).to.be.revertedWith("query for nonexistent token")
-  //   });
-  //   it("cannot withdraw not your token", async function () {
-  //     await expect(underwritingLocker.connect(user2).withdrawInPart(9, user1.address, 1)).to.be.revertedWith("only owner or approved")
-  //   });
-  //   it("cannot withdraw in excess", async function () {
-  //     await expect(underwritingLocker.connect(user1).withdrawInPart(9, user1.address, ONE_ETHER.mul(2).add(1))).to.be.revertedWith("excess withdraw")
-  //   });
-  //   it("can withdraw never locked token", async function () {
-  //     // in part
-  //     let xsLockID = 9;
-  //     let amount = (await underwritingLocker.locks(xsLockID)).amount;
-  //     let withdrawAmount1 = amount.div(3);
-  //     let withdrawAmount2 = amount.sub(withdrawAmount1);
-  //     let balances1 = await getBalances();
-  //     let tx1 = await underwritingLocker.connect(user1).withdrawInPart(xsLockID, user2.address, withdrawAmount1);
-  //     await expect(tx1).to.emit(underwritingLocker, "Withdrawl").withArgs(xsLockID, withdrawAmount1);
-  //     let balances2 = await getBalances();
-  //     let balances12 = getBalancesDiff(balances2, balances1);
-  //     expect(balances12.user1Solace).eq(0);
-  //     expect(balances12.user1StakedSolace).eq(withdrawAmount1.mul(-1));
-  //     expect(balances12.user2Solace).eq(withdrawAmount1);
-  //     expect(balances12.user2StakedSolace).eq(0);
-  //     expect(balances12.totalStakedSolace).eq(withdrawAmount1.mul(-1));
-  //     expect(balances12.user1Locks).eq(0);
-  //     expect(balances12.user2Locks).eq(0);
-  //     expect(balances12.totalNumLocks).eq(0);
-  //     expect(balances12.totalSupply).eq(0);
-  //     let lock = await underwritingLocker.locks(xsLockID);
-  //     expect(lock.amount).eq(withdrawAmount2);
-  //     expect(lock.end).eq(0);
-  //     // in full
-  //     let tx2 = await underwritingLocker.connect(user1).withdrawInPart(xsLockID, user2.address, withdrawAmount2);
-  //     await expect(tx2).to.emit(underwritingLocker, "Withdrawl").withArgs(xsLockID, withdrawAmount2);
-  //     let balances3 = await getBalances();
-  //     let balances23 = getBalancesDiff(balances3, balances2);
-  //     expect(balances23.user1Solace).eq(0);
-  //     expect(balances23.user1StakedSolace).eq(withdrawAmount2.mul(-1));
-  //     expect(balances23.user2Solace).eq(withdrawAmount2);
-  //     expect(balances23.user2StakedSolace).eq(0);
-  //     expect(balances23.totalStakedSolace).eq(withdrawAmount2.mul(-1));
-  //     expect(balances23.user1Locks).eq(-1);
-  //     expect(balances23.user2Locks).eq(0);
-  //     expect(balances23.totalNumLocks).eq(0);
-  //     expect(balances23.totalSupply).eq(-1);
-  //     await expect(underwritingLocker.locks(xsLockID)).to.be.revertedWith("query for nonexistent token");
-  //   });
-  //   it("can withdraw after lock expiration", async function () {
-  //     // in part
-  //     let xsLockID = 10;
-  //     let end = (await underwritingLocker.locks(xsLockID)).end.toNumber();
-  //     await provider.send("evm_setNextBlockTimestamp", [end]);
-  //     await provider.send("evm_mine", []);
-  //     let amount = (await underwritingLocker.locks(xsLockID)).amount;
-  //     let withdrawAmount1 = amount.div(3);
-  //     let withdrawAmount2 = amount.sub(withdrawAmount1);
-  //     let balances1 = await getBalances();
-  //     let tx1 = await underwritingLocker.connect(user1).withdrawInPart(xsLockID, user2.address, withdrawAmount1);
-  //     await expect(tx1).to.emit(underwritingLocker, "Withdrawl").withArgs(xsLockID, withdrawAmount1);
-  //     let balances2 = await getBalances();
-  //     let balances12 = getBalancesDiff(balances2, balances1);
-  //     expect(balances12.user1Solace).eq(0);
-  //     expect(balances12.user1StakedSolace).eq(withdrawAmount1.mul(-1));
-  //     expect(balances12.user2Solace).eq(withdrawAmount1);
-  //     expect(balances12.user2StakedSolace).eq(0);
-  //     expect(balances12.totalStakedSolace).eq(withdrawAmount1.mul(-1));
-  //     expect(balances12.user1Locks).eq(0);
-  //     expect(balances12.user2Locks).eq(0);
-  //     expect(balances12.totalNumLocks).eq(0);
-  //     expect(balances12.totalSupply).eq(0);
-  //     let lock = await underwritingLocker.locks(xsLockID);
-  //     expect(lock.amount).eq(withdrawAmount2);
-  //     expect(lock.end).eq(end);
-  //     // in full
-  //     let tx2 = await underwritingLocker.connect(user1).withdrawInPart(xsLockID, user2.address, withdrawAmount2);
-  //     await expect(tx2).to.emit(underwritingLocker, "Withdrawl").withArgs(xsLockID, withdrawAmount2);
-  //     let balances3 = await getBalances();
-  //     let balances23 = getBalancesDiff(balances3, balances2);
-  //     expect(balances23.user1Solace).eq(0);
-  //     expect(balances23.user1StakedSolace).eq(withdrawAmount2.mul(-1));
-  //     expect(balances23.user2Solace).eq(withdrawAmount2);
-  //     expect(balances23.user2StakedSolace).eq(0);
-  //     expect(balances23.totalStakedSolace).eq(withdrawAmount2.mul(-1));
-  //     expect(balances23.user1Locks).eq(-1);
-  //     expect(balances23.user2Locks).eq(0);
-  //     expect(balances23.totalNumLocks).eq(0);
-  //     expect(balances23.totalSupply).eq(-1);
-  //     await expect(underwritingLocker.locks(xsLockID)).to.be.revertedWith("query for nonexistent token");
-  //   });
-  //   it("can withdraw if approved for one", async function () {
-  //     // in part
-  //     let xsLockID = 11;
-  //     await underwritingLocker.connect(user1).approve(user3.address, xsLockID);
-  //     let amount = (await underwritingLocker.locks(xsLockID)).amount;
-  //     let withdrawAmount1 = amount.div(3);
-  //     let withdrawAmount2 = amount.sub(withdrawAmount1);
-  //     let balances1 = await getBalances();
-  //     let tx1 = await underwritingLocker.connect(user3).withdrawInPart(xsLockID, user2.address, withdrawAmount1);
-  //     await expect(tx1).to.emit(underwritingLocker, "Withdrawl").withArgs(xsLockID, withdrawAmount1);
-  //     let balances2 = await getBalances();
-  //     let balances12 = getBalancesDiff(balances2, balances1);
-  //     expect(balances12.user1Solace).eq(0);
-  //     expect(balances12.user1StakedSolace).eq(withdrawAmount1.mul(-1));
-  //     expect(balances12.user2Solace).eq(withdrawAmount1);
-  //     expect(balances12.user2StakedSolace).eq(0);
-  //     expect(balances12.user3Solace).eq(0);
-  //     expect(balances12.user3StakedSolace).eq(0);
-  //     expect(balances12.totalStakedSolace).eq(withdrawAmount1.mul(-1));
-  //     expect(balances12.user1Locks).eq(0);
-  //     expect(balances12.user2Locks).eq(0);
-  //     expect(balances12.user3Locks).eq(0);
-  //     expect(balances12.totalNumLocks).eq(0);
-  //     expect(balances12.totalSupply).eq(0);
-  //     let lock = await underwritingLocker.locks(xsLockID);
-  //     expect(lock.amount).eq(withdrawAmount2);
-  //     expect(lock.end).eq(0);
-  //     // in full
-  //     let tx2 = await underwritingLocker.connect(user1).withdrawInPart(xsLockID, user2.address, withdrawAmount2);
-  //     await expect(tx2).to.emit(underwritingLocker, "Withdrawl").withArgs(xsLockID, withdrawAmount2);
-  //     let balances3 = await getBalances();
-  //     let balances23 = getBalancesDiff(balances3, balances2);
-  //     expect(balances23.user1Solace).eq(0);
-  //     expect(balances23.user1StakedSolace).eq(withdrawAmount2.mul(-1));
-  //     expect(balances23.user2Solace).eq(withdrawAmount2);
-  //     expect(balances23.user2StakedSolace).eq(0);
-  //     expect(balances23.user3Solace).eq(0);
-  //     expect(balances23.user3StakedSolace).eq(0);
-  //     expect(balances23.totalStakedSolace).eq(withdrawAmount2.mul(-1));
-  //     expect(balances23.user1Locks).eq(-1);
-  //     expect(balances23.user2Locks).eq(0);
-  //     expect(balances23.user3Locks).eq(0);
-  //     expect(balances23.totalNumLocks).eq(0);
-  //     expect(balances23.totalSupply).eq(-1);
-  //     await expect(underwritingLocker.locks(xsLockID)).to.be.revertedWith("query for nonexistent token");
-  //   });
-  //   it("can withdraw if approved for all", async function () {
-  //     // in part
-  //     let xsLockID = 12;
-  //     await underwritingLocker.connect(user1).setApprovalForAll(user3.address, true);
-  //     let amount = (await underwritingLocker.locks(xsLockID)).amount;
-  //     let withdrawAmount1 = amount.div(3);
-  //     let withdrawAmount2 = amount.sub(withdrawAmount1);
-  //     let balances1 = await getBalances();
-  //     let tx1 = await underwritingLocker.connect(user3).withdrawInPart(xsLockID, user2.address, withdrawAmount1);
-  //     await expect(tx1).to.emit(underwritingLocker, "Withdrawl").withArgs(xsLockID, withdrawAmount1);
-  //     let balances2 = await getBalances();
-  //     let balances12 = getBalancesDiff(balances2, balances1);
-  //     expect(balances12.user1Solace).eq(0);
-  //     expect(balances12.user1StakedSolace).eq(withdrawAmount1.mul(-1));
-  //     expect(balances12.user2Solace).eq(withdrawAmount1);
-  //     expect(balances12.user2StakedSolace).eq(0);
-  //     expect(balances12.user3Solace).eq(0);
-  //     expect(balances12.user3StakedSolace).eq(0);
-  //     expect(balances12.totalStakedSolace).eq(withdrawAmount1.mul(-1));
-  //     expect(balances12.user1Locks).eq(0);
-  //     expect(balances12.user2Locks).eq(0);
-  //     expect(balances12.user3Locks).eq(0);
-  //     expect(balances12.totalNumLocks).eq(0);
-  //     expect(balances12.totalSupply).eq(0);
-  //     let lock = await underwritingLocker.locks(xsLockID);
-  //     expect(lock.amount).eq(withdrawAmount2);
-  //     expect(lock.end).eq(0);
-  //     // in full
-  //     let tx2 = await underwritingLocker.connect(user1).withdrawInPart(xsLockID, user2.address, withdrawAmount2);
-  //     await expect(tx2).to.emit(underwritingLocker, "Withdrawl").withArgs(xsLockID, withdrawAmount2);
-  //     let balances3 = await getBalances();
-  //     let balances23 = getBalancesDiff(balances3, balances2);
-  //     expect(balances23.user1Solace).eq(0);
-  //     expect(balances23.user1StakedSolace).eq(withdrawAmount2.mul(-1));
-  //     expect(balances23.user2Solace).eq(withdrawAmount2);
-  //     expect(balances23.user2StakedSolace).eq(0);
-  //     expect(balances23.user3Solace).eq(0);
-  //     expect(balances23.user3StakedSolace).eq(0);
-  //     expect(balances23.totalStakedSolace).eq(withdrawAmount2.mul(-1));
-  //     expect(balances23.user1Locks).eq(-1);
-  //     expect(balances23.user2Locks).eq(0);
-  //     expect(balances23.user3Locks).eq(0);
-  //     expect(balances23.totalNumLocks).eq(0);
-  //     expect(balances23.totalSupply).eq(-1);
-  //     await expect(underwritingLocker.locks(xsLockID)).to.be.revertedWith("query for nonexistent token");
-  //   });
-  // });
+  /*******************
+    STATE SUMMARY
+  *******************/
+  /**
+   * There are two locks:
+   * i.) lockID 1 => 2wk lock held by user1, with 1e18 token locked
+   * ii.) lockID 2 => Unlocked lock held by user1, with 1e18 token staked
+   */
 
-  // describe("withdraw multiple", function () {
-  //   before("create more locks", async function () {
-  //     await token.connect(governor).mint(user1.address, ONE_ETHER.mul(100));
-  //     await token.connect(user1).approve(underwritingLocker.address, ONE_ETHER.mul(100));
-  //     await underwritingLocker.connect(user1).setApprovalForAll(user3.address, false);
-  //     await provider.send("evm_mine", []);
-  //     let timestamp = (await provider.getBlock('latest')).timestamp;
-  //     await underwritingLocker.connect(user1).createLock(user1.address, ONE_ETHER, 0); // 13
-  //     await underwritingLocker.connect(user1).createLock(user1.address, ONE_ETHER.mul(2), timestamp+ONE_WEEK*2); // 14
-  //     await underwritingLocker.connect(user1).createLock(user1.address, ONE_ETHER.mul(3), 0); // 15
-  //     await underwritingLocker.connect(user1).createLock(user1.address, ONE_ETHER.mul(4), 0); // 16
-  //   });
-  //   it("can withdraw none", async function () {
-  //     let balances1 = await getBalances();
-  //     await underwritingLocker.connect(user1).withdrawMany([], user1.address);
-  //     let balances2 = await getBalances();
-  //     let balances12 = getBalancesDiff(balances2, balances1);
-  //     expect(balances12.user1Solace).eq(0);
-  //     expect(balances12.user1StakedSolace).eq(0);
-  //     expect(balances12.user2Solace).eq(0);
-  //     expect(balances12.user2StakedSolace).eq(0);
-  //     expect(balances12.user3Solace).eq(0);
-  //     expect(balances12.user3StakedSolace).eq(0);
-  //     expect(balances12.totalStakedSolace).eq(0);
-  //     expect(balances12.user1Locks).eq(0);
-  //     expect(balances12.user2Locks).eq(0);
-  //     expect(balances12.user3Locks).eq(0);
-  //     expect(balances12.totalNumLocks).eq(0);
-  //     expect(balances12.totalSupply).eq(0);
-  //   });
-  //   it("cannot withdraw multiple if one fails", async function () {
-  //     await expect(underwritingLocker.connect(user1).withdrawMany([999], user1.address)).to.be.revertedWith("query for nonexistent token");
-  //     await expect(underwritingLocker.connect(user2).withdrawMany([13], user1.address)).to.be.revertedWith("only owner or approved");
-  //     await expect(underwritingLocker.connect(user1).withdrawMany([14], user1.address)).to.be.revertedWith("locked");
-  //   });
-  //   it("can withdraw multiple", async function () {
-  //     let end = (await underwritingLocker.locks(14)).end.toNumber();
-  //     await provider.send("evm_setNextBlockTimestamp", [end]);
-  //     await provider.send("evm_mine", []);
-  //     let expectedAmount = ONE_ETHER.mul(6);
-  //     let balances1 = await getBalances();
-  //     await underwritingLocker.connect(user1).withdrawMany([13, 14, 15], user2.address);
-  //     let balances2 = await getBalances();
-  //     let balances12 = getBalancesDiff(balances2, balances1);
-  //     expect(balances12.user1Solace).eq(0);
-  //     expect(balances12.user1StakedSolace).eq(expectedAmount.mul(-1));
-  //     expect(balances12.user2Solace).eq(expectedAmount);
-  //     expect(balances12.user2StakedSolace).eq(0);
-  //     expect(balances12.user3Solace).eq(0);
-  //     expect(balances12.user3StakedSolace).eq(0);
-  //     expect(balances12.totalStakedSolace).eq(expectedAmount.mul(-1));
-  //     expect(balances12.user1Locks).eq(-3);
-  //     expect(balances12.user2Locks).eq(0);
-  //     expect(balances12.user3Locks).eq(0);
-  //     expect(balances12.totalNumLocks).eq(0);
-  //     expect(balances12.totalSupply).eq(-3);
-  //     await expect(underwritingLocker.locks(13)).to.be.revertedWith("query for nonexistent token");
-  //     await expect(underwritingLocker.locks(14)).to.be.revertedWith("query for nonexistent token");
-  //     await expect(underwritingLocker.locks(15)).to.be.revertedWith("query for nonexistent token");
-  //   });
-  // });
+  describe("withdrawInPartMultiple", function () {
+    // Deposit 4e18 token into each lockID
+    before(async function () {
+      await underwritingLocker.connect(user1).increaseAmountMultiple([1, 2], [DEPOSIT_AMOUNT.mul(2), DEPOSIT_AMOUNT.mul(2)])
+    });
+    it("must provide argument arrays of matching length", async function () {
+      const LOCK_ID_1 = 1;
+      const LOCK_ID_2 = 2;
+
+      await expect(underwritingLocker.connect(user1).withdrawInPartMultiple(
+        [LOCK_ID_1, LOCK_ID_2], 
+        [WITHDRAW_AMOUNT],
+        user1.address
+      )).to.be.revertedWith("ArrayArgumentsLengthMismatch");
+    });
+    it("cannot withdraw non existant token", async function () {
+      const NON_EXISTENT_LOCK_ID = 999;
+      const LOCK_ID_1 = 1;
+      // Error does not indicate non-existant tokenID, however it will revert regardless
+      await expect(underwritingLocker.connect(user1).withdrawInPartMultiple(
+        [LOCK_ID_1, NON_EXISTENT_LOCK_ID], 
+        [WITHDRAW_AMOUNT, WITHDRAW_AMOUNT],
+        user1.address
+      )).to.be.revertedWith("ERC721: invalid token ID");
+    });
+    it("cannot withdraw more than lock amount", async function () {
+      const LOCK_ID_1 = 1;
+      const LOCK_ID_2 = 2;
+      const LOCK_AMOUNT_2 = (await underwritingLocker.locks(2)).amount
+      await expect(underwritingLocker.connect(user1).withdrawInPartMultiple(
+        [LOCK_ID_1, LOCK_ID_2], 
+        [WITHDRAW_AMOUNT, LOCK_AMOUNT_2.mul(2)],
+        user1.address
+      )).to.be.revertedWith(`ExcessWithdraw(${LOCK_ID_2}, ${LOCK_AMOUNT_2.toString()}, ${LOCK_AMOUNT_2.mul(2).toString()})`);
+    });
+    it("non owner or approved cannot withdraw", async function () {
+      const LOCK_ID_1 = 1;
+      const LOCK_ID_2 = 2;
+      await expect(underwritingLocker.connect(user3).withdrawInPartMultiple(
+        [LOCK_ID_1, LOCK_ID_2], 
+        [WITHDRAW_AMOUNT, WITHDRAW_AMOUNT],
+        user1.address
+      )).to.be.revertedWith("NotOwnerNorApproved");
+    });
+    it("owner can withdraw in part from multiple locks, and listener notified", async function () {
+      const LOCKED_LOCK_ID = 1;
+      const UNLOCKED_LOCK_ID = 2;
+      const oldGlobalState = await getGlobalState();
+      const oldUserState = await getUserState(user1);
+      const oldLockState_Locked = await getLockState(LOCKED_LOCK_ID);
+      const oldLockState_Unlocked = await getLockState(UNLOCKED_LOCK_ID);
+      const oldRevenueRouterBalance = await token.balanceOf(revenueRouter.address);
+      const {number: CURRENT_BLOCK} = await provider.getBlock('latest')
+      const PENALTY_AMOUNT = await underwritingLocker.getEarlyWithdrawInPartPenalty(LOCKED_LOCK_ID, WITHDRAW_AMOUNT);
+
+      const tx = underwritingLocker.connect(user1).withdrawInPartMultiple(
+        [LOCKED_LOCK_ID, UNLOCKED_LOCK_ID], 
+        [WITHDRAW_AMOUNT, WITHDRAW_AMOUNT],
+        user1.address
+      )
+      await expect(tx).to.emit(underwritingLocker, "Withdrawal").withArgs(UNLOCKED_LOCK_ID, WITHDRAW_AMOUNT);
+      await expect(tx).to.emit(underwritingLocker, "EarlyWithdrawal").withArgs(LOCKED_LOCK_ID, WITHDRAW_AMOUNT, PENALTY_AMOUNT);
+
+      const newGlobalState = await getGlobalState();
+      const newUserState = await getUserState(user1);
+      const newLockState_Locked = await getLockState(LOCKED_LOCK_ID);
+      const newLockState_Unlocked = await getLockState(UNLOCKED_LOCK_ID);
+      const newRevenueRouterBalance = await token.balanceOf(revenueRouter.address);
+      const globalStateChange = getGlobalStateChange(newGlobalState, oldGlobalState);
+      const userStateChange = getUserStateChange(newUserState, oldUserState);
+      const lockStateChange_Locked = getLockStateChange(newLockState_Locked, oldLockState_Locked);
+      const lockStateChange_Unlocked = getLockStateChange(newLockState_Unlocked, oldLockState_Unlocked);
+      const revenueRouterChange = newRevenueRouterBalance.sub(oldRevenueRouterBalance);
+
+      expect(globalStateChange.totalNumLocks.eq(0));
+      expect(globalStateChange.totalStakedAmount.eq(WITHDRAW_AMOUNT.mul(2)));
+      expect(globalStateChange.totalSupply).eq(0)
+      expect(userStateChange.lockedTokenAmount).eq(WITHDRAW_AMOUNT.mul(-2));
+      expect(userStateChange.numOfLocks).eq(0);
+      expect(userStateChange.tokenAmountInWallet).eq(WITHDRAW_AMOUNT.add(WITHDRAW_AMOUNT).sub(PENALTY_AMOUNT));
+      expect(lockStateChange_Locked.amount).eq(WITHDRAW_AMOUNT.mul(-1));
+      expect(lockStateChange_Locked.end).eq(0);
+      expect(lockStateChange_Unlocked.amount).eq(WITHDRAW_AMOUNT.mul(-1));
+      expect(lockStateChange_Unlocked.end).eq(0);
+      expect(revenueRouterChange).eq(PENALTY_AMOUNT);
+
+      const listenerUpdate = await listener.lastUpdate();
+      expect(listenerUpdate.blocknum).eq(CURRENT_BLOCK + 1);
+      expect(listenerUpdate.caller).eq(underwritingLocker.address);
+      expect(listenerUpdate.lockID).eq(UNLOCKED_LOCK_ID);
+      expect(listenerUpdate.oldOwner).eq(user1.address);
+      expect(listenerUpdate.newOwner).eq(user1.address);
+      expect(listenerUpdate.oldLock.amount).eq(oldLockState_Unlocked.amount);
+      expect(listenerUpdate.oldLock.end).eq(oldLockState_Unlocked.end);
+      expect(listenerUpdate.newLock.amount).eq(newLockState_Unlocked.amount);
+      expect(listenerUpdate.newLock.end).eq(newLockState_Unlocked.end);
+    });
+    it("approved can withdraw in part from multiple locks, and listener notified", async function () {
+      const LOCKED_LOCK_ID = 1;
+      const UNLOCKED_LOCK_ID = 2;
+      const oldGlobalState = await getGlobalState();
+      const oldUserState = await getUserState(user1);
+      const oldLockState_Locked = await getLockState(LOCKED_LOCK_ID);
+      const oldLockState_Unlocked = await getLockState(UNLOCKED_LOCK_ID);
+      const oldRevenueRouterBalance = await token.balanceOf(revenueRouter.address);
+      const {number: CURRENT_BLOCK} = await provider.getBlock('latest');
+      const PENALTY_AMOUNT = await underwritingLocker.getEarlyWithdrawInPartPenalty(LOCKED_LOCK_ID, WITHDRAW_AMOUNT);
+
+      await underwritingLocker.connect(user1).setApprovalForAll(user2.address, true)
+      const tx = underwritingLocker.connect(user2).withdrawInPartMultiple(
+        [LOCKED_LOCK_ID, UNLOCKED_LOCK_ID], 
+        [WITHDRAW_AMOUNT, WITHDRAW_AMOUNT],
+        user1.address
+      )
+      await expect(tx).to.emit(underwritingLocker, "Withdrawal").withArgs(UNLOCKED_LOCK_ID, WITHDRAW_AMOUNT);
+      await expect(tx).to.emit(underwritingLocker, "EarlyWithdrawal").withArgs(LOCKED_LOCK_ID, WITHDRAW_AMOUNT, PENALTY_AMOUNT);
+
+      const newGlobalState = await getGlobalState();
+      const newUserState = await getUserState(user1);
+      const newLockState_Locked = await getLockState(LOCKED_LOCK_ID);
+      const newLockState_Unlocked = await getLockState(UNLOCKED_LOCK_ID);
+      const newRevenueRouterBalance = await token.balanceOf(revenueRouter.address);
+      const globalStateChange = getGlobalStateChange(newGlobalState, oldGlobalState);
+      const userStateChange = getUserStateChange(newUserState, oldUserState);
+      const lockStateChange_Locked = getLockStateChange(newLockState_Locked, oldLockState_Locked);
+      const lockStateChange_Unlocked = getLockStateChange(newLockState_Unlocked, oldLockState_Unlocked);
+      const revenueRouterChange = newRevenueRouterBalance.sub(oldRevenueRouterBalance);
+
+      expect(globalStateChange.totalNumLocks.eq(0));
+      expect(globalStateChange.totalStakedAmount.eq(WITHDRAW_AMOUNT.mul(2)));
+      expect(globalStateChange.totalSupply).eq(0)
+      expect(userStateChange.lockedTokenAmount).eq(WITHDRAW_AMOUNT.mul(-2));
+      expect(userStateChange.numOfLocks).eq(0);
+      expect(userStateChange.tokenAmountInWallet).eq(WITHDRAW_AMOUNT.add(WITHDRAW_AMOUNT).sub(PENALTY_AMOUNT));
+      expect(lockStateChange_Locked.amount).eq(WITHDRAW_AMOUNT.mul(-1));
+      expect(lockStateChange_Locked.end).eq(0);
+      expect(lockStateChange_Unlocked.amount).eq(WITHDRAW_AMOUNT.mul(-1));
+      expect(lockStateChange_Unlocked.end).eq(0);
+      expect(revenueRouterChange).eq(PENALTY_AMOUNT);
+
+      const listenerUpdate = await listener.lastUpdate();
+      expect(listenerUpdate.blocknum).eq(CURRENT_BLOCK + 2);
+      expect(listenerUpdate.caller).eq(underwritingLocker.address);
+      expect(listenerUpdate.lockID).eq(UNLOCKED_LOCK_ID);
+      expect(listenerUpdate.oldOwner).eq(user1.address);
+      expect(listenerUpdate.newOwner).eq(user1.address);
+      expect(listenerUpdate.oldLock.amount).eq(oldLockState_Unlocked.amount);
+      expect(listenerUpdate.oldLock.end).eq(oldLockState_Unlocked.end);
+      expect(listenerUpdate.newLock.amount).eq(newLockState_Unlocked.amount);
+      expect(listenerUpdate.newLock.end).eq(newLockState_Unlocked.end);
+    });
+  });
+
+  /*******************
+    STATE SUMMARY
+  *******************/
+  /**
+   * There are two locks:
+   * i.) lockID 1 => 2wk lock held by user1, with 1e18 token locked
+   * ii.) lockID 2 => Unlocked lock held by user1, with 1e18 token staked
+   */
+
 
   // describe("listeners", function () {
 
@@ -1385,47 +1295,6 @@ describe("UnderwritingLocker", function () {
   //     expect(lastUpdate2.oldLock.end).eq(end);
   //     expect(lastUpdate2.newLock.amount).eq(0);
   //     expect(lastUpdate2.newLock.end).eq(0);
-  //     // listener 3, detached
-  //     let lastUpdate3 = await listener3.lastUpdate();
-  //     expect(lastUpdate3.blocknum).eq(0);
-  //     expect(lastUpdate3.caller).eq(ZERO_ADDRESS);
-  //     expect(lastUpdate3.xsLockID).eq(0);
-  //     expect(lastUpdate3.oldOwner).eq(ZERO_ADDRESS);
-  //     expect(lastUpdate3.newOwner).eq(ZERO_ADDRESS);
-  //     expect(lastUpdate3.oldLock.amount).eq(0);
-  //     expect(lastUpdate3.oldLock.end).eq(0);
-  //     expect(lastUpdate3.newLock.amount).eq(0);
-  //     expect(lastUpdate3.newLock.end).eq(0);
-  //   });
-  //   it("listeners hear transfer", async function () {
-  //     let end = ONE_WEEK * 52 * 20;
-  //     await underwritingLocker.connect(user1).createLock(user2.address, ONE_ETHER, end);
-  //     let block = await provider.getBlock('latest');
-  //     let blocknum = block.number;
-  //     let xsLockID = await underwritingLocker.totalNumLocks();
-  //     await underwritingLocker.connect(user2).transfer(user3.address, xsLockID);
-  //     // listener 1
-  //     let lastUpdate1 = await listener1.lastUpdate();
-  //     expect(lastUpdate1.blocknum).eq(blocknum+1);
-  //     expect(lastUpdate1.caller).eq(underwritingLocker.address);
-  //     expect(lastUpdate1.xsLockID).eq(xsLockID);
-  //     expect(lastUpdate1.oldOwner).eq(user2.address);
-  //     expect(lastUpdate1.newOwner).eq(user3.address);
-  //     expect(lastUpdate1.oldLock.amount).eq(ONE_ETHER);
-  //     expect(lastUpdate1.oldLock.end).eq(end);
-  //     expect(lastUpdate1.newLock.amount).eq(ONE_ETHER);
-  //     expect(lastUpdate1.newLock.end).eq(end);
-  //     // listener 2
-  //     let lastUpdate2 = await listener2.lastUpdate();
-  //     expect(lastUpdate2.blocknum).eq(blocknum+1);
-  //     expect(lastUpdate2.caller).eq(underwritingLocker.address);
-  //     expect(lastUpdate2.xsLockID).eq(xsLockID);
-  //     expect(lastUpdate2.oldOwner).eq(user2.address);
-  //     expect(lastUpdate2.newOwner).eq(user3.address);
-  //     expect(lastUpdate2.oldLock.amount).eq(ONE_ETHER);
-  //     expect(lastUpdate2.oldLock.end).eq(end);
-  //     expect(lastUpdate2.newLock.amount).eq(ONE_ETHER);
-  //     expect(lastUpdate2.newLock.end).eq(end);
   //     // listener 3, detached
   //     let lastUpdate3 = await listener3.lastUpdate();
   //     expect(lastUpdate3.blocknum).eq(0);
