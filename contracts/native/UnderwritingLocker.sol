@@ -18,7 +18,7 @@ import "./../interfaces/native/IUnderwritingLocker.sol";
 // $UWE needs to inherit ERC20Permit, or we remove ...Signed methods from this contract
 
 /**
- * @title UnderwritingLocker
+ * @title IUnderwritingLocker
  * @author solace.fi
  * @notice Having an underwriting lock is a requirement to vote on Solace Native insurance gauges.
  * To create an underwriting lock, $UWE must be locked for a minimum of 6 months.
@@ -27,20 +27,17 @@ import "./../interfaces/native/IUnderwritingLocker.sol";
  * Each lock has an `amount` of locked $UWE, and an `end` timestamp.
  * Locks have a maximum duration of four years.
  *
- * Locked $UWE can be withdrawn without penalty via [`withdraw()`](#withdraw) only after the `end` timestamp
- * Locked $UWE withdrawn before the `end` timestamp via [`emergencyWithdraw()`](#emergencywithdraw) will incur 
- * a withdrawal penalty, which increases with remaining lock time.
+ * Locked $UWE withdrawn before the `end` timestamp will incur a withdrawal penalty, which scales with remaining lock time.
  *
- * Users can create locks via [`createLock()`](#createlock) or [`createLockSigned()`](#createlocksigned)
- * Users can deposit more $UWE into a lock via [`increaseAmount()`](#increaseamount), [`increaseAmountSigned()`] (#increaseamountsigned) or [`increaseAmountMultiple()`](#increaseamountmultiple)
- * Users can extend a lock via [`extendLock()`](#extendlock) or [`extendLockMultiply()`](#extendlockmultiple)
- * Users can withdraw from a lock via [`withdraw()`](#withdraw), [`withdrawInPart()`](#withdrawinpart), or [`withdrawmultiple()`](#withdrawmultiple).
- * Users can emergency withdraw from a lock via [`emergencyWithdraw()`](#emergencywithdraw), [`emergencywithdrawinpart()`](#emergencywithdrawinpart), or [`emergencyWithdrawMultiple()`](#emergencywithdrawmultiple).
+ * Users can create locks via [`createLock()`](#createlock) or [`createLockSigned()`](#createlocksigned).
+ * Users can deposit more $UWE into a lock via [`increaseAmount()`](#increaseamount), [`increaseAmountSigned()`] (#increaseamountsigned) or [`increaseAmountMultiple()`](#increaseamountmultiple).
+ * Users can extend a lock via [`extendLock()`](#extendlock) or [`extendLockMultiply()`](#extendlockmultiple).
+ * Users can withdraw from a lock via [`withdraw()`](#withdraw), [`withdrawInPart()`](#withdrawinpart), [`withdrawMultiple()`](#withdrawmultiple) or [`withdrawInPartMultiple()`](#withdrawinpartmultiple).
  *
+ * Users and contracts may create a lock for another address.
  * Users and contracts may deposit into a lock that they do not own.
  *
  * Any time a lock is minted, burned or otherwise modified it will notify the listener contracts.
- *
  */
 // solhint-disable-next-line contract-name-camelcase
 contract UnderwritingLocker is 
@@ -328,57 +325,63 @@ contract UnderwritingLocker is
     /**
      * @notice Withdraw from a lock in full.
      * @dev Can only be called by the lock owner or approved.
-     * @dev Can only be called if unlocked.
+     * @dev If called before `end` timestamp, will incur a penalty
      * @param lockID_ The ID of the lock to withdraw from.
      * @param recipient_ The user to receive the lock's token.
      */
     function withdraw(uint256 lockID_, address recipient_) external override nonReentrant onlyOwnerOrApproved(lockID_) {
         uint256 amount = _locks[lockID_].amount;
-        _withdraw(lockID_, amount);
+        uint256 penalty = _withdraw(lockID_, amount);
         // transfer token
-        SafeERC20.safeTransfer(IERC20(token), recipient_, amount);
+        if (penalty > 0) {SafeERC20.safeTransfer(IERC20(token), revenueRouter, penalty);}
+        SafeERC20.safeTransfer(IERC20(token), recipient_, amount - penalty);
     }
+
 
     /**
      * @notice Withdraw from a lock in part.
      * @dev Can only be called by the lock owner or approved.
-     * @dev Can only be called if unlocked.
+     * @dev If called before `end` timestamp, will incur a penalty
      * @param lockID_ The ID of the lock to withdraw from.
      * @param amount_ The amount of token to withdraw.
      * @param recipient_ The user to receive the lock's token.
      */
     function withdrawInPart(uint256 lockID_, uint256 amount_, address recipient_) external override nonReentrant onlyOwnerOrApproved(lockID_) {
         if (amount_ > _locks[lockID_].amount) revert ExcessWithdraw(lockID_, _locks[lockID_].amount, amount_);
-        _withdraw(lockID_, amount_);
+        uint256 penalty = _withdraw(lockID_, amount_);
         // transfer token
-        SafeERC20.safeTransfer(IERC20(token), recipient_, amount_);
+        if (penalty > 0) {SafeERC20.safeTransfer(IERC20(token), revenueRouter, penalty);}
+        SafeERC20.safeTransfer(IERC20(token), recipient_, amount_ - penalty);
     }
 
     /**
      * @notice Withdraw from multiple locks in full.
      * @dev Can only be called by the lock owner or approved.
-     * @dev Can only be called if unlocked.
+     * @dev If called before `end` timestamp, will incur a penalty
      * @param lockIDs_ The ID of the locks to withdraw from.
      * @param recipient_ The user to receive the lock's token.
      */
     function withdrawMultiple(uint256[] calldata lockIDs_, address recipient_) external override nonReentrant {
         uint256 len = lockIDs_.length;
         uint256 totalWithdrawAmount = 0;
+        uint256 totalPenaltyAmount = 0;
         for(uint256 i = 0; i < len; i++) {
             uint256 lockID = lockIDs_[i];
             if (!_isApprovedOrOwner(msg.sender, lockID)) revert NotOwnerNorApproved();
             uint256 singleLockAmount = _locks[lockID].amount;
-            totalWithdrawAmount += singleLockAmount;
-            _withdraw(lockID, singleLockAmount);
+            uint256 penalty = _withdraw(lockID, singleLockAmount);
+            totalPenaltyAmount += penalty;
+            totalWithdrawAmount += (singleLockAmount - penalty);
         }
         // batched token transfer
+        if (totalPenaltyAmount > 0) {SafeERC20.safeTransfer(IERC20(token), revenueRouter, totalPenaltyAmount);}
         SafeERC20.safeTransfer(IERC20(token), recipient_, totalWithdrawAmount);
     }
 
     /**
      * @notice Withdraw from multiple locks in part.
      * @dev Can only be called by the lock owner or approved.
-     * @dev Can only be called if unlocked.
+     * @dev If called before `end` timestamp, will incur a penalty
      * @param lockIDs_ The ID of the locks to withdraw from.
      * @param amounts_ Array of token amounts to withdraw
      * @param recipient_ The user to receive the lock's token.
@@ -387,97 +390,18 @@ contract UnderwritingLocker is
         if (lockIDs_.length != amounts_.length) revert ArrayArgumentsLengthMismatch();
         uint256 len = lockIDs_.length;
         uint256 totalWithdrawAmount = 0;
-        for(uint256 i = 0; i < len; i++) {
-            uint256 lockID = lockIDs_[i];
-            if (!_isApprovedOrOwner(msg.sender, lockID)) revert NotOwnerNorApproved();
-            uint256 singleLockAmount = amounts_[i];
-            if (singleLockAmount > _locks[lockID].amount) revert ExcessWithdraw(lockID, _locks[lockID].amount, singleLockAmount);
-            totalWithdrawAmount += singleLockAmount;
-            _withdraw(lockID, singleLockAmount);
-        }
-        // batched token transfer
-        SafeERC20.safeTransfer(IERC20(token), recipient_, totalWithdrawAmount);
-    }
-
-    /**
-     * @notice Emergency withdraw from a lock in full.
-     * @dev Can only be called by the lock owner or approved.
-     * @dev If called before `end` timestamp, will incur a penalty
-     * @param lockID_ The ID of the lock to emergency withdraw from.
-     * @param recipient_ The user to receive the lock's token.
-     */
-    function emergencyWithdraw(uint256 lockID_, address recipient_) external override nonReentrant onlyOwnerOrApproved(lockID_) {
-        uint256 amount = _locks[lockID_].amount;
-        // Accounting
-        uint256 penalty = _emergencyWithdraw(lockID_, amount);
-        // Token transfers
-        SafeERC20.safeTransfer(IERC20(token), revenueRouter, penalty);
-        SafeERC20.safeTransfer(IERC20(token), recipient_, amount - penalty);
-    }
-
-    /**
-     * @notice Emergency withdraw from a lock in part.
-     * @dev Can only be called by the lock owner or approved.
-     * @dev If called before `end` timestamp, will incur a penalty
-     * @param lockID_ The ID of the lock to emergency withdraw from.
-     * @param amount_ The amount of token to withdraw.
-     * @param recipient_ The user to receive the lock's token.
-     */
-    function emergencyWithdrawInPart(uint256 lockID_, uint256 amount_, address recipient_) external override nonReentrant onlyOwnerOrApproved(lockID_) {
-        if (amount_ > _locks[lockID_].amount) revert ExcessWithdraw(lockID_, _locks[lockID_].amount, amount_);
-        uint256 penalty = _emergencyWithdraw(lockID_, amount_);
-        SafeERC20.safeTransfer(IERC20(token), revenueRouter, penalty);
-        SafeERC20.safeTransfer(IERC20(token), recipient_, amount_ - penalty);
-    }
-
-    /**
-     * @notice Emergency withdraw from multiple locks in full.
-     * @dev Can only be called by the lock owner or approved.
-     * @dev If called before `end` timestamp, will incur a penalty
-     * @param lockIDs_ The ID of the locks to withdraw from.
-     * @param recipient_ The user to receive the lock's token.
-     */
-    function emergencyWithdrawMultiple(uint256[] calldata lockIDs_, address recipient_) external override nonReentrant {
-        uint256 len = lockIDs_.length;
-        uint256 totalWithdrawAmount = 0;
-        uint256 totalPenaltyAmount = 0;
-        for(uint256 i = 0; i < len; i++) {
-            uint256 lockID = lockIDs_[i];
-            if (!_isApprovedOrOwner(msg.sender, lockID)) revert NotOwnerNorApproved();
-            uint256 singleLockAmount = _locks[lockID].amount;
-            uint256 penalty = _emergencyWithdraw(lockID, singleLockAmount);
-            totalPenaltyAmount += penalty;
-            totalWithdrawAmount += (singleLockAmount - penalty);
-        }
-        // batched token transfer
-        SafeERC20.safeTransfer(IERC20(token), revenueRouter, totalPenaltyAmount);
-        SafeERC20.safeTransfer(IERC20(token), recipient_, totalWithdrawAmount);
-    }
-
-    /**
-     * @notice Emergency withdraw from multiple locks in part.
-     * @dev Can only be called by the lock owner or approved.
-     * @dev If called before `end` timestamp, will incur a penalty
-     * @param lockIDs_ The ID of the locks to withdraw from.
-     * @param amounts_ Array of token amounts to emergency withdraw
-     * @param recipient_ The user to receive the lock's token.
-     */
-    function emergencyWithdrawInPartMultiple(uint256[] calldata lockIDs_, uint256[] calldata amounts_, address recipient_) external override nonReentrant {
-        if (lockIDs_.length != amounts_.length) revert ArrayArgumentsLengthMismatch();
-        uint256 len = lockIDs_.length;
-        uint256 totalWithdrawAmount = 0;
         uint256 totalPenaltyAmount = 0;
         for(uint256 i = 0; i < len; i++) {
             uint256 lockID = lockIDs_[i];
             if (!_isApprovedOrOwner(msg.sender, lockID)) revert NotOwnerNorApproved();
             uint256 singleLockAmount = amounts_[i];
             if (singleLockAmount > _locks[lockID].amount) revert ExcessWithdraw(lockID, _locks[lockID].amount, singleLockAmount);
-            uint256 penalty = _emergencyWithdraw(lockID, singleLockAmount);
+            uint256 penalty = _withdraw(lockID, singleLockAmount);
             totalPenaltyAmount += penalty;
             totalWithdrawAmount += (singleLockAmount - penalty);
         }
         // batched token transfer
-        SafeERC20.safeTransfer(IERC20(token), revenueRouter, totalPenaltyAmount);
+        if (totalPenaltyAmount > 0) {SafeERC20.safeTransfer(IERC20(token), revenueRouter, totalPenaltyAmount);}
         SafeERC20.safeTransfer(IERC20(token), recipient_, totalWithdrawAmount);
     }
 
@@ -537,29 +461,6 @@ contract UnderwritingLocker is
     }
 
     /**
-     * @notice Withdraws from a lock.
-     * @param lockID_ The ID of the lock to withdraw from.
-     * @param amount_ The amount of token to withdraw.
-     */
-    function _withdraw(uint256 lockID_, uint256 amount_) internal {
-        // solhint-disable-next-line not-rely-on-time
-        if(_locks[lockID_].end > block.timestamp) revert CannotWithdrawWhileLocked(); // cannot withdraw while locked
-        // accounting
-        if(amount_ == _locks[lockID_].amount) {
-            _burn(lockID_);
-            delete _locks[lockID_];
-        }
-        else {
-            Lock memory oldLock = _locks[lockID_];
-            Lock memory newLock = Lock(oldLock.amount - amount_, oldLock.end);
-            _locks[lockID_].amount -= amount_;
-            address owner = ownerOf(lockID_);
-            _notify(lockID_, owner, owner, oldLock, newLock);
-        }
-        emit Withdrawal(lockID_, amount_);
-    }
-
-    /**
      * @notice Extend a lock's duration.
      * @dev Can only be called by the lock owner or approved.
      * @param lockID_ The ID of the lock to update.
@@ -574,15 +475,21 @@ contract UnderwritingLocker is
     }
 
     /**
-     * @notice Emergency withdraws from a lock.
-     * @param lockID_ The ID of the lock to emergency withdraw from.
-     * @param amount_ The amount of token to emergency withdraw.
-     * @return penalty Token amount that will be paid to RevenueRouter as a penalty for emergency withdraw
+     * @notice Withdraws from a lock.
+     * @param lockID_ The ID of the lock to withdraw from.
+     * @param amount_ The amount of token to withdraw.
+     * @param penalty Penalty amount (will be 0 if block.timestamp >= end).
      */
-    function _emergencyWithdraw(uint256 lockID_, uint256 amount_) internal returns (uint256 penalty) {
-        // Make _getEmergencyWithdrawPenaltyPercentage query before lockID is potentially deleted
-        uint256 penaltyPercentage = _getEmergencyWithdrawPenaltyPercentage(lockID_);
-        penalty = amount_ * penaltyPercentage / 1e18;
+    function _withdraw(uint256 lockID_, uint256 amount_) internal returns (uint256 penalty) {
+        // solhint-disable-next-line not-rely-on-time
+        bool isEarlyWithdraw = _locks[lockID_].end < block.timestamp;
+
+        if(isEarlyWithdraw) {
+            // Make _getEmergencyWithdrawPenaltyPercentage query before lockID is potentially deleted
+            uint256 penaltyPercentage = _getEmergencyWithdrawPenaltyPercentage(lockID_);
+            penalty = amount_ * penaltyPercentage / 1e18;
+        }
+
         // accounting
         if(amount_ == _locks[lockID_].amount) {
             _burn(lockID_);
@@ -595,7 +502,11 @@ contract UnderwritingLocker is
             address owner = ownerOf(lockID_);
             _notify(lockID_, owner, owner, oldLock, newLock);
         }
-        emit EmergencyWithdrawal(lockID_, amount_, penalty);
+
+        if(isEarlyWithdraw) {emit EarlyWithdrawal(lockID_, amount_, penalty);} 
+        else {emit Withdrawal(lockID_, amount_);}
+
+        return penalty;
     }
 
     /**

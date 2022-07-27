@@ -22,20 +22,17 @@ struct Lock {
  * Each lock has an `amount` of locked $UWE, and an `end` timestamp.
  * Locks have a maximum duration of four years.
  *
- * Locked $UWE can be withdrawn without penalty via [`withdraw()`](#withdraw) only after the `end` timestamp
- * Locked $UWE withdrawn before the `end` timestamp via [`emergencyWithdraw()`](#emergencywithdraw) will incur 
- * a withdrawal penalty, which increases with remaining lock time.
+ * Locked $UWE withdrawn before the `end` timestamp will incur a withdrawal penalty, which scales with remaining lock time.
  *
- * Users can create locks via [`createLock()`](#createlock) or [`createLockSigned()`](#createlocksigned)
- * Users can deposit more $UWE into a lock via [`increaseAmount()`](#increaseamount), [`increaseAmountSigned()`] (#increaseamountsigned) or [`increaseAmountMultiple()`](#increaseamountmultiple)
- * Users can extend a lock via [`extendLock()`](#extendlock) or [`extendLockMultiply()`](#extendlockmultiple)
- * Users can withdraw from a lock via [`withdraw()`](#withdraw), [`withdrawInPart()`](#withdrawinpart), or [`withdrawmultiple()`](#withdrawmultiple).
- * Users can emergency withdraw from a lock via [`emergencyWithdraw()`](#emergencywithdraw), [`emergencywithdrawinpart()`](#emergencywithdrawinpart), or [`emergencyWithdrawMultiple()`](#emergencywithdrawmultiple).
+ * Users can create locks via [`createLock()`](#createlock) or [`createLockSigned()`](#createlocksigned).
+ * Users can deposit more $UWE into a lock via [`increaseAmount()`](#increaseamount), [`increaseAmountSigned()`] (#increaseamountsigned) or [`increaseAmountMultiple()`](#increaseamountmultiple).
+ * Users can extend a lock via [`extendLock()`](#extendlock) or [`extendLockMultiply()`](#extendlockmultiple).
+ * Users can withdraw from a lock via [`withdraw()`](#withdraw), [`withdrawInPart()`](#withdrawinpart), [`withdrawMultiple()`](#withdrawmultiple) or [`withdrawInPartMultiple()`](#withdrawinpartmultiple).
  *
+ * Users and contracts may create a lock for another address.
  * Users and contracts may deposit into a lock that they do not own.
  *
- * Any time a lock is minted, burned or otherwise modified it will notify the listener contracts (eg UnderwriterLockVoting.sol).
- *
+ * Any time a lock is minted, burned or otherwise modified it will notify the listener contracts.
  */
 interface IUnderwritingLocker is IERC721Enhanced {
 
@@ -68,9 +65,6 @@ interface IUnderwritingLocker is IERC721Enhanced {
     /// @notice Thrown when transfer is attempted while locked.
     error CannotTransferWhileLocked();
 
-    /// @notice Thrown when withdraw is attempted while locked.
-    error CannotWithdrawWhileLocked();
-
     /**
      * @notice Thrown when a withdraw or emergency withdraw is attempted for an `amount` that exceeds the lock balance.
      * @param lockID The ID of the lock
@@ -98,8 +92,8 @@ interface IUnderwritingLocker is IERC721Enhanced {
     /// @notice Emitted when a lock is withdrawn from.
     event Withdrawal(uint256 indexed lockID, uint256 amount);
 
-    /// @notice Emitted when an emergency withdraw is made from a lock.
-    event EmergencyWithdrawal(uint256 indexed lockID, uint256 totalWithdrawAmount, uint256 penaltyAmount);
+    /// @notice Emitted when an early withdraw is made.
+    event EarlyWithdrawal(uint256 indexed lockID, uint256 totalWithdrawAmount, uint256 penaltyAmount);
 
     /// @notice Emitted when a listener is added.
     event LockListenerAdded(address indexed listener);
@@ -259,7 +253,7 @@ interface IUnderwritingLocker is IERC721Enhanced {
     /**
      * @notice Withdraw from a lock in full.
      * @dev Can only be called by the lock owner or approved.
-     * @dev Can only be called if unlocked.
+     * @dev If called before `end` timestamp, will incur a penalty
      * @param lockID_ The ID of the lock to withdraw from.
      * @param recipient_ The user to receive the lock's token.
      */
@@ -268,16 +262,17 @@ interface IUnderwritingLocker is IERC721Enhanced {
     /**
      * @notice Withdraw from a lock in part.
      * @dev Can only be called by the lock owner or approved.
-     * @dev Can only be called if unlocked.
+     * @dev If called before `end` timestamp, will incur a penalty
      * @param lockID_ The ID of the lock to withdraw from.
      * @param amount_ The amount of token to withdraw.
      * @param recipient_ The user to receive the lock's token.
      */
     function withdrawInPart(uint256 lockID_, uint256 amount_, address recipient_) external;
+
     /**
      * @notice Withdraw from multiple locks in full.
      * @dev Can only be called by the lock owner or approved.
-     * @dev Can only be called if unlocked.
+     * @dev If called before `end` timestamp, will incur a penalty
      * @param lockIDs_ The ID of the locks to withdraw from.
      * @param recipient_ The user to receive the lock's token.
      */
@@ -286,50 +281,12 @@ interface IUnderwritingLocker is IERC721Enhanced {
     /**
      * @notice Withdraw from multiple locks in part.
      * @dev Can only be called by the lock owner or approved.
-     * @dev Can only be called if unlocked.
+     * @dev If called before `end` timestamp, will incur a penalty
      * @param lockIDs_ The ID of the locks to withdraw from.
      * @param amounts_ Array of token amounts to withdraw
      * @param recipient_ The user to receive the lock's token.
      */
-    function withdrawInPartMultiple(uint256[] calldata lockIDs_,  uint256[] calldata amounts_, address recipient_) external;
-
-    /**
-     * @notice Emergency withdraw from a lock in full.
-     * @dev Can only be called by the lock owner or approved.
-     * @dev If called before `end` timestamp, will incur a penalty
-     * @param lockID_ The ID of the lock to emergency withdraw from.
-     * @param recipient_ The user to receive the lock's token.
-     */
-    function emergencyWithdraw(uint256 lockID_, address recipient_) external;
-
-    /**
-     * @notice Emergency withdraw from a lock in part.
-     * @dev Can only be called by the lock owner or approved.
-     * @dev If called before `end` timestamp, will incur a penalty
-     * @param lockID_ The ID of the lock to emergency withdraw from.
-     * @param amount_ The amount of token to withdraw.
-     * @param recipient_ The user to receive the lock's token.
-     */
-    function emergencyWithdrawInPart(uint256 lockID_, uint256 amount_, address recipient_) external;
-
-    /**
-     * @notice Emergency withdraw from multiple locks in full.
-     * @dev Can only be called by the lock owner or approved.
-     * @dev If called before `end` timestamp, will incur a penalty
-     * @param lockIDs_ The ID of the locks to withdraw from.
-     * @param recipient_ The user to receive the lock's token.
-     */
-    function emergencyWithdrawMultiple(uint256[] calldata lockIDs_, address recipient_) external;
-
-    /**
-     * @notice Emergency withdraw from multiple locks in part.
-     * @dev Can only be called by the lock owner or approved.
-     * @dev If called before `end` timestamp, will incur a penalty
-     * @param lockIDs_ The ID of the locks to withdraw from.
-     * @param amounts_ Array of token amounts to emergency withdraw
-     * @param recipient_ The user to receive the lock's token.
-     */
-    function emergencyWithdrawInPartMultiple(uint256[] calldata lockIDs_, uint256[] calldata amounts_, address recipient_) external;
+    function withdrawInPartMultiple(uint256[] calldata lockIDs_, uint256[] calldata amounts_ ,address recipient_) external;
 
     /***************************************
     GOVERNANCE FUNCTIONS
