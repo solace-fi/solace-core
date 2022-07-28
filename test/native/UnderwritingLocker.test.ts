@@ -1683,7 +1683,6 @@ describe("UnderwritingLocker", function () {
         ownerOf: ZERO_ADDRESS
       }
     }
-
   }
 
   function getGlobalStateChange(newGlobalState: GlobalState, oldGlobalState: GlobalState): GlobalState {

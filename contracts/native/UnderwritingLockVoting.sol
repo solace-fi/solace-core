@@ -17,7 +17,7 @@ import "./../interfaces/native/IUnderwritingLockVoting.sol";
 // Formula for _calculateVoteFee()
 
 // vote gaugeID = 0 -> retract vote (no $UWE charge)
-// setLockManagerMultiple[]
+// Is processVotes DDOS resistant?
 
 /**
  * @title UnderwritingLockVoting
@@ -29,7 +29,7 @@ import "./../interfaces/native/IUnderwritingLockVoting.sol";
  * Each vote will stream $UWE to the revenue router.
  * 
  * The `votePower` of an underwriting lock scales with i.) locked amount, and ii.) lock duration
- * `votePower` can be viewed with [`votePower()`](#votePower)
+ * `votePower` can be viewed with [`getVotePower()`](#getVotePower)
  * 
  * Underwriting lock owners can call [`setLockManager()`](#setlockmanager) to assign a manger who can place votes on behalf of the lock owner
  * Underwriting lock managers cannot interact with [`UnderwritingLocker`](./UnderwritingLocker) to do the following for a lock they do not own:
@@ -76,18 +76,19 @@ contract UnderwritingLockVoting is
     uint256 public override lastTimeAllVotesProcessed;
 
     uint256 constant public override WEEK = 604800;
+    uint256 constant public override MONTH = 2628000;
 
     /// @notice lockId => lockManager address
     /// @dev We have several mappings using lockId as the key, we may intuitively consider merging the values types into a struct and use a single mapping. 
     /// @dev One argument against this is that we need to iterate through each stored vote in [`processVotes()`](#processvotes), which is unbounded and thus runs the risk of exceeding the gas limit. 
     /// @dev By minimising the entry size of the mapping we iterate through, we minimise the risk of exceeding the gas limit. We also increase the ceiling on voteBatchSize value that we can use.
-    mapping(uint256 => address) public override lockManagers;
+    mapping(uint256 => address) public override lockManagerOf;
 
     /***************************************
     GLOBAL INTERNAL VARIABLES
     ***************************************/
 
-    // Ideally we would like an EnumerableMap of (lockId => {gaugeID, lastTimeVoteProcessed, lockManager}) to merge lockManagers, _votes and _lastTimeVoteProcessed mappings. We would need to create a custom data structure to do this.
+    // Ideally we would like an EnumerableMap of (lockId => {gaugeID, lastTimeVoteProcessed, lockManager}) to merge lockManagerOf, _votes and _lastTimeVoteProcessed mappings. We would need to create a custom data structure to do this.
 
     /// @notice lockId => insurance gauge vote
     /// @dev Use an enumerable map so that governance can iterate through each vote after each epoch, and relay vote data to the GaugeController
@@ -153,7 +154,10 @@ contract UnderwritingLockVoting is
      * @return votePower The vote power for the lock (for the current epoch)
      */
     function _calculateVotePower(uint256 amount_, uint256 end_) internal view returns (uint256 votePower) {
-        return 1; // dummy return for contract compile
+        // votePower = lockAmount * sqrt(timeLeftInMonths) * ( 1 / sqrt(6)).
+        // Multiply numerator and denominator by 1e18 for pseudo-floating point precision.
+        uint256 timeLeftInMonthsScaled = 1e18 * (end_ - block.timestamp) / MONTH;
+        return amount_ * _sqrt(timeLeftInMonthsScaled) / _sqrt(1e18 * 6);
     }
 
     /**
@@ -161,12 +165,11 @@ contract UnderwritingLockVoting is
      * @param lockID_ The ID of the lock to query.
      * @return votePower
      */
-    function _votePower(uint256 lockID_) internal view returns (uint256 votePower) {
+    function _getVotePower(uint256 lockID_) internal view returns (uint256 votePower) {
         // Expect revert if lockID doesn't exist
         Lock memory lock = IUnderwritingLocker(underwritingLocker).locks(lockID_);
         return _calculateVotePower(lock.amount, lock.end);
     }
-
 
     /**
      * @notice Computes voting fee (in token amount)
@@ -174,7 +177,7 @@ contract UnderwritingLockVoting is
      * @param end_ The unlock timestamp of the lock.
      */
     function _calculateVoteFee(uint256 amount_, uint256 end_) internal view returns (uint256 fee) {
-        return 1; // dummy return for contract compile
+        return amount_ / 1000; // Start with flat 0.1% vote fee
     }
 
     /**
@@ -190,7 +193,22 @@ contract UnderwritingLockVoting is
      * @return timestamp
      */
     function _getEpochEndTimestamp() internal view returns (uint256 timestamp) {
-        return ( (block.timestamp * WEEK) / WEEK ) + 1;
+        return ( (block.timestamp * WEEK) / WEEK ) + WEEK;
+    }
+
+    // https://github.com/Uniswap/v2-core/blob/master/contracts/libraries/Math.sol
+    // babylonian method (https://en.wikipedia.org/wiki/Methods_of_computing_square_roots#Babylonian_method)
+    function _sqrt(uint y) internal pure returns (uint z) {
+        if (y > 3) {
+            z = y;
+            uint x = y / 2 + 1;
+            while (x < z) {
+                z = x;
+                x = (y / x + x) / 2;
+            }
+        } else if (y != 0) {
+            z = 1;
+        }
     }
 
     /***************************************
@@ -212,8 +230,8 @@ contract UnderwritingLockVoting is
      * @param lockID_ The ID of the lock to query.
      * @return votePower
      */
-    function votePower(uint256 lockID_) external view override returns (uint256 votePower) {
-        return _votePower(lockID_);
+    function getVotePower(uint256 lockID_) external view override returns (uint256 votePower) {
+        return _getVotePower(lockID_);
     }
 
     /**
@@ -222,7 +240,9 @@ contract UnderwritingLockVoting is
      * @return gaugeID The ID of the gauge the lock has voted for, returns 0 if either lockID or vote doesn't exist
      */
     function getVote(uint256 lockID_) external view override returns (uint256 gaugeID) {
-        (,gaugeID) = _votes.tryGet(lockID_);
+        (bool success, uint256 gaugeID) = _votes.tryGet(lockID_);
+        if (!success) revert VoteNotFound();
+        else return gaugeID;
     }
 
     /**
@@ -279,9 +299,22 @@ contract UnderwritingLockVoting is
      * @param gaugeID_ Address of intended lock manager
      */
     function _vote(uint256 lockID_, uint256 gaugeID_) internal  {
-        if( IUnderwritingLocker(underwritingLocker).ownerOf(lockID_) != msg.sender && lockManagers[lockID_] != msg.sender) revert NotOwnerNorManager();
+        if( IUnderwritingLocker(underwritingLocker).ownerOf(lockID_) != msg.sender && lockManagerOf[lockID_] != msg.sender) revert NotOwnerNorManager();
         _votes.set(lockID_, gaugeID_);
-        emit Vote(lockID_, gaugeID_, msg.sender, _getEpochEndTimestamp(), _votePower(lockID_));
+        emit Vote(lockID_, gaugeID_, msg.sender, _getEpochEndTimestamp(), _getVotePower(lockID_));
+    }
+
+    /**
+     * @notice Set the manager for a given lock
+     * Can only be called by the lock owner
+     * To remove a manager, the manager can be set to the ZERO_ADDRESS - 0x0000000000000000000000000000000000000000
+     * @param lockID_ The ID of the lock to set the manager of.
+     * @param manager_ Address of intended lock manager
+     */
+    function _setLockManager(uint256 lockID_, address manager_) internal {
+        if( IUnderwritingLocker(underwritingLocker).ownerOf(lockID_) != msg.sender) revert NotOwner();
+        lockManagerOf[lockID_] = manager_;
+        emit LockManagerSet(lockID_, manager_);
     }
 
     /***************************************
@@ -326,9 +359,21 @@ contract UnderwritingLockVoting is
      * @param manager_ Address of intended lock manager
      */
     function setLockManager(uint256 lockID_, address manager_) external override {
-        if( IUnderwritingLocker(underwritingLocker).ownerOf(lockID_) != msg.sender) revert NotOwner();
-        lockManagers[lockID_] = manager_;
-        emit LockManagerSet(lockID_, manager_);
+        _setLockManager(lockID_, manager_);
+    }
+
+    /**
+     * @notice Set managers for multiple lock
+     * Can only be called by the lock owner
+     * To remove a manager, the manager can be set to the ZERO_ADDRESS - 0x0000000000000000000000000000000000000000
+     * @param lockIDs_ Array of lock IDs.
+     * @param managers_ Array of addresses of intended lock managers.
+     */
+    function setLockManagerMultiple(uint256[] calldata lockIDs_, address[] calldata managers_) external override {
+        if (lockIDs_.length != managers_.length) revert ArrayArgumentsLengthMismatch();
+        for (uint256 i = 0; i < lockIDs_.length; i++) {
+            _setLockManager(lockIDs_[i], managers_[i]);
+        }
     }
 
     /***************************************
@@ -376,7 +421,7 @@ contract UnderwritingLockVoting is
             (uint256 lockID, uint256 gaugeID) = _votes.at(vote_index);
 
             // If lockID hasn't been processed for last epoch, then process the individual lcok
-            if (_lastTimeVoteProcessed[lockID] != epochStartTimestamp) {
+            if (gaugeID != 0 && _lastTimeVoteProcessed[lockID] != epochStartTimestamp) {
                 (,,uint256 amount, uint256 end) = _getLockInfo(lockID);
                 sum_voting_fee += _calculateVoteFee(amount, end);
                 _votePowerOfGaugeForEpoch[epochStartTimestamp][gaugeID] += _calculateVotePower(amount, end);

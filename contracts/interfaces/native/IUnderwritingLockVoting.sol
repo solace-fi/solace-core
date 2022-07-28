@@ -13,7 +13,7 @@ import "./IGaugeVoter.sol";
  * Each vote will stream $UWE to the revenue router.
  * 
  * The `votePower` of an underwriting lock scales with i.) locked amount, and ii.) lock duration
- * `votePower` can be viewed with [`votePower()`](#votePower)
+ * `votePower` can be viewed with [`getVotePower()`](#getVotePower)
  * 
  * Underwriting lock owners can call [`setLockManager()`](#setlockmanager) to assign a manger who can place votes on behalf of the lock owner
  * Underwriting lock managers cannot interact with [`UnderwritingLocker`](./UnderwritingLocker) to do the following for a lock they do not own:
@@ -55,6 +55,9 @@ interface IUnderwritingLockVoting is IGaugeVoter {
 
     /// @notice Thrown when vote is attempted before last epoch's votes have been successfully processed.
     error LastEpochVotesNotProcessed();
+
+    /// @notice Thrown when getVote() cannot get a vote for a given lockID. Either the lockID, the vote for the lockID, or both don't exist.
+    error VoteNotFound();
 
     /***************************************
     EVENTS
@@ -99,11 +102,14 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     function voteBatchSize() external view returns (uint256);
 
     function WEEK() external view returns (uint256);
+    function MONTH() external view returns (uint256);
 
-    /// @notice Get lockManager for a given lockId
-    /// @param lockID_ The ID of the lock to query for
-    /// @return lockManager
-    function lockManagers(uint256 lockID_) external view returns (address lockManager);
+    /**
+     * @notice Get lockManager for a given lockId.
+     * @param lockID_ The ID of the lock to query for.
+     * @return lockManager Zero address if no lock manager.
+     */
+    function lockManagerOf(uint256 lockID_) external view returns (address lockManager);
 
     /***************************************
     EXTERNAL VIEW FUNCTIONS
@@ -113,7 +119,7 @@ interface IUnderwritingLockVoting is IGaugeVoter {
      * @param lockID_ The ID of the lock to query.
      * @return votePower
      */
-    function votePower(uint256 lockID_) external view returns (uint256 votePower);
+    function getVotePower(uint256 lockID_) external view returns (uint256 votePower);
 
     /**
      * @notice Get currently registered vote for a lockID.
@@ -166,6 +172,15 @@ interface IUnderwritingLockVoting is IGaugeVoter {
      * @param manager_ Address of intended lock manager
      */
     function setLockManager(uint256 lockID_, address manager_) external;
+
+    /**
+     * @notice Set managers for multiple lock
+     * Can only be called by the lock owner
+     * To remove a manager, the manager can be set to the ZERO_ADDRESS - 0x0000000000000000000000000000000000000000
+     * @param lockIDs_ Array of lock IDs.
+     * @param managers_ Array of addresses of intended lock managers.
+     */
+    function setLockManagerMultiple(uint256[] calldata lockIDs_, address[] calldata managers_) external;
 
     /***************************************
     GOVERNANCE FUNCTIONS
