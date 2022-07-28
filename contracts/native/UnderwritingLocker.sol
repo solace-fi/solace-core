@@ -13,12 +13,8 @@ import "./../interfaces/utils/IRegistry.sol";
 import "./../interfaces/native/IUnderwritingLockListener.sol";
 import "./../interfaces/native/IUnderwritingLocker.sol";
 
-// TODO
-// $UWE needs to inherit ERC20Permit, or we remove ...Signed methods from this contract
-// getEarlyWithdrawInPartPenalty
-
 /**
- * @title IUnderwritingLocker
+ * @title UnderwritingLocker
  * @author solace.fi
  * @notice Having an underwriting lock is a requirement to vote on Solace Native insurance gauges.
  * To create an underwriting lock, $UWE must be locked for a minimum of 6 months.
@@ -27,8 +23,6 @@ import "./../interfaces/native/IUnderwritingLocker.sol";
  * Each lock has an `amount` of locked $UWE, and an `end` timestamp.
  * Locks have a maximum duration of four years.
  *
- * Locked $UWE withdrawn before the `end` timestamp will incur a withdrawal penalty, which scales with remaining lock time.
- *
  * Users can create locks via [`createLock()`](#createlock) or [`createLockSigned()`](#createlocksigned).
  * Users can deposit more $UWE into a lock via [`increaseAmount()`](#increaseamount), [`increaseAmountSigned()`] (#increaseamountsigned) or [`increaseAmountMultiple()`](#increaseamountmultiple).
  * Users can extend a lock via [`extendLock()`](#extendlock) or [`extendLockMultiple()`](#extendlockmultiple).
@@ -36,6 +30,8 @@ import "./../interfaces/native/IUnderwritingLocker.sol";
  *
  * Users and contracts may create a lock for another address.
  * Users and contracts may deposit into a lock that they do not own.
+ * A portion (set by the funding rate) of withdraws will be burned. This is to incentivize longer staking periods - withdrawing later than other users will yield more tokens than withdrawing earlier.
+ * Early withdrawls will incur an additional burn, which will increase with longer remaining lock duration.
  *
  * Any time a lock is minted, burned or otherwise modified it will notify the listener contracts.
  */
@@ -55,9 +51,6 @@ contract UnderwritingLocker is
     /// @notice Token locked in the underwriting lock.
     address public override token;
 
-    /// @notice Revenue router address (Early withdraw penalties will be transferred here).
-    address public override revenueRouter;
-
     /// @notice Registry address
     address public override registry;
 
@@ -69,6 +62,10 @@ contract UnderwritingLocker is
     /// @dev Difference with totalSupply is that totalNumLocks does not decrement when locks are burned.
     uint256 public override totalNumLocks;
 
+    /// @notice Funding rate - amount that will be charged and burned from a regular withdraw.
+    /// @dev Value of 1e18 => 100%.
+    uint256 public override fundingRate;
+
     /// @notice The minimum lock duration (six months) that a new lock must be created with.
     uint256 public constant override MIN_LOCK_DURATION = (365 days) / 2;
 
@@ -78,6 +75,8 @@ contract UnderwritingLocker is
     /***************************************
     GLOBAL INTERNAL VARIABLES
     ***************************************/
+
+    uint256 internal constant MONTH = 365 days / 12;
 
     // lockId => Lock {uint256 amount, uint256 end}
     mapping(uint256 => Lock) internal _locks;
@@ -91,7 +90,7 @@ contract UnderwritingLocker is
 
     /**
      * @notice Construct the UnderwritingLocker contract.
-     * @dev Requires 'uwe' and 'revenueRouter' addresses to be set in the Registry.
+     * @dev Requires 'uwe' address to be set in the Registry.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
      * @param registry_ The [`Registry`](./Registry) contract address.
      */
@@ -107,43 +106,47 @@ contract UnderwritingLocker is
     ***************************************/
 
     /**
-     * @notice Computes current penalty (as a % of early withdrawn amount) for early withdrawing from a specified lock.
-     * @dev penaltyPercentage == 1e18 means 100% penalty percentage. Similarly 1e17 => 10% penalty percentage.
-     * @dev Current formula is `p = 6 / (t + 6)`, where p = percentage, t = time in months.
-     * @param end_ Timestamp when lock unlocks
-     * @return penaltyPercentage Penalty percentage that will be paid to RevenueRouter.sol for early withdrawing.
-     */
-    function _getEarlyWithdrawPenaltyPercentage(uint256 end_) internal view returns (uint256 penaltyPercentage) {
-        if (end_ < block.timestamp) {return 0;}
-        else {
-            // Round up - no free early withdraw in last month
-            uint256 timeRemainingInMonths = ( (end_ - block.timestamp) / (365 days / 12) ) + 1;
-            return (( 1e18 * 6 ) / (timeRemainingInMonths + 6));
-        }
-    }
-
-    /**
-     * @notice Computes current penalty for early withdrawing from a specified lock.
-     * @param lockID_ The ID of the lock to compute early withdraw penalty.
-     * @return penaltyAmount Token amount that will be paid to RevenueRouter.sol as a penalty for early withdrawing.
-     */
-    function _getEarlyWithdrawPenalty(uint256 lockID_) internal view returns (uint256 penaltyAmount) {
-        Lock memory lock = _locks[lockID_];
-        uint256 penaltyPercentage = _getEarlyWithdrawPenaltyPercentage(lock.end);
-        return (penaltyPercentage * lock.amount) / 1e18;
-    }
-
-    /**
-     * @notice Computes current penalty for early partial withdrawal from a specified lock.
-     * @param lockID_ The ID of the lock to compute early withdraw penalty.
+     * @notice Computes amount of token that will be burned on withdraw.
      * @param amount_ The amount to withdraw.
-     * @return penaltyAmount Token amount that will be paid to RevenueRouter.sol as a penalty for early partial withdrawal.
+     * @param end_ The end timestamp of the lock.
+     * @return burnAmount Token amount that will be burned on wihtdraw
      */
-    function _getEarlyWithdrawInPartPenalty(uint256 lockID_, uint256 amount_) internal view returns (uint256 penaltyAmount) {
-        Lock memory lock = _locks[lockID_];
-        if (amount_ > lock.amount) revert ExcessWithdraw(lockID_, lock.amount, amount_);
-        uint256 penaltyPercentage = _getEarlyWithdrawPenaltyPercentage(_locks[lockID_].end);
-        return (penaltyPercentage * amount_) / 1e18;
+    function _getWithdrawBurnAmount(uint256 amount_, uint256 end_) internal view returns (uint256 burnAmount) {
+        // solhint-disable-next-line not-rely-on-time
+        bool isEarlyWithdraw = block.timestamp < end_;
+        burnAmount = ( (1e18 - fundingRate) * amount_ ) / 1e18;
+        
+        if (isEarlyWithdraw) {
+            uint256 multiplier = _getLockMultiplier(end_);
+            burnAmount = 1e18 * burnAmount / (multiplier + 1e18);
+        }
+
+        return burnAmount;
+    }
+
+    /**
+     * @notice Gets multiplier (applied for voting boost, and for early withdrawals)
+     * @param end_ End timestamp of lock.
+     * @return multiplier 1e18 => 1x multiplier, 2e18 => 2x multiplier
+     */
+    function _getLockMultiplier(uint256 end_) internal view returns (uint256 multiplier) {
+        uint256 timeLeftInMonthsScaled = 1e18 * (end_ - block.timestamp) / MONTH;
+        return 1e18 * _sqrt(timeLeftInMonthsScaled) / _sqrt(1e18 * 6);
+    }
+
+    // https://github.com/Uniswap/v2-core/blob/master/contracts/libraries/Math.sol
+    // Babylonian method (https://en.wikipedia.org/wiki/Methods_of_computing_square_roots#Babylonian_method)
+    function _sqrt(uint y) internal pure returns (uint z) {
+        if (y > 3) {
+            z = y;
+            uint x = y / 2 + 1;
+            while (x < z) {
+                z = x;
+                x = (y / x + x) / 2;
+            }
+        } else if (y != 0) {
+            z = 1;
+        }
     }
 
     /***************************************
@@ -211,22 +214,32 @@ contract UnderwritingLocker is
     }
 
     /**
-     * @notice Computes current penalty for early complete withdrawal from a specified lock.
-     * @param lockID_ The ID of the lock to compute early withdraw penalty.
-     * @return penaltyAmount Token amount that will be paid to RevenueRouter.sol as a penalty for early complete withdrawal.
+     * @notice Computes amount of token that will be burned on withdraw.
+     * @param lockID_ The ID of the lock to query.
+     * @return burnAmount Token amount that will be burned on withdraw.
      */
-    function getEarlyWithdrawPenalty(uint256 lockID_) external view override tokenMustExist(lockID_) returns (uint256 penaltyAmount) {
-        return _getEarlyWithdrawPenalty(lockID_);
+    function getWithdrawBurnAmount(uint256 lockID_) external view override tokenMustExist(lockID_) returns (uint256 burnAmount) {
+        Lock memory lock = _locks[lockID_];
+        return _getWithdrawBurnAmount(lock.amount, lock.end);
     }
 
     /**
-     * @notice Computes current penalty for early partial withdrawal from a specified lock.
-     * @param lockID_ The ID of the lock to compute early withdraw penalty.
+     * @notice Computes amount of token that will be burned on withdraw.
+     * @param lockID_ The ID of the lock to query.
      * @param amount_ The amount to withdraw.
-     * @return penaltyAmount Token amount that will be paid to RevenueRouter.sol as a penalty for early partial withdrawal.
+     * @return burnAmount Token amount that will be burned on withdraw.
      */
-    function getEarlyWithdrawInPartPenalty(uint256 lockID_, uint256 amount_) external view override tokenMustExist(lockID_) returns (uint256 penaltyAmount) {
-        return _getEarlyWithdrawInPartPenalty(lockID_, amount_);
+    function getWithdrawInPartBurnAmount(uint256 lockID_, uint256 amount_) external view override tokenMustExist(lockID_) returns (uint256 burnAmount) {
+        return _getWithdrawBurnAmount(amount_, _locks[lockID_].end);
+    }
+
+    /**
+     * @notice Gets multiplier (applied for voting boost, and for early withdrawals)
+     * @param lockID_ The ID of the lock to query.
+     * @return multiplier 1e18 => 1x multiplier, 2e18 => 2x multiplier
+     */
+    function getLockMultiplier(uint256 lockID_) external view override tokenMustExist(lockID_) returns (uint256 multiplier) {
+        return _getLockMultiplier(_locks[lockID_].end);
     }
 
     /***************************************
@@ -348,63 +361,63 @@ contract UnderwritingLocker is
     /**
      * @notice Withdraw from a lock in full.
      * @dev Can only be called by the lock owner or approved.
-     * @dev If called before `end` timestamp, will incur a penalty
+     * @dev If called before `end` timestamp, will incur additional burn amount.
      * @param lockID_ The ID of the lock to withdraw from.
      * @param recipient_ The user to receive the lock's token.
      */
     function withdraw(uint256 lockID_, address recipient_) external override nonReentrant {
         uint256 amount = _locks[lockID_].amount;
-        uint256 penalty = _withdraw(lockID_, amount);
+        uint256 burnAmount = _withdraw(lockID_, amount);
         // transfer token
-        if (penalty > 0) {SafeERC20.safeTransfer(IERC20(token), revenueRouter, penalty);}
-        SafeERC20.safeTransfer(IERC20(token), recipient_, amount - penalty);
+        if (burnAmount > 0) {SafeERC20.safeTransfer(IERC20(token), address(0x0), burnAmount);}
+        SafeERC20.safeTransfer(IERC20(token), recipient_, amount - burnAmount);
     }
 
 
     /**
      * @notice Withdraw from a lock in part.
      * @dev Can only be called by the lock owner or approved.
-     * @dev If called before `end` timestamp, will incur a penalty
+     * @dev If called before `end` timestamp, will incur additional burn amount.
      * @param lockID_ The ID of the lock to withdraw from.
      * @param amount_ The amount of token to withdraw.
      * @param recipient_ The user to receive the lock's token.
      */
     function withdrawInPart(uint256 lockID_, uint256 amount_, address recipient_) external override nonReentrant {
         if (amount_ > _locks[lockID_].amount) revert ExcessWithdraw(lockID_, _locks[lockID_].amount, amount_);
-        uint256 penalty = _withdraw(lockID_, amount_);
+        uint256 burnAmount = _withdraw(lockID_, amount_);
         // transfer token
-        if (penalty > 0) {SafeERC20.safeTransfer(IERC20(token), revenueRouter, penalty);}
-        SafeERC20.safeTransfer(IERC20(token), recipient_, amount_ - penalty);
+        if (burnAmount > 0) {SafeERC20.safeTransfer(IERC20(token), address(0x0), burnAmount);}
+        SafeERC20.safeTransfer(IERC20(token), recipient_, amount_ - burnAmount);
     }
 
     /**
      * @notice Withdraw from multiple locks in full.
      * @dev Can only be called by the lock owner or approved.
-     * @dev If called before `end` timestamp, will incur a penalty
+     * @dev If called before `end` timestamp, will incur additional burn amount.
      * @param lockIDs_ The ID of the locks to withdraw from.
      * @param recipient_ The user to receive the lock's token.
      */
     function withdrawMultiple(uint256[] calldata lockIDs_, address recipient_) external override nonReentrant {
         uint256 len = lockIDs_.length;
         uint256 totalWithdrawAmount = 0;
-        uint256 totalPenaltyAmount = 0;
+        uint256 totalBurnAmount = 0;
         for(uint256 i = 0; i < len; i++) {
             uint256 lockID = lockIDs_[i];
             if (!_isApprovedOrOwner(msg.sender, lockID)) revert NotOwnerNorApproved();
             uint256 singleLockAmount = _locks[lockID].amount;
-            uint256 penalty = _withdraw(lockID, singleLockAmount);
-            totalPenaltyAmount += penalty;
-            totalWithdrawAmount += (singleLockAmount - penalty);
+            uint256 burnAmount = _withdraw(lockID, singleLockAmount);
+            totalBurnAmount += burnAmount;
+            totalWithdrawAmount += (singleLockAmount - burnAmount);
         }
         // batched token transfer
-        if (totalPenaltyAmount > 0) {SafeERC20.safeTransfer(IERC20(token), revenueRouter, totalPenaltyAmount);}
+        if (totalBurnAmount > 0) {SafeERC20.safeTransfer(IERC20(token), address(0x0), totalBurnAmount);}
         SafeERC20.safeTransfer(IERC20(token), recipient_, totalWithdrawAmount);
     }
 
     /**
      * @notice Withdraw from multiple locks in part.
      * @dev Can only be called by the lock owner or approved.
-     * @dev If called before `end` timestamp, will incur a penalty
+     * @dev If called before `end` timestamp, will incur additional burn amount.
      * @param lockIDs_ The ID of the locks to withdraw from.
      * @param amounts_ Array of token amounts to withdraw
      * @param recipient_ The user to receive the lock's token.
@@ -413,18 +426,18 @@ contract UnderwritingLocker is
         if (lockIDs_.length != amounts_.length) revert ArrayArgumentsLengthMismatch();
         uint256 len = lockIDs_.length;
         uint256 totalWithdrawAmount = 0;
-        uint256 totalPenaltyAmount = 0;
+        uint256 totalBurnAmount = 0;
         for(uint256 i = 0; i < len; i++) {
             uint256 lockID = lockIDs_[i];
             if (!_isApprovedOrOwner(msg.sender, lockID)) revert NotOwnerNorApproved();
             uint256 singleLockAmount = amounts_[i];
             if (singleLockAmount > _locks[lockID].amount) revert ExcessWithdraw(lockID, _locks[lockID].amount, singleLockAmount);
-            uint256 penalty = _withdraw(lockID, singleLockAmount);
-            totalPenaltyAmount += penalty;
-            totalWithdrawAmount += (singleLockAmount - penalty);
+            uint256 burnAmount = _withdraw(lockID, singleLockAmount);
+            totalBurnAmount += burnAmount;
+            totalWithdrawAmount += (singleLockAmount - burnAmount);
         }
         // batched token transfer
-        if (totalPenaltyAmount > 0) {SafeERC20.safeTransfer(IERC20(token), revenueRouter, totalPenaltyAmount);}
+        if (totalBurnAmount > 0) {SafeERC20.safeTransfer(IERC20(token), address(0x0), totalBurnAmount);}
         SafeERC20.safeTransfer(IERC20(token), recipient_, totalWithdrawAmount);
     }
 
@@ -503,28 +516,23 @@ contract UnderwritingLocker is
      * @notice Withdraws from a lock.
      * @param lockID_ The ID of the lock to withdraw from.
      * @param amount_ The amount of token to withdraw.
-     * @param penalty Penalty amount (will be 0 if block.timestamp >= end).
+     * @param burnAmount Amount that will be burned.
      */
     function _withdraw(uint256 lockID_, uint256 amount_) 
         internal 
         onlyOwnerOrApproved(lockID_) 
-        returns (uint256 penalty) 
+        returns (uint256 burnAmount) 
     {
         // solhint-disable-next-line not-rely-on-time
         bool isEarlyWithdraw = block.timestamp < _locks[lockID_].end;
+        burnAmount = _getWithdrawBurnAmount(amount_, _locks[lockID_].end);
 
-        if(isEarlyWithdraw) {
-            // Make _getEarlyWithdrawPenaltyPercentage query before lockID is potentially deleted
-            uint256 penaltyPercentage = _getEarlyWithdrawPenaltyPercentage(_locks[lockID_].end);
-            penalty = amount_ * penaltyPercentage / 1e18;
-        }
-
-        // accounting
+        // full withdraw
         if(amount_ == _locks[lockID_].amount) {
             _burn(lockID_);
             delete _locks[lockID_];
-        }
-        else {
+        // partial withdraw
+        } else {
             Lock memory oldLock = _locks[lockID_];
             Lock memory newLock = Lock(oldLock.amount - amount_, oldLock.end);
             _locks[lockID_].amount -= amount_;
@@ -532,10 +540,9 @@ contract UnderwritingLocker is
             _notify(lockID_, owner, owner, oldLock, newLock);
         }
 
-        if(isEarlyWithdraw) {emit EarlyWithdrawal(lockID_, amount_, penalty);} 
-        else {emit Withdrawal(lockID_, amount_);}
-
-        return penalty;
+        if(isEarlyWithdraw) {emit EarlyWithdrawal(lockID_, amount_, burnAmount);} 
+        else {emit Withdrawal(lockID_, amount_, burnAmount);}
+        return burnAmount;
     }
 
     /**
@@ -581,7 +588,7 @@ contract UnderwritingLocker is
 
     /**
      * @notice Sets registry and related contract addresses.
-     * @dev Requires 'uwe' and 'revenueRouter' addresses to be set in the Registry.
+     * @dev Requires 'uwe' addresses to be set in the Registry.
      * @param registry_ The registry address to set.
      */
     function _setRegistry(address registry_) internal {
@@ -589,10 +596,6 @@ contract UnderwritingLocker is
         if(registry_ == address(0x0)) revert ZeroAddressInput("registry");
         registry = registry_;
         IRegistry reg = IRegistry(registry_);
-        // set revenueRouter
-        (, address revenueRouterAddr) = reg.tryGet("revenueRouter");
-        if(revenueRouterAddr == address(0x0)) revert ZeroAddressInput("revenueRouter");
-        revenueRouter = revenueRouterAddr;
         // set token ($UWE)
         (, address uweAddr) = reg.tryGet("uwe");
         if(uweAddr == address(0x0)) revert ZeroAddressInput("uwe");
@@ -635,7 +638,7 @@ contract UnderwritingLocker is
 
     /**
      * @notice Sets the [`Registry`](./Registry) contract address.
-     * @dev Requires 'uwe' and 'revenueRouter' addresses to be set in the Registry.
+     * @dev Requires 'uwe' address to be set in the Registry.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param registry_ The address of `Registry` contract.
      */
@@ -657,5 +660,16 @@ contract UnderwritingLocker is
         votingContract = votingContractAddr;
         SafeERC20.safeApprove(IERC20(token), votingContractAddr, type(uint256).max);        
         emit VotingContractSet(votingContractAddr);
+    }
+
+    /**
+     * @notice Sets fundingRate.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param fundingRate_ Desired funding rate, 1e18 => 100%
+     */
+    function setFundingRate(uint256 fundingRate_) external override onlyGovernance {
+        if (fundingRate_ > 1e18) revert FundingRateAboveOne();
+        fundingRate = fundingRate_;
+        emit FundingRateSet(fundingRate_);
     }
 }

@@ -22,8 +22,6 @@ struct Lock {
  * Each lock has an `amount` of locked $UWE, and an `end` timestamp.
  * Locks have a maximum duration of four years.
  *
- * Locked $UWE withdrawn before the `end` timestamp will incur a withdrawal penalty, which scales with remaining lock time.
- *
  * Users can create locks via [`createLock()`](#createlock) or [`createLockSigned()`](#createlocksigned).
  * Users can deposit more $UWE into a lock via [`increaseAmount()`](#increaseamount), [`increaseAmountSigned()`] (#increaseamountsigned) or [`increaseAmountMultiple()`](#increaseamountmultiple).
  * Users can extend a lock via [`extendLock()`](#extendlock) or [`extendLockMultiple()`](#extendlockmultiple).
@@ -31,9 +29,12 @@ struct Lock {
  *
  * Users and contracts may create a lock for another address.
  * Users and contracts may deposit into a lock that they do not own.
+ * A portion (set by the funding rate) of withdraws will be burned. This is to incentivize longer staking periods - withdrawing later than other users will yield more tokens than withdrawing earlier.
+ * Early withdrawls will incur an additional burn, which will increase with longer remaining lock duration.
  *
  * Any time a lock is minted, burned or otherwise modified it will notify the listener contracts.
  */
+// solhint-disable-next-line contract-name-camelcase
 interface IUnderwritingLocker is IERC721Enhanced {
 
     /***************************************
@@ -76,6 +77,9 @@ interface IUnderwritingLocker is IERC721Enhanced {
      */
     error ExcessWithdraw(uint256 lockID, uint256 lockAmount, uint256 attemptedWithdrawAmount);
 
+    /// @notice Thrown when funding rate is set above 100%
+    error FundingRateAboveOne();
+
     /***************************************
     EVENTS
     ***************************************/
@@ -93,10 +97,10 @@ interface IUnderwritingLocker is IERC721Enhanced {
     event LockUpdated(uint256 indexed lockID, uint256 amount, uint256 end);
 
     /// @notice Emitted when a lock is withdrawn from.
-    event Withdrawal(uint256 indexed lockID, uint256 amount);
+    event Withdrawal(uint256 indexed lockID, uint256 requestedWithdrawAmount, uint256 burnAmount);
 
     /// @notice Emitted when an early withdraw is made.
-    event EarlyWithdrawal(uint256 indexed lockID, uint256 totalWithdrawAmount, uint256 penaltyAmount);
+    event EarlyWithdrawal(uint256 indexed lockID, uint256 requestedWithdrawAmount, uint256 burnAmount);
 
     /// @notice Emitted when a listener is added.
     event LockListenerAdded(address indexed listener);
@@ -110,6 +114,9 @@ interface IUnderwritingLocker is IERC721Enhanced {
     /// @notice Emitted when voting contract has been set
     event VotingContractSet(address indexed votingContract);
 
+    /// @notice Emitted when funding rate is set.
+    event FundingRateSet(uint256 indexed fundingRate);
+
     /***************************************
     GLOBAL VARIABLES
     ***************************************/
@@ -117,24 +124,25 @@ interface IUnderwritingLocker is IERC721Enhanced {
     /// @notice Token locked in the underwriting lock.
     function token() external view returns (address);
 
-    /// @notice Revenue router address (Early withdraw penalties will be transferred here).
-    function revenueRouter() external view returns (address);
-
     /// @notice Registry address
     function registry() external view returns (address);
 
     /// @notice UnderwriterLockVoting.sol address
     function votingContract() external view returns (address);
 
+    /// @notice The total number of locks that have been created.
+    /// @dev Difference with totalSupply is that totalNumLocks does not decrement when locks are burned.
+    function totalNumLocks() external view returns (uint256);
+
+    /// @notice Funding rate - amount that will be charged and burned from a regular withdraw.
+    /// @dev Value of 1e18 => 100%.
+    function fundingRate() external view returns (uint256);
+
     /// @notice The minimum lock duration that a new lock must be created with.
     function MIN_LOCK_DURATION() external view returns (uint256);
 
     /// @notice The maximum time into the future that a lock can expire.
     function MAX_LOCK_DURATION() external view returns (uint256);
-
-    /// @notice The total number of locks that have been created.
-    /// @dev Difference with totalSupply is that totalNumLocks does not decrement when locks are burned.
-    function totalNumLocks() external view returns (uint256);
 
     /***************************************
     EXTERNAL VIEW FUNCTIONS
@@ -176,19 +184,24 @@ interface IUnderwritingLocker is IERC721Enhanced {
     function getLockListeners() external view returns (address[] memory listeners_);
 
     /**
-     * @notice Computes current penalty for early complete withdrawal from a specified lock.
-     * @param lockID_ The ID of the lock to compute early withdraw penalty.
-     * @return penaltyAmount Token amount that will be paid to RevenueRouter.sol as a penalty for early complete withdrawal.
+     * @notice Computes amount of token that will be burned on withdraw.
+     * @param lockID_ The ID of the lock to query.
+     * @return burnAmount Token amount that will be burned on withdraw.
      */
-    function getEarlyWithdrawPenalty(uint256 lockID_) external returns (uint256 penaltyAmount);
-
+    function getWithdrawBurnAmount(uint256 lockID_) external view returns (uint256 burnAmount);
     /**
-     * @notice Computes current penalty for early partial withdrawal from a specified lock.
-     * @param lockID_ The ID of the lock to compute early withdraw penalty.
+     * @notice Computes amount of token that will be burned on withdraw.
+     * @param lockID_ The ID of the lock to query.
      * @param amount_ The amount to withdraw.
-     * @return penaltyAmount Token amount that will be paid to RevenueRouter.sol as a penalty for early partial withdrawal.
+     * @return burnAmount Token amount that will be burned on withdraw.
      */
-    function getEarlyWithdrawInPartPenalty(uint256 lockID_, uint256 amount_) external returns (uint256 penaltyAmount);
+    function getWithdrawInPartBurnAmount(uint256 lockID_, uint256 amount_) external view returns (uint256 burnAmount);
+    /**
+     * @notice Gets multiplier (applied for voting boost, and for early withdrawals)
+     * @param lockID_ The ID of the lock to query.
+     * @return multiplier 1e18 => 1x multiplier, 2e18 => 2x multiplier
+     */
+    function getLockMultiplier(uint256 lockID_) external view returns (uint256 multiplier);
 
     /***************************************
     EXTERNAL MUTATOR FUNCTIONS
@@ -270,7 +283,7 @@ interface IUnderwritingLocker is IERC721Enhanced {
     /**
      * @notice Withdraw from a lock in full.
      * @dev Can only be called by the lock owner or approved.
-     * @dev If called before `end` timestamp, will incur a penalty
+     * @dev If called before `end` timestamp, will incur additional burn amount.
      * @param lockID_ The ID of the lock to withdraw from.
      * @param recipient_ The user to receive the lock's token.
      */
@@ -279,7 +292,7 @@ interface IUnderwritingLocker is IERC721Enhanced {
     /**
      * @notice Withdraw from a lock in part.
      * @dev Can only be called by the lock owner or approved.
-     * @dev If called before `end` timestamp, will incur a penalty
+     * @dev If called before `end` timestamp, will incur additional burn amount.
      * @param lockID_ The ID of the lock to withdraw from.
      * @param amount_ The amount of token to withdraw.
      * @param recipient_ The user to receive the lock's token.
@@ -289,7 +302,7 @@ interface IUnderwritingLocker is IERC721Enhanced {
     /**
      * @notice Withdraw from multiple locks in full.
      * @dev Can only be called by the lock owner or approved.
-     * @dev If called before `end` timestamp, will incur a penalty
+     * @dev If called before `end` timestamp, will incur additional burn amount.
      * @param lockIDs_ The ID of the locks to withdraw from.
      * @param recipient_ The user to receive the lock's token.
      */
@@ -298,7 +311,7 @@ interface IUnderwritingLocker is IERC721Enhanced {
     /**
      * @notice Withdraw from multiple locks in part.
      * @dev Can only be called by the lock owner or approved.
-     * @dev If called before `end` timestamp, will incur a penalty
+     * @dev If called before `end` timestamp, will incur additional burn amount.
      * @param lockIDs_ The ID of the locks to withdraw from.
      * @param amounts_ Array of token amounts to withdraw
      * @param recipient_ The user to receive the lock's token.
@@ -343,4 +356,11 @@ interface IUnderwritingLocker is IERC721Enhanced {
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      */
     function setVotingContract() external;
+
+    /**
+     * @notice Sets fundingRate.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param fundingRate_ Desired funding rate, 1e18 => 100%
+     */
+    function setFundingRate(uint256 fundingRate_) external;
 }
