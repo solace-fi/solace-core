@@ -33,6 +33,18 @@ import "./IGaugeVoter.sol";
 interface IUnderwritingLockVoting is IGaugeVoter {
 
     /***************************************
+    STRUCTS
+    ***************************************/
+
+    // Struct packing into two 32-byte words.
+    struct LockVoteInfo { 
+        address lockManager; // 20-bytes
+        uint48 lastTimeVoteProcessed; // 6-bytes
+        uint48 lastTimeCharged; // 6-bytes
+        uint256 lastProcessedVotePower; // Full word, need to store for accurate premium charge calculation (which is done at a different time from processVotes)
+    }
+
+    /***************************************
     CUSTOM ERRORS
     ***************************************/
 
@@ -42,7 +54,11 @@ interface IUnderwritingLockVoting is IGaugeVoter {
 
     /// @notice Thrown when processVote() attempted when all stored votes have already been processed for the last epoch.
     /// @param epochTime Timestamp of endtime for epoch already processed.
-    error LastEpochAlreadyProcessed(uint256 epochTime);
+    error LastEpochVotesAlreadyProcessed(uint256 epochTime);
+
+    /// @notice Thrown when chargePremiums() attempted when all premiums have been charged for the last epoch.
+    /// @param epochTime Timestamp of endtime for epoch already processed.
+    error LastEpochPremiumsAlreadyProcessed(uint256 epochTime);
 
     /// @notice Thrown when setLockManager() attempted for a non-owner.
     error NotOwner();
@@ -53,8 +69,11 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     /// @notice Thrown when array arguments are mismatched in length (and need to have the same length);
     error ArrayArgumentsLengthMismatch();
 
-    /// @notice Thrown when vote is attempted before last epoch's votes have been successfully processed.
+    /// @notice Thrown when vote or chargePremiums is attempted before last epoch's votes have been successfully processed.
     error LastEpochVotesNotProcessed();
+
+    /// @notice Thrown when vote is attempted before last epoch's premiums have been successfully charged.
+    error LastEpochPremiumsNotCharged();
 
     /// @notice Thrown when getVote() cannot get a vote for a given lockID. Either the lockID, the vote for the lockID, or both don't exist.
     error VoteNotFound();
@@ -76,18 +95,21 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     /// @notice Emitted when voteBatchSize is set.
     event VoteBatchSizeSet(uint256 indexed voteBatchSize);
 
-    /// @notice Emitted a vote for an epoch has been processed
+    /// @notice Emitted a vote for an epoch has been processed.
     event VoteProcessed(uint256 indexed lockID, uint256 indexed gaugeID, uint256 indexed epochStartTimestamp);
+
+    /// @notice Emitted a premium is charged.
+    event PremiumCharged(uint256 indexed lockID, uint256 indexed gaugeID, uint256 indexed epochStartTimestamp, uint256 premium);
 
     /// @notice Emitted all stored votes for an epoch have been processed.
     event AllVotesProcessed(uint256 indexed epochTimestamp);
 
+    /// @notice Emitted when premiiums for all stored votes have been processed in an epoch.
+    event AllPremiumsCharged(uint256 indexed epochTimestamp);
+
     /***************************************
     GLOBAL VARIABLES
     ***************************************/
-
-    /// @notice Token locked in [`UnderwritingLocker`](./UnderwritingLocker).
-    function token() external view returns (address);
 
     /// @notice Revenue router address ($UWE voting fees will be transferred here).
     function revenueRouter() external view returns (address);
@@ -95,14 +117,14 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     /// @notice Address of [`UnderwritingLocker`](./UnderwritingLocker)
     function underwritingLocker() external view returns (address);
 
+    /// @notice Gauge controller address.
+    function gaugeController() external view returns (address);
+
     /// @notice Registry address
     function registry() external view returns (address);
 
     /// @notice Batch size of votes that will be processed in a single call of [`processVotes()`](#processvotes).
     function voteBatchSize() external view returns (uint256);
-
-    function WEEK() external view returns (uint256);
-    function MONTH() external view returns (uint256);
 
     /**
      * @notice Get lockManager for a given lockId.
@@ -110,6 +132,15 @@ interface IUnderwritingLockVoting is IGaugeVoter {
      * @return lockManager Zero address if no lock manager.
      */
     function lockManagerOf(uint256 lockID_) external view returns (address lockManager);
+
+    /**
+     * @notice Obtain end timestamp (rounded down to weeks) for the epoch where all premiums were charged.
+     * @return timestamp_
+     */
+    function lastTimePremiumsCharged() external view returns (uint256 timestamp_);
+
+    function WEEK() external view returns (uint256);
+    function MONTH() external view returns (uint256);
 
     /***************************************
     EXTERNAL VIEW FUNCTIONS
@@ -200,12 +231,20 @@ interface IUnderwritingLockVoting is IGaugeVoter {
      * @param voteBatchSize_ Batch size of votes that will be processed in a single call of [`processVotes()`](#processvotes)
      */
     function setVoteBatchSize(uint256 voteBatchSize_) external;
+
     /**
      * @notice Processes votes for the last epoch passed, batches $UWE voting fees and sends to RevenueRouter.sol, updates aggregate voting data (for each gauge) 
      * @dev Designed to be called multiple times until this function returns true (all stored votes are processed)
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @dev Edge case when processVotes() is not called to completion for certain epochs - GaugeController only take vote power for lastTimeAllVotesProcessed
-     * @return epochProcessed True if all stored votes are processed for the last epoch, false otherwise
      */
-    function processVotes() external returns (bool epochProcessed);
+    function processVotes() external;
+
+    /**
+     * @notice Charge premiums for votes.
+     * @dev Requires all votes to be processed for the last epochProcesses votes for the last epoch passed, batches $UWE voting fees and sends to RevenueRouter.sol, updates aggregate voting data (for each gauge) 
+     * @dev Designed to be called multiple times until this function returns true (all stored votes are processed)
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     */
+    function chargePremiums() external;
 }

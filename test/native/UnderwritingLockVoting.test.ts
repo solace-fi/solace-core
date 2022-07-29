@@ -7,7 +7,7 @@ import chai from "chai";
 const { expect } = chai;
 chai.use(solidity);
 import { import_artifacts, ArtifactImports } from "../utilities/artifact_importer";
-import { UnderwritingLocker, UnderwritingLockVoting, Registry, MockErc20Permit } from "../../typechain";
+import { UnderwritingLocker, UnderwritingLockVoting, Registry, MockErc20Permit, GaugeController } from "../../typechain";
 import { expectDeployed } from "../utilities/expectDeployed";
 
 /*******************
@@ -34,6 +34,7 @@ describe("UnderwritingLockVoting", function () {
     let token: MockErc20Permit;
     let registry: Registry;
     let underwritingLocker: UnderwritingLocker;
+    let gaugeController: GaugeController;
     let voting: UnderwritingLockVoting;
     let artifacts: ArtifactImports;
     let snapshot: BN;
@@ -45,7 +46,7 @@ describe("UnderwritingLockVoting", function () {
       
       // Deploy $UWE, and mint 1M $UWE to deployer
       token = (await deployContract(deployer, artifacts.MockERC20Permit, ["Underwriting Equity - Solace Native", "UWE", ONE_MILLION_ETHER, 18])) as MockErc20Permit;
-  
+
       // Deploy registry
       registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
     });
@@ -65,29 +66,32 @@ describe("UnderwritingLockVoting", function () {
           await expect(deployContract(deployer, artifacts.UnderwritingLockVoting, [governor.address, registry.address])).to.be.revertedWith('ZeroAddressInput("revenueRouter")');
           await registry.connect(governor).set(["revenueRouter"], [revenueRouter.address]);
         });
-        it("reverts if zero address uwe in Registry", async function () {
-          await expect(deployContract(deployer, artifacts.UnderwritingLockVoting, [governor.address, registry.address])).to.be.revertedWith('ZeroAddressInput("uwe")');
-          await registry.connect(governor).set(["uwe"], [token.address]);
-        });
         it("reverts if zero address underwritingLocker in Registry", async function () {
           await expect(deployContract(deployer, artifacts.UnderwritingLockVoting, [governor.address, registry.address])).to.be.revertedWith('ZeroAddressInput("underwritingLocker")');
+          await registry.connect(governor).set(["uwe"], [token.address]);
           underwritingLocker = (await deployContract(deployer, artifacts.UnderwritingLocker, [governor.address, registry.address])) as UnderwritingLocker;
           await expectDeployed(underwritingLocker.address);
           await registry.connect(governor).set(["underwritingLocker"], [underwritingLocker.address]);
+        });
+        it("reverts if zero address gaugeController in Registry", async function () {
+          await expect(deployContract(deployer, artifacts.UnderwritingLockVoting, [governor.address, registry.address])).to.be.revertedWith('ZeroAddressInput("gaugeController")');
+          gaugeController = (await deployContract(deployer, artifacts.GaugeController, [governor.address])) as GaugeController;
+          await registry.connect(governor).set(["gaugeController"], [gaugeController.address]);
         });
         it("deploys", async function () {
           voting = (await deployContract(deployer, artifacts.UnderwritingLockVoting, [governor.address, registry.address])) as UnderwritingLockVoting;
           await expectDeployed(voting.address);
         });
         it("initializes properly", async function () {
-          expect(await voting.token()).eq(token.address);
           expect(await voting.revenueRouter()).eq(revenueRouter.address);
           expect(await voting.underwritingLocker()).eq(underwritingLocker.address);
+          expect(await voting.gaugeController()).eq(gaugeController.address);
           expect(await voting.registry()).eq(registry.address);
           expect(await voting.voteBatchSize()).eq(DEFAULT_VOTE_BATCH_SIZE);
+          expect(await voting.lastTimeAllVotesProcessed()).eq(0);
+          expect(await voting.lastTimePremiumsCharged()).eq(0);
           expect(await voting.WEEK()).eq(ONE_WEEK);
           expect(await voting.MONTH()).eq(ONE_MONTH);
-          expect(await voting.lastTimeAllVotesProcessed()).eq(0);
         });
         it("getEpochStartTimestamp gets current timestamp rounded down to a multiple of WEEK ", async function () {
           const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
@@ -102,29 +106,32 @@ describe("UnderwritingLockVoting", function () {
         it("getVote should throw for an invalid lockID", async function () {
           await expect(voting.getVote(1)).to.be.revertedWith("VoteNotFound")
         });
-
+        it("processVotes should do nothing", async function () {
+          const tx = await voting.connect(governor).processVotes();
+          await expect(tx).to.not.emit(voting, "AllVotesProcessed");
+          expect(await voting.lastTimeAllVotesProcessed()).eq(0)
+        });
+        it("chargePremiums should revert", async function () {
+          await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("LastEpochVotesNotProcessed")
+        });
     });
 
     describe("governance", () => {
         it("starts with the correct governor", async () => {
           expect(await voting.governance()).to.equal(governor.address);
         });
-    
         it("rejects setting new governance by non governor", async  () => {
           await expect(voting.connect(owner1).setPendingGovernance(owner1.address)).to.be.revertedWith("!governance");
         });
-    
         it("can set new governance", async () => {
           let tx = await voting.connect(governor).setPendingGovernance(deployer.address);
           await expect(tx).to.emit(voting, "GovernancePending").withArgs(deployer.address);
           expect(await voting.governance()).to.equal(governor.address);
           expect(await voting.pendingGovernance()).to.equal(deployer.address);
         });
-    
         it("rejects governance transfer by non governor", async () => {
           await expect(voting.connect(owner1).acceptGovernance()).to.be.revertedWith("!pending governance");
         });
-    
         it("can transfer governance", async () => {
           let tx = await voting.connect(deployer).acceptGovernance();
           await expect(tx)
@@ -166,13 +173,13 @@ describe("UnderwritingLockVoting", function () {
           await expect(voting.connect(governor).setRegistry(registry2.address)).to.be.revertedWith('ZeroAddressInput("revenueRouter")');
           await registry2.connect(governor).set(["revenueRouter"], [RANDOM_ADDRESS_1]);
         });
-        it("reverts if zero address uwe in Registry", async function () {
-          await expect(voting.connect(governor).setRegistry(registry2.address)).to.be.revertedWith('ZeroAddressInput("uwe")');
-          await registry2.connect(governor).set(["uwe"], [RANDOM_ADDRESS_2]);
-        });
         it("reverts if zero address underwritingLocker in Registry", async function () {
           await expect(voting.connect(governor).setRegistry(registry2.address)).to.be.revertedWith('ZeroAddressInput("underwritingLocker")');
-          await registry2.connect(governor).set(["underwritingLocker"], [RANDOM_ADDRESS_3]);
+          await registry2.connect(governor).set(["underwritingLocker"], [RANDOM_ADDRESS_2]);
+        })
+        it("reverts if zero address gaugeController in Registry", async function () {
+          await expect(voting.connect(governor).setRegistry(registry2.address)).to.be.revertedWith('ZeroAddressInput("gaugeController")');
+          await registry2.connect(governor).set(["gaugeController"], [RANDOM_ADDRESS_3]);
         });
         it("sets registry", async function () {
           const tx = await voting.connect(governor).setRegistry(registry2.address);
@@ -181,8 +188,8 @@ describe("UnderwritingLockVoting", function () {
         it("copies Registry addresses to own state variables", async function () {
           expect(await voting.registry()).eq(registry2.address);
           expect(await voting.revenueRouter()).eq(RANDOM_ADDRESS_1);
-          expect(await voting.token()).eq(RANDOM_ADDRESS_2);
-          expect(await voting.underwritingLocker()).eq(RANDOM_ADDRESS_3);
+          expect(await voting.underwritingLocker()).eq(RANDOM_ADDRESS_2);
+          expect(await voting.gaugeController()).eq(RANDOM_ADDRESS_3);
         });
         after(async function () {
           await voting.connect(governor).setRegistry(registry.address);
@@ -192,9 +199,9 @@ describe("UnderwritingLockVoting", function () {
     describe("setLockManager", () => {
         // Create four locks for owner1, lockID 1 => 1yr, lockID 2 => 2yr, lockID 3 => 3yr, lockID 4 => 4yr
         before(async function () {
-            await token.connect(deployer).transfer(owner1.address, ONE_ETHER.mul(100));
-            await token.connect(owner1).approve(underwritingLocker.address, constants.MaxUint256);
             const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
+            await token.connect(deployer).transfer(owner1.address, ONE_ETHER.mul(100))
+            await token.connect(owner1).approve(underwritingLocker.address, constants.MaxUint256)
             await underwritingLocker.connect(owner1).createLock(owner1.address, DEPOSIT_AMOUNT, CURRENT_TIME + ONE_YEAR);
             await underwritingLocker.connect(owner1).createLock(owner1.address, DEPOSIT_AMOUNT, CURRENT_TIME + 2 * ONE_YEAR);
             await underwritingLocker.connect(owner1).createLock(owner1.address, DEPOSIT_AMOUNT, CURRENT_TIME + 3 * ONE_YEAR);
@@ -205,7 +212,7 @@ describe("UnderwritingLockVoting", function () {
             expect(await voting.lockManagerOf(4)).eq(ZERO_ADDRESS)
         });
         it("cannot set for non-existent lock", async function () {
-            await expect(voting.connect(owner1).setLockManager(999, manager1.address)).to.be.revertedWith("ERC721: invalid token ID");
+          await expect(voting.connect(manager1).setLockManager(5, manager1.address)).to.be.revertedWith("ERC721: invalid token ID");          
         })
         it("non-owner cannot set manager", async function () {
             await expect(voting.connect(manager1).setLockManager(1, manager1.address)).to.be.revertedWith("NotOwner");
@@ -229,18 +236,18 @@ describe("UnderwritingLockVoting", function () {
   *******************/
   /**
    * There are four locks owned by owner1:
-   * lockID 1 => 1-year lock managed by manager1, with 1e18 token locked
-   * lockID 2 => 2-year lock with no manager, with 1e18 token locked
-   * lockID 3 => 3-year lock with no manager, with 1e18 token locked
-   * lockID 4 => 4-year lock with no manager, with 1e18 token locked
+   * lockID 1 => 1e18 locked for 1 yr, managed by manager1
+   * lockID 2 => 1e18 locked for 2 yrs
+   * lockID 3 => 1e18 locked for 3 yrs
+   * lockID 4 => 1e18 locked for 4 yrs
    */
 
-   describe("setLockManagerMultiple", () => {
+  describe("setLockManagerMultiple", () => {
     it("must provide argument arrays of matching length", async function () {
         await expect(voting.connect(owner1).setLockManagerMultiple([2, 3], [manager1.address])).to.be.revertedWith("ArrayArgumentsLengthMismatch");
       });
     it("cannot set for non-existent lock", async function () {
-        await expect(voting.connect(owner1).setLockManagerMultiple([999, 2], [manager1.address, manager1.address])).to.be.revertedWith("ERC721: invalid token ID");
+      await expect(voting.connect(manager1).setLockManagerMultiple([5, 3], [manager1.address, manager1.address])).to.be.revertedWith("ERC721: invalid token ID");          
     })
     it("non-owner cannot set manager", async function () {
         await expect(voting.connect(manager1).setLockManagerMultiple([2, 3], [manager1.address, manager1.address])).to.be.revertedWith("NotOwner");
@@ -259,20 +266,18 @@ describe("UnderwritingLockVoting", function () {
         expect(await voting.lockManagerOf(2)).eq(manager2.address)
         expect(await voting.lockManagerOf(3)).eq(manager2.address)
     })
+  });
 
   /*******************
     STATE SUMMARY
   *******************/
   /**
    * There are four locks owned by owner1:
-   * lockID 1 => 1-year lock managed by manager1, with 1e18 token locked
-   * lockID 2 => 2-year lock with by manager2, with 1e18 token locked
-   * lockID 3 => 3-year lock with by manager2, with 1e18 token locked
-   * lockID 4 => 4-year lock with no manager, with 1e18 token locked
+   * lockID 1 => 1e18 locked for 1 yr, managed by manager1
+   * lockID 2 => 1e18 locked for 2 yrs, managed by manager2
+   * lockID 3 => 1e18 locked for 3 yrs, managed by manager2
+   * lockID 4 => 1e18 locked for 4 yrs
    */
-
-
-});
 
 
 });

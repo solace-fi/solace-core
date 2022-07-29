@@ -561,7 +561,6 @@ contract UnderwritingLocker is
         SafeERC20.safeTransfer(IERC20(token), recipient_, withdrawAmount);
     }
 
-
     /**
      * @notice Withdraw from a lock in part.
      * @dev Can only be called by the lock owner or approved.

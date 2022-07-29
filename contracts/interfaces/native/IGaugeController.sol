@@ -24,6 +24,7 @@ interface IGaugeController {
     struct Gauge { 
         string name;
         bool active;
+        uint256 rateOnLine;
     }
 
     /***************************************
@@ -55,6 +56,9 @@ interface IGaugeController {
      */
     error VotingContractNotUpdated(uint256 epochTimestamp, address votingContract);
 
+    /// @notice Thrown when array arguments are mismatched in length (and need to have the same length);
+    error ArrayArgumentsLengthMismatch();
+
     /***************************************
     EVENTS
     ***************************************/
@@ -77,9 +81,21 @@ interface IGaugeController {
     /// @notice Emitted when gauge weights are updated.
     event GaugeWeightsUpdated(uint256 indexed updateTime);
 
+    /// @notice Emitted when leverage factor set;
+    event LeverageFactorSet(uint256 indexed leverageFactor);
+
+    /// @notice Emitted when rate on line for a gauge is set.
+    event RateOnLineSet(uint256 indexed gaugeID, uint256 rateOnLine);
+
     /***************************************
     GLOBAL VARIABLES
     ***************************************/
+
+    /// @notice Underwriting equity token
+    function token() external view returns (address);
+
+    /// @notice Insurance leverage factor
+    function leverageFactor() external view returns (uint256);
 
     /// @notice The total number of gauges that have been created
     function totalGauges() external view returns (uint256);
@@ -147,6 +163,26 @@ interface IGaugeController {
      */
     function isGaugeActive(uint256 gaugeID_) external view returns (bool gaugeActive);
 
+    /**
+     * @notice Obtain rate on line of gauge.
+     * @param gaugeID_ The ID of the gauge to query.
+     * @return rateOnLine_ Rate on line, 1e18 => 100%.
+     */
+    function getRateOnLineOfGauge(uint256 gaugeID_) external view returns (uint256 rateOnLine_);
+
+    /**
+     * @notice Obtain insurance capacity in $UWE terms.
+     * @dev Leverage * UWE capacity
+     * @return insuranceCapacity Insurance capacity in $UWE.
+     */
+    function getInsuranceCapacity() external view returns (uint256 insuranceCapacity);
+
+    /**
+     * @notice Get vote power sum for all gauges
+     * @return votePowerSum
+     */
+    function getVotePowerSum() external view returns (uint256 votePowerSum);
+
     /***************************************
     GOVERNANCE FUNCTIONS
     ***************************************/
@@ -169,8 +205,9 @@ interface IGaugeController {
      * @notice Adds an insurance gauge
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param gaugeName_ Gauge name
+     * @param rateOnLine_ Rate on line (1e18 => 100%).
      */
-    function addGauge(string calldata gaugeName_) external;
+    function addGauge(string calldata gaugeName_, uint256 rateOnLine_) external;
 
     /**
      * @notice Pauses an insurance gauge
@@ -196,4 +233,21 @@ interface IGaugeController {
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      */
     function updateGaugeWeights() external;
+
+    /**
+     * @notice Set insurance leverage factor.
+     * @dev 1e18 => 100%
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param leverageFactor_ Desired leverage factor.
+     */
+    function setLeverageFactor(uint256 leverageFactor_) external;
+
+    /**
+     * @notice Set rate on line for selected gaugeIDs
+     * @dev 1e18 => 100%
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param gaugeIDs_ Array of gaugeIDs.
+     * @param rateOnLines_ Array of corresponding rate on line.
+     */
+    function setRateOnLine(uint256[] calldata gaugeIDs_, uint256[] calldata rateOnLines_) external;
 }

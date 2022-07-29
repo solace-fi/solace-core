@@ -2,6 +2,7 @@
 pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "./../utils/Governable.sol";
 import "./../interfaces/native/IGaugeVoter.sol";
@@ -34,6 +35,13 @@ contract GaugeController is
     /***************************************
     GLOBAL PUBLIC VARIABLES
     ***************************************/
+
+    /// @notice Underwriting equity token
+    address public override token;
+
+    /// @notice Insurance leverage factor
+    /// @dev 1e18 => 100%.
+    uint256 public override leverageFactor;
 
     /// @notice The total number of gauges that have been created
     uint256 public override totalGauges;
@@ -71,7 +79,7 @@ contract GaugeController is
     constructor(address governance_)
         Governable(governance_)
     {
-        Gauge memory newGauge = Gauge("", false); // Pre-fill slot 0 of _gauges, ensure gaugeID 1 maps to _gauges[1]
+        Gauge memory newGauge = Gauge("", false, 0); // Pre-fill slot 0 of _gauges, ensure gaugeID 1 maps to _gauges[1]
         _gauges.push(newGauge); 
     }
 
@@ -214,6 +222,32 @@ contract GaugeController is
         return _gauges[gaugeID_].active;
     }
 
+    /**
+     * @notice Obtain rate on line of gauge.
+     * @param gaugeID_ The ID of the gauge to query.
+     * @return rateOnLine_ Rate on line, 1e18 => 100%.
+     */
+    function getRateOnLineOfGauge(uint256 gaugeID_) external view override returns (uint256 rateOnLine_) {
+        return _gauges[gaugeID_].rateOnLine;
+    }
+
+    /**
+     * @notice Obtain insurance capacity in $UWE terms.
+     * @dev Leverage * UWE capacity
+     * @return insuranceCapacity Insurance capacity in $UWE.
+     */
+    function getInsuranceCapacity() external view override returns (uint256 insuranceCapacity) {
+        return (insuranceCapacity * IERC20(token).totalSupply() / 1e18);
+    }
+
+    /**
+     * @notice Get vote power sum for all gauges
+     * @return votePowerSum
+     */
+    function getVotePowerSum() external view override returns (uint256 votePowerSum) {
+        return _getVotePowerSum();
+    }
+
     /***************************************
     GOVERNANCE FUNCTIONS
     ***************************************/
@@ -242,10 +276,11 @@ contract GaugeController is
      * @notice Adds an insurance gauge
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param gaugeName_ Gauge name
+     * @param rateOnLine_ Rate on line (1e18 => 100%).
      */
-    function addGauge(string calldata gaugeName_) external override onlyGovernance {
+    function addGauge(string calldata gaugeName_, uint256 rateOnLine_) external override onlyGovernance {
         uint256 gaugeID = ++totalGauges;
-        Gauge memory newGauge = Gauge(gaugeName_, true);
+        Gauge memory newGauge = Gauge(gaugeName_, true, rateOnLine_);
         _gauges.push(newGauge); 
         assert(_gauges.length == totalGauges); // Uphold invariant, should not be violated.
         emit GaugeAdded(gaugeID, gaugeName_);
@@ -303,5 +338,31 @@ contract GaugeController is
         
         lastTimeGaugeWeightUpdated = epochStartTime;
         emit GaugeWeightsUpdated(epochStartTime);
+    }
+
+    /**
+     * @notice Set insurance leverage factor.
+     * @dev 1e18 => 100%
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param leverageFactor_ Desired leverage factor.
+     */
+    function setLeverageFactor(uint256 leverageFactor_) external override onlyGovernance {
+        leverageFactor = leverageFactor_;
+        emit LeverageFactorSet(leverageFactor_);
+    }
+
+    /**
+     * @notice Set rate on line for selected gaugeIDs
+     * @dev 1e18 => 100%
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param gaugeIDs_ Array of gaugeIDs.
+     * @param rateOnLines_ Array of corresponding rate on line.
+     */
+    function setRateOnLine(uint256[] calldata gaugeIDs_, uint256[] calldata rateOnLines_) external override onlyGovernance {
+        if (gaugeIDs_.length != rateOnLines_.length) revert ArrayArgumentsLengthMismatch();
+        for (uint256 i = 0; i < gaugeIDs_.length; i++) {
+            _gauges[gaugeIDs_[i]].rateOnLine = rateOnLines_[i];
+            emit RateOnLineSet(gaugeIDs_[i], rateOnLines_[i]);
+        }
     }
 }

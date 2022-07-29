@@ -11,11 +11,9 @@ import "./../utils/Governable.sol";
 import "./../interfaces/utils/IRegistry.sol";
 import "./../interfaces/native/IUnderwritingLocker.sol";
 import "./../interfaces/native/IUnderwritingLockVoting.sol";
+import "./../interfaces/native/IGaugeController.sol";
 
 // TO-DO
-// Formula for _calculateVotePower()
-// Formula for _calculateVoteFee()
-
 // vote gaugeID = 0 -> retract vote (no $UWE charge)
 // Is processVotes DDOS resistant?
 
@@ -57,14 +55,14 @@ contract UnderwritingLockVoting is
     GLOBAL PUBLIC VARIABLES
     ***************************************/
 
-    /// @notice Token locked in [`UnderwritingLocker`](./UnderwritingLocker).
-    address public override token;
-
     /// @notice Revenue router address ($UWE voting fees will be transferred here).
     address public override revenueRouter;
 
     /// @notice Address of [`UnderwritingLocker`](./UnderwritingLocker)
     address public override underwritingLocker;
+
+    /// @notice Gauge controller address.
+    address public override gaugeController;
 
     /// @notice Registry address
     address public override registry;
@@ -75,20 +73,17 @@ contract UnderwritingLockVoting is
     /// @notice End timestamp (rounded down to weeks) for epoch for which all stored votes were processed in full
     uint256 public override lastTimeAllVotesProcessed;
 
+    /// @notice End timestamp (rounded down to weeks) for epoch for which all stored votes were charged.
+    uint256 public override lastTimePremiumsCharged;
+
     uint256 constant public override WEEK = 604800;
     uint256 constant public override MONTH = 2628000;
-
-    /// @notice lockId => lockManager address
-    /// @dev We have several mappings using lockId as the key, we may intuitively consider merging the values types into a struct and use a single mapping. 
-    /// @dev One argument against this is that we need to iterate through each stored vote in [`processVotes()`](#processvotes), which is unbounded and thus runs the risk of exceeding the gas limit. 
-    /// @dev By minimising the entry size of the mapping we iterate through, we minimise the risk of exceeding the gas limit. We also increase the ceiling on voteBatchSize value that we can use.
-    mapping(uint256 => address) public override lockManagerOf;
 
     /***************************************
     GLOBAL INTERNAL VARIABLES
     ***************************************/
 
-    // Ideally we would like an EnumerableMap of (lockId => {gaugeID, lastTimeVoteProcessed, lockManager}) to merge lockManagerOf, _votes and _lastTimeVoteProcessed mappings. We would need to create a custom data structure to do this.
+    // Ideally we would like an EnumerableMap of (lockId => {gaugeID, lockManager, lastTimeVoteProcessed, lastTimeCharged}) to merge _votes and _voteInfoOfLock mappings. We would need to create a custom data structure to do this.
 
     /// @notice lockId => insurance gauge vote
     /// @dev Use an enumerable map so that governance can iterate through each vote after each epoch, and relay vote data to the GaugeController
@@ -97,8 +92,8 @@ contract UnderwritingLockVoting is
     /// @dev If vote is invalid value, it will be skipped and ignored (rather than revert) 
     EnumerableMap.UintToUintMap internal _votes;
 
-    // lockId => timestamp of last time (rounded down to weeks) that vote was processed via [`processVotes()`](#processvotes).
-    mapping(uint256 => uint256) internal _lastTimeVoteProcessed;
+    // lockId => LockVoteInfo {address lockManager, uint256 lastTimeVoteProcessed, uint256 lastTimeCharged, uint256 lastProcessedVotePower}.
+    mapping(uint256 => LockVoteInfo) internal _voteInfoOfLock;
 
     /// @notice Epoch start timestamp (rounded to weeks) => gaugeID => total vote power
     mapping(uint256 => mapping(uint256 => uint256)) internal _votePowerOfGaugeForEpoch;
@@ -109,7 +104,7 @@ contract UnderwritingLockVoting is
 
     /**
      * @notice Constructs the UnderwritingLockVoting contract.
-     * @dev Requires 'uwe', 'revenueRouter' and 'underwritingLocker' addresses to be set in the Registry.
+     * @dev Requires 'uwe', 'revenueRouter', 'underwritingLocker' and 'gaugeController' addresses to be set in the Registry.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
      * @param registry_ The [`Registry`](./Registry) contract address.
      */
@@ -148,36 +143,38 @@ contract UnderwritingLockVoting is
     }
 
     /**
-     * @notice Calculates the vote power (for the current epoch) of a lock with specified `amount` and `end` values
-     * @param amount_ The amount of token in the underwriting lock.
-     * @param end_ The unlock timestamp of the lock.
-     * @return votePower The vote power for the lock (for the current epoch)
-     */
-    function _calculateVotePower(uint256 amount_, uint256 end_) internal view returns (uint256 votePower) {
-        // votePower = lockAmount * sqrt(timeLeftInMonths) * ( 1 / sqrt(6)).
-        // Multiply numerator and denominator by 1e18 for pseudo-floating point precision.
-        uint256 timeLeftInMonthsScaled = 1e18 * (end_ - block.timestamp) / MONTH;
-        return amount_ * _sqrt(timeLeftInMonthsScaled) / _sqrt(1e18 * 6);
-    }
-
-    /**
      * @notice Get vote power (for the current epoch) for a lock
+     * @dev Can do this function with a single lockID_ parameter, however this introduces an extra external call which may be an issue in the unbounded loop of processVotes()
+     * @param amount_ Lock amount
      * @param lockID_ The ID of the lock to query.
      * @return votePower
      */
-    function _getVotePower(uint256 lockID_) internal view returns (uint256 votePower) {
+    function _getVotePower(uint256 amount_, uint256 lockID_) internal view returns (uint256 votePower) {
         // Expect revert if lockID doesn't exist
-        Lock memory lock = IUnderwritingLocker(underwritingLocker).locks(lockID_);
-        return _calculateVotePower(lock.amount, lock.end);
+        return ( amount_ * IUnderwritingLocker(underwritingLocker).getLockMultiplier(lockID_) ) / 1e18;   
     }
 
     /**
-     * @notice Computes voting fee (in token amount)
-     * @param amount_ The amount of token in the underwriting lock.
-     * @param end_ The unlock timestamp of the lock.
+     * @notice Computes voting premium for vote.
+     * @param lockID_ The ID of the lock to query.
+     * @param insuranceCapacity_ Solace insurance capacity. Placed as parameter to reduce external view calls in each chargePremiums() iteration.
+     * @return premium Premium for vote.
      */
-    function _calculateVoteFee(uint256 amount_, uint256 end_) internal view returns (uint256 fee) {
-        return amount_ / 1000; // Start with flat 0.1% vote fee
+    function _calculateVotePremium(uint256 lockID_, uint256 insuranceCapacity_) internal view returns (uint256 premium) {
+        uint256 rateOnLine = IGaugeController(gaugeController).getRateOnLineOfGauge(_getVote(lockID_));
+        uint256 votePowerSum = IGaugeController(gaugeController).getVotePowerSum();
+        return insuranceCapacity_ * rateOnLine * _voteInfoOfLock[lockID_].lastProcessedVotePower / votePowerSum;
+    }
+
+    /**
+     * @notice Get currently registered vote for a lockID.
+     * @param lockID_ The ID of the lock to query.
+     * @return gaugeID The ID of the gauge the lock has voted for, returns 0 if either lockID or vote doesn't exist
+     */
+    function _getVote(uint256 lockID_) internal view returns (uint256 gaugeID) {
+        (bool success, uint256 gaugeID) = _votes.tryGet(lockID_);
+        if (!success) revert VoteNotFound();
+        else return gaugeID;
     }
 
     /**
@@ -194,21 +191,6 @@ contract UnderwritingLockVoting is
      */
     function _getEpochEndTimestamp() internal view returns (uint256 timestamp) {
         return ( (block.timestamp * WEEK) / WEEK ) + WEEK;
-    }
-
-    // https://github.com/Uniswap/v2-core/blob/master/contracts/libraries/Math.sol
-    // babylonian method (https://en.wikipedia.org/wiki/Methods_of_computing_square_roots#Babylonian_method)
-    function _sqrt(uint y) internal pure returns (uint z) {
-        if (y > 3) {
-            z = y;
-            uint x = y / 2 + 1;
-            while (x < z) {
-                z = x;
-                x = (y / x + x) / 2;
-            }
-        } else if (y != 0) {
-            z = 1;
-        }
     }
 
     /***************************************
@@ -231,7 +213,8 @@ contract UnderwritingLockVoting is
      * @return votePower
      */
     function getVotePower(uint256 lockID_) external view override returns (uint256 votePower) {
-        return _getVotePower(lockID_);
+        Lock memory lock = IUnderwritingLocker(underwritingLocker).locks(lockID_);
+        return _getVotePower(lock.amount, lockID_);
     }
 
     /**
@@ -243,6 +226,15 @@ contract UnderwritingLockVoting is
         (bool success, uint256 gaugeID) = _votes.tryGet(lockID_);
         if (!success) revert VoteNotFound();
         else return gaugeID;
+    }
+
+    /**
+     * @notice Get lockManager for a given lockId.
+     * @param lockID_ The ID of the lock to query for.
+     * @return lockManager Zero address if no lock manager.
+     */
+    function lockManagerOf(uint256 lockID_) external view override returns (address lockManager) {
+        return _voteInfoOfLock[lockID_].lockManager;
     }
 
     /**
@@ -271,7 +263,6 @@ contract UnderwritingLockVoting is
      * @param _registry The registry address to set.
      */
     function _setRegistry(address _registry) internal {
-
         if(_registry == address(0x0)) revert ZeroAddressInput("registry");
         registry = _registry;
         IRegistry reg = IRegistry(_registry);
@@ -279,14 +270,14 @@ contract UnderwritingLockVoting is
         (, address revenueRouterAddr) = reg.tryGet("revenueRouter");
         if(revenueRouterAddr == address(0x0)) revert ZeroAddressInput("revenueRouter");
         revenueRouter = revenueRouterAddr;
-        // set token ($UWE)
-        (, address uweAddr) = reg.tryGet("uwe");
-        if(uweAddr == address(0x0)) revert ZeroAddressInput("uwe");
-        token = uweAddr;
         // set underwritingLocker
         (, address underwritingLockerAddr) = reg.tryGet("underwritingLocker");
         if(underwritingLockerAddr == address(0x0)) revert ZeroAddressInput("underwritingLocker");
         underwritingLocker = underwritingLockerAddr;
+        // set gaugeController
+        (, address gaugeControllerAddr) = reg.tryGet("gaugeController");
+        if(gaugeControllerAddr == address(0x0)) revert ZeroAddressInput("gaugeController");
+        gaugeController = gaugeControllerAddr;
         emit RegistrySet(_registry);
     }
 
@@ -299,9 +290,10 @@ contract UnderwritingLockVoting is
      * @param gaugeID_ Address of intended lock manager
      */
     function _vote(uint256 lockID_, uint256 gaugeID_) internal  {
-        if( IUnderwritingLocker(underwritingLocker).ownerOf(lockID_) != msg.sender && lockManagerOf[lockID_] != msg.sender) revert NotOwnerNorManager();
+        if( IUnderwritingLocker(underwritingLocker).ownerOf(lockID_) != msg.sender && _voteInfoOfLock[lockID_].lockManager != msg.sender) revert NotOwnerNorManager();
         _votes.set(lockID_, gaugeID_);
-        emit Vote(lockID_, gaugeID_, msg.sender, _getEpochEndTimestamp(), _getVotePower(lockID_));
+        Lock memory lock = IUnderwritingLocker(underwritingLocker).locks(lockID_);
+        emit Vote(lockID_, gaugeID_, msg.sender, _getEpochEndTimestamp(), _getVotePower(lock.amount, lockID_));
     }
 
     /**
@@ -313,7 +305,7 @@ contract UnderwritingLockVoting is
      */
     function _setLockManager(uint256 lockID_, address manager_) internal {
         if( IUnderwritingLocker(underwritingLocker).ownerOf(lockID_) != msg.sender) revert NotOwner();
-        lockManagerOf[lockID_] = manager_;
+        _voteInfoOfLock[lockID_].lockManager = manager_;
         emit LockManagerSet(lockID_, manager_);
     }
 
@@ -332,6 +324,7 @@ contract UnderwritingLockVoting is
     function vote(uint256 lockID_, uint256 gaugeID_) external override {
         // This require to deal with edge case where if a user puts a new vote in the time window between an epoch end and processVotes() returning true for that epoch, we do not know (with the current setup) whether that lockID has a previous vote or not (that then needs to be included in processVotes());
         if ( _getEpochStartTimestamp() != lastTimeAllVotesProcessed) revert LastEpochVotesNotProcessed();
+        if ( _getEpochStartTimestamp() != lastTimePremiumsCharged) revert LastEpochPremiumsNotCharged();
         _vote(lockID_, gaugeID_);
     }
 
@@ -400,34 +393,92 @@ contract UnderwritingLockVoting is
         emit VoteBatchSizeSet(voteBatchSize_);
     }
 
+    // Governance run this after every epoch
+    // Iterate through every stored vote - possible unbounded loop, so we limit loop size and 'save our progress' if we haven't iterated through every vote
+    // Once completed iteration and sure that _votePowerOfGaugeForEpoch is updated for this epoch, update FLAG for this epoch
+    // Re-iterate through every vote (same provision for possible unbounded loop), to process premiums for this voting round
+    // Need second iteration, because second iteration depends on data that can only be gotten from an initial iteration
+    // Second iteration also solves the 'free first epoch' issue.
+    // 
+
     /**
      * @notice Processes votes for the last epoch passed, batches $UWE voting fees and sends to RevenueRouter.sol, updates aggregate voting data (for each gauge) 
      * @dev Designed to be called multiple times until this function returns true (all stored votes are processed)
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @dev Edge case when processVotes() is not called to completion for certain epochs - GaugeController only take vote power for lastTimeAllVotesProcessed
-     * @return epochProcessed True if all stored votes are processed for the last epoch, false otherwise
      */
-    function processVotes() external override onlyGovernance nonReentrant returns (bool epochProcessed) {
+    function processVotes() external override onlyGovernance nonReentrant {
         uint256 epochStartTimestamp = _getEpochStartTimestamp();
-        if(lastTimeAllVotesProcessed == epochStartTimestamp) revert LastEpochAlreadyProcessed({epochTime: epochStartTimestamp});    
-        uint256 n_votes = _votes.length();
-        uint256 vote_index;
-        uint256 locks_processed;
-        uint256 sum_voting_fee;
+        if(lastTimeAllVotesProcessed == epochStartTimestamp) revert LastEpochVotesAlreadyProcessed({epochTime: epochStartTimestamp});  
+
+        uint256 totalVotes = _votes.length();
+        uint256 voteIndex;
+        uint256 numOfLocksProcessed;
 
         // Iterate through each vote
         // This is still technically an unbounded loop because n_votes is unbounded, need to test what the limit is here.
-        while (locks_processed <= voteBatchSize && vote_index < n_votes) {
-            (uint256 lockID, uint256 gaugeID) = _votes.at(vote_index);
-
+        while (numOfLocksProcessed <= voteBatchSize && voteIndex < totalVotes) {
+            (uint256 lockID, uint256 gaugeID) = _votes.at(voteIndex);
             // If lockID hasn't been processed for last epoch, then process the individual lcok
-            if (gaugeID != 0 && _lastTimeVoteProcessed[lockID] != epochStartTimestamp) {
-                (,,uint256 amount, uint256 end) = _getLockInfo(lockID);
-                sum_voting_fee += _calculateVoteFee(amount, end);
-                _votePowerOfGaugeForEpoch[epochStartTimestamp][gaugeID] += _calculateVotePower(amount, end);
-                _lastTimeVoteProcessed[lockID] = epochStartTimestamp;
-                locks_processed += 1;
+            if (uint256(_voteInfoOfLock[lockID].lastTimeVoteProcessed) != epochStartTimestamp) {
+                // if gaugeID == 0, skip processing vote
+                if (gaugeID == 0) {
+                    _voteInfoOfLock[lockID].lastTimeVoteProcessed = uint48(epochStartTimestamp);
+                    continue;
+                }
+
+                (,,uint256 amount,) = _getLockInfo(lockID);
+                uint256 votePower = _getVotePower(amount, lockID);
+                _votePowerOfGaugeForEpoch[epochStartTimestamp][gaugeID] += votePower;
+                _voteInfoOfLock[lockID].lastTimeVoteProcessed = uint48(epochStartTimestamp);
+                _voteInfoOfLock[lockID].lastProcessedVotePower = votePower;
+                numOfLocksProcessed += 1;
                 emit VoteProcessed(lockID, gaugeID, epochStartTimestamp);
+            }
+        }
+
+        // If full vote batch size not reached, assume completed processing;
+        if (numOfLocksProcessed < voteBatchSize && totalVotes > 0) {
+            lastTimeAllVotesProcessed = epochStartTimestamp;
+            emit AllVotesProcessed(epochStartTimestamp);
+        }
+    }
+
+    /**
+     * @notice Charge premiums for votes.
+     * @dev Requires all votes to be processed for the last epochProcesses votes for the last epoch passed, batches $UWE voting fees and sends to RevenueRouter.sol, updates aggregate voting data (for each gauge) 
+     * @dev Designed to be called multiple times until this function returns true (all stored votes are processed)
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     */
+    function chargePremiums() external override onlyGovernance nonReentrant {
+        uint256 epochStartTimestamp = _getEpochStartTimestamp();
+        if(lastTimeAllVotesProcessed != epochStartTimestamp) revert LastEpochVotesNotProcessed();
+        if(lastTimePremiumsCharged == epochStartTimestamp) revert LastEpochPremiumsAlreadyProcessed({epochTime: epochStartTimestamp}); 
+        
+        uint256 totalPremium;
+        uint256 insuranceCapacity = IGaugeController(gaugeController).getInsuranceCapacity();
+        uint256 totalVotes = _votes.length();
+        uint256 voteIndex;
+        uint256 numOfLocksProcessed;
+
+        // Iterate through votes to collect premiums to charge
+        // Skip gaugeID = 0 votes
+        while (numOfLocksProcessed <= voteBatchSize && voteIndex < totalVotes) {
+            (uint256 lockID, uint256 gaugeID) = _votes.at(voteIndex);
+            // If lockID hasn't been processed for last epoch, then process the individual lcok
+            if (uint256(_voteInfoOfLock[lockID].lastTimeCharged) != epochStartTimestamp) {
+                // if gaugeID == 0, skip processing vote
+                if (gaugeID == 0) {
+                    // Technically not charged, however need to update flag.
+                    _voteInfoOfLock[lockID].lastTimeCharged = uint48(epochStartTimestamp);
+                    continue;
+                }
+
+                uint256 premium = _calculateVotePremium(lockID, insuranceCapacity);
+                totalPremium += premium;
+                _voteInfoOfLock[lockID].lastTimeCharged = uint48(epochStartTimestamp);
+                numOfLocksProcessed += 1;
+                emit PremiumCharged(lockID, gaugeID, epochStartTimestamp, premium);
             }
         }
 
@@ -435,16 +486,14 @@ contract UnderwritingLockVoting is
             IERC20(IUnderwritingLocker(underwritingLocker).token()), 
             underwritingLocker, 
             revenueRouter,
-            sum_voting_fee
+            totalPremium
         );
 
-        // If no locks processed in this invocation or we don't reach full batch size, make assumption that all locks have been processed
-        if (locks_processed != voteBatchSize && n_votes > 0) {
+        // If full vote batch size not reached, assume completed processing;
+        if (numOfLocksProcessed < voteBatchSize && totalVotes > 0) {
             lastTimeAllVotesProcessed = epochStartTimestamp;
-            emit AllVotesProcessed(epochStartTimestamp);
-            return true;
+            emit AllPremiumsCharged(epochStartTimestamp);
         }
-
-        return false;
     }
+
 }
