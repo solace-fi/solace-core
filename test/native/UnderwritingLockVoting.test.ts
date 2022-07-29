@@ -9,6 +9,7 @@ chai.use(solidity);
 import { import_artifacts, ArtifactImports } from "../utilities/artifact_importer";
 import { UnderwritingLocker, UnderwritingLockVoting, Registry, MockErc20Permit, GaugeController } from "../../typechain";
 import { expectDeployed } from "../utilities/expectDeployed";
+import { expectClose } from "./../utilities/math";
 
 /*******************
   GLOBAL CONSTANTS
@@ -279,5 +280,10 @@ describe("UnderwritingLockVoting", function () {
    * lockID 4 => 1e18 locked for 4 yrs
    */
 
+   describe("getVotePower() sanity check", () => {
+    it("should return appropriate value for 1-yr lock", async function () {
+      expectClose(await underwritingLocker.timeLeft(1), ONE_YEAR, 1e15)
+    });
+   });
 
 });
