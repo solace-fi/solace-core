@@ -66,9 +66,6 @@ interface IUnderwritingLocker is IERC721Enhanced {
     /// @notice Thrown when extendLock is attempted to shorten the lock duration.
     error LockTimeNotExtended();
 
-    /// @notice Thrown when transfer is attempted while locked.
-    error CannotTransferWhileLocked();
-
     /**
      * @notice Thrown when a withdraw is attempted for an `amount` that exceeds the lock balance.
      * @param lockID The ID of the lock
@@ -97,10 +94,10 @@ interface IUnderwritingLocker is IERC721Enhanced {
     event LockUpdated(uint256 indexed lockID, uint256 amount, uint256 end);
 
     /// @notice Emitted when a lock is withdrawn from.
-    event Withdrawal(uint256 indexed lockID, uint256 requestedWithdrawAmount, uint256 burnAmount);
+    event Withdrawal(uint256 indexed lockID, uint256 requestedWithdrawAmount, uint256 actualWithdrawAmount, uint256 burnAmount);
 
     /// @notice Emitted when an early withdraw is made.
-    event EarlyWithdrawal(uint256 indexed lockID, uint256 requestedWithdrawAmount, uint256 burnAmount);
+    event EarlyWithdrawal(uint256 indexed lockID, uint256 requestedWithdrawAmount, uint256 actualWithdrawAmount, uint256 burnAmount);
 
     /// @notice Emitted when a listener is added.
     event LockListenerAdded(address indexed listener);
@@ -184,18 +181,35 @@ interface IUnderwritingLocker is IERC721Enhanced {
     function getLockListeners() external view returns (address[] memory listeners_);
 
     /**
-     * @notice Computes amount of token that will be burned on withdraw.
+     * @notice Computes amount of token that will be transferred to the user on full withdraw.
      * @param lockID_ The ID of the lock to query.
-     * @return burnAmount Token amount that will be burned on withdraw.
+     * @return withdrawAmount Token amount that will be withdrawn.
      */
-    function getWithdrawBurnAmount(uint256 lockID_) external view returns (uint256 burnAmount);
+    function getWithdrawAmount(uint256 lockID_) external view returns (uint256 withdrawAmount);
+
     /**
-     * @notice Computes amount of token that will be burned on withdraw.
+     * @notice Computes amount of token that will be transferred to the user on partial withdraw.
      * @param lockID_ The ID of the lock to query.
-     * @param amount_ The amount to withdraw.
+     * @param amount_ The requested amount to withdraw.
+     * @return withdrawAmount Token amount that will be withdrawn.
+     */
+    function getWithdrawInPartAmount(uint256 lockID_, uint256 amount_) external view returns (uint256 withdrawAmount);
+
+    /**
+     * @notice Computes amount of token that will be burned on full withdraw.
+     * @param lockID_ The ID of the lock to query.
      * @return burnAmount Token amount that will be burned on withdraw.
      */
-    function getWithdrawInPartBurnAmount(uint256 lockID_, uint256 amount_) external view returns (uint256 burnAmount);
+    function getBurnOnWithdrawAmount(uint256 lockID_) external view returns (uint256 burnAmount);
+
+    /**
+     * @notice Computes amount of token that will be burned on partial withdraw.
+     * @param lockID_ The ID of the lock to query.
+     * @param amount_ The requested amount to withdraw.
+     * @return burnAmount Token amount that will be burned on withdraw.
+     */
+    function getBurnOnWithdrawInPartAmount(uint256 lockID_, uint256 amount_) external view returns (uint256 burnAmount);
+
     /**
      * @notice Gets multiplier (applied for voting boost, and for early withdrawals)
      * @param lockID_ The ID of the lock to query.

@@ -109,19 +109,21 @@ contract UnderwritingLocker is
      * @notice Computes amount of token that will be burned on withdraw.
      * @param amount_ The amount to withdraw.
      * @param end_ The end timestamp of the lock.
-     * @return burnAmount Token amount that will be burned on wihtdraw
+     * @return withdrawAmount Token amount that will be withdrawn.
+     * @return burnAmount Token amount that will be burned on wihtdraw.
      */
-    function _getWithdrawBurnAmount(uint256 amount_, uint256 end_) internal view returns (uint256 burnAmount) {
+    function _getWithdrawAndBurnAmount(uint256 amount_, uint256 end_) internal view returns (uint256 withdrawAmount, uint256 burnAmount) {
         // solhint-disable-next-line not-rely-on-time
         bool isEarlyWithdraw = block.timestamp < end_;
-        burnAmount = ( (1e18 - fundingRate) * amount_ ) / 1e18;
+        uint256 withdrawAmount = ( (1e18 - fundingRate) * amount_ ) / 1e18;
         
         if (isEarlyWithdraw) {
             uint256 multiplier = _getLockMultiplier(end_);
-            burnAmount = 1e18 * burnAmount / (multiplier + 1e18);
+            withdrawAmount = 1e18 * withdrawAmount / (multiplier + 1e18);
         }
 
-        return burnAmount;
+        uint256 burnAmount = amount_ - withdrawAmount;
+        return (withdrawAmount, burnAmount);
     }
 
     /**
@@ -130,8 +132,11 @@ contract UnderwritingLocker is
      * @return multiplier 1e18 => 1x multiplier, 2e18 => 2x multiplier
      */
     function _getLockMultiplier(uint256 end_) internal view returns (uint256 multiplier) {
-        uint256 timeLeftInMonthsScaled = 1e18 * (end_ - block.timestamp) / MONTH;
-        return 1e18 * _sqrt(timeLeftInMonthsScaled) / _sqrt(1e18 * 6);
+        if (end_ < block.timestamp) {return 0;}
+        else {
+            uint256 timeLeftInMonthsScaled = 1e18 * (end_ - block.timestamp) / MONTH;
+            return 1e18 * _sqrt(timeLeftInMonthsScaled) / _sqrt(1e18 * 6);
+        }
     }
 
     // https://github.com/Uniswap/v2-core/blob/master/contracts/libraries/Math.sol
@@ -214,23 +219,47 @@ contract UnderwritingLocker is
     }
 
     /**
-     * @notice Computes amount of token that will be burned on withdraw.
+     * @notice Computes amount of token that will be transferred to the user on full withdraw.
      * @param lockID_ The ID of the lock to query.
-     * @return burnAmount Token amount that will be burned on withdraw.
+     * @return withdrawAmount Token amount that will be withdrawn.
      */
-    function getWithdrawBurnAmount(uint256 lockID_) external view override tokenMustExist(lockID_) returns (uint256 burnAmount) {
+    function getWithdrawAmount(uint256 lockID_) external view override tokenMustExist(lockID_) returns (uint256 withdrawAmount) {
         Lock memory lock = _locks[lockID_];
-        return _getWithdrawBurnAmount(lock.amount, lock.end);
+        (withdrawAmount, ) = _getWithdrawAndBurnAmount(lock.amount, lock.end);
+        return withdrawAmount;
     }
 
     /**
-     * @notice Computes amount of token that will be burned on withdraw.
+     * @notice Computes amount of token that will be transferred to the user on partial withdraw.
      * @param lockID_ The ID of the lock to query.
-     * @param amount_ The amount to withdraw.
+     * @param amount_ The requested amount to withdraw.
+     * @return withdrawAmount Token amount that will be withdrawn.
+     */
+    function getWithdrawInPartAmount(uint256 lockID_, uint256 amount_) external view override tokenMustExist(lockID_) returns (uint256 withdrawAmount) {
+        (withdrawAmount, ) = _getWithdrawAndBurnAmount(amount_, _locks[lockID_].end);
+        return withdrawAmount;
+    }
+
+    /**
+     * @notice Computes amount of token that will be burned on full withdraw.
+     * @param lockID_ The ID of the lock to query.
      * @return burnAmount Token amount that will be burned on withdraw.
      */
-    function getWithdrawInPartBurnAmount(uint256 lockID_, uint256 amount_) external view override tokenMustExist(lockID_) returns (uint256 burnAmount) {
-        return _getWithdrawBurnAmount(amount_, _locks[lockID_].end);
+    function getBurnOnWithdrawAmount(uint256 lockID_) external view override tokenMustExist(lockID_) returns (uint256 burnAmount) {
+        Lock memory lock = _locks[lockID_];
+        (, burnAmount) = _getWithdrawAndBurnAmount(lock.amount, lock.end);
+        return burnAmount;
+    }
+
+    /**
+     * @notice Computes amount of token that will be burned on partial withdraw.
+     * @param lockID_ The ID of the lock to query.
+     * @param amount_ The requested amount to withdraw.
+     * @return burnAmount Token amount that will be burned on withdraw.
+     */
+    function getBurnOnWithdrawInPartAmount(uint256 lockID_, uint256 amount_) external view override tokenMustExist(lockID_) returns (uint256 burnAmount) {
+        (, burnAmount) = _getWithdrawAndBurnAmount(amount_, _locks[lockID_].end);
+        return burnAmount;
     }
 
     /**
@@ -240,6 +269,165 @@ contract UnderwritingLocker is
      */
     function getLockMultiplier(uint256 lockID_) external view override tokenMustExist(lockID_) returns (uint256 multiplier) {
         return _getLockMultiplier(_locks[lockID_].end);
+    }
+
+    /***************************************
+    INTERNAL MUTATOR FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Creates a new lock.
+     * @dev There is no input validation that amount_ must > 0, but a lock is burned on complete withdraw lol. Trivial bug.
+     * @param recipient_ The user that the lock will be minted to.
+     * @param amount_ The amount of token in the lock.
+     * @param end_ The end of the lock.
+     * @return lockID The ID of the new lock.
+     */
+    function _createLock(address recipient_, uint256 amount_, uint256 end_) internal returns (uint256 lockID) {
+        if (amount_ == 0) revert CannotCreateEmptyLock();
+        // solhint-disable-next-line not-rely-on-time
+        if(end_ < block.timestamp + MIN_LOCK_DURATION) revert LockTimeTooShort();
+        // solhint-disable-next-line not-rely-on-time
+        if(end_ > block.timestamp + MAX_LOCK_DURATION) revert LockTimeTooLong();
+        lockID = ++totalNumLocks;
+        Lock memory newLock = Lock(amount_, end_);
+        // accounting
+        _locks[lockID] = newLock;
+        _safeMint(recipient_, lockID);
+        emit LockCreated(lockID);
+    }
+
+    /**
+     * @notice Deposit token to increase the value of an existing lock.
+     * @dev Token is transferred from msg.sender, assumes its already approved.
+     * @dev Anyone (not just the lock owner) can call increaseAmount() and deposit to an existing lock.
+     * @param lockID_ The ID of the lock to update.
+     * @param amount_ The amount of token to deposit.
+     */
+    function _increaseAmount(uint256 lockID_, uint256 amount_) internal {
+        uint256 newTotalAmount = _locks[lockID_].amount + amount_;
+        _updateLock(lockID_, newTotalAmount, _locks[lockID_].end);
+        emit LockIncreased(lockID_, newTotalAmount, amount_);
+    }
+
+
+    /**
+     * @notice Updates an existing lock.
+     * @param lockID_ The ID of the lock to update.
+     * @param amount_ The amount of token now in the lock.
+     * @param end_ The end of the lock.
+     */
+    function _updateLock(uint256 lockID_, uint256 amount_, uint256 end_) internal {
+        // checks
+        Lock memory prevLock = _locks[lockID_];
+        Lock memory newLock = Lock(amount_, end_); // end was sanitized before passed in
+        // accounting
+        _locks[lockID_] = newLock;
+        address owner = ownerOf(lockID_);
+        _notify(lockID_, owner, owner, prevLock, newLock);
+        emit LockUpdated(lockID_, amount_, end_);
+    }
+
+    /**
+     * @notice Extend a lock's duration.
+     * @dev Can only be called by the lock owner or approved.
+     * @param lockID_ The ID of the lock to update.
+     * @param end_ The new time for the lock to unlock.
+     */
+    function _extendLock(uint256 lockID_, uint256 end_) internal onlyOwnerOrApproved(lockID_) {
+        // solhint-disable-next-line not-rely-on-time
+        if(end_ > block.timestamp + MAX_LOCK_DURATION) revert LockTimeTooLong();
+        if(_locks[lockID_].end >= end_) revert LockTimeNotExtended();
+        _updateLock(lockID_, _locks[lockID_].amount, end_);
+        emit LockExtended(lockID_, end_);
+    }
+
+    /**
+     * @notice Withdraws from a lock.
+     * @param lockID_ The ID of the lock to withdraw from.
+     * @param amount_ The amount of token to withdraw.
+     * @return withdrawAmount Amount that will be withdrawn.
+     * @return burnAmount Amount that will be burned.
+     */
+    function _withdraw(uint256 lockID_, uint256 amount_) 
+        internal 
+        onlyOwnerOrApproved(lockID_) 
+        returns (uint256 withdrawAmount, uint256 burnAmount) 
+    {
+        // solhint-disable-next-line not-rely-on-time
+        bool isEarlyWithdraw = block.timestamp < _locks[lockID_].end;
+        (withdrawAmount, burnAmount) = _getWithdrawAndBurnAmount(amount_, _locks[lockID_].end);
+
+        // full withdraw
+        if(amount_ == _locks[lockID_].amount) {
+            _burn(lockID_);
+            delete _locks[lockID_];
+        // partial withdraw
+        } else {
+            Lock memory oldLock = _locks[lockID_];
+            Lock memory newLock = Lock(oldLock.amount - amount_, oldLock.end);
+            _locks[lockID_].amount -= amount_;
+            address owner = ownerOf(lockID_);
+            _notify(lockID_, owner, owner, oldLock, newLock);
+        }
+
+        if(isEarlyWithdraw) {emit EarlyWithdrawal(lockID_, amount_, withdrawAmount, burnAmount);} 
+        else {emit Withdrawal(lockID_, amount_, withdrawAmount, burnAmount);}
+        return (withdrawAmount, burnAmount);
+    }
+
+    /**
+     * @notice Hook that is called after any token transfer. This includes minting and burning.
+     * @param from_ The user that sends the token, or zero if minting.
+     * @param to_ The zero that receives the token, or zero if burning.
+     * @param lockID_ The ID of the token being transferred.
+     */
+    function _afterTokenTransfer(
+        address from_,
+        address to_,
+        uint256 lockID_
+    ) internal override {
+        super._afterTokenTransfer(from_, to_, lockID_);
+        Lock memory lock = _locks[lockID_];
+        // notify listeners
+        if(from_ == address(0x0)) _notify(lockID_, from_, to_, Lock(0, 0), lock); // mint
+        else if(to_ == address(0x0)) _notify(lockID_, from_, to_, lock, Lock(0, 0)); // burn
+        else {_notify(lockID_, from_, to_, lock, lock);} // transfer
+    }
+
+    /**
+     * @notice Notify the listeners of any updates.
+     * @dev Called on transfer, mint, burn, and update.
+     * Either the owner will change or the lock will change, not both.
+     * @param lockID_ The ID of the lock that was altered.
+     * @param oldOwner_ The old owner of the lock.
+     * @param newOwner_ The new owner of the lock.
+     * @param oldLock_ The old lock data.
+     * @param newLock_ The new lock data.
+     */
+    function _notify(uint256 lockID_, address oldOwner_, address newOwner_, Lock memory oldLock_, Lock memory newLock_) internal {
+        // register action with listener
+        uint256 len = _lockListeners.length();
+        for(uint256 i = 0; i < len; i++) {
+            IUnderwritingLockListener(_lockListeners.at(i)).registerLockEvent(lockID_, oldOwner_, newOwner_, oldLock_, newLock_);
+        }
+    }
+
+    /**
+     * @notice Sets registry and related contract addresses.
+     * @dev Requires 'uwe' addresses to be set in the Registry.
+     * @param registry_ The registry address to set.
+     */
+    function _setRegistry(address registry_) internal {
+        // set registry        
+        if(registry_ == address(0x0)) revert ZeroAddressInput("registry");
+        registry = registry_;
+        IRegistry reg = IRegistry(registry_);
+        // set token ($UWE)
+        (, address uweAddr) = reg.tryGet("uwe");
+        if(uweAddr == address(0x0)) revert ZeroAddressInput("uwe");
+        token = uweAddr;
+        emit RegistrySet(registry_);
     }
 
     /***************************************
@@ -367,10 +555,10 @@ contract UnderwritingLocker is
      */
     function withdraw(uint256 lockID_, address recipient_) external override nonReentrant {
         uint256 amount = _locks[lockID_].amount;
-        uint256 burnAmount = _withdraw(lockID_, amount);
+        (uint256 withdrawAmount, uint256 burnAmount) = _withdraw(lockID_, amount);
         // transfer token
-        if (burnAmount > 0) {SafeERC20.safeTransfer(IERC20(token), address(0x0), burnAmount);}
-        SafeERC20.safeTransfer(IERC20(token), recipient_, amount - burnAmount);
+        SafeERC20.safeTransfer(IERC20(token), address(0x1), burnAmount);
+        SafeERC20.safeTransfer(IERC20(token), recipient_, withdrawAmount);
     }
 
 
@@ -384,10 +572,10 @@ contract UnderwritingLocker is
      */
     function withdrawInPart(uint256 lockID_, uint256 amount_, address recipient_) external override nonReentrant {
         if (amount_ > _locks[lockID_].amount) revert ExcessWithdraw(lockID_, _locks[lockID_].amount, amount_);
-        uint256 burnAmount = _withdraw(lockID_, amount_);
+        (uint256 withdrawAmount, uint256 burnAmount) = _withdraw(lockID_, amount_);
         // transfer token
-        if (burnAmount > 0) {SafeERC20.safeTransfer(IERC20(token), address(0x0), burnAmount);}
-        SafeERC20.safeTransfer(IERC20(token), recipient_, amount_ - burnAmount);
+        SafeERC20.safeTransfer(IERC20(token), address(0x1), burnAmount);
+        SafeERC20.safeTransfer(IERC20(token), recipient_, withdrawAmount);
     }
 
     /**
@@ -405,12 +593,12 @@ contract UnderwritingLocker is
             uint256 lockID = lockIDs_[i];
             if (!_isApprovedOrOwner(msg.sender, lockID)) revert NotOwnerNorApproved();
             uint256 singleLockAmount = _locks[lockID].amount;
-            uint256 burnAmount = _withdraw(lockID, singleLockAmount);
+            (uint256 withdrawAmount, uint256 burnAmount) = _withdraw(lockID, singleLockAmount);
             totalBurnAmount += burnAmount;
-            totalWithdrawAmount += (singleLockAmount - burnAmount);
+            totalWithdrawAmount += withdrawAmount;
         }
         // batched token transfer
-        if (totalBurnAmount > 0) {SafeERC20.safeTransfer(IERC20(token), address(0x0), totalBurnAmount);}
+        if (totalBurnAmount > 0) {SafeERC20.safeTransfer(IERC20(token), address(0x1), totalBurnAmount);}
         SafeERC20.safeTransfer(IERC20(token), recipient_, totalWithdrawAmount);
     }
 
@@ -432,175 +620,13 @@ contract UnderwritingLocker is
             if (!_isApprovedOrOwner(msg.sender, lockID)) revert NotOwnerNorApproved();
             uint256 singleLockAmount = amounts_[i];
             if (singleLockAmount > _locks[lockID].amount) revert ExcessWithdraw(lockID, _locks[lockID].amount, singleLockAmount);
-            uint256 burnAmount = _withdraw(lockID, singleLockAmount);
+            (uint256 withdrawAmount, uint256 burnAmount) = _withdraw(lockID, singleLockAmount);
             totalBurnAmount += burnAmount;
-            totalWithdrawAmount += (singleLockAmount - burnAmount);
+            totalWithdrawAmount += withdrawAmount;
         }
         // batched token transfer
-        if (totalBurnAmount > 0) {SafeERC20.safeTransfer(IERC20(token), address(0x0), totalBurnAmount);}
+        if (totalBurnAmount > 0) {SafeERC20.safeTransfer(IERC20(token), address(0x1), totalBurnAmount);}
         SafeERC20.safeTransfer(IERC20(token), recipient_, totalWithdrawAmount);
-    }
-
-    /***************************************
-    INTERNAL MUTATOR FUNCTIONS
-    ***************************************/
-
-    /**
-     * @notice Creates a new lock.
-     * @dev There is no input validation that amount_ must > 0, but a lock is burned on complete withdraw lol. Trivial bug.
-     * @param recipient_ The user that the lock will be minted to.
-     * @param amount_ The amount of token in the lock.
-     * @param end_ The end of the lock.
-     * @return lockID The ID of the new lock.
-     */
-    function _createLock(address recipient_, uint256 amount_, uint256 end_) internal returns (uint256 lockID) {
-        if (amount_ == 0) revert CannotCreateEmptyLock();
-        // solhint-disable-next-line not-rely-on-time
-        if(end_ < block.timestamp + MIN_LOCK_DURATION) revert LockTimeTooShort();
-        // solhint-disable-next-line not-rely-on-time
-        if(end_ > block.timestamp + MAX_LOCK_DURATION) revert LockTimeTooLong();
-        lockID = ++totalNumLocks;
-        Lock memory newLock = Lock(amount_, end_);
-        // accounting
-        _locks[lockID] = newLock;
-        _safeMint(recipient_, lockID);
-        emit LockCreated(lockID);
-    }
-
-    /**
-     * @notice Deposit token to increase the value of an existing lock.
-     * @dev Token is transferred from msg.sender, assumes its already approved.
-     * @dev Anyone (not just the lock owner) can call increaseAmount() and deposit to an existing lock.
-     * @param lockID_ The ID of the lock to update.
-     * @param amount_ The amount of token to deposit.
-     */
-    function _increaseAmount(uint256 lockID_, uint256 amount_) internal {
-        uint256 newTotalAmount = _locks[lockID_].amount + amount_;
-        _updateLock(lockID_, newTotalAmount, _locks[lockID_].end);
-        emit LockIncreased(lockID_, newTotalAmount, amount_);
-    }
-
-
-    /**
-     * @notice Updates an existing lock.
-     * @param lockID_ The ID of the lock to update.
-     * @param amount_ The amount of token now in the lock.
-     * @param end_ The end of the lock.
-     */
-    function _updateLock(uint256 lockID_, uint256 amount_, uint256 end_) internal {
-        // checks
-        Lock memory prevLock = _locks[lockID_];
-        Lock memory newLock = Lock(amount_, end_); // end was sanitized before passed in
-        // accounting
-        _locks[lockID_] = newLock;
-        address owner = ownerOf(lockID_);
-        _notify(lockID_, owner, owner, prevLock, newLock);
-        emit LockUpdated(lockID_, amount_, end_);
-    }
-
-    /**
-     * @notice Extend a lock's duration.
-     * @dev Can only be called by the lock owner or approved.
-     * @param lockID_ The ID of the lock to update.
-     * @param end_ The new time for the lock to unlock.
-     */
-    function _extendLock(uint256 lockID_, uint256 end_) internal onlyOwnerOrApproved(lockID_) {
-        // solhint-disable-next-line not-rely-on-time
-        if(end_ > block.timestamp + MAX_LOCK_DURATION) revert LockTimeTooLong();
-        if(_locks[lockID_].end >= end_) revert LockTimeNotExtended();
-        _updateLock(lockID_, _locks[lockID_].amount, end_);
-        emit LockExtended(lockID_, end_);
-    }
-
-    /**
-     * @notice Withdraws from a lock.
-     * @param lockID_ The ID of the lock to withdraw from.
-     * @param amount_ The amount of token to withdraw.
-     * @param burnAmount Amount that will be burned.
-     */
-    function _withdraw(uint256 lockID_, uint256 amount_) 
-        internal 
-        onlyOwnerOrApproved(lockID_) 
-        returns (uint256 burnAmount) 
-    {
-        // solhint-disable-next-line not-rely-on-time
-        bool isEarlyWithdraw = block.timestamp < _locks[lockID_].end;
-        burnAmount = _getWithdrawBurnAmount(amount_, _locks[lockID_].end);
-
-        // full withdraw
-        if(amount_ == _locks[lockID_].amount) {
-            _burn(lockID_);
-            delete _locks[lockID_];
-        // partial withdraw
-        } else {
-            Lock memory oldLock = _locks[lockID_];
-            Lock memory newLock = Lock(oldLock.amount - amount_, oldLock.end);
-            _locks[lockID_].amount -= amount_;
-            address owner = ownerOf(lockID_);
-            _notify(lockID_, owner, owner, oldLock, newLock);
-        }
-
-        if(isEarlyWithdraw) {emit EarlyWithdrawal(lockID_, amount_, burnAmount);} 
-        else {emit Withdrawal(lockID_, amount_, burnAmount);}
-        return burnAmount;
-    }
-
-    /**
-     * @notice Hook that is called after any token transfer. This includes minting and burning.
-     * @param from_ The user that sends the token, or zero if minting.
-     * @param to_ The zero that receives the token, or zero if burning.
-     * @param lockID_ The ID of the token being transferred.
-     */
-    function _afterTokenTransfer(
-        address from_,
-        address to_,
-        uint256 lockID_
-    ) internal override {
-        super._afterTokenTransfer(from_, to_, lockID_);
-        Lock memory lock = _locks[lockID_];
-        // notify listeners
-        if(from_ == address(0x0)) _notify(lockID_, from_, to_, Lock(0, 0), lock); // mint
-        else if(to_ == address(0x0)) _notify(lockID_, from_, to_, lock, Lock(0, 0)); // burn
-        else { // transfer
-            // solhint-disable-next-line not-rely-on-time
-            if(lock.end > block.timestamp) revert CannotTransferWhileLocked();
-            _notify(lockID_, from_, to_, lock, lock);
-        }
-    }
-
-    /**
-     * @notice Notify the listeners of any updates.
-     * @dev Called on transfer, mint, burn, and update.
-     * Either the owner will change or the lock will change, not both.
-     * @param lockID_ The ID of the lock that was altered.
-     * @param oldOwner_ The old owner of the lock.
-     * @param newOwner_ The new owner of the lock.
-     * @param oldLock_ The old lock data.
-     * @param newLock_ The new lock data.
-     */
-    function _notify(uint256 lockID_, address oldOwner_, address newOwner_, Lock memory oldLock_, Lock memory newLock_) internal {
-        // register action with listener
-        uint256 len = _lockListeners.length();
-        for(uint256 i = 0; i < len; i++) {
-            IUnderwritingLockListener(_lockListeners.at(i)).registerLockEvent(lockID_, oldOwner_, newOwner_, oldLock_, newLock_);
-        }
-    }
-
-    /**
-     * @notice Sets registry and related contract addresses.
-     * @dev Requires 'uwe' addresses to be set in the Registry.
-     * @param registry_ The registry address to set.
-     */
-    function _setRegistry(address registry_) internal {
-        // set registry        
-        if(registry_ == address(0x0)) revert ZeroAddressInput("registry");
-        registry = registry_;
-        IRegistry reg = IRegistry(registry_);
-        // set token ($UWE)
-        (, address uweAddr) = reg.tryGet("uwe");
-        if(uweAddr == address(0x0)) revert ZeroAddressInput("uwe");
-        token = uweAddr;
-        emit RegistrySet(registry_);
     }
 
     /***************************************
