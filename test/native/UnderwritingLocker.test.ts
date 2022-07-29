@@ -1712,6 +1712,63 @@ describe("UnderwritingLocker", function () {
    * 1, 2, 3, 4, 5, 6, 7, 8
    */
 
+  describe("further sanity checks of funding rate mechanism", function () {
+    /**
+     * Create 2 more locks - 1 minimum-period lock (6 months) and 1 maximum-period lock (4 years)
+     * 
+     * lockID 9 -> 6-month lock
+     * lockID 10 -> 4-yr lock
+     */
+    before(async function () {
+      const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
+      await underwritingLocker.connect(user1).createLock(user1.address, DEPOSIT_AMOUNT, CURRENT_TIME + 6 * ONE_MONTH + 2);
+      await underwritingLocker.connect(user1).createLock(user1.address, DEPOSIT_AMOUNT, CURRENT_TIME + 4 * ONE_YEAR);
+    });
+
+    it("should return appropriate values for minimum-period lock", async function () {
+      const LOCKED_LOCK_ID = 9;
+      const lockState = await getLockState(LOCKED_LOCK_ID);
+
+      expect(lockState.isLocked).eq(true);
+      expectClose(lockState.timeLeft, BN.from(6).mul(ONE_MONTH), 1e15)
+      
+      /************************************************
+        ALTER HERE IF WITHDRAWAL BURN FORMULA CHANGES
+      ************************************************/
+
+      // const TIME_LEFT_IN_MONTHS_SCALED = SCALE_FACTOR.mul(lockState.timeLeft).div(ONE_MONTH);
+      // const EXPECTED_LOCK_MULTIPLIER = SCALE_FACTOR.mul(sqrt(TIME_LEFT_IN_MONTHS_SCALED)).div(sqrt(SCALE_FACTOR.mul(6)))
+      // expect(EXPECTED_LOCK_MULTIPLIER).eq(await underwritingLocker.getLockMultiplier(LOCKED_LOCK_ID))
+
+      // ( 1 / (1 + lock_multiplier) ) * (1 - funding_rate)
+      // const EXPECTED_EARLY_WITHDRAW_MULTIPLIER_NUMERATOR = SCALE_FACTOR;
+      // const EXPECTED_EARLY_WITHDRAW_MULTIPLIER_DENOMINATOR = EXPECTED_LOCK_MULTIPLIER.add(SCALE_FACTOR);
+      // const EXPECTED_WITHDRAW_MULTIPLIER_AFTER_FUNDING_NUMERATOR = ONE_HUNDRED_PERCENT.sub(FUNDING_RATE)
+      // const EXPECTED_WITHDRAW_MULTIPLIER_AFTER_FUNDING_DENOMINATOR = SCALE_FACTOR
+
+      // const EXPECTED_WITHDRAW_AMOUNT = lockState.amount
+      // .mul(EXPECTED_EARLY_WITHDRAW_MULTIPLIER_NUMERATOR)
+      // .mul(EXPECTED_WITHDRAW_MULTIPLIER_AFTER_FUNDING_NUMERATOR)
+      // .div(EXPECTED_EARLY_WITHDRAW_MULTIPLIER_DENOMINATOR)
+      // .div(EXPECTED_WITHDRAW_MULTIPLIER_AFTER_FUNDING_DENOMINATOR)
+
+      // expect(await underwritingLocker.getWithdrawAmount(LOCKED_LOCK_ID)).eq(EXPECTED_WITHDRAW_AMOUNT);
+      // expect(await underwritingLocker.getBurnOnWithdrawAmount(LOCKED_LOCK_ID)).eq(lockState.amount.sub(EXPECTED_WITHDRAW_AMOUNT));
+
+      // const EXPECTED_WITHDRAW_IN_PART_AMOUNT = WITHDRAW_AMOUNT
+      // .mul(EXPECTED_EARLY_WITHDRAW_MULTIPLIER_NUMERATOR)
+      // .mul(EXPECTED_WITHDRAW_MULTIPLIER_AFTER_FUNDING_NUMERATOR)
+      // .div(EXPECTED_EARLY_WITHDRAW_MULTIPLIER_DENOMINATOR)
+      // .div(EXPECTED_WITHDRAW_MULTIPLIER_AFTER_FUNDING_DENOMINATOR)
+
+      // expect(await underwritingLocker.getWithdrawInPartAmount(LOCKED_LOCK_ID, WITHDRAW_AMOUNT)).eq(EXPECTED_WITHDRAW_IN_PART_AMOUNT);
+      // expect(await underwritingLocker.getBurnOnWithdrawInPartAmount(LOCKED_LOCK_ID, WITHDRAW_AMOUNT)).eq(WITHDRAW_AMOUNT.sub(EXPECTED_WITHDRAW_IN_PART_AMOUNT));
+    });
+
+
+  });
+
+
   /******************
     HELPER CLOSURES
   ******************/
