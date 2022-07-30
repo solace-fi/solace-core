@@ -315,7 +315,7 @@ describe("UnderwritingLockVoting", function () {
       });
     });
 
-    describe("vote()", () => {
+    describe("basic vote() scenario", () => {
       it("vote() should throw if votes have not been processed", async function () {
         await expect(voting.connect(owner1).vote(1, 1)).to.be.revertedWith("LastEpochVotesNotProcessed");
       });
@@ -327,6 +327,9 @@ describe("UnderwritingLockVoting", function () {
         const tx = await voting.connect(governor).processVotes();
         await expect(tx).to.emit(voting, "AllVotesProcessed").withArgs(EPOCH_START_TIME);
         expect(await voting.lastTimeAllVotesProcessed()).eq(EPOCH_START_TIME)
+      });
+      it("processVotes() should revert if attempted again in the same epoch", async function () {
+        await expect(voting.connect(governor).processVotes()).to.be.revertedWith("LastEpochVotesAlreadyProcessed");
       });
       it("vote() should throw if premiums have not been charged", async function () {
         await expect(voting.connect(owner1).vote(1, 1)).to.be.revertedWith("LastEpochPremiumsNotCharged");
@@ -340,6 +343,9 @@ describe("UnderwritingLockVoting", function () {
         await expect(tx).to.emit(voting, "AllPremiumsCharged").withArgs(EPOCH_START_TIME);
         expect(await voting.lastTimePremiumsCharged()).eq(EPOCH_START_TIME)
       });
+      it("chargePremiums() should revert if attempted again in the same epoch", async function () {
+        await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("LastEpochPremiumsAlreadyProcessed");
+      });
       it("non-owner or non-manager cannot vote", async function () {
         await expect(voting.connect(anon).vote(1, 1)).to.be.revertedWith("NotOwnerNorManager()");
       });
@@ -347,9 +353,23 @@ describe("UnderwritingLockVoting", function () {
         await expect(voting.connect(owner1).vote(5, 1)).to.be.revertedWith("ERC721: invalid token ID");
       });
       it("owner can vote", async function () {
-        const tx = await voting.connect(owner1).vote(1, 1)
-        // await expect(tx).to.emit(voting, "AllVotesProcessed").withArgs(EPOCH_START_TIME);
-        // expect(await voting.lastTimeAllVotesProcessed()).eq(EPOCH_START_TIME)
+        const LOCK_ID = 1;
+        const GAUGE_ID = 1;
+        const tx = await voting.connect(owner1).vote(LOCK_ID, GAUGE_ID)
+        const EPOCH_END_TIME = await voting.getEpochEndTimestamp();
+        const VOTE_POWER = await voting.getVotePower(LOCK_ID)
+        await expect(tx).to.emit(voting, "Vote").withArgs(LOCK_ID, GAUGE_ID, owner1.address, EPOCH_END_TIME, VOTE_POWER);
+        expect(await voting.getVote(LOCK_ID)).eq(GAUGE_ID)
+      });
+      it("manager can vote", async function () {
+        const LOCK_ID = 1;
+        const GAUGE_ID = 1;
+        expect(await voting.lockManagerOf(LOCK_ID)).eq(manager1.address)
+        const tx = await voting.connect(manager1).vote(LOCK_ID, GAUGE_ID)
+        const EPOCH_END_TIME = await voting.getEpochEndTimestamp();
+        const VOTE_POWER = await voting.getVotePower(LOCK_ID)
+        await expect(tx).to.emit(voting, "Vote").withArgs(LOCK_ID, GAUGE_ID, manager1.address, EPOCH_END_TIME, VOTE_POWER);
+        expect(await voting.getVote(LOCK_ID)).eq(GAUGE_ID)
       });
     });
 
