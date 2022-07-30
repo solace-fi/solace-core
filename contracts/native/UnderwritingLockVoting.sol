@@ -182,7 +182,7 @@ contract UnderwritingLockVoting is
      * @return timestamp
      */
     function _getEpochStartTimestamp() internal view returns (uint256 timestamp) {
-        return ( (block.timestamp * WEEK) / WEEK );
+        return ( (block.timestamp / WEEK) * WEEK );
     }
 
     /**
@@ -190,7 +190,7 @@ contract UnderwritingLockVoting is
      * @return timestamp
      */
     function _getEpochEndTimestamp() internal view returns (uint256 timestamp) {
-        return ( (block.timestamp * WEEK) / WEEK ) + WEEK;
+        return ( (block.timestamp / WEEK) * WEEK ) + WEEK;
     }
 
     /***************************************
@@ -438,7 +438,7 @@ contract UnderwritingLockVoting is
         }
 
         // If full vote batch size not reached, assume completed processing;
-        if (numOfLocksProcessed < voteBatchSize && totalVotes > 0) {
+        if (numOfLocksProcessed < voteBatchSize) {
             lastTimeAllVotesProcessed = epochStartTimestamp;
             emit AllVotesProcessed(epochStartTimestamp);
         }
@@ -490,8 +490,8 @@ contract UnderwritingLockVoting is
         );
 
         // If full vote batch size not reached, assume completed processing;
-        if (numOfLocksProcessed < voteBatchSize && totalVotes > 0) {
-            lastTimeAllVotesProcessed = epochStartTimestamp;
+        if (numOfLocksProcessed < voteBatchSize) {
+            lastTimePremiumsCharged = epochStartTimestamp;
             emit AllPremiumsCharged(epochStartTimestamp);
         }
     }

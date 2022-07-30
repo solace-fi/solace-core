@@ -75,10 +75,12 @@ contract GaugeController is
     /**
      * @notice Construct the UnderwritingLocker contract.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
+     * @param token_ The address of the underwriting equity token.
      */
-    constructor(address governance_)
+    constructor(address governance_, address token_)
         Governable(governance_)
     {
+        token = token_;
         Gauge memory newGauge = Gauge("", false, 0); // Pre-fill slot 0 of _gauges, ensure gaugeID 1 maps to _gauges[1]
         _gauges.push(newGauge); 
     }
@@ -349,6 +351,16 @@ contract GaugeController is
     function setLeverageFactor(uint256 leverageFactor_) external override onlyGovernance {
         leverageFactor = leverageFactor_;
         emit LeverageFactorSet(leverageFactor_);
+    }
+
+    /**
+     * @notice Set underwriting token address.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param token_ The address of the new underwriting token.
+     */
+    function setToken(address token_) external override onlyGovernance {
+        token = token_;
+        emit TokenSet(token_);
     }
 
     /**

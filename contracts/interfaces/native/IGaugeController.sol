@@ -87,6 +87,9 @@ interface IGaugeController {
     /// @notice Emitted when rate on line for a gauge is set.
     event RateOnLineSet(uint256 indexed gaugeID, uint256 rateOnLine);
 
+    /// @notice Emitted when address of underwriting equity token is set.
+    event TokenSet(address indexed token);
+
     /***************************************
     GLOBAL VARIABLES
     ***************************************/
@@ -241,6 +244,13 @@ interface IGaugeController {
      * @param leverageFactor_ Desired leverage factor.
      */
     function setLeverageFactor(uint256 leverageFactor_) external;
+
+    /**
+     * @notice Set underwriting token address.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param token_ The address of the new underwriting token.
+     */
+    function setToken(address token_) external;
 
     /**
      * @notice Set rate on line for selected gaugeIDs
