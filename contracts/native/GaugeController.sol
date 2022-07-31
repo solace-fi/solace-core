@@ -59,21 +59,15 @@ contract GaugeController is
     GLOBAL INTERNAL VARIABLES
     ***************************************/
 
-    /// @notice True if last call to updateGaugeWeights() resulted in complete update, false otherwise.
-    bool internal _finishedLastUpdate;
-
-    /// @notice Index for _votingContracts for last incomplete updateGaugeWeights() call.
-    uint256 internal _saved_index_votingContracts;
-
-    /// @notice Index for _votes[saved_index_votingContracts] for last incomplete updateGaugeWeights() call.
-    uint256 internal _saved_index_votes;
-
     /// @notice The total number of paused gauges
     uint256 internal _pausedGaugesCount;
 
     /// @notice Epoch start timestamp (rounded to weeks) => gaugeID => total vote power
     /// @dev The same data structure exists in UnderwritingLockVoting.sol. If there is only the single IGaugeVoting contract (UnderwritingLockVoting.sol), then this data structure will be a deep copy. If there is more than one IGaugeVoting contract, this data structure will be the merged deep copies of `_votePowerOfGaugeForEpoch` in the IGaugeVoting contracts.   
     mapping(uint256 => mapping(uint256 => uint256)) internal _votePowerOfGaugeForEpoch;
+
+    /// @notice Array of Gauge {string name, bool active}
+    Gauge[] internal _gauges;
 
     /// @notice Set of voting contracts conforming to IGaugeVoting.sol interface. Sources of aggregated voting data.
     EnumerableSet.AddressSet internal _votingContracts;
@@ -82,8 +76,17 @@ contract GaugeController is
     /// @dev voteID is the unique identifier for each individual vote. In the case of UnderwritingLockVoting.sol, lockID = voteID.
     mapping(address => EnumerableMap.UintToUintMap) internal _votes;
 
-    /// @notice Array of Gauge {string name, bool active}
-    Gauge[] internal _gauges;
+    /// @dev Struct pack into single 32-byte word
+    /// @param finishedLastUpdate True if last call to updateGaugeWeights() resulted in complete update, false otherwise.
+    /// @param savedIndexOfVotingContracts Index for _votingContracts for last incomplete updateGaugeWeights() call.
+    /// @param savedIndexOfVotesIndex Index for _votes[_updateInfo.saved_index_votingContracts] for last incomplete updateGaugeWeights() call.
+    struct UpdateInfo {
+        bool finishedLastUpdate; // bool stored in 8 bits [0:8]
+        uint120 savedIndexOfVotingContracts; // uint248 stored in [8:128]
+        uint120 savedIndexOfVotesIndex; // uint248 stored in [128:248]
+    }
+
+    UpdateInfo internal _updateInfo;
 
     /***************************************
     CONSTRUCTOR
@@ -407,8 +410,8 @@ contract GaugeController is
     function updateGaugeWeights() external override nonReentrant onlyGovernance {
         uint256 epochStartTime = _getEpochStartTimestamp();
         if (lastTimeGaugeWeightsUpdated >= epochStartTime) revert GaugeWeightsAlreadyUpdated();
-        uint256 startIndex_votingContracts = _finishedLastUpdate ? 0 : _saved_index_votingContracts;
-        uint256 startIndex_votes = _finishedLastUpdate ? 0 : _saved_index_votes;
+        uint256 startIndex_votingContracts = _updateInfo.finishedLastUpdate ? 0 : _updateInfo.savedIndexOfVotingContracts;
+        uint256 startIndex_votes = _updateInfo.finishedLastUpdate ? 0 : _updateInfo.savedIndexOfVotesIndex;
         uint256 numVotingContracts = _votingContracts.length();
 
         // Iterate through voting contracts
@@ -422,9 +425,23 @@ contract GaugeController is
                 // Need to measure how much gas it takes minimum after this loop
                 assembly {
                     if lt(gas(), 10000) {
-                        sstore(_finishedLastUpdate.slot, 0)
-                        sstore(_saved_index_votingContracts.slot, i)
-                        sstore(_saved_index_votes.slot, j)
+                        // Use struct packing to make one sstore operation (vs 3 without)
+                        let updateInfo
+                        // updateInfo.finishedLastUpdate = [0:8] == false
+                        updateInfo := or(updateInfo, and(0, 0xFF))
+
+                        // We want to downcast uint256 i to uint120, and move the bits into [8:128] before bitwise-or with updateInfo
+                        // shl(136, i) => Remove the 136 least-significant bits from i => i is uint120 in [136:256]
+                        // shr(128, shl(136, i)) => uint120(i) is now in [8:128]
+                        // updateInfo.savedIndexOfVotingContracts = [8:128] = uint120(i)
+                        updateInfo := or(updateInfo, shr(128, shl(136, i)))
+
+                        // shl(136, j) => Remove the 136 least-significant bits from j => j is uint120 in [136:256]
+                        // shr(8, shl(136, j)) => uint120(j) is now in [128:248]
+                        // [248:256] has been cleared
+                        // updateInfo.savedIndexOfVotesIndex = [128:248] = uint120(j)
+                        updateInfo := or(updateInfo, shr(8, shl(136, j)))
+                        sstore(_updateInfo.slot, updateInfo)
                         return(0, 0)
                     }
                 }
@@ -440,7 +457,7 @@ contract GaugeController is
             }
         }
         
-        _finishedLastUpdate = true;
+        _updateInfo.finishedLastUpdate = true;
         lastTimeGaugeWeightsUpdated = epochStartTime;
         emit GaugeWeightsUpdated(epochStartTime);
     }
