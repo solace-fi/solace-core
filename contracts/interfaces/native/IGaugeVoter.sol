@@ -9,16 +9,18 @@ pragma solidity 0.8.6;
  */
 interface IGaugeVoter {
     /**
-     * @notice Obtain vote power sum for a gauge for a given epoch
-     * @param epochStartTimestamp_ Start timestamp for epoch.
-     * @param gaugeID_ Gauge ID to query.
-     * @return votePower
+     * @notice Set last recorded vote power for a vote ID.
+     * @dev Can only be called by the gaugeController contract.
+     * @dev For chargePremiums() calculations.
+     * @param voteID_ The ID of the vote to query.
+     * @param votePower_ Vote power
      */
-    function getVotePowerOfGaugeForEpoch(uint256 epochStartTimestamp_, uint256 gaugeID_) external view returns (uint256 votePower);
+    function setLastProcessedVotePower(uint256 voteID_, uint256 votePower_) external;
 
     /**
-     * @notice Obtain end timestamp (rounded down to weeks) for the epoch most recently processed in full.
-     * @return timestamp_
+     * @notice Get vote power (for the current epoch) for a voteID.
+     * @param voteID_ The ID of the vote to query.
+     * @return votePower
      */
-    function lastTimeAllVotesProcessed() external view returns (uint256 timestamp_);
+    function getVotePower(uint256 voteID_) external view returns (uint256 votePower);
 }

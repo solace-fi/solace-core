@@ -44,20 +44,21 @@ interface IGaugeController {
     error GaugeAlreadyUnpaused(uint256 gaugeID);
 
     /**
-     * @notice Thrown if updateGaugeWeights() is called more than once in an epoch.
-     * @param epochTimestamp Epoch start timestamp (rounded down to weeks).
+     * @notice Thrown if updateGaugeWeights() is called after gauge weights have been successfully updated in the current epoch.
      */
-    error GaugeWeightsAlreadyUpdated(uint256 epochTimestamp);
+    error GaugeWeightsAlreadyUpdated();
 
-    /**
-     * @notice Thrown if updateGaugeWeights() is called more than once in an epoch.
-     * @param epochTimestamp Epoch start timestamp (rounded down to weeks).
-     * @param votingContract Address of voting contract.
-     */
-    error VotingContractNotUpdated(uint256 epochTimestamp, address votingContract);
+    /// @notice Thrown when vote attempted before gauge weights have been successfully updated for this epoch.
+    error GaugeWeightsNotYetUpdated();
 
     /// @notice Thrown when array arguments are mismatched in length (and need to have the same length);
     error ArrayArgumentsLengthMismatch();
+
+    /// @notice Thrown when vote() is called by an address not listed as a voting contract;
+    error NotVotingContract();
+
+    /// @notice Thrown when vote() is called by a voting contract, but with the incorrect index for that voting contract.
+    error WrongVotingContractIndex();
 
     /***************************************
     EVENTS
@@ -104,7 +105,7 @@ interface IGaugeController {
     function totalGauges() external view returns (uint256);
 
     /// @notice Timestamp of last epoch start (rounded to weeks) that gauge weights were successfully updated.
-    function lastTimeGaugeWeightUpdated() external view returns (uint256);
+    function lastTimeGaugeWeightsUpdated() external view returns (uint256);
 
     function WEEK() external view returns (uint256);
 
@@ -185,6 +186,28 @@ interface IGaugeController {
      * @return votePowerSum
      */
     function getVotePowerSum() external view returns (uint256 votePowerSum);
+
+    /**
+     * @notice Register votes.
+     * @dev Can only be called by voting contracts that have been added via addVotingContract().
+     * @param votingContract_ Address of voting contract  - must have been added via addVotingContract().
+     * @param voteID_ Unique identifier for vote.
+     * @return gaugeID The ID of the voted gauge.
+     */
+    function getVote(address votingContract_, uint256 voteID_) external view returns (uint256 gaugeID);
+
+    /***************************************
+    VOTING CONTRACT FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Register votes.
+     * @dev Can only be called by voting contracts that have been added via addVotingContract().
+     * @dev Leave responsibility of emitting Event to the VotingContract.
+     * @param voteID_ Unique identifier for vote.
+     * @param gaugeID_ The ID of the voted gauge.
+     */
+    function vote(uint256 voteID_, uint256 gaugeID_) external;
 
     /***************************************
     GOVERNANCE FUNCTIONS

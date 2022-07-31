@@ -4,11 +4,14 @@ pragma solidity 0.8.6;
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
+import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "./../utils/Governable.sol";
 import "./../interfaces/native/IGaugeVoter.sol";
 import "./../interfaces/native/IGaugeController.sol";
 
 // TODO
+// @dev how to require interface when adding voting contract?
 
 /**
  * @title GaugeController
@@ -31,6 +34,7 @@ contract GaugeController is
         Governable 
     {
     using EnumerableSet for EnumerableSet.AddressSet;
+    using EnumerableMap for EnumerableMap.UintToUintMap;
 
     /***************************************
     GLOBAL PUBLIC VARIABLES
@@ -47,13 +51,22 @@ contract GaugeController is
     uint256 public override totalGauges;
     
     /// @notice Timestamp of last epoch start (rounded to weeks) that gauge weights were successfully updated.
-    uint256 public override lastTimeGaugeWeightUpdated;
+    uint256 public override lastTimeGaugeWeightsUpdated;
 
     uint256 constant public override WEEK = 604800;
 
     /***************************************
     GLOBAL INTERNAL VARIABLES
     ***************************************/
+
+    /// @notice True if last call to updateGaugeWeights() resulted in complete update, false otherwise.
+    bool internal _finishedLastUpdate;
+
+    /// @notice Index for _votingContracts for last incomplete updateGaugeWeights() call.
+    uint256 internal _saved_index_votingContracts;
+
+    /// @notice Index for _votes[saved_index_votingContracts] for last incomplete updateGaugeWeights() call.
+    uint256 internal _saved_index_votes;
 
     /// @notice The total number of paused gauges
     uint256 internal pausedGaugesCount;
@@ -62,8 +75,12 @@ contract GaugeController is
     /// @dev The same data structure exists in UnderwritingLockVoting.sol. If there is only the single IGaugeVoting contract (UnderwritingLockVoting.sol), then this data structure will be a deep copy. If there is more than one IGaugeVoting contract, this data structure will be the merged deep copies of `_votePowerOfGaugeForEpoch` in the IGaugeVoting contracts.   
     mapping(uint256 => mapping(uint256 => uint256)) internal _votePowerOfGaugeForEpoch;
 
-    // Set of voting contracts conforming to IGaugeVoting.sol interface. Sources of aggregated voting data.
+    /// @notice Set of voting contracts conforming to IGaugeVoting.sol interface. Sources of aggregated voting data.
     EnumerableSet.AddressSet internal _votingContracts;
+
+    /// @notice votingContract address => voteID => gaugeID of vote
+    /// @dev voteID is the unique identifier for each individual vote. In the case of UnderwritingLockVoting.sol, lockID = voteID.
+    mapping(address => EnumerableMap.UintToUintMap) internal _votes;
 
     /// @notice Array of Gauge {string name, bool active}
     Gauge[] internal _gauges;
@@ -95,7 +112,7 @@ contract GaugeController is
      * @return timestamp
      */
     function _getEpochStartTimestamp() internal view returns (uint256 timestamp) {
-        return ( (block.timestamp * WEEK) / WEEK );
+        return ( (block.timestamp / WEEK) * WEEK );
     }
 
     /**
@@ -103,7 +120,7 @@ contract GaugeController is
      * @return timestamp
      */
     function _getEpochEndTimestamp() internal view returns (uint256 timestamp) {
-        return ( (block.timestamp * WEEK) / WEEK ) + 1;
+        return ( (block.timestamp / WEEK) * WEEK ) + 1;
     }
 
     /**
@@ -113,7 +130,7 @@ contract GaugeController is
     function _getVotePowerSum() internal view returns (uint256 votePowerSum) {
         for(uint256 i = 1; i < totalGauges + 1; i++) {
             if (_gauges[i].active) {
-                votePowerSum += _votePowerOfGaugeForEpoch[lastTimeGaugeWeightUpdated][i];
+                votePowerSum += _votePowerOfGaugeForEpoch[lastTimeGaugeWeightsUpdated][i];
             }
         }
     }
@@ -126,7 +143,7 @@ contract GaugeController is
      */
     function _getGaugeWeight(uint256 gaugeID_) internal view returns (uint256 weight) {
         uint256 votePowerSum = _getVotePowerSum();
-        return 1e18 * _votePowerOfGaugeForEpoch[lastTimeGaugeWeightUpdated][gaugeID_] / votePowerSum;
+        return 1e18 * _votePowerOfGaugeForEpoch[lastTimeGaugeWeightsUpdated][gaugeID_] / votePowerSum;
     }
 
     /**
@@ -142,7 +159,7 @@ contract GaugeController is
 
         for(uint256 i = 1; i < totalGauges + 1; i++) {
             if (_gauges[i].active) {
-                weights[i] = (1e18 * _votePowerOfGaugeForEpoch[lastTimeGaugeWeightUpdated][i] / votePowerSum);
+                weights[i] = (1e18 * _votePowerOfGaugeForEpoch[lastTimeGaugeWeightsUpdated][i] / votePowerSum);
             } else {
                 weights[i] = 0;
             }
@@ -251,6 +268,36 @@ contract GaugeController is
         return _getVotePowerSum();
     }
 
+    /**
+     * @notice Register votes.
+     * @dev Can only be called by voting contracts that have been added via addVotingContract().
+     * @param votingContract_ Address of voting contract  - must have been added via addVotingContract().
+     * @param voteID_ Unique identifier for vote.
+     * @return gaugeID The ID of the voted gauge.
+     */
+    function getVote(address votingContract_, uint256 voteID_) external view override returns (uint256 gaugeID) {
+        if (!_votingContracts.contains(votingContract_)) {revert NotVotingContract();}
+        return _votes[votingContract_].get(voteID_, "InvalidVoteID");
+        // Leave responsibility of emitting event to the VotingContract.
+    }
+
+    /***************************************
+    VOTING CONTRACT FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Register votes.
+     * @dev Can only be called by voting contracts that have been added via addVotingContract().
+     * @param voteID_ Unique identifier for vote.
+     * @param gaugeID_ The ID of the voted gauge.
+     */
+    function vote(uint256 voteID_, uint256 gaugeID_) external override {
+        if (_getEpochStartTimestamp() != lastTimeGaugeWeightsUpdated) {revert GaugeWeightsNotYetUpdated();}
+        if (!_votingContracts.contains(msg.sender)) {revert NotVotingContract();}
+        _votes[msg.sender].set(voteID_, gaugeID_);
+        // Leave responsibility of emitting event to the VotingContract.
+    }
+
     /***************************************
     GOVERNANCE FUNCTIONS
     ***************************************/
@@ -317,33 +364,6 @@ contract GaugeController is
     }
 
     /**
-     * @notice Updates gauge weights by getting current vote data from Voting contracts.
-     * @dev Can only be called once per epoch.
-     * @dev Requires all Voting contracts to had votes processed for this epoch
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     */
-    function updateGaugeWeights() external override nonReentrant onlyGovernance {
-        uint256 epochStartTime = _getEpochStartTimestamp();
-        if (lastTimeGaugeWeightUpdated >= epochStartTime) revert GaugeWeightsAlreadyUpdated({epochTimestamp: epochStartTime});
-        uint256 n_voting_contracts = _votingContracts.length();
-        // Iterate through voting contracts
-        for(uint256 i = 0; i < n_voting_contracts; i++) {
-            require( IGaugeVoter(_votingContracts.at(i)).lastTimeAllVotesProcessed() == epochStartTime, "Voting contract not updated for this epoch");
-            if( IGaugeVoter(_votingContracts.at(i)).lastTimeAllVotesProcessed() != epochStartTime) revert VotingContractNotUpdated(epochStartTime, _votingContracts.at(i));
-
-            // Iterate through gaugeID, gaugeID start from 1
-            for (uint256 j = 1; j < totalGauges + 1; j++) {
-                if (_gauges[j].active) {
-                    _votePowerOfGaugeForEpoch[epochStartTime][j] += IGaugeVoter(_votingContracts.at(i)).getVotePowerOfGaugeForEpoch(epochStartTime, j);
-                }
-            }
-        }
-        
-        lastTimeGaugeWeightUpdated = epochStartTime;
-        emit GaugeWeightsUpdated(epochStartTime);
-    }
-
-    /**
      * @notice Set insurance leverage factor.
      * @dev 1e18 => 100%
      * Can only be called by the current [**governor**](/docs/protocol/governance).
@@ -377,5 +397,52 @@ contract GaugeController is
             _gauges[gaugeIDs_[i]].rateOnLine = rateOnLines_[i];
             emit RateOnLineSet(gaugeIDs_[i], rateOnLines_[i]);
         }
+    }
+
+    /**
+     * @notice Updates gauge weights by processing votes for the last epoch.
+     * @dev Can only be called to completion once per epoch.
+     * @dev Requires all Voting contracts to had votes processed for this epoch
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     */
+    function updateGaugeWeights() external override nonReentrant onlyGovernance {
+        uint256 epochStartTime = _getEpochStartTimestamp();
+        if (lastTimeGaugeWeightsUpdated >= epochStartTime) revert GaugeWeightsAlreadyUpdated();
+        uint256 startIndex_votingContracts = _finishedLastUpdate ? 0 : _saved_index_votingContracts;
+        uint256 startIndex_votes = _finishedLastUpdate ? 0 : _saved_index_votes;
+        uint256 numVotingContracts = _votingContracts.length();
+
+        // Iterate through voting contracts
+        for(uint256 i = startIndex_votingContracts; i < numVotingContracts; i++) {
+            address votingContract = _votingContracts.at(i);
+            // Iterate through votes for each voting contract
+            uint256 numVotesForContract = _votes[votingContract].length();
+            for(uint256 j = startIndex_votes; j < numVotesForContract; j++) {
+                // Measure for unbounded loop.
+                // Use inline assembly to measure gas remaining => if insufficient, save progress and return.
+                // Need to measure how much gas it takes minimum after this loop
+                assembly {
+                    if lt(gas(), 10000) {
+                        sstore(_finishedLastUpdate.slot, 0)
+                        sstore(_saved_index_votingContracts.slot, i)
+                        sstore(_saved_index_votes.slot, j)
+                        return(0, 0)
+                    }
+                }
+
+                (uint256 voteID, uint256 gaugeID) = _votes[votingContract].at(j);
+                if (gaugeID == 0) {
+                    IGaugeVoter(votingContract).setLastProcessedVotePower(voteID, 0);
+                    continue;
+                }
+                uint256 votePower = IGaugeVoter(votingContract).getVotePower(voteID);
+                _votePowerOfGaugeForEpoch[epochStartTime][gaugeID] += votePower;
+                IGaugeVoter(votingContract).setLastProcessedVotePower(voteID, votePower);
+            }
+        }
+        
+        _finishedLastUpdate = true;
+        lastTimeGaugeWeightsUpdated = epochStartTime;
+        emit GaugeWeightsUpdated(epochStartTime);
     }
 }

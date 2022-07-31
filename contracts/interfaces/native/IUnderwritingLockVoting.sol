@@ -33,18 +33,6 @@ import "./IGaugeVoter.sol";
 interface IUnderwritingLockVoting is IGaugeVoter {
 
     /***************************************
-    STRUCTS
-    ***************************************/
-
-    // Struct packing into two 32-byte words.
-    struct LockVoteInfo { 
-        address lockManager; // 20-bytes
-        uint48 lastTimeVoteProcessed; // 6-bytes
-        uint48 lastTimeCharged; // 6-bytes
-        uint256 lastProcessedVotePower; // Full word, need to store for accurate premium charge calculation (which is done at a different time from processVotes)
-    }
-
-    /***************************************
     CUSTOM ERRORS
     ***************************************/
 
@@ -78,6 +66,9 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     /// @notice Thrown when getVote() cannot get a vote for a given lockID. Either the lockID, the vote for the lockID, or both don't exist.
     error VoteNotFound();
 
+    /// @notice Thrown when non-gauge controller attempts to call setLastRecordedVotePower().
+    error NotGaugeController();
+
     /***************************************
     EVENTS
     ***************************************/
@@ -92,14 +83,8 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     /// epochTimestamp is the timestamp for the epoch (rounded down to weeks) that the vote counts for
     event Vote(uint256 indexed lockID, uint256 indexed gaugeID, address voter, uint256 indexed epochTimestamp, uint256 votePower);
 
-    /// @notice Emitted when voteBatchSize is set.
-    event VoteBatchSizeSet(uint256 indexed voteBatchSize);
-
-    /// @notice Emitted a vote for an epoch has been processed.
-    event VoteProcessed(uint256 indexed lockID, uint256 indexed gaugeID, uint256 indexed epochStartTimestamp, uint256 votePower);
-
     /// @notice Emitted a premium is charged.
-    event PremiumCharged(uint256 indexed lockID, uint256 indexed gaugeID, uint256 indexed epochStartTimestamp, uint256 premium);
+    event PremiumCharged(uint256 indexed lockID, uint256 indexed epochStartTimestamp, uint256 premium);
 
     /// @notice Emitted all stored votes for an epoch have been processed.
     event AllVotesProcessed(uint256 indexed epochTimestamp);
@@ -123,9 +108,6 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     /// @notice Registry address
     function registry() external view returns (address);
 
-    /// @notice Batch size of votes that will be processed in a single call of [`processVotes()`](#processvotes).
-    function voteBatchSize() external view returns (uint256);
-
     /**
      * @notice Get lockManager for a given lockId.
      * @param lockID_ The ID of the lock to query for.
@@ -145,13 +127,6 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     /***************************************
     EXTERNAL VIEW FUNCTIONS
     ***************************************/
-    /**
-     * @notice Get vote power (for the current epoch) for a lock
-     * @param lockID_ The ID of the lock to query.
-     * @return votePower
-     */
-    function getVotePower(uint256 lockID_) external view returns (uint256 votePower);
-
     /**
      * @notice Get currently registered vote for a lockID.
      * @param lockID_ The ID of the lock to query.
@@ -224,21 +199,6 @@ interface IUnderwritingLockVoting is IGaugeVoter {
      * @param registry_ The address of `Registry` contract.
      */
     function setRegistry(address registry_) external;
-
-    /**
-     * @notice Sets voteBatchSize
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param voteBatchSize_ Batch size of votes that will be processed in a single call of [`processVotes()`](#processvotes)
-     */
-    function setVoteBatchSize(uint256 voteBatchSize_) external;
-
-    /**
-     * @notice Processes votes for the last epoch passed, batches $UWE voting fees and sends to RevenueRouter.sol, updates aggregate voting data (for each gauge) 
-     * @dev Designed to be called multiple times until this function returns true (all stored votes are processed)
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @dev Edge case when processVotes() is not called to completion for certain epochs - GaugeController only take vote power for lastTimeAllVotesProcessed
-     */
-    function processVotes() external;
 
     /**
      * @notice Charge premiums for votes.
