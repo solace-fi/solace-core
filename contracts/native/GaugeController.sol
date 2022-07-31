@@ -81,6 +81,7 @@ contract GaugeController is
         Governable(governance_)
     {
         token = token_;
+        leverageFactor = 1e18; // Default 1x leverage factor
         Gauge memory newGauge = Gauge("", false, 0); // Pre-fill slot 0 of _gauges, ensure gaugeID 1 maps to _gauges[1]
         _gauges.push(newGauge); 
     }

@@ -315,6 +315,11 @@ describe("UnderwritingLockVoting", function () {
       });
     });
 
+    /*********************
+      INTENTION STATEMENT 
+    *********************/
+    // owner1 will vote for gaugeID 1 with lockID 1
+
     describe("basic vote() scenario", () => {
       it("vote() should throw if votes have not been processed", async function () {
         await expect(voting.connect(owner1).vote(1, 1)).to.be.revertedWith("LastEpochVotesNotProcessed");
@@ -326,6 +331,7 @@ describe("UnderwritingLockVoting", function () {
         const EPOCH_START_TIME = await voting.getEpochStartTimestamp();
         const tx = await voting.connect(governor).processVotes();
         await expect(tx).to.emit(voting, "AllVotesProcessed").withArgs(EPOCH_START_TIME);
+        await expect(tx).to.not.emit(voting, "VoteProcessed");
         expect(await voting.lastTimeAllVotesProcessed()).eq(EPOCH_START_TIME)
       });
       it("processVotes() should revert if attempted again in the same epoch", async function () {
@@ -341,6 +347,7 @@ describe("UnderwritingLockVoting", function () {
         const EPOCH_START_TIME = await voting.getEpochStartTimestamp();
         const tx = await voting.connect(governor).chargePremiums();
         await expect(tx).to.emit(voting, "AllPremiumsCharged").withArgs(EPOCH_START_TIME);
+        await expect(tx).to.not.emit(voting, "PremiumCharged");
         expect(await voting.lastTimePremiumsCharged()).eq(EPOCH_START_TIME)
       });
       it("chargePremiums() should revert if attempted again in the same epoch", async function () {
@@ -371,6 +378,31 @@ describe("UnderwritingLockVoting", function () {
         await expect(tx).to.emit(voting, "Vote").withArgs(LOCK_ID, GAUGE_ID, manager1.address, EPOCH_END_TIME, VOTE_POWER);
         expect(await voting.getVote(LOCK_ID)).eq(GAUGE_ID)
       });
+      it("no premiums should have been collected at this point", async function () {
+        expect(await token.balanceOf(revenueRouter.address)).eq(0)
+      });
+      it("processVotes() should succeed in the next epoch", async function () {
+        const LOCK_ID = 1;
+        const GAUGE_ID = 1;
+        const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
+        await provider.send("evm_mine", [CURRENT_TIME + ONE_WEEK]);
+        const tx = await voting.connect(governor).processVotes();
+        const EPOCH_START_TIME = await voting.getEpochStartTimestamp();
+        const VOTE_POWER = await voting.getVotePower(LOCK_ID);
+        await expect(tx).to.emit(voting, "AllVotesProcessed").withArgs(EPOCH_START_TIME);
+        await expect(tx).to.emit(voting, "VoteProcessed").withArgs(LOCK_ID, GAUGE_ID, EPOCH_START_TIME, VOTE_POWER)
+      });
+
+      // it("chargePremiums() should succeed in the next epoch", async function () {
+      //   const LOCK_ID = 1;
+      //   const GAUGE_ID = 1;
+      //   const tx = await voting.connect(governor).processVotes();
+      //   const EPOCH_START_TIME = await voting.getEpochStartTimestamp();
+      //   const VOTE_POWER = await voting.getVotePower(LOCK_ID);
+      //   await expect(tx).to.emit(voting, "AllVotesProcessed").withArgs(EPOCH_START_TIME);
+      //   await expect(tx).to.emit(voting, "VoteProcessed").withArgs(LOCK_ID, GAUGE_ID, EPOCH_START_TIME, VOTE_POWER)
+      // });
+
     });
 
     /*********
@@ -379,7 +411,12 @@ describe("UnderwritingLockVoting", function () {
     /**
      * No vote can occur, before the governor has processed all votes, and charged all premiums in this epoch (votes being processed and premiums being charged for last epoch).
      * GaugeController.sol must be deployed with correct token variable.
+     * GaugeController.sol requires setup ()
      */
+
+    // Need to test behaviour with 100 votes
+
+
 
   /******************
     HELPER CLOSURES

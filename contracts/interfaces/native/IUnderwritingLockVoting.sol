@@ -96,7 +96,7 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     event VoteBatchSizeSet(uint256 indexed voteBatchSize);
 
     /// @notice Emitted a vote for an epoch has been processed.
-    event VoteProcessed(uint256 indexed lockID, uint256 indexed gaugeID, uint256 indexed epochStartTimestamp);
+    event VoteProcessed(uint256 indexed lockID, uint256 indexed gaugeID, uint256 indexed epochStartTimestamp, uint256 votePower);
 
     /// @notice Emitted a premium is charged.
     event PremiumCharged(uint256 indexed lockID, uint256 indexed gaugeID, uint256 indexed epochStartTimestamp, uint256 premium);

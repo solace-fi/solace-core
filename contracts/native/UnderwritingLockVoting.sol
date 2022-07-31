@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
+import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -421,19 +422,15 @@ contract UnderwritingLockVoting is
             (uint256 lockID, uint256 gaugeID) = _votes.at(voteIndex);
             // If lockID hasn't been processed for last epoch, then process the individual lcok
             if (uint256(_voteInfoOfLock[lockID].lastTimeVoteProcessed) != epochStartTimestamp) {
-                // if gaugeID == 0, skip processing vote
-                if (gaugeID == 0) {
-                    _voteInfoOfLock[lockID].lastTimeVoteProcessed = uint48(epochStartTimestamp);
-                    continue;
-                }
-
+                voteIndex += 1;
+                _voteInfoOfLock[lockID].lastTimeVoteProcessed = uint48(epochStartTimestamp);
+                if (gaugeID == 0) {continue;}
                 (,,uint256 amount,) = _getLockInfo(lockID);
                 uint256 votePower = _getVotePower(amount, lockID);
                 _votePowerOfGaugeForEpoch[epochStartTimestamp][gaugeID] += votePower;
-                _voteInfoOfLock[lockID].lastTimeVoteProcessed = uint48(epochStartTimestamp);
                 _voteInfoOfLock[lockID].lastProcessedVotePower = votePower;
                 numOfLocksProcessed += 1;
-                emit VoteProcessed(lockID, gaugeID, epochStartTimestamp);
+                emit VoteProcessed(lockID, gaugeID, epochStartTimestamp, votePower);
             }
         }
 
