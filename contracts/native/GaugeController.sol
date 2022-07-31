@@ -69,7 +69,7 @@ contract GaugeController is
     uint256 internal _saved_index_votes;
 
     /// @notice The total number of paused gauges
-    uint256 internal pausedGaugesCount;
+    uint256 internal _pausedGaugesCount;
 
     /// @notice Epoch start timestamp (rounded to weeks) => gaugeID => total vote power
     /// @dev The same data structure exists in UnderwritingLockVoting.sol. If there is only the single IGaugeVoting contract (UnderwritingLockVoting.sol), then this data structure will be a deep copy. If there is more than one IGaugeVoting contract, this data structure will be the merged deep copies of `_votePowerOfGaugeForEpoch` in the IGaugeVoting contracts.   
@@ -213,7 +213,7 @@ contract GaugeController is
      * @return numActiveGauges
      */
     function getNumActiveGauges() external view override returns (uint256 numActiveGauges) {
-        return (totalGauges - pausedGaugesCount);
+        return (totalGauges - _pausedGaugesCount);
     }
 
     /**
@@ -221,7 +221,7 @@ contract GaugeController is
      * @return numPausedGauges
      */
     function getNumPausedGauges() external view override returns (uint256 numPausedGauges) {
-        return pausedGaugesCount;
+        return _pausedGaugesCount;
     }
 
     /**
@@ -277,8 +277,7 @@ contract GaugeController is
      */
     function getVote(address votingContract_, uint256 voteID_) external view override returns (uint256 gaugeID) {
         if (!_votingContracts.contains(votingContract_)) {revert NotVotingContract();}
-        return _votes[votingContract_].get(voteID_, "InvalidVoteID");
-        // Leave responsibility of emitting event to the VotingContract.
+        return _votes[votingContract_].get(voteID_, "VoteNotFound");
     }
 
     /***************************************
@@ -346,7 +345,7 @@ contract GaugeController is
      */
     function pauseGauge(uint256 gaugeID_) external override onlyGovernance {
         if(_gauges[gaugeID_].active == false) revert GaugeAlreadyPaused({gaugeID: gaugeID_});
-        pausedGaugesCount += 1;
+        _pausedGaugesCount += 1;
         _gauges[gaugeID_].active = false;
         emit GaugePaused(gaugeID_, _gauges[gaugeID_].name);
     }
@@ -358,7 +357,7 @@ contract GaugeController is
      */
     function unpauseGauge(uint256 gaugeID_) external override onlyGovernance {
         if(_gauges[gaugeID_].active == true) revert GaugeAlreadyUnpaused({gaugeID: gaugeID_});
-        pausedGaugesCount -= 1;
+        _pausedGaugesCount -= 1;
         _gauges[gaugeID_].active = true;
         emit GaugeUnpaused(gaugeID_, _gauges[gaugeID_].name);
     }

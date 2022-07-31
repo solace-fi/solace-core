@@ -81,11 +81,15 @@ contract UnderwritingLockVoting is
     GLOBAL INTERNAL VARIABLES
     ***************************************/
 
-    /// @notice True if last call to updateGaugeWeights() resulted in complete update, false otherwise.
-    bool internal _finishedLastUpdate;
+    /// @dev Struct pack into single 32-byte word
+    /// @param finishedLastUpdate True if last call to updateGaugeWeights() resulted in complete update, false otherwise.
+    /// @param savedIndexOfLastProcessedVotePowerOf Index for _votingContracts for last incomplete updateGaugeWeights() call.
+    struct UpdateInfo {
+        bool finishedLastUpdate; // bool stored in 8 bits [0:8]
+        uint248 savedIndexOfLastProcessedVotePowerOf; // uint248 stored in [8:256]
+    }
 
-    /// @notice Index for _votingContracts for last incomplete updateGaugeWeights() call.
-    uint256 internal _saved_index_lastProcessedVotePowerOf;
+    UpdateInfo internal _updateInfo;
 
     /// @notice lockId => last processed vote power
     /// @dev Use an enumerable map so that governance can iterate through each vote after each epoch, and relay vote data to the GaugeController
@@ -361,7 +365,7 @@ contract UnderwritingLockVoting is
         if(_getLastTimeGaugesUpdated() != epochStartTimestamp) revert LastEpochVotesNotProcessed();
         if(lastTimePremiumsCharged == epochStartTimestamp) revert LastEpochPremiumsAlreadyProcessed({epochTime: epochStartTimestamp});
 
-        uint256 startIndex_lastProcessedVotePowerOf = _finishedLastUpdate ? 0 : _saved_index_lastProcessedVotePowerOf;
+        uint256 startIndex_lastProcessedVotePowerOf = _updateInfo.finishedLastUpdate ? 0 : _updateInfo.savedIndexOfLastProcessedVotePowerOf;
         uint256 totalPremium;
         uint256 insuranceCapacity = IGaugeController(gaugeController).getInsuranceCapacity();
         uint256 totalVotes = _lastProcessedVotePowerOf.length();
@@ -370,8 +374,27 @@ contract UnderwritingLockVoting is
         for(uint256 i = startIndex_lastProcessedVotePowerOf; i < totalVotes; i++) {
             assembly {
                 if lt(gas(), 10000) {
-                    sstore(_finishedLastUpdate.slot, 0)
-                    sstore(_saved_index_lastProcessedVotePowerOf.slot, i)
+                    // Start with empty word
+                    let updateInfo
+
+                    // False = 0x00000000
+                    // Set 0x00000000 as bits [0:8] of updateInfo => Set false as _updateInfo.finishedLastUpdate
+                    updateInfo := or(updateInfo, and(0, 0xFF))
+
+                    // We are downcasting i from uint256 to uint248
+                    // So uint248(i) is initially stored in [0:248]
+                    // Left bitwise shift of 8 moves to [8:256]
+                    // Bitwise-or sets bits [8:256] of updateInfo => Set uint248(i) as _updateInfo.savedIndexOfLastProcessedVotePowerOf
+                    updateInfo := or(updateInfo, shl(8, i))
+
+                    // Now for updateInfo: [0:8] == false, [8:256] == uint248(i)
+                    // So overwrite _updateInfo storage slot with new struct values
+                    // Point of this exercise was to make single sstore operation (vs two if we didn't struct pack).
+                    sstore(_updateInfo.slot, updateInfo)
+
+                    // We are making an assumption that this function can only save state changes made at two points
+                    // i.) Here at this return statement, or ii.) we successfully get to the end of the function body
+                    // If there is another condition under which state changes can be saved, that will cause bugs.
                     return(0, 0)
                 }
             }
@@ -389,7 +412,7 @@ contract UnderwritingLockVoting is
             totalPremium
         );
 
-        _finishedLastUpdate = true;
+        _updateInfo.finishedLastUpdate = true;
         lastTimePremiumsCharged = epochStartTimestamp;
         emit AllPremiumsCharged(epochStartTimestamp);
     }
