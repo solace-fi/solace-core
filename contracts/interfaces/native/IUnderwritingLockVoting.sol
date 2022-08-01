@@ -57,8 +57,8 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     /// @notice Thrown when array arguments are mismatched in length (and need to have the same length);
     error ArrayArgumentsLengthMismatch();
 
-    /// @notice Thrown when vote or chargePremiums is attempted before last epoch's votes have been successfully processed.
-    error LastEpochVotesNotProcessed();
+    /// @notice Thrown when chargePremiums is attempted before last epoch's votes have been successfully processed through gaugeController.updateGaugeWeights().
+    error GaugeWeightsNotYetUpdated();
 
     /// @notice Thrown when vote is attempted before last epoch's premiums have been successfully charged.
     error LastEpochPremiumsNotCharged();
@@ -82,6 +82,10 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     /// @notice Emitted when the Vote is registered.
     /// epochTimestamp is the timestamp for the epoch (rounded down to weeks) that the vote counts for
     event Vote(uint256 indexed lockID, uint256 indexed gaugeID, address voter, uint256 indexed epochTimestamp, uint256 votePower);
+
+    /// @notice Emitted when the Vote processed by GaugeController.
+    /// epochTimestamp is the timestamp for the epoch (rounded down to weeks) that the vote counts for
+    event VoteProcessed(uint256 indexed lockID, uint256 indexed gaugeID, uint256 indexed epochTimestamp, uint256 votePower);
 
     /// @notice Emitted a premium is charged.
     event PremiumCharged(uint256 indexed lockID, uint256 indexed epochStartTimestamp, uint256 premium);
@@ -123,6 +127,7 @@ interface IUnderwritingLockVoting is IGaugeVoter {
 
     function WEEK() external view returns (uint256);
     function MONTH() external view returns (uint256);
+    function YEAR() external view returns (uint256);
 
     /***************************************
     EXTERNAL VIEW FUNCTIONS
@@ -145,6 +150,12 @@ interface IUnderwritingLockVoting is IGaugeVoter {
      * @return timestamp
      */
     function getEpochEndTimestamp() external view returns (uint256 timestamp);
+
+    /**
+     * @notice Query whether voting is open.
+     * @return True if voting is open for this epoch, false otherwise.
+     */
+    function isVotingOpen() external view returns (bool);
 
     /***************************************
     EXTERNAL MUTATOR FUNCTIONS

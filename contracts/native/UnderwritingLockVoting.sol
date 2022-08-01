@@ -13,6 +13,7 @@ import "./../interfaces/utils/IRegistry.sol";
 import "./../interfaces/native/IUnderwritingLocker.sol";
 import "./../interfaces/native/IUnderwritingLockVoting.sol";
 import "./../interfaces/native/IGaugeController.sol";
+import "hardhat/console.sol";
 
 // TO-DO
 // vote gaugeID = 0 -> retract vote (no $UWE charge)
@@ -73,6 +74,7 @@ contract UnderwritingLockVoting is
 
     uint256 constant public override WEEK = 604800;
     uint256 constant public override MONTH = 2628000;
+    uint256 constant public override YEAR = 31536000;
 
     /// @notice lockID => lock manager
     mapping(uint256 => address) public override lockManagerOf;
@@ -135,7 +137,9 @@ contract UnderwritingLockVoting is
     function _calculateVotePremium(uint256 lockID_, uint256 insuranceCapacity_) internal view returns (uint256 premium) {
         uint256 rateOnLine = IGaugeController(gaugeController).getRateOnLineOfGauge(_getVote(lockID_));
         uint256 votePowerSum = IGaugeController(gaugeController).getVotePowerSum();
-        return insuranceCapacity_ * rateOnLine * _lastProcessedVotePowerOf.get(lockID_) / votePowerSum;
+        // insuranceCapacity_ from gaugeController.getInsuranceCapacity() is already scaled.
+        // Need to convert rateOnLine from annual rate in 1e18 terms, to weekly rate in fraction terms. Hence `WEEK / (YEAR * 1e18)
+        return insuranceCapacity_ * rateOnLine * WEEK * _lastProcessedVotePowerOf.get(lockID_) / (votePowerSum * YEAR * 1e18);
     }
 
     /**
@@ -209,6 +213,15 @@ contract UnderwritingLockVoting is
         return _getEpochEndTimestamp();
     }
 
+    /**
+     * @notice Query whether voting is open.
+     * @return True if voting is open for this epoch, false otherwise.
+     */
+    function isVotingOpen() external view override returns (bool) {
+        uint256 epochStartTime = _getEpochStartTimestamp();
+        return epochStartTime == lastTimePremiumsCharged && epochStartTime == _getLastTimeGaugesUpdated();
+    }
+
     /***************************************
     INTERNAL MUTATOR FUNCTIONS
     ***************************************/
@@ -246,6 +259,7 @@ contract UnderwritingLockVoting is
      * @param gaugeID_ Address of intended lock manager
      */
     function _vote(uint256 lockID_, uint256 gaugeID_) internal  {
+        if ( _getEpochStartTimestamp() != lastTimePremiumsCharged) revert LastEpochPremiumsNotCharged();
         if( IUnderwritingLocker(underwritingLocker).ownerOf(lockID_) != msg.sender && lockManagerOf[lockID_] != msg.sender) revert NotOwnerNorManager();
         IGaugeController(gaugeController).vote(lockID_, gaugeID_);
         emit Vote(lockID_, gaugeID_, msg.sender, _getEpochEndTimestamp(), _getVotePower(lockID_));
@@ -278,8 +292,6 @@ contract UnderwritingLockVoting is
      */
     function vote(uint256 lockID_, uint256 gaugeID_) external override {
         // This require to deal with edge case where if a user puts a new vote in the time window between an epoch end and processVotes() returning true for that epoch, we do not know (with the current setup) whether that lockID has a previous vote or not (that then needs to be included in processVotes());
-        if ( _getEpochStartTimestamp() != _getLastTimeGaugesUpdated()) revert LastEpochVotesNotProcessed();
-        if ( _getEpochStartTimestamp() != lastTimePremiumsCharged) revert LastEpochPremiumsNotCharged();
         _vote(lockID_, gaugeID_);
     }
 
@@ -293,7 +305,6 @@ contract UnderwritingLockVoting is
      */
     function voteMultiple(uint256[] calldata lockIDs_, uint256[] calldata gaugeIDs_) external override {
         if (lockIDs_.length != gaugeIDs_.length) revert ArrayArgumentsLengthMismatch();
-        if ( _getEpochStartTimestamp() != _getLastTimeGaugesUpdated()) revert LastEpochVotesNotProcessed();
         for (uint256 i = 0; i < lockIDs_.length; i++) {
             _vote(lockIDs_[i], gaugeIDs_[i]);
         }
@@ -333,11 +344,13 @@ contract UnderwritingLockVoting is
      * @dev Can only be called by the gaugeController contract.
      * @dev For chargePremiums() calculations.
      * @param lockID_ The ID of the lock to set last processed vote power for.
+     * @param gaugeID_ GaugeID of vote.
      * @param votePower_ Vote power.
      */
-    function setLastProcessedVotePower(uint256 lockID_, uint256 votePower_) external override {
+    function setLastProcessedVotePower(uint256 lockID_, uint256 gaugeID_, uint256 votePower_) external override {
         if (msg.sender != gaugeController) revert NotGaugeController();
         _lastProcessedVotePowerOf.set(lockID_, votePower_);
+        emit VoteProcessed(lockID_, gaugeID_, _getEpochStartTimestamp(), votePower_);
     }
 
     /***************************************
@@ -362,7 +375,7 @@ contract UnderwritingLockVoting is
      */
     function chargePremiums() external override onlyGovernance nonReentrant {
         uint256 epochStartTimestamp = _getEpochStartTimestamp();
-        if(_getLastTimeGaugesUpdated() != epochStartTimestamp) revert LastEpochVotesNotProcessed();
+        if(_getLastTimeGaugesUpdated() != epochStartTimestamp) revert GaugeWeightsNotYetUpdated();
         if(lastTimePremiumsCharged == epochStartTimestamp) revert LastEpochPremiumsAlreadyProcessed({epochTime: epochStartTimestamp});
 
         uint256 startIndex_lastProcessedVotePowerOf = _updateInfo.finishedLastUpdate ? 0 : _updateInfo.savedIndexOfLastProcessedVotePowerOf;
@@ -372,8 +385,10 @@ contract UnderwritingLockVoting is
 
         // Iterate through votes
         for(uint256 i = startIndex_lastProcessedVotePowerOf; i < totalVotes; i++) {
+            // Check if we are at risk of running out of gas.
+            // If yes, save progress and return.
             assembly {
-                if lt(gas(), 10000) {
+                if lt(gas(), 70000) {
                     // Start with empty word
                     let updateInfo
 
@@ -402,6 +417,7 @@ contract UnderwritingLockVoting is
             (uint256 lockID, uint256 votePower) = _lastProcessedVotePowerOf.at(i);
             uint256 premium = _calculateVotePremium(lockID, insuranceCapacity);
             totalPremium += premium;
+            IUnderwritingLocker(underwritingLocker).chargePremium(lockID, premium);
             emit PremiumCharged(lockID, epochStartTimestamp, premium);
         }
 

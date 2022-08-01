@@ -24,11 +24,10 @@ const ONE_MILLION_ETHER = ONE_ETHER.mul(1000000);
 const ONE_YEAR = 31536000; // in seconds
 const ONE_MONTH = ONE_YEAR / 12;
 const ONE_WEEK = 604800; // in seconds
-const DEADLINE = constants.MaxUint256;
 const DEPOSIT_AMOUNT = ONE_ETHER;
 const WITHDRAW_AMOUNT = ONE_ETHER;
 const SCALE_FACTOR = ONE_ETHER;
-const DEFAULT_VOTE_BATCH_SIZE = 500;
+const ONE_PERCENT = ONE_ETHER.div(100);
 
 describe("UnderwritingLockVoting", function () {
     const [deployer, governor, revenueRouter, owner1, manager1, manager2, anon] = provider.getWallets();
@@ -50,7 +49,7 @@ describe("UnderwritingLockVoting", function () {
       await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
       
       // Deploy $UWE, and mint 1M $UWE to deployer
-      token = (await deployContract(deployer, artifacts.MockERC20Permit, ["Underwriting Equity - Solace Native", "UWE", ONE_MILLION_ETHER, 18])) as MockErc20Permit;
+      token = (await deployContract(deployer, artifacts.MockERC20Permit, ["Underwriting Equity - Solace Native", "UWE", ONE_ETHER.mul(100), 18])) as MockErc20Permit;
 
       // Deploy registry
       registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
@@ -93,6 +92,7 @@ describe("UnderwritingLockVoting", function () {
           expect(await voting.gaugeController()).eq(gaugeController.address);
           expect(await voting.registry()).eq(registry.address);
           expect(await voting.lastTimePremiumsCharged()).eq(0);
+          expect(await voting.isVotingOpen()).eq(false);
           expect(await voting.WEEK()).eq(ONE_WEEK);
           expect(await voting.MONTH()).eq(ONE_MONTH);
         });
@@ -112,10 +112,10 @@ describe("UnderwritingLockVoting", function () {
           await gaugeController.connect(governor).addVotingContract(voting.address);
         });
         it("getVote should throw for an invalid lockID", async function () {
-          await expect(voting.getVote(1)).to.be.revertedWith("InvalidVoteID");
+          await expect(voting.getVote(1)).to.be.revertedWith("VoteNotFound");
         });
         it("chargePremiums should revert", async function () {
-          await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("LastEpochVotesNotProcessed")
+          await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("GaugeWeightsNotYetUpdated")
         });
     });
 
@@ -311,98 +311,166 @@ describe("UnderwritingLockVoting", function () {
     *********************/
     // owner1 will vote for gaugeID 1 with lockID 1
 
-    // describe("basic vote() scenario", () => {
-    //   it("vote() should throw if votes have not been processed", async function () {
-    //     await expect(voting.connect(owner1).vote(1, 1)).to.be.revertedWith("LastEpochVotesNotProcessed");
-    //   });
-    //   it("processVotes() should revert if non governor", async function () {
-    //     await expect(voting.connect(owner1).processVotes()).to.be.revertedWith("!governance");
-    //   });
-    //   it("processVotes() should succeed", async function () {
-    //     const EPOCH_START_TIME = await voting.getEpochStartTimestamp();
-    //     const tx = await voting.connect(governor).processVotes();
-    //     await expect(tx).to.emit(voting, "AllVotesProcessed").withArgs(EPOCH_START_TIME);
-    //     await expect(tx).to.not.emit(voting, "VoteProcessed");
-    //     expect(await voting.lastTimeAllVotesProcessed()).eq(EPOCH_START_TIME)
-    //   });
-    //   it("processVotes() should revert if attempted again in the same epoch", async function () {
-    //     await expect(voting.connect(governor).processVotes()).to.be.revertedWith("LastEpochVotesAlreadyProcessed");
-    //   });
-    //   it("vote() should throw if premiums have not been charged", async function () {
-    //     await expect(voting.connect(owner1).vote(1, 1)).to.be.revertedWith("LastEpochPremiumsNotCharged");
-    //   });
-    //   it("chargePremiums() should revert if non governor", async function () {
-    //     await expect(voting.connect(owner1).chargePremiums()).to.be.revertedWith("!governance");
-    //   });
-    //   it("chargePremiums() should succeed", async function () {
-    //     const EPOCH_START_TIME = await voting.getEpochStartTimestamp();
-    //     const tx = await voting.connect(governor).chargePremiums();
-    //     await expect(tx).to.emit(voting, "AllPremiumsCharged").withArgs(EPOCH_START_TIME);
-    //     await expect(tx).to.not.emit(voting, "PremiumCharged");
-    //     expect(await voting.lastTimePremiumsCharged()).eq(EPOCH_START_TIME)
-    //   });
-    //   it("chargePremiums() should revert if attempted again in the same epoch", async function () {
-    //     await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("LastEpochPremiumsAlreadyProcessed");
-    //   });
-    //   it("non-owner or non-manager cannot vote", async function () {
-    //     await expect(voting.connect(anon).vote(1, 1)).to.be.revertedWith("NotOwnerNorManager()");
-    //   });
-    //   it("cannot vote for non-existent lock", async function () {
-    //     await expect(voting.connect(owner1).vote(5, 1)).to.be.revertedWith("ERC721: invalid token ID");
-    //   });
-    //   it("owner can vote", async function () {
-    //     const LOCK_ID = 1;
-    //     const GAUGE_ID = 1;
-    //     const tx = await voting.connect(owner1).vote(LOCK_ID, GAUGE_ID)
-    //     const EPOCH_END_TIME = await voting.getEpochEndTimestamp();
-    //     const VOTE_POWER = await voting.getVotePower(LOCK_ID)
-    //     await expect(tx).to.emit(voting, "Vote").withArgs(LOCK_ID, GAUGE_ID, owner1.address, EPOCH_END_TIME, VOTE_POWER);
-    //     expect(await voting.getVote(LOCK_ID)).eq(GAUGE_ID)
-    //   });
-    //   it("manager can vote", async function () {
-    //     const LOCK_ID = 1;
-    //     const GAUGE_ID = 1;
-    //     expect(await voting.lockManagerOf(LOCK_ID)).eq(manager1.address)
-    //     const tx = await voting.connect(manager1).vote(LOCK_ID, GAUGE_ID)
-    //     const EPOCH_END_TIME = await voting.getEpochEndTimestamp();
-    //     const VOTE_POWER = await voting.getVotePower(LOCK_ID)
-    //     await expect(tx).to.emit(voting, "Vote").withArgs(LOCK_ID, GAUGE_ID, manager1.address, EPOCH_END_TIME, VOTE_POWER);
-    //     expect(await voting.getVote(LOCK_ID)).eq(GAUGE_ID)
-    //   });
-    //   it("no premiums should have been collected at this point", async function () {
-    //     expect(await token.balanceOf(revenueRouter.address)).eq(0)
-    //   });
-    //   it("processVotes() should succeed in the next epoch", async function () {
-    //     const LOCK_ID = 1;
-    //     const GAUGE_ID = 1;
-    //     const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
-    //     await provider.send("evm_mine", [CURRENT_TIME + ONE_WEEK]);
-    //     const tx = await voting.connect(governor).processVotes();
-    //     const EPOCH_START_TIME = await voting.getEpochStartTimestamp();
-    //     const VOTE_POWER = await voting.getVotePower(LOCK_ID);
-    //     await expect(tx).to.emit(voting, "AllVotesProcessed").withArgs(EPOCH_START_TIME);
-    //     await expect(tx).to.emit(voting, "VoteProcessed").withArgs(LOCK_ID, GAUGE_ID, EPOCH_START_TIME, VOTE_POWER)
-    //   });
+    describe("basic vote() scenario", () => {
+      let LAST_RECORDED_VOTE_POWER: BN; // To transport VOTE_POWER value from one unit test to another.
 
-    //   // it("chargePremiums() should succeed in the next epoch", async function () {
-    //   //   const LOCK_ID = 1;
-    //   //   const GAUGE_ID = 1;
-    //   //   const tx = await voting.connect(governor).processVotes();
-    //   //   const EPOCH_START_TIME = await voting.getEpochStartTimestamp();
-    //   //   const VOTE_POWER = await voting.getVotePower(LOCK_ID);
-    //   //   await expect(tx).to.emit(voting, "AllVotesProcessed").withArgs(EPOCH_START_TIME);
-    //   //   await expect(tx).to.emit(voting, "VoteProcessed").withArgs(LOCK_ID, GAUGE_ID, EPOCH_START_TIME, VOTE_POWER)
-    //   // });
+      it("vote() should throw if gauge weights have not been processed", async function () {
+        await expect(voting.connect(owner1).vote(1, 1)).to.be.revertedWith("LastEpochPremiumsNotCharged");
+      });
+      it("updateGaugeWeights() should revert if non governor", async function () {
+        await expect(gaugeController.connect(owner1).updateGaugeWeights()).to.be.revertedWith("!governance");
+      });
+      it("chargePremiums() should revert if non governor", async function () {
+        await expect(voting.connect(owner1).chargePremiums()).to.be.revertedWith("!governance");
+      });
+      it("chargePremiums() should revert if gauge weights have not been updated", async function () {
+        await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("GaugeWeightsNotYetUpdated");
+      });
+      it("updateGaugeWeights() should succeed", async function () {
+        const EPOCH_START_TIME = await voting.getEpochStartTimestamp();
+        const tx = await gaugeController.connect(governor).updateGaugeWeights();
+        await expect(tx).to.emit(gaugeController, "GaugeWeightsUpdated").withArgs(EPOCH_START_TIME);
+        await expect(tx).to.not.emit(voting, "VoteProcessed");
+        expect(await gaugeController.lastTimeGaugeWeightsUpdated()).eq(EPOCH_START_TIME)
+        expect(await gaugeController.getVotePowerSum()).eq(0)
+      });
+      it("updateGaugeWeights() should revert if attempted again in the same epoch", async function () {
+        await expect(gaugeController.connect(governor).updateGaugeWeights()).to.be.revertedWith("GaugeWeightsAlreadyUpdated");
+      });
+      it("isVotingOpen() should return false at this point", async function () {
+        expect(await voting.isVotingOpen()).eq(false);
+      });
+      it("vote() should throw if premiums have not been charged", async function () {
+        await expect(voting.connect(owner1).vote(1, 1)).to.be.revertedWith("LastEpochPremiumsNotCharged");
+      });
+      it("chargePremiums() should succeed", async function () {
+        const EPOCH_START_TIME = await voting.getEpochStartTimestamp();
+        const tx = await voting.connect(governor).chargePremiums();
+        await expect(tx).to.emit(voting, "AllPremiumsCharged").withArgs(EPOCH_START_TIME);
+        await expect(tx).to.not.emit(voting, "PremiumCharged");
+        expect(await voting.lastTimePremiumsCharged()).eq(EPOCH_START_TIME)
+      });
+      it("isVotingOpen() should return true at this point", async function () {
+        expect(await voting.isVotingOpen()).eq(true);
+      });
+      it("chargePremiums() should revert if attempted again in the same epoch", async function () {
+        await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("LastEpochPremiumsAlreadyProcessed");
+      });
+      it("non-owner or non-manager cannot vote", async function () {
+        await expect(voting.connect(anon).vote(1, 1)).to.be.revertedWith("NotOwnerNorManager()");
+      });
+      it("cannot vote for non-existent lock", async function () {
+        await expect(voting.connect(owner1).vote(5, 1)).to.be.revertedWith("ERC721: invalid token ID");
+      });
+      it("cannot vote for gauge that has not been added", async function () {
+        await expect(voting.connect(owner1).vote(1, 1)).to.be.revertedWith("VotedGaugeIDNotExist");
+      });
+      it("non-governor cannot add gauge", async function () {
+        await expect(gaugeController.connect(owner1).addGauge("gauge1", ONE_PERCENT)).to.be.revertedWith("!governance");
+      });
+      it("governor can add gauge", async function () {
+        const tx = await gaugeController.connect(governor).addGauge("gauge1", ONE_PERCENT);
+        await expect(tx).to.emit(gaugeController, "GaugeAdded").withArgs(1, ONE_PERCENT, "gauge1");
+        expect(await gaugeController.totalGauges()).eq(1)
+        expect(await gaugeController.getRateOnLineOfGauge(1)).eq(ONE_PERCENT)
+      });
+      it("owner can vote", async function () {
+        const LOCK_ID = 1;
+        const GAUGE_ID = 1;
+        const tx = await voting.connect(owner1).vote(LOCK_ID, GAUGE_ID)
+        const EPOCH_END_TIME = await voting.getEpochEndTimestamp();
+        const VOTE_POWER = await voting.getVotePower(LOCK_ID)
+        await expect(tx).to.emit(voting, "Vote").withArgs(LOCK_ID, GAUGE_ID, owner1.address, EPOCH_END_TIME, VOTE_POWER);
+        expect(await voting.getVote(LOCK_ID)).eq(GAUGE_ID)
+      });
+      it("manager can vote", async function () {
+        const LOCK_ID = 1;
+        const GAUGE_ID = 1;
+        expect(await voting.lockManagerOf(LOCK_ID)).eq(manager1.address)
+        const tx = await voting.connect(manager1).vote(LOCK_ID, GAUGE_ID)
+        const EPOCH_END_TIME = await voting.getEpochEndTimestamp();
+        const VOTE_POWER = await voting.getVotePower(LOCK_ID)
+        await expect(tx).to.emit(voting, "Vote").withArgs(LOCK_ID, GAUGE_ID, manager1.address, EPOCH_END_TIME, VOTE_POWER);
+        expect(await voting.getVote(LOCK_ID)).eq(GAUGE_ID)
+      });
+      it("no premiums should have been collected at this point", async function () {
+        expect(await token.balanceOf(revenueRouter.address)).eq(0)
+      });
+      it("non-governor cannot pause gauge", async function () {
+        await expect(gaugeController.connect(owner1).pauseGauge(1)).to.be.revertedWith("!governance");
+      });
+      it("governor can pause gauge", async function () {
+        const tx = await gaugeController.connect(governor).pauseGauge(1);
+        await expect(tx).to.emit(gaugeController, "GaugePaused").withArgs(1, "gauge1");
+        expect(await gaugeController.totalGauges()).eq(1)
+        expect(await gaugeController.getNumPausedGauges()).eq(1)
+      });
+      it("neither owner nor manager can vote while gauge paused", async function() {
+        await expect(voting.connect(owner1).vote(1, 1)).to.be.revertedWith("VotedGaugeIDPaused");
+        await expect(voting.connect(manager1).vote(1, 1)).to.be.revertedWith("VotedGaugeIDPaused");
+        await gaugeController.connect(governor).unpauseGauge(1);
+      })
+      it("processVotes() should succeed in the next epoch", async function () {
+        const LOCK_ID = 1;
+        const GAUGE_ID = 1;
+        const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
+        await provider.send("evm_mine", [CURRENT_TIME + ONE_WEEK]);
+        const tx = await gaugeController.connect(governor).updateGaugeWeights();
+        const EPOCH_START_TIME = await voting.getEpochStartTimestamp();
+        const VOTE_POWER = await voting.getVotePower(LOCK_ID);
+        await expect(tx).to.emit(gaugeController, "GaugeWeightsUpdated").withArgs(EPOCH_START_TIME);
+        await expect(tx).to.emit(voting, "VoteProcessed").withArgs(LOCK_ID, GAUGE_ID, EPOCH_START_TIME, VOTE_POWER)
+        expect(await voting.isVotingOpen()).eq(false)
+        expect(await gaugeController.getVotePowerSum()).eq(VOTE_POWER)
+        await expect(voting.connect(owner1).vote(1, 1)).to.be.revertedWith("LastEpochPremiumsNotCharged");
+        LAST_RECORDED_VOTE_POWER = VOTE_POWER;
+      });
+      it("chargePremiums() should revert before underwritingLocker.sol call setVotingContract()", async function () {
+        await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("NotVotingContract");
+      });
+      it("chargePremiums() should succeed in the next epoch, provided allowance granted by underwritingLocker", async function () {
+        await registry.connect(governor).set(["underwritingLockVoting"],[voting.address]);
+        await underwritingLocker.connect(governor).setVotingContract();
+        const LOCK_ID = 1;
+        const GAUGE_ID = 1;
+        const OLD_LOCK_AMOUNT = (await underwritingLocker.locks(LOCK_ID)).amount;
+        const OLD_UNDERWRITING_LOCKER_BALANCE = await token.balanceOf(underwritingLocker.address);
 
-    // });
+        const tx = await voting.connect(governor).chargePremiums();
+        const EPOCH_START_TIME = await voting.getEpochStartTimestamp();
+        const NEW_LOCK_AMOUNT = (await underwritingLocker.locks(LOCK_ID)).amount;
+        const NEW_UNDERWRITING_LOCKER_BALANCE = await token.balanceOf(underwritingLocker.address);
+
+        // // Expect premium = UWE_total_supply * leverage * rateOnLine * votePower / votePowerSum
+        const UWE_TOTAL_SUPPLY = await token.totalSupply();
+        const LEVERAGE_FACTOR = await gaugeController.leverageFactor();
+        const RATE_ON_LINE = await gaugeController.getRateOnLineOfGauge(GAUGE_ID);
+        const VOTE_POWER_SUM = await gaugeController.getVotePowerSum();
+        const EXPECTED_PREMIUM = UWE_TOTAL_SUPPLY.mul(LEVERAGE_FACTOR).mul(RATE_ON_LINE).mul(ONE_WEEK).mul(LAST_RECORDED_VOTE_POWER).div(VOTE_POWER_SUM).div(ONE_YEAR).div(SCALE_FACTOR).div(SCALE_FACTOR)
+
+        await expect(tx).to.emit(voting, "AllPremiumsCharged").withArgs(EPOCH_START_TIME);
+        await expect(tx).to.emit(voting, "PremiumCharged").withArgs(LOCK_ID, EPOCH_START_TIME, EXPECTED_PREMIUM);
+        expect(await token.balanceOf(revenueRouter.address)).eq(EXPECTED_PREMIUM);
+        expect(OLD_LOCK_AMOUNT.sub(NEW_LOCK_AMOUNT)).eq(EXPECTED_PREMIUM);
+        expect(OLD_UNDERWRITING_LOCKER_BALANCE.sub(NEW_UNDERWRITING_LOCKER_BALANCE)).eq(EXPECTED_PREMIUM);
+        expect(await voting.isVotingOpen()).eq(true)
+      });
+
+    });
 
     /*********
       LESSON
     *********/
     /**
-     * No vote can occur, before the governor has processed all votes, and charged all premiums in this epoch (votes being processed and premiums being charged for last epoch).
-     * GaugeController.sol must be deployed with correct token variable.
-     * GaugeController.sol requires setup ()
+     * No vote can occur, gaugeController.updateGaugeWeights() and underwritingLockVoting.chargePremiums() has been completed for the last epoch, even at initialization.
+     * GaugeController.sol requires the following setup:
+     * i.) Deployed with correct must be deployed with correct token variable.
+     * ii.) addVotingContract() called to add UnderwritingLockVesting.sol.
+     * 
+     * i.) underwritingLockVoting must be added as a registry entry key
+     * ii.) underwritingLocker must have approved underwritingLockVoting.sol as a spender for its balance of $UWE.
+     * 
+     * Most of UWE total supply should be sitting in the lock 
      */
 
     // Need to test behaviour with 100 votes

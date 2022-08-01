@@ -9,13 +9,14 @@ pragma solidity 0.8.6;
  */
 interface IGaugeVoter {
     /**
-     * @notice Set last recorded vote power for a vote ID.
+     * @notice Set last processed vote power for a vote ID.
      * @dev Can only be called by the gaugeController contract.
      * @dev For chargePremiums() calculations.
-     * @param voteID_ The ID of the vote to query.
-     * @param votePower_ Vote power
+     * @param lockID_ The ID of the lock to set last processed vote power for.
+     * @param gaugeID_ GaugeID of vote.
+     * @param votePower_ Vote power.
      */
-    function setLastProcessedVotePower(uint256 voteID_, uint256 votePower_) external;
+    function setLastProcessedVotePower(uint256 lockID_, uint256 gaugeID_, uint256 votePower_) external;
 
     /**
      * @notice Get vote power (for the current epoch) for a voteID.

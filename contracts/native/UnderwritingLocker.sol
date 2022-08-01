@@ -629,6 +629,25 @@ contract UnderwritingLocker is
     }
 
     /***************************************
+    VOTING CONTRACT FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Perform accounting for voting premiums to be charged by UnderwritingLockVoting.chargePremiums().
+     * @dev Can only be called by votingContract set in the registry.
+     * @param lockID_ The ID of the lock to charge premium.
+     * @param premium_ The amount of token charged as premium.
+     */
+    function chargePremium(uint256 lockID_, uint256 premium_) external override nonReentrant {
+        if (msg.sender != votingContract) revert NotVotingContract();
+        Lock memory oldLock = _locks[lockID_];
+        Lock memory newLock = Lock(oldLock.amount - premium_, oldLock.end); // Relying on Solidity ^8.0 native underflow check.
+        _locks[lockID_].amount -= premium_;
+        address owner = ownerOf(lockID_);
+        _notify(lockID_, owner, owner, oldLock, newLock);
+    }
+
+    /***************************************
     GOVERNANCE FUNCTIONS
     ***************************************/
 

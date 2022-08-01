@@ -76,6 +76,12 @@ contract GaugeController is
     /// @dev voteID is the unique identifier for each individual vote. In the case of UnderwritingLockVoting.sol, lockID = voteID.
     mapping(address => EnumerableMap.UintToUintMap) internal _votes;
 
+    UpdateInfo internal _updateInfo;
+
+    /***************************************
+    STRUCTS
+    ***************************************/
+
     /// @dev Struct pack into single 32-byte word
     /// @param finishedLastUpdate True if last call to updateGaugeWeights() resulted in complete update, false otherwise.
     /// @param savedIndexOfVotingContracts Index for _votingContracts for last incomplete updateGaugeWeights() call.
@@ -85,8 +91,6 @@ contract GaugeController is
         uint120 savedIndexOfVotingContracts; // uint248 stored in [8:128]
         uint120 savedIndexOfVotesIndex; // uint248 stored in [128:248]
     }
-
-    UpdateInfo internal _updateInfo;
 
     /***************************************
     CONSTRUCTOR
@@ -102,7 +106,7 @@ contract GaugeController is
     {
         token = token_;
         leverageFactor = 1e18; // Default 1x leverage factor
-        Gauge memory newGauge = Gauge("", false, 0); // Pre-fill slot 0 of _gauges, ensure gaugeID 1 maps to _gauges[1]
+        Gauge memory newGauge = Gauge(false, 0, ""); // Pre-fill slot 0 of _gauges, ensure gaugeID 1 maps to _gauges[1]
         _gauges.push(newGauge); 
     }
 
@@ -260,7 +264,7 @@ contract GaugeController is
      * @return insuranceCapacity Insurance capacity in $UWE.
      */
     function getInsuranceCapacity() external view override returns (uint256 insuranceCapacity) {
-        return (insuranceCapacity * IERC20(token).totalSupply() / 1e18);
+        return (leverageFactor * IERC20(token).totalSupply() / 1e18);
     }
 
     /**
@@ -296,6 +300,8 @@ contract GaugeController is
     function vote(uint256 voteID_, uint256 gaugeID_) external override {
         if (_getEpochStartTimestamp() != lastTimeGaugeWeightsUpdated) {revert GaugeWeightsNotYetUpdated();}
         if (!_votingContracts.contains(msg.sender)) {revert NotVotingContract();}
+        if (gaugeID_ + 1 > _gauges.length) {revert VotedGaugeIDNotExist();}
+        if (!_gauges[gaugeID_].active) {revert VotedGaugeIDPaused();}
         _votes[msg.sender].set(voteID_, gaugeID_);
         // Leave responsibility of emitting event to the VotingContract.
     }
@@ -332,10 +338,10 @@ contract GaugeController is
      */
     function addGauge(string calldata gaugeName_, uint256 rateOnLine_) external override onlyGovernance {
         uint256 gaugeID = ++totalGauges;
-        Gauge memory newGauge = Gauge(gaugeName_, true, rateOnLine_);
+        Gauge memory newGauge = Gauge(true, SafeCast.toUint248(rateOnLine_), gaugeName_);
         _gauges.push(newGauge); 
-        assert(_gauges.length == totalGauges); // Uphold invariant, should not be violated.
-        emit GaugeAdded(gaugeID, gaugeName_);
+        assert(_gauges.length - 1 == totalGauges); // Uphold invariant, should not be violated. -1 because we already added _gauges[0] in constructor.
+        emit GaugeAdded(gaugeID, rateOnLine_, gaugeName_);
     }
 
     /**
@@ -396,7 +402,7 @@ contract GaugeController is
     function setRateOnLine(uint256[] calldata gaugeIDs_, uint256[] calldata rateOnLines_) external override onlyGovernance {
         if (gaugeIDs_.length != rateOnLines_.length) revert ArrayArgumentsLengthMismatch();
         for (uint256 i = 0; i < gaugeIDs_.length; i++) {
-            _gauges[gaugeIDs_[i]].rateOnLine = rateOnLines_[i];
+            _gauges[gaugeIDs_[i]].rateOnLine = SafeCast.toUint248(rateOnLines_[i]);
             emit RateOnLineSet(gaugeIDs_[i], rateOnLines_[i]);
         }
     }
@@ -424,7 +430,7 @@ contract GaugeController is
                 // Use inline assembly to measure gas remaining => if insufficient, save progress and return.
                 // Need to measure how much gas it takes minimum after this loop
                 assembly {
-                    if lt(gas(), 10000) {
+                    if lt(gas(), 20000) {
                         // Use struct packing to make one sstore operation (vs 3 without)
                         let updateInfo
                         // updateInfo.finishedLastUpdate = [0:8] == false
@@ -448,12 +454,12 @@ contract GaugeController is
 
                 (uint256 voteID, uint256 gaugeID) = _votes[votingContract].at(j);
                 if (gaugeID == 0) {
-                    IGaugeVoter(votingContract).setLastProcessedVotePower(voteID, 0);
+                    IGaugeVoter(votingContract).setLastProcessedVotePower(voteID, 0, 0);
                     continue;
                 }
                 uint256 votePower = IGaugeVoter(votingContract).getVotePower(voteID);
                 _votePowerOfGaugeForEpoch[epochStartTime][gaugeID] += votePower;
-                IGaugeVoter(votingContract).setLastProcessedVotePower(voteID, votePower);
+                IGaugeVoter(votingContract).setLastProcessedVotePower(voteID, gaugeID, votePower);
             }
         }
         

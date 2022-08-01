@@ -77,6 +77,9 @@ interface IUnderwritingLocker is IERC721Enhanced {
     /// @notice Thrown when funding rate is set above 100%
     error FundingRateAboveOne();
 
+    /// @notice Emitted when chargePremium() is not called by the voting contract.
+    error NotVotingContract();
+
     /***************************************
     EVENTS
     ***************************************/
@@ -331,6 +334,18 @@ interface IUnderwritingLocker is IERC721Enhanced {
      * @param recipient_ The user to receive the lock's token.
      */
     function withdrawInPartMultiple(uint256[] calldata lockIDs_, uint256[] calldata amounts_ ,address recipient_) external;
+
+    /***************************************
+    VOTING CONTRACT FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Perform accounting for voting premiums to be charged by UnderwritingLockVoting.chargePremiums().
+     * @dev Can only be called by votingContract set in the registry.
+     * @param lockID_ The ID of the lock to charge premium.
+     * @param premium_ The amount of token charged as premium.
+     */
+    function chargePremium(uint256 lockID_, uint256 premium_) external;
 
     /***************************************
     GOVERNANCE FUNCTIONS

@@ -22,9 +22,9 @@ interface IGaugeController {
     ***************************************/
 
     struct Gauge { 
+        bool active; // [0:8]
+        uint248 rateOnLine; // [8:256] Max value we reasonably expect is ~20% or 2e17. We only need log 2 2e17 = ~58 bits for this.
         string name;
-        bool active;
-        uint256 rateOnLine;
     }
 
     /***************************************
@@ -57,8 +57,11 @@ interface IGaugeController {
     /// @notice Thrown when vote() is called by an address not listed as a voting contract;
     error NotVotingContract();
 
-    /// @notice Thrown when vote() is called by a voting contract, but with the incorrect index for that voting contract.
-    error WrongVotingContractIndex();
+    /// @notice Thrown when vote() is called with gaugeID that does not exist.
+    error VotedGaugeIDNotExist();
+
+    /// @notice Thrown when vote() is called with gaugeID that is paused.
+    error VotedGaugeIDPaused();
 
     /***************************************
     EVENTS
@@ -71,7 +74,7 @@ interface IGaugeController {
     event VotingContractRemoved(address indexed votingContractAddress);
 
     /// @notice Emitted when a gauge is added.
-    event GaugeAdded(uint256 indexed gaugeID, string gaugeName);
+    event GaugeAdded(uint256 indexed gaugeID, uint256 rateOnLine, string gaugeName);
 
     /// @notice Emitted when a gauge is paused.
     event GaugePaused(uint256 indexed gaugeID, string gaugeName);
