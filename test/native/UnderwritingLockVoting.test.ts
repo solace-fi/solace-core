@@ -49,7 +49,7 @@ describe("UnderwritingLockVoting", function () {
       await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
       
       // Deploy $UWE, and mint 1M $UWE to deployer
-      token = (await deployContract(deployer, artifacts.MockERC20Permit, ["Underwriting Equity - Solace Native", "UWE", ONE_ETHER.mul(100), 18])) as MockErc20Permit;
+      token = (await deployContract(deployer, artifacts.MockERC20Permit, ["Underwriting Equity - Solace Native", "UWE", ONE_MILLION_ETHER, 18])) as MockErc20Permit;
 
       // Deploy registry
       registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
@@ -463,10 +463,13 @@ describe("UnderwritingLockVoting", function () {
     *********/
     /**
      * No vote can occur, gaugeController.updateGaugeWeights() and underwritingLockVoting.chargePremiums() has been completed for the last epoch, even at initialization.
+     * 
      * GaugeController.sol requires the following setup:
      * i.) Deployed with correct must be deployed with correct token variable.
      * ii.) addVotingContract() called to add UnderwritingLockVesting.sol.
+     * iii.) addTokenholder() called to add UnderwritingLocker.sol
      * 
+     * Successful call of UnderwritingLocker.setVotingContract()
      * i.) underwritingLockVoting must be added as a registry entry key
      * ii.) underwritingLocker must have approved underwritingLockVoting.sol as a spender for its balance of $UWE.
      * 

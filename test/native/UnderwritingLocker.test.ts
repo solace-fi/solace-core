@@ -1803,6 +1803,70 @@ describe("UnderwritingLocker", function () {
     });
   });
 
+  /*******************
+    STATE SUMMARY
+  *******************/
+  /**
+   * The following locks have been burned, and the IDs cannot be used again:
+   * 1, 2, 3, 4, 5, 6, 7, 8
+   * 
+   * The following locks exist:
+   * lockID 9 -> 6-month lock, 1e18 deposit
+   * lockID 10 -> 4-yr lock, 1e18 deposit
+   */
+
+  describe("chargePremium", function () {
+    const votingContractProxy = ethers.Wallet.createRandom().connect(provider);
+
+    it("will revert if called by non voting-contract", async function () {
+      await expect(underwritingLocker.connect(governor).chargePremium(1, 1)).to.be.revertedWith("NotVotingContract");
+    });
+    it("will revert if attempt to charge premium for non-existent lock", async function () {
+      await registry.connect(governor).set(["underwritingLockVoting"], [votingContractProxy.address])
+      await underwritingLocker.connect(governor).setVotingContract()
+      expect(await underwritingLocker.votingContract()).eq(votingContractProxy.address)
+      await expect(underwritingLocker.connect(votingContractProxy).chargePremium(1, 0)).to.be.revertedWith("ERC721: invalid token ID");
+    });
+    it("will revert if attempt to charge more premium than exists in the lock", async function () {
+      await expect(underwritingLocker.connect(votingContractProxy).chargePremium(9, DEPOSIT_AMOUNT.mul(2))).to.be.reverted;
+    });
+    it("premium can be charged, and listeners notified", async function () {
+      const LOCK_ID = 9;
+      const PREMIUM_AMOUNT = DEPOSIT_AMOUNT.div(2)
+      const oldLockState = await getLockState(LOCK_ID)
+
+      await user1.sendTransaction({to: votingContractProxy.address, value: ONE_ETHER}) // Send gas money
+      const tx = await underwritingLocker.connect(votingContractProxy).chargePremium(9, PREMIUM_AMOUNT)
+      const newLockState = await getLockState(LOCK_ID)
+      const lockStateChange = await getLockStateChange(newLockState, oldLockState)
+      expect(lockStateChange.amount).eq(PREMIUM_AMOUNT.mul(-1))
+
+      const listenerUpdate = await listener.lastUpdate();
+      expect(listenerUpdate.caller).eq(underwritingLocker.address);
+      expect(listenerUpdate.lockID).eq(LOCK_ID);
+      expect(listenerUpdate.oldOwner).eq(user1.address);
+      expect(listenerUpdate.newOwner).eq(user1.address);
+      expect(listenerUpdate.oldLock.amount).eq(oldLockState.amount);
+      expect(listenerUpdate.oldLock.end).eq(oldLockState.end);
+      expect(listenerUpdate.newLock.amount).eq(newLockState.amount);
+      expect(listenerUpdate.newLock.end).eq(newLockState.end);
+    });
+
+  /*******************
+    STATE SUMMARY
+  *******************/
+  /**
+   * The following locks have been burned, and the IDs cannot be used again:
+   * 1, 2, 3, 4, 5, 6, 7, 8
+   * 
+   * The following locks exist:
+   * lockID 9 -> 6-month lock, 5e17 deposit
+   * lockID 10 -> 4-yr lock, 1e18 deposit
+   */
+
+
+  });
+
   /******************
     HELPER CLOSURES
   ******************/

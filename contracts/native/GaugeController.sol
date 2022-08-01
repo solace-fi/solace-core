@@ -72,6 +72,9 @@ contract GaugeController is
     /// @notice Set of voting contracts conforming to IGaugeVoting.sol interface. Sources of aggregated voting data.
     EnumerableSet.AddressSet internal _votingContracts;
 
+    /// @notice Set of addresses from which getInsuranceCapacity() will tally UWE supply from.
+    EnumerableSet.AddressSet internal _tokenholders;
+
     /// @notice votingContract address => voteID => gaugeID of vote
     /// @dev voteID is the unique identifier for each individual vote. In the case of UnderwritingLockVoting.sol, lockID = voteID.
     mapping(address => EnumerableMap.UintToUintMap) internal _votes;
@@ -264,7 +267,11 @@ contract GaugeController is
      * @return insuranceCapacity Insurance capacity in $UWE.
      */
     function getInsuranceCapacity() external view override returns (uint256 insuranceCapacity) {
-        return (leverageFactor * IERC20(token).totalSupply() / 1e18);
+        uint256 tokenBalance;
+        for (uint256 i = 0; i < _tokenholders.length(); i++) {
+            tokenBalance += IERC20(token).balanceOf(_tokenholders.at(i));
+        }
+        return (leverageFactor * tokenBalance / 1e18);
     }
 
     /**
@@ -390,6 +397,27 @@ contract GaugeController is
     function setToken(address token_) external override onlyGovernance {
         token = token_;
         emit TokenSet(token_);
+    }
+
+    /**
+     * @notice Adds an address to set of tokenholders, whose token balances will be queried and summed to determine insurance capacity.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param tokenholder_ Address of new tokenholder.
+     */
+    function addTokenholder(address tokenholder_) external override onlyGovernance {
+        _tokenholders.add(tokenholder_);
+        emit TokenholderAdded(tokenholder_);
+    }
+
+    /**
+     * @notice Removes an address to set of tokenholders, whose token balances will be queried and summed to determine insurance capacity.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param tokenholder_ Address of new tokenholder.
+     */
+    function removeTokenholder(address tokenholder_) external override onlyGovernance {
+        bool success = _tokenholders.remove(tokenholder_);
+        if (!success) revert TokenholderNotPresent();
+        emit TokenholderRemoved(tokenholder_);
     }
 
     /**

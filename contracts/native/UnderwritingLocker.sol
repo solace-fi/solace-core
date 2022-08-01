@@ -635,6 +635,7 @@ contract UnderwritingLocker is
     /**
      * @notice Perform accounting for voting premiums to be charged by UnderwritingLockVoting.chargePremiums().
      * @dev Can only be called by votingContract set in the registry.
+     * @dev Not meant to be called directly, and within UnderwritingLockVoting.chargePremiums().
      * @param lockID_ The ID of the lock to charge premium.
      * @param premium_ The amount of token charged as premium.
      */

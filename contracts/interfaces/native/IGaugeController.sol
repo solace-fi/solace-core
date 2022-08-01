@@ -63,6 +63,9 @@ interface IGaugeController {
     /// @notice Thrown when vote() is called with gaugeID that is paused.
     error VotedGaugeIDPaused();
 
+    /// @notice Thrown when removeTokenholder() is attempted for an address not in the tokenholder set.
+    error TokenholderNotPresent();
+
     /***************************************
     EVENTS
     ***************************************/
@@ -93,6 +96,12 @@ interface IGaugeController {
 
     /// @notice Emitted when address of underwriting equity token is set.
     event TokenSet(address indexed token);
+
+    /// @notice Emitted when address added to tokenholder set.
+    event TokenholderAdded(address indexed tokenholder);
+
+    /// @notice Emitted when address removed from tokenholder set.
+    event TokenholderRemoved(address indexed tokenholder);
 
     /***************************************
     GLOBAL VARIABLES
@@ -278,6 +287,19 @@ interface IGaugeController {
      */
     function setToken(address token_) external;
 
+    /**
+     * @notice Adds an address to set of tokenholders, whose token balances will be queried and summed to determine insurance capacity.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param tokenholder_ Address of new tokenholder.
+     */
+    function addTokenholder(address tokenholder_) external;
+
+    /**
+     * @notice Removes an address to set of tokenholders, whose token balances will be queried and summed to determine insurance capacity.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param tokenholder_ Address of new tokenholder.
+     */
+    function removeTokenholder(address tokenholder_) external;
     /**
      * @notice Set rate on line for selected gaugeIDs
      * @dev 1e18 => 100%
