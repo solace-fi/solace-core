@@ -2,15 +2,16 @@
 pragma solidity 0.8.6;
 
 /**
- * @title IGaugeController
+ * @title GaugeController
  * @author solace.fi
- * @notice Maintains list (historical and current) Solace Native insurance gauges and corresponding weights. 
+ * @notice Maintains list (historical and current) Solace Native insurance gauges and corresponding weights. Also stores individual votes.
  * 
  * Current gauge weights can be obtained through [`getGaugeWeight()`](#getgaugeweight) and [`getAllGaugeWeights()`](#getallgaugeweights)
  *
- * Only governance can make mutator calls to GaugeController.sol. There are no unpermission external mutator calls in this contract.
+ * Only governance can make mutator calls to GaugeController.sol. There are no unpermissioned external mutator calls in this contract.
  * 
- * After every epoch, governance must call [`updateGaugeWeights()`](#updategaugeweights) to get voting data from Voting contracts (contracts that conform to interface defined by IGaugeVoter.sol).
+ * After every epoch, governance must call [`updateGaugeWeights()`](#updategaugeweights). This will process the last epoch's votes (stored in this contract), and will pass information required for premium charges to the VotingContract via IGaugeVoter.setLastProcessedVotePower()
+ * 
  * Individual voters register and manage their vote through Voting contracts.
  *
  * Governance can [`addGauge()`](#addgauge) or [`pauseGauge()`](#pausegauge).
@@ -151,7 +152,7 @@ interface IGaugeController {
      * @return weights
      * @dev weights[0] will always be 0, so that weights[1] maps to the weight of gaugeID 1.
      */
-    function getAllGaugeWeight() external view returns (uint256[] memory weights);
+    function getAllGaugeWeights() external view returns (uint256[] memory weights);
 
     /**
      * @notice Get number of active gauges

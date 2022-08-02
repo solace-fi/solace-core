@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "./../utils/Governable.sol";
 import "./../interfaces/native/IGaugeVoter.sol";
 import "./../interfaces/native/IGaugeController.sol";
+import "hardhat/console.sol";
 
 // TODO
 // @dev how to require interface when adding voting contract?
@@ -16,13 +17,14 @@ import "./../interfaces/native/IGaugeController.sol";
 /**
  * @title GaugeController
  * @author solace.fi
- * @notice Maintains list (historical and current) Solace Native insurance gauges and corresponding weights. 
+ * @notice Maintains list (historical and current) Solace Native insurance gauges and corresponding weights. Also stores individual votes.
  * 
  * Current gauge weights can be obtained through [`getGaugeWeight()`](#getgaugeweight) and [`getAllGaugeWeights()`](#getallgaugeweights)
  *
- * Only governance can make mutator calls to GaugeController.sol. There are no unpermission external mutator calls in this contract.
+ * Only governance can make mutator calls to GaugeController.sol. There are no unpermissioned external mutator calls in this contract.
  * 
- * After every epoch, governance must call [`updateGaugeWeights()`](#updategaugeweights) to get voting data from Voting contracts (contracts that conform to interface defined by IGaugeVoter.sol).
+ * After every epoch, governance must call [`updateGaugeWeights()`](#updategaugeweights). This will process the last epoch's votes (stored in this contract), and will pass information required for premium charges to the VotingContract via IGaugeVoter.setLastProcessedVotePower()
+ * 
  * Individual voters register and manage their vote through Voting contracts.
  *
  * Governance can [`addGauge()`](#addgauge) or [`pauseGauge()`](#pausegauge).
@@ -109,7 +111,8 @@ contract GaugeController is
     {
         token = token_;
         leverageFactor = 1e18; // Default 1x leverage factor
-        Gauge memory newGauge = Gauge(false, 0, ""); // Pre-fill slot 0 of _gauges, ensure gaugeID 1 maps to _gauges[1]
+        Gauge memory newGauge = Gauge(true, 0, ""); // Pre-fill slot 0 of _gauges, ensure gaugeID 1 maps to _gauges[1]
+        // Need gaugeID 0 to be active, so users can vote for it (to effectively cancel out votes)
         _gauges.push(newGauge); 
     }
 
@@ -214,7 +217,7 @@ contract GaugeController is
      * @return weights
      * @dev weights[0] will always be 0, so that weights[1] maps to the weight of gaugeID 1.
      */
-    function getAllGaugeWeight() external view override returns (uint256[] memory weights) {
+    function getAllGaugeWeights() external view override returns (uint256[] memory weights) {
         return _getAllGaugeWeights();
     }
 
@@ -439,9 +442,11 @@ contract GaugeController is
      * @notice Updates gauge weights by processing votes for the last epoch.
      * @dev Can only be called to completion once per epoch.
      * @dev Requires all Voting contracts to had votes processed for this epoch
+     * @dev This function design is not compatible with ReentrancyGuard.sol. Because the Reentrancy lock is only released once the full function body has been executed, but if we do an early return it will remain locked.
+     * @dev So the question is, are we concerned about reentrancy in this function? There's no value transfer here as in the classic Reentrancy attack.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      */
-    function updateGaugeWeights() external override nonReentrant onlyGovernance {
+    function updateGaugeWeights() external override onlyGovernance {
         uint256 epochStartTime = _getEpochStartTimestamp();
         if (lastTimeGaugeWeightsUpdated >= epochStartTime) revert GaugeWeightsAlreadyUpdated();
         uint256 startIndex_votingContracts = _updateInfo.finishedLastUpdate ? 0 : _updateInfo.savedIndexOfVotingContracts;
@@ -457,8 +462,9 @@ contract GaugeController is
                 // Measure for unbounded loop.
                 // Use inline assembly to measure gas remaining => if insufficient, save progress and return.
                 // Need to measure how much gas it takes minimum after this loop
+                console.log("processVotes 1 %s" , gasleft());
                 assembly {
-                    if lt(gas(), 20000) {
+                    if lt(gas(), 60000) {
                         // Use struct packing to make one sstore operation (vs 3 without)
                         let updateInfo
                         // updateInfo.finishedLastUpdate = [0:8] == false
@@ -479,14 +485,19 @@ contract GaugeController is
                         return(0, 0)
                     }
                 }
+                console.log("processVotes 2 %s" , gasleft());
 
                 (uint256 voteID, uint256 gaugeID) = _votes[votingContract].at(j);
-                if (gaugeID == 0) {
-                    IGaugeVoter(votingContract).setLastProcessedVotePower(voteID, 0, 0);
+                // Votes don't count if i.) gaugeID == 0, or ii.) gauge paused
+                // If don't have 2nd conditional, we can have edge case where someone votes when gauge is active (cannot vote for gauge when paused)
+                //, gauge paused after, but they will still be paying for the vote for a paused gauge
+                if (gaugeID == 0 || !_gauges[gaugeID].active) {
+                    IGaugeVoter(votingContract).setLastProcessedVotePower(voteID, gaugeID, 0);
+                    console.log("skipped %s", voteID);
                     continue;
                 }
                 uint256 votePower = IGaugeVoter(votingContract).getVotePower(voteID);
-                _votePowerOfGaugeForEpoch[epochStartTime][gaugeID] += votePower;
+                _votePowerOfGaugeForEpoch[epochStartTime][gaugeID] += votePower; // This part is susceptible to re-entrancy
                 IGaugeVoter(votingContract).setLastProcessedVotePower(voteID, gaugeID, votePower);
             }
         }
@@ -494,5 +505,6 @@ contract GaugeController is
         _updateInfo.finishedLastUpdate = true;
         lastTimeGaugeWeightsUpdated = epochStartTime;
         emit GaugeWeightsUpdated(epochStartTime);
+        console.log("processVotes 3 %s" , gasleft());
     }
 }

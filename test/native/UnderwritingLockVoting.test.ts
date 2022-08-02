@@ -12,7 +12,8 @@ import { expectDeployed } from "../utilities/expectDeployed";
 import { expectClose } from "./../utilities/math";
 
 // To-do
-// Edge case of lock being burned.
+// Edge case of lock is burned after voting
+// Can we remove dead votes?
 
 /*******************
   GLOBAL CONSTANTS
@@ -28,9 +29,10 @@ const DEPOSIT_AMOUNT = ONE_ETHER;
 const WITHDRAW_AMOUNT = ONE_ETHER;
 const SCALE_FACTOR = ONE_ETHER;
 const ONE_PERCENT = ONE_ETHER.div(100);
+const ONE_HUNDRED_PERCENT = ONE_ETHER;
 
 describe("UnderwritingLockVoting", function () {
-    const [deployer, governor, revenueRouter, owner1, manager1, manager2, anon] = provider.getWallets();
+    const [deployer, governor, revenueRouter, owner1, delegate1, delegate2, anon] = provider.getWallets();
   
     /***************************
        VARIABLE DECLARATIONS
@@ -95,6 +97,7 @@ describe("UnderwritingLockVoting", function () {
           expect(await voting.isVotingOpen()).eq(false);
           expect(await voting.WEEK()).eq(ONE_WEEK);
           expect(await voting.MONTH()).eq(ONE_MONTH);
+          expect(await voting.YEAR()).eq(ONE_YEAR);
         });
         it("getEpochStartTimestamp gets current timestamp rounded down to a multiple of WEEK ", async function () {
           const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
@@ -104,8 +107,9 @@ describe("UnderwritingLockVoting", function () {
         it("getEpochEndTimestamp() == getEpochStartTimestamp() + ONE_WEEK ", async function () {
           expect(await voting.getEpochEndTimestamp()).eq((await voting.getEpochStartTimestamp()).add(ONE_WEEK))
         });
-        it("getVotePower should throw for an invalid lockID", async function () {
-          await expect(voting.getVotePower(1)).to.be.revertedWith("query for nonexistent token")
+        it("getVotePower should return 0 for a invalid lockID", async function () {
+          await expect(underwritingLocker.locks(1)).to.be.revertedWith("query for nonexistent token")
+          expect(await voting.getVotePower(1)).eq(0)
         });
         it("getVote should throw before voting contract added to GaugeController.sol", async function () {
           await expect(voting.getVote(1)).to.be.revertedWith("NotVotingContract");
@@ -188,7 +192,7 @@ describe("UnderwritingLockVoting", function () {
         });
     });
 
-    describe("setLockManager", () => {
+    describe("setLockDelegate", () => {
         // Create four locks for owner1, lockID 1 => 1yr, lockID 2 => 2yr, lockID 3 => 3yr, lockID 4 => 4yr
         before(async function () {
             const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
@@ -198,28 +202,28 @@ describe("UnderwritingLockVoting", function () {
             await underwritingLocker.connect(owner1).createLock(owner1.address, DEPOSIT_AMOUNT, CURRENT_TIME + 2 * ONE_YEAR);
             await underwritingLocker.connect(owner1).createLock(owner1.address, DEPOSIT_AMOUNT, CURRENT_TIME + 3 * ONE_YEAR);
             await underwritingLocker.connect(owner1).createLock(owner1.address, DEPOSIT_AMOUNT, CURRENT_TIME + 4 * ONE_YEAR);
-            expect(await voting.lockManagerOf(1)).eq(ZERO_ADDRESS)
-            expect(await voting.lockManagerOf(2)).eq(ZERO_ADDRESS)
-            expect(await voting.lockManagerOf(3)).eq(ZERO_ADDRESS)
-            expect(await voting.lockManagerOf(4)).eq(ZERO_ADDRESS)
+            expect(await voting.lockDelegateOf(1)).eq(ZERO_ADDRESS)
+            expect(await voting.lockDelegateOf(2)).eq(ZERO_ADDRESS)
+            expect(await voting.lockDelegateOf(3)).eq(ZERO_ADDRESS)
+            expect(await voting.lockDelegateOf(4)).eq(ZERO_ADDRESS)
         });
         it("cannot set for non-existent lock", async function () {
-          await expect(voting.connect(manager1).setLockManager(5, manager1.address)).to.be.revertedWith("ERC721: invalid token ID");          
+          await expect(voting.connect(delegate1).setLockDelegate(5, delegate1.address)).to.be.revertedWith("ERC721: invalid token ID");          
         })
-        it("non-owner cannot set manager", async function () {
-            await expect(voting.connect(manager1).setLockManager(1, manager1.address)).to.be.revertedWith("NotOwner");
+        it("non-owner cannot set delegate", async function () {
+            await expect(voting.connect(delegate1).setLockDelegate(1, delegate1.address)).to.be.revertedWith("NotOwner");
         })
-        it("owner can set manager", async function () {
-            const tx = await voting.connect(owner1).setLockManager(1, manager1.address);
-            await expect(tx).to.emit(voting, "LockManagerSet").withArgs(1, manager1.address);
-            expect(await voting.lockManagerOf(1)).eq(manager1.address)
+        it("owner can set delegate", async function () {
+            const tx = await voting.connect(owner1).setLockDelegate(1, delegate1.address);
+            await expect(tx).to.emit(voting, "LockDelegateSet").withArgs(1, delegate1.address);
+            expect(await voting.lockDelegateOf(1)).eq(delegate1.address)
         })
-        it("owner can set manager again", async function () {
-            const tx = await voting.connect(owner1).setLockManager(1, manager2.address);
-            await expect(tx).to.emit(voting, "LockManagerSet").withArgs(1, manager2.address);
-            expect(await voting.lockManagerOf(1)).eq(manager2.address)
-            await voting.connect(owner1).setLockManager(1, manager1.address);
-            expect(await voting.lockManagerOf(1)).eq(manager1.address)
+        it("owner can set delegate again", async function () {
+            const tx = await voting.connect(owner1).setLockDelegate(1, delegate2.address);
+            await expect(tx).to.emit(voting, "LockDelegateSet").withArgs(1, delegate2.address);
+            expect(await voting.lockDelegateOf(1)).eq(delegate2.address)
+            await voting.connect(owner1).setLockDelegate(1, delegate1.address);
+            expect(await voting.lockDelegateOf(1)).eq(delegate1.address)
         })
     });
 
@@ -228,35 +232,35 @@ describe("UnderwritingLockVoting", function () {
   *******************/
   /**
    * There are four locks owned by owner1:
-   * lockID 1 => 1e18 locked for 1 yr, managed by manager1
+   * lockID 1 => 1e18 locked for 1 yr, managed by delegate1
    * lockID 2 => 1e18 locked for 2 yrs
    * lockID 3 => 1e18 locked for 3 yrs
    * lockID 4 => 1e18 locked for 4 yrs
    */
 
-    describe("setLockManagerMultiple", () => {
+    describe("setLockDelegateMultiple", () => {
       it("must provide argument arrays of matching length", async function () {
-          await expect(voting.connect(owner1).setLockManagerMultiple([2, 3], [manager1.address])).to.be.revertedWith("ArrayArgumentsLengthMismatch");
+          await expect(voting.connect(owner1).setLockDelegateMultiple([2, 3], [delegate1.address])).to.be.revertedWith("ArrayArgumentsLengthMismatch");
         });
       it("cannot set for non-existent lock", async function () {
-        await expect(voting.connect(manager1).setLockManagerMultiple([5, 3], [manager1.address, manager1.address])).to.be.revertedWith("ERC721: invalid token ID");          
+        await expect(voting.connect(delegate1).setLockDelegateMultiple([5, 3], [delegate1.address, delegate1.address])).to.be.revertedWith("ERC721: invalid token ID");          
       })
-      it("non-owner cannot set manager", async function () {
-          await expect(voting.connect(manager1).setLockManagerMultiple([2, 3], [manager1.address, manager1.address])).to.be.revertedWith("NotOwner");
+      it("non-owner cannot set delegate", async function () {
+          await expect(voting.connect(delegate1).setLockDelegateMultiple([2, 3], [delegate1.address, delegate1.address])).to.be.revertedWith("NotOwner");
       })
-      it("owner can set multiple manager", async function () {
-          const tx = await voting.connect(owner1).setLockManagerMultiple([2, 3], [manager1.address, manager1.address]);
-          await expect(tx).to.emit(voting, "LockManagerSet").withArgs(2, manager1.address);
-          await expect(tx).to.emit(voting, "LockManagerSet").withArgs(3, manager1.address);
-          expect(await voting.lockManagerOf(2)).eq(manager1.address)
-          expect(await voting.lockManagerOf(3)).eq(manager1.address)
+      it("owner can set multiple delegate", async function () {
+          const tx = await voting.connect(owner1).setLockDelegateMultiple([2, 3], [delegate1.address, delegate1.address]);
+          await expect(tx).to.emit(voting, "LockDelegateSet").withArgs(2, delegate1.address);
+          await expect(tx).to.emit(voting, "LockDelegateSet").withArgs(3, delegate1.address);
+          expect(await voting.lockDelegateOf(2)).eq(delegate1.address)
+          expect(await voting.lockDelegateOf(3)).eq(delegate1.address)
       })
-      it("owner can set manager again", async function () {
-          const tx = await voting.connect(owner1).setLockManagerMultiple([2, 3], [manager2.address, manager2.address]);
-          await expect(tx).to.emit(voting, "LockManagerSet").withArgs(2, manager2.address);
-          await expect(tx).to.emit(voting, "LockManagerSet").withArgs(3, manager2.address);
-          expect(await voting.lockManagerOf(2)).eq(manager2.address)
-          expect(await voting.lockManagerOf(3)).eq(manager2.address)
+      it("owner can set delegate again", async function () {
+          const tx = await voting.connect(owner1).setLockDelegateMultiple([2, 3], [delegate2.address, delegate2.address]);
+          await expect(tx).to.emit(voting, "LockDelegateSet").withArgs(2, delegate2.address);
+          await expect(tx).to.emit(voting, "LockDelegateSet").withArgs(3, delegate2.address);
+          expect(await voting.lockDelegateOf(2)).eq(delegate2.address)
+          expect(await voting.lockDelegateOf(3)).eq(delegate2.address)
       })
     });
 
@@ -265,46 +269,46 @@ describe("UnderwritingLockVoting", function () {
     *******************/
     /**
      * There are four locks owned by owner1:
-     * lockID 1 => 1e18 locked for 1 yr, managed by manager1
-     * lockID 2 => 1e18 locked for 2 yrs, managed by manager2
-     * lockID 3 => 1e18 locked for 3 yrs, managed by manager2
+     * lockID 1 => 1e18 locked for 1 yr, managed by delegate1
+     * lockID 2 => 1e18 locked for 2 yrs, managed by delegate2
+     * lockID 3 => 1e18 locked for 3 yrs, managed by delegate2
      * lockID 4 => 1e18 locked for 4 yrs
      */
 
-    // describe("getVotePower() sanity check", () => {
-    //   it("should return appropriate value for 1-yr lock", async function () {
-    //     const LOCK_ID = 1;
-    //     expectClose(await underwritingLocker.timeLeft(LOCK_ID), ONE_YEAR, 1e15)
-    //     // Expect lock multiplier = sqrt(12) / sqrt(6) = sqrt(2)
-    //     const EXPECTED_LOCK_MULTIPLIER = sqrt(SCALE_FACTOR.mul(SCALE_FACTOR).mul(2));
-    //     expectClose(await underwritingLocker.getLockMultiplier(LOCK_ID), EXPECTED_LOCK_MULTIPLIER, 1e15)
-    //     expectClose(await voting.getVotePower(LOCK_ID), EXPECTED_LOCK_MULTIPLIER.mul(DEPOSIT_AMOUNT).div(SCALE_FACTOR), 1e15);
-    //   });
-    //   it("should return appropriate value for 2-yr lock", async function () {
-    //     const LOCK_ID = 2;
-    //     expectClose(await underwritingLocker.timeLeft(LOCK_ID), 2 * ONE_YEAR, 1e15)
-    //     // Expect lock multiplier = sqrt(24) / sqrt(6) = 2
-    //     const EXPECTED_LOCK_MULTIPLIER = SCALE_FACTOR.mul(2);
-    //     expectClose(await underwritingLocker.getLockMultiplier(LOCK_ID), EXPECTED_LOCK_MULTIPLIER, 1e15)
-    //     expectClose(await voting.getVotePower(LOCK_ID), EXPECTED_LOCK_MULTIPLIER.mul(DEPOSIT_AMOUNT).div(SCALE_FACTOR), 1e15);
-    //   });
-    //   it("should return appropriate value for 3-yr lock", async function () {
-    //     const LOCK_ID = 3;
-    //     expectClose(await underwritingLocker.timeLeft(LOCK_ID), 3 * ONE_YEAR, 1e15)
-    //     // Expect lock multiplier = sqrt(36) / sqrt(6) = sqrt(6)
-    //     const EXPECTED_LOCK_MULTIPLIER = sqrt(SCALE_FACTOR.mul(SCALE_FACTOR).mul(6));
-    //     expectClose(await underwritingLocker.getLockMultiplier(LOCK_ID), EXPECTED_LOCK_MULTIPLIER, 1e15)
-    //     expectClose(await voting.getVotePower(LOCK_ID), EXPECTED_LOCK_MULTIPLIER.mul(DEPOSIT_AMOUNT).div(SCALE_FACTOR), 1e15);
-    //   });
-    //   it("should return appropriate value for 4-yr lock", async function () {
-    //     const LOCK_ID = 4;
-    //     expectClose(await underwritingLocker.timeLeft(LOCK_ID), 4 * ONE_YEAR, 1e15)
-    //     // Expect lock multiplier = sqrt(48) / sqrt(6) = sqrt(8)
-    //     const EXPECTED_LOCK_MULTIPLIER = sqrt(SCALE_FACTOR.mul(SCALE_FACTOR).mul(8));
-    //     expectClose(await underwritingLocker.getLockMultiplier(LOCK_ID), EXPECTED_LOCK_MULTIPLIER, 1e15)
-    //     expectClose(await voting.getVotePower(LOCK_ID), EXPECTED_LOCK_MULTIPLIER.mul(DEPOSIT_AMOUNT).div(SCALE_FACTOR), 1e15);
-    //   });
-    // });
+    describe("getVotePower() sanity check", () => {
+      it("should return appropriate value for 1-yr lock", async function () {
+        const LOCK_ID = 1;
+        expectClose(await underwritingLocker.timeLeft(LOCK_ID), ONE_YEAR, 1e15)
+        // Expect lock multiplier = sqrt(12) / sqrt(6) = sqrt(2)
+        const EXPECTED_LOCK_MULTIPLIER = sqrt(SCALE_FACTOR.mul(SCALE_FACTOR).mul(2));
+        expectClose(await underwritingLocker.getLockMultiplier(LOCK_ID), EXPECTED_LOCK_MULTIPLIER, 1e15)
+        expectClose(await voting.getVotePower(LOCK_ID), EXPECTED_LOCK_MULTIPLIER.mul(DEPOSIT_AMOUNT).div(SCALE_FACTOR), 1e15);
+      });
+      it("should return appropriate value for 2-yr lock", async function () {
+        const LOCK_ID = 2;
+        expectClose(await underwritingLocker.timeLeft(LOCK_ID), 2 * ONE_YEAR, 1e15)
+        // Expect lock multiplier = sqrt(24) / sqrt(6) = 2
+        const EXPECTED_LOCK_MULTIPLIER = SCALE_FACTOR.mul(2);
+        expectClose(await underwritingLocker.getLockMultiplier(LOCK_ID), EXPECTED_LOCK_MULTIPLIER, 1e15)
+        expectClose(await voting.getVotePower(LOCK_ID), EXPECTED_LOCK_MULTIPLIER.mul(DEPOSIT_AMOUNT).div(SCALE_FACTOR), 1e15);
+      });
+      it("should return appropriate value for 3-yr lock", async function () {
+        const LOCK_ID = 3;
+        expectClose(await underwritingLocker.timeLeft(LOCK_ID), 3 * ONE_YEAR, 1e15)
+        // Expect lock multiplier = sqrt(36) / sqrt(6) = sqrt(6)
+        const EXPECTED_LOCK_MULTIPLIER = sqrt(SCALE_FACTOR.mul(SCALE_FACTOR).mul(6));
+        expectClose(await underwritingLocker.getLockMultiplier(LOCK_ID), EXPECTED_LOCK_MULTIPLIER, 1e15)
+        expectClose(await voting.getVotePower(LOCK_ID), EXPECTED_LOCK_MULTIPLIER.mul(DEPOSIT_AMOUNT).div(SCALE_FACTOR), 1e15);
+      });
+      it("should return appropriate value for 4-yr lock", async function () {
+        const LOCK_ID = 4;
+        expectClose(await underwritingLocker.timeLeft(LOCK_ID), 4 * ONE_YEAR, 1e15)
+        // Expect lock multiplier = sqrt(48) / sqrt(6) = sqrt(8)
+        const EXPECTED_LOCK_MULTIPLIER = sqrt(SCALE_FACTOR.mul(SCALE_FACTOR).mul(8));
+        expectClose(await underwritingLocker.getLockMultiplier(LOCK_ID), EXPECTED_LOCK_MULTIPLIER, 1e15)
+        expectClose(await voting.getVotePower(LOCK_ID), EXPECTED_LOCK_MULTIPLIER.mul(DEPOSIT_AMOUNT).div(SCALE_FACTOR), 1e15);
+      });
+    });
 
     /*********************
       INTENTION STATEMENT 
@@ -314,8 +318,9 @@ describe("UnderwritingLockVoting", function () {
     describe("basic vote() scenario", () => {
       let LAST_RECORDED_VOTE_POWER: BN; // To transport VOTE_POWER value from one unit test to another.
 
-      it("vote() should throw if gauge weights have not been processed", async function () {
+      it("vote() and voteMultiple() should throw if gauge weights have not been processed", async function () {
         await expect(voting.connect(owner1).vote(1, 1)).to.be.revertedWith("LastEpochPremiumsNotCharged");
+        await expect(voting.connect(owner1).voteMultiple([1, 2], [1, 1])).to.be.revertedWith("LastEpochPremiumsNotCharged");
       });
       it("updateGaugeWeights() should revert if non governor", async function () {
         await expect(gaugeController.connect(owner1).updateGaugeWeights()).to.be.revertedWith("!governance");
@@ -340,8 +345,9 @@ describe("UnderwritingLockVoting", function () {
       it("isVotingOpen() should return false at this point", async function () {
         expect(await voting.isVotingOpen()).eq(false);
       });
-      it("vote() should throw if premiums have not been charged", async function () {
+      it("vote() and voteMultiple() should throw if premiums have not been charged", async function () {
         await expect(voting.connect(owner1).vote(1, 1)).to.be.revertedWith("LastEpochPremiumsNotCharged");
+        await expect(voting.connect(owner1).voteMultiple([1, 2], [1, 1])).to.be.revertedWith("LastEpochPremiumsNotCharged");
       });
       it("chargePremiums() should succeed", async function () {
         const EPOCH_START_TIME = await voting.getEpochStartTimestamp();
@@ -356,14 +362,17 @@ describe("UnderwritingLockVoting", function () {
       it("chargePremiums() should revert if attempted again in the same epoch", async function () {
         await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("LastEpochPremiumsAlreadyProcessed");
       });
-      it("non-owner or non-manager cannot vote", async function () {
-        await expect(voting.connect(anon).vote(1, 1)).to.be.revertedWith("NotOwnerNorManager()");
+      it("non-owner or non-delegate cannot vote() or voteMultiple()", async function () {
+        await expect(voting.connect(anon).vote(1, 1)).to.be.revertedWith("NotOwnerNorDelegate()");
+        await expect(voting.connect(anon).voteMultiple([1, 2], [1, 1])).to.be.revertedWith("NotOwnerNorDelegate");
       });
-      it("cannot vote for non-existent lock", async function () {
+      it("cannot vote() or voteMultiple() for non-existent lock", async function () {
         await expect(voting.connect(owner1).vote(5, 1)).to.be.revertedWith("ERC721: invalid token ID");
+        await expect(voting.connect(owner1).voteMultiple([5, 1], [1, 1])).to.be.revertedWith("ERC721: invalid token ID");
       });
-      it("cannot vote for gauge that has not been added", async function () {
+      it("cannot vote() or voteMultiple() for gauge that has not been added", async function () {
         await expect(voting.connect(owner1).vote(1, 1)).to.be.revertedWith("VotedGaugeIDNotExist");
+        await expect(voting.connect(owner1).voteMultiple([1, 2], [1, 1])).to.be.revertedWith("VotedGaugeIDNotExist");
       });
       it("non-governor cannot add gauge", async function () {
         await expect(gaugeController.connect(owner1).addGauge("gauge1", ONE_PERCENT)).to.be.revertedWith("!governance");
@@ -383,14 +392,14 @@ describe("UnderwritingLockVoting", function () {
         await expect(tx).to.emit(voting, "Vote").withArgs(LOCK_ID, GAUGE_ID, owner1.address, EPOCH_END_TIME, VOTE_POWER);
         expect(await voting.getVote(LOCK_ID)).eq(GAUGE_ID)
       });
-      it("manager can vote", async function () {
+      it("delegate can vote", async function () {
         const LOCK_ID = 1;
         const GAUGE_ID = 1;
-        expect(await voting.lockManagerOf(LOCK_ID)).eq(manager1.address)
-        const tx = await voting.connect(manager1).vote(LOCK_ID, GAUGE_ID)
+        expect(await voting.lockDelegateOf(LOCK_ID)).eq(delegate1.address)
+        const tx = await voting.connect(delegate1).vote(LOCK_ID, GAUGE_ID)
         const EPOCH_END_TIME = await voting.getEpochEndTimestamp();
         const VOTE_POWER = await voting.getVotePower(LOCK_ID)
-        await expect(tx).to.emit(voting, "Vote").withArgs(LOCK_ID, GAUGE_ID, manager1.address, EPOCH_END_TIME, VOTE_POWER);
+        await expect(tx).to.emit(voting, "Vote").withArgs(LOCK_ID, GAUGE_ID, delegate1.address, EPOCH_END_TIME, VOTE_POWER);
         expect(await voting.getVote(LOCK_ID)).eq(GAUGE_ID)
       });
       it("no premiums should have been collected at this point", async function () {
@@ -405,9 +414,11 @@ describe("UnderwritingLockVoting", function () {
         expect(await gaugeController.totalGauges()).eq(1)
         expect(await gaugeController.getNumPausedGauges()).eq(1)
       });
-      it("neither owner nor manager can vote while gauge paused", async function() {
+      it("neither owner nor delegate can vote() or voteMultiple() while gauge paused", async function() {
         await expect(voting.connect(owner1).vote(1, 1)).to.be.revertedWith("VotedGaugeIDPaused");
-        await expect(voting.connect(manager1).vote(1, 1)).to.be.revertedWith("VotedGaugeIDPaused");
+        await expect(voting.connect(owner1).voteMultiple([1, 2], [1, 1])).to.be.revertedWith("VotedGaugeIDPaused");
+        await expect(voting.connect(delegate1).vote(1, 1)).to.be.revertedWith("VotedGaugeIDPaused");
+        await expect(voting.connect(delegate1).voteMultiple([1, 2], [1, 1])).to.be.revertedWith("VotedGaugeIDPaused");
         await gaugeController.connect(governor).unpauseGauge(1);
       })
       it("processVotes() should succeed in the next epoch", async function () {
@@ -420,17 +431,25 @@ describe("UnderwritingLockVoting", function () {
         const VOTE_POWER = await voting.getVotePower(LOCK_ID);
         await expect(tx).to.emit(gaugeController, "GaugeWeightsUpdated").withArgs(EPOCH_START_TIME);
         await expect(tx).to.emit(voting, "VoteProcessed").withArgs(LOCK_ID, GAUGE_ID, EPOCH_START_TIME, VOTE_POWER)
-        expect(await voting.isVotingOpen()).eq(false)
-        expect(await gaugeController.getVotePowerSum()).eq(VOTE_POWER)
-        await expect(voting.connect(owner1).vote(1, 1)).to.be.revertedWith("LastEpochPremiumsNotCharged");
         LAST_RECORDED_VOTE_POWER = VOTE_POWER;
       });
+      it("sanity check of gauge weights", async function () {
+        expect(await gaugeController.getGaugeWeight(1)).eq(ONE_HUNDRED_PERCENT)
+        expect(await gaugeController.getAllGaugeWeights()).deep.eq([ZERO, ONE_HUNDRED_PERCENT]);
+        expect(await gaugeController.getVotePowerSum()).eq(LAST_RECORDED_VOTE_POWER)
+      });      
+      it("cannot vote or voteMultiple, between processVotes() and chargePremiums() for the same epoch", async function () {
+        expect(await voting.isVotingOpen()).eq(false)
+        await expect(voting.connect(owner1).vote(1, 1)).to.be.revertedWith("LastEpochPremiumsNotCharged");
+        await expect(voting.connect(delegate1).voteMultiple([1, 2], [1, 1])).to.be.revertedWith("LastEpochPremiumsNotCharged");
+      });      
       it("chargePremiums() should revert before underwritingLocker.sol call setVotingContract()", async function () {
         await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("NotVotingContract");
       });
       it("chargePremiums() should succeed in the next epoch, provided allowance granted by underwritingLocker", async function () {
         await registry.connect(governor).set(["underwritingLockVoting"],[voting.address]);
         await underwritingLocker.connect(governor).setVotingContract();
+        await gaugeController.connect(governor).addTokenholder(underwritingLocker.address)
         const LOCK_ID = 1;
         const GAUGE_ID = 1;
         const OLD_LOCK_AMOUNT = (await underwritingLocker.locks(LOCK_ID)).amount;
@@ -441,12 +460,11 @@ describe("UnderwritingLockVoting", function () {
         const NEW_LOCK_AMOUNT = (await underwritingLocker.locks(LOCK_ID)).amount;
         const NEW_UNDERWRITING_LOCKER_BALANCE = await token.balanceOf(underwritingLocker.address);
 
-        // // Expect premium = UWE_total_supply * leverage * rateOnLine * votePower / votePowerSum
-        const UWE_TOTAL_SUPPLY = await token.totalSupply();
+        // // Expect premium = UWE_balance_of_underwritinglocker * leverage * rateOnLine * votePower / votePowerSum
         const LEVERAGE_FACTOR = await gaugeController.leverageFactor();
         const RATE_ON_LINE = await gaugeController.getRateOnLineOfGauge(GAUGE_ID);
         const VOTE_POWER_SUM = await gaugeController.getVotePowerSum();
-        const EXPECTED_PREMIUM = UWE_TOTAL_SUPPLY.mul(LEVERAGE_FACTOR).mul(RATE_ON_LINE).mul(ONE_WEEK).mul(LAST_RECORDED_VOTE_POWER).div(VOTE_POWER_SUM).div(ONE_YEAR).div(SCALE_FACTOR).div(SCALE_FACTOR)
+        const EXPECTED_PREMIUM = OLD_UNDERWRITING_LOCKER_BALANCE.mul(LEVERAGE_FACTOR).mul(RATE_ON_LINE).mul(ONE_WEEK).mul(LAST_RECORDED_VOTE_POWER).div(VOTE_POWER_SUM).div(ONE_YEAR).div(SCALE_FACTOR).div(SCALE_FACTOR)
 
         await expect(tx).to.emit(voting, "AllPremiumsCharged").withArgs(EPOCH_START_TIME);
         await expect(tx).to.emit(voting, "PremiumCharged").withArgs(LOCK_ID, EPOCH_START_TIME, EXPECTED_PREMIUM);
@@ -458,16 +476,16 @@ describe("UnderwritingLockVoting", function () {
 
     });
 
-    /*********
-      LESSON
-    *********/
+    /**********
+      LESSONS
+    **********/
     /**
      * No vote can occur, gaugeController.updateGaugeWeights() and underwritingLockVoting.chargePremiums() has been completed for the last epoch, even at initialization.
      * 
      * GaugeController.sol requires the following setup:
      * i.) Deployed with correct must be deployed with correct token variable.
-     * ii.) addVotingContract() called to add UnderwritingLockVesting.sol.
-     * iii.) addTokenholder() called to add UnderwritingLocker.sol
+     * ii.) gaugeController.addVotingContract() called to add UnderwritingLockVesting.sol.
+     * iii.) gaugeController.addTokenholder() called to add UnderwritingLocker.sol
      * 
      * Successful call of UnderwritingLocker.setVotingContract()
      * i.) underwritingLockVoting must be added as a registry entry key
@@ -476,24 +494,178 @@ describe("UnderwritingLockVoting", function () {
      * Most of UWE total supply should be sitting in the lock 
      */
 
+    /*******************
+      STATE SUMMARY
+    *******************/
+    /**
+     * There are four locks owned by owner1:
+     * lockID 1 => (1e18 - premium) locked for 1 yr, managed by delegate1, has a vote for gaugeID 1
+     * lockID 2 => 1e18 locked for 2 yrs, managed by delegate2
+     * lockID 3 => 1e18 locked for 3 yrs, managed by delegate2
+     * lockID 4 => 1e18 locked for 4 yrs
+     * 
+     * There is 1 gauge
+     * gaugeID 1 => "gauge1" => 100% weight
+     * 
+     * Votes and premiums have been processed for the last epoch
+     * lockID1 has been charged for one epoch
+     */
+
+    /**********************
+      INTENTION STATEMENT 
+    **********************/
+    /**
+     * We will add 2 more gauges, and create 1 more lock
+     * 
+     * lockID 1 => will vote for gaugeID 0 (cancel the vote)
+     * lockID 2 => will vote for gaugeID 2 (2% ROL)
+     * lockID 3 => will vote for gaugeID 3 (5% ROL)
+     * lockID 4 => will vote for gaugeID 1 (we will pause this gauge)
+     * lockID 5 => will vote for gaugeID 2, will burn this lock after voting, but before it is processed
+     */
+
+    describe("basic voteMultiple() scenario", () => {
+      let LAST_RECORDED_VOTE_POWER_1: BN;
+      let LAST_RECORDED_VOTE_POWER_2: BN;
+      let LAST_RECORDED_VOTE_POWER_3: BN;
+      let LAST_RECORDED_VOTE_POWER_4: BN;
+      let LAST_RECORDED_VOTE_POWER_5: BN;
+
+      // Create new lock
+      before(async function () {
+        const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
+        await underwritingLocker.connect(owner1).createLock(owner1.address, DEPOSIT_AMOUNT, CURRENT_TIME + 4 * ONE_YEAR)
+      });
+      it("should revert if provide mismatching array inputs", async function () {
+        await expect(voting.connect(owner1).voteMultiple([1, 2], [1])).to.be.revertedWith("ArrayArgumentsLengthMismatch");
+      });
+      it("owner should be able to voteMultiple()", async function () {
+        const LOCK_ID_1 = 1
+        const LOCK_ID_2 = 4
+        const GAUGE_ID_1 = 0
+        const GAUGE_ID_2 = 1
+        const tx = await voting.connect(owner1).voteMultiple([LOCK_ID_1, LOCK_ID_2], [GAUGE_ID_1, GAUGE_ID_2]);
+        const EPOCH_END_TIME = await voting.getEpochEndTimestamp()
+        const VOTE_POWER_1 = await voting.getVotePower(LOCK_ID_1)
+        const VOTE_POWER_2 = await voting.getVotePower(LOCK_ID_2)
+        await expect(tx).to.emit(voting, "Vote").withArgs(LOCK_ID_1, GAUGE_ID_1, owner1.address, EPOCH_END_TIME, VOTE_POWER_1);
+        await expect(tx).to.emit(voting, "Vote").withArgs(LOCK_ID_2, GAUGE_ID_2, owner1.address, EPOCH_END_TIME, VOTE_POWER_2);
+
+        // Setup state as per intention statement
+        await gaugeController.connect(governor).addGauge("gauge2", ONE_PERCENT.mul(2))
+        await gaugeController.connect(governor).addGauge("gauge3", ONE_PERCENT.mul(5))
+        await gaugeController.connect(governor).pauseGauge(1)
+      });
+      it("delegate should be able to voteMultiple()", async function () {
+        const LOCK_ID_1 = 2
+        const LOCK_ID_2 = 3
+        const LOCK_ID_3 = 5
+        await voting.connect(owner1).setLockDelegateMultiple([LOCK_ID_1, LOCK_ID_2, LOCK_ID_3], [delegate1.address, delegate1.address, delegate1.address])
+        const GAUGE_ID_1 = 2
+        const GAUGE_ID_2 = 3
+        const GAUGE_ID_3 = 2
+        const tx = await voting.connect(delegate1).voteMultiple([LOCK_ID_1, LOCK_ID_2, LOCK_ID_3], [GAUGE_ID_1, GAUGE_ID_2, GAUGE_ID_3]);
+        const EPOCH_END_TIME = await voting.getEpochEndTimestamp()
+        const VOTE_POWER_1 = await voting.getVotePower(LOCK_ID_1)
+        const VOTE_POWER_2 = await voting.getVotePower(LOCK_ID_2)
+        const VOTE_POWER_3 = await voting.getVotePower(LOCK_ID_3)
+        await expect(tx).to.emit(voting, "Vote").withArgs(LOCK_ID_1, GAUGE_ID_1, delegate1.address, EPOCH_END_TIME, VOTE_POWER_1);
+        await expect(tx).to.emit(voting, "Vote").withArgs(LOCK_ID_2, GAUGE_ID_2, delegate1.address, EPOCH_END_TIME, VOTE_POWER_2);
+        await expect(tx).to.emit(voting, "Vote").withArgs(LOCK_ID_3, GAUGE_ID_3, delegate1.address, EPOCH_END_TIME, VOTE_POWER_3);
+
+        await underwritingLocker.connect(owner1).withdraw(LOCK_ID_3, owner1.address)
+      });
+      it("cannot call updateGaugeWeights() before epoch passes", async function () {
+        await expect(gaugeController.connect(governor).updateGaugeWeights()).to.be.revertedWith("GaugeWeightsAlreadyUpdated");
+      });
+      it("cannot call chargePremiums() before epoch passes", async function () {
+        await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("LastEpochPremiumsAlreadyProcessed");
+      });
+      it("can updateGaugeWeights() in the next epoch", async function () {
+        const LOCK_ID_1 = 1
+        const LOCK_ID_2 = 2
+        const LOCK_ID_3 = 3
+        const LOCK_ID_4 = 4
+        const LOCK_ID_5 = 5
+        const VOTE_1 = await voting.getVote(LOCK_ID_1)
+        const VOTE_2 = await voting.getVote(LOCK_ID_2)
+        const VOTE_3 = await voting.getVote(LOCK_ID_3)
+        const VOTE_4 = await voting.getVote(LOCK_ID_4)
+        const VOTE_5 = await voting.getVote(LOCK_ID_5)
+
+        const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
+        await provider.send("evm_mine", [CURRENT_TIME + ONE_WEEK]);
+        await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("GaugeWeightsNotYetUpdated");
+        const tx1 = await gaugeController.connect(governor).updateGaugeWeights()
+        await expect(tx1).to.emit(gaugeController, "GaugeWeightsUpdated");
+
+        const EPOCH_START_TIME = await voting.getEpochStartTimestamp();
+        const VOTE_POWER_2 = await voting.getVotePower(LOCK_ID_2);
+        const VOTE_POWER_3 = await voting.getVotePower(LOCK_ID_3);
+        const VOTE_POWER_5 = await voting.getVotePower(LOCK_ID_5);
+
+        expect(VOTE_POWER_5).eq(0) // lock burned
+        await expect(tx1).to.emit(voting, "VoteProcessed").withArgs(LOCK_ID_1, VOTE_1, EPOCH_START_TIME, 0) // gaugeID 0 => cancel vote
+        await expect(tx1).to.emit(voting, "VoteProcessed").withArgs(LOCK_ID_2, VOTE_2, EPOCH_START_TIME, VOTE_POWER_2)
+        await expect(tx1).to.emit(voting, "VoteProcessed").withArgs(LOCK_ID_3, VOTE_3, EPOCH_START_TIME, VOTE_POWER_3)
+        await expect(tx1).to.emit(voting, "VoteProcessed").withArgs(LOCK_ID_4, VOTE_4, EPOCH_START_TIME, 0) // gaugeID 1 => paused gauge
+        await expect(tx1).to.emit(voting, "VoteProcessed").withArgs(LOCK_ID_5, VOTE_5, EPOCH_START_TIME, 0) // locked burned
+        LAST_RECORDED_VOTE_POWER_1 = ZERO
+        LAST_RECORDED_VOTE_POWER_2 = VOTE_POWER_2
+        LAST_RECORDED_VOTE_POWER_3 = VOTE_POWER_3
+        LAST_RECORDED_VOTE_POWER_4 = ZERO
+        LAST_RECORDED_VOTE_POWER_5 = ZERO
+
+        expect (await gaugeController.lastTimeGaugeWeightsUpdated()).eq(EPOCH_START_TIME)
+        expect (await voting.isVotingOpen()).eq(false)
+      });
+      it("can chargePremiums() in the next epoch", async function () {
+        const LOCK_ID_1 = 1
+        const LOCK_ID_2 = 2
+        const LOCK_ID_3 = 3
+        const LOCK_ID_4 = 4
+        const LOCK_ID_5 = 5
+        const VOTE_1 = await voting.getVote(LOCK_ID_1)
+        const VOTE_2 = await voting.getVote(LOCK_ID_2)
+        const VOTE_3 = await voting.getVote(LOCK_ID_3)
+        const VOTE_4 = await voting.getVote(LOCK_ID_4)
+        const VOTE_5 = await voting.getVote(LOCK_ID_5)
+        const EPOCH_START_TIME = await voting.getEpochStartTimestamp()
+
+        const tx1 = await voting.connect(governor).chargePremiums();
+        await expect(tx1).to.emit(voting, "AllPremiumsCharged").withArgs(EPOCH_START_TIME);
+
+      });
+
+
+
+    });
+
+    /**********
+      LESSONS
+    **********/
+    /**
+     * You should customise gas limit to max for underwritingLockVoting.chargePremiums() and gaugeController.updateGaugeWeights()
+     */
+
     // Need to test behaviour with 100 votes
 
 
 
-  /******************
-    HELPER CLOSURES
-  ******************/
+    /******************
+      HELPER CLOSURES
+    ******************/
 
-  function sqrt(x: BN) {
-    const ONE = BN.from(1);
-    const TWO = BN.from(2);
-    let z = x.add(ONE).div(TWO);
-    let y = x;
-    while (z.sub(y).isNegative()) {
-        y = z;
-        z = x.div(z).add(z).div(TWO);
+    function sqrt(x: BN) {
+      const ONE = BN.from(1);
+      const TWO = BN.from(2);
+      let z = x.add(ONE).div(TWO);
+      let y = x;
+      while (z.sub(y).isNegative()) {
+          y = z;
+          z = x.div(z).add(z).div(TWO);
+      }
+      return y;
     }
-    return y;
-  }
 
 });

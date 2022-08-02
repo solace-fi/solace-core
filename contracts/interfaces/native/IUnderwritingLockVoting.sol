@@ -6,7 +6,7 @@ import "./IGaugeVoter.sol";
 /**
  * @title IUnderwritingLockVoting
  * @author solace.fi
- * @notice Manages individual votes in Solace Native insurance gauges for owners and managers of [`UnderwritingLocker`](./UnderwritingLocker).
+ * @notice Manages individual votes in Solace Native insurance gauges for owners and delegates of [`UnderwritingLocker`](./UnderwritingLocker).
  * 
  * Each underwriting lock entitles the owner to a vote for a Solace Native insurance gauge.
  * Votes will count only for the current epoch (one week), and a new vote will need to be registered for the next epoch.
@@ -15,11 +15,11 @@ import "./IGaugeVoter.sol";
  * The `votePower` of an underwriting lock scales with i.) locked amount, and ii.) lock duration
  * `votePower` can be viewed with [`getVotePower()`](#getVotePower)
  * 
- * Underwriting lock owners can call [`setLockManager()`](#setlockmanager) to assign a manger who can place votes on behalf of the lock owner
- * Underwriting lock managers cannot interact with [`UnderwritingLocker`](./UnderwritingLocker) to do the following for a lock they do not own:
+ * Underwriting lock owners can call [`setLockDelegate()`](#setlockdelegate) to assign a manger who can place votes on behalf of the lock owner
+ * Underwriting lock delegates cannot interact with [`UnderwritingLocker`](./UnderwritingLocker) to do the following for a lock they do not own:
  * extendLock, withdraw, emergencyWithdraw, or transfer the underwriting lock
  * 
- * To cast a vote for the current epoch, either the underwriting lock owner or manager can call [`vote()`](#vote) or [`voteMultiple()`](#voteMultiple)
+ * To cast a vote for the current epoch, either the underwriting lock owner or delegate can call [`vote()`](#vote) or [`voteMultiple()`](#voteMultiple)
  *
  * After every epoch, governance needs to make two functions calls:
  * i.) [`processVotes()`](#processvotes) which will iterate through each stored vote, batch $UWE voting fees and send to the RevenueRouter, and update aggregate voting data for the last epoch
@@ -48,11 +48,11 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     /// @param epochTime Timestamp of endtime for epoch already processed.
     error LastEpochPremiumsAlreadyProcessed(uint256 epochTime);
 
-    /// @notice Thrown when setLockManager() attempted for a non-owner.
+    /// @notice Thrown when setLockDelegate() attempted for a non-owner.
     error NotOwner();
 
-    /// @notice Thrown when vote() attempted by a non-owner or non-manager.
-    error NotOwnerNorManager();
+    /// @notice Thrown when vote() attempted by a non-owner or non-delegate.
+    error NotOwnerNorDelegate();
 
     /// @notice Thrown when array arguments are mismatched in length (and need to have the same length);
     error ArrayArgumentsLengthMismatch();
@@ -73,8 +73,8 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     EVENTS
     ***************************************/
 
-    /// @notice Emitted when a manager is set for a lock.
-    event LockManagerSet(uint256 indexed lockID, address indexed manager);
+    /// @notice Emitted when a delegate is set for a lock.
+    event LockDelegateSet(uint256 indexed lockID, address indexed delegate);
 
     /// @notice Emitted when the Registry is set.
     event RegistrySet(address indexed registry);
@@ -113,11 +113,11 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     function registry() external view returns (address);
 
     /**
-     * @notice Get lockManager for a given lockId.
+     * @notice Get lockDelegate for a given lockId.
      * @param lockID_ The ID of the lock to query for.
-     * @return lockManager Zero address if no lock manager.
+     * @return lockDelegate Zero address if no lock delegate.
      */
-    function lockManagerOf(uint256 lockID_) external view returns (address lockManager);
+    function lockDelegateOf(uint256 lockID_) external view returns (address lockDelegate);
 
     /**
      * @notice Obtain end timestamp (rounded down to weeks) for the epoch where all premiums were charged.
@@ -165,9 +165,9 @@ interface IUnderwritingLockVoting is IGaugeVoter {
      * @notice Register a vote for a gauge
      * @notice Each underwriting lock is entitled to a single vote
      * @notice A new vote cannot be registered before all stored votes have been registered for the previous epoch (via governor invoking [`processVotes()`](#processvotes)).
-     * Can only be called by the lock owner or manager
+     * Can only be called by the lock owner or delegate
      * @param lockID_ The ID of the lock to vote for.
-     * @param gaugeID_ Address of intended lock manager
+     * @param gaugeID_ Address of intended lock delegate
      */
     function vote(uint256 lockID_, uint256 gaugeID_) external;
 
@@ -175,29 +175,29 @@ interface IUnderwritingLockVoting is IGaugeVoter {
      * @notice Register multiple votes for a gauge
      * @notice Each underwriting lock is entitled to a single vote
      * @notice A new vote cannot be registered before all stored votes have been registered for the previous epoch (via governor invoking [`processVotes()`](#processvotes)).
-     * Can only be called by the lock owner or manager
+     * Can only be called by the lock owner or delegate
      * @param lockIDs_ Array of lockIDs to vote for.
      * @param gaugeIDs_ Array of gaugeIDs to vote for.
      */
     function voteMultiple(uint256[] calldata lockIDs_, uint256[] calldata gaugeIDs_) external;
 
     /**
-     * @notice Set the manager for a given lock
+     * @notice Set the delegate for a given lock
      * Can only be called by the lock owner
-     * To remove a manager, the manager can be set to the ZERO_ADDRESS - 0x0000000000000000000000000000000000000000
-     * @param lockID_ The ID of the lock to set the manager of.
-     * @param manager_ Address of intended lock manager
+     * To remove a delegate, the delegate can be set to the ZERO_ADDRESS - 0x0000000000000000000000000000000000000000
+     * @param lockID_ The ID of the lock to set the delegate of.
+     * @param delegate_ Address of intended lock delegate
      */
-    function setLockManager(uint256 lockID_, address manager_) external;
+    function setLockDelegate(uint256 lockID_, address delegate_) external;
 
     /**
-     * @notice Set managers for multiple lock
+     * @notice Set delegates for multiple lock
      * Can only be called by the lock owner
-     * To remove a manager, the manager can be set to the ZERO_ADDRESS - 0x0000000000000000000000000000000000000000
+     * To remove a delegate, the delegate can be set to the ZERO_ADDRESS - 0x0000000000000000000000000000000000000000
      * @param lockIDs_ Array of lock IDs.
-     * @param managers_ Array of addresses of intended lock managers.
+     * @param delegates_ Array of addresses of intended lock delegates.
      */
-    function setLockManagerMultiple(uint256[] calldata lockIDs_, address[] calldata managers_) external;
+    function setLockDelegateMultiple(uint256[] calldata lockIDs_, address[] calldata delegates_) external;
 
     /***************************************
     GOVERNANCE FUNCTIONS

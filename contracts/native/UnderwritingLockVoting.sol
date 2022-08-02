@@ -22,7 +22,7 @@ import "hardhat/console.sol";
 /**
  * @title UnderwritingLockVoting
  * @author solace.fi
- * @notice Manages individual votes in Solace Native insurance gauges for owners and managers of [`UnderwritingLocker`](./UnderwritingLocker).
+ * @notice Manages individual votes in Solace Native insurance gauges for owners and delegates of [`UnderwritingLocker`](./UnderwritingLocker).
  * 
  * Each underwriting lock entitles the owner to a vote for a Solace Native insurance gauge.
  * Votes will count only for the current epoch (one week), and a new vote will need to be registered for the next epoch.
@@ -31,11 +31,11 @@ import "hardhat/console.sol";
  * The `votePower` of an underwriting lock scales with i.) locked amount, and ii.) lock duration
  * `votePower` can be viewed with [`getVotePower()`](#getVotePower)
  * 
- * Underwriting lock owners can call [`setLockManager()`](#setlockmanager) to assign a manger who can place votes on behalf of the lock owner
- * Underwriting lock managers cannot interact with [`UnderwritingLocker`](./UnderwritingLocker) to do the following for a lock they do not own:
+ * Underwriting lock owners can call [`setLockDelegate()`](#setlockdelegate) to assign a manger who can place votes on behalf of the lock owner
+ * Underwriting lock delegates cannot interact with [`UnderwritingLocker`](./UnderwritingLocker) to do the following for a lock they do not own:
  * extendLock, withdraw, emergencyWithdraw, or transfer the underwriting lock
  * 
- * To cast a vote for the current epoch, either the underwriting lock owner or manager can call [`vote()`](#vote) or [`voteMultiple()`](#voteMultiple)
+ * To cast a vote for the current epoch, either the underwriting lock owner or delegate can call [`vote()`](#vote) or [`voteMultiple()`](#voteMultiple)
  *
  * After every epoch, governance needs to make two functions calls:
  * i.) [`processVotes()`](#processvotes) which will iterate through each stored vote, batch $UWE voting fees and send to the RevenueRouter, and update aggregate voting data for the last epoch
@@ -76,8 +76,8 @@ contract UnderwritingLockVoting is
     uint256 constant public override MONTH = 2628000;
     uint256 constant public override YEAR = 31536000;
 
-    /// @notice lockID => lock manager
-    mapping(uint256 => address) public override lockManagerOf;
+    /// @notice lockID => lock delegate
+    mapping(uint256 => address) public override lockDelegateOf;
 
     /***************************************
     GLOBAL INTERNAL VARIABLES
@@ -119,13 +119,16 @@ contract UnderwritingLockVoting is
     /**
      * @notice Get vote power (for the current epoch) for a lock
      * @dev Can do this function with a single lockID_ parameter, however this introduces an extra external call which may be an issue in the unbounded loop of processVotes()
+     * @dev Need try-catch block instead of revert, or else edge case of vote with a lock, burn the lock before epoch end => updateGaugeWeights() will always revert.
      * @param lockID_ The ID of the lock to query.
      * @return votePower
      */
     function _getVotePower(uint256 lockID_) internal view returns (uint256 votePower) {
-        // Expect revert if lockID doesn't exist
-        Lock memory lock = IUnderwritingLocker(underwritingLocker).locks(lockID_);
-        return ( lock.amount * IUnderwritingLocker(underwritingLocker).getLockMultiplier(lockID_) ) / 1e18;   
+        try IUnderwritingLocker(underwritingLocker).locks(lockID_) returns (Lock memory lock) {
+            return ( lock.amount * IUnderwritingLocker(underwritingLocker).getLockMultiplier(lockID_) ) / 1e18;
+        } catch {
+            return 0;
+        }
     }
 
     /**
@@ -254,28 +257,28 @@ contract UnderwritingLockVoting is
      * @notice Register a vote for a gauge
      * @notice Each underwriting lock is entitled to a single vote
      * @notice A new vote cannot be registered before all stored votes have been registered for the previous epoch (via governor invoking [`processVotes()`](#processvotes)).
-     * Can only be called by the lock owner or manager
+     * Can only be called by the lock owner or delegate
      * @param lockID_ The ID of the lock to vote for.
-     * @param gaugeID_ Address of intended lock manager
+     * @param gaugeID_ Address of intended lock delegate
      */
     function _vote(uint256 lockID_, uint256 gaugeID_) internal  {
         if ( _getEpochStartTimestamp() != lastTimePremiumsCharged) revert LastEpochPremiumsNotCharged();
-        if( IUnderwritingLocker(underwritingLocker).ownerOf(lockID_) != msg.sender && lockManagerOf[lockID_] != msg.sender) revert NotOwnerNorManager();
+        if( IUnderwritingLocker(underwritingLocker).ownerOf(lockID_) != msg.sender && lockDelegateOf[lockID_] != msg.sender) revert NotOwnerNorDelegate();
         IGaugeController(gaugeController).vote(lockID_, gaugeID_);
         emit Vote(lockID_, gaugeID_, msg.sender, _getEpochEndTimestamp(), _getVotePower(lockID_));
     }
 
     /**
-     * @notice Set the manager for a given lock
+     * @notice Set the delegate for a given lock
      * Can only be called by the lock owner
-     * To remove a manager, the manager can be set to the ZERO_ADDRESS - 0x0000000000000000000000000000000000000000
-     * @param lockID_ The ID of the lock to set the manager of.
-     * @param manager_ Address of intended lock manager
+     * To remove a delegate, the delegate can be set to the ZERO_ADDRESS - 0x0000000000000000000000000000000000000000
+     * @param lockID_ The ID of the lock to set the delegate of.
+     * @param delegate_ Address of intended lock delegate
      */
-    function _setLockManager(uint256 lockID_, address manager_) internal {
+    function _setLockDelegate(uint256 lockID_, address delegate_) internal {
         if( IUnderwritingLocker(underwritingLocker).ownerOf(lockID_) != msg.sender) revert NotOwner();
-        lockManagerOf[lockID_] = manager_;
-        emit LockManagerSet(lockID_, manager_);
+        lockDelegateOf[lockID_] = delegate_;
+        emit LockDelegateSet(lockID_, delegate_);
     }
 
     /***************************************
@@ -286,7 +289,7 @@ contract UnderwritingLockVoting is
      * @notice Register a vote for a gauge
      * @notice Each underwriting lock is entitled to a single vote
      * @notice A new vote cannot be registered before all stored votes have been registered for the previous epoch (via governor invoking [`processVotes()`](#processvotes)).
-     * Can only be called by the lock owner or manager
+     * Can only be called by the lock owner or delegate
      * @param lockID_ The ID of the lock to vote for.
      * @param gaugeID_ The ID of the gauge to vote for.
      */
@@ -299,7 +302,7 @@ contract UnderwritingLockVoting is
      * @notice Register multiple votes for a gauge
      * @notice Each underwriting lock is entitled to a single vote
      * @notice A new vote cannot be registered before all stored votes have been registered for the previous epoch (via governor invoking [`processVotes()`](#processvotes)).
-     * Can only be called by the lock owner or manager
+     * Can only be called by the lock owner or delegate
      * @param lockIDs_ Array of lockIDs to vote for.
      * @param gaugeIDs_ Array of gaugeIDs to vote for.
      */
@@ -311,27 +314,27 @@ contract UnderwritingLockVoting is
     }
 
     /**
-     * @notice Set the manager for a given lock
+     * @notice Set the delegate for a given lock
      * Can only be called by the lock owner
-     * To remove a manager, the manager can be set to the ZERO_ADDRESS - 0x0000000000000000000000000000000000000000
-     * @param lockID_ The ID of the lock to set the manager of.
-     * @param manager_ Address of intended lock manager
+     * To remove a delegate, the delegate can be set to the ZERO_ADDRESS - 0x0000000000000000000000000000000000000000
+     * @param lockID_ The ID of the lock to set the delegate of.
+     * @param delegate_ Address of intended lock delegate
      */
-    function setLockManager(uint256 lockID_, address manager_) external override {
-        _setLockManager(lockID_, manager_);
+    function setLockDelegate(uint256 lockID_, address delegate_) external override {
+        _setLockDelegate(lockID_, delegate_);
     }
 
     /**
-     * @notice Set managers for multiple lock
+     * @notice Set delegates for multiple lock
      * Can only be called by the lock owner
-     * To remove a manager, the manager can be set to the ZERO_ADDRESS - 0x0000000000000000000000000000000000000000
+     * To remove a delegate, the delegate can be set to the ZERO_ADDRESS - 0x0000000000000000000000000000000000000000
      * @param lockIDs_ Array of lock IDs.
-     * @param managers_ Array of addresses of intended lock managers.
+     * @param delegates_ Array of addresses of intended lock delegates.
      */
-    function setLockManagerMultiple(uint256[] calldata lockIDs_, address[] calldata managers_) external override {
-        if (lockIDs_.length != managers_.length) revert ArrayArgumentsLengthMismatch();
+    function setLockDelegateMultiple(uint256[] calldata lockIDs_, address[] calldata delegates_) external override {
+        if (lockIDs_.length != delegates_.length) revert ArrayArgumentsLengthMismatch();
         for (uint256 i = 0; i < lockIDs_.length; i++) {
-            _setLockManager(lockIDs_[i], managers_[i]);
+            _setLockDelegate(lockIDs_[i], delegates_[i]);
         }
     }
 
@@ -373,7 +376,7 @@ contract UnderwritingLockVoting is
      * @dev Designed to be called multiple times until this function returns true (all stored votes are processed)
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      */
-    function chargePremiums() external override onlyGovernance nonReentrant {
+    function chargePremiums() external override onlyGovernance {
         uint256 epochStartTimestamp = _getEpochStartTimestamp();
         if(_getLastTimeGaugesUpdated() != epochStartTimestamp) revert GaugeWeightsNotYetUpdated();
         if(lastTimePremiumsCharged == epochStartTimestamp) revert LastEpochPremiumsAlreadyProcessed({epochTime: epochStartTimestamp});
@@ -387,8 +390,9 @@ contract UnderwritingLockVoting is
         for(uint256 i = startIndex_lastProcessedVotePowerOf; i < totalVotes; i++) {
             // Check if we are at risk of running out of gas.
             // If yes, save progress and return.
+            console.log("chargePremium 1 %s" , gasleft());
             assembly {
-                if lt(gas(), 70000) {
+                if lt(gas(), 60000) {
                     // Start with empty word
                     let updateInfo
 
@@ -413,8 +417,9 @@ contract UnderwritingLockVoting is
                     return(0, 0)
                 }
             }
+            console.log("chargePremium 2 %s" , gasleft());
 
-            (uint256 lockID, uint256 votePower) = _lastProcessedVotePowerOf.at(i);
+            (uint256 lockID,) = _lastProcessedVotePowerOf.at(i);
             uint256 premium = _calculateVotePremium(lockID, insuranceCapacity);
             totalPremium += premium;
             IUnderwritingLocker(underwritingLocker).chargePremium(lockID, premium);
@@ -431,5 +436,6 @@ contract UnderwritingLockVoting is
         _updateInfo.finishedLastUpdate = true;
         lastTimePremiumsCharged = epochStartTimestamp;
         emit AllPremiumsCharged(epochStartTimestamp);
+        console.log("chargePremium 3 %s" , gasleft());
     }
 }

@@ -641,6 +641,7 @@ contract UnderwritingLocker is
      */
     function chargePremium(uint256 lockID_, uint256 premium_) external override nonReentrant {
         if (msg.sender != votingContract) revert NotVotingContract();
+        if (!_exists(lockID_)) {return;}
         Lock memory oldLock = _locks[lockID_];
         Lock memory newLock = Lock(oldLock.amount - premium_, oldLock.end); // Relying on Solidity ^8.0 native underflow check.
         _locks[lockID_].amount -= premium_;
