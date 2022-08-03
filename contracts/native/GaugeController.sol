@@ -481,7 +481,7 @@ contract GaugeController is
                 // Need to measure how much gas it takes minimum after this loop
                 console.log("processVotes 1 %s" , gasleft());
                 assembly {
-                    if lt(gas(), 60000) {
+                    if lt(gas(), 90000) {
                         // Use struct packing to make one sstore operation (vs 3 without)
                         let updateInfo
                         // updateInfo.finishedLastUpdate = [0:8] == false

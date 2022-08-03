@@ -355,7 +355,7 @@ contract UnderwritingLockVoting is
      * Can only be called by the lock owner or delegate
      * @param lockID_ The ID of the lock to remove the vote for.
      */
-    function removeVote(uint256 lockID_, uint256 gaugeID_) external override {
+    function removeVote(uint256 lockID_) external override {
         _removeVote(lockID_);
     }
 
@@ -480,7 +480,6 @@ contract UnderwritingLockVoting is
             if (premium == 0) {lockIDsToRemove.push(lockID);}
             // Could put next 3 lines in an else block for gas efficiency, but makes it harder to debug.
             totalPremiumDue += premium;
-            console.log("totalPremiumDue %s", totalPremiumDue);
             IUnderwritingLocker(underwritingLocker).chargePremium(lockID, premium);
             emit PremiumCharged(lockID, epochStartTimestamp, premium);
         }

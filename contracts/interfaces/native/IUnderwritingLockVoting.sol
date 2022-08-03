@@ -189,7 +189,7 @@ interface IUnderwritingLockVoting is IGaugeVoter {
      * Can only be called by the lock owner or delegate
      * @param lockID_ The ID of the lock to remove the vote for.
      */
-    function removeVote(uint256 lockID_, uint256 gaugeID_) external;
+    function removeVote(uint256 lockID_) external;
 
     /**
      * @notice Remove votes for multiple underwriting locks.
