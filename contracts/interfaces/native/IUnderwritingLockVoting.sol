@@ -83,6 +83,9 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     /// epochTimestamp is the timestamp for the epoch (rounded down to weeks) that the vote counts for
     event Vote(uint256 indexed lockID, uint256 indexed gaugeID, address voter, uint256 indexed epochTimestamp, uint256 votePower);
 
+    /// @notice Emitted when a vote is removed.
+    event VoteRemoved(uint256 indexed lockID, address voter);
+
     /// @notice Emitted when the Vote processed by GaugeController.
     /// epochTimestamp is the timestamp for the epoch (rounded down to weeks) that the vote counts for
     event VoteProcessed(uint256 indexed lockID, uint256 indexed gaugeID, uint256 indexed epochTimestamp, uint256 votePower);
@@ -180,6 +183,20 @@ interface IUnderwritingLockVoting is IGaugeVoter {
      * @param gaugeIDs_ Array of gaugeIDs to vote for.
      */
     function voteMultiple(uint256[] calldata lockIDs_, uint256[] calldata gaugeIDs_) external;
+
+    /**
+     * @notice Remove a vote for a lockID.
+     * Can only be called by the lock owner or delegate
+     * @param lockID_ The ID of the lock to remove the vote for.
+     */
+    function removeVote(uint256 lockID_, uint256 gaugeID_) external;
+
+    /**
+     * @notice Remove votes for multiple underwriting locks.
+     * Can only be called by the lock owner or delegate
+     * @param lockIDs_ Array of lockIDs to vote for.
+     */
+    function removeVoteMultiple(uint256[] calldata lockIDs_) external;
 
     /**
      * @notice Set the delegate for a given lock

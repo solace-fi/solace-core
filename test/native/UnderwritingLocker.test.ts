@@ -1821,13 +1821,10 @@ describe("UnderwritingLocker", function () {
     it("will revert if called by non voting-contract", async function () {
       await expect(underwritingLocker.connect(governor).chargePremium(1, 1)).to.be.revertedWith("NotVotingContract");
     });
-    it("will revert if attempt to charge premium for non-existent lock", async function () {
+    it("will revert if attempt to charge more premium than exists in the lock", async function () {
       await registry.connect(governor).set(["underwritingLockVoting"], [votingContractProxy.address])
       await underwritingLocker.connect(governor).setVotingContract()
       expect(await underwritingLocker.votingContract()).eq(votingContractProxy.address)
-      await expect(underwritingLocker.connect(votingContractProxy).chargePremium(1, 0)).to.be.revertedWith("ERC721: invalid token ID");
-    });
-    it("will revert if attempt to charge more premium than exists in the lock", async function () {
       await expect(underwritingLocker.connect(votingContractProxy).chargePremium(9, DEPOSIT_AMOUNT.mul(2))).to.be.reverted;
     });
     it("premium can be charged, and listeners notified", async function () {
@@ -1851,6 +1848,26 @@ describe("UnderwritingLocker", function () {
       expect(listenerUpdate.newLock.amount).eq(newLockState.amount);
       expect(listenerUpdate.newLock.end).eq(newLockState.end);
     });
+    it("if attempt to charge premium for non-existent lock, call will succeed but state will not change", async function () {
+      const LOCK_ID = 1;
+      const oldGlobalState = await getGlobalState()
+      const oldUserState = await getUserState(user1)
+      const tx = await underwritingLocker.connect(votingContractProxy).chargePremium(LOCK_ID, 1)
+      expect(await underwritingLocker.exists(LOCK_ID)).eq(false)
+      const newGlobalState = await getGlobalState()
+      const newUserState = await getUserState(user1)
+      const globalStateChange = getGlobalStateChange(newGlobalState, oldGlobalState)
+      const userStateChange = getUserStateChange(newUserState, oldUserState)
+      expect(globalStateChange.totalNumLocks).eq(0)
+      expect(globalStateChange.totalSupply).eq(0)
+      expect(globalStateChange.totalStakedAmount).eq(0)
+      expect(userStateChange.tokenAmountInWallet).eq(0)
+      expect(userStateChange.lockedTokenAmount).eq(0)
+      expect(userStateChange.numOfLocks).eq(0)
+    });
+
+
+  });
 
   /*******************
     STATE SUMMARY
@@ -1863,9 +1880,6 @@ describe("UnderwritingLocker", function () {
    * lockID 9 -> 6-month lock, 5e17 deposit
    * lockID 10 -> 4-yr lock, 1e18 deposit
    */
-
-
-  });
 
   /******************
     HELPER CLOSURES

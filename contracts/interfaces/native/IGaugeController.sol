@@ -44,6 +44,12 @@ interface IGaugeController {
      */
     error GaugeAlreadyUnpaused(uint256 gaugeID);
 
+    /// @notice Thrown if unpauseGauge() is attempted on gauge ID 0.
+    error CannotUnpauseGaugeID0();
+
+    /// @notice Thrown if vote() is attempted for gauge ID 0.
+    error CannotVoteForGaugeID0();
+
     /**
      * @notice Thrown if updateGaugeWeights() is called after gauge weights have been successfully updated in the current epoch.
      */
@@ -221,6 +227,13 @@ interface IGaugeController {
      * @param gaugeID_ The ID of the voted gauge.
      */
     function vote(uint256 voteID_, uint256 gaugeID_) external;
+
+    /**
+     * @notice Remove vote.
+     * @dev Can only be called by voting contracts that have been added via addVotingContract().
+     * @param voteID_ Unique identifier for vote.
+     */
+    function removeVote(uint256 voteID_) external;
 
     /***************************************
     GOVERNANCE FUNCTIONS

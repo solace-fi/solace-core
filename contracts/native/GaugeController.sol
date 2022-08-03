@@ -83,6 +83,10 @@ contract GaugeController is
 
     UpdateInfo internal _updateInfo;
 
+    /// @notice Dynamic array of dead voteIDs to remove from _votes EnumerableMap.
+    /// @dev Unfortunately Solidity doesn't allow dynamic arrays in memory, and I don't see a space-efficient way of creating a fixed-length array for this problem.
+    uint256[] internal voteIDsToRemove;
+
     /***************************************
     STRUCTS
     ***************************************/
@@ -111,8 +115,7 @@ contract GaugeController is
     {
         token = token_;
         leverageFactor = 1e18; // Default 1x leverage factor
-        Gauge memory newGauge = Gauge(true, 0, ""); // Pre-fill slot 0 of _gauges, ensure gaugeID 1 maps to _gauges[1]
-        // Need gaugeID 0 to be active, so users can vote for it (to effectively cancel out votes)
+        Gauge memory newGauge = Gauge(false, 0, ""); // Pre-fill slot 0 of _gauges, ensure gaugeID 1 maps to _gauges[1]
         _gauges.push(newGauge); 
     }
 
@@ -286,7 +289,7 @@ contract GaugeController is
     }
 
     /**
-     * @notice Register votes.
+     * @notice Get vote.
      * @dev Can only be called by voting contracts that have been added via addVotingContract().
      * @param votingContract_ Address of voting contract  - must have been added via addVotingContract().
      * @param voteID_ Unique identifier for vote.
@@ -308,11 +311,24 @@ contract GaugeController is
      * @param gaugeID_ The ID of the voted gauge.
      */
     function vote(uint256 voteID_, uint256 gaugeID_) external override {
-        if (_getEpochStartTimestamp() != lastTimeGaugeWeightsUpdated) {revert GaugeWeightsNotYetUpdated();}
-        if (!_votingContracts.contains(msg.sender)) {revert NotVotingContract();}
-        if (gaugeID_ + 1 > _gauges.length) {revert VotedGaugeIDNotExist();}
-        if (!_gauges[gaugeID_].active) {revert VotedGaugeIDPaused();}
+        if (gaugeID_ == 0) revert CannotVoteForGaugeID0();
+        if (_getEpochStartTimestamp() != lastTimeGaugeWeightsUpdated) revert GaugeWeightsNotYetUpdated();
+        if (!_votingContracts.contains(msg.sender)) revert NotVotingContract();
+        if (gaugeID_ + 1 > _gauges.length) revert VotedGaugeIDNotExist();
+        if (!_gauges[gaugeID_].active) revert VotedGaugeIDPaused();
         _votes[msg.sender].set(voteID_, gaugeID_);
+        // Leave responsibility of emitting event to the VotingContract.
+    }
+
+    /**
+     * @notice Remove vote.
+     * @dev Can only be called by voting contracts that have been added via addVotingContract().
+     * @param voteID_ Unique identifier for vote.
+     */
+    function removeVote(uint256 voteID_) external override {
+        if (!_votingContracts.contains(msg.sender)) {revert NotVotingContract();}
+        // Test - can you remove a non-existent voteID_ without issue?
+        _votes[msg.sender].remove(voteID_);
         // Leave responsibility of emitting event to the VotingContract.
     }
 
@@ -376,6 +392,7 @@ contract GaugeController is
      */
     function unpauseGauge(uint256 gaugeID_) external override onlyGovernance {
         if(_gauges[gaugeID_].active == true) revert GaugeAlreadyUnpaused({gaugeID: gaugeID_});
+        if(gaugeID_ == 0) revert CannotUnpauseGaugeID0(); // We do not permit gaugeID 0 to be active, and hence do not permit anyone to vote for it.
         _pausedGaugesCount -= 1;
         _gauges[gaugeID_].active = true;
         emit GaugeUnpaused(gaugeID_, _gauges[gaugeID_].name);
@@ -491,14 +508,22 @@ contract GaugeController is
                 // Votes don't count if i.) gaugeID == 0, or ii.) gauge paused
                 // If don't have 2nd conditional, we can have edge case where someone votes when gauge is active (cannot vote for gauge when paused)
                 //, gauge paused after, but they will still be paying for the vote for a paused gauge
-                if (gaugeID == 0 || !_gauges[gaugeID].active) {
+                if (!_gauges[gaugeID].active) {
                     IGaugeVoter(votingContract).setLastProcessedVotePower(voteID, gaugeID, 0);
                     console.log("skipped %s", voteID);
                     continue;
                 }
                 uint256 votePower = IGaugeVoter(votingContract).getVotePower(voteID);
+                if (votePower == 0) {voteIDsToRemove.push(voteID);}
                 _votePowerOfGaugeForEpoch[epochStartTime][gaugeID] += votePower; // This part is susceptible to re-entrancy
                 IGaugeVoter(votingContract).setLastProcessedVotePower(voteID, gaugeID, votePower);
+            }
+
+            // Remove dead voteIDs after iteration through EnumerableMap.
+            // Avoid removing during iteration to avoid side effect from iterating through a structure that we are mutating during iteration.
+            while (voteIDsToRemove.length > 0) {
+                _votes[votingContract].remove(voteIDsToRemove[voteIDsToRemove.length - 1]);
+                voteIDsToRemove.pop();
             }
         }
         

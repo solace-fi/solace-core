@@ -98,6 +98,15 @@ contract UnderwritingLockVoting is
     /// @dev If vote is invalid value, it will be skipped and ignored (rather than revert) 
     EnumerableMap.UintToUintMap internal _lastProcessedVotePowerOf;
 
+    /// @notice Dynamic array of dead lockIDs to remove from _lastProcessedVotePowerOf EnumerableMap.
+    /// @dev Unfortunately Solidity doesn't allow dynamic arrays in memory, and I don't see a space-efficient way of creating a fixed-length array for this problem.
+    uint256[] internal lockIDsToRemove;
+
+    /// @notice Total premium amount due to the revenueRouter.
+    /// @dev Should == 0 at most times. Only time it should be non-zero is when an incomplete chargePremium() call is made.
+    /// @dev Originally a local function variable, but need to save state between two function calls.
+    uint256 internal totalPremiumDue;
+
     /***************************************
     CONSTRUCTOR
     ***************************************/
@@ -138,11 +147,26 @@ contract UnderwritingLockVoting is
      * @return premium Premium for vote.
      */
     function _calculateVotePremium(uint256 lockID_, uint256 insuranceCapacity_) internal view returns (uint256 premium) {
-        uint256 rateOnLine = IGaugeController(gaugeController).getRateOnLineOfGauge(_getVote(lockID_));
-        uint256 votePowerSum = IGaugeController(gaugeController).getVotePowerSum();
-        // insuranceCapacity_ from gaugeController.getInsuranceCapacity() is already scaled.
-        // Need to convert rateOnLine from annual rate in 1e18 terms, to weekly rate in fraction terms. Hence `WEEK / (YEAR * 1e18)
-        return insuranceCapacity_ * rateOnLine * WEEK * _lastProcessedVotePowerOf.get(lockID_) / (votePowerSum * YEAR * 1e18);
+        try IGaugeController(gaugeController).getVote(address(this), lockID_) returns (uint256 gaugeID) {
+            try IGaugeController(gaugeController).getRateOnLineOfGauge(gaugeID) returns (uint256 rateOnLine) {
+                uint256 votePowerSum = IGaugeController(gaugeController).getVotePowerSum();
+                // insuranceCapacity_ from gaugeController.getInsuranceCapacity() is already scaled.
+                // Need to convert rateOnLine from annual rate in 1e18 terms, to weekly rate in fraction terms. Hence `WEEK / (YEAR * 1e18)
+                return insuranceCapacity_ * rateOnLine * WEEK * _lastProcessedVotePowerOf.get(lockID_) / (votePowerSum * YEAR * 1e18);
+            } catch {
+                return 0;
+            }
+        } catch {
+            return 0;
+        }
+        // try IGaugeController(gaugeController).getRateOnLineOfGauge(_getVote(lockID_)) returns (uint256 rateOnLine) {
+        //     uint256 votePowerSum = IGaugeController(gaugeController).getVotePowerSum();
+        //     // insuranceCapacity_ from gaugeController.getInsuranceCapacity() is already scaled.
+        //     // Need to convert rateOnLine from annual rate in 1e18 terms, to weekly rate in fraction terms. Hence `WEEK / (YEAR * 1e18)
+        //     return insuranceCapacity_ * rateOnLine * WEEK * _lastProcessedVotePowerOf.get(lockID_) / (votePowerSum * YEAR * 1e18);
+        // } catch {
+        //     return 0;
+        // }
     }
 
     /**
@@ -262,10 +286,24 @@ contract UnderwritingLockVoting is
      * @param gaugeID_ Address of intended lock delegate
      */
     function _vote(uint256 lockID_, uint256 gaugeID_) internal  {
+        // This require to deal with edge case where if a user puts a new vote in the time window between an epoch end and processVotes() returning true for that epoch, we do not know (with the current setup) whether that lockID has a previous vote or not (that then needs to be included in processVotes());
         if ( _getEpochStartTimestamp() != lastTimePremiumsCharged) revert LastEpochPremiumsNotCharged();
         if( IUnderwritingLocker(underwritingLocker).ownerOf(lockID_) != msg.sender && lockDelegateOf[lockID_] != msg.sender) revert NotOwnerNorDelegate();
         IGaugeController(gaugeController).vote(lockID_, gaugeID_);
         emit Vote(lockID_, gaugeID_, msg.sender, _getEpochEndTimestamp(), _getVotePower(lockID_));
+    }
+
+    /**
+     * @notice Remove a vote.
+     * Can only be called by the lock owner or delegate
+     * @param lockID_ The ID of the lock to remove the vote for.
+     */
+    function _removeVote(uint256 lockID_) internal  {
+        if( IUnderwritingLocker(underwritingLocker).ownerOf(lockID_) != msg.sender && lockDelegateOf[lockID_] != msg.sender) revert NotOwnerNorDelegate();
+        // Edge case, what if lockID is non-existent in chargePremium set?
+        _lastProcessedVotePowerOf.remove(lockID_);
+        IGaugeController(gaugeController).removeVote(lockID_);
+        emit VoteRemoved(lockID_, msg.sender);
     }
 
     /**
@@ -294,7 +332,6 @@ contract UnderwritingLockVoting is
      * @param gaugeID_ The ID of the gauge to vote for.
      */
     function vote(uint256 lockID_, uint256 gaugeID_) external override {
-        // This require to deal with edge case where if a user puts a new vote in the time window between an epoch end and processVotes() returning true for that epoch, we do not know (with the current setup) whether that lockID has a previous vote or not (that then needs to be included in processVotes());
         _vote(lockID_, gaugeID_);
     }
 
@@ -310,6 +347,26 @@ contract UnderwritingLockVoting is
         if (lockIDs_.length != gaugeIDs_.length) revert ArrayArgumentsLengthMismatch();
         for (uint256 i = 0; i < lockIDs_.length; i++) {
             _vote(lockIDs_[i], gaugeIDs_[i]);
+        }
+    }
+
+    /**
+     * @notice Remove a vote for a lockID.
+     * Can only be called by the lock owner or delegate
+     * @param lockID_ The ID of the lock to remove the vote for.
+     */
+    function removeVote(uint256 lockID_, uint256 gaugeID_) external override {
+        _removeVote(lockID_);
+    }
+
+    /**
+     * @notice Remove votes for multiple underwriting locks.
+     * Can only be called by the lock owner or delegate
+     * @param lockIDs_ Array of lockIDs to vote for.
+     */
+    function removeVoteMultiple(uint256[] calldata lockIDs_) external override {
+        for (uint256 i = 0; i < lockIDs_.length; i++) {
+            _removeVote(lockIDs_[i]);
         }
     }
 
@@ -382,7 +439,6 @@ contract UnderwritingLockVoting is
         if(lastTimePremiumsCharged == epochStartTimestamp) revert LastEpochPremiumsAlreadyProcessed({epochTime: epochStartTimestamp});
 
         uint256 startIndex_lastProcessedVotePowerOf = _updateInfo.finishedLastUpdate ? 0 : _updateInfo.savedIndexOfLastProcessedVotePowerOf;
-        uint256 totalPremium;
         uint256 insuranceCapacity = IGaugeController(gaugeController).getInsuranceCapacity();
         uint256 totalVotes = _lastProcessedVotePowerOf.length();
 
@@ -421,18 +477,28 @@ contract UnderwritingLockVoting is
 
             (uint256 lockID,) = _lastProcessedVotePowerOf.at(i);
             uint256 premium = _calculateVotePremium(lockID, insuranceCapacity);
-            totalPremium += premium;
+            if (premium == 0) {lockIDsToRemove.push(lockID);}
+            // Could put next 3 lines in an else block for gas efficiency, but makes it harder to debug.
+            totalPremiumDue += premium;
+            console.log("totalPremiumDue %s", totalPremiumDue);
             IUnderwritingLocker(underwritingLocker).chargePremium(lockID, premium);
             emit PremiumCharged(lockID, epochStartTimestamp, premium);
+        }
+
+        // Remove dead votes from EnumerableMap
+        while (lockIDsToRemove.length > 0) {
+            _lastProcessedVotePowerOf.remove(lockIDsToRemove[lockIDsToRemove.length - 1]);
+            lockIDsToRemove.pop();
         }
 
         SafeERC20.safeTransferFrom(
             IERC20(IUnderwritingLocker(underwritingLocker).token()), 
             underwritingLocker, 
             revenueRouter,
-            totalPremium
+            totalPremiumDue
         );
 
+        totalPremiumDue = 0; // Reset total premiium due
         _updateInfo.finishedLastUpdate = true;
         lastTimePremiumsCharged = epochStartTimestamp;
         emit AllPremiumsCharged(epochStartTimestamp);
