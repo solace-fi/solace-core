@@ -32,16 +32,16 @@ interface IGaugeController {
     CUSTOM ERRORS
     ***************************************/
 
-    /**
-     * @notice Thrown if pauseGauge() is attempted on a gauge that is already paused.
-     * @param gaugeID The gauge ID.
-     */
+    /// @notice Thrown when zero address is given as an argument.
+    /// @param contractName Name of contract for which zero address was incorrectly provided.
+    error ZeroAddressInput(string contractName);
+    
+    /// @notice Thrown if pauseGauge() is attempted on a gauge that is already paused.
+    /// @param gaugeID The gauge ID.
     error GaugeAlreadyPaused(uint256 gaugeID);
 
-    /**
-     * @notice Thrown if unpauseGauge() is attempted on a gauge that is already paused.
-     * @param gaugeID The gauge ID.
-     */
+    /// @notice Thrown if unpauseGauge() is attempted on a gauge that is already paused.
+    /// @param gaugeID The gauge ID.
     error GaugeAlreadyUnpaused(uint256 gaugeID);
 
     /// @notice Thrown if unpauseGauge() is attempted on gauge ID 0.
@@ -50,9 +50,7 @@ interface IGaugeController {
     /// @notice Thrown if vote() is attempted for gauge ID 0.
     error CannotVoteForGaugeID0();
 
-    /**
-     * @notice Thrown if updateGaugeWeights() is called after gauge weights have been successfully updated in the current epoch.
-     */
+    /// @notice Thrown if updateGaugeWeights() is called after gauge weights have been successfully updated in the current epoch.
     error GaugeWeightsAlreadyUpdated();
 
     /// @notice Thrown when vote attempted before gauge weights have been successfully updated for this epoch.
@@ -207,7 +205,7 @@ interface IGaugeController {
     function getVotePowerSum() external view returns (uint256 votePowerSum);
 
     /**
-     * @notice Register votes.
+     * @notice Get individual vote.
      * @dev Can only be called by voting contracts that have been added via addVotingContract().
      * @param votingContract_ Address of voting contract  - must have been added via addVotingContract().
      * @param voteID_ Unique identifier for vote.

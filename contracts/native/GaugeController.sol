@@ -113,6 +113,7 @@ contract GaugeController is
     constructor(address governance_, address token_)
         Governable(governance_)
     {
+        if (token_ == address(0x0)) revert ZeroAddressInput("token");
         token = token_;
         leverageFactor = 1e18; // Default 1x leverage factor
         Gauge memory newGauge = Gauge(false, 0, ""); // Pre-fill slot 0 of _gauges, ensure gaugeID 1 maps to _gauges[1]
@@ -136,7 +137,7 @@ contract GaugeController is
      * @return timestamp
      */
     function _getEpochEndTimestamp() internal view returns (uint256 timestamp) {
-        return ( (block.timestamp / WEEK) * WEEK ) + 1;
+        return ( (block.timestamp / WEEK) * WEEK ) + WEEK;
     }
 
     /**
@@ -159,7 +160,8 @@ contract GaugeController is
      */
     function _getGaugeWeight(uint256 gaugeID_) internal view returns (uint256 weight) {
         uint256 votePowerSum = _getVotePowerSum();
-        return 1e18 * _votePowerOfGaugeForEpoch[lastTimeGaugeWeightsUpdated][gaugeID_] / votePowerSum;
+        if (votePowerSum == 0) {return 0;} // Avoid divide by 0 error
+        else {return 1e18 * _votePowerOfGaugeForEpoch[lastTimeGaugeWeightsUpdated][gaugeID_] / votePowerSum;}
     }
 
     /**
@@ -289,7 +291,7 @@ contract GaugeController is
     }
 
     /**
-     * @notice Get vote.
+     * @notice Get individual vote.
      * @dev Can only be called by voting contracts that have been added via addVotingContract().
      * @param votingContract_ Address of voting contract  - must have been added via addVotingContract().
      * @param voteID_ Unique identifier for vote.
@@ -505,12 +507,9 @@ contract GaugeController is
                 console.log("processVotes 2 %s" , gasleft());
 
                 (uint256 voteID, uint256 gaugeID) = _votes[votingContract].at(j);
-                // Votes don't count if i.) gaugeID == 0, or ii.) gauge paused
-                // If don't have 2nd conditional, we can have edge case where someone votes when gauge is active (cannot vote for gauge when paused)
-                //, gauge paused after, but they will still be paying for the vote for a paused gauge
+                // Votes don't count if gauge paused => address edge case where someone votes when gauge is active (cannot vote for gauge when paused), gauge paused after, but they will still be paying for the vote for a paused gauge
                 if (!_gauges[gaugeID].active) {
                     IGaugeVoter(votingContract).setLastProcessedVotePower(voteID, gaugeID, 0);
-                    console.log("skipped %s", voteID);
                     continue;
                 }
                 uint256 votePower = IGaugeVoter(votingContract).getVotePower(voteID);
@@ -520,7 +519,7 @@ contract GaugeController is
             }
 
             // Remove dead voteIDs after iteration through EnumerableMap.
-            // Avoid removing during iteration to avoid side effect from iterating through a structure that we are mutating during iteration.
+            // Avoid removing during iteration to avoid side effect from iterating through a collection that we are mutating during iteration.
             while (voteIDsToRemove.length > 0) {
                 _votes[votingContract].remove(voteIDsToRemove[voteIDsToRemove.length - 1]);
                 voteIDsToRemove.pop();

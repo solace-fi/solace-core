@@ -15,10 +15,6 @@ import "./../interfaces/native/IUnderwritingLockVoting.sol";
 import "./../interfaces/native/IGaugeController.sol";
 import "hardhat/console.sol";
 
-// TO-DO
-// vote gaugeID = 0 -> retract vote (no $UWE charge)
-// Is processVotes DDOS resistant?
-
 /**
  * @title UnderwritingLockVoting
  * @author solace.fi
@@ -300,7 +296,6 @@ contract UnderwritingLockVoting is
      */
     function _removeVote(uint256 lockID_) internal  {
         if( IUnderwritingLocker(underwritingLocker).ownerOf(lockID_) != msg.sender && lockDelegateOf[lockID_] != msg.sender) revert NotOwnerNorDelegate();
-        // Edge case, what if lockID is non-existent in chargePremium set?
         _lastProcessedVotePowerOf.remove(lockID_);
         IGaugeController(gaugeController).removeVote(lockID_);
         emit VoteRemoved(lockID_, msg.sender);

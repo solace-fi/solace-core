@@ -11,10 +11,6 @@ import { UnderwritingLocker, UnderwritingLockVoting, Registry, MockErc20Permit, 
 import { expectDeployed } from "../utilities/expectDeployed";
 import { expectClose } from "./../utilities/math";
 
-// To-do
-// Edge case of lock is burned after voting
-// Can we remove dead votes?
-
 /*******************
   GLOBAL CONSTANTS
 *******************/
@@ -1010,6 +1006,7 @@ describe("UnderwritingLockVoting", function () {
           const tx = await gaugeController.connect(governor).updateGaugeWeights()
 
           if ((await gaugeController.lastTimeGaugeWeightsUpdated()).lt(EPOCH_START_TIME)) {
+            await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("GaugeWeightsNotYetUpdated");
             continue;
           } else {
             await expect(tx).to.emit(gaugeController, "GaugeWeightsUpdated").withArgs(EPOCH_START_TIME);
@@ -1061,6 +1058,7 @@ describe("UnderwritingLockVoting", function () {
           const tx = await voting.connect(governor).chargePremiums()
 
           if ((await voting.lastTimePremiumsCharged()).lt(EPOCH_START_TIME)) {
+            await expect(voting.connect(owner1).vote(1, 1)).to.be.revertedWith("LastEpochPremiumsNotCharged")
             continue;
           } else {
             await expect(tx).to.emit(voting, "AllPremiumsCharged").withArgs(EPOCH_START_TIME);
