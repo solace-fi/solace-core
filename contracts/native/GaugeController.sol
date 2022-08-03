@@ -81,11 +81,11 @@ contract GaugeController is
     /// @dev voteID is the unique identifier for each individual vote. In the case of UnderwritingLockVoting.sol, lockID = voteID.
     mapping(address => EnumerableMap.UintToUintMap) internal _votes;
 
-    UpdateInfo internal _updateInfo;
-
     /// @notice Dynamic array of dead voteIDs to remove from _votes EnumerableMap.
     /// @dev Unfortunately Solidity doesn't allow dynamic arrays in memory, and I don't see a space-efficient way of creating a fixed-length array for this problem.
     uint256[] internal voteIDsToRemove;
+
+    UpdateInfo internal _updateInfo;
 
     /***************************************
     STRUCTS

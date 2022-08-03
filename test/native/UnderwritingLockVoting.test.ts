@@ -624,6 +624,10 @@ describe("UnderwritingLockVoting", function () {
         expect (await voting.isVotingOpen()).eq(false)
         await expect(voting.connect(owner1).vote(1, 1)).to.be.revertedWith("LastEpochPremiumsNotCharged")
       });
+      it("sanity check of gaugeWeights", async function () {
+        const TOTAL_RECORDED_VOTE_POWER = LAST_RECORDED_VOTE_POWER_1.add(LAST_RECORDED_VOTE_POWER_2).add(LAST_RECORDED_VOTE_POWER_3).add(LAST_RECORDED_VOTE_POWER_4).add(LAST_RECORDED_VOTE_POWER_5)
+        expect(await gaugeController.getVotePowerSum()).eq(TOTAL_RECORDED_VOTE_POWER)
+      });
       it("should have removed vote for burned lock", async function () {
         const BURNED_LOCK_ID = 5
         await expect(voting.getVote(BURNED_LOCK_ID)).to.be.revertedWith("VoteNotFound");
@@ -701,7 +705,6 @@ describe("UnderwritingLockVoting", function () {
         expect(await gaugeController.lastTimeGaugeWeightsUpdated()).eq(EPOCH_START_TIME)
         expect(await voting.lastTimePremiumsCharged()).eq(EPOCH_START_TIME)
       });
-
     });
 
     /**********
@@ -709,6 +712,25 @@ describe("UnderwritingLockVoting", function () {
     **********/
     /**
      * You should customise gas limit to max for underwritingLockVoting.chargePremiums() and gaugeController.updateGaugeWeights()
+     */
+
+    /*******************
+      STATE SUMMARY
+    *******************/
+    /**
+     * There are four locks owned by owner1:
+     * lockID 1 => (1e18 - premium) locked for 1 yr, managed by delegate1, has a vote for gaugeID 1
+     * lockID 2 => (1e18 - premium) locked for 2 yrs, managed by delegate2, has a vote for gaugeID 2
+     * lockID 3 => (1e18 - premium) locked for 3 yrs, managed by delegate2, has a vote for gaugeID 3
+     * lockID 4 => 1e18 locked for 4 yrs, has a vote for gaugeID 1
+     * 
+     * lockID 5 has been burned
+     * 
+     * There are 3 gauges
+     * gaugeID 1 => "gauge1" => 100% weight
+     * 
+     * Votes and premiums have been processed for the last epoch
+     * lockID1 has been charged for one epoch
      */
 
     // Need to test behaviour with 100 votes
