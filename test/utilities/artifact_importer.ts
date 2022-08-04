@@ -112,6 +112,7 @@ export async function import_artifacts() {
   artifacts.xsLockerExtension = await tryImport(`${artifact_dir}/airdrop/xsLockerExtension.sol/xsLockerExtension.json`);
 
   // native contracts
+  artifacts.UnderwritingPool = await tryImport(`${artifact_dir}/native/UnderwritingPool.sol/UnderwritingPool.json`);
   artifacts.FluxMegaOracle = await tryImport(`${artifact_dir}/native/FluxMegaOracle.sol/FluxMegaOracle.json`);
   return artifacts;
 }
