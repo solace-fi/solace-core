@@ -271,6 +271,18 @@ contract UnderwritingLocker is
         return _getLockMultiplier(_locks[lockID_].end);
     }
 
+    /**
+     * @notice Gets all active lockIDs for a user
+     * @param user_ The address of user to query.
+     * @return lockIDs Array of active lockIDs.
+     */
+    function getAllLockIDsOf(address user_) external view override returns (uint256[] memory lockIDs) {
+        uint256 userNumOfLocks = balanceOf(user_);
+        lockIDs = new uint256[](userNumOfLocks);
+        for(uint256 i = 0; i < userNumOfLocks; i++) {lockIDs[i] = tokenOfOwnerByIndex(user_, i);}
+        return lockIDs;
+    }
+
     /***************************************
     INTERNAL MUTATOR FUNCTIONS
     ***************************************/

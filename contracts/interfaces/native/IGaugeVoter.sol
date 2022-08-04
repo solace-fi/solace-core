@@ -19,9 +19,10 @@ interface IGaugeVoter {
     function setLastProcessedVotePower(uint256 lockID_, uint256 gaugeID_, uint256 votePower_) external;
 
     /**
-     * @notice Get vote power (for the current epoch) for a voteID.
-     * @param voteID_ The ID of the vote to query.
+     * @notice Get vote power for a voter.
+     * @param voter_ The address of the voter to query.
      * @return votePower
      */
-    function getVotePower(uint256 voteID_) external view returns (uint256 votePower);
+    function getVotePowerOf(address voter_) external view returns (uint256 votePower);
+
 }

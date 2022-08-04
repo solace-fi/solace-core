@@ -220,6 +220,13 @@ interface IUnderwritingLocker is IERC721Enhanced {
      */
     function getLockMultiplier(uint256 lockID_) external view returns (uint256 multiplier);
 
+    /**
+     * @notice Gets all active lockIDs for a user
+     * @param user_ The address of user to query.
+     * @return lockIDs Array of active lockIDs.
+     */
+    function getAllLockIDsOf(address user_) external view returns (uint256[] memory lockIDs);
+
     /***************************************
     EXTERNAL MUTATOR FUNCTIONS
     ***************************************/

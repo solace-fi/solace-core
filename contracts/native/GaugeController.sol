@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "./../utils/Governable.sol";
 import "./../interfaces/native/IGaugeVoter.sol";
 import "./../interfaces/native/IGaugeController.sol";
+import "./GaugeControllerHelper.sol";
 import "hardhat/console.sol";
 
 // TODO
@@ -37,6 +38,7 @@ contract GaugeController is
     {
     using EnumerableSet for EnumerableSet.AddressSet;
     using EnumerableMap for EnumerableMap.UintToUintMap;
+    using EnumerableMap for EnumerableMap.Bytes32ToBytes32Map;
 
     /***************************************
     GLOBAL PUBLIC VARIABLES
@@ -52,6 +54,9 @@ contract GaugeController is
     /// @notice The total number of gauges that have been created
     uint256 public override totalGauges;
     
+    /// @notice The total number of votes that have been made.
+    uint256 public override totalVotes;
+
     /// @notice Timestamp of last epoch start (rounded to weeks) that gauge weights were successfully updated.
     uint256 public override lastTimeGaugeWeightsUpdated;
 
@@ -80,6 +85,9 @@ contract GaugeController is
     /// @notice votingContract address => voteID => gaugeID of vote
     /// @dev voteID is the unique identifier for each individual vote. In the case of UnderwritingLockVoting.sol, lockID = voteID.
     mapping(address => EnumerableMap.UintToUintMap) internal _votes;
+
+    // votingContract => voteID => {address voteOwner, uint48 gaugeID, uint48 votePowerBPS}.
+    mapping(address => EnumerableMap.Bytes32ToBytes32Map) internal _votes1;
 
     /// @notice Dynamic array of dead voteIDs to remove from _votes EnumerableMap.
     /// @dev Unfortunately Solidity doesn't allow dynamic arrays in memory, and I don't see a space-efficient way of creating a fixed-length array for this problem.
@@ -303,6 +311,46 @@ contract GaugeController is
     }
 
     /***************************************
+    INTERNAL MUTATOR FUNCTIONS
+    ***************************************/
+
+    /**
+     * @notice Internal mutator function to add, modify or remove vote
+     * @param votingContract_ Address of voting contract - must have been added via addVotingContract().
+     * @param voteID_ Unique identifier for vote, `0` if adding new vote.
+     * @param voter_ Address of voter.
+     * @param gaugeID_ ID of gauge to add, modify or remove vote for.
+     * @param newVotePowerBPS_ New votePowerBPS value.
+     * @return voteID New vote ID if adding vote, old vote ID otherwise.
+     * @return oldVotePowerBPS Old votePowerBPS value.
+     */
+    function _vote(address votingContract_, uint256 voteID_, address voter_, uint256 gaugeID_, uint256 newVotePowerBPS_) internal returns (uint256 voteID, uint256 oldVotePowerBPS) {
+        // If add vote
+        if (voteID_ == 0) {
+            assert(!_votes1[votingContract_].contains(bytes32(0)));
+            voteID = ++totalVotes;
+            bytes32 word = GaugeControllerHelper.voteInfoToBytes32(voter_, gaugeID_, newVotePowerBPS_);
+            _votes1[votingContract_].set(bytes32(voteID), word);
+            return (voteID, 0);
+        // Else if remove vote 
+        } else if (newVotePowerBPS_ == 0) {
+            (address voter, uint256 gaugeID, uint256 oldVotePowerBPS) = GaugeControllerHelper.bytes32ToVoteInfo(_votes1[votingContract_].get(bytes32(voteID_)));
+            assert(gaugeID == gaugeID_);
+            assert(voter == voter_);
+            _votes1[votingContract_].remove(bytes32(voteID_));
+            return (voteID_, oldVotePowerBPS);
+        // Else if modify vote
+        } else {
+            (address voter, uint256 gaugeID, uint256 oldVotePowerBPS) = GaugeControllerHelper.bytes32ToVoteInfo(_votes1[votingContract_].get(bytes32(voteID_)));
+            assert(gaugeID == gaugeID_);
+            assert(voter == voter_);
+            bytes32 word = GaugeControllerHelper.voteInfoToBytes32(voter_, gaugeID_, newVotePowerBPS_);
+            _votes1[votingContract_].set(bytes32(voteID), word);
+            return (voteID_, oldVotePowerBPS);
+        }
+    }
+
+    /***************************************
     VOTING CONTRACT FUNCTIONS
     ***************************************/
 
@@ -512,7 +560,9 @@ contract GaugeController is
                     IGaugeVoter(votingContract).setLastProcessedVotePower(voteID, gaugeID, 0);
                     continue;
                 }
-                uint256 votePower = IGaugeVoter(votingContract).getVotePower(voteID);
+                console.log("processVotes - getVotePower() start %s" , gasleft());
+                uint256 votePower = IGaugeVoter(votingContract).getVotePowerOf(msg.sender); // Modify here
+                console.log("processVotes - getVotePower() end %s" , gasleft());
                 if (votePower == 0) {voteIDsToRemove.push(voteID);}
                 _votePowerOfGaugeForEpoch[epochStartTime][gaugeID] += votePower; // This part is susceptible to re-entrancy
                 IGaugeVoter(votingContract).setLastProcessedVotePower(voteID, gaugeID, votePower);

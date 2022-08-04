@@ -121,6 +121,9 @@ interface IGaugeController {
     /// @notice The total number of gauges that have been created
     function totalGauges() external view returns (uint256);
 
+    /// @notice The total number of votes that have been made.
+    function totalVotes() external view returns (uint256);
+
     /// @notice Timestamp of last epoch start (rounded to weeks) that gauge weights were successfully updated.
     function lastTimeGaugeWeightsUpdated() external view returns (uint256);
 

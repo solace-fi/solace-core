@@ -69,12 +69,27 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     /// @notice Thrown when non-gauge controller attempts to call setLastRecordedVotePower().
     error NotGaugeController();
 
+    /// @notice Thrown when vote is attempted for voter with no underwriting locks.
+    error VoterHasNoLocks();
+
+    /// @notice Thrown if attempt to vote with single vote having votePowerBPS > 10000
+    error SingleVotePowerBPSOver10000();
+
+    /// @notice Thrown if attempt to vote with total votePowerBPS > 10000
+    error TotalVotePowerBPSOver10000();
+
+    /// @notice Thrown if attempt to cancel non-existent vote.
+    error CannotCancelNonExistentVote();
+
+    /// @notice Thrown if vote() is attempted for gauge ID 0.
+    error CannotVoteForGaugeID0();
+
     /***************************************
     EVENTS
     ***************************************/
 
-    /// @notice Emitted when a delegate is set for a lock.
-    event LockDelegateSet(uint256 indexed lockID, address indexed delegate);
+    /// @notice Emitted when a delegate is set for a voter.
+    event LockDelegateSet(address indexed voter, address indexed delegate);
 
     /// @notice Emitted when the Registry is set.
     event RegistrySet(address indexed registry);
@@ -83,8 +98,14 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     /// epochTimestamp is the timestamp for the epoch (rounded down to weeks) that the vote counts for
     event Vote(uint256 indexed lockID, uint256 indexed gaugeID, address voter, uint256 indexed epochTimestamp, uint256 votePower);
 
+    /// @notice Emitted when a vote is added.
+    event VoteAdded(address indexed voter, uint256 indexed gaugeID, uint256 indexed voteID, uint256 votePowerBPS);
+
+    /// @notice Emitted when a vote is added.
+    event VoteChanged(address indexed voter, uint256 indexed gaugeID, uint256 indexed voteID, uint256 oldVotePowerBPS, uint256 newVotePowerBPS);
+
     /// @notice Emitted when a vote is removed.
-    event VoteRemoved(uint256 indexed lockID, address voter);
+    event VoteRemoved(address indexed voter, uint256 indexed gaugeID, uint256 indexed voteID);
 
     /// @notice Emitted when the Vote processed by GaugeController.
     /// epochTimestamp is the timestamp for the epoch (rounded down to weeks) that the vote counts for
@@ -116,11 +137,18 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     function registry() external view returns (address);
 
     /**
-     * @notice Get lockDelegate for a given lockId.
-     * @param lockID_ The ID of the lock to query for.
-     * @return lockDelegate Zero address if no lock delegate.
+     * @notice Get delegate for a given voter.
+     * @param voter_ The address of the voter to query for.
+     * @return delegate Zero address if no lock delegate.
      */
-    function lockDelegateOf(uint256 lockID_) external view returns (address lockDelegate);
+    function lockDelegateOf(address voter_) external view returns (address delegate);
+
+    /**
+     * @notice Get usedVotePowerBPS for a given voter.
+     * @param voter_ The address of the voter to query for.
+     * @return usedVotePowerBPS Maximum value of 10000 (for 10000 basis points).
+     */
+    function usedVotePowerBPSOf(address voter_) external view returns (uint256 usedVotePowerBPS);
 
     /**
      * @notice Obtain end timestamp (rounded down to weeks) for the epoch where all premiums were charged.
@@ -165,56 +193,57 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     ***************************************/
 
     /**
-     * @notice Register a vote for a gauge
-     * @notice Each underwriting lock is entitled to a single vote
-     * @notice A new vote cannot be registered before all stored votes have been registered for the previous epoch (via governor invoking [`processVotes()`](#processvotes)).
-     * Can only be called by the lock owner or delegate
-     * @param lockID_ The ID of the lock to vote for.
-     * @param gaugeID_ Address of intended lock delegate
+     * @notice Directly register a single vote for a gauge. Can either add or change a vote.
+     * @notice Can also technically remove a vote (votePowerBPS_ == 0), however the difference with removeVote() is that vote() will revert if the voter has no locks (no locks => no right to vote, but may have dead locks created previously).
+     * @notice GaugeController.updateGaugeWeights() will remove these dead locks, however the user can also preemptively remove dead locks through removeVote().
+     * @notice Votes cannot be added or modified before all stored votes have been processed for the epoch (GaugeController.updateGaugeWeights() => UnderwritingLockVoting.chargePremiums())
+     * Can only be called by the voter or vote delegate.
+     * @param voter_ The voter address.
+     * @param gaugeID_ The ID of the gauge to vote for.
+     * @param votePowerBPS_ Vote power BPS to assign to this vote
+     * @return voteID Corresponding voteID
      */
-    function vote(uint256 lockID_, uint256 gaugeID_) external;
+    function vote(address voter_, uint256 gaugeID_, uint256 votePowerBPS_) external returns (uint256 voteID);
 
     /**
-     * @notice Register multiple votes for a gauge
-     * @notice Each underwriting lock is entitled to a single vote
-     * @notice A new vote cannot be registered before all stored votes have been registered for the previous epoch (via governor invoking [`processVotes()`](#processvotes)).
-     * Can only be called by the lock owner or delegate
-     * @param lockIDs_ Array of lockIDs to vote for.
-     * @param gaugeIDs_ Array of gaugeIDs to vote for.
+     * @notice Directly register multiple gauge votes. Can either add or change votes.
+     * @notice Can also technically remove votes (votePowerBPS_ == 0), however the difference with removeVoteMultiple() is that voteMultiple() will revert if the voter has no locks (no locks => no right to vote, but may have dead locks created previously).
+     * @notice GaugeController.updateGaugeWeights() will remove these dead locks, however the user can also preemptively remove dead locks through removeVote().
+     * @notice Votes cannot be added or modified before all stored votes have been processed for the epoch (GaugeController.updateGaugeWeights() => UnderwritingLockVoting.chargePremiums())
+     * Can only be called by the voter or vote delegate.
+     * @param voter_ The voter address.
+     * @param gaugeIDs_ Array of gauge IDs to vote for.
+     * @param votePowerBPSs_ Array of corresponding vote power BPS values.
+     * @return voteIDs Array of corresponding voteIDs in order of gaugeIDs_ array.
      */
-    function voteMultiple(uint256[] calldata lockIDs_, uint256[] calldata gaugeIDs_) external;
+    function voteMultiple(address voter_, uint256[] memory gaugeIDs_, uint256[] memory votePowerBPSs_) external returns (uint256[] memory voteIDs);
 
     /**
-     * @notice Remove a vote for a lockID.
-     * Can only be called by the lock owner or delegate
-     * @param lockID_ The ID of the lock to remove the vote for.
+     * @notice Removes a vote.
+     * @notice Votes cannot be removed before all stored votes have been processed for the epoch (GaugeController.updateGaugeWeights() => UnderwritingLockVoting.chargePremiums()).
+     * Can only be called by the voter or vote delegate.
+     * @param voter_ The voter address.
+     * @param gaugeID_ The ID of the gauge to remove vote for.
+     * @return voteID Corresponding voteID.
      */
-    function removeVote(uint256 lockID_) external;
+    function removeVote(address voter_, uint256 gaugeID_) external returns (uint256 voteID);
 
     /**
-     * @notice Remove votes for multiple underwriting locks.
-     * Can only be called by the lock owner or delegate
-     * @param lockIDs_ Array of lockIDs to vote for.
+     * @notice Remove multiple gauge votes.
+     * @notice Votes cannot be removed before all stored votes have been processed for the epoch (GaugeController.updateGaugeWeights() => UnderwritingLockVoting.chargePremiums()).
+     * Can only be called by the voter or vote delegate.
+     * @param voter_ The voter address.
+     * @param gaugeIDs_ Array of gauge IDs to remove votes for.
+     * @return voteIDs Array of corresponding voteIDs in order of gaugeIDs_ array.
      */
-    function removeVoteMultiple(uint256[] calldata lockIDs_) external;
+    function removeVoteMultiple(address voter_, uint256[] memory gaugeIDs_) external returns (uint256[] memory voteIDs);
 
     /**
-     * @notice Set the delegate for a given lock
-     * Can only be called by the lock owner
+     * @notice Set the voting delegate for the caller.
      * To remove a delegate, the delegate can be set to the ZERO_ADDRESS - 0x0000000000000000000000000000000000000000
-     * @param lockID_ The ID of the lock to set the delegate of.
-     * @param delegate_ Address of intended lock delegate
+     * @param delegate_ Address of intended delegate
      */
-    function setLockDelegate(uint256 lockID_, address delegate_) external;
-
-    /**
-     * @notice Set delegates for multiple lock
-     * Can only be called by the lock owner
-     * To remove a delegate, the delegate can be set to the ZERO_ADDRESS - 0x0000000000000000000000000000000000000000
-     * @param lockIDs_ Array of lock IDs.
-     * @param delegates_ Array of addresses of intended lock delegates.
-     */
-    function setLockDelegateMultiple(uint256[] calldata lockIDs_, address[] calldata delegates_) external;
+    function setLockDelegate(address delegate_) external;
 
     /***************************************
     GOVERNANCE FUNCTIONS
