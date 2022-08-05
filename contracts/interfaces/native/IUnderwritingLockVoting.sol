@@ -2,6 +2,7 @@
 pragma solidity 0.8.6;
 
 import "./IGaugeVoter.sol";
+import "./GaugeStructs.sol";
 
 /**
  * @title IUnderwritingLockVoting
@@ -78,12 +79,6 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     /// @notice Thrown if attempt to vote with total votePowerBPS > 10000
     error TotalVotePowerBPSOver10000();
 
-    /// @notice Thrown if attempt to cancel non-existent vote.
-    error CannotCancelNonExistentVote();
-
-    /// @notice Thrown if vote() is attempted for gauge ID 0.
-    error CannotVoteForGaugeID0();
-
     /***************************************
     EVENTS
     ***************************************/
@@ -106,10 +101,6 @@ interface IUnderwritingLockVoting is IGaugeVoter {
 
     /// @notice Emitted when a vote is removed.
     event VoteRemoved(address indexed voter, uint256 indexed gaugeID);
-
-    /// @notice Emitted when the Vote processed by GaugeController.
-    /// epochTimestamp is the timestamp for the epoch (rounded down to weeks) that the vote counts for
-    event VoteProcessed(uint256 indexed lockID, uint256 indexed gaugeID, uint256 indexed epochTimestamp, uint256 votePower);
 
     /// @notice Emitted a premium is charged.
     event PremiumCharged(uint256 indexed lockID, uint256 indexed epochStartTimestamp, uint256 premium);
@@ -163,12 +154,13 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     /***************************************
     EXTERNAL VIEW FUNCTIONS
     ***************************************/
+
     /**
-     * @notice Get currently registered vote for a lockID.
-     * @param lockID_ The ID of the lock to query.
-     * @return gaugeID The ID of the gauge the lock has voted for, returns 0 if either lockID or vote doesn't exist
+     * @notice Get votes for a voter.
+     * @param voter_ Address of voter to query for.
+     * @return votes Array of votes{gaugeID, votePowerBPS}.
      */
-    function getVote(uint256 lockID_) external view returns (uint256 gaugeID);
+    function getVotes(address voter_) external view returns (GaugeStructs.Vote[] memory votes);
 
     /**
      * @notice Get timestamp for the start of the current epoch

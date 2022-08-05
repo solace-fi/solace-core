@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
-import "./IGaugeVoter.sol"; // Import for Vote struct
+import "./GaugeStructs.sol";
 
 /**
  * @title GaugeController
@@ -19,16 +19,6 @@ import "./IGaugeVoter.sol"; // Import for Vote struct
  * Governance can [`addGauge()`](#addgauge) or [`pauseGauge()`](#pausegauge).
  */
 interface IGaugeController {
-
-    /***************************************
-    STRUCTS
-    ***************************************/
-
-    struct Gauge { 
-        bool active; // [0:8]
-        uint248 rateOnLine; // [8:256] Max value we reasonably expect is ~20% or 2e17. We only need log 2 2e17 = ~58 bits for this.
-        string name;
-    }
 
     /***************************************
     CUSTOM ERRORS
@@ -94,6 +84,9 @@ interface IGaugeController {
 
     /// @notice Emitted when gauge weights are updated.
     event GaugeWeightsUpdated(uint256 indexed updateTime);
+
+    /// @notice Emitted when updateGaugeWeights() does an incomplete update, and run again until completion.
+    event IncompleteGaugeUpdate();
 
     /// @notice Emitted when leverage factor set;
     event LeverageFactorSet(uint256 indexed leverageFactor);
@@ -212,8 +205,30 @@ interface IGaugeController {
      * @param voter_ Address of voter.
      * @return votes Array of Vote {gaugeID, votePowerBPS}.
      */
-    function getVotes(address votingContract_, address voter_) external view returns (Vote[] memory votes);
+    function getVotes(address votingContract_, address voter_) external view returns (GaugeStructs.Vote[] memory votes);
 
+    /**
+     * @notice Get all voters for a given voting contract.
+     * @param votingContract_ Address of voting contract  - must have been added via addVotingContract().
+     * @return voters Array of voters
+     */
+    function getVoters(address votingContract_) external view returns (address[] memory voters);
+
+    /**
+     * @notice Get number of votes for a given voter and voting contract.
+     * @param votingContract_ Address of voting contract  - must have been added via addVotingContract().
+     * @param voter_ Address of voter.
+     * @return voteCount Number of votes.
+     */
+    function getVoteCount(address votingContract_, address voter_) external view returns (uint256 voteCount);
+
+    /**
+     * @notice Get number of voters for a voting contract.
+     * @param votingContract_ Address of voting contract  - must have been added via addVotingContract().
+     * @return votersCount Number of votes.
+     */
+    function getVotersCount(address votingContract_) external view returns (uint256 votersCount);
+    
     /***************************************
     VOTING CONTRACT FUNCTIONS
     ***************************************/
@@ -309,9 +324,8 @@ interface IGaugeController {
     function setRateOnLine(uint256[] calldata gaugeIDs_, uint256[] calldata rateOnLines_) external;
 
     /**
-     * @notice Updates gauge weights by getting current vote data from Voting contracts.
+     * @notice Updates gauge weights by processing votes for the last epoch.
      * @dev Can only be called once per epoch.
-     * @dev Requires all Voting contracts to had votes processed for this epoch
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      */
     function updateGaugeWeights() external;

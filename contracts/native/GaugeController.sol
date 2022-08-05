@@ -69,7 +69,7 @@ contract GaugeController is
     mapping(uint256 => mapping(uint256 => uint256)) internal _votePowerOfGaugeForEpoch;
 
     /// @notice Array of Gauge {string name, bool active}
-    Gauge[] internal _gauges;
+    GaugeStructs.Gauge[] internal _gauges;
 
     /// @notice Set of addresses from which getInsuranceCapacity() will tally UWE supply from.
     EnumerableSet.AddressSet internal _tokenholders;
@@ -86,21 +86,7 @@ contract GaugeController is
     /// @notice Dynamic array of dead voters to remove from _voters
     address[] internal _votersToRemove;
 
-    UpdateInfo internal _updateInfo;
-
-    /***************************************
-    STRUCTS
-    ***************************************/
-
-    /// @dev Struct pack into single 32-byte word
-    /// @param _votingContractsIndex Index for _votingContracts for last incomplete updateGaugeWeights() call.
-    /// @param _votersIndex Index for _voters[savedIndex_votingContracts] for last incomplete updateGaugeWeights() call.
-    /// @param _votesIndex Index for _votes[savedIndex_votingContracts][savedIndex_voters] for last incomplete updateGaugeWeights() call.
-    struct UpdateInfo {
-        uint80 _votingContractsIndex; // [0:80]
-        uint88 _votersIndex; // [80:168]
-        uint88 _votesIndex; // [168:256]
-    }
+    GaugeStructs.UpdateInfo internal _updateInfo;
 
     /***************************************
     CONSTRUCTOR
@@ -117,8 +103,8 @@ contract GaugeController is
         if (token_ == address(0x0)) revert ZeroAddressInput("token");
         token = token_;
         leverageFactor = 1e18; // Default 1x leverage factor
-        Gauge memory newGauge = Gauge(false, 0, ""); // Pre-fill slot 0 of _gauges, ensure gaugeID 1 maps to _gauges[1]
-        _gauges.push(newGauge); 
+        GaugeStructs.Gauge memory newGauge = GaugeStructs.Gauge(false, 0, ""); // Pre-fill slot 0 of _gauges, ensure gaugeID 1 maps to _gauges[1]
+        _gauges.push(GaugeStructs.Gauge(false, 0, "")); 
     }
 
     /***************************************
@@ -297,18 +283,63 @@ contract GaugeController is
      * @param voter_ Address of voter.
      * @return votes Array of Vote {gaugeID, votePowerBPS}.
      */
-    function getVotes(address votingContract_, address voter_) external view override returns (Vote[] memory votes) {
+    function getVotes(address votingContract_, address voter_) external view override returns (GaugeStructs.Vote[] memory votes) {
         if ( !_votingContracts.contains(votingContract_) || !_voters[votingContract_].contains(voter_) ) {
-            votes = new Vote[](0);
+            votes = new GaugeStructs.Vote[](0);
         } else {
             uint256 voteCount = _votes[votingContract_][voter_].length();
-            votes = new Vote[](voteCount);
+            votes = new GaugeStructs.Vote[](voteCount);
             for (uint256 i = 0; i < voteCount; i++) {
                 (uint256 gaugeID, uint256 votingPowerBPS) = _votes[votingContract_][voter_].at(i);
-                votes[i] = Vote(gaugeID, votingPowerBPS);
+                votes[i] = GaugeStructs.Vote(gaugeID, votingPowerBPS);
             }
         } 
         return votes;
+    }
+
+    /**
+     * @notice Get all voters for a given voting contract.
+     * @param votingContract_ Address of voting contract  - must have been added via addVotingContract().
+     * @return voters Array of voters
+     */
+    function getVoters(address votingContract_) external view override returns (address[] memory voters) {
+        if ( !_votingContracts.contains(votingContract_) ) {
+            voters = new address[](0);
+        } else {
+            uint256 votersCount = _voters[votingContract_].length();
+            voters = new address[](votersCount);
+            for (uint256 i = 0; i < votersCount; i++) {
+                voters[i] = _voters[votingContract_].at(i);
+            }
+        } 
+        return voters;
+    }
+
+    /**
+     * @notice Get number of votes for a given voter and voting contract.
+     * @param votingContract_ Address of voting contract  - must have been added via addVotingContract().
+     * @param voter_ Address of voter.
+     * @return voteCount Number of votes.
+     */
+    function getVoteCount(address votingContract_, address voter_) external view override returns (uint256 voteCount) {
+        if ( !_votingContracts.contains(votingContract_) || !_voters[votingContract_].contains(voter_) ) {
+            return 0;
+        } else {
+            return _votes[votingContract_][voter_].length();
+        } 
+    }
+
+    /**
+     * @notice Get number of voters for a voting contract.
+     * @param votingContract_ Address of voting contract  - must have been added via addVotingContract().
+     * @return votersCount Number of votes.
+     */
+    function getVotersCount(address votingContract_) external view override returns (uint256 votersCount) {
+        if ( !_votingContracts.contains(votingContract_) ) {
+            return 0;
+        } else {
+            return _voters[votingContract_].length();
+        } 
     }
 
     /***************************************
@@ -403,7 +434,7 @@ contract GaugeController is
      */
     function addGauge(string calldata gaugeName_, uint256 rateOnLine_) external override onlyGovernance {
         uint256 gaugeID = ++totalGauges;
-        Gauge memory newGauge = Gauge(true, SafeCast.toUint248(rateOnLine_), gaugeName_);
+        GaugeStructs.Gauge memory newGauge = GaugeStructs.Gauge(true, SafeCast.toUint248(rateOnLine_), gaugeName_);
         _gauges.push(newGauge); 
         assert(_gauges.length - 1 == totalGauges); // Uphold invariant, should not be violated. -1 because we already added _gauges[0] in constructor.
         emit GaugeAdded(gaugeID, rateOnLine_, gaugeName_);
@@ -497,9 +528,10 @@ contract GaugeController is
     /**
      * @notice Updates gauge weights by processing votes for the last epoch.
      * @dev Can only be called to completion once per epoch.
-     * @dev Requires all Voting contracts to had votes processed for this epoch
      * @dev This function design is not compatible with ReentrancyGuard.sol. Because the Reentrancy lock is only released once the full function body has been executed, but if we do an early return it will remain locked.
      * @dev So the question is, are we concerned about reentrancy in this function? There's no value transfer here as in the classic Reentrancy attack.
+     * @dev Ternary operator in initialization expression of the for-loops is required to avoid using 3 extra local variables
+     * @dev which would set a stack-too deep error
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      */
     function updateGaugeWeights() external override onlyGovernance {
@@ -508,12 +540,12 @@ contract GaugeController is
         uint256 numVotingContracts = _votingContracts.length();
 
         // Iterate through voting contracts
-        for(uint256 i = _updateInfo._votingContractsIndex; i < numVotingContracts; i++) {
+        for(uint256 i = _updateInfo._votingContractsIndex == type(uint80).max ? 0 : _updateInfo._votingContractsIndex; i < numVotingContracts; i++) {
             address votingContract = _votingContracts.at(i);
             uint256 numVoters = _voters[votingContract].length();
 
             // Iterate through voters
-            for(uint256 j = _updateInfo._votersIndex; j < numVoters; j++) {
+            for(uint256 j = _updateInfo._votersIndex == type(uint88).max ? 0 : _updateInfo._votersIndex ; j < numVoters; j++) {
                 address voter = _voters[votingContract].at(j);
                 uint256 numVotes = _votes[votingContract][voter].length();
                 uint256 votePower = IGaugeVoter(votingContract).getVotePowerOf(voter); // Modify here
@@ -521,13 +553,18 @@ contract GaugeController is
                     _votersToRemove.push(voter);
                     continue;
                 }
-                // IGaugeVoter(votingContract).setLastProcessedVotePower(voteID, gaugeID, 0); // Cache votePower
+
+                // If votePower == 0, we don't need to cache the result because voter will be removed from _voters EnumerableSet
+                // => chargePremiums() will not iterate through it
+                IGaugeVoter(votingContract).cacheLastProcessedVotePower(voter, votePower); // Cache votePower for use in IGaugeVoter.chargePremiums() call later
+
                 uint256 totalVotePowerBPS; 
                 // Iterate through votes
-                for(uint256 k = _updateInfo._votesIndex; k < numVotes; k++) {    
+                for(uint256 k = _updateInfo._votesIndex == type(uint88).max ? 0 : _updateInfo._votesIndex; k < numVotes; k++) {    
                     console.log("processVotes 1 %s" , gasleft());            
                     if (gasleft() < 90000) {
                         _saveUpdateState(i, j, k);
+                        emit IncompleteGaugeUpdate();
                         return;
                     }
                     console.log("processVotes 2 %s" , gasleft());
@@ -558,15 +595,6 @@ contract GaugeController is
     /***************************************
      updateGaugeWeights() HELPER FUNCTIONS
     ***************************************/
-    
-    /// @notice Reset _updateInfo to bytes32(0).
-    /// @dev We could keep this storage slot 'warm' to save gas.
-    function _clearUpdateInfo() internal {
-        assembly {
-            let empty_word
-            sstore(_updateInfo.slot, empty_word)
-        }
-    }
 
     /**
      * @notice Save state of updating gauge weights to _updateInfo
@@ -581,6 +609,17 @@ contract GaugeController is
             updateInfo := or(updateInfo, shr(88, shl(168, votersIndex_))) // [80:168] => votersIndex_
             updateInfo := or(updateInfo, shl(168, votesIndex_)) // [168:256] => votesIndex_
             sstore(_updateInfo.slot, updateInfo) 
+        }
+    }
+
+    /// @notice Reset _updateInfo to starting state.
+    /// @dev We are setting all the bits of _updateInfo to 1.
+    /// @dev The naive approach here is to reset all the bits to 0. However the EVM imposes a 20K gas fee for 
+    /// @dev `rewarming` a cold slot (setting from 0 to 1) vs keeping it warm (changing from non-zero to non-zero value).
+    function _clearUpdateInfo() internal {
+        uint256 bitmap = type(uint256).max;
+        assembly {
+            sstore(_updateInfo.slot, bitmap)
         }
     }
 }
