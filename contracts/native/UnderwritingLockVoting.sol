@@ -109,10 +109,6 @@ contract UnderwritingLockVoting is
     /// @dev Originally a local function variable, but need to save state between two function calls.
     uint256 internal totalPremiumDue;
 
-    // voteOwner => gaugeID => voteID
-    // EnumerableMap enables us to find all voteIDs for a given address
-    mapping(address => EnumerableMap.UintToUintMap) _voteIDForGaugeForVoter;
-
     /***************************************
     CONSTRUCTOR
     ***************************************/
@@ -153,18 +149,19 @@ contract UnderwritingLockVoting is
      * @return premium Premium for vote.
      */
     function _calculateVotePremium(uint256 lockID_, uint256 insuranceCapacity_) internal view returns (uint256 premium) {
-        try IGaugeController(gaugeController).getVote(address(this), lockID_) returns (uint256 gaugeID) {
-            try IGaugeController(gaugeController).getRateOnLineOfGauge(gaugeID) returns (uint256 rateOnLine) {
-                uint256 votePowerSum = IGaugeController(gaugeController).getVotePowerSum();
-                // insuranceCapacity_ from gaugeController.getInsuranceCapacity() is already scaled.
-                // Need to convert rateOnLine from annual rate in 1e18 terms, to weekly rate in fraction terms. Hence `WEEK / (YEAR * 1e18)
-                return insuranceCapacity_ * rateOnLine * WEEK * _lastProcessedVotePowerOf.get(lockID_) / (votePowerSum * YEAR * 1e18);
-            } catch {
-                return 0;
-            }
-        } catch {
-            return 0;
-        }
+        // try IGaugeController(gaugeController).getVote(address(this), lockID_) returns (uint256 gaugeID) {
+        //     try IGaugeController(gaugeController).getRateOnLineOfGauge(gaugeID) returns (uint256 rateOnLine) {
+        //         uint256 votePowerSum = IGaugeController(gaugeController).getVotePowerSum();
+        //         // insuranceCapacity_ from gaugeController.getInsuranceCapacity() is already scaled.
+        //         // Need to convert rateOnLine from annual rate in 1e18 terms, to weekly rate in fraction terms. Hence `WEEK / (YEAR * 1e18)
+        //         return insuranceCapacity_ * rateOnLine * WEEK * _lastProcessedVotePowerOf.get(lockID_) / (votePowerSum * YEAR * 1e18);
+        //     } catch {
+        //         return 0;
+        //     }
+        // } catch {
+        //     return 0;
+        // }
+        return 0;
     }
 
     /**
@@ -173,7 +170,8 @@ contract UnderwritingLockVoting is
      * @return gaugeID The ID of the gauge the lock has voted for, returns 0 if either lockID or vote doesn't exist
      */
     function _getVote(uint256 lockID_) internal view returns (uint256 gaugeID) {
-        return IGaugeController(gaugeController).getVote(address(this), lockID_);
+        // return IGaugeController(gaugeController).getVote(address(this), lockID_);
+        return 0;
     }
 
     /**
@@ -297,48 +295,35 @@ contract UnderwritingLockVoting is
      * @param voter_ The voter address.
      * @param gaugeIDs_ The array of gaugeIDs to vote for.
      * @param votePowerBPSs_ The corresponding array of votePowerBPS values. Can be from 0 - 10000.
-     * @return voteIDs Array of voteIDs (in same order as provided gaugeIDs)
      */
-    function _vote(address voter_, uint256[] memory gaugeIDs_, uint256[] memory votePowerBPSs_) internal returns (uint256[] memory voteIDs)  {
+    function _vote(address voter_, uint256[] memory gaugeIDs_, uint256[] memory votePowerBPSs_) internal {
         // Disable voting if votes not yet processed or premiums not yet charged for this epoch
         if ( _getEpochStartTimestamp() != lastTimePremiumsCharged) revert LastEpochPremiumsNotCharged();
         if( voter_ != msg.sender && lockDelegateOf[voter_] != msg.sender) revert NotOwnerNorDelegate();
         if (gaugeIDs_.length != votePowerBPSs_.length) revert ArrayArgumentsLengthMismatch();
 
-        voteIDs = new uint256[](gaugeIDs_.length);
-
         for(uint256 i = 0; i < gaugeIDs_.length; i++) {
             uint256 gaugeID = gaugeIDs_[i];
             uint256 votePowerBPS = votePowerBPSs_[i];
-            if (gaugeID == 0) revert CannotVoteForGaugeID0(); // Arguably redundant as we check for this in GaugeController.sol as well
             if (votePowerBPS > 10000) revert SingleVotePowerBPSOver10000();
 
-            // If vote for this gaugeID already exists for this voter
-            if (_voteIDForGaugeForVoter[voter_].contains(gaugeID)) {
-                voteIDs[i] = _voteIDForGaugeForVoter[voter_].get(gaugeID);
-                // If removing gauge
-                if (votePowerBPS == 0) {
-                    // TODO - Get current votePowerBPS from GaugeController.sol.
-                    // TODO - Remove vote GaugeController.sol
-                    // Remove from this contract
-                    _voteIDForGaugeForVoter[voter_].remove(gaugeID);
-                    // TODO - Adjust usedVotePowerBPSOf[voter_]
-                    // TODO - Emit VoteRemoved
-                // Else modifying gauge
-                } else {
-                    // TODO - Get current vote, and from it current votePowerBPS
-                    // TODO - Adjust votePowerBPS of current vote
-                    // TODO - Adjust usedVotePowerBPSOf[msg.voter_]
-                    // TODO - Emit VoteChanged
-                }
-            // Else if vote does not exist already, adding gauge
+            // If remove vote
+            if ( votePowerBPS == 0 ) {
+                uint256 oldVotePowerBPS = IGaugeController(gaugeController).vote(voter_, gaugeID, votePowerBPS);
+                usedVotePowerBPSOf[voter_] -= oldVotePowerBPS;
+                emit VoteRemoved(voter_, gaugeID);
             } else {
-                if (votePowerBPS == 0) revert CannotCancelNonExistentVote();
-                // TODO - Add vote to GaugeController.sol, get new voteID (return value of add new vote)
-                voteIDs[i] = 0;
-                // _voteIDForGaugeForVoter[voter_].set(gaugeID, newVoteID);
-                usedVotePowerBPSOf[voter_] += votePowerBPS;
-                // TODO - Emit VoteAdded
+                uint256 oldVotePowerBPS = IGaugeController(gaugeController).vote(voter_, gaugeID, votePowerBPS);
+                // Add vote
+                if (oldVotePowerBPS == 0) {
+                    usedVotePowerBPSOf[voter_] += votePowerBPS;
+                    emit VoteAdded(voter_, gaugeID, votePowerBPS);
+                // Else modify vote
+                } else {
+                    usedVotePowerBPSOf[voter_] += votePowerBPS;
+                    usedVotePowerBPSOf[voter_] -= oldVotePowerBPS;
+                    emit VoteChanged(voter_, gaugeID, votePowerBPS, oldVotePowerBPS);
+                }
             }
         }
 
@@ -358,15 +343,14 @@ contract UnderwritingLockVoting is
      * @param voter_ The voter address.
      * @param gaugeID_ The ID of the gauge to vote for.
      * @param votePowerBPS_ Vote power BPS to assign to this vote
-     * @return voteID Corresponding voteID
      */
-    function vote(address voter_, uint256 gaugeID_, uint256 votePowerBPS_) external override returns (uint256 voteID) {
+    function vote(address voter_, uint256 gaugeID_, uint256 votePowerBPS_) external override {
         if ( IUnderwritingLocker(underwritingLocker).balanceOf(voter_) == 0 ) revert VoterHasNoLocks();
         uint256[] memory gaugeIDs_ = new uint256[](1);
         uint256[] memory votePowerBPSs_ = new uint256[](1);
         gaugeIDs_[0] = gaugeID_;
         votePowerBPSs_[0] = votePowerBPS_;
-        return _vote(voter_, gaugeIDs_, votePowerBPSs_)[0];
+        _vote(voter_, gaugeIDs_, votePowerBPSs_);
     }
 
     /**
@@ -378,11 +362,10 @@ contract UnderwritingLockVoting is
      * @param voter_ The voter address.
      * @param gaugeIDs_ Array of gauge IDs to vote for.
      * @param votePowerBPSs_ Array of corresponding vote power BPS values.
-     * @return voteIDs Array of corresponding voteIDs in order of gaugeIDs_ array.
      */
-    function voteMultiple(address voter_, uint256[] memory gaugeIDs_, uint256[] memory votePowerBPSs_) external override returns (uint256[] memory voteIDs) {
+    function voteMultiple(address voter_, uint256[] memory gaugeIDs_, uint256[] memory votePowerBPSs_) external override {
         if ( IUnderwritingLocker(underwritingLocker).balanceOf(voter_) == 0 ) revert VoterHasNoLocks();
-        return _vote(voter_, gaugeIDs_, votePowerBPSs_);
+        _vote(voter_, gaugeIDs_, votePowerBPSs_);
     }
 
     /**
@@ -391,14 +374,13 @@ contract UnderwritingLockVoting is
      * Can only be called by the voter or vote delegate.
      * @param voter_ The voter address.
      * @param gaugeID_ The ID of the gauge to remove vote for.
-     * @return voteID Corresponding voteID.
      */
-    function removeVote(address voter_, uint256 gaugeID_) external override returns (uint256 voteID) {
+    function removeVote(address voter_, uint256 gaugeID_) external override {
         uint256[] memory gaugeIDs_ = new uint256[](1);
         uint256[] memory votePowerBPSs_ = new uint256[](1);
         gaugeIDs_[0] = gaugeID_;
         votePowerBPSs_[0] = 0;
-        return _vote(voter_, gaugeIDs_, votePowerBPSs_)[0];
+        _vote(voter_, gaugeIDs_, votePowerBPSs_);
     }
 
     /**
@@ -407,12 +389,11 @@ contract UnderwritingLockVoting is
      * Can only be called by the voter or vote delegate.
      * @param voter_ The voter address.
      * @param gaugeIDs_ Array of gauge IDs to remove votes for.
-     * @return voteIDs Array of corresponding voteIDs in order of gaugeIDs_ array.
      */
-    function removeVoteMultiple(address voter_, uint256[] memory gaugeIDs_) external override returns (uint256[] memory voteIDs) {
+    function removeVoteMultiple(address voter_, uint256[] memory gaugeIDs_) external override {
         uint256[] memory votePowerBPSs_ = new uint256[](gaugeIDs_.length);
         for(uint256 i = 0; i < gaugeIDs_.length; i++) {votePowerBPSs_[i] = 0;}
-        return _vote(voter_, gaugeIDs_, votePowerBPSs_);
+        _vote(voter_, gaugeIDs_, votePowerBPSs_);
     }
 
     /**

@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
+struct Vote {
+    uint256 gaugeID;
+    uint256 votePowerBPS;
+}
+
 /**
  * @title IGaugeVoter
  * @author solace.fi

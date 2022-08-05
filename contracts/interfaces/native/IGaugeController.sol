@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
+import "./IGaugeVoter.sol"; // Import for Vote struct
+
 /**
  * @title GaugeController
  * @author solace.fi
@@ -121,9 +123,6 @@ interface IGaugeController {
     /// @notice The total number of gauges that have been created
     function totalGauges() external view returns (uint256);
 
-    /// @notice The total number of votes that have been made.
-    function totalVotes() external view returns (uint256);
-
     /// @notice Timestamp of last epoch start (rounded to weeks) that gauge weights were successfully updated.
     function lastTimeGaugeWeightsUpdated() external view returns (uint256);
 
@@ -208,13 +207,12 @@ interface IGaugeController {
     function getVotePowerSum() external view returns (uint256 votePowerSum);
 
     /**
-     * @notice Get individual vote.
-     * @dev Can only be called by voting contracts that have been added via addVotingContract().
+     * @notice Get all votes for a given voter and voting contract.
      * @param votingContract_ Address of voting contract  - must have been added via addVotingContract().
-     * @param voteID_ Unique identifier for vote.
-     * @return gaugeID The ID of the voted gauge.
+     * @param voter_ Address of voter.
+     * @return votes Array of Vote {gaugeID, votePowerBPS}.
      */
-    function getVote(address votingContract_, uint256 voteID_) external view returns (uint256 gaugeID);
+    function getVotes(address votingContract_, address voter_) external view returns (Vote[] memory votes);
 
     /***************************************
     VOTING CONTRACT FUNCTIONS
@@ -223,18 +221,12 @@ interface IGaugeController {
     /**
      * @notice Register votes.
      * @dev Can only be called by voting contracts that have been added via addVotingContract().
-     * @dev Leave responsibility of emitting Event to the VotingContract.
-     * @param voteID_ Unique identifier for vote.
+     * @param voter_ Address of voter.
      * @param gaugeID_ The ID of the voted gauge.
+     * @param newVotePowerBPS_ Desired vote power BPS, 0 if removing vote.
+     * @return oldVotePowerBPS Old votePowerBPS value, 0 if new vote.
      */
-    function vote(uint256 voteID_, uint256 gaugeID_) external;
-
-    /**
-     * @notice Remove vote.
-     * @dev Can only be called by voting contracts that have been added via addVotingContract().
-     * @param voteID_ Unique identifier for vote.
-     */
-    function removeVote(uint256 voteID_) external;
+    function vote(address voter_, uint256 gaugeID_, uint256 newVotePowerBPS_) external returns (uint256 oldVotePowerBPS);
 
     /***************************************
     GOVERNANCE FUNCTIONS
@@ -280,14 +272,6 @@ interface IGaugeController {
     function unpauseGauge(uint256 gaugeID_) external;
 
     /**
-     * @notice Updates gauge weights by getting current vote data from Voting contracts.
-     * @dev Can only be called once per epoch.
-     * @dev Requires all Voting contracts to had votes processed for this epoch
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     */
-    function updateGaugeWeights() external;
-
-    /**
      * @notice Set insurance leverage factor.
      * @dev 1e18 => 100%
      * Can only be called by the current [**governor**](/docs/protocol/governance).
@@ -323,4 +307,12 @@ interface IGaugeController {
      * @param rateOnLines_ Array of corresponding rate on line.
      */
     function setRateOnLine(uint256[] calldata gaugeIDs_, uint256[] calldata rateOnLines_) external;
+
+    /**
+     * @notice Updates gauge weights by getting current vote data from Voting contracts.
+     * @dev Can only be called once per epoch.
+     * @dev Requires all Voting contracts to had votes processed for this epoch
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     */
+    function updateGaugeWeights() external;
 }

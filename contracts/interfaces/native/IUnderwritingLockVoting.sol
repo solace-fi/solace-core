@@ -99,13 +99,13 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     event Vote(uint256 indexed lockID, uint256 indexed gaugeID, address voter, uint256 indexed epochTimestamp, uint256 votePower);
 
     /// @notice Emitted when a vote is added.
-    event VoteAdded(address indexed voter, uint256 indexed gaugeID, uint256 indexed voteID, uint256 votePowerBPS);
+    event VoteAdded(address indexed voter, uint256 indexed gaugeID, uint256 votePowerBPS);
 
     /// @notice Emitted when a vote is added.
-    event VoteChanged(address indexed voter, uint256 indexed gaugeID, uint256 indexed voteID, uint256 oldVotePowerBPS, uint256 newVotePowerBPS);
+    event VoteChanged(address indexed voter, uint256 indexed gaugeID, uint256 newVotePowerBPS, uint256 oldVotePowerBPS);
 
     /// @notice Emitted when a vote is removed.
-    event VoteRemoved(address indexed voter, uint256 indexed gaugeID, uint256 indexed voteID);
+    event VoteRemoved(address indexed voter, uint256 indexed gaugeID);
 
     /// @notice Emitted when the Vote processed by GaugeController.
     /// epochTimestamp is the timestamp for the epoch (rounded down to weeks) that the vote counts for
@@ -201,9 +201,8 @@ interface IUnderwritingLockVoting is IGaugeVoter {
      * @param voter_ The voter address.
      * @param gaugeID_ The ID of the gauge to vote for.
      * @param votePowerBPS_ Vote power BPS to assign to this vote
-     * @return voteID Corresponding voteID
      */
-    function vote(address voter_, uint256 gaugeID_, uint256 votePowerBPS_) external returns (uint256 voteID);
+    function vote(address voter_, uint256 gaugeID_, uint256 votePowerBPS_) external;
 
     /**
      * @notice Directly register multiple gauge votes. Can either add or change votes.
@@ -214,9 +213,8 @@ interface IUnderwritingLockVoting is IGaugeVoter {
      * @param voter_ The voter address.
      * @param gaugeIDs_ Array of gauge IDs to vote for.
      * @param votePowerBPSs_ Array of corresponding vote power BPS values.
-     * @return voteIDs Array of corresponding voteIDs in order of gaugeIDs_ array.
      */
-    function voteMultiple(address voter_, uint256[] memory gaugeIDs_, uint256[] memory votePowerBPSs_) external returns (uint256[] memory voteIDs);
+    function voteMultiple(address voter_, uint256[] memory gaugeIDs_, uint256[] memory votePowerBPSs_) external;
 
     /**
      * @notice Removes a vote.
@@ -224,9 +222,8 @@ interface IUnderwritingLockVoting is IGaugeVoter {
      * Can only be called by the voter or vote delegate.
      * @param voter_ The voter address.
      * @param gaugeID_ The ID of the gauge to remove vote for.
-     * @return voteID Corresponding voteID.
      */
-    function removeVote(address voter_, uint256 gaugeID_) external returns (uint256 voteID);
+    function removeVote(address voter_, uint256 gaugeID_) external;
 
     /**
      * @notice Remove multiple gauge votes.
@@ -234,9 +231,8 @@ interface IUnderwritingLockVoting is IGaugeVoter {
      * Can only be called by the voter or vote delegate.
      * @param voter_ The voter address.
      * @param gaugeIDs_ Array of gauge IDs to remove votes for.
-     * @return voteIDs Array of corresponding voteIDs in order of gaugeIDs_ array.
      */
-    function removeVoteMultiple(address voter_, uint256[] memory gaugeIDs_) external returns (uint256[] memory voteIDs);
+    function removeVoteMultiple(address voter_, uint256[] memory gaugeIDs_) external;
 
     /**
      * @notice Set the voting delegate for the caller.

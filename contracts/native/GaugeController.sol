@@ -9,7 +9,6 @@ import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "./../utils/Governable.sol";
 import "./../interfaces/native/IGaugeVoter.sol";
 import "./../interfaces/native/IGaugeController.sol";
-import "./GaugeControllerHelper.sol";
 import "hardhat/console.sol";
 
 // TODO
@@ -38,7 +37,6 @@ contract GaugeController is
     {
     using EnumerableSet for EnumerableSet.AddressSet;
     using EnumerableMap for EnumerableMap.UintToUintMap;
-    using EnumerableMap for EnumerableMap.Bytes32ToBytes32Map;
 
     /***************************************
     GLOBAL PUBLIC VARIABLES
@@ -53,9 +51,6 @@ contract GaugeController is
 
     /// @notice The total number of gauges that have been created
     uint256 public override totalGauges;
-    
-    /// @notice The total number of votes that have been made.
-    uint256 public override totalVotes;
 
     /// @notice Timestamp of last epoch start (rounded to weeks) that gauge weights were successfully updated.
     uint256 public override lastTimeGaugeWeightsUpdated;
@@ -76,22 +71,20 @@ contract GaugeController is
     /// @notice Array of Gauge {string name, bool active}
     Gauge[] internal _gauges;
 
-    /// @notice Set of voting contracts conforming to IGaugeVoting.sol interface. Sources of aggregated voting data.
-    EnumerableSet.AddressSet internal _votingContracts;
-
     /// @notice Set of addresses from which getInsuranceCapacity() will tally UWE supply from.
     EnumerableSet.AddressSet internal _tokenholders;
 
-    /// @notice votingContract address => voteID => gaugeID of vote
-    /// @dev voteID is the unique identifier for each individual vote. In the case of UnderwritingLockVoting.sol, lockID = voteID.
-    mapping(address => EnumerableMap.UintToUintMap) internal _votes;
+    /// @notice Set of voting contracts conforming to IGaugeVoting.sol interface. Sources of aggregated voting data.
+    EnumerableSet.AddressSet internal _votingContracts;
 
-    // votingContract => voteID => {address voteOwner, uint48 gaugeID, uint48 votePowerBPS}.
-    mapping(address => EnumerableMap.Bytes32ToBytes32Map) internal _votes1;
+    /// @notice Voting contract => voters
+    mapping(address => EnumerableSet.AddressSet) internal _voters;
 
-    /// @notice Dynamic array of dead voteIDs to remove from _votes EnumerableMap.
-    /// @dev Unfortunately Solidity doesn't allow dynamic arrays in memory, and I don't see a space-efficient way of creating a fixed-length array for this problem.
-    uint256[] internal voteIDsToRemove;
+    // votingContract => voter => gaugeID => votePowerBPS
+    mapping(address => mapping(address => EnumerableMap.UintToUintMap)) internal _votes;
+
+    /// @notice Dynamic array of dead voters to remove from _voters
+    address[] internal _votersToRemove;
 
     UpdateInfo internal _updateInfo;
 
@@ -100,13 +93,13 @@ contract GaugeController is
     ***************************************/
 
     /// @dev Struct pack into single 32-byte word
-    /// @param finishedLastUpdate True if last call to updateGaugeWeights() resulted in complete update, false otherwise.
-    /// @param savedIndexOfVotingContracts Index for _votingContracts for last incomplete updateGaugeWeights() call.
-    /// @param savedIndexOfVotesIndex Index for _votes[_updateInfo.saved_index_votingContracts] for last incomplete updateGaugeWeights() call.
+    /// @param _votingContractsIndex Index for _votingContracts for last incomplete updateGaugeWeights() call.
+    /// @param _votersIndex Index for _voters[savedIndex_votingContracts] for last incomplete updateGaugeWeights() call.
+    /// @param _votesIndex Index for _votes[savedIndex_votingContracts][savedIndex_voters] for last incomplete updateGaugeWeights() call.
     struct UpdateInfo {
-        bool finishedLastUpdate; // bool stored in 8 bits [0:8]
-        uint120 savedIndexOfVotingContracts; // uint248 stored in [8:128]
-        uint120 savedIndexOfVotesIndex; // uint248 stored in [128:248]
+        uint80 _votingContractsIndex; // [0:80]
+        uint88 _votersIndex; // [80:168]
+        uint88 _votesIndex; // [168:256]
     }
 
     /***************************************
@@ -299,15 +292,23 @@ contract GaugeController is
     }
 
     /**
-     * @notice Get individual vote.
-     * @dev Can only be called by voting contracts that have been added via addVotingContract().
+     * @notice Get all votes for a given voter and voting contract.
      * @param votingContract_ Address of voting contract  - must have been added via addVotingContract().
-     * @param voteID_ Unique identifier for vote.
-     * @return gaugeID The ID of the voted gauge.
+     * @param voter_ Address of voter.
+     * @return votes Array of Vote {gaugeID, votePowerBPS}.
      */
-    function getVote(address votingContract_, uint256 voteID_) external view override returns (uint256 gaugeID) {
-        if (!_votingContracts.contains(votingContract_)) {revert NotVotingContract();}
-        return _votes[votingContract_].get(voteID_, "VoteNotFound");
+    function getVotes(address votingContract_, address voter_) external view override returns (Vote[] memory votes) {
+        if ( !_votingContracts.contains(votingContract_) || !_voters[votingContract_].contains(voter_) ) {
+            votes = new Vote[](0);
+        } else {
+            uint256 voteCount = _votes[votingContract_][voter_].length();
+            votes = new Vote[](voteCount);
+            for (uint256 i = 0; i < voteCount; i++) {
+                (uint256 gaugeID, uint256 votingPowerBPS) = _votes[votingContract_][voter_].at(i);
+                votes[i] = Vote(gaugeID, votingPowerBPS);
+            }
+        } 
+        return votes;
     }
 
     /***************************************
@@ -317,36 +318,34 @@ contract GaugeController is
     /**
      * @notice Internal mutator function to add, modify or remove vote
      * @param votingContract_ Address of voting contract - must have been added via addVotingContract().
-     * @param voteID_ Unique identifier for vote, `0` if adding new vote.
      * @param voter_ Address of voter.
      * @param gaugeID_ ID of gauge to add, modify or remove vote for.
      * @param newVotePowerBPS_ New votePowerBPS value.
-     * @return voteID New vote ID if adding vote, old vote ID otherwise.
      * @return oldVotePowerBPS Old votePowerBPS value.
      */
-    function _vote(address votingContract_, uint256 voteID_, address voter_, uint256 gaugeID_, uint256 newVotePowerBPS_) internal returns (uint256 voteID, uint256 oldVotePowerBPS) {
-        // If add vote
-        if (voteID_ == 0) {
-            assert(!_votes1[votingContract_].contains(bytes32(0)));
-            voteID = ++totalVotes;
-            bytes32 word = GaugeControllerHelper.voteInfoToBytes32(voter_, gaugeID_, newVotePowerBPS_);
-            _votes1[votingContract_].set(bytes32(voteID), word);
-            return (voteID, 0);
-        // Else if remove vote 
+    function _vote(address votingContract_, address voter_, uint256 gaugeID_, uint256 newVotePowerBPS_) internal returns (uint256 oldVotePowerBPS) {
+        // Check if need to add new voter.
+        // Use `newVotePowerBPS_ > 0` to short circuit and avoid SLOAD for removing vote operations.
+        if ( newVotePowerBPS_ > 0 && !_voters[votingContract_].contains(voter_) ) {
+            _voters[votingContract_].add(voter_);
+        }
+
+        // If adding new vote
+        if ( !_votes[votingContract_][voter_].contains(gaugeID_) ) {
+            _votes[votingContract_][voter_].set(gaugeID_, newVotePowerBPS_);
+            return 0;
+        // Else if removing vote
         } else if (newVotePowerBPS_ == 0) {
-            (address voter, uint256 gaugeID, uint256 oldVotePowerBPS) = GaugeControllerHelper.bytes32ToVoteInfo(_votes1[votingContract_].get(bytes32(voteID_)));
-            assert(gaugeID == gaugeID_);
-            assert(voter == voter_);
-            _votes1[votingContract_].remove(bytes32(voteID_));
-            return (voteID_, oldVotePowerBPS);
-        // Else if modify vote
+            uint256 oldVotePowerBPS = _votes[votingContract_][voter_].get(gaugeID_);
+            _votes[votingContract_][voter_].remove(gaugeID_);
+            // Check if need to remove voter
+            if ( _votes[votingContract_][voter_].length() == 0 ) {_voters[votingContract_].remove(voter_);}
+            return oldVotePowerBPS;
+        // Else modify vote
         } else {
-            (address voter, uint256 gaugeID, uint256 oldVotePowerBPS) = GaugeControllerHelper.bytes32ToVoteInfo(_votes1[votingContract_].get(bytes32(voteID_)));
-            assert(gaugeID == gaugeID_);
-            assert(voter == voter_);
-            bytes32 word = GaugeControllerHelper.voteInfoToBytes32(voter_, gaugeID_, newVotePowerBPS_);
-            _votes1[votingContract_].set(bytes32(voteID), word);
-            return (voteID_, oldVotePowerBPS);
+            uint256 oldVotePowerBPS = _votes[votingContract_][voter_].get(gaugeID_);
+            _votes[votingContract_][voter_].set(gaugeID_, newVotePowerBPS_);
+            return oldVotePowerBPS;
         }
     }
 
@@ -357,29 +356,19 @@ contract GaugeController is
     /**
      * @notice Register votes.
      * @dev Can only be called by voting contracts that have been added via addVotingContract().
-     * @param voteID_ Unique identifier for vote.
+     * @param voter_ Address of voter.
      * @param gaugeID_ The ID of the voted gauge.
+     * @param newVotePowerBPS_ Desired vote power BPS, 0 if removing vote.
+     * @return oldVotePowerBPS Old votePowerBPS value, 0 if new vote.
      */
-    function vote(uint256 voteID_, uint256 gaugeID_) external override {
+    function vote(address voter_, uint256 gaugeID_, uint256 newVotePowerBPS_) external override returns (uint256 oldVotePowerBPS) {
         if (gaugeID_ == 0) revert CannotVoteForGaugeID0();
         if (_getEpochStartTimestamp() != lastTimeGaugeWeightsUpdated) revert GaugeWeightsNotYetUpdated();
         if (!_votingContracts.contains(msg.sender)) revert NotVotingContract();
         if (gaugeID_ + 1 > _gauges.length) revert VotedGaugeIDNotExist();
-        if (!_gauges[gaugeID_].active) revert VotedGaugeIDPaused();
-        _votes[msg.sender].set(voteID_, gaugeID_);
-        // Leave responsibility of emitting event to the VotingContract.
-    }
-
-    /**
-     * @notice Remove vote.
-     * @dev Can only be called by voting contracts that have been added via addVotingContract().
-     * @param voteID_ Unique identifier for vote.
-     */
-    function removeVote(uint256 voteID_) external override {
-        if (!_votingContracts.contains(msg.sender)) {revert NotVotingContract();}
-        // Test - can you remove a non-existent voteID_ without issue?
-        _votes[msg.sender].remove(voteID_);
-        // Leave responsibility of emitting event to the VotingContract.
+        // Can remove votes while gauge paused
+        if (newVotePowerBPS_ > 0 && !_gauges[gaugeID_].active) revert VotedGaugeIDPaused();
+        return _vote(msg.sender, voter_, gaugeID_, newVotePowerBPS_);
     }
 
     /***************************************
@@ -516,69 +505,82 @@ contract GaugeController is
     function updateGaugeWeights() external override onlyGovernance {
         uint256 epochStartTime = _getEpochStartTimestamp();
         if (lastTimeGaugeWeightsUpdated >= epochStartTime) revert GaugeWeightsAlreadyUpdated();
-        uint256 startIndex_votingContracts = _updateInfo.finishedLastUpdate ? 0 : _updateInfo.savedIndexOfVotingContracts;
-        uint256 startIndex_votes = _updateInfo.finishedLastUpdate ? 0 : _updateInfo.savedIndexOfVotesIndex;
         uint256 numVotingContracts = _votingContracts.length();
 
         // Iterate through voting contracts
-        for(uint256 i = startIndex_votingContracts; i < numVotingContracts; i++) {
+        for(uint256 i = _updateInfo._votingContractsIndex; i < numVotingContracts; i++) {
             address votingContract = _votingContracts.at(i);
-            // Iterate through votes for each voting contract
-            uint256 numVotesForContract = _votes[votingContract].length();
-            for(uint256 j = startIndex_votes; j < numVotesForContract; j++) {
-                // Measure for unbounded loop.
-                // Use inline assembly to measure gas remaining => if insufficient, save progress and return.
-                // Need to measure how much gas it takes minimum after this loop
-                console.log("processVotes 1 %s" , gasleft());
-                assembly {
-                    if lt(gas(), 90000) {
-                        // Use struct packing to make one sstore operation (vs 3 without)
-                        let updateInfo
-                        // updateInfo.finishedLastUpdate = [0:8] == false
-                        updateInfo := or(updateInfo, and(0, 0xFF))
+            uint256 numVoters = _voters[votingContract].length();
 
-                        // We want to downcast uint256 i to uint120, and move the bits into [8:128] before bitwise-or with updateInfo
-                        // shl(136, i) => Remove the 136 least-significant bits from i => i is uint120 in [136:256]
-                        // shr(128, shl(136, i)) => uint120(i) is now in [8:128]
-                        // updateInfo.savedIndexOfVotingContracts = [8:128] = uint120(i)
-                        updateInfo := or(updateInfo, shr(128, shl(136, i)))
-
-                        // shl(136, j) => Remove the 136 least-significant bits from j => j is uint120 in [136:256]
-                        // shr(8, shl(136, j)) => uint120(j) is now in [128:248]
-                        // [248:256] has been cleared
-                        // updateInfo.savedIndexOfVotesIndex = [128:248] = uint120(j)
-                        updateInfo := or(updateInfo, shr(8, shl(136, j)))
-                        sstore(_updateInfo.slot, updateInfo)
-                        return(0, 0)
-                    }
-                }
-                console.log("processVotes 2 %s" , gasleft());
-
-                (uint256 voteID, uint256 gaugeID) = _votes[votingContract].at(j);
-                // Votes don't count if gauge paused => address edge case where someone votes when gauge is active (cannot vote for gauge when paused), gauge paused after, but they will still be paying for the vote for a paused gauge
-                if (!_gauges[gaugeID].active) {
-                    IGaugeVoter(votingContract).setLastProcessedVotePower(voteID, gaugeID, 0);
+            // Iterate through voters
+            for(uint256 j = _updateInfo._votersIndex; j < numVoters; j++) {
+                address voter = _voters[votingContract].at(j);
+                uint256 numVotes = _votes[votingContract][voter].length();
+                uint256 votePower = IGaugeVoter(votingContract).getVotePowerOf(voter); // Modify here
+                if (votePower == 0) {
+                    _votersToRemove.push(voter);
                     continue;
                 }
-                console.log("processVotes - getVotePower() start %s" , gasleft());
-                uint256 votePower = IGaugeVoter(votingContract).getVotePowerOf(msg.sender); // Modify here
-                console.log("processVotes - getVotePower() end %s" , gasleft());
-                if (votePower == 0) {voteIDsToRemove.push(voteID);}
-                _votePowerOfGaugeForEpoch[epochStartTime][gaugeID] += votePower; // This part is susceptible to re-entrancy
-                IGaugeVoter(votingContract).setLastProcessedVotePower(voteID, gaugeID, votePower);
+                // IGaugeVoter(votingContract).setLastProcessedVotePower(voteID, gaugeID, 0); // Cache votePower
+                uint256 totalVotePowerBPS; 
+                // Iterate through votes
+                for(uint256 k = _updateInfo._votesIndex; k < numVotes; k++) {    
+                    console.log("processVotes 1 %s" , gasleft());            
+                    if (gasleft() < 90000) {
+                        _saveUpdateState(i, j, k);
+                        return;
+                    }
+                    console.log("processVotes 2 %s" , gasleft());
+                    (uint256 gaugeID, uint256 votingPowerBPS) = _votes[votingContract][voter].at(k);
+
+                    // Address edge case where vote placed before gauge is paused, will be counted
+                    if (!_gauges[gaugeID].active) {
+                        continue;
+                    }
+
+                    _votePowerOfGaugeForEpoch[epochStartTime][gaugeID] += votePower * votingPowerBPS / 10000; // Weak to re-entrancy here?
+                }   
             }
 
-            // Remove dead voteIDs after iteration through EnumerableMap.
-            // Avoid removing during iteration to avoid side effect from iterating through a collection that we are mutating during iteration.
-            while (voteIDsToRemove.length > 0) {
-                _votes[votingContract].remove(voteIDsToRemove[voteIDsToRemove.length - 1]);
-                voteIDsToRemove.pop();
+            // Remove dead voters after iterating through voters
+            while (_votersToRemove.length > 0) {
+                _voters[votingContract].remove(_votersToRemove[_votersToRemove.length - 1]);
+                _votersToRemove.pop();
             }
         }
         
-        _updateInfo.finishedLastUpdate = true;
+        _clearUpdateInfo();
         lastTimeGaugeWeightsUpdated = epochStartTime;
         emit GaugeWeightsUpdated(epochStartTime);
         console.log("processVotes 3 %s" , gasleft());
+    }
+
+    /***************************************
+     updateGaugeWeights() HELPER FUNCTIONS
+    ***************************************/
+    
+    /// @notice Reset _updateInfo to bytes32(0).
+    /// @dev We could keep this storage slot 'warm' to save gas.
+    function _clearUpdateInfo() internal {
+        assembly {
+            let empty_word
+            sstore(_updateInfo.slot, empty_word)
+        }
+    }
+
+    /**
+     * @notice Save state of updating gauge weights to _updateInfo
+     * @param votingContractsIndex_ Current index of _votingContracts.
+     * @param votersIndex_ Current index of _voters[votingContractsIndex_].
+     * @param votesIndex_ Current index of _votes[votingContractsIndex_][votersIndex_]
+     */
+    function _saveUpdateState(uint256 votingContractsIndex_, uint256 votersIndex_, uint256 votesIndex_) internal {
+        assembly {
+            let updateInfo
+            updateInfo := or(updateInfo, shr(176, shl(176, votingContractsIndex_))) // [0:80] => votingContractsIndex_
+            updateInfo := or(updateInfo, shr(88, shl(168, votersIndex_))) // [80:168] => votersIndex_
+            updateInfo := or(updateInfo, shl(168, votesIndex_)) // [168:256] => votesIndex_
+            sstore(_updateInfo.slot, updateInfo) 
+        }
     }
 }
