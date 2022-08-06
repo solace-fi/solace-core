@@ -170,11 +170,11 @@ contract UnderwritingPool is IUnderwritingPool, ERC20Permit, ReentrancyGuard, Go
             stIndex--;
             TokenData storage data = _tokens[stIndex];
             // pull tokens
-            uint256 amount = depositAmounts[inIndex];
-            SafeERC20.safeTransferFrom(IERC20(token), msg.sender, address(this), amount);
+            uint256 depositAmount = depositAmounts[inIndex];
+            SafeERC20.safeTransferFrom(IERC20(token), msg.sender, address(this), depositAmount);
             // calculate value
             address oracle = data.oracle;
-            uint256 tokenValue = IPriceOracle(oracle).valueOfTokens(token, amount);
+            uint256 tokenValue = IPriceOracle(oracle).valueOfTokens(token, depositAmount);
             depositValue += tokenValue;
             tokenValue += tokenValues[stIndex];
             tokenValues[stIndex] = tokenValue;

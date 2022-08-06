@@ -51,10 +51,10 @@ contract FluxMegaOracle is IFluxMegaOracle, Governable {
      */
     function valueOfTokens(address token, uint256 amount) external view override returns (uint256 valueInUSD) {
         PriceFeedData memory feed = _priceFeeds[token];
-        if(feed.oracle == address(0x0)) return 0;
-        int256 answer = IFluxPriceFeed(feed.oracle).latestAnswer();
+        if(feed.priceFeed == address(0x0)) return 0;
+        int256 answer = IFluxPriceFeed(feed.priceFeed).latestAnswer();
         require(answer >= 0, "negative price");
-        return (amount * uint256(answer) * 1 ether) / (10 ** (feed.tokenDecimals + feed.oracleDecimals));
+        return (amount * uint256(answer) * 1 ether) / (10 ** (feed.tokenDecimals + feed.priceFeedDecimals));
     }
 
     /***************************************

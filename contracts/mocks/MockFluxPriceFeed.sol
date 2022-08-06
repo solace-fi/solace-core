@@ -12,6 +12,8 @@ import "../interfaces/native/IFluxPriceFeed.sol";
  */
 contract MockFluxPriceFeed is IFluxPriceFeed, Governable {
 
+    event AnswerSet(int256 answer);
+
     int256 internal _latestAnswer;
 
     // solhint-disable-next-line no-empty-blocks
@@ -26,5 +28,6 @@ contract MockFluxPriceFeed is IFluxPriceFeed, Governable {
 
     function setAnswer(int256 answer) external onlyGovernance {
         _latestAnswer = answer;
+        emit AnswerSet(answer);
     }
 }

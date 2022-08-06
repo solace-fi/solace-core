@@ -65,10 +65,10 @@ describe("FluxMegaOracle", function () {
     // deploy oracle
     oracle = (await deployContract(deployer, artifacts.FluxMegaOracle, [governor.address])) as FluxMegaOracle;
     await oracle.connect(governor).addPriceFeeds([
-      { token: dai.address, oracle: daiPriceFeed.address, tokenDecimals: 18, oracleDecimals: 8 },
-      { token: weth.address, oracle: ethPriceFeed.address, tokenDecimals: 18, oracleDecimals: 8 },
-      { token: near.address, oracle: nearPriceFeed.address, tokenDecimals: 24, oracleDecimals: 8 },
-      { token: usdc.address, oracle: usdcPriceFeed.address, tokenDecimals: 6, oracleDecimals: 8 },
+      { token: dai.address, priceFeed: daiPriceFeed.address, tokenDecimals: 18, priceFeedDecimals: 8 },
+      { token: weth.address, priceFeed: ethPriceFeed.address, tokenDecimals: 18, priceFeedDecimals: 8 },
+      { token: near.address, priceFeed: nearPriceFeed.address, tokenDecimals: 24, priceFeedDecimals: 8 },
+      { token: usdc.address, priceFeed: usdcPriceFeed.address, tokenDecimals: 6, priceFeedDecimals: 8 },
     ]);
   });
 

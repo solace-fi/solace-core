@@ -77,38 +77,38 @@ describe("FluxMegaOracle", function () {
     });
     it("governance can add feeds", async function () {
       let tx1 = await oracle.connect(governor).addPriceFeeds([
-        { token: dai.address, oracle: daiPriceFeed.address, tokenDecimals: 18, oracleDecimals: 8 },
-        { token: weth.address, oracle: ethPriceFeed1.address, tokenDecimals: 18, oracleDecimals: 8 },
+        { token: dai.address, priceFeed: daiPriceFeed.address, tokenDecimals: 18, priceFeedDecimals: 8 },
+        { token: weth.address, priceFeed: ethPriceFeed1.address, tokenDecimals: 18, priceFeedDecimals: 8 },
       ]);
       await expect(tx1).to.emit(oracle, "PriceFeedAdded").withArgs(dai.address);
       await expect(tx1).to.emit(oracle, "PriceFeedAdded").withArgs(weth.address);
       let data1 = await oracle.priceFeedForToken(dai.address);
       expect(data1.token).eq(dai.address);
-      expect(data1.oracle).eq(daiPriceFeed.address);
+      expect(data1.priceFeed).eq(daiPriceFeed.address);
       expect(data1.tokenDecimals).eq(18);
-      expect(data1.oracleDecimals).eq(8);
+      expect(data1.priceFeedDecimals).eq(8);
       let data2 = await oracle.priceFeedForToken(weth.address);
       expect(data2.token).eq(weth.address);
-      expect(data2.oracle).eq(ethPriceFeed1.address);
+      expect(data2.priceFeed).eq(ethPriceFeed1.address);
       expect(data2.tokenDecimals).eq(18);
-      expect(data2.oracleDecimals).eq(8);
+      expect(data2.priceFeedDecimals).eq(8);
 
       let tx2 = await oracle.connect(governor).addPriceFeeds([
-        { token: weth.address, oracle: ethPriceFeed2.address, tokenDecimals: 18, oracleDecimals: 8 },
-        { token: near.address, oracle: nearPriceFeed.address, tokenDecimals: 24, oracleDecimals: 8 },
+        { token: weth.address, priceFeed: ethPriceFeed2.address, tokenDecimals: 18, priceFeedDecimals: 8 },
+        { token: near.address, priceFeed: nearPriceFeed.address, tokenDecimals: 24, priceFeedDecimals: 8 },
       ]);
       await expect(tx2).to.emit(oracle, "PriceFeedAdded").withArgs(weth.address);
       await expect(tx2).to.emit(oracle, "PriceFeedAdded").withArgs(near.address);
       let data3 = await oracle.priceFeedForToken(weth.address);
       expect(data3.token).eq(weth.address);
-      expect(data3.oracle).eq(ethPriceFeed2.address);
+      expect(data3.priceFeed).eq(ethPriceFeed2.address);
       expect(data3.tokenDecimals).eq(18);
-      expect(data3.oracleDecimals).eq(8);
+      expect(data3.priceFeedDecimals).eq(8);
       let data4 = await oracle.priceFeedForToken(near.address);
       expect(data4.token).eq(near.address);
-      expect(data4.oracle).eq(nearPriceFeed.address);
+      expect(data4.priceFeed).eq(nearPriceFeed.address);
       expect(data4.tokenDecimals).eq(24);
-      expect(data4.oracleDecimals).eq(8);
+      expect(data4.priceFeedDecimals).eq(8);
     });
     it("non governance cannot remove feeds", async function () {
       await expect(oracle.connect(user).removePriceFeeds([])).to.be.revertedWith("!governance");
@@ -119,14 +119,14 @@ describe("FluxMegaOracle", function () {
       await expect(tx).to.emit(oracle, "PriceFeedRemoved").withArgs(near.address);
       let data1 = await oracle.priceFeedForToken(dai.address);
       expect(data1.token).eq(ZERO_ADDRESS);
-      expect(data1.oracle).eq(ZERO_ADDRESS);
+      expect(data1.priceFeed).eq(ZERO_ADDRESS);
       expect(data1.tokenDecimals).eq(0);
-      expect(data1.oracleDecimals).eq(0);
+      expect(data1.priceFeedDecimals).eq(0);
       let data2 = await oracle.priceFeedForToken(near.address);
       expect(data2.token).eq(ZERO_ADDRESS);
-      expect(data2.oracle).eq(ZERO_ADDRESS);
+      expect(data2.priceFeed).eq(ZERO_ADDRESS);
       expect(data2.tokenDecimals).eq(0);
-      expect(data2.oracleDecimals).eq(0);
+      expect(data2.priceFeedDecimals).eq(0);
     });
   });
 
@@ -136,22 +136,22 @@ describe("FluxMegaOracle", function () {
     });
     it("fetches value", async function () {
       await oracle.connect(governor).addPriceFeeds([
-        { token: dai.address, oracle: daiPriceFeed.address, tokenDecimals: 18, oracleDecimals: 8 },
-        { token: near.address, oracle: nearPriceFeed.address, tokenDecimals: 24, oracleDecimals: 8 },
-        { token: usdc.address, oracle: usdcPriceFeed.address, tokenDecimals: 6, oracleDecimals: 8 },
+        { token: dai.address, priceFeed: daiPriceFeed.address, tokenDecimals: 18, priceFeedDecimals: 8 },
+        { token: near.address, priceFeed: nearPriceFeed.address, tokenDecimals: 24, priceFeedDecimals: 8 },
+        { token: usdc.address, priceFeed: usdcPriceFeed.address, tokenDecimals: 6, priceFeedDecimals: 8 },
       ]);
       expect(await oracle.valueOfTokens(dai.address, ONE_ETHER)).eq(ONE_ETHER);
       expect(await oracle.valueOfTokens(usdc.address, ONE_USDC.mul(123))).eq(ONE_ETHER.mul(123));
       expect(await oracle.valueOfTokens(weth.address, ONE_ETHER.mul(123))).eq(ONE_ETHER.mul(123).mul(1400));
       expect(await oracle.valueOfTokens(near.address, ONE_NEAR.mul(12345678))).eq(ONE_ETHER.mul(12345678).mul(4));
       await oracle.connect(governor).addPriceFeeds([
-        { token: weth.address, oracle: ethPriceFeed1.address, tokenDecimals: 18, oracleDecimals: 8 },
+        { token: weth.address, priceFeed: ethPriceFeed1.address, tokenDecimals: 18, priceFeedDecimals: 8 },
       ]);
       expect(await oracle.valueOfTokens(weth.address, ONE_ETHER.mul(123))).eq(ONE_ETHER.mul(123).mul(1300));
     });
     it("reverts if price feed is wrong address", async function () {
       await oracle.connect(governor).addPriceFeeds([
-        { token: dai.address, oracle: dai.address, tokenDecimals: 18, oracleDecimals: 8 },
+        { token: dai.address, priceFeed: dai.address, tokenDecimals: 18, priceFeedDecimals: 8 },
       ]);
       await expect(oracle.valueOfTokens(dai.address, ONE_ETHER)).to.be.reverted;
     });
@@ -172,9 +172,9 @@ describe("FluxMegaOracle", function () {
       ethPriceFeed2 = (await ethers.getContractAt(artifacts.MockFluxPriceFeed.abi, "0xA8Ac2Fa1D239c7d96046967ED21503D1F1fB2354")) as MockFluxPriceFeed;
       nearPriceFeed = (await ethers.getContractAt(artifacts.MockFluxPriceFeed.abi, "0x0a9A9cF9bDe10c861Fc1e45aCe4ea097eaa268eD")) as MockFluxPriceFeed;
       await oracle.connect(governor).addPriceFeeds([
-        { token: dai.address, oracle: daiPriceFeed.address, tokenDecimals: 18, oracleDecimals: 8 },
-        { token: weth.address, oracle: ethPriceFeed2.address, tokenDecimals: 18, oracleDecimals: 8 },
-        { token: near.address, oracle: nearPriceFeed.address, tokenDecimals: 24, oracleDecimals: 8 },
+        { token: dai.address, priceFeed: daiPriceFeed.address, tokenDecimals: 18, priceFeedDecimals: 8 },
+        { token: weth.address, priceFeed: ethPriceFeed2.address, tokenDecimals: 18, priceFeedDecimals: 8 },
+        { token: near.address, priceFeed: nearPriceFeed.address, tokenDecimals: 24, priceFeedDecimals: 8 },
       ]);
       let answer1 = await daiPriceFeed.latestAnswer();
       let amt1 = ONE_ETHER.mul(123);

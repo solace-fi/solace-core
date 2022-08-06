@@ -27,9 +27,9 @@ interface IFluxMegaOracle is IPriceOracle {
 
     struct PriceFeedData {
         address token;
-        address oracle;
+        address priceFeed;
         uint8 tokenDecimals;
-        uint8 oracleDecimals;
+        uint8 priceFeedDecimals;
     }
 
     /**
