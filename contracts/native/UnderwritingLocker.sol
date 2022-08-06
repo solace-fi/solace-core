@@ -154,6 +154,18 @@ contract UnderwritingLocker is
         }
     }
 
+    /**
+     * @notice Gets all active lockIDs for a user
+     * @param user_ The address of user to query.
+     * @return lockIDs Array of active lockIDs.
+     */
+    function _getAllLockIDsOf(address user_) internal view returns (uint256[] memory lockIDs) {
+        uint256 userNumOfLocks = balanceOf(user_);
+        lockIDs = new uint256[](userNumOfLocks);
+        for(uint256 i = 0; i < userNumOfLocks; i++) {lockIDs[i] = tokenOfOwnerByIndex(user_, i);}
+        return lockIDs;
+    }
+
     /***************************************
     EXTERNAL VIEW FUNCTIONS
     ***************************************/
@@ -277,12 +289,8 @@ contract UnderwritingLocker is
      * @return lockIDs Array of active lockIDs.
      */
     function getAllLockIDsOf(address user_) external view override returns (uint256[] memory lockIDs) {
-        uint256 userNumOfLocks = balanceOf(user_);
-        lockIDs = new uint256[](userNumOfLocks);
-        for(uint256 i = 0; i < userNumOfLocks; i++) {lockIDs[i] = tokenOfOwnerByIndex(user_, i);}
-        return lockIDs;
+        return _getAllLockIDsOf(user_);
     }
-
     /***************************************
     INTERNAL MUTATOR FUNCTIONS
     ***************************************/
@@ -648,7 +656,7 @@ contract UnderwritingLocker is
      * @notice Perform accounting for voting premiums to be charged by UnderwritingLockVoting.chargePremiums().
      * @dev Can only be called by votingContract set in the registry.
      * @dev Not meant to be called directly, and within UnderwritingLockVoting.chargePremiums().
-     * @param lockID_ The ID of the lock to charge premium.
+     * @param lockID_ The ID of the lock to charge.
      * @param premium_ The amount of token charged as premium.
      */
     function chargePremium(uint256 lockID_, uint256 premium_) external override nonReentrant {

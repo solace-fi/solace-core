@@ -108,7 +108,10 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     /// @notice Emitted all stored votes for an epoch have been processed.
     event AllVotesProcessed(uint256 indexed epochTimestamp);
 
-    /// @notice Emitted when premiiums for all stored votes have been processed in an epoch.
+    /// @notice Emitted when chargePremiums was partially completed and needs to be called again.
+    event IncompletePremiumsCharge();
+
+    /// @notice Emitted when premiums for all stored votes have been processed in an epoch.
     event AllPremiumsCharged(uint256 indexed epochTimestamp);
 
     /***************************************
@@ -133,13 +136,6 @@ interface IUnderwritingLockVoting is IGaugeVoter {
      * @return delegate Zero address if no lock delegate.
      */
     function lockDelegateOf(address voter_) external view returns (address delegate);
-
-    /**
-     * @notice Get usedVotePowerBPS for a given voter.
-     * @param voter_ The address of the voter to query for.
-     * @return usedVotePowerBPS Maximum value of 10000 (for 10000 basis points).
-     */
-    function usedVotePowerBPSOf(address voter_) external view returns (uint256 usedVotePowerBPS);
 
     /**
      * @notice Obtain end timestamp (rounded down to weeks) for the epoch where all premiums were charged.

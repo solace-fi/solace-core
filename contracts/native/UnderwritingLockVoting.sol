@@ -13,7 +13,6 @@ import "./../interfaces/utils/IRegistry.sol";
 import "./../interfaces/native/IUnderwritingLocker.sol";
 import "./../interfaces/native/IUnderwritingLockVoting.sol";
 import "./../interfaces/native/IGaugeController.sol";
-// import "./../interfaces/native/GaugeStructs.sol";
 import "hardhat/console.sol";
 
 /**
@@ -76,17 +75,12 @@ contract UnderwritingLockVoting is
     /// @notice voter => delegate
     mapping(address => address) public override lockDelegateOf;
 
-    /// @notice voter => used voting power percentage (max of 10000 BPS)
-    /// @dev Is a cache for sum of used voting power bps. Otherwise gotten by iterating through a voter's votes.
-    /// @dev Potentially unbounded loop if we iterate through voter's votes, and we require this value for input validation in _vote()
-    /// @dev Therefore justified to store cache, and maintain cache accuracy for with actual value.
-    mapping(address => uint256) public override usedVotePowerBPSOf;
-
     /***************************************
     GLOBAL INTERNAL VARIABLES
     ***************************************/
     /// @notice Total premium amount due to the revenueRouter.
-    /// @dev Should == 0 at most times. Only time it should be non-zero is when an incomplete chargePremium() call is made.
+    /// @dev Should == type(uint256).max when in-between complete chargePremiums() call
+    /// @dev Keep this slot warm, avoid cost of re-warming a cold storage slot.
     /// @dev Originally a local function variable, but need to save state between two function calls.
     uint256 internal totalPremiumDue;
 
@@ -95,6 +89,12 @@ contract UnderwritingLockVoting is
     /// @dev Empirically _getVotePowerOfLock() expends ~30K gas per lock, we prefer ~5K gas per user SSTORE + SLOAD to this cache.
     /// @dev This mapping is only intended to be used by chargePremiums(), after complete GaugeController.updateGaugeWeights().
     mapping (address => uint256) internal _lastProcessedVotePowerOf;
+
+    /// @notice voter => used voting power percentage (max of 10000 BPS)
+    /// @dev Is a cache for sum of used voting power bps. Otherwise gotten by iterating through a voter's votes.
+    /// @dev Potentially unbounded loop if we iterate through voter's votes, and we require this value for input validation in _vote()
+    /// @dev Therefore justified to store cache, and maintain cache accuracy for with actual value.
+    mapping(address => uint256) internal usedVotePowerBPSOf;
 
     GaugeStructs.UpdateInfo internal _updateInfo;
 
@@ -110,6 +110,7 @@ contract UnderwritingLockVoting is
      */
     constructor(address governance_, address registry_) Governable(governance_) {
         _setRegistry(registry_);
+        totalPremiumDue = type(uint256).max;
     }
 
     /***************************************
@@ -399,74 +400,48 @@ contract UnderwritingLockVoting is
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      */
     function chargePremiums() external override onlyGovernance {
-    //     uint256 epochStartTimestamp = _getEpochStartTimestamp();
-    //     if(_getLastTimeGaugesUpdated() != epochStartTimestamp) revert GaugeWeightsNotYetUpdated();
-    //     if(lastTimePremiumsCharged == epochStartTimestamp) revert LastEpochPremiumsAlreadyProcessed({epochTime: epochStartTimestamp});
+        uint256 epochStartTimestamp = _getEpochStartTimestamp();
+        if(_getLastTimeGaugesUpdated() != epochStartTimestamp) revert GaugeWeightsNotYetUpdated();
+        if(lastTimePremiumsCharged == epochStartTimestamp) revert LastEpochPremiumsAlreadyProcessed({epochTime: epochStartTimestamp});
 
-    //     uint256 startIndex_lastProcessedVotePowerOf = _updateInfo.finishedLastUpdate ? 0 : _updateInfo.savedIndexOfLastProcessedVotePowerOf;
-    //     uint256 insuranceCapacity = IGaugeController(gaugeController).getInsuranceCapacity();
-    //     uint256 totalVotes = _lastProcessedVotePowerOf.length();
+        // Make single call for universal charge premium parameters.
+        uint256 insuranceCapacity = IGaugeController(gaugeController).getInsuranceCapacity();
+        uint256 votePowerSum = IGaugeController(gaugeController).getVotePowerSum();
 
-    //     // Iterate through votes
-    //     for(uint256 i = startIndex_lastProcessedVotePowerOf; i < totalVotes; i++) {
-    //         // Check if we are at risk of running out of gas.
-    //         // If yes, save progress and return.
-    //         console.log("chargePremium 1 %s" , gasleft());
-    //         assembly {
-    //             if lt(gas(), 60000) {
-    //                 // Start with empty word
-    //                 let updateInfo
+        // Iterate through voters
+        address[] memory voters = IGaugeController(gaugeController).getVoters(address(this));
+        for(uint256 i = _updateInfo._votersIndex == type(uint88).max ? 0 : _updateInfo._votersIndex ; i < voters.length; i++) {
+            // Unbounded loop for SLOAD and CALL
+            uint256 premium = _calculateVotePremium(voters[i], insuranceCapacity, votePowerSum);
 
-    //                 // False = 0x00000000
-    //                 // Set 0x00000000 as bits [0:8] of updateInfo => Set false as _updateInfo.finishedLastUpdate
-    //                 updateInfo := or(updateInfo, and(0, 0xFF))
+            // Unbounded loop of SLOAD
+            uint256[] memory lockIDs = IUnderwritingLocker(underwritingLocker).getAllLockIDsOf(voters[i]);
 
-    //                 // We are downcasting i from uint256 to uint248
-    //                 // So uint248(i) is initially stored in [0:248]
-    //                 // Left bitwise shift of 8 moves to [8:256]
-    //                 // Bitwise-or sets bits [8:256] of updateInfo => Set uint248(i) as _updateInfo.savedIndexOfLastProcessedVotePowerOf
-    //                 updateInfo := or(updateInfo, shl(8, i))
+            // Unbounded loop of SSTORE
+            for(uint256 j = _updateInfo._votesIndex == type(uint88).max ? 0 : _updateInfo._votesIndex; j < lockIDs.length; j++) {
+                if (gasleft() < 70000) {
+                    _saveUpdateState(0, i, j);
+                    emit IncompletePremiumsCharge();
+                    return;
+                }
+                // Split premium amongst each lock equally
+                IUnderwritingLocker(underwritingLocker).chargePremium(lockIDs[i], premium / lockIDs.length);
+            }
 
-    //                 // Now for updateInfo: [0:8] == false, [8:256] == uint248(i)
-    //                 // So overwrite _updateInfo storage slot with new struct values
-    //                 // Point of this exercise was to make single sstore operation (vs two if we didn't struct pack).
-    //                 sstore(_updateInfo.slot, updateInfo)
+            totalPremiumDue -= premium;
+        }
 
-    //                 // We are making an assumption that this function can only save state changes made at two points
-    //                 // i.) Here at this return statement, or ii.) we successfully get to the end of the function body
-    //                 // If there is another condition under which state changes can be saved, that will cause bugs.
-    //                 return(0, 0)
-    //             }
-    //         }
-    //         console.log("chargePremium 2 %s" , gasleft());
+        SafeERC20.safeTransferFrom(
+            IERC20(IUnderwritingLocker(underwritingLocker).token()), 
+            underwritingLocker, 
+            revenueRouter,
+            type(uint256).max - totalPremiumDue // Avoid totalPremiumDue being 0 and cold slot
+        );
 
-    //         (uint256 lockID,) = _lastProcessedVotePowerOf.at(i);
-    //         uint256 premium = _calculateVotePremium(lockID, insuranceCapacity);
-    //         if (premium == 0) {lockIDsToRemove.push(lockID);}
-    //         // Could put next 3 lines in an else block for gas efficiency, but makes it harder to debug.
-    //         totalPremiumDue += premium;
-    //         IUnderwritingLocker(underwritingLocker).chargePremium(lockID, premium);
-    //         emit PremiumCharged(lockID, epochStartTimestamp, premium);
-    //     }
-
-    //     // Remove dead votes from EnumerableMap
-    //     while (lockIDsToRemove.length > 0) {
-    //         _lastProcessedVotePowerOf.remove(lockIDsToRemove[lockIDsToRemove.length - 1]);
-    //         lockIDsToRemove.pop();
-    //     }
-
-    //     SafeERC20.safeTransferFrom(
-    //         IERC20(IUnderwritingLocker(underwritingLocker).token()), 
-    //         underwritingLocker, 
-    //         revenueRouter,
-    //         totalPremiumDue
-    //     );
-
-    //     totalPremiumDue = 0; // Reset total premiium due
-    //     _updateInfo.finishedLastUpdate = true;
-    //     lastTimePremiumsCharged = epochStartTimestamp;
-    //     emit AllPremiumsCharged(epochStartTimestamp);
-    //     console.log("chargePremium 3 %s" , gasleft());
+        _clearUpdateInfo();
+        totalPremiumDue = type(uint256).max; // Reset total premium due
+        lastTimePremiumsCharged = epochStartTimestamp;
+        emit AllPremiumsCharged(epochStartTimestamp);
     }
 
     /***************************************
@@ -504,22 +479,23 @@ contract UnderwritingLockVoting is
      * @notice Computes voting premium for voter.
      * @param voter_ Address of voter.
      * @param insuranceCapacity_ Solace insurance capacity. Placed as parameter to reduce external view calls in each chargePremiums() iteration.
+     * @param votePowerSum_ Solace Native total vote power sum.
      * @return premium Premium for voter.
      */
-    function _calculateVotePremium(address voter_, uint256 insuranceCapacity_) internal view returns (uint256 premium) {
+    function _calculateVotePremium(address voter_, uint256 insuranceCapacity_, uint256 votePowerSum_) internal view returns (uint256 premium) {
         GaugeStructs.Vote[] memory votes = IGaugeController(gaugeController).getVotes(address(this), voter_);
         uint256 voteCount = votes.length;
 
         if (voteCount > 0) {
             uint256 accummulator;
-            uint256 global_numerator = _lastProcessedVotePowerOf[voter_] * insuranceCapacity_ * WEEK;
+            uint256 globalNumerator = _lastProcessedVotePowerOf[voter_] * insuranceCapacity_ * WEEK;
             // rateOnLine scaled to correct fraction for week => multiply by (WEEK / YEAR) * (1 / 1e18)
             // votePowerBPS scaled to correct fraction => multiply by (1 / 10000)
-            uint256 global_denominator = IGaugeController(gaugeController).getVotePowerSum() * YEAR * 1e18 * 10000;
+            uint256 globalDenominator = votePowerSum_ * YEAR * 1e18 * 10000;
             for (uint256 i = 0 ; i < voteCount; i++) {
                 accummulator += IGaugeController(gaugeController).getRateOnLineOfGauge(votes[i].gaugeID) * votes[i].votePowerBPS;
             }
-            return accummulator * global_numerator / global_denominator;
+            return accummulator * globalNumerator / globalDenominator;
         } else {
             return 0;
         }

@@ -64,9 +64,8 @@ contract GaugeController is
     /// @notice The total number of paused gauges
     uint256 internal _pausedGaugesCount;
 
-    /// @notice Epoch start timestamp (rounded to weeks) => gaugeID => total vote power
-    /// @dev The same data structure exists in UnderwritingLockVoting.sol. If there is only the single IGaugeVoting contract (UnderwritingLockVoting.sol), then this data structure will be a deep copy. If there is more than one IGaugeVoting contract, this data structure will be the merged deep copies of `_votePowerOfGaugeForEpoch` in the IGaugeVoting contracts.   
-    mapping(uint256 => mapping(uint256 => uint256)) internal _votePowerOfGaugeForEpoch;
+    /// @notice gaugeID => total vote power from last updateGaugeWeights() call
+    mapping(uint256 => uint256) internal _votePowerOfGauge;
 
     /// @notice Array of Gauge {string name, bool active}
     GaugeStructs.Gauge[] internal _gauges;
@@ -83,7 +82,7 @@ contract GaugeController is
     // votingContract => voter => gaugeID => votePowerBPS
     mapping(address => mapping(address => EnumerableMap.UintToUintMap)) internal _votes;
 
-    /// @notice Dynamic array of dead voters to remove from _voters
+    /// @notice Dynamic array of dead voters discovered in updateGaugeWeights() call.
     address[] internal _votersToRemove;
 
     GaugeStructs.UpdateInfo internal _updateInfo;
@@ -134,7 +133,7 @@ contract GaugeController is
     function _getVotePowerSum() internal view returns (uint256 votePowerSum) {
         for(uint256 i = 1; i < totalGauges + 1; i++) {
             if (_gauges[i].active) {
-                votePowerSum += _votePowerOfGaugeForEpoch[lastTimeGaugeWeightsUpdated][i];
+                votePowerSum += _votePowerOfGauge[i];
             }
         }
     }
@@ -146,9 +145,10 @@ contract GaugeController is
      * @return weight
      */
     function _getGaugeWeight(uint256 gaugeID_) internal view returns (uint256 weight) {
+        if (_gauges[gaugeID_].active) return 0;
         uint256 votePowerSum = _getVotePowerSum();
-        if (votePowerSum == 0) {return 0;} // Avoid divide by 0 error
-        else {return 1e18 * _votePowerOfGaugeForEpoch[lastTimeGaugeWeightsUpdated][gaugeID_] / votePowerSum;}
+        if (votePowerSum == 0) return 0; // Avoid divide by 0 error
+        else {return 1e18 * _votePowerOfGauge[gaugeID_] / votePowerSum;}
     }
 
     /**
@@ -164,7 +164,7 @@ contract GaugeController is
 
         for(uint256 i = 1; i < totalGauges + 1; i++) {
             if (_gauges[i].active) {
-                weights[i] = (1e18 * _votePowerOfGaugeForEpoch[lastTimeGaugeWeightsUpdated][i] / votePowerSum);
+                weights[i] = (1e18 * _votePowerOfGauge[i] / votePowerSum);
             } else {
                 weights[i] = 0;
             }
@@ -535,6 +535,9 @@ contract GaugeController is
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      */
     function updateGaugeWeights() external override onlyGovernance {
+        // If first call for epoch, reset _votePowerOfGauge
+        if ( _updateInfo._votesIndex == type(uint88).max ) {_resetVotePowerOfGaugeMapping();}
+
         uint256 epochStartTime = _getEpochStartTimestamp();
         if (lastTimeGaugeWeightsUpdated >= epochStartTime) revert GaugeWeightsAlreadyUpdated();
         uint256 numVotingContracts = _votingContracts.length();
@@ -556,7 +559,7 @@ contract GaugeController is
 
                 // If votePower == 0, we don't need to cache the result because voter will be removed from _voters EnumerableSet
                 // => chargePremiums() will not iterate through it
-                IGaugeVoter(votingContract).cacheLastProcessedVotePower(voter, votePower); // Cache votePower for use in IGaugeVoter.chargePremiums() call later
+                IGaugeVoter(votingContract).cacheLastProcessedVotePower(voter, votePower);
 
                 uint256 totalVotePowerBPS; 
                 // Iterate through votes
@@ -575,17 +578,24 @@ contract GaugeController is
                         continue;
                     }
 
-                    _votePowerOfGaugeForEpoch[epochStartTime][gaugeID] += votePower * votingPowerBPS / 10000; // Weak to re-entrancy here?
+                    _votePowerOfGauge[gaugeID] += votePower * votingPowerBPS / 10000; // Weak to re-entrancy here?
                 }   
             }
 
-            // Remove dead voters after iterating through voters
+            // Remove dead voters.
             while (_votersToRemove.length > 0) {
+                // Unbounded SSTORE loop here, can get DDOSed, so enable early return if not enough gas for 5 SSTOREs + 1 event
+                if (gasleft() < 40000) {
+                    _saveUpdateState(i, numVoters, type(uint88).max); // j + 1 to skip iterating through voters, and return to this point on next updateGaugeWeights() call.
+                    emit IncompleteGaugeUpdate();
+                    return;
+                }
                 _voters[votingContract].remove(_votersToRemove[_votersToRemove.length - 1]);
                 _votersToRemove.pop();
             }
         }
         
+        _adjustVotePowerOfGaugeMapping(); // Should cost (100 * totalGauges) gas
         _clearUpdateInfo();
         lastTimeGaugeWeightsUpdated = epochStartTime;
         emit GaugeWeightsUpdated(epochStartTime);
@@ -622,4 +632,31 @@ contract GaugeController is
             sstore(_updateInfo.slot, bitmap)
         }
     }
+
+    /// @notice Reset _votePowerOfGauge at start of updateGaugeWeights() call
+    /// @dev The justification for `reset` and `adjust` is for each slot, it costs 20000 gas to change from 0 to non-zero with SSTORE
+    /// @dev Whereas changing from non-zero to non-zero costs 2900 gas
+    function _resetVotePowerOfGaugeMapping() internal {
+        for (uint256 i = 0; i < totalGauges; i++) {
+            _votePowerOfGauge[i] = 1; /// @dev Don't make 0 to avoid 17K gas re-warming penalty.
+        }
+    }
+
+    /// @notice Adjust _votePowerOfGauge for reset done at start of updateGaugeWeights() call
+    /// @notice This is 
+    function _adjustVotePowerOfGaugeMapping() internal {
+        for (uint256 i = 0; i < totalGauges; i++) {
+            if ( _gauges[i].active ) {
+                _votePowerOfGauge[i] -= 1;
+            // Keep paused gauge with default value.
+            } else {
+                // Avoid unnecessary SSTORE
+                if (_votePowerOfGauge[i] != 1) {
+                    _votePowerOfGauge[i] = 1;
+                }
+            }
+        }
+    }
+
+
 }
