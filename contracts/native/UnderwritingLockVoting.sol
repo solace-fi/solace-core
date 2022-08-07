@@ -68,12 +68,17 @@ contract UnderwritingLockVoting is
     /// @notice End timestamp (rounded down to weeks) for epoch for which all stored votes were charged.
     uint256 public override lastTimePremiumsCharged;
 
+    /// @notice voter => delegate
+    mapping(address => address) public override lockDelegateOf;
+
+    /// @notice voter => used voting power percentage (max of 10000 BPS)
+    /// @dev Technically a cache for sum of used votingPowerBPS for a user. Required for input validation in _vote()
+    /// @dev which will otherwise encounter a potentially unbounded loop to get first-hand data.
+    mapping(address => uint256) public override usedVotePowerBPSOf;
+
     uint256 constant public override WEEK = 604800;
     uint256 constant public override MONTH = 2628000;
     uint256 constant public override YEAR = 31536000;
-
-    /// @notice voter => delegate
-    mapping(address => address) public override lockDelegateOf;
 
     /***************************************
     GLOBAL INTERNAL VARIABLES
@@ -82,19 +87,13 @@ contract UnderwritingLockVoting is
     /// @dev Should == type(uint256).max when in-between complete chargePremiums() call
     /// @dev Keep this slot warm, avoid cost of re-warming a cold storage slot.
     /// @dev Originally a local function variable, but need to save state between two function calls.
-    uint256 internal totalPremiumDue;
+    uint256 internal _totalPremiumDue;
 
     /// @notice voter => last processed vote power.
-    /// @dev Cache for getVotePowerOf() call for most recent complete GaugeController.updateGaugeWeights().
+    /// @dev Cache for getVotePower() call for most recent complete GaugeController.updateGaugeWeights().
     /// @dev Empirically _getVotePowerOfLock() expends ~30K gas per lock, we prefer ~5K gas per user SSTORE + SLOAD to this cache.
     /// @dev This mapping is only intended to be used by chargePremiums(), after complete GaugeController.updateGaugeWeights().
     mapping (address => uint256) internal _lastProcessedVotePowerOf;
-
-    /// @notice voter => used voting power percentage (max of 10000 BPS)
-    /// @dev Is a cache for sum of used voting power bps. Otherwise gotten by iterating through a voter's votes.
-    /// @dev Potentially unbounded loop if we iterate through voter's votes, and we require this value for input validation in _vote()
-    /// @dev Therefore justified to store cache, and maintain cache accuracy for with actual value.
-    mapping(address => uint256) internal usedVotePowerBPSOf;
 
     GaugeStructs.UpdateInfo internal _updateInfo;
 
@@ -110,7 +109,9 @@ contract UnderwritingLockVoting is
      */
     constructor(address governance_, address registry_) Governable(governance_) {
         _setRegistry(registry_);
-        totalPremiumDue = type(uint256).max;
+        // Initialize totalPremiumDue and _updateInfo as warm non-zero storage slots.
+        _totalPremiumDue = type(uint256).max;
+        _clearUpdateInfo();
     }
 
     /***************************************
@@ -165,13 +166,10 @@ contract UnderwritingLockVoting is
      * @param voter_ The address of the voter to query.
      * @return votePower
      */
-    function getVotePowerOf(address voter_) external view override returns (uint256 votePower) {
-        uint256 numVoterLocks = IUnderwritingLocker(underwritingLocker).balanceOf(voter_);
-        if (numVoterLocks == 0) return 0;
-        uint256[] memory lockIDs = new uint256[](numVoterLocks);
-        lockIDs = IUnderwritingLocker(underwritingLocker).getAllLockIDsOf(voter_);
+    function getVotePower(address voter_) external view override returns (uint256 votePower) {
+        uint256[] memory lockIDs = IUnderwritingLocker(underwritingLocker).getAllLockIDsOf(voter_);
+        uint256 numVoterLocks = lockIDs.length;
         for (uint256 i = 0; i < numVoterLocks; i++) {votePower += _getVotePowerOfLock(lockIDs[i]);}
-        return votePower;
     }
 
     /**
@@ -396,7 +394,7 @@ contract UnderwritingLockVoting is
     /**
      * @notice Charge premiums for votes.
      * @dev Requires all votes to be processed for the last epochProcesses votes for the last epoch passed, batches $UWE voting fees and sends to RevenueRouter.sol, updates aggregate voting data (for each gauge) 
-     * @dev Designed to be called multiple times until this function returns true (all stored votes are processed)
+     * @dev Designed to be called in a while-loop until this `lastTimePremiumsCharged == epochStartTimestamp`
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      */
     function chargePremiums() external override onlyGovernance {
@@ -411,37 +409,37 @@ contract UnderwritingLockVoting is
         // Iterate through voters
         address[] memory voters = IGaugeController(gaugeController).getVoters(address(this));
         for(uint256 i = _updateInfo._votersIndex == type(uint88).max ? 0 : _updateInfo._votersIndex ; i < voters.length; i++) {
+            // Need to test if unbounded loop of SLOADs and external calls can be a DDOS issue, if so need to have 4 update variables vs 2.
             // Unbounded loop for SLOAD and CALL
             uint256 premium = _calculateVotePremium(voters[i], insuranceCapacity, votePowerSum);
-
             // Unbounded loop of SLOAD
             uint256[] memory lockIDs = IUnderwritingLocker(underwritingLocker).getAllLockIDsOf(voters[i]);
+            uint256 numLocks = lockIDs.length;
 
             // Unbounded loop of SSTORE
-            for(uint256 j = _updateInfo._votesIndex == type(uint88).max ? 0 : _updateInfo._votesIndex; j < lockIDs.length; j++) {
-                if (gasleft() < 70000) {
-                    _saveUpdateState(0, i, j);
-                    emit IncompletePremiumsCharge();
-                    return;
-                }
-                // Split premium amongst each lock equally
-                IUnderwritingLocker(underwritingLocker).chargePremium(lockIDs[i], premium / lockIDs.length);
+            // Using _votesIndex as _lockIndex
+            for(uint256 j = _updateInfo._votesIndex == type(uint88).max ? 0 : _updateInfo._votesIndex; j < numLocks; j++) {
+                console.log("chargePremiums 1 %s" , gasleft());            
+                if (gasleft() < 20000) {return _saveUpdateState(0, i, j);}
+                console.log("chargePremiums 2 %s" , gasleft());
+                // Split premium amongst each lock equally.
+                IUnderwritingLocker(underwritingLocker).chargePremium(lockIDs[j], premium / numLocks);
             }
-
-            totalPremiumDue -= premium;
+            _totalPremiumDue -= premium;
         }
 
         SafeERC20.safeTransferFrom(
             IERC20(IUnderwritingLocker(underwritingLocker).token()), 
             underwritingLocker, 
             revenueRouter,
-            type(uint256).max - totalPremiumDue // Avoid totalPremiumDue being 0 and cold slot
+            type(uint256).max - _totalPremiumDue // Avoid _totalPremiumDue being zero.
         );
 
         _clearUpdateInfo();
-        totalPremiumDue = type(uint256).max; // Reset total premium due
+        _totalPremiumDue = type(uint256).max; // Reinitialize _totalPremiumDue.
         lastTimePremiumsCharged = epochStartTimestamp;
         emit AllPremiumsCharged(epochStartTimestamp);
+        console.log("chargePremiums 3 %s" , gasleft());            
     }
 
     /***************************************
@@ -462,6 +460,7 @@ contract UnderwritingLockVoting is
             updateInfo := or(updateInfo, shl(168, votesIndex_)) // [168:256] => votesIndex_
             sstore(_updateInfo.slot, updateInfo) 
         }
+        emit IncompletePremiumsCharge();
     }
 
     /// @notice Reset _updateInfo to starting state.

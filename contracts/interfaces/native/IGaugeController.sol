@@ -28,6 +28,9 @@ interface IGaugeController {
     /// @param contractName Name of contract for which zero address was incorrectly provided.
     error ZeroAddressInput(string contractName);
     
+    /// @notice Thrown when array arguments are mismatched in length (and need to have the same length);
+    error ArrayArgumentsLengthMismatch();
+
     /// @notice Thrown if pauseGauge() is attempted on a gauge that is already paused.
     /// @param gaugeID The gauge ID.
     error GaugeAlreadyPaused(uint256 gaugeID);
@@ -48,17 +51,18 @@ interface IGaugeController {
     /// @notice Thrown when vote attempted before gauge weights have been successfully updated for this epoch.
     error GaugeWeightsNotYetUpdated();
 
-    /// @notice Thrown when array arguments are mismatched in length (and need to have the same length);
-    error ArrayArgumentsLengthMismatch();
-
     /// @notice Thrown when vote() is called by an address not listed as a voting contract;
     error NotVotingContract();
 
     /// @notice Thrown when vote() is called with gaugeID that does not exist.
-    error VotedGaugeIDNotExist();
+    error GaugeIDNotExist();
 
     /// @notice Thrown when vote() is called with gaugeID that is paused.
-    error VotedGaugeIDPaused();
+    error GaugeIDPaused();
+
+    /// @notice Thrown when getInsurancePremium() is called and there are no tokenholders added.
+    /// @dev Intended to assist debugging in chargePremiums() function - cannot proceed if no tokenholders added to GaugeController. 
+    error NoTokenholdersAdded();
 
     /// @notice Thrown when removeTokenholder() is attempted for an address not in the tokenholder set.
     error TokenholderNotPresent();
@@ -82,12 +86,6 @@ interface IGaugeController {
     /// @notice Emitted when a gauge is unpaused.
     event GaugeUnpaused(uint256 indexed gaugeID, string gaugeName);
 
-    /// @notice Emitted when gauge weights are updated.
-    event GaugeWeightsUpdated(uint256 indexed updateTime);
-
-    /// @notice Emitted when updateGaugeWeights() does an incomplete update, and run again until completion.
-    event IncompleteGaugeUpdate();
-
     /// @notice Emitted when leverage factor set;
     event LeverageFactorSet(uint256 indexed leverageFactor);
 
@@ -102,6 +100,12 @@ interface IGaugeController {
 
     /// @notice Emitted when address removed from tokenholder set.
     event TokenholderRemoved(address indexed tokenholder);
+
+    /// @notice Emitted when updateGaugeWeights() does an incomplete update, and run again until completion.
+    event IncompleteGaugeUpdate();
+
+    /// @notice Emitted when gauge weights are updated.
+    event GaugeWeightsUpdated(uint256 indexed updateTime);
 
     /***************************************
     GLOBAL VARIABLES
@@ -182,7 +186,7 @@ interface IGaugeController {
     /**
      * @notice Obtain rate on line of gauge.
      * @param gaugeID_ The ID of the gauge to query.
-     * @return rateOnLine_ Rate on line, 1e18 => 100%.
+     * @return rateOnLine_ Annual rate on line, 1e18 => 100%.
      */
     function getRateOnLineOfGauge(uint256 gaugeID_) external view returns (uint256 rateOnLine_);
 
@@ -265,7 +269,7 @@ interface IGaugeController {
      * @notice Adds an insurance gauge
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param gaugeName_ Gauge name
-     * @param rateOnLine_ Rate on line (1e18 => 100%).
+     * @param rateOnLine_ Annual rate on line (1e18 => 100%).
      */
     function addGauge(string calldata gaugeName_, uint256 rateOnLine_) external;
 
@@ -319,7 +323,7 @@ interface IGaugeController {
      * @dev 1e18 => 100%
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param gaugeIDs_ Array of gaugeIDs.
-     * @param rateOnLines_ Array of corresponding rate on line.
+     * @param rateOnLines_ Array of corresponding annual rate on lines.
      */
     function setRateOnLine(uint256[] calldata gaugeIDs_, uint256[] calldata rateOnLines_) external;
 

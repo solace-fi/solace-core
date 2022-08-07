@@ -1865,8 +1865,6 @@ describe("UnderwritingLocker", function () {
       expect(userStateChange.lockedTokenAmount).eq(0)
       expect(userStateChange.numOfLocks).eq(0)
     });
-
-
   });
 
   /*******************
@@ -1880,6 +1878,17 @@ describe("UnderwritingLocker", function () {
    * lockID 9 -> 6-month lock, 5e17 deposit
    * lockID 10 -> 4-yr lock, 1e18 deposit
    */
+
+  describe("getAllLockIDsOf", function () {
+    it("should return all expected locks", async function () {
+      const LOCK_ID_1 = BN.from("9");
+      const LOCK_ID_2 = BN.from("10");
+      expect(await underwritingLocker.getAllLockIDsOf(user1.address)).deep.eq([LOCK_ID_1, LOCK_ID_2]);
+    });
+    it("should return empty array for non-owner", async function () {
+      expect(await underwritingLocker.getAllLockIDsOf(governor.address)).deep.eq([]);
+    });
+  });
 
   /******************
     HELPER CLOSURES
@@ -1985,5 +1994,4 @@ describe("UnderwritingLocker", function () {
     }
     return y;
   }
-
 });

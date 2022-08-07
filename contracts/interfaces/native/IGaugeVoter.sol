@@ -13,7 +13,7 @@ interface IGaugeVoter {
      * @param voter_ The address of the voter to query.
      * @return votePower
      */
-    function getVotePowerOf(address voter_) external view returns (uint256 votePower);
+    function getVotePower(address voter_) external view returns (uint256 votePower);
 
     /**
      * @notice Cache last processed vote power for a vote ID.

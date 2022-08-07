@@ -41,34 +41,17 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     /// @param contractName Name of contract for which zero address was incorrectly provided.
     error ZeroAddressInput(string contractName);
 
-    /// @notice Thrown when processVote() attempted when all stored votes have already been processed for the last epoch.
-    /// @param epochTime Timestamp of endtime for epoch already processed.
-    error LastEpochVotesAlreadyProcessed(uint256 epochTime);
-
-    /// @notice Thrown when chargePremiums() attempted when all premiums have been charged for the last epoch.
-    /// @param epochTime Timestamp of endtime for epoch already processed.
-    error LastEpochPremiumsAlreadyProcessed(uint256 epochTime);
+    /// @notice Thrown when array arguments are mismatched in length (and need to have the same length);
+    error ArrayArgumentsLengthMismatch();
 
     /// @notice Thrown when setLockDelegate() attempted for a non-owner.
     error NotOwner();
 
-    /// @notice Thrown when vote() attempted by a non-owner or non-delegate.
-    error NotOwnerNorDelegate();
-
-    /// @notice Thrown when array arguments are mismatched in length (and need to have the same length);
-    error ArrayArgumentsLengthMismatch();
-
-    /// @notice Thrown when chargePremiums is attempted before last epoch's votes have been successfully processed through gaugeController.updateGaugeWeights().
-    error GaugeWeightsNotYetUpdated();
-
     /// @notice Thrown when vote is attempted before last epoch's premiums have been successfully charged.
     error LastEpochPremiumsNotCharged();
 
-    /// @notice Thrown when getVote() cannot get a vote for a given lockID. Either the lockID, the vote for the lockID, or both don't exist.
-    error VoteNotFound();
-
-    /// @notice Thrown when non-gauge controller attempts to call setLastRecordedVotePower().
-    error NotGaugeController();
+    /// @notice Thrown when vote() attempted by a non-owner or non-delegate.
+    error NotOwnerNorDelegate();
 
     /// @notice Thrown when vote is attempted for voter with no underwriting locks.
     error VoterHasNoLocks();
@@ -78,6 +61,16 @@ interface IUnderwritingLockVoting is IGaugeVoter {
 
     /// @notice Thrown if attempt to vote with total votePowerBPS > 10000
     error TotalVotePowerBPSOver10000();
+
+    /// @notice Thrown when non-gauge controller attempts to call setLastRecordedVotePower().
+    error NotGaugeController();
+
+    /// @notice Thrown when chargePremiums is attempted before last epoch's votes have been successfully processed through gaugeController.updateGaugeWeights().
+    error GaugeWeightsNotYetUpdated();
+
+    /// @notice Thrown when chargePremiums() attempted when all premiums have been charged for the last epoch.
+    /// @param epochTime Timestamp of endtime for epoch already processed.
+    error LastEpochPremiumsAlreadyProcessed(uint256 epochTime);
 
     /***************************************
     EVENTS
@@ -89,10 +82,6 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     /// @notice Emitted when the Registry is set.
     event RegistrySet(address indexed registry);
 
-    /// @notice Emitted when the Vote is registered.
-    /// epochTimestamp is the timestamp for the epoch (rounded down to weeks) that the vote counts for
-    event Vote(uint256 indexed lockID, uint256 indexed gaugeID, address voter, uint256 indexed epochTimestamp, uint256 votePower);
-
     /// @notice Emitted when a vote is added.
     event VoteAdded(address indexed voter, uint256 indexed gaugeID, uint256 votePowerBPS);
 
@@ -101,12 +90,6 @@ interface IUnderwritingLockVoting is IGaugeVoter {
 
     /// @notice Emitted when a vote is removed.
     event VoteRemoved(address indexed voter, uint256 indexed gaugeID);
-
-    /// @notice Emitted a premium is charged.
-    event PremiumCharged(uint256 indexed lockID, uint256 indexed epochStartTimestamp, uint256 premium);
-
-    /// @notice Emitted all stored votes for an epoch have been processed.
-    event AllVotesProcessed(uint256 indexed epochTimestamp);
 
     /// @notice Emitted when chargePremiums was partially completed and needs to be called again.
     event IncompletePremiumsCharge();
@@ -131,6 +114,12 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     function registry() external view returns (address);
 
     /**
+     * @notice Obtain end timestamp (rounded down to weeks) for the epoch where all premiums were charged.
+     * @return timestamp_
+     */
+    function lastTimePremiumsCharged() external view returns (uint256 timestamp_);
+
+    /**
      * @notice Get delegate for a given voter.
      * @param voter_ The address of the voter to query for.
      * @return delegate Zero address if no lock delegate.
@@ -138,10 +127,11 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     function lockDelegateOf(address voter_) external view returns (address delegate);
 
     /**
-     * @notice Obtain end timestamp (rounded down to weeks) for the epoch where all premiums were charged.
-     * @return timestamp_
+     * @notice voter => used voting power percentage (max of 10000 BPS)
+     * @param voter_ The address of the voter to query for.
+     * @return usedVotePowerBPS Total usedVotePowerBPS.
      */
-    function lastTimePremiumsCharged() external view returns (uint256 timestamp_);
+    function usedVotePowerBPSOf(address voter_) external view returns (uint256 usedVotePowerBPS);
 
     function WEEK() external view returns (uint256);
     function MONTH() external view returns (uint256);

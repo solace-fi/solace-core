@@ -104,6 +104,7 @@ contract GaugeController is
         leverageFactor = 1e18; // Default 1x leverage factor
         GaugeStructs.Gauge memory newGauge = GaugeStructs.Gauge(false, 0, ""); // Pre-fill slot 0 of _gauges, ensure gaugeID 1 maps to _gauges[1]
         _gauges.push(GaugeStructs.Gauge(false, 0, "")); 
+        _clearUpdateInfo();
     }
 
     /***************************************
@@ -145,7 +146,7 @@ contract GaugeController is
      * @return weight
      */
     function _getGaugeWeight(uint256 gaugeID_) internal view returns (uint256 weight) {
-        if (_gauges[gaugeID_].active) return 0;
+        if (!_gauges[gaugeID_].active) return 0;
         uint256 votePowerSum = _getVotePowerSum();
         if (votePowerSum == 0) return 0; // Avoid divide by 0 error
         else {return 1e18 * _votePowerOfGauge[gaugeID_] / votePowerSum;}
@@ -163,14 +164,12 @@ contract GaugeController is
         uint256 votePowerSum = _getVotePowerSum();
 
         for(uint256 i = 1; i < totalGauges + 1; i++) {
-            if (_gauges[i].active) {
+            if (votePowerSum > 0 && _gauges[i].active) {
                 weights[i] = (1e18 * _votePowerOfGauge[i] / votePowerSum);
             } else {
                 weights[i] = 0;
             }
         }
-
-        return weights;
     }
 
     /***************************************
@@ -250,7 +249,7 @@ contract GaugeController is
     /**
      * @notice Obtain rate on line of gauge.
      * @param gaugeID_ The ID of the gauge to query.
-     * @return rateOnLine_ Rate on line, 1e18 => 100%.
+     * @return rateOnLine_ Annual rate on line, 1e18 => 100%.
      */
     function getRateOnLineOfGauge(uint256 gaugeID_) external view override returns (uint256 rateOnLine_) {
         return _gauges[gaugeID_].rateOnLine;
@@ -262,8 +261,10 @@ contract GaugeController is
      * @return insuranceCapacity Insurance capacity in $UWE.
      */
     function getInsuranceCapacity() external view override returns (uint256 insuranceCapacity) {
+        uint256 numTokenholders = _tokenholders.length();
+        if (numTokenholders == 0) revert NoTokenholdersAdded();
         uint256 tokenBalance;
-        for (uint256 i = 0; i < _tokenholders.length(); i++) {
+        for (uint256 i = 0; i < numTokenholders; i++) {
             tokenBalance += IERC20(token).balanceOf(_tokenholders.at(i));
         }
         return (leverageFactor * tokenBalance / 1e18);
@@ -294,7 +295,6 @@ contract GaugeController is
                 votes[i] = GaugeStructs.Vote(gaugeID, votingPowerBPS);
             }
         } 
-        return votes;
     }
 
     /**
@@ -312,7 +312,6 @@ contract GaugeController is
                 voters[i] = _voters[votingContract_].at(i);
             }
         } 
-        return voters;
     }
 
     /**
@@ -362,7 +361,7 @@ contract GaugeController is
         }
 
         // If adding new vote
-        if ( !_votes[votingContract_][voter_].contains(gaugeID_) ) {
+        if ( newVotePowerBPS_ > 0 && !_votes[votingContract_][voter_].contains(gaugeID_) ) {
             _votes[votingContract_][voter_].set(gaugeID_, newVotePowerBPS_);
             return 0;
         // Else if removing vote
@@ -395,10 +394,10 @@ contract GaugeController is
     function vote(address voter_, uint256 gaugeID_, uint256 newVotePowerBPS_) external override returns (uint256 oldVotePowerBPS) {
         if (gaugeID_ == 0) revert CannotVoteForGaugeID0();
         if (_getEpochStartTimestamp() != lastTimeGaugeWeightsUpdated) revert GaugeWeightsNotYetUpdated();
+        if (gaugeID_ + 1 > _gauges.length) revert GaugeIDNotExist();
         if (!_votingContracts.contains(msg.sender)) revert NotVotingContract();
-        if (gaugeID_ + 1 > _gauges.length) revert VotedGaugeIDNotExist();
         // Can remove votes while gauge paused
-        if (newVotePowerBPS_ > 0 && !_gauges[gaugeID_].active) revert VotedGaugeIDPaused();
+        if (newVotePowerBPS_ > 0 && !_gauges[gaugeID_].active) revert GaugeIDPaused();
         return _vote(msg.sender, voter_, gaugeID_, newVotePowerBPS_);
     }
 
@@ -430,7 +429,7 @@ contract GaugeController is
      * @notice Adds an insurance gauge
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param gaugeName_ Gauge name
-     * @param rateOnLine_ Rate on line (1e18 => 100%).
+     * @param rateOnLine_ Annual rate on line (1e18 => 100%).
      */
     function addGauge(string calldata gaugeName_, uint256 rateOnLine_) external override onlyGovernance {
         uint256 gaugeID = ++totalGauges;
@@ -515,7 +514,7 @@ contract GaugeController is
      * @dev 1e18 => 100%
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param gaugeIDs_ Array of gaugeIDs.
-     * @param rateOnLines_ Array of corresponding rate on line.
+     * @param rateOnLines_ Array of corresponding annual rate on lines.
      */
     function setRateOnLine(uint256[] calldata gaugeIDs_, uint256[] calldata rateOnLines_) external override onlyGovernance {
         if (gaugeIDs_.length != rateOnLines_.length) revert ArrayArgumentsLengthMismatch();
@@ -527,11 +526,7 @@ contract GaugeController is
 
     /**
      * @notice Updates gauge weights by processing votes for the last epoch.
-     * @dev Can only be called to completion once per epoch.
-     * @dev This function design is not compatible with ReentrancyGuard.sol. Because the Reentrancy lock is only released once the full function body has been executed, but if we do an early return it will remain locked.
-     * @dev So the question is, are we concerned about reentrancy in this function? There's no value transfer here as in the classic Reentrancy attack.
-     * @dev Ternary operator in initialization expression of the for-loops is required to avoid using 3 extra local variables
-     * @dev which would set a stack-too deep error
+     * @dev Designed to be called in a while-loop until this `lastTimePremiumsCharged == epochStartTimestamp`.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      */
     function updateGaugeWeights() external override onlyGovernance {
@@ -543,19 +538,23 @@ contract GaugeController is
         uint256 numVotingContracts = _votingContracts.length();
 
         // Iterate through voting contracts
+        // Use ternary operator to initialise loop, to avoid using local variables and setting stack-too deep
         for(uint256 i = _updateInfo._votingContractsIndex == type(uint80).max ? 0 : _updateInfo._votingContractsIndex; i < numVotingContracts; i++) {
             address votingContract = _votingContracts.at(i);
             uint256 numVoters = _voters[votingContract].length();
 
             // Iterate through voters
             for(uint256 j = _updateInfo._votersIndex == type(uint88).max ? 0 : _updateInfo._votersIndex ; j < numVoters; j++) {
+                if (gasleft() < 100000) {return _saveUpdateState(i, j, 0);}  
+                console.log("processVotes 1 %s" , gasleft());    
                 address voter = _voters[votingContract].at(j);
-                uint256 numVotes = _votes[votingContract][voter].length();
-                uint256 votePower = IGaugeVoter(votingContract).getVotePowerOf(voter); // Modify here
+                uint256 numVotes = _votes[votingContract][voter].length();      
+                uint256 votePower = IGaugeVoter(votingContract).getVotePower(voter); // Expensive 30K gas computation here
                 if (votePower == 0) {
                     _votersToRemove.push(voter);
                     continue;
                 }
+                console.log("processVotes 2 %s" , gasleft());
 
                 // If votePower == 0, we don't need to cache the result because voter will be removed from _voters EnumerableSet
                 // => chargePremiums() will not iterate through it
@@ -564,32 +563,23 @@ contract GaugeController is
                 uint256 totalVotePowerBPS; 
                 // Iterate through votes
                 for(uint256 k = _updateInfo._votesIndex == type(uint88).max ? 0 : _updateInfo._votesIndex; k < numVotes; k++) {    
-                    console.log("processVotes 1 %s" , gasleft());            
-                    if (gasleft() < 90000) {
-                        _saveUpdateState(i, j, k);
-                        emit IncompleteGaugeUpdate();
-                        return;
-                    }
-                    console.log("processVotes 2 %s" , gasleft());
+                    console.log("processVotes 3 %s" , gasleft());            
+                    if (gasleft() < 15000) {return _saveUpdateState(i, j, k);}
+                    console.log("processVotes 4 %s" , gasleft());
                     (uint256 gaugeID, uint256 votingPowerBPS) = _votes[votingContract][voter].at(k);
-
                     // Address edge case where vote placed before gauge is paused, will be counted
-                    if (!_gauges[gaugeID].active) {
-                        continue;
-                    }
-
-                    _votePowerOfGauge[gaugeID] += votePower * votingPowerBPS / 10000; // Weak to re-entrancy here?
+                    if (!_gauges[gaugeID].active) {continue;}
+                    _votePowerOfGauge[gaugeID] += votePower * votingPowerBPS / 10000;
                 }   
             }
 
             // Remove dead voters.
             while (_votersToRemove.length > 0) {
                 // Unbounded SSTORE loop here, can get DDOSed, so enable early return if not enough gas for 5 SSTOREs + 1 event
-                if (gasleft() < 40000) {
-                    _saveUpdateState(i, numVoters, type(uint88).max); // j + 1 to skip iterating through voters, and return to this point on next updateGaugeWeights() call.
-                    emit IncompleteGaugeUpdate();
-                    return;
-                }
+                // Yes get gas refund for resetting storage slot to 0, however refund comes after entire function body
+                // So theoretically someone can DDOS with a crapload of newly emptied Voter accounts
+                console.log("processVotes 5 %s" , gasleft());
+                if (gasleft() < 10000) {return _saveUpdateState(i, numVoters, type(uint88).max);}
                 _voters[votingContract].remove(_votersToRemove[_votersToRemove.length - 1]);
                 _votersToRemove.pop();
             }
@@ -599,7 +589,7 @@ contract GaugeController is
         _clearUpdateInfo();
         lastTimeGaugeWeightsUpdated = epochStartTime;
         emit GaugeWeightsUpdated(epochStartTime);
-        console.log("processVotes 3 %s" , gasleft());
+        console.log("processVotes 6 %s" , gasleft());
     }
 
     /***************************************
@@ -620,6 +610,7 @@ contract GaugeController is
             updateInfo := or(updateInfo, shl(168, votesIndex_)) // [168:256] => votesIndex_
             sstore(_updateInfo.slot, updateInfo) 
         }
+        emit IncompleteGaugeUpdate();
     }
 
     /// @notice Reset _updateInfo to starting state.
@@ -637,7 +628,7 @@ contract GaugeController is
     /// @dev The justification for `reset` and `adjust` is for each slot, it costs 20000 gas to change from 0 to non-zero with SSTORE
     /// @dev Whereas changing from non-zero to non-zero costs 2900 gas
     function _resetVotePowerOfGaugeMapping() internal {
-        for (uint256 i = 0; i < totalGauges; i++) {
+        for (uint256 i = 1; i < totalGauges + 1; i++) {
             _votePowerOfGauge[i] = 1; /// @dev Don't make 0 to avoid 17K gas re-warming penalty.
         }
     }
@@ -645,7 +636,7 @@ contract GaugeController is
     /// @notice Adjust _votePowerOfGauge for reset done at start of updateGaugeWeights() call
     /// @notice This is 
     function _adjustVotePowerOfGaugeMapping() internal {
-        for (uint256 i = 0; i < totalGauges; i++) {
+        for (uint256 i = 1; i < totalGauges + 1; i++) {
             if ( _gauges[i].active ) {
                 _votePowerOfGauge[i] -= 1;
             // Keep paused gauge with default value.
