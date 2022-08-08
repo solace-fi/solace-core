@@ -57,6 +57,9 @@ interface IUnderwritingLocker is IERC721Enhanced {
     /// @notice Thrown when create lock is attempted with 0 deposit.
     error CannotCreateEmptyLock();
 
+    /// @notice Thrown when a user attempts to create a new lock, when they already have MAX_NUM_LOCKS locks.
+    error CreatedMaxLocks();
+
     /// @notice Thrown when createLock is attempted with lock duration < 6 months.
     error LockTimeTooShort();
 
@@ -143,6 +146,9 @@ interface IUnderwritingLocker is IERC721Enhanced {
 
     /// @notice The maximum time into the future that a lock can expire.
     function MAX_LOCK_DURATION() external view returns (uint256);
+
+    /// @notice The maximum number of locks one user can create.
+    function MAX_NUM_LOCKS() external view returns (uint256);
 
     /***************************************
     EXTERNAL VIEW FUNCTIONS

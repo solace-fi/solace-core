@@ -12,6 +12,7 @@ import "./../utils/Governable.sol";
 import "./../interfaces/utils/IRegistry.sol";
 import "./../interfaces/native/IUnderwritingLockListener.sol";
 import "./../interfaces/native/IUnderwritingLocker.sol";
+import "hardhat/console.sol";
 
 /**
  * @title UnderwritingLocker
@@ -72,11 +73,15 @@ contract UnderwritingLocker is
     /// @notice The maximum time (four years) into the future that a lock can expire.
     uint256 public constant override MAX_LOCK_DURATION = 4 * (365 days);
 
+    /// @notice The maximum number of locks one user can create.
+    uint256 public constant override MAX_NUM_LOCKS = 10;
+
     /***************************************
     GLOBAL INTERNAL VARIABLES
     ***************************************/
 
     uint256 internal constant MONTH = 365 days / 12;
+    uint256 internal constant SQRT_SIX = 2449489742; // Precompute to save 35K gas from computing this in _sqrt()
 
     // lockId => Lock {uint256 amount, uint256 end}
     mapping(uint256 => Lock) internal _locks;
@@ -135,22 +140,65 @@ contract UnderwritingLocker is
         if (end_ < block.timestamp) {return 0;}
         else {
             uint256 timeLeftInMonthsScaled = 1e18 * (end_ - block.timestamp) / MONTH;
-            return 1e18 * _sqrt(timeLeftInMonthsScaled) / _sqrt(1e18 * 6);
+            return 1e18 * _sqrt(timeLeftInMonthsScaled) / SQRT_SIX;
         }
     }
 
-    // https://github.com/Uniswap/v2-core/blob/master/contracts/libraries/Math.sol
+    // https://github.com/paulrberg/prb-math/blob/86c068e21f9ba229025a77b951bd3c4c4cf103da/contracts/PRBMath.sol#L591-L647
     // Babylonian method (https://en.wikipedia.org/wiki/Methods_of_computing_square_roots#Babylonian_method)
-    function _sqrt(uint y) internal pure returns (uint z) {
-        if (y > 3) {
-            z = y;
-            uint x = y / 2 + 1;
-            while (x < z) {
-                z = x;
-                x = (y / x + x) / 2;
-            }
-        } else if (y != 0) {
-            z = 1;
+    // https://ethereum.stackexchange.com/questions/2910/can-i-square-root-in-solidity
+    // Initially attempted Uniswap implementation - https://github.com/Uniswap/v2-core/blob/master/contracts/libraries/Math.sol
+    // However Uniswap implementation very gas inefficient - require ~30000 gas to calculate typical result
+    // vs this implementation which take 700 gas to calculate same
+    // Burden of more difficult code well worth 40x gas efficiency, especially given _sqrt() runs in an unbounded loop
+    // in GaugeController.updateGaugeWeights().
+    function _sqrt(uint256 x) internal pure returns (uint256 result) {
+        if (x == 0) {
+            return 0;
+        }
+
+        // Set the initial guess to the least power of two that is greater than or equal to sqrt(x).
+        uint256 xAux = uint256(x);
+        result = 1;
+        if (xAux >= 0x100000000000000000000000000000000) {
+            xAux >>= 128;
+            result <<= 64;
+        }
+        if (xAux >= 0x10000000000000000) {
+            xAux >>= 64;
+            result <<= 32;
+        }
+        if (xAux >= 0x100000000) {
+            xAux >>= 32;
+            result <<= 16;
+        }
+        if (xAux >= 0x10000) {
+            xAux >>= 16;
+            result <<= 8;
+        }
+        if (xAux >= 0x100) {
+            xAux >>= 8;
+            result <<= 4;
+        }
+        if (xAux >= 0x10) {
+            xAux >>= 4;
+            result <<= 2;
+        }
+        if (xAux >= 0x8) {
+            result <<= 1;
+        }
+
+        // The operations can never overflow because the result is max 2^127 when it enters this block.
+        unchecked {
+            result = (result + x / result) >> 1;
+            result = (result + x / result) >> 1;
+            result = (result + x / result) >> 1;
+            result = (result + x / result) >> 1;
+            result = (result + x / result) >> 1;
+            result = (result + x / result) >> 1;
+            result = (result + x / result) >> 1; // Seven iterations should be enough
+            uint256 roundedDownResult = x / result;
+            return result >= roundedDownResult ? roundedDownResult : result;
         }
     }
 
@@ -291,6 +339,7 @@ contract UnderwritingLocker is
     function getAllLockIDsOf(address user_) external view override returns (uint256[] memory lockIDs) {
         return _getAllLockIDsOf(user_);
     }
+
     /***************************************
     INTERNAL MUTATOR FUNCTIONS
     ***************************************/
@@ -309,6 +358,7 @@ contract UnderwritingLocker is
         if(end_ < block.timestamp + MIN_LOCK_DURATION) revert LockTimeTooShort();
         // solhint-disable-next-line not-rely-on-time
         if(end_ > block.timestamp + MAX_LOCK_DURATION) revert LockTimeTooLong();
+        if( balanceOf(recipient_) >= MAX_NUM_LOCKS ) revert CreatedMaxLocks();
         lockID = ++totalNumLocks;
         Lock memory newLock = Lock(amount_, end_);
         // accounting

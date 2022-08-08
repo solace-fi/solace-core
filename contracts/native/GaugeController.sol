@@ -545,11 +545,11 @@ contract GaugeController is
 
             // Iterate through voters
             for(uint256 j = _updateInfo._votersIndex == type(uint88).max ? 0 : _updateInfo._votersIndex ; j < numVoters; j++) {
-                if (gasleft() < 100000) {return _saveUpdateState(i, j, 0);}  
-                console.log("processVotes 1 %s" , gasleft());    
+                console.log("processVotes 1 %s" , gasleft());
                 address voter = _voters[votingContract].at(j);
                 uint256 numVotes = _votes[votingContract][voter].length();      
-                uint256 votePower = IGaugeVoter(votingContract).getVotePower(voter); // Expensive 30K gas computation here
+                if (gasleft() < 40000 + 11000 * numVotes) {return _saveUpdateState(i, j, 0);}  
+                uint256 votePower = IGaugeVoter(votingContract).getVotePower(voter); // Expensive computation here. ~150K gas for max cap of 10 locks.
                 if (votePower == 0) {
                     _votersToRemove.push(voter);
                     continue;

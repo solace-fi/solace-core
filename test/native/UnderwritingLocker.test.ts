@@ -94,6 +94,7 @@ describe("UnderwritingLocker", function () {
       expect(await underwritingLocker.fundingRate()).eq(0);
       expect(await underwritingLocker.MIN_LOCK_DURATION()).eq(ONE_YEAR / 2);
       expect(await underwritingLocker.MAX_LOCK_DURATION()).eq(4 * ONE_YEAR);
+      expect(await underwritingLocker.MAX_NUM_LOCKS()).eq(10);
       expect(await underwritingLocker.totalStakedBalance(user1.address)).eq(0);
       expect(await underwritingLocker.getLockListeners()).deep.eq([]);
       expect(await underwritingLocker.balanceOf(user1.address)).eq(0);
@@ -351,7 +352,7 @@ describe("UnderwritingLocker", function () {
       expect(lock.end).eq(CURRENT_TIME + ONE_YEAR);
       expect(await underwritingLocker.ownerOf(LOCK_ID)).eq(user1.address);
       expect(await underwritingLocker.isLocked(LOCK_ID)).eq(true);
-      expect(await underwritingLocker.timeLeft(LOCK_ID)).eq(ONE_YEAR - 1); // 1s seems to have passed in Hardhat environment at this point, from our initial query for CURRENT_TIME
+      expectClose(await underwritingLocker.timeLeft(LOCK_ID), ONE_YEAR - 1, 1e15); // 1s seems to have passed in Hardhat environment at this point, from our initial query for CURRENT_TIME
 
       const listenerUpdate = await listener.lastUpdate();
       expect(listenerUpdate.blocknum).eq(CURRENT_BLOCK + 1);
@@ -1827,7 +1828,7 @@ describe("UnderwritingLocker", function () {
       expect(await underwritingLocker.votingContract()).eq(votingContractProxy.address)
       await expect(underwritingLocker.connect(votingContractProxy).chargePremium(9, DEPOSIT_AMOUNT.mul(2))).to.be.reverted;
     });
-    it("premium can be charged, and listeners notified", async function () {
+    it("premium can be charged", async function () {
       const LOCK_ID = 9;
       const PREMIUM_AMOUNT = DEPOSIT_AMOUNT.div(2)
       const oldLockState = await getLockState(LOCK_ID)
@@ -1837,16 +1838,6 @@ describe("UnderwritingLocker", function () {
       const newLockState = await getLockState(LOCK_ID)
       const lockStateChange = await getLockStateChange(newLockState, oldLockState)
       expect(lockStateChange.amount).eq(PREMIUM_AMOUNT.mul(-1))
-
-      const listenerUpdate = await listener.lastUpdate();
-      expect(listenerUpdate.caller).eq(underwritingLocker.address);
-      expect(listenerUpdate.lockID).eq(LOCK_ID);
-      expect(listenerUpdate.oldOwner).eq(user1.address);
-      expect(listenerUpdate.newOwner).eq(user1.address);
-      expect(listenerUpdate.oldLock.amount).eq(oldLockState.amount);
-      expect(listenerUpdate.oldLock.end).eq(oldLockState.end);
-      expect(listenerUpdate.newLock.amount).eq(newLockState.amount);
-      expect(listenerUpdate.newLock.end).eq(newLockState.end);
     });
     it("if attempt to charge premium for non-existent lock, call will succeed but state will not change", async function () {
       const LOCK_ID = 1;
@@ -1889,6 +1880,42 @@ describe("UnderwritingLocker", function () {
       expect(await underwritingLocker.getAllLockIDsOf(governor.address)).deep.eq([]);
     });
   });
+
+  describe("Invariant - user cannot have more than 10 active locks", function () {
+    it("user cannot have more than 10 active locks", async function () {
+      const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
+      await underwritingLocker.connect(user1).createLock(user1.address, DEPOSIT_AMOUNT, CURRENT_TIME + 4 * ONE_YEAR);
+      await underwritingLocker.connect(user1).createLock(user1.address, DEPOSIT_AMOUNT, CURRENT_TIME + 4 * ONE_YEAR);
+      await underwritingLocker.connect(user1).createLock(user1.address, DEPOSIT_AMOUNT, CURRENT_TIME + 4 * ONE_YEAR);
+      await underwritingLocker.connect(user1).createLock(user1.address, DEPOSIT_AMOUNT, CURRENT_TIME + 4 * ONE_YEAR);
+      await underwritingLocker.connect(user1).createLock(user1.address, DEPOSIT_AMOUNT, CURRENT_TIME + 4 * ONE_YEAR);
+      await underwritingLocker.connect(user1).createLock(user1.address, DEPOSIT_AMOUNT, CURRENT_TIME + 4 * ONE_YEAR);
+      await underwritingLocker.connect(user1).createLock(user1.address, DEPOSIT_AMOUNT, CURRENT_TIME + 4 * ONE_YEAR);
+      await underwritingLocker.connect(user1).createLock(user1.address, DEPOSIT_AMOUNT, CURRENT_TIME + 4 * ONE_YEAR);
+      expect(await underwritingLocker.balanceOf(user1.address)).eq(10)
+      await expect(underwritingLocker.connect(user1).createLock(user1.address, DEPOSIT_AMOUNT, CURRENT_TIME + 4 * ONE_YEAR)).to.be.revertedWith("CreatedMaxLocks")
+    });
+  });
+
+  /*******************
+    STATE SUMMARY
+  *******************/
+  /**
+   * The following locks have been burned, and the IDs cannot be used again:
+   * 1, 2, 3, 4, 5, 6, 7, 8
+   * 
+   * The following locks exist:
+   * lockID 9 -> 6-month lock, 5e17 deposit
+   * lockID 10 -> 4-yr lock, 1e18 deposit
+   * lockID 11 -> 4-yr lock, 1e18 deposit
+   * lockID 12 -> 4-yr lock, 1e18 deposit
+   * lockID 13 -> 4-yr lock, 1e18 deposit
+   * lockID 14 -> 4-yr lock, 1e18 deposit
+   * lockID 15 -> 4-yr lock, 1e18 deposit
+   * lockID 16 -> 4-yr lock, 1e18 deposit
+   * lockID 17 -> 4-yr lock, 1e18 deposit
+   * lockID 18 -> 4-yr lock, 1e18 deposit
+   */
 
   /******************
     HELPER CLOSURES
