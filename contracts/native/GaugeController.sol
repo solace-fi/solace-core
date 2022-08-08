@@ -526,7 +526,7 @@ contract GaugeController is
 
     /**
      * @notice Updates gauge weights by processing votes for the last epoch.
-     * @dev Designed to be called in a while-loop until this `lastTimePremiumsCharged == epochStartTimestamp`.
+     * @dev Designed to be called in a while-loop with custom gas limit of 6M until `lastTimePremiumsCharged == epochStartTimestamp`.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      */
     function updateGaugeWeights() external override onlyGovernance {
@@ -548,8 +548,8 @@ contract GaugeController is
                 console.log("processVotes 1 %s" , gasleft());
                 address voter = _voters[votingContract].at(j);
                 uint256 numVotes = _votes[votingContract][voter].length();      
-                if (gasleft() < 40000 + 11000 * numVotes) {return _saveUpdateState(i, j, 0);}  
-                uint256 votePower = IGaugeVoter(votingContract).getVotePower(voter); // Expensive computation here. ~150K gas for max cap of 10 locks.
+                if (gasleft() < 150000) {return _saveUpdateState(i, j, 0);} // 
+                uint256 votePower = IGaugeVoter(votingContract).getVotePower(voter); // Expensive computation here. ~150K gas for user with max cap of 10 locks.
                 if (votePower == 0) {
                     _votersToRemove.push(voter);
                     continue;
@@ -565,11 +565,11 @@ contract GaugeController is
                 for(uint256 k = _updateInfo._votesIndex == type(uint88).max ? 0 : _updateInfo._votesIndex; k < numVotes; k++) {    
                     console.log("processVotes 3 %s" , gasleft());            
                     if (gasleft() < 15000) {return _saveUpdateState(i, j, k);}
-                    console.log("processVotes 4 %s" , gasleft());
                     (uint256 gaugeID, uint256 votingPowerBPS) = _votes[votingContract][voter].at(k);
                     // Address edge case where vote placed before gauge is paused, will be counted
                     if (!_gauges[gaugeID].active) {continue;}
                     _votePowerOfGauge[gaugeID] += votePower * votingPowerBPS / 10000;
+                    console.log("processVotes 4 %s" , gasleft());
                 }   
             }
 
@@ -579,7 +579,7 @@ contract GaugeController is
                 // Yes get gas refund for resetting storage slot to 0, however refund comes after entire function body
                 // So theoretically someone can DDOS with a crapload of newly emptied Voter accounts
                 console.log("processVotes 5 %s" , gasleft());
-                if (gasleft() < 10000) {return _saveUpdateState(i, numVoters, type(uint88).max);}
+                if (gasleft() < 15000) {return _saveUpdateState(i, numVoters, type(uint88).max);}
                 _voters[votingContract].remove(_votersToRemove[_votersToRemove.length - 1]);
                 _votersToRemove.pop();
             }
@@ -611,6 +611,7 @@ contract GaugeController is
             sstore(_updateInfo.slot, updateInfo) 
         }
         emit IncompleteGaugeUpdate();
+        console.log("------");
     }
 
     /// @notice Reset _updateInfo to starting state.

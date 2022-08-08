@@ -409,21 +409,25 @@ contract UnderwritingLockVoting is
         // Iterate through voters
         address[] memory voters = IGaugeController(gaugeController).getVoters(address(this));
         for(uint256 i = _updateInfo._votersIndex == type(uint88).max ? 0 : _updateInfo._votersIndex ; i < voters.length; i++) {
+            console.log("chargePremiums 1 %s" , gasleft());    
+            // Short-circuit operator, need at least 30K gas for getVoteCount() call
+            if (gasleft() < 30000 || gasleft() < 10000 * IGaugeController(gaugeController).getVoteCount(address(this), voters[i])) {return _saveUpdateState(0, i, 0);}        
             // Need to test if unbounded loop of SLOADs and external calls can be a DDOS issue, if so need to have 4 update variables vs 2.
-            // Unbounded loop for SLOAD and CALL
-            uint256 premium = _calculateVotePremium(voters[i], insuranceCapacity, votePowerSum);
-            // Unbounded loop of SLOAD
+            // Unbounded loop for SLOAD and CALL - unbounded with votes
+            uint256 premium = _calculateVotePremium(voters[i], insuranceCapacity, votePowerSum); // 87K gas for 10 votes
+            console.log("chargePremiums 2 %s" , gasleft());
             uint256[] memory lockIDs = IUnderwritingLocker(underwritingLocker).getAllLockIDsOf(voters[i]);
+            console.log("chargePremiums 3 %s" , gasleft());
             uint256 numLocks = lockIDs.length;
 
-            // Unbounded loop of SSTORE
+            // Iterate through locks
             // Using _votesIndex as _lockIndex
             for(uint256 j = _updateInfo._votesIndex == type(uint88).max ? 0 : _updateInfo._votesIndex; j < numLocks; j++) {
-                console.log("chargePremiums 1 %s" , gasleft());            
+                console.log("chargePremiums 4 %s" , gasleft());            
                 if (gasleft() < 20000) {return _saveUpdateState(0, i, j);}
-                console.log("chargePremiums 2 %s" , gasleft());
                 // Split premium amongst each lock equally.
                 IUnderwritingLocker(underwritingLocker).chargePremium(lockIDs[j], premium / numLocks);
+                console.log("chargePremiums 5 %s" , gasleft());
             }
             _totalPremiumDue -= premium;
         }
@@ -439,7 +443,7 @@ contract UnderwritingLockVoting is
         _totalPremiumDue = type(uint256).max; // Reinitialize _totalPremiumDue.
         lastTimePremiumsCharged = epochStartTimestamp;
         emit AllPremiumsCharged(epochStartTimestamp);
-        console.log("chargePremiums 3 %s" , gasleft());            
+        console.log("chargePremiums 6 %s" , gasleft());            
     }
 
     /***************************************
@@ -461,6 +465,7 @@ contract UnderwritingLockVoting is
             sstore(_updateInfo.slot, updateInfo) 
         }
         emit IncompletePremiumsCharge();
+        console.log("------");
     }
 
     /// @notice Reset _updateInfo to starting state.
