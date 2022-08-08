@@ -421,6 +421,7 @@ contract GaugeController is
      * @param votingContract_ The votingContract to add.
      */
     function removeVotingContract(address votingContract_) external override onlyGovernance {
+        if (!_votingContracts.contains(votingContract_)) revert VotingContractNotAdded();
         _votingContracts.remove(votingContract_);
         emit VotingContractRemoved(votingContract_);
     }

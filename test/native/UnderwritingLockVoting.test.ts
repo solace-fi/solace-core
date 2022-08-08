@@ -2,7 +2,7 @@ import { ethers, waffle, upgrades } from "hardhat";
 const { deployContract, solidity } = waffle;
 import { MockProvider } from "ethereum-waffle";
 const provider: MockProvider = waffle.provider;
-import { BigNumber as BN, constants, BigNumberish, Wallet, ContractTransaction } from "ethers";
+import { BigNumber as BN, constants, Wallet } from "ethers";
 import chai from "chai";
 const { expect } = chai;
 chai.use(solidity);
@@ -23,7 +23,6 @@ const ONE_YEAR = 31536000; // in seconds
 const ONE_MONTH = ONE_YEAR / 12;
 const ONE_WEEK = 604800; // in seconds
 const DEPOSIT_AMOUNT = ONE_ETHER;
-const WITHDRAW_AMOUNT = ONE_ETHER;
 const SCALE_FACTOR = ONE_ETHER;
 const ONE_PERCENT = ONE_ETHER.div(100);
 const ONE_HUNDRED_PERCENT = ONE_ETHER;

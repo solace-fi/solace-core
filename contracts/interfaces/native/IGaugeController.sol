@@ -54,6 +54,9 @@ interface IGaugeController {
     /// @notice Thrown when vote() is called by an address not listed as a voting contract;
     error NotVotingContract();
 
+    /// @notice Thrown when removeVotingContract attempted for address that has not previously been added as a voting contract.
+    error VotingContractNotAdded();
+
     /// @notice Thrown when vote() is called with gaugeID that does not exist.
     error GaugeIDNotExist();
 

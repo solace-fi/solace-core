@@ -1,3 +1,6 @@
+/// @dev Testing simple setter/getter functions only in this test file.
+/// @dev More complex integration tests in `UnderwritingLockVoting.test.ts`
+
 import { ethers, waffle, upgrades } from "hardhat";
 const { deployContract, solidity } = waffle;
 import { MockProvider } from "ethereum-waffle";
@@ -26,8 +29,8 @@ const SCALE_FACTOR = ONE_ETHER;
 const ONE_PERCENT = ONE_ETHER.div(100);
 const ONE_HUNDRED_PERCENT = ONE_ETHER;
 
-describe("UnderwritingLockVoting", function () {
-    const [deployer, governor, revenueRouter, owner1, delegate1, delegate2, anon] = provider.getWallets();
+describe("GaugeController", function () {
+    const [deployer, governor, revenueRouter, voter1, delegate1, delegate2, anon] = provider.getWallets();
   
     /***************************
        VARIABLE DECLARATIONS
@@ -50,13 +53,13 @@ describe("UnderwritingLockVoting", function () {
   
         // Deploy registry
         registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
-      });
+    });
     
-      after(async function () {
-        await provider.send("evm_revert", [snapshot]);
-      });
+    after(async function () {
+      await provider.send("evm_revert", [snapshot]);
+    });
 
-      describe("deployment", function () {
+    describe("deployment", function () {
         it("reverts if zero address governance", async function () {
           await expect(deployContract(deployer, artifacts.GaugeController, [ZERO_ADDRESS, registry.address])).to.be.revertedWith("zero address governance");
         });
@@ -80,7 +83,6 @@ describe("UnderwritingLockVoting", function () {
           expect(await gaugeController.getGaugeName(0)).eq("");
           expect(await gaugeController.isGaugeActive(0)).eq(false);
           expect(await gaugeController.getRateOnLineOfGauge(0)).eq(0);
-          expect(await gaugeController.getInsuranceCapacity()).eq(0);
           expect(await gaugeController.getVotePowerSum()).eq(0);
         });
         it("getEpochStartTimestamp gets current timestamp rounded down to a multiple of WEEK ", async function () {
@@ -91,6 +93,173 @@ describe("UnderwritingLockVoting", function () {
         it("getEpochEndTimestamp() == getEpochStartTimestamp() + ONE_WEEK ", async function () {
           expect(await gaugeController.getEpochEndTimestamp()).eq((await gaugeController.getEpochStartTimestamp()).add(ONE_WEEK))
         });
+        it("getInsuranceCapacity should revert before tokenholder added", async function () {
+          await expect(gaugeController.getInsuranceCapacity()).to.be.revertedWith("NoTokenholdersAdded");
+        });
+    });
+
+    describe("governance", () => {
+      it("starts with the correct governor", async () => {
+        expect(await gaugeController.governance()).to.equal(governor.address);
+      });
+      it("rejects setting new governance by non governor", async  () => {
+        await expect(gaugeController.connect(voter1).setPendingGovernance(voter1.address)).to.be.revertedWith("!governance");
+      });
+      it("can set new governance", async () => {
+        let tx = await gaugeController.connect(governor).setPendingGovernance(deployer.address);
+        await expect(tx).to.emit(gaugeController, "GovernancePending").withArgs(deployer.address);
+        expect(await gaugeController.governance()).to.equal(governor.address);
+        expect(await gaugeController.pendingGovernance()).to.equal(deployer.address);
+      });
+      it("rejects governance transfer by non governor", async () => {
+        await expect(gaugeController.connect(voter1).acceptGovernance()).to.be.revertedWith("!pending governance");
+      });
+      it("can transfer governance", async () => {
+        let tx = await gaugeController.connect(deployer).acceptGovernance();
+        await expect(tx)
+          .to.emit(gaugeController, "GovernanceTransferred")
+          .withArgs(governor.address, deployer.address);
+        expect(await gaugeController.governance()).to.equal(deployer.address);
+        await gaugeController.connect(deployer).setPendingGovernance(governor.address);
+        await gaugeController.connect(governor).acceptGovernance();
+      });
+    });
+
+    describe("addVotingContract", () => {
+      it("non governor cannot add new voting contract", async  () => {
+        await expect(gaugeController.connect(voter1).addVotingContract(voter1.address)).to.be.revertedWith("!governance");
+      });
+      it("can add new voting contract", async () => {
+        let tx = await gaugeController.connect(governor).addVotingContract(voter1.address);
+        await expect(tx).to.emit(gaugeController, "VotingContractAdded").withArgs(voter1.address);
+      });
+    });
+
+    describe("removeVotingContract", () => {
+      it("rejects setting new governance by non governor", async  () => {
+        await expect(gaugeController.connect(voter1).removeVotingContract(voter1.address)).to.be.revertedWith("!governance");
+      });
+      it("cannot remove address, that has not previously been added as voting contract", async  () => {
+        await expect(gaugeController.connect(governor).removeVotingContract(deployer.address)).to.be.revertedWith("VotingContractNotAdded");
+      });
+      it("can remove voting contract", async () => {
+        let tx = await gaugeController.connect(governor).removeVotingContract(voter1.address);
+        await expect(tx).to.emit(gaugeController, "VotingContractRemoved").withArgs(voter1.address);
+      });
+    });
+
+    describe("addTokenholder", () => {
+      it("non governor cannot add new tokenholder", async  () => {
+        await expect(gaugeController.connect(voter1).addTokenholder(voter1.address)).to.be.revertedWith("!governance");
+      });
+      it("can add new tokenholder", async () => {
+        let tx = await gaugeController.connect(governor).addTokenholder(voter1.address);
+        await expect(tx).to.emit(gaugeController, "TokenholderAdded").withArgs(voter1.address);
+      });
+      it("getInsurancePremium() will not throw after tokenholder added", async () => {
+        const tx = await gaugeController.getInsuranceCapacity()
+      });
+    });
+
+    describe("removeTokenholder", () => {
+      it("rejects setting new governance by non governor", async  () => {
+        await expect(gaugeController.connect(voter1).removeTokenholder(voter1.address)).to.be.revertedWith("!governance");
+      });
+      it("cannot remove address, that has not previously been added as voting contract", async  () => {
+        await expect(gaugeController.connect(governor).removeTokenholder(deployer.address)).to.be.revertedWith("TokenholderNotPresent");
+      });
+      it("can remove voting contract", async () => {
+        let tx = await gaugeController.connect(governor).removeTokenholder(voter1.address);
+        await expect(tx).to.emit(gaugeController, "TokenholderRemoved").withArgs(voter1.address);
+      });
+    });
+
+    describe("setLeverageFactor", () => {
+      it("non governor cannot setLeverageFactor", async  () => {
+        await expect(gaugeController.connect(voter1).setLeverageFactor(ONE_HUNDRED_PERCENT)).to.be.revertedWith("!governance");
+      });
+      it("can set new leverage factor", async () => {
+        let tx = await gaugeController.connect(governor).setLeverageFactor(ONE_HUNDRED_PERCENT.mul(2));
+        await expect(tx).to.emit(gaugeController, "LeverageFactorSet").withArgs(ONE_HUNDRED_PERCENT.mul(2));
+        expect(await gaugeController.leverageFactor()).eq(ONE_HUNDRED_PERCENT.mul(2))
+        await gaugeController.connect(governor).setLeverageFactor(ONE_HUNDRED_PERCENT)
+      });
+    });
+
+    describe("setToken", () => {
+      it("non governor cannot setToken", async  () => {
+        await expect(gaugeController.connect(voter1).setToken(voter1.address)).to.be.revertedWith("!governance");
+      });
+      it("can set new token", async () => {
+        let tx = await gaugeController.connect(governor).setToken(voter1.address);
+        await expect(tx).to.emit(gaugeController, "TokenSet").withArgs(voter1.address);
+        expect(await gaugeController.token()).eq(voter1.address)
+        await gaugeController.connect(governor).setToken(token.address)
+      });
+    });
+
+    describe("addGauge", () => {
+      it("non governor cannot add new gauge", async  () => {
+        await expect(gaugeController.connect(voter1).addGauge("1", ONE_PERCENT)).to.be.revertedWith("!governance");
+      });
+      it("can add new gauge", async () => {
+        let tx = await gaugeController.connect(governor).addGauge("1", ONE_PERCENT);
+        await expect(tx).to.emit(gaugeController, "GaugeAdded").withArgs(1, ONE_PERCENT, "1");
+        expect(await gaugeController.totalGauges()).eq(1)
+        expect(await gaugeController.getNumActiveGauges()).eq(1)
+        expect(await gaugeController.getNumPausedGauges()).eq(0)
+        expect(await gaugeController.getGaugeName(1)).eq("1")
+        expect(await gaugeController.isGaugeActive(1)).eq(true)
+        expect(await gaugeController.getRateOnLineOfGauge(1)).eq(ONE_PERCENT)
+        expect(await gaugeController.getGaugeWeight(1)).eq(ZERO)
+      });
+    });
+
+    describe("pauseGauge", () => {
+      it("non governor cannot pause gauge", async  () => {
+        await expect(gaugeController.connect(voter1).pauseGauge(1)).to.be.revertedWith("!governance");
+      });
+      it("cannot pause non-existent gauge", async  () => {
+        await expect(gaugeController.connect(governor).pauseGauge(2)).to.be.reverted;
+      });
+      it("can pause gauge", async () => {
+        let tx = await gaugeController.connect(governor).pauseGauge(1);
+        await expect(tx).to.emit(gaugeController, "GaugePaused").withArgs(1, "1");
+        expect(await gaugeController.totalGauges()).eq(1)
+        expect(await gaugeController.getNumActiveGauges()).eq(0)
+        expect(await gaugeController.getNumPausedGauges()).eq(1)
+        expect(await gaugeController.isGaugeActive(1)).eq(false)
+        expect(await gaugeController.getRateOnLineOfGauge(1)).eq(ONE_PERCENT)
+        expect(await gaugeController.getGaugeWeight(1)).eq(ZERO)
+      });
+      it("cannot pause gauge again", async () => {
+        await expect(gaugeController.connect(governor).pauseGauge(1)).to.be.revertedWith("GaugeAlreadyPaused");
+      });
+    });
+
+    describe("unpauseGauge", () => {
+      it("non governor cannot unpause gauge", async  () => {
+        await expect(gaugeController.connect(voter1).unpauseGauge(1)).to.be.revertedWith("!governance");
+      });
+      it("cannot unpause non-existent gauge", async  () => {
+        await expect(gaugeController.connect(governor).unpauseGauge(2)).to.be.reverted;
+      });
+      it("cannot unpause gaugeID 0", async  () => {
+        await expect(gaugeController.connect(governor).unpauseGauge(0)).to.be.revertedWith("CannotUnpauseGaugeID0")
+      });
+      it("can unpause gauge", async () => {
+        let tx = await gaugeController.connect(governor).unpauseGauge(1);
+        await expect(tx).to.emit(gaugeController, "GaugeUnpaused").withArgs(1, "1");
+        expect(await gaugeController.totalGauges()).eq(1)
+        expect(await gaugeController.getNumActiveGauges()).eq(1)
+        expect(await gaugeController.getNumPausedGauges()).eq(0)
+        expect(await gaugeController.isGaugeActive(1)).eq(true)
+        expect(await gaugeController.getRateOnLineOfGauge(1)).eq(ONE_PERCENT)
+        expect(await gaugeController.getGaugeWeight(1)).eq(ZERO)
+      });
+      it("cannot unpause gauge again", async () => {
+        await expect(gaugeController.connect(governor).unpauseGauge(1)).to.be.revertedWith("GaugeAlreadyUnpaused");
+      });
     });
 
 });
