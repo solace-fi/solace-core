@@ -41,10 +41,7 @@ interface IUnderwritingLocker is IERC721Enhanced {
     CUSTOM ERRORS
     ***************************************/
 
-    /**
-     * @notice Thrown when array arguments are mismatched in length (and need to have the same length);
-     * @dev Should we use array of custom structs as the parameter type, instead of multiple array parameters for functions requiring this input validation?
-     */
+    /// @notice Thrown when array arguments are mismatched in length (and need to have the same length);
     error ArrayArgumentsLengthMismatch();
 
     /// @notice Thrown when zero address is given as an argument.
@@ -69,13 +66,8 @@ interface IUnderwritingLocker is IERC721Enhanced {
     /// @notice Thrown when extendLock is attempted to shorten the lock duration.
     error LockTimeNotExtended();
 
-    /**
-     * @notice Thrown when a withdraw is attempted for an `amount` that exceeds the lock balance.
-     * @param lockID The ID of the lock
-     * @param lockAmount Balance of the lock
-     * @param attemptedWithdrawAmount Attempted withdraw amount
-     */
-    error ExcessWithdraw(uint256 lockID, uint256 lockAmount, uint256 attemptedWithdrawAmount);
+    /// @notice Thrown when a withdraw is attempted for an `amount` that exceeds the lock balance.
+    error ExcessWithdraw();
 
     /// @notice Thrown when funding rate is set above 100%
     error FundingRateAboveOne();
@@ -130,11 +122,10 @@ interface IUnderwritingLocker is IERC721Enhanced {
     /// @notice Registry address
     function registry() external view returns (address);
 
-    /// @notice UnderwriterLockVoting.sol address
+    /// @notice UnderwriterLockVoting.sol address.
     function votingContract() external view returns (address);
 
     /// @notice The total number of locks that have been created.
-    /// @dev Difference with totalSupply is that totalNumLocks does not decrement when locks are burned.
     function totalNumLocks() external view returns (uint256);
 
     /// @notice Funding rate - amount that will be charged and burned from a regular withdraw.
@@ -157,7 +148,7 @@ interface IUnderwritingLocker is IERC721Enhanced {
     /**
      * @notice Get `amount` and `end` values for a lockID.
      * @param lockID_ The ID of the lock to query.
-     * @return lock_ Lock {uint256 amount, uint256 end}
+     * @return lock_ Lock {uint256 amount, uint256 end}.
      */
     function locks(uint256 lockID_) external view returns (Lock memory lock_);
 
@@ -220,14 +211,14 @@ interface IUnderwritingLocker is IERC721Enhanced {
     function getBurnOnWithdrawInPartAmount(uint256 lockID_, uint256 amount_) external view returns (uint256 burnAmount);
 
     /**
-     * @notice Gets multiplier (applied for voting boost, and for early withdrawals)
+     * @notice Gets multiplier (applied for voting boost, and for early withdrawals).
      * @param lockID_ The ID of the lock to query.
-     * @return multiplier 1e18 => 1x multiplier, 2e18 => 2x multiplier
+     * @return multiplier 1e18 => 1x multiplier, 2e18 => 2x multiplier.
      */
     function getLockMultiplier(uint256 lockID_) external view returns (uint256 multiplier);
 
     /**
-     * @notice Gets all active lockIDs for a user
+     * @notice Gets all active lockIDs for a user.
      * @param user_ The address of user to query.
      * @return lockIDs Array of active lockIDs.
      */
@@ -250,7 +241,7 @@ interface IUnderwritingLocker is IERC721Enhanced {
     /**
      * @notice Deposit token to create a new lock.
      * @dev Token is transferred from msg.sender using ERC20Permit.
-     * @dev recipient = msg.sender
+     * @dev recipient = msg.sender.
      * @param amount_ The amount of token to deposit.
      * @param end_ The timestamp the lock will unlock.
      * @param deadline_ Time the transaction must go through before.
@@ -394,7 +385,6 @@ interface IUnderwritingLocker is IERC721Enhanced {
 
     /**
      * @notice Sets votingContract and enable safeTransferFrom call by `underwritingLockVoting` address stored in Registry.
-     * @dev Hacky fix to the issue that [`UnderwritingLockVoting`](./UnderwritingLockVoting) needs token transfer approval, but will be deployed after this contract.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      */
     function setVotingContract() external;

@@ -7,13 +7,11 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
-import "./../utils/ERC721Enhanced.sol";
-import "./../utils/Governable.sol";
 import "./../interfaces/utils/IRegistry.sol";
 import "./../interfaces/native/IUnderwritingLockListener.sol";
 import "./../interfaces/native/IUnderwritingLocker.sol";
-import "hardhat/console.sol";
-
+import "./../utils/ERC721Enhanced.sol";
+import "./../utils/Governable.sol";
 /**
  * @title UnderwritingLocker
  * @author solace.fi
@@ -35,6 +33,8 @@ import "hardhat/console.sol";
  * Early withdrawls will incur an additional burn, which will increase with longer remaining lock duration.
  *
  * Any time a lock is minted, burned or otherwise modified it will notify the listener contracts.
+ * The exception to the above statement is on chargePremium() call, we do not emit an event because we do 
+ * not want to pay for event emission fees (~2K per event) in an unbounded loop within UnderwritingLockVoting.chargePremiums().
  */
 // solhint-disable-next-line contract-name-camelcase
 contract UnderwritingLocker is 
@@ -81,7 +81,8 @@ contract UnderwritingLocker is
     ***************************************/
 
     uint256 internal constant MONTH = 365 days / 12;
-    uint256 internal constant SQRT_SIX = 2449489742; // Precompute to save 35K gas from computing this in _sqrt()
+
+    uint256 internal constant SQRT_SIX = 2449489742;
 
     // lockId => Lock {uint256 amount, uint256 end}
     mapping(uint256 => Lock) internal _locks;
@@ -111,11 +112,11 @@ contract UnderwritingLocker is
     ***************************************/
 
     /**
-     * @notice Computes amount of token that will be burned on withdraw.
+     * @notice For a requested withdraw amount, computes amount burned on withdraw as well as realised withdraw amount.
      * @param amount_ The amount to withdraw.
      * @param end_ The end timestamp of the lock.
      * @return withdrawAmount Token amount that will be withdrawn.
-     * @return burnAmount Token amount that will be burned on wihtdraw.
+     * @return burnAmount Token amount that will be burned on withdraw.
      */
     function _getWithdrawAndBurnAmount(uint256 amount_, uint256 end_) internal view returns (uint256 withdrawAmount, uint256 burnAmount) {
         // solhint-disable-next-line not-rely-on-time
@@ -132,7 +133,7 @@ contract UnderwritingLocker is
     }
 
     /**
-     * @notice Gets multiplier (applied for voting boost, and for early withdrawals)
+     * @notice Gets lock multiplier (applied for voting boost, and for early withdrawals)
      * @param end_ End timestamp of lock.
      * @return multiplier 1e18 => 1x multiplier, 2e18 => 2x multiplier
      */
@@ -149,9 +150,9 @@ contract UnderwritingLocker is
     // https://ethereum.stackexchange.com/questions/2910/can-i-square-root-in-solidity
     // Initially attempted Uniswap implementation - https://github.com/Uniswap/v2-core/blob/master/contracts/libraries/Math.sol
     // However Uniswap implementation very gas inefficient - require ~30000 gas to calculate typical result
-    // vs this implementation which take 700 gas to calculate same
-    // Burden of more difficult code well worth 40x gas efficiency, especially given _sqrt() runs in an unbounded loop
-    // in GaugeController.updateGaugeWeights().
+    // vs this implementation which takes 700 gas to calculate same
+    // Burden of more difficult code well worth 40x gas efficiency, especially given that _sqrt() runs in an 
+    // unbounded loop in GaugeController.updateGaugeWeights().
     function _sqrt(uint256 x) internal pure returns (uint256 result) {
         if (x == 0) {
             return 0;
@@ -323,9 +324,9 @@ contract UnderwritingLocker is
     }
 
     /**
-     * @notice Gets multiplier (applied for voting boost, and for early withdrawals)
+     * @notice Gets multiplier (applied for voting boost, and for early withdrawals).
      * @param lockID_ The ID of the lock to query.
-     * @return multiplier 1e18 => 1x multiplier, 2e18 => 2x multiplier
+     * @return multiplier 1e18 => 1x multiplier, 2e18 => 2x multiplier.
      */
     function getLockMultiplier(uint256 lockID_) external view override tokenMustExist(lockID_) returns (uint256 multiplier) {
         return _getLockMultiplier(_locks[lockID_].end);
@@ -346,7 +347,6 @@ contract UnderwritingLocker is
 
     /**
      * @notice Creates a new lock.
-     * @dev There is no input validation that amount_ must > 0, but a lock is burned on complete withdraw lol. Trivial bug.
      * @param recipient_ The user that the lock will be minted to.
      * @param amount_ The amount of token in the lock.
      * @param end_ The end of the lock.
@@ -522,7 +522,7 @@ contract UnderwritingLocker is
     /**
      * @notice Deposit token to create a new lock.
      * @dev Token is transferred from msg.sender using ERC20Permit.
-     * @dev recipient = msg.sender
+     * @dev recipient = msg.sender.
      * @param amount_ The amount of token to deposit.
      * @param end_ The timestamp the lock will unlock.
      * @param deadline_ Time the transaction must go through before.
@@ -640,7 +640,7 @@ contract UnderwritingLocker is
      * @param recipient_ The user to receive the lock's token.
      */
     function withdrawInPart(uint256 lockID_, uint256 amount_, address recipient_) external override nonReentrant {
-        if (amount_ > _locks[lockID_].amount) revert ExcessWithdraw(lockID_, _locks[lockID_].amount, amount_);
+        if (amount_ > _locks[lockID_].amount) revert ExcessWithdraw();
         (uint256 withdrawAmount, uint256 burnAmount) = _withdraw(lockID_, amount_);
         // transfer token
         SafeERC20.safeTransfer(IERC20(token), address(0x1), burnAmount);
@@ -688,7 +688,7 @@ contract UnderwritingLocker is
             uint256 lockID = lockIDs_[i];
             if (!_isApprovedOrOwner(msg.sender, lockID)) revert NotOwnerNorApproved();
             uint256 singleLockAmount = amounts_[i];
-            if (singleLockAmount > _locks[lockID].amount) revert ExcessWithdraw(lockID, _locks[lockID].amount, singleLockAmount);
+            if (singleLockAmount > _locks[lockID].amount) revert ExcessWithdraw();
             (uint256 withdrawAmount, uint256 burnAmount) = _withdraw(lockID, singleLockAmount);
             totalBurnAmount += burnAmount;
             totalWithdrawAmount += withdrawAmount;
@@ -705,19 +705,15 @@ contract UnderwritingLocker is
     /**
      * @notice Perform accounting for voting premiums to be charged by UnderwritingLockVoting.chargePremiums().
      * @dev Can only be called by votingContract set in the registry.
-     * @dev Not meant to be called directly, and within UnderwritingLockVoting.chargePremiums().
-     * @dev Costs 5K gas per call to add notification functionality. This will quickly add-up in an unbounded loop.
+     * @dev Not meant to be called directly, but via UnderwritingLockVoting.chargePremiums().
+     * @dev Costs 5K gas per call to add notification functionality. This will quickly add-up in an unbounded loop so we omit it.
      * @param lockID_ The ID of the lock to charge.
      * @param premium_ The amount of token charged as premium.
      */
     function chargePremium(uint256 lockID_, uint256 premium_) external override nonReentrant {
         if (msg.sender != votingContract) revert NotVotingContract();
         if (!_exists(lockID_)) {return;}
-        // Lock memory oldLock = _locks[lockID_];
-        // Lock memory newLock = Lock(oldLock.amount - premium_, oldLock.end); // Relying on Solidity ^8.0 native underflow check.
         _locks[lockID_].amount -= premium_;
-        // address owner = ownerOf(lockID_);
-        // _notify(lockID_, owner, owner, oldLock, newLock);
     }
 
     /***************************************
@@ -765,7 +761,7 @@ contract UnderwritingLocker is
 
     /**
      * @notice Sets votingContract and enable safeTransferFrom call by `underwritingLockVoting` address stored in Registry.
-     * @dev Hacky fix to the issue that [`UnderwritingLockVoting`](./UnderwritingLockVoting) needs token transfer approval, but will be deployed after this contract.
+     * @dev Requirement for UnderwritingLockVoting.chargePremiums().
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      */
     function setVotingContract() external override onlyGovernance {

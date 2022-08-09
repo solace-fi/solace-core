@@ -28,9 +28,10 @@ const DEPOSIT_AMOUNT = ONE_ETHER;
 const SCALE_FACTOR = ONE_ETHER;
 const ONE_PERCENT = ONE_ETHER.div(100);
 const ONE_HUNDRED_PERCENT = ONE_ETHER;
+const CUSTOM_GAS_LIMIT = 6000000;
 
 describe("GaugeController", function () {
-    const [deployer, governor, revenueRouter, voter1, delegate1, delegate2, anon] = provider.getWallets();
+    const [deployer, governor, revenueRouter, voter1, anon] = provider.getWallets();
   
     /***************************
        VARIABLE DECLARATIONS
@@ -75,7 +76,6 @@ describe("GaugeController", function () {
           expect(await gaugeController.leverageFactor()).eq(ONE_HUNDRED_PERCENT);
           expect(await gaugeController.totalGauges()).eq(0);
           expect(await gaugeController.lastTimeGaugeWeightsUpdated()).eq(0);
-          expect(await gaugeController.WEEK()).eq(ONE_WEEK);
           expect(await gaugeController.getGaugeWeight(0)).eq(ZERO);
           expect(await gaugeController.getAllGaugeWeights()).deep.eq([ZERO]);
           expect(await gaugeController.getNumActiveGauges()).eq(0);
@@ -262,4 +262,94 @@ describe("GaugeController", function () {
       });
     });
 
+    describe("setRateOnLine", () => {
+      it("non governor cannot setRateOnLine", async  () => {
+        await expect(gaugeController.connect(voter1).setRateOnLine([1], [1])).to.be.revertedWith("!governance");
+      });
+      it("cannot setRateOnLine of non-existent gauge", async  () => {
+        await expect(gaugeController.connect(voter1).setRateOnLine([2], [1])).to.be.revertedWith("!governance");
+      });
+      it("can set setRateOnLine", async () => {
+        let tx = await gaugeController.connect(governor).setRateOnLine([1], [1]);
+        await expect(tx).to.emit(gaugeController, "RateOnLineSet").withArgs(1, 1);
+        expect(await gaugeController.getRateOnLineOfGauge(1)).eq(1)
+        await gaugeController.connect(governor).setRateOnLine([1], [ONE_PERCENT]);
+      });
+    });
+
+    describe("vote", () => {
+      it("cannot be vote for gaugeID 0", async  () => {
+        await expect(gaugeController.connect(voter1).vote(voter1.address, 0, 1)).to.be.revertedWith("CannotVoteForGaugeID0");
+      });
+      it("cannot be called before gauge weight updated", async  () => {
+        await expect(gaugeController.connect(voter1).vote(voter1.address, 1, 1)).to.be.revertedWith("GaugeWeightsNotYetUpdated");
+      });
+    });
+
+    /*********************
+      INTENTION STATEMENT 
+    *********************/
+    // voter1 will vote for gaugeID 1 with 100% of vote power
+
+    describe("simple vote() scenario", () => {
+      before(async function () {
+        const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
+
+        await registry.connect(governor).set(["uwe"], [token.address]);
+        underwritingLocker = (await deployContract(deployer, artifacts.UnderwritingLocker, [governor.address, registry.address])) as UnderwritingLocker;
+        await registry.connect(governor).set(["revenueRouter"], [revenueRouter.address]);
+        await registry.connect(governor).set(["underwritingLocker"], [underwritingLocker.address]);
+        await registry.connect(governor).set(["gaugeController"], [gaugeController.address]);
+        voting = (await deployContract(deployer, artifacts.UnderwritingLockVoting, [governor.address, registry.address])) as UnderwritingLockVoting;
+        await gaugeController.connect(governor).addTokenholder(underwritingLocker.address)
+        await gaugeController.connect(governor).addVotingContract(voting.address)
+        await registry.connect(governor).set(["underwritingLockVoting"], [voting.address]);
+        await underwritingLocker.connect(governor).setVotingContract()
+        await gaugeController.connect(governor).updateGaugeWeights();
+        await voting.connect(governor).chargePremiums();
+        await token.connect(deployer).transfer(voter1.address, ONE_ETHER.mul(1000))
+        await token.connect(voter1).approve(underwritingLocker.address, constants.MaxUint256)
+        await underwritingLocker.connect(voter1).createLock(voter1.address, DEPOSIT_AMOUNT, CURRENT_TIME + 4 * ONE_YEAR)
+        await voting.connect(voter1).vote(voter1.address, 1, 10000)
+      });
+      it("cannot vote for non existent gauge ID", async  () => {
+        await expect(gaugeController.connect(voter1).vote(voter1.address, 2, 1)).to.be.revertedWith("GaugeIDNotExist");
+      });
+      it("will throw if not called by voting contract", async  () => {
+        await expect(gaugeController.connect(voter1).vote(voter1.address, 1, 1)).to.be.revertedWith("NotVotingContract");
+      });
+      it("sanity check of view functions before votes processed", async  () => {
+        expect(await gaugeController.lastTimeGaugeWeightsUpdated()).eq(await gaugeController.getEpochStartTimestamp())
+        expect(await gaugeController.getGaugeWeight(1)).eq(0)
+        expect(await gaugeController.getAllGaugeWeights()).deep.eq([ZERO, ZERO])
+        expect(await gaugeController.getVotePowerSum()).eq(0)
+        const votes = await gaugeController.getVotes(voting.address, voter1.address)
+        expect(votes.length).eq(1)
+        expect(votes[0].gaugeID).eq(1)
+        expect(votes[0].votePowerBPS).eq(10000)
+        expect(await gaugeController.getVoters(voting.address)).deep.eq([voter1.address])
+        expect(await gaugeController.getVoteCount(voting.address, voter1.address)).eq(1)
+        expect(await gaugeController.getVotersCount(voting.address)).eq(1)
+      });
+      it("can updateGaugeWeight in next epoch", async  () => {
+        const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
+        await provider.send("evm_mine", [CURRENT_TIME + ONE_WEEK]);
+        const tx = await gaugeController.connect(governor).updateGaugeWeights({gasLimit: CUSTOM_GAS_LIMIT})
+        const EPOCH_START_TIME = await gaugeController.getEpochStartTimestamp()
+        await expect(tx).to.emit(gaugeController, "GaugeWeightsUpdated").withArgs(EPOCH_START_TIME);
+      });
+      it("sanity check of view functions after votes processed", async  () => {
+        expect(await gaugeController.lastTimeGaugeWeightsUpdated()).eq(await gaugeController.getEpochStartTimestamp())
+        expect(await gaugeController.getGaugeWeight(1)).eq(ONE_HUNDRED_PERCENT)
+        expect(await gaugeController.getAllGaugeWeights()).deep.eq([ZERO, ONE_HUNDRED_PERCENT])
+        expect(await gaugeController.getVotePowerSum()).eq(await voting.getVotePower(voter1.address))
+        const votes = await gaugeController.getVotes(voting.address, voter1.address)
+        expect(votes.length).eq(1)
+        expect(votes[0].gaugeID).eq(1)
+        expect(votes[0].votePowerBPS).eq(10000)
+        expect(await gaugeController.getVoters(voting.address)).deep.eq([voter1.address])
+        expect(await gaugeController.getVoteCount(voting.address, voter1.address)).eq(1)
+        expect(await gaugeController.getVotersCount(voting.address)).eq(1)
+      });
+    });
 });

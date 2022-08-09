@@ -6,15 +6,15 @@ import "./GaugeStructs.sol";
 /**
  * @title GaugeController
  * @author solace.fi
- * @notice Maintains list (historical and current) Solace Native insurance gauges and corresponding weights. Also stores individual votes.
- * 
+ * @notice Stores individual votes for Solace Native gauges, and maintains current gauge weights.
+ *
  * Current gauge weights can be obtained through [`getGaugeWeight()`](#getgaugeweight) and [`getAllGaugeWeights()`](#getallgaugeweights)
  *
  * Only governance can make mutator calls to GaugeController.sol. There are no unpermissioned external mutator calls in this contract.
  * 
- * After every epoch, governance must call [`updateGaugeWeights()`](#updategaugeweights). This will process the last epoch's votes (stored in this contract), and will pass information required for premium charges to the VotingContract via IGaugeVoter.setLastProcessedVotePower()
+ * After every epoch, governance must call [`updateGaugeWeights()`](#updategaugeweights). This will process the last epoch's votes (stored in this contract).
  * 
- * Individual voters register and manage their vote through Voting contracts.
+ * Individual voters register and manage their vote through voting contracts that conform to IGaugeVoting.
  *
  * Governance can [`addGauge()`](#addgauge) or [`pauseGauge()`](#pausegauge).
  */
@@ -28,7 +28,7 @@ interface IGaugeController {
     /// @param contractName Name of contract for which zero address was incorrectly provided.
     error ZeroAddressInput(string contractName);
     
-    /// @notice Thrown when array arguments are mismatched in length (and need to have the same length);
+    /// @notice Thrown when array arguments are mismatched in length;
     error ArrayArgumentsLengthMismatch();
 
     /// @notice Thrown if pauseGauge() is attempted on a gauge that is already paused.
@@ -51,7 +51,7 @@ interface IGaugeController {
     /// @notice Thrown when vote attempted before gauge weights have been successfully updated for this epoch.
     error GaugeWeightsNotYetUpdated();
 
-    /// @notice Thrown when vote() is called by an address not listed as a voting contract;
+    /// @notice Thrown when vote() is called by an address not added as a voting contract.
     error NotVotingContract();
 
     /// @notice Thrown when removeVotingContract attempted for address that has not previously been added as a voting contract.
@@ -64,7 +64,6 @@ interface IGaugeController {
     error GaugeIDPaused();
 
     /// @notice Thrown when getInsurancePremium() is called and there are no tokenholders added.
-    /// @dev Intended to assist debugging in chargePremiums() function - cannot proceed if no tokenholders added to GaugeController. 
     error NoTokenholdersAdded();
 
     /// @notice Thrown when removeTokenholder() is attempted for an address not in the tokenholder set.
@@ -89,7 +88,7 @@ interface IGaugeController {
     /// @notice Emitted when a gauge is unpaused.
     event GaugeUnpaused(uint256 indexed gaugeID, string gaugeName);
 
-    /// @notice Emitted when leverage factor set;
+    /// @notice Emitted when leverage factor set.
     event LeverageFactorSet(uint256 indexed leverageFactor);
 
     /// @notice Emitted when rate on line for a gauge is set.
@@ -114,38 +113,36 @@ interface IGaugeController {
     GLOBAL VARIABLES
     ***************************************/
 
-    /// @notice Underwriting equity token
+    /// @notice Underwriting equity token.
     function token() external view returns (address);
 
-    /// @notice Insurance leverage factor
+    /// @notice Insurance leverage factor.
     function leverageFactor() external view returns (uint256);
 
-    /// @notice The total number of gauges that have been created
+    /// @notice The total number of gauges that have been created.
     function totalGauges() external view returns (uint256);
 
-    /// @notice Timestamp of last epoch start (rounded to weeks) that gauge weights were successfully updated.
+    /// @notice End timestamp for last epoch that all stored votes were processed.
     function lastTimeGaugeWeightsUpdated() external view returns (uint256);
-
-    function WEEK() external view returns (uint256);
 
     /***************************************
     EXTERNAL VIEW FUNCTIONS
     ***************************************/
 
     /**
-     * @notice Get timestamp for the start of the current epoch
+     * @notice Get timestamp for the start of the current epoch.
      * @return timestamp
      */
     function getEpochStartTimestamp() external view returns (uint256 timestamp);
 
     /**
-     * @notice Get timestamp for end of the current epoch
+     * @notice Get timestamp for end of the current epoch.
      * @return timestamp
      */
     function getEpochEndTimestamp() external view returns (uint256 timestamp);
 
     /**
-     * @notice Get current gauge weight of single gauge ID
+     * @notice Get current gauge weight of single gauge ID.
      * @dev Gauge weights must sum to 1e18, so a weight of 1e17 == 10% weight
      * @param gaugeID_ The ID of the gauge to query.
      * @return weight
@@ -155,25 +152,25 @@ interface IGaugeController {
     /**
      * @notice Get all gauge weights.
      * @dev Gauge weights must sum to 1e18, so a weight of 1e17 == 10% weight.
-     * @return weights
      * @dev weights[0] will always be 0, so that weights[1] maps to the weight of gaugeID 1.
+     * @return weights
      */
     function getAllGaugeWeights() external view returns (uint256[] memory weights);
 
     /**
-     * @notice Get number of active gauges
+     * @notice Get number of active gauges.
      * @return numActiveGauges
      */
     function getNumActiveGauges() external view returns (uint256 numActiveGauges);
 
     /**
-     * @notice Get number of paused gauges
+     * @notice Get number of paused gauges.
      * @return numPausedGauges
      */
     function getNumPausedGauges() external view returns (uint256 numPausedGauges);
     
     /**
-     * @notice Get gauge name
+     * @notice Get gauge name.
      * @param gaugeID_ The ID of the gauge to query.
      * @return gaugeName
      */
@@ -195,13 +192,13 @@ interface IGaugeController {
 
     /**
      * @notice Obtain insurance capacity in $UWE terms.
-     * @dev Leverage * UWE capacity
+     * @dev Leverage * UWE capacity.
      * @return insuranceCapacity Insurance capacity in $UWE.
      */
     function getInsuranceCapacity() external view returns (uint256 insuranceCapacity);
 
     /**
-     * @notice Get vote power sum for all gauges
+     * @notice Get vote power sum across all gauges.
      * @return votePowerSum
      */
     function getVotePowerSum() external view returns (uint256 votePowerSum);
@@ -255,21 +252,21 @@ interface IGaugeController {
     ***************************************/
 
     /**
-     * @notice Adds a voting contract
+     * @notice Adds a voting contract.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param votingContract_ The votingContract to add.
      */
     function addVotingContract(address votingContract_) external;
 
     /**
-     * @notice Removes a voting contract
+     * @notice Removes a voting contract.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param votingContract_ The votingContract to add.
      */
     function removeVotingContract(address votingContract_) external;
 
     /**
-     * @notice Adds an insurance gauge
+     * @notice Adds an insurance gauge.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param gaugeName_ Gauge name
      * @param rateOnLine_ Annual rate on line (1e18 => 100%).
@@ -277,17 +274,17 @@ interface IGaugeController {
     function addGauge(string calldata gaugeName_, uint256 rateOnLine_) external;
 
     /**
-     * @notice Pauses an insurance gauge
-     * @dev We do not include a removeGauge function as this would involve re-organising the entire historical data of gauge votes, and can easily lead to confusion if gaugeID 2 in the past is not the same as gaugeID 2 currently.
+     * @notice Pauses an insurance gauge.
+     * @notice Paused gauges cannot have votes added or modified, and votes for a paused gauge will not be counted
+     * in the next updateGaugeWeights() call.
+     * @dev We do not include a removeGauge function as this would distort the order of the _gauges array
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * If a gaugeID is paused, it means that vote data for that gauge will no longer be collected on future [`updateGaugeWeights()`](#updategaugeweights) calls.
-     * It does not mean that users can no longer vote for their gauge, it just means that their vote for that gauge will no longer count for gauge weights (however they will still be charged for that vote. It is the responsibility of the voter to ensure they are voting for a valid gauge).
      * @param gaugeID_ ID of gauge to pause
      */
     function pauseGauge(uint256 gaugeID_) external;
 
     /**
-     * @notice Unpauses an insurance gauge
+     * @notice Unpauses an insurance gauge.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param gaugeID_ ID of gauge to pause
      */
@@ -295,7 +292,7 @@ interface IGaugeController {
 
     /**
      * @notice Set insurance leverage factor.
-     * @dev 1e18 => 100%
+     * @dev 1e18 => 100%.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param leverageFactor_ Desired leverage factor.
      */
@@ -308,21 +305,22 @@ interface IGaugeController {
      */
     function setToken(address token_) external;
 
-    /**
-     * @notice Adds an address to set of tokenholders, whose token balances will be queried and summed to determine insurance capacity.
+   /**
+     * @notice Adds address to tokenholders set - these addresses will be queried for $UWE token balance and summed to determine the Solace Native insurance capacity.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param tokenholder_ Address of new tokenholder.
+     * @param tokenholder_ Address of new tokenholder
      */
     function addTokenholder(address tokenholder_) external;
 
     /**
-     * @notice Removes an address to set of tokenholders, whose token balances will be queried and summed to determine insurance capacity.
+     * @notice Removes an address from the tokenholder set - these addresses will be queried for $UWE token balance and summed to determine the Solace Native insurance capacity.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param tokenholder_ Address of new tokenholder.
      */
     function removeTokenholder(address tokenholder_) external;
+    
     /**
-     * @notice Set rate on line for selected gaugeIDs
+     * @notice Set annual rate-on-line for selected gaugeIDs
      * @dev 1e18 => 100%
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param gaugeIDs_ Array of gaugeIDs.
@@ -332,7 +330,7 @@ interface IGaugeController {
 
     /**
      * @notice Updates gauge weights by processing votes for the last epoch.
-     * @dev Can only be called once per epoch.
+     * @dev Designed to be called in a while-loop with custom gas limit of 6M until `lastTimePremiumsCharged == epochStartTimestamp`.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      */
     function updateGaugeWeights() external;

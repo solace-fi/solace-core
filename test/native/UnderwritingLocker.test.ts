@@ -976,14 +976,13 @@ describe("UnderwritingLocker", function () {
 
   describe("withdrawInPart", function () {
     it("cannot withdraw non existant token", async function () {
-      const NON_EXISTENT_LOCK_ID = 999;
       // Error does not indicate non-existant tokenID, however it will revert regardless
-      await expect(underwritingLocker.connect(user1).withdrawInPart(999, WITHDRAW_AMOUNT, user1.address)).to.be.revertedWith(`ExcessWithdraw(${NON_EXISTENT_LOCK_ID}, 0, ${WITHDRAW_AMOUNT.toString()})`)
+      await expect(underwritingLocker.connect(user1).withdrawInPart(999, WITHDRAW_AMOUNT, user1.address)).to.be.revertedWith(`ExcessWithdraw`)
     });
     it("cannot withdraw more than lock amount", async function () {
       const LOCK_ID = 1;
       const LOCK_AMOUNT = (await underwritingLocker.locks(1)).amount
-      await expect(underwritingLocker.connect(user1).withdrawInPart(LOCK_ID, LOCK_AMOUNT.mul(2), user1.address)).to.be.revertedWith(`ExcessWithdraw(${LOCK_ID}, ${LOCK_AMOUNT.toString()}, ${LOCK_AMOUNT.mul(2).toString()})`)  
+      await expect(underwritingLocker.connect(user1).withdrawInPart(LOCK_ID, LOCK_AMOUNT.mul(2), user1.address)).to.be.revertedWith(`ExcessWithdraw`)  
     });
     it("non owner or approved cannot withdraw", async function () {
       const LOCK_ID = 1;
@@ -1201,7 +1200,7 @@ describe("UnderwritingLocker", function () {
         [LOCK_ID_1, LOCK_ID_2], 
         [WITHDRAW_AMOUNT, LOCK_AMOUNT_2.mul(2)],
         user1.address
-      )).to.be.revertedWith(`ExcessWithdraw(${LOCK_ID_2}, ${LOCK_AMOUNT_2.toString()}, ${LOCK_AMOUNT_2.mul(2).toString()})`);
+      )).to.be.revertedWith(`ExcessWithdraw()`);
     });
     it("non owner or approved cannot withdraw", async function () {
       const LOCK_ID_1 = 1;

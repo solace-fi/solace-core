@@ -92,9 +92,6 @@ describe("UnderwritingLockVoting", function () {
           expect(await voting.registry()).eq(registry.address);
           expect(await voting.lastTimePremiumsCharged()).eq(0);
           expect(await voting.isVotingOpen()).eq(false);
-          expect(await voting.WEEK()).eq(ONE_WEEK);
-          expect(await voting.MONTH()).eq(ONE_MONTH);
-          expect(await voting.YEAR()).eq(ONE_YEAR);
         });
         it("getEpochStartTimestamp gets current timestamp rounded down to a multiple of WEEK ", async function () {
           const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
@@ -184,7 +181,7 @@ describe("UnderwritingLockVoting", function () {
         });
     });
 
-    describe("setLockDelegate", () => {
+    describe("setDelegate", () => {
         // Create two locks for voter1: lockID 1 => 1yr, lockID 2 => 2yr
         // and two locks for voter 2: lockID 3 => 3yr, lockID 4 => 4yr
         before(async function () {
@@ -197,13 +194,13 @@ describe("UnderwritingLockVoting", function () {
             await underwritingLocker.connect(voter1).createLock(voter1.address, DEPOSIT_AMOUNT, CURRENT_TIME + 2 * ONE_YEAR);
             await underwritingLocker.connect(voter2).createLock(voter2.address, DEPOSIT_AMOUNT, CURRENT_TIME + 3 * ONE_YEAR);
             await underwritingLocker.connect(voter2).createLock(voter2.address, DEPOSIT_AMOUNT, CURRENT_TIME + 4 * ONE_YEAR);
-            expect(await voting.lockDelegateOf(voter1.address)).eq(ZERO_ADDRESS)
+            expect(await voting.delegateOf(voter1.address)).eq(ZERO_ADDRESS)
         });
         it("owner can set delegate", async function () {
-            const tx = await voting.connect(voter1).setLockDelegate(delegate1.address);
-            await expect(tx).to.emit(voting, "LockDelegateSet").withArgs(voter1.address, delegate1.address);
-            expect(await voting.lockDelegateOf(voter1.address)).eq(delegate1.address)
-            expect(await voting.lockDelegateOf(voter2.address)).eq(ZERO_ADDRESS)
+            const tx = await voting.connect(voter1).setDelegate(delegate1.address);
+            await expect(tx).to.emit(voting, "DelegateSet").withArgs(voter1.address, delegate1.address);
+            expect(await voting.delegateOf(voter1.address)).eq(delegate1.address)
+            expect(await voting.delegateOf(voter2.address)).eq(ZERO_ADDRESS)
         })
     });
 
@@ -367,7 +364,7 @@ describe("UnderwritingLockVoting", function () {
       });
       it("delegate can change vote", async function () {
         const GAUGE_ID = 1;
-        expect(await voting.lockDelegateOf(voter1.address)).eq(delegate1.address)
+        expect(await voting.delegateOf(voter1.address)).eq(delegate1.address)
         const tx = await voting.connect(delegate1).vote(voter1.address, GAUGE_ID, 10000)
         await expect(tx).to.emit(voting, "VoteChanged").withArgs(voter1.address, GAUGE_ID, 10000, 10000);
       });
@@ -1246,7 +1243,6 @@ describe("UnderwritingLockVoting", function () {
         expect (await voting.isVotingOpen()).eq(false)
         await expect(voting.connect(voter1).vote(voter1.address, 1, 1)).to.be.revertedWith("LastEpochPremiumsNotCharged")
         
-        const EXPECTED_TOTAL_RECORDED_VOTE_POWER = LAST_RECORDED_VOTE_POWER_N.mul(40)
         // SAVED_RANDOM_VOTER here has 10 locks - has 10x the unit votePower
         // So we should have 200 1-lock users + 20 10-lock users => 400 unit votePower
         // So we have 400/10 = 40 of SAVED_RANDOM_VOTER votePower
@@ -1272,9 +1268,12 @@ describe("UnderwritingLockVoting", function () {
         expectClose(await gaugeController.getGaugeWeight(9), OG_GAUGE_WEIGHT, 2e14);
         expectClose(await gaugeController.getGaugeWeight(10), OG_GAUGE_WEIGHT, 2e14);
 
-        // for (let i = 11; i < 101; i++) {
+        console.log("OG_GAUGE_WEIGHT: ", OG_GAUGE_WEIGHT.toString())
+
+        for (let i = 11; i < 101; i++) {
+          console.log((await gaugeController.getGaugeWeight(i)).toString())
           // expectClose(await gaugeController.getGaugeWeight(i), (ONE_HUNDRED_PERCENT.sub(OG_GAUGE_WEIGHT.mul(10))).div(90), 2e14);
-        // }
+        }
       })
       it("chargePremium() charges premiums as expected", async function () {
         const OLD_VOTER_LOCKED_AMOUNT = await getTotalLockedAmount(SAVED_RANDOM_VOTER.address)

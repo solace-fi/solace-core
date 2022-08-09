@@ -11,21 +11,18 @@ import "./../interfaces/native/IGaugeVoter.sol";
 import "./../interfaces/native/IGaugeController.sol";
 import "hardhat/console.sol";
 
-// TODO
-// @dev how to require interface when adding voting contract?
-
 /**
  * @title GaugeController
  * @author solace.fi
- * @notice Maintains list (historical and current) Solace Native insurance gauges and corresponding weights. Also stores individual votes.
- * 
+ * @notice Stores individual votes for Solace Native gauges, and maintains current gauge weights.
+ *
  * Current gauge weights can be obtained through [`getGaugeWeight()`](#getgaugeweight) and [`getAllGaugeWeights()`](#getallgaugeweights)
  *
  * Only governance can make mutator calls to GaugeController.sol. There are no unpermissioned external mutator calls in this contract.
  * 
- * After every epoch, governance must call [`updateGaugeWeights()`](#updategaugeweights). This will process the last epoch's votes (stored in this contract), and will pass information required for premium charges to the VotingContract via IGaugeVoter.setLastProcessedVotePower()
+ * After every epoch, governance must call [`updateGaugeWeights()`](#updategaugeweights). This will process the last epoch's votes (stored in this contract).
  * 
- * Individual voters register and manage their vote through Voting contracts.
+ * Individual voters register and manage their vote through voting contracts that conform to IGaugeVoting.
  *
  * Governance can [`addGauge()`](#addgauge) or [`pauseGauge()`](#pausegauge).
  */
@@ -45,26 +42,26 @@ contract GaugeController is
     /// @notice Underwriting equity token
     address public override token;
 
-    /// @notice Insurance leverage factor
+    /// @notice Insurance leverage factor.
     /// @dev 1e18 => 100%.
     uint256 public override leverageFactor;
 
-    /// @notice The total number of gauges that have been created
+    /// @notice The total number of gauges that have been created.
     uint256 public override totalGauges;
 
-    /// @notice Timestamp of last epoch start (rounded to weeks) that gauge weights were successfully updated.
+    /// @notice End timestamp for last epoch that all stored votes were processed.
     uint256 public override lastTimeGaugeWeightsUpdated;
-
-    uint256 constant public override WEEK = 604800;
 
     /***************************************
     GLOBAL INTERNAL VARIABLES
     ***************************************/
 
-    /// @notice The total number of paused gauges
+    uint256 constant internal WEEK = 604800;
+
+    /// @notice The total number of paused gauges.
     uint256 internal _pausedGaugesCount;
 
-    /// @notice gaugeID => total vote power from last updateGaugeWeights() call
+    /// @notice gaugeID => total vote power from last time the gauge weights were updated.
     mapping(uint256 => uint256) internal _votePowerOfGauge;
 
     /// @notice Array of Gauge {string name, bool active}
@@ -73,18 +70,19 @@ contract GaugeController is
     /// @notice Set of addresses from which getInsuranceCapacity() will tally UWE supply from.
     EnumerableSet.AddressSet internal _tokenholders;
 
-    /// @notice Set of voting contracts conforming to IGaugeVoting.sol interface. Sources of aggregated voting data.
+    /// @notice Set of voting contracts conforming to IGaugeVoting.sol interface that can call [`vote()`](#vote).
     EnumerableSet.AddressSet internal _votingContracts;
 
-    /// @notice Voting contract => voters
+    /// @notice votingContract => voters.
     mapping(address => EnumerableSet.AddressSet) internal _voters;
 
-    // votingContract => voter => gaugeID => votePowerBPS
+    /// @notice votingContract => voter => gaugeID => votePowerBPS
     mapping(address => mapping(address => EnumerableMap.UintToUintMap)) internal _votes;
 
-    /// @notice Dynamic array of dead voters discovered in updateGaugeWeights() call.
+    /// @notice Dynamic array of dead voters to remove.
     address[] internal _votersToRemove;
 
+    /// @notice State of last [`updateGaugeWeights()`](#updategaugeweights) call.
     GaugeStructs.UpdateInfo internal _updateInfo;
 
     /***************************************
@@ -92,7 +90,7 @@ contract GaugeController is
     ***************************************/
 
     /**
-     * @notice Construct the UnderwritingLocker contract.
+     * @notice Constructs the UnderwritingLocker contract.
      * @param governance_ The address of the [governor](/docs/protocol/governance).
      * @param token_ The address of the underwriting equity token.
      */
@@ -101,8 +99,9 @@ contract GaugeController is
     {
         if (token_ == address(0x0)) revert ZeroAddressInput("token");
         token = token_;
-        leverageFactor = 1e18; // Default 1x leverage factor
-        GaugeStructs.Gauge memory newGauge = GaugeStructs.Gauge(false, 0, ""); // Pre-fill slot 0 of _gauges, ensure gaugeID 1 maps to _gauges[1]
+        leverageFactor = 1e18; // Default 1x leverage.
+        // Pre-fill slot 0 of _gauges, ensure gaugeID 1 maps to _gauges[1]
+        GaugeStructs.Gauge memory newGauge = GaugeStructs.Gauge(false, 0, ""); 
         _gauges.push(GaugeStructs.Gauge(false, 0, "")); 
         _clearUpdateInfo();
     }
@@ -112,7 +111,7 @@ contract GaugeController is
     ***************************************/
 
     /**
-     * @notice Get timestamp for the start of the current epoch
+     * @notice Get timestamp for the start of the current epoch.
      * @return timestamp
      */
     function _getEpochStartTimestamp() internal view returns (uint256 timestamp) {
@@ -120,7 +119,7 @@ contract GaugeController is
     }
 
     /**
-     * @notice Get timestamp for end of the current epoch
+     * @notice Get timestamp for end of the current epoch.
      * @return timestamp
      */
     function _getEpochEndTimestamp() internal view returns (uint256 timestamp) {
@@ -128,7 +127,7 @@ contract GaugeController is
     }
 
     /**
-     * @notice Get vote power sum for all gauges
+     * @notice Get vote power sum across all gauges.
      * @return votePowerSum
      */
     function _getVotePowerSum() internal view returns (uint256 votePowerSum) {
@@ -140,8 +139,8 @@ contract GaugeController is
     }
 
     /**
-     * @notice Get current gauge weight of single gauge ID
-     * @dev Gauge weights must sum to 1e18, so a weight of 1e17 == 10% weight
+     * @notice Get current gauge weight for a single gauge ID.
+     * @dev Gauge weights must sum to 1e18, so a weight of 1e17 == 10% weight.
      * @param gaugeID_ The ID of the gauge to query.
      * @return weight
      */
@@ -155,8 +154,8 @@ contract GaugeController is
     /**
      * @notice Get all gauge weights.
      * @dev Gauge weights must sum to 1e18, so a weight of 1e17 == 10% weight.
-     * @return weights
      * @dev weights[0] will always be 0, so that weights[1] maps to the weight of gaugeID 1.
+     * @return weights
      */
     function _getAllGaugeWeights() internal view returns (uint256[] memory weights) {
         weights = new uint[](totalGauges + 1);
@@ -177,7 +176,7 @@ contract GaugeController is
     ***************************************/
 
     /**
-     * @notice Get timestamp for the start of the current epoch
+     * @notice Get timestamp for the start of the current epoch.
      * @return timestamp
      */
     function getEpochStartTimestamp() external view override returns (uint256 timestamp) {
@@ -185,7 +184,7 @@ contract GaugeController is
     }
 
     /**
-     * @notice Get timestamp for end of the current epoch
+     * @notice Get timestamp for end of the current epoch.
      * @return timestamp
      */
     function getEpochEndTimestamp() external view override returns (uint256 timestamp) {
@@ -193,8 +192,8 @@ contract GaugeController is
     }
 
     /**
-     * @notice Get current gauge weight of single gauge ID
-     * @dev Gauge weights must sum to 1e18, so a weight of 1e17 == 10% weight
+     * @notice Get current gauge weight of single gauge ID.
+     * @dev Gauge weights must sum to 1e18, so a weight of 1e17 == 10% weight.
      * @param gaugeID_ The ID of the gauge to query.
      * @return weight
      */
@@ -205,15 +204,15 @@ contract GaugeController is
     /**
      * @notice Get all gauge weights.
      * @dev Gauge weights must sum to 1e18, so a weight of 1e17 == 10% weight.
-     * @return weights
      * @dev weights[0] will always be 0, so that weights[1] maps to the weight of gaugeID 1.
+     * @return weights
      */
     function getAllGaugeWeights() external view override returns (uint256[] memory weights) {
         return _getAllGaugeWeights();
     }
 
     /**
-     * @notice Get number of active gauges
+     * @notice Get number of active gauges.
      * @return numActiveGauges
      */
     function getNumActiveGauges() external view override returns (uint256 numActiveGauges) {
@@ -221,7 +220,7 @@ contract GaugeController is
     }
 
     /**
-     * @notice Get number of paused gauges
+     * @notice Get number of paused gauges.
      * @return numPausedGauges
      */
     function getNumPausedGauges() external view override returns (uint256 numPausedGauges) {
@@ -229,7 +228,7 @@ contract GaugeController is
     }
 
     /**
-     * @notice Get gauge name
+     * @notice Get gauge name.
      * @param gaugeID_ The ID of the gauge to query.
      * @return gaugeName
      */
@@ -271,7 +270,7 @@ contract GaugeController is
     }
 
     /**
-     * @notice Get vote power sum for all gauges
+     * @notice Get vote power sum for all gauges.
      * @return votePowerSum
      */
     function getVotePowerSum() external view override returns (uint256 votePowerSum) {
@@ -282,7 +281,7 @@ contract GaugeController is
      * @notice Get all votes for a given voter and voting contract.
      * @param votingContract_ Address of voting contract  - must have been added via addVotingContract().
      * @param voter_ Address of voter.
-     * @return votes Array of Vote {gaugeID, votePowerBPS}.
+     * @return votes Array of Vote {gaugeID, votePowerBPS}
      */
     function getVotes(address votingContract_, address voter_) external view override returns (GaugeStructs.Vote[] memory votes) {
         if ( !_votingContracts.contains(votingContract_) || !_voters[votingContract_].contains(voter_) ) {
@@ -300,7 +299,7 @@ contract GaugeController is
     /**
      * @notice Get all voters for a given voting contract.
      * @param votingContract_ Address of voting contract  - must have been added via addVotingContract().
-     * @return voters Array of voters
+     * @return voters Array of voters.
      */
     function getVoters(address votingContract_) external view override returns (address[] memory voters) {
         if ( !_votingContracts.contains(votingContract_) ) {
@@ -429,8 +428,8 @@ contract GaugeController is
     /**
      * @notice Adds an insurance gauge
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param gaugeName_ Gauge name
-     * @param rateOnLine_ Annual rate on line (1e18 => 100%).
+     * @param gaugeName_ Gauge name.
+     * @param rateOnLine_ Annual rate on line (1e18 => 100%)
      */
     function addGauge(string calldata gaugeName_, uint256 rateOnLine_) external override onlyGovernance {
         uint256 gaugeID = ++totalGauges;
@@ -442,10 +441,10 @@ contract GaugeController is
 
     /**
      * @notice Pauses an insurance gauge
-     * @dev We do not include a removeGauge function as this would involve re-organising the entire historical data of gauge votes, and can easily lead to confusion if gaugeID 2 in the past is not the same as gaugeID 2 currently.
+     * @notice Paused gauges cannot have votes added or modified, and votes for a paused gauge will not be counted
+     * in the next updateGaugeWeights() call.
+     * @dev We do not include a removeGauge function as this would distort the order of the _gauges array
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * If a gaugeID is paused, it means that vote data for that gauge will no longer be collected on future [`updateGaugeWeights()`](#updategaugeweights) calls.
-     * It does not mean that users can no longer vote for their gauge, it just means that their vote for that gauge will no longer count for gauge weights (however they will still be charged for that vote. It is the responsibility of the voter to ensure they are voting for a valid gauge).
      * @param gaugeID_ ID of gauge to pause
      */
     function pauseGauge(uint256 gaugeID_) external override onlyGovernance {
@@ -456,9 +455,9 @@ contract GaugeController is
     }
 
     /**
-     * @notice Unpauses an insurance gauge
+     * @notice Unpauses an insurance gauge.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param gaugeID_ ID of gauge to pause
+     * @param gaugeID_ ID of gauge to pause.
      */
     function unpauseGauge(uint256 gaugeID_) external override onlyGovernance {
         if(_gauges[gaugeID_].active == true) revert GaugeAlreadyUnpaused({gaugeID: gaugeID_});
@@ -482,7 +481,7 @@ contract GaugeController is
     /**
      * @notice Set underwriting token address.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param token_ The address of the new underwriting token.
+     * @param token_ The address of the new underwriting token
      */
     function setToken(address token_) external override onlyGovernance {
         token = token_;
@@ -490,9 +489,9 @@ contract GaugeController is
     }
 
     /**
-     * @notice Adds an address to set of tokenholders, whose token balances will be queried and summed to determine insurance capacity.
+     * @notice Adds address to tokenholders set - these addresses will be queried for $UWE token balance and summed to determine the Solace Native insurance capacity.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param tokenholder_ Address of new tokenholder.
+     * @param tokenholder_ Address of new tokenholder
      */
     function addTokenholder(address tokenholder_) external override onlyGovernance {
         _tokenholders.add(tokenholder_);
@@ -500,7 +499,7 @@ contract GaugeController is
     }
 
     /**
-     * @notice Removes an address to set of tokenholders, whose token balances will be queried and summed to determine insurance capacity.
+     * @notice Removes an address from the tokenholder set - these addresses will be queried for $UWE token balance and summed to determine the Solace Native insurance capacity.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param tokenholder_ Address of new tokenholder.
      */
@@ -511,7 +510,7 @@ contract GaugeController is
     }
 
     /**
-     * @notice Set rate on line for selected gaugeIDs
+     * @notice Set annual rate-on-line for selected gaugeIDs
      * @dev 1e18 => 100%
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param gaugeIDs_ Array of gaugeIDs.
@@ -531,15 +530,13 @@ contract GaugeController is
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      */
     function updateGaugeWeights() external override onlyGovernance {
-        // If first call for epoch, reset _votePowerOfGauge
-        if ( _updateInfo._votesIndex == type(uint88).max ) {_resetVotePowerOfGaugeMapping();}
-
+        if ( _updateInfo._votesIndex == type(uint88).max ) {_resetVotePowerOfGaugeMapping();} // If first call for epoch, reset _votePowerOfGauge
         uint256 epochStartTime = _getEpochStartTimestamp();
         if (lastTimeGaugeWeightsUpdated >= epochStartTime) revert GaugeWeightsAlreadyUpdated();
         uint256 numVotingContracts = _votingContracts.length();
 
         // Iterate through voting contracts
-        // Use ternary operator to initialise loop, to avoid using local variables and setting stack-too deep
+        // Use ternary operator to initialise loop, to avoid setting stack-too deep error from too many local variables.
         for(uint256 i = _updateInfo._votingContractsIndex == type(uint80).max ? 0 : _updateInfo._votingContractsIndex; i < numVotingContracts; i++) {
             address votingContract = _votingContracts.at(i);
             uint256 numVoters = _voters[votingContract].length();
@@ -561,7 +558,6 @@ contract GaugeController is
                 // => chargePremiums() will not iterate through it
                 IGaugeVoter(votingContract).cacheLastProcessedVotePower(voter, votePower);
 
-                uint256 totalVotePowerBPS; 
                 // Iterate through votes
                 for(uint256 k = _updateInfo._votesIndex == type(uint88).max ? 0 : _updateInfo._votesIndex; k < numVotes; k++) {    
                     console.log("processVotes 3 %s" , gasleft());            
@@ -574,11 +570,8 @@ contract GaugeController is
                 }   
             }
 
-            // Remove dead voters.
+            // Remove dead voters - unbounded SSTORE loop.
             while (_votersToRemove.length > 0) {
-                // Unbounded SSTORE loop here, can get DDOSed, so enable early return if not enough gas for 5 SSTOREs + 1 event
-                // Yes get gas refund for resetting storage slot to 0, however refund comes after entire function body
-                // So theoretically someone can DDOS with a crapload of newly emptied Voter accounts
                 console.log("processVotes 5 %s" , gasleft());
                 if (gasleft() < 15000) {return _saveUpdateState(i, numVoters, type(uint88).max);}
                 _voters[votingContract].remove(_votersToRemove[_votersToRemove.length - 1]);
@@ -586,7 +579,7 @@ contract GaugeController is
             }
         }
         
-        _adjustVotePowerOfGaugeMapping(); // Should cost (100 * totalGauges) gas
+        _adjustVotePowerOfGaugeMapping();
         _clearUpdateInfo();
         lastTimeGaugeWeightsUpdated = epochStartTime;
         emit GaugeWeightsUpdated(epochStartTime);
@@ -598,7 +591,7 @@ contract GaugeController is
     ***************************************/
 
     /**
-     * @notice Save state of updating gauge weights to _updateInfo
+     * @notice Save state of updating gauge weights to _updateInfo.
      * @param votingContractsIndex_ Current index of _votingContracts.
      * @param votersIndex_ Current index of _voters[votingContractsIndex_].
      * @param votesIndex_ Current index of _votes[votingContractsIndex_][votersIndex_]
@@ -616,9 +609,7 @@ contract GaugeController is
     }
 
     /// @notice Reset _updateInfo to starting state.
-    /// @dev We are setting all the bits of _updateInfo to 1.
-    /// @dev The naive approach here is to reset all the bits to 0. However the EVM imposes a 20K gas fee for 
-    /// @dev `rewarming` a cold slot (setting from 0 to 1) vs keeping it warm (changing from non-zero to non-zero value).
+    /// @dev Avoid zero-value of storage slot.
     function _clearUpdateInfo() internal {
         uint256 bitmap = type(uint256).max;
         assembly {
@@ -626,17 +617,15 @@ contract GaugeController is
         }
     }
 
-    /// @notice Reset _votePowerOfGauge at start of updateGaugeWeights() call
-    /// @dev The justification for `reset` and `adjust` is for each slot, it costs 20000 gas to change from 0 to non-zero with SSTORE
-    /// @dev Whereas changing from non-zero to non-zero costs 2900 gas
+    /// @notice Reset _votePowerOfGauge on first updateGaugeWeights() call for the epoch.
+    /// @dev Avoid zero value of storage slots
     function _resetVotePowerOfGaugeMapping() internal {
         for (uint256 i = 1; i < totalGauges + 1; i++) {
-            _votePowerOfGauge[i] = 1; /// @dev Don't make 0 to avoid 17K gas re-warming penalty.
+            _votePowerOfGauge[i] = 1;
         }
     }
 
-    /// @notice Adjust _votePowerOfGauge for reset done at start of updateGaugeWeights() call
-    /// @notice This is 
+    /// @notice Adjust _votePowerOfGauge for _resetVotePowerOfGaugeMapping call() done this epoch.
     function _adjustVotePowerOfGaugeMapping() internal {
         for (uint256 i = 1; i < totalGauges + 1; i++) {
             if ( _gauges[i].active ) {
@@ -650,6 +639,4 @@ contract GaugeController is
             }
         }
     }
-
-
 }

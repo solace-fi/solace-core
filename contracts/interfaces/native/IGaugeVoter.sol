@@ -4,8 +4,7 @@ pragma solidity 0.8.6;
 /**
  * @title IGaugeVoter
  * @author solace.fi
- * @dev Could include other vote-related methods in UnderwritingLockVoting.sol, however only the bottom two are directly involved in the GaugeController pulling regular up-to-date vote information from UnderwritingLockVoting.sol. We do not want to prematurely restrict future Voting contracts to a rigid set of voting function signatures.
- * @notice A standard interface for a contract that registers and collect vote data on behalf of GaugeController.sol
+ * @notice A standard interface for a contract that interacts with GaugeController.sol to register votes.
  */
 interface IGaugeVoter {
     /**
