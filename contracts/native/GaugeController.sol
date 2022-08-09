@@ -543,7 +543,8 @@ contract GaugeController is
 
             // Iterate through voters
             for(uint256 j = _updateInfo._votersIndex == type(uint88).max || i != _updateInfo._votingContractsIndex ? 0 : _updateInfo._votersIndex ; j < numVoters; j++) {
-                if (gasleft() < 180000) {
+                console.log("---processVotes A %s---" , gasleft());
+                if (gasleft() < 200000) {
                     console.log("---processVotes 1 %s---" , gasleft());
                     return _saveUpdateState(i, j, 0);
                 }
@@ -554,10 +555,11 @@ contract GaugeController is
                     _votersToRemove.push(voter);
                     continue;
                 }
-
+                console.log("---processVotes B %s---" , gasleft());
                 // If votePower == 0, we don't need to cache the result because voter will be removed from _voters EnumerableSet
                 // => chargePremiums() will not iterate through it
                 IGaugeVoter(votingContract).cacheLastProcessedVotePower(voter, votePower);
+                console.log("---processVotes C %s---" , gasleft());
 
                 // Iterate through votes
                 for(uint256 k = _updateInfo._votesIndex == type(uint88).max || j != _updateInfo._votersIndex || i != _updateInfo._votingContractsIndex ? 0 : _updateInfo._votesIndex; k < numVotes; k++) {    
@@ -577,7 +579,7 @@ contract GaugeController is
                 // Subtle bug, don't set _updateInfo._votesIndex to type(uint88).max or else you actually don't skip votes iteration
                 if (gasleft() < 15000) {
                     console.log("---processVotes 3 %s---" , gasleft());
-                    return _saveUpdateState(i, numVoters, type(uint88).max - 1);
+                    return _saveUpdateState(i, type(uint88).max - 1, type(uint88).max - 1);
                 }
                 _voters[votingContract].remove(_votersToRemove[_votersToRemove.length - 1]);
                 _votersToRemove.pop();
@@ -633,12 +635,6 @@ contract GaugeController is
         for (uint256 i = 1; i < totalGauges + 1; i++) {
             if ( _gauges[i].active ) {
                 _votePowerOfGauge[i] -= 1;
-            // Keep paused gauge with default value.
-            } else {
-                // Avoid unnecessary SSTORE
-                if (_votePowerOfGauge[i] != 1) {
-                    _votePowerOfGauge[i] = 1;
-                }
             }
         }
     }

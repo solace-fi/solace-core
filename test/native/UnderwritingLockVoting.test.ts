@@ -92,6 +92,8 @@ describe("UnderwritingLockVoting", function () {
           expect(await voting.registry()).eq(registry.address);
           expect(await voting.lastTimePremiumsCharged()).eq(0);
           expect(await voting.isVotingOpen()).eq(false);
+          expect(await gaugeController.getVoteCount(voting.address, voter1.address)).eq(0)
+          expect(await gaugeController.getVotersCount(voting.address)).eq(0)
         });
         it("getEpochStartTimestamp gets current timestamp rounded down to a multiple of WEEK ", async function () {
           const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
@@ -100,6 +102,12 @@ describe("UnderwritingLockVoting", function () {
         });
         it("getEpochEndTimestamp() == getEpochStartTimestamp() + ONE_WEEK ", async function () {
           expect(await voting.getEpochEndTimestamp()).eq((await voting.getEpochStartTimestamp()).add(ONE_WEEK))
+        });
+        it("getEpochStartTimestamp() should be equivalent to gaugeController ", async function () {
+          expect(await voting.getEpochStartTimestamp()).eq(await gaugeController.getEpochStartTimestamp())
+        });
+        it("getEpochEndTimestamp() should be equivalent to gaugeController ", async function () {
+          expect(await voting.getEpochEndTimestamp()).eq(await gaugeController.getEpochEndTimestamp())
         });
         it("getVotePower should return 0 for a non-lock owner", async function () {
           expect(await voting.getVotePower(voter1.address)).eq(0)
@@ -252,6 +260,44 @@ describe("UnderwritingLockVoting", function () {
       });
     });
 
+    describe("gaugeController.removeTokenholder", () => {
+      it("rejects setting new governance by non governor", async  () => {
+        await expect(gaugeController.connect(voter1).removeTokenholder(voter1.address)).to.be.revertedWith("!governance");
+      });
+      it("cannot remove address, that has not previously been added as voting contract", async  () => {
+        await expect(gaugeController.connect(governor).removeTokenholder(deployer.address)).to.be.revertedWith("TokenholderNotPresent");
+      });
+      it("can remove voting contract", async () => {
+        await gaugeController.connect(governor).addTokenholder(voter1.address);
+        let tx = await gaugeController.connect(governor).removeTokenholder(voter1.address);
+        await expect(tx).to.emit(gaugeController, "TokenholderRemoved").withArgs(voter1.address);
+      });
+    });
+
+    describe("gaugeController.setLeverageFactor", () => {
+      it("non governor cannot setLeverageFactor", async  () => {
+        await expect(gaugeController.connect(voter1).setLeverageFactor(ONE_HUNDRED_PERCENT)).to.be.revertedWith("!governance");
+      });
+      it("can set new leverage factor", async () => {
+        let tx = await gaugeController.connect(governor).setLeverageFactor(ONE_HUNDRED_PERCENT.mul(2));
+        await expect(tx).to.emit(gaugeController, "LeverageFactorSet").withArgs(ONE_HUNDRED_PERCENT.mul(2));
+        expect(await gaugeController.leverageFactor()).eq(ONE_HUNDRED_PERCENT.mul(2))
+        await gaugeController.connect(governor).setLeverageFactor(ONE_HUNDRED_PERCENT)
+      });
+    });
+
+    describe("gaugeController.setToken", () => {
+      it("non governor cannot setToken", async  () => {
+        await expect(gaugeController.connect(voter1).setToken(voter1.address)).to.be.revertedWith("!governance");
+      });
+      it("can set new token", async () => {
+        let tx = await gaugeController.connect(governor).setToken(voter1.address);
+        await expect(tx).to.emit(gaugeController, "TokenSet").withArgs(voter1.address);
+        expect(await gaugeController.token()).eq(voter1.address)
+        await gaugeController.connect(governor).setToken(token.address)
+      });
+    });
+
     /*********************
       INTENTION STATEMENT 
     *********************/
@@ -325,11 +371,39 @@ describe("UnderwritingLockVoting", function () {
         const tx = await gaugeController.connect(governor).addGauge("gauge1", ONE_PERCENT);
         await expect(tx).to.emit(gaugeController, "GaugeAdded").withArgs(1, ONE_PERCENT, "gauge1");
         expect(await gaugeController.totalGauges()).eq(1)
+        expect(await gaugeController.getGaugeName(1)).eq("gauge1")
+        expect(await gaugeController.isGaugeActive(1)).eq(true)
         expect(await gaugeController.getRateOnLineOfGauge(1)).eq(ONE_PERCENT)
+      });
+      it("non governor cannot setRateOnLine", async  () => {
+        await expect(gaugeController.connect(voter1).setRateOnLine([1], [1])).to.be.revertedWith("!governance");
+      });
+      it("cannot setRateOnLine of non-existent gauge", async  () => {
+        await expect(gaugeController.connect(governor).setRateOnLine([2], [1])).to.be.reverted;
+      });
+      it("cannot setRateOnLine with mismatching arrays", async  () => {
+        await expect(gaugeController.connect(governor).setRateOnLine([2, 0], [1])).to.be.revertedWith("ArrayArgumentsLengthMismatch");
+      });
+      it("can set setRateOnLine", async () => {
+        let tx = await gaugeController.connect(governor).setRateOnLine([1], [1]);
+        await expect(tx).to.emit(gaugeController, "RateOnLineSet").withArgs(1, 1);
+        expect(await gaugeController.getRateOnLineOfGauge(1)).eq(1)
+        await gaugeController.connect(governor).setRateOnLine([1], [ONE_PERCENT]);
       });
       it("cannot vote() or voteMultiple() before voting contract added to gaugeController", async function () {
         await expect(voting.connect(voter1).vote(voter1.address, 1, 10000)).to.be.revertedWith("NotVotingContract");
         await expect(voting.connect(voter1).voteMultiple(voter1.address, [1, 1], [10000, 10000])).to.be.revertedWith("NotVotingContract");
+        await gaugeController.connect(governor).addVotingContract(voting.address);
+      });
+      it("non governor cannot remove voting contract", async  () => {
+        await expect(gaugeController.connect(voter1).removeVotingContract(voter1.address)).to.be.revertedWith("!governance");
+      });
+      it("cannot remove address, that has not previously been added as voting contract", async  () => {
+        await expect(gaugeController.connect(governor).removeVotingContract(deployer.address)).to.be.revertedWith("VotingContractNotAdded");
+      });
+      it("can remove voting contract", async () => {
+        const tx = await gaugeController.connect(governor).removeVotingContract(voting.address);
+        await expect(tx).to.emit(gaugeController, "VotingContractRemoved").withArgs(voting.address);
         await gaugeController.connect(governor).addVotingContract(voting.address);
       });
       it("no premiums should have been collected at this point", async function () {
@@ -344,10 +418,19 @@ describe("UnderwritingLockVoting", function () {
         expect(await gaugeController.totalGauges()).eq(1)
         expect(await gaugeController.getNumPausedGauges()).eq(1)
       });
+      it("non-governor cannot repause gauge", async function () {
+        await expect(gaugeController.connect(governor).pauseGauge(1)).to.be.revertedWith("GaugeAlreadyPaused(1)");
+      });
       it("neither voter nor delegate can vote() or voteMultiple() while gauge is paused", async function () {
         await expect(voting.connect(voter1).vote(voter1.address, 1, 10000)).to.be.revertedWith("GaugeIDPaused");
         await expect(voting.connect(voter1).voteMultiple(voter1.address, [1, 1], [10000, 10000])).to.be.revertedWith("GaugeIDPaused");
         await gaugeController.connect(governor).unpauseGauge(1);
+      });
+      it("non-governor cannot re-unpause gauge", async function () {
+        await expect(gaugeController.connect(governor).unpauseGauge(1)).to.be.revertedWith("GaugeAlreadyUnpaused(1)");
+      });
+      it("non-governor cannot unpause gaugeID 0", async function () {
+        await expect(gaugeController.connect(governor).unpauseGauge(0)).to.be.revertedWith("CannotUnpauseGaugeID0");
       });
       it("non lockowner cannot vote", async function () {
         await expect(voting.connect(anon).vote(anon.address, 1, 10000)).to.be.revertedWith("VoterHasNoLocks");
@@ -379,6 +462,8 @@ describe("UnderwritingLockVoting", function () {
         expect(await gaugeController.getGaugeWeight(1)).eq(ZERO)
         expect(await gaugeController.getAllGaugeWeights()).deep.eq([ZERO, ZERO]);
         expect(await gaugeController.getVotePowerSum()).eq(ZERO)
+        expect(await gaugeController.getVoteCount(voting.address, voter1.address)).eq(1)
+        expect(await gaugeController.getVotersCount(voting.address)).eq(1)
       });
       it("processVotes() should succeed in the next epoch", async function () {
         const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
@@ -966,154 +1051,154 @@ describe("UnderwritingLockVoting", function () {
      * I want to test if the system can revert with a out-of-gas error with i.) lots of locks to iterate through, ii.) lot of voters to remove 
      */
 
-    // describe("edge case - DDOS scenario with max locks", () => {
-    //   let LAST_RECORDED_VOTE_POWER_N: BN;
-    //   let SAVED_RANDOM_VOTER: Wallet
+    describe("edge case - DDOS scenario with max locks", () => {
+      let LAST_RECORDED_VOTE_POWER_N: BN;
+      let SAVED_RANDOM_VOTER: Wallet
 
-    //   before(async function () {
-    //     const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
+      before(async function () {
+        const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
 
-    //     // Create 5 new gauges
-    //     await gaugeController.connect(governor).addGauge("gauge6", ONE_PERCENT)
-    //     await gaugeController.connect(governor).addGauge("gauge7", ONE_PERCENT)
-    //     await gaugeController.connect(governor).addGauge("gauge8", ONE_PERCENT)
-    //     await gaugeController.connect(governor).addGauge("gauge9", ONE_PERCENT)
-    //     await gaugeController.connect(governor).addGauge("gauge10", ONE_PERCENT)
+        // Create 5 new gauges
+        await gaugeController.connect(governor).addGauge("gauge6", ONE_PERCENT)
+        await gaugeController.connect(governor).addGauge("gauge7", ONE_PERCENT)
+        await gaugeController.connect(governor).addGauge("gauge8", ONE_PERCENT)
+        await gaugeController.connect(governor).addGauge("gauge9", ONE_PERCENT)
+        await gaugeController.connect(governor).addGauge("gauge10", ONE_PERCENT)
 
-    //     // Create 100 voters with 1 max-duration locks each, each equally distributed among gauges 6 - 10.
-    //     for (let i = 0; i < 100; i++) {
-    //       const RANDOM_VOTER = ethers.Wallet.createRandom().connect(provider);
-    //       SAVED_RANDOM_VOTER = RANDOM_VOTER;
-    //       await token.connect(deployer).transfer(RANDOM_VOTER.address, ONE_ETHER) // gas money
-    //       // Can't createLock in parallel or else nonce re-use issue lol
-    //       await underwritingLocker.connect(voter1).createLock(RANDOM_VOTER.address, DEPOSIT_AMOUNT, CURRENT_TIME + 4 * ONE_YEAR)
-    //       await deployer.sendTransaction({to: RANDOM_VOTER.address, value: ONE_ETHER.div(10)})
-    //       await voting.connect(RANDOM_VOTER).vote(
-    //         RANDOM_VOTER.address,
-    //         i < 20 ? 6 :
-    //         i < 40 ? 7 :
-    //         i < 60 ? 8 :
-    //         i < 80 ? 9 :
-    //         10
-    //         ,
-    //         10000
-    //       )
-    //     }
-    //     expect(await underwritingLocker.totalNumLocks()).eq(205)
+        // Create 100 voters with 1 max-duration locks each, each equally distributed among gauges 6 - 10.
+        for (let i = 0; i < 100; i++) {
+          const RANDOM_VOTER = ethers.Wallet.createRandom().connect(provider);
+          SAVED_RANDOM_VOTER = RANDOM_VOTER;
+          await token.connect(deployer).transfer(RANDOM_VOTER.address, ONE_ETHER) // gas money
+          // Can't createLock in parallel or else nonce re-use issue lol
+          await underwritingLocker.connect(voter1).createLock(RANDOM_VOTER.address, DEPOSIT_AMOUNT, CURRENT_TIME + 4 * ONE_YEAR)
+          await deployer.sendTransaction({to: RANDOM_VOTER.address, value: ONE_ETHER.div(10)})
+          await voting.connect(RANDOM_VOTER).vote(
+            RANDOM_VOTER.address,
+            i < 20 ? 6 :
+            i < 40 ? 7 :
+            i < 60 ? 8 :
+            i < 80 ? 9 :
+            10
+            ,
+            10000
+          )
+        }
+        expect(await underwritingLocker.totalNumLocks()).eq(205)
 
-    //     // Create 10 voters with 10 max-duration locks each, each equally distributed among gauges 1 - 10.
-    //     for (let i = 0; i < 10; i++) {
-    //       const RANDOM_VOTER = ethers.Wallet.createRandom().connect(provider);
-    //       await token.connect(deployer).transfer(RANDOM_VOTER.address, ONE_ETHER) // gas money
-    //       // Create 10 locks each
-    //       for (let j = 0; j < 10; j++) {
-    //         await underwritingLocker.connect(voter1).createLock(RANDOM_VOTER.address, DEPOSIT_AMOUNT, CURRENT_TIME + 4 * ONE_YEAR)            
-    //       }
-    //       await deployer.sendTransaction({to: RANDOM_VOTER.address, value: ONE_ETHER.div(10)})
-    //       await voting.connect(RANDOM_VOTER).voteMultiple(
-    //         RANDOM_VOTER.address,
-    //         [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-    //         [1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000],
-    //       )
-    //     }
-    //     expect(await underwritingLocker.totalNumLocks()).eq(305)
+        // Create 10 voters with 10 max-duration locks each, each equally distributed among gauges 1 - 10.
+        for (let i = 0; i < 10; i++) {
+          const RANDOM_VOTER = ethers.Wallet.createRandom().connect(provider);
+          await token.connect(deployer).transfer(RANDOM_VOTER.address, ONE_ETHER) // gas money
+          // Create 10 locks each
+          for (let j = 0; j < 10; j++) {
+            await underwritingLocker.connect(voter1).createLock(RANDOM_VOTER.address, DEPOSIT_AMOUNT, CURRENT_TIME + 4 * ONE_YEAR)            
+          }
+          await deployer.sendTransaction({to: RANDOM_VOTER.address, value: ONE_ETHER.div(10)})
+          await voting.connect(RANDOM_VOTER).voteMultiple(
+            RANDOM_VOTER.address,
+            [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+            [1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000],
+          )
+        }
+        expect(await underwritingLocker.totalNumLocks()).eq(305)
 
-    //     // Create 100 voters with 1 max-duration locks each, all voting for gauge1, all of whom votes will be removed
-    //     // removeVote() will clean the _voters array, _votersToRemove array will fill only with voters who lose all voting 
-    //     // power after voting
-    //     for (let i = 0; i < 100; i++) {
-    //       const RANDOM_VOTER = ethers.Wallet.createRandom().connect(provider);
-    //       await token.connect(deployer).transfer(RANDOM_VOTER.address, ONE_ETHER) // gas money
-    //       // Can't createLock in parallel or else nonce re-use issue lol
-    //       await underwritingLocker.connect(voter1).createLock(RANDOM_VOTER.address, DEPOSIT_AMOUNT, CURRENT_TIME + 4 * ONE_YEAR)
-    //       await deployer.sendTransaction({to: RANDOM_VOTER.address, value: ONE_ETHER.div(10)})
-    //       await voting.connect(RANDOM_VOTER).vote(RANDOM_VOTER.address, 1, 10000)
-    //       await underwritingLocker.connect(RANDOM_VOTER).withdraw(306 + i, RANDOM_VOTER.address) // Lose voting power
-    //     }
-    //     expect(await underwritingLocker.totalNumLocks()).eq(405)
-    //   });
-    //   it("updateGaugeWeight() updates gauge weights as expected in the next epoch", async function () {
-    //     const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
-    //     await provider.send("evm_mine", [CURRENT_TIME + ONE_WEEK]);
-    //     await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("GaugeWeightsNotYetUpdated");
-    //     const EPOCH_START_TIME = await voting.getEpochStartTimestamp();
+        // Create 100 voters with 1 max-duration locks each, all voting for gauge1, all of whom votes will be removed
+        // removeVote() will clean the _voters array, _votersToRemove array will fill only with voters who lose all voting 
+        // power after voting
+        for (let i = 0; i < 100; i++) {
+          const RANDOM_VOTER = ethers.Wallet.createRandom().connect(provider);
+          await token.connect(deployer).transfer(RANDOM_VOTER.address, ONE_ETHER) // gas money
+          // Can't createLock in parallel or else nonce re-use issue lol
+          await underwritingLocker.connect(voter1).createLock(RANDOM_VOTER.address, DEPOSIT_AMOUNT, CURRENT_TIME + 4 * ONE_YEAR)
+          await deployer.sendTransaction({to: RANDOM_VOTER.address, value: ONE_ETHER.div(10)})
+          await voting.connect(RANDOM_VOTER).vote(RANDOM_VOTER.address, 1, 10000)
+          await underwritingLocker.connect(RANDOM_VOTER).withdraw(306 + i, RANDOM_VOTER.address) // Lose voting power
+        }
+        expect(await underwritingLocker.totalNumLocks()).eq(405)
+      });
+      it("updateGaugeWeight() updates gauge weights as expected in the next epoch", async function () {
+        const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
+        await provider.send("evm_mine", [CURRENT_TIME + ONE_WEEK]);
+        await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("GaugeWeightsNotYetUpdated");
+        const EPOCH_START_TIME = await voting.getEpochStartTimestamp();
 
-    //     let counter = 0;
-    //     while (true) {
-    //       counter += 1;
-    //       const tx = await gaugeController.connect(governor).updateGaugeWeights({gasLimit: CUSTOM_GAS_LIMIT})
+        let counter = 0;
+        while (true) {
+          counter += 1;
+          const tx = await gaugeController.connect(governor).updateGaugeWeights({gasLimit: CUSTOM_GAS_LIMIT})
 
-    //       if ((await gaugeController.lastTimeGaugeWeightsUpdated()).lt(EPOCH_START_TIME)) {
-    //         await expect(tx).to.emit(gaugeController, "IncompleteGaugeUpdate");
-    //         continue;
-    //       } else {
-    //         await expect(tx).to.emit(gaugeController, "GaugeWeightsUpdated").withArgs(EPOCH_START_TIME);
-    //         break;
-    //       }
-    //     }
-    //     console.log(`Required ${counter} iterations of updateGaugeWeights()`)
+          if ((await gaugeController.lastTimeGaugeWeightsUpdated()).lt(EPOCH_START_TIME)) {
+            await expect(tx).to.emit(gaugeController, "IncompleteGaugeUpdate");
+            continue;
+          } else {
+            await expect(tx).to.emit(gaugeController, "GaugeWeightsUpdated").withArgs(EPOCH_START_TIME);
+            break;
+          }
+        }
+        console.log(`Required ${counter} iterations of updateGaugeWeights()`)
 
-    //     LAST_RECORDED_VOTE_POWER_N = await voting.getVotePower(SAVED_RANDOM_VOTER.address)
-    //     expect (await gaugeController.lastTimeGaugeWeightsUpdated()).eq(EPOCH_START_TIME)
-    //     expect (await voting.isVotingOpen()).eq(false)
-    //     await expect(voting.connect(voter1).vote(voter1.address, 1, 1)).to.be.revertedWith("LastEpochPremiumsNotCharged")
+        LAST_RECORDED_VOTE_POWER_N = await voting.getVotePower(SAVED_RANDOM_VOTER.address)
+        expect (await gaugeController.lastTimeGaugeWeightsUpdated()).eq(EPOCH_START_TIME)
+        expect (await voting.isVotingOpen()).eq(false)
+        await expect(voting.connect(voter1).vote(voter1.address, 1, 1)).to.be.revertedWith("LastEpochPremiumsNotCharged")
         
-    //     const EXPECTED_TOTAL_RECORDED_VOTE_POWER = LAST_RECORDED_VOTE_POWER_N.mul(300)
-    //     // Accept 5% error - because first 100 votes from 1 week back
-    //     expect(await gaugeController.getVotePowerSum()).gte(EXPECTED_TOTAL_RECORDED_VOTE_POWER.mul(95).div(100))
-    //     expect(await gaugeController.getVotePowerSum()).lte(EXPECTED_TOTAL_RECORDED_VOTE_POWER.mul(105).div(100))
-    //     expectClose(await gaugeController.getGaugeWeight(1), ONE_HUNDRED_PERCENT.div(10), 2e14);
-    //     expectClose(await gaugeController.getGaugeWeight(2), ONE_HUNDRED_PERCENT.div(10), 2e14);
-    //     expectClose(await gaugeController.getGaugeWeight(3), ONE_HUNDRED_PERCENT.div(10), 2e14);
-    //     expectClose(await gaugeController.getGaugeWeight(4), ONE_HUNDRED_PERCENT.div(10), 2e14);
-    //     expectClose(await gaugeController.getGaugeWeight(5), ONE_HUNDRED_PERCENT.div(10), 2e14);
-    //     expectClose(await gaugeController.getGaugeWeight(6), ONE_HUNDRED_PERCENT.div(10), 2e14);
-    //     expectClose(await gaugeController.getGaugeWeight(7), ONE_HUNDRED_PERCENT.div(10), 2e14);
-    //     expectClose(await gaugeController.getGaugeWeight(8), ONE_HUNDRED_PERCENT.div(10), 2e14);
-    //     expectClose(await gaugeController.getGaugeWeight(9), ONE_HUNDRED_PERCENT.div(10), 2e14);
-    //     expectClose(await gaugeController.getGaugeWeight(10), ONE_HUNDRED_PERCENT.div(10), 2e14);
-    //   })
-    //   it("chargePremium() charges premiums as expected", async function () {
-    //     const OLD_VOTER_LOCKED_AMOUNT = await getTotalLockedAmount(SAVED_RANDOM_VOTER.address)
-    //     const OLD_UNDERWRITING_LOCKER_BALANCE = await token.balanceOf(underwritingLocker.address);
-    //     const OLD_REVENUE_ROUTER_BALANCE = await token.balanceOf(revenueRouter.address);
+        const EXPECTED_TOTAL_RECORDED_VOTE_POWER = LAST_RECORDED_VOTE_POWER_N.mul(300)
+        // Accept 5% error - because first 100 votes from 1 week back
+        expect(await gaugeController.getVotePowerSum()).gte(EXPECTED_TOTAL_RECORDED_VOTE_POWER.mul(95).div(100))
+        expect(await gaugeController.getVotePowerSum()).lte(EXPECTED_TOTAL_RECORDED_VOTE_POWER.mul(105).div(100))
+        expectClose(await gaugeController.getGaugeWeight(1), ONE_HUNDRED_PERCENT.div(10), 2e14);
+        expectClose(await gaugeController.getGaugeWeight(2), ONE_HUNDRED_PERCENT.div(10), 2e14);
+        expectClose(await gaugeController.getGaugeWeight(3), ONE_HUNDRED_PERCENT.div(10), 2e14);
+        expectClose(await gaugeController.getGaugeWeight(4), ONE_HUNDRED_PERCENT.div(10), 2e14);
+        expectClose(await gaugeController.getGaugeWeight(5), ONE_HUNDRED_PERCENT.div(10), 2e14);
+        expectClose(await gaugeController.getGaugeWeight(6), ONE_HUNDRED_PERCENT.div(10), 2e14);
+        expectClose(await gaugeController.getGaugeWeight(7), ONE_HUNDRED_PERCENT.div(10), 2e14);
+        expectClose(await gaugeController.getGaugeWeight(8), ONE_HUNDRED_PERCENT.div(10), 2e14);
+        expectClose(await gaugeController.getGaugeWeight(9), ONE_HUNDRED_PERCENT.div(10), 2e14);
+        expectClose(await gaugeController.getGaugeWeight(10), ONE_HUNDRED_PERCENT.div(10), 2e14);
+      })
+      it("chargePremium() charges premiums as expected", async function () {
+        const OLD_VOTER_LOCKED_AMOUNT = await getTotalLockedAmount(SAVED_RANDOM_VOTER.address)
+        const OLD_UNDERWRITING_LOCKER_BALANCE = await token.balanceOf(underwritingLocker.address);
+        const OLD_REVENUE_ROUTER_BALANCE = await token.balanceOf(revenueRouter.address);
 
-    //     const EPOCH_START_TIME = await voting.getEpochStartTimestamp()
+        const EPOCH_START_TIME = await voting.getEpochStartTimestamp()
 
-    //     let counter = 0;
-    //     while (true) {
-    //       counter += 1;
-    //       const tx = await voting.connect(governor).chargePremiums({gasLimit: CUSTOM_GAS_LIMIT})
+        let counter = 0;
+        while (true) {
+          counter += 1;
+          const tx = await voting.connect(governor).chargePremiums({gasLimit: CUSTOM_GAS_LIMIT})
 
-    //       if ((await voting.lastTimePremiumsCharged()).lt(EPOCH_START_TIME)) {
-    //         await expect(tx).to.emit(voting, "IncompletePremiumsCharge");
-    //         continue;
-    //       } else {
-    //         await expect(tx).to.emit(voting, "AllPremiumsCharged").withArgs(EPOCH_START_TIME);
-    //         break;
-    //       }
-    //     }
-    //     console.log(`Required ${counter} iterations of chargePremiums()`)
+          if ((await voting.lastTimePremiumsCharged()).lt(EPOCH_START_TIME)) {
+            await expect(tx).to.emit(voting, "IncompletePremiumsCharge");
+            continue;
+          } else {
+            await expect(tx).to.emit(voting, "AllPremiumsCharged").withArgs(EPOCH_START_TIME);
+            break;
+          }
+        }
+        console.log(`Required ${counter} iterations of chargePremiums()`)
 
-    //     const NEW_VOTER_LOCKED_AMOUNT = await getTotalLockedAmount(SAVED_RANDOM_VOTER.address)
-    //     const NEW_UNDERWRITING_LOCKER_BALANCE = await token.balanceOf(underwritingLocker.address);
-    //     const NEW_REVENUE_ROUTER_BALANCE = await token.balanceOf(revenueRouter.address);
-    //     const EXPECTED_PREMIUM = await getExpectedPremium(SAVED_RANDOM_VOTER.address, OLD_UNDERWRITING_LOCKER_BALANCE, LAST_RECORDED_VOTE_POWER_N)
-    //     const EXPECTED_PREMIUM_UNIT = await getExpectedUnitPremium(SAVED_RANDOM_VOTER.address, OLD_UNDERWRITING_LOCKER_BALANCE, LAST_RECORDED_VOTE_POWER_N);
-    //     const EXPECTED_TOTAL_PREMIUM = EXPECTED_PREMIUM_UNIT.mul(450) 
-    //     // 8*20 + 2*20 + 20*5 = 300 for single lock voters
-    //     // 10 * (8 + 2 + 5) = 10 * 15 for 10-lock voters
+        const NEW_VOTER_LOCKED_AMOUNT = await getTotalLockedAmount(SAVED_RANDOM_VOTER.address)
+        const NEW_UNDERWRITING_LOCKER_BALANCE = await token.balanceOf(underwritingLocker.address);
+        const NEW_REVENUE_ROUTER_BALANCE = await token.balanceOf(revenueRouter.address);
+        const EXPECTED_PREMIUM = await getExpectedPremium(SAVED_RANDOM_VOTER.address, OLD_UNDERWRITING_LOCKER_BALANCE, LAST_RECORDED_VOTE_POWER_N)
+        const EXPECTED_PREMIUM_UNIT = await getExpectedUnitPremium(SAVED_RANDOM_VOTER.address, OLD_UNDERWRITING_LOCKER_BALANCE, LAST_RECORDED_VOTE_POWER_N);
+        const EXPECTED_TOTAL_PREMIUM = EXPECTED_PREMIUM_UNIT.mul(450) 
+        // 8*20 + 2*20 + 20*5 = 300 for single lock voters
+        // 10 * (8 + 2 + 5) = 10 * 15 for 10-lock voters
 
-    //     expectClose(NEW_REVENUE_ROUTER_BALANCE.sub(OLD_REVENUE_ROUTER_BALANCE), EXPECTED_TOTAL_PREMIUM, 1e15);
-    //     expectClose(NEW_VOTER_LOCKED_AMOUNT.sub(OLD_VOTER_LOCKED_AMOUNT), EXPECTED_PREMIUM.mul(-1), 1e15);
-    //     expectClose(NEW_UNDERWRITING_LOCKER_BALANCE.sub(OLD_UNDERWRITING_LOCKER_BALANCE), EXPECTED_TOTAL_PREMIUM.mul(-1), 1e15);
-    //     expect(await voting.isVotingOpen()).eq(true)
-    //     await expect(gaugeController.connect(governor).updateGaugeWeights()).to.be.revertedWith("GaugeWeightsAlreadyUpdated")
-    //     await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("LastEpochPremiumsAlreadyProcessed")
-    //     expect(await gaugeController.lastTimeGaugeWeightsUpdated()).eq(EPOCH_START_TIME)
-    //     expect(await voting.lastTimePremiumsCharged()).eq(EPOCH_START_TIME)
-    //   })
-    // });
+        expectClose(NEW_REVENUE_ROUTER_BALANCE.sub(OLD_REVENUE_ROUTER_BALANCE), EXPECTED_TOTAL_PREMIUM, 1e15);
+        expectClose(NEW_VOTER_LOCKED_AMOUNT.sub(OLD_VOTER_LOCKED_AMOUNT), EXPECTED_PREMIUM.mul(-1), 1e15);
+        expectClose(NEW_UNDERWRITING_LOCKER_BALANCE.sub(OLD_UNDERWRITING_LOCKER_BALANCE), EXPECTED_TOTAL_PREMIUM.mul(-1), 1e15);
+        expect(await voting.isVotingOpen()).eq(true)
+        await expect(gaugeController.connect(governor).updateGaugeWeights()).to.be.revertedWith("GaugeWeightsAlreadyUpdated")
+        await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("LastEpochPremiumsAlreadyProcessed")
+        expect(await gaugeController.lastTimeGaugeWeightsUpdated()).eq(EPOCH_START_TIME)
+        expect(await voting.lastTimePremiumsCharged()).eq(EPOCH_START_TIME)
+      })
+    });
 
     /**********
       LESSONS
@@ -1187,140 +1272,140 @@ describe("UnderwritingLockVoting", function () {
      * I want to test how the system does with a larger number of gauges
      */
 
-    // describe("edge case - DDOS scenario with 100 gauges", () => {
-    //   let LAST_RECORDED_VOTE_POWER_N: BN;
-    //   let SAVED_RANDOM_VOTER: Wallet
+    describe("edge case - DDOS scenario with 100 gauges", () => {
+      let LAST_RECORDED_VOTE_POWER_N: BN;
+      let SAVED_RANDOM_VOTER: Wallet
 
-    //   before(async function () {
-    //     const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
+      before(async function () {
+        const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
 
-    //     // Create 90 new gauges
-    //     for (let i = 0; i < 90; i++) {
-    //       await gaugeController.connect(governor).addGauge(`gauge${i+11}`, ONE_PERCENT)
-    //     }
+        // Create 90 new gauges
+        for (let i = 0; i < 90; i++) {
+          await gaugeController.connect(governor).addGauge(`gauge${i+11}`, ONE_PERCENT)
+        }
 
-    //     const VOTEPOWERBPS_ARRAY = []
-    //     const GAUGEID_ARRAY = []
+        const VOTEPOWERBPS_ARRAY = []
+        const GAUGEID_ARRAY = []
 
-    //     for (let i = 0; i < 100; i++) {
-    //       GAUGEID_ARRAY.push(i + 1)
-    //       VOTEPOWERBPS_ARRAY.push(100)
-    //     }
+        for (let i = 0; i < 100; i++) {
+          GAUGEID_ARRAY.push(i + 1)
+          VOTEPOWERBPS_ARRAY.push(100)
+        }
 
-    //     // Create 10 voters with 10 max-duration locks each, each equally distributed among gauges 1 - 100.
-    //     for (let i = 0; i < 10; i++) {
-    //       const RANDOM_VOTER = ethers.Wallet.createRandom().connect(provider);
-    //       SAVED_RANDOM_VOTER = RANDOM_VOTER;
-    //       await token.connect(deployer).transfer(RANDOM_VOTER.address, ONE_ETHER) // gas money
-    //       // Create 10 locks each
-    //       for (let j = 0; j < 10; j++) {
-    //         await underwritingLocker.connect(voter1).createLock(RANDOM_VOTER.address, DEPOSIT_AMOUNT, CURRENT_TIME + 4 * ONE_YEAR)            
-    //       }
-    //       await deployer.sendTransaction({to: RANDOM_VOTER.address, value: ONE_ETHER.div(10)})
-    //       await voting.connect(RANDOM_VOTER).voteMultiple(
-    //         RANDOM_VOTER.address,
-    //         GAUGEID_ARRAY,
-    //         VOTEPOWERBPS_ARRAY,
-    //       )
-    //     }
-    //     expect(await underwritingLocker.totalNumLocks()).eq(505)
-    //   });
-    //   it("updateGaugeWeight() updates gauge weights as expected in the next epoch", async function () {
-    //     const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
-    //     await provider.send("evm_mine", [CURRENT_TIME + ONE_WEEK]);
-    //     await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("GaugeWeightsNotYetUpdated");
-    //     const EPOCH_START_TIME = await voting.getEpochStartTimestamp();
+        // Create 10 voters with 10 max-duration locks each, each equally distributed among gauges 1 - 100.
+        for (let i = 0; i < 10; i++) {
+          const RANDOM_VOTER = ethers.Wallet.createRandom().connect(provider);
+          SAVED_RANDOM_VOTER = RANDOM_VOTER;
+          await token.connect(deployer).transfer(RANDOM_VOTER.address, ONE_ETHER) // gas money
+          // Create 10 locks each
+          for (let j = 0; j < 10; j++) {
+            await underwritingLocker.connect(voter1).createLock(RANDOM_VOTER.address, DEPOSIT_AMOUNT, CURRENT_TIME + 4 * ONE_YEAR)            
+          }
+          await deployer.sendTransaction({to: RANDOM_VOTER.address, value: ONE_ETHER.div(10)})
+          await voting.connect(RANDOM_VOTER).voteMultiple(
+            RANDOM_VOTER.address,
+            GAUGEID_ARRAY,
+            VOTEPOWERBPS_ARRAY,
+          )
+        }
+        expect(await underwritingLocker.totalNumLocks()).eq(505)
+      });
+      it("updateGaugeWeight() updates gauge weights as expected in the next epoch", async function () {
+        const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
+        await provider.send("evm_mine", [CURRENT_TIME + ONE_WEEK]);
+        await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("GaugeWeightsNotYetUpdated");
+        const EPOCH_START_TIME = await voting.getEpochStartTimestamp();
 
-    //     let counter = 0;
-    //     while (true) {
-    //       counter += 1;
-    //       const tx = await gaugeController.connect(governor).updateGaugeWeights({gasLimit: CUSTOM_GAS_LIMIT})
+        let counter = 0;
+        while (true) {
+          counter += 1;
+          const tx = await gaugeController.connect(governor).updateGaugeWeights({gasLimit: CUSTOM_GAS_LIMIT})
 
-    //       if ((await gaugeController.lastTimeGaugeWeightsUpdated()).lt(EPOCH_START_TIME)) {
-    //         await expect(tx).to.emit(gaugeController, "IncompleteGaugeUpdate");
-    //         continue;
-    //       } else {
-    //         await expect(tx).to.emit(gaugeController, "GaugeWeightsUpdated").withArgs(EPOCH_START_TIME);
-    //         break;
-    //       }
-    //     }
-    //     console.log(`Required ${counter} iterations of updateGaugeWeights()`)
+          if ((await gaugeController.lastTimeGaugeWeightsUpdated()).lt(EPOCH_START_TIME)) {
+            await expect(tx).to.emit(gaugeController, "IncompleteGaugeUpdate");
+            continue;
+          } else {
+            await expect(tx).to.emit(gaugeController, "GaugeWeightsUpdated").withArgs(EPOCH_START_TIME);
+            break;
+          }
+        }
+        console.log(`Required ${counter} iterations of updateGaugeWeights()`)
 
-    //     LAST_RECORDED_VOTE_POWER_N = await voting.getVotePower(SAVED_RANDOM_VOTER.address)
-    //     expect (await gaugeController.lastTimeGaugeWeightsUpdated()).eq(EPOCH_START_TIME)
-    //     expect (await voting.isVotingOpen()).eq(false)
-    //     await expect(voting.connect(voter1).vote(voter1.address, 1, 1)).to.be.revertedWith("LastEpochPremiumsNotCharged")
+        LAST_RECORDED_VOTE_POWER_N = await voting.getVotePower(SAVED_RANDOM_VOTER.address)
+        expect (await gaugeController.lastTimeGaugeWeightsUpdated()).eq(EPOCH_START_TIME)
+        expect (await voting.isVotingOpen()).eq(false)
+        await expect(voting.connect(voter1).vote(voter1.address, 1, 1)).to.be.revertedWith("LastEpochPremiumsNotCharged")
         
-    //     // SAVED_RANDOM_VOTER here has 10 locks - has 10x the unit votePower
-    //     // So we should have 200 1-lock users + 20 10-lock users => 400 unit votePower
-    //     // So we have 400/10 = 40 of SAVED_RANDOM_VOTER votePower
+        // SAVED_RANDOM_VOTER here has 10 locks - has 10x the unit votePower
+        // So we should have 200 1-lock users + 20 10-lock users => 400 unit votePower
+        // So we have 400/10 = 40 of SAVED_RANDOM_VOTER votePower
 
-    //     // Accept 5% error - because first 100 votes from 1 week back
-    //     // expect(await gaugeController.getVotePowerSum()).gte(EXPECTED_TOTAL_RECORDED_VOTE_POWER.mul(95).div(100))
-    //     // expect(await gaugeController.getVotePowerSum()).lte(EXPECTED_TOTAL_RECORDED_VOTE_POWER.mul(105).div(100))
+        // Accept 5% error - because first 100 votes from 1 week back
+        // expect(await gaugeController.getVotePowerSum()).gte(EXPECTED_TOTAL_RECORDED_VOTE_POWER.mul(95).div(100))
+        // expect(await gaugeController.getVotePowerSum()).lte(EXPECTED_TOTAL_RECORDED_VOTE_POWER.mul(105).div(100))
 
-    //     // 400 units
-    //     // 200 voters with 200 units => 20 units to each of first 10 gauges
-    //     // 10 voters with 100 units => 10 units to each of first 10 gauges
-    //     // 10 voters with 100 units => 1 unit to each gauge
-    //     // But time decay of vote power
+        // 400 units
+        // 200 voters with 200 units => 20 units to each of first 10 gauges
+        // 10 voters with 100 units => 10 units to each of first 10 gauges
+        // 10 voters with 100 units => 1 unit to each gauge
+        // But time decay of vote power
 
-    //     const OG_GAUGE_WEIGHT = await gaugeController.getGaugeWeight(1);
-    //     expectClose(await gaugeController.getGaugeWeight(2), OG_GAUGE_WEIGHT, 2e14);
-    //     expectClose(await gaugeController.getGaugeWeight(3), OG_GAUGE_WEIGHT, 2e14);
-    //     expectClose(await gaugeController.getGaugeWeight(4), OG_GAUGE_WEIGHT, 2e14);
-    //     expectClose(await gaugeController.getGaugeWeight(5), OG_GAUGE_WEIGHT, 2e14);
-    //     expectClose(await gaugeController.getGaugeWeight(6), OG_GAUGE_WEIGHT, 2e14);
-    //     expectClose(await gaugeController.getGaugeWeight(7), OG_GAUGE_WEIGHT, 2e14);
-    //     expectClose(await gaugeController.getGaugeWeight(8), OG_GAUGE_WEIGHT, 2e14);
-    //     expectClose(await gaugeController.getGaugeWeight(9), OG_GAUGE_WEIGHT, 2e14);
-    //     expectClose(await gaugeController.getGaugeWeight(10), OG_GAUGE_WEIGHT, 2e14);
+        const OG_GAUGE_WEIGHT = await gaugeController.getGaugeWeight(1);
+        expectClose(await gaugeController.getGaugeWeight(2), OG_GAUGE_WEIGHT, 2e14);
+        expectClose(await gaugeController.getGaugeWeight(3), OG_GAUGE_WEIGHT, 2e14);
+        expectClose(await gaugeController.getGaugeWeight(4), OG_GAUGE_WEIGHT, 2e14);
+        expectClose(await gaugeController.getGaugeWeight(5), OG_GAUGE_WEIGHT, 2e14);
+        expectClose(await gaugeController.getGaugeWeight(6), OG_GAUGE_WEIGHT, 2e14);
+        expectClose(await gaugeController.getGaugeWeight(7), OG_GAUGE_WEIGHT, 2e14);
+        expectClose(await gaugeController.getGaugeWeight(8), OG_GAUGE_WEIGHT, 2e14);
+        expectClose(await gaugeController.getGaugeWeight(9), OG_GAUGE_WEIGHT, 2e14);
+        expectClose(await gaugeController.getGaugeWeight(10), OG_GAUGE_WEIGHT, 2e14);
 
-    //     for (let i = 11; i < 101; i++) {
-    //       expectClose(await gaugeController.getGaugeWeight(i), (ONE_HUNDRED_PERCENT.sub(OG_GAUGE_WEIGHT.mul(10))).div(90), 2e14);
-    //     }
-    //   })
-    //   it("chargePremium() charges premiums as expected", async function () {
-    //     const OLD_VOTER_LOCKED_AMOUNT = await getTotalLockedAmount(SAVED_RANDOM_VOTER.address)
-    //     const OLD_UNDERWRITING_LOCKER_BALANCE = await token.balanceOf(underwritingLocker.address);
-    //     const OLD_REVENUE_ROUTER_BALANCE = await token.balanceOf(revenueRouter.address);
+        for (let i = 11; i < 101; i++) {
+          expectClose(await gaugeController.getGaugeWeight(i), (ONE_HUNDRED_PERCENT.sub(OG_GAUGE_WEIGHT.mul(10))).div(90), 2e14);
+        }
+      })
+      it("chargePremium() charges premiums as expected", async function () {
+        const OLD_VOTER_LOCKED_AMOUNT = await getTotalLockedAmount(SAVED_RANDOM_VOTER.address)
+        const OLD_UNDERWRITING_LOCKER_BALANCE = await token.balanceOf(underwritingLocker.address);
+        const OLD_REVENUE_ROUTER_BALANCE = await token.balanceOf(revenueRouter.address);
 
-    //     const EPOCH_START_TIME = await voting.getEpochStartTimestamp()
+        const EPOCH_START_TIME = await voting.getEpochStartTimestamp()
 
-    //     let counter = 0;
-    //     while (true) {
-    //       counter += 1;
-    //       const tx = await voting.connect(governor).chargePremiums({gasLimit: CUSTOM_GAS_LIMIT})
+        let counter = 0;
+        while (true) {
+          counter += 1;
+          const tx = await voting.connect(governor).chargePremiums({gasLimit: CUSTOM_GAS_LIMIT})
 
-    //       if ((await voting.lastTimePremiumsCharged()).lt(EPOCH_START_TIME)) {
-    //         await expect(tx).to.emit(voting, "IncompletePremiumsCharge");
-    //         continue;
-    //       } else {
-    //         await expect(tx).to.emit(voting, "AllPremiumsCharged").withArgs(EPOCH_START_TIME);
-    //         break;
-    //       }
-    //     }
-    //     console.log(`Required ${counter} iterations of chargePremiums()`)
+          if ((await voting.lastTimePremiumsCharged()).lt(EPOCH_START_TIME)) {
+            await expect(tx).to.emit(voting, "IncompletePremiumsCharge");
+            continue;
+          } else {
+            await expect(tx).to.emit(voting, "AllPremiumsCharged").withArgs(EPOCH_START_TIME);
+            break;
+          }
+        }
+        console.log(`Required ${counter} iterations of chargePremiums()`)
 
-    //     // const NEW_VOTER_LOCKED_AMOUNT = await getTotalLockedAmount(SAVED_RANDOM_VOTER.address)
-    //     // const NEW_UNDERWRITING_LOCKER_BALANCE = await token.balanceOf(underwritingLocker.address);
-    //     // const NEW_REVENUE_ROUTER_BALANCE = await token.balanceOf(revenueRouter.address);
-    //     // const EXPECTED_PREMIUM = await getExpectedPremium(SAVED_RANDOM_VOTER.address, OLD_UNDERWRITING_LOCKER_BALANCE, LAST_RECORDED_VOTE_POWER_N)
-    //     // const EXPECTED_PREMIUM_UNIT = await getExpectedUnitPremium(SAVED_RANDOM_VOTER.address, OLD_UNDERWRITING_LOCKER_BALANCE, LAST_RECORDED_VOTE_POWER_N);
-    //   //   const EXPECTED_TOTAL_PREMIUM = EXPECTED_PREMIUM_UNIT.mul(450) 
-    //   //   // 8*20 + 2*20 + 20*5 = 300 for single lock voters
-    //   //   // 10 * (8 + 2 + 5) = 10 * 15 for 10-lock voters
+        // const NEW_VOTER_LOCKED_AMOUNT = await getTotalLockedAmount(SAVED_RANDOM_VOTER.address)
+        // const NEW_UNDERWRITING_LOCKER_BALANCE = await token.balanceOf(underwritingLocker.address);
+        // const NEW_REVENUE_ROUTER_BALANCE = await token.balanceOf(revenueRouter.address);
+        // const EXPECTED_PREMIUM = await getExpectedPremium(SAVED_RANDOM_VOTER.address, OLD_UNDERWRITING_LOCKER_BALANCE, LAST_RECORDED_VOTE_POWER_N)
+        // const EXPECTED_PREMIUM_UNIT = await getExpectedUnitPremium(SAVED_RANDOM_VOTER.address, OLD_UNDERWRITING_LOCKER_BALANCE, LAST_RECORDED_VOTE_POWER_N);
+      //   const EXPECTED_TOTAL_PREMIUM = EXPECTED_PREMIUM_UNIT.mul(450) 
+      //   // 8*20 + 2*20 + 20*5 = 300 for single lock voters
+      //   // 10 * (8 + 2 + 5) = 10 * 15 for 10-lock voters
 
-    //   //   expectClose(NEW_REVENUE_ROUTER_BALANCE.sub(OLD_REVENUE_ROUTER_BALANCE), EXPECTED_TOTAL_PREMIUM, 1e15);
-    //   //   expectClose(NEW_VOTER_LOCKED_AMOUNT.sub(OLD_VOTER_LOCKED_AMOUNT), EXPECTED_PREMIUM.mul(-1), 1e15);
-    //   //   expectClose(NEW_UNDERWRITING_LOCKER_BALANCE.sub(OLD_UNDERWRITING_LOCKER_BALANCE), EXPECTED_TOTAL_PREMIUM.mul(-1), 1e15);
-    //     expect(await voting.isVotingOpen()).eq(true)
-    //     await expect(gaugeController.connect(governor).updateGaugeWeights()).to.be.revertedWith("GaugeWeightsAlreadyUpdated")
-    //     await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("LastEpochPremiumsAlreadyProcessed")
-    //     expect(await gaugeController.lastTimeGaugeWeightsUpdated()).eq(EPOCH_START_TIME)
-    //     expect(await voting.lastTimePremiumsCharged()).eq(EPOCH_START_TIME)
-    //   })
-    // });
+      //   expectClose(NEW_REVENUE_ROUTER_BALANCE.sub(OLD_REVENUE_ROUTER_BALANCE), EXPECTED_TOTAL_PREMIUM, 1e15);
+      //   expectClose(NEW_VOTER_LOCKED_AMOUNT.sub(OLD_VOTER_LOCKED_AMOUNT), EXPECTED_PREMIUM.mul(-1), 1e15);
+      //   expectClose(NEW_UNDERWRITING_LOCKER_BALANCE.sub(OLD_UNDERWRITING_LOCKER_BALANCE), EXPECTED_TOTAL_PREMIUM.mul(-1), 1e15);
+        expect(await voting.isVotingOpen()).eq(true)
+        await expect(gaugeController.connect(governor).updateGaugeWeights()).to.be.revertedWith("GaugeWeightsAlreadyUpdated")
+        await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("LastEpochPremiumsAlreadyProcessed")
+        expect(await gaugeController.lastTimeGaugeWeightsUpdated()).eq(EPOCH_START_TIME)
+        expect(await voting.lastTimePremiumsCharged()).eq(EPOCH_START_TIME)
+      })
+    });
 
     /*******************
       STATE SUMMARY
