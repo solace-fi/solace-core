@@ -542,38 +542,43 @@ contract GaugeController is
             uint256 numVoters = _voters[votingContract].length();
 
             // Iterate through voters
-            for(uint256 j = _updateInfo._votersIndex == type(uint88).max ? 0 : _updateInfo._votersIndex ; j < numVoters; j++) {
-                console.log("processVotes 1 %s" , gasleft());
+            for(uint256 j = _updateInfo._votersIndex == type(uint88).max || i != _updateInfo._votingContractsIndex ? 0 : _updateInfo._votersIndex ; j < numVoters; j++) {
+                if (gasleft() < 180000) {
+                    console.log("---processVotes 1 %s---" , gasleft());
+                    return _saveUpdateState(i, j, 0);
+                }
                 address voter = _voters[votingContract].at(j);
                 uint256 numVotes = _votes[votingContract][voter].length();      
-                if (gasleft() < 150000) {return _saveUpdateState(i, j, 0);} // 
                 uint256 votePower = IGaugeVoter(votingContract).getVotePower(voter); // Expensive computation here. ~150K gas for user with max cap of 10 locks.
                 if (votePower == 0) {
                     _votersToRemove.push(voter);
                     continue;
                 }
-                console.log("processVotes 2 %s" , gasleft());
 
                 // If votePower == 0, we don't need to cache the result because voter will be removed from _voters EnumerableSet
                 // => chargePremiums() will not iterate through it
                 IGaugeVoter(votingContract).cacheLastProcessedVotePower(voter, votePower);
 
                 // Iterate through votes
-                for(uint256 k = _updateInfo._votesIndex == type(uint88).max ? 0 : _updateInfo._votesIndex; k < numVotes; k++) {    
-                    console.log("processVotes 3 %s" , gasleft());            
-                    if (gasleft() < 15000) {return _saveUpdateState(i, j, k);}
+                for(uint256 k = _updateInfo._votesIndex == type(uint88).max || j != _updateInfo._votersIndex || i != _updateInfo._votingContractsIndex ? 0 : _updateInfo._votesIndex; k < numVotes; k++) {    
+                    if (gasleft() < 15000) {
+                        console.log("---processVotes 2 %s---" , gasleft());            
+                        return _saveUpdateState(i, j, k);
+                    }
                     (uint256 gaugeID, uint256 votingPowerBPS) = _votes[votingContract][voter].at(k);
                     // Address edge case where vote placed before gauge is paused, will be counted
                     if (!_gauges[gaugeID].active) {continue;}
                     _votePowerOfGauge[gaugeID] += votePower * votingPowerBPS / 10000;
-                    console.log("processVotes 4 %s" , gasleft());
-                }   
+                }
             }
 
             // Remove dead voters - unbounded SSTORE loop.
             while (_votersToRemove.length > 0) {
-                console.log("processVotes 5 %s" , gasleft());
-                if (gasleft() < 15000) {return _saveUpdateState(i, numVoters, type(uint88).max);}
+                // Subtle bug, don't set _updateInfo._votesIndex to type(uint88).max or else you actually don't skip votes iteration
+                if (gasleft() < 15000) {
+                    console.log("---processVotes 3 %s---" , gasleft());
+                    return _saveUpdateState(i, numVoters, type(uint88).max - 1);
+                }
                 _voters[votingContract].remove(_votersToRemove[_votersToRemove.length - 1]);
                 _votersToRemove.pop();
             }
@@ -583,7 +588,6 @@ contract GaugeController is
         _clearUpdateInfo();
         lastTimeGaugeWeightsUpdated = epochStartTime;
         emit GaugeWeightsUpdated(epochStartTime);
-        console.log("processVotes 6 %s" , gasleft());
     }
 
     /***************************************
@@ -605,7 +609,6 @@ contract GaugeController is
             sstore(_updateInfo.slot, updateInfo) 
         }
         emit IncompleteGaugeUpdate();
-        console.log("------");
     }
 
     /// @notice Reset _updateInfo to starting state.

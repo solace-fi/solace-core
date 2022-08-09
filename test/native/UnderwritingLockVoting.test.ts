@@ -660,6 +660,14 @@ describe("UnderwritingLockVoting", function () {
         const tx = await voting.connect(voter2).removeVote(voter2.address, GAUGE_ID);
         await expect(tx).to.emit(voting, "VoteRemoved").withArgs(voter2.address, GAUGE_ID);
       })
+      it("can removeVote() while gauge paused", async function () {
+        const GAUGE_ID = 2
+        await voting.connect(voter2).vote(voter2.address, 2, 4000)
+        await gaugeController.connect(governor).pauseGauge(2)
+        const tx = await voting.connect(voter2).removeVote(voter2.address, GAUGE_ID);
+        await expect(tx).to.emit(voting, "VoteRemoved").withArgs(voter2.address, GAUGE_ID);
+        await gaugeController.connect(governor).unpauseGauge(2)
+      })
       it("updateGaugeWeight() updates gauge weights as expected in the next epoch", async function () {
         const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
         await provider.send("evm_mine", [CURRENT_TIME + ONE_WEEK]);
@@ -899,6 +907,14 @@ describe("UnderwritingLockVoting", function () {
       })
     });
 
+    describe("edge case - total vote power BPS cannot > 10000", () => {
+      it("should revert if total vote power BPS > 10000", async function () {
+        await voting.connect(voter1).voteMultiple(voter1.address, [1, 2], [5000, 5000])
+        await expect(voting.connect(voter1).voteMultiple(voter1.address, [2, 3, 4], [0, 2500, 2501])).to.be.revertedWith("TotalVotePowerBPSOver10000")
+        await voting.connect(voter1).removeVoteMultiple(voter1.address, [1, 2])
+      });
+    });
+
     /**********
       LESSONS
     **********/
@@ -932,14 +948,6 @@ describe("UnderwritingLockVoting", function () {
      * 
      * LockID 5 is burned
      */
-
-    describe("edge case - total vote power BPS cannot > 10000", () => {
-      it("should revert if total vote power BPS > 10000", async function () {
-        await voting.connect(voter1).voteMultiple(voter1.address, [1, 2], [5000, 5000])
-        await expect(voting.connect(voter1).voteMultiple(voter1.address, [2, 3, 4], [0, 2500, 2501])).to.be.revertedWith("TotalVotePowerBPSOver10000")
-        await voting.connect(voter1).removeVoteMultiple(voter1.address, [1, 2])
-      });
-    });
 
     /**********************
       INTENTION STATEMENT 
@@ -1268,11 +1276,8 @@ describe("UnderwritingLockVoting", function () {
         expectClose(await gaugeController.getGaugeWeight(9), OG_GAUGE_WEIGHT, 2e14);
         expectClose(await gaugeController.getGaugeWeight(10), OG_GAUGE_WEIGHT, 2e14);
 
-        console.log("OG_GAUGE_WEIGHT: ", OG_GAUGE_WEIGHT.toString())
-
         for (let i = 11; i < 101; i++) {
-          console.log((await gaugeController.getGaugeWeight(i)).toString())
-          // expectClose(await gaugeController.getGaugeWeight(i), (ONE_HUNDRED_PERCENT.sub(OG_GAUGE_WEIGHT.mul(10))).div(90), 2e14);
+          expectClose(await gaugeController.getGaugeWeight(i), (ONE_HUNDRED_PERCENT.sub(OG_GAUGE_WEIGHT.mul(10))).div(90), 2e14);
         }
       })
       it("chargePremium() charges premiums as expected", async function () {
@@ -1297,11 +1302,11 @@ describe("UnderwritingLockVoting", function () {
         }
         console.log(`Required ${counter} iterations of chargePremiums()`)
 
-        const NEW_VOTER_LOCKED_AMOUNT = await getTotalLockedAmount(SAVED_RANDOM_VOTER.address)
-        const NEW_UNDERWRITING_LOCKER_BALANCE = await token.balanceOf(underwritingLocker.address);
-        const NEW_REVENUE_ROUTER_BALANCE = await token.balanceOf(revenueRouter.address);
-        const EXPECTED_PREMIUM = await getExpectedPremium(SAVED_RANDOM_VOTER.address, OLD_UNDERWRITING_LOCKER_BALANCE, LAST_RECORDED_VOTE_POWER_N)
-        const EXPECTED_PREMIUM_UNIT = await getExpectedUnitPremium(SAVED_RANDOM_VOTER.address, OLD_UNDERWRITING_LOCKER_BALANCE, LAST_RECORDED_VOTE_POWER_N);
+        // const NEW_VOTER_LOCKED_AMOUNT = await getTotalLockedAmount(SAVED_RANDOM_VOTER.address)
+        // const NEW_UNDERWRITING_LOCKER_BALANCE = await token.balanceOf(underwritingLocker.address);
+        // const NEW_REVENUE_ROUTER_BALANCE = await token.balanceOf(revenueRouter.address);
+        // const EXPECTED_PREMIUM = await getExpectedPremium(SAVED_RANDOM_VOTER.address, OLD_UNDERWRITING_LOCKER_BALANCE, LAST_RECORDED_VOTE_POWER_N)
+        // const EXPECTED_PREMIUM_UNIT = await getExpectedUnitPremium(SAVED_RANDOM_VOTER.address, OLD_UNDERWRITING_LOCKER_BALANCE, LAST_RECORDED_VOTE_POWER_N);
       //   const EXPECTED_TOTAL_PREMIUM = EXPECTED_PREMIUM_UNIT.mul(450) 
       //   // 8*20 + 2*20 + 20*5 = 300 for single lock voters
       //   // 10 * (8 + 2 + 5) = 10 * 15 for 10-lock voters

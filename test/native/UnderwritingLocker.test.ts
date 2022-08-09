@@ -197,6 +197,9 @@ describe("UnderwritingLocker", function () {
     it("non governor cannot set voting contract approval", async function () {
       await expect(underwritingLocker.connect(user1).setFundingRate(FUNDING_RATE)).to.be.revertedWith("!governance");
     });
+    it("cannot set funding rate above 100%", async function () {
+      await expect(underwritingLocker.connect(governor).setFundingRate(ONE_HUNDRED_PERCENT.mul(2))).to.be.revertedWith("FundingRateAboveOne");
+    });
     it("governor can set funding rate", async function () {
       const tx = await underwritingLocker.connect(governor).setFundingRate(FUNDING_RATE);
       await expect(tx).to.emit(underwritingLocker, "FundingRateSet").withArgs(FUNDING_RATE);
@@ -1218,6 +1221,7 @@ describe("UnderwritingLocker", function () {
       const oldUserState = await getUserState(user1);
       const oldLockState_Locked = await getLockState(LOCKED_LOCK_ID);
       const oldLockState_Unlocked = await getLockState(UNLOCKED_LOCK_ID);
+      const oldBurnAddressBalance = await token.balanceOf(BURN_ADDRESS);
       const {number: CURRENT_BLOCK} = await provider.getBlock('latest')
 
       const tx = await underwritingLocker.connect(user1).withdrawInPartMultiple(
@@ -1239,10 +1243,12 @@ describe("UnderwritingLocker", function () {
       const newUserState = await getUserState(user1);
       const newLockState_Locked = await getLockState(LOCKED_LOCK_ID);
       const newLockState_Unlocked = await getLockState(UNLOCKED_LOCK_ID);
+      const newBurnAddressBalance = await token.balanceOf(BURN_ADDRESS);
       const globalStateChange = getGlobalStateChange(newGlobalState, oldGlobalState);
       const userStateChange = getUserStateChange(newUserState, oldUserState);
       const lockStateChange_Locked = getLockStateChange(newLockState_Locked, oldLockState_Locked);
       const lockStateChange_Unlocked = getLockStateChange(newLockState_Unlocked, oldLockState_Unlocked);
+      const burnAddressBalanceChange = newBurnAddressBalance.sub(oldBurnAddressBalance)
 
       expect(globalStateChange.totalNumLocks.eq(0));
       expect(globalStateChange.totalStakedAmount.eq(WITHDRAW_AMOUNT.mul(2)));
@@ -1254,6 +1260,7 @@ describe("UnderwritingLocker", function () {
       expect(lockStateChange_Locked.end).eq(0);
       expect(lockStateChange_Unlocked.amount).eq(WITHDRAW_AMOUNT.mul(-1));
       expect(lockStateChange_Unlocked.end).eq(0);
+      expect(burnAddressBalanceChange).eq(BURN_AMOUNT_LOCKED.add(BURN_AMOUNT_UNLOCKED))
 
       const listenerUpdate = await listener.lastUpdate();
       expect(listenerUpdate.blocknum).eq(CURRENT_BLOCK + 1);
