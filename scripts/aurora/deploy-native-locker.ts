@@ -1,8 +1,3 @@
-// deploys XsLockerExtension
-
-// Any address can call deployXsLockerExtension()
-// But only governor address can call approveXsLockerExtension() and distributeLocks()
-
 // Requires following fields in .env
 
 // AURORA_URL

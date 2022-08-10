@@ -411,9 +411,7 @@ contract UnderwritingLockVoting is
             // Using _votesIndex as _lockIndex
             // If either votesIndex slot is cleared, or we aren't on the same voter as when we last saved, start from index 0.
             for(uint256 j = _updateInfo._votesIndex == type(uint88).max || i != _updateInfo._votersIndex ? 0 : _updateInfo._votesIndex; j < numLocks; j++) {
-                if (gasleft() < 20000) {
-                    return _saveUpdateState(0, i, j);
-                }
+                if (gasleft() < 20000) {return _saveUpdateState(0, i, j);}
                 // Split premium amongst each lock equally.
                 IUnderwritingLocker(underwritingLocker).chargePremium(lockIDs[j], premium / numLocks);
             }
