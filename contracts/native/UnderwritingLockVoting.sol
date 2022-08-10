@@ -9,7 +9,6 @@ import "./../interfaces/utils/IRegistry.sol";
 import "./../interfaces/native/IUnderwritingLocker.sol";
 import "./../interfaces/native/IUnderwritingLockVoting.sol";
 import "./../interfaces/native/IGaugeController.sol";
-import "hardhat/console.sol";
 
 /**
  * @title UnderwritingLockVoting
@@ -401,7 +400,6 @@ contract UnderwritingLockVoting is
             // _saveUpdateState(0, i, 0);
             // Short-circuit operator - need at least 30K gas for getVoteCount() call
             if (gasleft() < 40000 || gasleft() < 10000 * IGaugeController(gaugeController).getVoteCount(address(this), voters[i])) {
-                console.log("---chargePremiums 1 %s---" , gasleft());    
                 return _saveUpdateState(0, i, 0);
             }        
             // Unbounded loop since # of votes (gauges) unbounded
@@ -414,7 +412,6 @@ contract UnderwritingLockVoting is
             // If either votesIndex slot is cleared, or we aren't on the same voter as when we last saved, start from index 0.
             for(uint256 j = _updateInfo._votesIndex == type(uint88).max || i != _updateInfo._votersIndex ? 0 : _updateInfo._votesIndex; j < numLocks; j++) {
                 if (gasleft() < 20000) {
-                    console.log("---chargePremiums 2 %s---" , gasleft());            
                     return _saveUpdateState(0, i, j);
                 }
                 // Split premium amongst each lock equally.

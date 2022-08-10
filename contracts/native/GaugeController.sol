@@ -9,7 +9,6 @@ import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "./../utils/Governable.sol";
 import "./../interfaces/native/IGaugeVoter.sol";
 import "./../interfaces/native/IGaugeController.sol";
-import "hardhat/console.sol";
 
 /**
  * @title GaugeController
@@ -543,11 +542,7 @@ contract GaugeController is
 
             // Iterate through voters
             for(uint256 j = _updateInfo._votersIndex == type(uint88).max || i != _updateInfo._votingContractsIndex ? 0 : _updateInfo._votersIndex ; j < numVoters; j++) {
-                console.log("---processVotes A %s---" , gasleft());
-                if (gasleft() < 200000) {
-                    console.log("---processVotes 1 %s---" , gasleft());
-                    return _saveUpdateState(i, j, 0);
-                }
+                if (gasleft() < 200000) {return _saveUpdateState(i, j, 0);}
                 address voter = _voters[votingContract].at(j);
                 uint256 numVotes = _votes[votingContract][voter].length();      
                 uint256 votePower = IGaugeVoter(votingContract).getVotePower(voter); // Expensive computation here. ~150K gas for user with max cap of 10 locks.
@@ -555,18 +550,13 @@ contract GaugeController is
                     _votersToRemove.push(voter);
                     continue;
                 }
-                console.log("---processVotes B %s---" , gasleft());
                 // If votePower == 0, we don't need to cache the result because voter will be removed from _voters EnumerableSet
                 // => chargePremiums() will not iterate through it
                 IGaugeVoter(votingContract).cacheLastProcessedVotePower(voter, votePower);
-                console.log("---processVotes C %s---" , gasleft());
 
                 // Iterate through votes
                 for(uint256 k = _updateInfo._votesIndex == type(uint88).max || j != _updateInfo._votersIndex || i != _updateInfo._votingContractsIndex ? 0 : _updateInfo._votesIndex; k < numVotes; k++) {    
-                    if (gasleft() < 15000) {
-                        console.log("---processVotes 2 %s---" , gasleft());            
-                        return _saveUpdateState(i, j, k);
-                    }
+                    if (gasleft() < 15000) {return _saveUpdateState(i, j, k);}
                     (uint256 gaugeID, uint256 votingPowerBPS) = _votes[votingContract][voter].at(k);
                     // Address edge case where vote placed before gauge is paused, will be counted
                     if (!_gauges[gaugeID].active) {continue;}
@@ -578,7 +568,6 @@ contract GaugeController is
             while (_votersToRemove.length > 0) {
                 // Subtle bug, don't set _updateInfo._votesIndex to type(uint88).max or else you actually don't skip votes iteration
                 if (gasleft() < 15000) {
-                    console.log("---processVotes 3 %s---" , gasleft());
                     return _saveUpdateState(i, type(uint88).max - 1, type(uint88).max - 1);
                 }
                 _voters[votingContract].remove(_votersToRemove[_votersToRemove.length - 1]);
