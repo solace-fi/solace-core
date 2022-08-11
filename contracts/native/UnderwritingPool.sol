@@ -260,6 +260,7 @@ contract UnderwritingPool is IUnderwritingPool, ERC20Permit, ReentrancyGuard, Go
     function addTokensToPool(TokenData[] memory tokens) external override onlyGovernance {
         uint256 inLen = tokens.length;
         uint256 stLen = _tokensLength;
+        uint256 stLen0 = stLen;
         // for each token to add
         for(uint256 inIndex = 0; inIndex < inLen; inIndex++) {
             address token = tokens[inIndex].token;
@@ -277,7 +278,7 @@ contract UnderwritingPool is IUnderwritingPool, ERC20Permit, ReentrancyGuard, Go
             }
             emit TokenAdded(token);
         }
-        _tokensLength = stLen;
+        if(stLen != stLen0) _tokensLength = stLen;
     }
 
     /**
@@ -288,6 +289,7 @@ contract UnderwritingPool is IUnderwritingPool, ERC20Permit, ReentrancyGuard, Go
     function removeTokensFromPool(address[] memory tokens) external override onlyGovernance {
         uint256 inLen = tokens.length;
         uint256 stLen = _tokensLength;
+        uint256 stLen0 = stLen;
         // for each token to remove
         for(uint256 inIndex = 0; inIndex < inLen; inIndex++) {
             address token = tokens[inIndex];
@@ -310,7 +312,7 @@ contract UnderwritingPool is IUnderwritingPool, ERC20Permit, ReentrancyGuard, Go
             }
             emit TokenRemoved(token);
         }
-        _tokensLength = stLen;
+        if(stLen != stLen0) _tokensLength = stLen;
     }
 
     /**

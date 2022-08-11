@@ -21,7 +21,7 @@ const ONE_ETHER = BN.from("1000000000000000000");
 const ONE_NEAR = BN.from("1000000000000000000000000");
 const EIGHT_DECIMALS = BN.from("100000000");
 
-describe("FluxMegaOracle", function () {
+describe("UnderwritingPool", function () {
   let uwp: UnderwritingPool;
   let oracle: FluxMegaOracle;
   let dai: MockErc20;
@@ -167,6 +167,15 @@ describe("FluxMegaOracle", function () {
       expect(await uwp.tokensLength()).eq(3);
       await expect(uwp.tokenList(3)).to.be.revertedWith("index out of bounds");
 
+      await uwp.connect(governor).addTokensToPool([]);
+      let tx3 = await uwp.connect(governor).addTokensToPool([
+        { token: weth.address, oracle: oracle.address, min: 4, max: 5 },
+        { token: near.address, oracle: oracle.address, min: 6, max: 7 },
+      ]);
+      await expect(tx3).to.emit(uwp, "TokenAdded").withArgs(weth.address);
+      await expect(tx3).to.emit(uwp, "TokenAdded").withArgs(near.address);
+      expect(await uwp.tokensLength()).eq(3);
+
       expect(await uwp.valueOfPool()).eq(0);
       expect(await uwp.valuePerShare()).eq(0);
     });
@@ -199,6 +208,10 @@ describe("FluxMegaOracle", function () {
       expect(data4.max).eq(5);
       expect(await uwp.tokensLength()).eq(1);
       await expect(uwp.tokenList(1)).to.be.revertedWith("index out of bounds");
+
+      await uwp.connect(governor).removeTokensFromPool([]);
+      await uwp.connect(governor).removeTokensFromPool([near.address, dai.address, usdc.address]);
+      expect(await uwp.tokensLength()).eq(1);
 
       expect(await uwp.valueOfPool()).eq(0);
       expect(await uwp.valuePerShare()).eq(0);
