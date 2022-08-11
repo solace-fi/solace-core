@@ -72,6 +72,10 @@ describe("FluxMegaOracle", function () {
   });
 
   describe("setting feeds", function () {
+    it("starts with no feeds", async function () {
+      expect(await oracle.tokensLength()).eq(0);
+      await expect(oracle.tokenByIndex(0)).to.be.revertedWith("index out of bounds");
+    });
     it("non governance cannot add feeds", async function () {
       await expect(oracle.connect(user).addPriceFeeds([])).to.be.revertedWith("!governance");
     });
@@ -92,6 +96,10 @@ describe("FluxMegaOracle", function () {
       expect(data2.priceFeed).eq(ethPriceFeed1.address);
       expect(data2.tokenDecimals).eq(18);
       expect(data2.priceFeedDecimals).eq(8);
+      expect(await oracle.tokensLength()).eq(2);
+      expect(await oracle.tokenByIndex(0)).eq(dai.address);
+      expect(await oracle.tokenByIndex(1)).eq(weth.address);
+      await expect(oracle.tokenByIndex(2)).to.be.revertedWith("index out of bounds");
 
       let tx2 = await oracle.connect(governor).addPriceFeeds([
         { token: weth.address, priceFeed: ethPriceFeed2.address, tokenDecimals: 18, priceFeedDecimals: 8 },
@@ -109,6 +117,11 @@ describe("FluxMegaOracle", function () {
       expect(data4.priceFeed).eq(nearPriceFeed.address);
       expect(data4.tokenDecimals).eq(24);
       expect(data4.priceFeedDecimals).eq(8);
+      expect(await oracle.tokensLength()).eq(3);
+      expect(await oracle.tokenByIndex(0)).eq(dai.address);
+      expect(await oracle.tokenByIndex(1)).eq(weth.address);
+      expect(await oracle.tokenByIndex(2)).eq(near.address);
+      await expect(oracle.tokenByIndex(3)).to.be.revertedWith("index out of bounds");
     });
     it("non governance cannot remove feeds", async function () {
       await expect(oracle.connect(user).removePriceFeeds([])).to.be.revertedWith("!governance");
@@ -127,6 +140,14 @@ describe("FluxMegaOracle", function () {
       expect(data2.priceFeed).eq(ZERO_ADDRESS);
       expect(data2.tokenDecimals).eq(0);
       expect(data2.priceFeedDecimals).eq(0);
+      expect(await oracle.tokensLength()).eq(1);
+      expect(await oracle.tokenByIndex(0)).eq(weth.address);
+      await expect(oracle.tokenByIndex(1)).to.be.revertedWith("index out of bounds");
+
+      await oracle.connect(governor).removePriceFeeds([dai.address, near.address]);
+      expect(await oracle.tokensLength()).eq(1);
+      expect(await oracle.tokenByIndex(0)).eq(weth.address);
+      await expect(oracle.tokenByIndex(1)).to.be.revertedWith("index out of bounds");
     });
   });
 
@@ -140,6 +161,12 @@ describe("FluxMegaOracle", function () {
         { token: near.address, priceFeed: nearPriceFeed.address, tokenDecimals: 24, priceFeedDecimals: 8 },
         { token: usdc.address, priceFeed: usdcPriceFeed.address, tokenDecimals: 6, priceFeedDecimals: 8 },
       ]);
+      expect(await oracle.tokensLength()).eq(4);
+      expect(await oracle.tokenByIndex(0)).eq(weth.address);
+      expect(await oracle.tokenByIndex(1)).eq(dai.address);
+      expect(await oracle.tokenByIndex(2)).eq(near.address);
+      expect(await oracle.tokenByIndex(3)).eq(usdc.address);
+      await expect(oracle.tokenByIndex(4)).to.be.revertedWith("index out of bounds");
       expect(await oracle.valueOfTokens(dai.address, ONE_ETHER)).eq(ONE_ETHER);
       expect(await oracle.valueOfTokens(usdc.address, ONE_USDC.mul(123))).eq(ONE_ETHER.mul(123));
       expect(await oracle.valueOfTokens(weth.address, ONE_ETHER.mul(123))).eq(ONE_ETHER.mul(123).mul(1400));
@@ -147,13 +174,31 @@ describe("FluxMegaOracle", function () {
       await oracle.connect(governor).addPriceFeeds([
         { token: weth.address, priceFeed: ethPriceFeed1.address, tokenDecimals: 18, priceFeedDecimals: 8 },
       ]);
+      expect(await oracle.tokensLength()).eq(4);
+      expect(await oracle.tokenByIndex(0)).eq(weth.address);
+      expect(await oracle.tokenByIndex(1)).eq(dai.address);
+      expect(await oracle.tokenByIndex(2)).eq(near.address);
+      expect(await oracle.tokenByIndex(3)).eq(usdc.address);
+      await expect(oracle.tokenByIndex(4)).to.be.revertedWith("index out of bounds");
       expect(await oracle.valueOfTokens(weth.address, ONE_ETHER.mul(123))).eq(ONE_ETHER.mul(123).mul(1300));
     });
     it("reverts if price feed is wrong address", async function () {
+      await oracle.connect(governor).removePriceFeeds([usdc.address]);
+      expect(await oracle.tokensLength()).eq(3);
+      expect(await oracle.tokenByIndex(0)).eq(weth.address);
+      expect(await oracle.tokenByIndex(1)).eq(dai.address);
+      expect(await oracle.tokenByIndex(2)).eq(near.address);
+      await expect(oracle.tokenByIndex(3)).to.be.revertedWith("index out of bounds");
       await oracle.connect(governor).addPriceFeeds([
-        { token: dai.address, priceFeed: dai.address, tokenDecimals: 18, priceFeedDecimals: 8 },
+        { token: usdc.address, priceFeed: usdc.address, tokenDecimals: 18, priceFeedDecimals: 8 },
       ]);
-      await expect(oracle.valueOfTokens(dai.address, ONE_ETHER)).to.be.reverted;
+      expect(await oracle.tokensLength()).eq(4);
+      expect(await oracle.tokenByIndex(0)).eq(weth.address);
+      expect(await oracle.tokenByIndex(1)).eq(dai.address);
+      expect(await oracle.tokenByIndex(2)).eq(near.address);
+      expect(await oracle.tokenByIndex(3)).eq(usdc.address);
+      await expect(oracle.tokenByIndex(4)).to.be.revertedWith("index out of bounds");
+      await expect(oracle.valueOfTokens(usdc.address, ONE_USDC)).to.be.reverted;
     });
     it("reverts if price feed is negative", async function () {
       await ethPriceFeed1.connect(governor).setAnswer(ONE_ETHER.mul(-1300));

@@ -40,6 +40,20 @@ interface IFluxMegaOracle is IPriceOracle {
      */
     function priceFeedForToken(address token) external view returns (PriceFeedData memory data);
 
+    /**
+     * @notice Lists the tokens in the oracle.
+     * @dev Enumerable `[0,tokensLength]`
+     * @param index The index to query.
+     * @return token The address of the token at that index.
+     */
+    function tokenByIndex(uint256 index) external view returns (address token);
+
+    /**
+     * @notice The number of tokens with feeds in this oracle.
+     * @return len The number of tokens.
+     */
+    function tokensLength() external view returns (uint256 len);
+
     /***************************************
     GOVERNANCE FUNCTIONS
     ***************************************/

@@ -15,7 +15,13 @@ import "../interfaces/native/IFluxMegaOracle.sol";
  */
 contract FluxMegaOracle is IFluxMegaOracle, Governable {
 
+    // token => data
     mapping(address => PriceFeedData) internal _priceFeeds;
+    // index => token
+    mapping(uint256 => address) internal _indexToToken;
+    // token => index+1
+    mapping(address => uint256) internal _tokenToIndex;
+    uint256 internal _tokensLength;
 
     /***************************************
     STATE VARIABLES
@@ -43,6 +49,25 @@ contract FluxMegaOracle is IFluxMegaOracle, Governable {
     }
 
     /**
+     * @notice Lists the tokens in the oracle.
+     * @dev Enumerable `[0,tokensLength]`
+     * @param index The index to query.
+     * @return token The address of the token at that index.
+     */
+    function tokenByIndex(uint256 index) external view override returns (address token) {
+        require(index < _tokensLength, "index out of bounds");
+        return _indexToToken[index];
+    }
+
+    /**
+     * @notice The number of tokens with feeds in this oracle.
+     * @return len The number of tokens.
+     */
+    function tokensLength() external view override returns (uint256 len) {
+        return _tokensLength;
+    }
+
+    /**
      * @notice Given an amount of some token, calculates the value in `USD`.
      * @dev Returns zero if no known price feed for the token.
      * @param token The address of the token to price.
@@ -67,12 +92,22 @@ contract FluxMegaOracle is IFluxMegaOracle, Governable {
      * @param feeds The list of price feeds to add.
      */
     function addPriceFeeds(PriceFeedData[] memory feeds) external override onlyGovernance {
+        uint256 stLen = _tokensLength;
+        uint256 stLen0 = stLen;
         for(uint256 i = 0; i < feeds.length; i++) {
+            // add to feed mapping
             PriceFeedData memory feed = feeds[i];
             address token = feed.token;
             _priceFeeds[token] = feed;
+            // add to token enumeration
+            if(_tokenToIndex[token] == 0) {
+                uint256 index = stLen++; // autoincrement from 0
+                _indexToToken[index] = token;
+                _tokenToIndex[token] = index + 1;
+            }
             emit PriceFeedAdded(token);
         }
+        if(stLen != stLen0) _tokensLength = stLen;
     }
 
     /**
@@ -81,10 +116,31 @@ contract FluxMegaOracle is IFluxMegaOracle, Governable {
      * @param tokens The list of price feeds to remove.
      */
     function removePriceFeeds(address[] memory tokens) external override onlyGovernance {
+        uint256 stLen = _tokensLength;
+        uint256 stLen0 = stLen;
         for(uint256 i = 0; i < tokens.length; i++) {
             address token = tokens[i];
             delete _priceFeeds[token];
+            uint256 stIndex = _tokenToIndex[token];
+            // token was not in pool anyways. skip
+            if(stIndex == 0) continue;
+            // token was at end of list. simple pop
+            if(stIndex == stLen) {
+                stLen--;
+                delete _tokenToIndex[token];
+                delete _indexToToken[stIndex-1];
+            }
+            // token was not at end of list. remove and shuffle
+            else {
+                stLen--;
+                address otherToken = _indexToToken[stLen];
+                _indexToToken[stIndex-1] = otherToken;
+                delete _indexToToken[stLen];
+                _tokenToIndex[otherToken] = stIndex;
+                delete _tokenToIndex[token];
+            }
             emit PriceFeedRemoved(token);
         }
+        if(stLen != stLen0) _tokensLength = stLen;
     }
 }
