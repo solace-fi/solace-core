@@ -241,9 +241,11 @@ describe("UnderwritingPool", function () {
 
   describe("issue", function () {
     it("cannot deposit mismatched args", async function () {
+      await expect(uwp.connect(user1).calculateIssue([dai.address], [1,2])).to.be.revertedWith("length mismatch");
       await expect(uwp.connect(user1).issue([dai.address], [1,2], user1.address)).to.be.revertedWith("length mismatch");
     });
     it("cannot deposit token not in pool", async function () {
+      await expect(uwp.connect(user1).calculateIssue([dai.address], [1])).to.be.revertedWith("token not in pool");
       await expect(uwp.connect(user1).issue([dai.address], [1], user1.address)).to.be.revertedWith("token not in pool");
     });
     it("cannot deposit with insufficient balance", async function () {
@@ -265,15 +267,22 @@ describe("UnderwritingPool", function () {
         { token: usdc.address, oracle: oracle.address, min: 0, max: ONE_ETHER.mul(10000) },
         { token: near.address, oracle: oracle.address, min: 0, max: ONE_ETHER.mul(10000) }, // measured in USD, so 0-2500 NEAR
       ]);
+      await expect(uwp.connect(user1).calculateIssue([dai.address], [ONE_ETHER.mul(999)])).to.be.revertedWith("deposit too small");
       await expect(uwp.connect(user1).issue([dai.address], [ONE_ETHER.mul(999)], user1.address)).to.be.revertedWith("deposit too small");
+      await expect(uwp.connect(user1).calculateIssue([weth.address], [ONE_ETHER.mul(999).div(1000)])).to.be.revertedWith("deposit too small");
       await expect(uwp.connect(user1).issue([weth.address], [ONE_ETHER.mul(999).div(1000)], user1.address)).to.be.revertedWith("deposit too small");
     });
     it("cannot deposit above max", async function () {
+      await expect(uwp.connect(user1).calculateIssue([dai.address], [ONE_ETHER.mul(10001)])).to.be.revertedWith("deposit too large");
       await expect(uwp.connect(user1).issue([dai.address], [ONE_ETHER.mul(10001)], user1.address)).to.be.revertedWith("deposit too large");
+      await expect(uwp.connect(user1).calculateIssue([weth.address], [ONE_ETHER.mul(10001).div(1000)])).to.be.revertedWith("deposit too large");
       await expect(uwp.connect(user1).issue([weth.address], [ONE_ETHER.mul(10001).div(1000)], user1.address)).to.be.revertedWith("deposit too large");
     });
     it("can deposit empty", async function () {
+      let amount = await uwp.connect(user1).calculateIssue([], []);
+      expect(amount).eq(0);
       let tx = await uwp.connect(user1).issue([], [], user2.address);
+      await expect(tx).to.emit(uwp, "IssueMade").withArgs(user1.address, 0);
       await expect(tx).to.emit(uwp, "Transfer").withArgs(ZERO_ADDRESS, user2.address, 0);
       expect(await uwp.balanceOf(user1.address)).eq(0);
       expect(await uwp.balanceOf(user2.address)).eq(0);
@@ -282,7 +291,10 @@ describe("UnderwritingPool", function () {
       expect(await uwp.valuePerShare()).eq(0);
     });
     it("can deposit zero", async function () {
+      let amount = await uwp.connect(user1).calculateIssue([usdc.address], [0]);
+      expect(amount).eq(0);
       let tx = await uwp.connect(user1).issue([usdc.address], [0], user2.address);
+      await expect(tx).to.emit(uwp, "IssueMade").withArgs(user1.address, 0);
       await expect(tx).to.emit(usdc, "Transfer").withArgs(user1.address, uwp.address, 0);
       await expect(tx).to.emit(uwp, "Transfer").withArgs(ZERO_ADDRESS, user2.address, 0);
       expect(await uwp.balanceOf(user1.address)).eq(0);
@@ -293,9 +305,12 @@ describe("UnderwritingPool", function () {
     });
     it("can deposit 1", async function () {
       // first deposit
+      let amount1 = await uwp.connect(user1).calculateIssue([dai.address], [ONE_ETHER.mul(1000)]);
+      expect(amount1).eq(ONE_ETHER.mul(1000))
       let amount = await uwp.connect(user1).callStatic.issue([dai.address], [ONE_ETHER.mul(1000)], user2.address);
       expect(amount).eq(ONE_ETHER.mul(1000));
       let tx = await uwp.connect(user1).issue([dai.address], [ONE_ETHER.mul(1000)], user2.address);
+      await expect(tx).to.emit(uwp, "IssueMade").withArgs(user1.address, ONE_ETHER.mul(1000));
       await expect(tx).to.emit(dai, "Transfer").withArgs(user1.address, uwp.address, ONE_ETHER.mul(1000));
       await expect(tx).to.emit(uwp, "Transfer").withArgs(ZERO_ADDRESS, user2.address, ONE_ETHER.mul(1000));
       expect(await uwp.balanceOf(user1.address)).eq(0);
@@ -306,9 +321,12 @@ describe("UnderwritingPool", function () {
     });
     it("can deposit 2", async function () {
       // another deposit
+      let amount1 = await uwp.connect(user1).calculateIssue([dai.address], [ONE_ETHER.mul(1000)]);
+      expect(amount1).eq(ONE_ETHER.mul(1000));
       let amount = await uwp.connect(user1).callStatic.issue([dai.address], [ONE_ETHER.mul(1000)], user2.address);
       expect(amount).eq(ONE_ETHER.mul(1000));
       let tx = await uwp.connect(user1).issue([dai.address], [ONE_ETHER.mul(1000)], user2.address);
+      await expect(tx).to.emit(uwp, "IssueMade").withArgs(user1.address, ONE_ETHER.mul(1000));
       await expect(tx).to.emit(dai, "Transfer").withArgs(user1.address, uwp.address, ONE_ETHER.mul(1000));
       await expect(tx).to.emit(uwp, "Transfer").withArgs(ZERO_ADDRESS, user2.address, ONE_ETHER.mul(1000));
       expect(await uwp.balanceOf(user1.address)).eq(0);
@@ -319,9 +337,12 @@ describe("UnderwritingPool", function () {
     });
     it("can deposit 3", async function () {
       // multi deposit
+      let amount1 = await uwp.connect(user1).calculateIssue([dai.address, weth.address], [ONE_ETHER.mul(1000), ONE_ETHER]);
+      expect(amount1).eq(ONE_ETHER.mul(2300));
       let amount = await uwp.connect(user1).callStatic.issue([dai.address, weth.address], [ONE_ETHER.mul(1000), ONE_ETHER], user2.address);
       expect(amount).eq(ONE_ETHER.mul(2300));
       let tx = await uwp.connect(user1).issue([dai.address, weth.address], [ONE_ETHER.mul(1000), ONE_ETHER], user2.address);
+      await expect(tx).to.emit(uwp, "IssueMade").withArgs(user1.address, ONE_ETHER.mul(2300));
       await expect(tx).to.emit(dai, "Transfer").withArgs(user1.address, uwp.address, ONE_ETHER.mul(1000));
       await expect(tx).to.emit(weth, "Transfer").withArgs(user1.address, uwp.address, ONE_ETHER);
       await expect(tx).to.emit(uwp, "Transfer").withArgs(ZERO_ADDRESS, user2.address, ONE_ETHER.mul(2300));
@@ -332,9 +353,12 @@ describe("UnderwritingPool", function () {
     it("can deposit 4", async function () {
       // with issue fee
       await uwp.connect(governor).setIssueFee(ONE_ETHER.div(100), user3.address);
+      let amount1 = await uwp.connect(user1).calculateIssue([dai.address], [ONE_ETHER.mul(1000)]);
+      expect(amount1).eq(ONE_ETHER.mul(990));
       let amount = await uwp.connect(user1).callStatic.issue([dai.address], [ONE_ETHER.mul(1000)], user2.address);
       expect(amount).eq(ONE_ETHER.mul(990));
       let tx = await uwp.connect(user1).issue([dai.address], [ONE_ETHER.mul(1000)], user2.address);
+      await expect(tx).to.emit(uwp, "IssueMade").withArgs(user1.address, ONE_ETHER.mul(990));
       await expect(tx).to.emit(dai, "Transfer").withArgs(user1.address, uwp.address, ONE_ETHER.mul(1000));
       await expect(tx).to.emit(uwp, "Transfer").withArgs(ZERO_ADDRESS, user2.address, ONE_ETHER.mul(990));
       await expect(tx).to.emit(uwp, "Transfer").withArgs(ZERO_ADDRESS, user3.address, ONE_ETHER.mul(10));
@@ -346,7 +370,9 @@ describe("UnderwritingPool", function () {
       expect(await uwp.valuePerShare()).eq(ONE_ETHER);
     });
     it("cannot deposit above max pt 2", async function () {
+      await expect(uwp.connect(user1).calculateIssue([dai.address], [ONE_ETHER.mul(6001)])).to.be.revertedWith("deposit too large");
       await expect(uwp.connect(user1).issue([dai.address], [ONE_ETHER.mul(6001)], user1.address)).to.be.revertedWith("deposit too large");
+      await expect(uwp.connect(user1).calculateIssue([weth.address], [ONE_ETHER.mul(9001).div(1000)])).to.be.revertedWith("deposit too large");
       await expect(uwp.connect(user1).issue([weth.address], [ONE_ETHER.mul(9001).div(1000)], user1.address)).to.be.revertedWith("deposit too large");
     });
     it("value of pool changes with oracle answers", async function () {
@@ -359,9 +385,12 @@ describe("UnderwritingPool", function () {
     it("can deposit 5", async function () {
       // at value per share != 1
       await uwp.connect(governor).setIssueFee(0, ZERO_ADDRESS);
+      let amount1 = await uwp.connect(user1).calculateIssue([near.address], [ONE_NEAR.mul(1000)]);
+      expect(amount1).eq(ONE_ETHER.mul(1000).mul(4).mul(5300).div(5400));
       let amount = await uwp.connect(user1).callStatic.issue([near.address], [ONE_NEAR.mul(1000)], user2.address);
       expect(amount).eq(ONE_ETHER.mul(1000).mul(4).mul(5300).div(5400));
       let tx = await uwp.connect(user1).issue([near.address], [ONE_NEAR.mul(1000)], user2.address);
+      await expect(tx).to.emit(uwp, "IssueMade").withArgs(user1.address, ONE_ETHER.mul(1000).mul(4).mul(5300).div(5400));
       await expect(tx).to.emit(near, "Transfer").withArgs(user1.address, uwp.address, ONE_NEAR.mul(1000));
       await expect(tx).to.emit(uwp, "Transfer").withArgs(ZERO_ADDRESS, user2.address, ONE_ETHER.mul(1000).mul(4).mul(5300).div(5400));
       expect(await uwp.balanceOf(user1.address)).eq(0);
@@ -374,6 +403,8 @@ describe("UnderwritingPool", function () {
 
   describe("redeem", function () {
     it("cannot redeem more than balance", async function () {
+      let ts = await uwp.totalSupply();
+      await expect(uwp.connect(user2).calculateRedeem(ts.add(1))).to.be.revertedWith("redeem amount exceeds supply");
       let bal = await uwp.balanceOf(user2.address);
       await expect(uwp.connect(user2).redeem(bal.add(1), user3.address)).to.be.revertedWith("ERC20: burn amount exceeds balance");
     });
@@ -384,13 +415,16 @@ describe("UnderwritingPool", function () {
       let ts = await uwp.totalSupply();
       let redeemAmount = ONE_ETHER.mul(1000);
       // static
+      let amounts1 = await uwp.connect(user2).calculateRedeem(redeemAmount);
       let amounts = await uwp.connect(user2).callStatic.redeem(redeemAmount, user3.address);
       for(var i = 0; i < tokens.length; ++i) {
         let expectedAmount = bals[i].mul(redeemAmount).div(ts);
+        expect(amounts1[i]).eq(expectedAmount);
         expect(amounts[i]).eq(expectedAmount);
       }
       // real
       let tx = await uwp.connect(user2).redeem(redeemAmount, user3.address);
+      await expect(tx).to.emit(uwp, "RedeemMade").withArgs(user2.address, redeemAmount);
       await expect(tx).to.emit(uwp, "Transfer").withArgs(user2.address, ZERO_ADDRESS, redeemAmount);
       for(var i = 0; i < tokens.length; ++i) {
         let expectedAmount = bals[i].mul(redeemAmount).div(ts);
@@ -421,4 +455,32 @@ describe("UnderwritingPool", function () {
       expect(await comp.balanceOf(user1.address)).eq(ONE_ETHER.mul(10));
     });
   });
+
+  describe("pause", function () {
+    it("starts unpaused", async function () {
+      expect(await uwp.isPaused()).eq(false);
+    });
+    it("cannot be paused by non goveranance", async function () {
+      await expect(uwp.connect(user1).setPause(true)).to.be.revertedWith("!governance");
+    });
+    it("can be paused", async function () {
+      let tx = await uwp.connect(governor).setPause(true);
+      await expect(tx).to.emit(uwp, "PauseSet").withArgs(true);
+      expect(await uwp.isPaused()).eq(true);
+    });
+    it("cannot issue while paused", async function () {
+      await expect(uwp.connect(user1).issue([], [], user1.address)).to.be.revertedWith("issue is paused");
+    });
+    it("cannot be unpaused by non goveranance", async function () {
+      await expect(uwp.connect(user1).setPause(false)).to.be.revertedWith("!governance");
+    });
+    it("can be unpaused", async function () {
+      let tx = await uwp.connect(governor).setPause(false);
+      await expect(tx).to.emit(uwp, "PauseSet").withArgs(false);
+      expect(await uwp.isPaused()).eq(false);
+    });
+    it("can issue after unpause", async function () {
+      await uwp.connect(user1).issue([], [], user2.address);
+    });
+  })
 });

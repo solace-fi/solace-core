@@ -20,6 +20,8 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
  * - Solace may charge a protocol fee as a fraction of the mint amount [`issueFee()`](#issuefee).
  *
  * Anyone can redeem their $UWP for tokens in the pool by calling [`redeem()`](#redeem). You will receive a fair portion of all assets in the pool.
+ *
+ * [Governance](/docs/protocol/governance) can pause and unpause [`issue()`](#issue). The other functions cannot be paused.
  */
 interface IUnderwritingPool is IERC20Metadata {
 
@@ -31,8 +33,14 @@ interface IUnderwritingPool is IERC20Metadata {
     event TokenAdded(address indexed token);
     /// @notice Emitted when a token is removed from the pool.
     event TokenRemoved(address indexed token);
+    /// @notice Emitted when uwp is issued.
+    event IssueMade(address user, uint256 amount);
+    /// @notice Emitted when uwp is redeemed.
+    event RedeemMade(address user, uint256 amount);
     /// @notice Emitted when issue fee is set.
     event IssueFeeSet(uint256 fee, address receiver);
+    /// @notice Emitted when pause is set.
+    event PauseSet(bool issueIsPaused);
 
     /***************************************
     VIEW FUNCTIONS
@@ -60,14 +68,14 @@ interface IUnderwritingPool is IERC20Metadata {
 
     /**
      * @notice The list of tokens in the pool.
-     * @dev Iterable [0, tokensLength).
+     * @dev Iterable `[0, tokensLength)`.
      * @param index The index of the list to query.
      * @return data Information about the token.
      */
     function tokenList(uint256 index) external view returns (TokenData memory data);
 
     /**
-     * @notice The fraction of pool tokens that are charged as a protocol fee on mint.
+     * @notice The fraction of `UWP` that are charged as a protocol fee on mint.
      * @return fee The fee as a fraction with 18 decimals.
      */
     function issueFee() external view returns (uint256 fee);
@@ -79,16 +87,37 @@ interface IUnderwritingPool is IERC20Metadata {
     function issueFeeTo() external view returns (address receiver);
 
     /**
+     * @notice Returns true if issue is paused.
+     * @return paused Returns true if issue is paused.
+     */
+    function isPaused() external view returns (bool paused);
+
+    /**
      * @notice Calculates the value of all assets in the pool in `USD`.
      * @return valueInUSD The value of the pool in `USD` with 18 decimals.
      */
     function valueOfPool() external view returns (uint256 valueInUSD);
 
     /**
-     * @notice Calculates the value of one pool token in `USD`.
+     * @notice Calculates the value of one `UWP` in `USD`.
      * @return valueInUSD The value of one token in `USD` with 18 decimals.
      */
     function valuePerShare() external view returns (uint256 valueInUSD);
+
+    /**
+     * @notice Determines the amount of tokens that would be minted for a given deposit.
+     * @param depositTokens The list of tokens to deposit.
+     * @param depositAmounts The amount of each token to deposit.
+     * @return amount The amount of `UWP` minted.
+     */
+    function calculateIssue(address[] memory depositTokens, uint256[] memory depositAmounts) external view returns (uint256 amount);
+
+    /**
+     * @notice Determines the amount of underlying tokens that would be received for an amount of `UWP`.
+     * @param amount The amount of `UWP` to burn.
+     * @return amounts The amount of each token received.
+     */
+    function calculateRedeem(uint256 amount) external view returns (uint256[] memory amounts);
 
     /***************************************
     MODIFIER FUNCTIONS
@@ -98,14 +127,14 @@ interface IUnderwritingPool is IERC20Metadata {
      * @notice Deposits one or more tokens into the pool.
      * @param depositTokens The list of tokens to deposit.
      * @param depositAmounts The amount of each token to deposit.
-     * @param receiver The address to send newly minted pool token to.
-     * @return amount The amount of pool tokens minted.
+     * @param receiver The address to send newly minted `UWP` to.
+     * @return amount The amount of `UWP` minted.
      */
     function issue(address[] memory depositTokens, uint256[] memory depositAmounts, address receiver) external returns (uint256 amount);
 
     /**
-     * @notice Redeems some of the pool token for some of the tokens in the pool.
-     * @param amount The amount of the pool token to burn.
+     * @notice Redeems some `UWP` for some of the tokens in the pool.
+     * @param amount The amount of `UWP` to burn.
      * @param receiver The address to receive underlying tokens.
      * @return amounts The amount of each token received.
      */
@@ -144,4 +173,11 @@ interface IUnderwritingPool is IERC20Metadata {
      * @param receiver The receiver of the fee.
      */
     function setIssueFee(uint256 fee, address receiver) external;
+
+    /**
+     * @notice Pauses or unpauses issue.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param pause True to pause issue, false to unpause.
+     */
+    function setPause(bool pause) external;
 }

@@ -26,6 +26,8 @@ import "../interfaces/native/IUnderwritingPool.sol";
  * - Solace may charge a protocol fee as a fraction of the mint amount [`issueFee()`](#issuefee).
  *
  * Anyone can redeem their $UWP for tokens in the pool by calling [`redeem()`](#redeem). You will receive a fair portion of all assets in the pool.
+ *
+ * [Governance](/docs/protocol/governance) can pause and unpause [`issue()`](#issue). The other functions cannot be paused.
  */
 contract UnderwritingPool is IUnderwritingPool, ERC20Permit, ReentrancyGuard, Governable {
     // dev: 'Len' and 'Index' may be prefixed with 'in' for input or 'st' for storage
@@ -46,6 +48,8 @@ contract UnderwritingPool is IUnderwritingPool, ERC20Permit, ReentrancyGuard, Go
     uint256 internal _issueFee;
     // receiver of issue fee
     address internal _issueFeeTo;
+    // true if issue is paused. default false
+    bool internal _isPaused;
 
     /**
      * @notice Constructs the `UnderwritingPool` contract.
@@ -85,7 +89,7 @@ contract UnderwritingPool is IUnderwritingPool, ERC20Permit, ReentrancyGuard, Go
 
     /**
      * @notice The list of tokens in the pool.
-     * @dev Iterable [0, tokensLength).
+     * @dev Iterable `[0, tokensLength)`.
      * @param index The index of the list to query.
      * @return data Information about the token.
      */
@@ -95,7 +99,7 @@ contract UnderwritingPool is IUnderwritingPool, ERC20Permit, ReentrancyGuard, Go
     }
 
     /**
-     * @notice The fraction of pool tokens that are charged as a protocol fee on mint.
+     * @notice The fraction of `UWP` that are charged as a protocol fee on mint.
      * @return fee The fee as a fraction with 18 decimals.
      */
     function issueFee() external view override returns (uint256 fee) {
@@ -111,6 +115,14 @@ contract UnderwritingPool is IUnderwritingPool, ERC20Permit, ReentrancyGuard, Go
     }
 
     /**
+     * @notice Returns true if issue is paused.
+     * @return paused Returns true if issue is paused.
+     */
+    function isPaused() external view override returns (bool paused) {
+        return _isPaused;
+    }
+
+    /**
      * @notice Calculates the value of all assets in the pool in `USD`.
      * @return valueInUSD The value of the pool in `USD` with 18 decimals.
      */
@@ -119,13 +131,97 @@ contract UnderwritingPool is IUnderwritingPool, ERC20Permit, ReentrancyGuard, Go
     }
 
     /**
-     * @notice Calculates the value of one pool token in `USD`.
+     * @notice Calculates the value of one `UWP` in `USD`.
      * @return valueInUSD The value of one token in `USD` with 18 decimals.
      */
     function valuePerShare() external view override returns (uint256 valueInUSD) {
         uint256 ts = totalSupply();
         if(ts == 0) return 0;
         return _valueOfPool() * 1 ether / ts;
+    }
+
+    /**
+     * @notice Determines the amount of tokens that would be minted for a given deposit.
+     * @param depositTokens The list of tokens to deposit.
+     * @param depositAmounts The amount of each token to deposit.
+     * @return amount The amount of `UWP` minted.
+     */
+    function calculateIssue(address[] memory depositTokens, uint256[] memory depositAmounts) external view override returns (uint256 amount) {
+        // checks
+        uint256 inLen = depositTokens.length;
+        require(inLen == depositAmounts.length, "length mismatch");
+        // step 1: calculate the value of the pool
+        uint256 poolValue = 0;
+        uint256 stLen = _tokensLength;
+        uint256[] memory tokenValues = new uint256[](stLen);
+        // for each token in pool
+        for(uint256 stIndex = 0; stIndex < stLen; stIndex++) {
+            // get token and oracle
+            TokenData storage data = _tokens[stIndex];
+            address token = data.token;
+            address oracle = data.oracle;
+            // get value
+            uint256 balance = IERC20(token).balanceOf(address(this));
+            uint256 tokenValue = IPriceOracle(oracle).valueOfTokens(token, balance);
+            // accumulate
+            tokenValues[stIndex] = tokenValue;
+            poolValue += tokenValue;
+        }
+        // step 2: pull tokens from msg.sender, calculate value
+        uint256 depositValue = 0;
+        // for each token to deposit
+        for(uint256 inIndex = 0; inIndex < inLen; inIndex++) {
+            address token = depositTokens[inIndex];
+            uint256 stIndex = _tokenIndices[token];
+            require(stIndex != 0, "token not in pool");
+            stIndex--;
+            TokenData storage data = _tokens[stIndex];
+            // pull tokens
+            uint256 depositAmount = depositAmounts[inIndex];
+            // calculate value
+            address oracle = data.oracle;
+            uint256 tokenValue = IPriceOracle(oracle).valueOfTokens(token, depositAmount);
+            depositValue += tokenValue;
+            tokenValue += tokenValues[stIndex];
+            tokenValues[stIndex] = tokenValue;
+            // check min, max
+            require(tokenValue >= data.min, "deposit too small");
+            require(tokenValue <= data.max, "deposit too large");
+        }
+        // step 3: issue
+        uint256 ts = totalSupply();
+        uint256 mintAmount = (ts == 0 || poolValue == 0)
+            ? depositValue
+            : (ts * depositValue / poolValue);
+        uint256 fee = mintAmount * _issueFee / 1 ether;
+        if(fee > 0) {
+            mintAmount -= fee;
+        }
+        return mintAmount;
+    }
+
+    /**
+     * @notice Determines the amount of underlying tokens that would be received for an amount of `UWP`.
+     * @param amount The amount of `UWP` to burn.
+     * @return amounts The amount of each token received.
+     */
+    function calculateRedeem(uint256 amount) external view override returns (uint256[] memory amounts) {
+        uint256 ts = totalSupply();
+        require(amount <= ts, "redeem amount exceeds supply");
+        uint256 stLen = _tokensLength;
+        amounts = new uint256[](stLen);
+        // for each token in pool
+        for(uint256 stIndex = 0; stIndex < stLen; stIndex++) {
+            // get token
+            TokenData storage data = _tokens[stIndex];
+            IERC20 token = IERC20(data.token);
+            // get balance
+            uint256 balance = token.balanceOf(address(this));
+            // transfer out fair portion
+            uint256 amt = balance * amount / ts;
+            amounts[stIndex] = amt;
+        }
+        return amounts;
     }
 
     /***************************************
@@ -136,13 +232,14 @@ contract UnderwritingPool is IUnderwritingPool, ERC20Permit, ReentrancyGuard, Go
      * @notice Deposits one or more tokens into the pool.
      * @param depositTokens The list of tokens to deposit.
      * @param depositAmounts The amount of each token to deposit.
-     * @param receiver The address to send newly minted pool token to.
-     * @return amount The amount of pool tokens minted.
+     * @param receiver The address to send newly minted `UWP` to.
+     * @return amount The amount of `UWP` minted.
      */
     function issue(address[] memory depositTokens, uint256[] memory depositAmounts, address receiver) external override nonReentrant returns (uint256 amount) {
         // checks
         uint256 inLen = depositTokens.length;
         require(inLen == depositAmounts.length, "length mismatch");
+        require(!_isPaused, "issue is paused");
         // step 1: calculate the value of the pool
         uint256 poolValue = 0;
         uint256 stLen = _tokensLength;
@@ -193,12 +290,13 @@ contract UnderwritingPool is IUnderwritingPool, ERC20Permit, ReentrancyGuard, Go
             mintAmount -= fee;
         }
         _mint(receiver, mintAmount);
+        emit IssueMade(msg.sender, mintAmount);
         return mintAmount;
     }
 
     /**
-     * @notice Redeems some of the pool token for some of the tokens in the pool.
-     * @param amount The amount of the pool token to burn.
+     * @notice Redeems some `UWP` for some of the tokens in the pool.
+     * @param amount The amount of `UWP` to burn.
      * @param receiver The address to receive underlying tokens.
      * @return amounts The amount of each token received.
      */
@@ -219,6 +317,7 @@ contract UnderwritingPool is IUnderwritingPool, ERC20Permit, ReentrancyGuard, Go
             amounts[stIndex] = amt;
             SafeERC20.safeTransfer(token, receiver, amt);
         }
+        emit RedeemMade(msg.sender, amount);
         return amounts;
     }
 
@@ -347,5 +446,15 @@ contract UnderwritingPool is IUnderwritingPool, ERC20Permit, ReentrancyGuard, Go
         _issueFee = fee;
         _issueFeeTo = receiver;
         emit IssueFeeSet(fee, receiver);
+    }
+
+    /**
+     * @notice Pauses or unpauses issue.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param pause True to pause issue, false to unpause.
+     */
+    function setPause(bool pause) external override onlyGovernance {
+        _isPaused = pause;
+        emit PauseSet(pause);
     }
 }
