@@ -113,6 +113,7 @@ export async function import_artifacts() {
 
   // native contracts
   artifacts.UnderwritingPool = await tryImport(`${artifact_dir}/native/UnderwritingPool.sol/UnderwritingPool.json`);
+  artifacts.UnderwritingEquity = await tryImport(`${artifact_dir}/native/UnderwritingEquity.sol/UnderwritingEquity.json`);
   artifacts.FluxMegaOracle = await tryImport(`${artifact_dir}/native/FluxMegaOracle.sol/FluxMegaOracle.json`);
   return artifacts;
 }

@@ -23,7 +23,7 @@ contract UnderwritingEquity is IUnderwritingEquity, ERC20Permit, ReentrancyGuard
     // underwriting pool token
     address internal _uwp;
 
-    // issue fee in 18 decimals
+    // issue fee in 18 decimals. default zero
     uint256 internal _issueFee;
     // receiver of issue fee
     address internal _issueFeeTo;
@@ -49,7 +49,7 @@ contract UnderwritingEquity is IUnderwritingEquity, ERC20Permit, ReentrancyGuard
     ***************************************/
 
     /**
-     * @notice Address of the [`underwriting pool`](./../../native/UnderwritingPool).
+     * @notice Address of the [`underwriting pool`](./UnderwritingPool).
      * @return uwp The underwriting pool.
      */
     function underwritingPool() external view override returns (address uwp) {
@@ -83,8 +83,8 @@ contract UnderwritingEquity is IUnderwritingEquity, ERC20Permit, ReentrancyGuard
     }
 
     /**
-     * @notice Calculates the amount of `UWE` minted for an amount of [`UWP`](./../../native/UnderwritingPool) deposited.
-     * @param uwpAmount The amount of [`UWP`](./../../native/UnderwritingPool) to deposit.
+     * @notice Calculates the amount of `UWE` minted for an amount of [`UWP`](./UnderwritingPool) deposited.
+     * @param uwpAmount The amount of [`UWP`](./UnderwritingPool) to deposit.
      * @return uweAmount The amount of `UWE` that will be minted to the receiver.
      */
     function calculateDeposit(uint256 uwpAmount) external view override returns (uint256 uweAmount) {
@@ -104,9 +104,9 @@ contract UnderwritingEquity is IUnderwritingEquity, ERC20Permit, ReentrancyGuard
     }
 
     /**
-     * @notice Calculates the amount of [`UWP`](./../../native/UnderwritingPool) returned for an amount of `UWE` withdrawn.
+     * @notice Calculates the amount of [`UWP`](./UnderwritingPool) returned for an amount of `UWE` withdrawn.
      * @param uweAmount The amount of `UWE` to redeem.
-     * @return uwpAmount The amount of [`UWP`](./../../native/UnderwritingPool) that will be returned to the receiver.
+     * @return uwpAmount The amount of [`UWP`](./UnderwritingPool) that will be returned to the receiver.
      */
     function calculateWithdraw(uint256 uweAmount) external view override returns (uint256 uwpAmount) {
         // get state
@@ -126,12 +126,13 @@ contract UnderwritingEquity is IUnderwritingEquity, ERC20Permit, ReentrancyGuard
     ***************************************/
 
     /**
-     * @notice Deposits [`UWP`](./../../native/UnderwritingPool) into `UWE`.
-     * @param uwpAmount The amount of [`UWP`](./../../native/UnderwritingPool) to deposit.
+     * @notice Deposits [`UWP`](./UnderwritingPool) into `UWE`.
+     * @param uwpAmount The amount of [`UWP`](./UnderwritingPool) to deposit.
      * @param receiver The address to send newly minted `UWE` to.
      * @return uweAmount The amount of `UWE` minted.
      */
     function deposit(uint256 uwpAmount, address receiver) external override nonReentrant returns (uint256 uweAmount) {
+        require(!_depositIsPaused, "deposit is paused");
         // get state
         uint256 ts = totalSupply();
         IERC20 uwp = IERC20(_uwp);
@@ -154,12 +155,13 @@ contract UnderwritingEquity is IUnderwritingEquity, ERC20Permit, ReentrancyGuard
     }
 
     /**
-     * @notice Redeems some `UWE` for [`UWP`](./../../native/UnderwritingPool).
+     * @notice Redeems some `UWE` for [`UWP`](./UnderwritingPool).
      * @param uweAmount The amount of `UWE` to burn.
-     * @param receiver The address to receive [`UWP`](./../../native/UnderwritingPool).
-     * @return uwpAmount The amount of [`UWP`](./../../native/UnderwritingPool) received.
+     * @param receiver The address to receive [`UWP`](./UnderwritingPool).
+     * @return uwpAmount The amount of [`UWP`](./UnderwritingPool) received.
      */
     function withdraw(uint256 uweAmount, address receiver) external override nonReentrant returns (uint256 uwpAmount) {
+        require(!_withdrawIsPaused, "withdraw is paused");
         // get state
         uint256 ts = totalSupply();
         IERC20 uwp = IERC20(_uwp);
@@ -209,12 +211,13 @@ contract UnderwritingEquity is IUnderwritingEquity, ERC20Permit, ReentrancyGuard
     }
 
     /**
-     * @notice Lends out [`UWP`](./../../native/UnderwritingPool) to pay claims.
+     * @notice Lends out [`UWP`](./UnderwritingPool) to pay claims.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param uwpAmount The amount of [`UWP`](./../../native/UnderwritingPool) to lend.
-     * @param receiver The receiver of [`UWP`](./../../native/UnderwritingPool).
+     * @param uwpAmount The amount of [`UWP`](./UnderwritingPool) to lend.
+     * @param receiver The receiver of [`UWP`](./UnderwritingPool).
      */
     function lend(uint256 uwpAmount, address receiver) external override onlyGovernance {
+        require(!_lendIsPaused, "lend is paused");
         SafeERC20.safeTransfer(IERC20(_uwp), receiver, uwpAmount);
         emit UwpLoaned(uwpAmount, receiver);
     }
