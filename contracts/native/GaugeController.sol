@@ -41,6 +41,10 @@ contract GaugeController is
     /// @notice Underwriting equity token
     address public override token;
 
+    /// @notice Updater address.
+    /// @dev Second address that can call updateGaugeWeights (in addition to governance).
+    address public override updater;
+
     /// @notice Insurance leverage factor.
     /// @dev 1e18 => 100%.
     uint256 public override leverageFactor;
@@ -168,6 +172,14 @@ contract GaugeController is
                 weights[i] = 0;
             }
         }
+    }
+
+    /**
+     * @notice Query whether msg.sender is either the governance or updater role.
+     * @return True if msg.sender is either governor or updater roler, and contract govenance is not locked, false otherwise.
+     */
+    function _isUpdaterOrGovernance() internal view returns (bool) {
+        return ( !this.governanceIsLocked() && ( msg.sender == updater || msg.sender == this.governance() ));
     }
 
     /***************************************
@@ -488,6 +500,16 @@ contract GaugeController is
     }
 
     /**
+     * @notice Set updater address.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param updater_ The address of the new updater.
+     */
+    function setUpdater(address updater_) external override onlyGovernance {
+        updater = updater_;
+        emit UpdaterSet(updater_);
+    }
+
+    /**
      * @notice Adds address to tokenholders set - these addresses will be queried for $UWE token balance and summed to determine the Solace Native insurance capacity.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param tokenholder_ Address of new tokenholder
@@ -526,9 +548,10 @@ contract GaugeController is
     /**
      * @notice Updates gauge weights by processing votes for the last epoch.
      * @dev Designed to be called in a while-loop with custom gas limit of 6M until `lastTimePremiumsCharged == epochStartTimestamp`.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * Can only be called by the current [**governor**](/docs/protocol/governance) or the updater role.
      */
-    function updateGaugeWeights() external override onlyGovernance {
+    function updateGaugeWeights() external override {
+        if (!_isUpdaterOrGovernance()) revert NotUpdaterNorGovernance();
         if ( _updateInfo._votesIndex == type(uint88).max ) {_resetVotePowerOfGaugeMapping();} // If first call for epoch, reset _votePowerOfGauge
         uint256 epochStartTime = _getEpochStartTimestamp();
         if (lastTimeGaugeWeightsUpdated >= epochStartTime) revert GaugeWeightsAlreadyUpdated();

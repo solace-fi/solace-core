@@ -57,6 +57,10 @@ contract UnderwritingLockVoting is
     /// @notice Registry address
     address public override registry;
 
+    /// @notice Updater address.
+    /// @dev Second address that can call chargePremiums (in addition to governance).
+    address public override updater;
+
     /// @notice End timestamp for last epoch that premiums were charged for all stored votes.
     uint256 public override lastTimePremiumsCharged;
 
@@ -136,14 +140,20 @@ contract UnderwritingLockVoting is
         return ( (block.timestamp / WEEK) * WEEK ) + WEEK;
     }
 
-
-
     /**
      * @notice Get end timestamp for last epoch that all stored votes were processed.
      * @return timestamp
      */
     function _getLastTimeGaugesUpdated() internal view returns (uint256 timestamp) {
         return IGaugeController(gaugeController).lastTimeGaugeWeightsUpdated();
+    }
+
+    /**
+     * @notice Query whether msg.sender is either the governance or updater role.
+     * @return True if msg.sender is either governor or updater roler, and contract govenance is not locked, false otherwise.
+     */
+    function _isUpdaterOrGovernance() internal view returns (bool) {
+        return ( !this.governanceIsLocked() && ( msg.sender == updater || msg.sender == this.governance() ));
     }
 
     /***************************************
@@ -380,12 +390,23 @@ contract UnderwritingLockVoting is
     }
 
     /**
+     * @notice Set updater address.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param updater_ The address of the new updater.
+     */
+    function setUpdater(address updater_) external override onlyGovernance {
+        updater = updater_;
+        emit UpdaterSet(updater_);
+    }
+
+    /**
      * @notice Charge premiums for votes.
      * @dev Designed to be called in a while-loop with the condition being `lastTimePremiumsCharged != epochStartTimestamp` and using the maximum custom gas limit.
      * @dev Requires GaugeController.updateGaugeWeights() to be run to completion for the last epoch.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      */
-    function chargePremiums() external override onlyGovernance {
+    function chargePremiums() external override {
+        if (!_isUpdaterOrGovernance()) revert NotUpdaterNorGovernance();
         uint256 epochStartTimestamp = _getEpochStartTimestamp();
         if(_getLastTimeGaugesUpdated() != epochStartTimestamp) revert GaugeWeightsNotYetUpdated();
         if(lastTimePremiumsCharged == epochStartTimestamp) revert LastEpochPremiumsAlreadyProcessed({epochTime: epochStartTimestamp});
