@@ -10,6 +10,7 @@ import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 import "./../interfaces/utils/IRegistry.sol";
 import "./../interfaces/native/IUnderwritingLockListener.sol";
 import "./../interfaces/native/IUnderwritingLocker.sol";
+import "./../interfaces/native/IUnderwritingEquity.sol";
 import "./../utils/ERC721Enhanced.sol";
 import "./../utils/Governable.sol";
 /**
@@ -627,7 +628,7 @@ contract UnderwritingLocker is
         uint256 amount = _locks[lockID_].amount;
         (uint256 withdrawAmount, uint256 burnAmount) = _withdraw(lockID_, amount);
         // transfer token
-        SafeERC20.safeTransfer(IERC20(token), address(0x1), burnAmount);
+        IUnderwritingEquity(token).burn(burnAmount);
         SafeERC20.safeTransfer(IERC20(token), recipient_, withdrawAmount);
     }
 
@@ -643,7 +644,7 @@ contract UnderwritingLocker is
         if (amount_ > _locks[lockID_].amount) revert ExcessWithdraw();
         (uint256 withdrawAmount, uint256 burnAmount) = _withdraw(lockID_, amount_);
         // transfer token
-        SafeERC20.safeTransfer(IERC20(token), address(0x1), burnAmount);
+        IUnderwritingEquity(token).burn(burnAmount);
         SafeERC20.safeTransfer(IERC20(token), recipient_, withdrawAmount);
     }
 
@@ -667,7 +668,7 @@ contract UnderwritingLocker is
             totalWithdrawAmount += withdrawAmount;
         }
         // batched token transfer
-        if (totalBurnAmount > 0) {SafeERC20.safeTransfer(IERC20(token), address(0x1), totalBurnAmount);}
+        if (totalBurnAmount > 0) {IUnderwritingEquity(token).burn(totalBurnAmount);}
         SafeERC20.safeTransfer(IERC20(token), recipient_, totalWithdrawAmount);
     }
 
@@ -694,7 +695,7 @@ contract UnderwritingLocker is
             totalWithdrawAmount += withdrawAmount;
         }
         // batched token transfer
-        if (totalBurnAmount > 0) {SafeERC20.safeTransfer(IERC20(token), address(0x1), totalBurnAmount);}
+        if (totalBurnAmount > 0) {IUnderwritingEquity(token).burn(totalBurnAmount);}
         SafeERC20.safeTransfer(IERC20(token), recipient_, totalWithdrawAmount);
     }
 

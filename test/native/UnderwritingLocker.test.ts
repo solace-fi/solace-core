@@ -7,7 +7,7 @@ import chai from "chai";
 const { expect } = chai;
 chai.use(solidity);
 import { import_artifacts, ArtifactImports } from "../utilities/artifact_importer";
-import { MockErc20Permit, UnderwritingLocker, Registry, MockUnderwritingLockListener } from "../../typechain";
+import { MockErc20PermitWithBurn, UnderwritingLocker, Registry, MockUnderwritingLockListener } from "../../typechain";
 import { expectDeployed } from "../utilities/expectDeployed";
 import { expectClose } from "./../utilities/math";
 import { getERC20PermitSignature } from "../utilities/getERC20PermitSignature";
@@ -24,7 +24,7 @@ import { getERC20PermitSignature } from "../utilities/getERC20PermitSignature";
 *******************/
 const ZERO = BN.from("0");
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-const BURN_ADDRESS = "0x0000000000000000000000000000000000000001";
+const BURN_ADDRESS = "0x0000000000000000000000000000000000000000";
 const ONE_ETHER = BN.from("1000000000000000000");
 const ONE_MILLION_ETHER = ONE_ETHER.mul(1000000);
 const ONE_YEAR = 31536000; // in seconds
@@ -43,7 +43,7 @@ describe("UnderwritingLocker", function () {
   /***************************
      VARIABLE DECLARATIONS
   ***************************/
-  let token: MockErc20Permit;
+  let token: MockErc20PermitWithBurn;
   let registry: Registry;
   let underwritingLocker: UnderwritingLocker;
   let listener: MockUnderwritingLockListener;
@@ -56,7 +56,7 @@ describe("UnderwritingLocker", function () {
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
     
     // Deploy $UWE, and mint 1M $UWE to deployer
-    token = (await deployContract(deployer, artifacts.MockERC20Permit, ["Underwriting Equity - Solace Native", "UWE", ONE_MILLION_ETHER, 18])) as MockErc20Permit;
+    token = (await deployContract(deployer, artifacts.MockERC20PermitWithBurn, ["Underwriting Equity - Solace Native", "UWE", ONE_MILLION_ETHER, 18])) as MockErc20PermitWithBurn;
 
     // Deploy registry
     registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
@@ -1221,7 +1221,7 @@ describe("UnderwritingLocker", function () {
       const oldUserState = await getUserState(user1);
       const oldLockState_Locked = await getLockState(LOCKED_LOCK_ID);
       const oldLockState_Unlocked = await getLockState(UNLOCKED_LOCK_ID);
-      const oldBurnAddressBalance = await token.balanceOf(BURN_ADDRESS);
+      const oldUWETotalSupply = await token.totalSupply()
       const {number: CURRENT_BLOCK} = await provider.getBlock('latest')
 
       const tx = await underwritingLocker.connect(user1).withdrawInPartMultiple(
@@ -1243,12 +1243,12 @@ describe("UnderwritingLocker", function () {
       const newUserState = await getUserState(user1);
       const newLockState_Locked = await getLockState(LOCKED_LOCK_ID);
       const newLockState_Unlocked = await getLockState(UNLOCKED_LOCK_ID);
-      const newBurnAddressBalance = await token.balanceOf(BURN_ADDRESS);
+      const newUWETotalSupply = await token.totalSupply()
       const globalStateChange = getGlobalStateChange(newGlobalState, oldGlobalState);
       const userStateChange = getUserStateChange(newUserState, oldUserState);
       const lockStateChange_Locked = getLockStateChange(newLockState_Locked, oldLockState_Locked);
       const lockStateChange_Unlocked = getLockStateChange(newLockState_Unlocked, oldLockState_Unlocked);
-      const burnAddressBalanceChange = newBurnAddressBalance.sub(oldBurnAddressBalance)
+      const UWETotalSupplyChange = newUWETotalSupply.sub(oldUWETotalSupply)
 
       expect(globalStateChange.totalNumLocks.eq(0));
       expect(globalStateChange.totalStakedAmount.eq(WITHDRAW_AMOUNT.mul(2)));
@@ -1260,7 +1260,7 @@ describe("UnderwritingLocker", function () {
       expect(lockStateChange_Locked.end).eq(0);
       expect(lockStateChange_Unlocked.amount).eq(WITHDRAW_AMOUNT.mul(-1));
       expect(lockStateChange_Unlocked.end).eq(0);
-      expect(burnAddressBalanceChange).eq(BURN_AMOUNT_LOCKED.add(BURN_AMOUNT_UNLOCKED))
+      expect(UWETotalSupplyChange).eq((BURN_AMOUNT_LOCKED.add(BURN_AMOUNT_UNLOCKED)).mul(-1))
 
       const listenerUpdate = await listener.lastUpdate();
       expect(listenerUpdate.blocknum).eq(CURRENT_BLOCK + 1);
@@ -1280,6 +1280,7 @@ describe("UnderwritingLocker", function () {
       const oldUserState = await getUserState(user1);
       const oldLockState_Locked = await getLockState(LOCKED_LOCK_ID);
       const oldLockState_Unlocked = await getLockState(UNLOCKED_LOCK_ID);
+      const oldUWETotalSupply = await token.totalSupply()
       const {number: CURRENT_BLOCK} = await provider.getBlock('latest');
 
       await underwritingLocker.connect(user1).setApprovalForAll(user2.address, true)
@@ -1302,10 +1303,12 @@ describe("UnderwritingLocker", function () {
       const newUserState = await getUserState(user1);
       const newLockState_Locked = await getLockState(LOCKED_LOCK_ID);
       const newLockState_Unlocked = await getLockState(UNLOCKED_LOCK_ID);
+      const newUWETotalSupply = await token.totalSupply()
       const globalStateChange = getGlobalStateChange(newGlobalState, oldGlobalState);
       const userStateChange = getUserStateChange(newUserState, oldUserState);
       const lockStateChange_Locked = getLockStateChange(newLockState_Locked, oldLockState_Locked);
       const lockStateChange_Unlocked = getLockStateChange(newLockState_Unlocked, oldLockState_Unlocked);
+      const UWETotalSupplyChange = newUWETotalSupply.sub(oldUWETotalSupply)
 
       expect(globalStateChange.totalNumLocks.eq(0));
       expect(globalStateChange.totalStakedAmount.eq(WITHDRAW_AMOUNT.mul(2)));
@@ -1317,6 +1320,7 @@ describe("UnderwritingLocker", function () {
       expect(lockStateChange_Locked.end).eq(0);
       expect(lockStateChange_Unlocked.amount).eq(WITHDRAW_AMOUNT.mul(-1));
       expect(lockStateChange_Unlocked.end).eq(0);
+      expect(UWETotalSupplyChange).eq((BURN_AMOUNT_LOCKED.add(BURN_AMOUNT_UNLOCKED)).mul(-1))
 
       const listenerUpdate = await listener.lastUpdate();
       expect(listenerUpdate.blocknum).eq(CURRENT_BLOCK + 2);
@@ -1417,6 +1421,7 @@ describe("UnderwritingLocker", function () {
       const oldLockState = await getLockState(UNLOCKED_LOCK_ID);
       const {number: CURRENT_BLOCK} = await provider.getBlock('latest')
       const LOCK_AMOUNT = oldLockState.amount;
+      const oldUWETotalSupply = await token.totalSupply()
 
       await underwritingLocker.connect(user1).approve(user2.address, UNLOCKED_LOCK_ID);
       const ACTUAL_WITHDRAW_AMOUNT = await underwritingLocker.getWithdrawAmount(UNLOCKED_LOCK_ID)
@@ -1428,8 +1433,10 @@ describe("UnderwritingLocker", function () {
 
       const newGlobalState = await getGlobalState();
       const newUserState = await getUserState(user1);
+      const newUWETotalSupply = await token.totalSupply()
       const globalStateChange = getGlobalStateChange(newGlobalState, oldGlobalState);
       const userStateChange = getUserStateChange(newUserState, oldUserState);
+      const UWETotalSupplyChange = newUWETotalSupply.sub(oldUWETotalSupply)
 
       expect(globalStateChange.totalNumLocks.eq(0));
       expect(globalStateChange.totalStakedAmount.eq(LOCK_AMOUNT));
@@ -1437,6 +1444,7 @@ describe("UnderwritingLocker", function () {
       expect(userStateChange.lockedTokenAmount).eq(LOCK_AMOUNT.mul(-1));
       expect(userStateChange.numOfLocks).eq(-1);
       expect(userStateChange.tokenAmountInWallet).eq(ACTUAL_WITHDRAW_AMOUNT);
+      expect(UWETotalSupplyChange).eq(BURN_AMOUNT.mul(-1))
       await expect(underwritingLocker.locks(UNLOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
       await expect(underwritingLocker.timeLeft(UNLOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
       await expect(underwritingLocker.isLocked(UNLOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
@@ -1458,7 +1466,7 @@ describe("UnderwritingLocker", function () {
       const oldGlobalState = await getGlobalState();
       const oldUserState = await getUserState(user1);
       const oldLockState = await getLockState(LOCKED_LOCK_ID);
-      const oldBurnAddressBalance = await token.balanceOf(BURN_ADDRESS);
+      const oldUWETotalSupply = await token.totalSupply()
       const {number: CURRENT_BLOCK} = await provider.getBlock('latest')
       const LOCK_AMOUNT = oldLockState.amount;
       
@@ -1475,10 +1483,10 @@ describe("UnderwritingLocker", function () {
 
       const newGlobalState = await getGlobalState();
       const newUserState = await getUserState(user1);
-      const newBurnAddressBalance = await token.balanceOf(BURN_ADDRESS);
+      const newUWETotalSupply = await token.totalSupply()
       const globalStateChange = getGlobalStateChange(newGlobalState, oldGlobalState);
       const userStateChange = getUserStateChange(newUserState, oldUserState);
-      const burnAddressBalanceChange = newBurnAddressBalance.sub(oldBurnAddressBalance)
+      const UWETotalSupplyChange = newUWETotalSupply.sub(oldUWETotalSupply)
 
       expect(globalStateChange.totalNumLocks.eq(0));
       expect(globalStateChange.totalStakedAmount.eq(LOCK_AMOUNT));
@@ -1486,7 +1494,7 @@ describe("UnderwritingLocker", function () {
       expect(userStateChange.lockedTokenAmount).eq(LOCK_AMOUNT.mul(-1));
       expect(userStateChange.numOfLocks).eq(-1);
       expectClose(userStateChange.tokenAmountInWallet, ACTUAL_WITHDRAW_AMOUNT, 1e15);
-      expectClose(burnAddressBalanceChange, BURN_AMOUNT, 1e15);
+      expectClose(UWETotalSupplyChange, BURN_AMOUNT.mul(-1), 1e15);
       await expect(underwritingLocker.locks(LOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
       await expect(underwritingLocker.timeLeft(LOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
       await expect(underwritingLocker.isLocked(LOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
@@ -1508,7 +1516,7 @@ describe("UnderwritingLocker", function () {
       const oldGlobalState = await getGlobalState();
       const oldUserState = await getUserState(user1);
       const oldLockState = await getLockState(LOCKED_LOCK_ID);
-      const oldBurnAddressBalance = await token.balanceOf(BURN_ADDRESS);
+      const oldUWETotalSupply = await token.totalSupply()
       const {number: CURRENT_BLOCK} = await provider.getBlock('latest')
       const LOCK_AMOUNT = oldLockState.amount;
 
@@ -1521,10 +1529,10 @@ describe("UnderwritingLocker", function () {
 
       const newGlobalState = await getGlobalState();
       const newUserState = await getUserState(user1);
-      const newBurnAddressBalance = await token.balanceOf(BURN_ADDRESS);
+      const newUWETotalSupply = await token.totalSupply()
       const globalStateChange = getGlobalStateChange(newGlobalState, oldGlobalState);
       const userStateChange = getUserStateChange(newUserState, oldUserState);
-      const burnAddressBalanceChange = newBurnAddressBalance.sub(oldBurnAddressBalance)
+      const UWETotalSupplyChange = newUWETotalSupply.sub(oldUWETotalSupply)
 
       expect(globalStateChange.totalNumLocks.eq(0));
       expect(globalStateChange.totalStakedAmount.eq(LOCK_AMOUNT));
@@ -1532,7 +1540,7 @@ describe("UnderwritingLocker", function () {
       expect(userStateChange.lockedTokenAmount).eq(LOCK_AMOUNT.mul(-1));
       expect(userStateChange.numOfLocks).eq(-1);
       expectClose(userStateChange.tokenAmountInWallet, ACTUAL_WITHDRAW_AMOUNT, 1e15);
-      expectClose(burnAddressBalanceChange, BURN_AMOUNT, 1e15);
+      expectClose(UWETotalSupplyChange, BURN_AMOUNT.mul(-1), 1e15);
       await expect(underwritingLocker.locks(LOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
       await expect(underwritingLocker.timeLeft(LOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
       await expect(underwritingLocker.isLocked(LOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
@@ -1602,7 +1610,7 @@ describe("UnderwritingLocker", function () {
       const oldGlobalState = await getGlobalState();
       const oldUserState = await getUserState(user1);
       const oldLockState = await getLockState(LOCKED_LOCK_ID);
-      const oldBurnAddressBalance = await token.balanceOf(BURN_ADDRESS);
+      const oldUWETotalSupply = await token.totalSupply()
       const {number: CURRENT_BLOCK} = await provider.getBlock('latest')
       const LOCK_AMOUNT = oldLockState.amount
 
@@ -1619,10 +1627,10 @@ describe("UnderwritingLocker", function () {
 
       const newGlobalState = await getGlobalState();
       const newUserState = await getUserState(user1);
-      const newBurnAddressBalance = await token.balanceOf(BURN_ADDRESS);
+      const newUWETotalSupply = await token.totalSupply()
       const globalStateChange = getGlobalStateChange(newGlobalState, oldGlobalState);
       const userStateChange = getUserStateChange(newUserState, oldUserState);
-      const burnAddressBalanceChange = newBurnAddressBalance.sub(oldBurnAddressBalance);
+      const UWETotalSupplyChange = newUWETotalSupply.sub(oldUWETotalSupply)
 
       expect(globalStateChange.totalNumLocks.eq(0));
       expect(globalStateChange.totalStakedAmount.eq(LOCK_AMOUNT));
@@ -1630,7 +1638,7 @@ describe("UnderwritingLocker", function () {
       expect(userStateChange.lockedTokenAmount).eq(LOCK_AMOUNT.mul(-2));
       expect(userStateChange.numOfLocks).eq(-2);
       expectClose(userStateChange.tokenAmountInWallet, ACTUAL_WITHDRAW_AMOUNT_LOCKED.add(ACTUAL_WITHDRAW_AMOUNT_UNLOCKED), 1e15)
-      expectClose(burnAddressBalanceChange, BURN_AMOUNT_LOCKED.add(BURN_AMOUNT_UNLOCKED), 1e15)
+      expectClose(UWETotalSupplyChange, (BURN_AMOUNT_LOCKED.add(BURN_AMOUNT_UNLOCKED)).mul(-1), 1e15)
 
       await expect(underwritingLocker.locks(UNLOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
       await expect(underwritingLocker.timeLeft(UNLOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
@@ -1658,7 +1666,7 @@ describe("UnderwritingLocker", function () {
       const oldGlobalState = await getGlobalState();
       const oldUserState = await getUserState(user1);
       const oldLockState = await getLockState(LOCKED_LOCK_ID);
-      const oldBurnAddressBalance = await token.balanceOf(BURN_ADDRESS);
+      const oldUWETotalSupply = await token.totalSupply()
       const {number: CURRENT_BLOCK} = await provider.getBlock('latest')
       const LOCK_AMOUNT = oldLockState.amount
 
@@ -1676,10 +1684,10 @@ describe("UnderwritingLocker", function () {
 
       const newGlobalState = await getGlobalState();
       const newUserState = await getUserState(user1);
-      const newBurnAddressBalance = await token.balanceOf(BURN_ADDRESS);
+      const newUWETotalSupply = await token.totalSupply()
       const globalStateChange = getGlobalStateChange(newGlobalState, oldGlobalState);
       const userStateChange = getUserStateChange(newUserState, oldUserState);
-      const burnAddressBalanceChange = newBurnAddressBalance.sub(oldBurnAddressBalance);
+      const UWETotalSupplyChange = newUWETotalSupply.sub(oldUWETotalSupply)
 
       expect(globalStateChange.totalNumLocks.eq(0));
       expect(globalStateChange.totalStakedAmount.eq(LOCK_AMOUNT));
@@ -1687,7 +1695,7 @@ describe("UnderwritingLocker", function () {
       expect(userStateChange.lockedTokenAmount).eq(LOCK_AMOUNT.mul(-2));
       expect(userStateChange.numOfLocks).eq(-2);
       expectClose(userStateChange.tokenAmountInWallet, ACTUAL_WITHDRAW_AMOUNT_LOCKED.add(ACTUAL_WITHDRAW_AMOUNT_UNLOCKED), 1e15)
-      expectClose(burnAddressBalanceChange, BURN_AMOUNT_LOCKED.add(BURN_AMOUNT_UNLOCKED), 1e15)
+      expectClose(UWETotalSupplyChange, (BURN_AMOUNT_LOCKED.add(BURN_AMOUNT_UNLOCKED)).mul(-1), 1e15)
 
       await expect(underwritingLocker.locks(UNLOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
       await expect(underwritingLocker.timeLeft(UNLOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
