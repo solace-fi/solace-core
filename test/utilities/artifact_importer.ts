@@ -106,15 +106,20 @@ export async function import_artifacts() {
 
   // vesting
   artifacts.TokenVesting = await tryImport(`${artifact_dir}/vesting/TokenVesting.sol/TokenVesting.json`);
-  
+
   // airdrop contracts
   artifacts.MerkleDistributor = await tryImport(`${artifact_dir}/airdrop/MerkleDistributor.sol/MerkleDistributor.json`);
   artifacts.xsLockerExtension = await tryImport(`${artifact_dir}/airdrop/xsLockerExtension.sol/xsLockerExtension.json`);
 
   // native contracts
+  artifacts.FluxMegaOracle = await tryImport(`${artifact_dir}/native/FluxMegaOracle.sol/FluxMegaOracle.json`);
   artifacts.UnderwritingPool = await tryImport(`${artifact_dir}/native/UnderwritingPool.sol/UnderwritingPool.json`);
   artifacts.UnderwritingEquity = await tryImport(`${artifact_dir}/native/UnderwritingEquity.sol/UnderwritingEquity.json`);
-  artifacts.FluxMegaOracle = await tryImport(`${artifact_dir}/native/FluxMegaOracle.sol/FluxMegaOracle.json`);
+  artifacts.UnderwritingLocker = await tryImport(`${artifact_dir}/native/UnderwritingLocker.sol/UnderwritingLocker.json`);
+  artifacts.UnderwritingLockVoting = await tryImport(`${artifact_dir}/native/UnderwritingLockVoting.sol/UnderwritingLockVoting.json`);
+  artifacts.GaugeController = await tryImport(`${artifact_dir}/native/GaugeController.sol/GaugeController.json`);
+  artifacts.MockUnderwritingLockListener = await tryImport(`${artifact_dir}/mocks/MockUnderwritingLockListener.sol/MockUnderwritingLockListener.json`);
+
   return artifacts;
 }
 
