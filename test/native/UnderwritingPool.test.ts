@@ -91,7 +91,10 @@ describe("UnderwritingPool", function () {
       expect(await uwp.issueFee()).eq(0);
       expect(await uwp.issueFeeTo()).eq(ZERO_ADDRESS);
       expect(await uwp.valueOfPool()).eq(0);
-      expect(await uwp.valuePerShare()).eq(0);
+      expect(await uwp.isPaused()).eq(false);
+      expect(await uwp.valueOfShares(0)).eq(0);
+      expect(await uwp.valueOfHolder(user1.address)).eq(0);
+      await expect(uwp.valueOfShares(1)).to.be.revertedWith("shares exceeds supply");
     });
   });
 
@@ -177,7 +180,6 @@ describe("UnderwritingPool", function () {
       expect(await uwp.tokensLength()).eq(3);
 
       expect(await uwp.valueOfPool()).eq(0);
-      expect(await uwp.valuePerShare()).eq(0);
     });
     it("non governance cannot remove tokens", async function () {
       await expect(uwp.connect(user1).removeTokensFromPool([])).to.be.revertedWith("!governance");
@@ -214,7 +216,6 @@ describe("UnderwritingPool", function () {
       expect(await uwp.tokensLength()).eq(1);
 
       expect(await uwp.valueOfPool()).eq(0);
-      expect(await uwp.valuePerShare()).eq(0);
     });
   });
 
@@ -288,7 +289,8 @@ describe("UnderwritingPool", function () {
       expect(await uwp.balanceOf(user2.address)).eq(0);
       expect(await uwp.totalSupply()).eq(0);
       expect(await uwp.valueOfPool()).eq(0);
-      expect(await uwp.valuePerShare()).eq(0);
+      expect(await uwp.valueOfShares(0)).eq(0);
+      expect(await uwp.valueOfHolder(user1.address)).eq(0);
     });
     it("can deposit zero", async function () {
       let amount = await uwp.connect(user1).calculateIssue([usdc.address], [0]);
@@ -301,7 +303,8 @@ describe("UnderwritingPool", function () {
       expect(await uwp.balanceOf(user2.address)).eq(0);
       expect(await uwp.totalSupply()).eq(0);
       expect(await uwp.valueOfPool()).eq(0);
-      expect(await uwp.valuePerShare()).eq(0);
+      expect(await uwp.valueOfShares(0)).eq(0);
+      expect(await uwp.valueOfHolder(user1.address)).eq(0);
     });
     it("can deposit 1", async function () {
       // first deposit
@@ -317,7 +320,10 @@ describe("UnderwritingPool", function () {
       expect(await uwp.balanceOf(user2.address)).eq(ONE_ETHER.mul(1000));
       expect(await uwp.totalSupply()).eq(ONE_ETHER.mul(1000));
       expect(await uwp.valueOfPool()).eq(ONE_ETHER.mul(1000));
-      expect(await uwp.valuePerShare()).eq(ONE_ETHER);
+      expect(await uwp.valueOfShares(ONE_ETHER)).eq(ONE_ETHER);
+      expect(await uwp.valueOfHolder(user1.address)).eq(0);
+      expect(await uwp.valueOfHolder(user2.address)).eq(ONE_ETHER.mul(1000));
+      await expect(uwp.valueOfShares(ONE_ETHER.mul(1000).add(1))).to.be.revertedWith("shares exceeds supply");
     });
     it("can deposit 2", async function () {
       // another deposit
@@ -333,7 +339,10 @@ describe("UnderwritingPool", function () {
       expect(await uwp.balanceOf(user2.address)).eq(ONE_ETHER.mul(2000));
       expect(await uwp.totalSupply()).eq(ONE_ETHER.mul(2000));
       expect(await uwp.valueOfPool()).eq(ONE_ETHER.mul(2000));
-      expect(await uwp.valuePerShare()).eq(ONE_ETHER);
+      expect(await uwp.valueOfShares(ONE_ETHER)).eq(ONE_ETHER);
+      expect(await uwp.valueOfHolder(user1.address)).eq(0);
+      expect(await uwp.valueOfHolder(user2.address)).eq(ONE_ETHER.mul(2000));
+      await expect(uwp.valueOfShares(ONE_ETHER.mul(2000).add(1))).to.be.revertedWith("shares exceeds supply");
     });
     it("can deposit 3", async function () {
       // multi deposit
@@ -349,6 +358,11 @@ describe("UnderwritingPool", function () {
       expect(await uwp.balanceOf(user1.address)).eq(0);
       expect(await uwp.balanceOf(user2.address)).eq(ONE_ETHER.mul(4300));
       expect(await uwp.totalSupply()).eq(ONE_ETHER.mul(4300));
+      expect(await uwp.valueOfPool()).eq(ONE_ETHER.mul(4300));
+      expect(await uwp.valueOfShares(ONE_ETHER)).eq(ONE_ETHER);
+      expect(await uwp.valueOfHolder(user1.address)).eq(0);
+      expect(await uwp.valueOfHolder(user2.address)).eq(ONE_ETHER.mul(4300));
+      await expect(uwp.valueOfShares(ONE_ETHER.mul(4300).add(1))).to.be.revertedWith("shares exceeds supply");
     });
     it("can deposit 4", async function () {
       // with issue fee
@@ -367,7 +381,10 @@ describe("UnderwritingPool", function () {
       expect(await uwp.balanceOf(user3.address)).eq(ONE_ETHER.mul(10));
       expect(await uwp.totalSupply()).eq(ONE_ETHER.mul(5300));
       expect(await uwp.valueOfPool()).eq(ONE_ETHER.mul(5300));
-      expect(await uwp.valuePerShare()).eq(ONE_ETHER);
+      expect(await uwp.valueOfShares(ONE_ETHER)).eq(ONE_ETHER);
+      expect(await uwp.valueOfHolder(user1.address)).eq(0);
+      expect(await uwp.valueOfHolder(user2.address)).eq(ONE_ETHER.mul(5290));
+      await expect(uwp.valueOfShares(ONE_ETHER.mul(5300).add(1))).to.be.revertedWith("shares exceeds supply");
     });
     it("cannot deposit above max pt 2", async function () {
       await expect(uwp.connect(user1).calculateIssue([dai.address], [ONE_ETHER.mul(6001)])).to.be.revertedWith("deposit too large");
@@ -377,10 +394,12 @@ describe("UnderwritingPool", function () {
     });
     it("value of pool changes with oracle answers", async function () {
       expect(await uwp.valueOfPool()).eq(ONE_ETHER.mul(5300));
-      expect(await uwp.valuePerShare()).eq(ONE_ETHER);
       await ethPriceFeed.connect(governor).setAnswer(EIGHT_DECIMALS.mul(1400));
       expect(await uwp.valueOfPool()).eq(ONE_ETHER.mul(5400));
-      expect(await uwp.valuePerShare()).eq(ONE_ETHER.mul(5400).div(5300));
+      expect(await uwp.valueOfShares(ONE_ETHER)).eq(ONE_ETHER.mul(5400).div(5300));
+      expect(await uwp.valueOfHolder(user1.address)).eq(0);
+      expect(await uwp.valueOfHolder(user2.address)).eq(ONE_ETHER.mul(5400).mul(await uwp.balanceOf(user2.address)).div(await uwp.totalSupply()));
+      await expect(uwp.valueOfShares(ONE_ETHER.mul(5300).add(1))).to.be.revertedWith("shares exceeds supply");
     });
     it("can deposit 5", async function () {
       // at value per share != 1
@@ -397,7 +416,9 @@ describe("UnderwritingPool", function () {
       expect(await uwp.balanceOf(user2.address)).eq(ONE_ETHER.mul(5290).add(ONE_ETHER.mul(1000).mul(4).mul(5300).div(5400)));
       expect(await uwp.totalSupply()).eq(ONE_ETHER.mul(5300).add(ONE_ETHER.mul(1000).mul(4).mul(5300).div(5400)));
       expect(await uwp.valueOfPool()).eq(ONE_ETHER.mul(9400));
-      expect(await uwp.valuePerShare()).eq(ONE_ETHER.mul(5400).div(5300));
+      expect(await uwp.valueOfShares(ONE_ETHER)).eq(ONE_ETHER.mul(5400).div(5300));
+      expect(await uwp.valueOfHolder(user1.address)).eq(0);
+      expect(await uwp.valueOfHolder(user2.address)).eq(ONE_ETHER.mul(9400).mul(await uwp.balanceOf(user2.address)).div(await uwp.totalSupply()));
     });
   });
 

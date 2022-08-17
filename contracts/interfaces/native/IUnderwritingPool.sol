@@ -99,10 +99,18 @@ interface IUnderwritingPool is IERC20Metadata {
     function valueOfPool() external view returns (uint256 valueInUSD);
 
     /**
-     * @notice Calculates the value of one `UWP` in `USD`.
-     * @return valueInUSD The value of one token in `USD` with 18 decimals.
+     * @notice Calculates the value of an amount of `UWP` shares in `USD`.
+     * @param shares The amount of shares to query.
+     * @return valueInUSD The value of the shares in `USD` with 18 decimals.
      */
-    function valuePerShare() external view returns (uint256 valueInUSD);
+    function valueOfShares(uint256 shares) external view returns (uint256 valueInUSD);
+
+    /**
+     * @notice Calculates the value of a holders `UWP` shares in `USD`.
+     * @param holder The holder to query.
+     * @return valueInUSD The value of the users shares in `USD` with 18 decimals.
+     */
+    function valueOfHolder(address holder) external view returns (uint256 valueInUSD);
 
     /**
      * @notice Determines the amount of tokens that would be minted for a given deposit.

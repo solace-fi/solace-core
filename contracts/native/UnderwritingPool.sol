@@ -44,7 +44,7 @@ contract UnderwritingPool is IUnderwritingPool, ERC20Permit, ReentrancyGuard, Go
     // map of token to index+1. if mapping returns zero, token is not in pool
     mapping(address => uint256) internal _tokenIndices;
 
-    // issue fee in 18 decimals
+    // issue fee in 18 decimals. default zero
     uint256 internal _issueFee;
     // receiver of issue fee
     address internal _issueFeeTo;
@@ -131,13 +131,27 @@ contract UnderwritingPool is IUnderwritingPool, ERC20Permit, ReentrancyGuard, Go
     }
 
     /**
-     * @notice Calculates the value of one `UWP` in `USD`.
-     * @return valueInUSD The value of one token in `USD` with 18 decimals.
+     * @notice Calculates the value of an amount of `UWP` shares in `USD`.
+     * @param shares The amount of shares to query.
+     * @return valueInUSD The value of the shares in `USD` with 18 decimals.
      */
-    function valuePerShare() external view override returns (uint256 valueInUSD) {
+    function valueOfShares(uint256 shares) external view override returns (uint256 valueInUSD) {
+        if(shares == 0) return 0;
         uint256 ts = totalSupply();
-        if(ts == 0) return 0;
-        return _valueOfPool() * 1 ether / ts;
+        require(shares <= ts, "shares exceeds supply");
+        return ((_valueOfPool() * shares) / ts);
+    }
+
+    /**
+     * @notice Calculates the value of a holders `UWP` shares in `USD`.
+     * @param holder The holder to query.
+     * @return valueInUSD The value of the users shares in `USD` with 18 decimals.
+     */
+    function valueOfHolder(address holder) external view override returns (uint256 valueInUSD) {
+        uint256 bal = balanceOf(holder);
+        if(bal == 0) return 0;
+        uint256 ts = totalSupply();
+        return ((_valueOfPool() * bal) / ts);
     }
 
     /**
