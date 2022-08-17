@@ -32,12 +32,6 @@ interface IDepositHelper {
     function underwritingLocker() external view returns (address locker);
 
     /**
-     * @notice Address of [underwriting lock voting](./../../native/UnderwritingLockVoting).
-     * @return voting The underwriting lock voting.
-     */
-    function underwritingLockVoting() external view returns (address voting);
-
-    /**
      * @notice Calculates the amount of [`UWE`](./../../native/UnderwritingEquity) minted for an amount of a token deposited.
      * The deposit token may be one of the tokens in [`UWP`](./../../native/UnderwritingPool) or [`UWP`](./../../native/UnderwritingPool) itself.
      * @param depositToken The address of the token to deposit.
@@ -51,25 +45,23 @@ interface IDepositHelper {
     ***************************************/
 
     /**
-     * @notice Deposits tokens into `UWE`, deposits `UWE` into a new `UWE Lock`, and votes on a gauge.
+     * @notice Deposits tokens into [`UWE`](./../../native/UnderwritingEquity) and deposits [`UWE`](./../../native/UnderwritingEquity) into a new [`UWE Lock`](./../../native/UnderwritingLocker).
      * @param depositToken Address of the token to deposit.
      * @param depositAmount Amount of the token to deposit.
      * @param lockExpiry The timestamp the lock will unlock.
-     * @param gaugeID The ID of the gauge to vote on.
      * @return lockID The ID of the newly created `UWE Lock`.
      */
-    function depositLockAndVote(
+    function depositAndLock(
         address depositToken,
         uint256 depositAmount,
-        uint256 lockExpiry,
-        uint256 gaugeID
+        uint256 lockExpiry
     ) external returns (uint256 lockID);
 
     /**
-     * @notice Deposits tokens into `UWE` and deposits `UWE` into an existing `UWE Lock`
+     * @notice Deposits tokens into [`UWE`](./../../native/UnderwritingEquity) and deposits [`UWE`](./../../native/UnderwritingEquity) into an existing [`UWE Lock`](./../../native/UnderwritingLocker)
      * @param depositToken Address of the token to deposit.
      * @param depositAmount Amount of the token to deposit.
-     * @param lockID The ID of the `uwe lock` to deposit into.
+     * @param lockID The ID of the [`UWE Lock`](./../../native/UnderwritingLocker) to deposit into.
      */
     function depositToLock(
         address depositToken,
