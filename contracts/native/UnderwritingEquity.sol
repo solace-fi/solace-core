@@ -12,7 +12,15 @@ import "../interfaces/native/IUnderwritingEquity.sol";
 /**
  * @title UnderwritingEquity
  * @author solace.fi
- * @notice
+ * @notice Equity of the [Underwriting Pool](./UnderwritingPool) that can be used in Solace Native.
+ *
+ * Users can deposit [`UWP`](./UnderwritingPool) via [`deposit()`](#deposit) which mints `UWE`. Users can redeem `UWE` for [`UWP`](./UnderwritingPool) via [`withdraw()`](#withdraw). Note that deposits must be made via [`deposit()`](#deposit). Simply transferring [`UWP`](./UnderwritingPool) to this contract will not mint `UWE`.
+ *
+ * Solace may charge a protocol fee as a fraction of the mint amount [`issueFee()`](#issuefee).
+ *
+ * Solace may lend some of the underlying [`UWP`](./UnderwritingPool) to a lending module and borrow stables against it to pay claims via [`lend()`](#lend).
+ *
+ * [Governance](/docs/protocol/governance) can pause and unpause [`deposit()`](#deposit), [`withdraw()`](#withdraw), and [`lend()`](#lend).
  */
 contract UnderwritingEquity is IUnderwritingEquity, ERC20Permit, ReentrancyGuard, Governable {
 
@@ -197,12 +205,13 @@ contract UnderwritingEquity is IUnderwritingEquity, ERC20Permit, ReentrancyGuard
      * @param receiver The receiver of the tokens.
      */
     function rescueTokens(address[] memory tokens, address receiver) external override onlyGovernance {
+        address uwp_ = _uwp;
         // for each requested token
         uint256 len = tokens.length;
         for(uint256 index = 0; index < len; index++) {
             address token = tokens[index];
             // cannot rescue valued underlying tokens
-            require(token != _uwp, "cannot rescue uwp");
+            require(token != uwp_, "cannot rescue uwp");
             // send balance to receiver
             IERC20 tkn = IERC20(token);
             uint256 balance = tkn.balanceOf(address(this));

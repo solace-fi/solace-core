@@ -8,7 +8,7 @@ import "./IPriceOracle.sol";
  * @author solace.fi
  * @notice An oracle that consumes data from [Flux](https://fluxprotocol.org) and returns it in a useable format.
  *
- * [Governance](/docs/protocol/governance) can add or remove price feeds via [`addPriceFeeds()`](#addpricefeeds) and [`removePriceFeeds()`](#removepricefeeds). Users can view price feeds via [`priceFeedForToken(address token)`](#pricefeedfortoken). Users can use the price feeds via [`valueOfTokens()`](#valueoftokens).
+ * [Governance](/docs/protocol/governance) can add or remove price feeds via [`addPriceFeeds()`](#addpricefeeds) and [`removePriceFeeds()`](#removepricefeeds). Users can view price feeds via [`priceFeedForToken(address token)`](#pricefeedfortoken). Users can use the price feeds via [`valueOfTokens()`](#valueoftokens). Users can list price feeds via [`tokensLength()`](#tokenslength) and [`tokenByIndex()`](#tokenbyindex).
  */
 interface IFluxMegaOracle is IPriceOracle {
 

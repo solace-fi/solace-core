@@ -9,17 +9,17 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
  * @author solace.fi
  * @notice The underwriting pool of Solace Native.
  *
- * In Solace Native risk is backed by a basket of assets known as the underwriting pool (UWP). Shares of the pool are known as $UWP. [Governance](/docs/protocol/governance) can add or remove tokens from the basket and set their parameters (min and max in USD, price oracle) via [`addTokensToPool()`](#addtokenstopool) and [`removeTokensFromPool()`](#removetokensfrompool).
+ * In Solace Native risk is backed by a basket of assets known as the underwriting pool (UWP). Shares of the pool are known as `UWP` and are represented as an ERC20 token. [Governance](/docs/protocol/governance) can add or remove tokens from the basket and set their parameters (min and max in USD, price oracle) via [`addTokensToPool()`](#addtokenstopool) and [`removeTokensFromPool()`](#removetokensfrompool).
  *
  * Users can view tokens in the pool via [`tokensLength()`](#tokenslength), [`tokenData(address token)`](#tokendata), and [`tokenList(uint256 index)`](#tokenlist).
  *
- * Anyone can mint $UWP by calling [`issue()`](#issue) and depositing any of the tokens in the pool. Note that
- * - You will not be credited $UWP for raw transferring tokens to this contract. Use [`issue()`](#issue) instead.
+ * Anyone can mint `UWP` by calling [`issue()`](#issue) and depositing any of the tokens in the pool. Note that
+ * - You will not be credited `UWP` for raw transferring tokens to this contract. Use [`issue()`](#issue) instead.
  * - You do not need to deposit all of the tokens in the pool. Most users will deposit a single token.
  * - To manage risk, each token has a corresponding `min` and `max` measured in USD. Deposits must keep the pool within these bounds.
  * - Solace may charge a protocol fee as a fraction of the mint amount [`issueFee()`](#issuefee).
  *
- * Anyone can redeem their $UWP for tokens in the pool by calling [`redeem()`](#redeem). You will receive a fair portion of all assets in the pool.
+ * Anyone can redeem their `UWP` for tokens in the pool by calling [`redeem()`](#redeem). You will receive a fair portion of all assets in the pool.
  *
  * [Governance](/docs/protocol/governance) can pause and unpause [`issue()`](#issue). The other functions cannot be paused.
  */

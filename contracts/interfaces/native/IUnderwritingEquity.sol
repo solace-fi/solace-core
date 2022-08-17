@@ -7,7 +7,15 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 /**
  * @title IUnderwritingEquity
  * @author solace.fi
- * @notice
+ * @notice Equity of the [Underwriting Pool](./../../native/UnderwritingPool) that can be used in Solace Native.
+ *
+ * Users can deposit [`UWP`](./../../native/UnderwritingPool) via [`deposit()`](#deposit) which mints `UWE`. Users can redeem `UWE` for [`UWP`](./../../native/UnderwritingPool) via [`withdraw()`](#withdraw). Note that deposits must be made via [`deposit()`](#deposit). Simply transferring [`UWP`](./../../native/UnderwritingPool) to this contract will not mint `UWE`.
+ *
+ * Solace may charge a protocol fee as a fraction of the mint amount [`issueFee()`](#issuefee).
+ *
+ * Solace may lend some of the underlying [`UWP`](./../../native/UnderwritingPool) to a lending module and borrow stables against it to pay claims via [`lend()`](#lend).
+ *
+ * [Governance](/docs/protocol/governance) can pause and unpause [`deposit()`](#deposit), [`withdraw()`](#withdraw), and [`lend()`](#lend).
  */
 interface IUnderwritingEquity is IERC20Metadata {
 
