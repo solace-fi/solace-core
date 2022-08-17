@@ -36,6 +36,11 @@ const ORACLE_ADDRESS               = "0x501aCee3740e4A7CBf62C2A4C3b42703cE44ADa9
 const UWP_ADDRESS                  = "0x501ACEe266FAFF76AE48C891a06068bF6507c7f6";
 const UWE_ADDRESS                  = "0x501ACEF0d60A70F3bc1bFE090a3d51ca10757aaE";
 
+const ONE_USDC = BN.from("1000000");
+const ONE_ETHER = BN.from("1000000000000000000");
+const ONE_NEAR = BN.from("1000000000000000000000000");
+const ONE_WBTC = BN.from("100000000");
+
 let artifacts: ArtifactImports;
 
 let oracle: FluxMegaOracle;
@@ -64,79 +69,75 @@ async function main() {
   await expectDeployed(WBTC_ADDRESS);
   await expectDeployed(WETH_ADDRESS);
 
-  // deploy and configure contracts
-  // oracles
-  await deployOracle();
-  //await configureOracle();
-  // uwp
-  await deployUwp();
-  //await configureUwp();
-  // uwe
-  await deployUwe();
+  await expectDeployed(ORACLE_ADDRESS);
+  await expectDeployed(UWP_ADDRESS);
+  await expectDeployed(UWE_ADDRESS);
+
+  oracle = (await ethers.getContractAt(artifacts.FluxMegaOracle.abi, ORACLE_ADDRESS)) as FluxMegaOracle;
+  uwp = (await ethers.getContractAt(artifacts.UnderwritingPool.abi, UWP_ADDRESS)) as UnderwritingPool;
+  uwe = (await ethers.getContractAt(artifacts.UnderwritingEquity.abi, UWE_ADDRESS)) as UnderwritingEquity;
+
+  //await depositIntoUwp();
+  //await redeemFromUwp();
+  await depositIntoUwe();
 
   // log addresses
   await logAddresses();
 }
 
-async function deployOracle() {
-  if(await isDeployed(ORACLE_ADDRESS)) {
-    oracle = (await ethers.getContractAt(artifacts.FluxMegaOracle.abi, ORACLE_ADDRESS)) as FluxMegaOracle;
-  } else {
-    console.log("Deploying FluxMegaOracle");
-    const res = await create2Contract(deployer, artifacts.FluxMegaOracle, [signerAddress], {}, "", DEPLOYER_CONTRACT_ADDRESS);
-    oracle = (await ethers.getContractAt(artifacts.FluxMegaOracle.abi, res.address)) as FluxMegaOracle;
-    console.log(`Deployed FluxMegaOracle to ${oracle.address}`);
+async function depositIntoUwp() {
+  let usdc = (await ethers.getContractAt(artifacts.MockERC20.abi, USDC_ADDRESS)) as MockErc20;
+  let wbtc = (await ethers.getContractAt(artifacts.MockERC20.abi, WBTC_ADDRESS)) as MockErc20;
+  let weth = (await ethers.getContractAt(artifacts.MockERC20.abi, WETH_ADDRESS)) as MockErc20;
+
+  console.log("Depositing tokens into UWP");
+  let tokens = [usdc, wbtc, weth];
+  let tokenAddresses = [usdc.address, wbtc.address, weth.address];
+  let symbols = ["USDC", "WBTC", "WETH"];
+  let depositAmounts = [ONE_USDC.mul(100), ONE_WBTC.div(100), ONE_ETHER.div(10)];
+  for(var i = 0; i < tokens.length; ++i) {
+    if((await tokens[i].allowance(signerAddress, uwp.address)).lt(depositAmounts[i])) {
+      let tx = await tokens[i].connect(deployer).approve(uwp.address, ethers.constants.MaxUint256, networkSettings.overrides);
+      await tx.wait(networkSettings.confirmations);
+    }
+    let bal = await tokens[i].balanceOf(signerAddress);
+    if(bal.lt(depositAmounts[i])) {
+      console.log(`insufficient ${symbols[i]} balance. depositing ${ethers.utils.formatUnits(depositAmounts[i])} have ${ethers.utils.formatUnits(bal)}`);
+    }
   }
+  let bal1 = await uwp.balanceOf(signerAddress);
+  console.log(`uwp balance before : ${ethers.utils.formatUnits(bal1)}`);
+  let tx2 = await uwp.connect(deployer).issue(tokenAddresses, depositAmounts, signerAddress, networkSettings.overrides);
+  await tx2.wait(networkSettings.confirmations);
+  let bal2 = await uwp.balanceOf(signerAddress);
+  console.log(`uwp balance after  : ${ethers.utils.formatUnits(bal2)}`);
+  console.log("Deposited tokens into UWP");
 }
 
-async function configureOracle() {
-  console.log('Adding price feeds to oracle');
-  let tx = await oracle.connect(deployer).addPriceFeeds([
-    { token: USDC_ADDRESS, priceFeed: USDC_PRICE_FEED_ADDRESS, tokenDecimals: 6, priceFeedDecimals: 8 },
-    { token: DAI_ADDRESS, priceFeed: USDC_PRICE_FEED_ADDRESS, tokenDecimals: 18, priceFeedDecimals: 8 },
-    { token: USDT_ADDRESS, priceFeed: USDC_PRICE_FEED_ADDRESS, tokenDecimals: 6, priceFeedDecimals: 8 },
-    { token: FRAX_ADDRESS, priceFeed: USDC_PRICE_FEED_ADDRESS, tokenDecimals: 18, priceFeedDecimals: 8 },
-    { token: WBTC_ADDRESS, priceFeed: BTC_PRICE_FEED_ADDRESS, tokenDecimals: 8, priceFeedDecimals: 8 },
-    { token: WETH_ADDRESS, priceFeed: ETH_PRICE_FEED_ADDRESS, tokenDecimals: 18, priceFeedDecimals: 8 },
-  ], networkSettings.overrides);
+async function redeemFromUwp() {
+  console.log("Redeeming UWP");
+  let bal = await uwp.balanceOf(signerAddress);
+  let tx = await uwp.connect(deployer).redeem(bal, signerAddress, networkSettings.overrides);
   await tx.wait(networkSettings.confirmations);
-  console.log('Added price feeds to oracle');
+  console.log("Redeemed UWP");
 }
 
-async function deployUwp() {
-  if(await isDeployed(UWP_ADDRESS)) {
-    uwp = (await ethers.getContractAt(artifacts.UnderwritingPool.abi, UWP_ADDRESS)) as UnderwritingPool;
-  } else {
-    console.log('Deploying UnderwritingPool');
-    const res = await create2Contract(deployer, artifacts.UnderwritingPool, [signerAddress], {}, "", DEPLOYER_CONTRACT_ADDRESS);
-    uwp = (await ethers.getContractAt(artifacts.UnderwritingPool.abi, res.address)) as UnderwritingPool;
-    console.log(`Deploying UnderwritingPool to ${uwp.address}`);
+async function depositIntoUwe() {
+  console.log("Depositing UWP into UWE");
+  let bal = await uwp.balanceOf(signerAddress);
+  let allowance = await uwp.allowance(signerAddress, uwe.address);
+  if(allowance.lt(bal)) {
+    let tx1 = await uwp.connect(deployer).approve(uwe.address, ethers.constants.MaxUint256, networkSettings.overrides);
+    await tx1.wait(networkSettings.confirmations);
   }
-}
-
-async function configureUwp() {
-  console.log('Adding tokens to uwp');
-  let tx = await uwp.connect(deployer).addTokensToPool([
-    { token: USDC_ADDRESS, oracle: oracle.address, min: 0, max: ethers.constants.MaxUint256 },
-    { token: DAI_ADDRESS, oracle: oracle.address, min: 0, max: ethers.constants.MaxUint256 },
-    { token: USDT_ADDRESS, oracle: oracle.address, min: 0, max: ethers.constants.MaxUint256 },
-    { token: FRAX_ADDRESS, oracle: oracle.address, min: 0, max: ethers.constants.MaxUint256 },
-    { token: WBTC_ADDRESS, oracle: oracle.address, min: 0, max: ethers.constants.MaxUint256 },
-    { token: WETH_ADDRESS, oracle: oracle.address, min: 0, max: ethers.constants.MaxUint256 },
-  ], networkSettings.overrides);
-  await tx.wait(networkSettings.confirmations);
-  console.log('Added tokens to uwp');
-}
-
-async function deployUwe() {
-  if(await isDeployed(UWE_ADDRESS)) {
-    uwe = (await ethers.getContractAt(artifacts.UnderwritingEquity.abi, UWE_ADDRESS)) as UnderwritingEquity;
-  } else {
-    console.log('Deploying UnderwritingEquity');
-    const res = await create2Contract(deployer, artifacts.UnderwritingEquity, [signerAddress, uwp.address], {}, "", DEPLOYER_CONTRACT_ADDRESS);
-    uwe = (await ethers.getContractAt(artifacts.UnderwritingEquity.abi, res.address)) as UnderwritingEquity;
-    console.log(`Deploying UnderwritingEquity to ${uwe.address}`);
-  }
+  let bal1 = await uwe.balanceOf(signerAddress);
+  console.log(`uwe balance before : ${ethers.utils.formatUnits(bal1)}`);
+  console.log(`depositing ${ethers.utils.formatUnits(bal)} uwp`)
+  let tx2 = await uwe.connect(deployer).deposit(bal, signerAddress, networkSettings.overrides);
+  await tx2.wait(networkSettings.confirmations);
+  let bal2 = await uwe.balanceOf(signerAddress);
+  console.log(`uwe balance after  : ${ethers.utils.formatUnits(bal2)}`);
+  console.log("Deposited UWP into UWE");
 }
 
 async function logAddresses() {
