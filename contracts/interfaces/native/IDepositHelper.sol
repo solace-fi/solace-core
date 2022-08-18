@@ -6,6 +6,13 @@ pragma solidity 0.8.6;
  * @title IDepositHelper
  * @author solace.fi
  * @notice The process of depositing into Solace Native requires multiple steps across multiple contracts. This helper contract allows users to deposit with a single transaction.
+ *
+ * These steps are
+ * 1. Deposit governance token into [`UWP`](./../../native/UnderwritingPool).
+ * 2. Deposit [`UWP`](./../../native/UnderwritingPool) into [`UWE`](./../../native/UnderwritingEquity).
+ * 3. Deposit [`UWE`](./../../native/UnderwritingEquity) into an [`Underwriting Lock`](./../../native/UnderwritingLocker).
+ *
+ * These steps can be replaced with [`depositAndLock()`](#depositandlock) or [`depositIntoLock()`](#depositintolock).
  */
 interface IDepositHelper {
 
@@ -33,10 +40,10 @@ interface IDepositHelper {
 
     /**
      * @notice Calculates the amount of [`UWE`](./../../native/UnderwritingEquity) minted for an amount of a token deposited.
-     * The deposit token may be one of the tokens in [`UWP`](./../../native/UnderwritingPool) or [`UWP`](./../../native/UnderwritingPool) itself.
+     * The deposit token may be one of the tokens in [`UWP`](./../../native/UnderwritingPool), the [`UWP`](./../../native/UnderwritingPool) token, or the [`UWE`](./../../native/UnderwritingEquity) token.
      * @param depositToken The address of the token to deposit.
      * @param depositAmount The amount of the token to deposit.
-     * @return uweAmount The amount of `UWE` that will be minted to the receiver.
+     * @return uweAmount The amount of [`UWE`](./../../native/UnderwritingEquity) that will be minted to the receiver.
      */
     function calculateDeposit(address depositToken, uint256 depositAmount) external view returns (uint256 uweAmount);
 
@@ -49,7 +56,7 @@ interface IDepositHelper {
      * @param depositToken Address of the token to deposit.
      * @param depositAmount Amount of the token to deposit.
      * @param lockExpiry The timestamp the lock will unlock.
-     * @return lockID The ID of the newly created `UWE Lock`.
+     * @return lockID The ID of the newly created [`UWE Lock`](./../../native/UnderwritingLocker).
      */
     function depositAndLock(
         address depositToken,
@@ -58,12 +65,12 @@ interface IDepositHelper {
     ) external returns (uint256 lockID);
 
     /**
-     * @notice Deposits tokens into [`UWE`](./../../native/UnderwritingEquity) and deposits [`UWE`](./../../native/UnderwritingEquity) into an existing [`UWE Lock`](./../../native/UnderwritingLocker)
+     * @notice Deposits tokens into [`UWE`](./../../native/UnderwritingEquity) and deposits [`UWE`](./../../native/UnderwritingEquity) into an existing [`UWE Lock`](./../../native/UnderwritingLocker).
      * @param depositToken Address of the token to deposit.
      * @param depositAmount Amount of the token to deposit.
      * @param lockID The ID of the [`UWE Lock`](./../../native/UnderwritingLocker) to deposit into.
      */
-    function depositToLock(
+    function depositIntoLock(
         address depositToken,
         uint256 depositAmount,
         uint256 lockID

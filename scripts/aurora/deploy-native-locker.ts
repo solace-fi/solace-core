@@ -20,7 +20,7 @@ const deployer = new ethers.Wallet(JSON.parse(process.env.PRIVATE_KEYS || '[]')[
 import { logContractAddress } from "../utils";
 
 import { import_artifacts, ArtifactImports } from "../../test/utilities/artifact_importer";
-import { Registry, Erc20, UnderwritingLockVoting, UnderwritingLocker, GaugeController } from "../../typechain";
+import { Registry, Erc20, UnderwritingLockVoting, UnderwritingLocker, GaugeController, DepositHelper } from "../../typechain";
 import { expectDeployed, isDeployed } from "../../test/utilities/expectDeployed";
 import { getNetworkSettings } from "../getNetworkSettings";
 import { create2Contract } from "../create2Contract";
@@ -28,11 +28,13 @@ import { formatUnits } from "ethers/lib/utils";
 
 const DEPLOYER_CONTRACT_ADDRESS         = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
 const REGISTRY_ADDRESS                  = "0x501ACe0f576fc4ef9C0380AA46A578eA96b85776";
+const UWP_ADDRESS                       = "0x501ACEe266FAFF76AE48C891a06068bF6507c7f6";
 const UWE_ADDRESS                       = "0x501ACEF0d60A70F3bc1bFE090a3d51ca10757aaE";
 const REVENUE_ROUTER_ADDRESS            = "0x501AcE0e8D16B92236763E2dEd7aE3bc2DFfA276";
 const UNDERWRITING_LOCKER_ADDRESS       = "0x501ACed0A3cC374E470BF10cbB625AE774A20d75";
 const UNDERWRITING_LOCK_VOTING_ADDRESS  = "0x501ACED282C623D53602cE29c3Ae8A22683843C2";
 const GAUGE_CONTROLLER_ADDRESS          = "0x501ACE3c9C22Ec7AE3c84D1863dE5AD3cb9760B1";
+const DEPOSIT_HELPER_ADDRESS            = "0x501ACeBb18b1328F6bd854faa3ad88314fb2Cc58";
 let GOVERNOR_ADDRESS: string;
 
 let artifacts: ArtifactImports;
@@ -40,6 +42,7 @@ let registry: Registry;
 let underwritingLocker: UnderwritingLocker;
 let voting: UnderwritingLockVoting;
 let gaugeController: GaugeController;
+let depositHelper: DepositHelper;
 
 let signerAddress: string;
 let networkSettings: any;
@@ -54,6 +57,7 @@ async function main() {
   networkSettings = getNetworkSettings(chainID);
 
   await expectDeployed(DEPLOYER_CONTRACT_ADDRESS);
+  await expectDeployed(UWP_ADDRESS);
   await expectDeployed(UWE_ADDRESS);
   await expectDeployed(REGISTRY_ADDRESS);
 
@@ -68,8 +72,9 @@ async function main() {
   await deployGaugeController();
   //await setRegistry2(); // Set 'revenueRouter', 'underwritingLocker' and 'gaugeController' in the registry
   await deployUnderwritingLockVoting();
-  await gaugeSetup();
+  //await gaugeSetup();
   //await addGauges();
+  await deployDepositHelper();
 
   // log addresses
   await logAddresses();
@@ -158,6 +163,17 @@ async function addGauges() {
   console.log("Added gauges to GaugeController");
 }
 
+async function deployDepositHelper() {
+  if(await isDeployed(DEPOSIT_HELPER_ADDRESS)) {
+    depositHelper = (await ethers.getContractAt(artifacts.DepositHelper.abi, DEPOSIT_HELPER_ADDRESS)) as DepositHelper;
+  } else {
+    console.log("Deploying DepositHelper");
+    const res = await create2Contract(deployer, artifacts.DepositHelper, [UWP_ADDRESS, UWE_ADDRESS, underwritingLocker.address], {}, "", DEPLOYER_CONTRACT_ADDRESS);
+    depositHelper = (await ethers.getContractAt(artifacts.DepositHelper.abi, res.address)) as DepositHelper;
+    console.log(`Deployed DepositHelper to ${depositHelper.address}`);
+  }
+}
+
 async function logAddresses() {
   console.log("");
   console.log("| Contract Name                | Address                                      |");
@@ -165,6 +181,7 @@ async function logAddresses() {
   logContractAddress("UnderwritingLocker", underwritingLocker.address);
   logContractAddress("GaugeController", gaugeController.address);
   logContractAddress("UnderwritingLockVoting", voting.address);
+  logContractAddress("DepositHelper", depositHelper.address);
 }
 
 main()

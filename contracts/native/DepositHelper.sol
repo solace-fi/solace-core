@@ -14,6 +14,13 @@ import "./../interfaces/native/IDepositHelper.sol";
  * @title DepositHelper
  * @author solace.fi
  * @notice The process of depositing into Solace Native requires multiple steps across multiple contracts. This helper contract allows users to deposit with a single transaction.
+ *
+ * These steps are
+ * 1. Deposit governance token into [`UWP`](./UnderwritingPool).
+ * 2. Deposit [`UWP`](./UnderwritingPool) into [`UWE`](./UnderwritingEquity).
+ * 3. Deposit [`UWE`](./UnderwritingEquity) into an [`Underwriting Lock`](./UnderwritingLocker).
+ *
+ * These steps can be replaced with [`depositAndLock()`](#depositandlock) or [`depositIntoLock()`](#depositintolock).
  */
 contract DepositHelper is IDepositHelper, ReentrancyGuard {
 
@@ -41,7 +48,7 @@ contract DepositHelper is IDepositHelper, ReentrancyGuard {
     ***************************************/
 
     /**
-     * @notice Address of the [underwriting pool](./../../native/UnderwritingPool).
+     * @notice Address of the [underwriting pool](./UnderwritingPool).
      * @return uwp The underwriting pool.
      */
     function underwritingPool() external view override returns (address uwp) {
@@ -49,7 +56,7 @@ contract DepositHelper is IDepositHelper, ReentrancyGuard {
     }
 
     /**
-     * @notice Address of [underwriting equity](./../../native/UnderwritingEquity).
+     * @notice Address of [underwriting equity](./UnderwritingEquity).
      * @return uwe The underwriting equity.
      */
     function underwritingEquity() external view override returns (address uwe) {
@@ -57,7 +64,7 @@ contract DepositHelper is IDepositHelper, ReentrancyGuard {
     }
 
     /**
-     * @notice Address of [underwriting locker](./../../native/UnderwritingLocker).
+     * @notice Address of [underwriting locker](./UnderwritingLocker).
      * @return locker The underwriting locker.
      */
     function underwritingLocker() external view override returns (address locker) {
@@ -65,11 +72,11 @@ contract DepositHelper is IDepositHelper, ReentrancyGuard {
     }
 
     /**
-     * @notice Calculates the amount of [`UWE`](./../../native/UnderwritingEquity) minted for an amount of a token deposited.
-     * The deposit token may be one of the tokens in [`UWP`](./../../native/UnderwritingPool) or [`UWP`](./../../native/UnderwritingPool) itself.
+     * @notice Calculates the amount of [`UWE`](./UnderwritingEquity) minted for an amount of a token deposited.
+     * The deposit token may be one of the tokens in [`UWP`](./UnderwritingPool), the [`UWP`](./UnderwritingPool) token, or the [`UWE`](./UnderwritingEquity) token.
      * @param depositToken The address of the token to deposit.
      * @param depositAmount The amount of the token to deposit.
-     * @return uweAmount The amount of `UWE` that will be minted to the receiver.
+     * @return uweAmount The amount of [`UWE`](./UnderwritingEquity) that will be minted to the receiver.
      */
     function calculateDeposit(address depositToken, uint256 depositAmount) external view override returns (uint256 uweAmount) {
         address uwp_ = _uwp;
@@ -98,11 +105,11 @@ contract DepositHelper is IDepositHelper, ReentrancyGuard {
     ***************************************/
 
     /**
-     * @notice Deposits tokens into [`UWE`](./../../native/UnderwritingEquity) and deposits [`UWE`](./../../native/UnderwritingEquity) into a new [`UWE Lock`](./../../native/UnderwritingLocker).
+     * @notice Deposits tokens into [`UWE`](./UnderwritingEquity) and deposits [`UWE`](./UnderwritingEquity) into a new [`UWE Lock`](./UnderwritingLocker).
      * @param depositToken Address of the token to deposit.
      * @param depositAmount Amount of the token to deposit.
      * @param lockExpiry The timestamp the lock will unlock.
-     * @return lockID The ID of the newly created `UWE Lock`.
+     * @return lockID The ID of the newly created [`UWE Lock`](./UnderwritingLocker).
      */
     function depositAndLock(
         address depositToken,
@@ -117,12 +124,12 @@ contract DepositHelper is IDepositHelper, ReentrancyGuard {
     }
 
     /**
-     * @notice Deposits tokens into [`UWE`](./../../native/UnderwritingEquity) and deposits [`UWE`](./../../native/UnderwritingEquity) into an existing [`UWE Lock`](./../../native/UnderwritingLocker)
+     * @notice Deposits tokens into [`UWE`](./UnderwritingEquity) and deposits [`UWE`](./UnderwritingEquity) into an existing [`UWE Lock`](./UnderwritingLocker).
      * @param depositToken Address of the token to deposit.
      * @param depositAmount Amount of the token to deposit.
-     * @param lockID The ID of the [`UWE Lock`](./../../native/UnderwritingLocker) to deposit into.
+     * @param lockID The ID of the [`UWE Lock`](./UnderwritingLocker) to deposit into.
      */
-    function depositToLock(
+    function depositIntoLock(
         address depositToken,
         uint256 depositAmount,
         uint256 lockID
@@ -138,10 +145,10 @@ contract DepositHelper is IDepositHelper, ReentrancyGuard {
     ***************************************/
 
     /**
-     * @notice Given a deposit token and amount, pulls the token from `msg.sender` and converts it to an amount of `UWE`.
+     * @notice Given a deposit token and amount, pulls the token from `msg.sender` and converts it to an amount of [`UWE`](./UnderwritingEquity).
      * @param depositToken Address of the token to deposit.
      * @param depositAmount Amount of the token to deposit.
-     * @return uweAmount Amount of `UWE` that was minted.
+     * @return uweAmount Amount of [`UWE`](./UnderwritingEquity) that was minted.
      */
     function _tokenToUwe(
         address depositToken,
