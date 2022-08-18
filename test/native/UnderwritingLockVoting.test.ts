@@ -7,10 +7,9 @@ import chai from "chai";
 const { expect } = chai;
 chai.use(solidity);
 import { import_artifacts, ArtifactImports } from "../utilities/artifact_importer";
-import { UnderwritingLocker, UnderwritingLockVoting, Registry, MockErc20Permit, GaugeController } from "../../typechain";
+import { UnderwritingLocker, UnderwritingLockVoting, Registry, MockErc20PermitWithBurn, GaugeController } from "../../typechain";
 import { expectDeployed } from "../utilities/expectDeployed";
 import { expectClose } from "./../utilities/math";
-import { get } from "https";
 
 /*******************
   GLOBAL CONSTANTS
@@ -29,12 +28,12 @@ const ONE_HUNDRED_PERCENT = ONE_ETHER;
 const CUSTOM_GAS_LIMIT = 6000000;
 
 describe("UnderwritingLockVoting", function () {
-    const [deployer, governor, revenueRouter, voter1, voter2, voter3, delegate1, anon] = provider.getWallets();
+    const [deployer, governor, revenueRouter, voter1, voter2, delegate1, updater, anon] = provider.getWallets();
   
     /***************************
        VARIABLE DECLARATIONS
     ***************************/
-    let token: MockErc20Permit;
+    let token: MockErc20PermitWithBurn;
     let registry: Registry;
     let underwritingLocker: UnderwritingLocker;
     let gaugeController: GaugeController;
@@ -48,7 +47,7 @@ describe("UnderwritingLockVoting", function () {
       await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
       
       // Deploy $UWE, and mint 1M $UWE to deployer
-      token = (await deployContract(deployer, artifacts.MockERC20Permit, ["Underwriting Equity - Solace Native", "UWE", ONE_MILLION_ETHER, 18])) as MockErc20Permit;
+      token = (await deployContract(deployer, artifacts.MockERC20PermitWithBurn, ["Underwriting Equity - Solace Native", "UWE", ONE_MILLION_ETHER, 18])) as MockErc20PermitWithBurn;
 
       // Deploy registry
       registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
@@ -90,6 +89,7 @@ describe("UnderwritingLockVoting", function () {
           expect(await voting.underwritingLocker()).eq(underwritingLocker.address);
           expect(await voting.gaugeController()).eq(gaugeController.address);
           expect(await voting.registry()).eq(registry.address);
+          expect(await voting.updater()).eq(ZERO_ADDRESS);
           expect(await voting.lastTimePremiumsCharged()).eq(0);
           expect(await voting.isVotingOpen()).eq(false);
           expect(await gaugeController.getVoteCount(voting.address, voter1.address)).eq(0)
@@ -212,6 +212,17 @@ describe("UnderwritingLockVoting", function () {
         })
     });
 
+    describe("setUpdater", () => {
+      it("non governor cannot setUpdater", async  () => {
+        await expect(voting.connect(voter1).setUpdater(updater.address)).to.be.revertedWith("!governance");
+      });
+      it("can set updater", async () => {
+        let tx = await voting.connect(governor).setUpdater(updater.address);
+        await expect(tx).to.emit(voting, "UpdaterSet").withArgs(updater.address);
+        expect(await voting.updater()).eq(updater.address)
+      });
+    });
+
   /*******************
     STATE SUMMARY
   *******************/
@@ -298,6 +309,17 @@ describe("UnderwritingLockVoting", function () {
       });
     });
 
+    describe("gaugeController.setUpdater", () => {
+      it("non governor cannot setUpdater", async  () => {
+        await expect(gaugeController.connect(voter1).setUpdater(updater.address)).to.be.revertedWith("!governance");
+      });
+      it("can set updater", async () => {
+        let tx = await gaugeController.connect(governor).setUpdater(updater.address);
+        await expect(tx).to.emit(gaugeController, "UpdaterSet").withArgs(updater.address);
+        expect(await gaugeController.updater()).eq(updater.address)
+      });
+    });
+
     /*********************
       INTENTION STATEMENT 
     *********************/
@@ -310,11 +332,11 @@ describe("UnderwritingLockVoting", function () {
         await expect(voting.connect(voter1).vote(voter1.address, 1, 10000)).to.be.revertedWith("LastEpochPremiumsNotCharged");
         await expect(voting.connect(voter1).voteMultiple(voter1.address, [1, 2], [10000, 10000])).to.be.revertedWith("LastEpochPremiumsNotCharged");
       });
-      it("updateGaugeWeights() should revert if non governor", async function () {
-        await expect(gaugeController.connect(voter1).updateGaugeWeights()).to.be.revertedWith("!governance");
+      it("updateGaugeWeights() should revert if non governor or updater", async function () {
+        await expect(gaugeController.connect(voter1).updateGaugeWeights()).to.be.revertedWith("NotUpdaterNorGovernance");
       });
-      it("chargePremiums() should revert if non governor", async function () {
-        await expect(voting.connect(voter1).chargePremiums()).to.be.revertedWith("!governance");
+      it("chargePremiums() should revert if non governor or updater", async function () {
+        await expect(voting.connect(voter1).chargePremiums()).to.be.revertedWith("NotUpdaterNorGovernance");
       });
       it("chargePremiums() should revert if gauge weights have not been updated", async function () {
         await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("GaugeWeightsNotYetUpdated");
@@ -465,10 +487,10 @@ describe("UnderwritingLockVoting", function () {
         expect(await gaugeController.getVoteCount(voting.address, voter1.address)).eq(1)
         expect(await gaugeController.getVotersCount(voting.address)).eq(1)
       });
-      it("processVotes() should succeed in the next epoch", async function () {
+      it("updateGaugeWeights() called by updater should succeed in the next epoch", async function () {
         const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
         await provider.send("evm_mine", [CURRENT_TIME + ONE_WEEK]);
-        const tx = await gaugeController.connect(governor).updateGaugeWeights({gasLimit: CUSTOM_GAS_LIMIT});
+        const tx = await gaugeController.connect(updater).updateGaugeWeights({gasLimit: CUSTOM_GAS_LIMIT});
         const EPOCH_START_TIME = await voting.getEpochStartTimestamp();
         const VOTE_POWER = await voting.getVotePower(voter1.address);
         await expect(tx).to.emit(gaugeController, "GaugeWeightsUpdated").withArgs(EPOCH_START_TIME);
@@ -487,13 +509,13 @@ describe("UnderwritingLockVoting", function () {
       it("chargePremiums() should revert before underwritingLocker.sol call setVotingContract()", async function () {
         await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("NotVotingContract");
       });
-      it("chargePremiums() should succeed in the next epoch, provided allowance granted by underwritingLocker", async function () {
+      it("chargePremiums() call by updater should succeed in the next epoch, provided allowance granted by underwritingLocker", async function () {
         await registry.connect(governor).set(["underwritingLockVoting"],[voting.address]);
         await underwritingLocker.connect(governor).setVotingContract();
         const OLD_VOTER_LOCKED_AMOUNT = await getTotalLockedAmount(voter1.address)
         const OLD_UNDERWRITING_LOCKER_BALANCE = await token.balanceOf(underwritingLocker.address);
 
-        const tx = await voting.connect(governor).chargePremiums();
+        const tx = await voting.connect(updater).chargePremiums();
         const EPOCH_START_TIME = await voting.getEpochStartTimestamp();
         const NEW_VOTER_LOCKED_AMOUNT = await getTotalLockedAmount(voter1.address)
         const NEW_UNDERWRITING_LOCKER_BALANCE = await token.balanceOf(underwritingLocker.address);
@@ -585,7 +607,7 @@ describe("UnderwritingLockVoting", function () {
 
         // Add edge conditions
         await gaugeController.connect(governor).pauseGauge(1)
-        await underwritingLocker.connect(voter1).withdraw(5, voter1.address)
+        await underwritingLocker.connect(voter1).withdraw(5, voter1.address);
       });
       it("owner should be able to voteMultiple()", async function () {
         const GAUGE_ID_1 = 2

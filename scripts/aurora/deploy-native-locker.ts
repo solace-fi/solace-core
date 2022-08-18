@@ -27,19 +27,19 @@ import { create2Contract } from "../create2Contract";
 import { formatUnits } from "ethers/lib/utils";
 
 const DEPLOYER_CONTRACT_ADDRESS         = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
-const REGISTRY_ADDRESS                  = "";
-const UWE_ADDRESS                       = "";
-const REVENUE_ROUTER_ADDRESS            = "";
-const UNDERWRITING_LOCKER_ADDRESS       = "";
-const UNDERWRITING_LOCK_VOTING_ADDRESS  = "";
-const GAUGE_CONTROLLER_ADDRESS          = "";
+const REGISTRY_ADDRESS                  = "0x501ACe0f576fc4ef9C0380AA46A578eA96b85776";
+const UWE_ADDRESS                       = "0x501ACEF0d60A70F3bc1bFE090a3d51ca10757aaE";
+const REVENUE_ROUTER_ADDRESS            = "0x501AcE0e8D16B92236763E2dEd7aE3bc2DFfA276";
+const UNDERWRITING_LOCKER_ADDRESS       = "0x501ACed0A3cC374E470BF10cbB625AE774A20d75";
+const UNDERWRITING_LOCK_VOTING_ADDRESS  = "0x501ACED282C623D53602cE29c3Ae8A22683843C2";
+const GAUGE_CONTROLLER_ADDRESS          = "0x501ACE3c9C22Ec7AE3c84D1863dE5AD3cb9760B1";
 let GOVERNOR_ADDRESS: string;
 
 let artifacts: ArtifactImports;
-let registry: Registry
-let underwritingLocker: UnderwritingLocker
-let voting: UnderwritingLockVoting
-let gaugeController: GaugeController
+let registry: Registry;
+let underwritingLocker: UnderwritingLocker;
+let voting: UnderwritingLockVoting;
+let gaugeController: GaugeController;
 
 let signerAddress: string;
 let networkSettings: any;
@@ -58,15 +58,18 @@ async function main() {
   await expectDeployed(REGISTRY_ADDRESS);
 
   /*********************
-     DEPLOY SEQUENCE 
+     DEPLOY SEQUENCE
   *********************/
 
-  await setRegistry1(); // Set 'uwe' in the registry
+  registry = (await ethers.getContractAt(artifacts.Registry.abi, REGISTRY_ADDRESS)) as Registry;
+
+  //await setRegistry1(); // Set 'uwe' in the registry
   await deployUnderwritingLocker();
   await deployGaugeController();
-  await setRegistry2(); // Set 'revenueRouter', 'underwritingLocker' and 'gaugeController' in the registry
+  //await setRegistry2(); // Set 'revenueRouter', 'underwritingLocker' and 'gaugeController' in the registry
   await deployUnderwritingLockVoting();
   await gaugeSetup();
+  //await addGauges();
 
   // log addresses
   await logAddresses();
@@ -75,8 +78,7 @@ async function main() {
 async function setRegistry1() {
     console.log("Setting 'uwe' in the Registry.")
     const keys = ["uwe"];
-    const values = [UWE_ADDRESS]
-    registry = (await ethers.getContractAt(artifacts.Registry.abi, REGISTRY_ADDRESS)) as Registry;
+    const values = [UWE_ADDRESS];
     let tx = await registry.connect(deployer).set(keys, values, networkSettings.overrides);
     await tx.wait(networkSettings.confirmations);
 }
@@ -138,6 +140,22 @@ async function gaugeSetup() {
     console.log("Enabling UnderwritingLockVoting to charge premium to UnderwritingLocker");
     const tx4 = await underwritingLocker.connect(deployer).setVotingContract(networkSettings.overrides);
     await tx4.wait(networkSettings.confirmations);
+}
+
+async function addGauges() {
+  console.log("Adding gauges to GaugeController");
+  let rol = BN.from(10).pow(18).mul(250).div(10000); // 2.5%
+  let appIDs = ["aurora-plus", "aurigami", "bastion-protocol", "bluebit", "trisolaris", "vaporwave-finance"];
+  let len = (await gaugeController.totalGauges()).toNumber();
+  if(len > 0) {
+    console.log(`${len} gauges already found. skipping`);
+    return;
+  }
+  for(let i = 0; i < appIDs.length; ++i) {
+    let tx = await gaugeController.connect(deployer).addGauge(appIDs[i], rol, networkSettings.overrides);
+    await tx.wait(networkSettings.confirmations);
+  }
+  console.log("Added gauges to GaugeController");
 }
 
 async function logAddresses() {

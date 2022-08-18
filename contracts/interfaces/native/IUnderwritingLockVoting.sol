@@ -71,6 +71,9 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     /// @param epochTime Timestamp of endtime for epoch already processed.
     error LastEpochPremiumsAlreadyProcessed(uint256 epochTime);
 
+    /// @notice Thrown when chargePremiums() is called by neither governance nor updater, or governance is locked.
+    error NotUpdaterNorGovernance();
+
     /***************************************
     EVENTS
     ***************************************/
@@ -80,6 +83,9 @@ interface IUnderwritingLockVoting is IGaugeVoter {
 
     /// @notice Emitted when the Registry is set.
     event RegistrySet(address indexed registry);
+
+    /// @notice Emitted when the Updater is set.
+    event UpdaterSet(address indexed updater);
 
     /// @notice Emitted when a vote is added.
     event VoteAdded(address indexed voter, uint256 indexed gaugeID, uint256 votePowerBPS);
@@ -111,6 +117,9 @@ interface IUnderwritingLockVoting is IGaugeVoter {
 
     /// @notice Registry address
     function registry() external view returns (address);
+
+    /// @notice Updater address.
+    function updater() external view returns (address);
 
     /**
      * @notice End timestamp for last epoch that premiums were charged for all stored votes.
@@ -225,6 +234,13 @@ interface IUnderwritingLockVoting is IGaugeVoter {
      * @param registry_ The address of `Registry` contract.
      */
     function setRegistry(address registry_) external;
+
+    /**
+     * @notice Set updater address.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param updater_ The address of the new updater.
+     */
+    function setUpdater(address updater_) external;
 
     /**
      * @notice Charge premiums for votes.
