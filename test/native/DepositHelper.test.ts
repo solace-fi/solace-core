@@ -148,8 +148,8 @@ describe("DepositHelper", function () {
     });
     it("cannot deposit with insufficient allowance", async function () {
       await dai.connect(deployer).transfer(user1.address, ONE_ETHER.mul(100000));
-      await expect(depositHelper.connect(user1).depositAndLock(dai.address, 1, 0)).to.be.revertedWith("ERC20: insufficient allowance");
-      await expect(depositHelper.connect(user1).depositIntoLock(dai.address, 1, 0)).to.be.revertedWith("ERC20: insufficient allowance");
+      await expect(depositHelper.connect(user1).depositAndLock(dai.address, 1, 0)).to.be.revertedWith("ERC20: transfer amount exceeds allowance");
+      await expect(depositHelper.connect(user1).depositIntoLock(dai.address, 1, 0)).to.be.revertedWith("ERC20: transfer amount exceeds allowance");
     });
     */
     it("cannot deposit into nonexistent lock", async function () {
