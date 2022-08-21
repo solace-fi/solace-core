@@ -4,9 +4,9 @@ pragma solidity 0.8.6;
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
-import "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import "./../utils/EnumerableMap.sol";
 import "./../utils/Governable.sol";
+import "./../utils/SafeCast.sol";
 import "./../interfaces/native/IGaugeVoter.sol";
 import "./../interfaces/native/IGaugeController.sol";
 

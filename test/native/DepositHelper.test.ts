@@ -155,7 +155,7 @@ describe("DepositHelper", function () {
     it("cannot deposit into nonexistent lock", async function () {
       await dai.connect(deployer).transfer(user1.address, ONE_ETHER.mul(100000));
       await dai.connect(user1).approve(depositHelper.address, ONE_ETHER.mul(100000));
-      await expect(depositHelper.connect(user1).depositIntoLock(dai.address, 1, 999)).to.be.revertedWith("ERC721: invalid token ID");
+      await expect(depositHelper.connect(user1).depositIntoLock(dai.address, 1, 999)).to.be.revertedWith("ERC721: owner query for nonexistent token");
     });
     it("can deposit 1", async function () {
       // dai to new lock at 1:1
