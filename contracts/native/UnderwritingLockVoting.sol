@@ -14,32 +14,32 @@ import "./../interfaces/native/IGaugeController.sol";
  * @title UnderwritingLockVoting
  * @author solace.fi
  * @notice Enables individual votes in Solace Native insurance gauges for owners of [`UnderwritingLocker`](./UnderwritingLocker).
- * 
+ *
  * Any address owning an underwriting lock can vote and will have a votePower that can be viewed with [`getVotePower()`](#getVotePower)
  * An address' vote power is the sum of the vote power of its owned locks.
  * A lock's vote power scales linearly with locked amount, and through a sqrt formula with lock duration
  * Users cannot view the vote power of an individual lock through this contract, only the total vote power of an address.
  * This is an intentional design choice to abstract locks away from address-based voting.
- * 
+ *
  * Voters can set a delegate who can vote on their behalf via [`setDelegate()`](#setDelegate).
- * 
+ *
  * To cast a vote, either the voter or their delegate can call [`vote()`](#vote) or [`voteMultiple()`](#voteMultiple).
  * Votes can be cast among existing gaugeIDs (set in GaugeController.sol), and voters/delegates can set a custom proportion
  * of their total voting power for different gauges.
  * Voting power proportion is measured in bps, and total used voting power bps for a voter cannot exceed 10000.
- * 
+ *
  * Votes are saved, so a vote today will count as the voter's vote for all future epochs until the voter modifies their votes.
- * 
+ *
  * After each epoch (one-week) has passed, voting is frozen until governance has processed all the votes.
  * This is a two-step process:
  * GaugeController.updateGaugeWeights() - this will aggregate individual votes and update gauge weights accordingly
- * [`chargePremiums()`](#chargepremiums) - this will charge premiums for every vote. There is a voting premium 
+ * [`chargePremiums()`](#chargepremiums) - this will charge premiums for every vote. There is a voting premium
  * to be paid every epoch, this gets sent to the revenue router.
  */
-contract UnderwritingLockVoting is 
-        IUnderwritingLockVoting, 
-        ReentrancyGuard, 
-        Governable 
+contract UnderwritingLockVoting is
+        IUnderwritingLockVoting,
+        ReentrancyGuard,
+        Governable
     {
     /***************************************
     GLOBAL PUBLIC VARIABLES
@@ -290,7 +290,7 @@ contract UnderwritingLockVoting is
 
     /**
      * @notice Register a single vote for a gauge. Can either add or change a vote.
-     * @notice Can also remove a vote (votePowerBPS_ == 0), the difference with removeVote() is that 
+     * @notice Can also remove a vote (votePowerBPS_ == 0), the difference with removeVote() is that
      * vote() will revert if the voter has no locks (no locks => no right to vote, but may have votes from
      * locks that have since been burned).
      * @notice GaugeController.updateGaugeWeights() will remove voters with no voting power, however voters can
@@ -422,7 +422,7 @@ contract UnderwritingLockVoting is
             // Short-circuit operator - need at least 30K gas for getVoteCount() call
             if (gasleft() < 40000 || gasleft() < 10000 * IGaugeController(gaugeController).getVoteCount(address(this), voters[i])) {
                 return _saveUpdateState(0, i, 0);
-            }        
+            }
             // Unbounded loop since # of votes (gauges) unbounded
             uint256 premium = _calculateVotePremium(voters[i], insuranceCapacity, votePowerSum); // 87K gas for 10 votes
             uint256[] memory lockIDs = IUnderwritingLocker(underwritingLocker).getAllLockIDsOf(voters[i]);
@@ -441,8 +441,8 @@ contract UnderwritingLockVoting is
         }
 
         SafeERC20.safeTransferFrom(
-            IERC20(IUnderwritingLocker(underwritingLocker).token()), 
-            underwritingLocker, 
+            IERC20(IUnderwritingLocker(underwritingLocker).token()),
+            underwritingLocker,
             revenueRouter,
             type(uint256).max - _totalPremiumDue // Avoid _totalPremiumDue being zero.
         );
@@ -469,7 +469,7 @@ contract UnderwritingLockVoting is
             updateInfo := or(updateInfo, shr(176, shl(176, empty_))) // [0:80] => empty_
             updateInfo := or(updateInfo, shr(88, shl(168, votersIndex_))) // [80:168] => votersIndex_
             updateInfo := or(updateInfo, shl(168, lockIndex_)) // [168:256] => lockIndex_
-            sstore(_updateInfo.slot, updateInfo) 
+            sstore(_updateInfo.slot, updateInfo)
         }
         emit IncompletePremiumsCharge();
     }

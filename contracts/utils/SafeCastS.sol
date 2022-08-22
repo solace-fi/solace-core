@@ -1,5 +1,5 @@
 // ^4.7.1 of OpenZeppelin SafeCast.sol
-// Created as local copy in Solace repo to enable use of single updated SafeCast.sol file while maintaining @openzeppelin dependencies at ~4.3.2. 
+// Created as local copy in Solace repo to enable use of single updated SafeCast.sol file while maintaining @openzeppelin dependencies at ~4.3.2.
 // Initializable pattern used in Solace repo broken with ^4.7.1
 
 // SPDX-License-Identifier: MIT
@@ -22,7 +22,7 @@ pragma solidity ^0.8.0;
  * Can be combined with {SafeMath} and {SignedSafeMath} to extend it to smaller types, by performing
  * all math on `uint256` and `int256` and then downcasting.
  */
-library SafeCast {
+library SafeCastS {
     /**
      * @dev Returns the downcasted uint248 from uint256, reverting on
      * overflow (when the input is greater than largest uint248).

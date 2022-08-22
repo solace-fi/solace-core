@@ -15,17 +15,18 @@ import "../interfaces/native/IFluxMegaOracle.sol";
  */
 contract FluxMegaOracle is IFluxMegaOracle, Governable {
 
+    /***************************************
+    STATE VARIABLES
+    ***************************************/
+
     // token => data
     mapping(address => PriceFeedData) internal _priceFeeds;
     // index => token
     mapping(uint256 => address) internal _indexToToken;
     // token => index+1
     mapping(address => uint256) internal _tokenToIndex;
+    // number of tokens known
     uint256 internal _tokensLength;
-
-    /***************************************
-    STATE VARIABLES
-    ***************************************/
 
     /**
      * @notice Constructs the `FluxMegaOracle` contract.

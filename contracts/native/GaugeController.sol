@@ -4,9 +4,9 @@ pragma solidity 0.8.6;
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import "./../utils/EnumerableMap.sol";
+import "./../utils/EnumerableMapS.sol";
 import "./../utils/Governable.sol";
-import "./../utils/SafeCast.sol";
+import "./../utils/SafeCastS.sol";
 import "./../interfaces/native/IGaugeVoter.sol";
 import "./../interfaces/native/IGaugeController.sol";
 
@@ -18,21 +18,21 @@ import "./../interfaces/native/IGaugeController.sol";
  * Current gauge weights can be obtained through [`getGaugeWeight()`](#getgaugeweight) and [`getAllGaugeWeights()`](#getallgaugeweights)
  *
  * Only governance can make mutator calls to GaugeController.sol. There are no unpermissioned external mutator calls in this contract.
- * 
+ *
  * After every epoch, governance must call [`updateGaugeWeights()`](#updategaugeweights). This will process the last epoch's votes (stored in this contract).
- * 
+ *
  * Individual voters register and manage their vote through voting contracts that conform to IGaugeVoting.
  *
  * Governance can [`addGauge()`](#addgauge) or [`pauseGauge()`](#pausegauge).
  */
 // solhint-disable-next-line contract-name-camelcase
-contract GaugeController is 
-        IGaugeController, 
-        ReentrancyGuard, 
-        Governable 
+contract GaugeController is
+        IGaugeController,
+        ReentrancyGuard,
+        Governable
     {
     using EnumerableSet for EnumerableSet.AddressSet;
-    using EnumerableMap for EnumerableMap.UintToUintMap;
+    using EnumerableMapS for EnumerableMapS.UintToUintMap;
 
     /***************************************
     GLOBAL PUBLIC VARIABLES
@@ -80,7 +80,7 @@ contract GaugeController is
     mapping(address => EnumerableSet.AddressSet) internal _voters;
 
     /// @notice votingContract => voter => gaugeID => votePowerBPS
-    mapping(address => mapping(address => EnumerableMap.UintToUintMap)) internal _votes;
+    mapping(address => mapping(address => EnumerableMapS.UintToUintMap)) internal _votes;
 
     /// @notice Dynamic array of dead voters to remove.
     address[] internal _votersToRemove;
@@ -104,8 +104,7 @@ contract GaugeController is
         token = token_;
         leverageFactor = 1e18; // Default 1x leverage.
         // Pre-fill slot 0 of _gauges, ensure gaugeID 1 maps to _gauges[1]
-        GaugeStructs.Gauge memory newGauge = GaugeStructs.Gauge(false, 0, ""); 
-        _gauges.push(GaugeStructs.Gauge(false, 0, "")); 
+        _gauges.push(GaugeStructs.Gauge(false, 0, ""));
         _clearUpdateInfo();
     }
 
@@ -304,7 +303,7 @@ contract GaugeController is
                 (uint256 gaugeID, uint256 votingPowerBPS) = _votes[votingContract_][voter_].at(i);
                 votes[i] = GaugeStructs.Vote(gaugeID, votingPowerBPS);
             }
-        } 
+        }
     }
 
     /**
@@ -321,7 +320,7 @@ contract GaugeController is
             for (uint256 i = 0; i < votersCount; i++) {
                 voters[i] = _voters[votingContract_].at(i);
             }
-        } 
+        }
     }
 
     /**
@@ -335,7 +334,7 @@ contract GaugeController is
             return 0;
         } else {
             return _votes[votingContract_][voter_].length();
-        } 
+        }
     }
 
     /**
@@ -348,7 +347,7 @@ contract GaugeController is
             return 0;
         } else {
             return _voters[votingContract_].length();
-        } 
+        }
     }
 
     /***************************************
@@ -376,14 +375,14 @@ contract GaugeController is
             return 0;
         // Else if removing vote
         } else if (newVotePowerBPS_ == 0) {
-            uint256 oldVotePowerBPS = _votes[votingContract_][voter_].get(gaugeID_);
+            oldVotePowerBPS = _votes[votingContract_][voter_].get(gaugeID_);
             _votes[votingContract_][voter_].remove(gaugeID_);
             // Check if need to remove voter
             if ( _votes[votingContract_][voter_].length() == 0 ) {_voters[votingContract_].remove(voter_);}
             return oldVotePowerBPS;
         // Else modify vote
         } else {
-            uint256 oldVotePowerBPS = _votes[votingContract_][voter_].get(gaugeID_);
+            oldVotePowerBPS = _votes[votingContract_][voter_].get(gaugeID_);
             _votes[votingContract_][voter_].set(gaugeID_, newVotePowerBPS_);
             return oldVotePowerBPS;
         }
@@ -444,8 +443,8 @@ contract GaugeController is
      */
     function addGauge(string calldata gaugeName_, uint256 rateOnLine_) external override onlyGovernance {
         uint256 gaugeID = ++totalGauges;
-        GaugeStructs.Gauge memory newGauge = GaugeStructs.Gauge(true, SafeCast.toUint248(rateOnLine_), gaugeName_);
-        _gauges.push(newGauge); 
+        GaugeStructs.Gauge memory newGauge = GaugeStructs.Gauge(true, SafeCastS.toUint248(rateOnLine_), gaugeName_);
+        _gauges.push(newGauge);
         assert(_gauges.length - 1 == totalGauges); // Uphold invariant, should not be violated. -1 because we already added _gauges[0] in constructor.
         emit GaugeAdded(gaugeID, rateOnLine_, gaugeName_);
     }
@@ -540,7 +539,7 @@ contract GaugeController is
     function setRateOnLine(uint256[] calldata gaugeIDs_, uint256[] calldata rateOnLines_) external override onlyGovernance {
         if (gaugeIDs_.length != rateOnLines_.length) revert ArrayArgumentsLengthMismatch();
         for (uint256 i = 0; i < gaugeIDs_.length; i++) {
-            _gauges[gaugeIDs_[i]].rateOnLine = SafeCast.toUint248(rateOnLines_[i]);
+            _gauges[gaugeIDs_[i]].rateOnLine = SafeCastS.toUint248(rateOnLines_[i]);
             emit RateOnLineSet(gaugeIDs_[i], rateOnLines_[i]);
         }
     }
@@ -567,7 +566,7 @@ contract GaugeController is
             for(uint256 j = _updateInfo._votersIndex == type(uint88).max || i != _updateInfo._votingContractsIndex ? 0 : _updateInfo._votersIndex ; j < numVoters; j++) {
                 if (gasleft() < 200000) {return _saveUpdateState(i, j, 0);}
                 address voter = _voters[votingContract].at(j);
-                uint256 numVotes = _votes[votingContract][voter].length();      
+                uint256 numVotes = _votes[votingContract][voter].length();
                 uint256 votePower = IGaugeVoter(votingContract).getVotePower(voter); // Expensive computation here. ~150K gas for user with max cap of 10 locks.
                 if (votePower == 0) {
                     _votersToRemove.push(voter);
@@ -578,7 +577,7 @@ contract GaugeController is
                 IGaugeVoter(votingContract).cacheLastProcessedVotePower(voter, votePower);
 
                 // Iterate through votes
-                for(uint256 k = _updateInfo._votesIndex == type(uint88).max || j != _updateInfo._votersIndex || i != _updateInfo._votingContractsIndex ? 0 : _updateInfo._votesIndex; k < numVotes; k++) {    
+                for(uint256 k = _updateInfo._votesIndex == type(uint88).max || j != _updateInfo._votersIndex || i != _updateInfo._votingContractsIndex ? 0 : _updateInfo._votesIndex; k < numVotes; k++) {
                     if (gasleft() < 15000) {return _saveUpdateState(i, j, k);}
                     (uint256 gaugeID, uint256 votingPowerBPS) = _votes[votingContract][voter].at(k);
                     // Address edge case where vote placed before gauge is paused, will be counted
@@ -597,7 +596,7 @@ contract GaugeController is
                 _votersToRemove.pop();
             }
         }
-        
+
         _adjustVotePowerOfGaugeMapping();
         _clearUpdateInfo();
         lastTimeGaugeWeightsUpdated = epochStartTime;
@@ -620,7 +619,7 @@ contract GaugeController is
             updateInfo := or(updateInfo, shr(176, shl(176, votingContractsIndex_))) // [0:80] => votingContractsIndex_
             updateInfo := or(updateInfo, shr(88, shl(168, votersIndex_))) // [80:168] => votersIndex_
             updateInfo := or(updateInfo, shl(168, votesIndex_)) // [168:256] => votesIndex_
-            sstore(_updateInfo.slot, updateInfo) 
+            sstore(_updateInfo.slot, updateInfo)
         }
         emit IncompleteGaugeUpdate();
     }

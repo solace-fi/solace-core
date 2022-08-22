@@ -1,13 +1,13 @@
 // ^4.7.1 of OpenZeppelin EnumerableMap.sol
-// Created as local copy in Solace repo to enable use of single updated EnumerableMap.sol file while maintaining @openzeppelin dependencies at ~4.3.2. 
+// Created as local copy in Solace repo to enable use of single updated EnumerableMap.sol file while maintaining @openzeppelin dependencies at ~4.3.2.
 // Initializable pattern used in Solace repo broken with ^4.7.1
 
 // SPDX-License-Identifier: MIT
 // OpenZeppelin Contracts (last updated v4.7.0) (utils/structs/EnumerableMap.sol)
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.6;
 
-import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import "./EnumerableSetS.sol";
 
 /**
  * @dev Library for managing an enumerable variant of Solidity's
@@ -46,8 +46,8 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
  *  In order to clean an EnumerableMap, you can either remove all elements one by one or create a fresh instance using an array of EnumerableMap.
  * ====
  */
-library EnumerableMap {
-    using EnumerableSet for EnumerableSet.Bytes32Set;
+library EnumerableMapS {
+    using EnumerableSetS for EnumerableSetS.Bytes32Set;
 
     // To implement this library for multiple types with as little code
     // repetition as possible, we write it in terms of a generic Map type with
@@ -60,7 +60,7 @@ library EnumerableMap {
 
     struct Bytes32ToBytes32Map {
         // Storage of keys
-        EnumerableSet.Bytes32Set _keys;
+        EnumerableSetS.Bytes32Set _keys;
         mapping(bytes32 => bytes32) _values;
     }
 
