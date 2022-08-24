@@ -170,6 +170,13 @@ interface IUnderwritingLockVoting is IGaugeVoter {
      */
     function isVotingOpen() external view returns (bool);
 
+    /**
+     * @notice Get array of voters who have delegated their vote to a given address.
+     * @param delegate_ Address to query array of voting delegators for.
+     * @return votingDelegators Array of voting delegators.
+     */
+    function getVotingDelegatorsOf(address delegate_) external view returns (address[] memory votingDelegators);
+
     /***************************************
     EXTERNAL MUTATOR FUNCTIONS
     ***************************************/

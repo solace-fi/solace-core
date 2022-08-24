@@ -205,10 +205,18 @@ describe("UnderwritingLockVoting", function () {
             expect(await voting.delegateOf(voter1.address)).eq(ZERO_ADDRESS)
         });
         it("owner can set delegate", async function () {
+            expect(await voting.getVotingDelegatorsOf(delegate1.address)).deep.eq([])
             const tx = await voting.connect(voter1).setDelegate(delegate1.address);
             await expect(tx).to.emit(voting, "DelegateSet").withArgs(voter1.address, delegate1.address);
             expect(await voting.delegateOf(voter1.address)).eq(delegate1.address)
             expect(await voting.delegateOf(voter2.address)).eq(ZERO_ADDRESS)
+            expect(await voting.getVotingDelegatorsOf(delegate1.address)).deep.eq([voter1.address])
+        })
+        it("getVotingDelegatorsOf can show multiple delegators", async function () {
+            await voting.connect(voter2).setDelegate(delegate1.address);
+            expect(await voting.getVotingDelegatorsOf(delegate1.address)).deep.eq([voter1.address, voter2.address])
+            await voting.connect(voter2).setDelegate(ZERO_ADDRESS);
+            expect(await voting.getVotingDelegatorsOf(delegate1.address)).deep.eq([voter1.address])
         })
     });
 

@@ -4,6 +4,7 @@ pragma solidity 0.8.6;
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "./../utils/Governable.sol";
 import "./../interfaces/utils/IRegistry.sol";
 import "./../interfaces/native/IUnderwritingLocker.sol";
@@ -41,6 +42,8 @@ contract UnderwritingLockVoting is
         ReentrancyGuard, 
         Governable 
     {
+    using EnumerableSet for EnumerableSet.AddressSet;
+
     /***************************************
     GLOBAL PUBLIC VARIABLES
     ***************************************/
@@ -88,6 +91,9 @@ contract UnderwritingLockVoting is
 
     /// @notice State of last [`chargePremiums()`](#chargepremiums) call.
     GaugeStructs.UpdateInfo internal _updateInfo;
+
+    /// @notice delegate => voters.
+    mapping(address => EnumerableSet.AddressSet) internal _votingDelegatorsOf;
 
     /***************************************
     CONSTRUCTOR
@@ -205,6 +211,19 @@ contract UnderwritingLockVoting is
         return epochStartTime == lastTimePremiumsCharged && epochStartTime == _getLastTimeGaugesUpdated();
     }
 
+    /**
+     * @notice Get array of voters who have delegated their vote to a given address.
+     * @param delegate_ Address to query array of voting delegators for.
+     * @return votingDelegators Array of voting delegators.
+     */
+    function getVotingDelegatorsOf(address delegate_) external view override returns (address[] memory votingDelegators) {
+        uint256 length = _votingDelegatorsOf[delegate_].length();
+        votingDelegators = new address[](length);
+        for (uint256 i = 0; i < length; i++) {
+            votingDelegators[i] = _votingDelegatorsOf[delegate_].at(i);
+        }
+    }
+
     /***************************************
     INTERNAL MUTATOR FUNCTIONS
     ***************************************/
@@ -215,6 +234,9 @@ contract UnderwritingLockVoting is
      * @param delegate_ Address of intended delegate
      */
     function _setDelegate(address delegate_) internal {
+        address oldDelegate = delegateOf[msg.sender];
+        if (oldDelegate != address(0)) _votingDelegatorsOf[oldDelegate].remove(msg.sender);
+        if (delegate_ != address(0)) _votingDelegatorsOf[delegate_].add(msg.sender);
         delegateOf[msg.sender] = delegate_;
         emit DelegateSet(msg.sender, delegate_);
     }
