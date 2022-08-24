@@ -868,6 +868,33 @@ describe("UnderwritingLockVoting", function () {
       })
     });
 
+    describe("voteForMultipleVoters and removeVotesForMultipleVoters", () => {
+      before(async function () {
+        await voting.connect(voter2).setDelegate(delegate1.address)
+      });
+      it("should revert if non-delegate attempts to voteForMultipleVoters", async function () {
+        await expect(voting.connect(governor).voteForMultipleVoters([voter1.address, voter2.address], [2], [1])).to.be.revertedWith("NotOwnerNorDelegate");
+      });
+      it("should revert if non-delegate attempts to removeVotesForMultipleVoters", async function () {
+        await expect(voting.connect(governor).removeVotesForMultipleVoters([voter1.address, voter2.address], [2])).to.be.revertedWith("NotOwnerNorDelegate");
+      });
+      it("delegate can voteForMultipleVoters()", async function () {
+        const tx = await voting.connect(delegate1).voteForMultipleVoters([voter1.address, voter2.address], [2], [1]);
+        await expect(tx).to.emit(voting, "VoteAdded").withArgs(voter1.address, 2, 1);
+        await expect(tx).to.emit(voting, "VoteAdded").withArgs(voter2.address, 2, 1);
+      })
+      it("delegate can removeVotesForMultipleVoters()", async function () {
+        const tx = await voting.connect(delegate1).removeVotesForMultipleVoters([voter1.address, voter2.address], [2]);
+        await expect(tx).to.emit(voting, "VoteRemoved").withArgs(voter1.address, 2);
+        await expect(tx).to.emit(voting, "VoteRemoved").withArgs(voter1.address, 2);
+      })
+      after(async function () {
+        await voting.connect(voter1).vote(voter1.address, 2, 5000)
+        await voting.connect(voter2).vote(voter2.address, 2, 4000)
+        await voting.connect(voter2).setDelegate(ZERO_ADDRESS)
+      });
+    });
+
     /*******************
       STATE SUMMARY
     *******************/

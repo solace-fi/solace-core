@@ -345,6 +345,21 @@ contract UnderwritingLockVoting is
     }
 
     /**
+     * @notice Register a single voting configuration for multiple voters.
+     * Can only be called by the voter or vote delegate.
+     * @param voters_ Array of voters.
+     * @param gaugeIDs_ Array of gauge IDs to vote for.
+     * @param votePowerBPSs_ Array of corresponding vote power BPS values.
+     */
+    function voteForMultipleVoters(address[] calldata voters_, uint256[] memory gaugeIDs_, uint256[] memory votePowerBPSs_) external override {
+        uint256 length = voters_.length;
+        for (uint256 i = 0; i < length; i++) {
+            if ( IUnderwritingLocker(underwritingLocker).balanceOf(voters_[i]) == 0 ) revert VoterHasNoLocks();
+            _vote(voters_[i], gaugeIDs_, votePowerBPSs_);
+        }
+    }
+
+    /**
      * @notice Removes a vote.
      * @notice Votes cannot be removed while voting is frozen.
      * Can only be called by the voter or vote delegate.
@@ -370,6 +385,22 @@ contract UnderwritingLockVoting is
         uint256[] memory votePowerBPSs_ = new uint256[](gaugeIDs_.length);
         for(uint256 i = 0; i < gaugeIDs_.length; i++) {votePowerBPSs_[i] = 0;}
         _vote(voter_, gaugeIDs_, votePowerBPSs_);
+    }
+
+    /**
+     * @notice Remove gauge votes for multiple voters.
+     * @notice Votes cannot be removed while voting is frozen.
+     * Can only be called by the voter or vote delegate.
+     * @param voters_ Array of voter addresses.
+     * @param gaugeIDs_ Array of gauge IDs to remove votes for.
+     */
+    function removeVotesForMultipleVoters(address[] calldata voters_, uint256[] memory gaugeIDs_) external override {
+        uint256 length = voters_.length;
+        uint256[] memory votePowerBPSs_ = new uint256[](gaugeIDs_.length);
+        for(uint256 i = 0; i < gaugeIDs_.length; i++) {votePowerBPSs_[i] = 0;}
+        for (uint256 i = 0; i < length; i++) {
+            _vote(voters_[i], gaugeIDs_, votePowerBPSs_);
+        }
     }
 
     /**

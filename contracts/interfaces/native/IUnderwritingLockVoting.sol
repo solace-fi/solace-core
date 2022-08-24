@@ -206,6 +206,15 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     function voteMultiple(address voter_, uint256[] memory gaugeIDs_, uint256[] memory votePowerBPSs_) external;
 
     /**
+     * @notice Register a single voting configuration for multiple voters.
+     * Can only be called by the voter or vote delegate.
+     * @param voters_ Array of voters.
+     * @param gaugeIDs_ Array of gauge IDs to vote for.
+     * @param votePowerBPSs_ Array of corresponding vote power BPS values.
+     */
+    function voteForMultipleVoters(address[] calldata voters_, uint256[] memory gaugeIDs_, uint256[] memory votePowerBPSs_) external;
+
+    /**
      * @notice Removes a vote.
      * @notice Votes cannot be removed while voting is frozen.
      * Can only be called by the voter or vote delegate.
@@ -222,6 +231,15 @@ interface IUnderwritingLockVoting is IGaugeVoter {
      * @param gaugeIDs_ Array of gauge IDs to remove votes for.
      */
     function removeVoteMultiple(address voter_, uint256[] memory gaugeIDs_) external;
+
+    /**
+     * @notice Remove gauge votes for multiple voters.
+     * @notice Votes cannot be removed while voting is frozen.
+     * Can only be called by the voter or vote delegate.
+     * @param voters_ Array of voter addresses.
+     * @param gaugeIDs_ Array of gauge IDs to remove votes for.
+     */
+    function removeVotesForMultipleVoters(address[] calldata voters_, uint256[] memory gaugeIDs_) external;
 
     /**
      * @notice Set the voting delegate for the caller.
