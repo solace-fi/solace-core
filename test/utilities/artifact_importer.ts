@@ -74,6 +74,7 @@ export async function import_artifacts() {
   if(!artifacts.ERC20) artifacts.ERC20 = await tryImport(`../../artifacts/@openzeppelin/contracts/token/ERC20/ERC20.sol/ERC20.json`);
   artifacts.MockERC20 = await tryImport(`${artifact_dir}/mocks/MockERC20.sol/MockERC20.json`);
   artifacts.MockERC20Permit = await tryImport(`${artifact_dir}/mocks/MockERC20Permit.sol/MockERC20Permit.json`);
+  artifacts.MockERC20PermitWithBurn = await tryImport(`${artifact_dir}/mocks/MockERC20PermitWithBurn.sol/MockERC20PermitWithBurn.json`);
   artifacts.MockERC20Decimals = await tryImport(`${artifact_dir}/mocks/MockERC20Decimals.sol/MockERC20Decimals.json`);
   artifacts.MockERC721 = await tryImport(`${artifact_dir}/mocks/MockERC721.sol/MockERC721.json`);
   artifacts.MockERC721Initializable = await tryImport(`${artifact_dir}/mocks/MockERC721Initializable.sol/MockERC721Initializable.json`);
@@ -115,6 +116,11 @@ export async function import_artifacts() {
   artifacts.UnderwritingPool = await tryImport(`${artifact_dir}/native/UnderwritingPool.sol/UnderwritingPool.json`);
   artifacts.UnderwritingEquity = await tryImport(`${artifact_dir}/native/UnderwritingEquity.sol/UnderwritingEquity.json`);
   artifacts.FluxMegaOracle = await tryImport(`${artifact_dir}/native/FluxMegaOracle.sol/FluxMegaOracle.json`);
+  artifacts.UnderwritingLocker = await tryImport(`${artifact_dir}/native/UnderwritingLocker.sol/UnderwritingLocker.json`);
+  artifacts.UnderwritingLockVoting = await tryImport(`${artifact_dir}/native/UnderwritingLockVoting.sol/UnderwritingLockVoting.json`);
+  artifacts.GaugeController = await tryImport(`${artifact_dir}/native/GaugeController.sol/GaugeController.json`);
+  artifacts.MockUnderwritingLockListener = await tryImport(`${artifact_dir}/mocks/MockUnderwritingLockListener.sol/MockUnderwritingLockListener.json`);
+  
   return artifacts;
 }
 
