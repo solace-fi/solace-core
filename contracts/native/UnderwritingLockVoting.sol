@@ -4,6 +4,7 @@ pragma solidity 0.8.6;
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "./../utils/Governable.sol";
 import "./../interfaces/utils/IRegistry.sol";
 import "./../interfaces/native/IUnderwritingLocker.sol";
@@ -41,6 +42,8 @@ contract UnderwritingLockVoting is
         ReentrancyGuard,
         Governable
     {
+    using EnumerableSet for EnumerableSet.AddressSet;
+
     /***************************************
     GLOBAL PUBLIC VARIABLES
     ***************************************/
@@ -88,6 +91,9 @@ contract UnderwritingLockVoting is
 
     /// @notice State of last [`chargePremiums()`](#chargepremiums) call.
     GaugeStructs.UpdateInfo internal _updateInfo;
+
+    /// @notice delegate => voters.
+    mapping(address => EnumerableSet.AddressSet) internal _votingDelegatorsOf;
 
     /***************************************
     CONSTRUCTOR
@@ -205,6 +211,19 @@ contract UnderwritingLockVoting is
         return epochStartTime == lastTimePremiumsCharged && epochStartTime == _getLastTimeGaugesUpdated();
     }
 
+    /**
+     * @notice Get array of voters who have delegated their vote to a given address.
+     * @param delegate_ Address to query array of voting delegators for.
+     * @return votingDelegators Array of voting delegators.
+     */
+    function getVotingDelegatorsOf(address delegate_) external view override returns (address[] memory votingDelegators) {
+        uint256 length = _votingDelegatorsOf[delegate_].length();
+        votingDelegators = new address[](length);
+        for (uint256 i = 0; i < length; i++) {
+            votingDelegators[i] = _votingDelegatorsOf[delegate_].at(i);
+        }
+    }
+
     /***************************************
     INTERNAL MUTATOR FUNCTIONS
     ***************************************/
@@ -215,6 +234,9 @@ contract UnderwritingLockVoting is
      * @param delegate_ Address of intended delegate
      */
     function _setDelegate(address delegate_) internal {
+        address oldDelegate = delegateOf[msg.sender];
+        if (oldDelegate != address(0)) _votingDelegatorsOf[oldDelegate].remove(msg.sender);
+        if (delegate_ != address(0)) _votingDelegatorsOf[delegate_].add(msg.sender);
         delegateOf[msg.sender] = delegate_;
         emit DelegateSet(msg.sender, delegate_);
     }
@@ -323,6 +345,21 @@ contract UnderwritingLockVoting is
     }
 
     /**
+     * @notice Register a single voting configuration for multiple voters.
+     * Can only be called by the voter or vote delegate.
+     * @param voters_ Array of voters.
+     * @param gaugeIDs_ Array of gauge IDs to vote for.
+     * @param votePowerBPSs_ Array of corresponding vote power BPS values.
+     */
+    function voteForMultipleVoters(address[] calldata voters_, uint256[] memory gaugeIDs_, uint256[] memory votePowerBPSs_) external override {
+        uint256 length = voters_.length;
+        for (uint256 i = 0; i < length; i++) {
+            if ( IUnderwritingLocker(underwritingLocker).balanceOf(voters_[i]) == 0 ) revert VoterHasNoLocks();
+            _vote(voters_[i], gaugeIDs_, votePowerBPSs_);
+        }
+    }
+
+    /**
      * @notice Removes a vote.
      * @notice Votes cannot be removed while voting is frozen.
      * Can only be called by the voter or vote delegate.
@@ -348,6 +385,22 @@ contract UnderwritingLockVoting is
         uint256[] memory votePowerBPSs_ = new uint256[](gaugeIDs_.length);
         for(uint256 i = 0; i < gaugeIDs_.length; i++) {votePowerBPSs_[i] = 0;}
         _vote(voter_, gaugeIDs_, votePowerBPSs_);
+    }
+
+    /**
+     * @notice Remove gauge votes for multiple voters.
+     * @notice Votes cannot be removed while voting is frozen.
+     * Can only be called by the voter or vote delegate.
+     * @param voters_ Array of voter addresses.
+     * @param gaugeIDs_ Array of gauge IDs to remove votes for.
+     */
+    function removeVotesForMultipleVoters(address[] calldata voters_, uint256[] memory gaugeIDs_) external override {
+        uint256 length = voters_.length;
+        uint256[] memory votePowerBPSs_ = new uint256[](gaugeIDs_.length);
+        for(uint256 i = 0; i < gaugeIDs_.length; i++) {votePowerBPSs_[i] = 0;}
+        for (uint256 i = 0; i < length; i++) {
+            _vote(voters_[i], gaugeIDs_, votePowerBPSs_);
+        }
     }
 
     /**
