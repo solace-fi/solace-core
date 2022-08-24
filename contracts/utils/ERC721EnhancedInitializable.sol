@@ -255,7 +255,7 @@ abstract contract ERC721EnhancedInitializable is IERC721EnhancedInitializable, E
         address to,
         uint256 tokenID
     // solhint-disable-next-line no-empty-blocks
-    ) internal override virtual {}
+    ) internal virtual {}
 
     /***************************************
     MISC

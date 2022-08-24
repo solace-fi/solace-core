@@ -29,6 +29,13 @@ const WBTC_ADDRESS                  = "0xD129f9A01Eb0d41302A2F808e9Ebfd5eB92cE17
 const USDT_ADDRESS                  = "0x92f2F8d238183f678a5652a04EDa83eD7BCfa99e";
 const FRAX_ADDRESS                  = "0xA542486E4Dc48580fFf76B75b5c406C211218AE2";
 
+const AURORA_ADDRESS                = "0x9727B423892C3BCBEBe9458F4FE5e86A954A0980";
+const PLY_ADDRESS                   = "0xfdA6cF34193993c28E32340fc7CEf9361e48C7Ac";
+const BSTN_ADDRESS                  = "0xb191d201073Bb24453419Eb3c1e0B790e6EFA6DF";
+const BBT_ADDRESS                   = "0xAaF70eE6d386dD0410E2681FA33367f53b3BCc18";
+const TRI_ADDRESS                   = "0x13fcD385A20496ed729AF787EC109A6aB4B44d75";
+const VWAVE_ADDRESS                 = "0x5C4Ccc7b2a2bC3E5c009364917fff92d12a08fF4";
+
 const ONE_ETHER = BN.from("1000000000000000000");
 
 let artifacts: ArtifactImports;
@@ -87,6 +94,12 @@ async function deployTestnetTokens() {
     {name: "Wrapped Bitcoin", symbol: "WBTC", supply: BN.from("1000000000"), decimals: 8, permit: false},
     {name: "USD Token", symbol: "USDT", supply: BN.from("1000000000"), decimals: 6, permit: false},
     {name: "Frax", symbol: "FRAX", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
+    {name: "Aurora", symbol: "AURORA", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
+    {name: "Aurigami Token", symbol: "PLY", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
+    {name: "Bastion", symbol: "BSTN", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
+    {name: "BlueBit Token", symbol: "BBT", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
+    {name: "Trisolaris", symbol: "TRI", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
+    {name: "vaporwave.finance", symbol: "VWAVE", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
   ];
   for(var i = 0; i < tokens.length; ++i) {
     let token = tokens[i];
@@ -117,6 +130,12 @@ async function mintTestnetTokens() {
     {name: "Wrapped Bitcoin", symbol: "WBTC", supply: BN.from("1000000000"), decimals: 8, permit: false, address: WBTC_ADDRESS},
     {name: "USD Token", symbol: "USDT", supply: BN.from("1000000000"), decimals: 6, permit: false, address: USDT_ADDRESS},
     {name: "Frax", symbol: "FRAX", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false, address: FRAX_ADDRESS},
+    {name: "Aurora", symbol: "AURORA", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false, address: AURORA_ADDRESS},
+    {name: "Aurigami Token", symbol: "PLY", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false, address: PLY_ADDRESS},
+    {name: "Bastion", symbol: "BSTN", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false, address: BSTN_ADDRESS},
+    {name: "BlueBit Token", symbol: "BBT", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false, address: BBT_ADDRESS},
+    {name: "Trisolaris", symbol: "TRI", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false, address: TRI_ADDRESS},
+    {name: "vaporwave.finance", symbol: "VWAVE", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false, address: VWAVE_ADDRESS},
   ];
   let recipients = [signerAddress];
   for(var j = 0; j < recipients.length; ++j) {
@@ -157,6 +176,12 @@ async function logAddresses() {
   logContractAddress("WBTC", WBTC_ADDRESS);
   logContractAddress("USDT", USDT_ADDRESS);
   logContractAddress("FRAX", FRAX_ADDRESS);
+  logContractAddress("AURORA", AURORA_ADDRESS);
+  logContractAddress("PLY", PLY_ADDRESS);
+  logContractAddress("BSTN", BSTN_ADDRESS);
+  logContractAddress("BBT", BBT_ADDRESS);
+  logContractAddress("TRI", TRI_ADDRESS);
+  logContractAddress("VWAVE", VWAVE_ADDRESS);
 }
 
 main()
