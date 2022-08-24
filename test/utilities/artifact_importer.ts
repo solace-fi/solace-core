@@ -92,6 +92,7 @@ export async function import_artifacts() {
   artifacts.RiskStrategyFactory = await tryImport(`${artifact_dir}/RiskStrategyFactory.sol/RiskStrategyFactory.json`);
   artifacts.RiskStrategy = await tryImport(`${artifact_dir}/RiskStrategy.sol/RiskStrategy.json`);
   artifacts.MockRiskStrategy = await tryImport(`${artifact_dir}/mocks/MockRiskStrategy.sol/MockRiskStrategy.json`);
+  artifacts.MockFluxPriceFeed = await tryImport(`${artifact_dir}/mocks/MockFluxPriceFeed.sol/MockFluxPriceFeed.json`);
 
   // uniswapv3 imports
   artifacts.UniswapV3Factory = await tryImport("@uniswap/v3-core/artifacts/contracts/UniswapV3Factory.sol/UniswapV3Factory.json");
@@ -112,6 +113,9 @@ export async function import_artifacts() {
   artifacts.xsLockerExtension = await tryImport(`${artifact_dir}/airdrop/xsLockerExtension.sol/xsLockerExtension.json`);
 
   // native contracts
+  artifacts.UnderwritingPool = await tryImport(`${artifact_dir}/native/UnderwritingPool.sol/UnderwritingPool.json`);
+  artifacts.UnderwritingEquity = await tryImport(`${artifact_dir}/native/UnderwritingEquity.sol/UnderwritingEquity.json`);
+  artifacts.FluxMegaOracle = await tryImport(`${artifact_dir}/native/FluxMegaOracle.sol/FluxMegaOracle.json`);
   artifacts.UnderwritingLocker = await tryImport(`${artifact_dir}/native/UnderwritingLocker.sol/UnderwritingLocker.json`);
   artifacts.UnderwritingLockVoting = await tryImport(`${artifact_dir}/native/UnderwritingLockVoting.sol/UnderwritingLockVoting.json`);
   artifacts.GaugeController = await tryImport(`${artifact_dir}/native/GaugeController.sol/GaugeController.json`);
