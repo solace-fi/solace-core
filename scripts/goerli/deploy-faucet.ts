@@ -29,6 +29,7 @@ const WBTC_ADDRESS                  = "0xD129f9A01Eb0d41302A2F808e9Ebfd5eB92cE17
 const USDT_ADDRESS                  = "0x92f2F8d238183f678a5652a04EDa83eD7BCfa99e";
 const FRAX_ADDRESS                  = "0xA542486E4Dc48580fFf76B75b5c406C211218AE2";
 
+const NEAR_ADDRESS                  = "0x19435895aDC47127AA3151a9bf96dfa74f8b2C33";
 const AURORA_ADDRESS                = "0x9727B423892C3BCBEBe9458F4FE5e86A954A0980";
 const PLY_ADDRESS                   = "0xfdA6cF34193993c28E32340fc7CEf9361e48C7Ac";
 const BSTN_ADDRESS                  = "0xb191d201073Bb24453419Eb3c1e0B790e6EFA6DF";
@@ -60,8 +61,8 @@ async function main() {
   solace = (await ethers.getContractAt(artifacts.SOLACE.abi, SOLACE_ADDRESS)) as Solace;
 
   //await deployTestnetTokens();
-  //await mintTestnetTokens();
-  await deployFaucet();
+  await mintTestnetTokens();
+  //await deployFaucet();
 
   await logAddresses();
 }
@@ -85,15 +86,18 @@ async function deployFaucet() {
 }
 
 async function deployTestnetTokens() {
+  /*
   console.log(`Deploying WETH`);
   let weth = await deployContract(deployer, artifacts.WETH, [], {...networkSettings.overrides, gasLimit:6000000});
   console.log(`Deployed to ${weth.address}`);
+  */
   let tokens: any[] = [
     {name: "Dai Stablecoin", symbol: "DAI", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
     {name: "USD Coin", symbol: "USDC", supply: BN.from("1000000000"), decimals: 6, permit: true},
     {name: "Wrapped Bitcoin", symbol: "WBTC", supply: BN.from("1000000000"), decimals: 8, permit: false},
     {name: "USD Token", symbol: "USDT", supply: BN.from("1000000000"), decimals: 6, permit: false},
     {name: "Frax", symbol: "FRAX", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
+    {name: "NEAR", symbol: "NEAR", supply: 0, decimals: 24, permit: false},
     {name: "Aurora", symbol: "AURORA", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
     {name: "Aurigami Token", symbol: "PLY", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
     {name: "Bastion", symbol: "BSTN", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false},
@@ -111,18 +115,20 @@ async function deployTestnetTokens() {
 }
 
 async function mintTestnetTokens() {
+  /*
   let weth = await ethers.getContractAt(artifacts.WETH.abi, WETH_ADDRESS);
   console.log('start eth balance');
   console.log(await provider.getBalance(signerAddress));
   console.log('start weth balance');
   console.log(await weth.balanceOf(signerAddress));
   console.log('wrapping eth')
-  let tx1 = await weth.connect(deployer).deposit({...networkSettings.overrides, value: ONE_ETHER.div(1000)});
+  let tx1 = await weth.connect(deployer).deposit({...networkSettings.overrides, value: ONE_ETHER});
   await tx1.wait(networkSettings.confirmations);
   console.log('end eth balance');
   console.log(await provider.getBalance(signerAddress));
   console.log('end weth balance');
   console.log(await weth.balanceOf(signerAddress));
+  */
 
   let tokens: any[] = [
     {name: "Dai Stablecoin", symbol: "DAI", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false, address: DAI_ADDRESS},
@@ -130,6 +136,7 @@ async function mintTestnetTokens() {
     {name: "Wrapped Bitcoin", symbol: "WBTC", supply: BN.from("1000000000"), decimals: 8, permit: false, address: WBTC_ADDRESS},
     {name: "USD Token", symbol: "USDT", supply: BN.from("1000000000"), decimals: 6, permit: false, address: USDT_ADDRESS},
     {name: "Frax", symbol: "FRAX", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false, address: FRAX_ADDRESS},
+    {name: "NEAR", symbol: "NEAR", supply: 0, decimals: 24, permit: false, address: NEAR_ADDRESS},
     {name: "Aurora", symbol: "AURORA", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false, address: AURORA_ADDRESS},
     {name: "Aurigami Token", symbol: "PLY", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false, address: PLY_ADDRESS},
     {name: "Bastion", symbol: "BSTN", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false, address: BSTN_ADDRESS},
@@ -137,9 +144,19 @@ async function mintTestnetTokens() {
     {name: "Trisolaris", symbol: "TRI", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false, address: TRI_ADDRESS},
     {name: "vaporwave.finance", symbol: "VWAVE", supply: ONE_ETHER.mul(1000000), decimals: 18, permit: false, address: VWAVE_ADDRESS},
   ];
-  let recipients = [signerAddress];
+  let recipients = [
+    "0x0fb78424e5021404093aA0cFcf50B176B30a3c1d",
+    "0x34Bb9e91dC8AC1E13fb42A0e23f7236999e063D4",
+    "0xc32e0d89e25222abb4d2d68755babf5aa6648f15",
+    "0x67367Ca1DE9d7Eb10908f646a2a56Bc01B03b406",
+    "0x8b80755C441d355405CA7571443Bb9247B77Ec16",
+    "0x8021dA485A6bcD7b5AD20ACDa353A79C912cb12D",
+    "0x9BEdBBB7B64Ff5e9b4225EE70fdCedCdEc51637D",
+    signerAddress
+  ];
   for(var j = 0; j < recipients.length; ++j) {
     let recipient = recipients[j];
+    console.log(`Minting to ${recipient}`);
     for(var i = 0; i < tokens.length; ++i) {
       let token = tokens[i];
       let artifact = token.permit ? artifacts.MockERC20Permit : artifacts.MockERC20Decimals;
@@ -152,15 +169,17 @@ async function mintTestnetTokens() {
       console.log(`Transferring ${token.symbol}`);
       let tx2 = await tokenContract.connect(deployer).transfer(recipient, bal2.sub(bal1), networkSettings.overrides);
       await tx2.wait(networkSettings.confirmations);
-
       console.log(`Checking balance of ${token.symbol}`);
-      console.log(await tokenContract.balanceOf(recipient));
+      console.log(ethers.utils.formatUnits(await tokenContract.balanceOf(recipient), tokens[i].decimals));
     }
+    /*
     console.log('Minting SOLACE');
     let tx3 = await solace.connect(deployer).mint(recipient, ONE_ETHER.mul(1000), networkSettings.overrides);
     await tx3.wait(networkSettings.confirmations)
     console.log('Checking balance of SOLACE');
-    console.log(await solace.balanceOf(recipient));
+    console.log(ethers.utils.formatUnits(await solace.balanceOf(recipient)));
+    console.log('')
+    */
   }
 }
 
@@ -169,19 +188,22 @@ async function logAddresses() {
   console.log("| Contract Name                | Address                                      |");
   console.log("|------------------------------|----------------------------------------------|");
   logContractAddress("SOLACE", solace.address);
-  logContractAddress("Faucet", faucet.address);
   logContractAddress("DAI", DAI_ADDRESS);
   logContractAddress("WETH", WETH_ADDRESS);
   logContractAddress("USDC", USDC_ADDRESS);
   logContractAddress("WBTC", WBTC_ADDRESS);
   logContractAddress("USDT", USDT_ADDRESS);
   logContractAddress("FRAX", FRAX_ADDRESS);
+
+  logContractAddress("NEAR", NEAR_ADDRESS);
   logContractAddress("AURORA", AURORA_ADDRESS);
   logContractAddress("PLY", PLY_ADDRESS);
   logContractAddress("BSTN", BSTN_ADDRESS);
   logContractAddress("BBT", BBT_ADDRESS);
   logContractAddress("TRI", TRI_ADDRESS);
   logContractAddress("VWAVE", VWAVE_ADDRESS);
+
+  logContractAddress("Faucet", faucet.address);
 }
 
 main()
