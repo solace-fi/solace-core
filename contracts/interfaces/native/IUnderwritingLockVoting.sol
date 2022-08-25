@@ -177,6 +177,13 @@ interface IUnderwritingLockVoting is IGaugeVoter {
      */
     function getVotingDelegatorsOf(address delegate_) external view returns (address[] memory votingDelegators);
 
+    /**
+     * @notice Get last processed vote power for given voter.
+     * @param voter_ Address of voter to query for.
+     * @return lastProcessedVotePower
+     */
+    function getLastProcessedVotePowerOf(address voter_) external view returns (uint256 lastProcessedVotePower);
+
     /***************************************
     EXTERNAL MUTATOR FUNCTIONS
     ***************************************/

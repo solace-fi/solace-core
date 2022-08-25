@@ -14,8 +14,8 @@ struct Lock {
  * @author solace.fi
  * @notice Having an underwriting lock is a requirement to vote on Solace Native insurance gauges.
  * To create an underwriting lock, $UWE must be locked for a minimum of 6 months.
- *
- * Locks are ERC721s and can be viewed with [`locks()`](#locks).
+ * 
+ * Locks are ERC721s and can be viewed with [`locks()`](#locks). 
  * Each lock has an `amount` of locked $UWE, and an `end` timestamp.
  * Locks have a maximum duration of four years.
  *
