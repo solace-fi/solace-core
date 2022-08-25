@@ -24,15 +24,17 @@ interface IUnderwritingEquity is IERC20Metadata {
     ***************************************/
 
     /// @notice Emitted when a deposit is made.
-    event DepositMade(address user, uint256 uwpAmount, uint256 uweAmount);
+    event DepositMade(address indexed user, uint256 uwpAmount, uint256 uweAmount);
     /// @notice Emitted when a withdraw is made.
-    event WithdrawMade(address user, uint256 uwpAmount, uint256 uweAmount);
+    event WithdrawMade(address indexed user, uint256 uwpAmount, uint256 uweAmount);
     /// @notice Emitted when uwp is loaned.
     event UwpLoaned(uint256 uwpAmount, address receiver);
     /// @notice Emitted when issue fee is set.
     event IssueFeeSet(uint256 fee, address receiver);
     /// @notice Emitted when pause is set.
     event PauseSet(bool depositIsPaused, bool withdrawIsPaused, bool lendIsPaused);
+    /// @notice Emitted when the [`UWP`](./../../native/UnderwritingPool) contract is set.
+    event UwpSet(address uwp);
 
     /***************************************
     VIEW FUNCTIONS
@@ -134,9 +136,17 @@ interface IUnderwritingEquity is IERC20Metadata {
 
     /**
      * @notice Pauses or unpauses contract functionality.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param depositIsPaused True to pause deposit, false to unpause.
      * @param withdrawIsPaused True to pause withdraw, false to unpause.
      * @param lendIsPaused True to pause lend, false to unpause.
      */
     function setPause(bool depositIsPaused, bool withdrawIsPaused, bool lendIsPaused) external;
+
+    /**
+     * @notice Upgrades the [`UWP`](./../../native/UnderwritingPool) contract.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param uwp_ The address of the new [`UWP`](./../../native/UnderwritingPool).
+     */
+    function setUwp(address uwp_) external;
 }
