@@ -72,7 +72,7 @@ async function main() {
   await deployGaugeController();
   //await setRegistry2(); // Set 'revenueRouter', 'underwritingLocker' and 'gaugeController' in the registry
   await deployUnderwritingLockVoting();
-  await gaugeSetup();
+  //await gaugeSetup();
   //await addGauges();
   await deployDepositHelper();
 
@@ -133,7 +133,7 @@ async function gaugeSetup() {
     console.log("Adding UnderwritingLocker as $UWE capacity source in GaugeController");
     const tx1 = await gaugeController.connect(deployer).addTokenholder(underwritingLocker.address, networkSettings.overrides);
     await tx1.wait(networkSettings.confirmations);
-    
+
     console.log("Adding UnderwritingLockVoting as vote source in GaugeController");
     const tx2 = await gaugeController.connect(deployer).addVotingContract(voting.address, {...networkSettings.overrides, gasLimit: 1000000});
     await tx2.wait(networkSettings.confirmations);
