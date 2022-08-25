@@ -4,6 +4,7 @@ pragma solidity 0.8.6;
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "./../utils/Governable.sol";
 import "./../interfaces/utils/IRegistry.sol";
 import "./../interfaces/native/IUnderwritingLocker.sol";
@@ -14,33 +15,35 @@ import "./../interfaces/native/IGaugeController.sol";
  * @title UnderwritingLockVoting
  * @author solace.fi
  * @notice Enables individual votes in Solace Native insurance gauges for owners of [`UnderwritingLocker`](./UnderwritingLocker).
- * 
+ *
  * Any address owning an underwriting lock can vote and will have a votePower that can be viewed with [`getVotePower()`](#getVotePower)
  * An address' vote power is the sum of the vote power of its owned locks.
  * A lock's vote power scales linearly with locked amount, and through a sqrt formula with lock duration
  * Users cannot view the vote power of an individual lock through this contract, only the total vote power of an address.
  * This is an intentional design choice to abstract locks away from address-based voting.
- * 
+ *
  * Voters can set a delegate who can vote on their behalf via [`setDelegate()`](#setDelegate).
- * 
+ *
  * To cast a vote, either the voter or their delegate can call [`vote()`](#vote) or [`voteMultiple()`](#voteMultiple).
  * Votes can be cast among existing gaugeIDs (set in GaugeController.sol), and voters/delegates can set a custom proportion
  * of their total voting power for different gauges.
  * Voting power proportion is measured in bps, and total used voting power bps for a voter cannot exceed 10000.
- * 
+ *
  * Votes are saved, so a vote today will count as the voter's vote for all future epochs until the voter modifies their votes.
- * 
+ *
  * After each epoch (one-week) has passed, voting is frozen until governance has processed all the votes.
  * This is a two-step process:
  * GaugeController.updateGaugeWeights() - this will aggregate individual votes and update gauge weights accordingly
- * [`chargePremiums()`](#chargepremiums) - this will charge premiums for every vote. There is a voting premium 
+ * [`chargePremiums()`](#chargepremiums) - this will charge premiums for every vote. There is a voting premium
  * to be paid every epoch, this gets sent to the revenue router.
  */
-contract UnderwritingLockVoting is 
-        IUnderwritingLockVoting, 
-        ReentrancyGuard, 
-        Governable 
+contract UnderwritingLockVoting is
+        IUnderwritingLockVoting,
+        ReentrancyGuard,
+        Governable
     {
+    using EnumerableSet for EnumerableSet.AddressSet;
+
     /***************************************
     GLOBAL PUBLIC VARIABLES
     ***************************************/
@@ -56,6 +59,10 @@ contract UnderwritingLockVoting is
 
     /// @notice Registry address
     address public override registry;
+
+    /// @notice Updater address.
+    /// @dev Second address that can call chargePremiums (in addition to governance).
+    address public override updater;
 
     /// @notice End timestamp for last epoch that premiums were charged for all stored votes.
     uint256 public override lastTimePremiumsCharged;
@@ -84,6 +91,9 @@ contract UnderwritingLockVoting is
 
     /// @notice State of last [`chargePremiums()`](#chargepremiums) call.
     GaugeStructs.UpdateInfo internal _updateInfo;
+
+    /// @notice delegate => voters.
+    mapping(address => EnumerableSet.AddressSet) internal _votingDelegatorsOf;
 
     /***************************************
     CONSTRUCTOR
@@ -136,14 +146,20 @@ contract UnderwritingLockVoting is
         return ( (block.timestamp / WEEK) * WEEK ) + WEEK;
     }
 
-
-
     /**
      * @notice Get end timestamp for last epoch that all stored votes were processed.
      * @return timestamp
      */
     function _getLastTimeGaugesUpdated() internal view returns (uint256 timestamp) {
         return IGaugeController(gaugeController).lastTimeGaugeWeightsUpdated();
+    }
+
+    /**
+     * @notice Query whether msg.sender is either the governance or updater role.
+     * @return True if msg.sender is either governor or updater roler, and contract govenance is not locked, false otherwise.
+     */
+    function _isUpdaterOrGovernance() internal view returns (bool) {
+        return ( !this.governanceIsLocked() && ( msg.sender == updater || msg.sender == this.governance() ));
     }
 
     /***************************************
@@ -195,6 +211,19 @@ contract UnderwritingLockVoting is
         return epochStartTime == lastTimePremiumsCharged && epochStartTime == _getLastTimeGaugesUpdated();
     }
 
+    /**
+     * @notice Get array of voters who have delegated their vote to a given address.
+     * @param delegate_ Address to query array of voting delegators for.
+     * @return votingDelegators Array of voting delegators.
+     */
+    function getVotingDelegatorsOf(address delegate_) external view override returns (address[] memory votingDelegators) {
+        uint256 length = _votingDelegatorsOf[delegate_].length();
+        votingDelegators = new address[](length);
+        for (uint256 i = 0; i < length; i++) {
+            votingDelegators[i] = _votingDelegatorsOf[delegate_].at(i);
+        }
+    }
+
     /***************************************
     INTERNAL MUTATOR FUNCTIONS
     ***************************************/
@@ -205,6 +234,9 @@ contract UnderwritingLockVoting is
      * @param delegate_ Address of intended delegate
      */
     function _setDelegate(address delegate_) internal {
+        address oldDelegate = delegateOf[msg.sender];
+        if (oldDelegate != address(0)) _votingDelegatorsOf[oldDelegate].remove(msg.sender);
+        if (delegate_ != address(0)) _votingDelegatorsOf[delegate_].add(msg.sender);
         delegateOf[msg.sender] = delegate_;
         emit DelegateSet(msg.sender, delegate_);
     }
@@ -280,7 +312,7 @@ contract UnderwritingLockVoting is
 
     /**
      * @notice Register a single vote for a gauge. Can either add or change a vote.
-     * @notice Can also remove a vote (votePowerBPS_ == 0), the difference with removeVote() is that 
+     * @notice Can also remove a vote (votePowerBPS_ == 0), the difference with removeVote() is that
      * vote() will revert if the voter has no locks (no locks => no right to vote, but may have votes from
      * locks that have since been burned).
      * @notice GaugeController.updateGaugeWeights() will remove voters with no voting power, however voters can
@@ -313,6 +345,21 @@ contract UnderwritingLockVoting is
     }
 
     /**
+     * @notice Register a single voting configuration for multiple voters.
+     * Can only be called by the voter or vote delegate.
+     * @param voters_ Array of voters.
+     * @param gaugeIDs_ Array of gauge IDs to vote for.
+     * @param votePowerBPSs_ Array of corresponding vote power BPS values.
+     */
+    function voteForMultipleVoters(address[] calldata voters_, uint256[] memory gaugeIDs_, uint256[] memory votePowerBPSs_) external override {
+        uint256 length = voters_.length;
+        for (uint256 i = 0; i < length; i++) {
+            if ( IUnderwritingLocker(underwritingLocker).balanceOf(voters_[i]) == 0 ) revert VoterHasNoLocks();
+            _vote(voters_[i], gaugeIDs_, votePowerBPSs_);
+        }
+    }
+
+    /**
      * @notice Removes a vote.
      * @notice Votes cannot be removed while voting is frozen.
      * Can only be called by the voter or vote delegate.
@@ -338,6 +385,22 @@ contract UnderwritingLockVoting is
         uint256[] memory votePowerBPSs_ = new uint256[](gaugeIDs_.length);
         for(uint256 i = 0; i < gaugeIDs_.length; i++) {votePowerBPSs_[i] = 0;}
         _vote(voter_, gaugeIDs_, votePowerBPSs_);
+    }
+
+    /**
+     * @notice Remove gauge votes for multiple voters.
+     * @notice Votes cannot be removed while voting is frozen.
+     * Can only be called by the voter or vote delegate.
+     * @param voters_ Array of voter addresses.
+     * @param gaugeIDs_ Array of gauge IDs to remove votes for.
+     */
+    function removeVotesForMultipleVoters(address[] calldata voters_, uint256[] memory gaugeIDs_) external override {
+        uint256 length = voters_.length;
+        uint256[] memory votePowerBPSs_ = new uint256[](gaugeIDs_.length);
+        for(uint256 i = 0; i < gaugeIDs_.length; i++) {votePowerBPSs_[i] = 0;}
+        for (uint256 i = 0; i < length; i++) {
+            _vote(voters_[i], gaugeIDs_, votePowerBPSs_);
+        }
     }
 
     /**
@@ -380,12 +443,23 @@ contract UnderwritingLockVoting is
     }
 
     /**
+     * @notice Set updater address.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param updater_ The address of the new updater.
+     */
+    function setUpdater(address updater_) external override onlyGovernance {
+        updater = updater_;
+        emit UpdaterSet(updater_);
+    }
+
+    /**
      * @notice Charge premiums for votes.
      * @dev Designed to be called in a while-loop with the condition being `lastTimePremiumsCharged != epochStartTimestamp` and using the maximum custom gas limit.
      * @dev Requires GaugeController.updateGaugeWeights() to be run to completion for the last epoch.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      */
-    function chargePremiums() external override onlyGovernance {
+    function chargePremiums() external override {
+        if (!_isUpdaterOrGovernance()) revert NotUpdaterNorGovernance();
         uint256 epochStartTimestamp = _getEpochStartTimestamp();
         if(_getLastTimeGaugesUpdated() != epochStartTimestamp) revert GaugeWeightsNotYetUpdated();
         if(lastTimePremiumsCharged == epochStartTimestamp) revert LastEpochPremiumsAlreadyProcessed({epochTime: epochStartTimestamp});
@@ -401,7 +475,7 @@ contract UnderwritingLockVoting is
             // Short-circuit operator - need at least 30K gas for getVoteCount() call
             if (gasleft() < 40000 || gasleft() < 10000 * IGaugeController(gaugeController).getVoteCount(address(this), voters[i])) {
                 return _saveUpdateState(0, i, 0);
-            }        
+            }
             // Unbounded loop since # of votes (gauges) unbounded
             uint256 premium = _calculateVotePremium(voters[i], insuranceCapacity, votePowerSum); // 87K gas for 10 votes
             uint256[] memory lockIDs = IUnderwritingLocker(underwritingLocker).getAllLockIDsOf(voters[i]);
@@ -420,8 +494,8 @@ contract UnderwritingLockVoting is
         }
 
         SafeERC20.safeTransferFrom(
-            IERC20(IUnderwritingLocker(underwritingLocker).token()), 
-            underwritingLocker, 
+            IERC20(IUnderwritingLocker(underwritingLocker).token()),
+            underwritingLocker,
             revenueRouter,
             type(uint256).max - _totalPremiumDue // Avoid _totalPremiumDue being zero.
         );
@@ -448,7 +522,7 @@ contract UnderwritingLockVoting is
             updateInfo := or(updateInfo, shr(176, shl(176, empty_))) // [0:80] => empty_
             updateInfo := or(updateInfo, shr(88, shl(168, votersIndex_))) // [80:168] => votersIndex_
             updateInfo := or(updateInfo, shl(168, lockIndex_)) // [168:256] => lockIndex_
-            sstore(_updateInfo.slot, updateInfo) 
+            sstore(_updateInfo.slot, updateInfo)
         }
         emit IncompletePremiumsCharge();
     }

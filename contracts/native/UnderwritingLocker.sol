@@ -10,15 +10,18 @@ import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 import "./../interfaces/utils/IRegistry.sol";
 import "./../interfaces/native/IUnderwritingLockListener.sol";
 import "./../interfaces/native/IUnderwritingLocker.sol";
+import "./../interfaces/native/IUnderwritingEquity.sol";
 import "./../utils/ERC721Enhanced.sol";
 import "./../utils/Governable.sol";
+
+
 /**
  * @title UnderwritingLocker
  * @author solace.fi
  * @notice Having an underwriting lock is a requirement to vote on Solace Native insurance gauges.
  * To create an underwriting lock, $UWE must be locked for a minimum of 6 months.
- * 
- * Locks are ERC721s and can be viewed with [`locks()`](#locks). 
+ *
+ * Locks are ERC721s and can be viewed with [`locks()`](#locks).
  * Each lock has an `amount` of locked $UWE, and an `end` timestamp.
  * Locks have a maximum duration of four years.
  *
@@ -33,16 +36,16 @@ import "./../utils/Governable.sol";
  * Early withdrawls will incur an additional burn, which will increase with longer remaining lock duration.
  *
  * Any time a lock is minted, burned or otherwise modified it will notify the listener contracts.
- * The exception to the above statement is on chargePremium() call, we do not emit an event because we do 
+ * The exception to the above statement is on chargePremium() call, we do not emit an event because we do
  * not want to pay for event emission fees (~2K per event) in an unbounded loop within UnderwritingLockVoting.chargePremiums().
  */
 // solhint-disable-next-line contract-name-camelcase
-contract UnderwritingLocker is 
-        IUnderwritingLocker, 
-        ERC721Enhanced, 
-        ReentrancyGuard, 
-        Governable 
-    {    
+contract UnderwritingLocker is
+        IUnderwritingLocker,
+        ERC721Enhanced,
+        ReentrancyGuard,
+        Governable
+    {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     /***************************************
@@ -121,14 +124,14 @@ contract UnderwritingLocker is
     function _getWithdrawAndBurnAmount(uint256 amount_, uint256 end_) internal view returns (uint256 withdrawAmount, uint256 burnAmount) {
         // solhint-disable-next-line not-rely-on-time
         bool isEarlyWithdraw = block.timestamp < end_;
-        uint256 withdrawAmount = ( (1e18 - fundingRate) * amount_ ) / 1e18;
-        
+        withdrawAmount = ( (1e18 - fundingRate) * amount_ ) / 1e18;
+
         if (isEarlyWithdraw) {
             uint256 multiplier = _getLockMultiplier(end_);
             withdrawAmount = 1e18 * withdrawAmount / (multiplier + 1e18);
         }
 
-        uint256 burnAmount = amount_ - withdrawAmount;
+        burnAmount = amount_ - withdrawAmount;
         return (withdrawAmount, burnAmount);
     }
 
@@ -151,7 +154,7 @@ contract UnderwritingLocker is
     // Initially attempted Uniswap implementation - https://github.com/Uniswap/v2-core/blob/master/contracts/libraries/Math.sol
     // However Uniswap implementation very gas inefficient - require ~30000 gas to calculate typical result
     // vs this implementation which takes 700 gas to calculate same
-    // Burden of more difficult code well worth 40x gas efficiency, especially given that _sqrt() runs in an 
+    // Burden of more difficult code well worth 40x gas efficiency, especially given that _sqrt() runs in an
     // unbounded loop in GaugeController.updateGaugeWeights().
     function _sqrt(uint256 x) internal pure returns (uint256 result) {
         if (x == 0) {
@@ -419,10 +422,10 @@ contract UnderwritingLocker is
      * @return withdrawAmount Amount that will be withdrawn.
      * @return burnAmount Amount that will be burned.
      */
-    function _withdraw(uint256 lockID_, uint256 amount_) 
-        internal 
-        onlyOwnerOrApproved(lockID_) 
-        returns (uint256 withdrawAmount, uint256 burnAmount) 
+    function _withdraw(uint256 lockID_, uint256 amount_)
+        internal
+        onlyOwnerOrApproved(lockID_)
+        returns (uint256 withdrawAmount, uint256 burnAmount)
     {
         // solhint-disable-next-line not-rely-on-time
         bool isEarlyWithdraw = block.timestamp < _locks[lockID_].end;
@@ -441,7 +444,7 @@ contract UnderwritingLocker is
             _notify(lockID_, owner, owner, oldLock, newLock);
         }
 
-        if(isEarlyWithdraw) {emit EarlyWithdrawal(lockID_, amount_, withdrawAmount, burnAmount);} 
+        if(isEarlyWithdraw) {emit EarlyWithdrawal(lockID_, amount_, withdrawAmount, burnAmount);}
         else {emit Withdrawal(lockID_, amount_, withdrawAmount, burnAmount);}
         return (withdrawAmount, burnAmount);
     }
@@ -489,7 +492,7 @@ contract UnderwritingLocker is
      * @param registry_ The registry address to set.
      */
     function _setRegistry(address registry_) internal {
-        // set registry        
+        // set registry
         if(registry_ == address(0x0)) revert ZeroAddressInput("registry");
         registry = registry_;
         IRegistry reg = IRegistry(registry_);
@@ -627,7 +630,7 @@ contract UnderwritingLocker is
         uint256 amount = _locks[lockID_].amount;
         (uint256 withdrawAmount, uint256 burnAmount) = _withdraw(lockID_, amount);
         // transfer token
-        SafeERC20.safeTransfer(IERC20(token), address(0x1), burnAmount);
+        IUnderwritingEquity(token).burn(burnAmount);
         SafeERC20.safeTransfer(IERC20(token), recipient_, withdrawAmount);
     }
 
@@ -643,7 +646,7 @@ contract UnderwritingLocker is
         if (amount_ > _locks[lockID_].amount) revert ExcessWithdraw();
         (uint256 withdrawAmount, uint256 burnAmount) = _withdraw(lockID_, amount_);
         // transfer token
-        SafeERC20.safeTransfer(IERC20(token), address(0x1), burnAmount);
+        IUnderwritingEquity(token).burn(burnAmount);
         SafeERC20.safeTransfer(IERC20(token), recipient_, withdrawAmount);
     }
 
@@ -667,7 +670,7 @@ contract UnderwritingLocker is
             totalWithdrawAmount += withdrawAmount;
         }
         // batched token transfer
-        if (totalBurnAmount > 0) {SafeERC20.safeTransfer(IERC20(token), address(0x1), totalBurnAmount);}
+        if (totalBurnAmount > 0) {IUnderwritingEquity(token).burn(totalBurnAmount);}
         SafeERC20.safeTransfer(IERC20(token), recipient_, totalWithdrawAmount);
     }
 
@@ -694,7 +697,7 @@ contract UnderwritingLocker is
             totalWithdrawAmount += withdrawAmount;
         }
         // batched token transfer
-        if (totalBurnAmount > 0) {SafeERC20.safeTransfer(IERC20(token), address(0x1), totalBurnAmount);}
+        if (totalBurnAmount > 0) {IUnderwritingEquity(token).burn(totalBurnAmount);}
         SafeERC20.safeTransfer(IERC20(token), recipient_, totalWithdrawAmount);
     }
 
@@ -771,7 +774,7 @@ contract UnderwritingLocker is
         (, address votingContractAddr) = IRegistry(registry).tryGet("underwritingLockVoting");
         if(votingContractAddr == address(0x0)) revert ZeroAddressInput("underwritingLockVoting");
         votingContract = votingContractAddr;
-        SafeERC20.safeApprove(IERC20(token), votingContractAddr, type(uint256).max);        
+        SafeERC20.safeApprove(IERC20(token), votingContractAddr, type(uint256).max);
         emit VotingContractSet(votingContractAddr);
     }
 

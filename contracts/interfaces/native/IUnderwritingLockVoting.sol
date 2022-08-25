@@ -71,6 +71,9 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     /// @param epochTime Timestamp of endtime for epoch already processed.
     error LastEpochPremiumsAlreadyProcessed(uint256 epochTime);
 
+    /// @notice Thrown when chargePremiums() is called by neither governance nor updater, or governance is locked.
+    error NotUpdaterNorGovernance();
+
     /***************************************
     EVENTS
     ***************************************/
@@ -80,6 +83,9 @@ interface IUnderwritingLockVoting is IGaugeVoter {
 
     /// @notice Emitted when the Registry is set.
     event RegistrySet(address indexed registry);
+
+    /// @notice Emitted when the Updater is set.
+    event UpdaterSet(address indexed updater);
 
     /// @notice Emitted when a vote is added.
     event VoteAdded(address indexed voter, uint256 indexed gaugeID, uint256 votePowerBPS);
@@ -111,6 +117,9 @@ interface IUnderwritingLockVoting is IGaugeVoter {
 
     /// @notice Registry address
     function registry() external view returns (address);
+
+    /// @notice Updater address.
+    function updater() external view returns (address);
 
     /**
      * @notice End timestamp for last epoch that premiums were charged for all stored votes.
@@ -161,6 +170,13 @@ interface IUnderwritingLockVoting is IGaugeVoter {
      */
     function isVotingOpen() external view returns (bool);
 
+    /**
+     * @notice Get array of voters who have delegated their vote to a given address.
+     * @param delegate_ Address to query array of voting delegators for.
+     * @return votingDelegators Array of voting delegators.
+     */
+    function getVotingDelegatorsOf(address delegate_) external view returns (address[] memory votingDelegators);
+
     /***************************************
     EXTERNAL MUTATOR FUNCTIONS
     ***************************************/
@@ -190,6 +206,15 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     function voteMultiple(address voter_, uint256[] memory gaugeIDs_, uint256[] memory votePowerBPSs_) external;
 
     /**
+     * @notice Register a single voting configuration for multiple voters.
+     * Can only be called by the voter or vote delegate.
+     * @param voters_ Array of voters.
+     * @param gaugeIDs_ Array of gauge IDs to vote for.
+     * @param votePowerBPSs_ Array of corresponding vote power BPS values.
+     */
+    function voteForMultipleVoters(address[] calldata voters_, uint256[] memory gaugeIDs_, uint256[] memory votePowerBPSs_) external;
+
+    /**
      * @notice Removes a vote.
      * @notice Votes cannot be removed while voting is frozen.
      * Can only be called by the voter or vote delegate.
@@ -206,6 +231,15 @@ interface IUnderwritingLockVoting is IGaugeVoter {
      * @param gaugeIDs_ Array of gauge IDs to remove votes for.
      */
     function removeVoteMultiple(address voter_, uint256[] memory gaugeIDs_) external;
+
+    /**
+     * @notice Remove gauge votes for multiple voters.
+     * @notice Votes cannot be removed while voting is frozen.
+     * Can only be called by the voter or vote delegate.
+     * @param voters_ Array of voter addresses.
+     * @param gaugeIDs_ Array of gauge IDs to remove votes for.
+     */
+    function removeVotesForMultipleVoters(address[] calldata voters_, uint256[] memory gaugeIDs_) external;
 
     /**
      * @notice Set the voting delegate for the caller.
@@ -225,6 +259,13 @@ interface IUnderwritingLockVoting is IGaugeVoter {
      * @param registry_ The address of `Registry` contract.
      */
     function setRegistry(address registry_) external;
+
+    /**
+     * @notice Set updater address.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param updater_ The address of the new updater.
+     */
+    function setUpdater(address updater_) external;
 
     /**
      * @notice Charge premiums for votes.

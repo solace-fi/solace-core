@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.6;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 import "./../utils/IERC721Enhanced.sol";
 
 /// @dev Defining Lock struct outside of the interface body causes this struct to be visible to contracts that import, but do not inherit, this file. If we otherwise define this struct in the interface body, it is only visible to contracts that both import and inherit this file.
@@ -17,8 +14,8 @@ struct Lock {
  * @author solace.fi
  * @notice Having an underwriting lock is a requirement to vote on Solace Native insurance gauges.
  * To create an underwriting lock, $UWE must be locked for a minimum of 6 months.
- * 
- * Locks are ERC721s and can be viewed with [`locks()`](#locks). 
+ *
+ * Locks are ERC721s and can be viewed with [`locks()`](#locks).
  * Each lock has an `amount` of locked $UWE, and an `end` timestamp.
  * Locks have a maximum duration of four years.
  *

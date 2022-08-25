@@ -7,7 +7,7 @@ import chai from "chai";
 const { expect } = chai;
 chai.use(solidity);
 import { import_artifacts, ArtifactImports } from "../utilities/artifact_importer";
-import { MockErc20Permit, UnderwritingLocker, Registry, MockUnderwritingLockListener } from "../../typechain";
+import { MockErc20PermitWithBurn, UnderwritingLocker, Registry, MockUnderwritingLockListener } from "../../typechain";
 import { expectDeployed } from "../utilities/expectDeployed";
 import { expectClose } from "./../utilities/math";
 import { getERC20PermitSignature } from "../utilities/getERC20PermitSignature";
@@ -24,7 +24,7 @@ import { getERC20PermitSignature } from "../utilities/getERC20PermitSignature";
 *******************/
 const ZERO = BN.from("0");
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-const BURN_ADDRESS = "0x0000000000000000000000000000000000000001";
+const BURN_ADDRESS = "0x0000000000000000000000000000000000000000";
 const ONE_ETHER = BN.from("1000000000000000000");
 const ONE_MILLION_ETHER = ONE_ETHER.mul(1000000);
 const ONE_YEAR = 31536000; // in seconds
@@ -43,7 +43,7 @@ describe("UnderwritingLocker", function () {
   /***************************
      VARIABLE DECLARATIONS
   ***************************/
-  let token: MockErc20Permit;
+  let token: MockErc20PermitWithBurn;
   let registry: Registry;
   let underwritingLocker: UnderwritingLocker;
   let listener: MockUnderwritingLockListener;
@@ -54,9 +54,9 @@ describe("UnderwritingLocker", function () {
     artifacts = await import_artifacts();
     snapshot = await provider.send("evm_snapshot", []);
     await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
-    
+
     // Deploy $UWE, and mint 1M $UWE to deployer
-    token = (await deployContract(deployer, artifacts.MockERC20Permit, ["Underwriting Equity - Solace Native", "UWE", ONE_MILLION_ETHER, 18])) as MockErc20Permit;
+    token = (await deployContract(deployer, artifacts.MockERC20PermitWithBurn, ["Underwriting Equity - Solace Native", "UWE", ONE_MILLION_ETHER, 18])) as MockErc20PermitWithBurn;
 
     // Deploy registry
     registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
@@ -74,7 +74,7 @@ describe("UnderwritingLocker", function () {
       await expect(deployContract(deployer, artifacts.UnderwritingLocker, [ZERO_ADDRESS, registry.address])).to.be.revertedWith("zero address governance");
     });
     it("reverts if zero address registry", async function () {
-      await expect(deployContract(deployer, artifacts.UnderwritingLocker, [governor.address, ZERO_ADDRESS])).to.be.revertedWith('ZeroAddressInput("registry")');
+      await expect(deployContract(deployer, artifacts.UnderwritingLocker, [governor.address, ZERO_ADDRESS], {gasLimit:10000000})).to.be.revertedWith('ZeroAddressInput("registry")');
     });
     it("reverts if zero address uwe in Registry", async function () {
       await expect(deployContract(deployer, artifacts.UnderwritingLocker, [governor.address, registry.address])).to.be.revertedWith('ZeroAddressInput("uwe")');
@@ -169,7 +169,7 @@ describe("UnderwritingLocker", function () {
       await expect(underwritingLocker.connect(user1).setVotingContract()).to.be.revertedWith("!governance");
     });
     it("non governor cannot set voting contract if not set in Registry", async function () {
-      await expect(underwritingLocker.connect(governor).setVotingContract()).to.be.revertedWith('ZeroAddressInput("underwritingLockVoting")');
+      await expect(underwritingLocker.connect(governor).setVotingContract({gasLimit:1000000})).to.be.revertedWith('ZeroAddressInput("underwritingLockVoting")');
     });
     it("governor can set voting contract", async function () {
       const RANDOM_ADDRESS = ethers.Wallet.createRandom().connect(provider).address;
@@ -218,10 +218,10 @@ describe("UnderwritingLocker", function () {
       await expect(underwritingLocker.connect(user1).setRegistry(registry2.address)).to.be.revertedWith("!governance");
     })
     it("reverts if zero address registry", async function () {
-      await expect(underwritingLocker.connect(governor).setRegistry(ZERO_ADDRESS)).to.be.revertedWith('ZeroAddressInput("registry")');
+      await expect(underwritingLocker.connect(governor).setRegistry(ZERO_ADDRESS, {gasLimit:1000000})).to.be.revertedWith('ZeroAddressInput("registry")');
     });
     it("reverts if zero address uwe in Registry", async function () {
-      await expect(underwritingLocker.connect(governor).setRegistry(registry2.address)).to.be.revertedWith('ZeroAddressInput("uwe")');
+      await expect(underwritingLocker.connect(governor).setRegistry(registry2.address, {gasLimit:1000000})).to.be.revertedWith('ZeroAddressInput("uwe")');
       await registry2.connect(governor).set(["uwe"], [RANDOM_ADDRESS]);
     });
     it("sets registry", async function () {
@@ -238,15 +238,15 @@ describe("UnderwritingLocker", function () {
   });
 
   describe("createLock", function () {
-    it("cannot create lock with no allowance", async function () {
-      await expect(underwritingLocker.connect(user1).createLock(user1.address, 1, 0)).to.be.revertedWith("ERC20: insufficient allowance");
-    });
     it("cannot create lock with no balance", async function () {
-      await token.connect(user1).approve(underwritingLocker.address, constants.MaxUint256);
       await expect(underwritingLocker.connect(user1).createLock(user1.address, 1, 0)).to.be.revertedWith("ERC20: transfer amount exceeds balance");
     });
-    it("cannot create lock below minimum duration", async function () {
+    it("cannot create lock with no allowance", async function () {
       await token.connect(deployer).transfer(user1.address, ONE_ETHER.mul(100));
+      await expect(underwritingLocker.connect(user1).createLock(user1.address, 1, 0)).to.be.revertedWith("ERC20: transfer amount exceeds allowance");
+      await token.connect(user1).approve(underwritingLocker.address, constants.MaxUint256);
+    });
+    it("cannot create lock below minimum duration", async function () {
       const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
       await expect(underwritingLocker.connect(user1).createLock(user1.address, 1, CURRENT_TIME)).to.be.revertedWith("LockTimeTooShort");
     });
@@ -381,11 +381,11 @@ describe("UnderwritingLocker", function () {
 
   describe("increaseAmount", function () {
     it("cannot deposit with no allowance", async function () {
-      await expect(underwritingLocker.connect(user1).increaseAmount(1, 1)).to.be.revertedWith("ERC20: insufficient allowance");
+      await expect(underwritingLocker.connect(user1).increaseAmount(1, 1)).to.be.revertedWith("ERC20: transfer amount exceeds allowance");
     });
     it("cannot deposit to non existant lock", async function () {
       await token.connect(user1).approve(underwritingLocker.address, constants.MaxUint256); // Creating permit in createLockSigned reduced allowance, and token transfer afterwards reduced allowance to 0.
-      await expect(underwritingLocker.connect(user1).increaseAmount(999, 1)).to.be.revertedWith("ERC721: invalid token ID");
+      await expect(underwritingLocker.connect(user1).increaseAmount(999, 1)).to.be.revertedWith("ERC721: owner query for nonexistent token");
     });
     it("can increaseAmount, and listener notified", async function () {
       const LOCK_ID = 1;
@@ -448,7 +448,7 @@ describe("UnderwritingLocker", function () {
     });
     it("cannot increaseAmountSigned to non existant lock", async function () {
       const { v, r, s } = await getERC20PermitSignature(user1, underwritingLocker, token, DEPOSIT_AMOUNT, DEADLINE);
-      await expect(underwritingLocker.connect(user1).increaseAmountSigned(999, DEPOSIT_AMOUNT, DEADLINE, v, r, s)).to.be.revertedWith("ERC721: invalid token ID");
+      await expect(underwritingLocker.connect(user1).increaseAmountSigned(999, DEPOSIT_AMOUNT, DEADLINE, v, r, s)).to.be.revertedWith("ERC721: owner query for nonexistent token");
     });
     it("can increaseAmountSigned, and listener notified", async function () {
       const LOCK_ID = 2;
@@ -506,10 +506,12 @@ describe("UnderwritingLocker", function () {
       await expect(underwritingLocker.connect(user1).increaseAmountMultiple([1, 2], [DEPOSIT_AMOUNT])).to.be.revertedWith("ArrayArgumentsLengthMismatch");
     });
     it("cannot deposit to a non-existant lock", async function () {
-      await expect(underwritingLocker.connect(user1).increaseAmountMultiple([1, 999], [DEPOSIT_AMOUNT, DEPOSIT_AMOUNT])).to.be.revertedWith("ERC721: invalid token ID");
+      await expect(underwritingLocker.connect(user1).increaseAmountMultiple([1, 999], [DEPOSIT_AMOUNT, DEPOSIT_AMOUNT])).to.be.revertedWith("ERC721: owner query for nonexistent token");
     });
     it("cannot deposit with no allowance", async function () {
-      await expect(underwritingLocker.connect(user2).increaseAmountMultiple([1, 2], [DEPOSIT_AMOUNT, DEPOSIT_AMOUNT])).to.be.revertedWith("ERC20: insufficient allowance");
+      await token.connect(user1).approve(underwritingLocker.address, 0);
+      await expect(underwritingLocker.connect(user1).increaseAmountMultiple([1, 2], [DEPOSIT_AMOUNT, DEPOSIT_AMOUNT])).to.be.revertedWith("ERC20: transfer amount exceeds allowance");
+      await token.connect(user1).approve(underwritingLocker.address, constants.MaxUint256);
     });
     it("cannot deposit with no balance", async function () {
       await token.connect(user2).approve(underwritingLocker.address, constants.MaxUint256);
@@ -579,7 +581,7 @@ describe("UnderwritingLocker", function () {
 
   describe("extendLock", function () {
     it("cannot extend non-existant lock", async function () {
-      await expect(underwritingLocker.connect(user1).extendLock(999, 1)).to.be.revertedWith("ERC721: invalid token ID");
+      await expect(underwritingLocker.connect(user1).extendLock(999, 1)).to.be.revertedWith("ERC721: operator query for nonexistent token");
     });
     it("non-owned or non-approved cannot extend lock", async function () {
       await expect(underwritingLocker.connect(user2).extendLock(1, 1)).to.be.revertedWith("only owner or approved");
@@ -668,7 +670,7 @@ describe("UnderwritingLocker", function () {
       const EXTENSION_TIME = ONE_WEEK;
 
       await expect(underwritingLocker.connect(user1).extendLockMultiple(
-        [LOCK_ID_1, LOCK_ID_2], 
+        [LOCK_ID_1, LOCK_ID_2],
         [CURRENT_END_1.add(EXTENSION_TIME)]
       )).to.be.revertedWith("ArrayArgumentsLengthMismatch");
     });
@@ -678,9 +680,9 @@ describe("UnderwritingLocker", function () {
       const EXTENSION_TIME = ONE_WEEK;
 
       await expect(underwritingLocker.connect(user1).extendLockMultiple(
-        [LOCK_ID_1, 999], 
+        [LOCK_ID_1, 999],
         [CURRENT_END_1.add(EXTENSION_TIME), CURRENT_END_1.add(EXTENSION_TIME)]
-      )).to.be.revertedWith("ERC721: invalid token ID");
+      )).to.be.revertedWith("ERC721: operator query for nonexistent token");
     });
     it("non-owned or non-approved cannot extend lock", async function () {
       const LOCK_ID_1 = 1;
@@ -690,7 +692,7 @@ describe("UnderwritingLocker", function () {
       const EXTENSION_TIME = ONE_WEEK;
 
       await expect(underwritingLocker.connect(user3).extendLockMultiple(
-        [LOCK_ID_1, LOCK_ID_2], 
+        [LOCK_ID_1, LOCK_ID_2],
         [CURRENT_END_1.add(EXTENSION_TIME), CURRENT_END_2.add(EXTENSION_TIME)]
       )).to.be.revertedWith("only owner or approved");
     });
@@ -700,7 +702,7 @@ describe("UnderwritingLocker", function () {
         const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
 
         await expect(underwritingLocker.connect(user1).extendLockMultiple(
-          [LOCK_ID_1, LOCK_ID_2], 
+          [LOCK_ID_1, LOCK_ID_2],
           [CURRENT_TIME + ONE_YEAR*4 + ONE_WEEK, CURRENT_TIME + ONE_YEAR*4 + ONE_WEEK]
         )).to.be.revertedWith("LockTimeTooLong");
       });
@@ -711,7 +713,7 @@ describe("UnderwritingLocker", function () {
         const CURRENT_END_2 = (await underwritingLocker.locks(LOCK_ID_2)).end;
 
         await expect(underwritingLocker.connect(user1).extendLockMultiple(
-          [LOCK_ID_1, LOCK_ID_2], 
+          [LOCK_ID_1, LOCK_ID_2],
           [CURRENT_END_1.sub(1), CURRENT_END_2.sub(1)]
         )).to.be.revertedWith("LockTimeNotExtended");
       });
@@ -729,14 +731,14 @@ describe("UnderwritingLocker", function () {
         const {number: CURRENT_BLOCK} = await provider.getBlock('latest')
 
         const tx = await underwritingLocker.connect(user1).extendLockMultiple(
-          [LOCK_ID_1, LOCK_ID_2], 
+          [LOCK_ID_1, LOCK_ID_2],
           [NEW_END_1, NEW_END_2]
         );
         await expect(tx).to.emit(underwritingLocker, "LockUpdated").withArgs(LOCK_ID_1, oldLockState1.amount, NEW_END_1);
         await expect(tx).to.emit(underwritingLocker, "LockExtended").withArgs(LOCK_ID_1, NEW_END_1);
         await expect(tx).to.emit(underwritingLocker, "LockUpdated").withArgs(LOCK_ID_2, oldLockState2.amount, NEW_END_2);
         await expect(tx).to.emit(underwritingLocker, "LockExtended").withArgs(LOCK_ID_2, NEW_END_2);
-  
+
         const newLockState1 = await getLockState(LOCK_ID_1);
         const newLockState2 = await getLockState(LOCK_ID_2);
         const lockStateChange1 = getLockStateChange(newLockState1, oldLockState1);
@@ -745,7 +747,7 @@ describe("UnderwritingLocker", function () {
         expect(lockStateChange2.amount).eq(0)
         expect(lockStateChange1.end).eq(EXTENSION_TIME)
         expect(lockStateChange2.end).eq(EXTENSION_TIME)
-  
+
         const listenerUpdate = await listener.lastUpdate();
         expect(listenerUpdate.blocknum).eq(CURRENT_BLOCK + 1);
         expect(listenerUpdate.caller).eq(underwritingLocker.address);
@@ -772,14 +774,14 @@ describe("UnderwritingLocker", function () {
 
         await underwritingLocker.connect(user1).approve(user2.address, LOCK_ID_2);
         const tx = await underwritingLocker.connect(user2).extendLockMultiple(
-          [LOCK_ID_1, LOCK_ID_2], 
+          [LOCK_ID_1, LOCK_ID_2],
           [NEW_END_1, NEW_END_2]
         );
         await expect(tx).to.emit(underwritingLocker, "LockUpdated").withArgs(LOCK_ID_1, oldLockState1.amount, NEW_END_1);
         await expect(tx).to.emit(underwritingLocker, "LockExtended").withArgs(LOCK_ID_1, NEW_END_1);
         await expect(tx).to.emit(underwritingLocker, "LockUpdated").withArgs(LOCK_ID_2, oldLockState2.amount, NEW_END_2);
         await expect(tx).to.emit(underwritingLocker, "LockExtended").withArgs(LOCK_ID_2, NEW_END_2);
-  
+
         const newLockState1 = await getLockState(LOCK_ID_1);
         const newLockState2 = await getLockState(LOCK_ID_2);
         const lockStateChange1 = getLockStateChange(newLockState1, oldLockState1);
@@ -788,7 +790,7 @@ describe("UnderwritingLocker", function () {
         expect(lockStateChange2.amount).eq(0)
         expect(lockStateChange1.end).eq(EXTENSION_TIME)
         expect(lockStateChange2.end).eq(EXTENSION_TIME)
-  
+
         const listenerUpdate = await listener.lastUpdate();
         expect(listenerUpdate.blocknum).eq(CURRENT_BLOCK + 2);
         expect(listenerUpdate.caller).eq(underwritingLocker.address);
@@ -813,7 +815,7 @@ describe("UnderwritingLocker", function () {
    */
 
   /*********************
-    INTENTION STATEMENT 
+    INTENTION STATEMENT
   *********************/
   // Before proceeding, let's do a time-skip such that lockID 1 is locked, whereas lockID 2 is unlocked
 
@@ -912,7 +914,7 @@ describe("UnderwritingLocker", function () {
 
   describe("sanity check for view functions for individual locks", function () {
     it("should not be able to query nonexistent lockIDs", async function () {
-      await expect(underwritingLocker.ownerOf(999)).to.be.revertedWith("ERC721: invalid token ID");
+      await expect(underwritingLocker.ownerOf(999)).to.be.revertedWith("ERC721: owner query for nonexistent token");
       await expect(underwritingLocker.locks(999)).to.be.revertedWith("query for nonexistent token");
       await expect(underwritingLocker.isLocked(999)).to.be.revertedWith("query for nonexistent token");
       await expect(underwritingLocker.timeLeft(999)).to.be.revertedWith("query for nonexistent token");
@@ -928,7 +930,7 @@ describe("UnderwritingLocker", function () {
 
       expect(await lockState.isLocked).eq(true);
       expect(await lockState.timeLeft).above(0);
-      
+
       /************************************************
         ALTER HERE IF WITHDRAWAL BURN FORMULA CHANGES
       ************************************************/
@@ -985,7 +987,7 @@ describe("UnderwritingLocker", function () {
     it("cannot withdraw more than lock amount", async function () {
       const LOCK_ID = 1;
       const LOCK_AMOUNT = (await underwritingLocker.locks(1)).amount
-      await expect(underwritingLocker.connect(user1).withdrawInPart(LOCK_ID, LOCK_AMOUNT.mul(2), user1.address)).to.be.revertedWith(`ExcessWithdraw`)  
+      await expect(underwritingLocker.connect(user1).withdrawInPart(LOCK_ID, LOCK_AMOUNT.mul(2), user1.address)).to.be.revertedWith(`ExcessWithdraw`)
     });
     it("non owner or approved cannot withdraw", async function () {
       const LOCK_ID = 1;
@@ -1180,7 +1182,7 @@ describe("UnderwritingLocker", function () {
       const LOCK_ID_2 = 2;
 
       await expect(underwritingLocker.connect(user1).withdrawInPartMultiple(
-        [LOCK_ID_1, LOCK_ID_2], 
+        [LOCK_ID_1, LOCK_ID_2],
         [WITHDRAW_AMOUNT],
         user1.address
       )).to.be.revertedWith("ArrayArgumentsLengthMismatch");
@@ -1190,17 +1192,17 @@ describe("UnderwritingLocker", function () {
       const LOCK_ID_1 = 1;
       // Error does not indicate non-existant tokenID, however it will revert regardless
       await expect(underwritingLocker.connect(user1).withdrawInPartMultiple(
-        [LOCK_ID_1, NON_EXISTENT_LOCK_ID], 
+        [LOCK_ID_1, NON_EXISTENT_LOCK_ID],
         [WITHDRAW_AMOUNT, WITHDRAW_AMOUNT],
         user1.address
-      )).to.be.revertedWith("ERC721: invalid token ID");
+      )).to.be.revertedWith("ERC721: operator query for nonexistent token");
     });
     it("cannot withdraw more than lock amount", async function () {
       const LOCK_ID_1 = 1;
       const LOCK_ID_2 = 2;
       const LOCK_AMOUNT_2 = (await underwritingLocker.locks(2)).amount
       await expect(underwritingLocker.connect(user1).withdrawInPartMultiple(
-        [LOCK_ID_1, LOCK_ID_2], 
+        [LOCK_ID_1, LOCK_ID_2],
         [WITHDRAW_AMOUNT, LOCK_AMOUNT_2.mul(2)],
         user1.address
       )).to.be.revertedWith(`ExcessWithdraw()`);
@@ -1209,7 +1211,7 @@ describe("UnderwritingLocker", function () {
       const LOCK_ID_1 = 1;
       const LOCK_ID_2 = 2;
       await expect(underwritingLocker.connect(user3).withdrawInPartMultiple(
-        [LOCK_ID_1, LOCK_ID_2], 
+        [LOCK_ID_1, LOCK_ID_2],
         [WITHDRAW_AMOUNT, WITHDRAW_AMOUNT],
         user1.address
       )).to.be.revertedWith("NotOwnerNorApproved");
@@ -1221,15 +1223,15 @@ describe("UnderwritingLocker", function () {
       const oldUserState = await getUserState(user1);
       const oldLockState_Locked = await getLockState(LOCKED_LOCK_ID);
       const oldLockState_Unlocked = await getLockState(UNLOCKED_LOCK_ID);
-      const oldBurnAddressBalance = await token.balanceOf(BURN_ADDRESS);
+      const oldUWETotalSupply = await token.totalSupply()
       const {number: CURRENT_BLOCK} = await provider.getBlock('latest')
 
       const tx = await underwritingLocker.connect(user1).withdrawInPartMultiple(
-        [LOCKED_LOCK_ID, UNLOCKED_LOCK_ID], 
+        [LOCKED_LOCK_ID, UNLOCKED_LOCK_ID],
         [WITHDRAW_AMOUNT, WITHDRAW_AMOUNT],
         user1.address
       )
-      
+
       const ACTUAL_WITHDRAW_AMOUNT_UNLOCKED = await underwritingLocker.getWithdrawInPartAmount(UNLOCKED_LOCK_ID, WITHDRAW_AMOUNT)
       const BURN_AMOUNT_UNLOCKED = await underwritingLocker.getBurnOnWithdrawInPartAmount(UNLOCKED_LOCK_ID, WITHDRAW_AMOUNT)
       const ACTUAL_WITHDRAW_AMOUNT_LOCKED = await underwritingLocker.getWithdrawInPartAmount(LOCKED_LOCK_ID, WITHDRAW_AMOUNT)
@@ -1243,12 +1245,12 @@ describe("UnderwritingLocker", function () {
       const newUserState = await getUserState(user1);
       const newLockState_Locked = await getLockState(LOCKED_LOCK_ID);
       const newLockState_Unlocked = await getLockState(UNLOCKED_LOCK_ID);
-      const newBurnAddressBalance = await token.balanceOf(BURN_ADDRESS);
+      const newUWETotalSupply = await token.totalSupply()
       const globalStateChange = getGlobalStateChange(newGlobalState, oldGlobalState);
       const userStateChange = getUserStateChange(newUserState, oldUserState);
       const lockStateChange_Locked = getLockStateChange(newLockState_Locked, oldLockState_Locked);
       const lockStateChange_Unlocked = getLockStateChange(newLockState_Unlocked, oldLockState_Unlocked);
-      const burnAddressBalanceChange = newBurnAddressBalance.sub(oldBurnAddressBalance)
+      const UWETotalSupplyChange = newUWETotalSupply.sub(oldUWETotalSupply)
 
       expect(globalStateChange.totalNumLocks.eq(0));
       expect(globalStateChange.totalStakedAmount.eq(WITHDRAW_AMOUNT.mul(2)));
@@ -1260,7 +1262,7 @@ describe("UnderwritingLocker", function () {
       expect(lockStateChange_Locked.end).eq(0);
       expect(lockStateChange_Unlocked.amount).eq(WITHDRAW_AMOUNT.mul(-1));
       expect(lockStateChange_Unlocked.end).eq(0);
-      expect(burnAddressBalanceChange).eq(BURN_AMOUNT_LOCKED.add(BURN_AMOUNT_UNLOCKED))
+      expect(UWETotalSupplyChange).eq((BURN_AMOUNT_LOCKED.add(BURN_AMOUNT_UNLOCKED)).mul(-1))
 
       const listenerUpdate = await listener.lastUpdate();
       expect(listenerUpdate.blocknum).eq(CURRENT_BLOCK + 1);
@@ -1280,11 +1282,12 @@ describe("UnderwritingLocker", function () {
       const oldUserState = await getUserState(user1);
       const oldLockState_Locked = await getLockState(LOCKED_LOCK_ID);
       const oldLockState_Unlocked = await getLockState(UNLOCKED_LOCK_ID);
+      const oldUWETotalSupply = await token.totalSupply()
       const {number: CURRENT_BLOCK} = await provider.getBlock('latest');
 
       await underwritingLocker.connect(user1).setApprovalForAll(user2.address, true)
       const tx = await underwritingLocker.connect(user2).withdrawInPartMultiple(
-        [LOCKED_LOCK_ID, UNLOCKED_LOCK_ID], 
+        [LOCKED_LOCK_ID, UNLOCKED_LOCK_ID],
         [WITHDRAW_AMOUNT, WITHDRAW_AMOUNT],
         user1.address
       )
@@ -1302,10 +1305,12 @@ describe("UnderwritingLocker", function () {
       const newUserState = await getUserState(user1);
       const newLockState_Locked = await getLockState(LOCKED_LOCK_ID);
       const newLockState_Unlocked = await getLockState(UNLOCKED_LOCK_ID);
+      const newUWETotalSupply = await token.totalSupply()
       const globalStateChange = getGlobalStateChange(newGlobalState, oldGlobalState);
       const userStateChange = getUserStateChange(newUserState, oldUserState);
       const lockStateChange_Locked = getLockStateChange(newLockState_Locked, oldLockState_Locked);
       const lockStateChange_Unlocked = getLockStateChange(newLockState_Unlocked, oldLockState_Unlocked);
+      const UWETotalSupplyChange = newUWETotalSupply.sub(oldUWETotalSupply)
 
       expect(globalStateChange.totalNumLocks.eq(0));
       expect(globalStateChange.totalStakedAmount.eq(WITHDRAW_AMOUNT.mul(2)));
@@ -1317,6 +1322,7 @@ describe("UnderwritingLocker", function () {
       expect(lockStateChange_Locked.end).eq(0);
       expect(lockStateChange_Unlocked.amount).eq(WITHDRAW_AMOUNT.mul(-1));
       expect(lockStateChange_Unlocked.end).eq(0);
+      expect(UWETotalSupplyChange).eq((BURN_AMOUNT_LOCKED.add(BURN_AMOUNT_UNLOCKED)).mul(-1))
 
       const listenerUpdate = await listener.lastUpdate();
       expect(listenerUpdate.blocknum).eq(CURRENT_BLOCK + 2);
@@ -1344,7 +1350,7 @@ describe("UnderwritingLocker", function () {
 
     /**
      * Skip time forward, and create two more locks such that:
-     * 
+     *
      * lockID 1 => Unlocked lock held by user1, with 1e18 token staked
      * lockID 2 => Unlocked lock held by user1, with 1e18 token staked
      * lockID 3 => Locked (1yr) lock held by user1, with 1e18 token staked
@@ -1363,7 +1369,7 @@ describe("UnderwritingLocker", function () {
     it("cannot withdraw non existant token", async function () {
       const NON_EXISTENT_LOCK_ID = 999;
       // Error does not indicate non-existant tokenID, however it will revert regardless
-      await expect(underwritingLocker.connect(user1).withdraw(999, user1.address)).to.be.revertedWith("ERC721: invalid token ID")
+      await expect(underwritingLocker.connect(user1).withdraw(999, user1.address)).to.be.revertedWith("ERC721: operator query for nonexistent token")
     });
     it("non owner or approved cannot withdraw", async function () {
       const LOCK_ID = 1;
@@ -1397,7 +1403,7 @@ describe("UnderwritingLocker", function () {
       await expect(underwritingLocker.locks(UNLOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
       await expect(underwritingLocker.timeLeft(UNLOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
       await expect(underwritingLocker.isLocked(UNLOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
-      await expect(underwritingLocker.ownerOf(UNLOCKED_LOCK_ID)).to.be.revertedWith("ERC721: invalid token ID")
+      await expect(underwritingLocker.ownerOf(UNLOCKED_LOCK_ID)).to.be.revertedWith("ERC721: owner query for nonexistent token")
 
       const listenerUpdate = await listener.lastUpdate();
       expect(listenerUpdate.blocknum).eq(CURRENT_BLOCK + 1);
@@ -1417,6 +1423,7 @@ describe("UnderwritingLocker", function () {
       const oldLockState = await getLockState(UNLOCKED_LOCK_ID);
       const {number: CURRENT_BLOCK} = await provider.getBlock('latest')
       const LOCK_AMOUNT = oldLockState.amount;
+      const oldUWETotalSupply = await token.totalSupply()
 
       await underwritingLocker.connect(user1).approve(user2.address, UNLOCKED_LOCK_ID);
       const ACTUAL_WITHDRAW_AMOUNT = await underwritingLocker.getWithdrawAmount(UNLOCKED_LOCK_ID)
@@ -1428,8 +1435,10 @@ describe("UnderwritingLocker", function () {
 
       const newGlobalState = await getGlobalState();
       const newUserState = await getUserState(user1);
+      const newUWETotalSupply = await token.totalSupply()
       const globalStateChange = getGlobalStateChange(newGlobalState, oldGlobalState);
       const userStateChange = getUserStateChange(newUserState, oldUserState);
+      const UWETotalSupplyChange = newUWETotalSupply.sub(oldUWETotalSupply)
 
       expect(globalStateChange.totalNumLocks.eq(0));
       expect(globalStateChange.totalStakedAmount.eq(LOCK_AMOUNT));
@@ -1437,10 +1446,11 @@ describe("UnderwritingLocker", function () {
       expect(userStateChange.lockedTokenAmount).eq(LOCK_AMOUNT.mul(-1));
       expect(userStateChange.numOfLocks).eq(-1);
       expect(userStateChange.tokenAmountInWallet).eq(ACTUAL_WITHDRAW_AMOUNT);
+      expect(UWETotalSupplyChange).eq(BURN_AMOUNT.mul(-1))
       await expect(underwritingLocker.locks(UNLOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
       await expect(underwritingLocker.timeLeft(UNLOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
       await expect(underwritingLocker.isLocked(UNLOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
-      await expect(underwritingLocker.ownerOf(UNLOCKED_LOCK_ID)).to.be.revertedWith("ERC721: invalid token ID")
+      await expect(underwritingLocker.ownerOf(UNLOCKED_LOCK_ID)).to.be.revertedWith("ERC721: owner query for nonexistent token")
 
       const listenerUpdate = await listener.lastUpdate();
       expect(listenerUpdate.blocknum).eq(CURRENT_BLOCK + 2);
@@ -1458,10 +1468,10 @@ describe("UnderwritingLocker", function () {
       const oldGlobalState = await getGlobalState();
       const oldUserState = await getUserState(user1);
       const oldLockState = await getLockState(LOCKED_LOCK_ID);
-      const oldBurnAddressBalance = await token.balanceOf(BURN_ADDRESS);
+      const oldUWETotalSupply = await token.totalSupply()
       const {number: CURRENT_BLOCK} = await provider.getBlock('latest')
       const LOCK_AMOUNT = oldLockState.amount;
-      
+
       const ACTUAL_WITHDRAW_AMOUNT = await underwritingLocker.getWithdrawAmount(LOCKED_LOCK_ID)
       const BURN_AMOUNT = await underwritingLocker.getBurnOnWithdrawAmount(LOCKED_LOCK_ID)
       const tx = await underwritingLocker.connect(user1).withdraw(LOCKED_LOCK_ID, user1.address);
@@ -1475,10 +1485,10 @@ describe("UnderwritingLocker", function () {
 
       const newGlobalState = await getGlobalState();
       const newUserState = await getUserState(user1);
-      const newBurnAddressBalance = await token.balanceOf(BURN_ADDRESS);
+      const newUWETotalSupply = await token.totalSupply()
       const globalStateChange = getGlobalStateChange(newGlobalState, oldGlobalState);
       const userStateChange = getUserStateChange(newUserState, oldUserState);
-      const burnAddressBalanceChange = newBurnAddressBalance.sub(oldBurnAddressBalance)
+      const UWETotalSupplyChange = newUWETotalSupply.sub(oldUWETotalSupply)
 
       expect(globalStateChange.totalNumLocks.eq(0));
       expect(globalStateChange.totalStakedAmount.eq(LOCK_AMOUNT));
@@ -1486,11 +1496,11 @@ describe("UnderwritingLocker", function () {
       expect(userStateChange.lockedTokenAmount).eq(LOCK_AMOUNT.mul(-1));
       expect(userStateChange.numOfLocks).eq(-1);
       expectClose(userStateChange.tokenAmountInWallet, ACTUAL_WITHDRAW_AMOUNT, 1e15);
-      expectClose(burnAddressBalanceChange, BURN_AMOUNT, 1e15);
+      expectClose(UWETotalSupplyChange, BURN_AMOUNT.mul(-1), 1e15);
       await expect(underwritingLocker.locks(LOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
       await expect(underwritingLocker.timeLeft(LOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
       await expect(underwritingLocker.isLocked(LOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
-      await expect(underwritingLocker.ownerOf(LOCKED_LOCK_ID)).to.be.revertedWith("ERC721: invalid token ID")
+      await expect(underwritingLocker.ownerOf(LOCKED_LOCK_ID)).to.be.revertedWith("ERC721: owner query for nonexistent token")
 
       const listenerUpdate = await listener.lastUpdate();
       expect(listenerUpdate.blocknum).eq(CURRENT_BLOCK + 1);
@@ -1508,7 +1518,7 @@ describe("UnderwritingLocker", function () {
       const oldGlobalState = await getGlobalState();
       const oldUserState = await getUserState(user1);
       const oldLockState = await getLockState(LOCKED_LOCK_ID);
-      const oldBurnAddressBalance = await token.balanceOf(BURN_ADDRESS);
+      const oldUWETotalSupply = await token.totalSupply()
       const {number: CURRENT_BLOCK} = await provider.getBlock('latest')
       const LOCK_AMOUNT = oldLockState.amount;
 
@@ -1521,10 +1531,10 @@ describe("UnderwritingLocker", function () {
 
       const newGlobalState = await getGlobalState();
       const newUserState = await getUserState(user1);
-      const newBurnAddressBalance = await token.balanceOf(BURN_ADDRESS);
+      const newUWETotalSupply = await token.totalSupply()
       const globalStateChange = getGlobalStateChange(newGlobalState, oldGlobalState);
       const userStateChange = getUserStateChange(newUserState, oldUserState);
-      const burnAddressBalanceChange = newBurnAddressBalance.sub(oldBurnAddressBalance)
+      const UWETotalSupplyChange = newUWETotalSupply.sub(oldUWETotalSupply)
 
       expect(globalStateChange.totalNumLocks.eq(0));
       expect(globalStateChange.totalStakedAmount.eq(LOCK_AMOUNT));
@@ -1532,11 +1542,11 @@ describe("UnderwritingLocker", function () {
       expect(userStateChange.lockedTokenAmount).eq(LOCK_AMOUNT.mul(-1));
       expect(userStateChange.numOfLocks).eq(-1);
       expectClose(userStateChange.tokenAmountInWallet, ACTUAL_WITHDRAW_AMOUNT, 1e15);
-      expectClose(burnAddressBalanceChange, BURN_AMOUNT, 1e15);
+      expectClose(UWETotalSupplyChange, BURN_AMOUNT.mul(-1), 1e15);
       await expect(underwritingLocker.locks(LOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
       await expect(underwritingLocker.timeLeft(LOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
       await expect(underwritingLocker.isLocked(LOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
-      await expect(underwritingLocker.ownerOf(LOCKED_LOCK_ID)).to.be.revertedWith("ERC721: invalid token ID")
+      await expect(underwritingLocker.ownerOf(LOCKED_LOCK_ID)).to.be.revertedWith("ERC721: owner query for nonexistent token")
 
       const listenerUpdate = await listener.lastUpdate();
       expect(listenerUpdate.blocknum).eq(CURRENT_BLOCK + 2);
@@ -1562,7 +1572,7 @@ describe("UnderwritingLocker", function () {
   describe("withdrawMultiple", function () {
     /**
      * Create 4 locks - 2 locked and 2 unlocked:
-     * 
+     *
      * lockID 5 -> unlocked
      * lockID 6 -> locked
      * lockID 7 -> unlocked
@@ -1584,15 +1594,15 @@ describe("UnderwritingLocker", function () {
       const NON_EXISTENT_LOCK_ID = 999;
       const UNLOCKED_LOCK_ID = 5;
       await expect(underwritingLocker.connect(user1).withdrawMultiple(
-        [UNLOCKED_LOCK_ID, NON_EXISTENT_LOCK_ID], 
+        [UNLOCKED_LOCK_ID, NON_EXISTENT_LOCK_ID],
         user1.address
-      )).to.be.revertedWith("ERC721: invalid token ID");
+      )).to.be.revertedWith("ERC721: operator query for nonexistent token");
     });
     it("non owner or approved cannot withdraw", async function () {
       const UNLOCKED_LOCK_ID = 5;
       const LOCKED_LOCK_ID = 6;
       await expect(underwritingLocker.connect(user3).withdrawMultiple(
-        [UNLOCKED_LOCK_ID, LOCKED_LOCK_ID], 
+        [UNLOCKED_LOCK_ID, LOCKED_LOCK_ID],
         user1.address
       )).to.be.revertedWith("NotOwnerNorApproved");
     });
@@ -1602,7 +1612,7 @@ describe("UnderwritingLocker", function () {
       const oldGlobalState = await getGlobalState();
       const oldUserState = await getUserState(user1);
       const oldLockState = await getLockState(LOCKED_LOCK_ID);
-      const oldBurnAddressBalance = await token.balanceOf(BURN_ADDRESS);
+      const oldUWETotalSupply = await token.totalSupply()
       const {number: CURRENT_BLOCK} = await provider.getBlock('latest')
       const LOCK_AMOUNT = oldLockState.amount
 
@@ -1611,7 +1621,7 @@ describe("UnderwritingLocker", function () {
       const ACTUAL_WITHDRAW_AMOUNT_UNLOCKED = await underwritingLocker.getWithdrawAmount(UNLOCKED_LOCK_ID)
       const BURN_AMOUNT_UNLOCKED = await underwritingLocker.getBurnOnWithdrawAmount(UNLOCKED_LOCK_ID)
       const tx = underwritingLocker.connect(user1).withdrawMultiple(
-        [UNLOCKED_LOCK_ID, LOCKED_LOCK_ID], 
+        [UNLOCKED_LOCK_ID, LOCKED_LOCK_ID],
         user1.address
       )
       await expect(tx).to.emit(underwritingLocker, "Withdrawal")
@@ -1619,10 +1629,10 @@ describe("UnderwritingLocker", function () {
 
       const newGlobalState = await getGlobalState();
       const newUserState = await getUserState(user1);
-      const newBurnAddressBalance = await token.balanceOf(BURN_ADDRESS);
+      const newUWETotalSupply = await token.totalSupply()
       const globalStateChange = getGlobalStateChange(newGlobalState, oldGlobalState);
       const userStateChange = getUserStateChange(newUserState, oldUserState);
-      const burnAddressBalanceChange = newBurnAddressBalance.sub(oldBurnAddressBalance);
+      const UWETotalSupplyChange = newUWETotalSupply.sub(oldUWETotalSupply)
 
       expect(globalStateChange.totalNumLocks.eq(0));
       expect(globalStateChange.totalStakedAmount.eq(LOCK_AMOUNT));
@@ -1630,16 +1640,16 @@ describe("UnderwritingLocker", function () {
       expect(userStateChange.lockedTokenAmount).eq(LOCK_AMOUNT.mul(-2));
       expect(userStateChange.numOfLocks).eq(-2);
       expectClose(userStateChange.tokenAmountInWallet, ACTUAL_WITHDRAW_AMOUNT_LOCKED.add(ACTUAL_WITHDRAW_AMOUNT_UNLOCKED), 1e15)
-      expectClose(burnAddressBalanceChange, BURN_AMOUNT_LOCKED.add(BURN_AMOUNT_UNLOCKED), 1e15)
+      expectClose(UWETotalSupplyChange, (BURN_AMOUNT_LOCKED.add(BURN_AMOUNT_UNLOCKED)).mul(-1), 1e15)
 
       await expect(underwritingLocker.locks(UNLOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
       await expect(underwritingLocker.timeLeft(UNLOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
       await expect(underwritingLocker.isLocked(UNLOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
-      await expect(underwritingLocker.ownerOf(UNLOCKED_LOCK_ID)).to.be.revertedWith("ERC721: invalid token ID")
+      await expect(underwritingLocker.ownerOf(UNLOCKED_LOCK_ID)).to.be.revertedWith("ERC721: owner query for nonexistent token")
       await expect(underwritingLocker.locks(LOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
       await expect(underwritingLocker.timeLeft(LOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
       await expect(underwritingLocker.isLocked(LOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
-      await expect(underwritingLocker.ownerOf(LOCKED_LOCK_ID)).to.be.revertedWith("ERC721: invalid token ID")
+      await expect(underwritingLocker.ownerOf(LOCKED_LOCK_ID)).to.be.revertedWith("ERC721: owner query for nonexistent token")
 
       const listenerUpdate = await listener.lastUpdate();
       expect(listenerUpdate.blocknum).eq(CURRENT_BLOCK + 1);
@@ -1658,7 +1668,7 @@ describe("UnderwritingLocker", function () {
       const oldGlobalState = await getGlobalState();
       const oldUserState = await getUserState(user1);
       const oldLockState = await getLockState(LOCKED_LOCK_ID);
-      const oldBurnAddressBalance = await token.balanceOf(BURN_ADDRESS);
+      const oldUWETotalSupply = await token.totalSupply()
       const {number: CURRENT_BLOCK} = await provider.getBlock('latest')
       const LOCK_AMOUNT = oldLockState.amount
 
@@ -1668,7 +1678,7 @@ describe("UnderwritingLocker", function () {
       const ACTUAL_WITHDRAW_AMOUNT_UNLOCKED = await underwritingLocker.getWithdrawAmount(UNLOCKED_LOCK_ID)
       const BURN_AMOUNT_UNLOCKED = await underwritingLocker.getBurnOnWithdrawAmount(UNLOCKED_LOCK_ID)
       const tx = underwritingLocker.connect(user2).withdrawMultiple(
-        [UNLOCKED_LOCK_ID, LOCKED_LOCK_ID], 
+        [UNLOCKED_LOCK_ID, LOCKED_LOCK_ID],
         user1.address
       )
       await expect(tx).to.emit(underwritingLocker, "Withdrawal");
@@ -1676,10 +1686,10 @@ describe("UnderwritingLocker", function () {
 
       const newGlobalState = await getGlobalState();
       const newUserState = await getUserState(user1);
-      const newBurnAddressBalance = await token.balanceOf(BURN_ADDRESS);
+      const newUWETotalSupply = await token.totalSupply()
       const globalStateChange = getGlobalStateChange(newGlobalState, oldGlobalState);
       const userStateChange = getUserStateChange(newUserState, oldUserState);
-      const burnAddressBalanceChange = newBurnAddressBalance.sub(oldBurnAddressBalance);
+      const UWETotalSupplyChange = newUWETotalSupply.sub(oldUWETotalSupply)
 
       expect(globalStateChange.totalNumLocks.eq(0));
       expect(globalStateChange.totalStakedAmount.eq(LOCK_AMOUNT));
@@ -1687,16 +1697,16 @@ describe("UnderwritingLocker", function () {
       expect(userStateChange.lockedTokenAmount).eq(LOCK_AMOUNT.mul(-2));
       expect(userStateChange.numOfLocks).eq(-2);
       expectClose(userStateChange.tokenAmountInWallet, ACTUAL_WITHDRAW_AMOUNT_LOCKED.add(ACTUAL_WITHDRAW_AMOUNT_UNLOCKED), 1e15)
-      expectClose(burnAddressBalanceChange, BURN_AMOUNT_LOCKED.add(BURN_AMOUNT_UNLOCKED), 1e15)
+      expectClose(UWETotalSupplyChange, (BURN_AMOUNT_LOCKED.add(BURN_AMOUNT_UNLOCKED)).mul(-1), 1e15)
 
       await expect(underwritingLocker.locks(UNLOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
       await expect(underwritingLocker.timeLeft(UNLOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
       await expect(underwritingLocker.isLocked(UNLOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
-      await expect(underwritingLocker.ownerOf(UNLOCKED_LOCK_ID)).to.be.revertedWith("ERC721: invalid token ID")
+      await expect(underwritingLocker.ownerOf(UNLOCKED_LOCK_ID)).to.be.revertedWith("ERC721: owner query for nonexistent token")
       await expect(underwritingLocker.locks(LOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
       await expect(underwritingLocker.timeLeft(LOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
       await expect(underwritingLocker.isLocked(LOCKED_LOCK_ID)).to.be.revertedWith("query for nonexistent token")
-      await expect(underwritingLocker.ownerOf(LOCKED_LOCK_ID)).to.be.revertedWith("ERC721: invalid token ID")
+      await expect(underwritingLocker.ownerOf(LOCKED_LOCK_ID)).to.be.revertedWith("ERC721: owner query for nonexistent token")
 
       const listenerUpdate = await listener.lastUpdate();
       expect(listenerUpdate.blocknum).eq(CURRENT_BLOCK + 2);
@@ -1722,7 +1732,7 @@ describe("UnderwritingLocker", function () {
   describe("further sanity checks of funding rate mechanism", function () {
     /**
      * Create 2 more locks - 1 minimum-period lock (6 months) and 1 maximum-period lock (4 years)
-     * 
+     *
      * lockID 9 -> 6-month lock
      * lockID 10 -> 4-yr lock
      */
@@ -1738,7 +1748,7 @@ describe("UnderwritingLocker", function () {
 
       expect(lockState.isLocked).eq(true);
       expectClose(lockState.timeLeft, BN.from(6).mul(ONE_MONTH), 1e15)
-      
+
       // Expect multiplier for minimum-period lock to be 1.0x
       const EXPECTED_LOCK_MULTIPLIER = ONE_HUNDRED_PERCENT;
       expectClose(await underwritingLocker.getLockMultiplier(LOCK_ID), EXPECTED_LOCK_MULTIPLIER, 1e15)
@@ -1776,7 +1786,7 @@ describe("UnderwritingLocker", function () {
 
       expect(lockState.isLocked).eq(true);
       expectClose(lockState.timeLeft, BN.from(4).mul(ONE_YEAR), 1e15)
-      
+
       // Expect multiplier for maximum-period lock to be sqrt(8) = 2.83x
       const EXPECTED_LOCK_MULTIPLIER = sqrt(SCALE_FACTOR.mul(SCALE_FACTOR).mul(8));
       expectClose(await underwritingLocker.getLockMultiplier(LOCK_ID), EXPECTED_LOCK_MULTIPLIER, 1e15)
@@ -1816,7 +1826,7 @@ describe("UnderwritingLocker", function () {
   /**
    * The following locks have been burned, and the IDs cannot be used again:
    * 1, 2, 3, 4, 5, 6, 7, 8
-   * 
+   *
    * The following locks exist:
    * lockID 9 -> 6-month lock, 1e18 deposit
    * lockID 10 -> 4-yr lock, 1e18 deposit
@@ -1870,7 +1880,7 @@ describe("UnderwritingLocker", function () {
   /**
    * The following locks have been burned, and the IDs cannot be used again:
    * 1, 2, 3, 4, 5, 6, 7, 8
-   * 
+   *
    * The following locks exist:
    * lockID 9 -> 6-month lock, 5e17 deposit
    * lockID 10 -> 4-yr lock, 1e18 deposit
@@ -1909,7 +1919,7 @@ describe("UnderwritingLocker", function () {
   /**
    * The following locks have been burned, and the IDs cannot be used again:
    * 1, 2, 3, 4, 5, 6, 7, 8
-   * 
+   *
    * The following locks exist:
    * lockID 9 -> 6-month lock, 5e17 deposit
    * lockID 10 -> 4-yr lock, 1e18 deposit

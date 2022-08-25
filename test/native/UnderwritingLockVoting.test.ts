@@ -7,10 +7,9 @@ import chai from "chai";
 const { expect } = chai;
 chai.use(solidity);
 import { import_artifacts, ArtifactImports } from "../utilities/artifact_importer";
-import { UnderwritingLocker, UnderwritingLockVoting, Registry, MockErc20Permit, GaugeController } from "../../typechain";
+import { UnderwritingLocker, UnderwritingLockVoting, Registry, MockErc20PermitWithBurn, GaugeController } from "../../typechain";
 import { expectDeployed } from "../utilities/expectDeployed";
 import { expectClose } from "./../utilities/math";
-import { get } from "https";
 
 /*******************
   GLOBAL CONSTANTS
@@ -29,31 +28,31 @@ const ONE_HUNDRED_PERCENT = ONE_ETHER;
 const CUSTOM_GAS_LIMIT = 6000000;
 
 describe("UnderwritingLockVoting", function () {
-    const [deployer, governor, revenueRouter, voter1, voter2, voter3, delegate1, anon] = provider.getWallets();
-  
+    const [deployer, governor, revenueRouter, voter1, voter2, delegate1, updater, anon] = provider.getWallets();
+
     /***************************
        VARIABLE DECLARATIONS
     ***************************/
-    let token: MockErc20Permit;
+    let token: MockErc20PermitWithBurn;
     let registry: Registry;
     let underwritingLocker: UnderwritingLocker;
     let gaugeController: GaugeController;
     let voting: UnderwritingLockVoting;
     let artifacts: ArtifactImports;
     let snapshot: BN;
-  
+
     before(async function () {
       artifacts = await import_artifacts();
       snapshot = await provider.send("evm_snapshot", []);
       await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
-      
+
       // Deploy $UWE, and mint 1M $UWE to deployer
-      token = (await deployContract(deployer, artifacts.MockERC20Permit, ["Underwriting Equity - Solace Native", "UWE", ONE_MILLION_ETHER, 18])) as MockErc20Permit;
+      token = (await deployContract(deployer, artifacts.MockERC20PermitWithBurn, ["Underwriting Equity - Solace Native", "UWE", ONE_MILLION_ETHER, 18])) as MockErc20PermitWithBurn;
 
       // Deploy registry
       registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
     });
-  
+
     after(async function () {
       await provider.send("evm_revert", [snapshot]);
     });
@@ -90,6 +89,7 @@ describe("UnderwritingLockVoting", function () {
           expect(await voting.underwritingLocker()).eq(underwritingLocker.address);
           expect(await voting.gaugeController()).eq(gaugeController.address);
           expect(await voting.registry()).eq(registry.address);
+          expect(await voting.updater()).eq(ZERO_ADDRESS);
           expect(await voting.lastTimePremiumsCharged()).eq(0);
           expect(await voting.isVotingOpen()).eq(false);
           expect(await gaugeController.getVoteCount(voting.address, voter1.address)).eq(0)
@@ -152,7 +152,7 @@ describe("UnderwritingLockVoting", function () {
         const RANDOM_ADDRESS_1 = ethers.Wallet.createRandom().connect(provider).address;
         const RANDOM_ADDRESS_2 = ethers.Wallet.createRandom().connect(provider).address;
         const RANDOM_ADDRESS_3 = ethers.Wallet.createRandom().connect(provider).address;
-    
+
         before(async function () {
           registry2 = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
         });
@@ -160,18 +160,18 @@ describe("UnderwritingLockVoting", function () {
           await expect(voting.connect(voter1).setRegistry(registry2.address)).to.be.revertedWith("!governance");
         })
         it("reverts if zero address registry", async function () {
-          await expect(voting.connect(governor).setRegistry(ZERO_ADDRESS)).to.be.revertedWith('ZeroAddressInput("registry")');
+          await expect(voting.connect(governor).setRegistry(ZERO_ADDRESS, {gasLimit:1000000})).to.be.revertedWith('ZeroAddressInput("registry")');
         });
         it("reverts if zero address revenueRouter in Registry", async function () {
-          await expect(voting.connect(governor).setRegistry(registry2.address)).to.be.revertedWith('ZeroAddressInput("revenueRouter")');
+          await expect(voting.connect(governor).setRegistry(registry2.address, {gasLimit:1000000})).to.be.revertedWith('ZeroAddressInput("revenueRouter")');
           await registry2.connect(governor).set(["revenueRouter"], [RANDOM_ADDRESS_1]);
         });
         it("reverts if zero address underwritingLocker in Registry", async function () {
-          await expect(voting.connect(governor).setRegistry(registry2.address)).to.be.revertedWith('ZeroAddressInput("underwritingLocker")');
+          await expect(voting.connect(governor).setRegistry(registry2.address, {gasLimit:1000000})).to.be.revertedWith('ZeroAddressInput("underwritingLocker")');
           await registry2.connect(governor).set(["underwritingLocker"], [RANDOM_ADDRESS_2]);
         })
         it("reverts if zero address gaugeController in Registry", async function () {
-          await expect(voting.connect(governor).setRegistry(registry2.address)).to.be.revertedWith('ZeroAddressInput("gaugeController")');
+          await expect(voting.connect(governor).setRegistry(registry2.address, {gasLimit:1000000})).to.be.revertedWith('ZeroAddressInput("gaugeController")');
           await registry2.connect(governor).set(["gaugeController"], [RANDOM_ADDRESS_3]);
         });
         it("sets registry", async function () {
@@ -205,11 +205,30 @@ describe("UnderwritingLockVoting", function () {
             expect(await voting.delegateOf(voter1.address)).eq(ZERO_ADDRESS)
         });
         it("owner can set delegate", async function () {
+            expect(await voting.getVotingDelegatorsOf(delegate1.address)).deep.eq([])
             const tx = await voting.connect(voter1).setDelegate(delegate1.address);
             await expect(tx).to.emit(voting, "DelegateSet").withArgs(voter1.address, delegate1.address);
             expect(await voting.delegateOf(voter1.address)).eq(delegate1.address)
             expect(await voting.delegateOf(voter2.address)).eq(ZERO_ADDRESS)
+            expect(await voting.getVotingDelegatorsOf(delegate1.address)).deep.eq([voter1.address])
         })
+        it("getVotingDelegatorsOf can show multiple delegators", async function () {
+            await voting.connect(voter2).setDelegate(delegate1.address);
+            expect(await voting.getVotingDelegatorsOf(delegate1.address)).deep.eq([voter1.address, voter2.address])
+            await voting.connect(voter2).setDelegate(ZERO_ADDRESS);
+            expect(await voting.getVotingDelegatorsOf(delegate1.address)).deep.eq([voter1.address])
+        })
+    });
+
+    describe("setUpdater", () => {
+      it("non governor cannot setUpdater", async  () => {
+        await expect(voting.connect(voter1).setUpdater(updater.address)).to.be.revertedWith("!governance");
+      });
+      it("can set updater", async () => {
+        let tx = await voting.connect(governor).setUpdater(updater.address);
+        await expect(tx).to.emit(voting, "UpdaterSet").withArgs(updater.address);
+        expect(await voting.updater()).eq(updater.address)
+      });
     });
 
   /*******************
@@ -298,8 +317,19 @@ describe("UnderwritingLockVoting", function () {
       });
     });
 
+    describe("gaugeController.setUpdater", () => {
+      it("non governor cannot setUpdater", async  () => {
+        await expect(gaugeController.connect(voter1).setUpdater(updater.address)).to.be.revertedWith("!governance");
+      });
+      it("can set updater", async () => {
+        let tx = await gaugeController.connect(governor).setUpdater(updater.address);
+        await expect(tx).to.emit(gaugeController, "UpdaterSet").withArgs(updater.address);
+        expect(await gaugeController.updater()).eq(updater.address)
+      });
+    });
+
     /*********************
-      INTENTION STATEMENT 
+      INTENTION STATEMENT
     *********************/
     // voter1 will vote for gaugeID 1 with 100% of vote power
 
@@ -310,11 +340,11 @@ describe("UnderwritingLockVoting", function () {
         await expect(voting.connect(voter1).vote(voter1.address, 1, 10000)).to.be.revertedWith("LastEpochPremiumsNotCharged");
         await expect(voting.connect(voter1).voteMultiple(voter1.address, [1, 2], [10000, 10000])).to.be.revertedWith("LastEpochPremiumsNotCharged");
       });
-      it("updateGaugeWeights() should revert if non governor", async function () {
-        await expect(gaugeController.connect(voter1).updateGaugeWeights()).to.be.revertedWith("!governance");
+      it("updateGaugeWeights() should revert if non governor or updater", async function () {
+        await expect(gaugeController.connect(voter1).updateGaugeWeights()).to.be.revertedWith("NotUpdaterNorGovernance");
       });
-      it("chargePremiums() should revert if non governor", async function () {
-        await expect(voting.connect(voter1).chargePremiums()).to.be.revertedWith("!governance");
+      it("chargePremiums() should revert if non governor or updater", async function () {
+        await expect(voting.connect(voter1).chargePremiums()).to.be.revertedWith("NotUpdaterNorGovernance");
       });
       it("chargePremiums() should revert if gauge weights have not been updated", async function () {
         await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("GaugeWeightsNotYetUpdated");
@@ -465,10 +495,10 @@ describe("UnderwritingLockVoting", function () {
         expect(await gaugeController.getVoteCount(voting.address, voter1.address)).eq(1)
         expect(await gaugeController.getVotersCount(voting.address)).eq(1)
       });
-      it("processVotes() should succeed in the next epoch", async function () {
+      it("updateGaugeWeights() called by updater should succeed in the next epoch", async function () {
         const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
         await provider.send("evm_mine", [CURRENT_TIME + ONE_WEEK]);
-        const tx = await gaugeController.connect(governor).updateGaugeWeights({gasLimit: CUSTOM_GAS_LIMIT});
+        const tx = await gaugeController.connect(updater).updateGaugeWeights({gasLimit: CUSTOM_GAS_LIMIT});
         const EPOCH_START_TIME = await voting.getEpochStartTimestamp();
         const VOTE_POWER = await voting.getVotePower(voter1.address);
         await expect(tx).to.emit(gaugeController, "GaugeWeightsUpdated").withArgs(EPOCH_START_TIME);
@@ -478,22 +508,22 @@ describe("UnderwritingLockVoting", function () {
         expect(await gaugeController.getGaugeWeight(1)).eq(ONE_HUNDRED_PERCENT)
         expect(await gaugeController.getAllGaugeWeights()).deep.eq([ZERO, ONE_HUNDRED_PERCENT]);
         expect(await gaugeController.getVotePowerSum()).eq(LAST_RECORDED_VOTE_POWER)
-      });      
+      });
       it("cannot vote or voteMultiple, between processVotes() and chargePremiums() for the same epoch", async function () {
         expect(await voting.isVotingOpen()).eq(false)
         await expect(voting.connect(voter1).vote(voter1.address, 1, 1)).to.be.revertedWith("LastEpochPremiumsNotCharged");
         await expect(voting.connect(delegate1).voteMultiple(voter1.address, [1, 2], [10000, 10000])).to.be.revertedWith("LastEpochPremiumsNotCharged");
-      });      
+      });
       it("chargePremiums() should revert before underwritingLocker.sol call setVotingContract()", async function () {
         await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("NotVotingContract");
       });
-      it("chargePremiums() should succeed in the next epoch, provided allowance granted by underwritingLocker", async function () {
+      it("chargePremiums() call by updater should succeed in the next epoch, provided allowance granted by underwritingLocker", async function () {
         await registry.connect(governor).set(["underwritingLockVoting"],[voting.address]);
         await underwritingLocker.connect(governor).setVotingContract();
         const OLD_VOTER_LOCKED_AMOUNT = await getTotalLockedAmount(voter1.address)
         const OLD_UNDERWRITING_LOCKER_BALANCE = await token.balanceOf(underwritingLocker.address);
 
-        const tx = await voting.connect(governor).chargePremiums();
+        const tx = await voting.connect(updater).chargePremiums();
         const EPOCH_START_TIME = await voting.getEpochStartTimestamp();
         const NEW_VOTER_LOCKED_AMOUNT = await getTotalLockedAmount(voter1.address)
         const NEW_UNDERWRITING_LOCKER_BALANCE = await token.balanceOf(underwritingLocker.address);
@@ -511,12 +541,12 @@ describe("UnderwritingLockVoting", function () {
     **********/
     /**
      * No vote can occur, gaugeController.updateGaugeWeights() and underwritingLockVoting.chargePremiums() has been completed for the last epoch, even at initialization.
-     * 
+     *
      * GaugeController.sol requires the following setup:
      * i.) Deployed with correct must be deployed with correct token variable.
      * ii.) gaugeController.addVotingContract() called to add UnderwritingLockVesting.sol.
      * iii.) gaugeController.addTokenholder() called to add UnderwritingLocker.sol
-     * 
+     *
      * Successful call of UnderwritingLocker.setVotingContract()
      * i.) underwritingLockVoting must be added as a registry entry key
      * ii.) underwritingLocker must have approved underwritingLockVoting.sol as a spender for its balance of $UWE.
@@ -531,28 +561,28 @@ describe("UnderwritingLockVoting", function () {
      * - delegate is delegate1
      * - Own lockID 1 (1e18 initial deposit, locked for 1 yr)
      * - Own lockID 2 (1e18 initial deposit, locked for 2 yr)
-     * 
+     *
      * voter2:
      * - no votes
      * - no delegates
      * - Own lockID 3 (1e18 initial deposit, locked for 3 yr)
      * - Own lockID 4 (1e18 initial deposit, locked for 4 yr)
-     * 
+     *
      * There is 1 gauge
      * gaugeID 1 => "gauge1" => 100% weight
-     * 
+     *
      * Votes and premiums have been processed for the last epoch
      */
 
     /**********************
-      INTENTION STATEMENT 
+      INTENTION STATEMENT
     **********************/
     /**
      * We will add 2 more gauges, and create 1 more lock
      * - gaugeID 2 => 2% ROL
      * - gaugeID 3 => 5% ROL
      * - Create lockID 5 for voter1, but burn this lock after voting (but before updateGaugeWeights called).
-     * 
+     *
      * voter1 => will vote 50% for gauge1 (we will pause this gauge after), and 50% for gauge2
      * voter2 => will vote 40% for gauge2, 30% for gauge3, leave 30% unallocated
      */
@@ -585,7 +615,7 @@ describe("UnderwritingLockVoting", function () {
 
         // Add edge conditions
         await gaugeController.connect(governor).pauseGauge(1)
-        await underwritingLocker.connect(voter1).withdraw(5, voter1.address)
+        await underwritingLocker.connect(voter1).withdraw(5, voter1.address);
       });
       it("owner should be able to voteMultiple()", async function () {
         const GAUGE_ID_1 = 2
@@ -697,21 +727,21 @@ describe("UnderwritingLockVoting", function () {
      * - delegate is delegate1
      * - Own lockID 1 (1e18 initial deposit, locked for 1 yr)
      * - Own lockID 2 (1e18 initial deposit, locked for 2 yr)
-     * 
+     *
      * voter2:
      * - votes: gauge2 (40%), gauge3 (30%)
      * - no delegates
      * - Own lockID 3 (1e18 initial deposit, locked for 3 yr)
      * - Own lockID 4 (1e18 initial deposit, locked for 4 yr)
-     * 
+     *
      * There are 3 gauges
      * - gauge1 is paused
-     * 
+     *
      * LockID 5 is burned
      */
 
     /**********************
-      INTENTION STATEMENT 
+      INTENTION STATEMENT
     **********************/
     /**
      * We will unpause gaugeID 1
@@ -838,6 +868,33 @@ describe("UnderwritingLockVoting", function () {
       })
     });
 
+    describe("voteForMultipleVoters and removeVotesForMultipleVoters", () => {
+      before(async function () {
+        await voting.connect(voter2).setDelegate(delegate1.address)
+      });
+      it("should revert if non-delegate attempts to voteForMultipleVoters", async function () {
+        await expect(voting.connect(governor).voteForMultipleVoters([voter1.address, voter2.address], [2], [1])).to.be.revertedWith("NotOwnerNorDelegate");
+      });
+      it("should revert if non-delegate attempts to removeVotesForMultipleVoters", async function () {
+        await expect(voting.connect(governor).removeVotesForMultipleVoters([voter1.address, voter2.address], [2])).to.be.revertedWith("NotOwnerNorDelegate");
+      });
+      it("delegate can voteForMultipleVoters()", async function () {
+        const tx = await voting.connect(delegate1).voteForMultipleVoters([voter1.address, voter2.address], [2], [1]);
+        await expect(tx).to.emit(voting, "VoteAdded").withArgs(voter1.address, 2, 1);
+        await expect(tx).to.emit(voting, "VoteAdded").withArgs(voter2.address, 2, 1);
+      })
+      it("delegate can removeVotesForMultipleVoters()", async function () {
+        const tx = await voting.connect(delegate1).removeVotesForMultipleVoters([voter1.address, voter2.address], [2]);
+        await expect(tx).to.emit(voting, "VoteRemoved").withArgs(voter1.address, 2);
+        await expect(tx).to.emit(voting, "VoteRemoved").withArgs(voter1.address, 2);
+      })
+      after(async function () {
+        await voting.connect(voter1).vote(voter1.address, 2, 5000)
+        await voting.connect(voter2).vote(voter2.address, 2, 4000)
+        await voting.connect(voter2).setDelegate(ZERO_ADDRESS)
+      });
+    });
+
     /*******************
       STATE SUMMARY
     *******************/
@@ -847,23 +904,23 @@ describe("UnderwritingLockVoting", function () {
      * - delegate is delegate1
      * - Own lockID 1 (1e18 initial deposit, locked for 1 yr)
      * - Own lockID 2 (1e18 initial deposit, locked for 2 yr)
-     * 
+     *
      * voter2:
      * - votes: gauge3 (30%)
      * - no delegates
      * - Own lockID 3 (1e18 initial deposit, locked for 3 yr)
      * - Own lockID 4 (1e18 initial deposit, locked for 4 yr)
-     * 
+     *
      * There are 3 gauges
      * - gauge1: 1% ROL
      * - gauge2: 2% ROL
      * - gauge3: 5% ROL
-     * 
+     *
      * LockID 5 is burned
      */
 
     /**********************
-      INTENTION STATEMENT 
+      INTENTION STATEMENT
     **********************/
     /**
      * We will re-add the votes that were deleted in the last block (voter1 and voter2 votes for gauge2)
@@ -942,7 +999,7 @@ describe("UnderwritingLockVoting", function () {
         expect (await gaugeController.lastTimeGaugeWeightsUpdated()).eq(EPOCH_START_TIME)
         expect (await voting.isVotingOpen()).eq(false)
         await expect(voting.connect(voter1).vote(voter1.address, 1, 1)).to.be.revertedWith("LastEpochPremiumsNotCharged")
-        
+
         const TOTAL_RECORDED_VOTE_POWER = LAST_RECORDED_VOTE_POWER_N.mul(100)
         // Don't expect exact equality because different votes processed at different timestamp
         expectClose(await gaugeController.getVotePowerSum(), TOTAL_RECORDED_VOTE_POWER, 1e14);
@@ -1017,38 +1074,38 @@ describe("UnderwritingLockVoting", function () {
      * - delegate is delegate1
      * - Own lockID 1 (1e18 initial deposit, locked for 1 yr)
      * - Own lockID 2 (1e18 initial deposit, locked for 2 yr)
-     * 
+     *
      * voter2:
      * - no votes
      * - no delegates
      * - Own lockID 3 (1e18 initial deposit, locked for 3 yr)
      * - Own lockID 4 (1e18 initial deposit, locked for 4 yr)
-     * 
+     *
      * There are 5 gauges
      * - gauge1: 1% ROL
      * - gauge2: 2% ROL
      * - gauge3: 5% ROL
      * - gauge4: 1% ROL
      * - gauge5: 1% ROL
-     * 
+     *
      * LockID 5 is burned
      */
 
     /**********************
-      INTENTION STATEMENT 
+      INTENTION STATEMENT
     **********************/
     /**
      * We will test the system at a larger scale
      * We currently have 100 voters with 1 lock each
-     * 
+     *
      * Let's add another 5 gauges.
      * Let's add the votes of another 100 voters with 1 max-duration lock each, and distribute them equally among these 5 new gauges.
-     * 
+     *
      * Let's also add another 10 voters, with 10 max-duration locks each, equally distributed among the 10 gauges.
-     * 
+     *
      * Let's then create another 100 voter who will vote for gauge 1, then lose their voting power after voting (but before vote processing).
-     * 
-     * I want to test if the system can revert with a out-of-gas error with i.) lots of locks to iterate through, ii.) lot of voters to remove 
+     *
+     * I want to test if the system can revert with a out-of-gas error with i.) lots of locks to iterate through, ii.) lot of voters to remove
      */
 
     describe("edge case - DDOS scenario with max locks", () => {
@@ -1092,7 +1149,7 @@ describe("UnderwritingLockVoting", function () {
           await token.connect(deployer).transfer(RANDOM_VOTER.address, ONE_ETHER) // gas money
           // Create 10 locks each
           for (let j = 0; j < 10; j++) {
-            await underwritingLocker.connect(voter1).createLock(RANDOM_VOTER.address, DEPOSIT_AMOUNT, CURRENT_TIME + 4 * ONE_YEAR)            
+            await underwritingLocker.connect(voter1).createLock(RANDOM_VOTER.address, DEPOSIT_AMOUNT, CURRENT_TIME + 4 * ONE_YEAR)
           }
           await deployer.sendTransaction({to: RANDOM_VOTER.address, value: ONE_ETHER.div(10)})
           await voting.connect(RANDOM_VOTER).voteMultiple(
@@ -1104,7 +1161,7 @@ describe("UnderwritingLockVoting", function () {
         expect(await underwritingLocker.totalNumLocks()).eq(305)
 
         // Create 100 voters with 1 max-duration locks each, all voting for gauge1, all of whom votes will be removed
-        // removeVote() will clean the _voters array, _votersToRemove array will fill only with voters who lose all voting 
+        // removeVote() will clean the _voters array, _votersToRemove array will fill only with voters who lose all voting
         // power after voting
         for (let i = 0; i < 100; i++) {
           const RANDOM_VOTER = ethers.Wallet.createRandom().connect(provider);
@@ -1142,7 +1199,7 @@ describe("UnderwritingLockVoting", function () {
         expect (await gaugeController.lastTimeGaugeWeightsUpdated()).eq(EPOCH_START_TIME)
         expect (await voting.isVotingOpen()).eq(false)
         await expect(voting.connect(voter1).vote(voter1.address, 1, 1)).to.be.revertedWith("LastEpochPremiumsNotCharged")
-        
+
         const EXPECTED_TOTAL_RECORDED_VOTE_POWER = LAST_RECORDED_VOTE_POWER_N.mul(300)
         // Accept 5% error - because first 100 votes from 1 week back
         expect(await gaugeController.getVotePowerSum()).gte(EXPECTED_TOTAL_RECORDED_VOTE_POWER.mul(95).div(100))
@@ -1185,7 +1242,7 @@ describe("UnderwritingLockVoting", function () {
         const NEW_REVENUE_ROUTER_BALANCE = await token.balanceOf(revenueRouter.address);
         const EXPECTED_PREMIUM = await getExpectedPremium(SAVED_RANDOM_VOTER.address, OLD_UNDERWRITING_LOCKER_BALANCE, LAST_RECORDED_VOTE_POWER_N)
         const EXPECTED_PREMIUM_UNIT = await getExpectedUnitPremium(SAVED_RANDOM_VOTER.address, OLD_UNDERWRITING_LOCKER_BALANCE, LAST_RECORDED_VOTE_POWER_N);
-        const EXPECTED_TOTAL_PREMIUM = EXPECTED_PREMIUM_UNIT.mul(450) 
+        const EXPECTED_TOTAL_PREMIUM = EXPECTED_PREMIUM_UNIT.mul(450)
         // 8*20 + 2*20 + 20*5 = 300 for single lock voters
         // 10 * (8 + 2 + 5) = 10 * 15 for 10-lock voters
 
@@ -1206,26 +1263,26 @@ describe("UnderwritingLockVoting", function () {
     /**
      * Need to cap locks for one person - otherwise getVotePower() is an unbounded loop and anyone can deadlock the contract
      * by creating more than 500+ locks. 1 voter with 50 locks => ~750K gas to getVotePower()
-     * 
+     *
      * Uniswap implementation of sqrt is inefficient - sqrt(6 * 1e18) requiring 35 iterations of Babylonian method => ~30K gas
      * Alternate implementation with bitwise operations = ~700 gas = 40x more efficient. Swapping this implementation of sqrt
      * allows us to process slightly more than 100 new one-lock voters in a 6M gas call.
-     * 
+     *
      * Arbitrary cap of 10 locks => ~150K gas for updateGaugeWeights(). getVotePower() is an external call to UnderwritingLockVoting
-     * And we want to keep layer between locks and votes, hence GaugeController should not need any methods from IUnderwritingLock. 
-     * 
-     * Balance need to protect against DDOS possibility, against desire to run simple scenarios in a single run. 
+     * And we want to keep layer between locks and votes, hence GaugeController should not need any methods from IUnderwritingLock.
+     *
+     * Balance need to protect against DDOS possibility, against desire to run simple scenarios in a single run.
      * Mmm, when the system scales, who cares about simple scenarios. Should underweigh the convenience of simple unit tests
      * for durability in scale. Let's make it clear that the updateGaugeWeight() function is intended to be run
      * in a while-loop with custom gas limit of 6M each call.
-     * 
-     * I'm not as concerned with DDOS from having unbounded number of votes - we can save progress between vote iteration 
+     *
+     * I'm not as concerned with DDOS from having unbounded number of votes - we can save progress between vote iteration
      * done in the updateGaugeWeights() function body. We cannot save progress between lock iterations done in an external call.
-     * 
+     *
      * In terms of DDOS from removing empty voters - it costs ~10K gas for each voter, and we can save progress between iterations. So not an issue.
-     * 
+     *
      * We need need to test for DDOS from unbounded amount of votes
-     * 
+     *
      */
 
     /*******************
@@ -1237,13 +1294,13 @@ describe("UnderwritingLockVoting", function () {
      * - delegate is delegate1
      * - Own lockID 1 (1e18 initial deposit, locked for 1 yr)
      * - Own lockID 2 (1e18 initial deposit, locked for 2 yr)
-     * 
+     *
      * voter2:
      * - no votes
      * - no delegates
      * - Own lockID 3 (1e18 initial deposit, locked for 3 yr)
      * - Own lockID 4 (1e18 initial deposit, locked for 4 yr)
-     * 
+     *
      * There are 10 gauges
      * - gauge1: 1% ROL
      * - gauge2: 2% ROL
@@ -1255,20 +1312,20 @@ describe("UnderwritingLockVoting", function () {
      * - gauge8: 1% ROL
      * - gauge9: 1% ROL
      * - gauge10: 1% ROL
-     * 
+     *
      * LockIDs 5, 306-405 are burned
-     * 
+     *
      * There are 200 voters with 1 max-duration lock, with votes equally distributed amongst the 10 gauges
      * There are 10 voters with 10 max-duration locks each, equally distributed among the 10 gauges
      */
 
     /**********************
-      INTENTION STATEMENT 
+      INTENTION STATEMENT
     **********************/
     /**
      * We will add 90 gauges, for a total of 100
      * We will add 10 voters, with 10 max-duration locks each, who equally distribute their votes among the 100 gauges
-     * 
+     *
      * I want to test how the system does with a larger number of gauges
      */
 
@@ -1299,7 +1356,7 @@ describe("UnderwritingLockVoting", function () {
           await token.connect(deployer).transfer(RANDOM_VOTER.address, ONE_ETHER) // gas money
           // Create 10 locks each
           for (let j = 0; j < 10; j++) {
-            await underwritingLocker.connect(voter1).createLock(RANDOM_VOTER.address, DEPOSIT_AMOUNT, CURRENT_TIME + 4 * ONE_YEAR)            
+            await underwritingLocker.connect(voter1).createLock(RANDOM_VOTER.address, DEPOSIT_AMOUNT, CURRENT_TIME + 4 * ONE_YEAR)
           }
           await deployer.sendTransaction({to: RANDOM_VOTER.address, value: ONE_ETHER.div(10)})
           await voting.connect(RANDOM_VOTER).voteMultiple(
@@ -1335,7 +1392,7 @@ describe("UnderwritingLockVoting", function () {
         expect (await gaugeController.lastTimeGaugeWeightsUpdated()).eq(EPOCH_START_TIME)
         expect (await voting.isVotingOpen()).eq(false)
         await expect(voting.connect(voter1).vote(voter1.address, 1, 1)).to.be.revertedWith("LastEpochPremiumsNotCharged")
-        
+
         // SAVED_RANDOM_VOTER here has 10 locks - has 10x the unit votePower
         // So we should have 200 1-lock users + 20 10-lock users => 400 unit votePower
         // So we have 400/10 = 40 of SAVED_RANDOM_VOTER votePower
@@ -1392,7 +1449,7 @@ describe("UnderwritingLockVoting", function () {
         // const NEW_REVENUE_ROUTER_BALANCE = await token.balanceOf(revenueRouter.address);
         // const EXPECTED_PREMIUM = await getExpectedPremium(SAVED_RANDOM_VOTER.address, OLD_UNDERWRITING_LOCKER_BALANCE, LAST_RECORDED_VOTE_POWER_N)
         // const EXPECTED_PREMIUM_UNIT = await getExpectedUnitPremium(SAVED_RANDOM_VOTER.address, OLD_UNDERWRITING_LOCKER_BALANCE, LAST_RECORDED_VOTE_POWER_N);
-      //   const EXPECTED_TOTAL_PREMIUM = EXPECTED_PREMIUM_UNIT.mul(450) 
+      //   const EXPECTED_TOTAL_PREMIUM = EXPECTED_PREMIUM_UNIT.mul(450)
       //   // 8*20 + 2*20 + 20*5 = 300 for single lock voters
       //   // 10 * (8 + 2 + 5) = 10 * 15 for 10-lock voters
 
@@ -1416,22 +1473,22 @@ describe("UnderwritingLockVoting", function () {
      * - delegate is delegate1
      * - Own lockID 1 (1e18 initial deposit, locked for 1 yr)
      * - Own lockID 2 (1e18 initial deposit, locked for 2 yr)
-     * 
+     *
      * voter2:
      * - no votes
      * - no delegates
      * - Own lockID 3 (1e18 initial deposit, locked for 3 yr)
      * - Own lockID 4 (1e18 initial deposit, locked for 4 yr)
-     * 
+     *
      * There are 100 gauges
      * - gauge1: 1% ROL
      * - gauge2: 2% ROL
      * - gauge3: 5% ROL
      * - gauge4: 1% ROL
      * - gauges 5-100: 1% ROL
-     * 
+     *
      * LockIDs 5, 306-405 are burned
-     * 
+     *
      * There are 200 voters with 1 max-duration lock, with votes equally distributed amongst the first 10 gauges
      * There are 10 voters with 10 max-duration locks each, equally distributed among the first 10 gauges
      * There are another 10 voters with 10 max-duration locks each, equally distributed among the 100 gauges
@@ -1492,7 +1549,7 @@ describe("UnderwritingLockVoting", function () {
       const SCALING_DENOMINATOR = SCALE_FACTOR.mul(ONE_YEAR).mul(10000).mul(ONE_ETHER)
 
       // TOTAL_PREMIUM = GLOBAL_MULTIPLIER * SUM(ROL_GAUGE * ROL_WEIGHT)
-      
+
       const ACCUMULATOR = ONE_PERCENT.mul(10000)
       return ACCUMULATOR.mul(GLOBAL_NUMERATOR).mul(SCALING_NUMERATOR).div(GLOBAL_DENOMINATOR).div(SCALING_DENOMINATOR)
     }

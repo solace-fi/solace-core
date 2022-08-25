@@ -30,7 +30,7 @@ const DEPLOYER_CONTRACT_ADDRESS         = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff
 const REGISTRY_ADDRESS                  = "0x501ACe0f576fc4ef9C0380AA46A578eA96b85776";
 const UWP_ADDRESS                       = "0x501ACEb41708De16FbedE3b31f3064919E9d7F23";
 const UWE_ADDRESS                       = "0x501AcE91E8832CDeA18b9e685751079CCddfc0e2";
-const REVENUE_ROUTER_ADDRESS            = "0x0436C20030d0C2e278E7e8e4b42D304a6420D3bb";
+const REVENUE_ROUTER_ADDRESS            = "0x501AcE0e8D16B92236763E2dEd7aE3bc2DFfA276";
 const UNDERWRITING_LOCKER_ADDRESS       = "0x501aceAC7279713F33d8cd1eBDCfd8E442909CA5";
 const GAUGE_CONTROLLER_ADDRESS          = "0x501AcE75E1f2098099E73e05BC73d5F16ED7b6f1";
 const UNDERWRITING_LOCK_VOTING_ADDRESS  = "0x501ace085C07AfB7EB070ddbC7b4bC3D4379761a";
@@ -70,10 +70,10 @@ async function main() {
   //await setRegistry1(); // Set 'uwe' in the registry
   await deployUnderwritingLocker();
   await deployGaugeController();
-  //await setRegistry2(); // Set 'revenueRouter', 'underwritingLocker' and 'gaugeController' in the registry
+  await setRegistry2(); // Set 'revenueRouter', 'underwritingLocker' and 'gaugeController' in the registry
   await deployUnderwritingLockVoting();
-  //await gaugeSetup();
-  //await addGauges();
+  await gaugeSetup();
+  await addGauges();
   await deployDepositHelper();
 
   // log addresses
@@ -135,7 +135,7 @@ async function gaugeSetup() {
     await tx1.wait(networkSettings.confirmations);
 
     console.log("Adding UnderwritingLockVoting as vote source in GaugeController");
-    const tx2 = await gaugeController.connect(deployer).addVotingContract(voting.address, {...networkSettings.overrides, gasLimit: 1000000});
+    const tx2 = await gaugeController.connect(deployer).addVotingContract(voting.address, networkSettings.overrides);
     await tx2.wait(networkSettings.confirmations);
 
     console.log("Adding 'underwritingLockVoting' to the registry");
