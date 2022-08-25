@@ -33,7 +33,7 @@ const TEN_MILLION_ETHER = BN.from("10000000000000000000000000");
 
 const ONE_MONTH = 2500000;
 const THREE_YEARS = 94608000
-const VESTING_START = 1638209176 + THREE_YEARS;
+const VESTING_START = 1638209176 + THREE_YEARS; 
 // Unix timestamp for initial SOLACE add liquidity transaction - https://etherscan.io/tx/0x71f1de15ee75f414c454aec3612433d0123e44ec5987515fc3566795cd840bc3
 // Add three years (arbitrary time) to intended VESTING_START because want to test contract behaviour
 // before vestingStart, and cannot shift time backwards in Hardhat environment. So need to shift vestingStart forwards.
@@ -41,7 +41,7 @@ const VESTING_START = 1638209176 + THREE_YEARS;
 describe("TokenVesting", function () {
     const [deployer, governor, investor1, investor2, investor3, randomGreedyPerson, investor1_new_account, SOLACE_rescue_account] = provider.getWallets();
     let artifacts: ArtifactImports;
-
+  
     before(async function () {
         artifacts = await import_artifacts();
         await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
@@ -108,7 +108,7 @@ describe("TokenVesting", function () {
       //     expect(await tokenVesting.pendingGovernance()).to.equal("0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF");
       // });
     });
-
+  
     describe("setTotalInvestorTokens", function () {
       it("only Governor can call setTotalInvestorTokens", async function () {
           await expect(tokenVesting.connect(investor1).setTotalInvestorTokens([investor1.address, investor2.address, investor3.address], [ONE_MILLION_ETHER, 0, 0])).to.be.revertedWith("!governance");
@@ -118,7 +118,7 @@ describe("TokenVesting", function () {
       it("verifies equivalent lengths of 'investors' array and 'SOLACE token amounts' array", async function () {
           await expect(tokenVesting.connect(governor).setTotalInvestorTokens([investor1.address, investor2.address, investor3.address], [ONE_MILLION_ETHER, 0])).to.be.revertedWith("length mismatch");
       });
-      it("sets correct total investor token amounts", async function () {
+      it("sets correct total investor token amounts", async function () {            
           let tx = await tokenVesting.connect(governor).setTotalInvestorTokens([investor1.address, investor2.address, investor3.address], [THREE_HUNDRED_THOUSAND_ETHER, THREE_HUNDRED_THOUSAND_ETHER, THREE_HUNDRED_THOUSAND_ETHER])
           expect((await tokenVesting.totalInvestorTokens(investor1.address))).to.equal(THREE_HUNDRED_THOUSAND_ETHER);
           expect((await tokenVesting.totalInvestorTokens(investor2.address))).to.equal(THREE_HUNDRED_THOUSAND_ETHER);
@@ -283,7 +283,7 @@ describe("TokenVesting", function () {
         await expect(investor3_claim_tx).to.emit(solace, "Transfer").withArgs(tokenVesting.address, investor3.address, claimedTokenAmount);
         await expect(investor3_claim_tx).to.emit(tokenVesting, "TokensClaimed").withArgs(solace.address, investor3.address, claimedTokenAmount);
         expect((await tokenVesting.claimedInvestorTokens(investor3.address))).to.equal(claimedTokenAmount.add(preClaimedAmount));
-        expect(await solace.balanceOf(investor3.address)).eq(claimedTokenAmount.add(preClaimedAmount))
+        expect(await solace.balanceOf(investor3.address)).eq(claimedTokenAmount.add(preClaimedAmount))   
       })
       it("Sanity check redeemedInvestorTokens - should have lower values than totalInvestorTokens for same addresses", async function () {
         const investor1_claimedTokens = await tokenVesting.claimedInvestorTokens(investor1_new_account.address);
@@ -352,7 +352,7 @@ describe("TokenVesting", function () {
         await expect(investor3_claim_tx).to.emit(solace, "Transfer").withArgs(tokenVesting.address, investor3.address, claimedTokenAmount);
         await expect(investor3_claim_tx).to.emit(tokenVesting, "TokensClaimed").withArgs(solace.address, investor3.address, claimedTokenAmount);
         expect((await tokenVesting.claimedInvestorTokens(investor3.address))).to.equal(claimedTokenAmount.add(preClaimedAmount));
-        expect(await solace.balanceOf(investor3.address)).eq(claimedTokenAmount.add(preClaimedAmount))
+        expect(await solace.balanceOf(investor3.address)).eq(claimedTokenAmount.add(preClaimedAmount))       
       })
       it("Sanity check redeemedInvestorTokens - should be equivalent to totalInvestorTokens for same addresses", async function () {
         const investor1_claimedTokens = await tokenVesting.claimedInvestorTokens(investor1_new_account.address);
@@ -425,7 +425,8 @@ describe("TokenVesting", function () {
 })
 
 async function getCurrentTimestamp() {
-  const currentBlock = await provider.getBlock("latest");
+  const currentBlockNumber = await provider.getBlockNumber();
+  const currentBlock = await provider.getBlock(currentBlockNumber);
   const currentTimestamp = currentBlock.timestamp;
   return currentTimestamp
 }

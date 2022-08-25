@@ -80,6 +80,9 @@ describe("Deployer", function () {
       let predictedAddress = await deployerContract.callStatic.deploy(initcode, toBytes32(0));
       expect(predictedAddress.length).eq(42);
       expect(predictedAddress).to.not.equal(ZERO_ADDRESS);
+      // test no deployment
+      solace = (await ethers.getContractAt(artifacts.SOLACE.abi, predictedAddress)) as Solace;
+      await expect(solace.isMinter(governor.address)).to.be.reverted;
       // test actual deployment
       let tx = await deployerContract.deploy(initcode, toBytes32(0), {gasLimit: 10000000});
       //let gasUsed = (await tx.wait()).gasUsed;
@@ -94,6 +97,9 @@ describe("Deployer", function () {
       expect(predictedAddress.length).eq(42);
       expect(predictedAddress).to.not.equal(ZERO_ADDRESS);
       expect(predictedAddress).to.not.equal(solaceAddress);
+      // test no deployment
+      solace = (await ethers.getContractAt(artifacts.SOLACE.abi, predictedAddress)) as Solace;
+      await expect(solace.isMinter(governor.address)).to.be.reverted;
       // test actual deployment
       let tx = await deployerContract.deploy(initcode, toBytes32(1), {gasLimit: 10000000});
       //let gasUsed = (await tx.wait()).gasUsed;
