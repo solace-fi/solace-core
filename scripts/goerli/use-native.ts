@@ -30,6 +30,7 @@ const USDT_ADDRESS                 = "0x92f2F8d238183f678a5652a04EDa83eD7BCfa99e
 const FRAX_ADDRESS                 = "0xA542486E4Dc48580fFf76B75b5c406C211218AE2";
 const WBTC_ADDRESS                 = "0xD129f9A01Eb0d41302A2F808e9Ebfd5eB92cE17C";
 const WETH_ADDRESS                 = "0x714ECD380a9700086eadAc03297027bAf4686276";
+const NEAR_ADDRESS                 = "0x19435895aDC47127AA3151a9bf96dfa74f8b2C33";
 const SOLACE_ADDRESS               = "0x501acE9c35E60f03A2af4d484f49F9B1EFde9f40";
 const AURORA_ADDRESS               = "0x9727B423892C3BCBEBe9458F4FE5e86A954A0980";
 const PLY_ADDRESS                  = "0xfdA6cF34193993c28E32340fc7CEf9361e48C7Ac";
@@ -87,6 +88,7 @@ async function main() {
   await expectDeployed(FRAX_ADDRESS);
   await expectDeployed(WBTC_ADDRESS);
   await expectDeployed(WETH_ADDRESS);
+  await expectDeployed(NEAR_ADDRESS);
   await expectDeployed(SOLACE_ADDRESS);
   await expectDeployed(AURORA_ADDRESS);
   await expectDeployed(PLY_ADDRESS);
@@ -120,11 +122,11 @@ async function main() {
   //await withdrawFromUwe();
   //await redeemFromUwp();
 
-  //await setPriceFeeds();
-  //await getUwpTokens();
+  await setPriceFeeds();
+  await getUwpTokens();
   //await getGauges();
-  await rolloverEpoch();
-  await castVote();
+  //await rolloverEpoch();
+  //await castVote();
   //await getEpochTimestamps();
 }
 
@@ -249,8 +251,8 @@ async function withdrawFromUwe() {
 async function setPriceFeeds() {
   console.log('Setting prices in SolaceMegaOracle');
   let tx = await solaceMegaOracle.connect(deployer).transmit(
-    [SOLACE_ADDRESS, AURORA_ADDRESS, PLY_ADDRESS, BSTN_ADDRESS, BBT_ADDRESS, TRI_ADDRESS, VWAVE_ADDRESS],
-    [ONE_ETHER.mul(120).div(10000), ONE_ETHER.mul(14000).div(10000), ONE_ETHER.mul(16).div(10000), ONE_ETHER.mul(36).div(10000), ONE_ETHER.mul(9).div(10000), ONE_ETHER.mul(317).div(10000), ONE_ETHER.mul(223697).div(10000)],
+    [NEAR_ADDRESS, SOLACE_ADDRESS, AURORA_ADDRESS, PLY_ADDRESS, BSTN_ADDRESS, BBT_ADDRESS, TRI_ADDRESS, VWAVE_ADDRESS],
+    [ONE_ETHER.mul(4), ONE_ETHER.mul(120).div(10000), ONE_ETHER.mul(14000).div(10000), ONE_ETHER.mul(16).div(10000), ONE_ETHER.mul(36).div(10000), ONE_ETHER.mul(9).div(10000), ONE_ETHER.mul(317).div(10000), ONE_ETHER.mul(223697).div(10000)],
     networkSettings.overrides);
   await tx.wait(networkSettings.confirmations);
   console.log('Set prices in SolaceMegaOracle');
@@ -278,10 +280,10 @@ async function getUwpTokens() {
       oracle2.valueOfTokens(data.token, metadata[3]), // balance
     ]));
   }
-  console.log("| Name            | Symbol | Decimals | Price           | Balance  | Value           |");
-  console.log("--------------------------------------------------------------------------------------");
+  console.log("| Name              | Symbol | Decimals | Price           | Balance  | Value           |");
+  console.log("----------------------------------------------------------------------------------------");
   for(let tokenID = 0; tokenID < len; ++tokenID) {
-    console.log(`| ${leftPad(tokenMetadata[tokenID][0],15)} | ${leftPad(tokenMetadata[tokenID][1],6)} | ${leftPad(`${tokenMetadata[tokenID][2]}`,8)} | ${leftPad(ethers.utils.formatUnits(oracleData[tokenID][0]),15)} | ${leftPad(ethers.utils.formatUnits(tokenMetadata[tokenID][3],tokenMetadata[tokenID][2]),8)} | ${leftPad(ethers.utils.formatUnits(oracleData[tokenID][1]),15)} |`)
+    console.log(`| ${leftPad(tokenMetadata[tokenID][0],17)} | ${leftPad(tokenMetadata[tokenID][1],6)} | ${leftPad(`${tokenMetadata[tokenID][2]}`,8)} | ${leftPad(ethers.utils.formatUnits(oracleData[tokenID][0]),15)} | ${leftPad(ethers.utils.formatUnits(tokenMetadata[tokenID][3],tokenMetadata[tokenID][2]),8)} | ${leftPad(ethers.utils.formatUnits(oracleData[tokenID][1]),15)} |`)
   }
 }
 

@@ -19,25 +19,27 @@ import { create2Contract } from "../create2Contract";
 const DEPLOYER_CONTRACT_ADDRESS    = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
 
 // price feed addresses
-const USDC_PRICE_FEED_ADDRESS      = "0xB61119a7349494b694be8C0e1580C1CFCD55753f";
-const BTC_PRICE_FEED_ADDRESS       = "0x887e7e9097d7d2AB44ba31dE0C022040Fb26FC9D";
-const ETH_PRICE_FEED_ADDRESS       = "0xEB3DA77d163055634335aA65F29e612BeaBf4391";
+const USDC_PRICE_FEED_ADDRESS      = "0xdD170e697d7ADed472a9284f07576c3449284502";
+const DAI_PRICE_FEED_ADDRESS       = "0x9e3C7532d9E4bfF3298a132101Bcc62576D80e36";
+const USDT_PRICE_FEED_ADDRESS      = "0x55b9eD56737B161677dC5146873E643647Ba5a43";
+const FRAX_PRICE_FEED_ADDRESS      = "";
+const BTC_PRICE_FEED_ADDRESS       = "0xBE46e430d336fC827d096Db044cBaEECE72e17bC";
+const ETH_PRICE_FEED_ADDRESS       = "0x842AF8074Fa41583E3720821cF1435049cf93565";
 
 // token addresses
-const USDC_ADDRESS                 = "0x995714E92a094Ea9b50e9F23934C36F86136A46c";
-const DAI_ADDRESS                  = "0x6a49238e4d0fA003BA07fbd5ec8B6b045f980574";
-const USDT_ADDRESS                 = "0x92f2F8d238183f678a5652a04EDa83eD7BCfa99e";
-const FRAX_ADDRESS                 = "0xA542486E4Dc48580fFf76B75b5c406C211218AE2";
-const WBTC_ADDRESS                 = "0xD129f9A01Eb0d41302A2F808e9Ebfd5eB92cE17C";
-const WETH_ADDRESS                 = "0x714ECD380a9700086eadAc03297027bAf4686276";
-const NEAR_ADDRESS                 = "0x19435895aDC47127AA3151a9bf96dfa74f8b2C33";
+const USDC_ADDRESS                 = "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802";
+const DAI_ADDRESS                  = "0xe3520349F477A5F6EB06107066048508498A291b";
+const USDT_ADDRESS                 = "0x4988a896b1227218e4A686fdE5EabdcAbd91571f";
+const FRAX_ADDRESS                 = "0xDA2585430fEf327aD8ee44Af8F1f989a2A91A3d2";
+const WBTC_ADDRESS                 = "0xf4eb217ba2454613b15dbdea6e5f22276410e89e";
+const WETH_ADDRESS                 = "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB";
 const SOLACE_ADDRESS               = "0x501acE9c35E60f03A2af4d484f49F9B1EFde9f40";
-const AURORA_ADDRESS               = "0x9727B423892C3BCBEBe9458F4FE5e86A954A0980";
-const PLY_ADDRESS                  = "0xfdA6cF34193993c28E32340fc7CEf9361e48C7Ac";
-const BSTN_ADDRESS                 = "0xb191d201073Bb24453419Eb3c1e0B790e6EFA6DF";
-const BBT_ADDRESS                  = "0xAaF70eE6d386dD0410E2681FA33367f53b3BCc18";
-const TRI_ADDRESS                  = "0x13fcD385A20496ed729AF787EC109A6aB4B44d75";
-const VWAVE_ADDRESS                = "0x5C4Ccc7b2a2bC3E5c009364917fff92d12a08fF4";
+const AURORA_ADDRESS               = "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79";
+const PLY_ADDRESS                  = "0x09C9D464b58d96837f8d8b6f4d9fE4aD408d3A4f";
+const BSTN_ADDRESS                 = "0x9f1F933C660a1DC856F0E0Fe058435879c5CCEf0";
+const BBT_ADDRESS                  = "0x4148d2Ce7816F0AE378d98b40eB3A7211E1fcF0D";
+const TRI_ADDRESS                  = "0xFa94348467f64D5A457F75F8bc40495D33c65aBB";
+const VWAVE_ADDRESS                = "0x2451dB68DeD81900C4F16ae1af597E9658689734";
 
 // contract addresses
 const SOLACE_MEGA_ORACLE_ADDRESS   = "0x501acEC7AD3F8bb5Fc3C925dcAC1C4077e2bb7C5";
@@ -64,7 +66,11 @@ async function main() {
   networkSettings = getNetworkSettings(chainID);
 
   await expectDeployed(DEPLOYER_CONTRACT_ADDRESS);
+  /*
   await expectDeployed(USDC_PRICE_FEED_ADDRESS);
+  await expectDeployed(DAI_PRICE_FEED_ADDRESS);
+  await expectDeployed(USDT_PRICE_FEED_ADDRESS);
+  await expectDeployed(FRAX_PRICE_FEED_ADDRESS);
   await expectDeployed(BTC_PRICE_FEED_ADDRESS);
   await expectDeployed(ETH_PRICE_FEED_ADDRESS);
   await expectDeployed(USDC_ADDRESS);
@@ -73,7 +79,6 @@ async function main() {
   await expectDeployed(FRAX_ADDRESS);
   await expectDeployed(WBTC_ADDRESS);
   await expectDeployed(WETH_ADDRESS);
-  await expectDeployed(NEAR_ADDRESS);
   await expectDeployed(SOLACE_ADDRESS);
   await expectDeployed(AURORA_ADDRESS);
   await expectDeployed(PLY_ADDRESS);
@@ -81,6 +86,7 @@ async function main() {
   await expectDeployed(BBT_ADDRESS);
   await expectDeployed(TRI_ADDRESS);
   await expectDeployed(VWAVE_ADDRESS);
+  */
 
   // deploy and configure contracts
   // SolaceMegaOracle
@@ -118,7 +124,6 @@ async function configureSolaceMegaOracle() {
 
   console.log('Adding price feeds to SolaceMegaOracle');
   let tx = await solaceMegaOracle.connect(deployer).addPriceFeeds([
-    { token: NEAR_ADDRESS, latestPrice: 0, tokenDecimals: 24, priceFeedDecimals: 18 },
     { token: SOLACE_ADDRESS, latestPrice: 0, tokenDecimals: 18, priceFeedDecimals: 18 },
     { token: AURORA_ADDRESS, latestPrice: 0, tokenDecimals: 18, priceFeedDecimals: 18 },
     { token: PLY_ADDRESS, latestPrice: 0, tokenDecimals: 18, priceFeedDecimals: 18 },
@@ -146,9 +151,9 @@ async function configureFluxMegaOracle() {
   console.log('Adding price feeds to FluxMegaOracle');
   let tx = await fluxMegaOracle.connect(deployer).addPriceFeeds([
     { token: USDC_ADDRESS, priceFeed: USDC_PRICE_FEED_ADDRESS, tokenDecimals: 6, priceFeedDecimals: 8 },
-    { token: DAI_ADDRESS, priceFeed: USDC_PRICE_FEED_ADDRESS, tokenDecimals: 18, priceFeedDecimals: 8 },
-    { token: USDT_ADDRESS, priceFeed: USDC_PRICE_FEED_ADDRESS, tokenDecimals: 6, priceFeedDecimals: 8 },
-    { token: FRAX_ADDRESS, priceFeed: USDC_PRICE_FEED_ADDRESS, tokenDecimals: 18, priceFeedDecimals: 8 },
+    { token: DAI_ADDRESS, priceFeed: DAI_PRICE_FEED_ADDRESS, tokenDecimals: 18, priceFeedDecimals: 8 },
+    { token: USDT_ADDRESS, priceFeed: USDT_PRICE_FEED_ADDRESS, tokenDecimals: 6, priceFeedDecimals: 8 },
+    { token: FRAX_ADDRESS, priceFeed: FRAX_PRICE_FEED_ADDRESS, tokenDecimals: 18, priceFeedDecimals: 8 },
     { token: WBTC_ADDRESS, priceFeed: BTC_PRICE_FEED_ADDRESS, tokenDecimals: 8, priceFeedDecimals: 8 },
     { token: WETH_ADDRESS, priceFeed: ETH_PRICE_FEED_ADDRESS, tokenDecimals: 18, priceFeedDecimals: 8 },
   ], networkSettings.overrides);
@@ -176,7 +181,6 @@ async function configureUwp() {
     { token: FRAX_ADDRESS, oracle: fluxMegaOracle.address, min: 0, max: ethers.constants.MaxUint256 },
     { token: WBTC_ADDRESS, oracle: fluxMegaOracle.address, min: 0, max: ethers.constants.MaxUint256 },
     { token: WETH_ADDRESS, oracle: fluxMegaOracle.address, min: 0, max: ethers.constants.MaxUint256 },
-    { token: NEAR_ADDRESS, oracle: solaceMegaOracle.address, min: 0, max: ethers.constants.MaxUint256 },
     { token: SOLACE_ADDRESS, oracle: solaceMegaOracle.address, min: 0, max: ethers.constants.MaxUint256 },
     { token: AURORA_ADDRESS, oracle: solaceMegaOracle.address, min: 0, max: ethers.constants.MaxUint256 },
     { token: PLY_ADDRESS, oracle: solaceMegaOracle.address, min: 0, max: ethers.constants.MaxUint256 },
@@ -216,7 +220,6 @@ async function logAddresses() {
   logContractAddress("FRAX", FRAX_ADDRESS);
   logContractAddress("WBTC", WBTC_ADDRESS);
   logContractAddress("WETH", WETH_ADDRESS);
-  logContractAddress("NEAR", NEAR_ADDRESS);
   logContractAddress("SOLACE", SOLACE_ADDRESS)
   logContractAddress("AURORA", AURORA_ADDRESS);
   logContractAddress("PLY", PLY_ADDRESS);

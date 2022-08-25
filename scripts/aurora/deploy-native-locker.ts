@@ -28,13 +28,13 @@ import { formatUnits } from "ethers/lib/utils";
 
 const DEPLOYER_CONTRACT_ADDRESS         = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff694EF";
 const REGISTRY_ADDRESS                  = "0x501ACe0f576fc4ef9C0380AA46A578eA96b85776";
-const UWP_ADDRESS                       = "0x501ACEe266FAFF76AE48C891a06068bF6507c7f6";
-const UWE_ADDRESS                       = "0x501ACEF0d60A70F3bc1bFE090a3d51ca10757aaE";
-const REVENUE_ROUTER_ADDRESS            = "0x501AcE0e8D16B92236763E2dEd7aE3bc2DFfA276";
-const UNDERWRITING_LOCKER_ADDRESS       = "0x501ACed0A3cC374E470BF10cbB625AE774A20d75";
-const UNDERWRITING_LOCK_VOTING_ADDRESS  = "0x501ACED282C623D53602cE29c3Ae8A22683843C2";
-const GAUGE_CONTROLLER_ADDRESS          = "0x501ACE3c9C22Ec7AE3c84D1863dE5AD3cb9760B1";
-const DEPOSIT_HELPER_ADDRESS            = "0x501ACeBb18b1328F6bd854faa3ad88314fb2Cc58";
+const UWP_ADDRESS                       = "0x501ACEb41708De16FbedE3b31f3064919E9d7F23";
+const UWE_ADDRESS                       = "0x501AcE91E8832CDeA18b9e685751079CCddfc0e2";
+const REVENUE_ROUTER_ADDRESS            = "0x0436C20030d0C2e278E7e8e4b42D304a6420D3bb";
+const UNDERWRITING_LOCKER_ADDRESS       = "0x501aceAC7279713F33d8cd1eBDCfd8E442909CA5";
+const GAUGE_CONTROLLER_ADDRESS          = "0x501AcE75E1f2098099E73e05BC73d5F16ED7b6f1";
+const UNDERWRITING_LOCK_VOTING_ADDRESS  = "0x501ace085C07AfB7EB070ddbC7b4bC3D4379761a";
+const DEPOSIT_HELPER_ADDRESS            = "0x501acE8830E73F81172C4877c9d273D6a3767AD1";
 let GOVERNOR_ADDRESS: string;
 
 let artifacts: ArtifactImports;
@@ -135,11 +135,11 @@ async function gaugeSetup() {
     await tx1.wait(networkSettings.confirmations);
 
     console.log("Adding UnderwritingLockVoting as vote source in GaugeController");
-    const tx2 = await gaugeController.connect(deployer).addVotingContract(voting.address, networkSettings.overrides);
+    const tx2 = await gaugeController.connect(deployer).addVotingContract(voting.address, {...networkSettings.overrides, gasLimit: 1000000});
     await tx2.wait(networkSettings.confirmations);
 
     console.log("Adding 'underwritingLockVoting' to the registry");
-    const tx3 = await registry.connect(deployer).set(["underwritingLockVoting"], [voting.address], networkSettings.overrides);
+    const tx3 = await registry.connect(deployer).set(["underwritingLockVoting"], [voting.address], {...networkSettings.overrides, gasLimit: 1000000});
     await tx3.wait(networkSettings.confirmations);
 
     console.log("Enabling UnderwritingLockVoting to charge premium to UnderwritingLocker");
