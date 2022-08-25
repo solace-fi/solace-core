@@ -24,7 +24,9 @@ contract MockERC20PermitWithBurn is MockERC20Permit {
         string memory symbol,
         uint256 supply,
         uint8 decimals_
-    ) MockERC20Permit(name, symbol, supply, decimals_) {}
+    )
+    // solhint-disable-next-line no-empty-blocks
+    MockERC20Permit(name, symbol, supply, decimals_) {}
 
     function burn(uint256 amount_) external {
         _burn(msg.sender, amount_);

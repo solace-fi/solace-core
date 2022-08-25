@@ -74,7 +74,7 @@ describe("UnderwritingLocker", function () {
       await expect(deployContract(deployer, artifacts.UnderwritingLocker, [ZERO_ADDRESS, registry.address])).to.be.revertedWith("zero address governance");
     });
     it("reverts if zero address registry", async function () {
-      await expect(deployContract(deployer, artifacts.UnderwritingLocker, [governor.address, ZERO_ADDRESS])).to.be.revertedWith('ZeroAddressInput("registry")');
+      await expect(deployContract(deployer, artifacts.UnderwritingLocker, [governor.address, ZERO_ADDRESS], {gasLimit:10000000})).to.be.revertedWith('ZeroAddressInput("registry")');
     });
     it("reverts if zero address uwe in Registry", async function () {
       await expect(deployContract(deployer, artifacts.UnderwritingLocker, [governor.address, registry.address])).to.be.revertedWith('ZeroAddressInput("uwe")');
@@ -169,7 +169,7 @@ describe("UnderwritingLocker", function () {
       await expect(underwritingLocker.connect(user1).setVotingContract()).to.be.revertedWith("!governance");
     });
     it("non governor cannot set voting contract if not set in Registry", async function () {
-      await expect(underwritingLocker.connect(governor).setVotingContract()).to.be.revertedWith('ZeroAddressInput("underwritingLockVoting")');
+      await expect(underwritingLocker.connect(governor).setVotingContract({gasLimit:1000000})).to.be.revertedWith('ZeroAddressInput("underwritingLockVoting")');
     });
     it("governor can set voting contract", async function () {
       const RANDOM_ADDRESS = ethers.Wallet.createRandom().connect(provider).address;
@@ -218,10 +218,10 @@ describe("UnderwritingLocker", function () {
       await expect(underwritingLocker.connect(user1).setRegistry(registry2.address)).to.be.revertedWith("!governance");
     })
     it("reverts if zero address registry", async function () {
-      await expect(underwritingLocker.connect(governor).setRegistry(ZERO_ADDRESS)).to.be.revertedWith('ZeroAddressInput("registry")');
+      await expect(underwritingLocker.connect(governor).setRegistry(ZERO_ADDRESS, {gasLimit:1000000})).to.be.revertedWith('ZeroAddressInput("registry")');
     });
     it("reverts if zero address uwe in Registry", async function () {
-      await expect(underwritingLocker.connect(governor).setRegistry(registry2.address)).to.be.revertedWith('ZeroAddressInput("uwe")');
+      await expect(underwritingLocker.connect(governor).setRegistry(registry2.address, {gasLimit:1000000})).to.be.revertedWith('ZeroAddressInput("uwe")');
       await registry2.connect(governor).set(["uwe"], [RANDOM_ADDRESS]);
     });
     it("sets registry", async function () {
