@@ -88,6 +88,9 @@ contract GaugeController is
     /// @notice State of last [`updateGaugeWeights()`](#updategaugeweights) call.
     GaugeStructs.UpdateInfo internal _updateInfo;
 
+    /// @notice Epoch length, default is 1 week.
+    uint256 internal _epochLength;
+
     /***************************************
     CONSTRUCTOR
     ***************************************/
@@ -107,6 +110,7 @@ contract GaugeController is
         GaugeStructs.Gauge memory newGauge = GaugeStructs.Gauge(false, 0, ""); 
         _gauges.push(GaugeStructs.Gauge(false, 0, "")); 
         _clearUpdateInfo();
+        _epochLength = WEEK;
     }
 
     /***************************************
@@ -118,7 +122,7 @@ contract GaugeController is
      * @return timestamp
      */
     function _getEpochStartTimestamp() internal view returns (uint256 timestamp) {
-        return ( (block.timestamp / WEEK) * WEEK );
+        return ( (block.timestamp / _epochLength) * _epochLength );
     }
 
     /**
@@ -126,7 +130,7 @@ contract GaugeController is
      * @return timestamp
      */
     function _getEpochEndTimestamp() internal view returns (uint256 timestamp) {
-        return ( (block.timestamp / WEEK) * WEEK ) + WEEK;
+        return ( (block.timestamp / _epochLength) * _epochLength ) + _epochLength;
     }
 
     /**
@@ -351,6 +355,14 @@ contract GaugeController is
         } 
     }
 
+    /**
+     * @notice Get current epoch length in seconds.
+     * @return epochLength
+     */
+    function getEpochLength() external view override returns (uint256 epochLength) {
+        return _epochLength;
+    }
+
     /***************************************
     INTERNAL MUTATOR FUNCTIONS
     ***************************************/
@@ -507,6 +519,16 @@ contract GaugeController is
     function setUpdater(address updater_) external override onlyGovernance {
         updater = updater_;
         emit UpdaterSet(updater_);
+    }
+
+    /**
+     * @notice Set epoch length (as an integer multiple of 1 week).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param weeks_ Integer multiple of 1 week, to set epochLength to.
+     */
+    function setEpochLengthInWeeks(uint256 weeks_) external override onlyGovernance {
+        _epochLength = weeks_ * WEEK;
+        emit EpochLengthSet(weeks_);
     }
 
     /**

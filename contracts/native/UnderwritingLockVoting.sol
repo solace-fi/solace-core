@@ -77,7 +77,6 @@ contract UnderwritingLockVoting is
     GLOBAL INTERNAL VARIABLES
     ***************************************/
 
-    uint256 constant internal WEEK = 604800;
     uint256 constant internal YEAR = 31536000;
 
     /// @notice Total premium due to the revenueRouter.
@@ -134,7 +133,7 @@ contract UnderwritingLockVoting is
      * @return timestamp
      */
     function _getEpochStartTimestamp() internal view returns (uint256 timestamp) {
-        return ( (block.timestamp / WEEK) * WEEK );
+        return IGaugeController(gaugeController).getEpochStartTimestamp();
     }
 
     /**
@@ -142,7 +141,7 @@ contract UnderwritingLockVoting is
      * @return timestamp
      */
     function _getEpochEndTimestamp() internal view returns (uint256 timestamp) {
-        return ( (block.timestamp / WEEK) * WEEK ) + WEEK;
+        return IGaugeController(gaugeController).getEpochEndTimestamp();
     }
 
     /**
@@ -475,6 +474,7 @@ contract UnderwritingLockVoting is
         // Single call for universal multipliers in premium computation.
         uint256 insuranceCapacity = IGaugeController(gaugeController).getInsuranceCapacity();
         uint256 votePowerSum = IGaugeController(gaugeController).getVotePowerSum();
+        uint256 epochLength = IGaugeController(gaugeController).getEpochLength();
 
         // Iterate through voters
         address[] memory voters = IGaugeController(gaugeController).getVoters(address(this));
@@ -483,9 +483,9 @@ contract UnderwritingLockVoting is
             // Short-circuit operator - need at least 30K gas for getVoteCount() call
             if (gasleft() < 40000 || gasleft() < 10000 * IGaugeController(gaugeController).getVoteCount(address(this), voters[i])) {
                 return _saveUpdateState(0, i, 0);
-            }        
+            }
             // Unbounded loop since # of votes (gauges) unbounded
-            uint256 premium = _calculateVotePremium(voters[i], insuranceCapacity, votePowerSum); // 87K gas for 10 votes
+            uint256 premium = _calculateVotePremium(voters[i], insuranceCapacity, votePowerSum, epochLength); // 87K gas for 10 votes
             uint256[] memory lockIDs = IUnderwritingLocker(underwritingLocker).getAllLockIDsOf(voters[i]);
             uint256 numLocks = lockIDs.length;
 
@@ -551,13 +551,13 @@ contract UnderwritingLockVoting is
      * @param votePowerSum_ Solace Native vote power sum.
      * @return premium Premium for voter.
      */
-    function _calculateVotePremium(address voter_, uint256 insuranceCapacity_, uint256 votePowerSum_) internal view returns (uint256 premium) {
+    function _calculateVotePremium(address voter_, uint256 insuranceCapacity_, uint256 votePowerSum_, uint256 epochLength_) internal view returns (uint256 premium) {
         GaugeStructs.Vote[] memory votes = IGaugeController(gaugeController).getVotes(address(this), voter_);
         uint256 voteCount = votes.length;
 
         if (voteCount > 0) {
             uint256 accummulator;
-            uint256 globalNumerator = _lastProcessedVotePowerOf[voter_] * insuranceCapacity_ * WEEK;
+            uint256 globalNumerator = _lastProcessedVotePowerOf[voter_] * insuranceCapacity_ * epochLength_;
             // rateOnLine scaled to correct fraction for week => multiply by (WEEK / YEAR) * (1 / 1e18)
             // votePowerBPS scaled to correct fraction => multiply by (1 / 10000)
             uint256 globalDenominator = votePowerSum_ * YEAR * 1e18 * 10000;

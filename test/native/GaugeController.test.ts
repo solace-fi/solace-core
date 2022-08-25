@@ -210,6 +210,19 @@ describe("GaugeController", function () {
       });
     });
 
+    describe("setEpochLengthInWeeks", () => {
+      it("non governor cannot setEpochLengthInWeeks", async  () => {
+        await expect(gaugeController.connect(voter1).setEpochLengthInWeeks(1)).to.be.revertedWith("!governance");
+      });
+      it("can setEpochLengthInWeeks", async () => {
+        let tx = await gaugeController.connect(governor).setEpochLengthInWeeks(2);
+        await expect(tx).to.emit(gaugeController, "EpochLengthSet").withArgs(2);
+        expect(await gaugeController.getEpochLength()).eq(2 * ONE_WEEK);
+        await gaugeController.connect(governor).setEpochLengthInWeeks(1);
+        expect(await gaugeController.getEpochLength()).eq(ONE_WEEK);
+      });
+    });
+
     describe("addGauge", () => {
       it("non governor cannot add new gauge", async  () => {
         await expect(gaugeController.connect(voter1).addGauge("1", ONE_PERCENT)).to.be.revertedWith("!governance");
