@@ -248,7 +248,7 @@ abstract contract ERC721Enhanced is ERC721Enumerable, IERC721Enhanced, EIP712 {
         address to,
         uint256 tokenID
     // solhint-disable-next-line no-empty-blocks
-    ) internal override virtual {}
+    ) internal virtual {}
 
     /***************************************
     MISC
