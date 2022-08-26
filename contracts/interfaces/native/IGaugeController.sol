@@ -11,9 +11,9 @@ import "./GaugeStructs.sol";
  * Current gauge weights can be obtained through [`getGaugeWeight()`](#getgaugeweight) and [`getAllGaugeWeights()`](#getallgaugeweights)
  *
  * Only governance can make mutator calls to GaugeController.sol. There are no unpermissioned external mutator calls in this contract.
- * 
+ *
  * After every epoch, governance must call [`updateGaugeWeights()`](#updategaugeweights). This will process the last epoch's votes (stored in this contract).
- * 
+ *
  * Individual voters register and manage their vote through voting contracts that conform to IGaugeVoting.
  *
  * Governance can [`addGauge()`](#addgauge) or [`pauseGauge()`](#pausegauge).
@@ -27,7 +27,7 @@ interface IGaugeController {
     /// @notice Thrown when zero address is given as an argument.
     /// @param contractName Name of contract for which zero address was incorrectly provided.
     error ZeroAddressInput(string contractName);
-    
+
     /// @notice Thrown when array arguments are mismatched in length;
     error ArrayArgumentsLengthMismatch();
 
@@ -99,6 +99,9 @@ interface IGaugeController {
 
     /// @notice Emitted when address of underwriting equity token is set.
     event TokenSet(address indexed token);
+
+    /// @notice Emitted when the epoch length is set.
+    event EpochLengthSet(uint256 indexed weeks_);
 
     /// @notice Emitted when the Updater is set.
     event UpdaterSet(address indexed updater);
@@ -177,7 +180,7 @@ interface IGaugeController {
      * @return numPausedGauges
      */
     function getNumPausedGauges() external view returns (uint256 numPausedGauges);
-    
+
     /**
      * @notice Get gauge name.
      * @param gaugeID_ The ID of the gauge to query.
@@ -241,7 +244,13 @@ interface IGaugeController {
      * @return votersCount Number of votes.
      */
     function getVotersCount(address votingContract_) external view returns (uint256 votersCount);
-    
+
+    /**
+     * @notice Get current epoch length in seconds.
+     * @return epochLength
+     */
+    function getEpochLength() external view returns (uint256 epochLength);
+
     /***************************************
     VOTING CONTRACT FUNCTIONS
     ***************************************/
@@ -321,6 +330,13 @@ interface IGaugeController {
      */
     function setUpdater(address updater_) external;
 
+    /**
+     * @notice Set epoch length (as an integer multiple of 1 week).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param weeks_ Integer multiple of 1 week, to set epochLength to.
+     */
+    function setEpochLengthInWeeks(uint256 weeks_) external;
+
    /**
      * @notice Adds address to tokenholders set - these addresses will be queried for $UWE token balance and summed to determine the Solace Native insurance capacity.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
@@ -334,7 +350,7 @@ interface IGaugeController {
      * @param tokenholder_ Address of new tokenholder.
      */
     function removeTokenholder(address tokenholder_) external;
-    
+
     /**
      * @notice Set annual rate-on-line for selected gaugeIDs
      * @dev 1e18 => 100%

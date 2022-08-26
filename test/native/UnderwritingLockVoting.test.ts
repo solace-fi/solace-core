@@ -587,13 +587,14 @@ describe("UnderwritingLockVoting", function () {
      * voter2 => will vote 40% for gauge2, 30% for gauge3, leave 30% unallocated
      */
 
-    describe("basic voteMultiple() scenario", () => {
+    describe("basic voteMultiple() scenario, with epoch length set to 2 weeks", () => {
       let LAST_RECORDED_VOTE_POWER_1: BN;
       let LAST_RECORDED_VOTE_POWER_2: BN;
 
       // Create new gauges and lock
       before(async function () {
         const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
+        await gaugeController.connect(governor).setEpochLengthInWeeks(2)
         await underwritingLocker.connect(voter1).createLock(voter1.address, DEPOSIT_AMOUNT, CURRENT_TIME + 4 * ONE_YEAR)
         await gaugeController.connect(governor).addGauge("gauge2", ONE_PERCENT.mul(2))
         await gaugeController.connect(governor).addGauge("gauge3", ONE_PERCENT.mul(5))
@@ -636,6 +637,8 @@ describe("UnderwritingLockVoting", function () {
         await expect(gaugeController.connect(governor).updateGaugeWeights()).to.be.revertedWith("GaugeWeightsAlreadyUpdated");
       });
       it("cannot call chargePremiums() before epoch passes", async function () {
+        const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
+        await provider.send("evm_mine", [CURRENT_TIME + ONE_WEEK]);
         await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("LastEpochPremiumsAlreadyProcessed");
       });
       it("can updateGaugeWeights() in the next epoch", async function () {
@@ -715,6 +718,9 @@ describe("UnderwritingLockVoting", function () {
         await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("LastEpochPremiumsAlreadyProcessed")
         expect(await gaugeController.lastTimeGaugeWeightsUpdated()).eq(EPOCH_START_TIME)
         expect(await voting.lastTimePremiumsCharged()).eq(EPOCH_START_TIME)
+      });
+      after(async function () {
+        await gaugeController.connect(governor).setEpochLengthInWeeks(1)
       });
     });
 
@@ -1518,7 +1524,7 @@ describe("UnderwritingLockVoting", function () {
       // SCALE ROL => WEEK / (YEAR * 1e18)
       // SCALE BPS => (1 / 10000)
       // SCALE LEVERAGE FACTOR => (1 / 10000)
-      const SCALING_NUMERATOR = ONE_WEEK
+      const SCALING_NUMERATOR = await gaugeController.getEpochLength();
       const SCALING_DENOMINATOR = SCALE_FACTOR.mul(ONE_YEAR).mul(10000).mul(ONE_ETHER)
 
       // TOTAL_PREMIUM = GLOBAL_MULTIPLIER * SUM(ROL_GAUGE * ROL_WEIGHT)
@@ -1545,7 +1551,7 @@ describe("UnderwritingLockVoting", function () {
       // SCALE ROL => WEEK / (YEAR * 1e18)
       // SCALE BPS => (1 / 10000)
       // SCALE LEVERAGE FACTOR => (1 / 10000)
-      const SCALING_NUMERATOR = ONE_WEEK
+      const SCALING_NUMERATOR = await gaugeController.getEpochLength();
       const SCALING_DENOMINATOR = SCALE_FACTOR.mul(ONE_YEAR).mul(10000).mul(ONE_ETHER)
 
       // TOTAL_PREMIUM = GLOBAL_MULTIPLIER * SUM(ROL_GAUGE * ROL_WEIGHT)

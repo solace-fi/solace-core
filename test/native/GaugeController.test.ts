@@ -32,7 +32,7 @@ const CUSTOM_GAS_LIMIT = 6000000;
 
 describe("GaugeController", function () {
     const [deployer, governor, revenueRouter, voter1, updater, anon] = provider.getWallets();
-  
+
     /***************************
        VARIABLE DECLARATIONS
     ***************************/
@@ -48,14 +48,14 @@ describe("GaugeController", function () {
         artifacts = await import_artifacts();
         snapshot = await provider.send("evm_snapshot", []);
         await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
-        
+
         // Deploy $UWE, and mint 1M $UWE to deployer
         token = (await deployContract(deployer, artifacts.MockERC20Permit, ["Underwriting Equity - Solace Native", "UWE", ONE_MILLION_ETHER, 18])) as MockErc20Permit;
-  
+
         // Deploy registry
         registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
     });
-    
+
     after(async function () {
       await provider.send("evm_revert", [snapshot]);
     });
@@ -210,6 +210,19 @@ describe("GaugeController", function () {
       });
     });
 
+    describe("setEpochLengthInWeeks", () => {
+      it("non governor cannot setEpochLengthInWeeks", async  () => {
+        await expect(gaugeController.connect(voter1).setEpochLengthInWeeks(1)).to.be.revertedWith("!governance");
+      });
+      it("can setEpochLengthInWeeks", async () => {
+        let tx = await gaugeController.connect(governor).setEpochLengthInWeeks(2);
+        await expect(tx).to.emit(gaugeController, "EpochLengthSet").withArgs(2);
+        expect(await gaugeController.getEpochLength()).eq(2 * ONE_WEEK);
+        await gaugeController.connect(governor).setEpochLengthInWeeks(1);
+        expect(await gaugeController.getEpochLength()).eq(ONE_WEEK);
+      });
+    });
+
     describe("addGauge", () => {
       it("non governor cannot add new gauge", async  () => {
         await expect(gaugeController.connect(voter1).addGauge("1", ONE_PERCENT)).to.be.revertedWith("!governance");
@@ -299,7 +312,7 @@ describe("GaugeController", function () {
     });
 
     /*********************
-      INTENTION STATEMENT 
+      INTENTION STATEMENT
     *********************/
     // voter1 will vote for gaugeID 1 with 100% of vote power
 
