@@ -36,6 +36,9 @@ interface IBribeController {
     /// @notice Thrown when voteForBribe() attempted by a non-owner or non-delegate.
     error NotOwnerNorDelegate();
 
+    /// @notice Thrown when attempting to remove vote that does not exist.
+    error CannotRemoveNonExistentVote();
+
     /// @notice Thrown when voteForBribe() attempted for gauge without bribe.
     error NoBribesForSelectedGauge();
 
@@ -54,6 +57,15 @@ interface IBribeController {
 
     /// @notice Emitted when bribe is provided.
     event BribeProvided(address indexed briber, uint256 indexed gaugeID, address indexed bribeToken, uint256 bribeAmount);
+
+    /// @notice Emitted when a vote is added.
+    event VoteForBribeAdded(address indexed voter, uint256 indexed gaugeID, uint256 votePowerBPS);
+
+    /// @notice Emitted when a vote is added.
+    event VoteForBribeChanged(address indexed voter, uint256 indexed gaugeID, uint256 newVotePowerBPS, uint256 oldVotePowerBPS);
+
+    /// @notice Emitted when a vote is removed.
+    event VoteForBribeRemoved(address indexed voter, uint256 indexed gaugeID);
 
     /// @notice Emitted when bribe is claimed.
     event BribeClaimed(address indexed briber, address indexed bribeToken, uint256 bribeAmount);
@@ -112,6 +124,13 @@ interface IBribeController {
     function getEpochEndTimestamp() external view returns (uint256 timestamp);
 
     /**
+     * @notice Get unused votePowerBPS for a voter.
+     * @param voter_ The address of the voter to query for.
+     * @return unusedVotePowerBPS
+     */
+    function getUnusedVotePowerBPS(address voter_) external view returns (uint256 unusedVotePowerBPS);
+
+    /**
      * @notice Get list of whitelisted bribe tokens.
      * @return whitelist
      */
@@ -125,18 +144,18 @@ interface IBribeController {
     function getClaimableBribes(address voter_) external view returns (Bribe[] memory bribes);
 
     /**
-     * @notice Get bribes which have been provided for the current epoch for a given gauge.
-     * @param gaugeID_ GaugeID to query for.
-     * @return bribes Array of provided bribes.
+     * @notice Get all gaugeIDs with bribe/s offered in the present epoch.
+     * @return gauges Array of gaugeIDs with current bribe.
      */
-    function getProvidedBribesForCurrentEpoch(uint256 gaugeID_) external view returns (Bribe[] memory bribes);
+    function getAllGaugesWithBribe() external view returns (uint256[] memory gauges);
 
     /**
-     * @notice Get bribes which have been provided for the next epoch for a given gauge.
+     * @notice Get all bribes which have been offered for a given gauge.
      * @param gaugeID_ GaugeID to query for.
      * @return bribes Array of provided bribes.
      */
-    function getProvidedBribesForNextEpoch(uint256 gaugeID_) external view returns (Bribe[] memory bribes);
+    function getProvidedBribesForGauge(uint256 gaugeID_) external view returns (Bribe[] memory bribes);
+
     /**
      * @notice Get lifetime provided bribes for a given briber.
      * @param briber_ Briber to query for.
@@ -168,8 +187,50 @@ interface IBribeController {
      * @notice Vote for gaugeID with bribe.
      * @param voter_ address of voter.
      * @param gaugeID_ gaugeID to vote for
+     * @param votePowerBPS_ Vote power BPS to assign to this vote.
      */
-    function voteForBribe(address voter_, uint256 gaugeID_) external;
+    function voteForBribe(address voter_, uint256 gaugeID_, uint256 votePowerBPS_) external;
+
+    /**
+     * @notice Vote for multiple gaugeIDs with bribes.
+     * @param voter_ address of voter.
+     * @param gaugeIDs_ Array of gaugeIDs to vote for
+     * @param votePowerBPSs_ Array of corresponding vote power BPS values.
+     */
+    function voteForMultipleBribes(address voter_, uint256[] calldata gaugeIDs_, uint256[] calldata votePowerBPSs_) external;
+
+    /**
+     * @notice Register a single voting configuration for multiple voters.
+     * Can only be called by the voter or vote delegate.
+     * @param voters_ Array of voters.
+     * @param gaugeIDs_ Array of gauge IDs to vote for.
+     * @param votePowerBPSs_ Array of corresponding vote power BPS values.
+     */
+    function voteForBribeForMultipleVoters(address[] calldata voters_, uint256[] memory gaugeIDs_, uint256[] memory votePowerBPSs_) external;
+
+    /**
+     * @notice Remove vote for gaugeID with bribe.
+     * @param voter_ address of voter.
+     * @param gaugeID_ The ID of the gauge to remove vote for.
+     */
+    function removeVoteForBribe(address voter_, uint256 gaugeID_) external;
+
+    /**
+     * @notice Remove multiple votes for bribes.
+     * @param voter_ address of voter.
+     * @param gaugeIDs_ Array of gaugeIDs to remove votes for
+     */
+    function removeVoteForMultipleBribes(address voter_, uint256[] calldata gaugeIDs_) external;
+
+    /**
+     * @notice Remove gauge votes for multiple voters.
+     * @notice Votes cannot be removed while voting is frozen.
+     * Can only be called by the voter or vote delegate.
+     * @param voters_ Array of voter addresses.
+     * @param gaugeIDs_ Array of gauge IDs to remove votes for.
+     */
+    function removeVotesForBribeForMultipleVoters(address[] calldata voters_, uint256[] memory gaugeIDs_) external;
+
     /**
      * @notice Claim bribes.
      */

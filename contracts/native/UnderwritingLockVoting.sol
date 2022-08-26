@@ -331,7 +331,7 @@ contract UnderwritingLockVoting is
      * Can only be called by the voter or vote delegate.
      * @param voter_ The voter address.
      * @param gaugeID_ The ID of the gauge to vote for.
-     * @param votePowerBPS_ Vote power BPS to assign to this vote
+     * @param votePowerBPS_ Vote power BPS to assign to this vote.
      */
     function vote(address voter_, uint256 gaugeID_, uint256 votePowerBPS_) external override {
         if ( IUnderwritingLocker(underwritingLocker).balanceOf(voter_) == 0 ) revert VoterHasNoLocks();
