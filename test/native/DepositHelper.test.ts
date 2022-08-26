@@ -101,17 +101,14 @@ describe("DepositHelper", function () {
   });
 
   describe("deployment", function () {
-    it("reverts if zero uwp", async function () {
-      await expect(deployContract(deployer, artifacts.DepositHelper, [ZERO_ADDRESS, uwe.address, underwritingLocker.address])).to.be.revertedWith("zero address uwp");
-    });
     it("reverts if zero uwe", async function () {
-      await expect(deployContract(deployer, artifacts.DepositHelper, [uwp.address, ZERO_ADDRESS, underwritingLocker.address])).to.be.revertedWith("zero address uwe");
+      await expect(deployContract(deployer, artifacts.DepositHelper, [ZERO_ADDRESS, underwritingLocker.address])).to.be.revertedWith("zero address uwe");
     });
     it("reverts if zero locker", async function () {
-      await expect(deployContract(deployer, artifacts.DepositHelper, [uwp.address, uwe.address, ZERO_ADDRESS])).to.be.revertedWith("zero address locker");
+      await expect(deployContract(deployer, artifacts.DepositHelper, [uwe.address, ZERO_ADDRESS])).to.be.revertedWith("zero address locker");
     });
     it("deploys", async function () {
-      depositHelper = (await deployContract(deployer, artifacts.DepositHelper, [uwp.address, uwe.address, underwritingLocker.address])) as DepositHelper;
+      depositHelper = (await deployContract(deployer, artifacts.DepositHelper, [uwe.address, underwritingLocker.address])) as DepositHelper;
       await expectDeployed(depositHelper.address);
     });
     it("initializes correctly", async function () {
@@ -305,6 +302,49 @@ describe("DepositHelper", function () {
       expect(await underwritingLocker.ownerOf(6)).eq(user1.address);
       let lock = await underwritingLocker.locks(6);
       expect(lock.amount).eq(ONE_ETHER.mul(1000).div(3).mul(4).div(5));
+    });
+  });
+
+  describe("edge case - uwp is upgraded", function () {
+    let uwp2: UnderwritingPool;
+    let end: BN;
+
+    before(async function () {
+      let timestamp = await blockGetter.getBlockTimestamp();
+      end = timestamp.add(ONE_YEAR);
+      // deploy uwp
+      uwp2 = (await deployContract(deployer, artifacts.UnderwritingPool, [governor.address])) as UnderwritingPool;
+      await uwp2.connect(governor).addTokensToPool([
+        { token: dai.address, oracle: oracle.address, min: 0, max: ethers.constants.MaxUint256 },
+        { token: weth.address, oracle: oracle.address, min: 0, max: ethers.constants.MaxUint256 },
+      ]);
+      // mint uwp2 to uwe
+      let ts = await uwe.totalSupply();
+      await dai.connect(deployer).approve(uwp2.address, ethers.constants.MaxUint256);
+      await uwp2.connect(deployer).issue([dai.address], [ts], uwe.address);
+      expect(await uwp2.balanceOf(uwe.address)).eq(ts);
+      // set
+      await uwe.connect(governor).setUwp(uwp2.address);
+      expect(await depositHelper.underwritingPool()).eq(uwp2.address);
+    });
+    it("can deposit", async function () {
+      // dai to new lock at 1:1
+      let amt = await depositHelper.calculateDeposit(dai.address, ONE_ETHER.mul(1000));
+      expect(amt).eq(ONE_ETHER.mul(1000));
+
+      let tx = await depositHelper.connect(user1).depositAndLock(dai.address, ONE_ETHER.mul(1000), end);
+      await expect(tx).to.emit(dai, "Transfer").withArgs(user1.address, depositHelper.address, ONE_ETHER.mul(1000));
+      await expect(tx).to.emit(dai, "Transfer").withArgs(depositHelper.address, uwp2.address, ONE_ETHER.mul(1000));
+      await expect(tx).to.emit(uwp2, "Transfer").withArgs(ZERO_ADDRESS, depositHelper.address, ONE_ETHER.mul(1000));
+      await expect(tx).to.emit(uwp2, "Transfer").withArgs(depositHelper.address, uwe.address, ONE_ETHER.mul(1000));
+      await expect(tx).to.emit(uwe, "Transfer").withArgs(ZERO_ADDRESS, depositHelper.address, ONE_ETHER.mul(1000));
+      await expect(tx).to.emit(uwe, "Transfer").withArgs(depositHelper.address, underwritingLocker.address, ONE_ETHER.mul(1000));
+      await expect(tx).to.emit(underwritingLocker, "Transfer").withArgs(ZERO_ADDRESS, user1.address, 7);
+      expect(await underwritingLocker.balanceOf(user1.address)).eq(7);
+      expect(await underwritingLocker.ownerOf(7)).eq(user1.address);
+      let lock = await underwritingLocker.locks(7);
+      expect(lock.amount).eq(ONE_ETHER.mul(1000));
+      expect(lock.end).eq(end);
     });
   });
 });
