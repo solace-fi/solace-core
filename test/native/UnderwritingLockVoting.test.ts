@@ -28,7 +28,7 @@ const ONE_HUNDRED_PERCENT = ONE_ETHER;
 const CUSTOM_GAS_LIMIT = 6000000;
 
 describe("UnderwritingLockVoting", function () {
-    const [deployer, governor, revenueRouter, voter1, voter2, delegate1, updater, anon] = provider.getWallets();
+    const [deployer, governor, revenueRouter, voter1, voter2, delegate1, updater, bribeController, anon] = provider.getWallets();
   
     /***************************
        VARIABLE DECLARATIONS
@@ -90,6 +90,7 @@ describe("UnderwritingLockVoting", function () {
           expect(await voting.gaugeController()).eq(gaugeController.address);
           expect(await voting.registry()).eq(registry.address);
           expect(await voting.updater()).eq(ZERO_ADDRESS);
+          expect(await voting.bribeController()).eq(ZERO_ADDRESS);
           expect(await voting.lastTimePremiumsCharged()).eq(0);
           expect(await voting.isVotingOpen()).eq(false);
           expect(await gaugeController.getVoteCount(voting.address, voter1.address)).eq(0)
@@ -225,9 +226,24 @@ describe("UnderwritingLockVoting", function () {
         await expect(voting.connect(voter1).setUpdater(updater.address)).to.be.revertedWith("!governance");
       });
       it("can set updater", async () => {
-        let tx = await voting.connect(governor).setUpdater(updater.address);
+        const tx = await voting.connect(governor).setUpdater(updater.address);
         await expect(tx).to.emit(voting, "UpdaterSet").withArgs(updater.address);
         expect(await voting.updater()).eq(updater.address)
+      });
+    });
+
+    describe("setBribeController", () => {
+      it("non governor cannot setBribeController", async  () => {
+        await expect(voting.connect(voter1).setBribeController()).to.be.revertedWith("!governance");
+      });
+      it("will revert if bribeController not set in Registry", async  () => {
+        await expect(voting.connect(governor).setBribeController()).to.be.revertedWith('ZeroAddressInput("bribeController")');
+      });
+      it("can setBribeController", async () => {
+        await registry.connect(governor).set(["bribeController"], [bribeController.address])
+        const tx = await voting.connect(governor).setBribeController();
+        await expect(tx).to.emit(voting, "BribeControllerSet").withArgs(bribeController.address);
+        expect(await voting.bribeController()).eq(bribeController.address)
       });
     });
 
@@ -479,6 +495,11 @@ describe("UnderwritingLockVoting", function () {
         const GAUGE_ID = 1;
         expect(await voting.delegateOf(voter1.address)).eq(delegate1.address)
         const tx = await voting.connect(delegate1).vote(voter1.address, GAUGE_ID, 10000)
+        await expect(tx).to.emit(voting, "VoteChanged").withArgs(voter1.address, GAUGE_ID, 10000, 10000);
+      });
+      it("bribeController can change vote", async function () {
+        const GAUGE_ID = 1;
+        const tx = await voting.connect(bribeController).vote(voter1.address, GAUGE_ID, 10000)
         await expect(tx).to.emit(voting, "VoteChanged").withArgs(voter1.address, GAUGE_ID, 10000, 10000);
       });
       it("sanity check of getVotes and gauge weights", async function () {
