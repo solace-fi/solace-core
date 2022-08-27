@@ -13,6 +13,11 @@ interface IBribeController {
         uint256 bribeAmount;
     }
 
+    struct VoteForGauge {
+        address voter;
+        uint256 votePowerBPS;
+    }
+
     /***************************************
     CUSTOM ERRORS
     ***************************************/
@@ -42,14 +47,17 @@ interface IBribeController {
     /// @notice Thrown when voteForBribe() attempted for gauge without bribe.
     error NoBribesForSelectedGauge();
 
+    /// @notice Thrown when offerBribe() or voteForBribe() attempted before last epoch bribes are processed.
+    error LastEpochBribesNotProcessed();
+
     /// @notice Thrown when distributeBribes() is called by neither governance nor updater, or governance is locked.
     error NotUpdaterNorGovernance();
 
     /// @notice Thrown if distributeBribes() is called after bribes have already been successfully distributed in the current epoch.
     error BribesAlreadyDistributed();
 
-    /// @notice Thrown when distributeBribes is attempted before the last epoch's votes have been successfully processed through gaugeController.updateGaugeWeights().
-    error GaugeWeightsNotYetUpdated();
+    /// @notice Thrown when distributeBribes is attempted before the last epoch's premiums have been successfully charged through underwritingLockVoting.chargePremiums().
+    error LastEpochPremiumsNotCharged();
 
     /***************************************
     EVENTS
@@ -83,7 +91,7 @@ interface IBribeController {
     event BribeTokenRemoved(address indexed bribeToken);
 
     /// @notice Emitted when distributeBribes() does an incomplete update, and will need to be run again until completion.
-    event IncompleteBribeDistribution();
+    event IncompleteBribeProcessing();
 
     /// @notice Emitted when bribes distributed for an epoch.
     event BribesDistributed(uint256 indexed epochEndTimestamp);
@@ -101,11 +109,14 @@ interface IBribeController {
     /// @notice Address of UnderwritingLockVoting.sol
     function votingContract() external view returns (address);
 
+    /// @notice Address of revenue router.
+    function revenueRouter() external view returns (address);
+
     /// @notice Updater address.
     function updater() external view returns (address);
 
-    /// @notice End timestamp for last epoch that bribes were distributed for all stored votes.
-    function lastTimeBribesDistributed() external view returns (uint256);
+    /// @notice End timestamp for last epoch that bribes were processed for all stored votes.
+    function lastTimeBribesProcessed() external view returns (uint256);
 
     /***************************************
     EXTERNAL VIEW FUNCTIONS
@@ -162,6 +173,20 @@ interface IBribeController {
      * @return bribes Array of lifetime provided bribes.
      */
     function getLifetimeProvidedBribes(address briber_) external view returns (Bribe[] memory bribes);
+
+    /**
+     * @notice Get all current voteForBribes for a given voter.
+     * @param voter_ Voter to query for.
+     * @return votes Array of Votes {uint256 gaugeID, uint256 votePowerBPS}.
+     */
+    function getVotesForVoter(address voter_) external view returns (GaugeStructs.Vote[] memory votes);
+
+    /**
+     * @notice Get all current voteForBribes for a given gaugeID.
+     * @param gaugeID_ GaugeID to query for.
+     * @return votes Array of VoteForGauge {address voter, uint256 votePowerBPS}.
+     */
+    function getVotesForGauge(uint256 gaugeID_) external view returns (VoteForGauge[] memory votes);
 
     /***************************************
     BRIBER FUNCTIONS

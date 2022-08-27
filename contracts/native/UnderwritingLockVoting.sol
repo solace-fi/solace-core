@@ -111,6 +111,7 @@ contract UnderwritingLockVoting is
         // Initialize as non-zero storage slots.
         _totalPremiumDue = type(uint256).max;
         _clearUpdateInfo();
+        lastTimePremiumsCharged = _getEpochStartTimestamp();
     }
 
     /***************************************

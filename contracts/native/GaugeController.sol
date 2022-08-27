@@ -111,6 +111,7 @@ contract GaugeController is
         _gauges.push(GaugeStructs.Gauge(false, 0, "")); 
         _clearUpdateInfo();
         _epochLength = WEEK;
+        lastTimeGaugeWeightsUpdated = _getEpochStartTimestamp();
     }
 
     /***************************************
