@@ -8,13 +8,10 @@ library GaugeStructs {
     }
 
     /// @dev Struct pack into single 32-byte word
-    /// @param _votingContractsIndex Index for _votingContracts for last incomplete updateGaugeWeights() call.
-    /// @param _votersIndex Index for _voters[savedIndex_votingContracts] for last incomplete updateGaugeWeights() call.
-    /// @param _votesIndex Index for _votes[savedIndex_votingContracts][savedIndex_voters] for last incomplete updateGaugeWeights() call.
     struct UpdateInfo {
-        uint80 _votingContractsIndex; // [0:80]
-        uint88 _votersIndex; // [80:168]
-        uint88 _votesIndex; // [168:256]
+        uint80 index1; // [0:80]
+        uint88 index2; // [80:168]
+        uint88 index3; // [168:256]
     }
 
     struct Gauge { 

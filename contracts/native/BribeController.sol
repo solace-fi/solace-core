@@ -19,7 +19,6 @@ contract BribeController is
         Governable 
     {
     using EnumerableSet for EnumerableSet.AddressSet;
-    using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableMapS for EnumerableMapS.AddressToUintMap;
     using EnumerableMapS for EnumerableMapS.UintToUintMap;
 
@@ -587,7 +586,7 @@ contract BribeController is
         }
 
         // LOOP 2 - DO ACCOUNTING FOR _claimableBribes AND _providedBribes MAPPINGS
-        // _gaugeToTotalVotePower, _votes, _voters, _votes and _providedBribes enumerable collections should be empty at the end.
+        // _gaugeToTotalVotePower, _votes and _providedBribes enumerable collections should be empty at the end.
         {
         // Iterate by gauge
         while (_gaugeToTotalVotePower.length() > 0) {

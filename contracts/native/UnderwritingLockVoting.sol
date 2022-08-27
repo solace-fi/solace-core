@@ -494,7 +494,7 @@ contract UnderwritingLockVoting is
 
         // Iterate through voters
         address[] memory voters = IGaugeController(gaugeController).getVoters(address(this));
-        for(uint256 i = _updateInfo._votersIndex == type(uint88).max ? 0 : _updateInfo._votersIndex ; i < voters.length; i++) {
+        for(uint256 i = _updateInfo.index2 == type(uint88).max ? 0 : _updateInfo.index2 ; i < voters.length; i++) {
             // _saveUpdateState(0, i, 0);
             // Short-circuit operator - need at least 30K gas for getVoteCount() call
             if (gasleft() < 40000 || gasleft() < 10000 * IGaugeController(gaugeController).getVoteCount(address(this), voters[i])) {
@@ -508,7 +508,7 @@ contract UnderwritingLockVoting is
             // Iterate through locks
             // Using _votesIndex as _lockIndex
             // If either votesIndex slot is cleared, or we aren't on the same voter as when we last saved, start from index 0.
-            for(uint256 j = _updateInfo._votesIndex == type(uint88).max || i != _updateInfo._votersIndex ? 0 : _updateInfo._votesIndex; j < numLocks; j++) {
+            for(uint256 j = _updateInfo.index3 == type(uint88).max || i != _updateInfo.index2 ? 0 : _updateInfo.index3; j < numLocks; j++) {
                 if (gasleft() < 20000) {return _saveUpdateState(0, i, j);}
                 // Split premium amongst each lock equally.
                 IUnderwritingLocker(underwritingLocker).chargePremium(lockIDs[j], premium / numLocks);

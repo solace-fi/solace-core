@@ -575,19 +575,19 @@ contract GaugeController is
      */
     function updateGaugeWeights() external override {
         if (!_isUpdaterOrGovernance()) revert NotUpdaterNorGovernance();
-        if ( _updateInfo._votesIndex == type(uint88).max ) {_resetVotePowerOfGaugeMapping();} // If first call for epoch, reset _votePowerOfGauge
+        if ( _updateInfo.index3 == type(uint88).max ) {_resetVotePowerOfGaugeMapping();} // If first call for epoch, reset _votePowerOfGauge
         uint256 epochStartTime = _getEpochStartTimestamp();
         if (lastTimeGaugeWeightsUpdated >= epochStartTime) revert GaugeWeightsAlreadyUpdated();
         uint256 numVotingContracts = _votingContracts.length();
 
         // Iterate through voting contracts
         // Use ternary operator to initialise loop, to avoid setting stack-too deep error from too many local variables.
-        for(uint256 i = _updateInfo._votingContractsIndex == type(uint80).max ? 0 : _updateInfo._votingContractsIndex; i < numVotingContracts; i++) {
+        for(uint256 i = _updateInfo.index1 == type(uint80).max ? 0 : _updateInfo.index1; i < numVotingContracts; i++) {
             address votingContract = _votingContracts.at(i);
             uint256 numVoters = _voters[votingContract].length();
 
             // Iterate through voters
-            for(uint256 j = _updateInfo._votersIndex == type(uint88).max || i != _updateInfo._votingContractsIndex ? 0 : _updateInfo._votersIndex ; j < numVoters; j++) {
+            for(uint256 j = _updateInfo.index2 == type(uint88).max || i != _updateInfo.index1 ? 0 : _updateInfo.index2 ; j < numVoters; j++) {
                 if (gasleft() < 200000) {return _saveUpdateState(i, j, 0);}
                 address voter = _voters[votingContract].at(j);
                 uint256 numVotes = _votes[votingContract][voter].length();      
@@ -601,7 +601,7 @@ contract GaugeController is
                 IGaugeVoter(votingContract).cacheLastProcessedVotePower(voter, votePower);
 
                 // Iterate through votes
-                for(uint256 k = _updateInfo._votesIndex == type(uint88).max || j != _updateInfo._votersIndex || i != _updateInfo._votingContractsIndex ? 0 : _updateInfo._votesIndex; k < numVotes; k++) {    
+                for(uint256 k = _updateInfo.index3 == type(uint88).max || j != _updateInfo.index2 || i != _updateInfo.index1 ? 0 : _updateInfo.index3; k < numVotes; k++) {    
                     if (gasleft() < 15000) {return _saveUpdateState(i, j, k);}
                     (uint256 gaugeID, uint256 votingPowerBPS) = _votes[votingContract][voter].at(k);
                     // Address edge case where vote placed before gauge is paused, will be counted
