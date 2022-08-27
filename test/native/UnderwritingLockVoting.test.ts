@@ -91,8 +91,8 @@ describe("UnderwritingLockVoting", function () {
           expect(await voting.registry()).eq(registry.address);
           expect(await voting.updater()).eq(ZERO_ADDRESS);
           expect(await voting.bribeController()).eq(ZERO_ADDRESS);
-          expect(await voting.lastTimePremiumsCharged()).eq(0);
-          expect(await voting.isVotingOpen()).eq(false);
+          expect(await voting.lastTimePremiumsCharged()).eq(await voting.lastTimePremiumsCharged());
+          expect(await voting.isVotingOpen()).eq(true);
           expect(await gaugeController.getVoteCount(voting.address, voter1.address)).eq(0)
           expect(await gaugeController.getVotersCount(voting.address)).eq(0)
         });
@@ -117,7 +117,7 @@ describe("UnderwritingLockVoting", function () {
           expect(await voting.getVotes(voter1.address)).deep.eq([])
         });
         it("chargePremiums should revert", async function () {
-          await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("GaugeWeightsNotYetUpdated")
+          await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("LastEpochPremiumsAlreadyProcessed")
         });
     });
 
@@ -351,53 +351,6 @@ describe("UnderwritingLockVoting", function () {
 
     describe("basic vote() scenario", () => {
       let LAST_RECORDED_VOTE_POWER: BN; // To transport VOTE_POWER value from one unit test to another.
-
-      it("vote() and voteMultiple() should throw if gauge weights have not been processed", async function () {
-        await expect(voting.connect(voter1).vote(voter1.address, 1, 10000)).to.be.revertedWith("LastEpochPremiumsNotCharged");
-        await expect(voting.connect(voter1).voteMultiple(voter1.address, [1, 2], [10000, 10000])).to.be.revertedWith("LastEpochPremiumsNotCharged");
-      });
-      it("updateGaugeWeights() should revert if non governor or updater", async function () {
-        await expect(gaugeController.connect(voter1).updateGaugeWeights()).to.be.revertedWith("NotUpdaterNorGovernance");
-      });
-      it("chargePremiums() should revert if non governor or updater", async function () {
-        await expect(voting.connect(voter1).chargePremiums()).to.be.revertedWith("NotUpdaterNorGovernance");
-      });
-      it("chargePremiums() should revert if gauge weights have not been updated", async function () {
-        await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("GaugeWeightsNotYetUpdated");
-      });
-      it("updateGaugeWeights() should succeed", async function () {
-        const EPOCH_START_TIME = await voting.getEpochStartTimestamp();
-        const tx = await gaugeController.connect(governor).updateGaugeWeights({gasLimit: CUSTOM_GAS_LIMIT});
-        await expect(tx).to.emit(gaugeController, "GaugeWeightsUpdated").withArgs(EPOCH_START_TIME);
-        expect(await gaugeController.lastTimeGaugeWeightsUpdated()).eq(EPOCH_START_TIME)
-        expect(await gaugeController.getVotePowerSum()).eq(0)
-      });
-      it("updateGaugeWeights() should revert if attempted again in the same epoch", async function () {
-        await expect(gaugeController.connect(governor).updateGaugeWeights()).to.be.revertedWith("GaugeWeightsAlreadyUpdated");
-      });
-      it("isVotingOpen() should return false at this point", async function () {
-        expect(await voting.isVotingOpen()).eq(false);
-      });
-      it("vote() and voteMultiple() should throw if premiums have not been charged", async function () {
-        await expect(voting.connect(voter1).vote(voter1.address, 1, 10000)).to.be.revertedWith("LastEpochPremiumsNotCharged");
-        await expect(voting.connect(voter1).voteMultiple(voter1.address, [1, 2], [10000, 10000])).to.be.revertedWith("LastEpochPremiumsNotCharged");
-      });
-      it("chargePremiums() should revert before tokenholder added to gaugeController()", async function () {
-        await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("NoTokenholdersAdded");
-        await gaugeController.connect(governor).addTokenholder(underwritingLocker.address);
-      });
-      it("chargePremiums() should succeed", async function () {
-        const EPOCH_START_TIME = await voting.getEpochStartTimestamp();
-        const tx = await voting.connect(governor).chargePremiums();
-        await expect(tx).to.emit(voting, "AllPremiumsCharged").withArgs(EPOCH_START_TIME);
-        expect(await voting.lastTimePremiumsCharged()).eq(EPOCH_START_TIME)
-      });
-      it("isVotingOpen() should return true at this point", async function () {
-        expect(await voting.isVotingOpen()).eq(true);
-      });
-      it("chargePremiums() should revert if attempted again in the same epoch", async function () {
-        await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("LastEpochPremiumsAlreadyProcessed");
-      });
       it("non-owner or non-delegate cannot vote() or voteMultiple()", async function () {
         await expect(voting.connect(anon).vote(voter1.address, 1, 1)).to.be.revertedWith("NotOwnerNorDelegate()");
         await expect(voting.connect(anon).voteMultiple(voter1.address, [1, 2], [10000, 10000])).to.be.revertedWith("NotOwnerNorDelegate");
@@ -516,27 +469,47 @@ describe("UnderwritingLockVoting", function () {
         expect(await gaugeController.getVoteCount(voting.address, voter1.address)).eq(1)
         expect(await gaugeController.getVotersCount(voting.address)).eq(1)
       });
-      it("updateGaugeWeights() called by updater should succeed in the next epoch", async function () {
+      it("chargePremiums() should revert if gauge weights have not been updated", async function () {
         const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
         await provider.send("evm_mine", [CURRENT_TIME + ONE_WEEK]);
+        await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("GaugeWeightsNotYetUpdated");
+      });
+      it("updateGaugeWeights() should revert if non governor or updater", async function () {
+        await expect(gaugeController.connect(voter1).updateGaugeWeights()).to.be.revertedWith("NotUpdaterNorGovernance");
+      });
+      it("updateGaugeWeights() called by updater should succeed in the next epoch", async function () {
         const tx = await gaugeController.connect(updater).updateGaugeWeights({gasLimit: CUSTOM_GAS_LIMIT});
         const EPOCH_START_TIME = await voting.getEpochStartTimestamp();
         const VOTE_POWER = await voting.getVotePower(voter1.address);
         await expect(tx).to.emit(gaugeController, "GaugeWeightsUpdated").withArgs(EPOCH_START_TIME);
+        expect(await gaugeController.lastTimeGaugeWeightsUpdated()).eq(EPOCH_START_TIME)
         LAST_RECORDED_VOTE_POWER = VOTE_POWER;
+      });
+      it("updateGaugeWeights() should revert if attempted again in the same epoch", async function () {
+        await expect(gaugeController.connect(governor).updateGaugeWeights()).to.be.revertedWith("GaugeWeightsAlreadyUpdated");
+      });
+      it("isVotingOpen() should return false at this point", async function () {
+        expect(await voting.isVotingOpen()).eq(false);
       });
       it("sanity check of gauge weights", async function () {
         expect(await gaugeController.getGaugeWeight(1)).eq(ONE_HUNDRED_PERCENT)
         expect(await gaugeController.getAllGaugeWeights()).deep.eq([ZERO, ONE_HUNDRED_PERCENT]);
         expect(await gaugeController.getVotePowerSum()).eq(LAST_RECORDED_VOTE_POWER)
       });      
-      it("cannot vote or voteMultiple, between processVotes() and chargePremiums() for the same epoch", async function () {
+      it("cannot vote or voteMultiple, if premiums not charged for the last epoch", async function () {
         expect(await voting.isVotingOpen()).eq(false)
         await expect(voting.connect(voter1).vote(voter1.address, 1, 1)).to.be.revertedWith("LastEpochPremiumsNotCharged");
         await expect(voting.connect(delegate1).voteMultiple(voter1.address, [1, 2], [10000, 10000])).to.be.revertedWith("LastEpochPremiumsNotCharged");
-      });      
+      });
+      it("chargePremiums() should revert before tokenholder added to gaugeController()", async function () {
+        await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("NoTokenholdersAdded");
+        await gaugeController.connect(governor).addTokenholder(underwritingLocker.address);
+      });
       it("chargePremiums() should revert before underwritingLocker.sol call setVotingContract()", async function () {
         await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("NotVotingContract");
+      });
+      it("chargePremiums() should revert if non governor or updater", async function () {
+        await expect(voting.connect(voter1).chargePremiums()).to.be.revertedWith("NotUpdaterNorGovernance");
       });
       it("chargePremiums() call by updater should succeed in the next epoch, provided allowance granted by underwritingLocker", async function () {
         await registry.connect(governor).set(["underwritingLockVoting"],[voting.address]);
@@ -553,6 +526,7 @@ describe("UnderwritingLockVoting", function () {
         expect(await token.balanceOf(revenueRouter.address)).eq(EXPECTED_PREMIUM);
         expect(NEW_VOTER_LOCKED_AMOUNT.sub(OLD_VOTER_LOCKED_AMOUNT)).eq(EXPECTED_PREMIUM.mul(-1));
         expect(NEW_UNDERWRITING_LOCKER_BALANCE.sub(OLD_UNDERWRITING_LOCKER_BALANCE)).eq(EXPECTED_PREMIUM.mul(-1));
+        expect(await voting.lastTimePremiumsCharged()).eq(EPOCH_START_TIME)
         expect(await voting.isVotingOpen()).eq(true)
       });
     });
