@@ -35,6 +35,9 @@ interface IBribeController {
     /// @notice Thrown when provideBribe attempted for inactive gauge.
     error CannotBribeForInactiveGauge();
 
+    /// @notice Thrown when provideBribe attempted for non-existing gauge.
+    error CannotBribeForNonExistentGauge();
+
     /// @notice Thrown when provideBribe attempted unwhitelisted bribe token.
     error CannotBribeWithNonWhitelistedToken();
 
@@ -50,13 +53,13 @@ interface IBribeController {
     /// @notice Thrown when offerBribe() or voteForBribe() attempted before last epoch bribes are processed.
     error LastEpochBribesNotProcessed();
 
-    /// @notice Thrown when distributeBribes() is called by neither governance nor updater, or governance is locked.
+    /// @notice Thrown when processBribes() is called by neither governance nor updater, or governance is locked.
     error NotUpdaterNorGovernance();
 
-    /// @notice Thrown if distributeBribes() is called after bribes have already been successfully distributed in the current epoch.
-    error BribesAlreadyDistributed();
+    /// @notice Thrown if processBribes() is called after bribes have already been successfully processed in the current epoch.
+    error BribesAlreadyProcessed();
 
-    /// @notice Thrown when distributeBribes is attempted before the last epoch's premiums have been successfully charged through underwritingLockVoting.chargePremiums().
+    /// @notice Thrown when processBribes is attempted before the last epoch's premiums have been successfully charged through underwritingLockVoting.chargePremiums().
     error LastEpochPremiumsNotCharged();
 
     /***************************************
@@ -90,11 +93,11 @@ interface IBribeController {
     /// @notice Emitted when bribe token removed from whitelist.
     event BribeTokenRemoved(address indexed bribeToken);
 
-    /// @notice Emitted when distributeBribes() does an incomplete update, and will need to be run again until completion.
-    event IncompleteBribeProcessing();
+    /// @notice Emitted when processBribes() does an incomplete update, and will need to be run again until completion.
+    event IncompleteBribesProcessing();
 
     /// @notice Emitted when bribes distributed for an epoch.
-    event BribesDistributed(uint256 indexed epochEndTimestamp);
+    event BribesProcessed(uint256 indexed epochEndTimestamp);
 
     /***************************************
     GLOBAL VARIABLES
@@ -188,17 +191,23 @@ interface IBribeController {
      */
     function getVotesForGauge(uint256 gaugeID_) external view returns (VoteForGauge[] memory votes);
 
+    /**
+     * @notice Query whether bribing is currently open.
+     * @return True if bribing is open for this epoch, false otherwise.
+     */
+    function isBribingOpen() external view returns (bool);
+
     /***************************************
     BRIBER FUNCTIONS
     ***************************************/
 
     /**
-     * @notice Offer bribes.
+     * @notice Provide bribe/s.
      * @param bribeTokens_ Array of bribe token addresses.
      * @param bribeAmounts_ Array of bribe token amounts.
      * @param gaugeID_ Gauge ID to bribe for.
      */
-    function offerBribes(
+    function provideBribes(
         address[] calldata bribeTokens_, 
         uint256[] calldata bribeAmounts_,
         uint256 gaugeID_
@@ -293,6 +302,10 @@ interface IBribeController {
      * @param bribeToken_ Address of bribe token.
      */
     function removeBribeToken(address bribeToken_) external;
+
+    /***************************************
+    UPDATER FUNCTIONS
+    ***************************************/
 
     /**
      * @notice Processes bribes, and makes bribes claimable by eligible voters.

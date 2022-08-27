@@ -278,6 +278,17 @@ contract BribeController is
         }
     }
 
+    /**
+     * @notice Query whether bribing is currently open.
+     * @return True if bribing is open for this epoch, false otherwise.
+     */
+    function isBribingOpen() external view override returns (bool) {
+        uint256 epochStartTime = _getEpochStartTimestamp();
+        return (epochStartTime == IGaugeController(gaugeController).lastTimeGaugeWeightsUpdated() 
+        && epochStartTime == IUnderwritingLockVoting(votingContract).lastTimePremiumsCharged() 
+        && epochStartTime == lastTimeBribesProcessed);
+    }
+
     /***************************************
     INTERNAL MUTATOR FUNCTIONS
     ***************************************/
@@ -328,9 +339,9 @@ contract BribeController is
      */
     function _voteForBribe(address voter_, uint256[] memory gaugeIDs_, uint256[] memory votePowerBPSs_) internal nonReentrant {
         // CHECKS
-        if (voter_ != msg.sender && IUnderwritingLockVoting(votingContract).delegateOf(voter_) != msg.sender) revert NotOwnerNorDelegate();
         if (gaugeIDs_.length != votePowerBPSs_.length) revert ArrayArgumentsLengthMismatch();
         if ( _getEpochStartTimestamp() != lastTimeBribesProcessed) revert LastEpochBribesNotProcessed();
+        if (voter_ != msg.sender && IUnderwritingLockVoting(votingContract).delegateOf(voter_) != msg.sender) revert NotOwnerNorDelegate();
 
         for(uint256 i = 0; i < gaugeIDs_.length; i++) {
             uint256 gaugeID = gaugeIDs_[i];
@@ -347,9 +358,8 @@ contract BribeController is
                 if (_votes[gaugeID].length() == 0) _gaugeToTotalVotePower.remove(gaugeID);
                 emit VoteForBribeRemoved(voter_, gaugeID);
             } else {
-                _gaugeToTotalVotePower.set(gaugeID, 0);
                 _votes[gaugeID].set(voter_, votePowerBPS);
-
+                
                 // Change vote
                 if(votePresent) {
                     emit VoteForBribeChanged(voter_, gaugeID, votePowerBPS, oldVotePowerBPS);
@@ -366,20 +376,24 @@ contract BribeController is
     ***************************************/
 
     /**
-     * @notice Offer bribes.
+     * @notice Provide bribe/s.
      * @param bribeTokens_ Array of bribe token addresses.
      * @param bribeAmounts_ Array of bribe token amounts.
      * @param gaugeID_ Gauge ID to bribe for.
      */
-    function offerBribes(
+    function provideBribes(
         address[] calldata bribeTokens_, 
         uint256[] calldata bribeAmounts_,
         uint256 gaugeID_
     ) external override nonReentrant {
         // CHECKS
         if (bribeTokens_.length != bribeAmounts_.length) revert ArrayArgumentsLengthMismatch();
-        if (!IGaugeController(gaugeController).isGaugeActive(gaugeID_)) revert CannotBribeForInactiveGauge();
-        if ( _getEpochStartTimestamp() != lastTimeBribesProcessed) revert LastEpochBribesNotProcessed();
+        if (_getEpochStartTimestamp() != lastTimeBribesProcessed) revert LastEpochBribesNotProcessed();
+        try IGaugeController(gaugeController).isGaugeActive(gaugeID_) returns (bool gaugeActive) {
+            if (!gaugeActive) revert CannotBribeForInactiveGauge();
+        } catch {
+            revert CannotBribeForNonExistentGauge();
+        }
 
         uint256 length = _bribeTokenWhitelist.length();
         for (uint256 i = 0; i < length; i++) {
@@ -387,6 +401,9 @@ contract BribeController is
         }
 
         // INTERNAL STATE MUTATIONS
+        (bool gaugePresent,) = _gaugeToTotalVotePower.tryGet(gaugeID_);
+        if(!gaugePresent) _gaugeToTotalVotePower.set(gaugeID_, 1); // Do not set to 0 to avoid SSTORE penalty for 0 slot in processBribes().
+
         for (uint256 i = 0; i < length; i++) {
             (,uint256 previousBribeSum) = _providedBribes[gaugeID_].tryGet(bribeTokens_[i]);
             _providedBribes[gaugeID_].set(bribeTokens_[i], previousBribeSum + bribeAmounts_[i]);
@@ -546,12 +563,9 @@ contract BribeController is
         emit BribeTokenRemoved(bribeToken_);
     }
 
-    // To get bribe allocated to a vote, need all votes allocated to the gauge to calculate total votepower allocated to that gauge
-
-    // Need two iterations
-    // 1.) Iterate to find total votepower to each gaugeID
-    // 2.) Iterate to allocate bribes to each voter, also cleanup of _providedBribes, _voters and _votes enumerable collections
-    // Leftover bribes to revenueRouter
+    /***************************************
+    UPDATER FUNCTIONS
+    ***************************************/
 
     /**
      * @notice Processes bribes, and makes bribes claimable by eligible voters.
@@ -562,21 +576,23 @@ contract BribeController is
         // CHECKS
         if (!_isUpdaterOrGovernance()) revert NotUpdaterNorGovernance();
         uint256 currentEpochStartTime = _getEpochStartTimestamp();
+        if (lastTimeBribesProcessed >= currentEpochStartTime) revert BribesAlreadyProcessed();
         // Require gauge weights to have been updated for this epoch => ensure state we are querying from is < 1 WEEK old.
         if(IUnderwritingLockVoting(votingContract).lastTimePremiumsCharged() != currentEpochStartTime) revert LastEpochPremiumsNotCharged();
-        if (lastTimeBribesProcessed >= currentEpochStartTime) revert BribesAlreadyDistributed();
 
-        // LOOP 1 - GET TOTAL VOTE POWER FOR EACH GAUGE 
+        // LOOP 1 - GET TOTAL VOTE POWER CHASING BRIBES FOR EACH GAUGE 
         // Block-scope to avoid stack too deep error
         {
         uint256 numGauges = _gaugeToTotalVotePower.length();        
         // Iterate by gauge
-        for (uint256 i = 0; i < numGauges; i++) {
+        for (uint256 i = _updateInfo.index1 == type(uint80).max ? 0 : _updateInfo.index1; i < numGauges; i++) {
             // Iterate by vote
             (uint256 gaugeID, uint256 runningVotePowerSum) = _gaugeToTotalVotePower.at(i);
             uint256 numVotes = _votes[gaugeID].length();
 
-            for (uint256 j = 0; j < numVotes; j++) {
+            for (uint256 j = _updateInfo.index2 == type(uint88).max || i != _updateInfo.index1 ? 0 : _updateInfo.index2; j < numVotes; j++) {
+                // Checkpoint 1
+                if (gasleft() < 20000) {return _saveUpdateState(i, j, type(uint88).max);}
                 (address voter, uint256 votePowerBPS) = _votes[gaugeID].at(j);
                 uint256 votePower = IUnderwritingLockVoting(votingContract).getLastProcessedVotePowerOf(voter);
                 // State mutation 1
@@ -594,15 +610,18 @@ contract BribeController is
             // Iterate by vote
             while(_votes[gaugeID].length() > 0) {
                 (address voter, uint256 votePowerBPS) = _votes[gaugeID].at(0);
-                uint256 bribeProportion = (IUnderwritingLockVoting(votingContract).getLastProcessedVotePowerOf(voter) * votePowerBPS / 10000) * 1e18 / votePowerSum;
+                // `votePowerSum - 1` to nullify initiating _gaugeToTotalVotePower values at 1 rather than 0.
+                uint256 bribeProportion = (IUnderwritingLockVoting(votingContract).getLastProcessedVotePowerOf(voter) * votePowerBPS / 10000) * 1e18 / (votePowerSum - 1);
 
                 // Iterate by bribeToken
                 uint256 numBribeTokens = _providedBribes[gaugeID].length();
                 for (uint256 k = 0; k < numBribeTokens; k++) {
-                    // State mutation 2
+                    // Checkpoint 2
+                    if (gasleft() < 30000) {return _saveUpdateState(type(uint80).max - 1, type(uint88).max - 1, k);}
                     (address bribeToken, uint256 totalBribeAmount) = _providedBribes[gaugeID].at(k);
                     (, uint256 runningClaimableAmount) = _claimableBribes[voter].tryGet(bribeToken);
                     uint256 bribeAmount = totalBribeAmount * bribeProportion / 1e18;
+                    // State mutation 2
                     _providedBribes[gaugeID].set(bribeToken, totalBribeAmount - bribeAmount); // Should not underflow as integers round down in Solidity.
                     _claimableBribes[voter].set(bribeToken, runningClaimableAmount + bribeAmount);
                 }
@@ -620,7 +639,7 @@ contract BribeController is
         }
         }
 
-        emit BribesDistributed(currentEpochStartTime);
+        emit BribesProcessed(currentEpochStartTime);
         _clearUpdateInfo();
     }
 
@@ -629,20 +648,20 @@ contract BribeController is
     ***************************************/
 
     /**
-     * @notice Save state of updating gauge weights to _updateInfo.
-     * @param votingContractsIndex_ Current index of _votingContracts.
-     * @param votersIndex_ Current index of _voters[votingContractsIndex_].
-     * @param votesIndex_ Current index of _votes[votingContractsIndex_][votersIndex_]
+     * @notice Save state of processing bribes to _updateInfo.
+     * @param loop1GaugeIndex_ Current index of _gaugeToTotalVotePower in loop 1.
+     * @param loop1VoteIndex_ Current index of _votes[gaugeID] in loop 1.
+     * @param loop2BribeTokenIndex_ Current index of _providedBribes[gaugeID] in loop 2.
      */
-    function _saveUpdateState(uint256 votingContractsIndex_, uint256 votersIndex_, uint256 votesIndex_) internal {
+    function _saveUpdateState(uint256 loop1GaugeIndex_, uint256 loop1VoteIndex_, uint256 loop2BribeTokenIndex_) internal {
         assembly {
             let updateInfo
-            updateInfo := or(updateInfo, shr(176, shl(176, votingContractsIndex_))) // [0:80] => votingContractsIndex_
-            updateInfo := or(updateInfo, shr(88, shl(168, votersIndex_))) // [80:168] => votersIndex_
-            updateInfo := or(updateInfo, shl(168, votesIndex_)) // [168:256] => votesIndex_
+            updateInfo := or(updateInfo, shr(176, shl(176, loop1GaugeIndex_))) // [0:80] => votingContractsIndex_
+            updateInfo := or(updateInfo, shr(88, shl(168, loop1VoteIndex_))) // [80:168] => votersIndex_
+            updateInfo := or(updateInfo, shl(168, loop2BribeTokenIndex_)) // [168:256] => votesIndex_
             sstore(_updateInfo.slot, updateInfo) 
         }
-        emit IncompleteBribeProcessing();
+        emit IncompleteBribesProcessing();
     }
 
     /// @notice Reset _updateInfo to starting state.
