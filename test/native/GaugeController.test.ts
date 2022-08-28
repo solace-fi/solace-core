@@ -214,6 +214,9 @@ describe("GaugeController", function () {
       it("non governor cannot setEpochLengthInWeeks", async  () => {
         await expect(gaugeController.connect(voter1).setEpochLengthInWeeks(1)).to.be.revertedWith("!governance");
       });
+      it("cannot set epoch length to 0", async  () => {
+        await expect(gaugeController.connect(governor).setEpochLengthInWeeks(0)).to.be.revertedWith("CannotSetEpochLengthTo0");
+      });
       it("can setEpochLengthInWeeks", async () => {
         let tx = await gaugeController.connect(governor).setEpochLengthInWeeks(2);
         await expect(tx).to.emit(gaugeController, "EpochLengthSet").withArgs(2);

@@ -528,6 +528,7 @@ contract GaugeController is
      * @param weeks_ Integer multiple of 1 week, to set epochLength to.
      */
     function setEpochLengthInWeeks(uint256 weeks_) external override onlyGovernance {
+        if(weeks_ == 0) revert CannotSetEpochLengthTo0();
         _epochLength = weeks_ * WEEK;
         emit EpochLengthSet(weeks_);
     }

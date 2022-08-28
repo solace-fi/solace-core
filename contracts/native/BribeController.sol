@@ -19,6 +19,7 @@ contract BribeController is
         Governable 
     {
     using EnumerableSet for EnumerableSet.AddressSet;
+    using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableMapS for EnumerableMapS.AddressToUintMap;
     using EnumerableMapS for EnumerableMapS.UintToUintMap;
 
@@ -59,9 +60,10 @@ contract BribeController is
     mapping(address => EnumerableMapS.AddressToUintMap) internal _claimableBribes;
 
     /// @notice gaugeID => total vote power
-    /// @dev We use this to i.) Store an enumerable collection of gauges with bribes, 
-    /// @dev and ii.) Store total vote power chaisng bribes for each gauge.
     EnumerableMapS.UintToUintMap internal _gaugeToTotalVotePower;
+
+    /// @notice Collection of gauges with current bribes.
+    EnumerableSet.UintSet internal _gaugesWithBribes;
 
     /// @notice gaugeID => voter => votePowerBPS.
     mapping(uint256 => EnumerableMapS.AddressToUintMap) internal _votes;
@@ -187,11 +189,10 @@ contract BribeController is
      * @return gauges Array of gaugeIDs with current bribe.
      */
     function getAllGaugesWithBribe() external view override returns (uint256[] memory gauges) {
-        uint256 length = _gaugeToTotalVotePower.length();
+        uint256 length = _gaugesWithBribes.length();
         gauges = new uint256[](length);
         for (uint256 i = 0; i < length; i++) {
-            (uint256 gaugeID,) = _gaugeToTotalVotePower.at(i);
-            gauges[i] = gaugeID;
+            gauges[i] = _gaugesWithBribes.at(i);
         }
     }
 
@@ -322,12 +323,12 @@ contract BribeController is
      * @param voter_ address of voter.
      * @param gaugeID_ The ID of the gauge to remove vote for.
      */
-    function _removeVoteForBribe(address voter_, uint256 gaugeID_) internal {
+    function _removeVoteForBribeInternal(address voter_, uint256 gaugeID_) internal {
         uint256[] memory gaugeIDs_ = new uint256[](1);
         uint256[] memory votePowerBPSs_ = new uint256[](1);
         gaugeIDs_[0] = gaugeID_;
         votePowerBPSs_[0] = 0;
-        _voteForBribe(voter_, gaugeIDs_, votePowerBPSs_);
+        _voteForBribe(voter_, gaugeIDs_, votePowerBPSs_, true);
     }
 
     /**
@@ -336,12 +337,17 @@ contract BribeController is
      * @param voter_ The voter address.
      * @param gaugeIDs_ The array of gaugeIDs to vote for.
      * @param votePowerBPSs_ The corresponding array of votePowerBPS values. Can be from 0-10000.
+     * @param isInternalCall_ True if called through processBribes, false otherwise.
      */
-    function _voteForBribe(address voter_, uint256[] memory gaugeIDs_, uint256[] memory votePowerBPSs_) internal nonReentrant {
+    function _voteForBribe(address voter_, uint256[] memory gaugeIDs_, uint256[] memory votePowerBPSs_, bool isInternalCall_) internal nonReentrant {
         // CHECKS
         if (gaugeIDs_.length != votePowerBPSs_.length) revert ArrayArgumentsLengthMismatch();
-        if ( _getEpochStartTimestamp() != lastTimeBribesProcessed) revert LastEpochBribesNotProcessed();
-        if (voter_ != msg.sender && IUnderwritingLockVoting(votingContract).delegateOf(voter_) != msg.sender) revert NotOwnerNorDelegate();
+
+        // ENABLE INTERNAL CALL TO SKIP CHECKS (which otherwise block processBribes)
+        if (!isInternalCall_) {
+            if (_getEpochStartTimestamp() != lastTimeBribesProcessed) revert LastEpochBribesNotProcessed();
+            if (voter_ != msg.sender && IUnderwritingLockVoting(votingContract).delegateOf(voter_) != msg.sender) revert NotOwnerNorDelegate();
+        }
 
         for(uint256 i = 0; i < gaugeIDs_.length; i++) {
             uint256 gaugeID = gaugeIDs_[i];
@@ -350,7 +356,6 @@ contract BribeController is
             // USE CHECKS IN EXTERNAL CALLS BEFORE FURTHER INTERNAL STATE MUTATIONS
             IUnderwritingLockVoting(votingContract).vote(voter_, gaugeID, votePowerBPS);
             (bool votePresent, uint256 oldVotePowerBPS) = _votes[gaugeID].tryGet(voter_);
-
             // If remove vote
             if (votePowerBPS == 0) {
                 if (!votePresent) revert CannotRemoveNonExistentVote();
@@ -358,6 +363,7 @@ contract BribeController is
                 if (_votes[gaugeID].length() == 0) _gaugeToTotalVotePower.remove(gaugeID);
                 emit VoteForBribeRemoved(voter_, gaugeID);
             } else {
+                _gaugeToTotalVotePower.set(gaugeID, 1); // Do not set to 0 to avoid SSTORE penalty for 0 slot in processBribes().
                 _votes[gaugeID].set(voter_, votePowerBPS);
                 
                 // Change vote
@@ -388,21 +394,19 @@ contract BribeController is
     ) external override nonReentrant {
         // CHECKS
         if (bribeTokens_.length != bribeAmounts_.length) revert ArrayArgumentsLengthMismatch();
-        if (_getEpochStartTimestamp() != lastTimeBribesProcessed) revert LastEpochBribesNotProcessed();
         try IGaugeController(gaugeController).isGaugeActive(gaugeID_) returns (bool gaugeActive) {
             if (!gaugeActive) revert CannotBribeForInactiveGauge();
         } catch {
             revert CannotBribeForNonExistentGauge();
         }
 
-        uint256 length = _bribeTokenWhitelist.length();
+        uint256 length = bribeTokens_.length;
         for (uint256 i = 0; i < length; i++) {
             if (!_bribeTokenWhitelist.contains(bribeTokens_[i])) revert CannotBribeWithNonWhitelistedToken();
         }
-
+        
         // INTERNAL STATE MUTATIONS
-        (bool gaugePresent,) = _gaugeToTotalVotePower.tryGet(gaugeID_);
-        if(!gaugePresent) _gaugeToTotalVotePower.set(gaugeID_, 1); // Do not set to 0 to avoid SSTORE penalty for 0 slot in processBribes().
+        _gaugesWithBribes.add(gaugeID_);
 
         for (uint256 i = 0; i < length; i++) {
             (,uint256 previousBribeSum) = _providedBribes[gaugeID_].tryGet(bribeTokens_[i]);
@@ -439,7 +443,7 @@ contract BribeController is
         uint256[] memory votePowerBPSs_ = new uint256[](1);
         gaugeIDs_[0] = gaugeID_;
         votePowerBPSs_[0] = votePowerBPS_;
-        _voteForBribe(voter_, gaugeIDs_, votePowerBPSs_);
+        _voteForBribe(voter_, gaugeIDs_, votePowerBPSs_, false);
     }
 
     /**
@@ -449,7 +453,7 @@ contract BribeController is
      * @param votePowerBPSs_ Array of corresponding vote power BPS values.
      */
     function voteForMultipleBribes(address voter_, uint256[] calldata gaugeIDs_, uint256[] calldata votePowerBPSs_) external override {
-        _voteForBribe(voter_, gaugeIDs_, votePowerBPSs_);
+        _voteForBribe(voter_, gaugeIDs_, votePowerBPSs_, false);
     }
 
     /**
@@ -462,7 +466,7 @@ contract BribeController is
     function voteForBribeForMultipleVoters(address[] calldata voters_, uint256[] memory gaugeIDs_, uint256[] memory votePowerBPSs_) external override {
         uint256 length = voters_.length;
         for (uint256 i = 0; i < length; i++) {
-            _voteForBribe(voters_[i], gaugeIDs_, votePowerBPSs_);
+            _voteForBribe(voters_[i], gaugeIDs_, votePowerBPSs_, false);
         }
     }
 
@@ -472,7 +476,11 @@ contract BribeController is
      * @param gaugeID_ The ID of the gauge to remove vote for.
      */
     function removeVoteForBribe(address voter_, uint256 gaugeID_) external override {
-        _removeVoteForBribe(voter_, gaugeID_);
+        uint256[] memory gaugeIDs_ = new uint256[](1);
+        uint256[] memory votePowerBPSs_ = new uint256[](1);
+        gaugeIDs_[0] = gaugeID_;
+        votePowerBPSs_[0] = 0;
+        _voteForBribe(voter_, gaugeIDs_, votePowerBPSs_, false);
     }
 
     /**
@@ -483,7 +491,7 @@ contract BribeController is
     function removeVoteForMultipleBribes(address voter_, uint256[] calldata gaugeIDs_) external override {
         uint256[] memory votePowerBPSs_ = new uint256[](gaugeIDs_.length);
         for(uint256 i = 0; i < gaugeIDs_.length; i++) {votePowerBPSs_[i] = 0;}
-        _voteForBribe(voter_, gaugeIDs_, votePowerBPSs_);
+        _voteForBribe(voter_, gaugeIDs_, votePowerBPSs_, false);
     }
 
     /**
@@ -498,7 +506,7 @@ contract BribeController is
         uint256[] memory votePowerBPSs_ = new uint256[](gaugeIDs_.length);
         for(uint256 i = 0; i < gaugeIDs_.length; i++) {votePowerBPSs_[i] = 0;}
         for (uint256 i = 0; i < length; i++) {
-            _voteForBribe(voters_[i], gaugeIDs_, votePowerBPSs_);
+            _voteForBribe(voters_[i], gaugeIDs_, votePowerBPSs_, false);
         }
     }
 
@@ -626,19 +634,24 @@ contract BribeController is
                     _claimableBribes[voter].set(bribeToken, runningClaimableAmount + bribeAmount);
                 }
                 // Cleanup _votes, _gaugeToTotalVotePower enumerable collections.
-                _removeVoteForBribe(voter, gaugeID);
+                _removeVoteForBribeInternal(voter, gaugeID);
             }
+        }
+        }
 
-            // Cleanup _providedBribes enumerable collection.
-            // Send leftover bribes to revenueRouter.
+        // Cleanup _gaugesWithBribes and _providedBribes enumerable collections.
+        // Send leftover bribes to revenueRouter.
+        while(_gaugesWithBribes.length() > 0) {
+            uint256 gaugeID = _gaugesWithBribes.at(0);
             while(_providedBribes[gaugeID].length() > 0) {
                 (address bribeToken, uint256 remainingBribeAmount) = _providedBribes[gaugeID].at(0);
                 SafeERC20.safeTransfer(IERC20(bribeToken), revenueRouter, remainingBribeAmount);
                 _providedBribes[gaugeID].remove(bribeToken);
             }
-        }
+            _gaugesWithBribes.remove(gaugeID);
         }
 
+        lastTimeBribesProcessed = currentEpochStartTime;
         emit BribesProcessed(currentEpochStartTime);
         _clearUpdateInfo();
     }

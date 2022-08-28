@@ -45,6 +45,9 @@ interface IGaugeController {
     /// @notice Thrown if vote() is attempted for gauge ID 0.
     error CannotVoteForGaugeID0();
 
+    /// @notice Thrown if attempt to setEpochLength to 0.
+    error CannotSetEpochLengthTo0();
+
     /// @notice Thrown if updateGaugeWeights() is called after gauge weights have been successfully updated in the current epoch.
     error GaugeWeightsAlreadyUpdated();
 
