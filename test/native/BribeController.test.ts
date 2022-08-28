@@ -468,8 +468,14 @@ describe("BribeController", function () {
       it("throws if remove inexistent vote", async () => {
         await expect(bribeController.connect(voter1.address).removeVoteForBribe(voter1.address, 1)).to.be.revertedWith("EnumerableMap: nonexistent key");
       })
-      it("can remove vote", async () => {
+      it("if gauge paused, cannot vote", async () => {
+        await gaugeController.connect(governor).pauseGauge(1);
+        await expect(bribeController.connect(voter1.address).voteForBribe(voter1.address, 1, 1000)).to.be.revertedWith("GaugeIDPaused");
+        await gaugeController.connect(governor).unpauseGauge(1);
         await bribeController.connect(voter1).voteForBribe(voter1.address, 1, 1000);
+      })
+      it("if gauge paused, can remove vote", async () => {
+        await gaugeController.connect(governor).pauseGauge(1);
         const tx = await bribeController.connect(voter1).removeVoteForBribe(voter1.address, 1);
         await expect(tx).to.emit(bribeController, "VoteForBribeRemoved").withArgs(voter1.address, 1);
       })
@@ -503,6 +509,7 @@ describe("BribeController", function () {
       })
       after(async function () {
         await gaugeController.connect(governor).setEpochLengthInWeeks(1);
+        await gaugeController.connect(governor).unpauseGauge(1);
       });
     });
 
