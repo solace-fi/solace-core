@@ -92,6 +92,9 @@ interface IBribeController {
 
     /// @notice Emitted when bribe token removed from whitelist.
     event BribeTokenRemoved(address indexed bribeToken);
+    
+    /// @notice Emitted when token rescued.
+    event TokenRescued(address indexed token, address indexed receiver, uint256 balance);
 
     /// @notice Emitted when processBribes() does an incomplete update, and will need to be run again until completion.
     event IncompleteBribesProcessing();
@@ -254,7 +257,7 @@ interface IBribeController {
      * @param voter_ address of voter.
      * @param gaugeIDs_ Array of gaugeIDs to remove votes for
      */
-    function removeVoteForMultipleBribes(address voter_, uint256[] calldata gaugeIDs_) external;
+    function removeVotesForMultipleBribes(address voter_, uint256[] calldata gaugeIDs_) external;
 
     /**
      * @notice Remove gauge votes for multiple voters.
@@ -302,6 +305,14 @@ interface IBribeController {
      * @param bribeToken_ Address of bribe token.
      */
     function removeBribeToken(address bribeToken_) external;
+
+    /**
+     * @notice Rescues misplaced and remaining bribes (from Solidity rounding down).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param tokens_ Array of tokens to rescue.
+     * @param receiver_ The receiver of the tokens.
+     */
+    function rescueTokens(address[] memory tokens_, address receiver_) external;
 
     /***************************************
     UPDATER FUNCTIONS

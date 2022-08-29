@@ -488,7 +488,7 @@ contract BribeController is
      * @param voter_ address of voter.
      * @param gaugeIDs_ Array of gaugeIDs to remove votes for
      */
-    function removeVoteForMultipleBribes(address voter_, uint256[] calldata gaugeIDs_) external override {
+    function removeVotesForMultipleBribes(address voter_, uint256[] calldata gaugeIDs_) external override {
         uint256[] memory votePowerBPSs_ = new uint256[](gaugeIDs_.length);
         for(uint256 i = 0; i < gaugeIDs_.length; i++) {votePowerBPSs_[i] = 0;}
         _voteForBribe(voter_, gaugeIDs_, votePowerBPSs_, false);
@@ -571,6 +571,22 @@ contract BribeController is
         emit BribeTokenRemoved(bribeToken_);
     }
 
+    /**
+     * @notice Rescues misplaced and remaining bribes (from Solidity rounding down).
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param tokens_ Array of tokens to rescue.
+     * @param receiver_ The receiver of the tokens.
+     */
+    function rescueTokens(address[] memory tokens_, address receiver_) external override onlyGovernance {
+        uint256 length = tokens_.length;
+        for(uint256 i = 0; i < length; i++) {
+            IERC20 token = IERC20(tokens_[i]);
+            uint256 balance = token.balanceOf(address(this));
+            SafeERC20.safeTransfer(token, receiver_, balance);
+            emit TokenRescued(address(token), receiver_, balance);
+        }
+    }
+
     /***************************************
     UPDATER FUNCTIONS
     ***************************************/
@@ -588,6 +604,27 @@ contract BribeController is
         // Require gauge weights to have been updated for this epoch => ensure state we are querying from is < 1 WEEK old.
         if(IUnderwritingLockVoting(votingContract).lastTimePremiumsCharged() != currentEpochStartTime) revert LastEpochPremiumsNotCharged();
 
+        // If no votes to process 
+        // => early cleanup of _gaugesWithBribes and _providedBribes mappings
+        // => send provided bribes to revenueRouter
+        // => early return
+        if (_gaugeToTotalVotePower.length() == 0) {
+            while(_gaugesWithBribes.length() > 0) {
+                uint256 gaugeID = _gaugesWithBribes.at(0);
+                while(_providedBribes[gaugeID].length() > 0) {
+                    (address bribeToken, uint256 remainingBribeAmount) = _providedBribes[gaugeID].at(0);
+                    SafeERC20.safeTransfer(IERC20(bribeToken), revenueRouter, remainingBribeAmount);
+                    _providedBribes[gaugeID].remove(bribeToken);
+                }
+                _gaugesWithBribes.remove(gaugeID);
+            }
+
+            lastTimeBribesProcessed = currentEpochStartTime;
+            emit BribesProcessed(currentEpochStartTime);
+            _clearUpdateInfo();
+            return;
+        }
+
         // LOOP 1 - GET TOTAL VOTE POWER CHASING BRIBES FOR EACH GAUGE 
         // Block-scope to avoid stack too deep error
         {
@@ -595,12 +632,13 @@ contract BribeController is
         // Iterate by gauge
         for (uint256 i = _updateInfo.index1 == type(uint80).max ? 0 : _updateInfo.index1; i < numGauges; i++) {
             // Iterate by vote
-            (uint256 gaugeID, uint256 runningVotePowerSum) = _gaugeToTotalVotePower.at(i);
+            (uint256 gaugeID,) = _gaugeToTotalVotePower.at(i);
             uint256 numVotes = _votes[gaugeID].length();
 
             for (uint256 j = _updateInfo.index2 == type(uint88).max || i != _updateInfo.index1 ? 0 : _updateInfo.index2; j < numVotes; j++) {
                 // Checkpoint 1
                 if (gasleft() < 20000) {return _saveUpdateState(i, j, type(uint88).max);}
+                uint256 runningVotePowerSum = _gaugeToTotalVotePower.get(gaugeID);
                 (address voter, uint256 votePowerBPS) = _votes[gaugeID].at(j);
                 uint256 votePower = IUnderwritingLockVoting(votingContract).getLastProcessedVotePowerOf(voter);
                 // State mutation 1
@@ -615,6 +653,7 @@ contract BribeController is
         // Iterate by gauge
         while (_gaugeToTotalVotePower.length() > 0) {
             (uint256 gaugeID, uint256 votePowerSum) = _gaugeToTotalVotePower.at(0);
+
             // Iterate by vote
             while(_votes[gaugeID].length() > 0) {
                 (address voter, uint256 votePowerBPS) = _votes[gaugeID].at(0);
@@ -630,7 +669,6 @@ contract BribeController is
                     (, uint256 runningClaimableAmount) = _claimableBribes[voter].tryGet(bribeToken);
                     uint256 bribeAmount = totalBribeAmount * bribeProportion / 1e18;
                     // State mutation 2
-                    _providedBribes[gaugeID].set(bribeToken, totalBribeAmount - bribeAmount); // Should not underflow as integers round down in Solidity.
                     _claimableBribes[voter].set(bribeToken, runningClaimableAmount + bribeAmount);
                 }
                 // Cleanup _votes, _gaugeToTotalVotePower enumerable collections.
@@ -640,12 +678,11 @@ contract BribeController is
         }
 
         // Cleanup _gaugesWithBribes and _providedBribes enumerable collections.
-        // Send leftover bribes to revenueRouter.
+        // No leftover bribes to send to the revenueRouter in this case.
         while(_gaugesWithBribes.length() > 0) {
             uint256 gaugeID = _gaugesWithBribes.at(0);
             while(_providedBribes[gaugeID].length() > 0) {
-                (address bribeToken, uint256 remainingBribeAmount) = _providedBribes[gaugeID].at(0);
-                SafeERC20.safeTransfer(IERC20(bribeToken), revenueRouter, remainingBribeAmount);
+                (address bribeToken,) = _providedBribes[gaugeID].at(0);
                 _providedBribes[gaugeID].remove(bribeToken);
             }
             _gaugesWithBribes.remove(gaugeID);

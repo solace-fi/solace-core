@@ -29,7 +29,7 @@ const ONE_HUNDRED_PERCENT = ONE_ETHER;
 const CUSTOM_GAS_LIMIT = 6000000;
 
 describe("BribeController", function () {
-    const [deployer, governor, revenueRouter, voter1, voter2, delegate1, updater, briber1, anon] = provider.getWallets();
+    const [deployer, governor, revenueRouter, voter1, voter2, voter3, delegate1, updater, briber1, anon] = provider.getWallets();
   
     /***************************
        VARIABLE DECLARATIONS
@@ -318,6 +318,7 @@ describe("BribeController", function () {
     describe("voteForBribe", () => {
       before(async function () {
         await gaugeController.connect(governor).addVotingContract(voting.address)
+        await voting.connect(voter1).setDelegate(delegate1.address);
       });
       it("will throw if called by non-lock owner or delegate", async  () => {
         await expect(bribeController.connect(briber1).voteForBribe(voter1.address, 1, 10000)).to.be.revertedWith("NotOwnerNorDelegate");
@@ -474,9 +475,9 @@ describe("BribeController", function () {
         await gaugeController.connect(governor).unpauseGauge(1);
         await bribeController.connect(voter1).voteForBribe(voter1.address, 1, 1000);
       })
-      it("if gauge paused, can remove vote", async () => {
+      it("if gauge paused, delegate can remove vote", async () => {
         await gaugeController.connect(governor).pauseGauge(1);
-        const tx = await bribeController.connect(voter1).removeVoteForBribe(voter1.address, 1);
+        const tx = await bribeController.connect(delegate1).removeVoteForBribe(voter1.address, 1);
         await expect(tx).to.emit(bribeController, "VoteForBribeRemoved").withArgs(voter1.address, 1);
       })
       it("cannot process bribes before next epoch", async () => {
@@ -484,7 +485,7 @@ describe("BribeController", function () {
         await provider.send("evm_mine", [CURRENT_TIME + ONE_WEEK]);
         await expect(bribeController.connect(governor.address).processBribes()).to.be.revertedWith("BribesAlreadyProcessed");
       })
-      it("after processing bribes, all bribes should be distributed to revenue router", async () => {
+      it("after processing bribes, all bribes should be distributed to revenue router, and paused gauge does not impact this", async () => {
         const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
         await provider.send("evm_mine", [CURRENT_TIME + 2 * ONE_WEEK]);
         await gaugeController.connect(governor).updateGaugeWeights({gasLimit: CUSTOM_GAS_LIMIT})
@@ -506,6 +507,11 @@ describe("BribeController", function () {
         expect(BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1_CHANGE).eq(BRIBE_AMOUNT.mul(-1))
         expect(REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_1_CHANGE).eq(BRIBE_AMOUNT)
         expect(await bribeToken1.balanceOf(revenueRouter.address)).eq(BRIBE_AMOUNT)
+        expect(await bribeController.getAllGaugesWithBribe()).deep.eq([])
+        expect(await bribeController.getProvidedBribesForGauge(1)).deep.eq([])
+        expect(await bribeController.getVotesForVoter(voter1.address)).deep.eq([])
+        expect(await bribeController.getVotesForGauge(1)).deep.eq([])
+        expect(await bribeController.getUnusedVotePowerBPS(voter1.address)).eq(1000)
       })
       after(async function () {
         await gaugeController.connect(governor).setEpochLengthInWeeks(1);
@@ -513,16 +519,267 @@ describe("BribeController", function () {
       });
     });
 
-
-
-    /*******************
-      STATE SUMMARY
-    *******************/
+    /*********************
+      INTENTION STATEMENT 
+    *********************/
     /**
-     * voter1 => lockID1, voted for gaugeID 1 with 10000 votePowerBPS
-     * gaugeID 1 => 1K of bribeToken1 and 1K and bribeToken2 provided for the epoch just past
+     * Create gaugeID 3
+     * briber1 will provide bribe for gaugeID 1 with 100 of bribeToken1 and 100 of bribeToken2.
+     * briber1 will provide bribe for gaugeID 3 with 100 of bribeToken1 and 100 of bribeToken2.
+     * voter2 and voter3 will create an equivalent lock to voter1
+     * voter1 will voteForBribe for gaugeID 1 with 5% and gaugeID 2 with 5% 
+     * voter2 will voteForBribe for gaugeID 1 with 50% and gaugeID 2 with 50% 
+     * voter3 will initially mirror voter2 voteForBribes, but then remove their bribe
      */
 
+    describe("voteForMultipleBribes and removeVoteForMultipleBribes scenario", () => {
+      before(async function () {
+        await gaugeController.connect(governor).addGauge("3", ONE_PERCENT);
+        await bribeController.connect(briber1).provideBribes([bribeToken1.address, bribeToken2.address], [BRIBE_AMOUNT, BRIBE_AMOUNT], 1)
+        await bribeController.connect(briber1).provideBribes([bribeToken1.address, bribeToken2.address], [BRIBE_AMOUNT, BRIBE_AMOUNT], 3)
+        const lock = await underwritingLocker.locks(1);
+        await underwritingLocker.connect(deployer).createLock(voter2.address, lock.amount, lock.end);
+        await underwritingLocker.connect(deployer).createLock(voter3.address, lock.amount, lock.end);
+        expect(await voting.getVotePower(voter1.address)).eq(await voting.getVotePower(voter2.address))
+        expect(await voting.getVotePower(voter1.address)).eq(await voting.getVotePower(voter3.address))
+        expect(await bribeController.getAllGaugesWithBribe()).deep.eq([BN.from("1"), BN.from("3")])
+        const bribes1 = await bribeController.getProvidedBribesForGauge(1);
+        expect(bribes1[0].bribeToken).eq(bribeToken1.address)
+        expect(bribes1[1].bribeToken).eq(bribeToken2.address)
+        expect(bribes1[0].bribeAmount).eq(BRIBE_AMOUNT)
+        expect(bribes1[1].bribeAmount).eq(BRIBE_AMOUNT)
+        const bribes3 = await bribeController.getProvidedBribesForGauge(3);
+        expect(bribes3[0].bribeToken).eq(bribeToken1.address)
+        expect(bribes3[1].bribeToken).eq(bribeToken2.address)
+        expect(bribes3[0].bribeAmount).eq(BRIBE_AMOUNT)
+        expect(bribes3[1].bribeAmount).eq(BRIBE_AMOUNT)
+        await voting.connect(voter2).setDelegate(delegate1.address)
+        const lifetimeBribes1 = await bribeController.getLifetimeProvidedBribes(briber1.address);
+        expect(lifetimeBribes1[0].bribeToken).eq(bribeToken1.address)
+        expect(lifetimeBribes1[1].bribeToken).eq(bribeToken2.address)
+        expect(lifetimeBribes1[0].bribeAmount).eq(BRIBE_AMOUNT.mul(4))
+        expect(lifetimeBribes1[1].bribeAmount).eq(BRIBE_AMOUNT.mul(3))
+      });
+      it("will throw if called by non-lock owner or delegate", async () => {
+        await expect(bribeController.connect(briber1).voteForMultipleBribes(voter1.address, [1, 2], [500, 500])).to.be.revertedWith("NotOwnerNorDelegate");
+      });
+      it("will throw if voter has no locks", async () => {
+        await expect(bribeController.connect(briber1).voteForMultipleBribes(briber1.address, [1, 2], [500, 500])).to.be.revertedWith("VoterHasNoLocks");
+      });
+      it("will throw if voteForBribe for gauge with no bribe", async () => {
+        await expect(bribeController.connect(voter1).voteForMultipleBribes(voter1.address, [1, 4], [500, 500])).to.be.revertedWith("NoBribesForSelectedGauge");
+      });
+      it("will throw if voteForBribe for more than unused votepower", async () => {
+        expect(await bribeController.getUnusedVotePowerBPS(voter1.address)).eq(1000);
+        await expect(bribeController.connect(voter1).voteForMultipleBribes(voter1.address, [1, 3], [500, 501])).to.be.revertedWith("TotalVotePowerBPSOver10000");
+      });
+      it("can voteForMultipleBribes", async () => {
+        const tx1 = await bribeController.connect(voter1).voteForMultipleBribes(voter1.address, [1, 3], [500, 500]);
+        await expect(tx1).to.emit(bribeController, "VoteForBribeAdded").withArgs(voter1.address, 1, 500);
+        await expect(tx1).to.emit(bribeController, "VoteForBribeAdded").withArgs(voter1.address, 3, 500);
+        const tx2 = await bribeController.connect(delegate1).voteForMultipleBribes(voter2.address, [1, 3], [500, 500]);
+        await expect(tx2).to.emit(bribeController, "VoteForBribeAdded").withArgs(voter2.address, 1, 500);
+        await expect(tx2).to.emit(bribeController, "VoteForBribeAdded").withArgs(voter2.address, 3, 500);
+        const tx3 = await bribeController.connect(delegate1).voteForMultipleBribes(voter2.address, [1, 3], [5000, 5000]);
+        await expect(tx3).to.emit(bribeController, "VoteForBribeChanged").withArgs(voter2.address, 1, 5000, 500);
+        await expect(tx3).to.emit(bribeController, "VoteForBribeChanged").withArgs(voter2.address, 3, 5000, 500);
+        const tx4 = await bribeController.connect(voter3).voteForMultipleBribes(voter3.address, [1, 3], [5000, 5000]);
+        await expect(tx4).to.emit(bribeController, "VoteForBribeAdded").withArgs(voter3.address, 1, 5000);
+        await expect(tx4).to.emit(bribeController, "VoteForBribeAdded").withArgs(voter3.address, 3, 5000);
+        expect(await bribeController.getUnusedVotePowerBPS(voter1.address)).eq(0)
+        expect(await bribeController.getUnusedVotePowerBPS(voter2.address)).eq(0)
+        expect(await bribeController.getUnusedVotePowerBPS(voter3.address)).eq(0)
+      });
+      it("can removeVotesForMultipleBribes", async () => {
+        const tx = await bribeController.connect(voter3).removeVotesForMultipleBribes(voter3.address, [1, 3]);
+        await expect(tx).to.emit(bribeController, "VoteForBribeRemoved").withArgs(voter3.address, 1);
+        await expect(tx).to.emit(bribeController, "VoteForBribeRemoved").withArgs(voter3.address, 3);
+        expect(await bribeController.getUnusedVotePowerBPS(voter3.address)).eq(10000)
+      });
+      it("getVotesForGauge", async () => {
+        const votes1 = await bribeController.getVotesForGauge(1);
+        expect(votes1[0].voter).eq(voter1.address)
+        expect(votes1[1].voter).eq(voter2.address)
+        expect(votes1[0].votePowerBPS).eq(500)
+        expect(votes1[1].votePowerBPS).eq(5000)
+        const votes3 = await bribeController.getVotesForGauge(3);
+        expect(votes1[0].voter).eq(voter1.address)
+        expect(votes1[1].voter).eq(voter2.address)
+        expect(votes1[0].votePowerBPS).eq(500)
+        expect(votes1[1].votePowerBPS).eq(5000)
+      })
+      it("getVotesForVoter", async () => {
+        const votes1 = await bribeController.getVotesForVoter(voter1.address);
+        expect(votes1[0].gaugeID).eq(1)
+        expect(votes1[1].gaugeID).eq(3)
+        expect(votes1[0].votePowerBPS).eq(500)
+        expect(votes1[1].votePowerBPS).eq(500)
+        const votes2 = await bribeController.getVotesForVoter(voter2.address);
+        expect(votes2[0].gaugeID).eq(1)
+        expect(votes2[1].gaugeID).eq(3)
+        expect(votes2[0].votePowerBPS).eq(5000)
+        expect(votes2[1].votePowerBPS).eq(5000)
+        expect(await bribeController.getVotesForVoter(voter3.address)).deep.eq([])
+      })
+      it("processBribes will change state as expected", async () => {
+        const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
+        await provider.send("evm_mine", [CURRENT_TIME + ONE_WEEK]);
+        await gaugeController.connect(governor).updateGaugeWeights({gasLimit: CUSTOM_GAS_LIMIT});
+        await voting.connect(governor).chargePremiums({gasLimit: CUSTOM_GAS_LIMIT});
 
+        const OLD_VOTER_1_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(voter1.address)
+        const OLD_VOTER_2_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(voter2.address)
+        const OLD_VOTER_3_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(voter3.address)
+        const OLD_VOTER_1_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(voter1.address)
+        const OLD_VOTER_2_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(voter2.address)
+        const OLD_VOTER_3_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(voter3.address)
+        const OLD_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(bribeController.address)
+        const OLD_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(bribeController.address)
+        const OLD_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(revenueRouter.address)
+        const OLD_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(revenueRouter.address)
+
+        await bribeController.connect(governor).processBribes({gasLimit: CUSTOM_GAS_LIMIT});
+
+        const NEW_VOTER_1_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(voter1.address)
+        const NEW_VOTER_2_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(voter2.address)
+        const NEW_VOTER_3_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(voter3.address)
+        const NEW_VOTER_1_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(voter1.address)
+        const NEW_VOTER_2_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(voter2.address)
+        const NEW_VOTER_3_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(voter3.address)
+        const NEW_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(bribeController.address)
+        const NEW_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(bribeController.address)
+        const NEW_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(revenueRouter.address)
+        const NEW_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(revenueRouter.address)
+
+        const CHANGE_VOTER_1_BALANCE_BRIBE_TOKEN_1 = NEW_VOTER_1_BALANCE_BRIBE_TOKEN_1.sub(OLD_VOTER_1_BALANCE_BRIBE_TOKEN_1)
+        const CHANGE_VOTER_2_BALANCE_BRIBE_TOKEN_1 = NEW_VOTER_2_BALANCE_BRIBE_TOKEN_1.sub(OLD_VOTER_2_BALANCE_BRIBE_TOKEN_1)
+        const CHANGE_VOTER_3_BALANCE_BRIBE_TOKEN_1 = NEW_VOTER_3_BALANCE_BRIBE_TOKEN_1.sub(OLD_VOTER_3_BALANCE_BRIBE_TOKEN_1)
+        const CHANGE_VOTER_1_BALANCE_BRIBE_TOKEN_2 = NEW_VOTER_1_BALANCE_BRIBE_TOKEN_2.sub(OLD_VOTER_1_BALANCE_BRIBE_TOKEN_2)
+        const CHANGE_VOTER_2_BALANCE_BRIBE_TOKEN_2 = NEW_VOTER_2_BALANCE_BRIBE_TOKEN_2.sub(OLD_VOTER_2_BALANCE_BRIBE_TOKEN_2)
+        const CHANGE_VOTER_3_BALANCE_BRIBE_TOKEN_2 = NEW_VOTER_3_BALANCE_BRIBE_TOKEN_2.sub(OLD_VOTER_3_BALANCE_BRIBE_TOKEN_2)
+        const CHANGE_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1 = NEW_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1.sub(OLD_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1)
+        const CHANGE_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_2 = NEW_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_2.sub(OLD_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_2)
+        const CHANGE_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_1 = NEW_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_1.sub(OLD_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_1)
+        const CHANGE_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_2 = NEW_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_2.sub(OLD_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_2)
+        
+        expect(CHANGE_VOTER_1_BALANCE_BRIBE_TOKEN_1).eq(0)
+        expect(CHANGE_VOTER_2_BALANCE_BRIBE_TOKEN_1).eq(0)
+        expect(CHANGE_VOTER_3_BALANCE_BRIBE_TOKEN_1).eq(0)
+        expect(CHANGE_VOTER_1_BALANCE_BRIBE_TOKEN_2).eq(0)
+        expect(CHANGE_VOTER_2_BALANCE_BRIBE_TOKEN_2).eq(0)
+        expect(CHANGE_VOTER_3_BALANCE_BRIBE_TOKEN_2).eq(0)
+        expect(CHANGE_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1).eq(0)
+        expect(CHANGE_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_2).eq(0)
+        expect(CHANGE_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_1).eq(0)
+        expect(CHANGE_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_2).eq(0)
+
+        expect(await bribeController.getAllGaugesWithBribe()).deep.eq([])
+        expect(await bribeController.getProvidedBribesForGauge(1)).deep.eq([])
+        expect(await bribeController.getProvidedBribesForGauge(3)).deep.eq([])
+        expect(await bribeController.getVotesForVoter(voter1.address)).deep.eq([])
+        expect(await bribeController.getVotesForVoter(voter2.address)).deep.eq([])
+        expect(await bribeController.getVotesForGauge(1)).deep.eq([])
+        expect(await bribeController.getVotesForGauge(3)).deep.eq([])
+        expect(await bribeController.getUnusedVotePowerBPS(voter1.address)).eq(1000)
+        expect(await bribeController.getUnusedVotePowerBPS(voter2.address)).eq(10000)
+      })
+      it("getClaimableBribes", async () => {
+        const claim1 = await bribeController.getClaimableBribes(voter1.address);
+        expect(claim1[0].bribeToken).eq(bribeToken1.address)
+        expect(claim1[1].bribeToken).eq(bribeToken2.address)
+        expectClose(claim1[0].bribeAmount, BRIBE_AMOUNT.mul(2).mul(1).div(11), 1e3)
+        expectClose(claim1[1].bribeAmount, BRIBE_AMOUNT.mul(2).mul(1).div(11), 1e3)
+        const claim2 = await bribeController.getClaimableBribes(voter2.address);
+        expect(claim2[0].bribeToken).eq(bribeToken1.address)
+        expect(claim2[1].bribeToken).eq(bribeToken2.address)
+        expectClose(claim2[0].bribeAmount, BRIBE_AMOUNT.mul(2).mul(10).div(11), 1e3)
+        expectClose(claim2[1].bribeAmount, BRIBE_AMOUNT.mul(2).mul(10).div(11), 1e3)
+        expect(await bribeController.getClaimableBribes(voter3.address)).deep.eq([])
+      })
+      it("can claimBribes", async () => {
+        const OLD_VOTER_1_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(voter1.address)
+        const OLD_VOTER_1_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(voter1.address)
+        const OLD_VOTER_2_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(voter2.address)
+        const OLD_VOTER_2_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(voter2.address)
+        const OLD_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(bribeController.address)
+        const OLD_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(bribeController.address)
+        const OLD_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(revenueRouter.address)
+        const OLD_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_2 = await bribeToken1.balanceOf(revenueRouter.address)
+        const tx1 = await bribeController.connect(voter1).claimBribes();
+        const tx2 = await bribeController.connect(voter2).claimBribes();
+        await expect(tx1).to.emit(bribeController, "BribeClaimed");
+        await expect(tx2).to.emit(bribeController, "BribeClaimed");
+
+        const NEW_VOTER_1_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(voter1.address)
+        const NEW_VOTER_1_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(voter1.address)
+        const NEW_VOTER_2_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(voter2.address)
+        const NEW_VOTER_2_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(voter2.address)
+        const NEW_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(bribeController.address)
+        const NEW_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(bribeController.address)
+        const NEW_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(revenueRouter.address)
+        const NEW_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_2 = await bribeToken1.balanceOf(revenueRouter.address)
+
+        const CHANGE_VOTER_1_BALANCE_BRIBE_TOKEN_1 = NEW_VOTER_1_BALANCE_BRIBE_TOKEN_1.sub(OLD_VOTER_1_BALANCE_BRIBE_TOKEN_1)
+        const CHANGE_VOTER_1_BALANCE_BRIBE_TOKEN_2 = NEW_VOTER_1_BALANCE_BRIBE_TOKEN_2.sub(OLD_VOTER_1_BALANCE_BRIBE_TOKEN_2)
+        const CHANGE_VOTER_2_BALANCE_BRIBE_TOKEN_1 = NEW_VOTER_2_BALANCE_BRIBE_TOKEN_1.sub(OLD_VOTER_2_BALANCE_BRIBE_TOKEN_1)
+        const CHANGE_VOTER_2_BALANCE_BRIBE_TOKEN_2 = NEW_VOTER_2_BALANCE_BRIBE_TOKEN_2.sub(OLD_VOTER_2_BALANCE_BRIBE_TOKEN_2)
+        const CHANGE_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1 = NEW_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1.sub(OLD_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1)
+        const CHANGE_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_2 = NEW_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_2.sub(OLD_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_2)
+        const CHANGE_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_1 = NEW_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_1.sub(OLD_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_1)
+        const CHANGE_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_2 = NEW_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_2.sub(OLD_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_2)
+
+        expectClose(CHANGE_VOTER_1_BALANCE_BRIBE_TOKEN_1, BRIBE_AMOUNT.mul(2).mul(1).div(11), 1e3);
+        expectClose(CHANGE_VOTER_1_BALANCE_BRIBE_TOKEN_2, BRIBE_AMOUNT.mul(2).mul(1).div(11), 1e3);
+        expectClose(CHANGE_VOTER_2_BALANCE_BRIBE_TOKEN_1, BRIBE_AMOUNT.mul(2).mul(10).div(11), 1e3);
+        expectClose(CHANGE_VOTER_2_BALANCE_BRIBE_TOKEN_2, BRIBE_AMOUNT.mul(2).mul(10).div(11), 1e3);
+        expectClose(CHANGE_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1, BRIBE_AMOUNT.mul(-2), 1e4);
+        expectClose(CHANGE_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_2, BRIBE_AMOUNT.mul(-2), 1e4);
+        expect(CHANGE_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_1).eq(0)
+        expect(CHANGE_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_2).eq(0)
+        expect(await bribeController.getClaimableBribes(briber1.address)).deep.eq([]);
+      })
+      it("claimTokens cannot be called by non-governance", async () => {
+        await expect(bribeController.connect(voter1).rescueTokens([bribeToken1.address, bribeToken2.address], revenueRouter.address)).to.be.revertedWith("!governance");
+      })
+      it("claimTokens can be called", async () => {
+        const OLD_VOTER_1_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(voter1.address)
+        const OLD_VOTER_1_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(voter1.address)
+        const OLD_VOTER_2_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(voter2.address)
+        const OLD_VOTER_2_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(voter2.address)
+        const OLD_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(bribeController.address)
+        const OLD_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(bribeController.address)
+        const OLD_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(revenueRouter.address)
+        const OLD_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_2 = await bribeToken1.balanceOf(revenueRouter.address)
+
+        const tx = await bribeController.connect(governor).rescueTokens([bribeToken1.address, bribeToken2.address], revenueRouter.address)
+        await expect(tx).to.emit(bribeController, "TokenRescued").withArgs(bribeToken1.address, revenueRouter.address, OLD_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1);
+        await expect(tx).to.emit(bribeController, "TokenRescued").withArgs(bribeToken1.address, revenueRouter.address, OLD_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_2);
+
+        const NEW_VOTER_1_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(voter1.address)
+        const NEW_VOTER_1_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(voter1.address)
+        const NEW_VOTER_2_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(voter2.address)
+        const NEW_VOTER_2_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(voter2.address)
+        const NEW_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(bribeController.address)
+        const NEW_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(bribeController.address)
+        const NEW_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(revenueRouter.address)
+        const NEW_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_2 = await bribeToken1.balanceOf(revenueRouter.address)
+
+        const CHANGE_VOTER_1_BALANCE_BRIBE_TOKEN_1 = NEW_VOTER_1_BALANCE_BRIBE_TOKEN_1.sub(OLD_VOTER_1_BALANCE_BRIBE_TOKEN_1)
+        const CHANGE_VOTER_1_BALANCE_BRIBE_TOKEN_2 = NEW_VOTER_1_BALANCE_BRIBE_TOKEN_2.sub(OLD_VOTER_1_BALANCE_BRIBE_TOKEN_2)
+        const CHANGE_VOTER_2_BALANCE_BRIBE_TOKEN_1 = NEW_VOTER_2_BALANCE_BRIBE_TOKEN_1.sub(OLD_VOTER_2_BALANCE_BRIBE_TOKEN_1)
+        const CHANGE_VOTER_2_BALANCE_BRIBE_TOKEN_2 = NEW_VOTER_2_BALANCE_BRIBE_TOKEN_2.sub(OLD_VOTER_2_BALANCE_BRIBE_TOKEN_2)
+        const CHANGE_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_1 = NEW_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_1.sub(OLD_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_1)
+        const CHANGE_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_2 = NEW_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_2.sub(OLD_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_2)
+
+        expect(CHANGE_VOTER_1_BALANCE_BRIBE_TOKEN_1).eq(0)
+        expect(CHANGE_VOTER_1_BALANCE_BRIBE_TOKEN_2).eq(0)
+        expect(CHANGE_VOTER_2_BALANCE_BRIBE_TOKEN_1).eq(0)
+        expect(CHANGE_VOTER_2_BALANCE_BRIBE_TOKEN_2).eq(0)
+        expect(NEW_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1).eq(0)
+        expect(NEW_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1).eq(0)
+        expect(CHANGE_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_1).eq(OLD_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1)
+        expect(CHANGE_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_2).eq(OLD_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_2)
+      })
+    });
 
 });
