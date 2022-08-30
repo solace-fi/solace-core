@@ -41,6 +41,9 @@ interface IBribeController {
     /// @notice Thrown when provideBribe attempted unwhitelisted bribe token.
     error CannotBribeWithNonWhitelistedToken();
 
+    /// @notice Thrown when attempt to claim bribes when no bribe rewards are claimable.
+    error NoClaimableBribes();
+
     /// @notice Thrown when voteForBribe() attempted by a non-owner or non-delegate.
     error NotOwnerNorDelegate();
 
@@ -114,9 +117,6 @@ interface IBribeController {
 
     /// @notice Address of UnderwritingLockVoting.sol
     function votingContract() external view returns (address);
-
-    /// @notice Address of revenue router.
-    function revenueRouter() external view returns (address);
 
     /// @notice Updater address.
     function updater() external view returns (address);
@@ -279,7 +279,7 @@ interface IBribeController {
 
     /**
      * @notice Sets the [`Registry`](./Registry) contract address.
-     * @dev Requires 'uwe', 'revenueRouter' and 'underwritingLocker' addresses to be set in the Registry.
+     * @dev Requires 'uwe' and 'underwritingLocker' addresses to be set in the Registry.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param registry_ The address of `Registry` contract.
      */

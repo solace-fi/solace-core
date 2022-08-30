@@ -107,7 +107,6 @@ contract GaugeController is
         token = token_;
         leverageFactor = 1e18; // Default 1x leverage.
         // Pre-fill slot 0 of _gauges, ensure gaugeID 1 maps to _gauges[1]
-        GaugeStructs.Gauge memory newGauge = GaugeStructs.Gauge(false, 0, ""); 
         _gauges.push(GaugeStructs.Gauge(false, 0, "")); 
         _clearUpdateInfo();
         _epochLength = WEEK;

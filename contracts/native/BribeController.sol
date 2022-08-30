@@ -36,9 +36,6 @@ contract BribeController is
     /// @notice UnderwriterLockVoting.sol address
     address public override votingContract;
 
-    /// @notice Revenue router address
-    address public override revenueRouter;
-
     /// @notice Updater address.
     /// @dev Second address that can call updateGaugeWeights (in addition to governance).
     address public override updater;
@@ -296,7 +293,7 @@ contract BribeController is
 
     /**
      * @notice Sets registry and related contract addresses.
-     * @dev Requires 'uwe', 'revenueRouter' and 'underwritingLocker' addresses to be set in the Registry.
+     * @dev Requires 'uwe' and 'underwritingLocker' addresses to be set in the Registry.
      * @param _registry The registry address to set.
      */
     function _setRegistry(address _registry) internal {
@@ -311,10 +308,6 @@ contract BribeController is
         (, address underwritingLockVoting) = reg.tryGet("underwritingLockVoting");
         if(underwritingLockVoting == address(0x0)) revert ZeroAddressInput("underwritingLockVoting");
         votingContract = underwritingLockVoting;
-        // set revenueRouter
-        (, address revenueRouterAddr) = reg.tryGet("revenueRouter");
-        if(revenueRouterAddr == address(0x0)) revert ZeroAddressInput("revenueRouter");
-        revenueRouter = revenueRouterAddr;
         emit RegistrySet(_registry);
     }
 
@@ -516,7 +509,7 @@ contract BribeController is
      */
     function claimBribes() external override nonReentrant {
         uint256 length = _claimableBribes[msg.sender].length();
-        if (length == 0) return;
+        if (length == 0) revert NoClaimableBribes();
 
         while (_claimableBribes[msg.sender].length() != 0) {
             (address bribeToken, uint256 bribeAmount) = _claimableBribes[msg.sender].at(0);
@@ -532,7 +525,7 @@ contract BribeController is
 
     /**
      * @notice Sets the [`Registry`](./Registry) contract address.
-     * @dev Requires 'uwe', 'revenueRouter' and 'underwritingLocker' addresses to be set in the Registry.
+     * @dev Requires 'uwe' and 'underwritingLocker' addresses to be set in the Registry.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param registry_ The address of `Registry` contract.
      */
@@ -572,7 +565,7 @@ contract BribeController is
     }
 
     /**
-     * @notice Rescues misplaced and remaining bribes (from Solidity rounding down).
+     * @notice Rescues misplaced and remaining bribes (from Solidity rounding down, and bribing rounds with no voters).
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param tokens_ Array of tokens to rescue.
      * @param receiver_ The receiver of the tokens.
@@ -606,24 +599,13 @@ contract BribeController is
 
         // If no votes to process 
         // => early cleanup of _gaugesWithBribes and _providedBribes mappings
-        // => send provided bribes to revenueRouter
+        // => bribes stay custodied on bribing contract
         // => early return
         if (_gaugeToTotalVotePower.length() == 0) {
-            while(_gaugesWithBribes.length() > 0) {
-                uint256 gaugeID = _gaugesWithBribes.at(0);
-                while(_providedBribes[gaugeID].length() > 0) {
-                    (address bribeToken, uint256 remainingBribeAmount) = _providedBribes[gaugeID].at(0);
-                    SafeERC20.safeTransfer(IERC20(bribeToken), revenueRouter, remainingBribeAmount);
-                    _providedBribes[gaugeID].remove(bribeToken);
-                }
-                _gaugesWithBribes.remove(gaugeID);
-            }
-
-            lastTimeBribesProcessed = currentEpochStartTime;
-            emit BribesProcessed(currentEpochStartTime);
-            _clearUpdateInfo();
-            return;
+            return _concludeProcessBribes(currentEpochStartTime);
         }
+
+        console.log("===Loaded state: 1: %s, 2: %s, 3: %s", _updateInfo.index1, _updateInfo.index2, _updateInfo.index3);
 
         // LOOP 1 - GET TOTAL VOTE POWER CHASING BRIBES FOR EACH GAUGE 
         // Block-scope to avoid stack too deep error
@@ -637,15 +619,19 @@ contract BribeController is
 
             for (uint256 j = _updateInfo.index2 == type(uint88).max || i != _updateInfo.index1 ? 0 : _updateInfo.index2; j < numVotes; j++) {
                 // Checkpoint 1
+                // console.log("LOOP 1 START: ", gasleft());
                 if (gasleft() < 20000) {return _saveUpdateState(i, j, type(uint88).max);}
                 uint256 runningVotePowerSum = _gaugeToTotalVotePower.get(gaugeID);
                 (address voter, uint256 votePowerBPS) = _votes[gaugeID].at(j);
                 uint256 votePower = IUnderwritingLockVoting(votingContract).getLastProcessedVotePowerOf(voter);
                 // State mutation 1
                 _gaugeToTotalVotePower.set(gaugeID, runningVotePowerSum + (votePower * votePowerBPS) / 10000);
+                // console.log("LOOP 1 END: ", gasleft());
             }
         }
         }
+
+        console.log("B");
 
         // LOOP 2 - DO ACCOUNTING FOR _claimableBribes AND _providedBribes MAPPINGS
         // _gaugeToTotalVotePower, _votes and _providedBribes enumerable collections should be empty at the end.
@@ -663,13 +649,16 @@ contract BribeController is
                 // Iterate by bribeToken
                 uint256 numBribeTokens = _providedBribes[gaugeID].length();
                 for (uint256 k = 0; k < numBribeTokens; k++) {
+                    // console.log("LOOP 2 START: ", gasleft());
                     // Checkpoint 2
-                    if (gasleft() < 30000) {return _saveUpdateState(type(uint80).max - 1, type(uint88).max - 1, k);}
+                    if (gasleft() < 120000) {return _saveUpdateState(type(uint80).max - 1, type(uint88).max - 1, k);}
                     (address bribeToken, uint256 totalBribeAmount) = _providedBribes[gaugeID].at(k);
                     (, uint256 runningClaimableAmount) = _claimableBribes[voter].tryGet(bribeToken);
                     uint256 bribeAmount = totalBribeAmount * bribeProportion / 1e18;
                     // State mutation 2
                     _claimableBribes[voter].set(bribeToken, runningClaimableAmount + bribeAmount);
+                    // console.log("LOOP 2 END: ", gasleft());
+                    if (gasleft() < 100000) {return _saveUpdateState(type(uint80).max - 1, type(uint88).max - 1, k + 1);}
                 }
                 // Cleanup _votes, _gaugeToTotalVotePower enumerable collections.
                 _removeVoteForBribeInternal(voter, gaugeID);
@@ -678,19 +667,7 @@ contract BribeController is
         }
 
         // Cleanup _gaugesWithBribes and _providedBribes enumerable collections.
-        // No leftover bribes to send to the revenueRouter in this case.
-        while(_gaugesWithBribes.length() > 0) {
-            uint256 gaugeID = _gaugesWithBribes.at(0);
-            while(_providedBribes[gaugeID].length() > 0) {
-                (address bribeToken,) = _providedBribes[gaugeID].at(0);
-                _providedBribes[gaugeID].remove(bribeToken);
-            }
-            _gaugesWithBribes.remove(gaugeID);
-        }
-
-        lastTimeBribesProcessed = currentEpochStartTime;
-        emit BribesProcessed(currentEpochStartTime);
-        _clearUpdateInfo();
+        _concludeProcessBribes(currentEpochStartTime);
     }
 
     /***************************************
@@ -704,6 +681,7 @@ contract BribeController is
      * @param loop2BribeTokenIndex_ Current index of _providedBribes[gaugeID] in loop 2.
      */
     function _saveUpdateState(uint256 loop1GaugeIndex_, uint256 loop1VoteIndex_, uint256 loop2BribeTokenIndex_) internal {
+        console.log("===SAVEUPDATESTATE: 1: %s, 2: %s, 3: %s", loop1GaugeIndex_, loop1VoteIndex_, loop2BribeTokenIndex_);
         assembly {
             let updateInfo
             updateInfo := or(updateInfo, shr(176, shl(176, loop1GaugeIndex_))) // [0:80] => votingContractsIndex_
@@ -721,5 +699,22 @@ contract BribeController is
         assembly {
             sstore(_updateInfo.slot, bitmap)
         }
+    }
+
+    /// @notice Finishing code block of processBribes.
+    /// @param currentEpochStartTime_ Current epoch start timestamp.
+    function _concludeProcessBribes(uint256 currentEpochStartTime_) internal {
+        while(_gaugesWithBribes.length() > 0) {
+            uint256 gaugeID = _gaugesWithBribes.at(0);
+            while(_providedBribes[gaugeID].length() > 0) {
+                (address bribeToken,) = _providedBribes[gaugeID].at(0);
+                _providedBribes[gaugeID].remove(bribeToken);
+            }
+            _gaugesWithBribes.remove(gaugeID);
+        }
+
+        lastTimeBribesProcessed = currentEpochStartTime_;
+        emit BribesProcessed(currentEpochStartTime_);
+        _clearUpdateInfo();
     }
 }
