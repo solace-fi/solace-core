@@ -347,11 +347,12 @@ contract BribeController is
             uint256 votePowerBPS = votePowerBPSs_[i];
             if (_providedBribes[gaugeID].length() == 0) revert NoBribesForSelectedGauge();
             // USE CHECKS IN EXTERNAL CALLS BEFORE FURTHER INTERNAL STATE MUTATIONS
+            uint256 gas3 = gasleft();
             IUnderwritingLockVoting(votingContract).vote(voter_, gaugeID, votePowerBPS);
-            (bool votePresent, uint256 oldVotePowerBPS) = _votes[gaugeID].tryGet(voter_);
+            console.log("IUnderwritingLockVoting.vote: %s", gas3 - gasleft());
+            (,uint256 oldVotePowerBPS) = _votes[gaugeID].tryGet(voter_);
             // If remove vote
             if (votePowerBPS == 0) {
-                if (!votePresent) revert CannotRemoveNonExistentVote();
                 _votes[gaugeID].remove(voter_);
                 if (_votes[gaugeID].length() == 0) _gaugeToTotalVotePower.remove(gaugeID);
                 emit VoteForBribeRemoved(voter_, gaugeID);
@@ -360,7 +361,7 @@ contract BribeController is
                 _votes[gaugeID].set(voter_, votePowerBPS);
                 
                 // Change vote
-                if(votePresent) {
+                if(oldVotePowerBPS > 0) {
                     emit VoteForBribeChanged(voter_, gaugeID, votePowerBPS, oldVotePowerBPS);
                 // Add vote
                 } else {
@@ -619,19 +620,15 @@ contract BribeController is
 
             for (uint256 j = _updateInfo.index2 == type(uint88).max || i != _updateInfo.index1 ? 0 : _updateInfo.index2; j < numVotes; j++) {
                 // Checkpoint 1
-                // console.log("LOOP 1 START: ", gasleft());
                 if (gasleft() < 20000) {return _saveUpdateState(i, j, type(uint88).max);}
                 uint256 runningVotePowerSum = _gaugeToTotalVotePower.get(gaugeID);
                 (address voter, uint256 votePowerBPS) = _votes[gaugeID].at(j);
                 uint256 votePower = IUnderwritingLockVoting(votingContract).getLastProcessedVotePowerOf(voter);
                 // State mutation 1
                 _gaugeToTotalVotePower.set(gaugeID, runningVotePowerSum + (votePower * votePowerBPS) / 10000);
-                // console.log("LOOP 1 END: ", gasleft());
             }
         }
         }
-
-        console.log("B");
 
         // LOOP 2 - DO ACCOUNTING FOR _claimableBribes AND _providedBribes MAPPINGS
         // _gaugeToTotalVotePower, _votes and _providedBribes enumerable collections should be empty at the end.
@@ -649,7 +646,7 @@ contract BribeController is
                 // Iterate by bribeToken
                 uint256 numBribeTokens = _providedBribes[gaugeID].length();
                 for (uint256 k = 0; k < numBribeTokens; k++) {
-                    // console.log("LOOP 2 START: ", gasleft());
+                    uint256 gas1 = gasleft();
                     // Checkpoint 2
                     if (gasleft() < 120000) {return _saveUpdateState(type(uint80).max - 1, type(uint88).max - 1, k);}
                     (address bribeToken, uint256 totalBribeAmount) = _providedBribes[gaugeID].at(k);
@@ -657,11 +654,13 @@ contract BribeController is
                     uint256 bribeAmount = totalBribeAmount * bribeProportion / 1e18;
                     // State mutation 2
                     _claimableBribes[voter].set(bribeToken, runningClaimableAmount + bribeAmount);
-                    // console.log("LOOP 2 END: ", gasleft());
-                    if (gasleft() < 100000) {return _saveUpdateState(type(uint80).max - 1, type(uint88).max - 1, k + 1);}
+                    console.log("LOOP 2 GAS COST: ", gas1 - gasleft());
                 }
                 // Cleanup _votes, _gaugeToTotalVotePower enumerable collections.
+                uint256 gas2 = gasleft();
+                if (gasleft() < 110000) {return _saveUpdateState(type(uint80).max - 1, type(uint88).max - 1, 0);}
                 _removeVoteForBribeInternal(voter, gaugeID);
+                console.log("_removeVoteForBribeInternal: %s", gas2 - gasleft());
             }
         }
         }

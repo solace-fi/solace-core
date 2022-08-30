@@ -47,9 +47,6 @@ interface IBribeController {
     /// @notice Thrown when voteForBribe() attempted by a non-owner or non-delegate.
     error NotOwnerNorDelegate();
 
-    /// @notice Thrown when attempting to remove vote that does not exist.
-    error CannotRemoveNonExistentVote();
-
     /// @notice Thrown when voteForBribe() attempted for gauge without bribe.
     error NoBribesForSelectedGauge();
 
