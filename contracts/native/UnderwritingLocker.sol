@@ -707,14 +707,16 @@ contract UnderwritingLocker is
      * @notice Perform accounting for voting premiums to be charged by UnderwritingLockVoting.chargePremiums().
      * @dev Can only be called by votingContract set in the registry.
      * @dev Not meant to be called directly, but via UnderwritingLockVoting.chargePremiums().
-     * @dev Costs 5K gas per call to add notification functionality. This will quickly add-up in an unbounded loop so we omit it.
-     * @param lockID_ The ID of the lock to charge.
+     * @param voter_ Voter to charge premium for.
      * @param premium_ The amount of token charged as premium.
      */
-    function chargePremium(uint256 lockID_, uint256 premium_) external override nonReentrant {
+    function chargePremium(address voter_, uint256 premium_) external override nonReentrant {
         if (msg.sender != votingContract) revert NotVotingContract();
-        if (!_exists(lockID_)) {return;}
-        _locks[lockID_].amount -= premium_;
+        uint256[] memory lockIDs = _getAllLockIDsOf(voter_);
+        uint256 numLocks = lockIDs.length;
+        for (uint256 i = 0; i < numLocks; i++) {
+            _locks[lockIDs[i]].amount -= premium_ / numLocks;
+        }
     }
 
     /***************************************

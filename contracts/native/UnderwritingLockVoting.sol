@@ -482,18 +482,7 @@ contract UnderwritingLockVoting is
             }
             // Unbounded loop since # of votes (gauges) unbounded
             uint256 premium = _calculateVotePremium(voters[i], insuranceCapacity, votePowerSum, epochLength); // 87K gas for 10 votes
-            uint256[] memory lockIDs = IUnderwritingLocker(underwritingLocker).getAllLockIDsOf(voters[i]);
-            uint256 numLocks = lockIDs.length;
-
-            // Iterate through locks
-            // Using _votesIndex as _lockIndex
-            // If either votesIndex slot is cleared, or we aren't on the same voter as when we last saved, start from index 0.
-            for(uint256 j = _updateInfo.index3 == type(uint88).max || i != _updateInfo.index2 ? 0 : _updateInfo.index3; j < numLocks; j++) {
-                if (gasleft() < 20000) {return _saveUpdateState(0, i, j);}
-                // Split premium amongst each lock equally.
-                IUnderwritingLocker(underwritingLocker).chargePremium(lockIDs[j], premium / numLocks);
-            }
-
+            IUnderwritingLocker(underwritingLocker).chargePremium(voters[i], premium);
             _totalPremiumDue -= premium;
         }
 

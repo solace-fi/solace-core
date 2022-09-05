@@ -343,10 +343,11 @@ interface IUnderwritingLocker is IERC721Enhanced {
     /**
      * @notice Perform accounting for voting premiums to be charged by UnderwritingLockVoting.chargePremiums().
      * @dev Can only be called by votingContract set in the registry.
-     * @param lockID_ The ID of the lock to charge premium.
-     * @param premium_ Amount of tokens to charge as premium.
+     * @dev Not meant to be called directly, but via UnderwritingLockVoting.chargePremiums().
+     * @param voter_ Voter to charge premium for.
+     * @param premium_ The amount of token charged as premium.
      */
-    function chargePremium(uint256 lockID_, uint256 premium_) external;
+    function chargePremium(address voter_, uint256 premium_) external;
 
     /***************************************
     GOVERNANCE FUNCTIONS
