@@ -36,10 +36,6 @@ contract BribeController is
     /// @notice UnderwriterLockVoting.sol address
     address public override votingContract;
 
-    /// @notice Updater address.
-    /// @dev Second address that can call updateGaugeWeights (in addition to governance).
-    address public override updater;
-
     /// @notice End timestamp for last epoch that bribes were processed for all stored votes.
     uint256 public override lastTimeBribesProcessed;
 
@@ -106,14 +102,6 @@ contract BribeController is
      */
     function _getEpochEndTimestamp() internal view returns (uint256 timestamp) {
         return IGaugeController(gaugeController).getEpochEndTimestamp();
-    }
-
-    /**
-     * @notice Query whether msg.sender is either the governance or updater role.
-     * @return True if msg.sender is either governor or updater roler, and contract govenance is not locked, false otherwise.
-     */
-    function _isUpdaterOrGovernance() internal view returns (bool) {
-        return ( !this.governanceIsLocked() && ( msg.sender == updater || msg.sender == this.governance() ));
     }
 
     /**
@@ -338,7 +326,7 @@ contract BribeController is
 
         // ENABLE INTERNAL CALL TO SKIP CHECKS (which otherwise block processBribes)
         if (!isInternalCall_) {
-            if (_getEpochStartTimestamp() != lastTimeBribesProcessed) revert LastEpochBribesNotProcessed();
+            if (_getEpochStartTimestamp() > lastTimeBribesProcessed) revert LastEpochBribesNotProcessed();
             if (voter_ != msg.sender && IUnderwritingLockVoting(votingContract).delegateOf(voter_) != msg.sender) revert NotOwnerNorDelegate();
         }
 
@@ -535,16 +523,6 @@ contract BribeController is
     }
 
     /**
-     * @notice Set updater address.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param updater_ The address of the new updater.
-     */
-    function setUpdater(address updater_) external override onlyGovernance {
-        updater = updater_;
-        emit UpdaterSet(updater_);
-    }
-
-    /**
      * @notice Adds token to whitelist of accepted bribe tokens.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param bribeToken_ Address of bribe token.
@@ -581,22 +559,20 @@ contract BribeController is
         }
     }
 
-    /***************************************
-    UPDATER FUNCTIONS
-    ***************************************/
+    /********************************************
+     UPDATER FUNCTION TO BE RUN AFTER EACH EPOCH
+    ********************************************/
 
     /**
      * @notice Processes bribes, and makes bribes claimable by eligible voters.
      * @dev Designed to be called in a while-loop with custom gas limit of 6M until `lastTimeBribesProcessed == epochStartTimestamp`.
-     * Can only be called by the current [**governor**](/docs/protocol/governance) or the updater role.
      */
     function processBribes() external override {
         // CHECKS
-        if (!_isUpdaterOrGovernance()) revert NotUpdaterNorGovernance();
         uint256 currentEpochStartTime = _getEpochStartTimestamp();
         if (lastTimeBribesProcessed >= currentEpochStartTime) revert BribesAlreadyProcessed();
         // Require gauge weights to have been updated for this epoch => ensure state we are querying from is < 1 WEEK old.
-        if(IUnderwritingLockVoting(votingContract).lastTimePremiumsCharged() != currentEpochStartTime) revert LastEpochPremiumsNotCharged();
+        if(IUnderwritingLockVoting(votingContract).lastTimePremiumsCharged() < currentEpochStartTime) revert LastEpochPremiumsNotCharged();
 
         // If no votes to process 
         // => early cleanup of _gaugesWithBribes and _providedBribes mappings
@@ -670,7 +646,7 @@ contract BribeController is
     }
 
     /***************************************
-     distributeBribes() HELPER FUNCTIONS
+     processBribes() HELPER FUNCTIONS
     ***************************************/
 
     /**

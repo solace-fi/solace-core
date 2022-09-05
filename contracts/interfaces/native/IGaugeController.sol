@@ -72,9 +72,6 @@ interface IGaugeController {
     /// @notice Thrown when removeTokenholder() is attempted for an address not in the tokenholder set.
     error TokenholderNotPresent();
 
-    /// @notice Thrown when updateGaugeWeights() is called by neither governance nor updater, or governance is locked.
-    error NotUpdaterNorGovernance();
-
     /***************************************
     EVENTS
     ***************************************/
@@ -106,9 +103,6 @@ interface IGaugeController {
     /// @notice Emitted when the epoch length is set.
     event EpochLengthSet(uint256 indexed weeks_);
 
-    /// @notice Emitted when the Updater is set.
-    event UpdaterSet(address indexed updater);
-
     /// @notice Emitted when address added to tokenholder set.
     event TokenholderAdded(address indexed tokenholder);
 
@@ -127,9 +121,6 @@ interface IGaugeController {
 
     /// @notice Underwriting equity token.
     function token() external view returns (address);
-
-    /// @notice Updater address.
-    function updater() external view returns (address);
 
     /// @notice Insurance leverage factor.
     function leverageFactor() external view returns (uint256);
@@ -327,13 +318,6 @@ interface IGaugeController {
     function setToken(address token_) external;
 
     /**
-     * @notice Set updater address.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param updater_ The address of the new updater.
-     */
-    function setUpdater(address updater_) external;
-
-    /**
      * @notice Set epoch length (as an integer multiple of 1 week).
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param weeks_ Integer multiple of 1 week, to set epochLength to.
@@ -366,7 +350,6 @@ interface IGaugeController {
     /**
      * @notice Updates gauge weights by processing votes for the last epoch.
      * @dev Designed to be called in a while-loop with custom gas limit of 6M until `lastTimePremiumsCharged == epochStartTimestamp`.
-     * Can only be called by the current [**governor**](/docs/protocol/governance) or the updater role.
      */
     function updateGaugeWeights() external;
 }

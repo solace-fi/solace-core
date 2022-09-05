@@ -41,10 +41,6 @@ contract GaugeController is
     /// @notice Underwriting equity token
     address public override token;
 
-    /// @notice Updater address.
-    /// @dev Second address that can call updateGaugeWeights (in addition to governance).
-    address public override updater;
-
     /// @notice Insurance leverage factor.
     /// @dev 1e18 => 100%.
     uint256 public override leverageFactor;
@@ -176,14 +172,6 @@ contract GaugeController is
                 weights[i] = 0;
             }
         }
-    }
-
-    /**
-     * @notice Query whether msg.sender is either the governance or updater role.
-     * @return True if msg.sender is either governor or updater roler, and contract govenance is not locked, false otherwise.
-     */
-    function _isUpdaterOrGovernance() internal view returns (bool) {
-        return ( !this.governanceIsLocked() && ( msg.sender == updater || msg.sender == this.governance() ));
     }
 
     /***************************************
@@ -415,7 +403,7 @@ contract GaugeController is
      */
     function vote(address voter_, uint256 gaugeID_, uint256 newVotePowerBPS_) external override returns (uint256 oldVotePowerBPS) {
         if (gaugeID_ == 0) revert CannotVoteForGaugeID0();
-        if (_getEpochStartTimestamp() != lastTimeGaugeWeightsUpdated) revert GaugeWeightsNotYetUpdated();
+        if (_getEpochStartTimestamp() > lastTimeGaugeWeightsUpdated) revert GaugeWeightsNotYetUpdated();
         if (gaugeID_ + 1 > _gauges.length) revert GaugeIDNotExist();
         if (!_votingContracts.contains(msg.sender)) revert NotVotingContract();
         // Can remove votes while gauge paused
@@ -512,17 +500,9 @@ contract GaugeController is
     }
 
     /**
-     * @notice Set updater address.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param updater_ The address of the new updater.
-     */
-    function setUpdater(address updater_) external override onlyGovernance {
-        updater = updater_;
-        emit UpdaterSet(updater_);
-    }
-
-    /**
      * @notice Set epoch length (as an integer multiple of 1 week).
+     * @dev Advise caution for timing of this function call. If reducing epoch length, voting may then become closed because lastTimeGaugeWeightsUpdated < epochStartTime.
+     * @dev If the above case occurs, will need to run updateGaugeWeights to re-open voting.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param weeks_ Integer multiple of 1 week, to set epochLength to.
      */
@@ -568,13 +548,15 @@ contract GaugeController is
         }
     }
 
+    /********************************************
+     UPDATER FUNCTION TO BE RUN AFTER EACH EPOCH
+    ********************************************/
+
     /**
      * @notice Updates gauge weights by processing votes for the last epoch.
      * @dev Designed to be called in a while-loop with custom gas limit of 6M until `lastTimePremiumsCharged == epochStartTimestamp`.
-     * Can only be called by the current [**governor**](/docs/protocol/governance) or the updater role.
      */
     function updateGaugeWeights() external override {
-        if (!_isUpdaterOrGovernance()) revert NotUpdaterNorGovernance();
         if ( _updateInfo.index3 == type(uint88).max ) {_resetVotePowerOfGaugeMapping();} // If first call for epoch, reset _votePowerOfGauge
         uint256 epochStartTime = _getEpochStartTimestamp();
         if (lastTimeGaugeWeightsUpdated >= epochStartTime) revert GaugeWeightsAlreadyUpdated();

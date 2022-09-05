@@ -53,9 +53,6 @@ interface IBribeController {
     /// @notice Thrown when offerBribe() or voteForBribe() attempted before last epoch bribes are processed.
     error LastEpochBribesNotProcessed();
 
-    /// @notice Thrown when processBribes() is called by neither governance nor updater, or governance is locked.
-    error NotUpdaterNorGovernance();
-
     /// @notice Thrown if processBribes() is called after bribes have already been successfully processed in the current epoch.
     error BribesAlreadyProcessed();
 
@@ -84,9 +81,6 @@ interface IBribeController {
     /// @notice Emitted when registry set.
     event RegistrySet(address indexed registry);
 
-    /// @notice Emitted when the Updater is set.
-    event UpdaterSet(address indexed updater);
-
     /// @notice Emitted when bribe token added to whitelist.
     event BribeTokenAdded(address indexed bribeToken);
 
@@ -114,9 +108,6 @@ interface IBribeController {
 
     /// @notice Address of UnderwritingLockVoting.sol
     function votingContract() external view returns (address);
-
-    /// @notice Updater address.
-    function updater() external view returns (address);
 
     /// @notice End timestamp for last epoch that bribes were processed for all stored votes.
     function lastTimeBribesProcessed() external view returns (uint256);
@@ -283,13 +274,6 @@ interface IBribeController {
     function setRegistry(address registry_) external;
 
     /**
-     * @notice Set updater address.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param updater_ The address of the new updater.
-     */
-    function setUpdater(address updater_) external;
-
-    /**
      * @notice Adds token to whitelist of accepted bribe tokens.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param bribeToken_ Address of bribe token.
@@ -312,13 +296,12 @@ interface IBribeController {
     function rescueTokens(address[] memory tokens_, address receiver_) external;
 
     /***************************************
-    UPDATER FUNCTIONS
+    UPDATER FUNCTION
     ***************************************/
 
     /**
      * @notice Processes bribes, and makes bribes claimable by eligible voters.
      * @dev Designed to be called in a while-loop with custom gas limit of 6M until `lastTimeBribesDistributed == epochStartTimestamp`.
-     * Can only be called by the current [**governor**](/docs/protocol/governance) or the updater role.
      */
     function processBribes() external;
 }

@@ -29,7 +29,7 @@ const ONE_HUNDRED_PERCENT = ONE_ETHER;
 const CUSTOM_GAS_LIMIT = 6000000;
 
 describe("BribeController", function () {
-    const [deployer, governor, revenueRouter, voter1, voter2, voter3, voter4, delegate1, updater, briber1] = provider.getWallets();
+    const [deployer, governor, revenueRouter, voter1, voter2, voter3, voter4, delegate1, briber1, anon] = provider.getWallets();
   
     /***************************
        VARIABLE DECLARATIONS
@@ -97,7 +97,6 @@ describe("BribeController", function () {
           expect(await bribeController.registry()).eq(registry.address);
           expect(await bribeController.gaugeController()).eq(gaugeController.address);
           expect(await bribeController.votingContract()).eq(voting.address);
-          expect(await bribeController.updater()).eq(ZERO_ADDRESS);
           expect(await bribeController.lastTimeBribesProcessed()).eq(await bribeController.getEpochStartTimestamp());
           expect(await bribeController.getBribeTokenWhitelist()).deep.eq([]);
           expect(await bribeController.getClaimableBribes(voter1.address)).deep.eq([]);
@@ -179,17 +178,6 @@ describe("BribeController", function () {
       });
       after(async function () {
         await bribeController.connect(governor).setRegistry(registry.address);
-      });
-    });
-
-    describe("setUpdater", () => {
-      it("non governor cannot setUpdater", async  () => {
-        await expect(bribeController.connect(voter1).setUpdater(updater.address)).to.be.revertedWith("!governance");
-      });
-      it("can set updater", async () => {
-        let tx = await bribeController.connect(governor).setUpdater(updater.address);
-        await expect(tx).to.emit(bribeController, "UpdaterSet").withArgs(updater.address);
-        expect(await bribeController.updater()).eq(updater.address)
       });
     });
 
@@ -364,9 +352,6 @@ describe("BribeController", function () {
         await underwritingLocker.connect(governor).setVotingContract()
         await gaugeController.connect(governor).addTokenholder(underwritingLocker.address)
       });
-      it("will throw if called by non-governor or non-updater", async  () => {
-        await expect(bribeController.connect(briber1).processBribes()).to.be.revertedWith("NotUpdaterNorGovernance");
-      });
       it("will throw if called in same epoch as contract deployment", async  () => {
         await expect(bribeController.connect(governor).processBribes()).to.be.revertedWith("BribesAlreadyProcessed");
       });
@@ -384,9 +369,9 @@ describe("BribeController", function () {
         await expect(bribeController.connect(voter1).voteForBribe(voter1.address, 1, 1000)).to.be.revertedWith("LastEpochBribesNotProcessed");
         await expect(bribeController.connect(voter1).removeVoteForBribe(voter1.address, 1)).to.be.revertedWith("LastEpochBribesNotProcessed");
       });
-      it("updater can process bribes", async () => {
+      it("anon can process bribes", async () => {
         const EPOCH_START_TIMESTAMP = await bribeController.getEpochStartTimestamp();
-        const tx = await bribeController.connect(governor).processBribes({gasLimit: CUSTOM_GAS_LIMIT});
+        const tx = await bribeController.connect(anon).processBribes({gasLimit: CUSTOM_GAS_LIMIT});
         await expect(tx).to.emit(bribeController, "BribesProcessed").withArgs(EPOCH_START_TIMESTAMP);
         expect(await bribeController.lastTimeBribesProcessed()).eq(EPOCH_START_TIMESTAMP);
         expect(await bribeController.isBribingOpen()).eq(true);
@@ -485,7 +470,7 @@ describe("BribeController", function () {
 
         const OLD_VOTER_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(voter1.address)
         const OLD_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(bribeController.address)
-        await bribeController.connect(updater).processBribes({gasLimit: CUSTOM_GAS_LIMIT})
+        await bribeController.connect(anon).processBribes({gasLimit: CUSTOM_GAS_LIMIT})
 
         const NEW_VOTER_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(voter1.address)
         const NEW_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(bribeController.address)
@@ -525,8 +510,18 @@ describe("BribeController", function () {
         expect(CHANGE_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1).eq(BRIBE_AMOUNT.mul(-1))
         expect(CHANGE_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_1).eq(BRIBE_AMOUNT)
       })
+      it("check for reset of epoch length", async function () {
+        await gaugeController.connect(governor).setEpochLengthInWeeks(1)
+        const LAST_CHECKPOINT_TIMESTAMP = await bribeController.lastTimeBribesProcessed();
+        const EPOCH_START_TIMESTAMP = await bribeController.getEpochStartTimestamp();
+        if(EPOCH_START_TIMESTAMP.gt(LAST_CHECKPOINT_TIMESTAMP)) {
+          await gaugeController.connect(anon).updateGaugeWeights({gasLimit: CUSTOM_GAS_LIMIT})
+          await voting.connect(anon).chargePremiums({gasLimit: CUSTOM_GAS_LIMIT});
+          await bribeController.connect(anon).processBribes({gasLimit: CUSTOM_GAS_LIMIT});
+        }
+        expect(await bribeController.isBribingOpen()).eq(true);
+      });
       after(async function () {
-        await gaugeController.connect(governor).setEpochLengthInWeeks(1);
         await gaugeController.connect(governor).unpauseGauge(1);
       });
     });
@@ -1638,7 +1633,7 @@ describe("BribeController", function () {
           let counter = 0;
           while (true) {
             counter += 1;
-            const tx = await bribeController.connect(updater).processBribes({gasLimit: CUSTOM_GAS_LIMIT})
+            const tx = await bribeController.connect(anon).processBribes({gasLimit: CUSTOM_GAS_LIMIT})
 
             if ((await bribeController.lastTimeBribesProcessed()).lt(EPOCH_START_TIME)) {
               await expect(tx).to.emit(bribeController, "IncompleteBribesProcessing");

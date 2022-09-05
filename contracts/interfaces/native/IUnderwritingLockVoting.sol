@@ -71,9 +71,6 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     /// @param epochTime Timestamp of endtime for epoch already processed.
     error LastEpochPremiumsAlreadyProcessed(uint256 epochTime);
 
-    /// @notice Thrown when chargePremiums() is called by neither governance nor updater, or governance is locked.
-    error NotUpdaterNorGovernance();
-
     /***************************************
     EVENTS
     ***************************************/
@@ -83,9 +80,6 @@ interface IUnderwritingLockVoting is IGaugeVoter {
 
     /// @notice Emitted when the Registry is set.
     event RegistrySet(address indexed registry);
-
-    /// @notice Emitted when the Updater is set.
-    event UpdaterSet(address indexed updater);
 
     /// @notice Emitted when the Bribe Controller is set.
     event BribeControllerSet(address indexed bribeController);
@@ -123,9 +117,6 @@ interface IUnderwritingLockVoting is IGaugeVoter {
 
     /// @notice Registry address
     function registry() external view returns (address);
-
-    /// @notice Updater address.
-    function updater() external view returns (address);
 
     /**
      * @notice End timestamp for last epoch that premiums were charged for all stored votes.
@@ -274,13 +265,6 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     function setRegistry(address registry_) external;
 
     /**
-     * @notice Set updater address.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param updater_ The address of the new updater.
-     */
-    function setUpdater(address updater_) external;
-
-    /**
      * @notice Sets bribeController as per `bribeController` address stored in Registry.
      * @dev We do not set this in constructor, because we expect BribeController.sol to be deployed after this contract.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
@@ -291,7 +275,6 @@ interface IUnderwritingLockVoting is IGaugeVoter {
      * @notice Charge premiums for votes.
      * @dev Designed to be called in a while-loop with the condition being `lastTimePremiumsCharged != epochStartTimestamp` and using the maximum custom gas limit.
      * @dev Requires GaugeController.updateGaugeWeights() to be run to completion for the last epoch.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
      */
     function chargePremiums() external;
 }

@@ -28,7 +28,7 @@ const ONE_HUNDRED_PERCENT = ONE_ETHER;
 const CUSTOM_GAS_LIMIT = 6000000;
 
 describe("UnderwritingLockVoting", function () {
-    const [deployer, governor, revenueRouter, voter1, voter2, delegate1, updater, bribeController, anon] = provider.getWallets();
+    const [deployer, governor, revenueRouter, voter1, voter2, delegate1, bribeController, anon] = provider.getWallets();
   
     /***************************
        VARIABLE DECLARATIONS
@@ -89,7 +89,6 @@ describe("UnderwritingLockVoting", function () {
           expect(await voting.underwritingLocker()).eq(underwritingLocker.address);
           expect(await voting.gaugeController()).eq(gaugeController.address);
           expect(await voting.registry()).eq(registry.address);
-          expect(await voting.updater()).eq(ZERO_ADDRESS);
           expect(await voting.bribeController()).eq(ZERO_ADDRESS);
           expect(await voting.lastTimePremiumsCharged()).eq(await voting.lastTimePremiumsCharged());
           expect(await voting.isVotingOpen()).eq(true);
@@ -221,17 +220,6 @@ describe("UnderwritingLockVoting", function () {
         })
     });
 
-    describe("setUpdater", () => {
-      it("non governor cannot setUpdater", async  () => {
-        await expect(voting.connect(voter1).setUpdater(updater.address)).to.be.revertedWith("!governance");
-      });
-      it("can set updater", async () => {
-        const tx = await voting.connect(governor).setUpdater(updater.address);
-        await expect(tx).to.emit(voting, "UpdaterSet").withArgs(updater.address);
-        expect(await voting.updater()).eq(updater.address)
-      });
-    });
-
     describe("setBribeController", () => {
       it("non governor cannot setBribeController", async  () => {
         await expect(voting.connect(voter1).setBribeController()).to.be.revertedWith("!governance");
@@ -330,17 +318,6 @@ describe("UnderwritingLockVoting", function () {
         await expect(tx).to.emit(gaugeController, "TokenSet").withArgs(voter1.address);
         expect(await gaugeController.token()).eq(voter1.address)
         await gaugeController.connect(governor).setToken(token.address)
-      });
-    });
-
-    describe("gaugeController.setUpdater", () => {
-      it("non governor cannot setUpdater", async  () => {
-        await expect(gaugeController.connect(voter1).setUpdater(updater.address)).to.be.revertedWith("!governance");
-      });
-      it("can set updater", async () => {
-        let tx = await gaugeController.connect(governor).setUpdater(updater.address);
-        await expect(tx).to.emit(gaugeController, "UpdaterSet").withArgs(updater.address);
-        expect(await gaugeController.updater()).eq(updater.address)
       });
     });
 
@@ -474,11 +451,8 @@ describe("UnderwritingLockVoting", function () {
         await provider.send("evm_mine", [CURRENT_TIME + ONE_WEEK]);
         await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("GaugeWeightsNotYetUpdated");
       });
-      it("updateGaugeWeights() should revert if non governor or updater", async function () {
-        await expect(gaugeController.connect(voter1).updateGaugeWeights()).to.be.revertedWith("NotUpdaterNorGovernance");
-      });
-      it("updateGaugeWeights() called by updater should succeed in the next epoch", async function () {
-        const tx = await gaugeController.connect(updater).updateGaugeWeights({gasLimit: CUSTOM_GAS_LIMIT});
+      it("updateGaugeWeights() called by anon should succeed in the next epoch", async function () {
+        const tx = await gaugeController.connect(anon).updateGaugeWeights({gasLimit: CUSTOM_GAS_LIMIT});
         const EPOCH_START_TIME = await voting.getEpochStartTimestamp();
         const VOTE_POWER = await voting.getVotePower(voter1.address);
         await expect(tx).to.emit(gaugeController, "GaugeWeightsUpdated").withArgs(EPOCH_START_TIME);
@@ -508,16 +482,13 @@ describe("UnderwritingLockVoting", function () {
       it("chargePremiums() should revert before underwritingLocker.sol call setVotingContract()", async function () {
         await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("NotVotingContract");
       });
-      it("chargePremiums() should revert if non governor or updater", async function () {
-        await expect(voting.connect(voter1).chargePremiums()).to.be.revertedWith("NotUpdaterNorGovernance");
-      });
-      it("chargePremiums() call by updater should succeed in the next epoch, provided allowance granted by underwritingLocker", async function () {
+      it("chargePremiums() call by anon should succeed in the next epoch, provided allowance granted by underwritingLocker", async function () {
         await registry.connect(governor).set(["underwritingLockVoting"],[voting.address]);
         await underwritingLocker.connect(governor).setVotingContract();
         const OLD_VOTER_LOCKED_AMOUNT = await getTotalLockedAmount(voter1.address)
         const OLD_UNDERWRITING_LOCKER_BALANCE = await token.balanceOf(underwritingLocker.address);
 
-        const tx = await voting.connect(updater).chargePremiums();
+        const tx = await voting.connect(anon).chargePremiums();
         const EPOCH_START_TIME = await voting.getEpochStartTimestamp();
         const NEW_VOTER_LOCKED_AMOUNT = await getTotalLockedAmount(voter1.address)
         const NEW_UNDERWRITING_LOCKER_BALANCE = await token.balanceOf(underwritingLocker.address);
@@ -634,7 +605,7 @@ describe("UnderwritingLockVoting", function () {
       it("cannot call chargePremiums() before epoch passes", async function () {
         const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
         await provider.send("evm_mine", [CURRENT_TIME + ONE_WEEK]);
-        await expect(voting.connect(governor).chargePremiums()).to.be.revertedWith("LastEpochPremiumsAlreadyProcessed");
+        await expect(voting.connect(governor).chargePremiums()).to.be.reverted;
       });
       it("can updateGaugeWeights() in the next epoch", async function () {
         const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
@@ -714,8 +685,15 @@ describe("UnderwritingLockVoting", function () {
         expect(await gaugeController.lastTimeGaugeWeightsUpdated()).eq(EPOCH_START_TIME)
         expect(await voting.lastTimePremiumsCharged()).eq(EPOCH_START_TIME)
       });
-      after(async function () {
+      it("check for reset of epoch length", async function () {
         await gaugeController.connect(governor).setEpochLengthInWeeks(1)
+        const LAST_CHECKPOINT_TIMESTAMP = await voting.lastTimePremiumsCharged();
+        const EPOCH_START_TIMESTAMP = await voting.getEpochStartTimestamp();
+        if(EPOCH_START_TIMESTAMP.gt(LAST_CHECKPOINT_TIMESTAMP)) {
+          await gaugeController.connect(governor).updateGaugeWeights({gasLimit: CUSTOM_GAS_LIMIT})
+          await voting.connect(governor).chargePremiums();
+        }
+        expect(await voting.isVotingOpen()).eq(true);
       });
     });
 
