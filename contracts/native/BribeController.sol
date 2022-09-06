@@ -166,9 +166,15 @@ contract BribeController is
      */
     function getClaimableBribes(address voter_) external view override returns (Bribe[] memory bribes) {
         uint256 length = _claimableBribes[voter_].length();
-        bribes = new Bribe[](length);
+        uint256 bribesLength = 0;
+        for (uint256 i = 0; i < length; i++) {
+            (, uint256 bribeAmount) = _claimableBribes[voter_].at(i);
+            if (bribeAmount != type(uint256).max) {bribesLength += 1;}
+        }
+        bribes = new Bribe[](bribesLength);
         for (uint256 i = 0; i < length; i++) {
             (address bribeToken, uint256 bribeAmount) = _claimableBribes[voter_].at(i);
+            if (bribeAmount == type(uint256).max) {continue;}
             bribes[i] = Bribe(bribeToken, bribeAmount);
         }
         return bribes;
@@ -357,9 +363,23 @@ contract BribeController is
                     emit VoteForBribeChanged(voter_, gaugeID, votePowerBPS, oldVotePowerBPS);
                 // Add vote
                 } else {
+                    _preInitializeClaimableBribes(gaugeID, voter_);
                     emit VoteForBribeAdded(voter_, gaugeID, votePowerBPS);
                 }
             }
+        }
+    }
+
+    /**
+     * @notice Pre-initialize claimableBribes mapping to save SSTORE cost for zero-slot in processBribes()
+     * @param gaugeID_ GaugeID.
+     * @param voter_ Voter.
+     */
+    function _preInitializeClaimableBribes(uint256 gaugeID_, address voter_) internal {
+        uint256 numBribeTokens = _providedBribes[gaugeID_].length();
+        for (uint256 i = 0; i < numBribeTokens; i++) {
+            (address bribeToken, ) = _providedBribes[gaugeID_].at(i);
+            _claimableBribes[voter_].set(bribeToken, type(uint256).max);
         }
     }
 
@@ -503,10 +523,10 @@ contract BribeController is
     function claimBribes() external override nonReentrant {
         uint256 length = _claimableBribes[msg.sender].length();
         if (length == 0) revert NoClaimableBribes();
-
         while (_claimableBribes[msg.sender].length() != 0) {
             (address bribeToken, uint256 bribeAmount) = _claimableBribes[msg.sender].at(0);
             _claimableBribes[msg.sender].remove(bribeToken);
+            if (bribeAmount == type(uint256).max) {continue;}
             SafeERC20.safeTransfer(IERC20(bribeToken), msg.sender, bribeAmount);
             emit BribeClaimed(msg.sender, bribeToken, bribeAmount);
         }
@@ -633,6 +653,7 @@ contract BribeController is
                     }
                     (address bribeToken, uint256 totalBribeAmount) = _providedBribes[gaugeID].at(k);
                     (, uint256 runningClaimableAmount) = _claimableBribes[voter].tryGet(bribeToken);
+                    if (runningClaimableAmount == type(uint256).max) {runningClaimableAmount = 0;}
                     uint256 bribeAmount = totalBribeAmount * bribeProportion / 1e18;
                     // State mutation 2
                     _claimableBribes[voter].set(bribeToken, runningClaimableAmount + bribeAmount);

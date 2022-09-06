@@ -1623,7 +1623,7 @@ describe("BribeController", function () {
               break;
             }
           }
-          console.log(`Required ${counter} iterations of lastTimePremiumsCharged()`)
+          console.log(`Required ${counter} iterations of chargePremiums()`)
         }
 
         const OLD_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(bribeController.address)
