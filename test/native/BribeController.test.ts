@@ -1508,8 +1508,8 @@ describe("BribeController", function () {
      */
 
     describe("stress test with 25 voters and 50 gauges", () => {
-      const TOTAL_GAUGES = 25;
-      const TOTAL_VOTERS = 50;
+      const TOTAL_GAUGES = 50;
+      const TOTAL_VOTERS = 25;
       let WALLET_ARRAY: Wallet[] = []
       let VOTER_ARRAY: string[] = []
 

@@ -61,6 +61,11 @@ contract BribeController is
     /// @notice gaugeID => voter => votePowerBPS.
     mapping(uint256 => EnumerableMapS.AddressToUintMap) internal _votes;
 
+    /// @notice Mirror of votes.
+    /// @dev _votes will be cleaned up in processBribes(), _votesMirror will not be. 
+    /// @dev This will enable _voteForBribe to remove previous epoch's voteForBribes.
+    mapping(uint256 => EnumerableMapS.AddressToUintMap) internal _votesMirror;
+
     /// @notice whitelist of tokens that can be accepted as bribes
     EnumerableSet.AddressSet internal _bribeTokenWhitelist;
 
@@ -337,7 +342,6 @@ contract BribeController is
             // USE CHECKS IN EXTERNAL CALLS BEFORE FURTHER INTERNAL STATE MUTATIONS
             uint256 gas3 = gasleft();
             IUnderwritingLockVoting(votingContract).vote(voter_, gaugeID, votePowerBPS);
-            console.log("IUnderwritingLockVoting.vote: %s", gas3 - gasleft());
             (,uint256 oldVotePowerBPS) = _votes[gaugeID].tryGet(voter_);
             // If remove vote
             if (votePowerBPS == 0) {
@@ -582,11 +586,10 @@ contract BribeController is
             return _concludeProcessBribes(currentEpochStartTime);
         }
 
-        console.log("===Loaded state: 1: %s, 2: %s, 3: %s", _updateInfo.index1, _updateInfo.index2, _updateInfo.index3);
-
         // LOOP 1 - GET TOTAL VOTE POWER CHASING BRIBES FOR EACH GAUGE 
         // Block-scope to avoid stack too deep error
         {
+        uint256 gas0 = gasleft();
         uint256 numGauges = _gaugeToTotalVotePower.length();        
         // Iterate by gauge
         for (uint256 i = _updateInfo.index1 == type(uint80).max ? 0 : _updateInfo.index1; i < numGauges; i++) {
@@ -609,6 +612,7 @@ contract BribeController is
         // LOOP 2 - DO ACCOUNTING FOR _claimableBribes AND _providedBribes MAPPINGS
         // _gaugeToTotalVotePower, _votes and _providedBribes enumerable collections should be empty at the end.
         {
+        uint256 gas0 = gasleft();
         // Iterate by gauge
         while (_gaugeToTotalVotePower.length() > 0) {
             (uint256 gaugeID, uint256 votePowerSum) = _gaugeToTotalVotePower.at(0);
@@ -621,28 +625,31 @@ contract BribeController is
 
                 // Iterate by bribeToken
                 uint256 numBribeTokens = _providedBribes[gaugeID].length();
-                for (uint256 k = 0; k < numBribeTokens; k++) {
+                for (uint256 k = _updateInfo.index3 == type(uint88).max ? 0 : _updateInfo.index3; k < numBribeTokens; k++) {
                     uint256 gas1 = gasleft();
                     // Checkpoint 2
-                    if (gasleft() < 120000) {return _saveUpdateState(type(uint80).max - 1, type(uint88).max - 1, k);}
+                    if (gasleft() < 120000) {
+                        return _saveUpdateState(type(uint80).max - 1, type(uint88).max - 1, k);
+                    }
                     (address bribeToken, uint256 totalBribeAmount) = _providedBribes[gaugeID].at(k);
                     (, uint256 runningClaimableAmount) = _claimableBribes[voter].tryGet(bribeToken);
                     uint256 bribeAmount = totalBribeAmount * bribeProportion / 1e18;
                     // State mutation 2
                     _claimableBribes[voter].set(bribeToken, runningClaimableAmount + bribeAmount);
-                    console.log("LOOP 2 GAS COST: ", gas1 - gasleft());
+                    // console.log("LOOP 2 D - GAS COST PER BRIBE TOKEN: ", gas1 - gasleft());
                 }
+                if (_updateInfo.index3 != 0) {_updateInfo.index3 = type(uint88).max;}
                 // Cleanup _votes, _gaugeToTotalVotePower enumerable collections.
                 uint256 gas2 = gasleft();
-                if (gasleft() < 110000) {return _saveUpdateState(type(uint80).max - 1, type(uint88).max - 1, 0);}
+                if (gasleft() < 110000) {return _saveUpdateState(type(uint80).max - 1, type(uint88).max - 1, type(uint88).max - 1);}
                 _removeVoteForBribeInternal(voter, gaugeID);
-                console.log("_removeVoteForBribeInternal: %s", gas2 - gasleft());
             }
         }
+        console.log("===BLOCK 2 GAS: %s", gas0 - gasleft());
         }
 
         // Cleanup _gaugesWithBribes and _providedBribes enumerable collections.
-        _concludeProcessBribes(currentEpochStartTime);
+        return _concludeProcessBribes(currentEpochStartTime);
     }
 
     /***************************************
@@ -656,7 +663,6 @@ contract BribeController is
      * @param loop2BribeTokenIndex_ Current index of _providedBribes[gaugeID] in loop 2.
      */
     function _saveUpdateState(uint256 loop1GaugeIndex_, uint256 loop1VoteIndex_, uint256 loop2BribeTokenIndex_) internal {
-        console.log("===SAVEUPDATESTATE: 1: %s, 2: %s, 3: %s", loop1GaugeIndex_, loop1VoteIndex_, loop2BribeTokenIndex_);
         assembly {
             let updateInfo
             updateInfo := or(updateInfo, shr(176, shl(176, loop1GaugeIndex_))) // [0:80] => votingContractsIndex_
@@ -682,6 +688,7 @@ contract BribeController is
         while(_gaugesWithBribes.length() > 0) {
             uint256 gaugeID = _gaugesWithBribes.at(0);
             while(_providedBribes[gaugeID].length() > 0) {
+                if (gasleft() < 45000) {return _saveUpdateState(type(uint80).max - 1, type(uint88).max - 1, type(uint88).max - 1);}
                 (address bribeToken,) = _providedBribes[gaugeID].at(0);
                 _providedBribes[gaugeID].remove(bribeToken);
             }
