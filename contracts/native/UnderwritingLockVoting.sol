@@ -57,6 +57,9 @@ contract UnderwritingLockVoting is
     /// @notice Address of [`GaugeController`](./GaugeController).
     address public override gaugeController;
 
+    /// @notice Address of [`BribeController`](./BribeController).
+    address public override bribeController;
+
     /// @notice Registry address
     address public override registry;
 
@@ -282,7 +285,7 @@ contract UnderwritingLockVoting is
     function _vote(address voter_, uint256[] memory gaugeIDs_, uint256[] memory votePowerBPSs_) internal {
         // Disable voting if votes not yet processed or premiums not yet charged for this epoch
         if ( _getEpochStartTimestamp() != lastTimePremiumsCharged) revert LastEpochPremiumsNotCharged();
-        if( voter_ != msg.sender && delegateOf[voter_] != msg.sender) revert NotOwnerNorDelegate();
+        if( voter_ != msg.sender && delegateOf[voter_] != msg.sender && bribeController != msg.sender) revert NotOwnerNorDelegate();
         if (gaugeIDs_.length != votePowerBPSs_.length) revert ArrayArgumentsLengthMismatch();
 
         for(uint256 i = 0; i < gaugeIDs_.length; i++) {
@@ -457,6 +460,18 @@ contract UnderwritingLockVoting is
     function setUpdater(address updater_) external override onlyGovernance {
         updater = updater_;
         emit UpdaterSet(updater_);
+    }
+
+    /**
+     * @notice Sets bribeController as per `bribeController` address stored in Registry.
+     * @dev We do not set this in constructor, because we expect BribeController.sol to be deployed after this contract.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     */
+    function setBribeController() external override onlyGovernance {
+        (, address bribeControllerAddr) = IRegistry(registry).tryGet("bribeController");
+        if(bribeControllerAddr == address(0x0)) revert ZeroAddressInput("bribeController");
+        bribeController = bribeControllerAddr;
+        emit BribeControllerSet(bribeControllerAddr);
     }
 
     /**

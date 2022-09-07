@@ -87,6 +87,9 @@ interface IUnderwritingLockVoting is IGaugeVoter {
     /// @notice Emitted when the Updater is set.
     event UpdaterSet(address indexed updater);
 
+    /// @notice Emitted when the Bribe Controller is set.
+    event BribeControllerSet(address indexed bribeController);
+
     /// @notice Emitted when a vote is added.
     event VoteAdded(address indexed voter, uint256 indexed gaugeID, uint256 votePowerBPS);
 
@@ -114,6 +117,9 @@ interface IUnderwritingLockVoting is IGaugeVoter {
 
     /// @notice Address of [`GaugeController`](./GaugeController).
     function gaugeController() external view returns (address);
+
+    /// @notice Address of [`BribeController`](./BribeController).
+    function bribeController() external view returns (address);
 
     /// @notice Registry address
     function registry() external view returns (address);
@@ -273,6 +279,13 @@ interface IUnderwritingLockVoting is IGaugeVoter {
      * @param updater_ The address of the new updater.
      */
     function setUpdater(address updater_) external;
+
+    /**
+     * @notice Sets bribeController as per `bribeController` address stored in Registry.
+     * @dev We do not set this in constructor, because we expect BribeController.sol to be deployed after this contract.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     */
+    function setBribeController() external;
 
     /**
      * @notice Charge premiums for votes.
