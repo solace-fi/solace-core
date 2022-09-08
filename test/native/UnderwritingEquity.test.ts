@@ -23,7 +23,11 @@ const EIGHT_DECIMALS = BN.from("100000000");
 
 describe("UnderwritingEquity", function () {
   let uwp: MockErc20;
+  let uwp2: MockErc20;
   let uwe: UnderwritingEquity;
+
+  let dai: MockErc20;
+  let weth: MockErc20;
 
   const [deployer, governor, user1, user2, user3] = provider.getWallets();
   let artifacts: ArtifactImports;
@@ -36,6 +40,9 @@ describe("UnderwritingEquity", function () {
 
     // deploy tokens
     uwp = (await deployContract(deployer, artifacts.MockERC20, ["Solace Native Underwriting Pool", "UWP", ONE_ETHER.mul(1000000)])) as MockErc20;
+    uwp2 = (await deployContract(deployer, artifacts.MockERC20, ["Solace Native Underwriting Pool", "UWP", ONE_ETHER.mul(1000000)])) as MockErc20;
+    dai = (await deployContract(deployer, artifacts.MockERC20, ["Dai Stablecoin", "DAI", ONE_ETHER.mul(1000000)])) as MockErc20;
+    weth = (await deployContract(deployer, artifacts.MockERC20, ["Wrapped Ether", "WETH", ONE_ETHER.mul(1000000)])) as MockErc20;
   });
 
   after(async function () {
@@ -323,8 +330,6 @@ describe("UnderwritingEquity", function () {
       await expect(uwe.connect(governor).rescueTokens([uwp.address], user1.address)).to.be.revertedWith("cannot rescue uwp")
     });
     it("can rescue tokens", async function () {
-      let dai = (await deployContract(deployer, artifacts.MockERC20, ["Dai Stablecoin", "DAI", ONE_ETHER.mul(1000000)])) as MockErc20;
-      let weth = (await deployContract(deployer, artifacts.MockERC20, ["Wrapped Ether", "WETH", ONE_ETHER.mul(1000000)])) as MockErc20;
       await dai.connect(deployer).transfer(uwe.address, ONE_ETHER.mul(100));
       await weth.connect(deployer).transfer(uwe.address, ONE_ETHER);
       await uwe.connect(governor).rescueTokens([dai.address, weth.address], user1.address);
@@ -334,5 +339,44 @@ describe("UnderwritingEquity", function () {
       expect(await weth.balanceOf(user1.address)).eq(ONE_ETHER);
     });
   });
-  //it("", async function () {});
+
+  describe("setUwp", function () {
+    it("cannot be called by non governor", async function () {
+      await expect(uwe.connect(user1).setUwp(dai.address)).to.be.revertedWith("!governance")
+    });
+    it("reverts if zero address uwp", async function () {
+      await expect(uwe.connect(governor).setUwp(ZERO_ADDRESS)).to.be.revertedWith("zero address uwp")
+    });
+    it("can be called by governor", async function () {
+      let tx = await uwe.connect(governor).setUwp(uwp2.address);
+      await expect(tx).to.emit(uwe, "UwpSet").withArgs(uwp2.address);
+      expect(await uwe.underwritingPool()).eq(uwp2.address);
+    });
+    it("edge case - zero uwp bal", async function () {
+      // deposits 1:1
+      expect(await uwe.calculateDeposit(ONE_ETHER)).eq(ONE_ETHER);
+      await uwp2.connect(deployer).approve(uwe.address, ethers.constants.MaxUint256);
+      expect(await uwe.connect(deployer).callStatic.deposit(ONE_ETHER, deployer.address)).eq(ONE_ETHER);
+      // withdraws any:0
+      expect(await uwe.calculateWithdraw(ONE_ETHER)).eq(0);
+      expect(await uwe.connect(user1).callStatic.withdraw(ONE_ETHER, user1.address)).eq(0);
+    });
+    it("edge case - governance converts uwp and deposits", async function () {
+      await uwp2.transfer(uwe.address, ONE_ETHER);
+      // 1:2
+      expect(await uwe.calculateDeposit(ONE_ETHER)).eq(ONE_ETHER.mul(2));
+      expect(await uwe.connect(deployer).callStatic.deposit(ONE_ETHER, deployer.address)).eq(ONE_ETHER.mul(2));
+      expect(await uwe.calculateWithdraw(ONE_ETHER)).eq(ONE_ETHER.div(2));
+      expect(await uwe.connect(user1).callStatic.withdraw(ONE_ETHER, user1.address)).eq(ONE_ETHER.div(2));
+    });
+    it("can rescue old uwp", async function () {
+      let bale = await uwp.balanceOf(uwe.address);
+      let bal1 = await uwp.balanceOf(user3.address);
+      let tx = await uwe.connect(governor).rescueTokens([uwp.address], user3.address);
+      await expect(tx).to.emit(uwp, "Transfer").withArgs(uwe.address, user3.address, bale);
+      let bal2 = await uwp.balanceOf(user3.address);
+      expect(bal2.sub(bal1)).eq(bale);
+      expect(await uwp.balanceOf(uwe.address)).eq(0);
+    });
+  });
 });

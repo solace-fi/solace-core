@@ -28,18 +28,14 @@ contract DepositHelper is IDepositHelper, ReentrancyGuard {
     STATE VARIABLES
     ***************************************/
 
-    address internal _uwp;
     address internal _uwe;
     address internal _locker;
 
-    constructor(address uwp_, address uwe_, address locker_) {
-        require(uwp_ != address(0x0), "zero address uwp");
+    constructor(address uwe_, address locker_) {
         require(uwe_ != address(0x0), "zero address uwe");
         require(locker_ != address(0x0), "zero address locker");
-        _uwp = uwp_;
         _uwe = uwe_;
         _locker = locker_;
-        IERC20(uwp_).approve(uwe_, type(uint256).max);
         IERC20(uwe_).approve(locker_, type(uint256).max);
     }
 
@@ -52,7 +48,7 @@ contract DepositHelper is IDepositHelper, ReentrancyGuard {
      * @return uwp The underwriting pool.
      */
     function underwritingPool() external view override returns (address uwp) {
-        return _uwp;
+        return IUnderwritingEquity(_uwe).underwritingPool();
     }
 
     /**
@@ -79,8 +75,8 @@ contract DepositHelper is IDepositHelper, ReentrancyGuard {
      * @return uweAmount The amount of [`UWE`](./UnderwritingEquity) that will be minted to the receiver.
      */
     function calculateDeposit(address depositToken, uint256 depositAmount) external view override returns (uint256 uweAmount) {
-        address uwp_ = _uwp;
         address uwe_ = _uwe;
+        address uwp_ = IUnderwritingEquity(uwe_).underwritingPool();
         uint256 amount = depositAmount;
         // if deposit token is not uwp nor uwe
         // likely token is member of set
@@ -154,8 +150,8 @@ contract DepositHelper is IDepositHelper, ReentrancyGuard {
         address depositToken,
         uint256 depositAmount
     ) internal returns (uint256 uweAmount) {
-        address uwp_ = _uwp;
         address uwe_ = _uwe;
+        address uwp_ = IUnderwritingEquity(uwe_).underwritingPool();
         uint256 amount = depositAmount;
         IERC20 tkn = IERC20(depositToken);
         // pull tokens from msg.sender
@@ -174,6 +170,8 @@ contract DepositHelper is IDepositHelper, ReentrancyGuard {
         // if deposit token is not uwe
         if(depositToken != uwe_) {
             // deposit uwp into uwe
+            IERC20 uwp2 = IERC20(uwp_);
+            if(uwp2.allowance(address(this), uwe_) < amount) uwp2.approve(uwe_, type(uint256).max);
             amount = IUnderwritingEquity(uwe_).deposit(amount, address(this));
         }
         return amount;

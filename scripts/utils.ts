@@ -20,17 +20,3 @@ export function logContractAddress(contractName: String, address: String) {
 export function sortTokens(tokenA: string, tokenB: string) {
   return BN.from(tokenA).lt(BN.from(tokenB)) ? [tokenA, tokenB] : [tokenB, tokenA];
 }
-
-// creates, initializes, and returns a pool
-export async function createPool(creator: Signer, uniswapFactory: Contract, tokenA: string, tokenB: string, fee: FeeAmount) {
-  let [token0, token1] = sortTokens(tokenA, tokenB);
-  let pool: Contract;
-  let tx = await uniswapFactory.connect(creator).createPool(token0, token1, fee);
-  let events = (await tx.wait()).events;
-  let poolAddress = events[0].args.pool;
-  pool = await ethers.getContractAt(UniswapV3PoolArtifact.abi, poolAddress);
-  let sqrtPrice = encodePriceSqrt(1,1);
-  let tx2 = await pool.connect(creator).initialize(sqrtPrice);
-  await tx2.wait();
-  return pool;
-}

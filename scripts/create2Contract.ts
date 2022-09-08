@@ -3,7 +3,7 @@ import { deployContract } from "ethereum-waffle";
 import { ContractJSON } from "ethereum-waffle/dist/esm/ContractJSON";
 import { Contract, BigNumber as BN } from "ethers";
 import { keccak256, bufferToHex } from "ethereumjs-util";
-import { readFileSync, writeFileSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 
 import hardhat from "hardhat";
 const { waffle, ethers } = hardhat;
@@ -51,9 +51,13 @@ export async function create2Contract(wallet: Signer, factoryOrContractJson: Con
 }
 
 // initializes global variables if not done yet
+// and inits stash/
 async function _init() {
   if(initialized) return;
   artifacts = await import_artifacts();
+  if(!existsSync("stash/")) mkdirSync("stash/");
+  if(!existsSync("stash/scripts/")) mkdirSync("stash/scripts/");
+  if(!existsSync("stash/.gitignore")) writeFileSync("stash/.gitignore", "*");
   try {
     knownHashes = JSON.parse(readFileSync("stash/scripts/knownHashes.json").toString());
   } catch(e) {}
@@ -67,13 +71,15 @@ async function _initCodeGetter(wallet: Signer, factoryOrContractJson: ContractJS
   // TODO: intelligently construct the initCode instead of depending on failed transaction
   let contract;
   try {
-    contract = await deployContract(failDeployer, factoryOrContractJson, args, overrideOptions);
+    contract = await deployContract(failDeployer, factoryOrContractJson, args, {...overrideOptions, gasLimit: 21000});
   } catch(e: any) {
-    if(!e.tx || !e.tx.data) console.error(e);
-    return e.tx.data;
+    if(e.tx && e.tx.data) return e.tx.data;
+    if(e.transaction && e.transaction.data) return e.transaction.data;
+    console.error(e);
   }
   console.log(contract);
   throw "somehow created the contract";
+  return contract.deployTransaction.data;
 }
 
 // test salts until one results in an acceptable address

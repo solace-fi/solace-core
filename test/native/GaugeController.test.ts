@@ -32,7 +32,7 @@ const CUSTOM_GAS_LIMIT = 6000000;
 
 describe("GaugeController", function () {
     const [deployer, governor, revenueRouter, voter1, updater, anon] = provider.getWallets();
-  
+
     /***************************
        VARIABLE DECLARATIONS
     ***************************/
@@ -48,14 +48,14 @@ describe("GaugeController", function () {
         artifacts = await import_artifacts();
         snapshot = await provider.send("evm_snapshot", []);
         await deployer.sendTransaction({to:deployer.address}); // for some reason this helps solidity-coverage
-        
+
         // Deploy $UWE, and mint 1M $UWE to deployer
         token = (await deployContract(deployer, artifacts.MockERC20Permit, ["Underwriting Equity - Solace Native", "UWE", ONE_MILLION_ETHER, 18])) as MockErc20Permit;
-  
+
         // Deploy registry
         registry = (await deployContract(deployer, artifacts.Registry, [governor.address])) as Registry;
     });
-    
+
     after(async function () {
       await provider.send("evm_revert", [snapshot]);
     });
@@ -312,7 +312,7 @@ describe("GaugeController", function () {
     });
 
     /*********************
-      INTENTION STATEMENT 
+      INTENTION STATEMENT
     *********************/
     // voter1 will vote for gaugeID 1 with 100% of vote power
 

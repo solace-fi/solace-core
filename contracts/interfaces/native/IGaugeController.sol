@@ -11,9 +11,9 @@ import "./GaugeStructs.sol";
  * Current gauge weights can be obtained through [`getGaugeWeight()`](#getgaugeweight) and [`getAllGaugeWeights()`](#getallgaugeweights)
  *
  * Only governance can make mutator calls to GaugeController.sol. There are no unpermissioned external mutator calls in this contract.
- * 
+ *
  * After every epoch, governance must call [`updateGaugeWeights()`](#updategaugeweights). This will process the last epoch's votes (stored in this contract).
- * 
+ *
  * Individual voters register and manage their vote through voting contracts that conform to IGaugeVoting.
  *
  * Governance can [`addGauge()`](#addgauge) or [`pauseGauge()`](#pausegauge).
@@ -27,7 +27,7 @@ interface IGaugeController {
     /// @notice Thrown when zero address is given as an argument.
     /// @param contractName Name of contract for which zero address was incorrectly provided.
     error ZeroAddressInput(string contractName);
-    
+
     /// @notice Thrown when array arguments are mismatched in length;
     error ArrayArgumentsLengthMismatch();
 
@@ -180,7 +180,7 @@ interface IGaugeController {
      * @return numPausedGauges
      */
     function getNumPausedGauges() external view returns (uint256 numPausedGauges);
-    
+
     /**
      * @notice Get gauge name.
      * @param gaugeID_ The ID of the gauge to query.
@@ -244,7 +244,7 @@ interface IGaugeController {
      * @return votersCount Number of votes.
      */
     function getVotersCount(address votingContract_) external view returns (uint256 votersCount);
-    
+
     /**
      * @notice Get current epoch length in seconds.
      * @return epochLength
@@ -350,7 +350,7 @@ interface IGaugeController {
      * @param tokenholder_ Address of new tokenholder.
      */
     function removeTokenholder(address tokenholder_) external;
-    
+
     /**
      * @notice Set annual rate-on-line for selected gaugeIDs
      * @dev 1e18 => 100%
