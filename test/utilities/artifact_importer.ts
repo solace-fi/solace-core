@@ -74,6 +74,7 @@ export async function import_artifacts() {
   if(!artifacts.ERC20) artifacts.ERC20 = await tryImport(`../../artifacts/@openzeppelin/contracts/token/ERC20/ERC20.sol/ERC20.json`);
   artifacts.MockERC20 = await tryImport(`${artifact_dir}/mocks/MockERC20.sol/MockERC20.json`);
   artifacts.MockERC20Permit = await tryImport(`${artifact_dir}/mocks/MockERC20Permit.sol/MockERC20Permit.json`);
+  artifacts.MockERC20PermitWithBurn = await tryImport(`${artifact_dir}/mocks/MockERC20PermitWithBurn.sol/MockERC20PermitWithBurn.json`);
   artifacts.MockERC20Decimals = await tryImport(`${artifact_dir}/mocks/MockERC20Decimals.sol/MockERC20Decimals.json`);
   artifacts.MockERC721 = await tryImport(`${artifact_dir}/mocks/MockERC721.sol/MockERC721.json`);
   artifacts.MockERC721Initializable = await tryImport(`${artifact_dir}/mocks/MockERC721Initializable.sol/MockERC721Initializable.json`);
@@ -91,6 +92,7 @@ export async function import_artifacts() {
   artifacts.RiskStrategyFactory = await tryImport(`${artifact_dir}/RiskStrategyFactory.sol/RiskStrategyFactory.json`);
   artifacts.RiskStrategy = await tryImport(`${artifact_dir}/RiskStrategy.sol/RiskStrategy.json`);
   artifacts.MockRiskStrategy = await tryImport(`${artifact_dir}/mocks/MockRiskStrategy.sol/MockRiskStrategy.json`);
+  artifacts.MockFluxPriceFeed = await tryImport(`${artifact_dir}/mocks/MockFluxPriceFeed.sol/MockFluxPriceFeed.json`);
 
   // uniswapv3 imports
   artifacts.UniswapV3Factory = await tryImport("@uniswap/v3-core/artifacts/contracts/UniswapV3Factory.sol/UniswapV3Factory.json");
@@ -105,10 +107,22 @@ export async function import_artifacts() {
 
   // vesting
   artifacts.TokenVesting = await tryImport(`${artifact_dir}/vesting/TokenVesting.sol/TokenVesting.json`);
-  
+
   // airdrop contracts
   artifacts.MerkleDistributor = await tryImport(`${artifact_dir}/airdrop/MerkleDistributor.sol/MerkleDistributor.json`);
   artifacts.xsLockerExtension = await tryImport(`${artifact_dir}/airdrop/xsLockerExtension.sol/xsLockerExtension.json`);
+
+  // native contracts
+  artifacts.SolaceMegaOracle = await tryImport(`${artifact_dir}/native/SolaceMegaOracle.sol/SolaceMegaOracle.json`);
+  artifacts.FluxPriceFeed = await tryImport(`${artifact_dir}/interfaces/native/IFluxPriceFeed.sol/IFluxPriceFeed.json`);
+  artifacts.FluxMegaOracle = await tryImport(`${artifact_dir}/native/FluxMegaOracle.sol/FluxMegaOracle.json`);
+  artifacts.UnderwritingPool = await tryImport(`${artifact_dir}/native/UnderwritingPool.sol/UnderwritingPool.json`);
+  artifacts.UnderwritingEquity = await tryImport(`${artifact_dir}/native/UnderwritingEquity.sol/UnderwritingEquity.json`);
+  artifacts.UnderwritingLocker = await tryImport(`${artifact_dir}/native/UnderwritingLocker.sol/UnderwritingLocker.json`);
+  artifacts.UnderwritingLockVoting = await tryImport(`${artifact_dir}/native/UnderwritingLockVoting.sol/UnderwritingLockVoting.json`);
+  artifacts.GaugeController = await tryImport(`${artifact_dir}/native/GaugeController.sol/GaugeController.json`);
+  artifacts.MockUnderwritingLockListener = await tryImport(`${artifact_dir}/mocks/MockUnderwritingLockListener.sol/MockUnderwritingLockListener.json`);
+  artifacts.DepositHelper = await tryImport(`${artifact_dir}/native/DepositHelper.sol/DepositHelper.json`);
 
   return artifacts;
 }
