@@ -101,6 +101,7 @@ describe("BribeController", function () {
           expect(await bribeController.getBribeTokenWhitelist()).deep.eq([]);
           expect(await bribeController.getClaimableBribes(voter1.address)).deep.eq([]);
           expect(await bribeController.getUnusedVotePowerBPS(voter1.address)).eq(10000);
+          expect(await bribeController.getAvailableVotePowerBPS(voter1.address)).eq(10000);
           expect(await bribeController.getAllGaugesWithBribe()).deep.eq([]);
           expect(await bribeController.getProvidedBribesForGauge(1)).deep.eq([]);
           expect(await bribeController.getLifetimeProvidedBribes(briber1.address)).deep.eq([]);
@@ -320,6 +321,7 @@ describe("BribeController", function () {
         await registry.connect(governor).set(["bribeController"], [bribeController.address]);
         await voting.connect(governor).setBribeController();
         expect(await bribeController.getUnusedVotePowerBPS(voter1.address)).eq(1000);
+        expect(await bribeController.getAvailableVotePowerBPS(voter1.address)).eq(1000);
         await expect(bribeController.connect(voter1).voteForBribe(voter1.address, 1, 10000)).to.be.revertedWith("TotalVotePowerBPSOver10000");
       });
       it("can voteForBribe", async  () => {
@@ -381,7 +383,8 @@ describe("BribeController", function () {
         expect(await bribeController.getProvidedBribesForGauge(1)).deep.eq([])
         expect(await bribeController.getVotesForVoter(voter1.address)).deep.eq([])
         expect(await bribeController.getVotesForGauge(1)).deep.eq([])
-        expect(await bribeController.getUnusedVotePowerBPS(voter1.address)).eq(1000)
+        expect(await bribeController.getUnusedVotePowerBPS(voter1.address)).eq(0)
+        expect(await bribeController.getAvailableVotePowerBPS(voter1.address)).eq(1000)
       })
     });
 
@@ -460,7 +463,7 @@ describe("BribeController", function () {
       it("cannot process bribes before next epoch", async () => {
         const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
         await provider.send("evm_mine", [CURRENT_TIME + ONE_WEEK]);
-        await expect(bribeController.connect(governor.address).processBribes()).to.be.revertedWith("BribesAlreadyProcessed");
+        await expect(bribeController.connect(governor.address).processBribes()).to.be.reverted;
       })
       it("after processing bribes, all bribes should stay on the bribing contract, and paused gauge does not impact this", async () => {
         const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
@@ -486,6 +489,7 @@ describe("BribeController", function () {
         expect(await bribeController.getVotesForVoter(voter1.address)).deep.eq([])
         expect(await bribeController.getVotesForGauge(1)).deep.eq([])
         expect(await bribeController.getUnusedVotePowerBPS(voter1.address)).eq(1000)
+        expect(await bribeController.getAvailableVotePowerBPS(voter1.address)).eq(1000)
       })
       it("rescueTokens cannot be called by non-governance", async () => {
         await expect(bribeController.connect(voter1).rescueTokens([bribeToken1.address, bribeToken2.address], revenueRouter.address)).to.be.revertedWith("!governance");
@@ -580,6 +584,7 @@ describe("BribeController", function () {
       });
       it("will throw if voteForBribe for more than unused votepower", async () => {
         expect(await bribeController.getUnusedVotePowerBPS(voter1.address)).eq(1000);
+        expect(await bribeController.getAvailableVotePowerBPS(voter1.address)).eq(1000);
         await expect(bribeController.connect(voter1).voteForMultipleBribes(voter1.address, [1, 3], [500, 501])).to.be.revertedWith("TotalVotePowerBPSOver10000");
       });
       it("can voteForMultipleBribes", async () => {
@@ -596,14 +601,18 @@ describe("BribeController", function () {
         await expect(tx4).to.emit(bribeController, "VoteForBribeAdded").withArgs(voter3.address, 1, 5000);
         await expect(tx4).to.emit(bribeController, "VoteForBribeAdded").withArgs(voter3.address, 3, 5000);
         expect(await bribeController.getUnusedVotePowerBPS(voter1.address)).eq(0)
+        expect(await bribeController.getAvailableVotePowerBPS(voter1.address)).eq(0)
         expect(await bribeController.getUnusedVotePowerBPS(voter2.address)).eq(0)
+        expect(await bribeController.getAvailableVotePowerBPS(voter2.address)).eq(0)
         expect(await bribeController.getUnusedVotePowerBPS(voter3.address)).eq(0)
+        expect(await bribeController.getAvailableVotePowerBPS(voter3.address)).eq(0)
       });
       it("can removeVotesForMultipleBribes", async () => {
         const tx = await bribeController.connect(voter3).removeVotesForMultipleBribes(voter3.address, [1, 3]);
         await expect(tx).to.emit(bribeController, "VoteForBribeRemoved").withArgs(voter3.address, 1);
         await expect(tx).to.emit(bribeController, "VoteForBribeRemoved").withArgs(voter3.address, 3);
         expect(await bribeController.getUnusedVotePowerBPS(voter3.address)).eq(10000)
+        expect(await bribeController.getAvailableVotePowerBPS(voter3.address)).eq(10000)
       });
       it("getVotesForGauge", async () => {
         const votes1 = await bribeController.getVotesForGauge(1);
@@ -689,9 +698,12 @@ describe("BribeController", function () {
         expect(await bribeController.getVotesForVoter(voter2.address)).deep.eq([])
         expect(await bribeController.getVotesForGauge(1)).deep.eq([])
         expect(await bribeController.getVotesForGauge(3)).deep.eq([])
-        expect(await bribeController.getUnusedVotePowerBPS(voter1.address)).eq(1000)
-        expect(await bribeController.getUnusedVotePowerBPS(voter2.address)).eq(10000)
+        expect(await bribeController.getUnusedVotePowerBPS(voter1.address)).eq(0)
+        expect(await bribeController.getAvailableVotePowerBPS(voter1.address)).eq(1000)
+        expect(await bribeController.getUnusedVotePowerBPS(voter2.address)).eq(0)
+        expect(await bribeController.getAvailableVotePowerBPS(voter2.address)).eq(10000)
         expect(await bribeController.getUnusedVotePowerBPS(voter3.address)).eq(10000)
+        expect(await bribeController.getAvailableVotePowerBPS(voter3.address)).eq(10000)
       })
       it("getClaimableBribes", async () => {
         const claim1 = await bribeController.getClaimableBribes(voter1.address);
@@ -786,7 +798,7 @@ describe("BribeController", function () {
         expect(CHANGE_VOTER_2_BALANCE_BRIBE_TOKEN_1).eq(0)
         expect(CHANGE_VOTER_2_BALANCE_BRIBE_TOKEN_2).eq(0)
         expect(NEW_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1).eq(0)
-        expect(NEW_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1).eq(0)
+        expect(NEW_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_2).eq(0)
         expect(CHANGE_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_1).eq(OLD_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1)
         expect(CHANGE_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_2).eq(OLD_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_2)
       })
@@ -853,15 +865,20 @@ describe("BribeController", function () {
         await expect(bribeController.connect(delegate1).voteForBribeForMultipleVoters([voter1.address, voter2.address], [1, 4], [500, 500])).to.be.revertedWith("NoBribesForSelectedGauge");
       });
       it("will throw if voteForBribe for more than unused votepower", async () => {
-          expect(await bribeController.getUnusedVotePowerBPS(voter1.address)).eq(1000);
+        expect(await bribeController.getUnusedVotePowerBPS(voter1.address)).eq(0);
+        expect(await bribeController.getAvailableVotePowerBPS(voter1.address)).eq(1000);
         await expect(bribeController.connect(delegate1).voteForBribeForMultipleVoters([voter1.address, voter2.address, voter3.address, voter4.address], [1, 2, 3], [2000, 5000, 1000])).to.be.revertedWith("TotalVotePowerBPSOver10000");
       });
       it("can voteForBribeForMultipleVoters", async () => {
         await voting.connect(delegate1).removeVoteMultiple(voter1.address, [2])
-        expect(await bribeController.getUnusedVotePowerBPS(voter1.address)).eq(10000);
-        expect(await bribeController.getUnusedVotePowerBPS(voter2.address)).eq(10000);
+        expect(await bribeController.getUnusedVotePowerBPS(voter1.address)).eq(9000);
+        expect(await bribeController.getAvailableVotePowerBPS(voter1.address)).eq(10000);
+        expect(await bribeController.getUnusedVotePowerBPS(voter2.address)).eq(0);
+        expect(await bribeController.getAvailableVotePowerBPS(voter2.address)).eq(10000);
         expect(await bribeController.getUnusedVotePowerBPS(voter3.address)).eq(10000);
+        expect(await bribeController.getAvailableVotePowerBPS(voter3.address)).eq(10000);
         expect(await bribeController.getUnusedVotePowerBPS(voter4.address)).eq(10000);
+        expect(await bribeController.getAvailableVotePowerBPS(voter4.address)).eq(10000);
         const tx = await bribeController.connect(delegate1).voteForBribeForMultipleVoters([voter1.address, voter2.address, voter3.address, voter4.address], [1, 2, 3], [2000, 5000, 1000]);
         await expect(tx).to.emit(bribeController, "VoteForBribeAdded").withArgs(voter1.address, 1, 2000);
         await expect(tx).to.emit(bribeController, "VoteForBribeAdded").withArgs(voter2.address, 1, 2000);
@@ -876,16 +893,22 @@ describe("BribeController", function () {
         await expect(tx).to.emit(bribeController, "VoteForBribeAdded").withArgs(voter3.address, 3, 1000);
         await expect(tx).to.emit(bribeController, "VoteForBribeAdded").withArgs(voter4.address, 3, 1000);
         expect(await bribeController.getUnusedVotePowerBPS(voter1.address)).eq(2000)
+        expect(await bribeController.getAvailableVotePowerBPS(voter1.address)).eq(2000)
         expect(await bribeController.getUnusedVotePowerBPS(voter2.address)).eq(2000)
+        expect(await bribeController.getAvailableVotePowerBPS(voter2.address)).eq(2000)
         expect(await bribeController.getUnusedVotePowerBPS(voter3.address)).eq(2000)
+        expect(await bribeController.getAvailableVotePowerBPS(voter3.address)).eq(2000)
         expect(await bribeController.getUnusedVotePowerBPS(voter4.address)).eq(2000)
+        expect(await bribeController.getAvailableVotePowerBPS(voter4.address)).eq(2000)
       });
       it("can removeVotesForMultipleBribes", async () => {
         const tx = await bribeController.connect(delegate1).removeVotesForBribeForMultipleVoters([voter3.address, voter4.address], [3]);
         await expect(tx).to.emit(bribeController, "VoteForBribeRemoved").withArgs(voter3.address, 3);
         await expect(tx).to.emit(bribeController, "VoteForBribeRemoved").withArgs(voter4.address, 3);
         expect(await bribeController.getUnusedVotePowerBPS(voter3.address)).eq(3000)
+        expect(await bribeController.getAvailableVotePowerBPS(voter3.address)).eq(3000)
         expect(await bribeController.getUnusedVotePowerBPS(voter4.address)).eq(3000)
+        expect(await bribeController.getAvailableVotePowerBPS(voter4.address)).eq(3000)
       });
       it("getVotesForGauge", async () => {
         const votes1 = await bribeController.getVotesForGauge(1);
@@ -1012,10 +1035,14 @@ describe("BribeController", function () {
         expect(await bribeController.getVotesForGauge(1)).deep.eq([])
         expect(await bribeController.getVotesForGauge(2)).deep.eq([])
         expect(await bribeController.getVotesForGauge(3)).deep.eq([])
-        expect(await bribeController.getUnusedVotePowerBPS(voter1.address)).eq(10000)
-        expect(await bribeController.getUnusedVotePowerBPS(voter2.address)).eq(10000)
-        expect(await bribeController.getUnusedVotePowerBPS(voter3.address)).eq(10000)
-        expect(await bribeController.getUnusedVotePowerBPS(voter4.address)).eq(10000)
+        expect(await bribeController.getUnusedVotePowerBPS(voter1.address)).eq(2000)
+        expect(await bribeController.getAvailableVotePowerBPS(voter1.address)).eq(10000)
+        expect(await bribeController.getUnusedVotePowerBPS(voter2.address)).eq(2000)
+        expect(await bribeController.getAvailableVotePowerBPS(voter2.address)).eq(10000)
+        expect(await bribeController.getUnusedVotePowerBPS(voter3.address)).eq(3000)
+        expect(await bribeController.getAvailableVotePowerBPS(voter3.address)).eq(10000)
+        expect(await bribeController.getUnusedVotePowerBPS(voter4.address)).eq(3000)
+        expect(await bribeController.getAvailableVotePowerBPS(voter4.address)).eq(10000)
       })
       it("getClaimableBribes", async () => {
         const claim1 = await bribeController.getClaimableBribes(voter1.address);
@@ -1357,10 +1384,10 @@ describe("BribeController", function () {
         expect(await bribeController.getVotesForGauge(1)).deep.eq([])
         expect(await bribeController.getVotesForGauge(2)).deep.eq([])
         expect(await bribeController.getVotesForGauge(3)).deep.eq([])
-        expect(await bribeController.getUnusedVotePowerBPS(voter1.address)).eq(10000)
-        expect(await bribeController.getUnusedVotePowerBPS(voter2.address)).eq(10000)
-        expect(await bribeController.getUnusedVotePowerBPS(voter3.address)).eq(10000)
-        expect(await bribeController.getUnusedVotePowerBPS(voter4.address)).eq(10000)
+        expect(await bribeController.getAvailableVotePowerBPS(voter1.address)).eq(10000)
+        expect(await bribeController.getAvailableVotePowerBPS(voter2.address)).eq(10000)
+        expect(await bribeController.getAvailableVotePowerBPS(voter3.address)).eq(10000)
+        expect(await bribeController.getAvailableVotePowerBPS(voter4.address)).eq(10000)
         expect(await bribeController.getClaimableBribes(voter1.address)).deep.eq([]);
         expect(await bribeController.getClaimableBribes(voter2.address)).deep.eq([]);
         expect(await bribeController.getClaimableBribes(voter3.address)).deep.eq([]);
@@ -1483,10 +1510,10 @@ describe("BribeController", function () {
         expect(await bribeController.getVotesForGauge(1)).deep.eq([])
         expect(await bribeController.getVotesForGauge(2)).deep.eq([])
         expect(await bribeController.getVotesForGauge(3)).deep.eq([])
-        expect(await bribeController.getUnusedVotePowerBPS(voter1.address)).eq(10000)
-        expect(await bribeController.getUnusedVotePowerBPS(voter2.address)).eq(10000)
-        expect(await bribeController.getUnusedVotePowerBPS(voter3.address)).eq(10000)
-        expect(await bribeController.getUnusedVotePowerBPS(voter4.address)).eq(10000)
+        expect(await bribeController.getAvailableVotePowerBPS(voter1.address)).eq(10000)
+        expect(await bribeController.getAvailableVotePowerBPS(voter2.address)).eq(10000)
+        expect(await bribeController.getAvailableVotePowerBPS(voter3.address)).eq(10000)
+        expect(await bribeController.getAvailableVotePowerBPS(voter4.address)).eq(10000)
         expect(await bribeController.getClaimableBribes(voter1.address)).deep.eq([]);
         expect(await bribeController.getClaimableBribes(voter2.address)).deep.eq([]);
         expect(await bribeController.getClaimableBribes(voter3.address)).deep.eq([]);
@@ -1686,13 +1713,13 @@ describe("BribeController", function () {
         const voter_promises_2 = []
 
         for (let i = 0; i < TOTAL_VOTERS; i++) {
-          voter_promises_2.push(bribeController.getUnusedVotePowerBPS(VOTER_ARRAY[i]))
+          voter_promises_2.push(bribeController.getAvailableVotePowerBPS(VOTER_ARRAY[i]))
         }
 
-        const unusedVotePowerBPSArray = await Promise.all(voter_promises_2);
+        const availableVotePowerBPSArray = await Promise.all(voter_promises_2);
 
         for (let i = 0; i < VOTER_VOTES_ARRAY.length; i++) {
-          expect(unusedVotePowerBPSArray[i]).eq(10000);
+          expect(availableVotePowerBPSArray[i]).eq(10000);
         }
       });
       it("getClaimableBribes", async () => {

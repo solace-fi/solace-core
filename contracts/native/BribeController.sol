@@ -61,10 +61,10 @@ contract BribeController is
     /// @notice gaugeID => voter => votePowerBPS.
     mapping(uint256 => EnumerableMapS.AddressToUintMap) internal _votes;
 
-    /// @notice Mirror of votes.
-    /// @dev _votes will be cleaned up in processBribes(), _votesMirror will not be. 
+    /// @notice Address => gaugeID => votePowerBPS
+    /// @dev _votes will be cleaned up in processBribes(), _votesMirror will not be.
     /// @dev This will enable _voteForBribe to remove previous epoch's voteForBribes.
-    mapping(uint256 => EnumerableMapS.AddressToUintMap) internal _votesMirror;
+    mapping(address => EnumerableMapS.UintToUintMap) internal _votesMirror;
 
     /// @notice whitelist of tokens that can be accepted as bribes
     EnumerableSet.AddressSet internal _bribeTokenWhitelist;
@@ -118,6 +118,25 @@ contract BribeController is
         return (10000 - IUnderwritingLockVoting(votingContract).usedVotePowerBPSOf(voter_));
     }
 
+    /**
+     * @notice Get votePowerBPS available for voteForBribes.
+     * @param voter_ The address of the voter to query for.
+     * @return availableVotePowerBPS
+     */
+    function _getAvailableVotePowerBPS(address voter_) internal view returns (uint256 availableVotePowerBPS) {
+        (,uint256 epochEndTimestamp) = _votesMirror[voter_].tryGet(0);
+        if (epochEndTimestamp == _getEpochEndTimestamp()) {return _getUnusedVotePowerBPS(voter_);}
+        else {
+            uint256 length = _votesMirror[voter_].length();
+            uint256 staleVotePowerBPS = 0;
+            for (uint256 i = 0; i < length; i++) {
+                (uint256 gaugeID, uint256 votePowerBPS) = _votesMirror[voter_].at(i);
+                if (gaugeID != 0) {staleVotePowerBPS += votePowerBPS;}
+            }
+            return (10000 - IUnderwritingLockVoting(votingContract).usedVotePowerBPSOf(voter_) + staleVotePowerBPS);
+        }
+    }
+
     /***************************************
     EXTERNAL VIEW FUNCTIONS
     ***************************************/
@@ -145,6 +164,15 @@ contract BribeController is
      */
     function getUnusedVotePowerBPS(address voter_) external view override returns (uint256 unusedVotePowerBPS) {
         return _getUnusedVotePowerBPS(voter_);
+    }
+
+    /**
+     * @notice Get votePowerBPS available for voteForBribes.
+     * @param voter_ The address of the voter to query for.
+     * @return availableVotePowerBPS
+     */
+    function getAvailableVotePowerBPS(address voter_) external view override returns (uint256 availableVotePowerBPS) {
+        return _getAvailableVotePowerBPS(voter_);
     }
 
     /**
@@ -339,6 +367,18 @@ contract BribeController is
         if (!isInternalCall_) {
             if (_getEpochStartTimestamp() > lastTimeBribesProcessed) revert LastEpochBribesNotProcessed();
             if (voter_ != msg.sender && IUnderwritingLockVoting(votingContract).delegateOf(voter_) != msg.sender) revert NotOwnerNorDelegate();
+
+            // If stale _votesMirror, empty _votesMirror and do external calls to remove vote
+            if (_votesMirror[voter_].length() != 0) {
+                (,uint256 epochEndTimestamp) = _votesMirror[voter_].tryGet(0);
+                if (epochEndTimestamp < _getEpochEndTimestamp()) {
+                    while(_votesMirror[voter_].length() > 0) {
+                        (uint256 gaugeID, uint256 votePowerBPS) = _votesMirror[voter_].at(0);
+                        _votesMirror[voter_].remove(gaugeID);
+                        if (gaugeID != 0) {IUnderwritingLockVoting(votingContract).vote(voter_, gaugeID, 0);}
+                    }
+                }
+            }   
         }
 
         for(uint256 i = 0; i < gaugeIDs_.length; i++) {
@@ -346,18 +386,19 @@ contract BribeController is
             uint256 votePowerBPS = votePowerBPSs_[i];
             if (_providedBribes[gaugeID].length() == 0) revert NoBribesForSelectedGauge();
             // USE CHECKS IN EXTERNAL CALLS BEFORE FURTHER INTERNAL STATE MUTATIONS
-            uint256 gas3 = gasleft();
-            IUnderwritingLockVoting(votingContract).vote(voter_, gaugeID, votePowerBPS);
-            (,uint256 oldVotePowerBPS) = _votes[gaugeID].tryGet(voter_);
+            (bool success, uint256 oldVotePowerBPS) = _votes[gaugeID].tryGet(voter_);
+            if(!isInternalCall_) {IUnderwritingLockVoting(votingContract).vote(voter_, gaugeID, votePowerBPS);}
             // If remove vote
             if (votePowerBPS == 0) {
+                if(!isInternalCall_) _votesMirror[voter_].remove(gaugeID);
                 _votes[gaugeID].remove(voter_);
                 if (_votes[gaugeID].length() == 0) _gaugeToTotalVotePower.remove(gaugeID);
                 emit VoteForBribeRemoved(voter_, gaugeID);
             } else {
                 _gaugeToTotalVotePower.set(gaugeID, 1); // Do not set to 0 to avoid SSTORE penalty for 0 slot in processBribes().
                 _votes[gaugeID].set(voter_, votePowerBPS);
-                
+                if ( _votesMirror[voter_].length() == 0) _votesMirror[voter_].set(0, _getEpochEndTimestamp());
+                _votesMirror[voter_].set(gaugeID, votePowerBPS);
                 // Change vote
                 if(oldVotePowerBPS > 0) {
                     emit VoteForBribeChanged(voter_, gaugeID, votePowerBPS, oldVotePowerBPS);
@@ -372,6 +413,7 @@ contract BribeController is
 
     /**
      * @notice Pre-initialize claimableBribes mapping to save SSTORE cost for zero-slot in processBribes()
+     * @dev ~5% gas saving in processBribes().
      * @param gaugeID_ GaugeID.
      * @param voter_ Voter.
      */
@@ -596,15 +638,13 @@ contract BribeController is
         uint256 currentEpochStartTime = _getEpochStartTimestamp();
         if (lastTimeBribesProcessed >= currentEpochStartTime) revert BribesAlreadyProcessed();
         // Require gauge weights to have been updated for this epoch => ensure state we are querying from is < 1 WEEK old.
-        if(IUnderwritingLockVoting(votingContract).lastTimePremiumsCharged() < currentEpochStartTime) revert LastEpochPremiumsNotCharged();
+        if (IUnderwritingLockVoting(votingContract).lastTimePremiumsCharged() < currentEpochStartTime) revert LastEpochPremiumsNotCharged();
 
         // If no votes to process 
         // => early cleanup of _gaugesWithBribes and _providedBribes mappings
         // => bribes stay custodied on bribing contract
         // => early return
-        if (_gaugeToTotalVotePower.length() == 0) {
-            return _concludeProcessBribes(currentEpochStartTime);
-        }
+        if (_gaugeToTotalVotePower.length() == 0) {return _concludeProcessBribes(currentEpochStartTime);}
 
         // LOOP 1 - GET TOTAL VOTE POWER CHASING BRIBES FOR EACH GAUGE 
         // Block-scope to avoid stack too deep error
@@ -632,7 +672,6 @@ contract BribeController is
         // LOOP 2 - DO ACCOUNTING FOR _claimableBribes AND _providedBribes MAPPINGS
         // _gaugeToTotalVotePower, _votes and _providedBribes enumerable collections should be empty at the end.
         {
-        uint256 gas0 = gasleft();
         // Iterate by gauge
         while (_gaugeToTotalVotePower.length() > 0) {
             (uint256 gaugeID, uint256 votePowerSum) = _gaugeToTotalVotePower.at(0);
@@ -646,7 +685,6 @@ contract BribeController is
                 // Iterate by bribeToken
                 uint256 numBribeTokens = _providedBribes[gaugeID].length();
                 for (uint256 k = _updateInfo.index3 == type(uint88).max ? 0 : _updateInfo.index3; k < numBribeTokens; k++) {
-                    uint256 gas1 = gasleft();
                     // Checkpoint 2
                     if (gasleft() < 120000) {
                         return _saveUpdateState(type(uint80).max - 1, type(uint88).max - 1, k);
@@ -657,16 +695,14 @@ contract BribeController is
                     uint256 bribeAmount = totalBribeAmount * bribeProportion / 1e18;
                     // State mutation 2
                     _claimableBribes[voter].set(bribeToken, runningClaimableAmount + bribeAmount);
-                    // console.log("LOOP 2 D - GAS COST PER BRIBE TOKEN: ", gas1 - gasleft());
                 }
                 if (_updateInfo.index3 != 0) {_updateInfo.index3 = type(uint88).max;}
                 // Cleanup _votes, _gaugeToTotalVotePower enumerable collections.
-                uint256 gas2 = gasleft();
                 if (gasleft() < 110000) {return _saveUpdateState(type(uint80).max - 1, type(uint88).max - 1, type(uint88).max - 1);}
+                uint256 gas1 = gasleft();
                 _removeVoteForBribeInternal(voter, gaugeID);
             }
         }
-        console.log("===BLOCK 2 GAS: %s", gas0 - gasleft());
         }
 
         // Cleanup _gaugesWithBribes and _providedBribes enumerable collections.

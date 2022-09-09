@@ -136,6 +136,12 @@ interface IBribeController {
     function getUnusedVotePowerBPS(address voter_) external view returns (uint256 unusedVotePowerBPS);
 
     /**
+     * @notice Get votePowerBPS available for voteForBribes.
+     * @param voter_ The address of the voter to query for.
+     * @return availableVotePowerBPS
+     */
+    function getAvailableVotePowerBPS(address voter_) external view returns (uint256 availableVotePowerBPS);
+    /**
      * @notice Get list of whitelisted bribe tokens.
      * @return whitelist
      */
