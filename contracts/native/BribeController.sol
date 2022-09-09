@@ -649,7 +649,6 @@ contract BribeController is
         // LOOP 1 - GET TOTAL VOTE POWER CHASING BRIBES FOR EACH GAUGE 
         // Block-scope to avoid stack too deep error
         {
-        uint256 gas0 = gasleft();
         uint256 numGauges = _gaugeToTotalVotePower.length();        
         // Iterate by gauge
         for (uint256 i = _updateInfo.index1 == type(uint80).max ? 0 : _updateInfo.index1; i < numGauges; i++) {
@@ -680,7 +679,7 @@ contract BribeController is
             while(_votes[gaugeID].length() > 0) {
                 (address voter, uint256 votePowerBPS) = _votes[gaugeID].at(0);
                 // `votePowerSum - 1` to nullify initiating _gaugeToTotalVotePower values at 1 rather than 0.
-                uint256 bribeProportion = (IUnderwritingLockVoting(votingContract).getLastProcessedVotePowerOf(voter) * votePowerBPS / 10000) * 1e18 / (votePowerSum - 1);
+                uint256 bribeProportion = 1e18 * (IUnderwritingLockVoting(votingContract).getLastProcessedVotePowerOf(voter) * votePowerBPS / 10000) / (votePowerSum - 1);
 
                 // Iterate by bribeToken
                 uint256 numBribeTokens = _providedBribes[gaugeID].length();

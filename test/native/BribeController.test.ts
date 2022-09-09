@@ -23,7 +23,6 @@ const ONE_MONTH = ONE_YEAR / 12;
 const ONE_WEEK = 604800; // in seconds
 const DEPOSIT_AMOUNT = ONE_ETHER;
 const BRIBE_AMOUNT = ONE_ETHER.mul(100);
-const SCALE_FACTOR = ONE_ETHER;
 const ONE_PERCENT = ONE_ETHER.div(100);
 const ONE_HUNDRED_PERCENT = ONE_ETHER;
 const CUSTOM_GAS_LIMIT = 6000000;
@@ -112,10 +111,10 @@ describe("BribeController", function () {
         it("getEpochStartTimestamp gets current timestamp rounded down to a multiple of WEEK ", async function () {
           const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
           const EXPECTED_EPOCH_START_TIME = BN.from(CURRENT_TIME).div(ONE_WEEK).mul(ONE_WEEK)
-          expect(await gaugeController.getEpochStartTimestamp()).eq(EXPECTED_EPOCH_START_TIME)
+          expect(await bribeController.getEpochStartTimestamp()).eq(EXPECTED_EPOCH_START_TIME)
         });
         it("getEpochEndTimestamp() == getEpochStartTimestamp() + ONE_WEEK ", async function () {
-          expect(await gaugeController.getEpochEndTimestamp()).eq((await gaugeController.getEpochStartTimestamp()).add(ONE_WEEK))
+          expect(await bribeController.getEpochEndTimestamp()).eq((await bribeController.getEpochStartTimestamp()).add(ONE_WEEK))
         });
     });
 
@@ -334,6 +333,10 @@ describe("BribeController", function () {
         expect(voteForBribe[0].voter).eq(voter1.address)
         expect(voteForBribe[0].votePowerBPS).eq(1000)
       });
+      it("claimForBribe immediately after vote has no token transfer", async () => {
+        const tx = await bribeController.connect(voter1).claimBribes();
+        await expect(tx).to.not.emit(bribeController, "BribeClaimed");
+      })
     });
 
     /*******************
