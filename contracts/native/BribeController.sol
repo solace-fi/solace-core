@@ -125,8 +125,9 @@ contract BribeController is
      */
     function _getAvailableVotePowerBPS(address voter_) internal view returns (uint256 availableVotePowerBPS) {
         (,uint256 epochEndTimestamp) = _votesMirror[voter_].tryGet(0);
-        if (epochEndTimestamp == _getEpochEndTimestamp()) {return _getUnusedVotePowerBPS(voter_);}
-        else {
+        if (epochEndTimestamp == _getEpochEndTimestamp()) {
+            return _getUnusedVotePowerBPS(voter_);
+        } else {
             uint256 length = _votesMirror[voter_].length();
             uint256 staleVotePowerBPS = 0;
             for (uint256 i = 0; i < length; i++) {
@@ -386,7 +387,7 @@ contract BribeController is
             uint256 votePowerBPS = votePowerBPSs_[i];
             if (_providedBribes[gaugeID].length() == 0) revert NoBribesForSelectedGauge();
             // USE CHECKS IN EXTERNAL CALLS BEFORE FURTHER INTERNAL STATE MUTATIONS
-            (bool success, uint256 oldVotePowerBPS) = _votes[gaugeID].tryGet(voter_);
+            (, uint256 oldVotePowerBPS) = _votes[gaugeID].tryGet(voter_);
             if(!isInternalCall_) {IUnderwritingLockVoting(votingContract).vote(voter_, gaugeID, votePowerBPS);}
             // If remove vote
             if (votePowerBPS == 0) {
