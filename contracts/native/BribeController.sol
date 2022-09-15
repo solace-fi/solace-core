@@ -376,7 +376,8 @@ contract BribeController is
                     while(_votesMirror[voter_].length() > 0) {
                         (uint256 gaugeID, uint256 votePowerBPS) = _votesMirror[voter_].at(0);
                         _votesMirror[voter_].remove(gaugeID);
-                        if (gaugeID != 0) {IUnderwritingLockVoting(votingContract).vote(voter_, gaugeID, 0);}
+                        // 'Try' here for edge case where premiums charged => voter removes vote via UnderwritingLockVoting => bribe processed => Vote exists in BribeController.sol, but not in GaugeController.sol => Following call can fail.
+                        if (gaugeID != 0) {try IUnderwritingLockVoting(votingContract).vote(voter_, gaugeID, 0) {} catch {}}
                     }
                 }
             }   
@@ -442,6 +443,7 @@ contract BribeController is
         uint256 gaugeID_
     ) external override nonReentrant {
         // CHECKS
+        if (_getEpochStartTimestamp() > lastTimeBribesProcessed) revert LastEpochBribesNotProcessed();
         if (bribeTokens_.length != bribeAmounts_.length) revert ArrayArgumentsLengthMismatch();
         try IGaugeController(gaugeController).isGaugeActive(gaugeID_) returns (bool gaugeActive) {
             if (!gaugeActive) revert CannotBribeForInactiveGauge();

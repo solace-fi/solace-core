@@ -374,6 +374,9 @@ describe("BribeController", function () {
         await expect(bribeController.connect(voter1).voteForBribe(voter1.address, 1, 1000)).to.be.revertedWith("LastEpochBribesNotProcessed");
         await expect(bribeController.connect(voter1).removeVoteForBribe(voter1.address, 1)).to.be.revertedWith("LastEpochBribesNotProcessed");
       });
+      it("cannot provide bribe, before bribes processed", async () => {
+        await expect(bribeController.connect(briber1).provideBribes([bribeToken1.address], [1], 1)).to.be.revertedWith("LastEpochBribesNotProcessed");
+      });
       it("anon can process bribes", async () => {
         const EPOCH_START_TIMESTAMP = await bribeController.getEpochStartTimestamp();
         const tx = await bribeController.connect(anon).processBribes({gasLimit: CUSTOM_GAS_LIMIT});
