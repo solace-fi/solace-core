@@ -355,12 +355,13 @@ contract BribeController is
     /**
      * @notice Add, change or remove vote for bribe.
      * Can only be called by the voter or their delegate.
+     * @dev Remove NonReentrant modifier from internal function => 5K gas cost saving
      * @param voter_ The voter address.
      * @param gaugeIDs_ The array of gaugeIDs to vote for.
      * @param votePowerBPSs_ The corresponding array of votePowerBPS values. Can be from 0-10000.
      * @param isInternalCall_ True if called through processBribes, false otherwise.
      */
-    function _voteForBribe(address voter_, uint256[] memory gaugeIDs_, uint256[] memory votePowerBPSs_, bool isInternalCall_) internal nonReentrant {
+    function _voteForBribe(address voter_, uint256[] memory gaugeIDs_, uint256[] memory votePowerBPSs_, bool isInternalCall_) internal {
         // CHECKS
         if (gaugeIDs_.length != votePowerBPSs_.length) revert ArrayArgumentsLengthMismatch();
 
@@ -393,9 +394,9 @@ contract BribeController is
             // If remove vote
             if (votePowerBPS == 0) {
                 if(!isInternalCall_) _votesMirror[voter_].remove(gaugeID);
-                _votes[gaugeID].remove(voter_);
-                if (_votes[gaugeID].length() == 0) _gaugeToTotalVotePower.remove(gaugeID);
-                emit VoteForBribeRemoved(voter_, gaugeID);
+                _votes[gaugeID].remove(voter_); // This step costs 15-25K gas, wonder if more efficient implementation.
+                if (_votes[gaugeID].length() == 0) _gaugeToTotalVotePower.remove(gaugeID); // This step can cost up to 20K gas
+                if(!isInternalCall_) {emit VoteForBribeRemoved(voter_, gaugeID);} // 5K gas cost to emit, avoid in unbounded loop
             } else {
                 _gaugeToTotalVotePower.set(gaugeID, 1); // Do not set to 0 to avoid SSTORE penalty for 0 slot in processBribes().
                 _votes[gaugeID].set(voter_, votePowerBPS);
@@ -489,7 +490,7 @@ contract BribeController is
      * @param gaugeID_ gaugeID to vote for
      * @param votePowerBPS_ Vote power BPS to assign to this vote.
      */
-    function voteForBribe(address voter_, uint256 gaugeID_, uint256 votePowerBPS_) external override {
+    function voteForBribe(address voter_, uint256 gaugeID_, uint256 votePowerBPS_) external override nonReentrant {
         uint256[] memory gaugeIDs_ = new uint256[](1);
         uint256[] memory votePowerBPSs_ = new uint256[](1);
         gaugeIDs_[0] = gaugeID_;
@@ -503,7 +504,7 @@ contract BribeController is
      * @param gaugeIDs_ Array of gaugeIDs to vote for
      * @param votePowerBPSs_ Array of corresponding vote power BPS values.
      */
-    function voteForMultipleBribes(address voter_, uint256[] calldata gaugeIDs_, uint256[] calldata votePowerBPSs_) external override {
+    function voteForMultipleBribes(address voter_, uint256[] calldata gaugeIDs_, uint256[] calldata votePowerBPSs_) external override nonReentrant {
         _voteForBribe(voter_, gaugeIDs_, votePowerBPSs_, false);
     }
 
@@ -514,7 +515,7 @@ contract BribeController is
      * @param gaugeIDs_ Array of gauge IDs to vote for.
      * @param votePowerBPSs_ Array of corresponding vote power BPS values.
      */
-    function voteForBribeForMultipleVoters(address[] calldata voters_, uint256[] memory gaugeIDs_, uint256[] memory votePowerBPSs_) external override {
+    function voteForBribeForMultipleVoters(address[] calldata voters_, uint256[] memory gaugeIDs_, uint256[] memory votePowerBPSs_) external override nonReentrant {
         uint256 length = voters_.length;
         for (uint256 i = 0; i < length; i++) {
             _voteForBribe(voters_[i], gaugeIDs_, votePowerBPSs_, false);
@@ -526,7 +527,7 @@ contract BribeController is
      * @param voter_ address of voter.
      * @param gaugeID_ The ID of the gauge to remove vote for.
      */
-    function removeVoteForBribe(address voter_, uint256 gaugeID_) external override {
+    function removeVoteForBribe(address voter_, uint256 gaugeID_) external override nonReentrant {
         uint256[] memory gaugeIDs_ = new uint256[](1);
         uint256[] memory votePowerBPSs_ = new uint256[](1);
         gaugeIDs_[0] = gaugeID_;
@@ -539,7 +540,7 @@ contract BribeController is
      * @param voter_ address of voter.
      * @param gaugeIDs_ Array of gaugeIDs to remove votes for
      */
-    function removeVotesForMultipleBribes(address voter_, uint256[] calldata gaugeIDs_) external override {
+    function removeVotesForMultipleBribes(address voter_, uint256[] calldata gaugeIDs_) external override nonReentrant {
         uint256[] memory votePowerBPSs_ = new uint256[](gaugeIDs_.length);
         for(uint256 i = 0; i < gaugeIDs_.length; i++) {votePowerBPSs_[i] = 0;}
         _voteForBribe(voter_, gaugeIDs_, votePowerBPSs_, false);
@@ -552,7 +553,7 @@ contract BribeController is
      * @param voters_ Array of voter addresses.
      * @param gaugeIDs_ Array of gauge IDs to remove votes for.
      */
-    function removeVotesForBribeForMultipleVoters(address[] calldata voters_, uint256[] memory gaugeIDs_) external override {
+    function removeVotesForBribeForMultipleVoters(address[] calldata voters_, uint256[] memory gaugeIDs_) external override nonReentrant {
         uint256 length = voters_.length;
         uint256[] memory votePowerBPSs_ = new uint256[](gaugeIDs_.length);
         for(uint256 i = 0; i < gaugeIDs_.length; i++) {votePowerBPSs_[i] = 0;}
@@ -658,7 +659,8 @@ contract BribeController is
             // Iterate by vote
             (uint256 gaugeID,) = _gaugeToTotalVotePower.at(i);
             uint256 numVotes = _votes[gaugeID].length();
-
+            
+            // 7-13K gas per loop
             for (uint256 j = _updateInfo.index2 == type(uint88).max || i != _updateInfo.index1 ? 0 : _updateInfo.index2; j < numVotes; j++) {
                 // Checkpoint 1
                 if (gasleft() < 20000) {return _saveUpdateState(i, j, type(uint88).max);}
@@ -678,7 +680,7 @@ contract BribeController is
         while (_gaugeToTotalVotePower.length() > 0) {
             (uint256 gaugeID, uint256 votePowerSum) = _gaugeToTotalVotePower.at(0);
 
-            // Iterate by vote
+            // Iterate by vote - 30-60K gas per loop
             while(_votes[gaugeID].length() > 0) {
                 (address voter, uint256 votePowerBPS) = _votes[gaugeID].at(0);
                 // `votePowerSum - 1` to nullify initiating _gaugeToTotalVotePower values at 1 rather than 0.
@@ -701,8 +703,7 @@ contract BribeController is
                 if (_updateInfo.index3 != 0) {_updateInfo.index3 = type(uint88).max;}
                 // Cleanup _votes, _gaugeToTotalVotePower enumerable collections.
                 if (gasleft() < 110000) {return _saveUpdateState(type(uint80).max - 1, type(uint88).max - 1, type(uint88).max - 1);}
-                uint256 gas1 = gasleft();
-                _removeVoteForBribeInternal(voter, gaugeID);
+                _removeVoteForBribeInternal(voter, gaugeID); // 20-30K gas per call
             }
         }
         }
