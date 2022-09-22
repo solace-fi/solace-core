@@ -247,6 +247,7 @@ contract UnderwritingEquity is IUnderwritingEquity, ERC20Permit, ReentrancyGuard
 
     /**
      * @notice Pauses or unpauses contract functionality.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param depositIsPaused True to pause deposit, false to unpause.
      * @param withdrawIsPaused True to pause withdraw, false to unpause.
      * @param lendIsPaused True to pause lend, false to unpause.
@@ -256,5 +257,16 @@ contract UnderwritingEquity is IUnderwritingEquity, ERC20Permit, ReentrancyGuard
         _withdrawIsPaused = withdrawIsPaused;
         _lendIsPaused = lendIsPaused;
         emit PauseSet(depositIsPaused, withdrawIsPaused, lendIsPaused);
+    }
+
+    /**
+     * @notice Upgrades the [`UWP`](./UnderwritingPool) contract.
+     * Can only be called by the current [**governor**](/docs/protocol/governance).
+     * @param uwp_ The address of the new [`UWP`](./UnderwritingPool).
+     */
+    function setUwp(address uwp_) external override onlyGovernance {
+        require(uwp_ != address(0x0), "zero address uwp");
+        _uwp = uwp_;
+        emit UwpSet(uwp_);
     }
 }

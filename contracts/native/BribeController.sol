@@ -11,7 +11,6 @@ import "./../interfaces/native/IGaugeController.sol";
 import "./../interfaces/utils/IRegistry.sol";
 import "./../utils/EnumerableMapS.sol";
 import "./../utils/Governable.sol";
-import "hardhat/console.sol";
 
 contract BribeController is 
         IBribeController, 

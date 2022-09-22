@@ -5,7 +5,6 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import "../interfaces/airdrop/IMerkleDistributor.sol";
 import "../utils/Governable.sol";
-// import "hardhat/console.sol";
 
 contract MerkleDistributor is IMerkleDistributor, Governable {
     address public immutable override token; // Airdrop token
@@ -76,11 +75,3 @@ contract MerkleDistributor is IMerkleDistributor, Governable {
         emit GovernorRecoverAirdropTokens(balance);
     }
 }
-
-// Useful resources
-
-// Modified from https://github.com/Uniswap/merkle-distributor/blob/master/contracts/MerkleDistributor.sol
-// https://github.com/Anish-Agnihotri/merkle-airdrop-starter/blob/master/contracts/src/MerkleClaimERC20.sol
-
-// Use Custom errors - https://blog.soliditylang.org/2021/04/21/custom-errors/ - instead of require strings
-// Cheaper in deploy and runtime costs, able to convey dynamic information
