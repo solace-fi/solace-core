@@ -10,6 +10,7 @@ import "./../interfaces/utils/IRegistry.sol";
 import "./../interfaces/native/IUnderwritingLocker.sol";
 import "./../interfaces/native/IUnderwritingLockVoting.sol";
 import "./../interfaces/native/IGaugeController.sol";
+import "./../interfaces/native/IVoteListener.sol";
 
 /**
  * @title UnderwritingLockVoting
@@ -300,9 +301,34 @@ contract UnderwritingLockVoting is
                     emit VoteChanged(voter_, gaugeID, votePowerBPS, oldVotePowerBPS);
                 }
             }
+
+            if (bribeController != msg.sender) _notifyBribeController(voter_, gaugeID, votePowerBPS);
         }
 
         if (usedVotePowerBPSOf[voter_] > 10000) revert TotalVotePowerBPSOver10000();
+    }
+
+    /**
+     * @notice Internal function to notify BribeController contract of votes made. 
+     * @dev Required to prevent edge case where voteForBribe made via BribeController, is then modified via this contract, and the vote modifications are not reflected in BribeController _votes and _votesMirror storage data structures.
+     * @dev The above will result in an edge case where a voter can claim more bribes than they are actually eligible for (votePowerBPS in BribeController _votes data structure that is processed in processBribes(), will be higher than actual votePowerBPS used.)
+     * @param voter_ The voter address.
+     * @param gaugeID_ The gaugeID to vote for.
+     * @param votePowerBPS_ votePowerBPS value. Can be from 0-10000.
+     */
+    function _notifyBribeController(address voter_, uint256 gaugeID_, uint256 votePowerBPS_) internal {
+        // Try-catch does not catch 'function call to a non-contract account' error. So we check if we are going to call a non-contract account.
+        uint256 csize = 0;
+
+        // Our first thought is that it is more concise to write `if eq(extcodesize(bribeController.slot), 0) { return(0, 0) }` in assembly block, however 'return' in inline assembly halts code execution altogether, which is different behaviour from 'return' in high-level Solidity.
+        assembly {
+            csize := extcodesize(sload(bribeController.slot))
+        }
+
+        if (csize == 0) return;
+
+        // Use try-catch to avoid revert
+        try IVoteListener(bribeController).receiveVoteNotification(voter_, gaugeID_, votePowerBPS_) {} catch {}
     }
 
     /***************************************

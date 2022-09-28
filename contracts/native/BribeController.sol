@@ -578,6 +578,28 @@ contract BribeController is
     }
 
     /***************************************
+    RECEIVE NOTIFICATION HOOK
+    ***************************************/
+
+    /**
+     * @notice Hook that enables this contract to be informed of votes made via UnderwritingLockVoting.sol.
+     * @dev Required to prevent edge case where voteForBribe made via BribeController, is then modified via this contract, and the vote modifications are not reflected in BribeController _votes and _votesMirror storage data structures.
+     * @dev The above will result in an edge case where a voter can claim more bribes than they are actually eligible for (votePowerBPS in BribeController _votes data structure that is processed in processBribes(), will be higher than actual votePowerBPS used.)
+     * @param voter_ The voter address.
+     * @param gaugeID_ The gaugeID to vote for.
+     * @param votePowerBPS_ votePowerBPS value. Can be from 0-10000.
+     */
+    function receiveVoteNotification(address voter_, uint256 gaugeID_, uint256 votePowerBPS_) external override {
+        if (msg.sender != votingContract) revert NotVotingContract();
+
+        // Check if vote exists in _votes.
+        if(_votes[gaugeID_].contains(voter_)) _votes[gaugeID_].set(voter_, votePowerBPS_);
+
+        // Check if vote exists in _votesMirror.
+        if(_votesMirror[voter_].contains(gaugeID_)) _votesMirror[voter_].set(gaugeID_, votePowerBPS_);
+    }
+
+    /***************************************
     GOVERNANCE FUNCTIONS
     ***************************************/
 

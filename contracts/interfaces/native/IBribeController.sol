@@ -2,8 +2,9 @@
 pragma solidity 0.8.6;
 
 import "./GaugeStructs.sol";
+import "./IVoteListener.sol";
 
-interface IBribeController {
+interface IBribeController is IVoteListener {
     /***************************************
     STRUCTS
     ***************************************/
@@ -43,6 +44,9 @@ interface IBribeController {
 
     /// @notice Thrown when attempt to claim bribes when no bribe rewards are claimable.
     error NoClaimableBribes();
+
+    /// @notice Thrown when receiveVoteNotification() called by an address that is not the underwritingLockVoting contract.
+    error NotVotingContract();
 
     /// @notice Thrown when voteForBribe() attempted by a non-owner or non-delegate.
     error NotOwnerNorDelegate();
@@ -266,7 +270,7 @@ interface IBribeController {
      * @notice Claim bribes.
      */
     function claimBribes() external;
-
+    
     /***************************************
     GOVERNANCE FUNCTIONS
     ***************************************/

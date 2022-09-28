@@ -1645,6 +1645,161 @@ describe("BribeController", function () {
       })
     });
 
+    /*********************
+      INTENTION STATEMENT 
+    *********************/
+    /**
+     * briber1 will provide bribe for gaugeID 1 with 100 of bribeToken1, 100 of bribeToken2.
+     * voter2 and voter3 (who had locks created about the same time) will vote with all available votepower for gaugeID 1.
+     * voter2 will mutate their vote afterwards via UnderwritingLockVoting.
+     */
+
+    describe("edge case - voteForBribe mutated through UnderwritingLockVoting in the same epoch", () => {
+      const GAUGE_ID = 1;
+
+      before(async function () {
+        await bribeController.connect(briber1).provideBribes([bribeToken1.address, bribeToken2.address], [BRIBE_AMOUNT, BRIBE_AMOUNT], GAUGE_ID)
+        expect(await bribeController.getAllGaugesWithBribe()).deep.eq([BN.from("1")])
+        const bribes1 = await bribeController.getProvidedBribesForGauge(GAUGE_ID);
+        expect(bribes1[0].bribeToken).eq(bribeToken1.address);
+        expect(bribes1[1].bribeToken).eq(bribeToken2.address);
+        expect(bribes1[0].bribeAmount).eq(BRIBE_AMOUNT.mul(1));
+        expect(bribes1[1].bribeAmount).eq(BRIBE_AMOUNT.mul(1));
+      });
+      it("voteForBribe mutation made via UnderwritingLockVoting reflected in BribeController", async () => {
+        // Initially voter2 and voter3 will vote will all available votepower for gaugeID 1.
+        const votePowerBPS1 = await bribeController.getAvailableVotePowerBPS(voter2.address);
+        const votePowerBPS2 = await bribeController.getAvailableVotePowerBPS(voter3.address);
+        expect(votePowerBPS1).eq(votePowerBPS2);
+        await bribeController.connect(voter2).voteForBribe(voter2.address, GAUGE_ID, votePowerBPS1);
+        await bribeController.connect(voter3).voteForBribe(voter3.address, GAUGE_ID, votePowerBPS2);
+
+        // Now voter2 will mutate this vote via UnderwritingLockVoting.
+        await voting.connect(voter2).vote(voter2.address, GAUGE_ID, votePowerBPS1.div(2))
+
+        expect(await bribeController.getUnusedVotePowerBPS(voter2.address)).eq(votePowerBPS1.div(2))
+        expect(await bribeController.getAvailableVotePowerBPS(voter2.address)).eq(votePowerBPS1.div(2))
+        const voterVotes = await bribeController.getVotesForVoter(voter2.address);
+        expect(voterVotes[0].gaugeID).eq(GAUGE_ID)
+        expect(voterVotes[0].votePowerBPS).eq(votePowerBPS1.div(2))
+        const gaugeVotes = await bribeController.getVotesForGauge(GAUGE_ID);
+        expect(gaugeVotes[0].voter).eq(voter2.address)
+        expect(gaugeVotes[0].votePowerBPS).eq(votePowerBPS1.div(2))
+        expect(gaugeVotes[1].voter).eq(voter3.address)
+        expect(gaugeVotes[1].votePowerBPS).eq(votePowerBPS1)
+      })
+      it("processBribes will change state as expected", async () => {
+        const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
+        await provider.send("evm_mine", [CURRENT_TIME + ONE_WEEK]);
+        await gaugeController.connect(governor).updateGaugeWeights({gasLimit: CUSTOM_GAS_LIMIT});
+        await voting.connect(governor).chargePremiums({gasLimit: CUSTOM_GAS_LIMIT});
+
+        const OLD_VOTER_1_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(voter2.address)
+        const OLD_VOTER_1_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(voter2.address)
+        const OLD_VOTER_2_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(voter3.address)
+        const OLD_VOTER_2_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(voter3.address)
+        const OLD_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(bribeController.address)
+        const OLD_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(bribeController.address)
+        const OLD_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(revenueRouter.address)
+        const OLD_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(revenueRouter.address)
+
+        await bribeController.connect(anon).processBribes({gasLimit: CUSTOM_GAS_LIMIT});
+
+        const NEW_VOTER_1_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(voter2.address)
+        const NEW_VOTER_1_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(voter2.address)
+        const NEW_VOTER_2_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(voter3.address)
+        const NEW_VOTER_2_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(voter3.address)
+        const NEW_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(bribeController.address)
+        const NEW_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(bribeController.address)
+        const NEW_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(revenueRouter.address)
+        const NEW_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(revenueRouter.address)
+
+        const CHANGE_VOTER_1_BALANCE_BRIBE_TOKEN_1 = NEW_VOTER_1_BALANCE_BRIBE_TOKEN_1.sub(OLD_VOTER_1_BALANCE_BRIBE_TOKEN_1)
+        const CHANGE_VOTER_1_BALANCE_BRIBE_TOKEN_2 = NEW_VOTER_1_BALANCE_BRIBE_TOKEN_2.sub(OLD_VOTER_1_BALANCE_BRIBE_TOKEN_2)
+        const CHANGE_VOTER_2_BALANCE_BRIBE_TOKEN_1 = NEW_VOTER_2_BALANCE_BRIBE_TOKEN_1.sub(OLD_VOTER_2_BALANCE_BRIBE_TOKEN_1)
+        const CHANGE_VOTER_2_BALANCE_BRIBE_TOKEN_2 = NEW_VOTER_2_BALANCE_BRIBE_TOKEN_2.sub(OLD_VOTER_2_BALANCE_BRIBE_TOKEN_2)
+        const CHANGE_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1 = NEW_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1.sub(OLD_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1)
+        const CHANGE_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_2 = NEW_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_2.sub(OLD_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_2)
+        const CHANGE_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_1 = NEW_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_1.sub(OLD_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_1)
+        const CHANGE_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_2 = NEW_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_2.sub(OLD_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_2)
+        
+        expect(CHANGE_VOTER_1_BALANCE_BRIBE_TOKEN_1).eq(0)
+        expect(CHANGE_VOTER_1_BALANCE_BRIBE_TOKEN_2).eq(0)
+        expect(CHANGE_VOTER_2_BALANCE_BRIBE_TOKEN_1).eq(0)
+        expect(CHANGE_VOTER_2_BALANCE_BRIBE_TOKEN_2).eq(0)
+        expect(CHANGE_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1).eq(0)
+        expect(CHANGE_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_2).eq(0)
+        expect(CHANGE_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_1).eq(0)
+        expect(CHANGE_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_2).eq(0)
+
+        expect(await bribeController.getAllGaugesWithBribe()).deep.eq([])
+        expect(await bribeController.getProvidedBribesForGauge(1)).deep.eq([])
+        expect(await bribeController.getVotesForVoter(voter2.address)).deep.eq([])
+        expect(await bribeController.getVotesForVoter(voter3.address)).deep.eq([])
+        expect(await bribeController.getVotesForGauge(1)).deep.eq([])
+        expect(await bribeController.getUnusedVotePowerBPS(voter2.address)).eq(5000)
+        expect(await bribeController.getUnusedVotePowerBPS(voter3.address)).eq(0)
+        expect(await bribeController.getAvailableVotePowerBPS(voter2.address)).eq(10000)
+        expect(await bribeController.getAvailableVotePowerBPS(voter3.address)).eq(10000)
+      });
+      it("getClaimableBribes", async () => {
+        const claim1 = await bribeController.getClaimableBribes(voter2.address);
+        expect(claim1[0].bribeToken).eq(bribeToken1.address)
+        expect(claim1[1].bribeToken).eq(bribeToken2.address)
+
+        const claim2 = await bribeController.getClaimableBribes(voter3.address);
+        expect(claim2[0].bribeToken).eq(bribeToken1.address)
+        expect(claim2[1].bribeToken).eq(bribeToken2.address)
+
+        expectClose(claim1[0].bribeAmount.add(claim2[0].bribeAmount), BRIBE_AMOUNT, 1e3)
+        expectClose(claim1[1].bribeAmount.add(claim2[1].bribeAmount), BRIBE_AMOUNT, 1e3)
+        expectClose(claim2[0].bribeAmount.div(claim1[0].bribeAmount), 2, 1e14)
+        expectClose(claim2[1].bribeAmount.div(claim1[1].bribeAmount), 2, 1e14)
+      })
+      it("can claimBribes", async () => {
+        const OLD_VOTER_1_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(voter2.address)
+        const OLD_VOTER_1_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(voter2.address)
+        const OLD_VOTER_2_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(voter3.address)
+        const OLD_VOTER_2_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(voter3.address)
+        const OLD_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(bribeController.address)
+        const OLD_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(bribeController.address)
+        const OLD_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(revenueRouter.address)
+        const OLD_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_2 = await bribeToken1.balanceOf(revenueRouter.address)
+
+        const tx1 = await bribeController.connect(voter2).claimBribes();
+        await expect(tx1).to.emit(bribeController, "BribeClaimed");
+        const tx2 = await bribeController.connect(voter3).claimBribes();
+        await expect(tx2).to.emit(bribeController, "BribeClaimed");
+
+        const NEW_VOTER_1_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(voter2.address)
+        const NEW_VOTER_1_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(voter2.address)
+        const NEW_VOTER_2_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(voter3.address)
+        const NEW_VOTER_2_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(voter3.address)
+        const NEW_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(bribeController.address)
+        const NEW_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_2 = await bribeToken2.balanceOf(bribeController.address)
+        const NEW_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_1 = await bribeToken1.balanceOf(revenueRouter.address)
+        const NEW_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_2 = await bribeToken1.balanceOf(revenueRouter.address)
+
+        const CHANGE_VOTER_1_BALANCE_BRIBE_TOKEN_1 = NEW_VOTER_1_BALANCE_BRIBE_TOKEN_1.sub(OLD_VOTER_1_BALANCE_BRIBE_TOKEN_1)
+        const CHANGE_VOTER_1_BALANCE_BRIBE_TOKEN_2 = NEW_VOTER_1_BALANCE_BRIBE_TOKEN_2.sub(OLD_VOTER_1_BALANCE_BRIBE_TOKEN_2)
+        const CHANGE_VOTER_2_BALANCE_BRIBE_TOKEN_1 = NEW_VOTER_2_BALANCE_BRIBE_TOKEN_1.sub(OLD_VOTER_2_BALANCE_BRIBE_TOKEN_1)
+        const CHANGE_VOTER_2_BALANCE_BRIBE_TOKEN_2 = NEW_VOTER_2_BALANCE_BRIBE_TOKEN_2.sub(OLD_VOTER_2_BALANCE_BRIBE_TOKEN_2)
+        const CHANGE_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1 = NEW_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1.sub(OLD_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1)
+        const CHANGE_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_2 = NEW_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_2.sub(OLD_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_2)
+        const CHANGE_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_1 = NEW_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_1.sub(OLD_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_1)
+        const CHANGE_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_2 = NEW_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_2.sub(OLD_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_2)
+
+        expectClose(CHANGE_VOTER_1_BALANCE_BRIBE_TOKEN_1.add(CHANGE_VOTER_2_BALANCE_BRIBE_TOKEN_1), BRIBE_AMOUNT, 1e3)
+        expectClose(CHANGE_VOTER_1_BALANCE_BRIBE_TOKEN_2.add(CHANGE_VOTER_2_BALANCE_BRIBE_TOKEN_2), BRIBE_AMOUNT, 1e3)
+        expectClose(CHANGE_VOTER_2_BALANCE_BRIBE_TOKEN_1.div(CHANGE_VOTER_1_BALANCE_BRIBE_TOKEN_1), 2, 1e10)
+        expectClose(CHANGE_VOTER_2_BALANCE_BRIBE_TOKEN_2.div(CHANGE_VOTER_1_BALANCE_BRIBE_TOKEN_2), 2, 1e10)
+        expectClose(CHANGE_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_1, BRIBE_AMOUNT.mul(-1), 1e4);
+        expectClose(CHANGE_BRIBING_CONTROLLER_BALANCE_BRIBE_TOKEN_2, BRIBE_AMOUNT.mul(-1), 1e4);
+        expect(CHANGE_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_1).eq(0)
+        expect(CHANGE_REVENUE_ROUTER_BALANCE_BRIBE_TOKEN_2).eq(0)
+        expect(await bribeController.getClaimableBribes(briber1.address)).deep.eq([]);
+      })
+    });
 
     /*********************
       INTENTION STATEMENT 
