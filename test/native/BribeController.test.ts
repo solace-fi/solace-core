@@ -1666,6 +1666,9 @@ describe("BribeController", function () {
         expect(bribes1[0].bribeAmount).eq(BRIBE_AMOUNT.mul(1));
         expect(bribes1[1].bribeAmount).eq(BRIBE_AMOUNT.mul(1));
       });
+      it("non-voting contract cannot call receiveVoteNotification", async () => {
+        await expect(bribeController.connect(anon).receiveVoteNotification(voter1.address, GAUGE_ID, 10000)).to.be.revertedWith("NotVotingContract");
+      })
       it("voteForBribe mutation made via UnderwritingLockVoting reflected in BribeController", async () => {
         // Initially voter2 and voter3 will vote will all available votepower for gaugeID 1.
         const votePowerBPS1 = await bribeController.getAvailableVotePowerBPS(voter2.address);
