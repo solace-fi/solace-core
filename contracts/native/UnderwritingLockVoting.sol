@@ -10,6 +10,7 @@ import "./../interfaces/utils/IRegistry.sol";
 import "./../interfaces/native/IUnderwritingLocker.sol";
 import "./../interfaces/native/IUnderwritingLockVoting.sol";
 import "./../interfaces/native/IGaugeController.sol";
+import "./../interfaces/native/IVoteListener.sol";
 
 /**
  * @title UnderwritingLockVoting
@@ -63,10 +64,6 @@ contract UnderwritingLockVoting is
     /// @notice Registry address
     address public override registry;
 
-    /// @notice Updater address.
-    /// @dev Second address that can call chargePremiums (in addition to governance).
-    address public override updater;
-
     /// @notice End timestamp for last epoch that premiums were charged for all stored votes.
     uint256 public override lastTimePremiumsCharged;
 
@@ -111,6 +108,7 @@ contract UnderwritingLockVoting is
         // Initialize as non-zero storage slots.
         _totalPremiumDue = type(uint256).max;
         _clearUpdateInfo();
+        lastTimePremiumsCharged = _getEpochStartTimestamp();
     }
 
     /***************************************
@@ -153,14 +151,6 @@ contract UnderwritingLockVoting is
      */
     function _getLastTimeGaugesUpdated() internal view returns (uint256 timestamp) {
         return IGaugeController(gaugeController).lastTimeGaugeWeightsUpdated();
-    }
-
-    /**
-     * @notice Query whether msg.sender is either the governance or updater role.
-     * @return True if msg.sender is either governor or updater roler, and contract govenance is not locked, false otherwise.
-     */
-    function _isUpdaterOrGovernance() internal view returns (bool) {
-        return ( !this.governanceIsLocked() && ( msg.sender == updater || msg.sender == this.governance() ));
     }
 
     /***************************************
@@ -284,7 +274,7 @@ contract UnderwritingLockVoting is
      */
     function _vote(address voter_, uint256[] memory gaugeIDs_, uint256[] memory votePowerBPSs_) internal {
         // Disable voting if votes not yet processed or premiums not yet charged for this epoch
-        if ( _getEpochStartTimestamp() != lastTimePremiumsCharged) revert LastEpochPremiumsNotCharged();
+        if ( _getEpochStartTimestamp() > lastTimePremiumsCharged) revert LastEpochPremiumsNotCharged();
         if( voter_ != msg.sender && delegateOf[voter_] != msg.sender && bribeController != msg.sender) revert NotOwnerNorDelegate();
         if (gaugeIDs_.length != votePowerBPSs_.length) revert ArrayArgumentsLengthMismatch();
 
@@ -311,9 +301,34 @@ contract UnderwritingLockVoting is
                     emit VoteChanged(voter_, gaugeID, votePowerBPS, oldVotePowerBPS);
                 }
             }
+
+            if (bribeController != msg.sender) _notifyBribeController(voter_, gaugeID, votePowerBPS);
         }
 
         if (usedVotePowerBPSOf[voter_] > 10000) revert TotalVotePowerBPSOver10000();
+    }
+
+    /**
+     * @notice Internal function to notify BribeController contract of votes made. 
+     * @dev Required to prevent edge case where voteForBribe made via BribeController, is then modified via this contract, and the vote modifications are not reflected in BribeController _votes and _votesMirror storage data structures.
+     * @dev The above will result in an edge case where a voter can claim more bribes than they are actually eligible for (votePowerBPS in BribeController _votes data structure that is processed in processBribes(), will be higher than actual votePowerBPS used.)
+     * @param voter_ The voter address.
+     * @param gaugeID_ The gaugeID to vote for.
+     * @param votePowerBPS_ votePowerBPS value. Can be from 0-10000.
+     */
+    function _notifyBribeController(address voter_, uint256 gaugeID_, uint256 votePowerBPS_) internal {
+        // Try-catch does not catch 'function call to a non-contract account' error. So we check if we are going to call a non-contract account.
+        uint256 csize = 0;
+
+        // Our first thought is that it is more concise to write `if eq(extcodesize(bribeController.slot), 0) { return(0, 0) }` in assembly block, however 'return' in inline assembly halts code execution altogether, which is different behaviour from 'return' in high-level Solidity.
+        assembly {
+            csize := extcodesize(sload(bribeController.slot))
+        }
+
+        if (csize == 0) return;
+
+        // Use try-catch to avoid revert
+        try IVoteListener(bribeController).receiveVoteNotification(voter_, gaugeID_, votePowerBPS_) {} catch {}
     }
 
     /***************************************
@@ -331,7 +346,7 @@ contract UnderwritingLockVoting is
      * Can only be called by the voter or vote delegate.
      * @param voter_ The voter address.
      * @param gaugeID_ The ID of the gauge to vote for.
-     * @param votePowerBPS_ Vote power BPS to assign to this vote
+     * @param votePowerBPS_ Vote power BPS to assign to this vote.
      */
     function vote(address voter_, uint256 gaugeID_, uint256 votePowerBPS_) external override {
         if ( IUnderwritingLocker(underwritingLocker).balanceOf(voter_) == 0 ) revert VoterHasNoLocks();
@@ -453,16 +468,6 @@ contract UnderwritingLockVoting is
     }
 
     /**
-     * @notice Set updater address.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param updater_ The address of the new updater.
-     */
-    function setUpdater(address updater_) external override onlyGovernance {
-        updater = updater_;
-        emit UpdaterSet(updater_);
-    }
-
-    /**
      * @notice Sets bribeController as per `bribeController` address stored in Registry.
      * @dev We do not set this in constructor, because we expect BribeController.sol to be deployed after this contract.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
@@ -474,17 +479,19 @@ contract UnderwritingLockVoting is
         emit BribeControllerSet(bribeControllerAddr);
     }
 
+    /********************************************
+     UPDATER FUNCTION TO BE RUN AFTER EACH EPOCH
+    ********************************************/
+
     /**
      * @notice Charge premiums for votes.
      * @dev Designed to be called in a while-loop with the condition being `lastTimePremiumsCharged != epochStartTimestamp` and using the maximum custom gas limit.
      * @dev Requires GaugeController.updateGaugeWeights() to be run to completion for the last epoch.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
      */
     function chargePremiums() external override {
-        if (!_isUpdaterOrGovernance()) revert NotUpdaterNorGovernance();
         uint256 epochStartTimestamp = _getEpochStartTimestamp();
-        if(_getLastTimeGaugesUpdated() != epochStartTimestamp) revert GaugeWeightsNotYetUpdated();
-        if(lastTimePremiumsCharged == epochStartTimestamp) revert LastEpochPremiumsAlreadyProcessed({epochTime: epochStartTimestamp});
+        if(lastTimePremiumsCharged >= epochStartTimestamp) revert LastEpochPremiumsAlreadyProcessed({epochTime: epochStartTimestamp});
+        if(_getLastTimeGaugesUpdated() < epochStartTimestamp) revert GaugeWeightsNotYetUpdated();
 
         // Single call for universal multipliers in premium computation.
         uint256 insuranceCapacity = IGaugeController(gaugeController).getInsuranceCapacity();
@@ -493,7 +500,7 @@ contract UnderwritingLockVoting is
 
         // Iterate through voters
         address[] memory voters = IGaugeController(gaugeController).getVoters(address(this));
-        for(uint256 i = _updateInfo._votersIndex == type(uint88).max ? 0 : _updateInfo._votersIndex ; i < voters.length; i++) {
+        for(uint256 i = _updateInfo.index2 == type(uint88).max ? 0 : _updateInfo.index2 ; i < voters.length; i++) {
             // _saveUpdateState(0, i, 0);
             // Short-circuit operator - need at least 30K gas for getVoteCount() call
             if (gasleft() < 40000 || gasleft() < 10000 * IGaugeController(gaugeController).getVoteCount(address(this), voters[i])) {
@@ -501,18 +508,7 @@ contract UnderwritingLockVoting is
             }
             // Unbounded loop since # of votes (gauges) unbounded
             uint256 premium = _calculateVotePremium(voters[i], insuranceCapacity, votePowerSum, epochLength); // 87K gas for 10 votes
-            uint256[] memory lockIDs = IUnderwritingLocker(underwritingLocker).getAllLockIDsOf(voters[i]);
-            uint256 numLocks = lockIDs.length;
-
-            // Iterate through locks
-            // Using _votesIndex as _lockIndex
-            // If either votesIndex slot is cleared, or we aren't on the same voter as when we last saved, start from index 0.
-            for(uint256 j = _updateInfo._votesIndex == type(uint88).max || i != _updateInfo._votersIndex ? 0 : _updateInfo._votesIndex; j < numLocks; j++) {
-                if (gasleft() < 20000) {return _saveUpdateState(0, i, j);}
-                // Split premium amongst each lock equally.
-                IUnderwritingLocker(underwritingLocker).chargePremium(lockIDs[j], premium / numLocks);
-            }
-
+            IUnderwritingLocker(underwritingLocker).chargePremium(voters[i], premium);
             _totalPremiumDue -= premium;
         }
 
@@ -529,9 +525,9 @@ contract UnderwritingLockVoting is
         emit AllPremiumsCharged(epochStartTimestamp);
     }
 
-    /***************************************
-     updateGaugeWeights() HELPER FUNCTIONS
-    ***************************************/
+    /***********************************
+     chargePremiums() HELPER FUNCTIONS
+    ***********************************/
 
     /**
      * @notice Save state of charging premium to _updateInfo

@@ -31,8 +31,8 @@ const ONE_HUNDRED_PERCENT = ONE_ETHER;
 const CUSTOM_GAS_LIMIT = 6000000;
 
 describe("GaugeController", function () {
-    const [deployer, governor, revenueRouter, voter1, updater, anon] = provider.getWallets();
-
+    const [deployer, governor, revenueRouter, voter1, anon] = provider.getWallets();
+  
     /***************************
        VARIABLE DECLARATIONS
     ***************************/
@@ -73,10 +73,9 @@ describe("GaugeController", function () {
         });
         it("initializes properly", async function () {
           expect(await gaugeController.token()).eq(token.address);
-          expect(await gaugeController.updater()).eq(ZERO_ADDRESS);
           expect(await gaugeController.leverageFactor()).eq(ONE_HUNDRED_PERCENT);
           expect(await gaugeController.totalGauges()).eq(0);
-          expect(await gaugeController.lastTimeGaugeWeightsUpdated()).eq(0);
+          expect(await gaugeController.lastTimeGaugeWeightsUpdated()).eq(await gaugeController.getEpochStartTimestamp());
           expect(await gaugeController.getGaugeWeight(0)).eq(ZERO);
           expect(await gaugeController.getAllGaugeWeights()).deep.eq([ZERO]);
           expect(await gaugeController.getNumActiveGauges()).eq(0);
@@ -199,20 +198,13 @@ describe("GaugeController", function () {
       });
     });
 
-    describe("setUpdater", () => {
-      it("non governor cannot setUpdater", async  () => {
-        await expect(gaugeController.connect(voter1).setUpdater(updater.address)).to.be.revertedWith("!governance");
-      });
-      it("can set updater", async () => {
-        let tx = await gaugeController.connect(governor).setUpdater(updater.address);
-        await expect(tx).to.emit(gaugeController, "UpdaterSet").withArgs(updater.address);
-        expect(await gaugeController.updater()).eq(updater.address)
-      });
-    });
 
     describe("setEpochLengthInWeeks", () => {
       it("non governor cannot setEpochLengthInWeeks", async  () => {
         await expect(gaugeController.connect(voter1).setEpochLengthInWeeks(1)).to.be.revertedWith("!governance");
+      });
+      it("cannot set epoch length to 0", async  () => {
+        await expect(gaugeController.connect(governor).setEpochLengthInWeeks(0)).to.be.revertedWith("CannotSetEpochLengthTo0");
       });
       it("can setEpochLengthInWeeks", async () => {
         let tx = await gaugeController.connect(governor).setEpochLengthInWeeks(2);
@@ -306,9 +298,6 @@ describe("GaugeController", function () {
       it("cannot be vote for gaugeID 0", async  () => {
         await expect(gaugeController.connect(voter1).vote(voter1.address, 0, 1)).to.be.revertedWith("CannotVoteForGaugeID0");
       });
-      it("cannot be called before gauge weight updated", async  () => {
-        await expect(gaugeController.connect(voter1).vote(voter1.address, 1, 1)).to.be.revertedWith("GaugeWeightsNotYetUpdated");
-      });
     });
 
     /*********************
@@ -330,8 +319,6 @@ describe("GaugeController", function () {
         await gaugeController.connect(governor).addVotingContract(voting.address)
         await registry.connect(governor).set(["underwritingLockVoting"], [voting.address]);
         await underwritingLocker.connect(governor).setVotingContract()
-        await gaugeController.connect(governor).updateGaugeWeights();
-        await voting.connect(governor).chargePremiums();
         await token.connect(deployer).transfer(voter1.address, ONE_ETHER.mul(1000))
         await token.connect(voter1).approve(underwritingLocker.address, constants.MaxUint256)
         await underwritingLocker.connect(voter1).createLock(voter1.address, DEPOSIT_AMOUNT, CURRENT_TIME + 4 * ONE_YEAR)
@@ -356,10 +343,13 @@ describe("GaugeController", function () {
         expect(await gaugeController.getVoteCount(voting.address, voter1.address)).eq(1)
         expect(await gaugeController.getVotersCount(voting.address)).eq(1)
       });
-      it("updater can updateGaugeWeight in next epoch", async  () => {
+      it("cannot update gauge in same epoch as contract deployment", async  () => {
+        await expect(gaugeController.connect(governor).updateGaugeWeights()).to.be.revertedWith("GaugeWeightsAlreadyUpdated");
+      });
+      it("anon can updateGaugeWeight in next epoch", async  () => {
         const CURRENT_TIME = (await provider.getBlock('latest')).timestamp;
         await provider.send("evm_mine", [CURRENT_TIME + ONE_WEEK]);
-        const tx = await gaugeController.connect(updater).updateGaugeWeights({gasLimit: CUSTOM_GAS_LIMIT})
+        const tx = await gaugeController.connect(anon).updateGaugeWeights({gasLimit: CUSTOM_GAS_LIMIT})
         const EPOCH_START_TIME = await gaugeController.getEpochStartTimestamp()
         await expect(tx).to.emit(gaugeController, "GaugeWeightsUpdated").withArgs(EPOCH_START_TIME);
       });

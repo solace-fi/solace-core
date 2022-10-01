@@ -41,10 +41,6 @@ contract GaugeController is
     /// @notice Underwriting equity token
     address public override token;
 
-    /// @notice Updater address.
-    /// @dev Second address that can call updateGaugeWeights (in addition to governance).
-    address public override updater;
-
     /// @notice Insurance leverage factor.
     /// @dev 1e18 => 100%.
     uint256 public override leverageFactor;
@@ -107,9 +103,10 @@ contract GaugeController is
         token = token_;
         leverageFactor = 1e18; // Default 1x leverage.
         // Pre-fill slot 0 of _gauges, ensure gaugeID 1 maps to _gauges[1]
-        _gauges.push(GaugeStructs.Gauge(false, 0, ""));
+        _gauges.push(GaugeStructs.Gauge(false, 0, "")); 
         _clearUpdateInfo();
         _epochLength = WEEK;
+        lastTimeGaugeWeightsUpdated = _getEpochStartTimestamp();
     }
 
     /***************************************
@@ -175,14 +172,6 @@ contract GaugeController is
                 weights[i] = 0;
             }
         }
-    }
-
-    /**
-     * @notice Query whether msg.sender is either the governance or updater role.
-     * @return True if msg.sender is either governor or updater roler, and contract govenance is not locked, false otherwise.
-     */
-    function _isUpdaterOrGovernance() internal view returns (bool) {
-        return ( !this.governanceIsLocked() && ( msg.sender == updater || msg.sender == this.governance() ));
     }
 
     /***************************************
@@ -354,6 +343,14 @@ contract GaugeController is
         }
     }
 
+    /**
+     * @notice Get current epoch length in seconds.
+     * @return epochLength
+     */
+    function getEpochLength() external view override returns (uint256 epochLength) {
+        return _epochLength;
+    }
+    
     /***************************************
     INTERNAL MUTATOR FUNCTIONS
     ***************************************/
@@ -406,7 +403,7 @@ contract GaugeController is
      */
     function vote(address voter_, uint256 gaugeID_, uint256 newVotePowerBPS_) external override returns (uint256 oldVotePowerBPS) {
         if (gaugeID_ == 0) revert CannotVoteForGaugeID0();
-        if (_getEpochStartTimestamp() != lastTimeGaugeWeightsUpdated) revert GaugeWeightsNotYetUpdated();
+        if (_getEpochStartTimestamp() > lastTimeGaugeWeightsUpdated) revert GaugeWeightsNotYetUpdated();
         if (gaugeID_ + 1 > _gauges.length) revert GaugeIDNotExist();
         if (!_votingContracts.contains(msg.sender)) revert NotVotingContract();
         // Can remove votes while gauge paused
@@ -503,21 +500,14 @@ contract GaugeController is
     }
 
     /**
-     * @notice Set updater address.
-     * Can only be called by the current [**governor**](/docs/protocol/governance).
-     * @param updater_ The address of the new updater.
-     */
-    function setUpdater(address updater_) external override onlyGovernance {
-        updater = updater_;
-        emit UpdaterSet(updater_);
-    }
-
-    /**
      * @notice Set epoch length (as an integer multiple of 1 week).
+     * @dev Advise caution for timing of this function call. If reducing epoch length, voting may then become closed because lastTimeGaugeWeightsUpdated < epochStartTime.
+     * @dev If the above case occurs, will need to run updateGaugeWeights to re-open voting.
      * Can only be called by the current [**governor**](/docs/protocol/governance).
      * @param weeks_ Integer multiple of 1 week, to set epochLength to.
      */
     function setEpochLengthInWeeks(uint256 weeks_) external override onlyGovernance {
+        if(weeks_ == 0) revert CannotSetEpochLengthTo0();
         _epochLength = weeks_ * WEEK;
         emit EpochLengthSet(weeks_);
     }
@@ -558,26 +548,28 @@ contract GaugeController is
         }
     }
 
+    /********************************************
+     UPDATER FUNCTION TO BE RUN AFTER EACH EPOCH
+    ********************************************/
+
     /**
      * @notice Updates gauge weights by processing votes for the last epoch.
      * @dev Designed to be called in a while-loop with custom gas limit of 6M until `lastTimePremiumsCharged == epochStartTimestamp`.
-     * Can only be called by the current [**governor**](/docs/protocol/governance) or the updater role.
      */
     function updateGaugeWeights() external override {
-        if (!_isUpdaterOrGovernance()) revert NotUpdaterNorGovernance();
-        if ( _updateInfo._votesIndex == type(uint88).max ) {_resetVotePowerOfGaugeMapping();} // If first call for epoch, reset _votePowerOfGauge
+        if ( _updateInfo.index3 == type(uint88).max ) {_resetVotePowerOfGaugeMapping();} // If first call for epoch, reset _votePowerOfGauge
         uint256 epochStartTime = _getEpochStartTimestamp();
         if (lastTimeGaugeWeightsUpdated >= epochStartTime) revert GaugeWeightsAlreadyUpdated();
         uint256 numVotingContracts = _votingContracts.length();
 
         // Iterate through voting contracts
         // Use ternary operator to initialise loop, to avoid setting stack-too deep error from too many local variables.
-        for(uint256 i = _updateInfo._votingContractsIndex == type(uint80).max ? 0 : _updateInfo._votingContractsIndex; i < numVotingContracts; i++) {
+        for(uint256 i = _updateInfo.index1 == type(uint80).max ? 0 : _updateInfo.index1; i < numVotingContracts; i++) {
             address votingContract = _votingContracts.at(i);
             uint256 numVoters = _voters[votingContract].length();
 
             // Iterate through voters
-            for(uint256 j = _updateInfo._votersIndex == type(uint88).max || i != _updateInfo._votingContractsIndex ? 0 : _updateInfo._votersIndex ; j < numVoters; j++) {
+            for(uint256 j = _updateInfo.index2 == type(uint88).max || i != _updateInfo.index1 ? 0 : _updateInfo.index2 ; j < numVoters; j++) {
                 if (gasleft() < 200000) {return _saveUpdateState(i, j, 0);}
                 address voter = _voters[votingContract].at(j);
                 uint256 numVotes = _votes[votingContract][voter].length();
@@ -591,7 +583,7 @@ contract GaugeController is
                 IGaugeVoter(votingContract).cacheLastProcessedVotePower(voter, votePower);
 
                 // Iterate through votes
-                for(uint256 k = _updateInfo._votesIndex == type(uint88).max || j != _updateInfo._votersIndex || i != _updateInfo._votingContractsIndex ? 0 : _updateInfo._votesIndex; k < numVotes; k++) {
+                for(uint256 k = _updateInfo.index3 == type(uint88).max || j != _updateInfo.index2 || i != _updateInfo.index1 ? 0 : _updateInfo.index3; k < numVotes; k++) {    
                     if (gasleft() < 15000) {return _saveUpdateState(i, j, k);}
                     (uint256 gaugeID, uint256 votingPowerBPS) = _votes[votingContract][voter].at(k);
                     // Address edge case where vote placed before gauge is paused, will be counted

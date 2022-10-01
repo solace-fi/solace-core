@@ -123,6 +123,7 @@ export async function import_artifacts() {
   artifacts.GaugeController = await tryImport(`${artifact_dir}/native/GaugeController.sol/GaugeController.json`);
   artifacts.MockUnderwritingLockListener = await tryImport(`${artifact_dir}/mocks/MockUnderwritingLockListener.sol/MockUnderwritingLockListener.json`);
   artifacts.DepositHelper = await tryImport(`${artifact_dir}/native/DepositHelper.sol/DepositHelper.json`);
+  artifacts.BribeController = await tryImport(`${artifact_dir}/native/BribeController.sol/BribeController.json`);
 
   return artifacts;
 }

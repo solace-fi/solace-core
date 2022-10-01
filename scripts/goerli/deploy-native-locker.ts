@@ -20,7 +20,7 @@ const deployer = new ethers.Wallet(JSON.parse(process.env.PRIVATE_KEYS || '[]')[
 import { logContractAddress } from "../utils";
 
 import { import_artifacts, ArtifactImports } from "../../test/utilities/artifact_importer";
-import { Registry, Erc20, UnderwritingLockVoting, UnderwritingLocker, GaugeController, DepositHelper } from "../../typechain";
+import { Registry, Erc20, UnderwritingLockVoting, UnderwritingLocker, GaugeController, DepositHelper, BribeController } from "../../typechain";
 import { expectDeployed, isDeployed } from "../../test/utilities/expectDeployed";
 import { getNetworkSettings } from "../getNetworkSettings";
 import { create2Contract } from "../create2Contract";
@@ -30,11 +30,12 @@ const DEPLOYER_CONTRACT_ADDRESS         = "0x501aCe4732E4A80CC1bc5cd081BEe7f88ff
 const REGISTRY_ADDRESS                  = "0x501ACe0f576fc4ef9C0380AA46A578eA96b85776";
 const UWP_ADDRESS                       = "0x501ACEb41708De16FbedE3b31f3064919E9d7F23";
 const UWE_ADDRESS                       = "0x501ACE809013C8916CAAe439e9653bc436172919";
-const REVENUE_ROUTER_ADDRESS            = "0x501AcE0e8D16B92236763E2dEd7aE3bc2DFfA276";
-const UNDERWRITING_LOCKER_ADDRESS       = "0x501ACeC465fEbc1b1b936Bdc937A9FD28F6E6E7E";
-const GAUGE_CONTROLLER_ADDRESS          = "0x501acEB8a1D613D4aa1CD101881174bFAFAF1700";
-const UNDERWRITING_LOCK_VOTING_ADDRESS  = "0x501AcE58312fa3EED60fc38Ce0E5562112E72dF0";
-const DEPOSIT_HELPER_ADDRESS            = "0x501ACE3b845e959fa9b4C06e71973d9AB13853F3";
+const REVENUE_ROUTER_ADDRESS            = "0x501aceB2Ff39b3aC0189ba1ACe497C3dAB486F7B";
+const UNDERWRITING_LOCKER_ADDRESS       = "0x501aCeFC6a6ff5Aa21c27D7D9D58bedCA94f7BC9";
+const GAUGE_CONTROLLER_ADDRESS          = "0x501acE57a87C6B4Eec1BfD2fF2d600F65C2875aB";
+const UNDERWRITING_LOCK_VOTING_ADDRESS  = "0x501ACe9cc96E4eE51a4c2098d040EE15F6f3e77F";
+const DEPOSIT_HELPER_ADDRESS            = "0x501acE1652Cb4d7386cdaBCd84CdE26C811F3520";
+const BRIBE_CONTROLLER_ADDRESS          = "0x501Ace5093F43FBF578d081f2d93B5f42e905f90";
 let GOVERNOR_ADDRESS: string;
 
 let artifacts: ArtifactImports;
@@ -43,6 +44,7 @@ let underwritingLocker: UnderwritingLocker;
 let voting: UnderwritingLockVoting;
 let gaugeController: GaugeController;
 let depositHelper: DepositHelper;
+let bribeController: BribeController;
 
 let signerAddress: string;
 let networkSettings: any;
@@ -67,15 +69,17 @@ async function main() {
 
   registry = (await ethers.getContractAt(artifacts.Registry.abi, REGISTRY_ADDRESS)) as Registry;
 
-  await setRegistry1(); // Set 'uwe' in the registry
+  //await setRegistry1(); // Set 'uwe' in the registry
   await deployUnderwritingLocker();
   await deployGaugeController();
-  await setRegistry2(); // Set 'revenueRouter', 'underwritingLocker' and 'gaugeController' in the registry
+  //await setRegistry2(); // Set 'revenueRouter', 'underwritingLocker' and 'gaugeController' in the registry
   await deployUnderwritingLockVoting();
-  await gaugeSetup();
-  await addGauges();
+  //await gaugeSetup();
   await deployDepositHelper();
-  await setRegistry3(); // Set registry contract
+  //await setRegistry3(); // set 'underwritingLockVoting' in the registry
+  await deployBribeController();
+  //await setBribeController();
+  //await updateRegistry(); // post update to registry contract
 
   // log addresses
   await logAddresses();
@@ -148,22 +152,6 @@ async function gaugeSetup() {
     await tx4.wait(networkSettings.confirmations);
 }
 
-async function addGauges() {
-  console.log("Adding gauges to GaugeController");
-  let rol = BN.from(10).pow(18).mul(250).div(10000); // 2.5%
-  let appIDs = ["aurora-plus", "aurigami", "bastion-protocol", "bluebit", "trisolaris", "vaporwave-finance"];
-  let len = (await gaugeController.totalGauges()).toNumber();
-  if(len > 0) {
-    console.log(`${len} gauges already found. skipping`);
-    return;
-  }
-  for(let i = 0; i < appIDs.length; ++i) {
-    let tx = await gaugeController.connect(deployer).addGauge(appIDs[i], rol, networkSettings.overrides);
-    await tx.wait(networkSettings.confirmations);
-  }
-  console.log("Added gauges to GaugeController");
-}
-
 async function deployDepositHelper() {
   if(await isDeployed(DEPOSIT_HELPER_ADDRESS)) {
     depositHelper = (await ethers.getContractAt(artifacts.DepositHelper.abi, DEPOSIT_HELPER_ADDRESS)) as DepositHelper;
@@ -176,12 +164,47 @@ async function deployDepositHelper() {
 }
 
 async function setRegistry3() {
-  console.log("Setting registry");
+    console.log("Setting 'underwritingLockVoting' in the Registry.")
+    const keys = ["underwritingLockVoting"];
+    const values = [voting.address];
+    let tx = await registry.connect(deployer).set(keys, values, networkSettings.overrides);
+    await tx.wait(networkSettings.confirmations);
+    console.log("Set 'underwritingLockVoting' in the Registry.")
+}
+
+async function deployBribeController() {
+  if(await isDeployed(BRIBE_CONTROLLER_ADDRESS)) {
+    bribeController = (await ethers.getContractAt(artifacts.BribeController.abi, BRIBE_CONTROLLER_ADDRESS)) as BribeController;
+  } else {
+    console.log("Deploying BribeController");
+    const res = await create2Contract(deployer, artifacts.BribeController, [signerAddress, REGISTRY_ADDRESS], {}, "", DEPLOYER_CONTRACT_ADDRESS);
+    bribeController = (await ethers.getContractAt(artifacts.BribeController.abi, res.address)) as BribeController;
+    console.log(`Deployed BribeController to ${bribeController.address}`);
+  }
+}
+
+async function setBribeController() {
+  console.log("Setting BribeController in UnderwritingLockVoting");
+  let res = await registry.tryGet("bribeController");
+  if(res.value != bribeController.address) {
+    let tx1 = await registry.connect(deployer).set(["bribeController"], [bribeController.address], networkSettings.overrides);
+    await tx1.wait(networkSettings.confirmations);
+  }
+  let bc = await voting.bribeController();
+  if(bc != bribeController.address) {
+    let tx2 = await voting.connect(deployer).setBribeController(networkSettings.overrides);
+    await tx2.wait(networkSettings.confirmations);
+  }
+  console.log("Set BribeController in UnderwritingLockVoting");
+}
+
+async function updateRegistry() {
+  console.log("Updating registry");
   let tx1 = await underwritingLocker.connect(deployer).setRegistry(registry.address, networkSettings.overrides);
   await tx1.wait(networkSettings.confirmations);
   let tx2 = await voting.connect(deployer).setRegistry(registry.address, networkSettings.overrides);
   await tx2.wait(networkSettings.confirmations);
-  console.log("Set registry");
+  console.log("Updated registry");
 }
 
 async function logAddresses() {
@@ -192,6 +215,7 @@ async function logAddresses() {
   logContractAddress("GaugeController", gaugeController.address);
   logContractAddress("UnderwritingLockVoting", voting.address);
   logContractAddress("DepositHelper", depositHelper.address);
+  logContractAddress("BribeController", bribeController.address);
 }
 
 main()

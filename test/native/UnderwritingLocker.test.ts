@@ -1836,30 +1836,35 @@ describe("UnderwritingLocker", function () {
     const votingContractProxy = ethers.Wallet.createRandom().connect(provider);
 
     it("will revert if called by non voting-contract", async function () {
-      await expect(underwritingLocker.connect(governor).chargePremium(1, 1)).to.be.revertedWith("NotVotingContract");
+      await expect(underwritingLocker.connect(governor).chargePremium(user1.address, 1)).to.be.revertedWith("NotVotingContract");
     });
     it("will revert if attempt to charge more premium than exists in the lock", async function () {
       await registry.connect(governor).set(["underwritingLockVoting"], [votingContractProxy.address])
       await underwritingLocker.connect(governor).setVotingContract()
       expect(await underwritingLocker.votingContract()).eq(votingContractProxy.address)
-      await expect(underwritingLocker.connect(votingContractProxy).chargePremium(9, DEPOSIT_AMOUNT.mul(2))).to.be.reverted;
+      await expect(underwritingLocker.connect(votingContractProxy).chargePremium(user1.address, DEPOSIT_AMOUNT.mul(999))).to.be.reverted;
     });
     it("premium can be charged", async function () {
-      const LOCK_ID = 9;
+      const LOCK_ID_1 = 9;
+      const LOCK_ID_2 = 10;
       const PREMIUM_AMOUNT = DEPOSIT_AMOUNT.div(2)
-      const oldLockState = await getLockState(LOCK_ID)
+      const oldLockState1 = await getLockState(LOCK_ID_1)
+      const oldLockState2 = await getLockState(LOCK_ID_2)
 
       await user1.sendTransaction({to: votingContractProxy.address, value: ONE_ETHER}) // Send gas money
-      const tx = await underwritingLocker.connect(votingContractProxy).chargePremium(9, PREMIUM_AMOUNT)
-      const newLockState = await getLockState(LOCK_ID)
-      const lockStateChange = await getLockStateChange(newLockState, oldLockState)
-      expect(lockStateChange.amount).eq(PREMIUM_AMOUNT.mul(-1))
+      const tx = await underwritingLocker.connect(votingContractProxy).chargePremium(user1.address, PREMIUM_AMOUNT.mul(2))
+      const newLockState1 = await getLockState(LOCK_ID_1)
+      const newLockState2 = await getLockState(LOCK_ID_2)
+      const lockStateChange1 = await getLockStateChange(newLockState1, oldLockState1)
+      const lockStateChange2 = await getLockStateChange(newLockState2, oldLockState2)
+      expect(lockStateChange1.amount).eq(PREMIUM_AMOUNT.mul(-1))
+      expect(lockStateChange2.amount).eq(PREMIUM_AMOUNT.mul(-1))
     });
     it("if attempt to charge premium for non-existent lock, call will succeed but state will not change", async function () {
       const LOCK_ID = 1;
       const oldGlobalState = await getGlobalState()
       const oldUserState = await getUserState(user1)
-      const tx = await underwritingLocker.connect(votingContractProxy).chargePremium(LOCK_ID, 1)
+      const tx = await underwritingLocker.connect(votingContractProxy).chargePremium(user2.address, 1)
       expect(await underwritingLocker.exists(LOCK_ID)).eq(false)
       const newGlobalState = await getGlobalState()
       const newUserState = await getUserState(user1)
